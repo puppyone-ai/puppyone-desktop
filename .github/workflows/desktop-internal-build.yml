@@ -1,0 +1,84 @@
+name: Desktop Internal Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_r2:
+        description: Upload release files to Cloudflare R2
+        type: boolean
+        default: true
+      r2_prefix:
+        description: R2 object prefix
+        type: string
+        default: desktop/internal/mac
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    name: macOS unsigned package
+    runs-on: macos-latest
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      R2_BUCKET: puppyone-desktop
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build unsigned macOS package
+        run: npm run dist:mac
+
+      - name: Upload GitHub artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: puppyone-macos-unsigned-${{ github.run_number }}
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.yml
+            release/*.blockmap
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload to Cloudflare R2
+        if: ${{ inputs.upload_r2 }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_PREFIX: ${{ inputs.r2_prefix }}
+        run: |
+          set -euo pipefail
+          : "${AWS_ACCESS_KEY_ID:?Set the R2_ACCESS_KEY_ID repository secret}"
+          : "${AWS_SECRET_ACCESS_KEY:?Set the R2_SECRET_ACCESS_KEY repository secret}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Set the CLOUDFLARE_ACCOUNT_ID repository secret}"
+          if ! command -v aws >/dev/null 2>&1; then
+            brew install awscli
+          fi
+
+          aws s3 sync release "s3://${R2_BUCKET}/${R2_PREFIX}" \
+            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+            --exclude "*" \
+            --include "*.dmg" \
+            --include "*.zip" \
+            --include "*.yml" \
+            --include "*.blockmap" \
+            --cache-control "public, max-age=300"
+
+          if [ -f release/latest-mac.yml ]; then
+            aws s3 cp release/latest-mac.yml "s3://${R2_BUCKET}/${R2_PREFIX}/latest-mac.yml" \
+              --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+              --content-type "text/yaml" \
+              --cache-control "no-cache"
+          fi
