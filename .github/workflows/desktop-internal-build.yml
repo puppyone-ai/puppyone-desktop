@@ -11,9 +11,17 @@ on:
         description: R2 object prefix
         type: string
         default: desktop/internal/mac
+      create_github_release:
+        description: Create a GitHub prerelease with the same files
+        type: boolean
+        default: true
+      release_tag:
+        description: Optional release tag. Defaults to v<package version>-internal.<run number>
+        type: string
+        default: ""
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   mac:
@@ -39,6 +47,22 @@ jobs:
       - name: Build unsigned macOS package
         run: npm run dist:mac
 
+      - name: Resolve release metadata
+        id: release_meta
+        env:
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
+          if [ -n "${INPUT_RELEASE_TAG}" ]; then
+            TAG="${INPUT_RELEASE_TAG}"
+          else
+            TAG="v${VERSION}-internal.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "name=puppyone ${VERSION} internal ${GITHUB_RUN_NUMBER}" >> "${GITHUB_OUTPUT}"
+
       - name: Upload GitHub artifact
         uses: actions/upload-artifact@v4
         with:
@@ -50,6 +74,41 @@ jobs:
             release/*.blockmap
           if-no-files-found: error
           retention-days: 30
+
+      - name: Create GitHub prerelease
+        if: ${{ inputs.create_github_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
+          RELEASE_NAME: ${{ steps.release_meta.outputs.name }}
+          R2_PREFIX: ${{ inputs.r2_prefix }}
+        run: |
+          set -euo pipefail
+          files=()
+          for pattern in release/*.dmg release/*.zip release/*.yml release/*.blockmap; do
+            for file in $pattern; do
+              [ -e "${file}" ] && files+=("${file}")
+            done
+          done
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No release files found."
+            exit 1
+          fi
+
+          NOTES="$(mktemp)"
+          {
+            echo "Unsigned internal macOS build."
+            echo
+            echo "Commit: ${GITHUB_SHA}"
+            echo "R2 prefix: ${R2_PREFIX}"
+            echo
+            echo "This build is not Developer ID signed or notarized. Use it for internal testing only."
+          } > "${NOTES}"
+          gh release create "${RELEASE_TAG}" "${files[@]}" \
+            --target "${GITHUB_SHA}" \
+            --title "${RELEASE_NAME}" \
+            --notes-file "${NOTES}" \
+            --prerelease
 
       - name: Upload to Cloudflare R2
         if: ${{ inputs.upload_r2 }}
