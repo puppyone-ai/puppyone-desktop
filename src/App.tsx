@@ -94,7 +94,7 @@ export function App() {
     cloudSession,
     cloudSessionRestoring,
     handleCloudSessionChange: updateCloudSession,
-  } = useDesktopCloudSession();
+  } = useDesktopCloudSession(preferences.cloudEnabled);
   const [activeCloudSection, setActiveCloudSection] = useState<CloudWorkspaceSection>("overview");
   const [pendingCloudBackupSetup, setPendingCloudBackupSetup] = useState(false);
   const [cloudBackupLoading, setCloudBackupLoading] = useState(false);
@@ -102,6 +102,7 @@ export function App() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const {
     aiEditAssistEnabled,
+    cloudEnabled,
     explorerWidth,
     fileIconTheme,
     filesVisibilitySettings,
@@ -223,6 +224,16 @@ export function App() {
   const cloudWorkspaceAvailable = useMemo(() => Boolean(cloudSession), [cloudSession]);
 
   useEffect(() => {
+    if (!cloudEnabled && activeView === "cloud") {
+      setActiveView("data");
+      setActiveCloudSection("overview");
+      setPendingCloudBackupSetup(false);
+      setCloudBackupLoading(false);
+      setCloudBackupError(null);
+    }
+  }, [activeView, cloudEnabled]);
+
+  useEffect(() => {
     const preventFileDropNavigation = (event: DragEvent) => {
       event.preventDefault();
     };
@@ -296,6 +307,13 @@ export function App() {
   }, [activateWorkspace]);
 
   const navigateDesktopView = useCallback((view: DesktopView) => {
+    if (view === "cloud" && !cloudEnabled) {
+      setActiveView("data");
+      setSidebarCollapsed(false);
+      setSwitcherOpen(false);
+      return;
+    }
+
     if (view === "cloud") {
       if (cloudSessionRestoring && !cloudWorkspaceAvailable) {
         setActiveView("cloud");
@@ -308,7 +326,7 @@ export function App() {
     setActiveView(view);
     setSidebarCollapsed(false);
     setSwitcherOpen(false);
-  }, [cloudSessionRestoring, cloudWorkspaceAvailable]);
+  }, [cloudEnabled, cloudSessionRestoring, cloudWorkspaceAvailable]);
 
   const handleActiveDataPathChange = useCallback((path: string | null) => {
     setActiveDataPath(path);
@@ -358,6 +376,8 @@ export function App() {
   };
 
   const handleCloudSessionChange = useCallback((session: DesktopCloudSession | null) => {
+    if (!cloudEnabled) return;
+
     updateCloudSession(session);
     if (!session) {
       setActiveView("cloud");
@@ -365,9 +385,10 @@ export function App() {
       setSidebarCollapsed(false);
       setSwitcherOpen(false);
     }
-  }, [updateCloudSession]);
+  }, [cloudEnabled, updateCloudSession]);
 
   const handleConfigureCloudRemote = useCallback(async (remoteUrl: string) => {
+    if (!cloudEnabled) return null;
     if (!workspace) return null;
     const nextStatus = await configureWorkspaceCloudRemote(workspace.path, remoteUrl, "puppyone");
     const branch = nextStatus.branch && nextStatus.branch !== "detached" ? nextStatus.branch : null;
@@ -394,9 +415,10 @@ export function App() {
     applyGitStatus(nextStatus, workspace.path);
     refreshWorkspaceContent();
     return nextStatus;
-  }, [applyGitStatus, handlePuppyoneConfigChange, puppyoneConfig, refreshWorkspaceContent, workspace]);
+  }, [applyGitStatus, cloudEnabled, handlePuppyoneConfigChange, puppyoneConfig, refreshWorkspaceContent, workspace]);
 
   const createPuppyoneCloudBackup = useCallback(async (session: DesktopCloudSession) => {
+    if (!cloudEnabled) return false;
     if (!workspace) return false;
 
     setCloudBackupLoading(true);
@@ -482,6 +504,7 @@ export function App() {
     activeGitStatus,
     applyGitStatus,
     clearGitSelection,
+    cloudEnabled,
     handleCloudSessionChange,
     handlePuppyoneConfigChange,
     puppyoneConfig,
@@ -490,6 +513,8 @@ export function App() {
   ]);
 
   const handleStartPuppyoneBackup = useCallback(() => {
+    if (!cloudEnabled) return;
+
     setPendingCloudBackupSetup(true);
     setCloudBackupError(null);
     setGitOperationError(null);
@@ -500,12 +525,13 @@ export function App() {
       setSidebarCollapsed(false);
       setSwitcherOpen(false);
     }
-  }, [cloudSession]);
+  }, [cloudEnabled, cloudSession]);
 
   useEffect(() => {
+    if (!cloudEnabled) return;
     if (!pendingCloudBackupSetup || !cloudSession || cloudBackupLoading) return;
     void createPuppyoneCloudBackup(cloudSession);
-  }, [cloudBackupLoading, cloudSession, createPuppyoneCloudBackup, pendingCloudBackupSetup]);
+  }, [cloudBackupLoading, cloudEnabled, cloudSession, createPuppyoneCloudBackup, pendingCloudBackupSetup]);
 
   useEffect(() => {
     if (!workspace || !window.puppyoneDesktop?.watchWorkspace) return undefined;
@@ -864,10 +890,12 @@ export function App() {
             backupError: cloudBackupError,
             backupLoading: cloudBackupLoading,
             cloudSession,
+            enabled: cloudEnabled,
             sessionRestoring: cloudSessionRestoring,
             onCloudSessionChange: handleCloudSessionChange,
             onConfigureCloudRemote: handleConfigureCloudRemote,
             onOpenDetails: () => {
+              if (!cloudEnabled) return;
               setActiveView("cloud");
               setActiveCloudSection("overview");
               setSidebarCollapsed(false);

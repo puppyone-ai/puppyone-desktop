@@ -10,6 +10,7 @@ export function PuppyoneWorkspaceConfigSettings({
   remotes,
   branches,
   currentBranchName,
+  cloudEnabled,
   loading,
   saving,
   error,
@@ -19,12 +20,13 @@ export function PuppyoneWorkspaceConfigSettings({
   remotes: GitRemoteSummary[];
   branches: GitStatusSnapshot["branches"];
   currentBranchName: string | null;
+  cloudEnabled: boolean;
   loading: boolean;
   saving: boolean;
   error: string | null;
   onChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
 }) {
-  const [draft, setDraft] = useState<PuppyoneWorkspaceConfig>(() => normalizePuppyoneConfigDraft(config));
+  const [draft, setDraft] = useState<PuppyoneWorkspaceConfig>(() => normalizePuppyoneConfigDraft(config, cloudEnabled));
   const [localError, setLocalError] = useState<string | null>(null);
   const remoteNames = remotes.map((remote) => remote.name);
   const branchNames = branches
@@ -32,18 +34,18 @@ export function PuppyoneWorkspaceConfigSettings({
     .map((branch) => branch.name);
   const watchedBranchListId = "desktop-puppyone-watched-branch-options";
   const backupBranchListId = "desktop-puppyone-backup-branch-options";
-  const normalizedDraft = normalizePuppyoneConfigDraft(draft);
-  const savedConfig = normalizePuppyoneConfigDraft(config);
+  const normalizedDraft = normalizePuppyoneConfigDraft(draft, cloudEnabled);
+  const savedConfig = normalizePuppyoneConfigDraft(config, cloudEnabled);
   const dirty = !samePuppyoneConfig(normalizedDraft, savedConfig);
 
   useEffect(() => {
-    setDraft(normalizePuppyoneConfigDraft(config));
+    setDraft(normalizePuppyoneConfigDraft(config, cloudEnabled));
     setLocalError(null);
-  }, [config]);
+  }, [cloudEnabled, config]);
 
   const updateSourceOfTruthConfig = (nextSourceOfTruth: Partial<PuppyoneWorkspaceConfig["sync"]["sourceOfTruth"]>) => {
     setDraft((current) => {
-      const normalized = normalizePuppyoneConfigDraft(current);
+      const normalized = normalizePuppyoneConfigDraft(current, cloudEnabled);
       const sourceOfTruth = {
         ...normalized.sync.sourceOfTruth,
         ...nextSourceOfTruth,
@@ -64,7 +66,7 @@ export function PuppyoneWorkspaceConfigSettings({
 
   const updateBackupConfig = (nextBackup: Partial<PuppyoneWorkspaceConfig["backup"]>) => {
     setDraft((current) => {
-      const normalized = normalizePuppyoneConfigDraft(current);
+      const normalized = normalizePuppyoneConfigDraft(current, cloudEnabled);
       return {
         ...normalized,
         backup: {
@@ -77,7 +79,7 @@ export function PuppyoneWorkspaceConfigSettings({
 
   const updateCloudConfig = (nextCloud: Partial<PuppyoneWorkspaceConfig["cloud"]>) => {
     setDraft((current) => {
-      const normalized = normalizePuppyoneConfigDraft(current);
+      const normalized = normalizePuppyoneConfigDraft(current, cloudEnabled);
       return {
         ...normalized,
         cloud: {
@@ -92,7 +94,7 @@ export function PuppyoneWorkspaceConfigSettings({
     setLocalError(null);
     try {
       const saved = await onChange(normalizedDraft);
-      if (saved) setDraft(normalizePuppyoneConfigDraft(saved));
+      if (saved) setDraft(normalizePuppyoneConfigDraft(saved, cloudEnabled));
     } catch (saveError) {
       setLocalError(saveError instanceof Error ? saveError.message : String(saveError));
     }
@@ -119,14 +121,14 @@ export function PuppyoneWorkspaceConfigSettings({
               value={draft.sync.sourceOfTruth.service}
               disabled={saving}
               onChange={(event) => {
-                const service = normalizeBackendServiceDraft(event.target.value);
+                const service = normalizeBackendServiceDraft(event.target.value, cloudEnabled);
                 updateSourceOfTruthConfig({
                   service,
                   remote: inferBackupRemote(service, remotes, draft.sync.sourceOfTruth.remote),
                 });
               }}
             >
-              <option value="puppyone">PuppyOne Cloud</option>
+              {cloudEnabled && <option value="puppyone">PuppyOne Cloud</option>}
               <option value="github">GitHub</option>
               <option value="custom">Custom remote</option>
             </select>
@@ -196,14 +198,14 @@ export function PuppyoneWorkspaceConfigSettings({
               value={draft.backup.service}
               disabled={saving}
               onChange={(event) => {
-                const service = normalizeBackendServiceDraft(event.target.value);
+                const service = normalizeBackendServiceDraft(event.target.value, cloudEnabled);
                 updateBackupConfig({
                   service,
                   remote: inferBackupRemote(service, remotes, draft.backup.remote),
                 });
               }}
             >
-              <option value="puppyone">PuppyOne Cloud</option>
+              {cloudEnabled && <option value="puppyone">PuppyOne Cloud</option>}
               <option value="github">GitHub</option>
               <option value="custom">Custom remote</option>
             </select>
@@ -247,19 +249,21 @@ export function PuppyoneWorkspaceConfigSettings({
             </datalist>
           </label>
 
-          <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
-            <span className="desktop-settings-label-stack">
-              <strong>Cloud project id</strong>
-              <small>Non-secret project identifier for PuppyOne Cloud.</small>
-            </span>
-            <input
-              className="desktop-settings-text-input"
-              value={draft.cloud.projectId ?? ""}
-              placeholder="Not set"
-              disabled={saving}
-              onChange={(event) => updateCloudConfig({ projectId: normalizeSettingsText(event.target.value) })}
-            />
-          </label>
+          {cloudEnabled && (
+            <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
+              <span className="desktop-settings-label-stack">
+                <strong>Cloud project id</strong>
+                <small>Non-secret project identifier for PuppyOne Cloud.</small>
+              </span>
+              <input
+                className="desktop-settings-text-input"
+                value={draft.cloud.projectId ?? ""}
+                placeholder="Not set"
+                disabled={saving}
+                onChange={(event) => updateCloudConfig({ projectId: normalizeSettingsText(event.target.value) })}
+              />
+            </label>
+          )}
 
           <div className="desktop-puppyone-config-footer">
             <span>{error ?? localError ?? (dirty ? "Unsaved changes" : "Config is up to date")}</span>
@@ -290,8 +294,11 @@ export function PuppyoneWorkspaceConfigSettings({
   );
 }
 
-function normalizePuppyoneConfigDraft(config: PuppyoneWorkspaceConfig | null): PuppyoneWorkspaceConfig {
-  const sourceOfTruthService = normalizeBackendServiceDraft(config?.sync?.sourceOfTruth?.service ?? config?.backup?.service);
+function normalizePuppyoneConfigDraft(config: PuppyoneWorkspaceConfig | null, cloudEnabled = true): PuppyoneWorkspaceConfig {
+  const sourceOfTruthService = normalizeBackendServiceDraft(
+    config?.sync?.sourceOfTruth?.service ?? config?.backup?.service,
+    cloudEnabled,
+  );
   const sourceOfTruthRemote =
     normalizeSettingsText(config?.sync?.sourceOfTruth?.remote)
     ?? normalizeSettingsText(config?.git?.primaryRemote)
@@ -316,7 +323,7 @@ function normalizePuppyoneConfigDraft(config: PuppyoneWorkspaceConfig | null): P
     },
     backup: {
       enabled: config?.backup?.enabled === true,
-      service: normalizeBackendServiceDraft(config?.backup?.service ?? sourceOfTruthService),
+      service: normalizeBackendServiceDraft(config?.backup?.service ?? sourceOfTruthService, cloudEnabled),
       remote: normalizeSettingsText(config?.backup?.remote) ?? sourceOfTruthRemote,
       branch: normalizeSettingsText(config?.backup?.branch) ?? sourceOfTruthBranch,
     },
@@ -340,8 +347,9 @@ function samePuppyoneConfig(left: PuppyoneWorkspaceConfig, right: PuppyoneWorksp
     && left.cloud.projectId === right.cloud.projectId;
 }
 
-function normalizeBackendServiceDraft(value: string | null | undefined): PuppyoneBackendService {
-  return value === "github" || value === "custom" || value === "puppyone" ? value : "puppyone";
+function normalizeBackendServiceDraft(value: string | null | undefined, cloudEnabled = true): PuppyoneBackendService {
+  if (value === "puppyone") return cloudEnabled ? "puppyone" : "github";
+  return value === "github" || value === "custom" ? value : "github";
 }
 
 function inferBackupRemote(

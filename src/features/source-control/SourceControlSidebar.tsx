@@ -51,6 +51,7 @@ export type GitSidebarProps = {
   onPublish: () => Promise<boolean>;
   cloudBackupLoading: boolean;
   cloudBackupError: string | null;
+  cloudEnabled?: boolean;
   onStartPuppyoneBackup: () => void;
   onInitializeRepository: () => Promise<boolean>;
 };
@@ -108,6 +109,7 @@ export function GitSidebar({
   onPublish,
   cloudBackupLoading,
   cloudBackupError,
+  cloudEnabled = true,
   onStartPuppyoneBackup,
   onInitializeRepository,
 }: GitSidebarProps) {
@@ -530,6 +532,7 @@ export function GitSidebar({
                 cloudBackupLoading={cloudBackupLoading}
                 cloudBackupError={cloudBackupError}
                 dismissed={backupCardDismissed}
+                cloudEnabled={cloudEnabled}
                 onDismiss={() => setBackupCardDismissed(true)}
                 onStartPuppyoneBackup={onStartPuppyoneBackup}
               />
@@ -637,6 +640,7 @@ function GitRemotePrompt({
   cloudBackupLoading,
   cloudBackupError,
   dismissed,
+  cloudEnabled,
   onDismiss,
   onStartPuppyoneBackup,
 }: {
@@ -645,9 +649,12 @@ function GitRemotePrompt({
   cloudBackupLoading: boolean;
   cloudBackupError: string | null;
   dismissed: boolean;
+  cloudEnabled: boolean;
   onDismiss: () => void;
   onStartPuppyoneBackup: () => void;
 }) {
+  if (!cloudEnabled) return null;
+
   if (state.setupRequired) {
     if (dismissed && !cloudBackupError) return null;
 

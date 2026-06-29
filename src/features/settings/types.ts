@@ -2,7 +2,7 @@ import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import type { FilesVisibilitySettings, GitDisplayMode, RightSidebarToolsSettings, SidebarNavigationLayout, ThemeMode } from "../../preferences";
 
-export type SettingsSection = "workspace" | "editor" | "git" | "appearance" | "files";
+export type SettingsSection = "workspace" | "cloud" | "editor" | "git" | "appearance" | "files";
 
 export type SettingsViewProps = {
   workspace: Workspace;
@@ -17,6 +17,7 @@ export type SettingsViewProps = {
   filesVisibilitySettings: FilesVisibilitySettings;
   rightSidebarToolsSettings: RightSidebarToolsSettings;
   aiEditAssistEnabled: boolean;
+  cloudEnabled: boolean;
   puppyoneConfig: PuppyoneWorkspaceConfig | null;
   puppyoneConfigLoading: boolean;
   puppyoneConfigSaving: boolean;
@@ -29,6 +30,7 @@ export type SettingsViewProps = {
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
   onRightSidebarToolsSettingsChange: (settings: RightSidebarToolsSettings) => void;
   onAiEditAssistEnabledChange: (enabled: boolean) => void;
+  onCloudEnabledChange: (enabled: boolean) => void;
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
   onUnlinkWorkspace: () => Promise<void>;
   onRefreshGitStatus: () => void;

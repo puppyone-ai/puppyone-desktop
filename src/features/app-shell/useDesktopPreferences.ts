@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
+  CLOUD_ENABLED_STORAGE_KEY,
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
   GIT_DISPLAY_MODE_STORAGE_KEY,
@@ -21,6 +22,7 @@ import {
   RIGHT_SIDEBAR_WIDTH_STORAGE_KEY,
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   readInitialAiEditAssistEnabled,
+  readInitialCloudEnabled,
   readInitialExplorerWidth,
   readInitialFileIconTheme,
   readInitialFilesVisibilitySettings,
@@ -41,6 +43,7 @@ export function useDesktopPreferences() {
   const [filesVisibilitySettings, setFilesVisibilitySettings] = useState<FilesVisibilitySettings>(() => readInitialFilesVisibilitySettings());
   const [rightSidebarToolsSettings, setRightSidebarToolsSettings] = useState<RightSidebarToolsSettings>(() => readInitialRightSidebarToolsSettings());
   const [aiEditAssistEnabled, setAiEditAssistEnabled] = useState(() => readInitialAiEditAssistEnabled());
+  const [cloudEnabled, setCloudEnabled] = useState(() => readInitialCloudEnabled());
   const [explorerWidth, setExplorerWidth] = useState(() => readInitialExplorerWidth());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readInitialSidebarCollapsed());
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
@@ -76,6 +79,10 @@ export function useDesktopPreferences() {
   }, [aiEditAssistEnabled]);
 
   useEffect(() => {
+    window.localStorage.setItem(CLOUD_ENABLED_STORAGE_KEY, cloudEnabled ? "true" : "false");
+  }, [cloudEnabled]);
+
+  useEffect(() => {
     window.localStorage.setItem(EXPLORER_WIDTH_STORAGE_KEY, String(explorerWidth));
   }, [explorerWidth]);
 
@@ -107,6 +114,7 @@ export function useDesktopPreferences() {
 
   return {
     aiEditAssistEnabled,
+    cloudEnabled,
     explorerWidth,
     fileIconTheme,
     filesVisibilitySettings,
@@ -123,6 +131,7 @@ export function useDesktopPreferences() {
     terminalToolEnabled,
     themeMode,
     setAiEditAssistEnabled,
+    setCloudEnabled,
     setExplorerWidth,
     setFileIconTheme,
     setFilesVisibilitySettings,

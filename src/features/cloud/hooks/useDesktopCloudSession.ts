@@ -7,13 +7,20 @@ import {
   type DesktopCloudSession,
 } from "../../../lib/cloudSession";
 
-export function useDesktopCloudSession() {
-  const [cloudSession, setCloudSession] = useState<DesktopCloudSession | null>(() => getCachedDesktopCloudSession());
-  const [cloudSessionRestoring, setCloudSessionRestoring] = useState(true);
+export function useDesktopCloudSession(enabled = true) {
+  const [cloudSession, setCloudSession] = useState<DesktopCloudSession | null>(() => enabled ? getCachedDesktopCloudSession() : null);
+  const [cloudSessionRestoring, setCloudSessionRestoring] = useState(enabled);
 
   useEffect(() => {
     let cancelled = false;
 
+    if (!enabled) {
+      setCloudSession(null);
+      setCloudSessionRestoring(false);
+      return undefined;
+    }
+
+    setCloudSessionRestoring(true);
     const unsubscribe = onDesktopCloudSessionChanged((session) => {
       if (!cancelled) setCloudSession(session);
     });
@@ -35,16 +42,17 @@ export function useDesktopCloudSession() {
       cancelled = true;
       unsubscribe();
     };
-  }, []);
+  }, [enabled]);
 
   const handleCloudSessionChange = useCallback((session: DesktopCloudSession | null) => {
+    if (!enabled) return;
     setCloudSession(session);
     if (!session) {
       void clearDesktopCloudSession().catch(() => {
         setCloudSession(null);
       });
     }
-  }, []);
+  }, [enabled]);
 
   return {
     cloudSession,

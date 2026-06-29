@@ -25,7 +25,7 @@ const DEFAULT_PUPPYONE_WORKSPACE_CONFIG = Object.freeze({
   version: 1,
   sync: {
     sourceOfTruth: {
-      service: "puppyone",
+      service: "github",
       remote: null,
       branch: null,
     },
@@ -36,7 +36,7 @@ const DEFAULT_PUPPYONE_WORKSPACE_CONFIG = Object.freeze({
   },
   backup: {
     enabled: false,
-    service: "puppyone",
+    service: "github",
     remote: null,
     branch: null,
   },
@@ -1964,7 +1964,7 @@ function normalizePuppyoneWorkspaceConfig(value, options = {}) {
 }
 
 function normalizeBackendService(value) {
-  return value === "github" || value === "custom" || value === "puppyone" ? value : "puppyone";
+  return value === "github" || value === "custom" || value === "puppyone" ? value : "github";
 }
 
 function normalizeOptionalConfigText(value) {

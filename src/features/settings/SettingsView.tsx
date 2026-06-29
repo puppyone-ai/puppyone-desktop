@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, FileText, GitBranch, GripVertical, Monitor, Moon, PanelBottom, PanelTop, Pencil, RefreshCw, Settings, ShieldCheck, SquareTerminal, Sun, Unlink } from "lucide-react";
+import { Check, Cloud, Copy, FileText, GitBranch, GripVertical, Monitor, Moon, PanelBottom, PanelTop, Pencil, RefreshCw, Settings, ShieldCheck, SquareTerminal, Sun, Unlink } from "lucide-react";
 import { FILE_ICON_THEMES, FileGlyphIcon } from "@puppyone/shared-ui";
 import { DesktopUpdateSettingsRow } from "../../components/DesktopUpdateControls";
 import { DEFAULT_EXPLORER_EXCLUDE_PATTERNS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, normalizeExplorerExcludePatterns, type FilesVisibilitySettings, type RightSidebarToolId } from "../../preferences";
@@ -35,6 +35,7 @@ export function SettingsView({
   filesVisibilitySettings,
   rightSidebarToolsSettings,
   aiEditAssistEnabled,
+  cloudEnabled,
   puppyoneConfig,
   puppyoneConfigLoading,
   puppyoneConfigSaving,
@@ -47,6 +48,7 @@ export function SettingsView({
   onFilesVisibilitySettingsChange,
   onRightSidebarToolsSettingsChange,
   onAiEditAssistEnabledChange,
+  onCloudEnabledChange,
   onPuppyoneConfigChange,
   onUnlinkWorkspace,
   onRefreshGitStatus,
@@ -102,6 +104,7 @@ export function SettingsView({
         puppyoneConfigLoading={puppyoneConfigLoading}
         puppyoneConfigSaving={puppyoneConfigSaving}
         puppyoneConfigError={puppyoneConfigError}
+        cloudEnabled={cloudEnabled}
         onCopyRemoteUrl={copyRemoteUrl}
         onPuppyoneConfigChange={onPuppyoneConfigChange}
         onRefresh={onRefreshGitStatus}
@@ -114,6 +117,15 @@ export function SettingsView({
       <FilesSettingsView
         settings={filesVisibilitySettings}
         onChange={onFilesVisibilitySettingsChange}
+      />
+    );
+  }
+
+  if (activeSection === "cloud") {
+    return (
+      <CloudSettingsView
+        enabled={cloudEnabled}
+        onEnabledChange={onCloudEnabledChange}
       />
     );
   }
@@ -370,6 +382,40 @@ function EditorSettingsView({
   );
 }
 
+function CloudSettingsView({
+  enabled,
+  onEnabledChange,
+}: {
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+}) {
+  return (
+    <section className="desktop-utility-view desktop-settings-view">
+      <div className="desktop-utility-body desktop-settings-body">
+        <div className="desktop-settings-section">
+          <SettingsSectionHeader title="Cloud" detail="Local Cloud preference for this device." />
+          <div className="desktop-settings-list">
+            <div className="desktop-settings-row desktop-settings-row-control">
+              <span className="desktop-settings-label-stack">
+                <strong>Enable Cloud</strong>
+                <small>Show Cloud in the sidebar and enable Cloud backup actions.</small>
+              </span>
+              <label className="desktop-settings-switch">
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={(event) => onEnabledChange(event.target.checked)}
+                />
+                <span aria-hidden="true" />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function FilesSettingsView({
   settings,
   onChange,
@@ -491,6 +537,7 @@ function GitSettingsView({
   puppyoneConfigLoading,
   puppyoneConfigSaving,
   puppyoneConfigError,
+  cloudEnabled,
   onCopyRemoteUrl,
   onPuppyoneConfigChange,
   onRefresh,
@@ -504,6 +551,7 @@ function GitSettingsView({
   puppyoneConfigLoading: boolean;
   puppyoneConfigSaving: boolean;
   puppyoneConfigError: string | null;
+  cloudEnabled: boolean;
   onCopyRemoteUrl: (key: string, url: string) => Promise<void>;
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
   onRefresh: () => void;
@@ -556,48 +604,51 @@ function GitSettingsView({
                 remotes={remotes}
                 branches={status?.branches ?? []}
                 currentBranchName={status?.branch ?? null}
+                cloudEnabled={cloudEnabled}
                 loading={puppyoneConfigLoading}
                 saving={puppyoneConfigSaving}
                 error={puppyoneConfigError}
                 onChange={onPuppyoneConfigChange}
               />
 
-              <SettingsGroup title="puppyone remote">
-                <SettingsLine
-                  label="Status"
-                  value={cloudInfo ? "Connected" : "Not configured"}
-                  tone={cloudInfo ? "success" : undefined}
-                />
-                {cloudInfo ? (
-                  <>
-                    <SettingsLine label="Remote" value={cloudRemote?.name ?? "puppyone"} />
-                    <SettingsLine label="Host" value={cloudInfo.host} />
-                    <SettingsLine
-                      label={cloudInfo.kind === "access-point" ? "Access key" : "Project"}
-                      value={cloudInfo.displayId}
-                      monospace
-                    />
-                    <SettingsLine
-                      label="Git URL"
-                      value={cloudRemoteUrl ? maskRemoteUrl(cloudRemoteUrl) : "Not configured"}
-                      title={cloudRemoteUrl ?? undefined}
-                      monospace
-                      action={cloudRemoteUrl ? (
-                        <button
-                          className="desktop-settings-row-action"
-                          type="button"
-                          onClick={() => void onCopyRemoteUrl(cloudCopyKey, cloudRemoteUrl)}
-                        >
-                          <Copy size={13} />
-                          <span>{copiedRemoteKey === cloudCopyKey ? "Copied" : "Copy"}</span>
-                        </button>
-                      ) : undefined}
-                    />
-                  </>
-                ) : (
-                  <div className="desktop-settings-muted-row">Not configured</div>
-                )}
-              </SettingsGroup>
+              {cloudEnabled && (
+                <SettingsGroup title="puppyone remote">
+                  <SettingsLine
+                    label="Status"
+                    value={cloudInfo ? "Connected" : "Not configured"}
+                    tone={cloudInfo ? "success" : undefined}
+                  />
+                  {cloudInfo ? (
+                    <>
+                      <SettingsLine label="Remote" value={cloudRemote?.name ?? "puppyone"} />
+                      <SettingsLine label="Host" value={cloudInfo.host} />
+                      <SettingsLine
+                        label={cloudInfo.kind === "access-point" ? "Access key" : "Project"}
+                        value={cloudInfo.displayId}
+                        monospace
+                      />
+                      <SettingsLine
+                        label="Git URL"
+                        value={cloudRemoteUrl ? maskRemoteUrl(cloudRemoteUrl) : "Not configured"}
+                        title={cloudRemoteUrl ?? undefined}
+                        monospace
+                        action={cloudRemoteUrl ? (
+                          <button
+                            className="desktop-settings-row-action"
+                            type="button"
+                            onClick={() => void onCopyRemoteUrl(cloudCopyKey, cloudRemoteUrl)}
+                          >
+                            <Copy size={13} />
+                            <span>{copiedRemoteKey === cloudCopyKey ? "Copied" : "Copy"}</span>
+                          </button>
+                        ) : undefined}
+                      />
+                    </>
+                  ) : (
+                    <div className="desktop-settings-muted-row">Not configured</div>
+                  )}
+                </SettingsGroup>
+              )}
 
               <SettingsGroup title="Remotes">
                 {remotes.length === 0 ? (
@@ -653,6 +704,7 @@ function GitSettingsView({
 export function SettingsSidebar({ activeSection, onSelectSection }: SettingsSidebarProps) {
   const settingsSections = [
     { id: "workspace", label: "General", icon: Settings, disabled: false },
+    { id: "cloud", label: "Cloud", icon: Cloud, disabled: false },
     { id: "appearance", label: "Appearance", icon: Monitor, disabled: false },
     { id: "git", label: "Git", icon: GitBranch, disabled: false },
     { id: "files", label: "Git Ignore", icon: FileText, disabled: false },

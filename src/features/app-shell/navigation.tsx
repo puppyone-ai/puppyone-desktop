@@ -36,11 +36,13 @@ export function PuppyGitIcon({
 
 export function DesktopSidebarFooterNavigation({
   activeView,
+  cloudEnabled,
   gitIncomingCount,
   onNavigate,
   onOpenSettings,
 }: {
   activeView: DesktopView;
+  cloudEnabled?: boolean;
   gitIncomingCount: number;
   onNavigate: (view: DesktopView) => void;
   onOpenSettings: () => void;
@@ -60,26 +62,30 @@ export function DesktopSidebarFooterNavigation({
           onOpenSettings={onOpenSettings}
         />
       </div>
-      <div className="desktop-sidebar-footer-actions desktop-sidebar-footer-actions-cloud">
-        <DesktopSidebarIconNavigation
-          activeView={activeView}
-          items={DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS}
-          gitIncomingCount={gitIncomingCount}
-          onNavigate={onNavigate}
-        />
-      </div>
+      {cloudEnabled && (
+        <div className="desktop-sidebar-footer-actions desktop-sidebar-footer-actions-cloud">
+          <DesktopSidebarIconNavigation
+            activeView={activeView}
+            items={DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS}
+            gitIncomingCount={gitIncomingCount}
+            onNavigate={onNavigate}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
 export function DesktopSidebarTopNavigation({
   activeView,
+  cloudEnabled,
   orientation,
   gitIncomingCount,
   onNavigate,
   onOpenSettings,
 }: {
   activeView: DesktopView;
+  cloudEnabled?: boolean;
   orientation: SidebarNavigationOrientation;
   gitIncomingCount: number;
   onNavigate: (view: DesktopView) => void;
@@ -101,14 +107,16 @@ export function DesktopSidebarTopNavigation({
             onOpenSettings={onOpenSettings}
           />
         </div>
-        <div className="desktop-sidebar-top-navigation-group desktop-sidebar-top-navigation-cloud">
-          <DesktopSidebarButtonNavigation
-            activeView={activeView}
-            items={DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS}
-            gitIncomingCount={gitIncomingCount}
-            onNavigate={onNavigate}
-          />
-        </div>
+        {cloudEnabled && (
+          <div className="desktop-sidebar-top-navigation-group desktop-sidebar-top-navigation-cloud">
+            <DesktopSidebarButtonNavigation
+              activeView={activeView}
+              items={DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS}
+              gitIncomingCount={gitIncomingCount}
+              onNavigate={onNavigate}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

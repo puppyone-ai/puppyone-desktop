@@ -2,6 +2,7 @@ import { isFileIconThemeId, type FileIconThemeId } from "@puppyone/shared-ui";
 import type { PuppyoneWorkspaceConfig } from "../../types/electron";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
+  CLOUD_ENABLED_STORAGE_KEY,
   DEFAULT_SIDEBAR_NAVIGATION_LAYOUT,
   DEFAULT_THEME_MODE,
   FILES_VISIBILITY_STORAGE_KEY,
@@ -11,6 +12,7 @@ import {
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
   THEME_STORAGE_KEY,
   parseAiEditAssistEnabled,
+  parseCloudEnabled,
   parseFilesVisibilitySettings,
   parseGitDisplayMode,
   parseRightSidebarToolsSettings,
@@ -87,7 +89,7 @@ export function mergePuppyoneWorkspaceConfig(
 ): PuppyoneWorkspaceConfig {
   const currentSourceOfTruth = current?.sync?.sourceOfTruth;
   const sourceOfTruth = {
-    service: currentSourceOfTruth?.service ?? current?.backup?.service ?? "puppyone",
+    service: currentSourceOfTruth?.service ?? current?.backup?.service ?? "github",
     remote: currentSourceOfTruth?.remote ?? current?.git?.primaryRemote ?? current?.backup?.remote ?? null,
     branch: currentSourceOfTruth?.branch ?? current?.git?.watchedBranch ?? current?.backup?.branch ?? null,
     ...patch.sync?.sourceOfTruth,
@@ -121,6 +123,11 @@ export function mergePuppyoneWorkspaceConfig(
 export function readInitialAiEditAssistEnabled(): boolean {
   if (typeof window === "undefined") return parseAiEditAssistEnabled(null);
   return parseAiEditAssistEnabled(window.localStorage.getItem(AI_EDIT_ASSIST_STORAGE_KEY));
+}
+
+export function readInitialCloudEnabled(): boolean {
+  if (typeof window === "undefined") return parseCloudEnabled(null);
+  return parseCloudEnabled(window.localStorage.getItem(CLOUD_ENABLED_STORAGE_KEY));
 }
 
 export function readInitialExplorerWidth(): number {

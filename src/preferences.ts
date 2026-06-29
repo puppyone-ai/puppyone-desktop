@@ -26,6 +26,7 @@ export const FILES_VISIBILITY_STORAGE_KEY = "puppyone.desktop.filesVisibility";
 export const RIGHT_SIDEBAR_TOOLS_STORAGE_KEY = "puppyone.desktop.rightSidebarTools";
 export const AI_EDIT_ASSIST_STORAGE_KEY = "puppyone.desktop.aiEditAssist";
 export const GIT_DISPLAY_MODE_STORAGE_KEY = "puppyone.desktop.gitDisplayMode";
+export const CLOUD_ENABLED_STORAGE_KEY = "puppyone.desktop.cloudEnabled";
 
 export const DEFAULT_THEME_MODE: ThemeMode = "system";
 export const DEFAULT_GIT_DISPLAY_MODE: GitDisplayMode = "simple";
@@ -49,6 +50,7 @@ export const DEFAULT_RIGHT_SIDEBAR_TOOLS_SETTINGS: RightSidebarToolsSettings = {
   order: [...RIGHT_SIDEBAR_TOOL_IDS],
 };
 export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
+export const DEFAULT_CLOUD_ENABLED = false;
 
 export const SIDEBAR_NAVIGATION_LAYOUT_OPTIONS = [
   { value: "bottom-horizontal", label: "Bottom", placement: "bottom" },
@@ -129,6 +131,15 @@ export function parseAiEditAssistEnabled(value: string | null | undefined): bool
   if (value === "true") return true;
   if (value === "false") return false;
   return DEFAULT_AI_EDIT_ASSIST_ENABLED;
+}
+
+export function parseCloudEnabled(
+  value: string | null | undefined,
+  defaultEnabled = DEFAULT_CLOUD_ENABLED,
+): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return defaultEnabled;
 }
 
 function readRightSidebarToolEnabled(
