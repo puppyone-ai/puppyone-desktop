@@ -23,6 +23,21 @@ Recommended link policy:
 - The app auto-updater should use a Cloudflare-backed generic update feed after
   signing and notarization are enabled.
 
+Cloudflare should keep both versioned history and a fixed latest path:
+
+```text
+desktop/<channel>/mac/<release tag>/
+desktop/<channel>/mac/latest/
+```
+
+The versioned path is an archive. The `latest` path is overwritten on each
+release and should contain only the newest downloadable files. Product pages can
+therefore keep a stable URL such as:
+
+```text
+https://downloads.puppyone.ai/desktop/stable/mac/latest/puppyone-latest-arm64.dmg
+```
+
 ## GitHub Actions Secrets
 
 For Cloudflare R2 uploads, add these repository secrets:
@@ -39,10 +54,17 @@ The default R2 bucket is:
 puppyone-desktop
 ```
 
-The internal unsigned build workflow uploads to:
+The internal unsigned build workflow uses this base R2 prefix:
 
 ```text
 desktop/internal/mac
+```
+
+Each run uploads to both:
+
+```text
+desktop/internal/mac/<release tag>
+desktop/internal/mac/latest
 ```
 
 The stable production updater feed is configured in `package.json` as:
@@ -66,7 +88,8 @@ npm run dist:mac
 
 Artifacts are uploaded to GitHub Actions. If `create_github_release` is enabled,
 the same files are attached to a GitHub prerelease. If `upload_r2` is enabled,
-the files are also copied to Cloudflare R2.
+the files are also copied to Cloudflare R2 under both the versioned release tag
+and the fixed `latest` prefix.
 
 The default GitHub release tag is generated from the package version and run
 number:

@@ -8,7 +8,7 @@ on:
         type: boolean
         default: true
       r2_prefix:
-        description: R2 object prefix
+        description: Base R2 object prefix
         type: string
         default: desktop/internal/mac
       create_github_release:
@@ -100,7 +100,8 @@ jobs:
             echo "Unsigned internal macOS build."
             echo
             echo "Commit: ${GITHUB_SHA}"
-            echo "R2 prefix: ${R2_PREFIX}"
+            echo "R2 version prefix: ${R2_PREFIX}/${RELEASE_TAG}"
+            echo "R2 latest prefix: ${R2_PREFIX}/latest"
             echo
             echo "This build is not Developer ID signed or notarized. Use it for internal testing only."
           } > "${NOTES}"
@@ -117,16 +118,21 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           R2_PREFIX: ${{ inputs.r2_prefix }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
         run: |
           set -euo pipefail
           : "${AWS_ACCESS_KEY_ID:?Set the R2_ACCESS_KEY_ID repository secret}"
           : "${AWS_SECRET_ACCESS_KEY:?Set the R2_SECRET_ACCESS_KEY repository secret}"
           : "${CLOUDFLARE_ACCOUNT_ID:?Set the CLOUDFLARE_ACCOUNT_ID repository secret}"
+          : "${RELEASE_TAG:?Release tag is required}"
           if ! command -v aws >/dev/null 2>&1; then
             brew install awscli
           fi
 
-          aws s3 sync release "s3://${R2_BUCKET}/${R2_PREFIX}" \
+          VERSION_PREFIX="${R2_PREFIX}/${RELEASE_TAG}"
+          LATEST_PREFIX="${R2_PREFIX}/latest"
+
+          aws s3 sync release "s3://${R2_BUCKET}/${VERSION_PREFIX}" \
             --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" \
             --exclude "*" \
             --include "*.dmg" \
@@ -135,8 +141,40 @@ jobs:
             --include "*.blockmap" \
             --cache-control "public, max-age=300"
 
+          aws s3 sync release "s3://${R2_BUCKET}/${LATEST_PREFIX}" \
+            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+            --delete \
+            --exclude "*" \
+            --include "*.dmg" \
+            --include "*.zip" \
+            --include "*.yml" \
+            --include "*.blockmap" \
+            --cache-control "public, max-age=300"
+
+          for file in release/*.dmg release/*.zip; do
+            [ -e "${file}" ] || continue
+            name="$(basename "${file}")"
+            ext="${name##*.}"
+            arch="mac"
+            if [[ "${name}" == *"-arm64."* ]]; then
+              arch="arm64"
+            elif [[ "${name}" == *"-x64."* ]]; then
+              arch="x64"
+            elif [[ "${name}" == *"-universal."* ]]; then
+              arch="universal"
+            fi
+            aws s3 cp "${file}" "s3://${R2_BUCKET}/${LATEST_PREFIX}/puppyone-latest-${arch}.${ext}" \
+              --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+              --content-type "application/octet-stream" \
+              --cache-control "public, max-age=300"
+          done
+
           if [ -f release/latest-mac.yml ]; then
-            aws s3 cp release/latest-mac.yml "s3://${R2_BUCKET}/${R2_PREFIX}/latest-mac.yml" \
+            aws s3 cp release/latest-mac.yml "s3://${R2_BUCKET}/${VERSION_PREFIX}/latest-mac.yml" \
+              --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+              --content-type "text/yaml" \
+              --cache-control "no-cache"
+            aws s3 cp release/latest-mac.yml "s3://${R2_BUCKET}/${LATEST_PREFIX}/latest-mac.yml" \
               --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" \
               --content-type "text/yaml" \
               --cache-control "no-cache"
