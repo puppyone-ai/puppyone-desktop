@@ -59,6 +59,10 @@ export type FileContent = {
   url?: string | null;
 };
 
+export type DataImportResult = {
+  paths: string[];
+};
+
 export type DataCapabilities = {
   create?: boolean;
   rename?: boolean;
@@ -79,6 +83,7 @@ export type DataPort = {
   writeFile?: (path: string, content: string) => Promise<void>;
   createFolder?: (path: string) => Promise<void>;
   createFile?: (path: string, content?: string) => Promise<void>;
+  importFiles?: (files: File[], targetFolderPath: string | null) => Promise<DataImportResult>;
   renameNode?: (path: string, nextName: string) => Promise<void>;
   deleteNode?: (path: string) => Promise<void>;
   moveNode?: (from: string, to: string) => Promise<void>;

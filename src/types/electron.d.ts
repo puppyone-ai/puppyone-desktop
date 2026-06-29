@@ -273,6 +273,20 @@ export type LastWorkspaceResult = {
   error: string | null;
 };
 
+export type RecentWorkspacesResult = {
+  workspaces: Workspace[];
+  errors: Array<{
+    path: string;
+    error: string;
+  }>;
+};
+
+export type WorkspaceOpenResult = {
+  status: "opened-current" | "opened-new-window" | "focused-existing";
+  path: string | null;
+  workspace: Workspace | null;
+};
+
 export type WorkspaceCreateEntryKind = "file" | "folder";
 
 export type WorkspaceCreateEntryRequest = {
@@ -297,6 +311,16 @@ export type WorkspaceMoveEntryRequest = {
   rootPath: string;
   fromPath: string;
   toPath: string;
+};
+
+export type WorkspaceImportEntriesRequest = {
+  rootPath: string;
+  targetFolderPath: string | null;
+  sourcePaths: string[];
+};
+
+export type WorkspaceImportEntriesResult = {
+  paths: string[];
 };
 
 export type WorkspaceDeleteEntryRequest = {
@@ -414,10 +438,15 @@ declare global {
         };
       }>;
       openExternalUrl: (href: string) => Promise<{ ok: boolean }>;
+      getInitialWorkspace: () => Promise<LastWorkspaceResult>;
       getLastWorkspace: () => Promise<LastWorkspaceResult>;
+      getRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
       rememberLastWorkspace: (folderPath: string) => Promise<void>;
       forgetLastWorkspace: () => Promise<void>;
-      selectFolder: () => Promise<Workspace | null>;
+      openWorkspaceInCurrentWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
+      openWorkspaceInNewWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
+      selectFolder: () => Promise<WorkspaceOpenResult | null>;
+      selectFolderInNewWindow: () => Promise<WorkspaceOpenResult | null>;
       workspaceFromPath: (folderPath: string) => Promise<Workspace>;
       getPathForFile: (file: File) => string;
       listFolderChildren: (request: {
@@ -436,6 +465,7 @@ declare global {
       createEntry: (request: WorkspaceCreateEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       renameEntry: (request: WorkspaceRenameEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       moveEntry: (request: WorkspaceMoveEntryRequest) => Promise<WorkspaceCreateEntryResult>;
+      importEntries: (request: WorkspaceImportEntriesRequest) => Promise<WorkspaceImportEntriesResult>;
       deleteEntry: (request: WorkspaceDeleteEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       watchWorkspace: (
         rootPath: string,

@@ -425,6 +425,91 @@ export async function moveWorkspaceEntry(rootPath, request) {
   return { path: toRelativePath };
 }
 
+export async function importWorkspaceEntries(rootPath, request) {
+  const sourcePaths = Array.isArray(request?.sourcePaths) ? request.sourcePaths : [];
+  if (sourcePaths.length === 0) {
+    throw new Error("At least one source path is required.");
+  }
+
+  const targetFolderPath = request?.targetFolderPath ?? null;
+  const targetFolder = resolveWorkspacePath(rootPath, targetFolderPath);
+  const targetFolderMetadata = await fs.stat(targetFolder).catch((error) => {
+    throw new Error(`Unable to import entries: ${error.message}`);
+  });
+  if (!targetFolderMetadata.isDirectory()) {
+    throw new Error("Import target is not a folder.");
+  }
+
+  const normalizedTargetParent = normalizeRelativePath(targetFolderPath);
+  const targetPaths = new Set();
+  const plannedEntries = [];
+
+  for (const rawSourcePath of sourcePaths) {
+    if (typeof rawSourcePath !== "string" || rawSourcePath.trim().length === 0) {
+      throw new Error("Source path is required.");
+    }
+    if (!path.isAbsolute(rawSourcePath)) {
+      throw new Error("Source path must be absolute.");
+    }
+
+    const sourcePath = path.resolve(rawSourcePath);
+    const sourceMetadata = await fs.lstat(sourcePath).catch((error) => {
+      throw new Error(`Unable to read import source: ${error.message}`);
+    });
+    if (sourceMetadata.isSymbolicLink()) {
+      throw new Error("Symbolic links cannot be imported.");
+    }
+    if (!sourceMetadata.isFile() && !sourceMetadata.isDirectory()) {
+      throw new Error("Only files and folders can be imported.");
+    }
+
+    const name = normalizeNewEntryName(path.basename(sourcePath));
+    const relativePath = joinRelativePath(normalizedTargetParent, name);
+    const targetPath = resolveWorkspacePath(rootPath, relativePath);
+    if (sourceMetadata.isDirectory() && isSameOrInsidePath(sourcePath, targetPath)) {
+      throw new Error("Cannot import a folder into itself.");
+    }
+    if (targetPaths.has(targetPath)) {
+      throw new Error("Dropped items include duplicate names.");
+    }
+
+    const targetExists = await fs.lstat(targetPath)
+      .then(() => true)
+      .catch((error) => {
+        if (error?.code === "ENOENT") return false;
+        throw new Error(`Unable to inspect import target: ${error.message}`);
+      });
+    if (targetExists) {
+      throw new Error("An item with that name already exists.");
+    }
+
+    targetPaths.add(targetPath);
+    plannedEntries.push({
+      sourcePath,
+      targetPath,
+      relativePath,
+    });
+  }
+
+  for (const entry of plannedEntries) {
+    await fs.cp(entry.sourcePath, entry.targetPath, {
+      recursive: true,
+      force: false,
+      errorOnExist: true,
+      filter: async (sourcePath) => {
+        const metadata = await fs.lstat(sourcePath).catch(() => null);
+        return Boolean(metadata && !metadata.isSymbolicLink());
+      },
+    }).catch((error) => {
+      throw new Error(`Unable to import ${path.basename(entry.sourcePath)}: ${error.message}`);
+    });
+  }
+
+  return {
+    paths: plannedEntries.map((entry) => entry.relativePath),
+  };
+}
+
 export async function deleteWorkspaceEntry(rootPath, request) {
   const relativePath = normalizeRelativePath(request?.path);
   if (!relativePath) {
@@ -1065,6 +1150,15 @@ function resolveWorkspacePath(rootPath, relativePath) {
     throw new Error("Folder path is outside the selected workspace.");
   }
   return resolved;
+}
+
+function isSameOrInsidePath(parentPath, candidatePath) {
+  const parent = path.resolve(parentPath);
+  const candidate = path.resolve(candidatePath);
+  if (candidate === parent) return true;
+
+  const relativePath = path.relative(parent, candidate);
+  return Boolean(relativePath && !relativePath.startsWith("..") && !path.isAbsolute(relativePath));
 }
 
 function normalizeRelativePath(value) {

@@ -311,6 +311,11 @@ body.data-sidebar-resizing * {
   cursor: move;
 }
 
+.explorer-tree-shell.is-importing-files .tree-row.drop-target,
+.explorer-tree-shell.is-importing-files .tree-row.drop-parent-target {
+  cursor: copy;
+}
+
 .tree-row.drop-parent-target::before {
   content: "";
   position: absolute;

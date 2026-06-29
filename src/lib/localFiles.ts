@@ -6,8 +6,11 @@ import type {
   GitWorkingDiffScope,
   LastWorkspaceResult,
   PuppyoneWorkspaceConfig,
+  RecentWorkspacesResult,
   WorkspaceCreateEntryKind,
   WorkspaceCreateEntryResult,
+  WorkspaceImportEntriesResult,
+  WorkspaceOpenResult,
 } from "../types/electron";
 
 export type { Workspace };
@@ -23,6 +26,7 @@ export function createLocalDataPort(rootPath: string): DataPort {
     }),
     getFileUrl: (path) => buildLocalFileUrl(rootPath, path),
     writeFile: (path, content) => getDesktopBridge().writeFile({ rootPath, path, content }),
+    importFiles: (files, targetFolderPath) => importWorkspaceFiles(rootPath, targetFolderPath, files),
     renameNode: (path, nextName) => getDesktopBridge().renameEntry({ rootPath, path, nextName }).then(() => undefined),
     moveNode: (from, to) => getDesktopBridge().moveEntry({ rootPath, fromPath: from, toPath: to }).then(() => undefined),
     deleteNode: (path) => getDesktopBridge().deleteEntry({ rootPath, path }).then(() => undefined),
@@ -40,6 +44,14 @@ export async function getLastWorkspace(): Promise<LastWorkspaceResult> {
   return getDesktopBridge().getLastWorkspace();
 }
 
+export async function getInitialWorkspace(): Promise<LastWorkspaceResult> {
+  return getDesktopBridge().getInitialWorkspace();
+}
+
+export async function getRecentWorkspaces(): Promise<RecentWorkspacesResult> {
+  return getDesktopBridge().getRecentWorkspaces();
+}
+
 export async function rememberLastWorkspace(folderPath: string): Promise<void> {
   await getDesktopBridge().rememberLastWorkspace(folderPath);
 }
@@ -52,8 +64,20 @@ export async function forgetLastWorkspace(): Promise<void> {
   await getDesktopBridge().forgetLastWorkspace();
 }
 
-export async function selectWorkspaceFolder(): Promise<Workspace | null> {
+export async function openWorkspaceInCurrentWindow(folderPath: string): Promise<WorkspaceOpenResult> {
+  return getDesktopBridge().openWorkspaceInCurrentWindow(folderPath);
+}
+
+export async function openWorkspaceInNewWindow(folderPath: string): Promise<WorkspaceOpenResult> {
+  return getDesktopBridge().openWorkspaceInNewWindow(folderPath);
+}
+
+export async function selectWorkspaceFolder(): Promise<WorkspaceOpenResult | null> {
   return getDesktopBridge().selectFolder();
+}
+
+export async function selectWorkspaceFolderInNewWindow(): Promise<WorkspaceOpenResult | null> {
+  return getDesktopBridge().selectFolderInNewWindow();
 }
 
 export async function workspaceFromPath(folderPath: string): Promise<Workspace> {
@@ -70,6 +94,26 @@ export async function createWorkspaceEntry(
   },
 ): Promise<WorkspaceCreateEntryResult> {
   return getDesktopBridge().createEntry({ rootPath, ...request });
+}
+
+export async function importWorkspaceFiles(
+  rootPath: string,
+  targetFolderPath: string | null,
+  files: File[],
+): Promise<WorkspaceImportEntriesResult> {
+  const sourcePaths = files
+    .map((file) => getDesktopBridge().getPathForFile(file))
+    .filter((sourcePath) => sourcePath.trim().length > 0);
+
+  if (sourcePaths.length === 0) {
+    throw new Error("No dropped files could be resolved.");
+  }
+
+  return getDesktopBridge().importEntries({
+    rootPath,
+    targetFolderPath,
+    sourcePaths,
+  });
 }
 
 export async function getLatestAiEditReviewRequest(rootPath: string): Promise<AiEditRequest | null> {

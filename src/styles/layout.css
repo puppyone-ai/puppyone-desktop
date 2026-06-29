@@ -359,6 +359,19 @@ body.desktop-right-sidebar-resizing * {
   text-transform: uppercase;
 }
 
+.desktop-project-option-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  border-radius: 6px;
+}
+
+.desktop-project-option-row:hover,
+.desktop-project-option-row.active {
+  background: var(--po-hover);
+}
+
 .desktop-project-option,
 .desktop-project-add {
   display: flex;
@@ -375,6 +388,7 @@ body.desktop-right-sidebar-resizing * {
 .desktop-project-option {
   gap: 8px;
   height: 32px;
+  flex: 1;
   padding: 0 8px;
 }
 
@@ -382,6 +396,11 @@ body.desktop-right-sidebar-resizing * {
 .desktop-project-option.active,
 .desktop-project-add:hover {
   background: var(--po-hover);
+}
+
+.desktop-project-option-row:hover .desktop-project-option,
+.desktop-project-option-row.active .desktop-project-option {
+  background: transparent;
 }
 
 .desktop-project-mark {

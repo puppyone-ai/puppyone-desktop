@@ -21,6 +21,7 @@ export type ExplorerTreeProps = {
   onSelectNode: (node: DataNode | null) => void;
   onToggleFolder?: (node: DataNode, expanded: boolean) => void;
   onMoveNode?: (node: DataNode, targetFolderPath: string | null) => void | Promise<void>;
+  onImportFiles?: (files: File[], targetFolderPath: string | null) => void | Promise<void>;
   renderRootActions?: () => ReactNode;
   renderFolderActions?: (node: DataNode) => ReactNode;
   renderNodeActions?: (node: DataNode) => ReactNode;
@@ -83,6 +84,7 @@ export function ExplorerTree({
   onSelectNode,
   onToggleFolder,
   onMoveNode,
+  onImportFiles,
   renderRootActions,
   renderFolderActions,
   renderNodeActions,
@@ -93,6 +95,8 @@ export function ExplorerTree({
   const [dropTarget, setDropTarget] = useState<TreeDropTarget>(null);
   const rootDisplayNameCounts = useMemo(() => buildDisplayNameCounts(nodes), [nodes]);
   const moveEnabled = Boolean(canMoveNodes && onMoveNode);
+  const importEnabled = Boolean(onImportFiles);
+  const dropEnabled = moveEnabled || importEnabled;
   const resolvedLoadingPaths = useMemo<ReadonlySet<string>>(
     () => loadingPaths ?? (loadingPath ? new Set([loadingPath]) : EMPTY_PATH_SET),
     [loadingPath, loadingPaths],
@@ -142,6 +146,14 @@ export function ExplorerTree({
     targetFolderPath: string | null,
     mode: "folder" | "parent",
   ) => {
+    if (importEnabled && hasDataTransferFiles(event.dataTransfer)) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.dataTransfer.dropEffect = "copy";
+      setNextDropTarget(rowPath, targetFolderPath, mode, true);
+      return true;
+    }
+
     if (!moveEnabled || !draggedNode) return false;
 
     const valid = isValidMoveTarget(draggedNode, targetFolderPath);
@@ -150,13 +162,24 @@ export function ExplorerTree({
     event.dataTransfer.dropEffect = valid ? "move" : "none";
     setNextDropTarget(rowPath, targetFolderPath, mode, valid);
     return valid;
-  }, [draggedNode, moveEnabled, setNextDropTarget]);
+  }, [draggedNode, importEnabled, moveEnabled, setNextDropTarget]);
 
   const dragLeaveRow = useCallback((event: ReactDragEvent<HTMLElement>, rowPath: string | null) => {
     event.stopPropagation();
   }, []);
 
   const dropOnRow = useCallback((event: ReactDragEvent<HTMLElement>, targetFolderPath: string | null) => {
+    const importedFiles = getDataTransferFiles(event.dataTransfer);
+    if (importEnabled && importedFiles.length > 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      clearDragState();
+      void Promise.resolve(onImportFiles?.(importedFiles, targetFolderPath)).catch((error) => {
+        console.error("Unable to import dropped files:", error);
+      });
+      return;
+    }
+
     if (!moveEnabled || !draggedNode) return;
 
     event.preventDefault();
@@ -169,12 +192,12 @@ export function ExplorerTree({
     void Promise.resolve(onMoveNode(movingNode, targetFolderPath)).catch((error) => {
       console.error("Unable to move explorer item:", error);
     });
-  }, [clearDragState, draggedNode, moveEnabled, onMoveNode]);
+  }, [clearDragState, draggedNode, importEnabled, moveEnabled, onImportFiles, onMoveNode]);
 
   const leaveTree = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
-    if (!draggedNode || !didLeaveElementBounds(event)) return;
+    if (!dropTarget || !didLeaveElementBounds(event)) return;
     setDropTarget(null);
-  }, [draggedNode]);
+  }, [dropTarget]);
 
   const dragController = useMemo<TreeDragController>(() => ({
     enabled: moveEnabled,
@@ -230,18 +253,21 @@ export function ExplorerTree({
 
   return (
     <div
-      className={`explorer-tree-shell ${draggedNode ? "is-dragging-node" : ""}`}
-      onDragLeave={moveEnabled ? leaveTree : undefined}
+      className={`explorer-tree-shell ${draggedNode ? "is-dragging-node" : ""} ${dropTarget && !draggedNode ? "is-importing-files" : ""}`}
+      onDragEnter={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
+      onDragOver={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
+      onDragLeave={dropEnabled ? leaveTree : undefined}
+      onDrop={dropEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
     >
       {showRoot && (
         <div className="explorer-tree-root-scope">
           <div
             className={`tree-row root ${dropTarget?.rowPath === null && dropTarget.valid ? "drop-target" : ""} ${dropTarget?.rowPath === null && !dropTarget.valid ? "drop-invalid" : ""}`}
             style={{ "--depth": 0 } as CSSProperties}
-            onDragEnter={moveEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
-            onDragOver={moveEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
-            onDragLeave={moveEnabled ? (event) => dragController.onRowDragLeave(event, null) : undefined}
-            onDrop={moveEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
+            onDragEnter={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
+            onDragOver={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
+            onDragLeave={dropEnabled ? (event) => dragController.onRowDragLeave(event, null) : undefined}
+            onDrop={dropEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
           >
             <span className="tree-row-content">
               <span className="tree-label">{rootLabel}</span>
@@ -744,6 +770,21 @@ function didLeaveElementBounds(event: ReactDragEvent<HTMLElement>): boolean {
     || event.clientY < rect.top
     || event.clientY > rect.bottom
   );
+}
+
+function hasDataTransferFiles(dataTransfer: DataTransfer): boolean {
+  if (dataTransfer.files.length > 0) return true;
+  if (Array.from(dataTransfer.types).includes("Files")) return true;
+  return Array.from(dataTransfer.items).some((item) => item.kind === "file");
+}
+
+function getDataTransferFiles(dataTransfer: DataTransfer): File[] {
+  const files = Array.from(dataTransfer.files).filter((file) => file.name.length > 0);
+  if (files.length > 0) return files;
+
+  return Array.from(dataTransfer.items)
+    .map((item) => (item.kind === "file" ? item.getAsFile() : null))
+    .filter((file): file is File => Boolean(file && file.name.length > 0));
 }
 
 function isPointerInFolderPeerDropZone(event: ReactDragEvent<HTMLElement>): boolean {

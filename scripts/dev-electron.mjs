@@ -2,13 +2,11 @@ import { spawn } from "node:child_process";
 import { watch } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { prepareElectronAppRuntime } from "./electron-runtime.mjs";
+import { getDefaultElectronBin } from "./electron-runtime.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const desktopRoot = path.resolve(__dirname, "..");
 const devUrl = "http://127.0.0.1:5173";
-const electronDevAppPath = path.join("/private/tmp", "puppyone-electron-dev", "puppyone.app");
-const desktopDevAppIconPath = path.join(desktopRoot, "src-tauri", "icons", "icon.icns");
 const mainWatchPaths = [
   path.join(desktopRoot, "electron"),
   path.join(desktopRoot, "local-api"),
@@ -50,7 +48,7 @@ const healthCheck = setInterval(async () => {
 }, 250);
 
 function startElectron() {
-  const electronExecutable = prepareElectronDevRuntime();
+  const electronExecutable = getDefaultElectronBin(desktopRoot);
 
   electron = spawn(electronExecutable, ["."], {
     cwd: desktopRoot,
@@ -72,17 +70,6 @@ function startElectron() {
     stopMainWatchers();
     renderer.kill("SIGTERM");
     process.exit(code ?? 0);
-  });
-}
-
-function prepareElectronDevRuntime() {
-  return prepareElectronAppRuntime({
-    desktopRoot,
-    targetAppPath: electronDevAppPath,
-    appName: "puppyone",
-    displayName: "puppyone",
-    bundleIdentifier: "ai.puppyone.desktop.dev",
-    iconPath: desktopDevAppIconPath,
   });
 }
 

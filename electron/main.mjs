@@ -21,6 +21,7 @@ import {
   getWorkspaceGitCommitDetail,
   getWorkspaceGitStatus,
   getMimeType,
+  importWorkspaceEntries,
   initializeWorkspaceGitRepository,
   listFolderChildren,
   moveWorkspaceEntry,
@@ -88,10 +89,13 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-let mainWindow = null;
 let updateService = null;
+const windowsById = new Map();
+const windowStateById = new Map();
+const workspaceWindowByPath = new Map();
 const terminalSessions = new Map();
 const workspaceWatchers = new Map();
+let lastFocusedWindowId = null;
 const cloudAuthService = createCloudAuthService({
   app,
   projectRoot,
@@ -99,7 +103,7 @@ const cloudAuthService = createCloudAuthService({
   requestCloudApi,
   getCloudApiErrorMessage,
   getWindows: () => BrowserWindow.getAllWindows(),
-  revealWindow: revealMainWindow,
+  revealWindow: revealLastFocusedWindow,
 });
 
 app.setName(appName);
@@ -112,13 +116,11 @@ if (!gotSingleInstanceLock) {
   app.exit(0);
 }
 
-async function createWindow() {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    revealMainWindow();
-    return mainWindow;
-  }
-
-  mainWindow = new BrowserWindow({
+async function createWindow(options = {}) {
+  const initialWorkspacePath = typeof options.initialWorkspacePath === "string"
+    ? path.resolve(options.initialWorkspacePath)
+    : null;
+  const window = new BrowserWindow({
     width: 1280,
     height: 840,
     minWidth: 920,
@@ -136,69 +138,113 @@ async function createWindow() {
       preload: preloadPath,
     },
   });
+  const webContentsId = window.webContents.id;
+  windowsById.set(webContentsId, window);
+  windowStateById.set(webContentsId, {
+    initialWorkspacePath,
+    workspacePath: null,
+    lastFocusedAt: Date.now(),
+  });
+  lastFocusedWindowId = webContentsId;
 
-  mainWindow.once("ready-to-show", () => {
-    revealMainWindow();
+  window.on("focus", () => {
+    lastFocusedWindowId = webContentsId;
+    const state = windowStateById.get(webContentsId);
+    if (state) state.lastFocusedAt = Date.now();
   });
 
-  mainWindow.webContents.once("did-finish-load", () => {
-    revealMainWindow();
+  window.once("ready-to-show", () => {
+    revealWindow(window);
   });
 
-  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+  window.webContents.once("did-finish-load", () => {
+    revealWindow(window);
+  });
+
+  window.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
     console.error("puppyone renderer failed to load:", {
       errorCode,
       errorDescription,
       validatedURL,
     });
-    revealMainWindow();
+    revealWindow(window);
   });
 
   try {
     if (devServerUrl) {
-      await mainWindow.loadURL(devServerUrl);
-      mainWindow.webContents.openDevTools({ mode: "detach" });
+      await window.loadURL(devServerUrl);
+      window.webContents.openDevTools({ mode: "detach" });
     } else {
-      await mainWindow.loadFile(rendererDistPath);
+      await window.loadFile(rendererDistPath);
     }
   } catch (error) {
     console.error("puppyone failed to open renderer:", error);
-    revealMainWindow();
+    revealWindow(window);
   }
 
-  revealMainWindow();
+  revealWindow(window);
 
-  mainWindow.on("closed", () => {
-    closeAllTerminalSessions();
-    closeAllWorkspaceWatchers();
-    mainWindow = null;
+  window.on("closed", () => {
+    releaseWindowWorkspaceById(webContentsId, window);
+    closeTerminalSessionsForWindow(webContentsId);
+    stopWorkspaceWatchesForWindow(webContentsId);
+    windowsById.delete(webContentsId);
+    windowStateById.delete(webContentsId);
+    if (lastFocusedWindowId === webContentsId) {
+      lastFocusedWindowId = getLastFocusedWindow()?.webContents.id ?? null;
+    }
   });
 
-  return mainWindow;
+  return window;
 }
 
-function revealMainWindow() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  const wasVisible = mainWindow.isVisible();
-  if (mainWindow.isMinimized()) {
-    mainWindow.restore();
+function revealWindow(window) {
+  if (!window || window.isDestroyed()) return;
+  const wasVisible = window.isVisible();
+  if (window.isMinimized()) {
+    window.restore();
   }
   if (!wasVisible) {
-    mainWindow.show();
-    mainWindow.center();
+    window.show();
+    window.center();
   }
-  mainWindow.focus();
+  window.focus();
+  lastFocusedWindowId = window.webContents.id;
+  const state = windowStateById.get(window.webContents.id);
+  if (state) state.lastFocusedAt = Date.now();
   if (process.platform === "darwin") {
     app.focus({ steal: true });
   }
 }
 
-function createOrRevealWindow() {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    revealMainWindow();
+function revealLastFocusedWindow() {
+  const window = getLastFocusedWindow();
+  if (window) {
+    revealWindow(window);
     return;
   }
   void createWindow();
+}
+
+function createOrRevealWindow() {
+  revealLastFocusedWindow();
+}
+
+function getLastFocusedWindow() {
+  const directWindow = lastFocusedWindowId ? windowsById.get(lastFocusedWindowId) : null;
+  if (directWindow && !directWindow.isDestroyed()) return directWindow;
+
+  let bestWindow = null;
+  let bestFocusedAt = -1;
+  for (const [id, window] of windowsById.entries()) {
+    if (window.isDestroyed()) continue;
+    const focusedAt = windowStateById.get(id)?.lastFocusedAt ?? 0;
+    if (focusedAt > bestFocusedAt) {
+      bestFocusedAt = focusedAt;
+      bestWindow = window;
+    }
+  }
+  return bestWindow;
 }
 
 function resolveAppIconPath() {
@@ -233,6 +279,13 @@ app.on("second-instance", (_event, argv) => {
   const callbackUrl = argv.find(isCloudAuthCallbackUrl);
   if (callbackUrl) {
     void cloudAuthService.handleCallback(callbackUrl);
+    return;
+  }
+
+  const workspacePath = findWorkspacePathArg(argv);
+  if (workspacePath) {
+    void openWorkspaceInNewWindow(workspacePath);
+    return;
   }
   createOrRevealWindow();
 });
@@ -257,10 +310,17 @@ app.whenReady().then(async () => {
   });
   registerIpcHandlers();
   updateService.start();
-  await createWindow();
+  await createWindow({
+    initialWorkspacePath: await readLastActiveWorkspacePath(),
+  });
 
   app.on("activate", () => {
-    createOrRevealWindow();
+    if (windowsById.size > 0) {
+      revealLastFocusedWindow();
+      return;
+    }
+    void readLastActiveWorkspacePath()
+      .then((initialWorkspacePath) => createWindow({ initialWorkspacePath }));
   });
 }).catch((error) => {
   console.error("puppyone failed to start:", error);
@@ -273,9 +333,15 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   cloudAuthService.dispose();
   updateService?.dispose();
+  closeAllTerminalSessions();
+  closeAllWorkspaceWatchers();
 });
 
 function registerIpcHandlers() {
+  ipcMain.handle("window:get-initial-workspace", async (event) => {
+    return getInitialWorkspaceResultForWindow(event.sender);
+  });
+
   ipcMain.handle("cloud-session:read", async () => {
     return cloudAuthService.readSession();
   });
@@ -374,29 +440,53 @@ function registerIpcHandlers() {
     return getLastWorkspaceResult();
   });
 
+  ipcMain.handle("workspace:get-recent", async () => {
+    return getRecentWorkspacesResult();
+  });
+
   ipcMain.handle("workspace:remember-last", async (_event, folderPath) => {
     if (typeof folderPath !== "string" || folderPath.trim().length === 0) {
       throw new Error("Folder path is required.");
     }
-    await rememberLastWorkspacePath(folderPath);
+    await rememberRecentWorkspacePath(folderPath);
     return { ok: true };
   });
 
-  ipcMain.handle("workspace:forget-last", async () => {
-    await forgetLastWorkspacePath();
+  ipcMain.handle("workspace:forget-last", async (event) => {
+    await forgetCurrentWindowWorkspace(event.sender);
     return { ok: true };
   });
 
-  ipcMain.handle("workspace:select-folder", async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
+  ipcMain.handle("workspace:open-current", async (event, folderPath) => {
+    if (typeof folderPath !== "string" || folderPath.trim().length === 0) {
+      throw new Error("Folder path is required.");
+    }
+    return openWorkspaceInCurrentWindow(event.sender, folderPath);
+  });
+
+  ipcMain.handle("workspace:open-new-window", async (_event, folderPath) => {
+    if (typeof folderPath !== "string" || folderPath.trim().length === 0) {
+      throw new Error("Folder path is required.");
+    }
+    return openWorkspaceInNewWindow(folderPath);
+  });
+
+  ipcMain.handle("workspace:select-folder", async (event) => {
+    return selectWorkspaceForCurrentWindow(event.sender);
+  });
+
+  ipcMain.handle("workspace:select-folder-current", async (event) => {
+    return selectWorkspaceForCurrentWindow(event.sender);
+  });
+
+  ipcMain.handle("workspace:select-folder-new-window", async (event) => {
+    const result = await dialog.showOpenDialog(getDialogOwnerWindow(event.sender), {
       title: "Open local puppyone workspace",
       properties: ["openDirectory", "createDirectory"],
     });
 
     if (result.canceled || result.filePaths.length === 0) return null;
-    const workspace = await workspaceFromPath(result.filePaths[0]);
-    await rememberLastWorkspacePath(workspace.path);
-    return workspace;
+    return openWorkspaceInNewWindow(result.filePaths[0]);
   });
 
   ipcMain.handle("workspace:from-path", async (_event, folderPath) => {
@@ -472,6 +562,16 @@ function registerIpcHandlers() {
     const result = await moveWorkspaceEntry(rootPath, request);
     await absorbWorkspaceEditReviewPath(rootPath, previousPath);
     await absorbWorkspaceEditReviewPath(rootPath, result.path);
+    return result;
+  });
+
+  ipcMain.handle("workspace:import-entries", async (_event, request) => {
+    const rootPath = request?.rootPath;
+    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
+      throw new Error("Workspace root path is required.");
+    }
+    const result = await importWorkspaceEntries(rootPath, request);
+    await Promise.all(result.paths.map((importedPath) => absorbWorkspaceEditReviewPath(rootPath, importedPath)));
     return result;
   });
 
@@ -732,8 +832,222 @@ function requireWorkspaceRoot(request) {
   return rootPath;
 }
 
+async function getInitialWorkspaceResultForWindow(sender) {
+  const window = BrowserWindow.fromWebContents(sender);
+  if (!window || window.isDestroyed()) {
+    return {
+      path: null,
+      workspace: null,
+      error: null,
+    };
+  }
+
+  const state = windowStateById.get(window.webContents.id);
+  const initialPath = state?.workspacePath ?? state?.initialWorkspacePath ?? null;
+  if (!initialPath) {
+    return {
+      path: null,
+      workspace: null,
+      error: null,
+    };
+  }
+
+  try {
+    const workspace = await workspaceFromPath(initialPath);
+    const canonicalPath = await canonicalizeWorkspacePath(workspace.path);
+    const existingWindow = getWorkspaceWindow(canonicalPath);
+    if (existingWindow && existingWindow !== window) {
+      revealWindow(existingWindow);
+      return {
+        path: canonicalPath,
+        workspace: null,
+        error: `${workspace.name} is already open in another puppyone window.`,
+      };
+    }
+
+    assignWindowWorkspace(window, workspace, canonicalPath, { cleanupPrevious: false });
+    await rememberRecentWorkspacePath(canonicalPath);
+    return {
+      path: canonicalPath,
+      workspace,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      path: initialPath,
+      workspace: null,
+      error: `Unable to reopen workspace (${initialPath}): ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+async function selectWorkspaceForCurrentWindow(sender) {
+  const result = await dialog.showOpenDialog(getDialogOwnerWindow(sender), {
+    title: "Open local puppyone workspace",
+    properties: ["openDirectory", "createDirectory"],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return openWorkspaceInCurrentWindow(sender, result.filePaths[0]);
+}
+
+async function openWorkspaceInCurrentWindow(sender, folderPath, options = {}) {
+  const window = BrowserWindow.fromWebContents(sender);
+  if (!window || window.isDestroyed()) {
+    throw new Error("No active window is available for this workspace.");
+  }
+
+  const workspace = await workspaceFromPath(folderPath);
+  const canonicalPath = await canonicalizeWorkspacePath(workspace.path);
+  const existingWindow = getWorkspaceWindow(canonicalPath);
+  if (existingWindow && existingWindow !== window) {
+    revealWindow(existingWindow);
+    if (options.remember !== false) await rememberRecentWorkspacePath(canonicalPath);
+    return {
+      status: "focused-existing",
+      path: canonicalPath,
+      workspace,
+    };
+  }
+
+  assignWindowWorkspace(window, workspace, canonicalPath);
+  if (options.remember !== false) await rememberRecentWorkspacePath(canonicalPath);
+  return {
+    status: "opened-current",
+    path: canonicalPath,
+    workspace,
+  };
+}
+
+async function openWorkspaceInNewWindow(folderPath, options = {}) {
+  const workspace = await workspaceFromPath(folderPath);
+  const canonicalPath = await canonicalizeWorkspacePath(workspace.path);
+  const existingWindow = getWorkspaceWindow(canonicalPath);
+  if (existingWindow) {
+    revealWindow(existingWindow);
+    if (options.remember !== false) await rememberRecentWorkspacePath(canonicalPath);
+    return {
+      status: "focused-existing",
+      path: canonicalPath,
+      workspace,
+    };
+  }
+
+  const window = await createWindow({
+    initialWorkspacePath: canonicalPath,
+  });
+  assignWindowWorkspace(window, workspace, canonicalPath, { cleanupPrevious: false });
+  if (options.remember !== false) await rememberRecentWorkspacePath(canonicalPath);
+  return {
+    status: "opened-new-window",
+    path: canonicalPath,
+    workspace,
+  };
+}
+
+function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
+  if (!window || window.isDestroyed()) return;
+  const webContentsId = window.webContents.id;
+  const state = getOrCreateWindowState(window);
+  const previousPath = state.workspacePath;
+
+  if (previousPath && previousPath !== canonicalPath) {
+    const previousWindow = workspaceWindowByPath.get(previousPath);
+    if (previousWindow === window || previousWindow?.isDestroyed()) {
+      workspaceWindowByPath.delete(previousPath);
+    }
+    if (options.cleanupPrevious !== false) {
+      closeTerminalSessionsForWindow(webContentsId);
+      stopWorkspaceWatchesForWindow(webContentsId);
+    }
+  }
+
+  state.initialWorkspacePath = canonicalPath;
+  state.workspacePath = canonicalPath;
+  workspaceWindowByPath.set(canonicalPath, window);
+  window.setTitle(`${appName} - ${workspace.name}`);
+  if (typeof window.setRepresentedFilename === "function") {
+    try {
+      window.setRepresentedFilename(canonicalPath);
+    } catch {
+      // setRepresentedFilename is macOS-only and best-effort.
+    }
+  }
+}
+
+function releaseWindowWorkspace(window) {
+  if (!window) return null;
+  return releaseWindowWorkspaceById(window.webContents.id, window);
+}
+
+function releaseWindowWorkspaceById(webContentsId, window = null) {
+  const state = windowStateById.get(webContentsId);
+  const workspacePath = state?.workspacePath ?? null;
+  if (workspacePath) {
+    const existingWindow = workspaceWindowByPath.get(workspacePath);
+    if (existingWindow === window || existingWindow?.isDestroyed()) {
+      workspaceWindowByPath.delete(workspacePath);
+    }
+  }
+  if (state) {
+    state.workspacePath = null;
+    state.initialWorkspacePath = null;
+  }
+  if (window && !window.isDestroyed()) {
+    window.setTitle(appName);
+  }
+  return workspacePath;
+}
+
+async function forgetCurrentWindowWorkspace(sender) {
+  const window = BrowserWindow.fromWebContents(sender);
+  if (!window || window.isDestroyed()) {
+    await forgetLastWorkspacePath();
+    return;
+  }
+
+  const releasedPath = releaseWindowWorkspace(window);
+  closeTerminalSessionsForWindow(window.webContents.id);
+  stopWorkspaceWatchesForWindow(window.webContents.id);
+  if (releasedPath) await removeRecentWorkspacePath(releasedPath);
+}
+
+function getOrCreateWindowState(window) {
+  const webContentsId = window.webContents.id;
+  let state = windowStateById.get(webContentsId);
+  if (!state) {
+    state = {
+      initialWorkspacePath: null,
+      workspacePath: null,
+      lastFocusedAt: Date.now(),
+    };
+    windowStateById.set(webContentsId, state);
+  }
+  return state;
+}
+
+function getWorkspaceWindow(canonicalPath) {
+  const window = workspaceWindowByPath.get(canonicalPath);
+  if (!window || window.isDestroyed()) {
+    workspaceWindowByPath.delete(canonicalPath);
+    return null;
+  }
+  return window;
+}
+
+function getDialogOwnerWindow(sender) {
+  const window = BrowserWindow.fromWebContents(sender);
+  if (window && !window.isDestroyed()) return window;
+  return getLastFocusedWindow() ?? undefined;
+}
+
+async function canonicalizeWorkspacePath(folderPath) {
+  const resolvedPath = path.resolve(folderPath);
+  return fs.promises.realpath(resolvedPath).catch(() => resolvedPath);
+}
+
 async function getLastWorkspaceResult() {
-  const folderPath = await readLastWorkspacePath();
+  const folderPath = await readLastActiveWorkspacePath();
   if (!folderPath) {
     return {
       path: null,
@@ -757,12 +1071,36 @@ async function getLastWorkspaceResult() {
   }
 }
 
-async function readLastWorkspacePath() {
-  const state = await readWorkspaceState();
-  if (typeof state.lastWorkspacePath !== "string" || state.lastWorkspacePath.trim().length === 0) {
-    return null;
+async function getRecentWorkspacesResult() {
+  const state = normalizeWorkspaceState(await readWorkspaceState());
+  const workspaces = [];
+  const errors = [];
+  for (const folderPath of state.recentWorkspacePaths) {
+    try {
+      workspaces.push(await workspaceFromPath(folderPath));
+    } catch (error) {
+      errors.push({
+        path: folderPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
-  return path.resolve(state.lastWorkspacePath);
+  return { workspaces, errors };
+}
+
+async function readLastActiveWorkspacePath() {
+  const state = normalizeWorkspaceState(await readWorkspaceState());
+  const candidates = [
+    state.lastActiveWorkspacePath,
+    state.recentWorkspacePaths[0],
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return path.resolve(candidate);
+    }
+  }
+  return null;
 }
 
 async function readWorkspaceState() {
@@ -778,14 +1116,58 @@ async function readWorkspaceState() {
   }
 }
 
-async function rememberLastWorkspacePath(folderPath) {
-  const resolvedPath = path.resolve(folderPath);
+function normalizeWorkspaceState(state) {
+  const recentWorkspacePaths = [];
+  const addPath = (value) => {
+    if (typeof value !== "string" || value.trim().length === 0) return;
+    const resolvedPath = path.resolve(value);
+    if (!recentWorkspacePaths.includes(resolvedPath)) {
+      recentWorkspacePaths.push(resolvedPath);
+    }
+  };
+
+  addPath(state?.lastActiveWorkspacePath);
+  if (Array.isArray(state?.recentWorkspacePaths)) {
+    for (const item of state.recentWorkspacePaths) addPath(item);
+  }
+  addPath(state?.lastWorkspacePath);
+
+  return {
+    lastActiveWorkspacePath: recentWorkspacePaths[0] ?? null,
+    recentWorkspacePaths,
+  };
+}
+
+async function writeWorkspaceState(state) {
   await fs.promises.mkdir(path.dirname(getWorkspaceStatePath()), { recursive: true });
   await fs.promises.writeFile(
     getWorkspaceStatePath(),
-    JSON.stringify({ lastWorkspacePath: resolvedPath }, null, 2),
+    JSON.stringify(state, null, 2),
     "utf8",
   );
+}
+
+async function rememberRecentWorkspacePath(folderPath) {
+  const canonicalPath = await canonicalizeWorkspacePath(folderPath);
+  const state = normalizeWorkspaceState(await readWorkspaceState());
+  const recentWorkspacePaths = [
+    canonicalPath,
+    ...state.recentWorkspacePaths.filter((item) => item !== canonicalPath),
+  ].slice(0, 20);
+  await writeWorkspaceState({
+    lastActiveWorkspacePath: canonicalPath,
+    recentWorkspacePaths,
+  });
+}
+
+async function removeRecentWorkspacePath(folderPath) {
+  const canonicalPath = await canonicalizeWorkspacePath(folderPath);
+  const state = normalizeWorkspaceState(await readWorkspaceState());
+  const recentWorkspacePaths = state.recentWorkspacePaths.filter((item) => item !== canonicalPath);
+  await writeWorkspaceState({
+    lastActiveWorkspacePath: recentWorkspacePaths[0] ?? null,
+    recentWorkspacePaths,
+  });
 }
 
 async function forgetLastWorkspacePath() {
@@ -1046,8 +1428,16 @@ function closeTerminalSession(id) {
   }
 }
 
+function closeTerminalSessionsForWindow(webContentsId) {
+  for (const [id, session] of Array.from(terminalSessions.entries())) {
+    if (session.sender.id === webContentsId) {
+      closeTerminalSession(id);
+    }
+  }
+}
+
 function closeAllTerminalSessions() {
-  for (const id of terminalSessions.keys()) {
+  for (const id of Array.from(terminalSessions.keys())) {
     closeTerminalSession(id);
   }
 }
@@ -1079,6 +1469,12 @@ function stopWorkspaceWatch(webContentsId, rootPath) {
     entry.watcher.close();
     disposeWorkspaceEditReview(resolvedRoot);
     workspaceWatchers.delete(resolvedRoot);
+  }
+}
+
+function stopWorkspaceWatchesForWindow(webContentsId) {
+  for (const rootPath of Array.from(workspaceWatchers.keys())) {
+    stopWorkspaceWatch(webContentsId, rootPath);
   }
 }
 
@@ -1180,6 +1576,21 @@ function closeAllWorkspaceWatchers() {
     disposeWorkspaceEditReview(rootPath);
   }
   workspaceWatchers.clear();
+}
+
+function findWorkspacePathArg(argv) {
+  for (const arg of [...argv].reverse()) {
+    if (typeof arg !== "string" || arg.trim().length === 0) continue;
+    if (isCloudAuthCallbackUrl(arg)) continue;
+    if (arg.startsWith("-")) continue;
+    const candidate = path.resolve(arg);
+    try {
+      if (fs.statSync(candidate).isDirectory()) return candidate;
+    } catch {
+      // Not a local directory argument.
+    }
+  }
+  return null;
 }
 
 function registerLocalFileProtocol() {

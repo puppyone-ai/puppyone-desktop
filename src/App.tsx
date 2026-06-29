@@ -12,14 +12,17 @@ import {
   createLocalDataPort,
   createWorkspaceEntry,
   forgetLastWorkspace,
+  getInitialWorkspace,
   getLatestAiEditReviewRequest,
-  getLastWorkspace,
+  getRecentWorkspaces,
   getWorkspaceGitStatus,
   initializeWorkspaceGitRepository,
   loadFolderChildren,
+  openWorkspaceInCurrentWindow,
+  openWorkspaceInNewWindow,
   pushWorkspaceGit,
-  rememberLastWorkspace,
   selectWorkspaceFolder,
+  selectWorkspaceFolderInNewWindow,
   stageAllWorkspaceGitChanges,
   subscribeAiEditReviewUpdates,
 } from "./lib/localFiles";
@@ -29,7 +32,7 @@ import {
   type DesktopCloudSession,
 } from "./lib/cloudApi";
 import type { FilesVisibilitySettings } from "./preferences";
-import type { PuppyoneWorkspaceConfig } from "./types/electron";
+import type { PuppyoneWorkspaceConfig, WorkspaceOpenResult } from "./types/electron";
 import { ChevronDown } from "lucide-react";
 import { PuppyGitIcon } from "./features/app-shell/navigation";
 import {
@@ -80,9 +83,13 @@ import {
 } from "./features/source-control/operationDialogs";
 import { useDesktopGitController } from "./features/source-control/useDesktopGitController";
 
-type OpenWorkspaceOptions = {
-  remember?: boolean;
-};
+function mergeWorkspaceLists(current: Workspace[], incoming: Workspace[]) {
+  const byId = new Map<string, Workspace>();
+  for (const workspace of [...current, ...incoming]) {
+    byId.set(workspace.id, workspace);
+  }
+  return Array.from(byId.values());
+}
 
 export function App() {
   const desktopUpdates = useDesktopUpdates();
@@ -286,7 +293,7 @@ export function App() {
     setNodeActionMenu(null);
   }, [workspace?.path]);
 
-  const activateWorkspace = useCallback((nextWorkspace: Workspace, options: OpenWorkspaceOptions = {}) => {
+  const activateWorkspace = useCallback((nextWorkspace: Workspace) => {
     setWorkspaces((current) => {
       const withoutExisting = current.filter((item) => item.id !== nextWorkspace.id);
       return [nextWorkspace, ...withoutExisting];
@@ -295,16 +302,41 @@ export function App() {
     setActiveView("data");
     setSwitcherOpen(false);
     setRestoreWorkspaceError(null);
-    if (options.remember !== false) {
-      void rememberLastWorkspace(nextWorkspace.path).catch((error) => {
-        console.warn("Unable to remember puppyone workspace:", error);
-      });
+  }, []);
+
+  const refreshRecentWorkspaceList = useCallback(async () => {
+    const result = await getRecentWorkspaces();
+    setWorkspaces((current) => mergeWorkspaceLists(current, result.workspaces));
+    if (result.errors.length > 0) {
+      console.warn("Some recent puppyone workspaces could not be loaded:", result.errors);
     }
   }, []);
 
-  const openWorkspace = useCallback((nextWorkspace: Workspace, options: OpenWorkspaceOptions = {}) => {
-    activateWorkspace(nextWorkspace, options);
-  }, [activateWorkspace]);
+  const handleWorkspaceOpenResult = useCallback((result: WorkspaceOpenResult | null) => {
+    if (!result) return;
+    if (result.status === "opened-current" && result.workspace) {
+      activateWorkspace(result.workspace);
+    } else {
+      setSwitcherOpen(false);
+      setRestoreWorkspaceError(null);
+    }
+    void refreshRecentWorkspaceList().catch((error) => {
+      console.warn("Unable to refresh recent puppyone workspaces:", error);
+    });
+  }, [activateWorkspace, refreshRecentWorkspaceList]);
+
+  const openWorkspace = useCallback((nextWorkspace: Workspace) => {
+    void openWorkspaceInNewWindow(nextWorkspace.path)
+      .then(handleWorkspaceOpenResult)
+      .catch((error) => {
+        setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
+      });
+  }, [handleWorkspaceOpenResult]);
+
+  const openWorkspacePath = useCallback(async (folderPath: string) => {
+    const result = await openWorkspaceInCurrentWindow(folderPath);
+    handleWorkspaceOpenResult(result);
+  }, [handleWorkspaceOpenResult]);
 
   const navigateDesktopView = useCallback((view: DesktopView) => {
     if (view === "cloud" && !cloudEnabled) {
@@ -346,14 +378,18 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
 
-    getLastWorkspace()
-      .then((result) => {
+    Promise.all([getInitialWorkspace(), getRecentWorkspaces()])
+      .then(([initialWorkspace, recentWorkspaces]) => {
         if (cancelled) return;
-        if (result.workspace) {
-          openWorkspace(result.workspace, { remember: false });
-          return;
+        setWorkspaces((current) => mergeWorkspaceLists(current, recentWorkspaces.workspaces));
+        if (recentWorkspaces.errors.length > 0) {
+          console.warn("Some recent puppyone workspaces could not be loaded:", recentWorkspaces.errors);
         }
-        if (result.error) setRestoreWorkspaceError(result.error);
+        if (initialWorkspace.workspace) {
+          activateWorkspace(initialWorkspace.workspace);
+        } else if (initialWorkspace.error) {
+          setRestoreWorkspaceError(initialWorkspace.error);
+        }
       })
       .catch((error) => {
         if (!cancelled) {
@@ -367,12 +403,19 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [openWorkspace]);
+  }, [activateWorkspace]);
 
   const openFolder = async () => {
-    const nextWorkspace = await selectWorkspaceFolder();
-    if (nextWorkspace) openWorkspace(nextWorkspace);
-    setSwitcherOpen(false);
+    try {
+      const result = workspace
+        ? await selectWorkspaceFolderInNewWindow()
+        : await selectWorkspaceFolder();
+      handleWorkspaceOpenResult(result);
+    } catch (error) {
+      setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSwitcherOpen(false);
+    }
   };
 
   const handleCloudSessionChange = useCallback((session: DesktopCloudSession | null) => {
@@ -612,8 +655,11 @@ export function App() {
   }, []);
 
   const unlinkCurrentWorkspace = useCallback(async () => {
+    const currentWorkspaceId = workspace?.id ?? null;
     await forgetLastWorkspace();
-    setWorkspaces([]);
+    if (currentWorkspaceId) {
+      setWorkspaces((current) => current.filter((item) => item.id !== currentWorkspaceId));
+    }
     setActiveWorkspaceId(null);
     setActiveView("data");
     setSwitcherOpen(false);
@@ -622,7 +668,7 @@ export function App() {
     setCreateEntryDraft(null);
     setRestoreWorkspaceError(null);
     setRestoringWorkspace(false);
-  }, []);
+  }, [workspace?.id]);
 
   const selectCreateEntryKind = useCallback((kind: DesktopCreateEntryKind) => {
     setCreateEntryDraft((current) => current ? {
@@ -755,7 +801,8 @@ export function App() {
   if (!workspace) {
     return (
       <MinimalOnboarding
-        onOpenWorkspace={openWorkspace}
+        onChooseWorkspace={openFolder}
+        onOpenWorkspacePath={openWorkspacePath}
         initialError={restoreWorkspaceError}
         themeMode={themeMode}
         resolvedTheme={resolvedTheme}

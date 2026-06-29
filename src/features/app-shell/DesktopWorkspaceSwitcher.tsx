@@ -41,23 +41,27 @@ export function DesktopWorkspaceSwitcher({
       {open && (
         <div className="desktop-project-menu desktop-titlebar-menu">
           {workspaces.map((item) => (
-            <button
+            <div
               key={item.id}
-              className={`desktop-project-option ${item.id === workspace.id ? "active" : ""}`}
-              type="button"
-              title={`${item.name} - ${item.path}`}
-              onClick={() => onOpenWorkspace(item)}
+              className={`desktop-project-option-row ${item.id === workspace.id ? "active" : ""}`}
             >
-              <span className="desktop-project-mark">{item.name[0]?.toUpperCase() ?? "P"}</span>
-              <span className="desktop-project-option-text">
-                <strong>{item.name}</strong>
-                <small>{item.path}</small>
-              </span>
-            </button>
+              <button
+                className={`desktop-project-option ${item.id === workspace.id ? "active" : ""}`}
+                type="button"
+                title={`${item.name} - ${item.path}`}
+                onClick={() => onOpenWorkspace(item)}
+              >
+                <span className="desktop-project-mark">{item.name[0]?.toUpperCase() ?? "P"}</span>
+                <span className="desktop-project-option-text">
+                  <strong>{item.name}</strong>
+                  <small>{item.path}</small>
+                </span>
+              </button>
+            </div>
           ))}
           <button className="desktop-project-add" type="button" onClick={onOpenFolder}>
             <Plus size={14} />
-            <span>Open local folder</span>
+            <span>Open new local folder</span>
           </button>
         </div>
       )}

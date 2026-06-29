@@ -732,6 +732,51 @@ export function DataWorkspace({
     setTree((current) => updateNodeContent(current, node.path, content));
   };
 
+  const importFiles = useCallback(
+    async (files: File[], targetFolderPath: string | null) => {
+      if (!dataPort.importFiles || files.length === 0) return;
+
+      const requestGeneration = loadGenerationRef.current;
+      setFolderLoading(targetFolderPath, true);
+      setLoadError(null);
+
+      try {
+        const result = await dataPort.importFiles(files, targetFolderPath);
+        const children = await dataPort.listChildren(targetFolderPath);
+        if (requestGeneration !== loadGenerationRef.current) return;
+
+        setTree((current) => attachFolderChildren(current, targetFolderPath, children));
+        if (!targetFolderPath) setRootLoaded(true);
+        if (targetFolderPath) {
+          setExpandedFolderPaths((current) => addSetValues(current, [
+            ...collectAncestorFolderPaths(targetFolderPath),
+            targetFolderPath,
+          ]));
+        }
+
+        const importedNode = result.paths
+          .map((path) => children.find((child) => child.path === path) ?? null)
+          .find((node): node is DataNode => node !== null) ?? null;
+        if (!importedNode) return;
+
+        if (activePath === undefined) setInternalActivePath(importedNode.path);
+        onActivePathChange?.(importedNode.path, importedNode);
+        if (importedNode.type === "folder") {
+          void loadFolder(importedNode.path);
+        }
+      } catch (error) {
+        if (requestGeneration === loadGenerationRef.current) {
+          setLoadError(error instanceof Error ? error.message : String(error));
+        }
+      } finally {
+        if (requestGeneration === loadGenerationRef.current) {
+          setFolderLoading(targetFolderPath, false);
+        }
+      }
+    },
+    [activePath, dataPort, loadFolder, onActivePathChange, setFolderLoading],
+  );
+
   const moveNode = useCallback(
     async (node: DataNode, targetFolderPath: string | null) => {
       if (!resolvedCapabilities.move || !dataPort.moveNode) return;
@@ -902,6 +947,7 @@ export function DataWorkspace({
                     fileIconTheme={fileIconTheme}
                     canMoveNodes={Boolean(resolvedCapabilities.move && dataPort.moveNode)}
                     onMoveNode={moveNode}
+                    onImportFiles={dataPort.importFiles ? importFiles : undefined}
                     renderRootActions={explorerRootActionSlot ? () => renderWorkspaceSlot(explorerRootActionSlot, workspaceState) : undefined}
                     renderFolderActions={explorerFolderActionSlot ? (folder) => renderWorkspaceFolderSlot(explorerFolderActionSlot, workspaceState, folder) : undefined}
                     renderNodeActions={explorerNodeActionSlot ? (node) => renderWorkspaceNodeSlot(explorerNodeActionSlot, workspaceState, node) : undefined}

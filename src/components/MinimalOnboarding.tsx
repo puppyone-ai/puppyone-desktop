@@ -1,19 +1,19 @@
 import { AlertTriangle } from "lucide-react";
 import type { DragEvent } from "react";
 import { useEffect, useState } from "react";
-import type { Workspace } from "@puppyone/shared-ui";
-import { selectWorkspaceFolder, workspaceFromPath } from "../lib/localFiles";
 import type { ThemeMode } from "../preferences";
 
 type MinimalOnboardingProps = {
-  onOpenWorkspace: (workspace: Workspace) => void;
+  onChooseWorkspace: () => Promise<void>;
+  onOpenWorkspacePath: (path: string) => Promise<void>;
   initialError?: string | null;
   themeMode: ThemeMode;
   resolvedTheme: "light" | "dark";
 };
 
 export function MinimalOnboarding({
-  onOpenWorkspace,
+  onChooseWorkspace,
+  onOpenWorkspacePath,
   initialError = null,
   themeMode,
   resolvedTheme,
@@ -36,7 +36,7 @@ export function MinimalOnboarding({
 
     setOpening(true);
     try {
-      onOpenWorkspace(await workspaceFromPath(nextPath));
+      await onOpenWorkspacePath(nextPath);
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -48,8 +48,7 @@ export function MinimalOnboarding({
     setError(null);
     setOpening(true);
     try {
-      const workspace = await selectWorkspaceFolder();
-      if (workspace) onOpenWorkspace(workspace);
+      await onChooseWorkspace();
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
     } finally {
