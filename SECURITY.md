@@ -1,7 +1,7 @@
 # Security Policy
 
 Reporting a vulnerability
-- Please email security@puppyagent.com with details and steps to reproduce.
+- Please email security@puppyone.ai with details and steps to reproduce.
 
 Secrets and environment variables
 - Do not commit `.env` files or real secrets. `.env` files are globally ignored.
@@ -13,7 +13,7 @@ Secrets and environment variables
 
 Dependency security
 Trademarks and branding
-- This project does not grant rights to use PuppyAgent trademarks, service marks, or logos
+- This project does not grant rights to use puppyone trademarks, service marks, or logos
 - Remove third-party brand assets unless explicitly licensed; prefer neutral icons
 - Keep dependencies up to date; we use lockfiles and pinned versions where possible
 - Enable GitHub Dependabot alerts and code scanning
