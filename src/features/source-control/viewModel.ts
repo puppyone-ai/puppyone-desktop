@@ -271,10 +271,10 @@ export function getGitScmSyncCopy(
 
   if (remote.state === "outgoing") {
     return {
-      title: "Outgoing Commits",
-      count: remote.ahead,
+      title: "Remote Changes",
+      count: 0,
       detail: target,
-      tone: "pending",
+      tone: "ready",
     };
   }
 
@@ -319,17 +319,6 @@ export function getGitScmSyncAction(
 ): GitScmSyncAction | null {
   if (!remote) return null;
 
-  if (remote.canPublish) {
-    return {
-      kind: "publish",
-      label: "Publish Branch",
-      loadingLabel: "Publishing...",
-      title: state.pushTitle,
-      disabled: false,
-      icon: "upload",
-    };
-  }
-
   if (remote.state === "diverged") {
     return {
       kind: "pull",
@@ -349,17 +338,6 @@ export function getGitScmSyncAction(
       title: state.pullTitle,
       disabled: false,
       icon: "download",
-    };
-  }
-
-  if (remote.canPush) {
-    return {
-      kind: "push",
-      label: state.pushLabel,
-      loadingLabel: "Pushing...",
-      title: state.pushTitle,
-      disabled: false,
-      icon: "upload",
     };
   }
 
