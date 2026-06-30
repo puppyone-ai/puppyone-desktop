@@ -24,6 +24,7 @@ export function MarkdownViewer(context: EditorViewerContext) {
           htmlTrustMode={context.htmlTrustMode}
           documentPath={context.document.path}
           markdownLinkGraph={context.markdownLinkGraph}
+          markdownAssetUrlResolver={context.markdownAssetUrlResolver}
           onChange={controls.canEdit ? controls.onChange : undefined}
         />
       )}
@@ -36,6 +37,7 @@ export function MarkdownViewer(context: EditorViewerContext) {
           htmlTrustMode={context.htmlTrustMode}
           documentPath={context.document.path}
           markdownLinkGraph={context.markdownLinkGraph}
+          markdownAssetUrlResolver={context.markdownAssetUrlResolver}
           onChange={controls.canEdit ? controls.onChange : undefined}
         />
       )}

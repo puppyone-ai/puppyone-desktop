@@ -9,7 +9,7 @@ import {
 } from "./markdownCodeMirrorExtensions";
 import { markdownAiEditExtension } from "./markdownAiEditExtension";
 import type { AiEditFile } from "../ai-edits/types";
-import type { MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
 
 export type MarkdownCodeMirrorEditorProps = {
   value: string;
@@ -19,6 +19,7 @@ export type MarkdownCodeMirrorEditorProps = {
   htmlTrustMode?: MarkdownHtmlTrustMode;
   documentPath?: string;
   markdownLinkGraph?: MarkdownLinkGraph | null;
+  markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   onChange?: (value: string) => void;
 };
 
@@ -32,6 +33,7 @@ export function MarkdownCodeMirrorEditor({
   htmlTrustMode = "safe",
   documentPath = "",
   markdownLinkGraph = null,
+  markdownAssetUrlResolver = null,
   onChange,
 }: MarkdownCodeMirrorEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -56,7 +58,11 @@ export function MarkdownCodeMirrorEditor({
         extensions: [
           ...markdownCodeMirrorBaseExtensions(readOnly),
           editableCompartmentRef.current.of(getEditableExtensions(readOnly)),
-          livePreviewCompartmentRef.current.of(livePreview ? markdownLivePreviewExtension(htmlTrustMode, markdownLinkGraph, documentPath) : []),
+          livePreviewCompartmentRef.current.of(
+            livePreview
+              ? markdownLivePreviewExtension(htmlTrustMode, markdownLinkGraph, documentPath, markdownAssetUrlResolver)
+              : [],
+          ),
           aiEditCompartmentRef.current.of(markdownAiEditExtension(aiEditFile)),
           EditorView.updateListener.of((update) => {
             if (!update.docChanged) return;
@@ -89,9 +95,13 @@ export function MarkdownCodeMirrorEditor({
     if (!view) return;
 
     view.dispatch({
-      effects: livePreviewCompartmentRef.current.reconfigure(livePreview ? markdownLivePreviewExtension(htmlTrustMode, markdownLinkGraph, documentPath) : []),
+      effects: livePreviewCompartmentRef.current.reconfigure(
+        livePreview
+          ? markdownLivePreviewExtension(htmlTrustMode, markdownLinkGraph, documentPath, markdownAssetUrlResolver)
+          : [],
+      ),
     });
-  }, [documentPath, livePreview, htmlTrustMode, markdownLinkGraph]);
+  }, [documentPath, livePreview, htmlTrustMode, markdownLinkGraph, markdownAssetUrlResolver]);
 
   useLayoutEffect(() => {
     const view = viewRef.current;

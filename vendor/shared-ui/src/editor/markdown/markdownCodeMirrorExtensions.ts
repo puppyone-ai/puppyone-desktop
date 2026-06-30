@@ -6,6 +6,7 @@ import {
   Decoration,
   type DecorationSet,
   EditorView,
+  type MouseSelectionStyle,
   type Rect,
   WidgetType,
   dropCursor,
@@ -26,10 +27,15 @@ import { getMarkdownTaskLine, type MarkdownTaskLine } from "./rendering/taskMode
 import { getMarkdownHtmlBlock, type MarkdownHtmlBlock } from "./rendering/htmlBlockModel";
 import { isSafeHref } from "./rendering/markdownHtmlPolicy";
 import { createSanitizedBlockHtmlFragment } from "./rendering/sanitizeHtml";
+import {
+  findMarkdownImageTokens,
+  isSafeMarkdownImageUrl,
+  resolveMarkdownHtmlImageSources,
+} from "./links/markdownImageModel";
 import { findMarkdownLinkTokens, isExternalMarkdownHref } from "./links/markdownLinkModel";
 import { findWikiLinkTokens } from "./links/wikiLinkModel";
 import { getHtmlPreviewInteractionCss } from "../htmlPreviewInteraction";
-import type { MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
 
 type LivePreviewDecorations = {
   decorations: DecorationSet;
@@ -72,6 +78,12 @@ const markdownDocumentPathFacet = Facet.define<string, string>({
   },
 });
 
+const markdownAssetUrlResolverFacet = Facet.define<MarkdownAssetUrlResolver | null, MarkdownAssetUrlResolver | null>({
+  combine(values) {
+    return values.length > 0 ? values[values.length - 1] : null;
+  },
+});
+
 export function markdownCodeMirrorBaseExtensions(readOnly: boolean): Extension[] {
   return [
     highlightSpecialChars(),
@@ -82,6 +94,7 @@ export function markdownCodeMirrorBaseExtensions(readOnly: boolean): Extension[]
     markdown({ base: markdownLanguage }),
     syntaxHighlighting(puppyMarkdownHighlightStyle),
     EditorView.lineWrapping,
+    trailingLineWhitespaceSelectionExtension,
     EditorView.contentAttributes.of({
       spellcheck: "false",
       autocorrect: "off",
@@ -98,11 +111,13 @@ export function markdownLivePreviewExtension(
   htmlTrustMode: MarkdownHtmlTrustMode = "safe",
   markdownLinkGraph: MarkdownLinkGraph | null = null,
   documentPath = "",
+  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null = null,
 ): Extension {
   return [
     markdownHtmlTrustModeFacet.of(htmlTrustMode),
     markdownLinkGraphFacet.of(markdownLinkGraph),
     markdownDocumentPathFacet.of(documentPath),
+    markdownAssetUrlResolverFacet.of(markdownAssetUrlResolver),
     markdownLinkOpenHandler,
     markdownLivePreviewDecorations,
   ];
@@ -137,6 +152,65 @@ const puppyMarkdownHighlightStyle = HighlightStyle.define([
   { tag: tags.quote, class: "cm-md-syntax-quote" },
   { tag: tags.list, class: "cm-md-syntax-list" },
 ]);
+
+const TRAILING_LINE_WHITESPACE_SELECTION_GAP = 3;
+
+const trailingLineWhitespaceSelectionExtension = EditorView.mouseSelectionStyle.of((view, event) => {
+  if (event.button !== 0 || event.detail !== 1 || event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) {
+    return null;
+  }
+
+  const start = view.posAndSideAtCoords({ x: event.clientX, y: event.clientY }, false);
+  const startEdge = getTrailingLineSelectionEdge(view, start.pos);
+  if (
+    !startEdge ||
+    event.clientY < startEdge.top ||
+    event.clientY > startEdge.bottom ||
+    event.clientX <= startEdge.x + TRAILING_LINE_WHITESPACE_SELECTION_GAP
+  ) {
+    return null;
+  }
+
+  let anchor = startEdge.pos;
+  return {
+    get(curEvent) {
+      const currentEdge = getTrailingLineSelectionEdge(view, anchor) ?? startEdge;
+      if (
+        curEvent.clientY >= currentEdge.top &&
+        curEvent.clientY <= currentEdge.bottom &&
+        curEvent.clientX > currentEdge.x + TRAILING_LINE_WHITESPACE_SELECTION_GAP
+      ) {
+        return EditorSelection.create([EditorSelection.cursor(anchor, -1)]);
+      }
+
+      const head = view.posAndSideAtCoords({ x: curEvent.clientX, y: curEvent.clientY }, false);
+      return EditorSelection.create([EditorSelection.range(anchor, head.pos, undefined, undefined, head.assoc)]);
+    },
+    update(update) {
+      if (!update.docChanged) return false;
+      anchor = update.changes.mapPos(anchor);
+      return true;
+    },
+  } satisfies MouseSelectionStyle;
+});
+
+function getTrailingLineSelectionEdge(
+  view: EditorView,
+  pos: number,
+): { pos: number; x: number; top: number; bottom: number } | null {
+  const line = view.state.doc.lineAt(pos);
+  if (line.from === line.to) return null;
+
+  const edgeRect = view.coordsAtPos(line.to, -1);
+  if (!edgeRect) return null;
+
+  return {
+    pos: line.to,
+    x: Math.max(edgeRect.left, edgeRect.right),
+    top: edgeRect.top,
+    bottom: edgeRect.bottom,
+  };
+}
 
 const markdownLivePreviewDecorations = StateField.define<LivePreviewDecorations>({
   create(state) {
@@ -275,6 +349,7 @@ function buildMarkdownDecorations(state: EditorState): LivePreviewDecorations {
     state.facet(markdownHtmlTrustModeFacet),
     state.facet(markdownLinkGraphFacet),
     state.facet(markdownDocumentPathFacet),
+    state.facet(markdownAssetUrlResolverFacet),
   );
 
   return {
@@ -289,6 +364,7 @@ function addMarkdownBlockAndLineDecorations(
   htmlTrustMode: MarkdownHtmlTrustMode,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
+  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
 ) {
   const lineCount = state.doc.lines;
 
@@ -314,7 +390,7 @@ function addMarkdownBlockAndLineDecorations(
       addReplacementDecoration(
         builders,
         Decoration.replace({
-          widget: new HtmlBlockWidget(htmlBlock, htmlTrustMode),
+          widget: new HtmlBlockWidget(htmlBlock, htmlTrustMode, documentPath, markdownAssetUrlResolver),
           block: true,
         }),
         htmlBlock.from,
@@ -329,7 +405,7 @@ function addMarkdownBlockAndLineDecorations(
       addReplacementDecoration(
         builders,
         Decoration.replace({
-          widget: new MarkdownTableWidget(tableBlock.rows, markdownLinkGraph, documentPath),
+          widget: new MarkdownTableWidget(tableBlock.rows, markdownLinkGraph, documentPath, markdownAssetUrlResolver),
           block: true,
         }),
         tableBlock.from,
@@ -339,7 +415,7 @@ function addMarkdownBlockAndLineDecorations(
       continue;
     }
 
-    decorateMarkdownLine(line.from, line.to, line.text, builders, markdownLinkGraph, documentPath);
+    decorateMarkdownLine(line.from, line.to, line.text, builders, markdownLinkGraph, documentPath, markdownAssetUrlResolver);
     lineNumber += 1;
   }
 }
@@ -351,14 +427,16 @@ function decorateMarkdownLine(
   builders: MarkdownDecorationBuilders,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
+  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
 ) {
   const taskLine = getMarkdownTaskLine({ from: lineFrom, to: lineTo, text });
+  const listMatch = taskLine ? null : /^(\s*)([-*+]|\d+[.)])\s+/.exec(text);
   const lineClasses = getMarkdownLineClasses(text);
   if (lineClasses) {
     builders.decorations.push(
       Decoration.line({
         class: lineClasses,
-        attributes: taskLine ? { style: `--md-list-depth:${taskLine.depth};` } : undefined,
+        attributes: getMarkdownLineAttributes(taskLine, listMatch),
       }).range(lineFrom),
     );
   }
@@ -369,7 +447,7 @@ function decorateMarkdownLine(
       builders,
       Decoration.replace({
         widget: new HorizontalRuleWidget(),
-        block: true,
+        inclusive: false,
       }),
       lineFrom,
       lineFrom + hrMatch[1].length,
@@ -401,25 +479,33 @@ function decorateMarkdownLine(
       builders,
       markdownLinkGraph,
       documentPath,
+      markdownAssetUrlResolver,
       [{ from: taskLine.prefixFrom, to: taskLine.prefixTo }],
     );
     return;
   }
 
-  const listMatch = /^(\s*)([-*+]|\d+[.)])\s+/.exec(text);
   if (listMatch) {
-    addReplacementDecoration(
-      builders,
-      Decoration.replace({
-        widget: new ListMarkerWidget(getListMarkerText(listMatch[2]), getListDepth(listMatch[1])),
-        inclusive: false,
-      }),
-      lineFrom,
-      lineFrom + listMatch[0].length,
-    );
+    addHiddenDecoration(builders, lineFrom, lineFrom + listMatch[0].length);
   }
 
-  addInlineMarkdownDecorations(lineFrom, text, builders, markdownLinkGraph, documentPath);
+  addInlineMarkdownDecorations(lineFrom, text, builders, markdownLinkGraph, documentPath, markdownAssetUrlResolver);
+}
+
+function getMarkdownLineAttributes(
+  taskLine: MarkdownTaskLine | null,
+  listMatch: RegExpExecArray | null,
+): Record<string, string> | undefined {
+  if (taskLine) return { style: `--md-list-depth:${taskLine.depth};` };
+  if (!listMatch) return undefined;
+
+  const marker = cssString(getListMarkerText(listMatch[2]));
+  const depth = getListDepth(listMatch[1]);
+  return { style: `--md-list-depth:${depth};--md-list-marker:${marker};` };
+}
+
+function cssString(value: string): string {
+  return JSON.stringify(value);
 }
 
 function getMarkdownLineClasses(text: string): string {
@@ -447,12 +533,13 @@ function addInlineMarkdownDecorations(
   builders: MarkdownDecorationBuilders,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
+  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
   initialOccupied: OccupiedRange[] = [],
 ) {
   const occupied = [...initialOccupied];
 
   addDelimiterDecorations(lineFrom, text, /(`)([^`\n]+)(`)/g, 1, "cm-md-syntax-monospace", builders, occupied);
-  addImageDecorations(lineFrom, text, builders, occupied);
+  addImageDecorations(lineFrom, text, builders, occupied, documentPath, markdownAssetUrlResolver);
   addWikiLinkDecorations(lineFrom, text, builders, occupied, markdownLinkGraph, documentPath);
   addLinkDecorations(lineFrom, text, builders, occupied, markdownLinkGraph, documentPath);
   addDelimiterDecorations(lineFrom, text, /(\*\*|__)(\S(?:.*?\S)?)\1/g, 1, "cm-md-syntax-strong", builders, occupied);
@@ -465,19 +552,18 @@ function addImageDecorations(
   text: string,
   builders: MarkdownDecorationBuilders,
   occupied: OccupiedRange[],
+  documentPath: string,
+  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
 ) {
-  const pattern = /!\[([^\]\n]*)\]\(([^)\n]+)\)/g;
-
-  for (const match of text.matchAll(pattern)) {
-    if (match.index == null) continue;
-    const matchFrom = lineFrom + match.index;
-    const matchTo = matchFrom + match[0].length;
+  for (const token of findMarkdownImageTokens(text)) {
+    const matchFrom = lineFrom + token.from;
+    const matchTo = lineFrom + token.to;
     if (!reserveRange(occupied, matchFrom, matchTo)) continue;
 
     addReplacementDecoration(
       builders,
       Decoration.replace({
-        widget: new ImagePreviewWidget(match[1], match[2]),
+        widget: new ImagePreviewWidget(token.alt, token.href, token.title, documentPath, markdownAssetUrlResolver),
         inclusive: false,
       }),
       matchFrom,
@@ -644,14 +730,11 @@ function addItalicDecorations(
 
 function addHiddenDecoration(builders: MarkdownDecorationBuilders, from: number, to: number) {
   if (from >= to) return;
-  addReplacementDecoration(
-    builders,
-    Decoration.replace({
-      widget: hiddenMarkdownSyntaxWidget,
+  builders.decorations.push(
+    Decoration.mark({
+      class: "cm-md-hidden-syntax",
       inclusive: false,
-    }),
-    from,
-    to,
+    }).range(from, to),
   );
 }
 
@@ -660,11 +743,12 @@ function addReplacementDecoration(
   decoration: Decoration,
   from: number,
   to: number,
+  options: { atomic?: boolean } = {},
 ) {
   if (from >= to) return;
   const range = decoration.range(from, to);
   builders.decorations.push(range);
-  builders.atomicRanges.push(range);
+  if (options.atomic !== false) builders.atomicRanges.push(range);
 }
 
 function reserveRange(occupied: OccupiedRange[], from: number, to: number): boolean {
@@ -719,50 +803,6 @@ function getMarkdownCodeBlock(state: EditorState, lineNumber: number): MarkdownC
     code: codeLines.join("\n"),
   };
 }
-
-class ListMarkerWidget extends WidgetType {
-  constructor(
-    private readonly marker: string,
-    private readonly depth: number,
-  ) {
-    super();
-  }
-
-  eq(widget: WidgetType): boolean {
-    return widget instanceof ListMarkerWidget && widget.marker === this.marker && widget.depth === this.depth;
-  }
-
-  toDOM(): HTMLElement {
-    const marker = document.createElement("span");
-    marker.className = "cm-md-list-marker";
-    marker.style.setProperty("--md-list-depth", String(this.depth));
-    marker.textContent = this.marker;
-    return marker;
-  }
-
-  coordsAt(dom: HTMLElement, pos: number, side: number): Rect | null {
-    return getInlineWidgetTextCoords(dom, getInlineWidgetEdgeX(dom, pos, side));
-  }
-}
-
-class HiddenMarkdownSyntaxWidget extends WidgetType {
-  eq(widget: WidgetType): boolean {
-    return widget instanceof HiddenMarkdownSyntaxWidget;
-  }
-
-  toDOM(): HTMLElement {
-    const marker = document.createElement("span");
-    marker.className = "cm-md-hidden-syntax-widget";
-    marker.setAttribute("aria-hidden", "true");
-    return marker;
-  }
-
-  coordsAt(dom: HTMLElement, pos: number, side: number): Rect | null {
-    return getInlineWidgetTextCoords(dom, getInlineWidgetEdgeX(dom, pos, side));
-  }
-}
-
-const hiddenMarkdownSyntaxWidget = new HiddenMarkdownSyntaxWidget();
 
 class TaskCheckboxWidget extends WidgetType {
   private pointerDown: { x: number; y: number } | null = null;
@@ -864,7 +904,7 @@ function getNearestVisibleTextRect(line: HTMLElement, referenceRect: DOMRect): R
         if (!node.nodeValue?.trim()) return ownerWindow.NodeFilter.FILTER_REJECT;
         const parent = node.parentElement;
         if (!parent) return ownerWindow.NodeFilter.FILTER_REJECT;
-        if (parent.closest(".cm-md-hidden-syntax-widget, .cm-md-task-checkbox-widget")) {
+        if (parent.closest(".cm-md-hidden-syntax, .cm-md-task-checkbox-widget")) {
           return ownerWindow.NodeFilter.FILTER_REJECT;
         }
         return ownerWindow.NodeFilter.FILTER_ACCEPT;
@@ -926,25 +966,118 @@ function parseCssPixelValue(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+const MARKDOWN_HTML_WIDGET_VERTICAL_PADDING = 32;
+
+function estimateMarkdownHtmlBlockHeight(source: string): number {
+  const lineEstimate = Math.max(1, source.split("\n").length) * 24;
+  const imageEstimate = estimateHtmlImageHeight(source);
+  return clampNumber(Math.max(80, lineEstimate + imageEstimate) + MARKDOWN_HTML_WIDGET_VERTICAL_PADDING, 112, 2400);
+}
+
+function estimateHtmlImageHeight(source: string): number {
+  if (!source.includes("<img")) return 0;
+
+  const template = document.createElement("template");
+  template.innerHTML = source;
+  const images = Array.from(template.content.querySelectorAll<HTMLImageElement>("img"));
+  if (images.length === 0) return 0;
+
+  return images.reduce((total, image) => {
+    const explicitHeight = readPositiveNumberAttribute(image, "height");
+    if (explicitHeight) return total + explicitHeight;
+
+    const src = image.getAttribute("src") ?? "";
+    if (/img\.shields\.io|badge/i.test(src)) return total + 24;
+    return total + 320;
+  }, 0);
+}
+
+function readPositiveNumberAttribute(element: Element, name: string): number | null {
+  const value = Number.parseFloat(element.getAttribute(name) ?? "");
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function estimateCodeBlockWidgetHeight(code: string): number {
+  const codeLines = Math.max(1, code.split("\n").length);
+  return clampNumber(42 + codeLines * 20, 80, 1600);
+}
+
+function estimateMarkdownTableWidgetHeight(rowCount: number): number {
+  return clampNumber(24 + Math.max(1, rowCount) * 42, 80, 1600);
+}
+
+class MarkdownWidgetMeasureController {
+  private resizeObserver: ResizeObserver | null = null;
+  private measureFrame: number | null = null;
+  private disposed = false;
+
+  get destroyed(): boolean {
+    return this.disposed;
+  }
+
+  observe(element: HTMLElement, view: EditorView) {
+    if (!("ResizeObserver" in window)) return;
+
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = new ResizeObserver(() => {
+      this.schedule(view);
+    });
+    this.resizeObserver.observe(element);
+  }
+
+  schedule(view: EditorView) {
+    if (this.disposed || this.measureFrame !== null) return;
+
+    this.measureFrame = window.requestAnimationFrame(() => {
+      this.measureFrame = null;
+      if (!this.disposed) view.requestMeasure();
+    });
+  }
+
+  destroy() {
+    this.disposed = true;
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    if (this.measureFrame !== null) {
+      window.cancelAnimationFrame(this.measureFrame);
+      this.measureFrame = null;
+    }
+  }
+}
+
 class HorizontalRuleWidget extends WidgetType {
   eq(widget: WidgetType): boolean {
     return widget instanceof HorizontalRuleWidget;
   }
 
+  get estimatedHeight(): number {
+    return 24;
+  }
+
   toDOM(): HTMLElement {
-    const rule = document.createElement("div");
+    const rule = document.createElement("span");
     rule.className = "cm-md-hr-widget";
     return rule;
+  }
+
+  coordsAt(dom: HTMLElement, pos: number, side: number): Rect | null {
+    return getInlineWidgetTextCoords(dom, getInlineWidgetEdgeX(dom, pos, side));
   }
 }
 
 class HtmlBlockWidget extends WidgetType {
   private messageListener: ((event: MessageEvent) => void) | null = null;
   private readyTimer: number | null = null;
+  private readonly measure = new MarkdownWidgetMeasureController();
+  private previewVersion = 0;
 
   constructor(
     private readonly block: MarkdownHtmlBlock,
     private readonly htmlTrustMode: MarkdownHtmlTrustMode,
+    private readonly documentPath: string,
+    private readonly markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
   ) {
     super();
   }
@@ -955,11 +1088,17 @@ class HtmlBlockWidget extends WidgetType {
       widget.block.source === this.block.source &&
       widget.block.tagName === this.block.tagName &&
       widget.block.closed === this.block.closed &&
-      widget.htmlTrustMode === this.htmlTrustMode
+      widget.htmlTrustMode === this.htmlTrustMode &&
+      widget.documentPath === this.documentPath &&
+      widget.markdownAssetUrlResolver === this.markdownAssetUrlResolver
     );
   }
 
-  toDOM(): HTMLElement {
+  get estimatedHeight(): number {
+    return estimateMarkdownHtmlBlockHeight(this.block.source);
+  }
+
+  toDOM(view: EditorView): HTMLElement {
     const shell = document.createElement("div");
     shell.className = "cm-md-html-widget";
 
@@ -977,11 +1116,15 @@ class HtmlBlockWidget extends WidgetType {
     let showingSource = false;
     const render = () => {
       this.clearPreviewLifecycle();
-      content.replaceChildren(showingSource ? createHtmlSourceBlock(this.block.source) : this.createPreviewBlock());
+      const previewVersion = this.nextPreviewVersion();
+      content.replaceChildren(
+        showingSource ? createHtmlSourceBlock(this.block.source) : this.createPreviewBlock(previewVersion, view),
+      );
       toggleButton.replaceChildren(createHtmlWidgetIcon(showingSource ? "preview" : "source"));
       toggleButton.title = showingSource ? "Show HTML preview" : "Show HTML source";
       toggleButton.setAttribute("aria-label", showingSource ? "Show HTML preview" : "Show HTML source");
       toggleButton.classList.toggle("active", showingSource);
+      this.measure.schedule(view);
     };
 
     toggleButton.addEventListener("click", (event) => {
@@ -993,31 +1136,47 @@ class HtmlBlockWidget extends WidgetType {
 
     render();
     shell.append(toolbar, content);
+    this.measure.observe(shell, view);
     return shell;
   }
 
-  private createPreviewBlock(): HTMLElement {
+  private createPreviewBlock(previewVersion: number, view: EditorView): HTMLElement {
     if (!this.block.closed) {
       return createUnsupportedHtmlBlock(this.block, ["HTML block is not closed"]);
     }
 
     if (this.htmlTrustMode === "localTrusted") {
-      return this.createTrustedHtmlBlock(this.block);
+      return this.createTrustedHtmlBlock(this.block, previewVersion, view);
     }
 
-    const result = createSanitizedBlockHtmlFragment(this.block.source);
-    if (!result.supported) {
-      return createUnsupportedHtmlBlock(this.block, result.reasons);
+    const resolver = this.markdownAssetUrlResolver;
+    if (!resolver) {
+      return createSanitizedHtmlPreviewBlock(this.block, this.block.source);
     }
 
     const wrapper = document.createElement("div");
-    wrapper.className = "cm-md-html-rendered-surface cm-md-html-block";
-    wrapper.appendChild(result.fragment);
+    wrapper.className = "cm-md-html-rendered-surface cm-md-html-block is-loading";
+    wrapper.appendChild(createTrustedHtmlLoader());
+
+    resolveMarkdownHtmlImageSources(this.block.source, this.documentPath, resolver)
+      .then((source) => {
+        if (!this.isPreviewVersionCurrent(previewVersion)) return;
+        replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, source);
+        this.measure.schedule(view);
+      })
+      .catch(() => {
+        if (!this.isPreviewVersionCurrent(previewVersion)) return;
+        replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, this.block.source);
+        this.measure.schedule(view);
+      });
+
     return wrapper;
   }
 
   destroy() {
+    this.previewVersion += 1;
     this.clearPreviewLifecycle();
+    this.measure.destroy();
   }
 
   private clearPreviewLifecycle() {
@@ -1035,7 +1194,16 @@ class HtmlBlockWidget extends WidgetType {
     return true;
   }
 
-  private createTrustedHtmlBlock(block: MarkdownHtmlBlock): HTMLElement {
+  private nextPreviewVersion(): number {
+    this.previewVersion += 1;
+    return this.previewVersion;
+  }
+
+  private isPreviewVersionCurrent(previewVersion: number): boolean {
+    return !this.measure.destroyed && this.previewVersion === previewVersion;
+  }
+
+  private createTrustedHtmlBlock(block: MarkdownHtmlBlock, previewVersion: number, view: EditorView): HTMLElement {
     const wrapper = document.createElement("div");
     wrapper.className = "cm-md-html-trusted-block is-loading";
 
@@ -1061,6 +1229,7 @@ class HtmlBlockWidget extends WidgetType {
       wrapper.classList.remove("is-loading");
       sizer.remove();
       loader.remove();
+      this.measure.schedule(view);
     };
 
     let measuredHeight = false;
@@ -1070,6 +1239,7 @@ class HtmlBlockWidget extends WidgetType {
       measuredHeight = true;
       iframe.style.height = `${clampNumber(event.data.height, 80, 2400)}px`;
       markReady();
+      this.measure.schedule(view);
     };
     window.addEventListener("message", this.messageListener);
 
@@ -1080,8 +1250,20 @@ class HtmlBlockWidget extends WidgetType {
       }, 120);
     }, { once: true });
 
-    iframe.srcdoc = createTrustedHtmlDocument(block.source, frameId);
-    wrapper.appendChild(iframe);
+    resolveMarkdownHtmlImageSources(block.source, this.documentPath, this.markdownAssetUrlResolver)
+      .then((source) => {
+        if (!this.isPreviewVersionCurrent(previewVersion)) return;
+        iframe.srcdoc = createTrustedHtmlDocument(source, frameId);
+        wrapper.appendChild(iframe);
+        this.measure.schedule(view);
+      })
+      .catch(() => {
+        if (!this.isPreviewVersionCurrent(previewVersion)) return;
+        iframe.srcdoc = createTrustedHtmlDocument(block.source, frameId);
+        wrapper.appendChild(iframe);
+        this.measure.schedule(view);
+      });
+
     return wrapper;
   }
 }
@@ -1095,6 +1277,28 @@ function createHtmlSourceBlock(source: string): HTMLElement {
   pre.appendChild(code);
 
   return pre;
+}
+
+function createSanitizedHtmlPreviewBlock(block: MarkdownHtmlBlock, source: string): HTMLElement {
+  const result = createSanitizedBlockHtmlFragment(source);
+  if (!result.supported) {
+    return createUnsupportedHtmlBlock(block, result.reasons);
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "cm-md-html-rendered-surface cm-md-html-block";
+  wrapper.appendChild(result.fragment);
+  return wrapper;
+}
+
+function replaceWithSanitizedHtmlPreviewBlock(
+  target: HTMLElement,
+  block: MarkdownHtmlBlock,
+  source: string,
+) {
+  const nextBlock = createSanitizedHtmlPreviewBlock(block, source);
+  target.className = nextBlock.className;
+  target.replaceChildren(...Array.from(nextBlock.childNodes));
 }
 
 function createTrustedHtmlSizer(source: string): HTMLElement {
@@ -1335,6 +1539,10 @@ class CodeBlockWidget extends WidgetType {
     );
   }
 
+  get estimatedHeight(): number {
+    return estimateCodeBlockWidgetHeight(this.code);
+  }
+
   toDOM(view: EditorView): HTMLElement {
     const wrapper = document.createElement("div");
     wrapper.className = "cm-md-code-widget";
@@ -1421,46 +1629,100 @@ class CodeBlockWidget extends WidgetType {
 }
 
 class ImagePreviewWidget extends WidgetType {
+  private readonly measure = new MarkdownWidgetMeasureController();
+
   constructor(
     private readonly alt: string,
     private readonly source: string,
+    private readonly title: string | null,
+    private readonly documentPath: string,
+    private readonly markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
   ) {
     super();
   }
 
   eq(widget: WidgetType): boolean {
-    return widget instanceof ImagePreviewWidget && widget.alt === this.alt && widget.source === this.source;
+    return (
+      widget instanceof ImagePreviewWidget &&
+      widget.alt === this.alt &&
+      widget.source === this.source &&
+      widget.title === this.title &&
+      widget.documentPath === this.documentPath &&
+      widget.markdownAssetUrlResolver === this.markdownAssetUrlResolver
+    );
   }
 
   toDOM(view: EditorView): HTMLElement {
     const wrapper = document.createElement("span");
     wrapper.className = "cm-md-image-widget";
-    wrapper.title = this.source;
+    wrapper.title = this.title ?? this.source;
 
-    if (/^(https?:|data:|blob:)/i.test(this.source)) {
-      const image = document.createElement("img");
-      image.src = this.source;
-      image.alt = this.alt;
-      image.loading = "lazy";
-      image.addEventListener("load", () => view.requestMeasure());
-      image.addEventListener("error", () => view.requestMeasure());
-      wrapper.appendChild(image);
+    const directSource = this.source.trim();
+    if (isSafeMarkdownImageUrl(directSource)) {
+      wrapper.appendChild(this.createImage(directSource, view));
+      this.measure.observe(wrapper, view);
       return wrapper;
     }
 
+    if (!this.markdownAssetUrlResolver) {
+      wrapper.appendChild(this.createPlaceholder(this.alt || this.source));
+      this.measure.observe(wrapper, view);
+      return wrapper;
+    }
+
+    wrapper.appendChild(this.createPlaceholder("Loading image..."));
+    this.measure.observe(wrapper, view);
+
+    Promise.resolve(this.markdownAssetUrlResolver(this.documentPath, this.source))
+      .then((resolvedUrl) => {
+        if (!wrapper.isConnected) return;
+        wrapper.replaceChildren(
+          resolvedUrl && isSafeMarkdownImageUrl(resolvedUrl)
+            ? this.createImage(resolvedUrl, view)
+            : this.createPlaceholder(this.alt || this.source),
+        );
+        this.measure.schedule(view);
+      })
+      .catch(() => {
+        if (!wrapper.isConnected) return;
+        wrapper.replaceChildren(this.createPlaceholder(this.alt || this.source));
+        this.measure.schedule(view);
+      });
+
+    return wrapper;
+  }
+
+  destroy() {
+    this.measure.destroy();
+  }
+
+  private createImage(source: string, view: EditorView): HTMLImageElement {
+    const image = document.createElement("img");
+    image.src = source;
+    image.alt = this.alt;
+    image.loading = "lazy";
+    if (this.title) image.title = this.title;
+    image.addEventListener("load", () => this.measure.schedule(view));
+    image.addEventListener("error", () => this.measure.schedule(view));
+    return image;
+  }
+
+  private createPlaceholder(labelText: string): HTMLElement {
     const label = document.createElement("span");
     label.className = "cm-md-image-placeholder";
-    label.textContent = this.alt || this.source;
-    wrapper.appendChild(label);
-    return wrapper;
+    label.textContent = labelText;
+    return label;
   }
 }
 
 class MarkdownTableWidget extends WidgetType {
+  private readonly measure = new MarkdownWidgetMeasureController();
+
   constructor(
     private readonly rows: MarkdownTableRow[],
     private readonly markdownLinkGraph: MarkdownLinkGraph | null,
     private readonly documentPath: string,
+    private readonly markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
   ) {
     super();
   }
@@ -1470,8 +1732,13 @@ class MarkdownTableWidget extends WidgetType {
       widget instanceof MarkdownTableWidget &&
       JSON.stringify(widget.rows) === JSON.stringify(this.rows) &&
       widget.markdownLinkGraph === this.markdownLinkGraph &&
-      widget.documentPath === this.documentPath
+      widget.documentPath === this.documentPath &&
+      widget.markdownAssetUrlResolver === this.markdownAssetUrlResolver
     );
+  }
+
+  get estimatedHeight(): number {
+    return estimateMarkdownTableWidgetHeight(this.rows.length);
   }
 
   toDOM(view: EditorView): HTMLElement {
@@ -1487,7 +1754,7 @@ class MarkdownTableWidget extends WidgetType {
       const tr = document.createElement("tr");
       for (const cell of header.cells) {
         const th = document.createElement("th");
-        th.appendChild(createTableCellEditor(view, cell, this.markdownLinkGraph, this.documentPath));
+        th.appendChild(createTableCellEditor(view, cell, this.markdownLinkGraph, this.documentPath, this.markdownAssetUrlResolver));
         tr.appendChild(th);
       }
       thead.appendChild(tr);
@@ -1501,7 +1768,7 @@ class MarkdownTableWidget extends WidgetType {
         const tr = document.createElement("tr");
         for (const cell of row.cells) {
           const td = document.createElement("td");
-          td.appendChild(createTableCellEditor(view, cell, this.markdownLinkGraph, this.documentPath));
+          td.appendChild(createTableCellEditor(view, cell, this.markdownLinkGraph, this.documentPath, this.markdownAssetUrlResolver));
           tr.appendChild(td);
         }
         tbody.appendChild(tr);
@@ -1510,8 +1777,13 @@ class MarkdownTableWidget extends WidgetType {
     }
 
     wrapper.appendChild(table);
+    this.measure.observe(wrapper, view);
 
     return wrapper;
+  }
+
+  destroy() {
+    this.measure.destroy();
   }
 
   ignoreEvent() {
@@ -1524,11 +1796,14 @@ function createTableCellEditor(
   cell: MarkdownTableCell,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
+  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
 ): HTMLElement {
   const content = document.createElement("span");
   content.className = "cm-md-table-cell-content";
   content.spellcheck = false;
-  renderTableCellPreview(content, cell.text, markdownLinkGraph, documentPath);
+  renderTableCellPreview(content, cell.text, markdownLinkGraph, documentPath, markdownAssetUrlResolver, () => {
+    view.requestMeasure();
+  });
 
   if (!view.state.readOnly && cell.editable) {
     let editing = false;
@@ -1554,7 +1829,9 @@ function createTableCellEditor(
       const nextValue = sanitizeMarkdownTableCell(content.textContent ?? "");
       editing = false;
       if (nextValue === cell.text) {
-        renderTableCellPreview(content, cell.text, markdownLinkGraph, documentPath);
+        renderTableCellPreview(content, cell.text, markdownLinkGraph, documentPath, markdownAssetUrlResolver, () => {
+          view.requestMeasure();
+        });
         view.requestMeasure();
         return;
       }
@@ -1580,9 +1857,16 @@ function renderTableCellPreview(
   source: string,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
+  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
+  onLayoutChange: () => void,
 ) {
   content.replaceChildren();
-  renderMarkdownInlineInto(content, source, { markdownLinkGraph, sourcePath: documentPath });
+  renderMarkdownInlineInto(content, source, {
+    markdownLinkGraph,
+    markdownAssetUrlResolver,
+    onLayoutChange,
+    sourcePath: documentPath,
+  });
 }
 
 function stopCodeMirrorEvent(event: Event) {

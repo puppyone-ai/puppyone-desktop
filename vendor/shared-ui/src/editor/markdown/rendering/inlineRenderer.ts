@@ -1,16 +1,24 @@
 import { isSafeHref } from "./markdownHtmlPolicy";
 import { appendSanitizedInlineHtml } from "./sanitizeHtml";
-import type { MarkdownLinkGraph } from "../../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../viewerTypes";
+import {
+  findMarkdownImageTokens,
+  isSafeMarkdownImageUrl,
+  resolveMarkdownHtmlImageSources,
+} from "../links/markdownImageModel";
 import { findWikiLinkTokens, type MarkdownWikiLinkToken } from "../links/wikiLinkModel";
 
 type InlineToken =
   | { kind: "code"; from: number; to: number; text: string }
   | { kind: "del" | "em" | "strong"; from: number; to: number; text: string }
+  | { kind: "image"; from: number; to: number; alt: string; href: string; title: string | null }
   | { kind: "link"; from: number; to: number; label: string; href: string }
   | { kind: "wikiLink"; from: number; to: number; token: MarkdownWikiLinkToken };
 
 export type MarkdownInlineRenderOptions = {
   markdownLinkGraph?: MarkdownLinkGraph | null;
+  markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  onLayoutChange?: () => void;
   sourcePath?: string;
 };
 
@@ -31,13 +39,45 @@ export function renderMarkdownInlineInto(
   if (!source) return;
 
   if (mightContainHtml(source)) {
-    const template = document.createElement("template");
-    template.innerHTML = source;
-    appendSanitizedInlineHtml(target, template.content, (node, text) => appendMarkdownText(node, text, options));
+    appendInlineHtml(target, source, options);
     return;
   }
 
   appendMarkdownText(target, source, options);
+}
+
+function appendInlineHtml(target: Node, source: string, options: MarkdownInlineRenderOptions) {
+  const resolver = options.markdownAssetUrlResolver ?? null;
+  const shouldResolveImages = Boolean(resolver && /<img\b/i.test(source));
+  if (!shouldResolveImages) {
+    renderSanitizedInlineHtml(target, source, options);
+    return;
+  }
+
+  const targetNode = document.createElement("span");
+  target.appendChild(targetNode);
+  renderSanitizedInlineHtml(targetNode, source, options);
+
+  if (!resolver) return;
+
+  resolveMarkdownHtmlImageSources(source, options.sourcePath ?? "", resolver)
+    .then((resolvedSource) => {
+      if (resolvedSource === source) return;
+      if (targetNode instanceof HTMLElement && !targetNode.isConnected) return;
+      targetNode.replaceChildren();
+      renderSanitizedInlineHtml(targetNode, resolvedSource, {
+        ...options,
+        markdownAssetUrlResolver: null,
+      });
+      options.onLayoutChange?.();
+    })
+    .catch(() => undefined);
+}
+
+function renderSanitizedInlineHtml(target: Node, source: string, options: MarkdownInlineRenderOptions) {
+  const template = document.createElement("template");
+  template.innerHTML = source;
+  appendSanitizedInlineHtml(target, template.content, (node, text) => appendMarkdownText(node, text, options));
 }
 
 function appendMarkdownText(target: Node, source: string, options: MarkdownInlineRenderOptions) {
@@ -70,6 +110,11 @@ function appendToken(target: Node, token: InlineToken, options: MarkdownInlineRe
 
   if (token.kind === "wikiLink") {
     appendWikiLink(target, token.token, options);
+    return;
+  }
+
+  if (token.kind === "image") {
+    appendImage(target, token, options);
     return;
   }
 
@@ -131,6 +176,7 @@ function findNextToken(source: string, start: number): InlineToken | null {
     const token =
       parseCodeToken(source, index) ??
       parseWikiLinkToken(source, index) ??
+      parseImageToken(source, index) ??
       parseLinkToken(source, index) ??
       parseDelimitedToken(source, index, "**", "strong") ??
       parseDelimitedToken(source, index, "__", "strong") ??
@@ -142,6 +188,66 @@ function findNextToken(source: string, start: number): InlineToken | null {
   }
 
   return null;
+}
+
+function appendImage(
+  target: Node,
+  token: Extract<InlineToken, { kind: "image" }>,
+  options: MarkdownInlineRenderOptions,
+) {
+  const source = token.href.trim();
+  if (isSafeMarkdownImageUrl(source)) {
+    target.appendChild(createImageElement(source, token.alt, token.title, options.onLayoutChange));
+    return;
+  }
+
+  const resolver = options.markdownAssetUrlResolver ?? null;
+  if (!resolver) {
+    target.appendChild(createImagePlaceholder(token.alt || token.href));
+    return;
+  }
+
+  const placeholder = createImagePlaceholder("Loading image...");
+  target.appendChild(placeholder);
+
+  Promise.resolve(resolver(options.sourcePath ?? "", token.href))
+    .then((resolvedUrl) => {
+      if (!placeholder.isConnected) return;
+      placeholder.replaceWith(
+        resolvedUrl && isSafeMarkdownImageUrl(resolvedUrl)
+          ? createImageElement(resolvedUrl, token.alt, token.title, options.onLayoutChange)
+          : createImagePlaceholder(token.alt || token.href),
+      );
+      options.onLayoutChange?.();
+    })
+    .catch(() => {
+      if (!placeholder.isConnected) return;
+      placeholder.replaceWith(createImagePlaceholder(token.alt || token.href));
+      options.onLayoutChange?.();
+    });
+}
+
+function createImageElement(
+  source: string,
+  alt: string,
+  title: string | null,
+  onLayoutChange: (() => void) | undefined,
+): HTMLImageElement {
+  const image = document.createElement("img");
+  image.src = source;
+  image.alt = alt;
+  image.loading = "lazy";
+  if (title) image.title = title;
+  image.addEventListener("load", () => onLayoutChange?.());
+  image.addEventListener("error", () => onLayoutChange?.());
+  return image;
+}
+
+function createImagePlaceholder(labelText: string): HTMLElement {
+  const label = document.createElement("span");
+  label.className = "cm-md-image-placeholder";
+  label.textContent = labelText;
+  return label;
 }
 
 function parseWikiLinkToken(source: string, from: number): InlineToken | null {
@@ -197,6 +303,23 @@ function parseLinkToken(source: string, from: number): InlineToken | null {
     to: hrefTo + 1,
     label: source.slice(from + 1, labelTo),
     href: source.slice(labelTo + 2, hrefTo).trim(),
+  };
+}
+
+function parseImageToken(source: string, from: number): InlineToken | null {
+  if (!source.startsWith("![", from)) return null;
+  if (isEscaped(source, from)) return null;
+
+  const token = findMarkdownImageTokens(source.slice(from))[0] ?? null;
+  if (!token || token.from !== 0) return null;
+
+  return {
+    kind: "image",
+    from,
+    to: from + token.to,
+    alt: token.alt,
+    href: token.href,
+    title: token.title,
   };
 }
 

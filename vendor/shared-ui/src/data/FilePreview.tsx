@@ -2,7 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import type { DataNode, FileContent } from "../core/types";
 import { EditorHost } from "../editor/EditorHost";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
-import type { MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../editor/viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../editor/viewerTypes";
 import type { AiEditFile } from "../editor/ai-edits/types";
 import { FilePreviewIcon, type FileIconThemeId } from "../file/fileIcons";
 
@@ -25,6 +25,7 @@ export type FilePreviewProps = {
   editorSaveMode?: EditorSaveMode;
   htmlTrustMode?: MarkdownHtmlTrustMode;
   markdownLinkGraph?: MarkdownLinkGraph | null;
+  markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
 };
 
 export function FilePreview({
@@ -46,6 +47,7 @@ export function FilePreview({
   editorSaveMode = "manual",
   htmlTrustMode = "safe",
   markdownLinkGraph = null,
+  markdownAssetUrlResolver = null,
 }: FilePreviewProps) {
   if (!node) {
     if (emptySlot) return <>{emptySlot}</>;
@@ -105,6 +107,7 @@ export function FilePreview({
               saveMode={editorSaveMode}
               htmlTrustMode={htmlTrustMode}
               markdownLinkGraph={markdownLinkGraph}
+              markdownAssetUrlResolver={markdownAssetUrlResolver}
               deferFallbackContent={deferFallbackContent}
             />
           </EditorPreviewBoundary>

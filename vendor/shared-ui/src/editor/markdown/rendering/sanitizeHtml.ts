@@ -10,6 +10,7 @@ import {
   isVoidHtmlTag,
   type HtmlSanitizerMode,
 } from "./markdownHtmlPolicy";
+import { isSafeMarkdownImageSrcset, isSafeMarkdownImageUrl } from "../links/markdownImageModel";
 
 export type MarkdownTextRenderer = (target: Node, text: string) => void;
 
@@ -128,6 +129,42 @@ function copySafeAttributes(target: HTMLElement, source: HTMLElement, tagName: s
       } else {
         markUnsupported(context, "unsafe link URL is not supported");
       }
+      continue;
+    }
+
+    if (tagName === "img" && name === "src") {
+      if (isSafeMarkdownImageUrl(value)) {
+        target.setAttribute("src", value.trim());
+      } else {
+        markUnsupported(context, "unsafe image URL is not supported");
+      }
+      continue;
+    }
+
+    if (tagName === "img" && name === "srcset") {
+      if (isSafeMarkdownImageSrcset(value)) {
+        target.setAttribute("srcset", value.trim());
+      } else {
+        markUnsupported(context, "unsafe image srcset is not supported");
+      }
+      continue;
+    }
+
+    if (tagName === "img" && name === "alt") {
+      target.setAttribute("alt", value);
+      continue;
+    }
+
+    if (tagName === "img" && name === "loading") {
+      const loading = value.trim().toLowerCase();
+      if (loading === "lazy" || loading === "eager" || loading === "auto") target.setAttribute("loading", loading);
+      else markUnsupported(context, "image loading value is not supported");
+      continue;
+    }
+
+    if (tagName === "img" && (name === "width" || name === "height")) {
+      if (/^[1-9]\d{0,3}$/.test(value.trim())) target.setAttribute(name, value.trim());
+      else markUnsupported(context, `${name} value is not supported`);
       continue;
     }
 

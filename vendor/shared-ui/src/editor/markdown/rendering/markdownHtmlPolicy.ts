@@ -8,6 +8,7 @@ const INLINE_TAGS = [
   "del",
   "em",
   "i",
+  "img",
   "mark",
   "s",
   "span",
@@ -124,13 +125,14 @@ export const MARKDOWN_HTML_POLICY = {
     inline: new Set<string>(INLINE_TAGS),
     block: new Set<string>(BLOCK_TAGS),
     blocked: new Set<string>(BLOCKED_TAGS),
-    void: new Set<string>(["br", "hr"]),
+    void: new Set<string>(["br", "hr", "img"]),
   },
   attributes: {
     global: new Set<string>(["aria-label", "style", "title"]),
     byTag: new Map<string, Set<string>>([
       ["a", new Set(["aria-label", "href", "style", "title"])],
       ["details", new Set(["aria-label", "open", "style", "title"])],
+      ["img", new Set(["alt", "aria-label", "height", "loading", "src", "srcset", "style", "title", "width"])],
       ["td", new Set(["aria-label", "colspan", "rowspan", "style", "title"])],
       ["th", new Set(["aria-label", "colspan", "rowspan", "style", "title"])],
     ]),

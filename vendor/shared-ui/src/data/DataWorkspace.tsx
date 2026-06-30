@@ -17,6 +17,7 @@ import {
   createMarkdownLinkGraph,
   type MarkdownLinkGraphDocument,
 } from "../editor/markdown/links/markdownLinkGraph";
+import { resolveMarkdownAssetPath } from "../editor/markdown/links/markdownImageModel";
 import { ExplorerTree } from "./ExplorerTree";
 import { FilePreview, type FilePreviewProps } from "./FilePreview";
 import { ProjectsHeader } from "./ProjectsHeader";
@@ -506,6 +507,20 @@ export function DataWorkspace({
       },
     }),
     [markdownLinkDocuments, markdownLinkIndexing, onOpenExternalUrl, openMarkdownLinkCandidates],
+  );
+  const markdownAssetUrlResolver = useCallback(
+    async (sourcePath: string, href: string) => {
+      if (!dataPort.getFileUrl) return null;
+      const assetPath = resolveMarkdownAssetPath(sourcePath, href);
+      if (!assetPath) return null;
+
+      try {
+        return await dataPort.getFileUrl(assetPath);
+      } catch {
+        return null;
+      }
+    },
+    [dataPort],
   );
   const workspaceState: DataWorkspaceState = {
     tree,
@@ -1017,6 +1032,7 @@ export function DataWorkspace({
                   editorSaveMode={editorSaveMode}
                   htmlTrustMode={htmlTrustMode}
                   markdownLinkGraph={markdownLinkGraph}
+                  markdownAssetUrlResolver={markdownAssetUrlResolver}
                   emptySlot={emptySlot}
                   actionSlot={previewActionSlot}
                   renderBody={renderPreviewBody}

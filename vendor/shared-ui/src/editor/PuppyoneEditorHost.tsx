@@ -1,7 +1,7 @@
 "use client";
 
 import { resolveEditorViewer } from "./viewerRegistry";
-import type { EditorDocument, EditorSaveMode, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "./viewerTypes";
+import type { EditorDocument, EditorSaveMode, MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "./viewerTypes";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
 
@@ -20,6 +20,7 @@ export type PuppyoneEditorHostProps = {
   saveMode?: EditorSaveMode;
   htmlTrustMode?: MarkdownHtmlTrustMode;
   markdownLinkGraph?: MarkdownLinkGraph | null;
+  markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
 };
 
 export function PuppyoneEditorHost({
@@ -35,6 +36,7 @@ export function PuppyoneEditorHost({
   saveMode = "manual",
   htmlTrustMode = "safe",
   markdownLinkGraph = null,
+  markdownAssetUrlResolver = null,
 }: PuppyoneEditorHostProps) {
   const { viewer, format } = resolveEditorViewer(document);
   const rawContent = viewer.allowPreviewContent === false
@@ -69,6 +71,7 @@ export function PuppyoneEditorHost({
         saveMode,
         htmlTrustMode,
         markdownLinkGraph,
+        markdownAssetUrlResolver,
         onSaveContent,
       })}
     </>

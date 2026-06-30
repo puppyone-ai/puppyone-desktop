@@ -1197,7 +1197,22 @@ button.editor-save-chip {
 }
 
 .markdown-codemirror-editor .cm-md-list-line {
+  position: relative;
+  padding-left: calc(20px + var(--md-list-depth, 0) * 16px);
   color: color-mix(in srgb, var(--po-text) 78%, var(--po-text-muted));
+}
+
+.markdown-codemirror-editor .cm-md-list-line:not(.cm-md-task-line)::before {
+  position: absolute;
+  left: calc(var(--md-list-depth, 0) * 16px);
+  display: inline-flex;
+  width: 20px;
+  align-items: center;
+  justify-content: flex-start;
+  color: var(--po-text-subtle);
+  font-weight: 650;
+  user-select: none;
+  content: var(--md-list-marker, "");
 }
 
 .markdown-codemirror-editor .cm-md-list-mark {
@@ -1223,22 +1238,11 @@ button.editor-save-chip {
   color: var(--po-text-disabled);
 }
 
-.markdown-codemirror-editor .cm-md-list-marker {
-  display: inline-flex;
-  width: calc(20px + var(--md-list-depth, 0) * 16px);
-  align-items: center;
-  justify-content: flex-start;
-  color: var(--po-text-subtle);
-  font-weight: 650;
-  user-select: none;
-}
-
-.markdown-codemirror-editor .cm-md-hidden-syntax-widget {
-  display: inline-block;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  vertical-align: baseline;
+.markdown-codemirror-editor .cm-md-hidden-syntax {
+  color: transparent;
+  font-size: 0;
+  letter-spacing: 0;
+  line-height: 0;
 }
 
 .markdown-codemirror-editor .cm-md-task-line {
@@ -1309,12 +1313,14 @@ button.editor-save-chip {
 }
 
 .markdown-codemirror-editor .cm-md-hr-widget {
-  display: flex;
+  display: inline-flex;
   width: 100%;
   height: 37px;
   align-items: center;
   margin: 0;
   background: transparent;
+  user-select: none;
+  vertical-align: middle;
 }
 
 .markdown-codemirror-editor .cm-md-hr-widget::before {
@@ -1396,7 +1402,14 @@ button.editor-save-chip {
 .markdown-codemirror-editor .cm-md-html-widget {
   position: relative;
   display: block;
+  box-sizing: border-box;
   width: 100%;
+  padding: 14px 0 18px;
+}
+
+.markdown-codemirror-editor .cm-md-html-widget-content {
+  display: flow-root;
+  min-width: 0;
 }
 
 .markdown-codemirror-editor .cm-md-html-widget-toolbar {
@@ -1431,7 +1444,7 @@ button.editor-save-chip {
   box-sizing: border-box;
   width: 100%;
   max-height: 360px;
-  margin: 14px 0 18px;
+  margin: 0;
   padding: 12px 14px;
   overflow: auto;
   border: 1px solid color-mix(in srgb, var(--po-divider) 82%, transparent);
@@ -1455,6 +1468,7 @@ button.editor-save-chip {
   --text-muted: var(--po-text-muted);
   --text-normal: var(--po-text);
   box-sizing: border-box;
+  display: flow-root;
   width: 100%;
   color: color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted));
   font-family: var(--po-font-sans);
@@ -1463,7 +1477,12 @@ button.editor-save-chip {
 }
 
 .markdown-codemirror-editor .cm-md-html-block {
-  margin: 14px 0 18px;
+  margin: 0;
+}
+
+.markdown-codemirror-editor .cm-md-html-block.is-loading {
+  position: relative;
+  min-height: 80px;
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface * {
@@ -1502,11 +1521,19 @@ button.editor-save-chip {
   cursor: pointer;
 }
 
+.markdown-codemirror-editor .cm-md-html-rendered-surface img,
+.markdown-codemirror-editor .cm-md-html-rendered-surface video,
+.markdown-codemirror-editor .cm-md-html-rendered-surface canvas,
+.markdown-codemirror-editor .cm-md-html-rendered-surface svg {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 .markdown-codemirror-editor .cm-md-html-trusted-block {
   position: relative;
   display: block;
   width: 100%;
-  margin: 14px 0 18px;
+  margin: 0;
 }
 
 .markdown-codemirror-editor .cm-md-html-trusted-block.is-loading {
@@ -1584,7 +1611,7 @@ button.editor-save-chip {
 .markdown-codemirror-editor .cm-md-html-unsupported {
   display: grid;
   gap: 5px;
-  margin: 14px 0 18px;
+  margin: 0;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--po-warning) 30%, var(--po-divider));
   border-radius: 6px;
@@ -1619,6 +1646,7 @@ button.editor-save-chip {
 .markdown-codemirror-editor .cm-md-image-widget {
   display: inline-flex;
   max-width: 100%;
+  user-select: none;
   vertical-align: middle;
 }
 
@@ -1627,6 +1655,7 @@ button.editor-save-chip {
   max-width: min(100%, 520px);
   max-height: 320px;
   border-radius: 6px;
+  -webkit-user-drag: none;
 }
 
 .markdown-codemirror-editor .cm-md-image-placeholder {

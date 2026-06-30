@@ -73,6 +73,11 @@ export type MarkdownLinkGraph = {
   getBacklinks?: (path: string) => MarkdownBacklink[];
 };
 
+export type MarkdownAssetUrlResolver = (
+  sourcePath: string,
+  href: string,
+) => string | null | Promise<string | null>;
+
 export type EditorViewerMatch = {
   document: EditorDocument;
   format: FileFormat;
@@ -92,6 +97,7 @@ export type EditorViewerContext = EditorViewerMatch & {
   saveMode: EditorSaveMode;
   htmlTrustMode: MarkdownHtmlTrustMode;
   markdownLinkGraph?: MarkdownLinkGraph | null;
+  markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   onSaveContent?: (content: string) => Promise<void>;
 };
 
