@@ -1,5 +1,4 @@
 import { safeStorage, shell } from "electron";
-import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -16,7 +15,6 @@ export function createCloudAuthService({
   projectRoot,
   protocol = "puppyone",
   requestCloudApi,
-  getCloudApiErrorMessage,
   getWindows,
   revealWindow,
 }) {
@@ -86,27 +84,18 @@ export function createCloudAuthService({
     }
   }
 
-  async function signInWithPassword({ apiBase, email, password }) {
-    const data = await requestCloudApi(apiBase, "/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const session = buildSessionFromAuth(data, email, "", apiBase);
-    await initializeUser(apiBase, session.access_token);
-    return toPublicSession(await writeStoredSession(session));
-  }
-
   async function startOAuth({ apiBase, provider }) {
     const normalizedProvider = normalizeOAuthProvider(provider);
-    const config = await requestCloudApi(apiBase, "/auth/config", { method: "GET" });
-    const supabaseUrl = normalizeHttpOrigin(config?.supabase_url);
-    const anonKey = typeof config?.supabase_anon_key === "string" ? config.supabase_anon_key : "";
-    if (!supabaseUrl || !anonKey) throw new Error("Cloud auth config is unavailable.");
-
-    const state = randomTokenUrlSafe(32);
-    const codeVerifier = randomTokenUrlSafe(64);
-    const codeChallenge = base64Url(createHash("sha256").update(codeVerifier).digest());
+    const start = await requestCloudApi(apiBase, "/auth/desktop/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: normalizedProvider,
+        callback_url: `${callbackOrigin}/callback`,
+      }),
+    });
+    const state = requireNonEmptyString(start?.state, "Cloud sign-in start did not return state.");
+    const loginUrl = requireHttpUrl(start?.login_url, "Cloud sign-in start did not return a browser URL.");
     const timeout = setTimeout(() => {
       pendingOAuthStates.delete(state);
     }, OAUTH_STATE_TTL_MS);
@@ -114,20 +103,10 @@ export function createCloudAuthService({
     pendingOAuthStates.set(state, {
       apiBase,
       provider: normalizedProvider,
-      supabaseUrl,
-      anonKey,
-      codeVerifier,
       timeout,
     });
 
-    const authorizeUrl = new URL(`${supabaseUrl}/auth/v1/authorize`);
-    authorizeUrl.searchParams.set("provider", normalizedProvider);
-    authorizeUrl.searchParams.set("redirect_to", `${callbackOrigin}/callback`);
-    authorizeUrl.searchParams.set("code_challenge", codeChallenge);
-    authorizeUrl.searchParams.set("code_challenge_method", "s256");
-    authorizeUrl.searchParams.set("state", state);
-
-    await shell.openExternal(authorizeUrl.toString());
+    await shell.openExternal(loginUrl);
     return { ok: true };
   }
 
@@ -143,11 +122,10 @@ export function createCloudAuthService({
       if (!pending) throw new Error("Cloud sign-in callback expired. Please sign in again.");
       clearPendingOAuthState(state);
 
-      const data = await exchangeSupabasePkceCode({
-        supabaseUrl: pending.supabaseUrl,
-        anonKey: pending.anonKey,
-        code,
-        codeVerifier: pending.codeVerifier,
+      const data = await requestCloudApi(pending.apiBase, "/auth/desktop/exchange", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, state }),
       });
       const userEmail = typeof data?.user?.email === "string" ? data.user.email : "";
       const session = buildSessionFromAuth(data, userEmail, "", pending.apiBase);
@@ -239,27 +217,6 @@ export function createCloudAuthService({
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-  }
-
-  async function exchangeSupabasePkceCode({ supabaseUrl, anonKey, code, codeVerifier }) {
-    const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=pkce`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: anonKey,
-      },
-      body: JSON.stringify({
-        auth_code: code,
-        code_verifier: codeVerifier,
-      }),
-    });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) {
-      const error = new Error(getCloudApiErrorMessage(payload, `Cloud OAuth exchange failed (${response.status})`));
-      error.status = response.status;
-      throw error;
-    }
-    return payload;
   }
 
   function getSessionStatePath() {
@@ -407,7 +364,6 @@ export function createCloudAuthService({
     handleCallback,
     readSession,
     restoreSession,
-    signInWithPassword,
     startOAuth,
     requestSessionApi,
     clearSession,
@@ -422,6 +378,20 @@ function requireNonEmptyString(value, message) {
   return value.trim();
 }
 
+function requireHttpUrl(value, message) {
+  const raw = requireNonEmptyString(value, message);
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error(message);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(message);
+  }
+  return url.toString();
+}
+
 function normalizeRequestHeaders(headers) {
   if (!headers || typeof headers !== "object" || Array.isArray(headers)) return {};
   const normalized = {};
@@ -433,32 +403,10 @@ function normalizeRequestHeaders(headers) {
   return normalized;
 }
 
-function normalizeHttpOrigin(value) {
-  if (typeof value !== "string" || !value.trim()) return null;
-  try {
-    const url = new URL(value.trim());
-    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    return url.origin;
-  } catch {
-    return null;
-  }
-}
-
 function normalizeOAuthProvider(provider) {
+  if (provider == null || provider === "") return undefined;
   if (provider === "google" || provider === "github") return provider;
   throw new Error("Unsupported Cloud OAuth provider.");
-}
-
-function randomTokenUrlSafe(bytes) {
-  return base64Url(randomBytes(bytes));
-}
-
-function base64Url(buffer) {
-  return buffer
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
 }
 
 function isAuthFailure(error) {

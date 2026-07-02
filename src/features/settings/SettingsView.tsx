@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Check, Cloud, Copy, FileText, GitBranch, GripVertical, Monitor, Moon, PanelBottom, PanelTop, Pencil, RefreshCw, Settings, ShieldCheck, SquareTerminal, Sun, Unlink } from "lucide-react";
+import { Check, Cloud, Copy, FileText, GitBranch, GripVertical, LogIn, LogOut, Monitor, Moon, PanelBottom, PanelTop, Pencil, RefreshCw, Settings, ShieldCheck, SquareTerminal, Sun, Unlink, UserRound } from "lucide-react";
 import { FILE_ICON_THEMES, FileGlyphIcon } from "@puppyone/shared-ui";
 import { DesktopUpdateSettingsRow } from "../../components/DesktopUpdateControls";
+import { getDesktopCloudApiBaseUrl, isCloudSessionForApiBase, type DesktopCloudSession } from "../../lib/cloudApi";
+import { clearDesktopCloudSession, onDesktopCloudAuthError, startDesktopCloudOAuth, supportsDesktopCloudOAuth } from "../../lib/cloudSession";
 import { DEFAULT_EXPLORER_EXCLUDE_PATTERNS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, normalizeExplorerExcludePatterns, type FilesVisibilitySettings, type RightSidebarToolId } from "../../preferences";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import { getPuppyoneRemote, maskRemoteUrl, parsePuppyoneRemote } from "../source-control/remotes";
@@ -29,26 +31,27 @@ export function SettingsView({
   gitStatusLoading,
   gitStatusError,
   themeMode,
-  gitDisplayMode,
   fileIconTheme,
   sidebarNavigationLayout,
   filesVisibilitySettings,
   rightSidebarToolsSettings,
   aiEditAssistEnabled,
   cloudEnabled,
+  cloudSession,
+  cloudSessionRestoring,
+  cloudApiBaseUrl,
   puppyoneConfig,
   puppyoneConfigLoading,
   puppyoneConfigSaving,
   puppyoneConfigError,
   updateState,
   onThemeModeChange,
-  onGitDisplayModeChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onFilesVisibilitySettingsChange,
   onRightSidebarToolsSettingsChange,
   onAiEditAssistEnabledChange,
-  onCloudEnabledChange,
+  onCloudSessionChange,
   onPuppyoneConfigChange,
   onUnlinkWorkspace,
   onRefreshGitStatus,
@@ -63,6 +66,17 @@ export function SettingsView({
   const orderedRightSidebarTools = rightSidebarToolsSettings.order
     .map((toolId) => RIGHT_SIDEBAR_TOOL_DEFINITIONS.find((tool) => tool.id === toolId))
     .filter((tool): tool is typeof RIGHT_SIDEBAR_TOOL_DEFINITIONS[number] => Boolean(tool));
+
+  if (activeSection === "account") {
+    return (
+      <AccountSettingsView
+        cloudSession={cloudSession}
+        cloudSessionRestoring={cloudSessionRestoring}
+        cloudApiBaseUrl={cloudApiBaseUrl}
+        onCloudSessionChange={onCloudSessionChange}
+      />
+    );
+  }
 
   const unlinkWorkspace = async () => {
     if (unlinking) return;
@@ -100,6 +114,20 @@ export function SettingsView({
         error={gitStatusError}
         copiedRemoteKey={copiedRemoteKey}
         copyError={copyError}
+        onCopyRemoteUrl={copyRemoteUrl}
+        onRefresh={onRefreshGitStatus}
+      />
+    );
+  }
+
+  if (activeSection === "cloud") {
+    return (
+      <CloudHostingSettingsView
+        status={gitStatus}
+        loading={gitStatusLoading}
+        error={gitStatusError}
+        copiedRemoteKey={copiedRemoteKey}
+        copyError={copyError}
         puppyoneConfig={puppyoneConfig}
         puppyoneConfigLoading={puppyoneConfigLoading}
         puppyoneConfigSaving={puppyoneConfigSaving}
@@ -117,15 +145,6 @@ export function SettingsView({
       <FilesSettingsView
         settings={filesVisibilitySettings}
         onChange={onFilesVisibilitySettingsChange}
-      />
-    );
-  }
-
-  if (activeSection === "cloud") {
-    return (
-      <CloudSettingsView
-        enabled={cloudEnabled}
-        onEnabledChange={onCloudEnabledChange}
       />
     );
   }
@@ -172,27 +191,6 @@ export function SettingsView({
                   >
                     <Moon size={14} />
                     <span>Dark</span>
-                  </button>
-                </div>
-              </div>
-              <div className="desktop-settings-row desktop-settings-row-control">
-                <span>Git view</span>
-                <div className="desktop-theme-segment" aria-label="Git view mode">
-                  <button
-                    className={gitDisplayMode === "simple" ? "active" : ""}
-                    type="button"
-                    title="Show Remote, Committed, and Changes. Stage is handled automatically when committing."
-                    onClick={() => onGitDisplayModeChange("simple")}
-                  >
-                    <span>Simple</span>
-                  </button>
-                  <button
-                    className={gitDisplayMode === "professional" ? "active" : ""}
-                    type="button"
-                    title="Show Remote, Committed, Staged, and Unstaged changes separately."
-                    onClick={() => onGitDisplayModeChange("professional")}
-                  >
-                    <span>Professional</span>
                   </button>
                 </div>
               </div>
@@ -348,6 +346,150 @@ export function SettingsView({
   );
 }
 
+type AccountAuthOperation = "signin" | "signout";
+
+function AccountSettingsView({
+  cloudSession,
+  cloudSessionRestoring,
+  cloudApiBaseUrl,
+  onCloudSessionChange,
+}: {
+  cloudSession: DesktopCloudSession | null;
+  cloudSessionRestoring: boolean;
+  cloudApiBaseUrl: string | null;
+  onCloudSessionChange: (session: DesktopCloudSession | null) => void;
+}) {
+  const resolvedApiBaseUrl = cloudApiBaseUrl || getDesktopCloudApiBaseUrl();
+  const [operation, setOperation] = useState<AccountAuthOperation | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const signedIn = Boolean(cloudSession);
+  const sessionMatchesService = !cloudSession || isCloudSessionForApiBase(cloudSession, resolvedApiBaseUrl);
+  const desktopOAuthAvailable = supportsDesktopCloudOAuth();
+  const busy = Boolean(operation) || cloudSessionRestoring;
+
+  useEffect(() => {
+    return onDesktopCloudAuthError((message) => {
+      setOperation(null);
+      setAuthMessage(null);
+      setAuthError(message);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!cloudSession) return;
+    setOperation((current) => current === "signin" ? null : current);
+    setAuthError(null);
+    setAuthMessage(null);
+  }, [cloudSession?.api_base_url, cloudSession?.user_email]);
+
+  const startWebSignIn = async () => {
+    if (!desktopOAuthAvailable) {
+      setAuthMessage(null);
+      setAuthError("Desktop web sign-in is unavailable in this build.");
+      return;
+    }
+
+    setOperation("signin");
+    setAuthError(null);
+    setAuthMessage(null);
+    try {
+      await startDesktopCloudOAuth(resolvedApiBaseUrl);
+      setAuthMessage("Finish sign-in in your browser.");
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : "Unable to start web sign-in.");
+    } finally {
+      window.setTimeout(() => {
+        setOperation((current) => current === "signin" ? null : current);
+      }, 1200);
+    }
+  };
+
+  const signOut = async () => {
+    if (operation === "signout") return;
+    setOperation("signout");
+    setAuthError(null);
+    setAuthMessage(null);
+    try {
+      await clearDesktopCloudSession();
+      onCloudSessionChange(null);
+      setAuthMessage("Signed out.");
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : "Sign-out failed.");
+    } finally {
+      setOperation(null);
+    }
+  };
+
+  return (
+    <section className="desktop-utility-view desktop-settings-view">
+      <div className="desktop-utility-body desktop-settings-body">
+        <div className="desktop-settings-section desktop-account-settings-section">
+          <SettingsSectionHeader title="Account" detail="Desktop account and Cloud service settings." />
+
+          <SettingsGroup title="Puppyone account">
+            <SettingsLine
+              label="Status"
+              value={cloudSessionRestoring ? "Restoring" : signedIn ? "Signed in" : "Signed out"}
+              tone={signedIn ? "success" : undefined}
+              action={signedIn && !sessionMatchesService ? (
+                <span className="desktop-settings-badge warning">Different service</span>
+              ) : undefined}
+            />
+            <SettingsLine
+              label="Email"
+              value={cloudSession?.user_email ?? "Not signed in"}
+            />
+            <SettingsLine
+              label="Desktop service"
+              value={resolvedApiBaseUrl}
+              title={resolvedApiBaseUrl}
+              monospace
+            />
+            <SettingsLine
+              label="Session service"
+              value={cloudSession?.api_base_url ?? "None"}
+              title={cloudSession?.api_base_url}
+              monospace={Boolean(cloudSession?.api_base_url)}
+            />
+            <div className="desktop-settings-line desktop-settings-account-actions-line">
+              <span>Authentication</span>
+              <div className="desktop-settings-line-value desktop-settings-account-actions">
+                {signedIn ? (
+                  <button
+                    className="desktop-settings-action danger"
+                    type="button"
+                    disabled={operation === "signout" || cloudSessionRestoring}
+                    onClick={() => void signOut()}
+                  >
+                    <LogOut size={14} />
+                    <span>{operation === "signout" ? "Signing out..." : "Sign out"}</span>
+                  </button>
+                ) : (
+                  <button
+                    className="desktop-settings-action primary"
+                    type="button"
+                    disabled={busy || !desktopOAuthAvailable}
+                    onClick={() => void startWebSignIn()}
+                  >
+                    <LogIn size={14} />
+                    <span>{operation === "signin" ? "Opening browser..." : "Sign in with browser"}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            {(authError || authMessage) && (
+              <div className={`desktop-settings-account-feedback ${authError ? "danger" : "success"}`}>
+                {authError ?? authMessage}
+              </div>
+            )}
+          </SettingsGroup>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function EditorSettingsView({
   aiEditAssistEnabled,
   onAiEditAssistEnabledChange,
@@ -371,40 +513,6 @@ function EditorSettingsView({
                   type="checkbox"
                   checked={aiEditAssistEnabled}
                   onChange={(event) => onAiEditAssistEnabledChange(event.target.checked)}
-                />
-                <span aria-hidden="true" />
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function CloudSettingsView({
-  enabled,
-  onEnabledChange,
-}: {
-  enabled: boolean;
-  onEnabledChange: (enabled: boolean) => void;
-}) {
-  return (
-    <section className="desktop-utility-view desktop-settings-view">
-      <div className="desktop-utility-body desktop-settings-body">
-        <div className="desktop-settings-section">
-          <SettingsSectionHeader title="Cloud" detail="Local Cloud preference for this device." />
-          <div className="desktop-settings-list">
-            <div className="desktop-settings-row desktop-settings-row-control">
-              <span className="desktop-settings-label-stack">
-                <strong>Enable Cloud</strong>
-                <small>Show Cloud in the sidebar and enable Cloud backup actions.</small>
-              </span>
-              <label className="desktop-settings-switch">
-                <input
-                  type="checkbox"
-                  checked={enabled}
-                  onChange={(event) => onEnabledChange(event.target.checked)}
                 />
                 <span aria-hidden="true" />
               </label>
@@ -527,7 +635,7 @@ function moveRightSidebarTool(
   return nextOrder;
 }
 
-function GitSettingsView({
+function CloudHostingSettingsView({
   status,
   loading,
   error,
@@ -556,10 +664,7 @@ function GitSettingsView({
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
   onRefresh: () => void;
 }) {
-  const currentBranch = status?.branches.find((branch) => branch.current) ?? null;
   const remotes = status?.remotes ?? [];
-  const localBranchCount = status?.branches.filter((branch) => !branch.remote).length ?? 0;
-  const remoteBranchCount = status?.branches.filter((branch) => branch.remote).length ?? 0;
   const puppyoneRemote = remotes
     .map((remote) => ({ remote, info: parsePuppyoneRemote(remote.fetchUrl ?? remote.pushUrl) }))
     .find((entry) => entry.info);
@@ -567,6 +672,114 @@ function GitSettingsView({
   const cloudInfo = puppyoneRemote?.info ?? null;
   const cloudRemoteUrl = cloudRemote ? cloudRemote.fetchUrl ?? cloudRemote.pushUrl : null;
   const cloudCopyKey = cloudRemoteUrl ? `${cloudRemote?.name}:${cloudRemoteUrl}` : "";
+  const usesPuppyoneCloud = cloudEnabled
+    && (puppyoneConfig?.sync.sourceOfTruth.service === "puppyone"
+      || (puppyoneConfig?.backup.enabled === true && puppyoneConfig.backup.service === "puppyone"));
+
+  return (
+    <section className="desktop-utility-view desktop-settings-view">
+      <div className="desktop-utility-body desktop-settings-body">
+        <div className="desktop-settings-section">
+          <div className="desktop-settings-heading-row">
+            <SettingsSectionHeader
+              title="Cloud Hosting"
+              detail="Choose the service Puppyone treats as this workspace's sync authority."
+            />
+            <button className="desktop-settings-action" type="button" onClick={onRefresh} disabled={loading}>
+              <RefreshCw size={14} className={loading ? "spin" : undefined} />
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          {error ? (
+            <div className="desktop-utility-empty danger">{error}</div>
+          ) : loading && !status ? (
+            <div className="desktop-utility-empty">Reading Git...</div>
+          ) : status && !status.isRepo ? (
+            <div className="desktop-utility-empty">Not a Git repository.</div>
+          ) : (
+            <>
+              <PuppyoneWorkspaceConfigSettings
+                config={puppyoneConfig}
+                remotes={remotes}
+                branches={status?.branches ?? []}
+                currentBranchName={status?.branch ?? null}
+                cloudEnabled={cloudEnabled}
+                loading={puppyoneConfigLoading}
+                saving={puppyoneConfigSaving}
+                error={puppyoneConfigError}
+                onChange={onPuppyoneConfigChange}
+              />
+
+              {usesPuppyoneCloud && (
+                <SettingsGroup title="Puppyone Cloud connection">
+                  <SettingsLine
+                    label="Status"
+                    value={cloudInfo ? "Connected" : "Not configured"}
+                    tone={cloudInfo ? "success" : undefined}
+                  />
+                  {cloudInfo ? (
+                    <>
+                      <SettingsLine label="Remote" value={cloudRemote?.name ?? "puppyone"} />
+                      <SettingsLine label="Host" value={cloudInfo.host} />
+                      <SettingsLine
+                        label={cloudInfo.kind === "access-point" ? "Access key" : "Project"}
+                        value={cloudInfo.displayId}
+                        monospace
+                      />
+                      <SettingsLine
+                        label="Connection URL"
+                        value={cloudRemoteUrl ? maskRemoteUrl(cloudRemoteUrl) : "Not configured"}
+                        title={cloudRemoteUrl ?? undefined}
+                        monospace
+                        action={cloudRemoteUrl ? (
+                          <button
+                            className="desktop-settings-row-action"
+                            type="button"
+                            onClick={() => void onCopyRemoteUrl(cloudCopyKey, cloudRemoteUrl)}
+                          >
+                            <Copy size={13} />
+                            <span>{copiedRemoteKey === cloudCopyKey ? "Copied" : "Copy"}</span>
+                          </button>
+                        ) : undefined}
+                      />
+                    </>
+                  ) : (
+                    <div className="desktop-settings-muted-row">Not configured</div>
+                  )}
+                </SettingsGroup>
+              )}
+
+              {copyError && <div className="desktop-utility-empty danger">{copyError}</div>}
+            </>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function GitSettingsView({
+  status,
+  loading,
+  error,
+  copiedRemoteKey,
+  copyError,
+  onCopyRemoteUrl,
+  onRefresh,
+}: {
+  status: GitStatusSnapshot | null;
+  loading: boolean;
+  error: string | null;
+  copiedRemoteKey: string | null;
+  copyError: string | null;
+  onCopyRemoteUrl: (key: string, url: string) => Promise<void>;
+  onRefresh: () => void;
+}) {
+  const currentBranch = status?.branches.find((branch) => branch.current) ?? null;
+  const remotes = status?.remotes ?? [];
+  const localBranchCount = status?.branches.filter((branch) => !branch.remote).length ?? 0;
+  const remoteBranchCount = status?.branches.filter((branch) => branch.remote).length ?? 0;
 
   return (
     <section className="desktop-utility-view desktop-settings-view">
@@ -598,57 +811,6 @@ function GitSettingsView({
                 />
                 <SettingsLine label="HEAD" value={status?.headCommitId ? shortCommit(status.headCommitId) : "No commits"} monospace />
               </SettingsGroup>
-
-              <PuppyoneWorkspaceConfigSettings
-                config={puppyoneConfig}
-                remotes={remotes}
-                branches={status?.branches ?? []}
-                currentBranchName={status?.branch ?? null}
-                cloudEnabled={cloudEnabled}
-                loading={puppyoneConfigLoading}
-                saving={puppyoneConfigSaving}
-                error={puppyoneConfigError}
-                onChange={onPuppyoneConfigChange}
-              />
-
-              {cloudEnabled && (
-                <SettingsGroup title="puppyone remote">
-                  <SettingsLine
-                    label="Status"
-                    value={cloudInfo ? "Connected" : "Not configured"}
-                    tone={cloudInfo ? "success" : undefined}
-                  />
-                  {cloudInfo ? (
-                    <>
-                      <SettingsLine label="Remote" value={cloudRemote?.name ?? "puppyone"} />
-                      <SettingsLine label="Host" value={cloudInfo.host} />
-                      <SettingsLine
-                        label={cloudInfo.kind === "access-point" ? "Access key" : "Project"}
-                        value={cloudInfo.displayId}
-                        monospace
-                      />
-                      <SettingsLine
-                        label="Git URL"
-                        value={cloudRemoteUrl ? maskRemoteUrl(cloudRemoteUrl) : "Not configured"}
-                        title={cloudRemoteUrl ?? undefined}
-                        monospace
-                        action={cloudRemoteUrl ? (
-                          <button
-                            className="desktop-settings-row-action"
-                            type="button"
-                            onClick={() => void onCopyRemoteUrl(cloudCopyKey, cloudRemoteUrl)}
-                          >
-                            <Copy size={13} />
-                            <span>{copiedRemoteKey === cloudCopyKey ? "Copied" : "Copy"}</span>
-                          </button>
-                        ) : undefined}
-                      />
-                    </>
-                  ) : (
-                    <div className="desktop-settings-muted-row">Not configured</div>
-                  )}
-                </SettingsGroup>
-              )}
 
               <SettingsGroup title="Remotes">
                 {remotes.length === 0 ? (
@@ -703,12 +865,13 @@ function GitSettingsView({
 
 export function SettingsSidebar({ activeSection, onSelectSection }: SettingsSidebarProps) {
   const settingsSections = [
+    { id: "account", label: "Account", icon: UserRound, disabled: false },
     { id: "workspace", label: "General", icon: Settings, disabled: false },
-    { id: "cloud", label: "Cloud", icon: Cloud, disabled: false },
     { id: "appearance", label: "Appearance", icon: Monitor, disabled: false },
     { id: "git", label: "Git", icon: GitBranch, disabled: false },
     { id: "files", label: "Git Ignore", icon: FileText, disabled: false },
     { id: "editor", label: "Editor", icon: Pencil, disabled: false },
+    { id: "cloud", label: "Cloud Hosting", icon: Cloud, disabled: false },
   ] satisfies Array<{
     id: SettingsSection;
     label: string;
@@ -722,18 +885,21 @@ export function SettingsSidebar({ activeSection, onSelectSection }: SettingsSide
         {settingsSections.map((section) => {
           const Icon = section.icon;
           return (
-            <button
-              className={`desktop-tool-sidebar-row ${section.id === activeSection ? "active" : ""}`}
-              type="button"
-              disabled={section.disabled}
-              aria-disabled={section.disabled}
-              title={section.disabled ? `${section.label} is not available yet` : section.label}
-              key={section.id}
-              onClick={() => onSelectSection(section.id)}
-            >
-              <Icon size={15} />
-              <span>{section.label}</span>
-            </button>
+            <div key={section.id}>
+              <button
+                className={`desktop-tool-sidebar-row ${section.id === activeSection ? "active" : ""}`}
+                type="button"
+                disabled={section.disabled}
+                aria-disabled={section.disabled}
+                title={section.disabled ? `${section.label} is not available yet` : section.label}
+                onClick={() => onSelectSection(section.id)}
+              >
+                <Icon size={15} />
+                <span>{section.label}</span>
+              </button>
+              {section.id === "account" && <div className="desktop-settings-sidebar-divider" aria-hidden="true" />}
+              {section.id === "editor" && <div className="desktop-settings-sidebar-divider cloud" aria-hidden="true" />}
+            </div>
           );
         })}
       </div>

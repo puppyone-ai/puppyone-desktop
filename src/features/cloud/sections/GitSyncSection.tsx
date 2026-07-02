@@ -45,7 +45,7 @@ export function CloudGitSyncSection({
           <div className="desktop-cloud-sync-panel-header">
             <span className="desktop-cloud-web-status-dot ready" aria-hidden="true" />
             <div>
-              <strong>PuppyOne Cloud</strong>
+              <strong>Puppyone Cloud</strong>
               <small>Source of truth</small>
             </div>
           </div>

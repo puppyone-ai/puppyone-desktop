@@ -9,6 +9,14 @@ export type GitWorkingSelection = {
 
 export type GitMainPanel = "changes" | "history";
 
+export type GitHostingMode = "github" | "puppyone-cloud" | "generic-git";
+
+export type GitHostingIdentity = {
+  provider: Extract<GitHostingMode, "github" | "puppyone-cloud">;
+  label: string;
+  href: string | null;
+};
+
 export type GitActionIconKind = "download" | "upload" | "plus";
 
 export type GitSidebarPrimaryActionKind = "commit" | "commit-push" | "push" | "publish";

@@ -176,8 +176,10 @@ body.data-sidebar-resizing * {
   --tree-row-content-left: var(--po-tree-row-content-left, 8px);
   --tree-row-content-right: var(--po-tree-row-content-right, 6px);
   --tree-row-indent: var(--po-tree-row-indent, 24px);
+  --tree-icon-slot-size: var(--po-tree-icon-slot-size, 18px);
   --tree-root-top-gap: var(--po-tree-root-top-gap, 5px);
   --tree-list-bottom-gap: var(--po-tree-list-bottom-gap, 6px);
+  --tree-scrollbar-width: var(--po-tree-scrollbar-width, 4px);
 
   position: relative;
   display: flex;
@@ -206,8 +208,8 @@ body.data-sidebar-resizing * {
 }
 
 .explorer-tree-scroll::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: var(--tree-scrollbar-width);
+  height: var(--tree-scrollbar-width);
 }
 
 .explorer-tree-scroll::-webkit-scrollbar-track {
@@ -241,6 +243,10 @@ body.data-sidebar-resizing * {
   width: 100%;
   box-sizing: border-box;
   padding: 0 0 var(--tree-list-bottom-gap);
+}
+
+.explorer-tree-scroll.is-scrollable .explorer-tree-list {
+  --tree-row-right-gap: max(0px, calc(var(--po-tree-row-right-gap, 4px) - var(--tree-scrollbar-width)));
 }
 
 .data-explorer-footer {
@@ -435,8 +441,8 @@ body.data-sidebar-resizing * {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+  width: var(--tree-icon-slot-size);
+  height: var(--tree-icon-slot-size);
   color: inherit;
 }
 
@@ -497,7 +503,13 @@ body.data-sidebar-resizing * {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(var(--tree-row-left-gap) + var(--depth, 0) * var(--tree-row-indent) - var(--tree-row-content-left));
+  left: calc(
+    var(--tree-row-left-gap)
+    + var(--tree-row-content-left)
+    + var(--depth, 0) * var(--tree-row-indent)
+    - var(--tree-row-indent)
+    + var(--tree-icon-slot-size) / 2
+  );
   z-index: 0;
   width: 1px;
   background: var(--po-tree-guide);

@@ -35,7 +35,7 @@ export function CloudSignedOutState({
 }) {
   return (
     <CloudMainSection
-      title="PuppyOne Cloud"
+      title="Puppyone Cloud"
       count="Sign in required"
       action={<button className="desktop-cloud-row-action primary" type="button" onClick={onOpenDetails}>Sign in</button>}
     >
@@ -141,12 +141,12 @@ export function CloudRemoteConnectedWorkspace({
             <span>Hosted Git remote</span>
             <strong title={cloudRemote.rawUrl}>{workspace.name}</strong>
             <p>
-              This workspace is already initialized because its Git remote points to PuppyOne Cloud.
+              This workspace is already initialized because its Git remote points to Puppyone Cloud.
               Desktop is resolving the Cloud project metadata for project-level {activeSection === "overview" ? "sections" : section.title.toLowerCase()}.
             </p>
           </div>
           <div className="desktop-cloud-sync-summary">
-            <CloudMainMetric label="Source" value="PuppyOne Cloud" tone="ready" />
+            <CloudMainMetric label="Source" value="Puppyone Cloud" tone="ready" />
             <CloudMainMetric label="Remote" value={cloudRemote.info.displayId} tone="ready" mono />
             <CloudMainMetric label="Branch" value={branchName} />
           </div>
@@ -161,7 +161,7 @@ export function CloudRemoteConnectedWorkspace({
         <div className="desktop-cloud-empty-state">
           <span><Icon size={22} /></span>
           <div>
-            <strong>{loading ? "Resolving project metadata" : "PuppyOne Git remote is connected"}</strong>
+            <strong>{loading ? "Resolving project metadata" : "Puppyone Git remote is connected"}</strong>
             <p>
               Remote {cloudRemote.info.displayId} is the source of truth. Project-level access, MCP, branches, team, and settings appear after the Cloud API maps this access point to a project.
               {localChangeCount > 0 ? ` ${localChangeCount} local change${localChangeCount === 1 ? "" : "s"} are waiting in this working copy.` : ""}
@@ -306,7 +306,7 @@ export function CloudUnmappedSection({
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
 }) {
   const section = getCloudSectionDescriptor(activeSection);
-  const remoteLabel = cloudRemote?.info.displayId ?? "No PuppyOne remote";
+  const remoteLabel = cloudRemote?.info.displayId ?? "No Puppyone remote";
   const Icon = section.icon;
 
   return (

@@ -1,14 +1,19 @@
-import type { ComponentProps } from "react";
+import { useCallback, useState, type ComponentProps } from "react";
 import { DataWorkspace, type AiEditRequest, type DataNode, type Workspace } from "@puppyone/shared-ui";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
 import { GitSidebar, GitStatusView } from "../source-control";
 import type { DesktopGitController } from "../source-control/useDesktopGitController";
 import { SettingsSidebar, SettingsView, type SettingsSection } from "../settings";
 import {
+  DesktopCloudAccessSidebar,
   CloudServiceMainView,
   CloudServiceSidebar,
+  DesktopCloudAccessView,
+  DesktopCloudIntegrationsSidebar,
+  type CloudAccessFilter,
   type CloudWorkspaceSection,
 } from "../cloud";
+import { getGitHostingMode } from "../source-control/viewModel";
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import type { useDesktopUpdates } from "../../components/DesktopUpdateControls";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
@@ -38,8 +43,11 @@ type DesktopWorkspaceContentProps = {
     activeSection: CloudWorkspaceSection;
     backupError: string | null;
     backupLoading: boolean;
+    cloudApiBaseUrl: string | null;
     cloudSession: DesktopCloudSession | null;
+    storedCloudSession: DesktopCloudSession | null;
     enabled: boolean;
+    projectId: string | null;
     sessionRestoring: boolean;
     onCloudSessionChange: (session: DesktopCloudSession | null) => void;
     onConfigureCloudRemote: (remoteUrl: string) => Promise<GitStatusSnapshot | null>;
@@ -67,6 +75,7 @@ type DesktopWorkspaceContentProps = {
   puppyoneConfigSaving: boolean;
   settingsSection: SettingsSection;
   workspace: Workspace;
+  workspaceKind?: "local" | "cloud";
   workspaceKey: string;
   workspaceRefreshToken: number;
 };
@@ -95,10 +104,40 @@ export function DesktopWorkspaceContent({
   puppyoneConfigSaving,
   settingsSection,
   workspace,
+  workspaceKind = "local",
   workspaceKey,
   workspaceRefreshToken,
 }: DesktopWorkspaceContentProps) {
-  const resolvedActiveView = activeView === "cloud" && !cloud.enabled ? "data" : activeView;
+  const cloudWorkspace = workspaceKind === "cloud";
+  const resolvedActiveView = cloudWorkspace && (activeView === "git" || activeView === "cloud")
+    ? "data"
+    : !cloudWorkspace && (activeView === "access" || activeView === "integrations") ? "data"
+      : activeView === "cloud" && !cloud.enabled ? "data"
+        : (activeView === "access" || activeView === "integrations") && !cloud.enabled ? "data" : activeView;
+  const gitEnabled = !cloudWorkspace;
+  const gitHostingMode = getGitHostingMode(git.activeGitStatus, puppyoneConfig);
+  const workspaceChangeCount = gitEnabled
+    ? getDesktopWorkspaceChangeCount(git.activeGitStatus, gitHostingMode === "github")
+    : 0;
+  const accessNavigationEnabled = cloud.enabled && cloudWorkspace && Boolean(cloud.projectId);
+  const [activeCloudAccessFilter, setActiveCloudAccessFilter] = useState<CloudAccessFilter>("all");
+  const [activeIntegrationProvider, setActiveIntegrationProvider] = useState<string | null>(null);
+  const effectiveCloudAccessFilter: CloudAccessFilter = resolvedActiveView === "integrations"
+    ? "integrations"
+    : activeCloudAccessFilter === "integrations" ? "all" : activeCloudAccessFilter;
+  const handleIntegrationProviderChange = useCallback((provider: string | null) => {
+    setActiveIntegrationProvider(provider);
+  }, []);
+  const handleCloudAccessFilterChange = (filter: CloudAccessFilter) => {
+    if (filter === "integrations") {
+      setActiveCloudAccessFilter("all");
+      setActiveIntegrationProvider(null);
+      onNavigate("integrations");
+      return;
+    }
+    setActiveCloudAccessFilter(filter);
+    if (resolvedActiveView === "integrations") onNavigate("access");
+  };
 
   const settingsView = (
     <SettingsView
@@ -108,26 +147,27 @@ export function DesktopWorkspaceContent({
       gitStatusLoading={git.gitStatusLoading}
       gitStatusError={git.gitStatusError}
       themeMode={preferences.themeMode}
-      gitDisplayMode={preferences.gitDisplayMode}
       fileIconTheme={preferences.fileIconTheme}
       sidebarNavigationLayout={preferences.sidebarNavigationLayout}
       filesVisibilitySettings={preferences.filesVisibilitySettings}
       rightSidebarToolsSettings={preferences.rightSidebarToolsSettings}
       aiEditAssistEnabled={preferences.aiEditAssistEnabled}
-      cloudEnabled={preferences.cloudEnabled}
+      cloudEnabled={cloud.enabled}
+      cloudSession={cloud.storedCloudSession}
+      cloudSessionRestoring={cloud.sessionRestoring}
+      cloudApiBaseUrl={cloud.cloudApiBaseUrl}
       puppyoneConfig={puppyoneConfig}
       puppyoneConfigLoading={puppyoneConfigLoading}
       puppyoneConfigSaving={puppyoneConfigSaving}
       puppyoneConfigError={puppyoneConfigError}
       updateState={desktopUpdates.state}
       onThemeModeChange={preferences.setThemeMode}
-      onGitDisplayModeChange={preferences.setGitDisplayMode}
       onFileIconThemeChange={preferences.setFileIconTheme}
       onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
       onFilesVisibilitySettingsChange={onFilesVisibilitySettingsChange}
       onRightSidebarToolsSettingsChange={preferences.setRightSidebarToolsSettings}
       onAiEditAssistEnabledChange={preferences.setAiEditAssistEnabled}
-      onCloudEnabledChange={preferences.setCloudEnabled}
+      onCloudSessionChange={cloud.onCloudSessionChange}
       onPuppyoneConfigChange={onPuppyoneConfigChange}
       onUnlinkWorkspace={onUnlinkWorkspace}
       onRefreshGitStatus={git.refreshGitStatus}
@@ -167,7 +207,7 @@ export function DesktopWorkspaceContent({
       workspace={workspace}
       status={git.activeGitStatus}
       puppyoneConfig={puppyoneConfig}
-      cloudSession={cloud.cloudSession}
+      cloudSession={cloud.storedCloudSession}
       sessionRestoring={cloud.sessionRestoring}
       onCloudSessionChange={cloud.onCloudSessionChange}
       activeSection={cloud.activeSection}
@@ -184,10 +224,23 @@ export function DesktopWorkspaceContent({
     />
   );
 
+  const cloudAccessView = (
+    <DesktopCloudAccessView
+      projectId={cloud.projectId}
+      cloudSession={cloud.cloudSession}
+      activeFilter={effectiveCloudAccessFilter}
+      activeIntegrationProvider={resolvedActiveView === "integrations" ? activeIntegrationProvider : null}
+      sessionRestoring={cloud.sessionRestoring}
+      onCloudSessionChange={cloud.onCloudSessionChange}
+      onRefresh={() => undefined}
+    />
+  );
+
   if (!dataPort) {
     if (resolvedActiveView === "settings") return settingsView;
     if (resolvedActiveView === "git") return gitStatusView;
     if (resolvedActiveView === "cloud") return cloudMainView;
+    if (resolvedActiveView === "access" || resolvedActiveView === "integrations") return cloudAccessView;
     return null;
   }
 
@@ -213,9 +266,13 @@ export function DesktopWorkspaceContent({
         explorerToolbarSlot={preferences.sidebarNavigationPlacement === "top" ? (
           <DesktopSidebarTopNavigation
             activeView={resolvedActiveView}
-            cloudEnabled={cloud.enabled}
+            accessEnabled={accessNavigationEnabled}
+            gitEnabled={gitEnabled}
             orientation={preferences.sidebarNavigationOrientation}
             gitIncomingCount={git.gitIncomingCount}
+            gitOperationLoading={git.gitOperationLoading}
+            gitStatus={git.activeGitStatus}
+            workspaceChangeCount={workspaceChangeCount}
             onNavigate={onNavigate}
             onOpenSettings={onOpenSettings}
           />
@@ -226,6 +283,7 @@ export function DesktopWorkspaceContent({
         editorSaveMode="auto"
         htmlTrustMode="localTrusted"
         aiEditRequest={activeAiEditRequest}
+        enableMarkdownLinkContentIndexing={!cloudWorkspace}
         refreshKey={workspaceRefreshToken}
         explorerRootActionSlot={
           <DesktopExplorerRowActions
@@ -244,7 +302,20 @@ export function DesktopWorkspaceContent({
         )}
         explorerSlot={resolvedActiveView === "data" ? undefined : (
           <div className="desktop-view-surface desktop-view-surface-sidebar" data-view={resolvedActiveView}>
-            {resolvedActiveView === "git" ? (
+            {resolvedActiveView === "access" ? (
+              <DesktopCloudAccessSidebar
+                activeFilter={effectiveCloudAccessFilter}
+                onSelectFilter={handleCloudAccessFilterChange}
+              />
+            ) : resolvedActiveView === "integrations" ? (
+              <DesktopCloudIntegrationsSidebar
+                projectId={cloud.projectId}
+                cloudSession={cloud.cloudSession}
+                activeProvider={activeIntegrationProvider}
+                onCloudSessionChange={cloud.onCloudSessionChange}
+                onSelectProvider={handleIntegrationProviderChange}
+              />
+            ) : resolvedActiveView === "git" ? (
               <GitSidebar
                 status={git.activeGitStatus}
                 puppyoneConfig={puppyoneConfig}
@@ -279,7 +350,7 @@ export function DesktopWorkspaceContent({
             ) : resolvedActiveView === "cloud" ? (
               <CloudServiceSidebar
                 status={git.activeGitStatus}
-                cloudSession={cloud.cloudSession}
+                cloudSession={cloud.storedCloudSession}
                 activeSection={cloud.activeSection}
                 onSelectSection={cloud.onSelectSection}
               />
@@ -295,16 +366,26 @@ export function DesktopWorkspaceContent({
           preferences.sidebarNavigationPlacement === "bottom" ? (
             <DesktopSidebarFooterNavigation
               activeView={resolvedActiveView}
-              cloudEnabled={cloud.enabled}
+              accessEnabled={accessNavigationEnabled}
+              gitEnabled={gitEnabled}
               gitIncomingCount={git.gitIncomingCount}
+              gitOperationLoading={git.gitOperationLoading}
+              gitStatus={git.activeGitStatus}
+              workspaceChangeCount={workspaceChangeCount}
               onNavigate={onNavigate}
               onOpenSettings={onOpenSettings}
             />
           ) : undefined
         }
-        mainSlot={resolvedActiveView === "git" || resolvedActiveView === "settings" || resolvedActiveView === "cloud" ? (
+        mainSlot={resolvedActiveView === "git" || resolvedActiveView === "settings" || resolvedActiveView === "cloud" || resolvedActiveView === "access" || resolvedActiveView === "integrations" ? (
           <div className="desktop-view-surface desktop-view-surface-main" data-view={resolvedActiveView}>
-            {resolvedActiveView === "git" ? gitStatusView : resolvedActiveView === "cloud" ? cloudMainView : settingsView}
+            {resolvedActiveView === "git"
+              ? gitStatusView
+              : resolvedActiveView === "cloud"
+                ? cloudMainView
+                : resolvedActiveView === "access" || resolvedActiveView === "integrations"
+                  ? cloudAccessView
+                  : settingsView}
           </div>
         ) : undefined}
         capabilities={{
@@ -316,7 +397,7 @@ export function DesktopWorkspaceContent({
           history: true,
           accessPoints: false,
           cloudSync: false,
-          localGit: true,
+          localGit: gitEnabled,
           connectors: false,
         }}
       />
@@ -331,4 +412,19 @@ export function DesktopWorkspaceContent({
       )}
     </div>
   );
+}
+
+function getDesktopWorkspaceChangeCount(
+  status: GitStatusSnapshot | null,
+  includeCommittedChanges: boolean,
+) {
+  if (!status?.isRepo) return 0;
+  const localChangeCount =
+    status.stagedEntries.length +
+    status.unstagedEntries.length +
+    status.untrackedEntries.length;
+  const committedChangeCount = includeCommittedChanges
+    ? Math.max(0, status.sourceControl.remote.ahead)
+    : 0;
+  return localChangeCount + committedChangeCount;
 }

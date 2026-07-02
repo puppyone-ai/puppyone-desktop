@@ -55,7 +55,7 @@ export function CloudMcpCliSection({
           <CloudMethodSection title="Puppyone CLI">
             <CloudMethodCard icon={SquareTerminal} subtitle="Direct terminal access" active={Boolean(cliCommand)}>
               <CloudPromptBlock
-                value={`Use PuppyOne CLI to read and write ${scopeName} from any terminal. Paste this into Claude Code, Cursor, or your local shell.`}
+                value={`Use Puppyone CLI to read and write ${scopeName} from any terminal. Paste this into Claude Code, Cursor, or your local shell.`}
               />
               <CloudCommandBlock
                 label="Login"

@@ -1,3 +1,12 @@
+.desktop-overlay-root {
+  color: var(--po-text);
+  font-family: var(--po-font-sans);
+}
+
+.desktop-overlay-root:empty {
+  display: none;
+}
+
 .desktop-dialog-backdrop {
   position: fixed;
   inset: 0;

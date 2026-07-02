@@ -4,6 +4,8 @@ import type {
   GitScmSyncAction,
   GitScmSyncCopy,
   GitScmSyncSection,
+  GitHostingIdentity,
+  GitHostingMode,
   GitSidebarPrimaryAction,
   GitSyncState,
   SourceControlDisplayMode,
@@ -22,7 +24,7 @@ export function getGitSyncState(
       remoteExists: false,
       setupRequired: true,
       setupTitle: "Choose sync target",
-      setupDetail: "Initialize a repository, then create a PuppyOne Cloud backup.",
+      setupDetail: "Initialize a repository, then create a Puppyone Cloud backup.",
       behind: 0,
       ahead: 0,
       pullDetail: "No local repository.",
@@ -33,6 +35,45 @@ export function getGitSyncState(
       pushTitle: "Initialize a repository before pushing.",
       pushLabel: "Push",
       pushDetail: "No local repository.",
+    };
+  }
+
+  if (status.effectiveHosting.kind === "puppyone-cloud") {
+    const branchLabel = displayGitBranch(status);
+    const target = status.syncTarget;
+    const targetLabel = target?.ref ?? "Puppyone Cloud";
+    const targetExists = target?.exists === true;
+    const targetAhead = target?.ahead ?? 0;
+    const targetBehind = target?.behind ?? 0;
+    return {
+      branchLabel,
+      upstreamLabel: targetLabel,
+      remoteExists: targetExists,
+      setupRequired: !target?.remote,
+      setupTitle: "Puppyone Cloud",
+      setupDetail: target?.remote ? `Syncing with ${targetLabel}.` : "Configure a Puppyone Cloud remote before syncing.",
+      behind: targetBehind,
+      ahead: targetAhead,
+      pullDetail: targetExists
+        ? `${targetBehind} cloud commit${targetBehind === 1 ? "" : "s"} on ${targetLabel}.`
+        : `No cloud branch at ${targetLabel}.`,
+      pullDisabled: !targetExists || targetBehind === 0,
+      pushDisabled: targetExists
+        ? targetAhead === 0 || targetBehind > 0
+        : !status.headCommitId,
+      pullLabel: targetBehind > 0 ? `Download ${targetBehind}` : "Download",
+      pullTitle: targetExists
+        ? targetBehind === 0 ? "Cloud is up to date." : `Download ${targetBehind} commit${targetBehind === 1 ? "" : "s"} from ${targetLabel}.`
+        : "Cloud branch does not exist yet.",
+      pushTitle: targetBehind > 0
+        ? "Download cloud changes before uploading."
+        : targetAhead === 0
+          ? "No committed changes to upload."
+          : `Upload ${targetAhead} commit${targetAhead === 1 ? "" : "s"} to ${targetLabel}.`,
+      pushLabel: "Upload",
+      pushDetail: targetAhead > 0
+        ? `${targetAhead} committed change${targetAhead === 1 ? "" : "s"} waiting.`
+        : "No committed changes waiting.",
     };
   }
 
@@ -93,11 +134,11 @@ export function getGitSyncState(
     if (configuredCloudBackup) {
       return {
         branchLabel,
-        upstreamLabel: "PuppyOne Cloud",
+        upstreamLabel: "Puppyone Cloud",
         remoteExists: false,
         setupRequired: false,
         setupTitle: "Sync target",
-        setupDetail: "PuppyOne Cloud backup is enabled in .puppyone/config.json.",
+        setupDetail: "Puppyone Cloud backup is enabled in .puppyone/config.json.",
         behind: 0,
         ahead: 0,
         pullDetail: "Configure a Git remote before pulling.",
@@ -117,7 +158,7 @@ export function getGitSyncState(
       remoteExists: false,
       setupRequired: true,
       setupTitle: "Choose sync target",
-      setupDetail: `${branchLabel} is local only. Back it up with PuppyOne Cloud.`,
+      setupDetail: `${branchLabel} is local only. Back it up with Puppyone Cloud.`,
       behind: 0,
       ahead: 0,
       pullDetail: "No tracking branch.",
@@ -213,6 +254,43 @@ export function displayGitBranch(status: GitStatusSnapshot) {
   return status.branch && status.branch !== "detached" ? status.branch : "initial branch";
 }
 
+export function getGitHostingMode(
+  status: GitStatusSnapshot | null,
+  puppyoneConfig: PuppyoneWorkspaceConfig | null = null,
+): GitHostingMode {
+  if (status?.effectiveHosting) {
+    return status.effectiveHosting.kind === "github" || status.effectiveHosting.kind === "puppyone-cloud"
+      ? status.effectiveHosting.kind
+      : "generic-git";
+  }
+
+  const sourceService = puppyoneConfig?.sync?.sourceOfTruth?.service?.toLowerCase();
+  if (sourceService === "github") return "github";
+  if (sourceService === "puppyone" && hasConfiguredPuppyoneCloudIntent(puppyoneConfig)) return "puppyone-cloud";
+
+  return "generic-git";
+}
+
+function hasConfiguredPuppyoneCloudIntent(config: PuppyoneWorkspaceConfig | null) {
+  if (config?.cloud?.projectId) return true;
+  const configuredRemoteName = config?.sync?.sourceOfTruth?.remote
+    ?? config?.git?.primaryRemote
+    ?? config?.backup?.remote
+    ?? null;
+  return configuredRemoteName?.toLowerCase() === "puppyone";
+}
+
+export function getGitHostingIdentity(
+  status: GitStatusSnapshot | null,
+  _puppyoneConfig: PuppyoneWorkspaceConfig | null = null,
+): GitHostingIdentity | null {
+  if (status?.effectiveHosting?.identity) {
+    return status.effectiveHosting.identity;
+  }
+
+  return null;
+}
+
 function getUpstreamRemoteName(upstream: string) {
   const slashIndex = upstream.indexOf("/");
   return slashIndex > 0 ? upstream.slice(0, slashIndex) : upstream;
@@ -253,9 +331,9 @@ export function getGitScmSyncCopy(
 
   if (remote.state === "diverged") {
     return {
-      title: "Remote Changes",
+      title: "Sync Conflict",
       count: remote.behind,
-      detail: `${remote.ahead} outgoing waiting locally`,
+      detail: `${remote.behind} incoming, ${remote.ahead} outgoing`,
       tone: "warning",
     };
   }
@@ -322,10 +400,10 @@ export function getGitScmSyncAction(
   if (remote.state === "diverged") {
     return {
       kind: "pull",
-      label: "Pull",
-      loadingLabel: "Pulling...",
-      title: "Pull incoming commits first. Push outgoing commits after the pull succeeds.",
-      disabled: !remote.canPull,
+      label: "Resolve",
+      loadingLabel: "Resolving...",
+      title: "This branch has local and remote commits. Resolve divergence with merge or rebase before syncing.",
+      disabled: true,
       icon: "download",
     };
   }
@@ -378,6 +456,18 @@ export function getCommittedPrimaryAction(
       kind: "publish",
       loadingKey: "publish",
       loadingLabel: "Publishing...",
+      icon: "upload",
+    };
+  }
+
+  if (remote.state === "diverged") {
+    return {
+      label: state.pushLabel,
+      title: "Resolve incoming remote commits before pushing.",
+      disabled: true,
+      kind: "push",
+      loadingKey: "push",
+      loadingLabel: "Pushing...",
       icon: "upload",
     };
   }

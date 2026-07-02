@@ -91,6 +91,11 @@
   outline: none;
 }
 
+.desktop-history-list.is-scrollable > .desktop-history-row {
+  width: var(--git-sidebar-scroll-row-width);
+  margin-right: var(--git-sidebar-scroll-row-right-gap);
+}
+
 .desktop-history-row:hover,
 .desktop-history-row.active {
   background: var(--po-hover);
@@ -223,8 +228,7 @@
   .desktop-git-sidebar-empty-history span,
   .desktop-git-backup-copy span,
   .desktop-git-remote-prompt > div:first-child > span,
-  .desktop-git-remote-action,
-  .desktop-git-commit-push-action,
+  .desktop-git-operation-button,
   .desktop-git-remote-preview-row,
   .desktop-git-section-title span,
   .desktop-working-tree-main,
@@ -238,8 +242,7 @@
 
 .desktop-git-sidebar :is(
   .desktop-git-backup-action,
-  .desktop-git-remote-action,
-  .desktop-git-commit-push-action,
+  .desktop-git-operation-button,
   .desktop-tool-sidebar-action,
   .desktop-git-sidebar-empty-history strong,
   .desktop-git-section-title span,

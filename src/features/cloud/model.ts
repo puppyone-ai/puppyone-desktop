@@ -16,7 +16,7 @@ import {
 } from "./utils";
 
 export type CloudAuthView = "main" | "signin" | "signup" | "signedIn";
-export type CloudLoginMethod = "google" | "github" | "email" | "password";
+export type CloudLoginMethod = "browser" | "google" | "github" | "email" | "password";
 export type CloudLoginFeature = {
   label: string;
   icon: LucideIcon;
@@ -570,7 +570,7 @@ export function buildCloudAccessSurfaces({
       subtitle: "Direct terminal access",
       status: cliConnector?.status ?? (scope.access_key ? "active" : "missing"),
       statusLabel: cliConnector?.status ?? (scope.access_key ? "Active" : "Needs key"),
-      prompt: `Use PuppyOne CLI to read and write ${scopeName} from any terminal.`,
+      prompt: `Use Puppyone CLI to read and write ${scopeName} from any terminal.`,
       commands: [
         { label: "Login", value: cliCommand || "Open Cloud Access and regenerate an access key.", disabled: !cliCommand },
         { label: "Explore", value: `puppyone fs tree / --profile ${shellQuote(profileName)}\npuppyone fs ls / --profile ${shellQuote(profileName)}`, disabled: !cliCommand },
@@ -583,7 +583,7 @@ export function buildCloudAccessSurfaces({
       subtitle: "Native Git clone / push",
       status: gitConnector?.status ?? (gitUrl ? "active" : "missing"),
       statusLabel: gitConnector?.status ?? (gitUrl ? "Active" : "Needs key"),
-      prompt: "This workspace is Git-native. PuppyOne Cloud stays the source of truth.",
+      prompt: "This workspace is Git-native. Puppyone Cloud stays the source of truth.",
       commands: [
         { label: "Existing folder", value: `git remote add puppyone ${gitUrl || "<git-url>"}\ngit fetch puppyone`, disabled: !gitUrl },
         { label: "Clone", value: `git clone ${gitUrl || "<git-url>"} ${shellQuote(scopeName)}`, disabled: !gitUrl },

@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { DataCapabilities, DataNode, DataPort, FileContent, Workspace } from "../core/types";
 import { defaultDataCapabilities } from "../core/types";
-import { shouldReadEditorContent } from "../editor/viewerRegistry";
+import { getEditorSourceRequirement, shouldReadEditorContent } from "../editor/viewerRegistry";
 import {
   createMarkdownLinkGraph,
   type MarkdownLinkGraphDocument,
@@ -92,6 +92,7 @@ export type DataWorkspaceProps = {
   renderPreviewBody?: FilePreviewProps["renderBody"];
   previewAccessorySlot?: DataWorkspaceSlot;
   aiEditRequest?: AiEditRequest | null;
+  enableMarkdownLinkContentIndexing?: boolean;
   refreshKey?: unknown;
   onExplorerWidthChange?: (width: number) => void;
   onExplorerCollapsedChange?: (collapsed: boolean) => void;
@@ -148,6 +149,7 @@ export function DataWorkspace({
   renderPreviewBody,
   previewAccessorySlot,
   aiEditRequest = null,
+  enableMarkdownLinkContentIndexing = true,
   refreshKey,
   onExplorerWidthChange,
   onExplorerCollapsedChange,
@@ -355,7 +357,13 @@ export function DataWorkspace({
   const activeNode = useMemo(() => findDataNode(tree, resolvedActivePath), [resolvedActivePath, tree]);
   const currentFolderPath = activeNode?.type === "folder" ? activeNode.path : getParentPath(resolvedActivePath);
   const selectedFile = activeNode?.type !== "folder" ? activeNode : null;
+  const selectedFileSourceRequirement = selectedFile ? getEditorSourceRequirement(selectedFile) : "none";
   const selectedFileNeedsFullContent = Boolean(selectedFile && dataPort.readFile && shouldReadEditorContent(selectedFile));
+  const selectedFileNeedsResourceUrl = Boolean(
+    selectedFile &&
+    dataPort.getFileUrl &&
+    (selectedFileSourceRequirement === "resource" || selectedFileSourceRequirement === "content-and-resource"),
+  );
   const cachedSelectedFileContent = selectedFile ? fileContentCache[selectedFile.path] ?? null : null;
   const selectedFileContent = fileContent?.path === selectedFile?.path ? fileContent : cachedSelectedFileContent;
   const selectedFileError = fileErrorPath === selectedFile?.path ? fileError : null;
@@ -614,7 +622,7 @@ export function DataWorkspace({
   }, [dataPort, refreshKey, selectedFile?.path]);
 
   useEffect(() => {
-    if (!dataPort.readFile) {
+    if (!enableMarkdownLinkContentIndexing || !dataPort.readFile) {
       setMarkdownLinkIndexing(false);
       return undefined;
     }
@@ -650,10 +658,10 @@ export function DataWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [dataPort, fileContentCache, refreshKey, tree]);
+  }, [dataPort, enableMarkdownLinkContentIndexing, fileContentCache, refreshKey, tree]);
 
   useEffect(() => {
-    if (!selectedFile || !dataPort.getFileUrl) {
+    if (!selectedFile || !selectedFileNeedsResourceUrl || !dataPort.getFileUrl) {
       setFileUrl(null);
       setFileUrlPath(null);
       setFileUrlError(null);
@@ -685,7 +693,7 @@ export function DataWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [dataPort, selectedFile?.path]);
+  }, [dataPort, selectedFile?.path, selectedFileNeedsResourceUrl]);
 
   const toggleFolder = useCallback(
     (node: DataNode, expanded: boolean) => {

@@ -1,5 +1,5 @@
-import { Check, Cloud, RefreshCw, Server, SquareTerminal, Users } from "lucide-react";
-import type { FormEvent, ReactNode } from "react";
+import { Check, Cloud, LogIn, LogOut, RefreshCw, Server, SquareTerminal, Users } from "lucide-react";
+import type { ReactNode } from "react";
 import type { CloudAuthView, CloudLoginFeature, CloudLoginMethod } from "./model";
 import type { CloudServicePanelProps } from "./types";
 import { useCloudAuthController } from "./hooks/useCloudAuthController";
@@ -14,6 +14,7 @@ export function CloudServicePanel({
   onClose,
   onRefresh,
   onSignedIn,
+  onSignedOut,
   onEnterCloud,
   onOpenGitSettings,
 }: CloudServicePanelProps) {
@@ -24,6 +25,7 @@ export function CloudServicePanel({
     cloudApiBaseUrl,
     accountEmail,
     onSignedIn,
+    onSignedOut,
     onRefresh,
   });
 
@@ -93,28 +95,24 @@ export function CloudServicePanel({
                   loading={loading}
                   statusTitle={statusTitle}
                   error={error}
+                  signingOut={auth.signingOut}
                   onOpenCloud={onEnterCloud}
                   onRefresh={onRefresh}
+                  onSignOut={auth.handleSignOut}
                   onOpenGitSettings={onOpenGitSettings}
                 />
               ) : (
                 <CloudAuthCard
                   view={effectiveAuthView}
-                  email={auth.email}
-                  password={auth.password}
                   signedInEmail={signedInEmail}
                   loading={auth.loading}
+                  signingOut={auth.signingOut}
                   error={auth.error}
                   message={auth.message}
-                  onEmailChange={auth.setEmail}
-                  onPasswordChange={auth.setPassword}
                   onProviderLogin={auth.startProviderLogin}
-                  onEmailSubmit={auth.handleEmailSubmit}
-                  onPasswordSubmit={auth.handlePasswordSubmit}
-                  onSignupContinue={auth.handleSignupContinue}
                   onOpenCloud={onEnterCloud}
                   onRefresh={onRefresh}
-                  onBack={auth.handleBack}
+                  onSignOut={auth.handleSignOut}
                 />
               )}
             </aside>
@@ -127,130 +125,48 @@ export function CloudServicePanel({
 
 export function CloudAuthCard({
   view,
-  email,
-  password,
   signedInEmail,
   loading,
+  signingOut,
   error,
   message,
-  onEmailChange,
-  onPasswordChange,
   onProviderLogin,
-  onEmailSubmit,
-  onPasswordSubmit,
-  onSignupContinue,
   onOpenCloud,
   onRefresh,
-  onBack,
+  onSignOut,
 }: {
   view: CloudAuthView;
-  email: string;
-  password: string;
   signedInEmail: string | null;
   loading: CloudLoginMethod | null;
+  signingOut: boolean;
   error: string | null;
   message: string | null;
-  onEmailChange: (email: string) => void;
-  onPasswordChange: (password: string) => void;
-  onProviderLogin: (method: Exclude<CloudLoginMethod, "email" | "password">) => void;
-  onEmailSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onPasswordSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onSignupContinue: () => void;
+  onProviderLogin: (method?: Exclude<CloudLoginMethod, "email" | "password" | "browser">) => void;
   onOpenCloud: () => void;
   onRefresh: () => void;
-  onBack: () => void;
+  onSignOut: () => void;
 }) {
-  const disabled = Boolean(loading);
+  const disabled = Boolean(loading) || signingOut;
 
   return (
     <div className="desktop-cloud-auth-card">
-      {view !== "main" && view !== "signedIn" && (
-        <button className="desktop-cloud-auth-back" type="button" disabled={disabled} onClick={onBack}>
-          All sign in options
-        </button>
-      )}
-
-      {view === "main" ? (
+      {view !== "signedIn" ? (
         <>
-          <div className="desktop-cloud-auth-provider-list">
-            <CloudProviderButton
-              icon={<CloudGoogleIcon />}
-              label="Continue with Google"
-              loadingLabel="Opening..."
-              isLoading={loading === "google"}
-              disabled={disabled}
-              onClick={() => onProviderLogin("google")}
-            />
-            <CloudProviderButton
-              icon={<CloudGithubIcon />}
-              label="Continue with GitHub"
-              loadingLabel="Opening..."
-              isLoading={loading === "github"}
-              disabled={disabled}
-              onClick={() => onProviderLogin("github")}
-            />
-          </div>
-
-          <CloudAuthDivider />
-
-          <form className="desktop-cloud-auth-form" onSubmit={onEmailSubmit}>
-            <label htmlFor="desktop-cloud-login-email">Email</label>
-            <input
-              id="desktop-cloud-login-email"
-              type="email"
-              value={email}
-              placeholder="Your email address"
-              required
-              disabled={disabled}
-              onChange={(event) => onEmailChange(event.target.value)}
-            />
-            <button className="desktop-cloud-auth-submit" type="submit" disabled={disabled}>
-              {loading === "email" && <CloudAuthDots />}
-              <span>{loading === "email" ? "Checking..." : "Continue"}</span>
-            </button>
-          </form>
-        </>
-      ) : view === "signin" ? (
-        <>
-          <div className="desktop-cloud-auth-heading">
-            <h3>Welcome back</h3>
-            <p>{email}</p>
-          </div>
-          <form className="desktop-cloud-auth-form" onSubmit={onPasswordSubmit}>
-            <label htmlFor="desktop-cloud-login-password">Password</label>
-            <input
-              id="desktop-cloud-login-password"
-              type="password"
-              value={password}
-              placeholder="Enter your password"
-              required
-              minLength={6}
-              disabled={disabled}
-              autoFocus
-              onChange={(event) => onPasswordChange(event.target.value)}
-            />
-            <button className="desktop-cloud-auth-submit" type="submit" disabled={disabled}>
-              {loading === "password" && <CloudAuthDots />}
-              <span>{loading === "password" ? "Signing in..." : "Sign In"}</span>
-            </button>
-          </form>
-        </>
-      ) : view === "signup" ? (
-        <>
-          <div className="desktop-cloud-auth-heading">
-            <h3>Create your account</h3>
-            <p>{email}</p>
-          </div>
-          <button className="desktop-cloud-auth-submit" type="button" disabled={disabled} onClick={onSignupContinue}>
-            {loading === "email" && <CloudAuthDots />}
-            <span>{loading === "email" ? "Opening..." : "Continue in PuppyOne Cloud"}</span>
+          <button
+            className="desktop-cloud-auth-submit"
+            type="button"
+            disabled={disabled}
+            onClick={() => onProviderLogin()}
+          >
+            <LogIn size={15} />
+            <span>{loading === "browser" ? "Opening browser..." : "Sign in with browser"}</span>
           </button>
         </>
       ) : (
         <>
           <div className="desktop-cloud-auth-heading">
             <h3>Signed in</h3>
-            <p>{signedInEmail ?? email}</p>
+            <p>{signedInEmail ?? "Puppyone Cloud"}</p>
           </div>
           <div className="desktop-cloud-auth-state">
             <span>
@@ -268,6 +184,10 @@ export function CloudAuthCard({
             <RefreshCw size={14} />
             <span>Check workspace status</span>
           </button>
+          <button className="desktop-cloud-auth-secondary" type="button" disabled={signingOut} onClick={onSignOut}>
+            <LogOut size={14} />
+            <span>{signingOut ? "Signing out..." : "Sign out"}</span>
+          </button>
         </>
       )}
 
@@ -284,20 +204,24 @@ export function CloudHostedLoginCard({
   loading,
   statusTitle,
   error,
+  signingOut,
   onOpenCloud,
   onRefresh,
+  onSignOut,
   onOpenGitSettings,
 }: {
   loading: boolean;
   statusTitle: string;
   error: string | null;
+  signingOut: boolean;
   onOpenCloud: () => void;
   onRefresh: () => void;
+  onSignOut: () => void;
   onOpenGitSettings: () => void;
 }) {
   return (
     <div className="desktop-cloud-auth-card desktop-cloud-auth-card-hosted">
-      <h3>PuppyOne Cloud</h3>
+      <h3>Puppyone Cloud</h3>
       <p className="desktop-cloud-auth-hosted-copy">{statusTitle}</p>
       <button className="desktop-cloud-auth-submit" type="button" onClick={onOpenCloud}>
         Enter Cloud version
@@ -308,6 +232,10 @@ export function CloudHostedLoginCard({
       </button>
       <button className="desktop-cloud-auth-secondary" type="button" onClick={onOpenGitSettings}>
         Git sync details
+      </button>
+      <button className="desktop-cloud-auth-secondary" type="button" disabled={signingOut} onClick={onSignOut}>
+        <LogOut size={14} />
+        <span>{signingOut ? "Signing out..." : "Sign out"}</span>
       </button>
       {error && <p className="desktop-cloud-login-error">{error}</p>}
     </div>
@@ -337,16 +265,6 @@ export function CloudProviderButton({
   );
 }
 
-export function CloudAuthDivider() {
-  return (
-    <div className="desktop-cloud-auth-divider">
-      <span />
-      <small>or</small>
-      <span />
-    </div>
-  );
-}
-
 export function CloudAuthFeedback({ error, message }: { error: string | null; message: string | null }) {
   if (!error && !message) return null;
 
@@ -355,16 +273,6 @@ export function CloudAuthFeedback({ error, message }: { error: string | null; me
       {error && <div className="error">{error}</div>}
       {message && <div className="success">{message}</div>}
     </div>
-  );
-}
-
-export function CloudAuthDots() {
-  return (
-    <span className="desktop-cloud-auth-dots" aria-hidden="true">
-      <span />
-      <span />
-      <span />
-    </span>
   );
 }
 

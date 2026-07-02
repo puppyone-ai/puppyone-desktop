@@ -457,8 +457,7 @@
   opacity: 0.5;
 }
 
-.desktop-cloud-auth-provider-list,
-.desktop-cloud-auth-form {
+.desktop-cloud-auth-provider-list {
   display: grid;
   gap: 12px;
 }
@@ -493,8 +492,7 @@
 
 .desktop-cloud-provider-button:disabled,
 .desktop-cloud-auth-submit:disabled,
-.desktop-cloud-auth-secondary:disabled,
-.desktop-cloud-auth-form input:disabled {
+.desktop-cloud-auth-secondary:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -510,53 +508,6 @@
   justify-content: center;
   color: var(--po-text);
   transform: translateY(-50%);
-}
-
-.desktop-cloud-auth-divider {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  margin: 20px 0;
-  color: var(--po-text-subtle);
-}
-
-.desktop-cloud-auth-divider span {
-  height: 1px;
-  background: var(--po-divider);
-}
-
-.desktop-cloud-auth-divider small {
-  font-size: var(--desktop-cloud-body-size);
-  font-weight: 500;
-}
-
-.desktop-cloud-auth-form label {
-  margin: 0 0 -6px;
-  color: var(--po-text-muted);
-  font-size: var(--desktop-cloud-body-size);
-  font-weight: 500;
-}
-
-.desktop-cloud-auth-form input {
-  width: 100%;
-  height: 40px;
-  padding: 0 12px;
-  border: 1px solid var(--po-border-strong);
-  border-radius: 6px;
-  outline: none;
-  background: var(--po-inset);
-  color: var(--po-text);
-  font-size: var(--desktop-cloud-body-size);
-  transition: border-color 0.16s ease;
-}
-
-.desktop-cloud-auth-form input:focus {
-  border-color: var(--po-focus-ring);
-}
-
-.desktop-cloud-auth-form input::placeholder {
-  color: var(--po-text-disabled);
 }
 
 .desktop-cloud-auth-submit {
@@ -663,28 +614,6 @@
   text-align: center;
 }
 
-.desktop-cloud-auth-dots {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.desktop-cloud-auth-dots span {
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: currentColor;
-  animation: desktop-cloud-auth-dot 0.9s ease-in-out infinite;
-}
-
-.desktop-cloud-auth-dots span:nth-child(2) {
-  animation-delay: 0.12s;
-}
-
-.desktop-cloud-auth-dots span:nth-child(3) {
-  animation-delay: 0.24s;
-}
-
 .desktop-cloud-login-error,
 .desktop-cloud-login-note {
   margin: 4px 0 0;
@@ -698,20 +627,6 @@
 
 .desktop-cloud-login-note {
   color: var(--po-text-subtle);
-}
-
-@keyframes desktop-cloud-auth-dot {
-  0%,
-  80%,
-  100% {
-    opacity: 0.35;
-    transform: translateY(0);
-  }
-
-  40% {
-    opacity: 1;
-    transform: translateY(-2px);
-  }
 }
 
 @media (max-width: 720px) {

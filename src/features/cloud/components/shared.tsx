@@ -8,6 +8,7 @@ import type {
   DesktopCloudProject,
   DesktopCloudTreeEntry,
 } from "../../../lib/cloudApi";
+import type { CloudAccessIconComponent } from "../accessFilters";
 import type { CloudWorkspaceSection } from "../types";
 import { PageLoading } from "../../../components/loading";
 import {
@@ -257,7 +258,7 @@ export function CloudWebEmpty({
   title,
   detail,
 }: {
-  icon: typeof Cloud;
+  icon: CloudAccessIconComponent;
   title: string;
   detail: string;
 }) {

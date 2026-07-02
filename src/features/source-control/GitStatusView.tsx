@@ -430,11 +430,11 @@ function GitOverview({
     <section className="desktop-utility-view desktop-history-detail-view">
       <div className="desktop-git-default-state">
         <div className="desktop-git-default-copy">
-          <span>{hasChanges ? "Select a change to preview" : "PuppyOne backs up your changes"}</span>
+          <span>{hasChanges ? "Select a change to preview" : "Puppyone backs up your changes"}</span>
         </div>
-        {(operationLoading || operationError) && (
-          <div className={`desktop-git-default-status ${operationError ? "danger" : ""}`}>
-            {operationError ?? operationLoading}
+        {operationError && (
+          <div className="desktop-git-default-status danger">
+            {operationError}
           </div>
         )}
       </div>
@@ -506,9 +506,9 @@ function InitialGitRepositoryState({
               </div>
             </div>
 
-            {(operationLoading || operationError) && (
-              <div className={`desktop-initial-repo-status ${operationError ? "danger" : ""}`}>
-                {operationError ?? operationLoading}
+            {operationError && (
+              <div className="desktop-initial-repo-status danger">
+                {operationError}
               </div>
             )}
           </div>
@@ -644,6 +644,8 @@ function WorkingFileDetail({
 }
 
 function FileDiffBlock({ file }: { file: GitFileDiff }) {
+  const omittedLines = file.omittedLines ?? 0;
+
   return (
     <section className="desktop-file-diff">
       <div className="desktop-file-diff-header">
@@ -664,16 +666,30 @@ function FileDiffBlock({ file }: { file: GitFileDiff }) {
       {file.binary ? (
         <div className="desktop-diff-placeholder">Binary file</div>
       ) : file.lines.length === 0 ? (
-        <div className="desktop-diff-placeholder">No textual diff available</div>
-      ) : (
-        <div className="desktop-diff-lines">
-          {file.lines.map((line, index) => (
-            <DiffLineView line={line} key={index} />
-          ))}
+        <div className="desktop-diff-placeholder">
+          {file.truncated ? formatDiffTruncationMessage(omittedLines) : "No textual diff available"}
         </div>
+      ) : (
+        <>
+          <div className="desktop-diff-lines">
+            {file.lines.map((line, index) => (
+              <DiffLineView line={line} key={index} />
+            ))}
+          </div>
+          {file.truncated && (
+            <div className="desktop-diff-placeholder">{formatDiffTruncationMessage(omittedLines)}</div>
+          )}
+        </>
       )}
     </section>
   );
+}
+
+function formatDiffTruncationMessage(omittedLines: number) {
+  if (omittedLines > 0) {
+    return `Diff truncated. ${omittedLines.toLocaleString()} more line${omittedLines === 1 ? "" : "s"} hidden.`;
+  }
+  return "Diff truncated.";
 }
 
 function DiffLineView({ line }: { line: GitDiffLine }) {

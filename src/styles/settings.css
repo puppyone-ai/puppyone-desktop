@@ -291,14 +291,47 @@
   color: var(--po-success);
 }
 
+.desktop-account-settings-section {
+  max-width: 760px;
+}
+
+.desktop-settings-account-actions-line {
+  min-height: 46px;
+}
+
+.desktop-settings-account-actions {
+  flex-wrap: wrap;
+}
+
+.desktop-settings-account-feedback {
+  min-height: 34px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--po-divider);
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-settings-account-feedback:last-child {
+  border-bottom: 0;
+}
+
+.desktop-settings-account-feedback.success {
+  color: var(--po-success);
+}
+
+.desktop-settings-account-feedback.danger {
+  color: var(--po-danger);
+}
+
 .desktop-settings-row-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  height: 26px;
+  height: 28px;
   flex: 0 0 auto;
-  padding: 0 7px;
+  padding: 0 9px;
   border: 1px solid var(--po-divider);
   border-radius: 6px;
   background: transparent;
@@ -315,6 +348,21 @@
 .desktop-settings-row-action:disabled {
   color: var(--po-text-disabled);
   opacity: 0.55;
+}
+
+.desktop-settings-save-action:not(:disabled) {
+  border-color: var(--po-success);
+  background: var(--po-success);
+  color: var(--po-success-contrast, #ffffff);
+}
+
+.desktop-settings-save-action:not(:disabled) svg {
+  color: currentColor;
+}
+
+.desktop-settings-save-action:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--po-success) 86%, #000000);
+  background: color-mix(in srgb, var(--po-success) 88%, #000000);
 }
 
 .desktop-settings-select,
@@ -479,26 +527,60 @@
   color: var(--po-text-subtle);
 }
 
-.desktop-puppyone-config-note {
-  display: grid;
-  gap: 2px;
-  padding: 9px 12px 10px;
-  border-bottom: 1px solid var(--po-divider);
-  color: var(--po-text-subtle);
+.desktop-hosting-service-panel {
+  min-height: 54px;
 }
 
-.desktop-puppyone-config-note span {
+.desktop-hosting-service-options {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  padding: 2px;
+  border: 1px solid var(--po-divider);
+  border-radius: 7px;
+  background: var(--po-control);
+}
+
+.desktop-hosting-service-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: 82px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--po-text-muted);
+}
+
+.desktop-hosting-service-option:hover:not(:disabled) {
+  background: var(--po-hover);
   color: var(--po-text);
-  font-family: var(--po-font-mono);
-  font-size: 12px;
-  font-weight: 650;
 }
 
-.desktop-puppyone-config-note small {
-  color: var(--po-text-subtle);
-  font-size: 11.5px;
-  font-weight: 520;
-  line-height: 1.35;
+.desktop-hosting-service-option.active {
+  background: var(--po-panel-raised);
+  color: var(--po-text);
+  box-shadow: 0 0 0 1px var(--po-divider);
+}
+
+.desktop-hosting-service-option:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.desktop-hosting-service-option > strong {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-puppyone-config-row {
@@ -718,4 +800,26 @@
 .desktop-settings-badge.connected {
   background: color-mix(in srgb, var(--po-success) 12%, transparent);
   color: var(--po-success);
+}
+
+.desktop-settings-badge.warning {
+  background: color-mix(in srgb, var(--po-warning) 13%, transparent);
+  color: var(--po-warning);
+}
+
+@media (max-width: 760px) {
+  .desktop-hosting-service-panel {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .desktop-hosting-service-options {
+    width: 100%;
+  }
+
+  .desktop-hosting-service-option {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }

@@ -233,6 +233,7 @@
 .desktop-data-workspace-wrap {
   --po-tree-row-left-gap: var(--desktop-sidebar-row-left-gap);
   --po-tree-row-right-gap: var(--desktop-sidebar-row-right-gap);
+  --po-tree-scrollbar-width: var(--desktop-sidebar-scrollbar-width);
   --po-tree-row-height: var(--desktop-sidebar-row-height);
   --po-tree-row-radius: var(--desktop-sidebar-row-radius);
   --po-tree-row-content-left: var(--desktop-sidebar-row-content-left);

@@ -1,6 +1,6 @@
 import type { CSSProperties, Dispatch, ReactNode, SetStateAction } from "react";
 import { useEffect, useMemo, useRef } from "react";
-import { FileText, Folder, MoreVertical, Pencil, Plus, Trash2, X } from "lucide-react";
+import { FileText, Folder, FolderOpen, MoreVertical, Pencil, Plus, Trash2, X } from "lucide-react";
 import { FileGlyphIcon, getMatchedExtension, type DataNode, type FileIconThemeId } from "@puppyone/shared-ui";
 
 export type DesktopCreateEntryKind = "folder" | "markdown" | "text" | "json" | "csv";
@@ -28,14 +28,14 @@ export type DesktopNodeActionMenuDraft = {
   renameExtensionValue: string;
   renameFocus: "name" | "type";
   error: string | null;
-  operation: "rename" | "delete" | null;
+  operation: "rename" | "delete" | "reveal" | null;
 };
 
 const CREATE_ENTRY_MENU_MARGIN = 12;
 const CREATE_ENTRY_MENU_WIDTH = 184;
-const CREATE_ENTRY_MENU_ESTIMATED_HEIGHT = 166;
+const CREATE_ENTRY_MENU_ESTIMATED_HEIGHT = 158;
 const NODE_ACTION_MENU_WIDTH = 176;
-const NODE_ACTION_MENU_ESTIMATED_HEIGHT = 144;
+const NODE_ACTION_MENU_ESTIMATED_HEIGHT = 136;
 
 const CREATE_ENTRY_OPTIONS = [
   {
@@ -321,16 +321,20 @@ export function DesktopCreateEntryDialog({
 
 export function DesktopNodeActionMenu({
   draft,
+  showRevealInFinder = true,
   onChange,
   onCancel,
   onRename,
   onDelete,
+  onRevealInFinder,
 }: {
   draft: DesktopNodeActionMenuDraft;
+  showRevealInFinder?: boolean;
   onChange: Dispatch<SetStateAction<DesktopNodeActionMenuDraft | null>>;
   onCancel: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onRevealInFinder: () => void;
 }) {
   if (draft.mode === "rename") {
     return (
@@ -346,23 +350,29 @@ export function DesktopNodeActionMenu({
   return (
     <DesktopNodeActionPopover
       draft={draft}
+      showRevealInFinder={showRevealInFinder}
       onChange={onChange}
       onCancel={onCancel}
       onDelete={onDelete}
+      onRevealInFinder={onRevealInFinder}
     />
   );
 }
 
 function DesktopNodeActionPopover({
   draft,
+  showRevealInFinder,
   onChange,
   onCancel,
   onDelete,
+  onRevealInFinder,
 }: {
   draft: DesktopNodeActionMenuDraft;
+  showRevealInFinder: boolean;
   onChange: Dispatch<SetStateAction<DesktopNodeActionMenuDraft | null>>;
   onCancel: () => void;
   onDelete: () => void;
+  onRevealInFinder: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const position = getNodeActionMenuPosition(draft.anchor, NODE_ACTION_MENU_WIDTH, NODE_ACTION_MENU_ESTIMATED_HEIGHT);
@@ -405,6 +415,14 @@ function DesktopNodeActionPopover({
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
+      {showRevealInFinder && (
+        <DesktopNodeActionMenuItem
+          icon={<FolderOpen size={14} />}
+          label={draft.operation === "reveal" ? "Opening..." : "Reveal in Finder"}
+          disabled={draft.operation !== null}
+          onClick={onRevealInFinder}
+        />
+      )}
       <DesktopNodeActionMenuItem
         icon={<Pencil size={14} />}
         label="Rename"

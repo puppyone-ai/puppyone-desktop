@@ -1,4 +1,10 @@
 export { CloudServiceMainView } from "./CloudServiceMainView";
+export {
+  DesktopCloudAccessSidebar,
+  DesktopCloudAccessView,
+  DesktopCloudIntegrationsSidebar,
+} from "./DesktopCloudAccessView";
+export type { CloudAccessFilter } from "./accessFilters";
 export { CloudServicePanel } from "./CloudServicePanel";
 export { CloudServiceSidebar } from "./CloudServiceSidebar";
 export {

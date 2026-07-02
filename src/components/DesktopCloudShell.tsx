@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 
-export type DesktopView = "data" | "git" | "cloud" | "settings";
+export type DesktopView = "data" | "git" | "cloud" | "access" | "integrations" | "settings";
 
 type DesktopCloudShellProps = {
   children: ReactNode;

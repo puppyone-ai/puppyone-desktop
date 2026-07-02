@@ -17,16 +17,9 @@ export function RestoringWorkspaceScreen({
       data-theme-mode={themeMode}
     >
       <div className="onboarding-titlebar" aria-hidden="true" />
-      <section className="onboarding-panel onboarding-panel-compact" aria-label="Opening workspace">
-        <div className="onboarding-brand">
-          <img src={puppyoneLogoUrl} alt="" className="onboarding-logo" />
-          <span>puppyone</span>
-        </div>
-        <div className="onboarding-heading compact">
-          <span>Desktop workspace</span>
-          <h1>Opening last workspace</h1>
-          <p>Restoring your local puppyone workspace...</p>
-        </div>
+      <section className="restoring-workspace-status" aria-label="Opening last project">
+        <img src={puppyoneLogoUrl} alt="" className="restoring-workspace-logo" />
+        <span>Opening last project...</span>
       </section>
     </main>
   );

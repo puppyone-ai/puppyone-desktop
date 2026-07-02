@@ -340,7 +340,7 @@ body {
 }
 
 /*
- * ── PuppyOne unified loading system ────────────────────────────────
+ * ── Puppyone unified loading system ────────────────────────────────
  * Defined ONCE here. Components in `components/loading/` reference
  * these by name; do NOT inline `<style>{@keyframes ...}</style>` in
  * components anymore. Old `spin` / `pulse` / `ping` above are kept

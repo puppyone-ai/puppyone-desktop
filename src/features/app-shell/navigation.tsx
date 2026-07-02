@@ -1,7 +1,9 @@
-import type { ReactNode, SVGProps } from "react";
-import { Cloud, Folder, Settings } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
+import { Folder, Settings } from "lucide-react";
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import type { SidebarNavigationOrientation } from "../../preferences";
+import type { GitStatusEntry, GitStatusSnapshot } from "../../types/electron";
+import { AccessChainIcon, IntegrationsGridIcon } from "../cloud/accessFilters";
 
 export type DesktopSidebarIconComponent = (props: { size?: number; className?: string }) => ReactNode;
 
@@ -36,69 +38,98 @@ export function PuppyGitIcon({
 
 export function DesktopSidebarFooterNavigation({
   activeView,
-  cloudEnabled,
+  accessEnabled = false,
+  gitEnabled = true,
   gitIncomingCount,
+  gitOperationLoading,
+  gitStatus,
+  workspaceChangeCount,
   onNavigate,
   onOpenSettings,
 }: {
   activeView: DesktopView;
-  cloudEnabled?: boolean;
+  accessEnabled?: boolean;
+  gitEnabled?: boolean;
   gitIncomingCount: number;
+  gitOperationLoading: string | null;
+  gitStatus: GitStatusSnapshot | null;
+  workspaceChangeCount: number;
   onNavigate: (view: DesktopView) => void;
   onOpenSettings: () => void;
 }) {
+  const localItems = getDesktopLocalSidebarNavItems(gitEnabled);
+  const accessItems = getDesktopAccessSidebarNavItems(accessEnabled);
   return (
     <div className="desktop-sidebar-footer-bar actions-only horizontal">
-      <div className="desktop-sidebar-footer-actions desktop-sidebar-footer-actions-local">
+      <div className="desktop-sidebar-footer-actions desktop-sidebar-footer-actions-left">
         <DesktopSidebarIconNavigation
           activeView={activeView}
-          items={DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS}
+          items={localItems}
           gitIncomingCount={gitIncomingCount}
+          gitOperationLoading={gitOperationLoading}
+          gitStatus={gitStatus}
+          workspaceChangeCount={workspaceChangeCount}
           onNavigate={onNavigate}
         />
+        {accessItems.length > 0 && (
+          <DesktopSidebarIconNavigation
+            activeView={activeView}
+            items={accessItems}
+            gitIncomingCount={gitIncomingCount}
+            gitOperationLoading={gitOperationLoading}
+            gitStatus={gitStatus}
+            workspaceChangeCount={workspaceChangeCount}
+            onNavigate={onNavigate}
+          />
+        )}
+      </div>
+      <div className="desktop-sidebar-footer-actions desktop-sidebar-footer-actions-settings">
         <DesktopSidebarSettingsButton
           activeView={activeView}
           buttonClassName="desktop-sidebar-footer-button"
           onOpenSettings={onOpenSettings}
         />
       </div>
-      {cloudEnabled && (
-        <div className="desktop-sidebar-footer-actions desktop-sidebar-footer-actions-cloud">
-          <DesktopSidebarIconNavigation
-            activeView={activeView}
-            items={DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS}
-            gitIncomingCount={gitIncomingCount}
-            onNavigate={onNavigate}
-          />
-        </div>
-      )}
     </div>
   );
 }
 
 export function DesktopSidebarTopNavigation({
   activeView,
-  cloudEnabled,
+  accessEnabled = false,
+  gitEnabled = true,
   orientation,
   gitIncomingCount,
+  gitOperationLoading,
+  gitStatus,
+  workspaceChangeCount,
   onNavigate,
   onOpenSettings,
 }: {
   activeView: DesktopView;
-  cloudEnabled?: boolean;
+  accessEnabled?: boolean;
+  gitEnabled?: boolean;
   orientation: SidebarNavigationOrientation;
   gitIncomingCount: number;
+  gitOperationLoading: string | null;
+  gitStatus: GitStatusSnapshot | null;
+  workspaceChangeCount: number;
   onNavigate: (view: DesktopView) => void;
   onOpenSettings: () => void;
 }) {
+  const localItems = getDesktopLocalSidebarNavItems(gitEnabled);
+  const accessItems = getDesktopAccessSidebarNavItems(accessEnabled);
   return (
     <div className={`desktop-sidebar-top-navigation ${orientation}`}>
       <div className="desktop-sidebar-top-navigation-list" aria-label="Workspace navigation">
         <div className="desktop-sidebar-top-navigation-group desktop-sidebar-top-navigation-local">
           <DesktopSidebarButtonNavigation
             activeView={activeView}
-            items={DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS}
+            items={localItems}
             gitIncomingCount={gitIncomingCount}
+            gitOperationLoading={gitOperationLoading}
+            gitStatus={gitStatus}
+            workspaceChangeCount={workspaceChangeCount}
             onNavigate={onNavigate}
           />
           <DesktopSidebarSettingsButton
@@ -107,12 +138,15 @@ export function DesktopSidebarTopNavigation({
             onOpenSettings={onOpenSettings}
           />
         </div>
-        {cloudEnabled && (
+        {accessItems.length > 0 && (
           <div className="desktop-sidebar-top-navigation-group desktop-sidebar-top-navigation-cloud">
             <DesktopSidebarButtonNavigation
               activeView={activeView}
-              items={DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS}
+              items={accessItems}
               gitIncomingCount={gitIncomingCount}
+              gitOperationLoading={gitOperationLoading}
+              gitStatus={gitStatus}
+              workspaceChangeCount={workspaceChangeCount}
               onNavigate={onNavigate}
             />
           </div>
@@ -149,31 +183,43 @@ function DesktopSidebarButtonNavigation({
   activeView,
   items,
   gitIncomingCount,
+  gitOperationLoading,
+  gitStatus,
+  workspaceChangeCount,
   onNavigate,
 }: {
   activeView: DesktopView;
   items: typeof DESKTOP_NAV_ITEMS;
   gitIncomingCount: number;
+  gitOperationLoading: string | null;
+  gitStatus: GitStatusSnapshot | null;
+  workspaceChangeCount: number;
   onNavigate: (view: DesktopView) => void;
 }) {
   return (
     <>
       {items.map((item) => {
-        const badgeCount = item.view === "git" ? gitIncomingCount : 0;
-        const navLabel = getDesktopNavigationLabel(item.label, badgeCount);
+        const badge = getDesktopNavigationBadge(item.view, gitIncomingCount, workspaceChangeCount);
+        const navLabel = getDesktopNavigationLabel(item.label, item.view, badge, workspaceChangeCount);
+        const gitSummary = item.view === "git" ? getDesktopGitNavSummary(gitStatus, gitIncomingCount, gitOperationLoading) : null;
         return (
           <button
             key={item.view}
-            className={`desktop-sidebar-top-navigation-button ${activeView === item.view ? "active" : ""}`}
+            className={[
+              "desktop-sidebar-top-navigation-button",
+              activeView === item.view ? "active" : "",
+            ].filter(Boolean).join(" ")}
             type="button"
-            title={navLabel}
             aria-label={navLabel}
             aria-current={activeView === item.view ? "page" : undefined}
             onClick={() => onNavigate(item.view)}
           >
-            <item.icon size={item.iconSize ?? 16} />
-            <span>{item.label}</span>
-            <DesktopNavBadge count={badgeCount} />
+            <i className="desktop-sidebar-nav-icon-wrap" aria-hidden="true">
+              <item.icon size={item.iconSize ?? 16} />
+            </i>
+            <span className="desktop-sidebar-nav-label">{item.label}</span>
+            <DesktopNavBadge count={badge.count} tone={badge.tone} />
+            {gitSummary && <DesktopGitNavBubble summary={gitSummary} />}
           </button>
         );
       })}
@@ -185,30 +231,42 @@ function DesktopSidebarIconNavigation({
   activeView,
   items,
   gitIncomingCount,
+  gitOperationLoading,
+  gitStatus,
+  workspaceChangeCount,
   onNavigate,
 }: {
   activeView: DesktopView;
   items: typeof DESKTOP_NAV_ITEMS;
   gitIncomingCount: number;
+  gitOperationLoading: string | null;
+  gitStatus: GitStatusSnapshot | null;
+  workspaceChangeCount: number;
   onNavigate: (view: DesktopView) => void;
 }) {
   return (
     <>
       {items.map((item) => {
-        const badgeCount = item.view === "git" ? gitIncomingCount : 0;
-        const navLabel = getDesktopNavigationLabel(item.label, badgeCount);
+        const badge = getDesktopNavigationBadge(item.view, gitIncomingCount, workspaceChangeCount);
+        const navLabel = getDesktopNavigationLabel(item.label, item.view, badge, workspaceChangeCount);
+        const gitSummary = item.view === "git" ? getDesktopGitNavSummary(gitStatus, gitIncomingCount, gitOperationLoading) : null;
         return (
           <button
             key={item.view}
-            className={`desktop-sidebar-footer-button ${activeView === item.view ? "active" : ""}`}
+            className={[
+              "desktop-sidebar-footer-button",
+              activeView === item.view ? "active" : "",
+            ].filter(Boolean).join(" ")}
             type="button"
-            title={navLabel}
             aria-label={navLabel}
             aria-current={activeView === item.view ? "page" : undefined}
             onClick={() => onNavigate(item.view)}
           >
-            <item.icon size={item.iconSize ?? 16} />
-            <DesktopNavBadge count={badgeCount} />
+            <i className="desktop-sidebar-nav-icon-wrap" aria-hidden="true">
+              <item.icon size={item.iconSize ?? 16} />
+            </i>
+            <DesktopNavBadge count={badge.count} tone={badge.tone} />
+            {gitSummary && <DesktopGitNavBubble summary={gitSummary} />}
           </button>
         );
       })}
@@ -216,30 +274,222 @@ function DesktopSidebarIconNavigation({
   );
 }
 
-function DesktopNavBadge({ count }: { count: number }) {
+function DesktopNavBadge({ count, tone }: { count: number; tone: "remote" | "workspace" }) {
   if (count <= 0) return null;
   return (
-    <em className="desktop-sidebar-nav-badge" aria-hidden="true">
+    <em className={`desktop-sidebar-nav-badge ${tone}`} aria-hidden="true">
       {count > 99 ? "99+" : count}
     </em>
   );
 }
 
-function getDesktopNavigationLabel(label: string, incomingCount: number) {
-  if (incomingCount <= 0) return label;
-  return `${label}, ${incomingCount} remote change${incomingCount === 1 ? "" : "s"} to pull`;
+type DesktopGitNavSummary = {
+  active: boolean;
+  snapshotReady: boolean;
+  changeCount: number;
+  conflicts: number;
+  unstaged: number;
+  staged: number;
+  committed: number;
+  remoteIncoming: number;
+  operationActive: boolean;
+};
+
+function DesktopGitNavBubble({ summary }: { summary: DesktopGitNavSummary }) {
+  const bubble = useTransientGitNavBubble(summary);
+  if (!bubble) return null;
+
+  return (
+    <span key={bubble.id} className="desktop-sidebar-nav-popover is-visible" role="status">
+      {bubble.label}
+    </span>
+  );
+}
+
+type DesktopGitNavBubbleState = {
+  id: number;
+  label: string;
+};
+
+const DESKTOP_GIT_NAV_BUBBLE_ENABLED = false;
+
+function useTransientGitNavBubble(summary: DesktopGitNavSummary): DesktopGitNavBubbleState | null {
+  const [bubble, setBubble] = useState<DesktopGitNavBubbleState | null>(null);
+  const previousSignatureRef = useRef<string | null>(null);
+  const bubbleIdRef = useRef(0);
+  const initializedRef = useRef(false);
+  const operationActiveRef = useRef(false);
+  const signature = getDesktopGitNavSignature(summary);
+
+  useEffect(() => {
+    if (!DESKTOP_GIT_NAV_BUBBLE_ENABLED) return undefined;
+
+    const previousSignature = previousSignatureRef.current;
+    const wasOperationActive = operationActiveRef.current;
+    operationActiveRef.current = summary.operationActive;
+
+    if (!initializedRef.current) {
+      if (!summary.operationActive && summary.snapshotReady) {
+        previousSignatureRef.current = signature;
+        initializedRef.current = true;
+      }
+      return undefined;
+    }
+
+    if (summary.operationActive) {
+      return undefined;
+    }
+
+    previousSignatureRef.current = signature;
+
+    if (previousSignature === null) {
+      return undefined;
+    }
+
+    if (!wasOperationActive && (!summary.active || previousSignature === signature)) {
+      return undefined;
+    }
+
+    bubbleIdRef.current += 1;
+    setBubble({
+      id: bubbleIdRef.current,
+      label: getDesktopGitNavBubbleLabel(summary),
+    });
+    const timeout = window.setTimeout(() => setBubble(null), 1600);
+    return () => window.clearTimeout(timeout);
+  }, [signature, summary.active, summary.operationActive, summary.snapshotReady]);
+
+  return DESKTOP_GIT_NAV_BUBBLE_ENABLED ? bubble : null;
+}
+
+function getDesktopGitNavBubbleLabel(summary: DesktopGitNavSummary): string {
+  const labels = getDesktopGitNavBubbleLabels(summary);
+  if (labels.length === 0) return "Changed";
+  if (labels.length === 1) return labels[0];
+  return `${labels[0]} + more`;
+}
+
+function getDesktopGitNavBubbleLabels(summary: DesktopGitNavSummary): string[] {
+  const labels: string[] = [];
+  if (summary.conflicts > 0) labels.push("Conflicts");
+  if (summary.remoteIncoming > 0) labels.push("Incoming");
+  if (summary.committed > 0) labels.push("Committed");
+  if (summary.staged > 0) labels.push("Staged");
+  if (summary.unstaged > 0) labels.push("Unstaged");
+  return labels;
+}
+
+function getDesktopGitNavSignature(summary: DesktopGitNavSummary): string {
+  return [
+    summary.conflicts,
+    summary.unstaged,
+    summary.staged,
+    summary.committed,
+    summary.remoteIncoming,
+  ].join(":");
+}
+
+function getDesktopGitNavSummary(
+  status: GitStatusSnapshot | null,
+  gitIncomingCount: number,
+  operationLoading: string | null,
+): DesktopGitNavSummary {
+  const summary: DesktopGitNavSummary = {
+    active: Boolean(gitIncomingCount > 0),
+    snapshotReady: Boolean(status),
+    changeCount: 0,
+    conflicts: 0,
+    unstaged: 0,
+    staged: 0,
+    committed: 0,
+    remoteIncoming: gitIncomingCount,
+    operationActive: Boolean(operationLoading),
+  };
+
+  for (const entry of status?.entries ?? []) {
+    const kind = getDesktopGitEntryKind(entry);
+    if (kind === "conflict") summary.conflicts += 1;
+  }
+  summary.unstaged = (status?.unstagedEntries.length ?? 0) + (status?.untrackedEntries.length ?? 0);
+  summary.staged = status?.stagedEntries.length ?? 0;
+  summary.committed = Math.max(0, status?.sourceControl.remote.ahead ?? 0);
+  summary.remoteIncoming = Math.max(summary.remoteIncoming, status?.sourceControl.remote.behind ?? 0);
+
+  summary.active = summary.active
+    || summary.unstaged > 0
+    || summary.staged > 0
+    || summary.committed > 0
+    || summary.remoteIncoming > 0
+    || summary.conflicts > 0;
+  summary.changeCount = summary.unstaged + summary.staged + summary.committed + summary.conflicts + summary.remoteIncoming;
+  return summary;
+}
+
+function getDesktopGitEntryKind(entry: GitStatusEntry): "added" | "modified" | "deleted" | "renamed" | "conflict" {
+  const status = entry.status.toLowerCase();
+  if (entry.conflict || status === "conflict") return "conflict";
+  if (status === "untracked" || status === "added" || entry.staged === "A" || entry.unstaged === "A") return "added";
+  if (status === "deleted" || entry.staged === "D" || entry.unstaged === "D") return "deleted";
+  if (status === "renamed" || status === "copied" || entry.staged === "R" || entry.unstaged === "R") return "renamed";
+  return "modified";
+}
+
+type DesktopNavigationBadge = {
+  count: number;
+  tone: "remote" | "workspace";
+  kind: "remote" | "workspace" | "none";
+};
+
+function getDesktopNavigationBadge(
+  view: DesktopView,
+  gitIncomingCount: number,
+  workspaceChangeCount: number,
+): DesktopNavigationBadge {
+  if (view !== "git") return { count: 0, tone: "remote", kind: "none" };
+  if (workspaceChangeCount > 0) {
+    return { count: workspaceChangeCount, tone: "workspace", kind: "workspace" };
+  }
+  if (gitIncomingCount > 0) {
+    return { count: gitIncomingCount, tone: "remote", kind: "remote" };
+  }
+  return { count: 0, tone: "remote", kind: "none" };
+}
+
+function getDesktopNavigationLabel(
+  label: string,
+  view: DesktopView,
+  badge: DesktopNavigationBadge,
+  workspaceChangeCount: number,
+) {
+  if (view === "data" && workspaceChangeCount > 0) return `${label}, workspace changes detected`;
+  if (badge.count <= 0) return label;
+  if (badge.kind === "workspace") {
+    return `${label}, ${badge.count} workspace change${badge.count === 1 ? "" : "s"}`;
+  }
+  return `${label}, ${badge.count} remote change${badge.count === 1 ? "" : "s"} to pull`;
 }
 
 const DESKTOP_NAV_ITEMS = [
   { view: "data", label: "Files", icon: Folder },
   { view: "git", label: "Changes", icon: PuppyGitIcon, iconSize: 15 },
-  { view: "cloud", label: "Cloud", icon: Cloud },
+  { view: "access", label: "Access", icon: AccessChainIcon },
+  { view: "integrations", label: "Integrations", icon: IntegrationsGridIcon },
 ] satisfies Array<{
-  view: Extract<DesktopView, "data" | "git" | "cloud">;
+  view: Extract<DesktopView, "data" | "git" | "access" | "integrations">;
   label: string;
   icon: DesktopSidebarIconComponent;
   iconSize?: number;
 }>;
 
-const DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.view !== "cloud");
-const DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.view === "cloud");
+const DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.view !== "access" && item.view !== "integrations");
+const DESKTOP_ACCESS_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.view === "access" || item.view === "integrations");
+
+function getDesktopLocalSidebarNavItems(gitEnabled: boolean): typeof DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS {
+  return gitEnabled
+    ? DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS
+    : DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS.filter((item) => item.view !== "git");
+}
+
+function getDesktopAccessSidebarNavItems(accessEnabled: boolean): typeof DESKTOP_ACCESS_SIDEBAR_NAV_ITEMS {
+  return accessEnabled ? DESKTOP_ACCESS_SIDEBAR_NAV_ITEMS : [];
+}

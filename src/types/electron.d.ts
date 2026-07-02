@@ -70,6 +70,8 @@ export type GitDiffLine = {
 export type GitFileDiff = GitCommitChange & {
   binary: boolean;
   lines: GitDiffLine[];
+  truncated?: boolean;
+  omittedLines?: number;
 };
 
 export type GitCommitDetail = {
@@ -147,6 +149,32 @@ export type GitSourceControlSnapshot = {
 
 export type GitWorkingDiffScope = "staged" | "unstaged" | "untracked" | "remote" | "committed";
 
+export type GitEffectiveHostingKind = "github" | "puppyone-cloud" | "generic-git" | "local-only";
+
+export type GitEffectiveHostingReason =
+  | "configured"
+  | "remote-detected"
+  | "upstream-detected"
+  | "missing-remote"
+  | "local-only"
+  | "no-repository";
+
+export type GitEffectiveHostingIdentity = {
+  provider: Extract<GitEffectiveHostingKind, "github" | "puppyone-cloud">;
+  label: string;
+  href: string | null;
+};
+
+export type GitEffectiveHosting = {
+  kind: GitEffectiveHostingKind;
+  remoteName: string | null;
+  branchName: string | null;
+  ref: string | null;
+  ready: boolean;
+  reason: GitEffectiveHostingReason;
+  identity: GitEffectiveHostingIdentity | null;
+};
+
 export type GitStatusSnapshot = {
   isRepo: boolean;
   branch: string | null;
@@ -159,6 +187,7 @@ export type GitStatusSnapshot = {
   branches: GitBranchSummary[];
   remotes: GitRemoteSummary[];
   syncTarget: GitSyncTargetSummary | null;
+  effectiveHosting: GitEffectiveHosting;
   sourceControl: GitSourceControlSnapshot;
   commits: GitCommitSummary[];
   allCommits: GitCommitSummary[];
@@ -275,6 +304,10 @@ export type LastWorkspaceResult = {
 
 export type RecentWorkspacesResult = {
   workspaces: Workspace[];
+  items?: Array<{
+    workspace: Workspace;
+    lastOpenedAt: string | null;
+  }>;
   errors: Array<{
     path: string;
     error: string;
@@ -328,6 +361,11 @@ export type WorkspaceDeleteEntryRequest = {
   path: string;
 };
 
+export type WorkspaceRevealEntryRequest = {
+  rootPath: string;
+  path: string;
+};
+
 export type DesktopStoredCloudSession = {
   expires_in?: number;
   expires_at?: number;
@@ -369,14 +407,9 @@ declare global {
       restoreCloudSession: (request: {
         apiBaseUrl?: string | null;
       }) => Promise<DesktopStoredCloudSession | null>;
-      signInCloudSessionWithPassword: (request: {
-        apiBaseUrl: string;
-        email: string;
-        password: string;
-      }) => Promise<DesktopStoredCloudSession>;
       startCloudOAuth: (request: {
         apiBaseUrl: string;
-        provider: "google" | "github";
+        provider?: "google" | "github";
       }) => Promise<{ ok: boolean }>;
       clearCloudSession: () => Promise<void>;
       onCloudSessionChanged: (
@@ -443,6 +476,7 @@ declare global {
       getRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
       rememberLastWorkspace: (folderPath: string) => Promise<void>;
       forgetLastWorkspace: () => Promise<void>;
+      showHomepage: () => Promise<{ ok: boolean }>;
       openWorkspaceInCurrentWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
       openWorkspaceInNewWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
       selectFolder: () => Promise<WorkspaceOpenResult | null>;
@@ -467,6 +501,7 @@ declare global {
       moveEntry: (request: WorkspaceMoveEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       importEntries: (request: WorkspaceImportEntriesRequest) => Promise<WorkspaceImportEntriesResult>;
       deleteEntry: (request: WorkspaceDeleteEntryRequest) => Promise<WorkspaceCreateEntryResult>;
+      revealEntryInFinder: (request: WorkspaceRevealEntryRequest) => Promise<{ ok: boolean }>;
       watchWorkspace: (
         rootPath: string,
         callback: (event: WorkspaceChangedEvent) => void,
@@ -556,9 +591,11 @@ declare global {
       }) => Promise<GitStatusSnapshot>;
       pullGit: (request: {
         rootPath: string;
+        showNativeErrorDialog?: boolean;
       }) => Promise<GitStatusSnapshot>;
       pushGit: (request: {
         rootPath: string;
+        showNativeErrorDialog?: boolean;
       }) => Promise<GitStatusSnapshot>;
       publishGitBranch: (request: {
         rootPath: string;

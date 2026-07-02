@@ -9,10 +9,10 @@ export function SettingsSectionHeader({ title, detail }: { title: string; detail
   );
 }
 
-export function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
+export function SettingsGroup({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <section className="desktop-settings-group">
-      <div className="desktop-settings-group-title">{title}</div>
+      {title && <div className="desktop-settings-group-title">{title}</div>}
       <div className="desktop-settings-group-body">{children}</div>
     </section>
   );

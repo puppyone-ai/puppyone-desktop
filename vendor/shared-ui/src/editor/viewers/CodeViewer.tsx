@@ -1,9 +1,10 @@
 import { TextEditorFrame } from "./TextEditorFrame";
-import { DocumentPreview } from "./DocumentFallbackViewer";
-import { getDocumentLabel, isTextEditable } from "./viewerUtils";
+import { CodeMirrorCodeEditor } from "../CodeMirrorCodeEditor";
+import { isTextEditable } from "./viewerUtils";
 import type { EditorViewerContext } from "../viewerTypes";
 
 export function JsonViewer(context: EditorViewerContext) {
+  const language = context.format.monacoLanguage ?? "json";
   return (
     <TextEditorFrame
       documentId={context.document.path}
@@ -14,16 +15,30 @@ export function JsonViewer(context: EditorViewerContext) {
       onSaveContent={context.onSaveContent}
       hideSourceView={context.hideSourceView}
       saveMode={context.saveMode}
-      renderLive={(value) => <CodePreview language="JSON" content={value} />}
+      renderLive={(value, controls) => (
+        <CodeMirrorCodeEditor
+          content={value}
+          nodeName={context.document.name}
+          language={language}
+          readOnly={!controls.canEdit}
+          onChange={controls.canEdit ? controls.onChange : undefined}
+        />
+      )}
+      renderSource={(value, controls) => (
+        <CodeMirrorCodeEditor
+          content={value}
+          nodeName={context.document.name}
+          language={language}
+          readOnly={!controls.canEdit}
+          onChange={controls.canEdit ? controls.onChange : undefined}
+        />
+      )}
     />
   );
 }
 
 export function TextFileViewer(context: EditorViewerContext) {
-  if (!context.content) {
-    return <DocumentPreview document={context.document} title="No text preview available." />;
-  }
-
+  const language = context.format.monacoLanguage ?? null;
   return (
     <TextEditorFrame
       documentId={context.document.path}
@@ -34,29 +49,28 @@ export function TextFileViewer(context: EditorViewerContext) {
       onSaveContent={context.onSaveContent}
       hideSourceView={context.hideSourceView}
       saveMode={context.saveMode}
-      renderLive={(value) => <CodePreview language={getDocumentLabel(context.document)} content={value} />}
+      renderLive={(value, controls) => (
+        <CodeMirrorCodeEditor
+          content={value}
+          nodeName={context.document.name}
+          language={language}
+          readOnly={!controls.canEdit}
+          onChange={controls.canEdit ? controls.onChange : undefined}
+        />
+      )}
+      renderSource={(value, controls) => (
+        <CodeMirrorCodeEditor
+          content={value}
+          nodeName={context.document.name}
+          language={language}
+          readOnly={!controls.canEdit}
+          onChange={controls.canEdit ? controls.onChange : undefined}
+        />
+      )}
     />
   );
 }
 
 export function canEditTextFile(context: Pick<EditorViewerContext, "document" | "content">): boolean {
   return isTextEditable(context.document, context.content);
-}
-
-function CodePreview({ language, content }: { language: string; content: string }) {
-  return (
-    <div className="code-preview">
-      <div className="code-preview-toolbar">
-        <span>{language}</span>
-      </div>
-      <pre>
-        {content.split("\n").map((line, index) => (
-          <span key={index} className="code-line">
-            <span className="line-number">{index + 1}</span>
-            <span>{line || " "}</span>
-          </span>
-        ))}
-      </pre>
-    </div>
-  );
 }

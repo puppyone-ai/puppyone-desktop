@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, protocol, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from "electron";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
@@ -32,6 +32,7 @@ import {
   readWorkspaceTextFile,
   readWorkspaceFile,
   renameWorkspaceEntry,
+  resolveWorkspacePath as resolveLocalWorkspacePath,
   stageAllWorkspaceGitChanges,
   stageWorkspaceGitPaths,
   stashAndCheckoutWorkspaceGitBranch,
@@ -70,7 +71,7 @@ const cloudAuthProtocol = "puppyone";
 const macTitlebarOptions = process.platform === "darwin"
   ? {
       titleBarStyle: "hiddenInset",
-      trafficLightPosition: { x: 13, y: 13 },
+      trafficLightPosition: { x: 13, y: 12 },
     }
   : {
       titleBarStyle: "default",
@@ -265,6 +266,21 @@ function setDockIcon() {
   }
 }
 
+function setDockMenu() {
+  if (process.platform !== "darwin" || !app.dock) return;
+
+  const dockMenu = Menu.buildFromTemplate([
+    {
+      label: "New Window",
+      click: () => {
+        void createWindow();
+      },
+    },
+  ]);
+
+  app.dock.setMenu(dockMenu);
+}
+
 function registerCloudAuthProtocol() {
   cloudAuthService.registerProtocol();
 }
@@ -299,6 +315,7 @@ app.on("open-url", (event, callbackUrl) => {
 app.whenReady().then(async () => {
   if (process.platform === "darwin" && app.dock) {
     setDockIcon();
+    setDockMenu();
   }
 
   registerLocalFileProtocol();
@@ -349,14 +366,6 @@ function registerIpcHandlers() {
   ipcMain.handle("cloud-session:restore", async (_event, request) => {
     const apiBase = normalizeCloudApiBase(request?.apiBaseUrl);
     return cloudAuthService.restoreSession(apiBase);
-  });
-
-  ipcMain.handle("cloud-session:sign-in-password", async (_event, request) => {
-    const apiBase = normalizeCloudApiBase(request?.apiBaseUrl);
-    if (!apiBase) throw new Error("Cloud API base URL is required.");
-    const email = requireNonEmptyString(request?.email, "Email is required.");
-    const password = requireNonEmptyString(request?.password, "Password is required.");
-    return cloudAuthService.signInWithPassword({ apiBase, email, password });
   });
 
   ipcMain.handle("cloud-session:start-oauth", async (_event, request) => {
@@ -457,6 +466,11 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
+  ipcMain.handle("workspace:show-homepage", async (event) => {
+    await showHomepageForCurrentWindow(event.sender);
+    return { ok: true };
+  });
+
   ipcMain.handle("workspace:open-current", async (event, folderPath) => {
     if (typeof folderPath !== "string" || folderPath.trim().length === 0) {
       throw new Error("Folder path is required.");
@@ -480,13 +494,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("workspace:select-folder-new-window", async (event) => {
-    const result = await dialog.showOpenDialog(getDialogOwnerWindow(event.sender), {
-      title: "Open local puppyone workspace",
-      properties: ["openDirectory", "createDirectory"],
-    });
-
-    if (result.canceled || result.filePaths.length === 0) return null;
-    return openWorkspaceInNewWindow(result.filePaths[0]);
+    return selectWorkspaceForNewWindow(event.sender);
   });
 
   ipcMain.handle("workspace:from-path", async (_event, folderPath) => {
@@ -583,6 +591,24 @@ function registerIpcHandlers() {
     const result = await deleteWorkspaceEntry(rootPath, request);
     await absorbWorkspaceEditReviewPath(rootPath, result.path);
     return result;
+  });
+
+  ipcMain.handle("workspace:reveal-entry-in-finder", async (_event, request) => {
+    const rootPath = request?.rootPath;
+    const entryPath = request?.path;
+    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
+      throw new Error("Workspace root path is required.");
+    }
+    if (typeof entryPath !== "string" || entryPath.trim().length === 0) {
+      throw new Error("Entry path is required.");
+    }
+
+    const targetPath = resolveLocalWorkspacePath(rootPath, entryPath);
+    await fs.promises.stat(targetPath).catch((error) => {
+      throw new Error(`Unable to reveal entry in Finder: ${error.message}`);
+    });
+    shell.showItemInFolder(targetPath);
+    return { ok: true };
   });
 
   ipcMain.handle("workspace:watch-start", async (event, request) => {
@@ -725,12 +751,16 @@ function registerIpcHandlers() {
     return fetchWorkspaceGit(requireWorkspaceRoot(request));
   });
 
-  ipcMain.handle("workspace:git-pull", async (_event, request) => {
-    return pullWorkspaceGit(requireWorkspaceRoot(request));
+  ipcMain.handle("workspace:git-pull", async (event, request) => {
+    return runWorkspaceGitIpcOperation(event, request, "pull", () => (
+      pullWorkspaceGit(requireWorkspaceRoot(request))
+    ));
   });
 
-  ipcMain.handle("workspace:git-push", async (_event, request) => {
-    return pushWorkspaceGit(requireWorkspaceRoot(request));
+  ipcMain.handle("workspace:git-push", async (event, request) => {
+    return runWorkspaceGitIpcOperation(event, request, "push", () => (
+      pushWorkspaceGit(requireWorkspaceRoot(request))
+    ));
   });
 
   ipcMain.handle("workspace:git-publish-branch", async (_event, request) => {
@@ -832,6 +862,48 @@ function requireWorkspaceRoot(request) {
   return rootPath;
 }
 
+async function runWorkspaceGitIpcOperation(event, request, operation, handler) {
+  try {
+    return await handler();
+  } catch (error) {
+    if (request?.showNativeErrorDialog === true) {
+      void showWorkspaceGitErrorDialog(event.sender, operation, error);
+    }
+    throw error;
+  }
+}
+
+async function showWorkspaceGitErrorDialog(sender, operation, error) {
+  const owner = BrowserWindow.fromWebContents(sender);
+  const detail = error instanceof Error ? error.message : String(error);
+  const operationLabel = operation === "pull" ? "Pull" : operation === "push" ? "Push" : "Git Operation";
+  const message = operation === "pull"
+    ? "Cannot pull remote changes."
+    : operation === "push"
+      ? "Cannot push local commits."
+      : "Git operation failed.";
+
+  try {
+    const options = {
+      type: "error",
+      buttons: ["OK"],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+      title: `${operationLabel} Failed`,
+      message,
+      detail: detail.trim() || "No Git error output was captured.",
+    };
+    if (owner && !owner.isDestroyed()) {
+      await dialog.showMessageBox(owner, options);
+    } else {
+      await dialog.showMessageBox(options);
+    }
+  } catch (dialogError) {
+    console.warn("Unable to show Git operation error dialog:", dialogError);
+  }
+}
+
 async function getInitialWorkspaceResultForWindow(sender) {
   const window = BrowserWindow.fromWebContents(sender);
   if (!window || window.isDestroyed()) {
@@ -882,13 +954,29 @@ async function getInitialWorkspaceResultForWindow(sender) {
 }
 
 async function selectWorkspaceForCurrentWindow(sender) {
-  const result = await dialog.showOpenDialog(getDialogOwnerWindow(sender), {
-    title: "Open local puppyone workspace",
-    properties: ["openDirectory", "createDirectory"],
-  });
+  const result = await showWorkspaceOpenDialog(getDialogOwnerWindow(sender));
 
   if (result.canceled || result.filePaths.length === 0) return null;
   return openWorkspaceInCurrentWindow(sender, result.filePaths[0]);
+}
+
+async function selectWorkspaceForNewWindow(sender = null) {
+  const ownerWindow = sender ? getDialogOwnerWindow(sender) : getLastFocusedWindow() ?? undefined;
+  const result = await showWorkspaceOpenDialog(ownerWindow);
+
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return openWorkspaceInNewWindow(result.filePaths[0]);
+}
+
+async function showWorkspaceOpenDialog(ownerWindow) {
+  const options = {
+    title: "Open local puppyone workspace",
+    properties: ["openDirectory", "createDirectory"],
+  };
+
+  return ownerWindow && !ownerWindow.isDestroyed()
+    ? dialog.showOpenDialog(ownerWindow, options)
+    : dialog.showOpenDialog(options);
 }
 
 async function openWorkspaceInCurrentWindow(sender, folderPath, options = {}) {
@@ -1073,19 +1161,54 @@ async function getLastWorkspaceResult() {
 
 async function getRecentWorkspacesResult() {
   const state = normalizeWorkspaceState(await readWorkspaceState());
+  const items = [];
   const workspaces = [];
   const errors = [];
-  for (const folderPath of state.recentWorkspacePaths) {
+  for (const record of state.recentWorkspaceRecords) {
     try {
-      workspaces.push(await workspaceFromPath(folderPath));
+      const workspace = await workspaceFromPath(record.path);
+      items.push({
+        workspace,
+        lastOpenedAt: record.lastOpenedAt,
+      });
+      workspaces.push(workspace);
     } catch (error) {
       errors.push({
-        path: folderPath,
+        path: record.path,
         error: error instanceof Error ? error.message : String(error),
       });
     }
   }
-  return { workspaces, errors };
+  return { workspaces, items, errors };
+}
+
+async function showHomepageForCurrentWindow(sender) {
+  const window = BrowserWindow.fromWebContents(sender);
+  if (!window || window.isDestroyed()) return;
+  releaseWindowWorkspace(window);
+  closeTerminalSessionsForWindow(window.webContents.id);
+  stopWorkspaceWatchesForWindow(window.webContents.id);
+}
+
+function normalizeWorkspaceTimestamp(value) {
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) return null;
+  return timestamp.toISOString();
+}
+
+function normalizeWorkspaceRecord(value) {
+  if (typeof value === "string") {
+    return {
+      path: value,
+      lastOpenedAt: null,
+    };
+  }
+  if (!value || typeof value !== "object") return null;
+  return {
+    path: value.path,
+    lastOpenedAt: normalizeWorkspaceTimestamp(value.lastOpenedAt),
+  };
 }
 
 async function readLastActiveWorkspacePath() {
@@ -1117,24 +1240,39 @@ async function readWorkspaceState() {
 }
 
 function normalizeWorkspaceState(state) {
-  const recentWorkspacePaths = [];
-  const addPath = (value) => {
+  const recentWorkspaceRecords = [];
+  const addPath = (value, lastOpenedAt = null) => {
     if (typeof value !== "string" || value.trim().length === 0) return;
     const resolvedPath = path.resolve(value);
-    if (!recentWorkspacePaths.includes(resolvedPath)) {
-      recentWorkspacePaths.push(resolvedPath);
+    const normalizedLastOpenedAt = normalizeWorkspaceTimestamp(lastOpenedAt);
+    const existing = recentWorkspaceRecords.find((record) => record.path === resolvedPath);
+    if (existing) {
+      if (normalizedLastOpenedAt) existing.lastOpenedAt = normalizedLastOpenedAt;
+      return;
     }
+    recentWorkspaceRecords.push({
+      path: resolvedPath,
+      lastOpenedAt: normalizedLastOpenedAt,
+    });
   };
 
   addPath(state?.lastActiveWorkspacePath);
+  if (Array.isArray(state?.recentWorkspaces)) {
+    for (const item of state.recentWorkspaces) {
+      const record = normalizeWorkspaceRecord(item);
+      if (record) addPath(record.path, record.lastOpenedAt);
+    }
+  }
   if (Array.isArray(state?.recentWorkspacePaths)) {
     for (const item of state.recentWorkspacePaths) addPath(item);
   }
   addPath(state?.lastWorkspacePath);
+  const recentWorkspacePaths = recentWorkspaceRecords.map((record) => record.path);
 
   return {
     lastActiveWorkspacePath: recentWorkspacePaths[0] ?? null,
     recentWorkspacePaths,
+    recentWorkspaceRecords,
   };
 }
 
@@ -1150,23 +1288,28 @@ async function writeWorkspaceState(state) {
 async function rememberRecentWorkspacePath(folderPath) {
   const canonicalPath = await canonicalizeWorkspacePath(folderPath);
   const state = normalizeWorkspaceState(await readWorkspaceState());
-  const recentWorkspacePaths = [
-    canonicalPath,
-    ...state.recentWorkspacePaths.filter((item) => item !== canonicalPath),
+  const recentWorkspaceRecords = [
+    {
+      path: canonicalPath,
+      lastOpenedAt: new Date().toISOString(),
+    },
+    ...state.recentWorkspaceRecords.filter((item) => item.path !== canonicalPath),
   ].slice(0, 20);
   await writeWorkspaceState({
     lastActiveWorkspacePath: canonicalPath,
-    recentWorkspacePaths,
+    recentWorkspacePaths: recentWorkspaceRecords.map((record) => record.path),
+    recentWorkspaces: recentWorkspaceRecords,
   });
 }
 
 async function removeRecentWorkspacePath(folderPath) {
   const canonicalPath = await canonicalizeWorkspacePath(folderPath);
   const state = normalizeWorkspaceState(await readWorkspaceState());
-  const recentWorkspacePaths = state.recentWorkspacePaths.filter((item) => item !== canonicalPath);
+  const recentWorkspaceRecords = state.recentWorkspaceRecords.filter((item) => item.path !== canonicalPath);
   await writeWorkspaceState({
-    lastActiveWorkspacePath: recentWorkspacePaths[0] ?? null,
-    recentWorkspacePaths,
+    lastActiveWorkspacePath: recentWorkspaceRecords[0]?.path ?? null,
+    recentWorkspacePaths: recentWorkspaceRecords.map((record) => record.path),
+    recentWorkspaces: recentWorkspaceRecords,
   });
 }
 

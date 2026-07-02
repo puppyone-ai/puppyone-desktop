@@ -1,11 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import {
-  checkCloudEmail,
   openCloudApp,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
 import {
-  signInDesktopCloudWithPassword,
+  clearDesktopCloudSession,
   onDesktopCloudAuthError,
   startDesktopCloudOAuth,
   supportsDesktopCloudOAuth,
@@ -16,41 +15,44 @@ export function useCloudAuthController({
   cloudApiBaseUrl,
   accountEmail,
   onSignedIn,
+  onSignedOut,
   onRefresh,
 }: {
   cloudApiBaseUrl: string | null;
   accountEmail: string | null;
   onSignedIn: (session: DesktopCloudSession) => void;
+  onSignedOut?: () => void;
   onRefresh: () => void | Promise<void>;
 }) {
-  const [view, setView] = useState<CloudAuthView>("main");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState<CloudLoginMethod | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [signedInEmail, setSignedInEmail] = useState<string | null>(null);
-  const effectiveSignedInEmail = signedInEmail ?? accountEmail;
+  const [signedInEmail, setSignedInEmail] = useState<string | null | undefined>(undefined);
+  const effectiveSignedInEmail = signedInEmail === undefined ? accountEmail : signedInEmail;
 
   useEffect(() => {
     return onDesktopCloudAuthError((message) => {
       setLoading(null);
+      setSigningOut(false);
       setMessage(null);
       setError(message);
     });
   }, []);
 
-  const startCloudLogin = async (method: CloudLoginMethod, emailOverride?: string) => {
-    const params = new URLSearchParams();
-    if (method !== "email") params.set("provider", method);
-    const trimmedEmail = emailOverride?.trim();
-    if (trimmedEmail) params.set("email", trimmedEmail);
+  useEffect(() => {
+    setSignedInEmail(undefined);
+  }, [accountEmail]);
 
-    setLoading(method);
+  const startCloudLogin = async (method?: Exclude<CloudLoginMethod, "email" | "password" | "browser">) => {
+    const params = new URLSearchParams();
+    if (method) params.set("provider", method);
+
+    setLoading(method ?? "browser");
     setError(null);
     try {
-      if ((method === "google" || method === "github") && supportsDesktopCloudOAuth()) {
-        await startDesktopCloudOAuth(method, cloudApiBaseUrl);
+      if (supportsDesktopCloudOAuth()) {
+        await startDesktopCloudOAuth(method ?? cloudApiBaseUrl, method ? cloudApiBaseUrl : undefined);
         setMessage("Finish sign-in in your browser. Desktop will connect automatically.");
       } else {
         openCloudApp(`/login${params.size > 0 ? `?${params.toString()}` : ""}`);
@@ -62,73 +64,31 @@ export function useCloudAuthController({
     }
   };
 
-  const handleEmailSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) return;
-
+  const handleSignOut = async () => {
+    setSigningOut(true);
     setError(null);
     setMessage(null);
-    setLoading("email");
-
     try {
-      const result = await checkCloudEmail(trimmedEmail, cloudApiBaseUrl);
-      setView(result.exists ? "signin" : "signup");
-    } catch (checkError) {
-      setError(checkError instanceof Error ? checkError.message : "Failed to check email");
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const handlePasswordSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail || !password) return;
-
-    setError(null);
-    setMessage(null);
-    setLoading("password");
-
-    try {
-      const session = await signInDesktopCloudWithPassword(trimmedEmail, password, cloudApiBaseUrl);
-      setMessage(null);
-      setPassword("");
-      setSignedInEmail(session.user_email || trimmedEmail);
-      onSignedIn(session);
+      await clearDesktopCloudSession();
+      setSignedInEmail(null);
+      onSignedOut?.();
+      setMessage("Signed out.");
       void onRefresh();
-    } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : "Sign-in failed");
+    } catch (signOutError) {
+      setError(signOutError instanceof Error ? signOutError.message : "Sign-out failed");
     } finally {
-      setLoading(null);
+      setSigningOut(false);
     }
-  };
-
-  const handleSignupContinue = () => {
-    void startCloudLogin("email", email);
-  };
-
-  const handleBack = () => {
-    setView("main");
-    setPassword("");
-    setError(null);
-    setMessage(null);
   };
 
   return {
-    view,
-    email,
-    password,
+    view: "main" as CloudAuthView,
     signedInEmail: effectiveSignedInEmail,
     loading,
+    signingOut,
     error,
     message,
-    setEmail,
-    setPassword,
-    startProviderLogin: (method: Exclude<CloudLoginMethod, "email" | "password">) => void startCloudLogin(method),
-    handleEmailSubmit,
-    handlePasswordSubmit,
-    handleSignupContinue,
-    handleBack,
+    startProviderLogin: (method?: Exclude<CloudLoginMethod, "email" | "password" | "browser">) => void startCloudLogin(method),
+    handleSignOut: () => void handleSignOut(),
   };
 }

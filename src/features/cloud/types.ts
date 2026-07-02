@@ -21,6 +21,7 @@ export type CloudServicePanelProps = {
   onClose: () => void;
   onRefresh: () => void;
   onSignedIn: (session: DesktopCloudSession) => void;
+  onSignedOut: () => void;
   onEnterCloud: () => void;
   onOpenGitSettings: () => void;
 };

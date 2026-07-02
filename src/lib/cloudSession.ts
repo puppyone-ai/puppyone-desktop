@@ -32,39 +32,24 @@ export async function restoreDesktopCloudSession(apiBaseUrl?: string | null): Pr
   return session;
 }
 
-export async function signInDesktopCloudWithPassword(
-  email: string,
-  password: string,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudSession> {
-  if (!hasFreshCloudSessionBridge()) {
-    throw new Error("Desktop secure Cloud session service is unavailable.");
-  }
-
-  const session = normalizeCloudSession(await window.puppyoneDesktop?.signInCloudSessionWithPassword({
-    apiBaseUrl: normalizeSessionApiBase(apiBaseUrl),
-    email,
-    password,
-  }));
-  if (!session) throw new Error("Cloud session is invalid.");
-  cachedCloudSession = session;
-  clearLegacyStoredCloudSession();
-  return session;
-}
-
 export function supportsDesktopCloudOAuth(): boolean {
   return typeof window !== "undefined" && typeof window.puppyoneDesktop?.startCloudOAuth === "function";
 }
 
 export async function startDesktopCloudOAuth(
-  provider: "google" | "github",
+  providerOrApiBaseUrl?: "google" | "github" | string | null,
   apiBaseUrl?: string | null,
 ): Promise<void> {
   if (!supportsDesktopCloudOAuth()) {
     throw new Error("Desktop OAuth is unavailable.");
   }
+  const provider =
+    providerOrApiBaseUrl === "google" || providerOrApiBaseUrl === "github"
+      ? providerOrApiBaseUrl
+      : undefined;
+  const requestedApiBaseUrl = provider ? apiBaseUrl : (apiBaseUrl ?? providerOrApiBaseUrl);
   await window.puppyoneDesktop?.startCloudOAuth({
-    apiBaseUrl: normalizeSessionApiBase(apiBaseUrl),
+    apiBaseUrl: normalizeSessionApiBase(requestedApiBaseUrl),
     provider,
   });
 }
@@ -118,8 +103,7 @@ function hasFreshCloudSessionBridge(): boolean {
   const bridge = typeof window !== "undefined" ? window.puppyoneDesktop : undefined;
   return Boolean(
     bridge &&
-      typeof bridge.restoreCloudSession === "function" &&
-      typeof bridge.signInCloudSessionWithPassword === "function",
+      typeof bridge.restoreCloudSession === "function",
   );
 }
 

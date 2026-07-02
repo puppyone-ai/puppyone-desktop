@@ -68,6 +68,15 @@ export type {
   EditorSaveButtonProps as SaveStatusButtonProps,
   SaveStatus,
 } from "./editor/EditorSaveButton";
+export {
+  hasVerticalOverflow,
+  useScrollableDescendantClasses,
+  useScrollableState,
+} from "./primitives/useScrollableClass";
+export type {
+  ScrollableDescendantClassOptions,
+  ScrollableStateOptions,
+} from "./primitives/useScrollableClass";
 export { ConflictMarkerBanner } from "./editor/ConflictMarkerBanner";
 export {
   createAiEditFile,

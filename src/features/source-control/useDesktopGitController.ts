@@ -261,6 +261,7 @@ export function useDesktopGitController({
   const runGitOperation = useCallback(async (
     label: string,
     operation: (rootPath: string) => Promise<GitStatusSnapshot>,
+    options: { showRendererError?: boolean } = {},
   ) => {
     if (!workspace) return false;
 
@@ -272,7 +273,9 @@ export function useDesktopGitController({
       onWorkspaceContentChanged();
       return true;
     } catch (error) {
-      setGitOperationError(createGitOperationErrorState(error, label, workspace.path));
+      if (options.showRendererError !== false) {
+        setGitOperationError(createGitOperationErrorState(error, label, workspace.path));
+      }
       return false;
     } finally {
       setGitOperationLoading(null);

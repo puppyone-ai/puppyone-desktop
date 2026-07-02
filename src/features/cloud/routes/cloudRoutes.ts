@@ -92,7 +92,7 @@ export const CLOUD_ROUTES = [
     id: "git-sync",
     label: "Git Sync",
     title: "Git Sync",
-    description: "Desktop Git sync needs a PuppyOne Cloud remote mapped to a project.",
+    description: "Desktop Git sync needs a Puppyone Cloud remote mapped to a project.",
     icon: GitBranch,
     context: "project",
     showInSidebar: false,

@@ -8,6 +8,7 @@ export function SourceControlSectionHeader({
   title,
   count,
   highlightCount = false,
+  leadingIcon,
   action,
   className,
   expanded = true,
@@ -16,6 +17,7 @@ export function SourceControlSectionHeader({
   title: string;
   count: number;
   highlightCount?: boolean;
+  leadingIcon?: ReactNode;
   action?: ReactNode;
   className?: string;
   expanded?: boolean;
@@ -23,7 +25,8 @@ export function SourceControlSectionHeader({
 }) {
   const titleContent = (
     <>
-      <ChevronRight size={13} className={expanded ? "expanded" : undefined} />
+      {onToggle && <ChevronRight size={13} className={expanded ? "expanded" : undefined} />}
+      {leadingIcon && <span className="desktop-git-section-leading-icon">{leadingIcon}</span>}
       <span>{title}</span>
       <small className={highlightCount ? "desktop-git-section-count-badge" : undefined}>{count}</small>
     </>
@@ -90,49 +93,6 @@ export function SourceControlPreviewResourceList({
           </div>
         );
       })}
-    </div>
-  );
-}
-
-export function SourceControlResourceGroup({
-  title,
-  resources,
-  selectedWorkingFile,
-  operationLoading,
-  fileIconTheme,
-  onSelectWorkingFile,
-  onStagePaths,
-  onUnstagePaths,
-  onDiscardPaths,
-}: {
-  title: string;
-  resources: GitSourceControlResource[];
-  selectedWorkingFile: GitWorkingSelection | null;
-  operationLoading: string | null;
-  fileIconTheme: FileIconThemeId;
-  onSelectWorkingFile: (selection: GitWorkingSelection) => void;
-  onStagePaths: (paths: string[]) => Promise<boolean>;
-  onUnstagePaths: (paths: string[]) => Promise<boolean>;
-  onDiscardPaths: (paths: string[]) => Promise<boolean>;
-}) {
-  return (
-    <div className="desktop-git-resource-group">
-      <SourceControlSectionHeader title={title} count={resources.length} />
-      <div className="desktop-working-tree-list">
-        {resources.map((resource) => (
-          <SourceControlWorkingTreeRow
-            resource={resource}
-            key={resource.id}
-            selected={selectedWorkingFile?.path === resource.path && selectedWorkingFile.staged === resource.staged}
-            operationLoading={operationLoading}
-            fileIconTheme={fileIconTheme}
-            onSelect={onSelectWorkingFile}
-            onStagePaths={onStagePaths}
-            onUnstagePaths={onUnstagePaths}
-            onDiscardPaths={onDiscardPaths}
-          />
-        ))}
-      </div>
     </div>
   );
 }

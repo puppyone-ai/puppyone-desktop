@@ -15,3 +15,9 @@
 .desktop-settings-sidebar .desktop-tool-sidebar-list {
   padding-top: var(--desktop-sidebar-section-top-gap);
 }
+
+.desktop-settings-sidebar-divider {
+  height: 1px;
+  margin: 7px var(--desktop-sidebar-row-right-gap) 7px var(--desktop-sidebar-row-left-gap);
+  background: var(--po-divider);
+}

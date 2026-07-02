@@ -3,7 +3,6 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 contextBridge.exposeInMainWorld("puppyoneDesktop", {
   readCloudSession: () => ipcRenderer.invoke("cloud-session:read"),
   restoreCloudSession: (request) => ipcRenderer.invoke("cloud-session:restore", request),
-  signInCloudSessionWithPassword: (request) => ipcRenderer.invoke("cloud-session:sign-in-password", request),
   startCloudOAuth: (request) => ipcRenderer.invoke("cloud-session:start-oauth", request),
   clearCloudSession: () => ipcRenderer.invoke("cloud-session:clear"),
   onCloudSessionChanged: (callback) => {
@@ -26,6 +25,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   getRecentWorkspaces: () => ipcRenderer.invoke("workspace:get-recent"),
   rememberLastWorkspace: (folderPath) => ipcRenderer.invoke("workspace:remember-last", folderPath),
   forgetLastWorkspace: () => ipcRenderer.invoke("workspace:forget-last"),
+  showHomepage: () => ipcRenderer.invoke("workspace:show-homepage"),
   openWorkspaceInCurrentWindow: (folderPath) => ipcRenderer.invoke("workspace:open-current", folderPath),
   openWorkspaceInNewWindow: (folderPath) => ipcRenderer.invoke("workspace:open-new-window", folderPath),
   selectFolder: () => ipcRenderer.invoke("workspace:select-folder-current"),
@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   moveEntry: (request) => ipcRenderer.invoke("workspace:move-entry", request),
   importEntries: (request) => ipcRenderer.invoke("workspace:import-entries", request),
   deleteEntry: (request) => ipcRenderer.invoke("workspace:delete-entry", request),
+  revealEntryInFinder: (request) => ipcRenderer.invoke("workspace:reveal-entry-in-finder", request),
   watchWorkspace: (rootPath, callback) => {
     const listener = (_event, payload) => {
       if (payload?.rootPath === rootPath) callback(payload);

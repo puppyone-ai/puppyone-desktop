@@ -246,10 +246,6 @@ export type DesktopCloudRepoIdentity = {
   }>;
 };
 
-export type DesktopCloudEmailCheck = {
-  exists: boolean;
-};
-
 function normalizeSessionApiBase(apiBaseUrl: string | null | undefined): string {
   if (typeof apiBaseUrl === "string" && apiBaseUrl.trim()) {
     return resolveCloudApiBaseUrl(apiBaseUrl);
@@ -301,14 +297,6 @@ export function openCloudApp(path: string): void {
   window.open(getDesktopCloudWebUrl(path), "_blank", "noopener,noreferrer");
 }
 
-export async function checkCloudEmail(email: string, apiBaseUrl?: string | null): Promise<DesktopCloudEmailCheck> {
-  const payload = await requestPublic<{ exists?: boolean }>("/auth/check-email", {
-    method: "POST",
-    body: JSON.stringify({ email }),
-  }, apiBaseUrl);
-  return { exists: Boolean(payload?.exists) };
-}
-
 export async function cloudApiRequest<T>(
   path: string,
   session: DesktopCloudSession,
@@ -355,6 +343,21 @@ export function listCloudProjects(
   apiBaseUrl?: string | null,
 ): Promise<DesktopCloudProject[]> {
   return cloudApiRequest<DesktopCloudProject[]>("/projects/", session, onSessionChange, {}, apiBaseUrl);
+}
+
+export function getCloudProject(
+  session: DesktopCloudSession,
+  projectId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudProject> {
+  return cloudApiRequest<DesktopCloudProject>(
+    `/projects/${encodeURIComponent(projectId)}`,
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  );
 }
 
 export function listCloudOrganizations(

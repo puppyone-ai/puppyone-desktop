@@ -2,7 +2,6 @@ import { isFileIconThemeId, type FileIconThemeId } from "@puppyone/shared-ui";
 import type { PuppyoneWorkspaceConfig } from "../../types/electron";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
-  CLOUD_ENABLED_STORAGE_KEY,
   DEFAULT_SIDEBAR_NAVIGATION_LAYOUT,
   DEFAULT_THEME_MODE,
   FILES_VISIBILITY_STORAGE_KEY,
@@ -12,7 +11,6 @@ import {
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
   THEME_STORAGE_KEY,
   parseAiEditAssistEnabled,
-  parseCloudEnabled,
   parseFilesVisibilitySettings,
   parseGitDisplayMode,
   parseRightSidebarToolsSettings,
@@ -94,24 +92,37 @@ export function mergePuppyoneWorkspaceConfig(
     branch: currentSourceOfTruth?.branch ?? current?.git?.watchedBranch ?? current?.backup?.branch ?? null,
     ...patch.sync?.sourceOfTruth,
   };
+  if (sourceOfTruth.service === "puppyone") {
+    sourceOfTruth.branch = null;
+  }
+
+  const git = {
+    primaryRemote: current?.git?.primaryRemote ?? sourceOfTruth.remote,
+    watchedBranch: current?.git?.watchedBranch ?? sourceOfTruth.branch,
+    ...patch.git,
+  };
+  if (sourceOfTruth.service === "puppyone") {
+    git.watchedBranch = null;
+  }
+
+  const backup = {
+    enabled: current?.backup?.enabled ?? false,
+    service: current?.backup?.service ?? sourceOfTruth.service,
+    remote: current?.backup?.remote ?? sourceOfTruth.remote,
+    branch: current?.backup?.branch ?? sourceOfTruth.branch,
+    ...patch.backup,
+  };
+  if (backup.service === "puppyone") {
+    backup.branch = null;
+  }
 
   return {
     version: 1,
     sync: {
       sourceOfTruth,
     },
-    git: {
-      primaryRemote: current?.git?.primaryRemote ?? sourceOfTruth.remote,
-      watchedBranch: current?.git?.watchedBranch ?? sourceOfTruth.branch,
-      ...patch.git,
-    },
-    backup: {
-      enabled: current?.backup?.enabled ?? false,
-      service: current?.backup?.service ?? sourceOfTruth.service,
-      remote: current?.backup?.remote ?? sourceOfTruth.remote,
-      branch: current?.backup?.branch ?? sourceOfTruth.branch,
-      ...patch.backup,
-    },
+    git,
+    backup,
     cloud: {
       projectId: current?.cloud?.projectId ?? null,
       ...patch.cloud,
@@ -123,11 +134,6 @@ export function mergePuppyoneWorkspaceConfig(
 export function readInitialAiEditAssistEnabled(): boolean {
   if (typeof window === "undefined") return parseAiEditAssistEnabled(null);
   return parseAiEditAssistEnabled(window.localStorage.getItem(AI_EDIT_ASSIST_STORAGE_KEY));
-}
-
-export function readInitialCloudEnabled(): boolean {
-  if (typeof window === "undefined") return parseCloudEnabled(null);
-  return parseCloudEnabled(window.localStorage.getItem(CLOUD_ENABLED_STORAGE_KEY));
 }
 
 export function readInitialExplorerWidth(): number {

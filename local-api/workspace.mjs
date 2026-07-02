@@ -12,7 +12,11 @@ const GIT_HISTORY_LIMIT = 100;
 const GIT_ALL_BRANCH_HISTORY_LIMIT = 320;
 const GIT_REMOTE_PREVIEW_LIMIT = 12;
 const GIT_MAX_BUFFER = 1024 * 1024 * 4;
+const GIT_DEFAULT_TIMEOUT_MS = 5000;
+const GIT_DETAIL_MAX_TOTAL_DIFF_LINES = 4000;
+const GIT_DETAIL_MAX_FILE_DIFF_LINES = 900;
 const GIT_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
 const PUPPYONE_CONFIG_DIR = ".puppyone";
 const PUPPYONE_CONFIG_FILE = "config.json";
 const GIT_RESOURCE_GROUPS = Object.freeze([
@@ -551,6 +555,7 @@ export async function getWorkspaceGitStatus(rootPath) {
       branches: [],
       remotes: [],
       syncTarget: null,
+      effectiveHosting: createNoRepositoryHosting(),
       sourceControl,
       commits: [],
       allCommits: [],
@@ -589,7 +594,8 @@ export async function getWorkspaceGitStatus(rootPath) {
       .filter((branch) => branch.remote && branch.name.startsWith(`${remote.name}/`))
       .map((branch) => branch.name),
   }));
-  const syncTarget = await readGitSyncTarget(root, normalizedRemotes, normalizedBranches, branchName, headResult.stdout.trim());
+  const config = await readPuppyoneWorkspaceConfig(root).catch(() => null);
+  const syncTarget = await readGitSyncTarget(root, normalizedRemotes, normalizedBranches, branchName, headResult.stdout.trim(), config);
   const currentBranch = normalizedBranches.find((branch) => branch.current && !branch.remote) ?? null;
   const sourceControl = buildGitSourceControlSnapshot({
     entries: parsedStatus.entries,
@@ -597,6 +603,13 @@ export async function getWorkspaceGitStatus(rootPath) {
     syncTarget,
     currentBranch,
     headCommitId: headResult.stdout.trim() || null,
+  });
+  const effectiveHosting = resolveGitEffectiveHosting({
+    remotes: normalizedRemotes,
+    branches: normalizedBranches,
+    currentBranchName: branchName,
+    syncTarget,
+    config,
   });
 
   return {
@@ -611,6 +624,7 @@ export async function getWorkspaceGitStatus(rootPath) {
     branches: normalizedBranches,
     remotes: normalizedRemotes,
     syncTarget,
+    effectiveHosting,
     sourceControl,
     commits,
     allCommits,
@@ -1059,6 +1073,29 @@ export async function fetchWorkspaceGit(rootPath) {
 
 export async function pullWorkspaceGit(rootPath) {
   const root = resolveWorkspacePath(rootPath, null);
+  const config = await readPuppyoneWorkspaceConfig(root).catch(() => null);
+  const remotes = await readGitRemotes(root);
+  if (hasEffectivePuppyoneHostingTarget(remotes, config)) {
+    const target = await buildPuppyoneCloudSyncTarget(root, config);
+    if (!target.remote || !target.branch) {
+      throw new Error("Unable to pull changes: PuppyOne Cloud remote is not configured.");
+    }
+    await execGit(root, ["fetch", "--prune", target.remote], { timeout: 30000 }).catch((error) => {
+      throw new Error(`Unable to fetch cloud changes: ${getGitErrorOutput(error)}`);
+    });
+
+    const nextStatus = await getWorkspaceGitStatus(root);
+    if (nextStatus.sourceControl.remote.behind === 0) return nextStatus;
+
+    const pullModeArgs = nextStatus.sourceControl.remote.ahead > 0
+      ? ["pull", "--rebase", "--autostash", target.remote, target.branch]
+      : ["pull", "--ff-only", "--autostash", target.remote, target.branch];
+    await execGit(root, pullModeArgs, { timeout: 30000 }).catch((error) => {
+      throw new Error(`Unable to pull cloud changes: ${getGitErrorOutput(error)}`);
+    });
+    return getWorkspaceGitStatus(root);
+  }
+
   const pullArgs = await buildDefaultPullArgs(root);
   await execGit(root, pullArgs, { timeout: 30000 }).catch((error) => {
     throw new Error(`Unable to pull changes: ${getGitErrorOutput(error)}`);
@@ -1068,6 +1105,16 @@ export async function pullWorkspaceGit(rootPath) {
 
 export async function pushWorkspaceGit(rootPath) {
   const root = resolveWorkspacePath(rootPath, null);
+  const config = await readPuppyoneWorkspaceConfig(root).catch(() => null);
+  const remotes = await readGitRemotes(root);
+  if (hasEffectivePuppyoneHostingTarget(remotes, config)) {
+    if (!choosePuppyoneRemoteName(remotes, config)) {
+      throw new Error("Unable to push changes: PuppyOne Cloud remote is not configured.");
+    }
+    await pushWorkspaceGitWithDefaultUpstream(root);
+    return getWorkspaceGitStatus(root);
+  }
+
   await execGit(root, ["push"], { timeout: 30000 }).catch((error) => {
     if (isMissingUpstreamError(error)) {
       return pushWorkspaceGitWithDefaultUpstream(root);
@@ -1142,7 +1189,7 @@ async function nodeFromEntry(folder, entry, parentRelative) {
   };
 }
 
-function resolveWorkspacePath(rootPath, relativePath) {
+export function resolveWorkspacePath(rootPath, relativePath) {
   const root = path.resolve(rootPath);
   const normalizedRelative = normalizeRelativePath(relativePath);
   const resolved = normalizedRelative ? path.resolve(root, normalizedRelative) : root;
@@ -1456,20 +1503,51 @@ function stableWorkspaceId(folderPath) {
 }
 
 function execGit(rootPath, args, options = {}) {
+  const timeout = options.timeout ?? GIT_DEFAULT_TIMEOUT_MS;
   return execFileAsync("git", ["-C", rootPath, "-c", "core.quotePath=false", ...args], {
-    timeout: options.timeout ?? 5000,
+    timeout,
     maxBuffer: GIT_MAX_BUFFER,
+    env: buildGitEnvironment(),
+  }).catch((error) => {
+    if (error && typeof error === "object") {
+      error.gitArgs = args;
+      error.gitTimeoutMs = timeout;
+    }
+    throw error;
   });
 }
 
+function buildGitEnvironment() {
+  return {
+    ...process.env,
+    GCM_INTERACTIVE: "never",
+    GIT_TERMINAL_PROMPT: "0",
+  };
+}
+
 function getGitErrorOutput(error) {
-  if (typeof error?.stderr === "string" && error.stderr.trim()) {
-    return error.stderr.trim();
+  const stderr = typeof error?.stderr === "string" ? error.stderr.trim() : "";
+  const stdout = typeof error?.stdout === "string" ? error.stdout.trim() : "";
+
+  if (isGitTimeoutError(error)) {
+    const timeoutSeconds = Number.isFinite(error?.gitTimeoutMs)
+      ? Math.round(error.gitTimeoutMs / 1000)
+      : Math.round(GIT_DEFAULT_TIMEOUT_MS / 1000);
+    const timeoutMessage = `Git command timed out after ${timeoutSeconds}s. The operation may be waiting for credentials, network access, or a remote server response.`;
+    return [stderr, stdout, timeoutMessage].filter(Boolean).join("\n");
   }
-  if (typeof error?.stdout === "string" && error.stdout.trim()) {
-    return error.stdout.trim();
-  }
+
+  if (stderr) return stderr;
+  if (stdout) return stdout;
   return error instanceof Error ? error.message : String(error);
+}
+
+function isGitTimeoutError(error) {
+  return Boolean(
+    error?.killed === true ||
+      error?.signal === "SIGTERM" ||
+      /timed out|timeout/i.test(error instanceof Error ? error.message : String(error)),
+  );
 }
 
 function isMissingUpstreamError(error) {
@@ -1478,16 +1556,17 @@ function isMissingUpstreamError(error) {
 }
 
 async function buildDefaultPullArgs(rootPath) {
+  const config = await readPuppyoneWorkspaceConfig(rootPath).catch(() => null);
+  const remotes = await readGitRemotes(rootPath);
+  const puppyoneHostingActive = hasEffectivePuppyoneHostingTarget(remotes, config);
   const upstream = await execGit(rootPath, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
     .then((result) => result.stdout.trim())
     .catch(() => "");
-  if (upstream) return ["pull", "--ff-only"];
+  if (upstream && !puppyoneHostingActive) return ["pull", "--ff-only"];
 
-  const remotes = await readGitRemotes(rootPath);
   const branch = await execGit(rootPath, ["branch", "--show-current"])
     .then((result) => result.stdout.trim())
     .catch(() => "");
-  const config = await readPuppyoneWorkspaceConfig(rootPath).catch(() => null);
   const rawBranches = await readGitBranches(rootPath);
   const headCommitId = await execGit(rootPath, ["rev-parse", "HEAD"])
     .then((result) => result.stdout.trim())
@@ -1509,7 +1588,8 @@ async function pushWorkspaceGitWithDefaultUpstream(rootPath, requestedRemoteName
     throw new Error("Unable to push changes: current workspace is not on a branch.");
   }
   const config = await readPuppyoneWorkspaceConfig(rootPath).catch(() => null);
-  const targetBranch = config?.sync?.sourceOfTruth?.branch ?? config?.backup?.branch ?? config?.git?.watchedBranch ?? branch;
+  const remotes = await readGitRemotes(rootPath);
+  const targetBranch = getConfiguredSyncBranch(config, branch, hasEffectivePuppyoneHostingTarget(remotes, config));
   const refspec = targetBranch === branch ? branch : `HEAD:${targetBranch}`;
   const remote = await chooseDefaultPushRemote(rootPath, requestedRemoteName);
   await execGit(rootPath, ["push", "--set-upstream", remote, refspec], { timeout: 30000 }).catch((error) => {
@@ -1527,11 +1607,31 @@ async function chooseDefaultPushRemote(rootPath, requestedRemoteName = null) {
   const config = await readPuppyoneWorkspaceConfig(rootPath).catch(() => null);
   const preferredRemoteName = config?.sync?.sourceOfTruth?.remote ?? config?.git?.primaryRemote ?? config?.backup?.remote;
   if (preferredRemoteName && remotes.some((remote) => remote.name === preferredRemoteName)) return preferredRemoteName;
+  if (isPuppyoneHostingConfig(config)) {
+    const puppyoneRemote = choosePuppyoneRemoteName(remotes, config);
+    if (puppyoneRemote) return puppyoneRemote;
+    if (config?.cloud?.projectId) {
+      throw new Error("Unable to push changes: PuppyOne Cloud remote is not configured.");
+    }
+  }
   if (remotes.some((remote) => remote.name === "origin")) return "origin";
   if (remotes.some((remote) => remote.name === "puppyone")) return "puppyone";
   const firstRemote = remotes[0]?.name;
   if (firstRemote) return firstRemote;
   throw new Error("Unable to push changes: no Git remote is configured.");
+}
+
+async function buildPuppyoneCloudSyncTarget(rootPath, config) {
+  const remotes = await readGitRemotes(rootPath);
+  const branch = await execGit(rootPath, ["branch", "--show-current"])
+    .then((result) => result.stdout.trim())
+    .catch(() => "");
+  const rawBranches = await readGitBranches(rootPath);
+  const headCommitId = await execGit(rootPath, ["rev-parse", "HEAD"])
+    .then((result) => result.stdout.trim())
+    .catch(() => "");
+  const branches = normalizeGitBranches(rawBranches, branch || "detached", headCommitId);
+  return chooseGitSyncTarget(remotes, branches, branch || "detached", config);
 }
 
 function formatGitCheckoutError(error) {
@@ -1618,9 +1718,11 @@ function normalizeGitBranches(branches, currentBranchName, headCommitId) {
   ];
 }
 
-async function readGitSyncTarget(rootPath, remotes, branches, currentBranchName, headCommitId) {
-  const config = await readPuppyoneWorkspaceConfig(rootPath).catch(() => null);
-  const target = chooseGitSyncTarget(remotes, branches, currentBranchName, config);
+async function readGitSyncTarget(rootPath, remotes, branches, currentBranchName, headCommitId, config = undefined) {
+  const resolvedConfig = config === undefined
+    ? await readPuppyoneWorkspaceConfig(rootPath).catch(() => null)
+    : config;
+  const target = chooseGitSyncTarget(remotes, branches, currentBranchName, resolvedConfig);
   const remoteName = target.remote;
   const branchName = target.branch;
 
@@ -1683,12 +1785,161 @@ function chooseConfiguredRemoteName(remotes, config) {
   return remotes[0]?.name ?? null;
 }
 
+function createNoRepositoryHosting() {
+  return {
+    kind: "local-only",
+    remoteName: null,
+    branchName: null,
+    ref: null,
+    ready: false,
+    reason: "no-repository",
+    identity: null,
+  };
+}
+
+function resolveGitEffectiveHosting({ remotes, branches, currentBranchName, syncTarget, config }) {
+  const configuredService = config?.sync?.sourceOfTruth?.service ?? null;
+  const configuredRemoteName = config?.sync?.sourceOfTruth?.remote ?? config?.git?.primaryRemote ?? config?.backup?.remote ?? null;
+  const configuredRemote = configuredRemoteName ? remotes.find((remote) => remote.name === configuredRemoteName) ?? null : null;
+  const syncRemote = syncTarget?.remote ? remotes.find((remote) => remote.name === syncTarget.remote) ?? null : null;
+  const currentBranch = branches.find((branch) => branch.current && !branch.remote) ?? null;
+  const upstreamRemoteName = currentBranch?.upstream ? splitRemoteBranchName(currentBranch.upstream)?.remote ?? null : null;
+  const upstreamRemote = upstreamRemoteName ? remotes.find((remote) => remote.name === upstreamRemoteName) ?? null : null;
+  const branchName = syncTarget?.branch ?? normalizeCurrentBranchName(currentBranchName);
+  const ref = syncTarget?.ref ?? (syncTarget?.remote && branchName ? `${syncTarget.remote}/${branchName}` : null);
+
+  if (isPuppyoneHostingConfig(config)) {
+    const puppyoneRemoteName = choosePuppyoneRemoteName(remotes, config);
+    const puppyoneRemote = puppyoneRemoteName ? remotes.find((remote) => remote.name === puppyoneRemoteName) ?? null : null;
+    if (puppyoneRemote || config?.cloud?.projectId) {
+      return {
+        kind: "puppyone-cloud",
+        remoteName: puppyoneRemote?.name ?? null,
+        branchName: branchName ?? PUPPYONE_CLOUD_DEFAULT_BRANCH,
+        ref: puppyoneRemote?.name ? ref ?? `${puppyoneRemote.name}/${branchName ?? PUPPYONE_CLOUD_DEFAULT_BRANCH}` : null,
+        ready: Boolean(puppyoneRemote),
+        reason: puppyoneRemote ? "configured" : "missing-remote",
+        identity: buildPuppyoneHostingIdentity(puppyoneRemote, config),
+      };
+    }
+  }
+
+  if (configuredService === "github") {
+    const githubRemote = configuredRemote && isGithubRemote(configuredRemote)
+      ? configuredRemote
+      : remotes.find(isGithubRemote) ?? null;
+    if (githubRemote) {
+      return buildRemoteHosting({
+        kind: "github",
+        remote: githubRemote,
+        branchName,
+        ref,
+        reason: configuredRemoteName ? "configured" : "remote-detected",
+      });
+    }
+  }
+
+  for (const candidate of [configuredRemote, syncRemote, upstreamRemote]) {
+    if (!candidate) continue;
+    if (isGithubRemote(candidate)) {
+      return buildRemoteHosting({
+        kind: "github",
+        remote: candidate,
+        branchName,
+        ref,
+        reason: candidate === upstreamRemote ? "upstream-detected" : configuredRemoteName ? "configured" : "remote-detected",
+      });
+    }
+    if (isPuppyoneRemote(candidate)) {
+      return buildRemoteHosting({
+        kind: "puppyone-cloud",
+        remote: candidate,
+        branchName: branchName ?? PUPPYONE_CLOUD_DEFAULT_BRANCH,
+        ref,
+        reason: candidate === upstreamRemote ? "upstream-detected" : configuredRemoteName ? "configured" : "remote-detected",
+      });
+    }
+  }
+
+  const detectedGithubRemote = remotes.find(isGithubRemote) ?? null;
+  if (detectedGithubRemote) {
+    return buildRemoteHosting({
+      kind: "github",
+      remote: detectedGithubRemote,
+      branchName,
+      ref,
+      reason: "remote-detected",
+    });
+  }
+
+  const detectedPuppyoneRemote = remotes.find(isPuppyoneRemote) ?? null;
+  if (detectedPuppyoneRemote) {
+    return buildRemoteHosting({
+      kind: "puppyone-cloud",
+      remote: detectedPuppyoneRemote,
+      branchName: branchName ?? PUPPYONE_CLOUD_DEFAULT_BRANCH,
+      ref,
+      reason: "remote-detected",
+    });
+  }
+
+  const fallbackRemoteName = syncTarget?.remote ?? chooseConfiguredRemoteName(remotes, config);
+  const fallbackRemote = fallbackRemoteName ? remotes.find((remote) => remote.name === fallbackRemoteName) ?? null : null;
+  if (fallbackRemote) {
+    return buildRemoteHosting({
+      kind: "generic-git",
+      remote: fallbackRemote,
+      branchName,
+      ref,
+      reason: configuredRemoteName ? "configured" : syncTarget?.remote ? "upstream-detected" : "remote-detected",
+    });
+  }
+
+  return {
+    kind: "local-only",
+    remoteName: null,
+    branchName: normalizeCurrentBranchName(currentBranchName),
+    ref: null,
+    ready: true,
+    reason: "local-only",
+    identity: null,
+  };
+}
+
+function buildRemoteHosting({ kind, remote, branchName, ref, reason }) {
+  return {
+    kind,
+    remoteName: remote.name,
+    branchName: branchName ?? null,
+    ref: ref ?? (branchName ? `${remote.name}/${branchName}` : null),
+    ready: true,
+    reason,
+    identity: kind === "github"
+      ? buildGithubHostingIdentity(remote)
+      : kind === "puppyone-cloud"
+        ? buildPuppyoneHostingIdentity(remote, null)
+        : null,
+  };
+}
+
 function chooseGitSyncTarget(remotes, branches, currentBranchName, config) {
   const configuredRemoteName = config?.sync?.sourceOfTruth?.remote ?? config?.git?.primaryRemote ?? config?.backup?.remote;
   const configuredBranchName = config?.sync?.sourceOfTruth?.branch ?? config?.git?.watchedBranch ?? config?.backup?.branch;
   const remoteNames = new Set(remotes.map((remote) => remote.name));
+  const currentBranchNameSafe = normalizeCurrentBranchName(currentBranchName);
+  const currentBranch = branches.find((branch) => branch.current && !branch.remote);
 
-  if (configuredRemoteName || configuredBranchName) {
+  if (isPuppyoneHostingConfig(config)) {
+    const puppyoneRemote = choosePuppyoneRemoteName(remotes, config);
+    if (puppyoneRemote || config?.cloud?.projectId) {
+      return {
+        remote: puppyoneRemote,
+        branch: getConfiguredSyncBranch(config, PUPPYONE_CLOUD_DEFAULT_BRANCH, true),
+      };
+    }
+  }
+
+  if (configuredBranchName) {
     const remote = configuredRemoteName && remoteNames.has(configuredRemoteName)
       ? configuredRemoteName
       : findRemoteForBranch(branches, configuredBranchName)
@@ -1698,13 +1949,39 @@ function chooseGitSyncTarget(remotes, branches, currentBranchName, config) {
         ?? null;
     return {
       remote,
-      branch: configuredBranchName
-        ?? findDefaultBranchForRemote(branches, remote)
-        ?? normalizeCurrentBranchName(currentBranchName),
+      branch: configuredBranchName,
     };
   }
 
-  const currentBranch = branches.find((branch) => branch.current && !branch.remote);
+  if (configuredRemoteName) {
+    const remote = remoteNames.has(configuredRemoteName)
+      ? configuredRemoteName
+      : preferExistingRemote(remotes, "origin")
+        ?? preferExistingRemote(remotes, "puppyone")
+        ?? remotes[0]?.name
+        ?? null;
+
+    if (!remote) {
+      return { remote: null, branch: currentBranchNameSafe };
+    }
+
+    if (currentBranch?.upstream) {
+      const upstreamTarget = splitRemoteBranchName(currentBranch.upstream);
+      if (upstreamTarget?.remote === remote) return upstreamTarget;
+    }
+
+    if (currentBranchNameSafe) {
+      const matchingCurrentBranch = findRemoteBranch(branches, remote, currentBranchNameSafe);
+      if (matchingCurrentBranch) return matchingCurrentBranch;
+      return { remote, branch: currentBranchNameSafe };
+    }
+
+    return {
+      remote,
+      branch: findDefaultBranchForRemote(branches, remote),
+    };
+  }
+
   if (currentBranch?.upstream) {
     const upstreamTarget = splitRemoteBranchName(currentBranch.upstream);
     if (upstreamTarget) return upstreamTarget;
@@ -1716,7 +1993,6 @@ function chooseGitSyncTarget(remotes, branches, currentBranchName, config) {
   const puppyoneMain = findRemoteBranch(branches, "puppyone", "main");
   if (puppyoneMain) return puppyoneMain;
 
-  const currentBranchNameSafe = normalizeCurrentBranchName(currentBranchName);
   if (currentBranchNameSafe) {
     const originCurrent = findRemoteBranch(branches, "origin", currentBranchNameSafe);
     if (originCurrent) return originCurrent;
@@ -1735,6 +2011,153 @@ function chooseGitSyncTarget(remotes, branches, currentBranchName, config) {
       ?? currentBranchNameSafe
       ?? null,
   };
+}
+
+function isPuppyoneHostingConfig(config) {
+  return config?.sync?.sourceOfTruth?.service === "puppyone";
+}
+
+function hasEffectivePuppyoneHostingTarget(remotes, config) {
+  if (!isPuppyoneHostingConfig(config)) return false;
+  return Boolean(choosePuppyoneRemoteName(remotes, config) || config?.cloud?.projectId);
+}
+
+function getConfiguredSyncBranch(config, fallbackBranch = PUPPYONE_CLOUD_DEFAULT_BRANCH, puppyoneHostingActive = isPuppyoneHostingConfig(config)) {
+  if (puppyoneHostingActive) {
+    return PUPPYONE_CLOUD_DEFAULT_BRANCH;
+  }
+
+  return config?.sync?.sourceOfTruth?.branch
+    ?? config?.backup?.branch
+    ?? config?.git?.watchedBranch
+    ?? fallbackBranch
+    ?? null;
+}
+
+function choosePuppyoneRemoteName(remotes, config) {
+  const configuredRemoteName = config?.sync?.sourceOfTruth?.remote ?? config?.git?.primaryRemote ?? config?.backup?.remote;
+  const configuredRemote = configuredRemoteName
+    ? remotes.find((remote) => remote.name === configuredRemoteName) ?? null
+    : null;
+  if (configuredRemote && isPuppyoneRemote(configuredRemote)) return configuredRemote.name;
+  const puppyoneUrlRemote = remotes.find(isPuppyoneRemote);
+  if (puppyoneUrlRemote) return puppyoneUrlRemote.name;
+  return remotes.find((remote) => remote.name.toLowerCase() === "puppyone")?.name
+    ?? null;
+}
+
+function getRemoteUrl(remote) {
+  return remote?.fetchUrl ?? remote?.pushUrl ?? null;
+}
+
+function isGithubRemote(remote) {
+  return isGithubRemoteUrl(remote?.fetchUrl) || isGithubRemoteUrl(remote?.pushUrl);
+}
+
+function isGithubRemoteUrl(rawUrl) {
+  if (!rawUrl) return false;
+  return /(^|[/:@])github\.com([/:]|$)/i.test(rawUrl);
+}
+
+function isPuppyoneRemote(remote) {
+  return isPuppyoneRemoteUrl(remote?.fetchUrl) || isPuppyoneRemoteUrl(remote?.pushUrl);
+}
+
+function isPuppyoneRemoteUrl(rawUrl) {
+  if (!rawUrl) return false;
+  return /(^|[/:@])api\.puppyone\.ai([/:]|$)/i.test(rawUrl) || /\/git\/(ap\/)?[^/]+\.git$/i.test(rawUrl);
+}
+
+function buildGithubHostingIdentity(remote) {
+  const repo = parseGithubRemoteUrl(getRemoteUrl(remote));
+  if (!repo) {
+    return {
+      provider: "github",
+      label: remote?.name ?? "GitHub",
+      href: null,
+    };
+  }
+  return {
+    provider: "github",
+    label: repo.label,
+    href: repo.href,
+  };
+}
+
+function parseGithubRemoteUrl(rawUrl) {
+  if (!rawUrl) return null;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+
+  const sshScpMatch = trimmed.match(/^git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/i);
+  if (sshScpMatch) return formatGithubRepoIdentity(sshScpMatch[1], sshScpMatch[2]);
+
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname.toLowerCase() !== "github.com") return null;
+    const [owner, repo] = url.pathname.replace(/^\/+/, "").split("/");
+    return formatGithubRepoIdentity(owner, repo);
+  } catch {
+    return null;
+  }
+}
+
+function formatGithubRepoIdentity(owner, repo) {
+  const cleanOwner = typeof owner === "string" ? owner.trim() : "";
+  const cleanRepo = typeof repo === "string" ? repo.trim().replace(/\.git$/i, "") : "";
+  if (!cleanOwner || !cleanRepo) return null;
+  return {
+    label: cleanRepo,
+    href: `https://github.com/${cleanOwner}/${cleanRepo}`,
+  };
+}
+
+function buildPuppyoneHostingIdentity(remote, config) {
+  const info = parsePuppyoneRemoteInfo(getRemoteUrl(remote));
+  const projectId = config?.cloud?.projectId;
+  return {
+    provider: "puppyone-cloud",
+    label: info?.displayId ?? projectId ?? remote?.name ?? "Puppyone Cloud",
+    href: null,
+  };
+}
+
+function parsePuppyoneRemoteInfo(rawUrl) {
+  if (!rawUrl) return null;
+
+  try {
+    const url = new URL(rawUrl);
+    const accessPointMatch = url.pathname.match(/^\/git\/ap\/([^/]+)\.git$/);
+    const accessKey = accessPointMatch?.[1];
+    if (accessPointMatch) {
+      return {
+        kind: "access-point",
+        host: url.host,
+        displayId: accessKey ? maskSecret(accessKey) : "access point",
+        accessKey,
+      };
+    }
+
+    const projectMatch = url.pathname.match(/^\/git\/([^/]+)\.git$/);
+    const projectId = projectMatch?.[1];
+    if (projectMatch) {
+      return {
+        kind: "project",
+        host: url.host,
+        displayId: projectId ?? "project",
+        projectId,
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function maskSecret(value) {
+  if (value.length <= 8) return "****";
+  return `${value.slice(0, 4)}...${value.slice(-4)}`;
 }
 
 function findRemoteBranch(branches, remoteName, branchName) {
@@ -2016,14 +2439,16 @@ function normalizePuppyoneWorkspaceConfig(value, options = {}) {
   const primaryRemote = normalizeOptionalConfigText(git.primaryRemote);
   const watchedBranch = normalizeOptionalConfigText(git.watchedBranch);
   const sourceOfTruthService = normalizeBackendService(sourceOfTruth.service ?? backup.service);
+  const isPuppyoneSource = sourceOfTruthService === "puppyone";
   const sourceOfTruthRemote =
     normalizeOptionalConfigText(sourceOfTruth.remote)
     ?? primaryRemote
     ?? normalizeOptionalConfigText(backup.remote);
-  const sourceOfTruthBranch =
-    normalizeOptionalConfigText(sourceOfTruth.branch)
-    ?? watchedBranch
-    ?? normalizeOptionalConfigText(backup.branch);
+  const sourceOfTruthBranch = isPuppyoneSource
+    ? null
+    : normalizeOptionalConfigText(sourceOfTruth.branch)
+      ?? watchedBranch
+      ?? normalizeOptionalConfigText(backup.branch);
   const updatedAt = typeof options.updatedAt === "string"
     ? options.updatedAt
     : typeof source.updatedAt === "string"
@@ -2042,13 +2467,13 @@ function normalizePuppyoneWorkspaceConfig(value, options = {}) {
     },
     git: {
       primaryRemote: primaryRemote ?? sourceOfTruthRemote,
-      watchedBranch: watchedBranch ?? sourceOfTruthBranch,
+      watchedBranch: isPuppyoneSource ? null : watchedBranch ?? sourceOfTruthBranch,
     },
     backup: {
       enabled: backup.enabled === true || cloud.backupEnabled === true,
       service: normalizeBackendService(backup.service ?? sourceOfTruthService),
       remote: normalizeOptionalConfigText(backup.remote) ?? sourceOfTruthRemote,
-      branch: normalizeOptionalConfigText(backup.branch) ?? sourceOfTruthBranch,
+      branch: normalizeOptionalConfigText(backup.branch) ?? (isPuppyoneSource ? null : sourceOfTruthBranch),
     },
     cloud: {
       projectId: normalizeOptionalConfigText(cloud.projectId),
@@ -2300,16 +2725,31 @@ function parseGitPatch(patchText) {
   let current = null;
   let oldLine = 0;
   let newLine = 0;
+  let totalDiffLines = 0;
 
   const pushCurrent = () => {
     if (!current) return;
-    const additions = current.lines.filter((line) => line.kind === "add").length;
-    const deletions = current.lines.filter((line) => line.kind === "remove").length;
+    const { _additions, _deletions, _omittedLines, ...file } = current;
     files.push({
-      ...current,
-      additions: current.binary ? null : additions,
-      deletions: current.binary ? null : deletions,
+      ...file,
+      additions: current.binary ? null : _additions,
+      deletions: current.binary ? null : _deletions,
+      truncated: _omittedLines > 0,
+      omittedLines: _omittedLines,
     });
+  };
+
+  const pushDiffLine = (diffLine) => {
+    if (!current) return;
+    if (
+      current.lines.length >= GIT_DETAIL_MAX_FILE_DIFF_LINES ||
+      totalDiffLines >= GIT_DETAIL_MAX_TOTAL_DIFF_LINES
+    ) {
+      current._omittedLines += 1;
+      return;
+    }
+    current.lines.push(diffLine);
+    totalDiffLines += 1;
   };
 
   for (const line of patchText.split(/\r?\n/)) {
@@ -2349,21 +2789,23 @@ function parseGitPatch(patchText) {
       const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
       oldLine = match ? Number.parseInt(match[1], 10) : 0;
       newLine = match ? Number.parseInt(match[2], 10) : 0;
-      current.lines.push({ kind: "hunk", text: line });
+      pushDiffLine({ kind: "hunk", text: line });
       continue;
     }
     if (line.startsWith("+") && !line.startsWith("+++")) {
-      current.lines.push({ kind: "add", text: line.slice(1), newLine: newLine || undefined });
+      current._additions += 1;
+      pushDiffLine({ kind: "add", text: line.slice(1), newLine: newLine || undefined });
       newLine += 1;
       continue;
     }
     if (line.startsWith("-") && !line.startsWith("---")) {
-      current.lines.push({ kind: "remove", text: line.slice(1), oldLine: oldLine || undefined });
+      current._deletions += 1;
+      pushDiffLine({ kind: "remove", text: line.slice(1), oldLine: oldLine || undefined });
       oldLine += 1;
       continue;
     }
     if (line.startsWith(" ")) {
-      current.lines.push({
+      pushDiffLine({
         kind: "context",
         text: line.slice(1),
         oldLine: oldLine || undefined,
@@ -2391,6 +2833,9 @@ function parseGitDiffHeader(line) {
     status: "modified",
     binary: false,
     lines: [],
+    _additions: 0,
+    _deletions: 0,
+    _omittedLines: 0,
   };
 }
 
@@ -2769,7 +3214,7 @@ function buildGitSourceControlRemoteSummary({ branchName, syncTarget, currentBra
   const hasBranch = Boolean(branchName && branchName !== "detached");
   const hasTarget = Boolean(syncTarget?.remote && syncTarget?.branch);
   const remoteExists = syncTarget?.exists === true;
-  const upstream = currentBranch?.upstream ?? syncTarget?.ref ?? null;
+  const upstream = syncTarget?.ref ?? currentBranch?.upstream ?? null;
   const canPublish = hasBranch && hasTarget && !remoteExists && Boolean(headCommitId);
   const canPull = remoteExists && behind > 0;
   const canPush = remoteExists && ahead > 0;

@@ -147,7 +147,8 @@
   box-shadow: 0 14px 34px color-mix(in srgb, var(--po-shadow) 72%, transparent);
 }
 
-.app-shell.dark .desktop-create-entry-menu {
+.app-shell.dark .desktop-create-entry-menu,
+.desktop-overlay-root.dark .desktop-create-entry-menu {
   --po-text: #d2cec5;
   --po-text-muted: #b9b6ae;
   --po-text-subtle: #87837c;
@@ -192,7 +193,7 @@
   align-items: center;
   gap: 8px;
   width: calc(100% - 8px);
-  height: 32px;
+  height: var(--desktop-sidebar-row-height);
   margin: 0 4px;
   padding: 0 12px;
   border: 0;

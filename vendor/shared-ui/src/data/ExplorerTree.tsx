@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { DataNode } from "../core/types";
 import { getMatchedExtension } from "../core/fileFormats";
 import { FileGlyphIcon, type FileIconThemeId } from "../file/fileIcons";
+import { useScrollableState } from "../primitives/useScrollableClass";
 
 export type ExplorerTreeProps = {
   nodes: DataNode[];
@@ -90,7 +91,6 @@ export function ExplorerTree({
   renderNodeActions,
 }: ExplorerTreeProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [scrollable, setScrollable] = useState(false);
   const [draggedNode, setDraggedNode] = useState<DataNode | null>(null);
   const [dropTarget, setDropTarget] = useState<TreeDropTarget>(null);
   const rootDisplayNameCounts = useMemo(() => buildDisplayNameCounts(nodes), [nodes]);
@@ -101,6 +101,9 @@ export function ExplorerTree({
     () => loadingPaths ?? (loadingPath ? new Set([loadingPath]) : EMPTY_PATH_SET),
     [loadingPath, loadingPaths],
   );
+  const scrollable = useScrollableState(scrollRef, {
+    dependencies: [nodes, rootError, rootLoading, resolvedLoadingPaths, expandedPaths],
+  });
 
   const clearDragState = useCallback(() => {
     setDraggedNode(null);
@@ -218,38 +221,6 @@ export function ExplorerTree({
     dropTarget,
     moveEnabled,
   ]);
-
-  useLayoutEffect(() => {
-    if (typeof window === "undefined") return;
-    const element = scrollRef.current;
-    if (!element) return;
-
-    let frame = 0;
-    const updateScrollableState = () => {
-      frame = 0;
-      const nextScrollable = element.scrollHeight - element.clientHeight > 1;
-      setScrollable((current) => (current === nextScrollable ? current : nextScrollable));
-    };
-    const scheduleUpdate = () => {
-      if (frame) return;
-      frame = window.requestAnimationFrame(updateScrollableState);
-    };
-
-    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleUpdate);
-    resizeObserver?.observe(element);
-    if (element.firstElementChild) {
-      resizeObserver?.observe(element.firstElementChild);
-    }
-
-    scheduleUpdate();
-    window.addEventListener("resize", scheduleUpdate);
-
-    return () => {
-      if (frame) window.cancelAnimationFrame(frame);
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", scheduleUpdate);
-    };
-  }, [nodes, rootError, rootLoading, resolvedLoadingPaths, expandedPaths]);
 
   return (
     <div

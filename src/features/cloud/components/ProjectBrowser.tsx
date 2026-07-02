@@ -97,17 +97,20 @@ export function CloudProjectBrowserSignedOut({
   apiBaseUrl,
   accountEmail,
   onSignedIn,
+  onSignedOut,
   onRefresh,
 }: {
   apiBaseUrl: string | null;
   accountEmail: string | null;
   onSignedIn: (session: DesktopCloudSession) => void;
+  onSignedOut: () => void;
   onRefresh: () => void | Promise<void>;
 }) {
   const auth = useCloudAuthController({
     cloudApiBaseUrl: apiBaseUrl,
     accountEmail,
     onSignedIn,
+    onSignedOut,
     onRefresh,
   });
   const cloudFeatures: CloudLoginFeature[] = [
@@ -130,8 +133,8 @@ export function CloudProjectBrowserSignedOut({
   ];
 
   return (
-    <section className="desktop-cloud-project-auth-stage" aria-label="Sign in to PuppyOne Cloud">
-      <section className="desktop-cloud-panel locked desktop-cloud-project-auth-panel" aria-label="PuppyOne Cloud sign in">
+    <section className="desktop-cloud-project-auth-stage" aria-label="Sign in to Puppyone Cloud">
+      <section className="desktop-cloud-panel locked desktop-cloud-project-auth-panel" aria-label="Puppyone Cloud sign in">
         <div className="desktop-cloud-panel-body">
           <section className="desktop-cloud-login-layout">
             <div className="desktop-cloud-login-copy">
@@ -155,21 +158,15 @@ export function CloudProjectBrowserSignedOut({
             <aside className="desktop-cloud-login-card">
               <CloudAuthCard
                 view={auth.signedInEmail ? "signedIn" : auth.view}
-                email={auth.email}
-                password={auth.password}
                 signedInEmail={auth.signedInEmail}
                 loading={auth.loading}
+                signingOut={auth.signingOut}
                 error={auth.error}
                 message={auth.message}
-                onEmailChange={auth.setEmail}
-                onPasswordChange={auth.setPassword}
                 onProviderLogin={auth.startProviderLogin}
-                onEmailSubmit={auth.handleEmailSubmit}
-                onPasswordSubmit={auth.handlePasswordSubmit}
-                onSignupContinue={auth.handleSignupContinue}
                 onOpenCloud={() => openCloudApp("/projects")}
                 onRefresh={onRefresh}
-                onBack={auth.handleBack}
+                onSignOut={auth.handleSignOut}
               />
             </aside>
           </section>

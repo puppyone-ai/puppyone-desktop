@@ -261,7 +261,7 @@ export function CloudRouter({
         projectId={projectId}
         icon={Users}
         title="Team"
-        description="Project members and roles are managed in PuppyOne Cloud."
+        description="Project members and roles are managed in Puppyone Cloud."
         primaryLabel="Open team settings"
         onOpen={() => onOpenProject(projectId, "team")}
       />

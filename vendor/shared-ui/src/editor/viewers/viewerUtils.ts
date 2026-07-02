@@ -7,7 +7,7 @@ export function isTextPreviewKind(type: EditorDocument["type"]): boolean {
 
 export function isTextEditable(document: EditorDocument, content: string): boolean {
   if (document.type === "markdown" || document.type === "json") return true;
-  if (!content) return false;
+  void content;
   if (!isTextPreviewKind(document.type)) return false;
   return isTextLikeFile(document.name, document.type, document.mimeType);
 }

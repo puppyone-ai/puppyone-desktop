@@ -8,4 +8,4 @@ This folder owns the Desktop source-control experience.
 - `components.tsx` contains reusable Git list primitives such as section headers, preview rows, and working-tree rows.
 - `SourceControlSidebar.tsx` composes the sidebar flow and wires user actions to the view model.
 
-Keep Git command execution in the local API layer. Keep feature state derivation in `viewModel.ts`. Keep components mostly presentational so simple/professional mode, GitHub/PuppyOne remote behavior, and future sync actions can evolve without rewriting the whole sidebar.
+Keep Git command execution in the local API layer. Keep feature state derivation in `viewModel.ts`. Keep components mostly presentational so simple/professional mode, GitHub/Puppyone remote behavior, and future sync actions can evolve without rewriting the whole sidebar.

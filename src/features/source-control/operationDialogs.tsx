@@ -60,23 +60,27 @@ export function formatGitOperationError(error: unknown, operation: string): stri
 
   if (operation === "pull") {
     if (/not possible to fast-forward|diverging branches|diverged|non-fast-forward/i.test(message)) {
-      return "Cannot pull because the local branch and remote branch have diverged. Choose a merge or rebase strategy, then pull again.";
+      return "Cannot pull or download changes because local commits and the remote branch have diverged. Rebase local commits onto the remote branch, then try again.";
     }
-    return message ? `Cannot pull remote changes. ${message}` : "Cannot pull remote changes.";
+    return message ? `Cannot pull or download remote changes. ${message}` : "Cannot pull or download remote changes.";
   }
 
   if (operation === "push" || operation === "publish") {
     if (/non-fast-forward|fetch first|rejected/i.test(message)) {
-      return "Cannot push because the remote branch has changes that are not local yet. Pull remote changes first, then push again.";
+      return "Cannot push or upload because the remote branch has changes that are not local yet. Pull or download remote changes first, then try again.";
     }
-    return message ? `Cannot push changes. ${message}` : "Cannot push changes.";
+    return message ? `Cannot push or upload changes. ${message}` : "Cannot push or upload changes.";
   }
 
   if (operation === "commit-push") {
     if (/non-fast-forward|fetch first|rejected/i.test(message)) {
-      return "Committed locally, but push failed because the remote branch has changes that are not local yet. Pull remote changes first, then push again.";
+      return "Committed locally, but push/upload failed because the remote branch has changes that are not local yet. Pull or download remote changes first, then try again.";
     }
-    return message ? `Cannot commit and push changes. ${message}` : "Cannot commit and push changes.";
+    return message ? `Cannot commit and push/upload changes. ${message}` : "Cannot commit and push/upload changes.";
+  }
+
+  if (operation === "cloud-backup") {
+    return message ? `Cannot create Puppyone Cloud backup. ${message}` : "Cannot create Puppyone Cloud backup.";
   }
 
   if (operation === "commit" || operation === "commit-switch") {
@@ -96,6 +100,8 @@ function cleanGitOperationError(value: string): string {
     .replace(/^Unable to stage changes:\s*/i, "")
     .replace(/^Unable to commit changes:\s*/i, "")
     .replace(/^Unable to pull changes:\s*/i, "")
+    .replace(/^Unable to fetch cloud changes:\s*/i, "")
+    .replace(/^Unable to pull cloud changes:\s*/i, "")
     .replace(/^Unable to push changes:\s*/i, "")
     .replace(/^Unable to stash changes:\s*/i, "")
     .replace(/^Unable to preview remote change:\s*/i, "")
@@ -275,7 +281,7 @@ export function GitOperationErrorDialog({
 
 function buildGitFixPrompt(error: GitOperationErrorState): string {
   return [
-    "I am using PuppyOne Desktop and a Git operation failed.",
+    "I am using Puppyone Desktop and a Git operation failed.",
     "",
     `Operation: ${error.operation}`,
     `Workspace: ${error.workspacePath ?? "Unknown"}`,

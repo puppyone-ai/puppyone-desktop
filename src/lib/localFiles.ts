@@ -26,6 +26,14 @@ export function createLocalDataPort(rootPath: string): DataPort {
     }),
     getFileUrl: (path) => buildLocalFileUrl(rootPath, path),
     writeFile: (path, content) => getDesktopBridge().writeFile({ rootPath, path, content }),
+    createFolder: (path) => {
+      const { parentPath, name } = splitDataPath(path);
+      return getDesktopBridge().createEntry({ rootPath, parentPath, name, kind: "folder" }).then(() => undefined);
+    },
+    createFile: (path, content = "") => {
+      const { parentPath, name } = splitDataPath(path);
+      return getDesktopBridge().createEntry({ rootPath, parentPath, name, kind: "file", content }).then(() => undefined);
+    },
     importFiles: (files, targetFolderPath) => importWorkspaceFiles(rootPath, targetFolderPath, files),
     renameNode: (path, nextName) => getDesktopBridge().renameEntry({ rootPath, path, nextName }).then(() => undefined),
     moveNode: (from, to) => getDesktopBridge().moveEntry({ rootPath, fromPath: from, toPath: to }).then(() => undefined),
@@ -38,6 +46,18 @@ export async function loadFolderChildren(rootPath: string, folderPath: string | 
     rootPath,
     folderPath,
   });
+}
+
+function splitDataPath(path: string): { parentPath: string | null; name: string } {
+  const normalizedPath = path.replace(/^\/+|\/+$/g, "");
+  const slashIndex = normalizedPath.lastIndexOf("/");
+  if (slashIndex < 0) {
+    return { parentPath: null, name: normalizedPath };
+  }
+  return {
+    parentPath: normalizedPath.slice(0, slashIndex) || null,
+    name: normalizedPath.slice(slashIndex + 1),
+  };
 }
 
 export async function getLastWorkspace(): Promise<LastWorkspaceResult> {
@@ -60,8 +80,16 @@ export async function openExternalUrl(href: string): Promise<void> {
   await getDesktopBridge().openExternalUrl(href);
 }
 
+export async function revealWorkspaceEntryInFinder(rootPath: string, path: string): Promise<void> {
+  await getDesktopBridge().revealEntryInFinder({ rootPath, path });
+}
+
 export async function forgetLastWorkspace(): Promise<void> {
   await getDesktopBridge().forgetLastWorkspace();
+}
+
+export async function showHomepage(): Promise<void> {
+  await getDesktopBridge().showHomepage();
 }
 
 export async function openWorkspaceInCurrentWindow(folderPath: string): Promise<WorkspaceOpenResult> {
@@ -252,12 +280,18 @@ export async function fetchWorkspaceGit(rootPath: string): Promise<GitStatusSnap
   return getDesktopBridge().fetchGit({ rootPath });
 }
 
-export async function pullWorkspaceGit(rootPath: string): Promise<GitStatusSnapshot> {
-  return getDesktopBridge().pullGit({ rootPath });
+export async function pullWorkspaceGit(
+  rootPath: string,
+  options: { showNativeErrorDialog?: boolean } = {},
+): Promise<GitStatusSnapshot> {
+  return getDesktopBridge().pullGit({ rootPath, showNativeErrorDialog: options.showNativeErrorDialog });
 }
 
-export async function pushWorkspaceGit(rootPath: string): Promise<GitStatusSnapshot> {
-  return getDesktopBridge().pushGit({ rootPath });
+export async function pushWorkspaceGit(
+  rootPath: string,
+  options: { showNativeErrorDialog?: boolean } = {},
+): Promise<GitStatusSnapshot> {
+  return getDesktopBridge().pushGit({ rootPath, showNativeErrorDialog: options.showNativeErrorDialog });
 }
 
 export async function publishWorkspaceGitBranch(rootPath: string, remoteName?: string | null): Promise<GitStatusSnapshot> {

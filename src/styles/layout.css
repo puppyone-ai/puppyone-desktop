@@ -367,6 +367,30 @@ body.desktop-right-sidebar-resizing * {
   border-radius: 6px;
 }
 
+.desktop-project-menu {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: min(520px, calc(100vh - 58px));
+}
+
+.desktop-project-list {
+  display: grid;
+  min-height: 0;
+  overflow: auto;
+}
+
+.desktop-project-section {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.desktop-project-section + .desktop-project-section {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--po-divider);
+}
+
 .desktop-project-option-row:hover,
 .desktop-project-option-row.active {
   background: var(--po-hover);
@@ -387,7 +411,7 @@ body.desktop-right-sidebar-resizing * {
 
 .desktop-project-option {
   gap: 8px;
-  height: 32px;
+  height: var(--desktop-sidebar-row-height);
   flex: 1;
   padding: 0 8px;
 }
@@ -404,16 +428,20 @@ body.desktop-right-sidebar-resizing * {
 }
 
 .desktop-project-mark {
+  position: relative;
   display: grid;
   place-items: center;
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  border-radius: 5px;
-  background: var(--po-control);
   color: var(--po-text-muted);
-  font-size: 10.5px;
-  font-weight: 700;
+}
+
+.desktop-project-option:hover .desktop-project-mark,
+.desktop-project-option.active .desktop-project-mark,
+.desktop-project-option-row:hover .desktop-project-mark,
+.desktop-project-option-row.active .desktop-project-mark {
+  color: var(--po-text);
 }
 
 .desktop-project-option-text {
@@ -453,12 +481,30 @@ body.desktop-right-sidebar-resizing * {
 
 .desktop-project-add {
   gap: 8px;
-  height: 32px;
-  margin-top: 6px;
+  height: var(--desktop-sidebar-row-height);
   padding: 0 8px;
   color: var(--po-text-muted);
   font-size: 12.5px;
   font-weight: 600;
+}
+
+.desktop-project-actions {
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.desktop-project-add-mark {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  place-items: center;
+}
+
+.desktop-project-home {
+  margin-top: 0;
+  margin-bottom: 6px;
 }
 
 .desktop-rail-nav {

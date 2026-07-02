@@ -8,57 +8,231 @@ export type MarkdownImageToken = {
   title: string | null;
 };
 
-const IMAGE_PATTERN = /!\[([^\]\n]*)\]\(([^)\n]+)\)/g;
+const OBSIDIAN_IMAGE_EXTENSIONS = new Set([
+  "apng",
+  "avif",
+  "bmp",
+  "gif",
+  "ico",
+  "jpeg",
+  "jpg",
+  "png",
+  "svg",
+  "webp",
+]);
 
 export function findMarkdownImageTokens(source: string): MarkdownImageToken[] {
   const tokens: MarkdownImageToken[] = [];
 
-  for (const match of source.matchAll(IMAGE_PATTERN)) {
-    if (match.index == null) continue;
-    const parsed = parseMarkdownImageDestination(match[2]);
-    if (!parsed) continue;
+  for (let index = 0; index < source.length;) {
+    if (!source.startsWith("![", index) || isEscaped(source, index)) {
+      index += 1;
+      continue;
+    }
 
-    tokens.push({
-      from: match.index,
-      to: match.index + match[0].length,
-      alt: match[1],
-      href: parsed.href,
-      title: parsed.title,
-    });
+    const token = parseObsidianImageEmbed(source, index) ?? parseStandardMarkdownImage(source, index);
+    if (!token) {
+      index += 2;
+      continue;
+    }
+
+    tokens.push(token);
+    index = token.to;
   }
 
   return tokens;
+}
+
+function parseStandardMarkdownImage(source: string, from: number): MarkdownImageToken | null {
+  const labelFrom = from + 2;
+  const labelTo = findClosingBracket(source, labelFrom);
+  if (labelTo < 0 || source[labelTo + 1] !== "(") return null;
+
+  const destinationFrom = labelTo + 2;
+  const destinationTo = findClosingParen(source, destinationFrom);
+  if (destinationTo <= destinationFrom) return null;
+
+  const parsed = parseMarkdownImageDestination(source.slice(destinationFrom, destinationTo));
+  if (!parsed) return null;
+
+  return {
+    from,
+    to: destinationTo + 1,
+    alt: source.slice(labelFrom, labelTo),
+    href: parsed.href,
+    title: parsed.title,
+  };
+}
+
+function parseObsidianImageEmbed(source: string, from: number): MarkdownImageToken | null {
+  if (!source.startsWith("![[", from)) return null;
+
+  const contentFrom = from + 3;
+  const closingFrom = source.indexOf("]]", contentFrom);
+  if (closingFrom === -1) return null;
+
+  const content = source.slice(contentFrom, closingFrom);
+  if (!content.trim() || content.includes("\n")) return null;
+
+  const pipeOffset = findUnescapedPipe(content);
+  const rawTarget = pipeOffset === -1 ? content : content.slice(0, pipeOffset);
+  const href = rawTarget.trim();
+  if (!href || !isObsidianImageTarget(href)) return null;
+
+  const rawAlias = pipeOffset === -1 ? "" : content.slice(pipeOffset + 1).trim();
+  const alt = rawAlias && !isObsidianEmbedSize(rawAlias) ? rawAlias : href;
+
+  return {
+    from,
+    to: closingFrom + 2,
+    alt,
+    href,
+    title: null,
+  };
 }
 
 function parseMarkdownImageDestination(value: string): { href: string; title: string | null } | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
 
-  const titleMatch = /^(\S+)(?:\s+["']([^"']*)["'])?$/.exec(trimmed);
-  if (!titleMatch) return { href: trimmed, title: null };
+  const angleDestination = /^<([^>\n]+)>(?:\s+["']([^"']*)["'])?$/.exec(trimmed);
+  if (angleDestination) {
+    return {
+      href: angleDestination[1],
+      title: angleDestination[2] ?? null,
+    };
+  }
+
+  const quotedTitle = findTrailingQuotedTitle(trimmed);
+  if (quotedTitle) {
+    return {
+      href: quotedTitle.href,
+      title: quotedTitle.title,
+    };
+  }
 
   return {
-    href: titleMatch[1],
-    title: titleMatch[2] ?? null,
+    href: trimmed,
+    title: null,
   };
+}
+
+function findClosingBracket(source: string, from: number): number {
+  for (let index = from; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === "\n") return -1;
+    if (character === "]" && !isEscaped(source, index)) return index;
+  }
+  return -1;
+}
+
+function findClosingParen(source: string, from: number): number {
+  let depth = 0;
+  let quote: "\"" | "'" | null = null;
+
+  for (let index = from; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === "\n") return -1;
+    if (isEscaped(source, index)) continue;
+
+    if (quote) {
+      if (character === quote) quote = null;
+      continue;
+    }
+
+    if (character === "\"" || character === "'") {
+      quote = character;
+      continue;
+    }
+
+    if (character === "(") {
+      depth += 1;
+      continue;
+    }
+
+    if (character === ")") {
+      if (depth === 0) return index;
+      depth -= 1;
+    }
+  }
+
+  return -1;
+}
+
+function findTrailingQuotedTitle(value: string): { href: string; title: string } | null {
+  const quote = value[value.length - 1];
+  if (quote !== "\"" && quote !== "'") return null;
+
+  for (let index = value.length - 2; index >= 0; index -= 1) {
+    if (value[index] !== quote || isEscaped(value, index)) continue;
+
+    const href = value.slice(0, index).trim();
+    const title = value.slice(index + 1, -1);
+    if (!href) return null;
+    return { href, title };
+  }
+
+  return null;
+}
+
+function isObsidianImageTarget(value: string): boolean {
+  const normalized = value.split(/[?#]/, 1)[0]?.trim().toLowerCase() ?? "";
+  const extension = /\.([a-z0-9]+)$/.exec(normalized)?.[1] ?? "";
+  return OBSIDIAN_IMAGE_EXTENSIONS.has(extension);
+}
+
+function isObsidianEmbedSize(value: string): boolean {
+  return /^\d+(?:x\d+)?$/i.test(value.trim());
+}
+
+function findUnescapedPipe(content: string): number {
+  for (let index = 0; index < content.length; index += 1) {
+    if (content[index] === "|" && !isEscaped(content, index)) return index;
+  }
+  return -1;
+}
+
+function isEscaped(source: string, index: number): boolean {
+  let slashCount = 0;
+  for (let cursor = index - 1; cursor >= 0 && source[cursor] === "\\"; cursor -= 1) {
+    slashCount += 1;
+  }
+  return slashCount % 2 === 1;
 }
 
 export function resolveMarkdownAssetPath(sourcePath: string, href: string): string | null {
   const trimmedHref = href.trim();
   if (!trimmedHref || isSafeMarkdownImageUrl(trimmedHref)) return null;
-  if (trimmedHref.startsWith("#") || trimmedHref.startsWith("/") || trimmedHref.startsWith("\\")) return null;
+  if (trimmedHref.startsWith("#") || trimmedHref.startsWith("\\") || hasUrlScheme(trimmedHref)) return null;
 
   const sourceParts = sourcePath.split(/[\\/]+/).filter(Boolean);
-  sourceParts.pop();
+  if (!trimmedHref.startsWith("/")) sourceParts.pop();
 
-  const parts = [...sourceParts];
-  for (const segment of trimmedHref.split(/[\\/]+/)) {
+  const parts = trimmedHref.startsWith("/") ? [] : [...sourceParts];
+  for (const segment of stripMarkdownUrlSuffix(trimmedHref).split(/[\\/]+/)) {
     if (!segment || segment === ".") continue;
     if (segment === "..") parts.pop();
-    else parts.push(segment);
+    else parts.push(decodeMarkdownPathSegment(segment));
   }
 
   return parts.length > 0 ? parts.join("/") : null;
+}
+
+function hasUrlScheme(value: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:/i.test(value);
+}
+
+function stripMarkdownUrlSuffix(value: string): string {
+  const suffixIndex = value.search(/[?#]/);
+  return suffixIndex === -1 ? value : value.slice(0, suffixIndex);
+}
+
+function decodeMarkdownPathSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
 }
 
 export function isSafeMarkdownImageUrl(value: string): boolean {

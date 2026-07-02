@@ -5,7 +5,7 @@ import {
   type DesktopCloudProject,
 } from "../../lib/cloudApi";
 import type { CloudServiceMainViewProps, CloudWorkspaceSection } from "./types";
-import { getCloudAuthSession, isCloudAuthBlocking, useCloudSessionForEnvironment } from "./auth";
+import { getCloudAuthEmail, getCloudAuthSession, isCloudAuthBlocking, useCloudSessionForEnvironment } from "./auth";
 import { useDesktopCloudData } from "./data";
 import { resolveCloudEnvironment } from "./environment";
 import { copyText, shellQuote } from "./utils";
@@ -60,7 +60,7 @@ export function CloudServiceMainView({
     error: string | null;
   }>({ kind: null, projectId: null, message: null, error: null });
 
-  const accountEmail = effectiveCloudSession?.user_email ?? null;
+  const accountEmail = getCloudAuthEmail(cloudAuthState);
 
   useEffect(() => {
     setSelectedCloudProjectId(null);
@@ -147,6 +147,7 @@ export function CloudServiceMainView({
             apiBaseUrl={cloudApiBaseUrl}
             accountEmail={accountEmail}
             onSignedIn={(session) => onCloudSessionChange(session)}
+            onSignedOut={() => onCloudSessionChange(null)}
             onRefresh={onRefresh}
           />
         </div>
