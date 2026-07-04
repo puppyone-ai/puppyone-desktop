@@ -78,38 +78,33 @@ the document content and editor instance are ready.
 
 ## Current Code Boundaries
 
-- `frontend/shared-ui/src/data/DataWorkspace.tsx`
+- `vendor/shared-ui/src/data/DataWorkspace.tsx`
   - owns selected file resolution
   - owns file content cache
   - owns committed preview document state
   - binds save callbacks to the rendered document
 
-- `frontend/shared-ui/src/data/FilePreview.tsx`
+- `vendor/shared-ui/src/data/FilePreview.tsx`
   - renders the current preview shell
   - avoids fallback preview content while full content is pending
 
-- `frontend/shared-ui/src/editor/viewers/TextEditorFrame.tsx`
+- `vendor/shared-ui/src/editor/viewers/TextEditorFrame.tsx`
   - owns text editor draft, persisted content, save state, and mode state
   - resets by `documentId` without forcing a React remount
 
-- `frontend/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor.tsx`
+- `vendor/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor.tsx`
   - owns the CodeMirror `EditorView`
   - mounts and reconfigures in layout phase
   - updates content through CodeMirror transactions
 
-The desktop app consumes these shared UI files through
-`desktop/vendor/shared-ui`. After changing shared UI, run:
-
-```bash
-node scripts/sync-desktop-shared-ui.mjs
-```
+These files live in `vendor/shared-ui` — the canonical copy in this standalone
+repo (ISSUE-021). Edit them in place; there is no upstream to sync from.
 
 ## Verification
 
 For this feature, the minimum verification is:
 
 ```bash
-cd desktop
 npm run check:shared-ui
 npm run build
 ```

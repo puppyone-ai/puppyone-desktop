@@ -119,36 +119,31 @@ represents current state; subsequent state changes animate.
 
 ## Current Code Boundaries
 
-- `frontend/shared-ui/src/data/DataWorkspace.tsx`
+- `vendor/shared-ui/src/data/DataWorkspace.tsx`
   - owns `expandedFolderPaths`
   - owns `loadingFolderPaths`
   - owns root loaded state and load generation
   - loads folder children before expanding unloaded folders
   - renders the keep-alive explorer view stack
 
-- `frontend/shared-ui/src/data/ExplorerTree.tsx`
+- `vendor/shared-ui/src/data/ExplorerTree.tsx`
   - receives `expandedPaths` and `loadingPaths`
   - renders the controlled tree
   - owns transient drag/drop UI state only
   - contains subtree presence and motion helpers
 
-- `frontend/shared-ui/src/styles/data-workspace.css`
+- `vendor/shared-ui/src/styles/data-workspace.css`
   - defines subtree-level guide lines
   - preserves inactive frame layout through the sidebar view-stack styles
 
-The desktop app consumes these shared UI files through
-`desktop/vendor/shared-ui`. After changing shared UI, run:
-
-```bash
-node scripts/sync-desktop-shared-ui.mjs
-```
+These files live in `vendor/shared-ui` — the canonical copy in this standalone
+repo (ISSUE-021). Edit them in place; there is no upstream to sync from.
 
 ## Verification
 
 For this feature, the minimum verification is:
 
 ```bash
-cd desktop
 npm run check:shared-ui
 npm run check:boundaries
 npm run build
