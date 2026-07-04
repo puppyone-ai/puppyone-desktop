@@ -6,7 +6,7 @@ import { getDesktopCloudApiBaseUrl, isCloudSessionForApiBase, type DesktopCloudS
 import { clearDesktopCloudSession, onDesktopCloudAuthError, signInDesktopCloudWithPassword } from "../../lib/cloudSession";
 import { DEFAULT_EXPLORER_EXCLUDE_PATTERNS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, normalizeExplorerExcludePatterns, type FilesVisibilitySettings, type RightSidebarToolId } from "../../preferences";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import { getPuppyoneRemote, maskRemoteUrl, parsePuppyoneRemote } from "../source-control/remotes";
+import { maskRemoteUrl, parsePuppyoneRemote } from "../source-control/remotes";
 import { SettingsGroup, SettingsLine, SettingsSectionHeader } from "./components";
 import { PuppyoneWorkspaceConfigSettings } from "./PuppyoneWorkspaceConfigSettings";
 import type { SettingsSidebarProps, SettingsViewProps, SettingsSection } from "./types";
