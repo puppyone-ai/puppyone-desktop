@@ -51,7 +51,6 @@ import {
   getCloudProjectIdFromWorkspace,
   isCloudWorkspace,
 } from "./lib/cloudDataPort";
-import { startDesktopCloudOAuth } from "./lib/cloudSession";
 import type { FilesVisibilitySettings } from "./preferences";
 import type { PuppyoneWorkspaceConfig, WorkspaceOpenResult } from "./types/electron";
 import { ChevronDown } from "lucide-react";
@@ -297,14 +296,14 @@ export function App() {
   const [pendingCloudProjectCreate, setPendingCloudProjectCreate] = useState(false);
   const [homeOperationStatus, setHomeOperationStatus] = useState<OnboardingOperationStatus | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const showBrowserSignInStatus = useCallback((detail: string) => {
+  const showCloudSignInStatus = useCallback((detail: string) => {
     setHomeOperationStatus({
-      title: "Opening browser sign-in",
+      title: "Sign in to Puppyone Cloud",
       detail,
     });
     window.setTimeout(() => {
       setHomeOperationStatus((current) => (
-        current?.title === "Opening browser sign-in" ? null : current
+        current?.title === "Sign in to Puppyone Cloud" ? null : current
       ));
     }, 2200);
   }, []);
@@ -354,22 +353,13 @@ export function App() {
   useEffect(() => {
     if (workspace && homeOperationStatus) setHomeOperationStatus(null);
   }, [homeOperationStatus, workspace]);
-  const startCloudBrowserSignIn = useCallback(async () => {
-    if (!cloudEnabled) return;
-    try {
-      await startDesktopCloudOAuth(getDesktopCloudApiBaseUrl());
-    } catch (error) {
-      setHomeOperationStatus(null);
-      setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
-    }
-  }, [cloudEnabled]);
   const handleCloudDataSessionChange = useCallback((session: DesktopCloudSession | null) => {
     updateCloudSession(session);
     if (!session) {
       setActiveView("data");
-      void startCloudBrowserSignIn();
+      setCloudPanelOpen(true); // prompt re-auth via the email/password cloud panel
     }
-  }, [startCloudBrowserSignIn, updateCloudSession]);
+  }, [updateCloudSession]);
   const refreshWorkspaceContent = useCallback(() => {
     setWorkspaceRefreshToken((token) => token + 1);
   }, []);
@@ -840,8 +830,8 @@ export function App() {
   const createCloudProjectFromHomepage = useCallback(async () => {
     if (!activeCloudSession) {
       setPendingCloudProjectCreate(true);
-      showBrowserSignInStatus("Sign in to Puppyone Cloud, then this project will be created.");
-      void startCloudBrowserSignIn();
+      showCloudSignInStatus("Sign in to Puppyone Cloud, then this project will be created.");
+      setCloudPanelOpen(true);
       return;
     }
     setPendingCloudProjectCreate(false);
@@ -851,7 +841,7 @@ export function App() {
       setHomeOperationStatus(null);
       throw error;
     }
-  }, [activateCreatedCloudProject, activeCloudSession, showBrowserSignInStatus, startCloudBrowserSignIn]);
+  }, [activateCreatedCloudProject, activeCloudSession, showCloudSignInStatus]);
 
   useEffect(() => {
     if (!pendingCloudProjectCreate || !activeCloudSession) return undefined;
@@ -873,8 +863,8 @@ export function App() {
 
   const openCloudProjectFromHomepage = useCallback(async (projectId: string) => {
     if (!activeCloudSession) {
-      showBrowserSignInStatus("Sign in to Puppyone Cloud, then open this project again.");
-      void startCloudBrowserSignIn();
+      showCloudSignInStatus("Sign in to Puppyone Cloud, then open this project again.");
+      setCloudPanelOpen(true);
       return;
     }
 
@@ -890,7 +880,7 @@ export function App() {
       setHomeOperationStatus(null);
       throw error;
     }
-  }, [activateWorkspace, activeCloudSession, homeCloudProjects, showBrowserSignInStatus, startCloudBrowserSignIn, updateCloudSession]);
+  }, [activateWorkspace, activeCloudSession, homeCloudProjects, showCloudSignInStatus, updateCloudSession]);
 
   const handleCloudSessionChange = useCallback((session: DesktopCloudSession | null) => {
     if (!cloudEnabled) return;
@@ -905,9 +895,9 @@ export function App() {
       setActiveCloudSection("overview");
       setSidebarCollapsed(false);
       setSwitcherOpen(false);
-      if (workspaceIsCloud) void startCloudBrowserSignIn();
+      if (workspaceIsCloud) setCloudPanelOpen(true);
     }
-  }, [activeView, cloudEnabled, startCloudBrowserSignIn, updateCloudSession, workspaceIsCloud]);
+  }, [activeView, cloudEnabled, updateCloudSession, workspaceIsCloud]);
 
   const handleConfigureCloudRemote = useCallback(async (remoteUrl: string) => {
     if (!cloudEnabled) return null;

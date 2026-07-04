@@ -84,6 +84,12 @@ export function createCloudAuthService({
     }
   }
 
+  // DORMANT INFRASTRUCTURE (not wired to any UI). The renderer sign-in flow uses
+  // email/password (signInWithPassword) exclusively, because these endpoints —
+  // POST /auth/desktop/start and /auth/desktop/exchange — do not exist on the
+  // backend yet. startOAuth + handleCallback + the puppyone:// protocol handlers
+  // are retained so social sign-in can be re-enabled by only adding those two
+  // backend endpoints; no renderer code currently reaches them.
   async function startOAuth({ apiBase, provider }) {
     const normalizedProvider = normalizeOAuthProvider(provider);
     const start = await requestCloudApi(apiBase, "/auth/desktop/start", {

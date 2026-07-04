@@ -1,14 +1,9 @@
 import { useEffect, useState } from "react";
-import {
-  openCloudApp,
-  type DesktopCloudSession,
-} from "../../../lib/cloudApi";
+import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import {
   clearDesktopCloudSession,
   onDesktopCloudAuthError,
   signInDesktopCloudWithPassword,
-  startDesktopCloudOAuth,
-  supportsDesktopCloudOAuth,
 } from "../../../lib/cloudSession";
 import type { CloudAuthView, CloudLoginMethod } from "../model";
 
@@ -44,26 +39,6 @@ export function useCloudAuthController({
   useEffect(() => {
     setSignedInEmail(undefined);
   }, [accountEmail]);
-
-  const startCloudLogin = async (method?: Exclude<CloudLoginMethod, "email" | "password" | "browser">) => {
-    const params = new URLSearchParams();
-    if (method) params.set("provider", method);
-
-    setLoading(method ?? "browser");
-    setError(null);
-    try {
-      if (supportsDesktopCloudOAuth()) {
-        await startDesktopCloudOAuth(method ?? cloudApiBaseUrl, method ? cloudApiBaseUrl : undefined);
-        setMessage("Finish sign-in in your browser. Desktop will connect automatically.");
-      } else {
-        openCloudApp(`/login${params.size > 0 ? `?${params.toString()}` : ""}`);
-      }
-    } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : "Unable to start Cloud sign-in");
-    } finally {
-      window.setTimeout(() => setLoading(null), 1200);
-    }
-  };
 
   const signInWithPassword = async (email: string, password: string) => {
     const trimmedEmail = email.trim();
@@ -116,7 +91,6 @@ export function useCloudAuthController({
     signingOut,
     error,
     message,
-    startProviderLogin: (method?: Exclude<CloudLoginMethod, "email" | "password" | "browser">) => void startCloudLogin(method),
     signInWithPassword: (email: string, password: string) => void signInWithPassword(email, password),
     handleSignOut: () => void handleSignOut(),
   };

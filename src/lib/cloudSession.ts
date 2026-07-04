@@ -32,28 +32,6 @@ export async function restoreDesktopCloudSession(apiBaseUrl?: string | null): Pr
   return session;
 }
 
-export function supportsDesktopCloudOAuth(): boolean {
-  return typeof window !== "undefined" && typeof window.puppyoneDesktop?.startCloudOAuth === "function";
-}
-
-export async function startDesktopCloudOAuth(
-  providerOrApiBaseUrl?: "google" | "github" | string | null,
-  apiBaseUrl?: string | null,
-): Promise<void> {
-  if (!supportsDesktopCloudOAuth()) {
-    throw new Error("Desktop OAuth is unavailable.");
-  }
-  const provider =
-    providerOrApiBaseUrl === "google" || providerOrApiBaseUrl === "github"
-      ? providerOrApiBaseUrl
-      : undefined;
-  const requestedApiBaseUrl = provider ? apiBaseUrl : (apiBaseUrl ?? providerOrApiBaseUrl);
-  await window.puppyoneDesktop?.startCloudOAuth({
-    apiBaseUrl: normalizeSessionApiBase(requestedApiBaseUrl),
-    provider,
-  });
-}
-
 export function supportsDesktopCloudPasswordSignIn(): boolean {
   return typeof window !== "undefined" && typeof window.puppyoneDesktop?.signInCloudPassword === "function";
 }

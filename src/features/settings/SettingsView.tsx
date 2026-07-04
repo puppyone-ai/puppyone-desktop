@@ -3,7 +3,7 @@ import { Check, Cloud, Copy, FileText, GitBranch, GripVertical, LogIn, LogOut, M
 import { FILE_ICON_THEMES, FileGlyphIcon } from "@puppyone/shared-ui";
 import { DesktopUpdateSettingsRow } from "../../components/DesktopUpdateControls";
 import { getDesktopCloudApiBaseUrl, isCloudSessionForApiBase, type DesktopCloudSession } from "../../lib/cloudApi";
-import { clearDesktopCloudSession, onDesktopCloudAuthError, startDesktopCloudOAuth, supportsDesktopCloudOAuth } from "../../lib/cloudSession";
+import { clearDesktopCloudSession, onDesktopCloudAuthError, signInDesktopCloudWithPassword } from "../../lib/cloudSession";
 import { DEFAULT_EXPLORER_EXCLUDE_PATTERNS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, normalizeExplorerExcludePatterns, type FilesVisibilitySettings, type RightSidebarToolId } from "../../preferences";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import { getPuppyoneRemote, maskRemoteUrl, parsePuppyoneRemote } from "../source-control/remotes";
@@ -365,8 +365,9 @@ function AccountSettingsView({
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const signedIn = Boolean(cloudSession);
   const sessionMatchesService = !cloudSession || isCloudSessionForApiBase(cloudSession, resolvedApiBaseUrl);
-  const desktopOAuthAvailable = supportsDesktopCloudOAuth();
   const busy = Boolean(operation) || cloudSessionRestoring;
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
     return onDesktopCloudAuthError((message) => {
@@ -383,10 +384,11 @@ function AccountSettingsView({
     setAuthMessage(null);
   }, [cloudSession?.api_base_url, cloudSession?.user_email]);
 
-  const startWebSignIn = async () => {
-    if (!desktopOAuthAvailable) {
+  const signInWithPassword = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
       setAuthMessage(null);
-      setAuthError("Desktop web sign-in is unavailable in this build.");
+      setAuthError("Enter your email and password.");
       return;
     }
 
@@ -394,14 +396,18 @@ function AccountSettingsView({
     setAuthError(null);
     setAuthMessage(null);
     try {
-      await startDesktopCloudOAuth(resolvedApiBaseUrl);
-      setAuthMessage("Finish sign-in in your browser.");
+      const session = await signInDesktopCloudWithPassword(trimmedEmail, password, resolvedApiBaseUrl);
+      if (!session) {
+        setAuthError("Sign-in failed. Please try again.");
+        return;
+      }
+      onCloudSessionChange(session);
+      setPassword("");
+      setAuthMessage("Signed in.");
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Unable to start web sign-in.");
+      setAuthError(error instanceof Error ? error.message : "Unable to sign in.");
     } finally {
-      window.setTimeout(() => {
-        setOperation((current) => current === "signin" ? null : current);
-      }, 1200);
+      setOperation((current) => current === "signin" ? null : current);
     }
   };
 
@@ -466,15 +472,40 @@ function AccountSettingsView({
                     <span>{operation === "signout" ? "Signing out..." : "Sign out"}</span>
                   </button>
                 ) : (
-                  <button
-                    className="desktop-settings-action primary"
-                    type="button"
-                    disabled={busy || !desktopOAuthAvailable}
-                    onClick={() => void startWebSignIn()}
+                  <form
+                    className="desktop-settings-signin-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void signInWithPassword();
+                    }}
                   >
-                    <LogIn size={14} />
-                    <span>{operation === "signin" ? "Opening browser..." : "Sign in with browser"}</span>
-                  </button>
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      placeholder="you@example.com"
+                      value={email}
+                      disabled={busy}
+                      onChange={(event) => setEmail(event.target.value)}
+                    />
+                    <input
+                      type="password"
+                      autoComplete="current-password"
+                      placeholder="Password"
+                      value={password}
+                      disabled={busy}
+                      onChange={(event) => setPassword(event.target.value)}
+                    />
+                    <button
+                      className="desktop-settings-action primary"
+                      type="submit"
+                      disabled={busy || !email.trim() || !password}
+                    >
+                      <LogIn size={14} />
+                      <span>{operation === "signin" ? "Signing in..." : "Sign in"}</span>
+                    </button>
+                  </form>
                 )}
               </div>
             </div>
