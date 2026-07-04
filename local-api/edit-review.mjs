@@ -507,7 +507,17 @@ function resolveWorkspacePath(rootPath, relativePath) {
 
 function normalizeRelativePath(value) {
   if (typeof value !== "string") return "";
-  return value.replaceAll("\\", "/").split("/").filter(Boolean).join("/");
+  if (path.isAbsolute(value)) {
+    throw new Error("Path escapes the workspace root.");
+  }
+  const segments = value.replaceAll("\\", "/").split("/").filter(Boolean);
+  // Reject traversal at the normalize layer too (defense in depth) — the
+  // resolveWorkspacePath containment check is the backstop, matching the
+  // stricter normalizeRelativePath in workspace.mjs.
+  if (segments.includes("..")) {
+    throw new Error("Path escapes the workspace root.");
+  }
+  return segments.join("/");
 }
 
 function joinRelativePath(parentPath, childName) {
