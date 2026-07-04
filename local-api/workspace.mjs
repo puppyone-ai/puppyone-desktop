@@ -1277,20 +1277,18 @@ function isPreviewable(filePath) {
 }
 
 function loadFileFormatRegistry() {
-  const candidatePaths = [
-    path.resolve(localApiDir, "../vendor/shared-ui/src/core/fileFormats.json"),
-    path.resolve(localApiDir, "../../frontend/shared-ui/src/core/fileFormats.json"),
-  ];
-
-  for (const registryPath of candidatePaths) {
-    try {
-      return JSON.parse(readFileSync(registryPath, "utf8"));
-    } catch {
-      // Try the next candidate. The source path keeps dev usable before vendor sync.
-    }
+  // vendor/shared-ui is the canonical copy in this standalone repo (ISSUE-021).
+  // The former "../../frontend/shared-ui" fallback assumed a sibling monorepo
+  // checkout that does not exist in CI / packaged builds / other machines and
+  // resolved to nothing — it has been removed.
+  const registryPath = path.resolve(localApiDir, "../vendor/shared-ui/src/core/fileFormats.json");
+  try {
+    return JSON.parse(readFileSync(registryPath, "utf8"));
+  } catch (error) {
+    throw new Error(
+      `Unable to load PuppyOne file format registry from ${registryPath}: ${error.message}`,
+    );
   }
-
-  throw new Error("Unable to load PuppyOne file format registry.");
 }
 
 function resolveLocalFileFormat({ name, mimeType }) {
