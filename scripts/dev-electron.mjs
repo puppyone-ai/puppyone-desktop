@@ -11,7 +11,7 @@ const mainWatchPaths = [
   path.join(desktopRoot, "electron"),
   path.join(desktopRoot, "local-api"),
   path.join(desktopRoot, "public", "logo-square.png"),
-  path.join(desktopRoot, "src-tauri", "icons", "icon.icns"),
+  path.join(desktopRoot, "build", "icon.icns"),
 ];
 
 const renderer = spawn("npm", ["run", "dev:renderer"], {

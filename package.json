@@ -16,7 +16,9 @@
     "dist:mac:publish": "npm run check:shared-ui && npm run build && electron-builder --mac --publish always",
     "preview": "vite preview --host 127.0.0.1",
     "smoke:local-api": "node scripts/smoke-local-api.mjs",
-    "start": "node scripts/start-electron.mjs"
+    "start": "node scripts/start-electron.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -51,7 +53,8 @@
     "postcss": "^8.5.15",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.6.3",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
   },
   "build": {
     "appId": "ai.puppyone.desktop",
@@ -82,7 +85,7 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "icon": "src-tauri/icons/icon.icns",
+      "icon": "build/icon.icns",
       "identity": "-",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
