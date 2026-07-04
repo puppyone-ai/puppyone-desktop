@@ -417,6 +417,53 @@
   letter-spacing: 0;
 }
 
+.desktop-cloud-auth-form {
+  display: grid;
+  gap: 14px;
+}
+
+.desktop-cloud-auth-field {
+  display: grid;
+  gap: 6px;
+}
+
+.desktop-cloud-auth-field > span {
+  color: var(--po-text-subtle);
+  font-size: var(--desktop-cloud-body-size);
+  font-weight: 500;
+}
+
+.desktop-cloud-auth-field > input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--po-border, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  background: var(--po-surface-raised, rgba(255, 255, 255, 0.04));
+  color: var(--po-text);
+  font-size: var(--desktop-cloud-body-size);
+  line-height: 1.4;
+}
+
+.desktop-cloud-auth-field > input::placeholder {
+  color: var(--po-text-subtle);
+}
+
+.desktop-cloud-auth-field > input:focus {
+  outline: none;
+  border-color: var(--po-accent, #4d9fff);
+}
+
+.desktop-cloud-auth-field > input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.desktop-cloud-auth-form .desktop-cloud-auth-submit {
+  margin-top: 4px;
+}
+
 .desktop-cloud-auth-heading {
   margin: 0 0 24px;
   text-align: center;

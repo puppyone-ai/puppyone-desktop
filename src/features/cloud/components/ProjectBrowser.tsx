@@ -163,7 +163,7 @@ export function CloudProjectBrowserSignedOut({
                 signingOut={auth.signingOut}
                 error={auth.error}
                 message={auth.message}
-                onProviderLogin={auth.startProviderLogin}
+                onPasswordLogin={auth.signInWithPassword}
                 onOpenCloud={() => openCloudApp("/projects")}
                 onRefresh={onRefresh}
                 onSignOut={auth.handleSignOut}

@@ -411,6 +411,11 @@ declare global {
         apiBaseUrl: string;
         provider?: "google" | "github";
       }) => Promise<{ ok: boolean }>;
+      signInCloudPassword: (request: {
+        apiBaseUrl: string;
+        email: string;
+        password: string;
+      }) => Promise<DesktopStoredCloudSession | null>;
       clearCloudSession: () => Promise<void>;
       onCloudSessionChanged: (
         callback: (session: DesktopStoredCloudSession | null) => void,

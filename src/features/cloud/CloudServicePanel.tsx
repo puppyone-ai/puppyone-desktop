@@ -1,5 +1,5 @@
 import { Check, Cloud, LogIn, LogOut, RefreshCw, Server, SquareTerminal, Users } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { CloudAuthView, CloudLoginFeature, CloudLoginMethod } from "./model";
 import type { CloudServicePanelProps } from "./types";
 import { useCloudAuthController } from "./hooks/useCloudAuthController";
@@ -109,7 +109,7 @@ export function CloudServicePanel({
                   signingOut={auth.signingOut}
                   error={auth.error}
                   message={auth.message}
-                  onProviderLogin={auth.startProviderLogin}
+                  onPasswordLogin={auth.signInWithPassword}
                   onOpenCloud={onEnterCloud}
                   onRefresh={onRefresh}
                   onSignOut={auth.handleSignOut}
@@ -130,7 +130,7 @@ export function CloudAuthCard({
   signingOut,
   error,
   message,
-  onProviderLogin,
+  onPasswordLogin,
   onOpenCloud,
   onRefresh,
   onSignOut,
@@ -141,27 +141,56 @@ export function CloudAuthCard({
   signingOut: boolean;
   error: string | null;
   message: string | null;
-  onProviderLogin: (method?: Exclude<CloudLoginMethod, "email" | "password" | "browser">) => void;
+  onPasswordLogin: (email: string, password: string) => void;
   onOpenCloud: () => void;
   onRefresh: () => void;
   onSignOut: () => void;
 }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const disabled = Boolean(loading) || signingOut;
+  const signingIn = loading === "password" || loading === "email";
+  const canSubmit = !disabled && email.trim().length > 0 && password.length > 0;
 
   return (
     <div className="desktop-cloud-auth-card">
       {view !== "signedIn" ? (
-        <>
-          <button
-            className="desktop-cloud-auth-submit"
-            type="button"
-            disabled={disabled}
-            onClick={() => onProviderLogin()}
-          >
+        <form
+          className="desktop-cloud-auth-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canSubmit) onPasswordLogin(email.trim(), password);
+          }}
+        >
+          <label className="desktop-cloud-auth-field">
+            <span>Email</span>
+            <input
+              type="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="you@example.com"
+              value={email}
+              disabled={disabled}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
+          <label className="desktop-cloud-auth-field">
+            <span>Password</span>
+            <input
+              type="password"
+              autoComplete="current-password"
+              placeholder="Your password"
+              value={password}
+              disabled={disabled}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+          <button className="desktop-cloud-auth-submit" type="submit" disabled={!canSubmit}>
             <LogIn size={15} />
-            <span>{loading === "browser" ? "Opening browser..." : "Sign in with browser"}</span>
+            <span>{signingIn ? "Signing in..." : "Sign in"}</span>
           </button>
-        </>
+        </form>
       ) : (
         <>
           <div className="desktop-cloud-auth-heading">

@@ -6,6 +6,7 @@ import {
 import {
   clearDesktopCloudSession,
   onDesktopCloudAuthError,
+  signInDesktopCloudWithPassword,
   startDesktopCloudOAuth,
   supportsDesktopCloudOAuth,
 } from "../../../lib/cloudSession";
@@ -64,6 +65,33 @@ export function useCloudAuthController({
     }
   };
 
+  const signInWithPassword = async (email: string, password: string) => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setError("Enter your email and password.");
+      return;
+    }
+
+    setLoading("password");
+    setError(null);
+    setMessage(null);
+    try {
+      const session = await signInDesktopCloudWithPassword(trimmedEmail, password, cloudApiBaseUrl);
+      if (!session) {
+        setError("Sign-in failed. Please try again.");
+        return;
+      }
+      setSignedInEmail(session.user_email);
+      onSignedIn(session);
+      setMessage("Signed in.");
+      void onRefresh();
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : "Unable to sign in");
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const handleSignOut = async () => {
     setSigningOut(true);
     setError(null);
@@ -89,6 +117,7 @@ export function useCloudAuthController({
     error,
     message,
     startProviderLogin: (method?: Exclude<CloudLoginMethod, "email" | "password" | "browser">) => void startCloudLogin(method),
+    signInWithPassword: (email: string, password: string) => void signInWithPassword(email, password),
     handleSignOut: () => void handleSignOut(),
   };
 }

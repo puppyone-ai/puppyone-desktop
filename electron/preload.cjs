@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   readCloudSession: () => ipcRenderer.invoke("cloud-session:read"),
   restoreCloudSession: (request) => ipcRenderer.invoke("cloud-session:restore", request),
   startCloudOAuth: (request) => ipcRenderer.invoke("cloud-session:start-oauth", request),
+  signInCloudPassword: (request) => ipcRenderer.invoke("cloud-session:sign-in-password", request),
   clearCloudSession: () => ipcRenderer.invoke("cloud-session:clear"),
   onCloudSessionChanged: (callback) => {
     const listener = (_event, session) => callback(session);

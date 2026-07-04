@@ -54,6 +54,30 @@ export async function startDesktopCloudOAuth(
   });
 }
 
+export function supportsDesktopCloudPasswordSignIn(): boolean {
+  return typeof window !== "undefined" && typeof window.puppyoneDesktop?.signInCloudPassword === "function";
+}
+
+export async function signInDesktopCloudWithPassword(
+  email: string,
+  password: string,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudSession | null> {
+  if (!supportsDesktopCloudPasswordSignIn()) {
+    throw new Error("Desktop password sign-in is unavailable.");
+  }
+  const session = normalizeCloudSession(await window.puppyoneDesktop?.signInCloudPassword({
+    apiBaseUrl: normalizeSessionApiBase(apiBaseUrl),
+    email,
+    password,
+  }));
+  if (session) {
+    cachedCloudSession = session;
+    clearLegacyStoredCloudSession();
+  }
+  return session;
+}
+
 export async function clearDesktopCloudSession(): Promise<void> {
   cachedCloudSession = null;
   clearLegacyStoredCloudSession();

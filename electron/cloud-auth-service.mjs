@@ -110,6 +110,29 @@ export function createCloudAuthService({
     return { ok: true };
   }
 
+  async function signInWithPassword({ apiBase, email, password }) {
+    const normalizedEmail = requireNonEmptyString(email, "Enter your email address.");
+    if (typeof password !== "string" || password.length === 0) {
+      throw new Error("Enter your password.");
+    }
+    // Uses the already-deployed /auth/login (Supabase email+password). The
+    // Google/GitHub OAuth flow above targets /auth/desktop/* endpoints that do
+    // not exist on the backend yet, so email/password is the working sign-in.
+    const data = await requestCloudApi(apiBase, "/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: normalizedEmail, password }),
+    });
+    const userEmail = typeof data?.user_email === "string" && data.user_email.includes("@")
+      ? data.user_email
+      : normalizedEmail;
+    const session = buildSessionFromAuth(data, userEmail, "", apiBase);
+    await initializeUser(apiBase, session.access_token);
+    const storedSession = await writeStoredSession(session);
+    revealWindow();
+    return toPublicSession(storedSession);
+  }
+
   async function handleCallback(callbackUrl) {
     try {
       const url = new URL(callbackUrl);
@@ -365,6 +388,7 @@ export function createCloudAuthService({
     readSession,
     restoreSession,
     startOAuth,
+    signInWithPassword,
     requestSessionApi,
     clearSession,
     dispose,

@@ -374,6 +374,16 @@ function registerIpcHandlers() {
     return cloudAuthService.startOAuth({ apiBase, provider: request?.provider });
   });
 
+  ipcMain.handle("cloud-session:sign-in-password", async (_event, request) => {
+    const apiBase = normalizeCloudApiBase(request?.apiBaseUrl);
+    if (!apiBase) throw new Error("Cloud API base URL is required.");
+    return cloudAuthService.signInWithPassword({
+      apiBase,
+      email: request?.email,
+      password: request?.password,
+    });
+  });
+
   ipcMain.handle("cloud-session:clear", async () => {
     await cloudAuthService.clearSession();
     return { ok: true };
