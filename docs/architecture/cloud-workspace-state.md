@@ -249,7 +249,6 @@ escalate to global banners.
 For Cloud state changes, the minimum automated verification is:
 
 ```bash
-cd desktop
 npx tsc --noEmit
 npm run build
 ```

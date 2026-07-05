@@ -32,18 +32,17 @@ public/logo-square-v0.1.4-dark.png
 When updating the icon, copy the selected versioned PNG into
 `public/logo-square.png`. The active master must be a 1024 x 1024 RGBA PNG.
 
-The Tauri icon master mirrors the same file:
+The generated bundle icon lives at:
 
 ```text
-src-tauri/icons/icon.png
+build/icon.icns
 ```
 
-These files must have the same hash after an icon update:
+These PNG files must have the same hash after an icon update:
 
 ```text
 public/logo-square-v0.1.4-dark.png
 public/logo-square.png
-src-tauri/icons/icon.png
 ```
 
 ## Packaged App Contract
@@ -71,7 +70,7 @@ The macOS bundle icon remains:
 
 ```json
 "mac": {
-  "icon": "src-tauri/icons/icon.icns"
+  "icon": "build/icon.icns"
 }
 ```
 
@@ -112,15 +111,6 @@ Copy the selected source PNG into the active masters:
 
 ```bash
 ditto public/logo-square-v0.1.4-dark.png public/logo-square.png
-ditto public/logo-square-v0.1.4-dark.png src-tauri/icons/icon.png
-```
-
-Generate Tauri PNG sizes:
-
-```bash
-sips -z 32 32 public/logo-square.png --out src-tauri/icons/32x32.png
-sips -z 128 128 public/logo-square.png --out src-tauri/icons/128x128.png
-sips -z 256 256 public/logo-square.png --out src-tauri/icons/128x128@2x.png
 ```
 
 Generate the macOS iconset:
@@ -137,19 +127,7 @@ sips -z 256 256 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/
 sips -z 512 512 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_256x256@2x.png
 sips -z 512 512 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_512x512.png
 sips -z 1024 1024 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_512x512@2x.png
-iconutil -c icns /private/tmp/puppyone-logo.iconset -o src-tauri/icons/icon.icns
-```
-
-Generate the Windows `.ico`:
-
-```bash
-sips -z 16 16 public/logo-square.png --out /private/tmp/puppyone-icon-16.png
-sips -z 32 32 public/logo-square.png --out /private/tmp/puppyone-icon-32.png
-sips -z 48 48 public/logo-square.png --out /private/tmp/puppyone-icon-48.png
-sips -z 64 64 public/logo-square.png --out /private/tmp/puppyone-icon-64.png
-sips -z 128 128 public/logo-square.png --out /private/tmp/puppyone-icon-128.png
-sips -z 256 256 public/logo-square.png --out /private/tmp/puppyone-icon-256.png
-node -e 'const fs=require("fs"); const sizes=[16,32,48,64,128,256]; const imgs=sizes.map(s=>({s,b:fs.readFileSync(`/private/tmp/puppyone-icon-${s}.png`)})); const header=Buffer.alloc(6); header.writeUInt16LE(0,0); header.writeUInt16LE(1,2); header.writeUInt16LE(imgs.length,4); let offset=6+imgs.length*16; const entries=[]; for(const img of imgs){const e=Buffer.alloc(16); e.writeUInt8(img.s===256?0:img.s,0); e.writeUInt8(img.s===256?0:img.s,1); e.writeUInt8(0,2); e.writeUInt8(0,3); e.writeUInt16LE(1,4); e.writeUInt16LE(32,6); e.writeUInt32LE(img.b.length,8); e.writeUInt32LE(offset,12); entries.push(e); offset+=img.b.length;} fs.writeFileSync("src-tauri/icons/icon.ico", Buffer.concat([header,...entries,...imgs.map(i=>i.b)]));'
+iconutil -c icns /private/tmp/puppyone-logo.iconset -o build/icon.icns
 ```
 
 Build the macOS package:
@@ -166,8 +144,7 @@ Confirm the active PNGs are identical:
 shasum -a 256 \
   public/logo-square-v0.1.4-dark.png \
   public/logo-square.png \
-  dist/logo-square.png \
-  src-tauri/icons/icon.png
+  dist/logo-square.png
 ```
 
 Confirm the packaged raw PNG is present and identical:
@@ -183,7 +160,7 @@ Confirm the packaged `.icns` matches the generated one:
 
 ```bash
 shasum -a 256 \
-  src-tauri/icons/icon.icns \
+  build/icon.icns \
   release/mac-arm64/puppyone.app/Contents/Resources/icon.icns
 ```
 
@@ -220,4 +197,3 @@ the hashes above, then restart the Dock or relaunch the packaged app.
   Finder may use `icon.icns`; runtime Dock should use `logo-square.png`.
 - A screenshot appears to show an older icon.
   Check whether an old packaged app or dev Electron instance is still running.
-

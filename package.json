@@ -7,6 +7,8 @@
   "scripts": {
     "check:boundaries": "node scripts/check-data-ui-boundaries.mjs",
     "check:shared-ui": "node scripts/check-data-ui-boundaries.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "dev": "node scripts/dev-electron.mjs",
     "dev:renderer": "vite --host 127.0.0.1",
     "dev:browser": "vite --host 127.0.0.1",
@@ -16,7 +18,9 @@
     "dist:mac:publish": "npm run check:shared-ui && npm run build && electron-builder --mac --publish always",
     "preview": "vite preview --host 127.0.0.1",
     "smoke:local-api": "node scripts/smoke-local-api.mjs",
-    "start": "node scripts/start-electron.mjs"
+    "start": "node scripts/start-electron.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -44,14 +48,19 @@
   "devDependencies": {
     "@types/react": "^18.3.8",
     "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/parser": "^8.62.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.5.0",
     "electron": "^41.2.1",
     "electron-builder": "^26.15.3",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^17.7.0",
     "postcss": "^8.5.15",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.6.3",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
   },
   "build": {
     "appId": "ai.puppyone.desktop",
@@ -88,7 +97,7 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "icon": "src-tauri/icons/icon.icns",
+      "icon": "build/icon.icns",
       "identity": "-",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,

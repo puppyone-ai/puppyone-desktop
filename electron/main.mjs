@@ -332,6 +332,8 @@ app.whenReady().then(async () => {
     protocol,
     readWorkspaceFile,
     getMimeType,
+    canonicalizeWorkspacePath,
+    isOpenWorkspaceRoot,
   });
   updateService = createUpdateService({
     app,
@@ -407,7 +409,7 @@ function registerIpcHandlers() {
   registerWorkspaceWatchIpcHandlers({ ipcMain, workspaceWatchService });
 
   registerWorkspaceGitIpcHandlers({ ipcMain, BrowserWindow, dialog });
-  registerTerminalIpcHandlers({ ipcMain, terminalService });
+  registerTerminalIpcHandlers({ ipcMain, terminalService, getWorkspaceRootForSender });
 }
 
 function getUpdateRestartBlockers() {
@@ -687,6 +689,16 @@ function getWorkspaceWindow(canonicalPath) {
     return null;
   }
   return window;
+}
+
+function isOpenWorkspaceRoot(canonicalPath) {
+  return Boolean(getWorkspaceWindow(canonicalPath));
+}
+
+function getWorkspaceRootForSender(sender) {
+  const state = windowStateById.get(sender.id);
+  const workspacePath = state?.workspacePath ?? null;
+  return workspacePath && !isVirtualWorkspacePath(workspacePath) ? workspacePath : null;
 }
 
 function getDialogOwnerWindow(sender) {

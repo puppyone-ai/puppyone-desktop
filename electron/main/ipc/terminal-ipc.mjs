@@ -1,6 +1,6 @@
-export function registerTerminalIpcHandlers({ ipcMain, terminalService }) {
+export function registerTerminalIpcHandlers({ ipcMain, terminalService, getWorkspaceRootForSender }) {
   ipcMain.handle("terminal:create", async (event, request) => {
-    return terminalService.create(event.sender, request);
+    return terminalService.create(event.sender, request, getWorkspaceRootForSender?.(event.sender) ?? null);
   });
 
   ipcMain.on("terminal:input", (_event, request) => {

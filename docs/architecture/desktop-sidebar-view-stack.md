@@ -92,33 +92,28 @@ tree mount. `DataWorkspace` still owns data loading and expansion state, and
 
 ## Current Code Boundaries
 
-- `frontend/shared-ui/src/data/DataWorkspace.tsx`
+- `vendor/shared-ui/src/data/DataWorkspace.tsx`
   - renders the keep-alive explorer view stack
   - owns `expandedFolderPaths`, `loadingFolderPaths`, root loaded state, and
     load generation for the file tree
   - passes controlled tree state into `ExplorerTree`
 
-- `frontend/shared-ui/src/data/ExplorerTree.tsx`
+- `vendor/shared-ui/src/data/ExplorerTree.tsx`
   - must not infer fresh expansion from tab return
   - receives controlled expansion and loading props from `DataWorkspace`
 
-- `frontend/shared-ui/src/styles/data-workspace.css`
+- `vendor/shared-ui/src/styles/data-workspace.css`
   - defines the keep-alive explorer frame stack
   - preserves inactive frame layout without pointer interaction
 
-The desktop app consumes these shared UI files through
-`desktop/vendor/shared-ui`. After changing shared UI, run:
-
-```bash
-node scripts/sync-desktop-shared-ui.mjs
-```
+These files live in `vendor/shared-ui` — the canonical copy in this standalone
+repo (ISSUE-021). Edit them in place; there is no upstream to sync from.
 
 ## Verification
 
 For this feature, the minimum verification is:
 
 ```bash
-cd desktop
 npm run check:shared-ui
 npm run check:boundaries
 npm run build

@@ -10,8 +10,8 @@ export function createTerminalService({
 }) {
   const sessions = new Map();
 
-  async function create(sender, request) {
-    const cwd = normalizeTerminalCwd(request?.cwd);
+  async function create(sender, request, workspaceRoot = null) {
+    const cwd = normalizeTerminalCwd(request?.cwd, workspaceRoot);
     const id = normalizeTerminalId(request?.id);
     const cols = normalizeTerminalSize(request?.cols, 80, 20, 400);
     const rows = normalizeTerminalSize(request?.rows, 24, 8, 120);
@@ -121,7 +121,18 @@ export function createTerminalService({
   };
 }
 
-function normalizeTerminalCwd(cwd) {
+function normalizeTerminalCwd(cwd, workspaceRoot) {
+  if (typeof workspaceRoot === "string" && workspaceRoot.trim().length > 0) {
+    const root = path.resolve(workspaceRoot);
+    if (typeof cwd === "string" && cwd.trim().length > 0) {
+      const resolved = path.resolve(root, cwd);
+      if (resolved === root || resolved.startsWith(`${root}${path.sep}`)) {
+        return resolved;
+      }
+    }
+    return root;
+  }
+
   if (typeof cwd === "string" && cwd.trim().length > 0) {
     return path.resolve(cwd);
   }

@@ -2,17 +2,31 @@ export function registerLocalFileProtocol({
   protocol,
   readWorkspaceFile,
   getMimeType,
+  canonicalizeWorkspacePath,
+  isOpenWorkspaceRoot,
 }) {
   protocol.handle("puppyone-local", async (request) => {
-    const { rootPath, relativePath } = parseLocalFileUrl(request.url);
-    const contentType = getMimeType(relativePath) ?? "application/octet-stream";
-    return new Response(await readWorkspaceFile(rootPath, relativePath), {
-      headers: {
-        "Content-Type": contentType,
-        "Access-Control-Allow-Origin": "*",
-        "Accept-Ranges": "bytes",
-      },
-    });
+    try {
+      const { rootPath, relativePath } = parseLocalFileUrl(request.url);
+      const canonicalRoot = typeof canonicalizeWorkspacePath === "function"
+        ? await canonicalizeWorkspacePath(rootPath)
+        : rootPath;
+
+      if (typeof isOpenWorkspaceRoot === "function" && !isOpenWorkspaceRoot(canonicalRoot)) {
+        return new Response("Forbidden", { status: 403 });
+      }
+
+      const contentType = getMimeType(relativePath) ?? "application/octet-stream";
+      return new Response(await readWorkspaceFile(canonicalRoot, relativePath), {
+        headers: {
+          "Content-Type": contentType,
+          "Access-Control-Allow-Origin": "*",
+          "Accept-Ranges": "bytes",
+        },
+      });
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
   });
 }
 

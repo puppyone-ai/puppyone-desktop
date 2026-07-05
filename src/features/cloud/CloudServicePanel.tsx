@@ -151,17 +151,15 @@ export function CloudAuthCard({
   return (
     <div className="desktop-cloud-auth-card">
       {view !== "signedIn" ? (
-        <>
-          <button
-            className="desktop-cloud-auth-submit"
-            type="button"
-            disabled={disabled}
-            onClick={() => onProviderLogin()}
-          >
-            <LogIn size={15} />
-            <span>{loading === "browser" ? "Opening browser..." : "Sign in with browser"}</span>
-          </button>
-        </>
+        <button
+          className="desktop-cloud-auth-submit"
+          type="button"
+          disabled={disabled}
+          onClick={() => onProviderLogin()}
+        >
+          <LogIn size={15} />
+          <span>{loading === "browser" ? "Opening browser..." : "Sign in with browser"}</span>
+        </button>
       ) : (
         <>
           <div className="desktop-cloud-auth-heading">

@@ -8,6 +8,9 @@ import { fileURLToPath } from "node:url";
 const MAX_ENTRIES_PER_FOLDER = 500;
 const MAX_PREVIEW_BYTES = 4096;
 const MAX_EDITOR_BYTES = 1024 * 1024;
+// Cap for whole-file reads served over the puppyone-local:// protocol (media
+// preview). Bounds main-process memory so a huge file can't OOM the app.
+const MAX_LOCAL_FILE_BYTES = 100 * 1024 * 1024;
 const GIT_HISTORY_LIMIT = 100;
 const GIT_ALL_BRANCH_HISTORY_LIMIT = 320;
 const GIT_REMOTE_PREVIEW_LIMIT = 12;
@@ -256,6 +259,15 @@ export async function listFolderChildren(rootPath, folderPath) {
 
 export async function readWorkspaceFile(rootPath, relativePath) {
   const filePath = resolveWorkspacePath(rootPath, relativePath);
+  const metadata = await fs.stat(filePath).catch((error) => {
+    throw new Error(`Unable to read file: ${error.message}`);
+  });
+  if (metadata.isDirectory()) {
+    throw new Error("Selected path is a folder.");
+  }
+  if (metadata.size > MAX_LOCAL_FILE_BYTES) {
+    throw new Error("File is too large to serve.");
+  }
   return fs.readFile(filePath);
 }
 
@@ -1277,20 +1289,18 @@ function isPreviewable(filePath) {
 }
 
 function loadFileFormatRegistry() {
-  const candidatePaths = [
-    path.resolve(localApiDir, "../vendor/shared-ui/src/core/fileFormats.json"),
-    path.resolve(localApiDir, "../../frontend/shared-ui/src/core/fileFormats.json"),
-  ];
-
-  for (const registryPath of candidatePaths) {
-    try {
-      return JSON.parse(readFileSync(registryPath, "utf8"));
-    } catch {
-      // Try the next candidate. The source path keeps dev usable before vendor sync.
-    }
+  // vendor/shared-ui is the canonical copy in this standalone repo (ISSUE-021).
+  // The former "../../frontend/shared-ui" fallback assumed a sibling monorepo
+  // checkout that does not exist in CI / packaged builds / other machines and
+  // resolved to nothing — it has been removed.
+  const registryPath = path.resolve(localApiDir, "../vendor/shared-ui/src/core/fileFormats.json");
+  try {
+    return JSON.parse(readFileSync(registryPath, "utf8"));
+  } catch (error) {
+    throw new Error(
+      `Unable to load PuppyOne file format registry from ${registryPath}: ${error.message}`,
+    );
   }
-
-  throw new Error("Unable to load PuppyOne file format registry.");
 }
 
 function resolveLocalFileFormat({ name, mimeType }) {

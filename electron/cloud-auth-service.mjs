@@ -137,7 +137,10 @@ export function createCloudAuthService({
       if (errorDescription) throw new Error(errorDescription);
 
       const code = requireNonEmptyString(url.searchParams.get("code"), "Cloud sign-in callback is missing a code.");
-      const state = url.searchParams.get("state") || inferSinglePendingOAuthState();
+      // Require the exact CSRF state nonce from the callback — never infer it from
+      // "the single pending flow", which would let a forged callback consume an
+      // in-flight sign-in (CSRF). No state -> no match -> rejected below.
+      const state = url.searchParams.get("state");
       const pending = state ? pendingOAuthStates.get(state) : null;
       if (!pending) throw new Error("Cloud sign-in callback expired. Please sign in again.");
       clearPendingOAuthState(state);
@@ -356,11 +359,6 @@ export function createCloudAuthService({
         Authorization: `Bearer ${session.access_token}`,
       },
     };
-  }
-
-  function inferSinglePendingOAuthState() {
-    if (pendingOAuthStates.size !== 1) return null;
-    return pendingOAuthStates.keys().next().value ?? null;
   }
 
   function clearPendingOAuthState(state) {

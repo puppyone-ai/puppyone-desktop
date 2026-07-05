@@ -303,7 +303,6 @@ Build scripts:
 For this feature, the minimum verification is:
 
 ```bash
-cd desktop
 npm run build
 npm run dist:mac
 ```
