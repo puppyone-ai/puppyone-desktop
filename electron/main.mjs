@@ -117,6 +117,16 @@ if (!gotSingleInstanceLock) {
   app.exit(0);
 }
 
+function isInternalAppUrl(targetUrl) {
+  try {
+    const url = new URL(targetUrl);
+    if (devServerUrl) return url.origin === new URL(devServerUrl).origin;
+    return url.protocol === "file:"; // packaged renderer is loaded from file://
+  } catch {
+    return false;
+  }
+}
+
 async function createWindow(options = {}) {
   const initialWorkspacePath = typeof options.initialWorkspacePath === "string"
     ? path.resolve(options.initialWorkspacePath)
@@ -147,6 +157,25 @@ async function createWindow(options = {}) {
     lastFocusedAt: Date.now(),
   });
   lastFocusedWindowId = webContentsId;
+
+  // SECURITY: keep the app frame pinned to its own origin. Renderer content must
+  // not open in-app popups or navigate the main frame to remote/attacker content;
+  // safe external http(s) links are handed to the OS browser instead.
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      const protocol = new URL(url).protocol;
+      if (protocol === "http:" || protocol === "https:") void shell.openExternal(url);
+    } catch { /* ignore malformed URLs */ }
+    return { action: "deny" };
+  });
+  window.webContents.on("will-navigate", (navEvent, targetUrl) => {
+    if (isInternalAppUrl(targetUrl)) return;
+    navEvent.preventDefault();
+    try {
+      const protocol = new URL(targetUrl).protocol;
+      if (protocol === "http:" || protocol === "https:") void shell.openExternal(targetUrl);
+    } catch { /* ignore malformed URLs */ }
+  });
 
   window.on("focus", () => {
     lastFocusedWindowId = webContentsId;
@@ -782,7 +811,8 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("terminal:create", async (event, request) => {
-    const cwd = normalizeTerminalCwd(request?.cwd);
+    const workspaceRoot = windowStateById.get(event.sender.id)?.workspacePath ?? null;
+    const cwd = normalizeTerminalCwd(request?.cwd, workspaceRoot);
     const id = normalizeTerminalId(request?.id);
     const cols = normalizeTerminalSize(request?.cols, 80, 20, 400);
     const rows = normalizeTerminalSize(request?.rows, 24, 8, 120);
@@ -1492,11 +1522,20 @@ function getCloudApiErrorMessage(payload, fallback) {
   return fallback;
 }
 
-function normalizeTerminalCwd(cwd) {
-  if (typeof cwd === "string" && cwd.trim().length > 0) {
-    return path.resolve(cwd);
+function normalizeTerminalCwd(cwd, workspaceRoot) {
+  // Pin the initial terminal cwd to the window's workspace so a compromised
+  // renderer can't silently open a shell outside it. (The user can still cd
+  // freely once the shell is running — that is expected terminal behaviour.)
+  if (typeof workspaceRoot !== "string" || !workspaceRoot) {
+    return os.homedir();
   }
-  return os.homedir();
+  if (typeof cwd === "string" && cwd.trim().length > 0) {
+    const resolved = path.resolve(workspaceRoot, cwd);
+    if (resolved === workspaceRoot || resolved.startsWith(`${workspaceRoot}${path.sep}`)) {
+      return resolved;
+    }
+  }
+  return workspaceRoot;
 }
 
 function normalizeTerminalId(id) {
@@ -1746,17 +1785,34 @@ function findWorkspacePathArg(argv) {
   return null;
 }
 
+function isOpenWorkspaceRoot(canonicalPath) {
+  const window = workspaceWindowByPath.get(canonicalPath);
+  return Boolean(window && !window.isDestroyed());
+}
+
 function registerLocalFileProtocol() {
   protocol.handle("puppyone-local", async (request) => {
-    const { rootPath, relativePath } = parseLocalFileUrl(request.url);
-    const contentType = getMimeType(relativePath) ?? "application/octet-stream";
-    return new Response(await readWorkspaceFile(rootPath, relativePath), {
-      headers: {
-        "Content-Type": contentType,
-        "Access-Control-Allow-Origin": "*",
-        "Accept-Ranges": "bytes",
-      },
-    });
+    try {
+      const { rootPath, relativePath } = parseLocalFileUrl(request.url);
+      // SECURITY: rootPath is taken from the request URL. resolveWorkspacePath only
+      // confines relativePath WITHIN rootPath — rootPath itself must be validated,
+      // or a crafted puppyone-local:// request (e.g. from previewed HTML/markdown)
+      // could read ANY file on disk. Only serve from a workspace open in a window.
+      const canonicalRoot = await canonicalizeWorkspacePath(rootPath);
+      if (!isOpenWorkspaceRoot(canonicalRoot)) {
+        return new Response("Forbidden", { status: 403 });
+      }
+      const contentType = getMimeType(relativePath) ?? "application/octet-stream";
+      return new Response(await readWorkspaceFile(canonicalRoot, relativePath), {
+        headers: {
+          "Content-Type": contentType,
+          "Access-Control-Allow-Origin": "*",
+          "Accept-Ranges": "bytes",
+        },
+      });
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
   });
 }
 

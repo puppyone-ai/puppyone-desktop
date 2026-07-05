@@ -136,6 +136,12 @@ describe("read / write round-trips", () => {
     expect(Buffer.compare(out, bytes)).toBe(0);
   });
 
+  it("readWorkspaceFile (puppyone-local protocol path) rejects a directory and traversal", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "dir", kind: "folder" });
+    await expect(readWorkspaceFile(root, "dir")).rejects.toThrow(/folder/i);
+    await expect(readWorkspaceFile(root, "../../etc/passwd")).rejects.toThrow(/outside the selected workspace/i);
+  });
+
   it("surfaces binary files (null bytes) with content=null", async () => {
     await writeFile(path.join(root, "img.bin"), Buffer.from([0x00, 0x01, 0x02, 0x00]));
     const file = await readWorkspaceTextFile(root, "img.bin");

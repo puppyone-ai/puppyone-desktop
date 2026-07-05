@@ -10,6 +10,17 @@ export function normalizeCloudApiBaseUrl(apiBaseUrl) {
     const url = new URL(apiBaseUrl.trim());
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
 
+    // SECURITY (SSRF): only permit the PuppyOne cloud host family (+ localhost for
+    // dev). Otherwise a renderer-supplied base could drive the main process to
+    // fetch arbitrary internal/metadata/internet hosts via cloud:api-request.
+    const host = url.hostname.toLowerCase();
+    const allowedHost =
+      host === "puppyone.ai" ||
+      host.endsWith(".puppyone.ai") ||
+      host === "localhost" ||
+      host === "127.0.0.1";
+    if (!allowedHost) return null;
+
     if (url.hostname === PUPPYONE_CLOUD_API_HOST) {
       url.protocol = "https:";
       if (!url.pathname || url.pathname === "/") {

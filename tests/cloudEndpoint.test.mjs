@@ -22,11 +22,11 @@ describe("normalizeCloudApiBaseUrl", () => {
   });
 
   it("strips trailing slashes, hash and query", () => {
-    expect(normalizeCloudApiBaseUrl("https://example.com/api/v1/")).toBe(
-      "https://example.com/api/v1",
+    expect(normalizeCloudApiBaseUrl("https://qubits-try.puppyone.ai/api/v1/")).toBe(
+      "https://qubits-try.puppyone.ai/api/v1",
     );
-    expect(normalizeCloudApiBaseUrl("https://example.com/api/v1?x=1#frag")).toBe(
-      "https://example.com/api/v1",
+    expect(normalizeCloudApiBaseUrl("https://qubits-try.puppyone.ai/api/v1?x=1#frag")).toBe(
+      "https://qubits-try.puppyone.ai/api/v1",
     );
   });
 
@@ -34,6 +34,20 @@ describe("normalizeCloudApiBaseUrl", () => {
     expect(normalizeCloudApiBaseUrl("http://api.puppyone.ai")).toBe(
       "https://api.puppyone.ai/api/v1",
     );
+  });
+
+  it("SSRF guard: rejects non-PuppyOne hosts and internal/metadata targets", () => {
+    expect(normalizeCloudApiBaseUrl("https://example.com/api/v1")).toBeNull();
+    expect(normalizeCloudApiBaseUrl("http://169.254.169.254/latest/meta-data")).toBeNull();
+    expect(normalizeCloudApiBaseUrl("http://10.0.0.5/internal")).toBeNull();
+    // suffix-match must not be bypassable by a lookalike parent domain
+    expect(normalizeCloudApiBaseUrl("https://evil.puppyone.ai.attacker.com/api/v1")).toBeNull();
+  });
+
+  it("SSRF guard: allows the PuppyOne host family and localhost (dev)", () => {
+    expect(normalizeCloudApiBaseUrl("https://api.puppyone.ai/api/v1")).toBe("https://api.puppyone.ai/api/v1");
+    expect(normalizeCloudApiBaseUrl("https://qubits-try.puppyone.ai/api/v1")).toBe("https://qubits-try.puppyone.ai/api/v1");
+    expect(normalizeCloudApiBaseUrl("http://localhost:8000/api/v1")).toBe("http://localhost:8000/api/v1");
   });
 });
 
@@ -46,8 +60,8 @@ describe("resolveCloudApiBaseUrl", () => {
 
 describe("cloudApiBaseUrlFromRemote", () => {
   it("derives the /api/v1 base from a git remote origin", () => {
-    expect(cloudApiBaseUrlFromRemote("https://git.example.com/org/repo.git")).toBe(
-      "https://git.example.com/api/v1",
+    expect(cloudApiBaseUrlFromRemote("https://git.puppyone.ai/org/repo.git")).toBe(
+      "https://git.puppyone.ai/api/v1",
     );
   });
 
@@ -68,10 +82,10 @@ describe("normalizeCloudApiPath", () => {
 describe("sameCloudApiBaseUrl", () => {
   it("treats trailing-slash / scheme-normalized variants as equal", () => {
     expect(
-      sameCloudApiBaseUrl("https://example.com/api/v1", "https://example.com/api/v1/"),
+      sameCloudApiBaseUrl("https://qubits-try.puppyone.ai/api/v1", "https://qubits-try.puppyone.ai/api/v1/"),
     ).toBe(true);
     expect(
-      sameCloudApiBaseUrl("https://example.com/api/v1", "https://other.com/api/v1"),
+      sameCloudApiBaseUrl("https://qubits-try.puppyone.ai/api/v1", "https://api.puppyone.ai/api/v1"),
     ).toBe(false);
   });
 });

@@ -8,6 +8,9 @@ import { fileURLToPath } from "node:url";
 const MAX_ENTRIES_PER_FOLDER = 500;
 const MAX_PREVIEW_BYTES = 4096;
 const MAX_EDITOR_BYTES = 1024 * 1024;
+// Cap for whole-file reads served over the puppyone-local:// protocol (media
+// preview). Bounds main-process memory so a huge file can't OOM the app.
+const MAX_LOCAL_FILE_BYTES = 100 * 1024 * 1024;
 const GIT_HISTORY_LIMIT = 100;
 const GIT_ALL_BRANCH_HISTORY_LIMIT = 320;
 const GIT_REMOTE_PREVIEW_LIMIT = 12;
@@ -256,6 +259,15 @@ export async function listFolderChildren(rootPath, folderPath) {
 
 export async function readWorkspaceFile(rootPath, relativePath) {
   const filePath = resolveWorkspacePath(rootPath, relativePath);
+  const metadata = await fs.stat(filePath).catch((error) => {
+    throw new Error(`Unable to read file: ${error.message}`);
+  });
+  if (metadata.isDirectory()) {
+    throw new Error("Selected path is a folder.");
+  }
+  if (metadata.size > MAX_LOCAL_FILE_BYTES) {
+    throw new Error("File is too large to serve.");
+  }
   return fs.readFile(filePath);
 }
 
