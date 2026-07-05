@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
 import type { GitBranchSummary, GitStatusSnapshot } from "../../types/electron";
 import { PuppyGitIcon } from "../app-shell/navigation";
 
@@ -158,7 +159,10 @@ export function BranchSwitchConflictDialog({
   onCommitAndSwitch: () => void;
 }) {
   return (
-    <div className="desktop-dialog-backdrop" role="presentation" onClick={loading ? undefined : onCancel}>
+    <DesktopDialogRoot
+      onClose={onCancel}
+      dismissOnBackdrop={!loading}
+    >
       <section
         className="desktop-dialog-surface"
         role="dialog"
@@ -176,15 +180,7 @@ export function BranchSwitchConflictDialog({
               <p>Switching to <strong>{branchName}</strong> may overwrite your current changes.</p>
             </div>
           </div>
-          <button
-            className="desktop-dialog-icon-button"
-            type="button"
-            aria-label="Close"
-            disabled={loading}
-            onClick={onCancel}
-          >
-            <X size={15} />
-          </button>
+          <DesktopDialogCloseButton disabled={loading} onClick={onCancel} />
         </header>
 
         <div className="desktop-dialog-body">
@@ -205,7 +201,7 @@ export function BranchSwitchConflictDialog({
           </button>
         </footer>
       </section>
-    </div>
+    </DesktopDialogRoot>
   );
 }
 
@@ -230,7 +226,7 @@ export function GitOperationErrorDialog({
   };
 
   return (
-    <div className="desktop-dialog-backdrop" role="presentation" onClick={onClose}>
+    <DesktopDialogRoot onClose={onClose}>
       <section
         className="desktop-dialog-surface desktop-git-error-dialog"
         role="alertdialog"
@@ -248,14 +244,7 @@ export function GitOperationErrorDialog({
               <p>Copy the fix prompt into Codex or Claude Code if you want an agent to repair it.</p>
             </div>
           </div>
-          <button
-            className="desktop-dialog-icon-button"
-            type="button"
-            aria-label="Close"
-            onClick={onClose}
-          >
-            <X size={15} />
-          </button>
+          <DesktopDialogCloseButton onClick={onClose} />
         </header>
 
         <div className="desktop-dialog-body">
@@ -275,7 +264,7 @@ export function GitOperationErrorDialog({
           </button>
         </footer>
       </section>
-    </div>
+    </DesktopDialogRoot>
   );
 }
 

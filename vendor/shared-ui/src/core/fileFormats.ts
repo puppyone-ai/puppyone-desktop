@@ -4,6 +4,7 @@ export type FileCategory =
   | "image"
   | "audio"
   | "video"
+  | "app"
   | "markdown"
   | "text"
   | "code"
@@ -13,6 +14,7 @@ export type FileCategory =
   | "binary";
 
 export type GenericViewerId =
+  | "app-preview"
   | "markdown-editor"
   | "plain-text"
   | "monaco-code"
@@ -52,6 +54,7 @@ export interface FileFormat {
 
 export type FileSemanticKind =
   | "folder"
+  | "app"
   | "markdown"
   | "json"
   | "html"
@@ -68,6 +71,7 @@ export type FileSemanticKind =
   | "file";
 
 export type FilePreviewKind =
+  | "app"
   | "markdown"
   | "json"
   | "text"
@@ -226,6 +230,8 @@ export function getPreviewKindForFormat(format: FileFormat): FilePreviewKind {
       return "text";
     case "html-artifact":
       return "html";
+    case "app-preview":
+      return "app";
     case "image-preview":
       return "image";
     case "audio-preview":
@@ -250,6 +256,8 @@ export function getSemanticKindForFormat(format: FileFormat): FileSemanticKind {
       return "markdown";
     case "html-artifact":
       return "html";
+    case "app-preview":
+      return "app";
     case "image-preview":
       return "image";
     case "audio-preview":
@@ -267,6 +275,8 @@ export function getSemanticKindForFormat(format: FileFormat): FileSemanticKind {
   switch (format.category) {
     case "markdown":
       return "markdown";
+    case "app":
+      return "app";
     case "image":
       return "image";
     case "audio":
@@ -316,6 +326,8 @@ function getPreviewKindForSemanticType(type?: string | null): FilePreviewKind | 
       return "json";
     case "html":
       return "html";
+    case "app":
+      return "app";
     case "image":
       return "image";
     case "audio":
@@ -407,6 +419,7 @@ function basename(path: string): string {
 function isFileSemanticKind(value: string | null | undefined): value is FileSemanticKind {
   return Boolean(value && [
     "folder",
+    "app",
     "markdown",
     "json",
     "html",

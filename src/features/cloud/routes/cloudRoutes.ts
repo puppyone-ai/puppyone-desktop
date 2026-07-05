@@ -1,4 +1,4 @@
-import { Cloud, CreditCard, FileText, GitBranch, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
+import { Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
 import type { CloudWorkspaceSection } from "./cloudRouteIds";
 
 export type CloudRouteContext = "projects" | "project" | "account";
@@ -77,6 +77,16 @@ export const CLOUD_ROUTES = [
     showInSidebar: true,
     groupEnd: true,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
+  },
+  {
+    id: "integrations",
+    label: "Integrations",
+    title: "Integrations",
+    description: "Connected services and sync surfaces attached to this Cloud project.",
+    icon: Grid2X2,
+    context: "project",
+    showInSidebar: false,
+    webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/workflows`,
   },
   {
     id: "mcp-cli",

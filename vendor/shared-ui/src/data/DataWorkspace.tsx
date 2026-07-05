@@ -31,6 +31,8 @@ export type DataWorkspaceState = {
   tree: DataNode[];
   activePath: string | null;
   activeNode: DataNode | null;
+  selectedPaths: string[];
+  selectedNodes: DataNode[];
   currentFolderPath: string | null;
   selectedFile: DataNode | null;
   loadingPath: string | null;
@@ -53,9 +55,17 @@ type CommittedPreviewDocument = {
   fileError: string | null;
 };
 
+type MoveOperation = {
+  node: DataNode;
+  previousPath: string;
+  nextPath: string;
+  previousParentPath: string | null;
+};
+
 export type DataWorkspaceSlot = ReactNode | ((state: DataWorkspaceState) => ReactNode);
 export type DataWorkspaceFolderSlot = ReactNode | ((state: DataWorkspaceState, folder: DataNode) => ReactNode);
 export type DataWorkspaceNodeSlot = ReactNode | ((state: DataWorkspaceState, node: DataNode) => ReactNode);
+export type DataWorkspaceFolderExpansionStrategy = "load-before-expand" | "optimistic";
 
 export type DataWorkspaceProps = {
   workspace: Workspace;
@@ -93,10 +103,12 @@ export type DataWorkspaceProps = {
   previewAccessorySlot?: DataWorkspaceSlot;
   aiEditRequest?: AiEditRequest | null;
   enableMarkdownLinkContentIndexing?: boolean;
+  folderExpansionStrategy?: DataWorkspaceFolderExpansionStrategy;
   refreshKey?: unknown;
   onExplorerWidthChange?: (width: number) => void;
   onExplorerCollapsedChange?: (collapsed: boolean) => void;
   onActivePathChange?: (path: string | null, node: DataNode | null) => void;
+  onActiveNodeChange?: (node: DataNode | null) => void;
   onOpenExternalUrl?: (href: string) => void | Promise<void>;
   onCreate?: (folderPath: string | null) => void;
   onMore?: (state: DataWorkspaceState) => void;
@@ -150,10 +162,12 @@ export function DataWorkspace({
   previewAccessorySlot,
   aiEditRequest = null,
   enableMarkdownLinkContentIndexing = true,
+  folderExpansionStrategy = "load-before-expand",
   refreshKey,
   onExplorerWidthChange,
   onExplorerCollapsedChange,
   onActivePathChange,
+  onActiveNodeChange,
   onOpenExternalUrl,
   onCreate,
   onMore,
@@ -163,6 +177,10 @@ export function DataWorkspace({
   const resolvedCapabilities = { ...defaultDataCapabilities, ...capabilities };
   const [tree, setTree] = useState<DataNode[]>([]);
   const [internalActivePath, setInternalActivePath] = useState<string | null>(defaultActivePath);
+  const [selectedNodePaths, setSelectedNodePaths] = useState<Set<string>>(() => (
+    defaultActivePath ? new Set([defaultActivePath]) : new Set()
+  ));
+  const [selectionAnchorPath, setSelectionAnchorPath] = useState<string | null>(defaultActivePath);
   const [rootLoaded, setRootLoaded] = useState(false);
   const [loadingFolderPaths, setLoadingFolderPaths] = useState<Set<string>>(() => new Set([ROOT_FOLDER_KEY]));
   const [expandedFolderPaths, setExpandedFolderPaths] = useState<Set<string>>(() => new Set(collectAncestorFolderPaths(defaultActivePath)));
@@ -180,6 +198,7 @@ export function DataWorkspace({
   const [committedPreviewDocument, setCommittedPreviewDocument] = useState<CommittedPreviewDocument | null>(null);
   const lastRefreshKeyRef = useRef(refreshKey);
   const loadGenerationRef = useRef(0);
+  const suppressSelectionSyncRef = useRef(false);
   const [internalExplorerWidth, setInternalExplorerWidth] = useState(() => (
     clampNumber(defaultExplorerWidth, minExplorerWidth, maxExplorerWidth)
   ));
@@ -253,6 +272,8 @@ export function DataWorkspace({
   useEffect(() => {
     loadGenerationRef.current += 1;
     setInternalActivePath(defaultActivePath);
+    setSelectedNodePaths(defaultActivePath ? new Set([defaultActivePath]) : new Set());
+    setSelectionAnchorPath(defaultActivePath);
     setTree([]);
     setRootLoaded(false);
     setExpandedFolderPaths(new Set(collectAncestorFolderPaths(defaultActivePath)));
@@ -355,6 +376,7 @@ export function DataWorkspace({
   }, [dataPort, refreshKey, setFolderLoading, tree]);
 
   const activeNode = useMemo(() => findDataNode(tree, resolvedActivePath), [resolvedActivePath, tree]);
+  const selectedNodes = useMemo(() => findDataNodes(tree, selectedNodePaths), [selectedNodePaths, tree]);
   const currentFolderPath = activeNode?.type === "folder" ? activeNode.path : getParentPath(resolvedActivePath);
   const selectedFile = activeNode?.type !== "folder" ? activeNode : null;
   const selectedFileSourceRequirement = selectedFile ? getEditorSourceRequirement(selectedFile) : "none";
@@ -405,16 +427,62 @@ export function DataWorkspace({
   const loadingPath = getFirstSetValue(loadingFolderPaths);
   const rootLoading = loadingFolderPaths.has(ROOT_FOLDER_KEY);
   const filesExplorerActive = !explorerSlot;
+
+  useEffect(() => {
+    onActiveNodeChange?.(activeNode ?? null);
+  }, [activeNode, onActiveNodeChange]);
+
+  useEffect(() => {
+    if (suppressSelectionSyncRef.current) {
+      suppressSelectionSyncRef.current = false;
+      return;
+    }
+    if (!resolvedActivePath) {
+      setSelectedNodePaths((current) => (current.size === 0 ? current : new Set()));
+      setSelectionAnchorPath(null);
+      return;
+    }
+    setSelectedNodePaths((current) => {
+      if (current.has(resolvedActivePath)) return current;
+      return new Set([resolvedActivePath]);
+    });
+    setSelectionAnchorPath(resolvedActivePath);
+  }, [resolvedActivePath]);
+
   const activateNode = useCallback(
-    (node: DataNode | null) => {
+    (node: DataNode | null, intent: { additive?: boolean; range?: boolean } = {}) => {
       const nextPath = node?.path ?? null;
+      setSelectedNodePaths((current) => {
+        if (!nextPath) return current.size === 0 ? current : new Set();
+        if (intent.range) {
+          const visiblePaths = collectVisibleDataNodes(tree, expandedFolderPaths).map((item) => item.path);
+          const anchorPath = selectionAnchorPath && visiblePaths.includes(selectionAnchorPath)
+            ? selectionAnchorPath
+            : resolvedActivePath && visiblePaths.includes(resolvedActivePath)
+              ? resolvedActivePath
+              : nextPath;
+          const rangePaths = getPathRange(visiblePaths, anchorPath, nextPath);
+          if (intent.additive) return addSetValues(current, rangePaths);
+          return new Set(rangePaths);
+        }
+        if (intent.additive) {
+          const next = new Set(current);
+          if (next.has(nextPath)) next.delete(nextPath);
+          else next.add(nextPath);
+          return next;
+        }
+        return new Set([nextPath]);
+      });
+      if (nextPath && !intent.range) setSelectionAnchorPath(nextPath);
+      if (nextPath && intent.range && !selectionAnchorPath) setSelectionAnchorPath(nextPath);
+      if (nextPath !== resolvedActivePath) suppressSelectionSyncRef.current = true;
       if (activePath === undefined) setInternalActivePath(nextPath);
       onActivePathChange?.(nextPath, node);
       if (!node) {
         void loadFolder(null);
       }
     },
-    [activePath, loadFolder, onActivePathChange],
+    [activePath, expandedFolderPaths, loadFolder, onActivePathChange, resolvedActivePath, selectionAnchorPath, tree],
   );
   const loadLinkedPathNode = useCallback(
     async (path: string): Promise<DataNode | null> => {
@@ -534,6 +602,8 @@ export function DataWorkspace({
     tree,
     activePath: resolvedActivePath,
     activeNode,
+    selectedPaths: Array.from(selectedNodePaths),
+    selectedNodes,
     currentFolderPath,
     selectedFile,
     loadingPath,
@@ -709,12 +779,21 @@ export function DataWorkspace({
 
       if (loadingFolderPaths.has(node.path)) return;
 
+      if (folderExpansionStrategy === "optimistic") {
+        setExpandedFolderPaths((current) => addSetValue(current, node.path));
+        void loadFolder(node.path).then((loaded) => {
+          if (loaded) return;
+          setExpandedFolderPaths((current) => deleteSetValue(current, node.path));
+        });
+        return;
+      }
+
       void loadFolder(node.path).then((loaded) => {
         if (!loaded) return;
         setExpandedFolderPaths((current) => addSetValue(current, node.path));
       });
     },
-    [loadFolder, loadingFolderPaths],
+    [folderExpansionStrategy, loadFolder, loadingFolderPaths],
   );
 
   const saveFileContent = async (node: DataNode, content: string) => {
@@ -800,42 +879,77 @@ export function DataWorkspace({
     [activePath, dataPort, loadFolder, onActivePathChange, setFolderLoading],
   );
 
-  const moveNode = useCallback(
-    async (node: DataNode, targetFolderPath: string | null) => {
+  const moveNodes = useCallback(
+    async (nodes: DataNode[], targetFolderPath: string | null) => {
       if (!resolvedCapabilities.move || !dataPort.moveNode) return;
 
-      const previousPath = node.path;
-      const nextPath = joinDataPath(targetFolderPath, node.name);
-      const previousParentPath = getParentPath(previousPath);
+      const operations = collectTopLevelNodes(nodes)
+        .map((node) => {
+          const previousPath = node.path;
+          const nextPath = joinDataPath(targetFolderPath, node.name);
+          return {
+            node,
+            previousPath,
+            nextPath,
+            previousParentPath: getParentPath(previousPath),
+          };
+        })
+        .filter((operation) => (
+          operation.previousPath !== operation.nextPath &&
+          operation.previousParentPath !== targetFolderPath &&
+          isValidDataMoveTarget(operation.node, targetFolderPath)
+        ));
 
-      if (previousPath === nextPath || previousParentPath === targetFolderPath) return;
+      if (operations.length === 0) return;
 
       setLoadError(null);
 
       try {
-        await dataPort.moveNode(previousPath, nextPath);
+        for (const operation of operations) {
+          await dataPort.moveNode(operation.previousPath, operation.nextPath);
+        }
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : String(error));
         return;
       }
 
-      setTree((current) => moveDataNode(current, previousPath, nextPath, targetFolderPath));
-      setFileContentCache((current) => rebaseFileContentCache(current, previousPath, nextPath));
-      setFileContent((current) => rebaseFileContent(current, previousPath, nextPath));
-      setFileErrorPath((current) => rebaseMovedPath(current, previousPath, nextPath));
-      setFileUrlPath((current) => rebaseMovedPath(current, previousPath, nextPath));
-      setCommittedPreviewDocument((current) => rebaseCommittedPreviewDocument(current, previousPath, nextPath));
+      setTree((current) => operations.reduce(
+        (nextTree, operation) => moveDataNode(nextTree, operation.previousPath, operation.nextPath, targetFolderPath),
+        current,
+      ));
+      setFileContentCache((current) => operations.reduce(
+        (nextCache, operation) => rebaseFileContentCache(nextCache, operation.previousPath, operation.nextPath),
+        current,
+      ));
+      setFileContent((current) => operations.reduce(
+        (nextContent, operation) => rebaseFileContent(nextContent, operation.previousPath, operation.nextPath),
+        current,
+      ));
+      setFileErrorPath((current) => rebasePathByMoveOperations(current, operations));
+      setFileUrlPath((current) => rebasePathByMoveOperations(current, operations));
+      setCommittedPreviewDocument((current) => operations.reduce(
+        (nextDocument, operation) => rebaseCommittedPreviewDocument(nextDocument, operation.previousPath, operation.nextPath),
+        current,
+      ));
+      setSelectedNodePaths((current) => rebasePathSetByMoveOperations(current, operations));
+      setSelectionAnchorPath((current) => rebasePathByMoveOperations(current, operations));
 
-      const nextActivePath = rebaseMovedPath(resolvedActivePath, previousPath, nextPath);
+      const nextActivePath = rebasePathByMoveOperations(resolvedActivePath, operations);
       if (nextActivePath !== resolvedActivePath) {
-        const nextActiveNode = activeNode ? rebaseDataNode(activeNode, previousPath, nextPath) : null;
+        const nextActiveNode = activeNode
+          ? operations.reduce(
+            (nextNode, operation) => rebaseDataNode(nextNode, operation.previousPath, operation.nextPath),
+            activeNode,
+          )
+          : null;
         if (activePath === undefined) setInternalActivePath(nextActivePath);
         onActivePathChange?.(nextActivePath, nextActiveNode);
       }
 
-      void loadFolder(previousParentPath, true);
-      if (targetFolderPath !== previousParentPath) {
-        void loadFolder(targetFolderPath, true);
+      const foldersToRefresh = new Set<string | null>(operations.map((operation) => operation.previousParentPath));
+      foldersToRefresh.add(targetFolderPath);
+      for (const folderPath of foldersToRefresh) {
+        void loadFolder(folderPath, true);
       }
     },
     [
@@ -847,6 +961,10 @@ export function DataWorkspace({
       resolvedActivePath,
       resolvedCapabilities.move,
     ],
+  );
+  const moveNode = useCallback(
+    (node: DataNode, targetFolderPath: string | null) => moveNodes([node], targetFolderPath),
+    [moveNodes],
   );
 
   const beginExplorerResize = useCallback(
@@ -958,6 +1076,7 @@ export function DataWorkspace({
                   <ExplorerTree
                     nodes={tree}
                     activePath={resolvedActivePath}
+                    selectedPaths={selectedNodePaths}
                     expandedPaths={expandedFolderPaths}
                     loadingPaths={loadingFolderPaths}
                     rootLoading={rootLoading}
@@ -970,6 +1089,7 @@ export function DataWorkspace({
                     fileIconTheme={fileIconTheme}
                     canMoveNodes={Boolean(resolvedCapabilities.move && dataPort.moveNode)}
                     onMoveNode={moveNode}
+                    onMoveNodes={moveNodes}
                     onImportFiles={dataPort.importFiles ? importFiles : undefined}
                     renderRootActions={explorerRootActionSlot ? () => renderWorkspaceSlot(explorerRootActionSlot, workspaceState) : undefined}
                     renderFolderActions={explorerFolderActionSlot ? (folder) => renderWorkspaceFolderSlot(explorerFolderActionSlot, workspaceState, folder) : undefined}
@@ -1041,6 +1161,7 @@ export function DataWorkspace({
                   htmlTrustMode={htmlTrustMode}
                   markdownLinkGraph={markdownLinkGraph}
                   markdownAssetUrlResolver={markdownAssetUrlResolver}
+                  appPreview={dataPort.appPreview ?? null}
                   emptySlot={emptySlot}
                   actionSlot={previewActionSlot}
                   renderBody={renderPreviewBody}
@@ -1101,6 +1222,53 @@ function findDataNode(nodes: DataNode[], path: string | null): DataNode | null {
   }
 
   return null;
+}
+
+function findDataNodes(nodes: DataNode[], paths: ReadonlySet<string>): DataNode[] {
+  if (paths.size === 0) return [];
+  const matches: DataNode[] = [];
+
+  for (const node of nodes) {
+    if (paths.has(node.path)) matches.push(node);
+    if (node.children) matches.push(...findDataNodes(node.children, paths));
+  }
+
+  return matches;
+}
+
+function collectVisibleDataNodes(nodes: DataNode[], expandedPaths: ReadonlySet<string>): DataNode[] {
+  const visibleNodes: DataNode[] = [];
+
+  for (const node of nodes) {
+    visibleNodes.push(node);
+    if (node.type === "folder" && expandedPaths.has(node.path) && node.children) {
+      visibleNodes.push(...collectVisibleDataNodes(node.children, expandedPaths));
+    }
+  }
+
+  return visibleNodes;
+}
+
+function getPathRange(paths: string[], startPath: string, endPath: string): string[] {
+  const startIndex = paths.indexOf(startPath);
+  const endIndex = paths.indexOf(endPath);
+  if (startIndex < 0 || endIndex < 0) return [endPath];
+  const from = Math.min(startIndex, endIndex);
+  const to = Math.max(startIndex, endIndex);
+  return paths.slice(from, to + 1);
+}
+
+function collectTopLevelNodes(nodes: DataNode[]): DataNode[] {
+  return nodes.filter((node) => !nodes.some((candidate) => (
+    candidate.path !== node.path && node.path.startsWith(`${candidate.path}/`)
+  )));
+}
+
+function isValidDataMoveTarget(node: DataNode, targetFolderPath: string | null): boolean {
+  if (getParentPath(node.path) === targetFolderPath) return false;
+  if (targetFolderPath === node.path) return false;
+  if (targetFolderPath?.startsWith(`${node.path}/`)) return false;
+  return true;
 }
 
 function hasLoadedFolder(nodes: DataNode[], folderPath: string | null): boolean {
@@ -1305,6 +1473,22 @@ function rebaseMovedPath(path: string | null, previousPath: string, nextPath: st
   if (path === previousPath) return nextPath;
   if (path.startsWith(`${previousPath}/`)) return `${nextPath}${path.slice(previousPath.length)}`;
   return path;
+}
+
+function rebasePathByMoveOperations(path: string | null, operations: readonly MoveOperation[]): string | null {
+  return operations.reduce(
+    (nextPath, operation) => rebaseMovedPath(nextPath, operation.previousPath, operation.nextPath),
+    path,
+  );
+}
+
+function rebasePathSetByMoveOperations(paths: ReadonlySet<string>, operations: readonly MoveOperation[]): Set<string> {
+  const nextPaths = new Set<string>();
+  for (const path of paths) {
+    const nextPath = rebasePathByMoveOperations(path, operations);
+    if (nextPath) nextPaths.add(nextPath);
+  }
+  return nextPaths;
 }
 
 function joinDataPath(folderPath: string | null, name: string): string {

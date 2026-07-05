@@ -1,9 +1,9 @@
 import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import type { FilesVisibilitySettings, RightSidebarToolsSettings, SidebarNavigationLayout, ThemeMode } from "../../preferences";
+import type { DarkThemePreset, ExternalAppsSettings, FilesVisibilitySettings, LightThemePreset, RightSidebarToolsSettings, SidebarNavigationLayout, ThemeMode, TitlebarActionsSettings } from "../../preferences";
 
-export type SettingsSection = "account" | "workspace" | "editor" | "git" | "cloud" | "appearance" | "files";
+export type SettingsSection = "account" | "workspace" | "editor" | "git" | "cloud" | "appearance" | "files" | "external-apps";
 
 export type SettingsViewProps = {
   workspace: Workspace;
@@ -12,10 +12,14 @@ export type SettingsViewProps = {
   gitStatusLoading: boolean;
   gitStatusError: string | null;
   themeMode: ThemeMode;
+  lightThemePreset: LightThemePreset;
+  darkThemePreset: DarkThemePreset;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
   filesVisibilitySettings: FilesVisibilitySettings;
+  externalAppsSettings: ExternalAppsSettings;
   rightSidebarToolsSettings: RightSidebarToolsSettings;
+  titlebarActionsSettings: TitlebarActionsSettings;
   aiEditAssistEnabled: boolean;
   cloudEnabled: boolean;
   cloudSession: DesktopCloudSession | null;
@@ -27,10 +31,14 @@ export type SettingsViewProps = {
   puppyoneConfigError: string | null;
   updateState: DesktopUpdateState;
   onThemeModeChange: (mode: ThemeMode) => void;
+  onLightThemePresetChange: (preset: LightThemePreset) => void;
+  onDarkThemePresetChange: (preset: DarkThemePreset) => void;
   onFileIconThemeChange: (theme: FileIconThemeId) => void;
   onSidebarNavigationLayoutChange: (layout: SidebarNavigationLayout) => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
+  onExternalAppsSettingsChange: (settings: ExternalAppsSettings) => void;
   onRightSidebarToolsSettingsChange: (settings: RightSidebarToolsSettings) => void;
+  onTitlebarActionsSettingsChange: (settings: TitlebarActionsSettings) => void;
   onAiEditAssistEnabledChange: (enabled: boolean) => void;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;

@@ -73,6 +73,12 @@
       "vendor/shared-ui/**",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "public/logo-square.png",
+        "to": "logo-square.png"
+      }
+    ],
     "publish": [
       {
         "provider": "generic",

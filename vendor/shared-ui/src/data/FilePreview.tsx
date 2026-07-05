@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import type { DataNode, FileContent } from "../core/types";
+import type { AppPreviewController, DataNode, FileContent } from "../core/types";
 import { EditorHost } from "../editor/EditorHost";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../editor/viewerTypes";
@@ -26,6 +26,7 @@ export type FilePreviewProps = {
   htmlTrustMode?: MarkdownHtmlTrustMode;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  appPreview?: AppPreviewController | null;
 };
 
 export function FilePreview({
@@ -48,6 +49,7 @@ export function FilePreview({
   htmlTrustMode = "safe",
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
+  appPreview = null,
 }: FilePreviewProps) {
   if (!node) {
     if (emptySlot) return <>{emptySlot}</>;
@@ -108,6 +110,7 @@ export function FilePreview({
               htmlTrustMode={htmlTrustMode}
               markdownLinkGraph={markdownLinkGraph}
               markdownAssetUrlResolver={markdownAssetUrlResolver}
+              appPreview={appPreview}
               deferFallbackContent={deferFallbackContent}
             />
           </EditorPreviewBoundary>

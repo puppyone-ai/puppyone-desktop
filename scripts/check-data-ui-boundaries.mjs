@@ -36,9 +36,22 @@ const blockedDesktopImports = [
 const importPattern = /\b(?:import|export)\s+(?:type\s+)?(?:[^'"]*?\s+from\s+)?["']([^"']+)["']/g;
 const dynamicImportPattern = /\bimport\(\s*["']([^"']+)["']\s*\)/g;
 const sharedTreeSelectorPattern = /(^|[^A-Za-z0-9_-])\.(explorer-tree-shell|explorer-tree-root-scope|explorer-tree-scroll|explorer-tree-list|data-explorer-footer|tree-row|tree-row-content|tree-row-actions|tree-row-action-button|tree-icon-slot|tree-disclosure-marker|tree-label|tree-label-primary|tree-label-extension|tree-subtree-motion|tree-subtree-content|tree-meta-row|tree-status|tree-indent-guide)(?=[^A-Za-z0-9_-]|$)/g;
+const workspaceOpeningPrivateSymbols = [
+  "openWorkspaceInCurrentWindow",
+  "openWorkspaceInNewWindow",
+  "openCloudProjectInNewWindow",
+  "selectWorkspaceFolder",
+  "selectWorkspaceFolderInNewWindow",
+];
+const workspaceOpeningAllowedFiles = new Set([
+  path.join(repoRoot, "src", "lib", "localFiles.ts"),
+  path.join(repoRoot, "src", "lib", "workspaceOpening.ts"),
+  path.join(repoRoot, "src", "types", "electron.d.ts"),
+]);
 const errors = [
   ...findBoundaryErrors(checkedSrcDirs, blockedImports),
   ...findBoundaryErrors(desktopSrcDirs, blockedDesktopImports),
+  ...findDesktopWorkspaceOpeningErrors(desktopSrcDirs),
   ...findDesktopSharedTreeCssErrors([
     path.join(repoRoot, "src", "styles.css"),
   ]),
@@ -50,6 +63,10 @@ if (errors.length > 0) {
     if (error.kind === "css-selector") {
       console.error(
         `- ${path.relative(repoRoot, error.filePath)} defines "${error.specifier}" (${error.reason})`,
+      );
+    } else if (error.kind === "workspace-open-api") {
+      console.error(
+        `- ${path.relative(repoRoot, error.filePath)} references "${error.specifier}" (${error.reason})`,
       );
     } else {
       console.error(
@@ -144,4 +161,33 @@ function collectSharedTreeSelectors(source) {
   }
 
   return [...selectors].sort();
+}
+
+function findDesktopWorkspaceOpeningErrors(srcDirs) {
+  const boundaryErrors = [];
+  const symbolPatterns = workspaceOpeningPrivateSymbols.map((symbol) => ({
+    symbol,
+    pattern: new RegExp(`\\b${symbol}\\b`),
+  }));
+
+  for (const srcDir of srcDirs) {
+    for (const filePath of walk(srcDir)) {
+      if (!/\.(ts|tsx)$/.test(filePath)) continue;
+      if (workspaceOpeningAllowedFiles.has(filePath)) continue;
+
+      const source = readFileSync(filePath, "utf8");
+      for (const { symbol, pattern } of symbolPatterns) {
+        if (!pattern.test(source)) continue;
+
+        boundaryErrors.push({
+          kind: "workspace-open-api",
+          filePath,
+          specifier: symbol,
+          reason: "workspace opening lifecycle must go through src/lib/workspaceOpening.ts",
+        });
+      }
+    }
+  }
+
+  return boundaryErrors;
 }

@@ -7,10 +7,14 @@ import type {
   LastWorkspaceResult,
   PuppyoneWorkspaceConfig,
   RecentWorkspacesResult,
+  WorkspaceChooseExternalAppRequest,
   WorkspaceCreateEntryKind,
   WorkspaceCreateEntryResult,
+  WorkspaceExternalOpenTarget,
+  WorkspaceOpenEntryExternalRequest,
   WorkspaceImportEntriesResult,
   WorkspaceOpenResult,
+  WorkspaceResolveExternalOpenTargetRequest,
 } from "../types/electron";
 
 export type { Workspace };
@@ -25,6 +29,13 @@ export function createLocalDataPort(rootPath: string): DataPort {
       url: buildLocalFileUrl(rootPath, path),
     }),
     getFileUrl: (path) => buildLocalFileUrl(rootPath, path),
+    appPreview: {
+      start: (path) => getDesktopBridge().startAppPreview({ rootPath, path }),
+      restart: (path) => getDesktopBridge().restartAppPreview({ rootPath, path }),
+      stop: (path) => getDesktopBridge().stopAppPreview({ rootPath, path }),
+      getLogs: (path) => getDesktopBridge().getAppPreviewLogs({ rootPath, path }),
+      openExternal: (path) => getDesktopBridge().openAppPreviewExternal({ rootPath, path }).then(() => undefined),
+    },
     writeFile: (path, content) => getDesktopBridge().writeFile({ rootPath, path, content }),
     createFolder: (path) => {
       const { parentPath, name } = splitDataPath(path);
@@ -84,6 +95,30 @@ export async function revealWorkspaceEntryInFinder(rootPath: string, path: strin
   await getDesktopBridge().revealEntryInFinder({ rootPath, path });
 }
 
+export async function openWorkspaceEntryExternal(
+  request: WorkspaceOpenEntryExternalRequest,
+): Promise<{ ok: boolean; cancelled?: boolean }> {
+  return getDesktopBridge().openEntryExternal(request);
+}
+
+export async function resolveWorkspaceExternalOpenTarget(
+  request: WorkspaceResolveExternalOpenTargetRequest,
+): Promise<WorkspaceExternalOpenTarget> {
+  return getDesktopBridge().resolveExternalOpenTarget(request);
+}
+
+export async function listWorkspaceExternalOpenTargets(
+  request: WorkspaceResolveExternalOpenTargetRequest,
+): Promise<WorkspaceExternalOpenTarget[]> {
+  return getDesktopBridge().listExternalOpenTargets(request);
+}
+
+export async function chooseWorkspaceExternalApp(
+  request: WorkspaceChooseExternalAppRequest,
+): Promise<WorkspaceExternalOpenTarget | null> {
+  return getDesktopBridge().chooseExternalApp(request);
+}
+
 export async function forgetLastWorkspace(): Promise<void> {
   await getDesktopBridge().forgetLastWorkspace();
 }
@@ -98,6 +133,16 @@ export async function openWorkspaceInCurrentWindow(folderPath: string): Promise<
 
 export async function openWorkspaceInNewWindow(folderPath: string): Promise<WorkspaceOpenResult> {
   return getDesktopBridge().openWorkspaceInNewWindow(folderPath);
+}
+
+export async function openCloudProjectInNewWindow({
+  projectId,
+  name,
+}: {
+  projectId: string;
+  name: string;
+}): Promise<WorkspaceOpenResult> {
+  return getDesktopBridge().openCloudProjectInNewWindow({ projectId, name });
 }
 
 export async function selectWorkspaceFolder(): Promise<WorkspaceOpenResult | null> {

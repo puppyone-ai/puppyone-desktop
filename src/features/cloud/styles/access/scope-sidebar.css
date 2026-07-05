@@ -1,0 +1,284 @@
+.desktop-cloud-access-scope-sidebar {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.desktop-cloud-access-scope-sidebar-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 6px;
+  padding: 8px 8px 10px;
+  border-bottom: 1px solid var(--po-border-subtle);
+}
+
+.desktop-cloud-access-scope-search {
+  display: flex;
+  min-width: 0;
+  height: 30px;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: var(--po-control);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-access-scope-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--po-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.desktop-cloud-access-scope-search input::placeholder {
+  color: var(--po-text-subtle);
+}
+
+.desktop-cloud-access-filter-wrap {
+  position: relative;
+}
+
+.desktop-cloud-access-filter-button {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-access-filter-button:hover,
+.desktop-cloud-access-filter-button.active {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-filter-menu {
+  position: absolute;
+  z-index: 20;
+  top: 36px;
+  right: 0;
+  display: grid;
+  width: 150px;
+  gap: 1px;
+  padding: 4px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: var(--po-panel);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--po-shadow) 18%, transparent);
+}
+
+.desktop-cloud-access-filter-menu button {
+  display: flex;
+  width: 100%;
+  height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.desktop-cloud-access-filter-menu button:hover,
+.desktop-cloud-access-filter-menu button.active {
+  background: var(--po-selected);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-filter-menu button.active {
+  font-weight: 600;
+}
+
+.desktop-cloud-access-scope-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overflow-x: hidden;
+  padding: 6px 0;
+}
+
+.desktop-cloud-access-scope-row {
+  display: flex;
+  width: calc(100% - 12px);
+  min-height: 50px;
+  align-items: center;
+  box-sizing: border-box;
+  margin: 3px 6px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.desktop-cloud-access-scope-row:hover {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-scope-row.active {
+  background: var(--po-selected);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-scope-status {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 2px;
+  background: var(--po-text-disabled);
+}
+
+.desktop-cloud-access-scope-status.active {
+  background: var(--po-success);
+}
+
+.desktop-cloud-access-scope-row-content {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.desktop-cloud-access-scope-name,
+.desktop-cloud-access-scope-meta code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-access-scope-title-line {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.desktop-cloud-access-scope-name {
+  flex: 1;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 17px;
+}
+
+.desktop-cloud-access-scope-row.active .desktop-cloud-access-scope-name {
+  font-weight: 600;
+}
+
+.desktop-cloud-access-scope-meta {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding-left: 14px;
+}
+
+.desktop-cloud-access-scope-meta code {
+  flex: 1;
+  color: var(--po-text-subtle);
+  font-family: var(--po-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 15px;
+}
+
+.desktop-cloud-access-scope-row.active .desktop-cloud-access-scope-meta code {
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-access-scope-count {
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--po-border-subtle);
+  color: var(--po-text-muted);
+  font-family: var(--po-font-sans);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 18px;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.desktop-cloud-access-scope-row.active .desktop-cloud-access-scope-count {
+  background: color-mix(in srgb, var(--po-text) 10%, var(--po-panel) 90%);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-scope-empty {
+  padding: 18px 14px;
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.desktop-cloud-access-scope-sidebar-footer {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  padding: 8px;
+  border-top: 1px solid var(--po-divider);
+}
+
+.desktop-cloud-access-scope-sidebar-footer button {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.desktop-cloud-access-scope-sidebar-footer button:hover {
+  border-color: var(--po-border-strong);
+  background: var(--po-hover);
+  color: var(--po-text);
+}

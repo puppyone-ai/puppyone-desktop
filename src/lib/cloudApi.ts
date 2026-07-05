@@ -194,6 +194,13 @@ export type DesktopCloudScopePatch = {
   mode?: "r" | "rw";
 };
 
+export type DesktopCloudCreateScopeRequest = {
+  name: string;
+  path: string;
+  exclude?: string[];
+  mode?: "r" | "rw";
+};
+
 export type DesktopCloudConnector = {
   id: string;
   project_id: string;
@@ -214,6 +221,73 @@ export type DesktopCloudConnector = {
   updated_at?: string | null;
 };
 
+export type DesktopCloudConnectorPatch = {
+  name?: string;
+  direction?: string;
+  config?: Record<string, unknown>;
+  policy?: unknown;
+  oauth_connection_id?: number | null;
+  trigger?: Record<string, unknown> | null;
+  status?: string;
+};
+
+export type DesktopCloudWorkflowConfigField = {
+  key: string;
+  label: string;
+  type: "text" | "select" | "number" | "url";
+  required: boolean;
+  default: string | number | null;
+  options: { value: string; label: string }[] | null;
+  placeholder: string | null;
+  hint: string | null;
+};
+
+export type DesktopCloudWorkflowProviderSpec = {
+  provider: string;
+  display_name: string;
+  description: string | null;
+  auth: "none" | "oauth" | "optional_oauth" | "api_key" | "access_key";
+  creation_mode: "direct" | "bootstrap";
+  category: "datasource" | "agent" | "endpoint";
+  icon: string | null;
+  oauth_type?: string | null;
+  oauth_ui_type?: string | null;
+  default_sync_mode?: string;
+  supported_sync_modes?: string[];
+  supported_directions?: string[];
+  config_fields?: DesktopCloudWorkflowConfigField[];
+  icon_url?: string | null;
+};
+
+export type DesktopCloudWorkflowConnection = {
+  id: string;
+  project_id: string;
+  path: string | null;
+  direction: string;
+  provider: string;
+  config: Record<string, unknown>;
+  status: string;
+  last_sync_commit_id?: string | null;
+  error_message?: string | null;
+};
+
+export type DesktopCloudCreateWorkflowRequest = {
+  project_id: string;
+  provider: string;
+  config: Record<string, unknown>;
+  target_folder_path?: string;
+  target_path?: string;
+  direction?: string;
+  conflict_strategy?: string;
+  sync_mode?: "manual" | "scheduled" | "realtime";
+  trigger?: { type: string; schedule?: string; timezone?: string };
+};
+
+export type DesktopCloudCreateWorkflowResult = {
+  sync: DesktopCloudWorkflowConnection;
+  execution_result?: Record<string, unknown> | null;
+};
+
 export type DesktopCloudMcpEndpoint = {
   id: string;
   project_id: string;
@@ -229,6 +303,24 @@ export type DesktopCloudMcpEndpoint = {
   tools_config?: unknown;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+export type DesktopCloudCreateMcpEndpointRequest = {
+  project_id: string;
+  name?: string;
+  path?: string;
+  description?: string;
+  accesses?: Array<{ path: string; json_path?: string; readonly?: boolean }>;
+  tools_config?: unknown;
+};
+
+export type DesktopCloudUpdateMcpEndpointRequest = {
+  name?: string;
+  description?: string;
+  path?: string;
+  status?: string;
+  accesses?: Array<{ path: string; json_path?: string; readonly?: boolean }>;
+  tools_config?: unknown;
 };
 
 export type DesktopCloudRepoIdentity = {
@@ -522,6 +614,25 @@ export function listCloudScopes(
   return cloudApiRequest<DesktopCloudScope[]>(`/projects/${projectId}/scopes`, session, onSessionChange, {}, apiBaseUrl);
 }
 
+export function createCloudScope(
+  session: DesktopCloudSession,
+  projectId: string,
+  body: DesktopCloudCreateScopeRequest,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudScope> {
+  return cloudApiRequest<DesktopCloudScope>(
+    `/projects/${encodeURIComponent(projectId)}/scopes`,
+    session,
+    onSessionChange,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    apiBaseUrl,
+  );
+}
+
 export function listCloudConnectors(
   session: DesktopCloudSession,
   projectId: string,
@@ -529,6 +640,112 @@ export function listCloudConnectors(
   apiBaseUrl?: string | null,
 ): Promise<DesktopCloudConnector[]> {
   return cloudApiRequest<DesktopCloudConnector[]>(`/projects/${projectId}/connectors`, session, onSessionChange, {}, apiBaseUrl);
+}
+
+export function updateCloudConnector(
+  session: DesktopCloudSession,
+  projectId: string,
+  connectorId: string,
+  body: DesktopCloudConnectorPatch,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudConnector> {
+  return cloudApiRequest<DesktopCloudConnector>(
+    `/projects/${encodeURIComponent(projectId)}/connectors/${encodeURIComponent(connectorId)}`,
+    session,
+    onSessionChange,
+    {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    },
+    apiBaseUrl,
+  );
+}
+
+export function listCloudWorkflowProviderSpecs(
+  session: DesktopCloudSession,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudWorkflowProviderSpec[]> {
+  return cloudApiRequest<DesktopCloudWorkflowProviderSpec[]>("/integrations/connectors", session, onSessionChange, {}, apiBaseUrl);
+}
+
+export function createCloudWorkflow(
+  session: DesktopCloudSession,
+  body: DesktopCloudCreateWorkflowRequest,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudCreateWorkflowResult> {
+  return cloudApiRequest<DesktopCloudCreateWorkflowResult>(
+    "/integrations/connections",
+    session,
+    onSessionChange,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    apiBaseUrl,
+  );
+}
+
+export function refreshCloudWorkflowConnection(
+  session: DesktopCloudSession,
+  connectionId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<unknown> {
+  return cloudApiRequest<unknown>(
+    `/integrations/connections/${encodeURIComponent(connectionId)}/refresh`,
+    session,
+    onSessionChange,
+    { method: "POST", body: JSON.stringify({}) },
+    apiBaseUrl,
+  );
+}
+
+export function pauseCloudWorkflowConnection(
+  session: DesktopCloudSession,
+  connectionId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<unknown> {
+  return cloudApiRequest<unknown>(
+    `/integrations/connections/${encodeURIComponent(connectionId)}/pause`,
+    session,
+    onSessionChange,
+    { method: "POST", body: JSON.stringify({}) },
+    apiBaseUrl,
+  );
+}
+
+export function resumeCloudWorkflowConnection(
+  session: DesktopCloudSession,
+  connectionId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<unknown> {
+  return cloudApiRequest<unknown>(
+    `/integrations/connections/${encodeURIComponent(connectionId)}/resume`,
+    session,
+    onSessionChange,
+    { method: "POST", body: JSON.stringify({}) },
+    apiBaseUrl,
+  );
+}
+
+export function deleteCloudWorkflowConnection(
+  session: DesktopCloudSession,
+  connectionId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<unknown> {
+  return cloudApiRequest<unknown>(
+    `/integrations/connections/${encodeURIComponent(connectionId)}`,
+    session,
+    onSessionChange,
+    { method: "DELETE" },
+    apiBaseUrl,
+  );
 }
 
 export function listCloudMcpEndpoints(
@@ -542,6 +759,43 @@ export function listCloudMcpEndpoints(
     session,
     onSessionChange,
     {},
+    apiBaseUrl,
+  );
+}
+
+export function createCloudMcpEndpoint(
+  session: DesktopCloudSession,
+  body: DesktopCloudCreateMcpEndpointRequest,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudMcpEndpoint> {
+  return cloudApiRequest<DesktopCloudMcpEndpoint>(
+    "/mcp-endpoints",
+    session,
+    onSessionChange,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    apiBaseUrl,
+  );
+}
+
+export function updateCloudMcpEndpoint(
+  session: DesktopCloudSession,
+  endpointId: string,
+  body: DesktopCloudUpdateMcpEndpointRequest,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudMcpEndpoint> {
+  return cloudApiRequest<DesktopCloudMcpEndpoint>(
+    `/mcp-endpoints/${encodeURIComponent(endpointId)}`,
+    session,
+    onSessionChange,
+    {
+      method: "PUT",
+      body: JSON.stringify(body),
+    },
     apiBaseUrl,
   );
 }

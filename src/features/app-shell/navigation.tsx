@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
-import { Folder, Settings } from "lucide-react";
+import { ArrowRightLeft, Cloud, Folder, FolderOpen, Settings } from "lucide-react";
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import type { SidebarNavigationOrientation } from "../../preferences";
 import type { GitStatusEntry, GitStatusSnapshot } from "../../types/electron";
 import { AccessChainIcon, IntegrationsGridIcon } from "../cloud/accessFilters";
 
 export type DesktopSidebarIconComponent = (props: { size?: number; className?: string }) => ReactNode;
+export type DesktopWorkspaceSurfaceAction = {
+  kind: "switch-to-cloud" | "switch-to-local" | "open-locally";
+  disabled?: boolean;
+  onClick: () => void;
+};
 
 export function PuppyGitIcon({
   size = 15,
@@ -44,6 +49,7 @@ export function DesktopSidebarFooterNavigation({
   gitOperationLoading,
   gitStatus,
   workspaceChangeCount,
+  surfaceAction,
   onNavigate,
   onOpenSettings,
 }: {
@@ -54,6 +60,7 @@ export function DesktopSidebarFooterNavigation({
   gitOperationLoading: string | null;
   gitStatus: GitStatusSnapshot | null;
   workspaceChangeCount: number;
+  surfaceAction?: DesktopWorkspaceSurfaceAction | null;
   onNavigate: (view: DesktopView) => void;
   onOpenSettings: () => void;
 }) {
@@ -84,6 +91,7 @@ export function DesktopSidebarFooterNavigation({
         )}
       </div>
       <div className="desktop-sidebar-footer-actions desktop-sidebar-footer-actions-settings">
+        {surfaceAction && <DesktopWorkspaceSurfaceActionButton action={surfaceAction} />}
         <DesktopSidebarSettingsButton
           activeView={activeView}
           buttonClassName="desktop-sidebar-footer-button"
@@ -92,6 +100,51 @@ export function DesktopSidebarFooterNavigation({
       </div>
     </div>
   );
+}
+
+function DesktopWorkspaceSurfaceActionButton({
+  action,
+}: {
+  action: DesktopWorkspaceSurfaceAction;
+}) {
+  const config = getDesktopWorkspaceSurfaceActionConfig(action.kind);
+  return (
+    <button
+      className="desktop-sidebar-footer-button"
+      type="button"
+      title={config.title}
+      aria-label={config.title}
+      disabled={action.disabled}
+      onClick={action.onClick}
+    >
+      <span className="desktop-sidebar-surface-switch-icon" aria-hidden="true">
+        <ArrowRightLeft size={13} strokeWidth={2} />
+        <config.icon size={11} strokeWidth={2} />
+      </span>
+    </button>
+  );
+}
+
+function getDesktopWorkspaceSurfaceActionConfig(kind: DesktopWorkspaceSurfaceAction["kind"]) {
+  if (kind === "switch-to-cloud") {
+    return {
+      label: "Cloud",
+      title: "Switch to cloud project",
+      icon: Cloud,
+    };
+  }
+  if (kind === "switch-to-local") {
+    return {
+      label: "Local",
+      title: "Switch to local workspace",
+      icon: Folder,
+    };
+  }
+  return {
+    label: "Open local",
+    title: "Open locally",
+    icon: FolderOpen,
+  };
 }
 
 export function DesktopSidebarTopNavigation({

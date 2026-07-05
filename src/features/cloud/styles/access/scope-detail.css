@@ -1,0 +1,195 @@
+.desktop-cloud-access-scope-page > .desktop-cloud-access-detail {
+  overflow: hidden;
+}
+
+.desktop-cloud-access-web-detail {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--po-canvas);
+  animation: desktop-cloud-page-fade 160ms ease-out;
+  scrollbar-width: thin;
+  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+}
+
+.desktop-cloud-access-web-detail::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.desktop-cloud-access-web-detail::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.desktop-cloud-access-web-detail::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--po-scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+.desktop-cloud-access-web-rail {
+  width: min(100%, 900px);
+  min-width: 0;
+  margin: 0 auto;
+  padding: 20px 24px 40px;
+  box-sizing: border-box;
+}
+
+.desktop-cloud-access-web-scope-header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.desktop-cloud-access-web-scope-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.desktop-cloud-access-web-scope-copy h1 {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  color: var(--po-text);
+  font-family: var(--po-font-sans);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-access-web-aggregate,
+.desktop-cloud-access-web-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--po-text-muted);
+  font-family: var(--po-font-sans);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.desktop-cloud-access-web-aggregate strong {
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-cloud-access-web-aggregate.ready strong {
+  color: var(--po-success);
+}
+
+.desktop-cloud-access-web-aggregate.warning strong {
+  color: var(--po-warning);
+}
+
+.desktop-cloud-access-web-aggregate em {
+  color: var(--po-text-muted);
+  font-style: normal;
+  font-weight: 400;
+}
+
+.desktop-cloud-access-web-aggregate > span:not(.desktop-cloud-web-status-dot),
+.desktop-cloud-access-web-meta > span[aria-hidden="true"] {
+  color: var(--po-text-disabled);
+}
+
+.desktop-cloud-access-web-meta {
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.desktop-cloud-access-web-meta code {
+  max-width: 136px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text-muted);
+  font-family: var(--po-font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-access-key-copy {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--po-text-muted);
+  transform: translateY(2px);
+}
+
+.desktop-cloud-access-key-copy:not(:disabled):hover {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-key-copy:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.desktop-cloud-access-settings-button {
+  position: relative;
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.desktop-cloud-access-settings-button:hover,
+.desktop-cloud-access-settings-button.active {
+  border-color: var(--po-border-strong);
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-web-settings {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.desktop-cloud-access-section-label {
+  color: var(--po-text-subtle);
+  font-family: var(--po-font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 14px;
+  text-transform: uppercase;
+}
+
+.desktop-cloud-access-web-settings-body {
+  overflow: hidden;
+  padding: 14px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 10px;
+  background: var(--po-control);
+}

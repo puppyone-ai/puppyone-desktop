@@ -1,4 +1,4 @@
-import type { AiEditRequest, DataNode, FileContent, Workspace } from "@puppyone/shared-ui";
+import type { AiEditRequest, AppPreviewResult, DataNode, FileContent, Workspace } from "@puppyone/shared-ui";
 
 export type GitStatusEntry = {
   path: string;
@@ -366,6 +366,36 @@ export type WorkspaceRevealEntryRequest = {
   path: string;
 };
 
+export type WorkspaceOpenEntryExternalRequest = {
+  rootPath: string;
+  path: string;
+  strategy?: "system" | "app";
+  appPath?: string | null;
+  confirmExecutableFiles?: boolean;
+};
+
+export type WorkspaceExternalOpenTargetSource = "system" | "override" | "candidate" | "unknown";
+
+export type WorkspaceExternalOpenTarget = {
+  appName: string | null;
+  appPath: string | null;
+  bundleId: string | null;
+  extension: string | null;
+  iconDataUrl: string | null;
+  source: WorkspaceExternalOpenTargetSource;
+};
+
+export type WorkspaceResolveExternalOpenTargetRequest = {
+  rootPath: string;
+  path: string;
+  extension?: string | null;
+  overrideAppPath?: string | null;
+};
+
+export type WorkspaceChooseExternalAppRequest = {
+  extension?: string | null;
+};
+
 export type DesktopStoredCloudSession = {
   expires_in?: number;
   expires_at?: number;
@@ -479,6 +509,7 @@ declare global {
       showHomepage: () => Promise<{ ok: boolean }>;
       openWorkspaceInCurrentWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
       openWorkspaceInNewWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
+      openCloudProjectInNewWindow: (request: { projectId: string; name: string }) => Promise<WorkspaceOpenResult>;
       selectFolder: () => Promise<WorkspaceOpenResult | null>;
       selectFolderInNewWindow: () => Promise<WorkspaceOpenResult | null>;
       workspaceFromPath: (folderPath: string) => Promise<Workspace>;
@@ -502,6 +533,30 @@ declare global {
       importEntries: (request: WorkspaceImportEntriesRequest) => Promise<WorkspaceImportEntriesResult>;
       deleteEntry: (request: WorkspaceDeleteEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       revealEntryInFinder: (request: WorkspaceRevealEntryRequest) => Promise<{ ok: boolean }>;
+      openEntryExternal: (request: WorkspaceOpenEntryExternalRequest) => Promise<{ ok: boolean; cancelled?: boolean }>;
+      resolveExternalOpenTarget: (request: WorkspaceResolveExternalOpenTargetRequest) => Promise<WorkspaceExternalOpenTarget>;
+      listExternalOpenTargets: (request: WorkspaceResolveExternalOpenTargetRequest) => Promise<WorkspaceExternalOpenTarget[]>;
+      chooseExternalApp: (request: WorkspaceChooseExternalAppRequest) => Promise<WorkspaceExternalOpenTarget | null>;
+      startAppPreview: (request: {
+        rootPath: string;
+        path: string;
+      }) => Promise<AppPreviewResult>;
+      restartAppPreview: (request: {
+        rootPath: string;
+        path: string;
+      }) => Promise<AppPreviewResult>;
+      stopAppPreview: (request: {
+        rootPath: string;
+        path: string;
+      }) => Promise<AppPreviewResult>;
+      getAppPreviewLogs: (request: {
+        rootPath: string;
+        path: string;
+      }) => Promise<string>;
+      openAppPreviewExternal: (request: {
+        rootPath: string;
+        path: string;
+      }) => Promise<{ ok: boolean }>;
       watchWorkspace: (
         rootPath: string,
         callback: (event: WorkspaceChangedEvent) => void,

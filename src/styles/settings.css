@@ -400,6 +400,34 @@
   opacity: 0.62;
 }
 
+.desktop-settings-default-app-add .desktop-settings-label-stack {
+  display: grid;
+  gap: 2px;
+}
+
+.desktop-settings-default-app-add .desktop-settings-label-stack strong {
+  color: var(--po-text);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.desktop-settings-default-app-add .desktop-settings-label-stack small {
+  color: var(--po-text-subtle);
+  font-size: 11.5px;
+  font-weight: 560;
+}
+
+.desktop-settings-extension-input {
+  width: 86px;
+}
+
+.desktop-settings-row-action-group {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
 .desktop-settings-switch {
   position: relative;
   display: inline-flex;
@@ -525,6 +553,57 @@
   display: flex;
   min-height: 38px;
   color: var(--po-text-subtle);
+}
+
+.desktop-settings-external-app-list {
+  display: grid;
+}
+
+.desktop-settings-external-app-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--po-divider);
+}
+
+.desktop-settings-external-app-row:last-child {
+  border-bottom: 0;
+}
+
+.desktop-settings-external-app-icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  overflow: hidden;
+  border-radius: 5px;
+  color: var(--po-text-muted);
+}
+
+.desktop-settings-external-app-icon.fallback {
+  background: color-mix(in srgb, var(--po-text-muted) 13%, transparent);
+  color: var(--po-text);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.desktop-settings-external-app-icon img {
+  display: block;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.desktop-settings-external-app-loader {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: var(--po-text-muted);
 }
 
 .desktop-hosting-service-panel {

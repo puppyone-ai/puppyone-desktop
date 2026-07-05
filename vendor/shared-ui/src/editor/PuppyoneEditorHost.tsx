@@ -2,6 +2,7 @@
 
 import { resolveEditorViewer } from "./viewerRegistry";
 import type { EditorDocument, EditorSaveMode, MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "./viewerTypes";
+import type { AppPreviewController } from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
 
@@ -21,6 +22,7 @@ export type PuppyoneEditorHostProps = {
   htmlTrustMode?: MarkdownHtmlTrustMode;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  appPreview?: AppPreviewController | null;
 };
 
 export function PuppyoneEditorHost({
@@ -37,6 +39,7 @@ export function PuppyoneEditorHost({
   htmlTrustMode = "safe",
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
+  appPreview = null,
 }: PuppyoneEditorHostProps) {
   const { viewer, format } = resolveEditorViewer(document);
   const rawContent = viewer.allowPreviewContent === false
@@ -72,6 +75,7 @@ export function PuppyoneEditorHost({
         htmlTrustMode,
         markdownLinkGraph,
         markdownAssetUrlResolver,
+        appPreview,
         onSaveContent,
       })}
     </>

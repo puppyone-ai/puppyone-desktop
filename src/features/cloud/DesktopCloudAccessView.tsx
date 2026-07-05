@@ -1,120 +1,60 @@
-import { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Filter, Search } from "lucide-react";
 import {
-  getCloudRepoIdentity,
-  listCloudConnectors,
-  listCloudMcpEndpoints,
-  listCloudScopes,
   openCloudApp,
   type DesktopCloudConnector,
-  type DesktopCloudMcpEndpoint,
-  type DesktopCloudRepoIdentity,
-  type DesktopCloudScope,
   type DesktopCloudSession,
 } from "../../lib/cloudApi";
-import {
-  CLOUD_ACCESS_BUILTIN_FILTERS,
-  getCloudAccessFilterDescriptor,
-  type CloudAccessFilter,
-} from "./accessFilters";
+import { getCloudAccessFilterDescriptor, type CloudAccessFilter } from "./accessFilters";
 import { CloudProjectBrowserSignedOut } from "./components/ProjectBrowser";
 import { CloudWorkspaceLoadingState } from "./components/shared";
+import type { DesktopCloudAccessDataState } from "./data/useDesktopCloudAccessData";
 import { getCloudRouteWebPath } from "./routes/cloudRoutes";
 import { CloudAccessSection } from "./sections/access/AccessSection";
+import {
+  DesktopCloudProviderIcon,
+  getAccessMethodIconSize,
+  getAccessMethodTileProvider,
+  getDesktopCloudAccessMethodMeta,
+} from "./sections/access/accessProviders";
+import { isCloudAccessNavigationResource, type CloudAccessSurfaceRow } from "./sections/access/accessRows";
 import type { CloudWorkspaceSection } from "./types";
 import {
   formatProviderLabel,
   getCloudProviderIconUrl,
+  getScopeDisplayName,
+  getScopePathLabel,
   isCloudIntegrationConnector,
+  isConnectorActiveStatus,
   providerIcon,
-  unwrapSettled,
 } from "./utils";
-
-type DesktopCloudAccessState = {
-  scopes: DesktopCloudScope[];
-  connectors: DesktopCloudConnector[];
-  mcpEndpoints: DesktopCloudMcpEndpoint[];
-  identity: DesktopCloudRepoIdentity | null;
-  loading: boolean;
-  error: string | null;
-  warning: string | null;
-};
 
 export function DesktopCloudAccessView({
   projectId,
   cloudSession,
+  accessData,
   activeFilter,
+  activeAccessRowId,
   activeIntegrationProvider,
   sessionRestoring,
   onCloudSessionChange,
   onRefresh,
+  onSelectAccessRow,
 }: {
   projectId: string | null;
   cloudSession: DesktopCloudSession | null;
+  accessData: DesktopCloudAccessDataState;
   activeFilter: CloudAccessFilter;
+  activeAccessRowId: string | null;
   activeIntegrationProvider?: string | null;
   sessionRestoring: boolean;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onRefresh: () => void | Promise<void>;
+  onSelectAccessRow?: (rowId: string | null) => void;
 }) {
   const cloudApiBaseUrl = cloudSession?.api_base_url ?? null;
-  const [state, setState] = useState<DesktopCloudAccessState>(() => createCloudAccessState());
-
-  useEffect(() => {
-    if (!cloudSession || !projectId) {
-      setState(createCloudAccessState());
-      return undefined;
-    }
-
-    let cancelled = false;
-    const loadAccess = async () => {
-      setState((current) => ({
-        ...current,
-        loading: true,
-        error: null,
-        warning: null,
-      }));
-
-      const [scopesResult, connectorsResult, mcpResult, identityResult] = await Promise.allSettled([
-        listCloudScopes(cloudSession, projectId, onCloudSessionChange, cloudApiBaseUrl),
-        listCloudConnectors(cloudSession, projectId, onCloudSessionChange, cloudApiBaseUrl),
-        listCloudMcpEndpoints(cloudSession, projectId, onCloudSessionChange, cloudApiBaseUrl),
-        getCloudRepoIdentity(cloudSession, projectId, onCloudSessionChange, cloudApiBaseUrl),
-      ]);
-
-      if (cancelled) return;
-
-      const failures = [scopesResult, connectorsResult, mcpResult, identityResult]
-        .filter((result) => result.status === "rejected");
-      const allFailed = failures.length === 4;
-      const firstFailure = failures[0];
-      setState({
-        scopes: unwrapSettled(scopesResult) ?? [],
-        connectors: unwrapSettled(connectorsResult) ?? [],
-        mcpEndpoints: unwrapSettled(mcpResult) ?? [],
-        identity: unwrapSettled(identityResult),
-        loading: false,
-        error: allFailed && firstFailure?.status === "rejected"
-          ? getErrorMessage(firstFailure.reason, "Unable to load Cloud access.")
-          : null,
-        warning: !allFailed && failures.length > 0
-          ? "Some Cloud access details could not be loaded. Refresh after checking the backend connection."
-          : null,
-      });
-    };
-
-    void loadAccess().catch((error) => {
-      if (cancelled) return;
-      setState(createCloudAccessState({
-        loading: false,
-        error: getErrorMessage(error, "Unable to load Cloud access."),
-      }));
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [cloudApiBaseUrl, cloudSession, onCloudSessionChange, projectId]);
+  const accessNavigationRows = accessData.accessRows.filter(isCloudAccessNavigationResource);
+  const selectedAccessRowId = activeAccessRowId ?? accessNavigationRows[0]?.id ?? null;
 
   if (sessionRestoring && !cloudSession) {
     return (
@@ -153,22 +93,30 @@ export function DesktopCloudAccessView({
   }
 
   return (
-    <div className={`desktop-cloud-main-view ${activeFilter === "integrations" ? "desktop-cloud-integrations-main-view" : ""}`}>
-      <div className={`desktop-cloud-page-shell ${activeFilter === "integrations" ? "desktop-cloud-integrations-page-shell" : ""}`}>
-        {state.error && <div className="desktop-cloud-main-alert">{state.error}</div>}
-        {state.warning && <div className="desktop-cloud-main-alert">{state.warning}</div>}
+    <div className={`desktop-cloud-main-view desktop-cloud-access-main-view ${activeFilter === "integrations" ? "desktop-cloud-integrations-main-view" : ""}`}>
+      <div className={`desktop-cloud-page-shell desktop-cloud-access-page-shell ${activeFilter === "integrations" ? "desktop-cloud-integrations-page-shell" : ""}`}>
+        {accessData.error && <div className="desktop-cloud-main-alert">{accessData.error}</div>}
+        {accessData.warning && <div className="desktop-cloud-main-alert">{accessData.warning}</div>}
         <CloudAccessSection
           projectId={projectId}
+          cloudSession={cloudSession}
           apiBaseUrl={cloudApiBaseUrl}
-          identity={state.identity}
-          scopes={state.scopes}
-          connectors={state.connectors}
-          mcpEndpoints={state.mcpEndpoints}
+          identity={accessData.identity}
+          scopes={accessData.scopeRows}
+          connectors={accessData.connectors}
+          connectorsByScope={accessData.connectorsByScope}
+          mcpEndpoints={accessData.mcpEndpoints}
+          mcpEndpointsByScope={accessData.mcpEndpointsByScope}
           filter={activeFilter}
+          activeAccessRowId={selectedAccessRowId}
           integrationProviderFilter={activeIntegrationProvider ?? null}
-          loading={state.loading}
+          loading={accessData.loading}
+          onCloudSessionChange={onCloudSessionChange}
+          onRefresh={accessData.reload}
+          onSelectAccessRow={onSelectAccessRow}
           onOpenProject={handleOpenProject}
           onOpenIntegrations={handleOpenIntegrations}
+          sidebarOwnsHeader={activeFilter === "all"}
         />
       </div>
     </div>
@@ -176,128 +124,115 @@ export function DesktopCloudAccessView({
 }
 
 export function DesktopCloudAccessSidebar({
-  activeFilter,
-  onSelectFilter,
+  accessData,
+  activeAccessRowId,
+  onSelectAccessRow,
 }: {
-  activeFilter: CloudAccessFilter;
-  onSelectFilter: (filter: CloudAccessFilter) => void;
+  accessData: DesktopCloudAccessDataState;
+  activeAccessRowId: string | null;
+  onSelectAccessRow: (rowId: string | null) => void;
 }) {
-  const [allExpanded, setAllExpanded] = useState(true);
-  const allAccess = getCloudAccessFilterDescriptor("all");
-  const AllIcon = allAccess.icon;
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const resourceRows = useMemo(
+    () => accessData.accessRows.filter(isCloudAccessNavigationResource),
+    [accessData.accessRows],
+  );
+  const filteredRows = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return resourceRows.filter((row) => {
+      const meta = getDesktopCloudAccessMethodMeta(row.surface);
+      const active = isConnectorActiveStatus(row.surface.status);
+      if (filter === "active" && !active) return false;
+      if (filter === "inactive" && active) return false;
+      if (!normalizedQuery) return true;
+      return `${meta.title} ${row.surface.title} ${row.surface.provider} ${getScopeDisplayName(row.scope)} ${getScopePathLabel(row.scope)} ${row.scope.path ?? ""}`
+        .toLowerCase()
+        .includes(normalizedQuery);
+    });
+  }, [filter, query, resourceRows]);
+  const selectedAccessRowId = activeAccessRowId ?? resourceRows[0]?.id ?? null;
 
   return (
-    <section className="desktop-tool-sidebar desktop-cloud-service-sidebar desktop-cloud-access-type-sidebar">
-      <div className="desktop-tool-sidebar-list desktop-cloud-sidebar-list">
-        <nav className="desktop-cloud-sidebar-nav" aria-label="Cloud access types">
-          <div className="desktop-cloud-access-nav-tree">
-            <div className="desktop-cloud-access-nav-parent-row">
-              <button
-                className={`desktop-tool-sidebar-row desktop-cloud-sidebar-nav-row desktop-cloud-access-nav-parent ${activeFilter === "all" ? "active" : ""}`}
-                type="button"
-                aria-current={activeFilter === "all" ? "page" : undefined}
-                onClick={() => onSelectFilter("all")}
-              >
-                <span className="desktop-cloud-sidebar-nav-icon">
-                  <AllIcon size={15} />
-                </span>
-                <span className="desktop-cloud-sidebar-nav-label">{allAccess.label}</span>
-              </button>
-              <button
-                className={`desktop-cloud-access-nav-toggle ${allExpanded ? "expanded" : ""}`}
-                type="button"
-                aria-label={allExpanded ? "Collapse access types" : "Expand access types"}
-                aria-expanded={allExpanded}
-                onClick={() => setAllExpanded((expanded) => !expanded)}
-              >
-                <ChevronDown size={14} />
-              </button>
+    <section className="desktop-tool-sidebar desktop-cloud-service-sidebar desktop-cloud-access-scope-sidebar">
+      <div className="desktop-cloud-access-sidebar-page-header">
+        <div className="desktop-cloud-access-page-title-group">
+          <span className="desktop-cloud-access-page-title">Access</span>
+          <span className="desktop-cloud-access-count-badge">{accessData.loading ? 0 : resourceRows.length}</span>
+        </div>
+      </div>
+      <div className="desktop-cloud-access-scope-sidebar-toolbar">
+        <label className="desktop-cloud-access-scope-search">
+          <Search size={14} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search access"
+          />
+        </label>
+        <div className="desktop-cloud-access-filter-wrap">
+          <button
+            className={`desktop-cloud-access-filter-button ${filter !== "all" || filterOpen ? "active" : ""}`}
+            type="button"
+            aria-label="Filter access"
+            aria-expanded={filterOpen}
+            onClick={() => setFilterOpen((open) => !open)}
+          >
+            <Filter size={14} />
+          </button>
+          {filterOpen && (
+            <div className="desktop-cloud-access-filter-menu">
+              {(["all", "active", "inactive"] as const).map((item) => (
+                <button
+                  key={item}
+                  className={filter === item ? "active" : ""}
+                  type="button"
+                  onClick={() => {
+                    setFilter(item);
+                    setFilterOpen(false);
+                  }}
+                >
+                  <span>{item === "all" ? "All access" : item === "active" ? "Active" : "Inactive"}</span>
+                  {filter === item && <span aria-hidden="true">✓</span>}
+                </button>
+              ))}
             </div>
-            {allExpanded && (
-              <div className="desktop-cloud-access-nav-children" role="group" aria-label="All Access types">
-                {CLOUD_ACCESS_BUILTIN_FILTERS.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.id}
-                      className={`desktop-tool-sidebar-row desktop-cloud-sidebar-nav-row desktop-cloud-access-nav-child ${activeFilter === item.id ? "active" : ""}`}
-                      type="button"
-                      aria-current={activeFilter === item.id ? "page" : undefined}
-                      onClick={() => onSelectFilter(item.id)}
-                    >
-                      <span className="desktop-cloud-sidebar-nav-icon">
-                        <Icon size={14} />
-                      </span>
-                      <span className="desktop-cloud-sidebar-nav-label">{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </nav>
+          )}
+        </div>
+      </div>
+      <div className="desktop-tool-sidebar-list desktop-cloud-sidebar-list desktop-cloud-access-scope-list" role="listbox" aria-label="Cloud access resources">
+        {accessData.loading && filteredRows.length === 0 ? (
+          <div className="desktop-cloud-access-scope-empty">Loading access</div>
+        ) : filteredRows.length === 0 ? (
+          <div className="desktop-cloud-access-scope-empty">No matching access.</div>
+        ) : filteredRows.map((row) => (
+          <DesktopCloudAccessResourceRow
+            key={row.id}
+            row={row}
+            selected={row.id === selectedAccessRowId}
+            onSelect={() => onSelectAccessRow(row.id)}
+          />
+        ))}
       </div>
     </section>
   );
 }
 
-type DesktopCloudIntegrationsSidebarState = {
-  connectors: DesktopCloudConnector[];
-  loading: boolean;
-  error: string | null;
-};
-
 export function DesktopCloudIntegrationsSidebar({
-  projectId,
-  cloudSession,
+  accessData,
   activeProvider,
-  onCloudSessionChange,
   onSelectProvider,
 }: {
-  projectId: string | null;
-  cloudSession: DesktopCloudSession | null;
+  accessData: DesktopCloudAccessDataState;
   activeProvider: string | null;
-  onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onSelectProvider: (provider: string | null) => void;
 }) {
   const integrations = getCloudAccessFilterDescriptor("integrations");
   const IntegrationsIcon = integrations.icon;
-  const cloudApiBaseUrl = cloudSession?.api_base_url ?? null;
-  const [state, setState] = useState<DesktopCloudIntegrationsSidebarState>({
-    connectors: [],
-    loading: false,
-    error: null,
-  });
-  const integrationConnectors = state.connectors.filter(isCloudIntegrationConnector);
+  const integrationConnectors = accessData.connectors.filter(isCloudIntegrationConnector);
   const providerGroups = getIntegrationSidebarProviderGroups(integrationConnectors);
   const providerKey = providerGroups.map((group) => group.provider).join("|");
-
-  useEffect(() => {
-    if (!cloudSession || !projectId) {
-      setState({ connectors: [], loading: false, error: null });
-      return undefined;
-    }
-
-    let cancelled = false;
-    setState((current) => ({ ...current, loading: true, error: null }));
-    void listCloudConnectors(cloudSession, projectId, onCloudSessionChange, cloudApiBaseUrl)
-      .then((connectors) => {
-        if (cancelled) return;
-        setState({ connectors, loading: false, error: null });
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setState({
-          connectors: [],
-          loading: false,
-          error: getErrorMessage(error, "Unable to load integrations."),
-        });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [cloudApiBaseUrl, cloudSession, onCloudSessionChange, projectId]);
 
   useEffect(() => {
     if (activeProvider && !providerKey.split("|").includes(activeProvider)) {
@@ -345,19 +280,57 @@ export function DesktopCloudIntegrationsSidebar({
                 </button>
               );
             })}
-            {state.loading && providerGroups.length === 0 && (
+            {accessData.loading && providerGroups.length === 0 && (
               <div className="desktop-cloud-integrations-nav-empty" role="status">Loading integrations</div>
             )}
-            {!state.loading && state.error && (
-              <div className="desktop-cloud-integrations-nav-empty" role="status">{state.error}</div>
+            {!accessData.loading && accessData.error && (
+              <div className="desktop-cloud-integrations-nav-empty" role="status">{accessData.error}</div>
             )}
-            {!state.loading && !state.error && providerGroups.length === 0 && (
+            {!accessData.loading && !accessData.error && providerGroups.length === 0 && (
               <div className="desktop-cloud-integrations-nav-empty">No active integrations</div>
             )}
           </div>
         </nav>
       </div>
     </section>
+  );
+}
+
+function DesktopCloudAccessResourceRow({
+  row,
+  selected,
+  onSelect,
+}: {
+  row: CloudAccessSurfaceRow;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const meta = getDesktopCloudAccessMethodMeta(row.surface);
+  const scopePath = getScopePathLabel(row.scope);
+  const active = isConnectorActiveStatus(row.surface.status);
+  const tileProvider = getAccessMethodTileProvider(row.surface.provider);
+  const iconSize = getAccessMethodIconSize(row.surface.provider);
+
+  return (
+    <button
+      className={`desktop-cloud-access-scope-row desktop-cloud-access-resource-row ${selected ? "active" : ""}`}
+      type="button"
+      role="option"
+      aria-selected={selected}
+      title={`${meta.title} · ${getScopeDisplayName(row.scope)} · ${scopePath}`}
+      onClick={onSelect}
+    >
+      <span className={`desktop-cloud-access-resource-icon ${tileProvider}`} aria-hidden="true">
+        <DesktopCloudProviderIcon provider={row.surface.provider} size={iconSize === 34 ? 18 : iconSize} />
+      </span>
+      <span className="desktop-cloud-access-scope-row-content">
+        <span className="desktop-cloud-access-scope-title-line">
+          <span className={`desktop-cloud-access-scope-status ${active ? "active" : ""}`} aria-hidden="true" />
+          <span className="desktop-cloud-access-scope-name">{meta.title}</span>
+          <code className="desktop-cloud-access-resource-path" title={scopePath}>{scopePath}</code>
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -387,21 +360,4 @@ function handleOpenProject(projectId: string, section: CloudWorkspaceSection = "
 
 function handleOpenIntegrations(projectId: string) {
   openCloudApp(`/projects/${encodeURIComponent(projectId)}/workflows`);
-}
-
-function createCloudAccessState(overrides: Partial<DesktopCloudAccessState> = {}): DesktopCloudAccessState {
-  return {
-    scopes: [],
-    connectors: [],
-    mcpEndpoints: [],
-    identity: null,
-    loading: false,
-    error: null,
-    warning: null,
-    ...overrides,
-  };
-}
-
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
 }

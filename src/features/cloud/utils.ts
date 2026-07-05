@@ -235,14 +235,9 @@ export function countScopeAccessSurfaces(
   connectors: DesktopCloudConnector[],
   endpointCount: number,
 ) {
-  const cliConnector = connectors.find((connector) => connector.provider === "cli");
-  const gitConnector = connectors.find((connector) => (
-    connector.provider === "filesystem" ||
-    connector.provider === "git" ||
-    connector.provider === "git_remote"
-  ));
-  const thirdPartyCount = connectors.filter((connector) => connector !== cliConnector && connector !== gitConnector).length;
-  return 2 + endpointCount + thirdPartyCount;
+  void scope;
+  const thirdPartyCount = connectors.filter(isCloudIntegrationConnector).length;
+  return 2 + Math.max(1, endpointCount) + thirdPartyCount;
 }
 
 export function scopeMatchesMcpEndpoint(scope: DesktopCloudScope, endpoint: DesktopCloudMcpEndpoint) {

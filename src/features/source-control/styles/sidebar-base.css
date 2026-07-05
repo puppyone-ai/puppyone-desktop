@@ -11,18 +11,18 @@
 }
 
 .desktop-git-sidebar {
-  --git-sidebar-left-gap: 5px;
-  --git-sidebar-right-gap: 5px;
+  --git-sidebar-left-gap: var(--desktop-sidebar-row-left-gap);
+  --git-sidebar-right-gap: var(--desktop-sidebar-row-right-gap);
   --git-sidebar-scrollbar-width: var(--desktop-sidebar-scrollbar-width, 4px);
   --git-sidebar-scroll-row-right-gap: max(0px, calc(var(--git-sidebar-right-gap) - var(--git-sidebar-scrollbar-width)));
   --git-sidebar-scroll-row-width: calc(100% - var(--git-sidebar-left-gap) - var(--git-sidebar-scroll-row-right-gap));
   --git-sidebar-row-width: calc(100% - var(--git-sidebar-left-gap) - var(--git-sidebar-right-gap));
   --git-sidebar-block-width: calc(100% - var(--git-sidebar-left-gap) - var(--git-sidebar-right-gap));
-  --git-sidebar-control-left-gap: 8px;
-  --git-sidebar-control-right-gap: 8px;
+  --git-sidebar-control-left-gap: var(--desktop-sidebar-row-left-gap);
+  --git-sidebar-control-right-gap: var(--desktop-sidebar-row-right-gap);
   --git-sidebar-control-width: calc(100% - var(--git-sidebar-control-left-gap) - var(--git-sidebar-control-right-gap));
-  --git-sidebar-content-left: 7px;
-  --git-sidebar-content-right: 7px;
+  --git-sidebar-content-left: var(--desktop-sidebar-row-content-left);
+  --git-sidebar-content-right: var(--desktop-sidebar-row-content-right);
   --git-section-action-size: 28px;
   --git-section-body-top-gap: 2px;
   --git-section-divider-height: 12px;

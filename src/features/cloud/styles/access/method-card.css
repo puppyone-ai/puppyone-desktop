@@ -1,0 +1,339 @@
+.desktop-cloud-access-method-list {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  margin: 18px 0 10px;
+}
+
+.desktop-cloud-access-method-card {
+  display: grid;
+  min-width: 0;
+  min-height: 132px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 240px);
+  align-items: stretch;
+  column-gap: 16px;
+  row-gap: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 16px 18px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: var(--po-canvas);
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.desktop-cloud-access-method-card:hover {
+  background: color-mix(in srgb, var(--po-panel) 78%, var(--po-control) 22%);
+}
+
+.desktop-cloud-access-method-card.expanded {
+  border-color: var(--po-border-strong);
+  background: color-mix(in srgb, var(--po-panel) 72%, var(--po-control) 28%);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--po-shadow) 16%, transparent);
+}
+
+.desktop-cloud-access-method-card.remote {
+  min-height: 84px;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+}
+
+.desktop-cloud-access-method-card.mcp-placeholder {
+  margin-bottom: 0;
+}
+
+.desktop-cloud-access-method-info {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.desktop-cloud-access-method-icon {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: var(--po-hover);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-access-method-icon.cli {
+  border-color: var(--po-accent);
+  background: var(--po-accent);
+  color: var(--po-text-inverse);
+  box-shadow: 0 1px 2px var(--po-shadow);
+}
+
+.desktop-cloud-access-method-icon.git {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  border-color: color-mix(in srgb, #ef4a37 22%, var(--po-border-subtle) 78%);
+  border-radius: 7px;
+  background: color-mix(in srgb, #ef4a37 9%, var(--po-panel) 91%);
+  color: #d94939;
+}
+
+.desktop-cloud-access-method-card.expanded .desktop-cloud-access-method-icon.git {
+  border-color: color-mix(in srgb, #ef4a37 34%, var(--po-border-strong) 66%);
+  background: color-mix(in srgb, #ef4a37 16%, var(--po-panel) 84%);
+  box-shadow: 0 1px 2px color-mix(in srgb, #ef4a37 18%, transparent);
+}
+
+.desktop-cloud-access-git-brand-icon {
+  display: block;
+  width: 34px;
+  height: 34px;
+  border-radius: 5px;
+}
+
+.desktop-cloud-access-method-icon.mcp,
+.desktop-cloud-access-method-icon.vm,
+.desktop-cloud-access-method-icon.remote,
+.desktop-cloud-access-method-icon.integration {
+  border-color: var(--po-border);
+  background: var(--po-hover);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-access-method-main {
+  display: flex;
+  min-width: 0;
+  min-height: 96px;
+  flex: 1;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.desktop-cloud-access-method-card.remote .desktop-cloud-access-method-main {
+  min-height: 0;
+  gap: 5px;
+}
+
+.desktop-cloud-access-method-title-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.desktop-cloud-access-method-title-line h2 {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  color: var(--po-text);
+  font-family: var(--po-font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-access-method-title-line > span[aria-hidden="true"] {
+  color: var(--po-text-disabled);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.desktop-cloud-access-method-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.desktop-cloud-access-method-status.active {
+  color: var(--po-success);
+}
+
+.desktop-cloud-access-method-status.off {
+  color: var(--po-text-disabled);
+}
+
+.desktop-cloud-access-method-status.error {
+  color: var(--po-danger);
+}
+
+.desktop-cloud-access-method-main p {
+  margin: 0;
+  color: var(--po-text-muted);
+  font-family: var(--po-font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.desktop-cloud-access-method-actions {
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.desktop-cloud-access-method-outline-button,
+.desktop-cloud-access-method-remote-button {
+  display: inline-flex;
+  height: 30px;
+  min-width: 132px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid var(--po-border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font-family: var(--po-font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+.desktop-cloud-access-method-outline-button:hover {
+  border-color: var(--po-border-strong);
+  background: color-mix(in srgb, var(--po-panel) 72%, var(--po-control) 28%);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-method-outline-button.active {
+  border-color: var(--po-border-strong);
+  background: color-mix(in srgb, var(--po-control) 76%, var(--po-panel) 24%);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-method-expanded-chevron {
+  transform: rotate(180deg);
+}
+
+.desktop-cloud-access-method-remote-button {
+  min-width: 112px;
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-access-method-remote-button:hover {
+  border-color: var(--po-border-strong);
+  background: color-mix(in srgb, var(--po-panel) 72%, var(--po-control) 28%);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-method-remote-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.desktop-cloud-access-method-preview {
+  position: relative;
+  min-width: 0;
+  min-height: 96px;
+  overflow: hidden;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--po-inset) 92%, var(--po-panel) 8%);
+}
+
+.desktop-cloud-access-method-preview pre {
+  max-height: 96px;
+  overflow: hidden;
+  margin: 0;
+  padding: 9px 10px 30px;
+  color: color-mix(in srgb, var(--po-text) 58%, var(--po-text-muted) 42%);
+  font-family: var(--po-font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.desktop-cloud-access-method-preview-fade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--po-inset) 18%, transparent) 0%,
+    color-mix(in srgb, var(--po-inset) 92%, var(--po-panel) 8%) 82%
+  );
+  pointer-events: none;
+}
+
+.desktop-cloud-access-method-copy-button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid var(--po-text);
+  border-radius: 999px;
+  background: var(--po-text);
+  color: var(--po-canvas);
+  font-family: var(--po-font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--po-shadow) 30%, transparent);
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, opacity 0.14s ease;
+}
+
+.desktop-cloud-access-method-copy-button:hover {
+  background: color-mix(in srgb, var(--po-text) 90%, var(--po-canvas) 10%);
+}
+
+.desktop-cloud-access-method-copy-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  box-shadow: none;
+}
+
+.desktop-cloud-access-method-expanded-detail {
+  display: grid;
+  min-width: 0;
+  grid-column: 1 / -1;
+  gap: 12px;
+  margin: 0 -18px -16px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--po-border-subtle);
+  background: color-mix(in srgb, var(--po-control) 76%, var(--po-panel) 24%);
+}
+
+.desktop-cloud-access-method-command-list {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.desktop-cloud-access-method-expanded-note {
+  margin: 0;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.desktop-cloud-access-method-expanded-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--po-border);
+  border-radius: 8px;
+  background: var(--po-border);
+}

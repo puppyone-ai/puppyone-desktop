@@ -9,6 +9,7 @@ import {
 const DEFAULT_SESSION_STATE_FILENAME = "desktop-cloud-session.json";
 const SESSION_REFRESH_SKEW_MS = 60_000;
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+const OAUTH_START_COOLDOWN_MS = 2_000;
 
 export function createCloudAuthService({
   app,
@@ -20,6 +21,8 @@ export function createCloudAuthService({
 }) {
   const callbackOrigin = `${protocol}://auth`;
   const pendingOAuthStates = new Map();
+  const pendingOAuthStarts = new Map();
+  const pendingOAuthStartCooldowns = new Set();
 
   function registerProtocol() {
     try {
@@ -86,28 +89,45 @@ export function createCloudAuthService({
 
   async function startOAuth({ apiBase, provider }) {
     const normalizedProvider = normalizeOAuthProvider(provider);
-    const start = await requestCloudApi(apiBase, "/auth/desktop/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const startKey = getOAuthStartKey(apiBase, normalizedProvider);
+    const existing = pendingOAuthStarts.get(startKey);
+    if (existing) return existing;
+
+    const request = (async () => {
+      const start = await requestCloudApi(apiBase, "/auth/desktop/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: normalizedProvider,
+          callback_url: `${callbackOrigin}/callback`,
+        }),
+      });
+      const state = requireNonEmptyString(start?.state, "Cloud sign-in start did not return state.");
+      const loginUrl = requireHttpUrl(start?.login_url, "Cloud sign-in start did not return a browser URL.");
+      const timeout = setTimeout(() => {
+        pendingOAuthStates.delete(state);
+      }, OAUTH_STATE_TTL_MS);
+
+      pendingOAuthStates.set(state, {
+        apiBase,
         provider: normalizedProvider,
-        callback_url: `${callbackOrigin}/callback`,
-      }),
-    });
-    const state = requireNonEmptyString(start?.state, "Cloud sign-in start did not return state.");
-    const loginUrl = requireHttpUrl(start?.login_url, "Cloud sign-in start did not return a browser URL.");
-    const timeout = setTimeout(() => {
-      pendingOAuthStates.delete(state);
-    }, OAUTH_STATE_TTL_MS);
+        timeout,
+      });
 
-    pendingOAuthStates.set(state, {
-      apiBase,
-      provider: normalizedProvider,
-      timeout,
-    });
+      await shell.openExternal(loginUrl);
+      return { ok: true };
+    })();
 
-    await shell.openExternal(loginUrl);
-    return { ok: true };
+    pendingOAuthStarts.set(startKey, request);
+    try {
+      return await request;
+    } finally {
+      const timeout = setTimeout(() => {
+        if (pendingOAuthStarts.get(startKey) === request) pendingOAuthStarts.delete(startKey);
+        pendingOAuthStartCooldowns.delete(timeout);
+      }, OAUTH_START_COOLDOWN_MS);
+      pendingOAuthStartCooldowns.add(timeout);
+    }
   }
 
   async function handleCallback(callbackUrl) {
@@ -193,6 +213,11 @@ export function createCloudAuthService({
       clearTimeout(state.timeout);
     }
     pendingOAuthStates.clear();
+    for (const timeout of pendingOAuthStartCooldowns) {
+      clearTimeout(timeout);
+    }
+    pendingOAuthStartCooldowns.clear();
+    pendingOAuthStarts.clear();
   }
 
   async function refreshSession(session, apiBase) {
@@ -342,6 +367,10 @@ export function createCloudAuthService({
     const pending = pendingOAuthStates.get(state);
     if (pending) clearTimeout(pending.timeout);
     pendingOAuthStates.delete(state);
+  }
+
+  function getOAuthStartKey(apiBase, provider) {
+    return `${apiBase}\n${provider ?? ""}`;
   }
 
   function broadcastSessionChanged(session) {

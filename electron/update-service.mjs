@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import path from "node:path";
 import updaterPackage from "electron-updater";
 import log from "electron-log";
 
@@ -391,7 +393,66 @@ function getDisabledReason(app, forceDevUpdateConfig) {
   if (!app.isPackaged && !forceDevUpdateConfig) {
     return "Auto updates are disabled in development builds.";
   }
+  if (process.platform === "darwin" && !forceDevUpdateConfig) {
+    const signatureStatus = getMacCodeSignatureStatus(app);
+    if (!signatureStatus.canAutoUpdate) return signatureStatus.reason;
+  }
   return null;
+}
+
+function getMacCodeSignatureStatus(app) {
+  const appPath = getMacAppBundlePath(app);
+  const result = spawnSync("/usr/bin/codesign", ["-dv", "--verbose=4", appPath], {
+    encoding: "utf8",
+    timeout: 3000,
+  });
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+
+  if (result.error) {
+    return {
+      canAutoUpdate: false,
+      reason: `Auto updates are disabled because the macOS code signature could not be inspected: ${result.error.message}`,
+    };
+  }
+
+  if (result.status !== 0) {
+    return {
+      canAutoUpdate: false,
+      reason: "Auto updates are disabled because this macOS build is not code signed.",
+    };
+  }
+
+  if (/Signature=adhoc/im.test(output)) {
+    return {
+      canAutoUpdate: false,
+      reason: "Auto updates are disabled because this macOS build is ad-hoc signed.",
+    };
+  }
+
+  const authorities = Array.from(output.matchAll(/^Authority=(.+)$/gim), (match) => match[1]?.trim() ?? "");
+  const hasReleaseAuthority = authorities.some((authority) => (
+    /^Developer ID Application:/i.test(authority)
+      || /^Apple Distribution:/i.test(authority)
+      || /^3rd Party Mac Developer Application:/i.test(authority)
+  ));
+
+  if (hasReleaseAuthority) {
+    return {
+      canAutoUpdate: true,
+      reason: null,
+    };
+  }
+
+  return {
+    canAutoUpdate: false,
+    reason: "Auto updates are disabled because this macOS build is not signed with a release certificate.",
+  };
+}
+
+function getMacAppBundlePath(app) {
+  const executablePath = app.getPath("exe");
+  const appBundlePath = path.dirname(path.dirname(path.dirname(executablePath)));
+  return appBundlePath.toLowerCase().endsWith(".app") ? appBundlePath : executablePath;
 }
 
 function normalizeUpdateChannel(value) {

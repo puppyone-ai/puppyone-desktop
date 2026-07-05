@@ -102,7 +102,7 @@ export function CloudServiceMainView({
     setCloudAction({ kind: "connect", projectId: project.id, message: null, error: null });
     try {
       const identity = await getCloudRepoIdentity(effectiveCloudSession, project.id, onCloudSessionChange, cloudApiBaseUrl);
-      await onConfigureCloudRemote(identity.url);
+      await onConfigureCloudRemote(identity.url, project.id);
       setSelectedCloudProjectId(project.id);
       setCloudAction({
         kind: null,
@@ -216,5 +216,5 @@ export function CloudServiceMainView({
 }
 
 function shouldLoadAggregateProjectDetails(section: CloudWorkspaceSection): boolean {
-  return section === "contents" || section === "access" || section === "mcp-cli" || section === "git-sync";
+  return section === "overview" || section === "contents" || section === "access" || section === "mcp-cli" || section === "git-sync";
 }

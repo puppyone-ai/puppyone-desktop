@@ -1,0 +1,124 @@
+import {
+  cloudApiBaseUrlFromRemote,
+  normalizeCloudApiBaseUrl,
+} from "../../shared/cloudEndpoint.js";
+
+export function buildCloudApiBaseCandidates(remoteUrl, apiBaseUrl) {
+  const candidates = [];
+  addUniqueCloudApiBase(candidates, cloudApiBaseFromRemote(remoteUrl));
+  addUniqueCloudApiBase(candidates, normalizeCloudApiBase(apiBaseUrl));
+  return candidates;
+}
+
+export function normalizeCloudApiBase(apiBaseUrl) {
+  return normalizeCloudApiBaseUrl(apiBaseUrl);
+}
+
+export async function fetchCloudAccessPointDirectory({ accessKey, path: relPath, userEmail, apiBases }) {
+  if (apiBases.length === 0) {
+    throw new Error("Cloud API host is unavailable for this Git remote.");
+  }
+
+  const query = new URLSearchParams({
+    path: relPath,
+    include_hidden: "true",
+    include_size: "true",
+  });
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Access-Key": accessKey,
+    "X-Puppy-Client": "cli",
+  };
+  if (userEmail) headers["X-PuppyOne-User"] = userEmail;
+
+  const errors = [];
+  for (const apiBase of apiBases) {
+    try {
+      return await requestCloudApi(apiBase, `/ap-fs/ls?${query.toString()}`, {
+        method: "GET",
+        headers,
+      });
+    } catch (error) {
+      errors.push(`${apiBase}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  throw new Error(`Unable to load Cloud contents from the Git remote. Tried ${errors.join(" ; ")}`);
+}
+
+export async function fetchCloudAccessPointSemantics({ accessKey, userEmail, apiBases }) {
+  if (apiBases.length === 0) {
+    throw new Error("Cloud API host is unavailable for this Git remote.");
+  }
+
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Access-Key": accessKey,
+    "X-Puppy-Client": "cli",
+  };
+  if (userEmail) headers["X-PuppyOne-User"] = userEmail;
+
+  const errors = [];
+  for (const apiBase of apiBases) {
+    try {
+      return await requestCloudApi(apiBase, "/ap-fs/semantics", {
+        method: "GET",
+        headers,
+      });
+    } catch (error) {
+      errors.push(`${apiBase}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  throw new Error(`Unable to resolve Cloud project metadata from the Git remote. Tried ${errors.join(" ; ")}`);
+}
+
+export async function requestCloudApi(apiBase, apiPath, init) {
+  let response;
+  try {
+    response = await fetch(`${apiBase}${apiPath}`, init);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Unable to reach Cloud API at ${apiBase}. ${reason}`);
+  }
+
+  let payload = null;
+  const raw = await response.text();
+  if (raw) {
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      payload = null;
+    }
+  }
+
+  if (!response.ok) {
+    const error = new Error(getCloudApiErrorMessage(payload, `Request failed (${response.status})`));
+    error.status = response.status;
+    throw error;
+  }
+
+  return payload && Object.prototype.hasOwnProperty.call(payload, "data") ? payload.data : payload;
+}
+
+export function getCloudApiErrorMessage(payload, fallback) {
+  if (!payload || typeof payload !== "object") return fallback;
+  const detail = payload.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (detail && typeof detail === "object") {
+    if (typeof detail.message === "string" && detail.message.trim()) return detail.message;
+    if (typeof detail.detail === "string" && detail.detail.trim()) return detail.detail;
+  }
+  if (typeof payload.message === "string" && payload.message.trim()) return payload.message;
+  if (typeof payload.error === "string" && payload.error.trim()) return payload.error;
+  return fallback;
+}
+
+function addUniqueCloudApiBase(candidates, apiBase) {
+  if (!apiBase || candidates.includes(apiBase)) return;
+  candidates.push(apiBase);
+}
+
+function cloudApiBaseFromRemote(remoteUrl) {
+  return cloudApiBaseUrlFromRemote(remoteUrl);
+}

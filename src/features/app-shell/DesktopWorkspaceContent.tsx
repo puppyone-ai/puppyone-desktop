@@ -1,4 +1,4 @@
-import { useCallback, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import { DataWorkspace, type AiEditRequest, type DataNode, type Workspace } from "@puppyone/shared-ui";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
 import { GitSidebar, GitStatusView } from "../source-control";
@@ -13,6 +13,8 @@ import {
   type CloudAccessFilter,
   type CloudWorkspaceSection,
 } from "../cloud";
+import { useDesktopCloudAccessData } from "../cloud/data/useDesktopCloudAccessData";
+import { isCloudAccessNavigationResource } from "../cloud/sections/access/accessRows";
 import { getGitHostingMode } from "../source-control/viewModel";
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import type { useDesktopUpdates } from "../../components/DesktopUpdateControls";
@@ -29,6 +31,7 @@ import {
 } from "./preferences";
 import {
   DesktopSidebarFooterNavigation,
+  type DesktopWorkspaceSurfaceAction,
   DesktopSidebarTopNavigation,
 } from "./navigation";
 
@@ -50,7 +53,7 @@ type DesktopWorkspaceContentProps = {
     projectId: string | null;
     sessionRestoring: boolean;
     onCloudSessionChange: (session: DesktopCloudSession | null) => void;
-    onConfigureCloudRemote: (remoteUrl: string) => Promise<GitStatusSnapshot | null>;
+    onConfigureCloudRemote: (remoteUrl: string, projectId?: string | null) => Promise<GitStatusSnapshot | null>;
     onOpenDetails: () => void;
     onOpenGitSettings: () => void;
     onSelectSection: (section: CloudWorkspaceSection) => void;
@@ -59,7 +62,8 @@ type DesktopWorkspaceContentProps = {
   dataPort: DataWorkspacePort | null;
   desktopUpdates: DesktopUpdatesController;
   git: DesktopGitController;
-  onActiveDataPathChange: (path: string | null) => void;
+  onActiveDataPathChange: (path: string | null, node?: DataNode | null) => void;
+  onActiveDataNodeChange: (node: DataNode | null) => void;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DOMRect) => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
   onNavigate: (view: DesktopView) => void;
@@ -75,6 +79,8 @@ type DesktopWorkspaceContentProps = {
   puppyoneConfigSaving: boolean;
   settingsSection: SettingsSection;
   workspace: Workspace;
+  workspaceSurfaceError?: string | null;
+  workspaceSurfaceAction?: DesktopWorkspaceSurfaceAction | null;
   workspaceKind?: "local" | "cloud";
   workspaceKey: string;
   workspaceRefreshToken: number;
@@ -89,6 +95,7 @@ export function DesktopWorkspaceContent({
   desktopUpdates,
   git,
   onActiveDataPathChange,
+  onActiveDataNodeChange,
   onCreateEntryMenu,
   onFilesVisibilitySettingsChange,
   onNavigate,
@@ -104,6 +111,8 @@ export function DesktopWorkspaceContent({
   puppyoneConfigSaving,
   settingsSection,
   workspace,
+  workspaceSurfaceError = null,
+  workspaceSurfaceAction = null,
   workspaceKind = "local",
   workspaceKey,
   workspaceRefreshToken,
@@ -120,25 +129,27 @@ export function DesktopWorkspaceContent({
     ? getDesktopWorkspaceChangeCount(git.activeGitStatus, gitHostingMode === "github")
     : 0;
   const accessNavigationEnabled = cloud.enabled && cloudWorkspace && Boolean(cloud.projectId);
-  const [activeCloudAccessFilter, setActiveCloudAccessFilter] = useState<CloudAccessFilter>("all");
+  const cloudAccessData = useDesktopCloudAccessData({
+    projectId: cloud.projectId,
+    cloudSession: cloud.cloudSession,
+    apiBaseUrl: cloud.cloudApiBaseUrl,
+    onCloudSessionChange: cloud.onCloudSessionChange,
+  });
+  const [activeCloudAccessRowId, setActiveCloudAccessRowId] = useState<string | null>(null);
   const [activeIntegrationProvider, setActiveIntegrationProvider] = useState<string | null>(null);
   const effectiveCloudAccessFilter: CloudAccessFilter = resolvedActiveView === "integrations"
     ? "integrations"
-    : activeCloudAccessFilter === "integrations" ? "all" : activeCloudAccessFilter;
+    : "all";
+
+  useEffect(() => {
+    const accessRows = cloudAccessData.accessRows.filter(isCloudAccessNavigationResource);
+    if (activeCloudAccessRowId && accessRows.some((row) => row.id === activeCloudAccessRowId)) return;
+    setActiveCloudAccessRowId(accessRows[0]?.id ?? null);
+  }, [activeCloudAccessRowId, cloudAccessData.accessRows]);
+
   const handleIntegrationProviderChange = useCallback((provider: string | null) => {
     setActiveIntegrationProvider(provider);
   }, []);
-  const handleCloudAccessFilterChange = (filter: CloudAccessFilter) => {
-    if (filter === "integrations") {
-      setActiveCloudAccessFilter("all");
-      setActiveIntegrationProvider(null);
-      onNavigate("integrations");
-      return;
-    }
-    setActiveCloudAccessFilter(filter);
-    if (resolvedActiveView === "integrations") onNavigate("access");
-  };
-
   const settingsView = (
     <SettingsView
       workspace={workspace}
@@ -147,10 +158,14 @@ export function DesktopWorkspaceContent({
       gitStatusLoading={git.gitStatusLoading}
       gitStatusError={git.gitStatusError}
       themeMode={preferences.themeMode}
+      lightThemePreset={preferences.lightThemePreset}
+      darkThemePreset={preferences.darkThemePreset}
       fileIconTheme={preferences.fileIconTheme}
       sidebarNavigationLayout={preferences.sidebarNavigationLayout}
       filesVisibilitySettings={preferences.filesVisibilitySettings}
+      externalAppsSettings={preferences.externalAppsSettings}
       rightSidebarToolsSettings={preferences.rightSidebarToolsSettings}
+      titlebarActionsSettings={preferences.titlebarActionsSettings}
       aiEditAssistEnabled={preferences.aiEditAssistEnabled}
       cloudEnabled={cloud.enabled}
       cloudSession={cloud.storedCloudSession}
@@ -162,10 +177,14 @@ export function DesktopWorkspaceContent({
       puppyoneConfigError={puppyoneConfigError}
       updateState={desktopUpdates.state}
       onThemeModeChange={preferences.setThemeMode}
+      onLightThemePresetChange={preferences.setLightThemePreset}
+      onDarkThemePresetChange={preferences.setDarkThemePreset}
       onFileIconThemeChange={preferences.setFileIconTheme}
       onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
       onFilesVisibilitySettingsChange={onFilesVisibilitySettingsChange}
+      onExternalAppsSettingsChange={preferences.setExternalAppsSettings}
       onRightSidebarToolsSettingsChange={preferences.setRightSidebarToolsSettings}
+      onTitlebarActionsSettingsChange={preferences.setTitlebarActionsSettings}
       onAiEditAssistEnabledChange={preferences.setAiEditAssistEnabled}
       onCloudSessionChange={cloud.onCloudSessionChange}
       onPuppyoneConfigChange={onPuppyoneConfigChange}
@@ -228,15 +247,19 @@ export function DesktopWorkspaceContent({
     <DesktopCloudAccessView
       projectId={cloud.projectId}
       cloudSession={cloud.cloudSession}
+      accessData={cloudAccessData}
       activeFilter={effectiveCloudAccessFilter}
+      activeAccessRowId={activeCloudAccessRowId}
       activeIntegrationProvider={resolvedActiveView === "integrations" ? activeIntegrationProvider : null}
       sessionRestoring={cloud.sessionRestoring}
       onCloudSessionChange={cloud.onCloudSessionChange}
       onRefresh={() => undefined}
+      onSelectAccessRow={setActiveCloudAccessRowId}
     />
   );
 
   if (!dataPort) {
+    if (cloudWorkspace && !cloud.cloudSession) return cloudAccessView;
     if (resolvedActiveView === "settings") return settingsView;
     if (resolvedActiveView === "git") return gitStatusView;
     if (resolvedActiveView === "cloud") return cloudMainView;
@@ -246,6 +269,11 @@ export function DesktopWorkspaceContent({
 
   return (
     <div className="desktop-data-workspace-wrap">
+      {workspaceSurfaceError && (
+        <div className="desktop-workspace-surface-alert" role="status">
+          {workspaceSurfaceError}
+        </div>
+      )}
       <DataWorkspace
         key={workspaceKey}
         workspace={workspace}
@@ -253,6 +281,7 @@ export function DesktopWorkspaceContent({
         dataPort={dataPort}
         activePath={activeDataPath}
         onActivePathChange={onActiveDataPathChange}
+        onActiveNodeChange={onActiveDataNodeChange}
         onOpenExternalUrl={openExternalUrl}
         resizableExplorer
         explorerCollapsed={false}
@@ -284,6 +313,7 @@ export function DesktopWorkspaceContent({
         htmlTrustMode="localTrusted"
         aiEditRequest={activeAiEditRequest}
         enableMarkdownLinkContentIndexing={!cloudWorkspace}
+        folderExpansionStrategy={cloudWorkspace ? "optimistic" : "load-before-expand"}
         refreshKey={workspaceRefreshToken}
         explorerRootActionSlot={
           <DesktopExplorerRowActions
@@ -304,15 +334,14 @@ export function DesktopWorkspaceContent({
           <div className="desktop-view-surface desktop-view-surface-sidebar" data-view={resolvedActiveView}>
             {resolvedActiveView === "access" ? (
               <DesktopCloudAccessSidebar
-                activeFilter={effectiveCloudAccessFilter}
-                onSelectFilter={handleCloudAccessFilterChange}
+                accessData={cloudAccessData}
+                activeAccessRowId={activeCloudAccessRowId}
+                onSelectAccessRow={setActiveCloudAccessRowId}
               />
             ) : resolvedActiveView === "integrations" ? (
               <DesktopCloudIntegrationsSidebar
-                projectId={cloud.projectId}
-                cloudSession={cloud.cloudSession}
+                accessData={cloudAccessData}
                 activeProvider={activeIntegrationProvider}
-                onCloudSessionChange={cloud.onCloudSessionChange}
                 onSelectProvider={handleIntegrationProviderChange}
               />
             ) : resolvedActiveView === "git" ? (
@@ -372,6 +401,7 @@ export function DesktopWorkspaceContent({
               gitOperationLoading={git.gitOperationLoading}
               gitStatus={git.activeGitStatus}
               workspaceChangeCount={workspaceChangeCount}
+              surfaceAction={workspaceSurfaceAction}
               onNavigate={onNavigate}
               onOpenSettings={onOpenSettings}
             />

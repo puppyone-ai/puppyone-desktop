@@ -25,14 +25,9 @@ export function findMarkdownImageTokens(source: string): MarkdownImageToken[] {
   const tokens: MarkdownImageToken[] = [];
 
   for (let index = 0; index < source.length;) {
-    if (!source.startsWith("![", index) || isEscaped(source, index)) {
-      index += 1;
-      continue;
-    }
-
-    const token = parseObsidianImageEmbed(source, index) ?? parseStandardMarkdownImage(source, index);
+    const token = parseMarkdownImageTokenAt(source, index);
     if (!token) {
-      index += 2;
+      index += 1;
       continue;
     }
 
@@ -41,6 +36,11 @@ export function findMarkdownImageTokens(source: string): MarkdownImageToken[] {
   }
 
   return tokens;
+}
+
+export function parseMarkdownImageTokenAt(source: string, from: number): MarkdownImageToken | null {
+  if (!source.startsWith("![", from) || isEscaped(source, from)) return null;
+  return parseObsidianImageEmbed(source, from) ?? parseStandardMarkdownImage(source, from);
 }
 
 function parseStandardMarkdownImage(source: string, from: number): MarkdownImageToken | null {

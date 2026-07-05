@@ -1,6 +1,6 @@
 import type { RefObject } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
-import { ArrowLeft, ChevronDown, Cloud, Folder, FolderOpen } from "lucide-react";
+import { ArrowLeft, Cloud, Folder, FolderOpen } from "lucide-react";
 
 export type DesktopWorkspaceSwitcherItem = {
   id: string;
@@ -73,7 +73,6 @@ export function DesktopWorkspaceSwitcher({
       >
         <ProjectTypeMark kind={workspaceKind} className="desktop-titlebar-workspace-mark" />
         <span className="desktop-titlebar-workspace-name">{titlebarLabel}</span>
-        <ChevronDown size={12} />
       </button>
 
       {open && (

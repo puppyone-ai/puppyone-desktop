@@ -1,5 +1,5 @@
 .desktop-file-dialog {
-  width: min(420px, calc(100vw - 32px));
+  width: min(400px, calc(100vw - 32px));
 }
 
 .desktop-create-entry-dialog {
@@ -16,14 +16,14 @@
 }
 
 .desktop-dialog-button.primary.file {
-  border-color: color-mix(in srgb, var(--po-text) 32%, var(--po-border));
+  border-color: var(--po-text);
   background: var(--po-text);
   color: var(--po-text-inverse);
 }
 
 .desktop-dialog-button.primary.file:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--po-text) 44%, var(--po-border));
-  background: color-mix(in srgb, var(--po-text) 90%, var(--po-accent) 10%);
+  border-color: color-mix(in srgb, var(--po-text) 88%, var(--po-panel) 12%);
+  background: color-mix(in srgb, var(--po-text) 88%, var(--po-panel) 12%);
   color: var(--po-text-inverse);
 }
 
@@ -80,13 +80,14 @@
 }
 
 .desktop-dialog-field {
-  display: grid;
-  gap: 5px;
+  display: block;
   min-width: 0;
-  color: var(--po-text-muted);
-  font-size: 11.5px;
-  font-weight: 650;
-  line-height: 15px;
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 14px;
+  text-transform: uppercase;
 }
 
 .desktop-dialog-field input,
@@ -94,13 +95,19 @@
   width: 100%;
   height: 32px;
   box-sizing: border-box;
-  padding: 0 9px;
-  border: 1px solid var(--po-border);
-  border-radius: 7px;
-  background: var(--po-input, var(--po-panel-raised));
+  margin-top: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--po-border-strong);
+  border-radius: 6px;
+  background: var(--po-panel-raised);
   color: var(--po-text);
-  font: inherit;
-  font-size: 12.5px;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0;
+  line-height: 18px;
+  outline: none;
+  text-transform: none;
+  transition: border-color 0.12s ease, background 0.12s ease;
 }
 
 .desktop-dialog-field select {
@@ -109,12 +116,12 @@
   background:
     linear-gradient(45deg, transparent 50%, var(--po-text-muted) 50%) calc(100% - 15px) 13px / 5px 5px no-repeat,
     linear-gradient(135deg, var(--po-text-muted) 50%, transparent 50%) calc(100% - 10px) 13px / 5px 5px no-repeat,
-    var(--po-input, var(--po-panel-raised));
+    var(--po-panel-raised);
 }
 
 .desktop-dialog-field input:focus,
 .desktop-dialog-field select:focus {
-  border-color: color-mix(in srgb, var(--po-accent) 42%, var(--po-border));
+  border-color: var(--po-focus-ring);
   outline: none;
 }
 

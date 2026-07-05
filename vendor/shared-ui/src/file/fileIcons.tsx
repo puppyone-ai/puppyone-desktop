@@ -97,6 +97,7 @@ function getLabel(kind: FileVisualKind, name: string): string {
 }
 
 const FILE_KIND_LABELS: Partial<Record<FileVisualKind, string>> = {
+  app: "APP",
   audio: "MP3",
   html: "HTML",
   image: "IMG",

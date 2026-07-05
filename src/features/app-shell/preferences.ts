@@ -4,23 +4,36 @@ import {
   AI_EDIT_ASSIST_STORAGE_KEY,
   DEFAULT_SIDEBAR_NAVIGATION_LAYOUT,
   DEFAULT_THEME_MODE,
+  EXTERNAL_APPS_STORAGE_KEY,
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
   GIT_DISPLAY_MODE_STORAGE_KEY,
+  DARK_THEME_PRESET_STORAGE_KEY,
+  LEGACY_THEME_PRESET_STORAGE_KEY,
+  LIGHT_THEME_PRESET_STORAGE_KEY,
   RIGHT_SIDEBAR_TOOLS_STORAGE_KEY,
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
   THEME_STORAGE_KEY,
+  TITLEBAR_ACTIONS_STORAGE_KEY,
   parseAiEditAssistEnabled,
+  parseDarkThemePreset,
+  parseExternalAppsSettings,
   parseFilesVisibilitySettings,
   parseGitDisplayMode,
+  parseLightThemePreset,
   parseRightSidebarToolsSettings,
   parseSidebarNavigationLayout,
   parseThemeMode,
+  parseTitlebarActionsSettings,
+  type DarkThemePreset,
+  type ExternalAppsSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
+  type LightThemePreset,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
   type ThemeMode,
+  type TitlebarActionsSettings,
 } from "../../preferences";
 
 export const EXPLORER_WIDTH_STORAGE_KEY = "puppyone.desktop.explorerWidth";
@@ -48,6 +61,19 @@ export function readInitialThemeMode(): ThemeMode {
   return parseThemeMode(window.localStorage.getItem(THEME_STORAGE_KEY));
 }
 
+export function readInitialLightThemePreset(): LightThemePreset {
+  if (typeof window === "undefined") return parseLightThemePreset(null);
+  return parseLightThemePreset(
+    window.localStorage.getItem(LIGHT_THEME_PRESET_STORAGE_KEY)
+      ?? window.localStorage.getItem(LEGACY_THEME_PRESET_STORAGE_KEY),
+  );
+}
+
+export function readInitialDarkThemePreset(): DarkThemePreset {
+  if (typeof window === "undefined") return parseDarkThemePreset(null);
+  return parseDarkThemePreset(window.localStorage.getItem(DARK_THEME_PRESET_STORAGE_KEY));
+}
+
 export function readInitialFileIconTheme(): FileIconThemeId {
   if (typeof window === "undefined") return "default";
   const stored = window.localStorage.getItem(FILE_ICON_THEME_STORAGE_KEY);
@@ -69,9 +95,19 @@ export function readInitialFilesVisibilitySettings(): FilesVisibilitySettings {
   return parseFilesVisibilitySettings(window.localStorage.getItem(FILES_VISIBILITY_STORAGE_KEY));
 }
 
+export function readInitialExternalAppsSettings(): ExternalAppsSettings {
+  if (typeof window === "undefined") return parseExternalAppsSettings(null);
+  return parseExternalAppsSettings(window.localStorage.getItem(EXTERNAL_APPS_STORAGE_KEY));
+}
+
 export function readInitialRightSidebarToolsSettings(): RightSidebarToolsSettings {
   if (typeof window === "undefined") return parseRightSidebarToolsSettings(null);
   return parseRightSidebarToolsSettings(window.localStorage.getItem(RIGHT_SIDEBAR_TOOLS_STORAGE_KEY));
+}
+
+export function readInitialTitlebarActionsSettings(): TitlebarActionsSettings {
+  if (typeof window === "undefined") return parseTitlebarActionsSettings(null);
+  return parseTitlebarActionsSettings(window.localStorage.getItem(TITLEBAR_ACTIONS_STORAGE_KEY));
 }
 
 export function mergePuppyoneWorkspaceConfig(

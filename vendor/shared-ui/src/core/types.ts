@@ -1,5 +1,6 @@
 export type DataNodeKind =
   | "folder"
+  | "app"
   | "markdown"
   | "json"
   | "html"
@@ -59,6 +60,29 @@ export type FileContent = {
   url?: string | null;
 };
 
+export type AppPreviewStatus = "starting" | "running" | "stopped" | "error";
+
+export type AppPreviewResult = {
+  appId: string;
+  name: string;
+  status: AppPreviewStatus;
+  path: string;
+  url?: string | null;
+  port?: number | null;
+  command?: string[] | null;
+  cwd?: string | null;
+  message?: string | null;
+  logs?: string | null;
+};
+
+export type AppPreviewController = {
+  start: (path: string) => Promise<AppPreviewResult>;
+  restart?: (path: string) => Promise<AppPreviewResult>;
+  stop?: (path: string) => Promise<AppPreviewResult>;
+  getLogs?: (path: string) => Promise<string>;
+  openExternal?: (path: string) => Promise<void>;
+};
+
 export type DataImportResult = {
   paths: string[];
 };
@@ -80,6 +104,7 @@ export type DataPort = {
   listChildren: (folderPath: string | null) => Promise<DataNode[]>;
   readFile?: (path: string) => Promise<FileContent>;
   getFileUrl?: (path: string) => string | Promise<string>;
+  appPreview?: AppPreviewController;
   writeFile?: (path: string, content: string) => Promise<void>;
   createFolder?: (path: string) => Promise<void>;
   createFile?: (path: string, content?: string) => Promise<void>;

@@ -10,6 +10,7 @@ import {
   FileText,
   FileVideo,
   Folder as LucideFolder,
+  Joystick,
   type LucideIcon,
 } from "lucide-react";
 import { getFileAccent, type FileIconThemeId, type FileIconThemeMetadata, type FileVisualKind } from "./fileIconTypes";
@@ -318,6 +319,7 @@ function DocShell({
 }
 
 const DEFAULT_GLYPH_RENDERERS: Partial<Record<FileVisualKind, FileIconRenderer<FileIconRenderContext>>> = {
+  app: renderDefaultAppGlyph,
   audio: renderDefaultAudioGlyph,
   image: renderDefaultImageGlyph,
   html: renderDefaultCodeGlyph,
@@ -346,6 +348,24 @@ function renderDefaultImageGlyph({ color, size }: FileIconRenderContext): ReactN
       <rect x="2.75" y="3.75" width="12.5" height="10.5" rx="1.25" stroke={color} strokeWidth="1.45" />
       <path d="M3.8 12.5 6.35 9.65l2.05 2.1 2.35-3.05 3.35 3.8" stroke={color} strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
       <rect x="10.85" y="5.6" width="2" height="2" rx="0.35" fill={color} />
+    </svg>
+  );
+}
+
+function renderDefaultAppGlyph({ color, size }: FileIconRenderContext): ReactNode {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" aria-hidden>
+      <path
+        d="M5.15 11.25h7.7c.7 0 1.25.5 1.37 1.18l.34 2.02H3.44l.34-2.02c.12-.68.67-1.18 1.37-1.18Z"
+        fill="color-mix(in srgb, var(--po-file-icon-body) 72%, transparent)"
+        stroke={color}
+        strokeWidth="1.35"
+        strokeLinejoin="round"
+      />
+      <path d="M9.65 11.25 8.75 6.8" stroke={color} strokeWidth="1.35" strokeLinecap="round" />
+      <circle cx="8.45" cy="4.9" r="2" fill="color-mix(in srgb, var(--po-file-icon-body) 72%, transparent)" stroke={color} strokeWidth="1.35" />
+      <circle cx="12.2" cy="13.05" r="0.62" fill={color} opacity="0.76" />
+      <circle cx="6.15" cy="13.05" r="0.46" fill={color} opacity="0.55" />
     </svg>
   );
 }
@@ -387,6 +407,7 @@ function renderDefaultDocumentGlyph({ color, size }: FileIconRenderContext): Rea
 }
 
 const DEFAULT_PREVIEW_GLYPH_RENDERERS: Partial<Record<FileVisualKind, FileIconRenderer<FileIconRenderContext>>> = {
+  app: renderDefaultAppPreviewGlyph,
   image: renderDefaultImagePreviewGlyph,
   audio: renderDefaultAudioPreviewGlyph,
   video: renderDefaultVideoPreviewGlyph,
@@ -406,6 +427,24 @@ function renderDefaultImagePreviewGlyph({ color }: FileIconRenderContext): React
       <rect x="5.5" y="7" width="21" height="17.5" rx="2.4" stroke={color} strokeWidth="2" />
       <path d="M7.5 22.5 13 16.9l4.2 4.1 3.7-5 4.1 6.5" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="21.7" cy="11.8" r="1.85" fill={color} />
+    </svg>
+  );
+}
+
+function renderDefaultAppPreviewGlyph({ color }: FileIconRenderContext): ReactNode {
+  return (
+    <svg viewBox="0 0 32 32" width="100%" height="100%" fill="none" aria-hidden>
+      <path
+        d="M9.25 20.35h13.5c1.22 0 2.18.84 2.39 2.04l.6 3.43H6.26l.6-3.43c.21-1.2 1.17-2.04 2.39-2.04Z"
+        fill="color-mix(in srgb, var(--po-file-icon-body) 68%, transparent)"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M16.9 20.35 15.35 12.1" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <circle cx="14.95" cy="8.7" r="3.55" fill="color-mix(in srgb, var(--po-file-icon-body) 68%, transparent)" stroke={color} strokeWidth="2" />
+      <circle cx="21.5" cy="23.6" r="1.15" fill={color} opacity="0.78" />
+      <circle cx="10.65" cy="23.6" r="0.9" fill={color} opacity="0.56" />
     </svg>
   );
 }
@@ -530,6 +569,19 @@ type SymbolContext = {
 };
 
 const VSCODE_SYMBOL_RENDERERS: Partial<Record<FileVisualKind, (context: SymbolContext) => ReactNode>> = {
+  app: ({ color }) => (
+    <>
+      <path
+        d="M5.65 10.6h6.7c.62 0 1.1.42 1.2 1.02l.22 1.2H4.23l.22-1.2c.1-.6.58-1.02 1.2-1.02Z"
+        stroke={color}
+        strokeWidth="1"
+        strokeLinejoin="round"
+      />
+      <path d="M9.55 10.6 8.85 7.2" stroke={color} strokeWidth="0.95" strokeLinecap="round" />
+      <circle cx="8.65" cy="5.95" r="1.35" stroke={color} strokeWidth="1" />
+      <circle cx="11.65" cy="11.75" r="0.42" fill={color} opacity="0.78" />
+    </>
+  ),
   markdown: ({ color }) => <DocumentLinesSymbol color={color} />,
   json: ({ color }) => (
     <text x="8.75" y="12.15" textAnchor="middle" fontSize="8.2" fontWeight="850" fontFamily="var(--po-font-sans)" fill={color}>
@@ -628,6 +680,7 @@ function getVsCodeLabel(kind: FileVisualKind): string {
 }
 
 const MATERIAL_GLYPH_RENDERERS: Partial<Record<FileVisualKind, FileIconRenderer<FileIconRenderContext>>> = {
+  app: renderDefaultAppGlyph,
   audio: renderMaterialAudioGlyph,
   image: renderMaterialImageGlyph,
   video: renderMaterialVideoGlyph,
@@ -767,6 +820,7 @@ function StandaloneDocumentLinesGlyph({ size, color }: { size: number; color: st
 
 function getMinimalLucideIcon(kind: FileVisualKind): LucideIcon {
   const icons: Partial<Record<FileVisualKind, LucideIcon>> = {
+    app: Joystick,
     folder: LucideFolder,
     json: FileJson,
     html: FileCode,

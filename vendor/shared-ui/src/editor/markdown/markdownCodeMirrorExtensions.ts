@@ -27,6 +27,7 @@ import { getMarkdownTaskLine, type MarkdownTaskLine } from "./rendering/taskMode
 import { getMarkdownHtmlBlock, type MarkdownHtmlBlock } from "./rendering/htmlBlockModel";
 import { isSafeHref } from "./rendering/markdownHtmlPolicy";
 import { createSanitizedBlockHtmlFragment } from "./rendering/sanitizeHtml";
+import { puppyMarkdownParserExtensions } from "./syntax/markdownParserExtensions";
 import {
   findMarkdownImageTokens,
   isSafeMarkdownImageUrl,
@@ -91,7 +92,7 @@ export function markdownCodeMirrorBaseExtensions(readOnly: boolean): Extension[]
     dropCursor(),
     indentOnInput(),
     bracketMatching(),
-    markdown({ base: markdownLanguage }),
+    markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
     syntaxHighlighting(puppyMarkdownHighlightStyle),
     EditorView.lineWrapping,
     trailingLineWhitespaceSelectionExtension,

@@ -1,9 +1,10 @@
 import type { CSSProperties, Dispatch, ReactNode, SetStateAction } from "react";
 import { useEffect, useMemo, useRef } from "react";
-import { FileText, Folder, FolderOpen, MoreVertical, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ExternalLink, FileText, FolderOpen, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { FileGlyphIcon, getMatchedExtension, type DataNode, type FileIconThemeId } from "@puppyone/shared-ui";
+import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
 
-export type DesktopCreateEntryKind = "folder" | "markdown" | "text" | "json" | "csv";
+export type DesktopCreateEntryKind = "folder" | "markdown" | "text" | "json" | "csv" | "app";
 export type DesktopCreateEntryAnchor = {
   left: number;
   top: number;
@@ -28,14 +29,14 @@ export type DesktopNodeActionMenuDraft = {
   renameExtensionValue: string;
   renameFocus: "name" | "type";
   error: string | null;
-  operation: "rename" | "delete" | "reveal" | null;
+  operation: "rename" | "delete" | "open" | "reveal" | null;
 };
 
 const CREATE_ENTRY_MENU_MARGIN = 12;
 const CREATE_ENTRY_MENU_WIDTH = 184;
-const CREATE_ENTRY_MENU_ESTIMATED_HEIGHT = 158;
+const CREATE_ENTRY_MENU_ESTIMATED_HEIGHT = 184;
 const NODE_ACTION_MENU_WIDTH = 176;
-const NODE_ACTION_MENU_ESTIMATED_HEIGHT = 136;
+const NODE_ACTION_MENU_ESTIMATED_HEIGHT = 168;
 
 const CREATE_ENTRY_OPTIONS = [
   {
@@ -69,6 +70,14 @@ const CREATE_ENTRY_OPTIONS = [
     iconName: "Untitled.json",
     iconType: "json",
     defaultName: "Untitled.json",
+  },
+  {
+    kind: "app",
+    label: "Puppyone App",
+    dialogTitle: "New Puppyone App",
+    iconName: "Untitled.puppyoneapp",
+    iconType: "app",
+    defaultName: "Untitled.puppyoneapp",
   },
   {
     kind: "csv",
@@ -238,10 +247,9 @@ export function DesktopCreateEntryDialog({
   const extensionNote = getCreateEntryExtensionNote(selectedKind);
 
   return (
-    <div
-      className="desktop-dialog-backdrop"
-      role="presentation"
-      onClick={draft.creatingKind === null ? onCancel : undefined}
+    <DesktopDialogRoot
+      onClose={onCancel}
+      dismissOnBackdrop={draft.creatingKind === null}
     >
       <form
         className="desktop-dialog-surface desktop-file-dialog desktop-create-entry-dialog"
@@ -264,15 +272,7 @@ export function DesktopCreateEntryDialog({
               <p>{draft.parentPath ? `Create in ${draft.parentPath}` : "Create in workspace root"}</p>
             </div>
           </div>
-          <button
-            className="desktop-dialog-icon-button"
-            type="button"
-            disabled={draft.creatingKind !== null}
-            aria-label="Close"
-            onClick={onCancel}
-          >
-            <X size={16} />
-          </button>
+          <DesktopDialogCloseButton disabled={draft.creatingKind !== null} onClick={onCancel} />
         </header>
 
         <div className="desktop-dialog-body desktop-file-dialog-body">
@@ -315,25 +315,29 @@ export function DesktopCreateEntryDialog({
           </button>
         </footer>
       </form>
-    </div>
+    </DesktopDialogRoot>
   );
 }
 
 export function DesktopNodeActionMenu({
   draft,
   showRevealInFinder = true,
+  showOpenInDefaultApp = true,
   onChange,
   onCancel,
   onRename,
   onDelete,
+  onOpenInDefaultApp,
   onRevealInFinder,
 }: {
   draft: DesktopNodeActionMenuDraft;
   showRevealInFinder?: boolean;
+  showOpenInDefaultApp?: boolean;
   onChange: Dispatch<SetStateAction<DesktopNodeActionMenuDraft | null>>;
   onCancel: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onOpenInDefaultApp: () => void;
   onRevealInFinder: () => void;
 }) {
   if (draft.mode === "rename") {
@@ -348,30 +352,36 @@ export function DesktopNodeActionMenu({
   }
 
   return (
-    <DesktopNodeActionPopover
-      draft={draft}
-      showRevealInFinder={showRevealInFinder}
-      onChange={onChange}
-      onCancel={onCancel}
-      onDelete={onDelete}
-      onRevealInFinder={onRevealInFinder}
-    />
+      <DesktopNodeActionPopover
+        draft={draft}
+        showRevealInFinder={showRevealInFinder}
+        showOpenInDefaultApp={showOpenInDefaultApp}
+        onChange={onChange}
+        onCancel={onCancel}
+        onDelete={onDelete}
+        onOpenInDefaultApp={onOpenInDefaultApp}
+        onRevealInFinder={onRevealInFinder}
+      />
   );
 }
 
 function DesktopNodeActionPopover({
   draft,
   showRevealInFinder,
+  showOpenInDefaultApp,
   onChange,
   onCancel,
   onDelete,
+  onOpenInDefaultApp,
   onRevealInFinder,
 }: {
   draft: DesktopNodeActionMenuDraft;
   showRevealInFinder: boolean;
+  showOpenInDefaultApp: boolean;
   onChange: Dispatch<SetStateAction<DesktopNodeActionMenuDraft | null>>;
   onCancel: () => void;
   onDelete: () => void;
+  onOpenInDefaultApp: () => void;
   onRevealInFinder: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -415,6 +425,14 @@ function DesktopNodeActionPopover({
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
+      {showOpenInDefaultApp && draft.node.type !== "folder" && (
+        <DesktopNodeActionMenuItem
+          icon={<ExternalLink size={14} />}
+          label={draft.operation === "open" ? "Opening..." : "Open in Default App"}
+          disabled={draft.operation !== null}
+          onClick={onOpenInDefaultApp}
+        />
+      )}
       {showRevealInFinder && (
         <DesktopNodeActionMenuItem
           icon={<FolderOpen size={14} />}
@@ -499,10 +517,9 @@ function DesktopNodeRenameDialog({
   }, [draft.renameFocus, isFile]);
 
   return (
-    <div
-      className="desktop-dialog-backdrop"
-      role="presentation"
-      onClick={draft.operation === null ? onCancel : undefined}
+    <DesktopDialogRoot
+      onClose={onCancel}
+      dismissOnBackdrop={draft.operation === null}
     >
       <form
         className="desktop-dialog-surface desktop-file-dialog"
@@ -517,23 +534,11 @@ function DesktopNodeRenameDialog({
       >
         <header className="desktop-dialog-header">
           <div className="desktop-dialog-title-row">
-            <span className="desktop-dialog-leading file" aria-hidden="true">
-              {isFile ? <FileText size={16} /> : <Folder size={16} />}
-            </span>
             <div>
               <h2 id="desktop-node-rename-title">{title}</h2>
-              <p>{draft.node.name}</p>
             </div>
           </div>
-          <button
-            className="desktop-dialog-icon-button"
-            type="button"
-            disabled={draft.operation !== null}
-            aria-label="Close"
-            onClick={onCancel}
-          >
-            <X size={16} />
-          </button>
+          <DesktopDialogCloseButton disabled={draft.operation !== null} onClick={onCancel} />
         </header>
 
         <div className="desktop-dialog-body desktop-file-dialog-body">
@@ -595,7 +600,7 @@ function DesktopNodeRenameDialog({
           </button>
         </footer>
       </form>
-    </div>
+    </DesktopDialogRoot>
   );
 }
 
@@ -661,6 +666,7 @@ const DESKTOP_FILE_TYPE_OPTIONS = [
   { label: "Text (.txt)", extension: ".txt" },
   { label: "CSV (.csv)", extension: ".csv" },
   { label: "HTML (.html)", extension: ".html" },
+  { label: "Puppyone App (.puppyoneapp)", extension: ".puppyoneapp" },
   { label: "JavaScript (.js)", extension: ".js" },
   { label: "TypeScript (.ts)", extension: ".ts" },
   { label: "TSX (.tsx)", extension: ".tsx" },
@@ -756,6 +762,33 @@ export function defaultCreateName(kind: DesktopCreateEntryKind): string {
 export function getCreateEntryInitialContent(kind: DesktopCreateEntryKind): string {
   if (kind === "json") return "{}\n";
   if (kind === "csv") return "Column 1,Column 2\n";
+  if (kind === "app") {
+    return [
+      "{",
+      '  "type": "puppyone.app",',
+      '  "version": 1,',
+      '  "name": "Untitled App",',
+      '  "launch": {',
+      '    "kind": "local-server",',
+      '    "command": ["node", "server.mjs"],',
+      '    "cwd": ".",',
+      '    "env": {',
+      '      "HOST": "127.0.0.1",',
+      '      "PORT": "${port}"',
+      "    },",
+      '    "url": "http://127.0.0.1:${port}/",',
+      '    "health": {',
+      '      "path": "/",',
+      '      "expectStatus": 200',
+      "    }",
+      "  },",
+      '  "permissions": {',
+      '    "workspace": ["read"]',
+      "  }",
+      "}",
+      "",
+    ].join("\n");
+  }
   return "";
 }
 
@@ -782,6 +815,9 @@ export function normalizeCreateEntryName(kind: DesktopCreateEntryKind, value: st
   if (kind === "csv") {
     return ensureCreateEntryExtension(name, /\.(csv|tsv)$/i, ".csv");
   }
+  if (kind === "app") {
+    return ensureCreateEntryExtension(name, /\.puppyoneapp$/i, ".puppyoneapp");
+  }
   return name;
 }
 
@@ -795,6 +831,7 @@ function getCreateEntryExtensionNote(kind: DesktopCreateEntryKind): string | nul
   if (kind === "text") return "Names without an extension are saved as .txt.";
   if (kind === "json") return "Names without a JSON extension are saved as .json.";
   if (kind === "csv") return "Names without a table extension are saved as .csv.";
+  if (kind === "app") return "Names without a Puppyone App extension are saved as .puppyoneapp.";
   return null;
 }
 

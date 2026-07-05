@@ -1,0 +1,242 @@
+.desktop-cloud-scope-settings {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.desktop-cloud-scope-settings-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.desktop-cloud-scope-settings-card {
+  display: grid;
+  min-width: 0;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--po-divider);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel) 70%, var(--po-canvas) 30%);
+}
+
+.desktop-cloud-scope-settings-card.wide {
+  grid-column: 1 / -1;
+}
+
+.desktop-cloud-scope-settings-card.danger {
+  border-color: color-mix(in srgb, var(--po-danger) 28%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-danger) 5%, var(--po-panel));
+}
+
+.desktop-cloud-scope-settings-field {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.desktop-cloud-scope-settings-field > span {
+  color: var(--po-text);
+}
+
+.desktop-cloud-scope-settings-card p,
+.desktop-cloud-scope-settings-card em {
+  margin: 0;
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.45;
+}
+
+.desktop-cloud-scope-settings-field input,
+.desktop-cloud-scope-settings-field textarea {
+  min-width: 0;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 6px;
+  outline: none;
+  background: var(--po-inset);
+  color: var(--po-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.desktop-cloud-scope-settings-field input {
+  height: 32px;
+  padding: 0 10px;
+}
+
+.desktop-cloud-scope-settings-field textarea {
+  min-height: 78px;
+  resize: vertical;
+  padding: 8px 10px;
+  font-family: var(--po-font-mono);
+  line-height: 1.45;
+}
+
+.desktop-cloud-scope-settings-field input:disabled,
+.desktop-cloud-scope-settings-field textarea:disabled,
+.desktop-cloud-scope-mode-control button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.desktop-cloud-scope-settings-field input:focus,
+.desktop-cloud-scope-settings-field textarea:focus {
+  border-color: var(--po-border-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-accent) 12%, transparent);
+}
+
+.desktop-cloud-scope-mode-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 7px;
+  background: var(--po-inset);
+}
+
+.desktop-cloud-scope-mode-control button {
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.desktop-cloud-scope-mode-control button.active {
+  border-color: var(--po-border-strong);
+  background: var(--po-control);
+  color: var(--po-text);
+  box-shadow: 0 1px 1px color-mix(in srgb, var(--po-shadow) 36%, transparent);
+}
+
+.desktop-cloud-scope-key-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 30px 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 7px;
+  background: var(--po-inset);
+}
+
+.desktop-cloud-scope-key-row code {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 6px;
+  color: var(--po-text-muted);
+  font-family: var(--po-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-scope-key-row button,
+.desktop-cloud-scope-settings-actions button,
+.desktop-cloud-scope-settings-card.danger > button,
+.desktop-cloud-scope-settings-footer button {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.desktop-cloud-scope-key-row button {
+  width: 30px;
+  padding: 0;
+}
+
+.desktop-cloud-scope-key-row button:hover,
+.desktop-cloud-scope-settings-actions button:hover,
+.desktop-cloud-scope-settings-footer button:hover {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-scope-key-row button:disabled,
+.desktop-cloud-scope-settings-actions button:disabled,
+.desktop-cloud-scope-settings-card.danger > button:disabled,
+.desktop-cloud-scope-settings-footer button:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.desktop-cloud-scope-settings-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-scope-settings-actions button.danger,
+.desktop-cloud-scope-settings-card.danger > button {
+  border-color: color-mix(in srgb, var(--po-danger) 42%, var(--po-border-subtle));
+  color: var(--po-danger);
+}
+
+.desktop-cloud-scope-settings-actions button.danger {
+  background: color-mix(in srgb, var(--po-danger) 8%, transparent);
+}
+
+.desktop-cloud-scope-settings-card.danger > button {
+  width: max-content;
+  padding: 0 12px;
+}
+
+.desktop-cloud-scope-settings-error {
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--po-danger) 30%, var(--po-divider));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--po-danger) 8%, transparent);
+  color: var(--po-danger);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.desktop-cloud-scope-settings-footer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--po-border-strong);
+  border-radius: 8px;
+  background: var(--po-panel);
+}
+
+.desktop-cloud-scope-settings-footer span {
+  flex: 1;
+  min-width: 0;
+  color: var(--po-text-subtle);
+  font-size: 12px;
+}
+
+.desktop-cloud-scope-settings-footer button {
+  padding: 0 12px;
+}
+
+.desktop-cloud-scope-settings-footer button.primary {
+  border-color: var(--po-text);
+  background: var(--po-text);
+  color: var(--po-text-inverse);
+}

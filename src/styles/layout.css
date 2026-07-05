@@ -211,7 +211,7 @@ body.desktop-right-sidebar-resizing * {
   position: relative;
   box-sizing: border-box;
   height: 100%;
-  padding: 14px 0 16px 16px;
+  padding: 14px 16px 16px;
   font-variant-ligatures: none;
 }
 

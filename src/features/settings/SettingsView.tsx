@@ -1,28 +1,19 @@
 import { useEffect, useState } from "react";
-import { Check, Cloud, Copy, FileText, GitBranch, GripVertical, LogIn, LogOut, Monitor, Moon, PanelBottom, PanelTop, Pencil, RefreshCw, Settings, ShieldCheck, SquareTerminal, Sun, Unlink, UserRound } from "lucide-react";
+import { Check, Cloud, Copy, ExternalLink, FileText, GitBranch, LogIn, LogOut, Monitor, Moon, PanelBottom, PanelTop, Pencil, RefreshCw, Settings, ShieldCheck, Sun, Unlink, UserRound } from "lucide-react";
 import { FILE_ICON_THEMES, FileGlyphIcon } from "@puppyone/shared-ui";
 import { DesktopUpdateSettingsRow } from "../../components/DesktopUpdateControls";
 import { getDesktopCloudApiBaseUrl, isCloudSessionForApiBase, type DesktopCloudSession } from "../../lib/cloudApi";
 import { clearDesktopCloudSession, onDesktopCloudAuthError, startDesktopCloudOAuth, supportsDesktopCloudOAuth } from "../../lib/cloudSession";
-import { DEFAULT_EXPLORER_EXCLUDE_PATTERNS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, normalizeExplorerExcludePatterns, type FilesVisibilitySettings, type RightSidebarToolId } from "../../preferences";
+import { chooseWorkspaceExternalApp } from "../../lib/localFiles";
+import { DARK_THEME_PRESETS, DEFAULT_EXPLORER_EXCLUDE_PATTERNS, LIGHT_THEME_PRESETS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, normalizeExplorerExcludePatterns, normalizeExternalAppExtension, removeExternalAppOverride, upsertExternalAppOverride, type ExternalAppsSettings, type FilesVisibilitySettings, type TitlebarActionsSettings } from "../../preferences";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
+import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements";
+import { ExternalAppIcon } from "../external-apps/ExternalAppIcon";
 import { getPuppyoneRemote, maskRemoteUrl, parsePuppyoneRemote } from "../source-control/remotes";
 import { SettingsGroup, SettingsLine, SettingsSectionHeader } from "./components";
 import { PuppyoneWorkspaceConfigSettings } from "./PuppyoneWorkspaceConfigSettings";
 import type { SettingsSidebarProps, SettingsViewProps, SettingsSection } from "./types";
 import { remoteKindLabel, shortCommit, writeClipboardText } from "./utils";
-
-const RIGHT_SIDEBAR_TOOL_DEFINITIONS = [
-  {
-    id: "terminal",
-    label: "Terminal",
-    icon: SquareTerminal,
-  },
-] as const satisfies Array<{
-  id: RightSidebarToolId;
-  label: string;
-  icon: typeof SquareTerminal;
-}>;
 
 export function SettingsView({
   workspace,
@@ -31,10 +22,14 @@ export function SettingsView({
   gitStatusLoading,
   gitStatusError,
   themeMode,
+  lightThemePreset,
+  darkThemePreset,
   fileIconTheme,
   sidebarNavigationLayout,
   filesVisibilitySettings,
+  externalAppsSettings,
   rightSidebarToolsSettings,
+  titlebarActionsSettings,
   aiEditAssistEnabled,
   cloudEnabled,
   cloudSession,
@@ -46,10 +41,14 @@ export function SettingsView({
   puppyoneConfigError,
   updateState,
   onThemeModeChange,
+  onLightThemePresetChange,
+  onDarkThemePresetChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onFilesVisibilitySettingsChange,
+  onExternalAppsSettingsChange,
   onRightSidebarToolsSettingsChange,
+  onTitlebarActionsSettingsChange,
   onAiEditAssistEnabledChange,
   onCloudSessionChange,
   onPuppyoneConfigChange,
@@ -62,10 +61,7 @@ export function SettingsView({
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
   const [copiedRemoteKey, setCopiedRemoteKey] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
-  const [draggingRightSidebarToolId, setDraggingRightSidebarToolId] = useState<RightSidebarToolId | null>(null);
-  const orderedRightSidebarTools = rightSidebarToolsSettings.order
-    .map((toolId) => RIGHT_SIDEBAR_TOOL_DEFINITIONS.find((tool) => tool.id === toolId))
-    .filter((tool): tool is typeof RIGHT_SIDEBAR_TOOL_DEFINITIONS[number] => Boolean(tool));
+  const orderedHeaderElements = getOrderedHeaderElementDefinitions(titlebarActionsSettings.order);
 
   if (activeSection === "account") {
     return (
@@ -149,6 +145,15 @@ export function SettingsView({
     );
   }
 
+  if (activeSection === "external-apps") {
+    return (
+      <DefaultAppsSettingsView
+        settings={externalAppsSettings}
+        onChange={onExternalAppsSettingsChange}
+      />
+    );
+  }
+
   if (activeSection === "editor") {
     return (
       <EditorSettingsView
@@ -194,6 +199,48 @@ export function SettingsView({
                   </button>
                 </div>
               </div>
+              <div className="desktop-settings-row desktop-settings-row-control desktop-theme-preset-row">
+                <span>Light theme</span>
+                <div className="desktop-theme-preset-list" aria-label="Light theme preset">
+                  {LIGHT_THEME_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      className={lightThemePreset === preset.id ? "active" : ""}
+                      type="button"
+                      title={preset.description}
+                      onClick={() => onLightThemePresetChange(preset.id)}
+                    >
+                      <span className="desktop-theme-preset-swatches" aria-hidden="true">
+                        {preset.swatches.map((swatch) => (
+                          <i key={swatch} style={{ background: swatch }} />
+                        ))}
+                      </span>
+                      <span>{preset.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="desktop-settings-row desktop-settings-row-control desktop-theme-preset-row">
+                <span>Dark theme</span>
+                <div className="desktop-theme-preset-list" aria-label="Dark theme preset">
+                  {DARK_THEME_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      className={darkThemePreset === preset.id ? "active" : ""}
+                      type="button"
+                      title={preset.description}
+                      onClick={() => onDarkThemePresetChange(preset.id)}
+                    >
+                      <span className="desktop-theme-preset-swatches" aria-hidden="true">
+                        {preset.swatches.map((swatch) => (
+                          <i key={swatch} style={{ background: swatch }} />
+                        ))}
+                      </span>
+                      <span>{preset.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="desktop-settings-row desktop-settings-row-control">
                 <span>File icons</span>
                 <div className="desktop-theme-segment desktop-file-icon-theme-segment" aria-label="File icon theme">
@@ -231,55 +278,46 @@ export function SettingsView({
                 </div>
               </div>
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-tools-row">
-                <span>Right sidebar</span>
+                <span>Header elements</span>
                 <div className="desktop-settings-tool-list">
-                  {orderedRightSidebarTools.map((tool) => {
-                    const Icon = tool.icon;
+                  {orderedHeaderElements.map((element) => {
+                    const Icon = element.icon;
+                    const linkedToolId = element.linkedRightSidebarToolId;
+                    const actionEnabled = linkedToolId
+                      ? titlebarActionsSettings.enabled[element.id] && rightSidebarToolsSettings.enabled[linkedToolId]
+                      : titlebarActionsSettings.enabled[element.id];
                     return (
                       <div
-                        className={`desktop-settings-tool-item ${draggingRightSidebarToolId === tool.id ? "dragging" : ""}`}
-                        key={tool.id}
-                        draggable={orderedRightSidebarTools.length > 1}
-                        onDragStart={(event) => {
-                          setDraggingRightSidebarToolId(tool.id);
-                          event.dataTransfer.effectAllowed = "move";
-                          event.dataTransfer.setData("text/plain", tool.id);
-                        }}
-                        onDragOver={(event) => {
-                          if (!draggingRightSidebarToolId || draggingRightSidebarToolId === tool.id) return;
-                          event.preventDefault();
-                          event.dataTransfer.dropEffect = "move";
-                        }}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          const sourceToolId = readRightSidebarDragToolId(event.dataTransfer.getData("text/plain")) ?? draggingRightSidebarToolId;
-                          if (!sourceToolId || sourceToolId === tool.id) return;
-                          onRightSidebarToolsSettingsChange({
-                            ...rightSidebarToolsSettings,
-                            order: moveRightSidebarTool(rightSidebarToolsSettings.order, sourceToolId, tool.id),
-                          });
-                          setDraggingRightSidebarToolId(null);
-                        }}
-                        onDragEnd={() => setDraggingRightSidebarToolId(null)}
+                        className="desktop-settings-tool-item"
+                        key={element.id}
                       >
-                        <span className="desktop-settings-tool-drag-handle" aria-hidden="true">
-                          <GripVertical size={14} />
-                        </span>
                         <span className="desktop-settings-tool-label">
                           <Icon size={14} />
-                          <span>{tool.label}</span>
+                          <span>{element.label}</span>
                         </span>
                         <label className="desktop-settings-switch">
                           <input
                             type="checkbox"
-                            checked={rightSidebarToolsSettings.enabled[tool.id]}
-                            onChange={(event) => onRightSidebarToolsSettingsChange({
-                              ...rightSidebarToolsSettings,
-                              enabled: {
-                                ...rightSidebarToolsSettings.enabled,
-                                [tool.id]: event.target.checked,
-                              },
-                            })}
+                            checked={actionEnabled}
+                            onChange={(event) => {
+                              const enabled = event.target.checked;
+                              onTitlebarActionsSettingsChange({
+                                ...titlebarActionsSettings,
+                                enabled: {
+                                  ...titlebarActionsSettings.enabled,
+                                  [element.id]: enabled,
+                                },
+                              });
+                              if (linkedToolId && rightSidebarToolsSettings.enabled[linkedToolId] !== enabled) {
+                                onRightSidebarToolsSettingsChange({
+                                  ...rightSidebarToolsSettings,
+                                  enabled: {
+                                    ...rightSidebarToolsSettings.enabled,
+                                    [linkedToolId]: enabled,
+                                  },
+                                });
+                              }
+                            }}
                           />
                           <span aria-hidden="true" />
                         </label>
@@ -614,25 +652,164 @@ function FilesSettingsView({
   );
 }
 
-function readRightSidebarDragToolId(value: string): RightSidebarToolId | null {
-  return RIGHT_SIDEBAR_TOOL_DEFINITIONS.some((tool) => tool.id === value)
-    ? value as RightSidebarToolId
-    : null;
+function DefaultAppsSettingsView({
+  settings,
+  onChange,
+}: {
+  settings: ExternalAppsSettings;
+  onChange: (settings: ExternalAppsSettings) => void;
+}) {
+  const [extensionDraft, setExtensionDraft] = useState("");
+  const [choosingExtension, setChoosingExtension] = useState<string | null>(null);
+  const [choiceError, setChoiceError] = useState<string | null>(null);
+  const normalizedDraftExtension = normalizeExternalAppExtension(extensionDraft);
+
+  const chooseDefaultAppForExtension = async (extensionValue: string) => {
+    const extension = normalizeExternalAppExtension(extensionValue);
+    if (!extension) {
+      setChoiceError("Enter a file extension like md, pdf, or json.");
+      return;
+    }
+
+    setChoiceError(null);
+    setChoosingExtension(extension);
+    try {
+      const target = await chooseWorkspaceExternalApp({ extension });
+      if (!target?.appPath) return;
+      onChange(upsertExternalAppOverride(settings, {
+        extension,
+        appPath: target.appPath,
+        appName: target.appName,
+        bundleId: target.bundleId,
+        iconDataUrl: target.iconDataUrl,
+      }));
+      setExtensionDraft("");
+    } catch (error) {
+      setChoiceError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setChoosingExtension(null);
+    }
+  };
+
+  return (
+    <section className="desktop-utility-view desktop-settings-view">
+      <div className="desktop-utility-body desktop-settings-body">
+        <div className="desktop-settings-section">
+          <SettingsSectionHeader
+            title="Default Apps"
+            detail="Choose which app opens each local file type."
+          />
+
+          <SettingsGroup title="System default">
+            <SettingsLine
+              label="Open mode"
+              value="macOS default app"
+              action={(
+                <span className="desktop-settings-badge connected">System</span>
+              )}
+            />
+            <div className="desktop-settings-line desktop-settings-toggle-line">
+              <span className="desktop-settings-label-stack">
+                <strong>Confirm executable files</strong>
+                <small>Ask before opening files that may run code or install software.</small>
+              </span>
+              <label className="desktop-settings-switch">
+                <input
+                  type="checkbox"
+                  checked={settings.confirmExecutableFiles}
+                  onChange={(event) => onChange({
+                    ...settings,
+                    confirmExecutableFiles: event.target.checked,
+                  })}
+                />
+                <span aria-hidden="true" />
+              </label>
+            </div>
+          </SettingsGroup>
+
+          <SettingsGroup title="File type defaults">
+            <div className="desktop-settings-line desktop-settings-default-app-add">
+              <span className="desktop-settings-label-stack">
+                <strong>Add file type</strong>
+                <small>Use the extension without a dot.</small>
+              </span>
+              <div className="desktop-settings-line-value">
+                <input
+                  className="desktop-settings-text-input desktop-settings-extension-input"
+                  type="text"
+                  spellCheck={false}
+                  placeholder="md"
+                  value={extensionDraft}
+                  onChange={(event) => {
+                    setExtensionDraft(event.target.value);
+                    setChoiceError(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void chooseDefaultAppForExtension(extensionDraft);
+                  }}
+                />
+                <button
+                  className="desktop-settings-row-action"
+                  type="button"
+                  disabled={!normalizedDraftExtension || choosingExtension !== null}
+                  onClick={() => void chooseDefaultAppForExtension(extensionDraft)}
+                >
+                  <ExternalLink size={13} />
+                  <span>{choosingExtension === normalizedDraftExtension ? "Choosing..." : "Choose App"}</span>
+                </button>
+              </div>
+            </div>
+            {settings.overrides.length === 0 ? (
+              <div className="desktop-settings-muted-row">
+                No custom defaults. Files open with the default app selected in macOS.
+              </div>
+            ) : (
+              <div className="desktop-settings-external-app-list">
+                {settings.overrides.map((override) => (
+                  <div className="desktop-settings-external-app-row" key={override.extension}>
+                    <ExternalAppIcon
+                      appName={override.appName}
+                      className="desktop-settings-external-app-icon"
+                      iconDataUrl={override.iconDataUrl}
+                      loadingClassName="desktop-settings-external-app-loader"
+                    />
+                    <span className="desktop-settings-label-stack">
+                      <strong>.{override.extension}</strong>
+                      <small>{getExternalAppOverrideLabel(override.appPath, override.appName)}</small>
+                    </span>
+                    <span className="desktop-settings-row-action-group">
+                      <button
+                        className="desktop-settings-row-action"
+                        type="button"
+                        disabled={choosingExtension !== null}
+                        onClick={() => void chooseDefaultAppForExtension(override.extension)}
+                      >
+                        Change
+                      </button>
+                      <button
+                        className="desktop-settings-row-action"
+                        type="button"
+                        onClick={() => onChange(removeExternalAppOverride(settings, override.extension))}
+                      >
+                        Reset
+                      </button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {choiceError && <div className="desktop-settings-account-feedback danger">{choiceError}</div>}
+          </SettingsGroup>
+        </div>
+      </div>
+    </section>
+  );
 }
 
-function moveRightSidebarTool(
-  order: RightSidebarToolId[],
-  sourceToolId: RightSidebarToolId,
-  targetToolId: RightSidebarToolId,
-): RightSidebarToolId[] {
-  if (sourceToolId === targetToolId) return order;
-
-  const nextOrder = order.filter((toolId) => toolId !== sourceToolId);
-  const targetIndex = nextOrder.indexOf(targetToolId);
-  if (targetIndex < 0) return order;
-
-  nextOrder.splice(targetIndex, 0, sourceToolId);
-  return nextOrder;
+function getExternalAppOverrideLabel(appPath: string, appName?: string | null): string {
+  if (appName?.trim()) return appName.trim();
+  const leafName = appPath.replace(/\\/g, "/").split("/").pop();
+  return leafName?.replace(/\.app$/i, "") || "Custom app";
 }
 
 function CloudHostingSettingsView({
@@ -868,6 +1045,7 @@ export function SettingsSidebar({ activeSection, onSelectSection }: SettingsSide
     { id: "account", label: "Account", icon: UserRound, disabled: false },
     { id: "workspace", label: "General", icon: Settings, disabled: false },
     { id: "appearance", label: "Appearance", icon: Monitor, disabled: false },
+    { id: "external-apps", label: "Default Apps", icon: ExternalLink, disabled: false },
     { id: "git", label: "Git", icon: GitBranch, disabled: false },
     { id: "files", label: "Git Ignore", icon: FileText, disabled: false },
     { id: "editor", label: "Editor", icon: Pencil, disabled: false },

@@ -452,6 +452,25 @@
       "monacoLanguage": "coffeescript"
     },
     {
+      "id": "puppyone-app",
+      "label": "Puppyone App",
+      "extensions": [
+        ".puppyoneapp"
+      ],
+      "mimeTypes": [
+        "application/vnd.puppyone.app+json"
+      ],
+      "category": "app",
+      "defaultViewer": "app-preview",
+      "availableViewers": [
+        "app-preview",
+        "monaco-code"
+      ],
+      "editable": false,
+      "ingestStrategy": "parse-structured",
+      "monacoLanguage": "json"
+    },
+    {
       "id": "html",
       "label": "HTML",
       "extensions": [

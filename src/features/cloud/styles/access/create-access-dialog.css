@@ -1,0 +1,640 @@
+.desktop-cloud-create-access-backdrop {
+  background: var(--po-backdrop-strong);
+}
+
+.desktop-cloud-create-access-dialog {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.desktop-cloud-create-access-header {
+  padding: 14px 20px 8px;
+}
+
+.desktop-cloud-create-access-header .desktop-dialog-title-row {
+  flex: 1;
+}
+
+.desktop-cloud-create-access-header .desktop-dialog-title-row h2,
+.desktop-cloud-create-access-header .desktop-dialog-title-row p {
+  max-width: 620px;
+}
+
+.desktop-cloud-create-access-body {
+  display: block;
+  padding: 12px 20px 16px;
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-create-access-intent {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--po-control) 66%, var(--po-panel) 34%);
+}
+
+.desktop-cloud-create-access-intent-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.desktop-cloud-create-access-intent-header > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.desktop-cloud-create-access-intent-header span,
+.desktop-cloud-create-access-label {
+  color: var(--po-text-subtle);
+  font-family: var(--po-font-sans);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  line-height: 14px;
+  text-transform: uppercase;
+}
+
+.desktop-cloud-create-access-intent-header strong {
+  color: var(--po-text);
+  font-family: var(--po-font-sans);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 22px;
+}
+
+.desktop-cloud-create-access-intent-header small {
+  color: var(--po-text-disabled);
+  font-size: 12px;
+  line-height: 17px;
+  white-space: nowrap;
+}
+
+.desktop-cloud-create-access-intent-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.desktop-cloud-create-access-intent-option {
+  display: flex;
+  min-height: 104px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--po-text-muted);
+  cursor: pointer;
+  font-family: var(--po-font-sans);
+  text-align: left;
+  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.desktop-cloud-create-access-intent-option.active {
+  border-color: var(--po-border-strong);
+  background: var(--po-panel);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--po-shadow) 16%, transparent);
+}
+
+.desktop-cloud-create-access-intent-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-create-access-intent-title > span:last-child {
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-create-access-provider-tile {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--po-border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--po-control) 70%, var(--po-panel) 30%);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-create-access-provider-tile.cli {
+  background: color-mix(in srgb, var(--po-accent) 14%, var(--po-panel) 86%);
+  color: var(--po-accent);
+}
+
+.desktop-cloud-create-access-provider-tile.cli.active {
+  background: color-mix(in srgb, var(--po-accent) 92%, var(--po-panel) 8%);
+  color: var(--po-text-inverse);
+}
+
+.desktop-cloud-create-access-provider-tile.git {
+  background: color-mix(in srgb, #ef4a37 9%, var(--po-panel) 91%);
+  color: #d94939;
+}
+
+.desktop-cloud-create-access-provider-tile.git.active {
+  background: color-mix(in srgb, #ef4a37 18%, var(--po-panel) 82%);
+}
+
+.desktop-cloud-create-access-provider-tile .desktop-cloud-access-git-brand-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.desktop-cloud-create-access-intent-preview {
+  min-height: 32px;
+  color: var(--po-text-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.desktop-cloud-create-access-intent-preview.mono {
+  font-family: var(--po-font-mono);
+}
+
+.desktop-cloud-create-access-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.desktop-cloud-create-access-chip-list span {
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  padding: 0 7px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--po-control) 70%, var(--po-panel) 30%);
+  color: var(--po-text-disabled);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 14px;
+}
+
+.desktop-cloud-create-access-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.desktop-cloud-create-access-tree {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: var(--po-panel);
+}
+
+.desktop-cloud-create-access-tree > header {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--po-border-subtle);
+  color: var(--po-text-subtle);
+  font-family: var(--po-font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 14px;
+  text-transform: uppercase;
+}
+
+.desktop-cloud-create-access-tree-body {
+  height: 368px;
+  overflow: auto;
+  padding: 6px 0 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+}
+
+.desktop-cloud-create-access-tree-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.desktop-cloud-create-access-tree-body::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--po-scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+.desktop-cloud-create-access-tree-row-wrap {
+  position: relative;
+  height: 30px;
+  margin: 1px 6px;
+}
+
+.desktop-cloud-create-access-tree-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: 30px;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font-family: var(--po-font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  text-align: left;
+}
+
+.desktop-cloud-create-access-tree-row.root {
+  margin: 1px 6px;
+  padding: 0 8px;
+}
+
+.desktop-cloud-create-access-tree-row.folder {
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.desktop-cloud-create-access-tree-row.folder:hover,
+.desktop-cloud-create-access-tree-row.selected {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-create-access-tree-marker {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-cloud-create-access-disclosure {
+  transition: transform 0.12s ease;
+}
+
+.desktop-cloud-create-access-tree-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-create-access-tree-row.selected .desktop-cloud-create-access-tree-name,
+.desktop-cloud-create-access-tree-row.root .desktop-cloud-create-access-tree-name {
+  font-weight: 500;
+}
+
+.desktop-cloud-create-access-tree-row.file {
+  color: var(--po-filetree-rail);
+  font-size: 12px;
+  opacity: 0.82;
+}
+
+.desktop-cloud-create-access-tree-status {
+  width: 100px;
+  flex: 0 0 100px;
+  color: var(--po-filetree-rail);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 17px;
+  text-align: right;
+}
+
+.desktop-cloud-create-access-tree-status.existing,
+.desktop-cloud-create-access-tree-status.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.desktop-cloud-create-access-tree-status.action {
+  color: var(--po-text-disabled);
+}
+
+.desktop-cloud-create-access-tree-status.action.selected {
+  color: var(--po-accent);
+}
+
+.desktop-cloud-create-access-tree-status.action > span:last-child {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--po-border);
+  border-radius: 5px;
+  color: transparent;
+}
+
+.desktop-cloud-create-access-tree-status.action.selected > span:last-child {
+  border-color: var(--po-accent);
+  background: var(--po-accent);
+  color: white;
+}
+
+.desktop-cloud-create-access-tree-guides {
+  position: absolute;
+  left: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.desktop-cloud-create-access-tree-message {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  color: var(--po-filetree-rail);
+  font-size: 12px;
+}
+
+.desktop-cloud-create-access-form {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.desktop-cloud-create-access-field {
+  display: block;
+  min-width: 0;
+}
+
+.desktop-cloud-create-access-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.desktop-cloud-create-access-label i {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--po-danger);
+}
+
+.desktop-cloud-create-access-input,
+.desktop-cloud-create-access-path-box {
+  width: 100%;
+  height: 34px;
+  box-sizing: border-box;
+  border: 1px solid var(--po-border);
+  border-radius: 7px;
+  background: var(--po-control);
+  color: var(--po-text);
+  font-family: var(--po-font-sans);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.desktop-cloud-create-access-input {
+  padding: 0 10px;
+  outline: none;
+}
+
+.desktop-cloud-create-access-input:focus {
+  border-color: var(--po-border-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-accent) 12%, transparent);
+}
+
+.desktop-cloud-create-access-input::placeholder {
+  color: var(--po-text-disabled);
+}
+
+.desktop-cloud-create-access-path-box {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  padding: 0 10px;
+  background: var(--po-inset);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-create-access-path-box.empty {
+  color: var(--po-filetree-rail);
+}
+
+.desktop-cloud-create-access-path-box.existing {
+  border-color: var(--po-border-strong);
+}
+
+.desktop-cloud-create-access-path-box.existing .desktop-cloud-create-access-disclosure {
+  color: var(--po-success);
+}
+
+.desktop-cloud-create-access-path-box span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-create-access-field-note {
+  margin-top: 6px;
+  color: var(--po-text-disabled);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.desktop-cloud-create-access-method-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.desktop-cloud-create-access-method-row {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: transparent;
+  opacity: 1;
+}
+
+.desktop-cloud-create-access-method-row.enabled {
+  border-color: var(--po-border-strong);
+  background: var(--po-control);
+}
+
+.desktop-cloud-create-access-method-row.inactive {
+  background: color-mix(in srgb, var(--po-panel) 72%, var(--po-canvas));
+  opacity: 0.58;
+}
+
+.desktop-cloud-create-access-method-icon {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--po-hover);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-create-access-method-icon .desktop-cloud-access-git-brand-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.desktop-cloud-create-access-method-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.desktop-cloud-create-access-method-copy > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-create-access-method-copy span {
+  overflow: hidden;
+  color: var(--po-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-create-access-method-row:not(.inactive) .desktop-cloud-create-access-method-copy span {
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-create-access-method-copy em {
+  display: inline-flex;
+  height: 18px;
+  align-items: center;
+  padding: 0 6px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 999px;
+  color: var(--po-filetree-rail);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.desktop-cloud-create-access-method-copy p {
+  overflow: hidden;
+  margin: 2px 0 0;
+  color: var(--po-text-disabled);
+  font-size: 12px;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-create-access-switch {
+  position: relative;
+  display: inline-flex;
+  width: 26px;
+  height: 16px;
+  flex: 0 0 26px;
+  align-items: center;
+  padding: 0;
+  border: 1px solid var(--po-switch-border-off);
+  border-radius: 999px;
+  background: var(--po-switch-track-off);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+}
+
+.desktop-cloud-create-access-switch span {
+  position: absolute;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--po-switch-thumb);
+  box-shadow: 0 1px 2px var(--po-switch-thumb-shadow);
+  transition: transform 0.12s ease;
+}
+
+.desktop-cloud-create-access-switch.checked {
+  border-color: var(--po-switch-border-on);
+  background: var(--po-switch-track-on);
+}
+
+.desktop-cloud-create-access-switch.checked span {
+  transform: translateX(10px);
+}
+
+.desktop-cloud-create-access-switch:disabled {
+  cursor: default;
+}
+
+.desktop-cloud-create-access-error {
+  margin-top: 12px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--po-danger) 30%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--po-danger) 7%, transparent);
+  color: var(--po-danger);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.desktop-cloud-create-access-footer {
+  padding: 0 20px 20px;
+}
+
+.desktop-cloud-create-access-footer .desktop-dialog-button {
+  height: 32px;
+  padding: 0 12px;
+}
+
+.desktop-cloud-create-access-footer .desktop-dialog-button.primary {
+  gap: 6px;
+  padding: 0 13px;
+  border-color: var(--po-accent);
+  background: var(--po-accent);
+  color: var(--po-text-inverse);
+}
+
+.desktop-cloud-create-access-footer .desktop-dialog-button.primary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--po-accent) 88%, var(--po-text) 12%);
+  background: color-mix(in srgb, var(--po-accent) 88%, var(--po-text) 12%);
+  color: var(--po-text-inverse);
+}
+
+@media (max-width: 760px) {
+  .desktop-cloud-create-access-intent-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

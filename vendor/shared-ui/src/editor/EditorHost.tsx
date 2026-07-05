@@ -1,4 +1,4 @@
-import type { DataNode, FileContent } from "../core/types";
+import type { AppPreviewController, DataNode, FileContent } from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import { PuppyoneEditorHost, type EditorSaveMode } from "./PuppyoneEditorHost";
 import type { AiEditFile } from "./ai-edits/types";
@@ -20,6 +20,7 @@ export type EditorHostProps = {
   htmlTrustMode?: MarkdownHtmlTrustMode;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  appPreview?: AppPreviewController | null;
   deferFallbackContent?: boolean;
 };
 
@@ -39,6 +40,7 @@ export function EditorHost({
   htmlTrustMode = "safe",
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
+  appPreview = null,
   deferFallbackContent = false,
 }: EditorHostProps) {
   return (
@@ -64,6 +66,7 @@ export function EditorHost({
       htmlTrustMode={htmlTrustMode}
       markdownLinkGraph={markdownLinkGraph}
       markdownAssetUrlResolver={markdownAssetUrlResolver}
+      appPreview={appPreview}
     />
   );
 }

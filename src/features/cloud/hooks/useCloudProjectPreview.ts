@@ -58,8 +58,14 @@ export function useCloudProjectPreview({
     }));
 
     const request = getPreviewRequest(cacheKey, () => (
-      listCloudRoot(session, projectId, onSessionChange, apiBaseUrl)
-        .then((tree) => sortPreviewEntries(tree.entries).slice(0, CLOUD_PROJECT_PREVIEW_LIMIT))
+      listCloudRoot(
+        session,
+        projectId,
+        (nextSession) => {
+          if (nextSession) onSessionChange(nextSession);
+        },
+        apiBaseUrl,
+      ).then((tree) => sortPreviewEntries(tree.entries).slice(0, CLOUD_PROJECT_PREVIEW_LIMIT))
     ));
 
     request

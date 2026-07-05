@@ -114,6 +114,27 @@ export function CloudRouter({
     return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
   }
 
+  if (activeSection === "overview" && cloudData.activeProjectId) {
+    return (
+      <CloudMappedOverview
+        workspace={workspace}
+        project={activeProject ?? mappedProject}
+        dashboard={cloudData.dashboard}
+        tree={cloudData.tree}
+        history={cloudData.history}
+        scopes={cloudData.scopes}
+        connectors={cloudData.connectors}
+        mcpEndpoints={cloudData.mcpEndpoints}
+        identity={cloudData.identity}
+        cloudRemote={cloudRemote}
+        loading={loading || cloudData.loading}
+        onSelectSection={onSelectSection}
+        onOpenProject={onOpenProject}
+        onRefresh={cloudData.reload}
+      />
+    );
+  }
+
   if (activeSection === "overview") {
     return (
       <CloudProjectBrowser
@@ -176,6 +197,22 @@ export function CloudRouter({
   }
 
   const projectId = workspaceBinding.projectId;
+  const connectorsByScope = new Map<string, typeof cloudData.connectors>();
+  for (const connector of cloudData.connectors) {
+    const group = connectorsByScope.get(connector.scope_id) ?? [];
+    group.push(connector);
+    connectorsByScope.set(connector.scope_id, group);
+  }
+  const mcpEndpointsByScope = new Map<string, typeof cloudData.mcpEndpoints>();
+  for (const scope of cloudData.scopes) {
+    mcpEndpointsByScope.set(
+      scope.id,
+      cloudData.mcpEndpoints.filter((endpoint) => (
+        endpoint.path === scope.path
+        || (!endpoint.path && scope.is_root)
+      )),
+    );
+  }
 
   if (activeSection === "contents") {
     return (
@@ -217,12 +254,18 @@ export function CloudRouter({
     return (
       <CloudAccessSection
         projectId={projectId}
+        cloudSession={cloudSession}
         apiBaseUrl={cloudApiBaseUrl}
         identity={cloudData.identity}
         scopes={cloudData.scopes}
         connectors={cloudData.connectors}
+        connectorsByScope={connectorsByScope}
         mcpEndpoints={cloudData.mcpEndpoints}
+        mcpEndpointsByScope={mcpEndpointsByScope}
+        activeAccessRowId={null}
         loading={cloudData.loading}
+        onCloudSessionChange={onSessionChange}
+        onRefresh={cloudData.reload}
         onOpenProject={onOpenProject}
       />
     );

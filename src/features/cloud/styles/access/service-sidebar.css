@@ -1,0 +1,162 @@
+.desktop-cloud-access-page-header.sidebar-owned {
+  justify-content: flex-end;
+}
+
+.desktop-cloud-access-sidebar-page-header {
+  display: flex;
+  height: 46px;
+  min-height: 46px;
+  flex: 0 0 46px;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--po-active, var(--po-divider));
+  background: var(--po-canvas);
+  font-family: var(--po-font-sans);
+}
+
+.desktop-cloud-service-sidebar.desktop-cloud-access-scope-sidebar {
+  border-right: 1px solid var(--po-border-subtle);
+  background: var(--po-canvas);
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-scope-list {
+  display: block;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overflow-x: hidden;
+  padding: 6px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-scope-list::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-scope-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-scope-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--po-scrollbar-thumb);
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-scope-row {
+  width: calc(100% - 12px);
+  min-height: 50px;
+  margin: 3px 6px;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-row {
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--po-border);
+  border-radius: 4px;
+  background: var(--po-hover);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-icon.cli {
+  border-color: var(--po-accent);
+  background: var(--po-accent);
+  color: var(--po-text-inverse);
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-icon.git {
+  border-color: color-mix(in srgb, #ef4a37 24%, var(--po-border-subtle) 76%);
+  background: color-mix(in srgb, #ef4a37 10%, var(--po-panel) 90%);
+  color: #d94939;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-icon .desktop-cloud-access-git-brand-icon {
+  width: 17px;
+  height: 17px;
+  border-radius: 3px;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-icon.mcp,
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-icon.vm {
+  border-color: var(--po-border);
+  background: var(--po-hover);
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-row.active .desktop-cloud-access-resource-icon {
+  border-color: var(--po-border-strong);
+  background: color-mix(in srgb, var(--po-text) 7%, var(--po-hover) 93%);
+  color: var(--po-text);
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-row.active .desktop-cloud-access-resource-icon.cli {
+  border-color: var(--po-accent);
+  background: var(--po-accent);
+  color: var(--po-text-inverse);
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-scope-row-content {
+  height: 100%;
+  min-width: 0;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-scope-status {
+  margin-left: 0;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-row .desktop-cloud-access-scope-title-line {
+  gap: 6px;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-row .desktop-cloud-access-scope-status {
+  width: 5px;
+  height: 5px;
+  flex-basis: 5px;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-row .desktop-cloud-access-scope-name {
+  flex: 0 1 auto;
+  font-size: 12px;
+  font-weight: 540;
+  line-height: 16px;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-row.active .desktop-cloud-access-scope-name {
+  font-weight: 620;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-path {
+  min-width: 22px;
+  overflow: hidden;
+  color: var(--po-text-subtle);
+  font-family: var(--po-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-service-sidebar .desktop-cloud-access-resource-row.active .desktop-cloud-access-resource-path {
+  color: var(--po-text-muted);
+}

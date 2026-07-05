@@ -2,19 +2,25 @@ import { useEffect, useState } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
+  EXTERNAL_APPS_STORAGE_KEY,
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
   GIT_DISPLAY_MODE_STORAGE_KEY,
+  DARK_THEME_PRESET_STORAGE_KEY,
+  LIGHT_THEME_PRESET_STORAGE_KEY,
   RIGHT_SIDEBAR_TOOLS_STORAGE_KEY,
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
   THEME_STORAGE_KEY,
+  TITLEBAR_ACTIONS_STORAGE_KEY,
   getSidebarNavigationOrientation,
   getSidebarNavigationPlacement,
+  type ExternalAppsSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
   type ThemeMode,
+  type TitlebarActionsSettings,
 } from "../../preferences";
 import {
   EXPLORER_WIDTH_STORAGE_KEY,
@@ -22,6 +28,7 @@ import {
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   readInitialAiEditAssistEnabled,
   readInitialExplorerWidth,
+  readInitialExternalAppsSettings,
   readInitialFileIconTheme,
   readInitialFilesVisibilitySettings,
   readInitialGitDisplayMode,
@@ -29,17 +36,24 @@ import {
   readInitialRightSidebarWidth,
   readInitialSidebarCollapsed,
   readInitialSidebarNavigationLayout,
+  readInitialTitlebarActionsSettings,
+  readInitialDarkThemePreset,
+  readInitialLightThemePreset,
   readInitialThemeMode,
   readSystemDarkMode,
 } from "./preferences";
 
 export function useDesktopPreferences() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readInitialThemeMode());
+  const [lightThemePreset, setLightThemePreset] = useState(() => readInitialLightThemePreset());
+  const [darkThemePreset, setDarkThemePreset] = useState(() => readInitialDarkThemePreset());
   const [fileIconTheme, setFileIconTheme] = useState<FileIconThemeId>(() => readInitialFileIconTheme());
   const [sidebarNavigationLayout, setSidebarNavigationLayout] = useState<SidebarNavigationLayout>(() => readInitialSidebarNavigationLayout());
   const [gitDisplayMode, setGitDisplayMode] = useState<GitDisplayMode>(() => readInitialGitDisplayMode());
   const [filesVisibilitySettings, setFilesVisibilitySettings] = useState<FilesVisibilitySettings>(() => readInitialFilesVisibilitySettings());
+  const [externalAppsSettings, setExternalAppsSettings] = useState<ExternalAppsSettings>(() => readInitialExternalAppsSettings());
   const [rightSidebarToolsSettings, setRightSidebarToolsSettings] = useState<RightSidebarToolsSettings>(() => readInitialRightSidebarToolsSettings());
+  const [titlebarActionsSettings, setTitlebarActionsSettings] = useState<TitlebarActionsSettings>(() => readInitialTitlebarActionsSettings());
   const [aiEditAssistEnabled, setAiEditAssistEnabled] = useState(() => readInitialAiEditAssistEnabled());
   const [explorerWidth, setExplorerWidth] = useState(() => readInitialExplorerWidth());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readInitialSidebarCollapsed());
@@ -50,6 +64,14 @@ export function useDesktopPreferences() {
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
   }, [themeMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(LIGHT_THEME_PRESET_STORAGE_KEY, lightThemePreset);
+  }, [lightThemePreset]);
+
+  useEffect(() => {
+    window.localStorage.setItem(DARK_THEME_PRESET_STORAGE_KEY, darkThemePreset);
+  }, [darkThemePreset]);
 
   useEffect(() => {
     window.localStorage.setItem(FILE_ICON_THEME_STORAGE_KEY, fileIconTheme);
@@ -68,8 +90,16 @@ export function useDesktopPreferences() {
   }, [filesVisibilitySettings]);
 
   useEffect(() => {
+    window.localStorage.setItem(EXTERNAL_APPS_STORAGE_KEY, JSON.stringify(externalAppsSettings));
+  }, [externalAppsSettings]);
+
+  useEffect(() => {
     window.localStorage.setItem(RIGHT_SIDEBAR_TOOLS_STORAGE_KEY, JSON.stringify(rightSidebarToolsSettings));
   }, [rightSidebarToolsSettings]);
+
+  useEffect(() => {
+    window.localStorage.setItem(TITLEBAR_ACTIONS_STORAGE_KEY, JSON.stringify(titlebarActionsSettings));
+  }, [titlebarActionsSettings]);
 
   useEffect(() => {
     window.localStorage.setItem(AI_EDIT_ASSIST_STORAGE_KEY, aiEditAssistEnabled ? "true" : "false");
@@ -108,6 +138,7 @@ export function useDesktopPreferences() {
   return {
     aiEditAssistEnabled,
     explorerWidth,
+    externalAppsSettings,
     fileIconTheme,
     filesVisibilitySettings,
     gitDisplayMode,
@@ -121,9 +152,14 @@ export function useDesktopPreferences() {
     sidebarNavigationPlacement,
     terminalSidebarOpen,
     terminalToolEnabled,
+    titlebarActionsSettings,
+    darkThemePreset,
+    lightThemePreset,
     themeMode,
     setAiEditAssistEnabled,
+    setDarkThemePreset,
     setExplorerWidth,
+    setExternalAppsSettings,
     setFileIconTheme,
     setFilesVisibilitySettings,
     setGitDisplayMode,
@@ -132,6 +168,8 @@ export function useDesktopPreferences() {
     setRightSidebarWidth,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
+    setTitlebarActionsSettings,
+    setLightThemePreset,
     setThemeMode,
   };
 }

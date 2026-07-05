@@ -1,13 +1,15 @@
-import type { CSSProperties, DragEvent as ReactDragEvent, ReactNode } from "react";
+import type { CSSProperties, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DataNode } from "../core/types";
 import { getMatchedExtension } from "../core/fileFormats";
 import { FileGlyphIcon, type FileIconThemeId } from "../file/fileIcons";
+import { DotsLoader, InlineLoading } from "../primitives/LoadingIndicator";
 import { useScrollableState } from "../primitives/useScrollableClass";
 
 export type ExplorerTreeProps = {
   nodes: DataNode[];
   activePath: string | null;
+  selectedPaths?: ReadonlySet<string>;
   loadingPath?: string | null;
   expandedPaths: ReadonlySet<string>;
   loadingPaths?: ReadonlySet<string>;
@@ -19,13 +21,19 @@ export type ExplorerTreeProps = {
   loadingLabel?: string;
   fileIconTheme?: FileIconThemeId;
   canMoveNodes?: boolean;
-  onSelectNode: (node: DataNode | null) => void;
+  onSelectNode: (node: DataNode | null, intent?: ExplorerSelectionIntent) => void;
   onToggleFolder?: (node: DataNode, expanded: boolean) => void;
   onMoveNode?: (node: DataNode, targetFolderPath: string | null) => void | Promise<void>;
+  onMoveNodes?: (nodes: DataNode[], targetFolderPath: string | null) => void | Promise<void>;
   onImportFiles?: (files: File[], targetFolderPath: string | null) => void | Promise<void>;
   renderRootActions?: () => ReactNode;
   renderFolderActions?: (node: DataNode) => ReactNode;
   renderNodeActions?: (node: DataNode) => ReactNode;
+};
+
+export type ExplorerSelectionIntent = {
+  additive?: boolean;
+  range?: boolean;
 };
 
 type TreeDropTarget = {
@@ -37,7 +45,7 @@ type TreeDropTarget = {
 
 type TreeDragController = {
   enabled: boolean;
-  draggedNode: DataNode | null;
+  draggedNodes: DataNode[];
   dropTarget: TreeDropTarget;
   onNodeDragStart: (event: ReactDragEvent<HTMLButtonElement>, node: DataNode) => void;
   onNodeDragEnd: () => void;
@@ -71,6 +79,7 @@ const FOLDER_PEER_DROP_ZONE_RATIO = 0.34;
 export function ExplorerTree({
   nodes,
   activePath,
+  selectedPaths = EMPTY_PATH_SET,
   loadingPath = null,
   expandedPaths,
   loadingPaths,
@@ -85,16 +94,18 @@ export function ExplorerTree({
   onSelectNode,
   onToggleFolder,
   onMoveNode,
+  onMoveNodes,
   onImportFiles,
   renderRootActions,
   renderFolderActions,
   renderNodeActions,
 }: ExplorerTreeProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [draggedNode, setDraggedNode] = useState<DataNode | null>(null);
+  const [draggedNodes, setDraggedNodes] = useState<DataNode[]>([]);
   const [dropTarget, setDropTarget] = useState<TreeDropTarget>(null);
   const rootDisplayNameCounts = useMemo(() => buildDisplayNameCounts(nodes), [nodes]);
-  const moveEnabled = Boolean(canMoveNodes && onMoveNode);
+  const selectedDragNodes = useMemo(() => collectTopLevelSelectedNodes(nodes, selectedPaths), [nodes, selectedPaths]);
+  const moveEnabled = Boolean(canMoveNodes && (onMoveNodes || onMoveNode));
   const importEnabled = Boolean(onImportFiles);
   const dropEnabled = moveEnabled || importEnabled;
   const resolvedLoadingPaths = useMemo<ReadonlySet<string>>(
@@ -106,7 +117,7 @@ export function ExplorerTree({
   });
 
   const clearDragState = useCallback(() => {
-    setDraggedNode(null);
+    setDraggedNodes([]);
     setDropTarget(null);
   }, []);
 
@@ -137,11 +148,14 @@ export function ExplorerTree({
 
     event.stopPropagation();
     event.dataTransfer.effectAllowed = "copyMove";
-    event.dataTransfer.setData(EXPLORER_TREE_NODE_DRAG_TYPE, node.path);
-    event.dataTransfer.setData("text/plain", node.path);
-    setDraggedNode(node);
+    const movingNodes = selectedPaths.has(node.path) && selectedDragNodes.length > 0
+      ? selectedDragNodes
+      : [node];
+    event.dataTransfer.setData(EXPLORER_TREE_NODE_DRAG_TYPE, movingNodes.map((item) => item.path).join("\n"));
+    event.dataTransfer.setData("text/plain", movingNodes.map((item) => item.path).join("\n"));
+    setDraggedNodes(movingNodes);
     setDropTarget(null);
-  }, [moveEnabled]);
+  }, [moveEnabled, selectedDragNodes, selectedPaths]);
 
   const dragOverRow = useCallback((
     event: ReactDragEvent<HTMLElement>,
@@ -157,15 +171,15 @@ export function ExplorerTree({
       return true;
     }
 
-    if (!moveEnabled || !draggedNode) return false;
+    if (!moveEnabled || draggedNodes.length === 0) return false;
 
-    const valid = isValidMoveTarget(draggedNode, targetFolderPath);
+    const valid = isValidMoveTargetForNodes(draggedNodes, targetFolderPath);
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = valid ? "move" : "none";
     setNextDropTarget(rowPath, targetFolderPath, mode, valid);
     return valid;
-  }, [draggedNode, importEnabled, moveEnabled, setNextDropTarget]);
+  }, [draggedNodes, importEnabled, moveEnabled, setNextDropTarget]);
 
   const dragLeaveRow = useCallback((event: ReactDragEvent<HTMLElement>, rowPath: string | null) => {
     event.stopPropagation();
@@ -183,19 +197,22 @@ export function ExplorerTree({
       return;
     }
 
-    if (!moveEnabled || !draggedNode) return;
+    if (!moveEnabled || draggedNodes.length === 0) return;
 
     event.preventDefault();
     event.stopPropagation();
-    const movingNode = draggedNode;
-    const valid = isValidMoveTarget(movingNode, targetFolderPath);
+    const movingNodes = draggedNodes;
+    const valid = isValidMoveTargetForNodes(movingNodes, targetFolderPath);
     clearDragState();
-    if (!valid || !onMoveNode) return;
+    if (!valid) return;
 
-    void Promise.resolve(onMoveNode(movingNode, targetFolderPath)).catch((error) => {
+    const moveResult = onMoveNodes
+      ? onMoveNodes(movingNodes, targetFolderPath)
+      : Promise.all(movingNodes.map((node) => onMoveNode?.(node, targetFolderPath)));
+    void Promise.resolve(moveResult).catch((error) => {
       console.error("Unable to move explorer item:", error);
     });
-  }, [clearDragState, draggedNode, importEnabled, moveEnabled, onImportFiles, onMoveNode]);
+  }, [clearDragState, draggedNodes, importEnabled, moveEnabled, onImportFiles, onMoveNode, onMoveNodes]);
 
   const leaveTree = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (!dropTarget || !didLeaveElementBounds(event)) return;
@@ -204,7 +221,7 @@ export function ExplorerTree({
 
   const dragController = useMemo<TreeDragController>(() => ({
     enabled: moveEnabled,
-    draggedNode,
+    draggedNodes,
     dropTarget,
     onNodeDragStart: beginNodeDrag,
     onNodeDragEnd: clearDragState,
@@ -216,7 +233,7 @@ export function ExplorerTree({
     clearDragState,
     dragLeaveRow,
     dragOverRow,
-    draggedNode,
+    draggedNodes,
     dropOnRow,
     dropTarget,
     moveEnabled,
@@ -224,7 +241,7 @@ export function ExplorerTree({
 
   return (
     <div
-      className={`explorer-tree-shell ${draggedNode ? "is-dragging-node" : ""} ${dropTarget && !draggedNode ? "is-importing-files" : ""}`}
+      className={`explorer-tree-shell ${draggedNodes.length > 0 ? "is-dragging-node" : ""} ${dropTarget && draggedNodes.length === 0 ? "is-importing-files" : ""}`}
       onDragEnter={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
       onDragOver={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
       onDragLeave={dropEnabled ? leaveTree : undefined}
@@ -257,7 +274,7 @@ export function ExplorerTree({
           {rootError && nodes.length === 0 ? (
             <ExplorerTreeMetaRow depth={0}>{rootError}</ExplorerTreeMetaRow>
           ) : rootLoading && nodes.length === 0 ? (
-            <ExplorerTreeMetaRow depth={0}>{loadingLabel}</ExplorerTreeMetaRow>
+            <ExplorerTreeMetaRow depth={0} loading>{loadingLabel}</ExplorerTreeMetaRow>
           ) : nodes.length === 0 ? (
             <ExplorerTreeMetaRow depth={0}>{emptyLabel}</ExplorerTreeMetaRow>
           ) : (
@@ -269,6 +286,7 @@ export function ExplorerTree({
                 siblingDisplayNameCounts={rootDisplayNameCounts}
                 expandedPaths={expandedPaths}
                 activePath={activePath}
+                selectedPaths={selectedPaths}
                 loadingPaths={resolvedLoadingPaths}
                 emptyLabel={emptyLabel}
                 loadingLabel={loadingLabel}
@@ -293,6 +311,7 @@ function TreeNodeRow({
   siblingDisplayNameCounts,
   expandedPaths,
   activePath,
+  selectedPaths,
   loadingPaths,
   emptyLabel,
   loadingLabel,
@@ -308,12 +327,13 @@ function TreeNodeRow({
   siblingDisplayNameCounts: Map<string, number>;
   expandedPaths: ReadonlySet<string>;
   activePath: string | null;
+  selectedPaths: ReadonlySet<string>;
   loadingPaths: ReadonlySet<string>;
   emptyLabel: string;
   loadingLabel: string;
   fileIconTheme: FileIconThemeId;
   onToggleFolder?: (node: DataNode, expanded: boolean) => void;
-  onSelectNode: (node: DataNode) => void;
+  onSelectNode: ExplorerTreeProps["onSelectNode"];
   dragController: TreeDragController;
   renderFolderActions?: (node: DataNode) => ReactNode;
   renderNodeActions?: (node: DataNode) => ReactNode;
@@ -322,8 +342,9 @@ function TreeNodeRow({
   const isExpanded = isFolder && expandedPaths.has(node.path);
   const hoverExpandTimer = useRef<number | null>(null);
   const active = activePath === node.path;
+  const selected = selectedPaths.has(node.path);
   const loading = loadingPaths.has(node.path);
-  const dragging = dragController.draggedNode?.path === node.path;
+  const dragging = dragController.draggedNodes.some((draggedNode) => draggedNode.path === node.path);
   const dropMatchesRow = dragController.dropTarget?.rowPath === node.path;
   const dropOver = dropMatchesRow && dragController.dropTarget?.mode === "folder" && dragController.dropTarget.valid;
   const dropParentOver = dropMatchesRow && dragController.dropTarget?.mode === "parent" && dragController.dropTarget.valid;
@@ -376,10 +397,11 @@ function TreeNodeRow({
   return (
     <>
       <button
-        className={`tree-row ${isFolder ? "folder" : "file"} ${active ? "active" : ""} ${loading ? "loading" : ""} ${dragging ? "dragging" : ""} ${dropOver ? "drop-target" : ""} ${dropParentOver ? "drop-parent-target" : ""} ${dropInvalid ? "drop-invalid" : ""} ${node.status ? `status-${node.status}` : ""}`}
+        className={`tree-row ${isFolder ? "folder" : "file"} ${selected ? "selected" : ""} ${active ? "active" : ""} ${loading ? "loading" : ""} ${dragging ? "dragging" : ""} ${dropOver ? "drop-target" : ""} ${dropParentOver ? "drop-parent-target" : ""} ${dropInvalid ? "drop-invalid" : ""} ${node.status ? `status-${node.status}` : ""}`}
         type="button"
         draggable={dragController.enabled}
         aria-current={active ? "true" : undefined}
+        aria-selected={selected || undefined}
         aria-expanded={isFolder ? isExpanded : undefined}
         aria-busy={loading || undefined}
         aria-grabbed={dragging ? "true" : undefined}
@@ -408,11 +430,12 @@ function TreeNodeRow({
         }}
         onClick={(event) => {
           event.stopPropagation();
+          const intent = getSelectionIntent(event);
+          onSelectNode(node, intent);
           if (isFolder) {
-            toggleCurrentFolder();
+            if (!intent.additive && !intent.range) toggleCurrentFolder();
             return;
           }
-          onSelectNode(node);
         }}
         style={{ "--depth": depth } as CSSProperties}
       >
@@ -442,7 +465,13 @@ function TreeNodeRow({
           {node.status && node.status !== "clean" && (
             <span className={`tree-status ${node.status}`}>{shortStatus(node.status)}</span>
           )}
-          {loading && <span className="tree-loading-dot" aria-hidden />}
+          {loading && (
+            <DotsLoader
+              size="sm"
+              className="tree-loading-indicator"
+              ariaHidden
+            />
+          )}
           {rowActions && (
             <span className="tree-row-actions" onClick={(event) => event.stopPropagation()}>
               {rowActions}
@@ -454,7 +483,7 @@ function TreeNodeRow({
       {isFolder && (
         <ExplorerSubtreePresence expanded={isExpanded} guideDepth={depth + 1}>
           {loading && children.length === 0 && (
-            <ExplorerTreeMetaRow depth={depth + 1}>{loadingLabel}</ExplorerTreeMetaRow>
+            <ExplorerTreeMetaRow depth={depth + 1} loading>{loadingLabel}</ExplorerTreeMetaRow>
           )}
           {!loading && children.length === 0 && node.children && (
             <ExplorerTreeMetaRow depth={depth + 1}>{emptyLabel}</ExplorerTreeMetaRow>
@@ -467,6 +496,7 @@ function TreeNodeRow({
               siblingDisplayNameCounts={childDisplayNameCounts}
               expandedPaths={expandedPaths}
               activePath={activePath}
+              selectedPaths={selectedPaths}
               loadingPaths={loadingPaths}
               emptyLabel={emptyLabel}
               loadingLabel={loadingLabel}
@@ -514,14 +544,25 @@ function TreeDisclosureMarker({
 
 function ExplorerTreeMetaRow({
   depth,
+  loading = false,
   children,
 }: {
   depth: number;
+  loading?: boolean;
   children: ReactNode;
 }) {
   return (
-    <div className="tree-meta-row" style={{ "--depth": depth } as CSSProperties}>
-      <span>{children}</span>
+    <div className={`tree-meta-row ${loading ? "loading" : ""}`} style={{ "--depth": depth } as CSSProperties}>
+      {loading ? (
+        <InlineLoading
+          label={children}
+          size="sm"
+          indicator="dots"
+          className="tree-meta-loading"
+        />
+      ) : (
+        <span>{children}</span>
+      )}
     </div>
   );
 }
@@ -726,6 +767,35 @@ function isValidMoveTarget(node: DataNode, targetFolderPath: string | null): boo
   if (targetFolderPath === node.path) return false;
   if (targetFolderPath?.startsWith(`${node.path}/`)) return false;
   return true;
+}
+
+function isValidMoveTargetForNodes(nodes: DataNode[], targetFolderPath: string | null): boolean {
+  if (nodes.length === 0) return false;
+  return nodes.every((node) => isValidMoveTarget(node, targetFolderPath));
+}
+
+function collectTopLevelSelectedNodes(nodes: DataNode[], selectedPaths: ReadonlySet<string>): DataNode[] {
+  if (selectedPaths.size === 0) return [];
+  const selectedNodes = collectSelectedNodes(nodes, selectedPaths);
+  return selectedNodes.filter((node) => !selectedNodes.some((candidate) => (
+    candidate.path !== node.path && node.path.startsWith(`${candidate.path}/`)
+  )));
+}
+
+function collectSelectedNodes(nodes: DataNode[], selectedPaths: ReadonlySet<string>): DataNode[] {
+  const selectedNodes: DataNode[] = [];
+  for (const node of nodes) {
+    if (selectedPaths.has(node.path)) selectedNodes.push(node);
+    if (node.children) selectedNodes.push(...collectSelectedNodes(node.children, selectedPaths));
+  }
+  return selectedNodes;
+}
+
+function getSelectionIntent(event: ReactMouseEvent<HTMLElement>): ExplorerSelectionIntent {
+  return {
+    additive: event.metaKey || event.ctrlKey,
+    range: event.shiftKey,
+  };
 }
 
 function getParentPath(path: string): string | null {

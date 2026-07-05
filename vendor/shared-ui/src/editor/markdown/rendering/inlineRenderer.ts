@@ -4,6 +4,7 @@ import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../viewerTy
 import {
   findMarkdownImageTokens,
   isSafeMarkdownImageUrl,
+  parseMarkdownImageTokenAt,
   resolveMarkdownHtmlImageSources,
 } from "../links/markdownImageModel";
 import { findWikiLinkTokens, type MarkdownWikiLinkToken } from "../links/wikiLinkModel";
@@ -307,16 +308,13 @@ function parseLinkToken(source: string, from: number): InlineToken | null {
 }
 
 function parseImageToken(source: string, from: number): InlineToken | null {
-  if (!source.startsWith("![", from)) return null;
-  if (isEscaped(source, from)) return null;
-
-  const token = findMarkdownImageTokens(source.slice(from))[0] ?? null;
-  if (!token || token.from !== 0) return null;
+  const token = parseMarkdownImageTokenAt(source, from);
+  if (!token) return null;
 
   return {
     kind: "image",
-    from,
-    to: from + token.to,
+    from: token.from,
+    to: token.to,
     alt: token.alt,
     href: token.href,
     title: token.title,

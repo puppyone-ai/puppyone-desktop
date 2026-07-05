@@ -1,0 +1,348 @@
+.desktop-cloud-workflow-dialog {
+  background: var(--po-overlay);
+}
+
+.desktop-cloud-workflow-dialog-header {
+  align-items: center;
+  padding: 18px 20px 10px;
+}
+
+.desktop-cloud-workflow-dialog-header .desktop-dialog-title-row h2 {
+  margin: 0;
+  color: var(--po-text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.desktop-cloud-workflow-dialog-header .desktop-dialog-title-row p {
+  margin: 3px 0 0;
+  color: var(--po-text-muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.desktop-cloud-workflow-dialog-body {
+  display: grid;
+  gap: 16px;
+  padding: 12px 20px 20px;
+}
+
+.desktop-cloud-workflow-state {
+  display: grid;
+  min-height: 120px;
+  place-items: center;
+  color: var(--po-text-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.desktop-cloud-workflow-source-grid {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.desktop-cloud-workflow-source-card {
+  display: grid;
+  width: 100%;
+  min-height: 62px;
+  min-width: 0;
+  grid-template-columns: 36px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel-raised) 44%, transparent);
+  color: var(--po-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.desktop-cloud-workflow-source-card:hover {
+  border-color: var(--po-border);
+  background: color-mix(in srgb, var(--po-panel-raised) 64%, transparent);
+}
+
+.desktop-cloud-workflow-source-card.selected {
+  border-color: var(--po-border-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-border-strong) 62%, transparent);
+}
+
+.desktop-cloud-workflow-source-icon,
+.desktop-cloud-workflow-node-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--po-border-subtle);
+  background: var(--po-panel);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-workflow-source-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+}
+
+.desktop-cloud-workflow-source-icon img,
+.desktop-cloud-workflow-node-icon img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.desktop-cloud-workflow-source-content {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.desktop-cloud-workflow-source-content span,
+.desktop-cloud-workflow-source-content small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-workflow-source-content span {
+  color: var(--po-text);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.desktop-cloud-workflow-source-content small {
+  color: var(--po-text-muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.desktop-cloud-workflow-source-auth {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.desktop-cloud-workflow-source-auth:hover {
+  border-color: var(--po-border-strong);
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-workflow-dialog-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--po-border-subtle);
+}
+
+.desktop-cloud-workflow-dialog-footer-row > span {
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.desktop-cloud-workflow-dialog-footer-row > span.ready {
+  color: var(--po-success);
+}
+
+.desktop-cloud-workflow-dialog-footer-row > span.muted {
+  color: var(--po-text-subtle);
+}
+
+.desktop-cloud-workflow-actions,
+.desktop-cloud-workflow-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-workflow-actions .desktop-dialog-button,
+.desktop-cloud-workflow-header-actions .desktop-dialog-button {
+  gap: 6px;
+}
+
+.desktop-cloud-workflow-map {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 86px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 12px;
+}
+
+.desktop-cloud-workflow-node {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  overflow: hidden;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel-raised) 48%, transparent);
+}
+
+.desktop-cloud-workflow-node-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--po-border-subtle);
+}
+
+.desktop-cloud-workflow-node-header > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-workflow-node-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 7px;
+}
+
+.desktop-cloud-workflow-node-body {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  padding: 12px;
+}
+
+.desktop-cloud-workflow-field {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.desktop-cloud-workflow-field > span {
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.desktop-cloud-workflow-field input,
+.desktop-cloud-workflow-field select {
+  width: 100%;
+  height: 30px;
+  box-sizing: border-box;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  outline: 0;
+  background: var(--po-panel-raised);
+  color: var(--po-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  padding: 0 9px;
+}
+
+.desktop-cloud-workflow-field input:focus,
+.desktop-cloud-workflow-field select:focus {
+  border-color: var(--po-border-strong);
+}
+
+.desktop-cloud-workflow-field small,
+.desktop-cloud-workflow-field-empty {
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.desktop-cloud-workflow-connector {
+  display: grid;
+  grid-template-rows: minmax(22px, 1fr) 28px minmax(22px, 1fr) 24px;
+  justify-items: center;
+  align-items: center;
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-workflow-connector > span {
+  width: 1px;
+  height: 100%;
+  background: var(--po-border-subtle);
+}
+
+.desktop-cloud-workflow-connector button {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid var(--po-border);
+  border-radius: 999px;
+  background: var(--po-panel);
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.desktop-cloud-access-header {
+  display: flex;
+  height: 46px;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--po-divider);
+  background: var(--po-panel);
+}
+
+.desktop-cloud-access-header > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-access-header > div > span {
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-access-header small {
+  display: inline-flex;
+  min-width: 20px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--po-border-subtle);
+  color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+}

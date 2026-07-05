@@ -25,9 +25,13 @@ export {
 } from "./core/fileFormats";
 
 export { DataWorkspace } from "./data/DataWorkspace";
-export type { DataWorkspaceProps, DataWorkspaceState } from "./data/DataWorkspace";
+export type {
+  DataWorkspaceFolderExpansionStrategy,
+  DataWorkspaceProps,
+  DataWorkspaceState,
+} from "./data/DataWorkspace";
 export { EXPLORER_TREE_NODE_DRAG_TYPE, ExplorerTree } from "./data/ExplorerTree";
-export type { ExplorerTreeProps } from "./data/ExplorerTree";
+export type { ExplorerSelectionIntent, ExplorerTreeProps } from "./data/ExplorerTree";
 export { FilePreview } from "./data/FilePreview";
 export type { FilePreviewProps } from "./data/FilePreview";
 export { ProjectsHeader as WorkspaceHeader } from "./data/ProjectsHeader";
@@ -115,3 +119,5 @@ export { EmptyState } from "./primitives/EmptyState";
 export type { EmptyStateProps } from "./primitives/EmptyState";
 export { StatusBadge } from "./primitives/StatusBadge";
 export type { StatusBadgeProps } from "./primitives/StatusBadge";
+export { DotsLoader, InlineLoading, PulseGridLoader } from "./primitives/LoadingIndicator";
+export type { LoaderSize, LoaderTone } from "./primitives/LoadingIndicator";

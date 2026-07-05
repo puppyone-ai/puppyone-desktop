@@ -202,6 +202,49 @@ body.data-sidebar-resizing * {
   color: var(--po-text);
 }
 
+.desktop-sidebar-surface-switch-icon {
+  position: relative;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-sidebar-surface-switch-icon svg:first-child {
+  transform: translate(-2px, 0);
+}
+
+.desktop-sidebar-surface-switch-icon svg:last-child {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  filter: drop-shadow(0 0 1px var(--po-sidebar));
+}
+
+.desktop-sidebar-footer-button:disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.desktop-workspace-surface-alert {
+  position: absolute;
+  z-index: 85;
+  top: 12px;
+  right: 16px;
+  max-width: min(420px, calc(100% - var(--data-explorer-width, 320px) - 40px));
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--po-warning) 45%, var(--po-border));
+  border-radius: var(--desktop-control-radius);
+  background: color-mix(in srgb, var(--po-warning) 14%, var(--po-panel-raised));
+  color: color-mix(in srgb, var(--po-warning) 78%, var(--po-text));
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1.35;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+}
+
 .desktop-sidebar-top-navigation {
   position: relative;
   display: flex;

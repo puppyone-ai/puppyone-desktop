@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   showHomepage: () => ipcRenderer.invoke("workspace:show-homepage"),
   openWorkspaceInCurrentWindow: (folderPath) => ipcRenderer.invoke("workspace:open-current", folderPath),
   openWorkspaceInNewWindow: (folderPath) => ipcRenderer.invoke("workspace:open-new-window", folderPath),
+  openCloudProjectInNewWindow: (request) => ipcRenderer.invoke("workspace:open-cloud-project-new-window", request),
   selectFolder: () => ipcRenderer.invoke("workspace:select-folder-current"),
   selectFolderInNewWindow: () => ipcRenderer.invoke("workspace:select-folder-new-window"),
   workspaceFromPath: (folderPath) => ipcRenderer.invoke("workspace:from-path", folderPath),
@@ -41,6 +42,15 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   importEntries: (request) => ipcRenderer.invoke("workspace:import-entries", request),
   deleteEntry: (request) => ipcRenderer.invoke("workspace:delete-entry", request),
   revealEntryInFinder: (request) => ipcRenderer.invoke("workspace:reveal-entry-in-finder", request),
+  openEntryExternal: (request) => ipcRenderer.invoke("workspace:open-entry-external", request),
+  resolveExternalOpenTarget: (request) => ipcRenderer.invoke("workspace:resolve-external-open-target", request),
+  listExternalOpenTargets: (request) => ipcRenderer.invoke("workspace:list-external-open-targets", request),
+  chooseExternalApp: (request) => ipcRenderer.invoke("workspace:choose-external-app", request),
+  startAppPreview: (request) => ipcRenderer.invoke("app-preview:start", request),
+  restartAppPreview: (request) => ipcRenderer.invoke("app-preview:restart", request),
+  stopAppPreview: (request) => ipcRenderer.invoke("app-preview:stop", request),
+  getAppPreviewLogs: (request) => ipcRenderer.invoke("app-preview:get-logs", request),
+  openAppPreviewExternal: (request) => ipcRenderer.invoke("app-preview:open-external", request),
   watchWorkspace: (rootPath, callback) => {
     const listener = (_event, payload) => {
       if (payload?.rootPath === rootPath) callback(payload);

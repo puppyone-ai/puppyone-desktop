@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
+import type { AppPreviewController } from "../core/types";
 import type { FileFormat } from "../core/fileFormats";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
 
 export type EditorDocumentKind =
   | "folder"
+  | "app"
   | "markdown"
   | "json"
   | "html"
@@ -98,6 +100,7 @@ export type EditorViewerContext = EditorViewerMatch & {
   htmlTrustMode: MarkdownHtmlTrustMode;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  appPreview?: AppPreviewController | null;
   onSaveContent?: (content: string) => Promise<void>;
 };
 

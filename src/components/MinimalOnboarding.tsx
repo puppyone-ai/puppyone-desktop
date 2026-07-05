@@ -2,7 +2,7 @@ import type { Workspace } from "@puppyone/shared-ui";
 import { AlertTriangle, Cloud, Folder, FolderOpen, Monitor } from "lucide-react";
 import type { DragEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import type { ThemeMode } from "../preferences";
+import type { DarkThemePreset, LightThemePreset, ThemeMode } from "../preferences";
 import { InlineLoading } from "./loading";
 
 export type RecentWorkspaceHomeItem = {
@@ -48,6 +48,8 @@ type MinimalOnboardingProps = {
   operationStatus?: OnboardingOperationStatus | null;
   initialError?: string | null;
   themeMode: ThemeMode;
+  lightThemePreset: LightThemePreset;
+  darkThemePreset: DarkThemePreset;
   resolvedTheme: "light" | "dark";
 };
 
@@ -65,6 +67,8 @@ export function MinimalOnboarding({
   operationStatus = null,
   initialError = null,
   themeMode,
+  lightThemePreset,
+  darkThemePreset,
   resolvedTheme,
 }: MinimalOnboardingProps) {
   const [error, setError] = useState<string | null>(initialError);
@@ -207,6 +211,8 @@ export function MinimalOnboarding({
     <main
       className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${dragging ? "dragging" : ""}`}
       data-theme-mode={themeMode}
+      data-light-theme-preset={lightThemePreset}
+      data-dark-theme-preset={darkThemePreset}
       onDragEnter={() => setDragging(true)}
       onDragOver={(event) => {
         event.preventDefault();

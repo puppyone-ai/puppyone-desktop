@@ -300,6 +300,15 @@ body.data-sidebar-resizing * {
   opacity: 0.46;
 }
 
+.tree-row.selected {
+  background: var(--po-selected);
+  color: var(--po-text);
+}
+
+.tree-row.selected:not(.active) {
+  background: color-mix(in srgb, var(--po-selected) 74%, transparent);
+}
+
 .tree-row.active {
   background: var(--po-selected);
   color: var(--po-text);
@@ -341,7 +350,7 @@ body.data-sidebar-resizing * {
 }
 
 .tree-row.loading {
-  color: var(--po-text);
+  color: inherit;
 }
 
 .tree-row.status-deleted {
@@ -530,7 +539,12 @@ body.data-sidebar-resizing * {
   user-select: none;
 }
 
-.tree-meta-row > span {
+.tree-meta-row.loading {
+  color: var(--po-text-muted);
+}
+
+.tree-meta-row > span,
+.tree-meta-loading > span {
   position: relative;
   z-index: 1;
   min-width: 0;
@@ -539,25 +553,50 @@ body.data-sidebar-resizing * {
   white-space: nowrap;
 }
 
-.tree-loading-dot {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  margin-right: 2px;
-  border-radius: 999px;
-  background: var(--po-text-subtle);
-  animation: tree-loading-pulse 820ms ease-in-out infinite;
+.tree-meta-loading {
+  min-width: 0;
+  color: inherit;
 }
 
-@keyframes tree-loading-pulse {
+.tree-meta-loading [data-puppy-loader],
+.tree-loading-indicator {
+  flex: 0 0 auto;
+  height: 10px;
+}
+
+.tree-loading-indicator {
+  margin-right: 2px;
+}
+
+@keyframes puppy-pulse-grid {
   0%,
+  60%,
+  100% {
+    opacity: 0.18;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+@keyframes puppy-dot-bounce {
+  0%,
+  80%,
   100% {
     opacity: 0.35;
-    transform: scale(0.86);
+    transform: translateY(0);
   }
-  50% {
-    opacity: 0.9;
-    transform: scale(1);
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-puppy-loader],
+  [data-puppy-loader] * {
+    animation: none !important;
+    opacity: 0.6 !important;
   }
 }
 

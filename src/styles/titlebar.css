@@ -8,7 +8,7 @@
   min-height: var(--desktop-chrome-height);
   padding: 0 8px 0 86px;
   border-bottom: 1px solid var(--po-divider);
-  background: var(--po-header);
+  background: var(--po-sidebar);
   -webkit-app-region: drag;
   user-select: none;
 }
@@ -87,6 +87,12 @@
 
 .desktop-titlebar-action .spin {
   animation: spin 900ms linear infinite;
+}
+
+.desktop-titlebar-action-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .desktop-update-titlebar-action.available,
@@ -196,6 +202,104 @@
   background: var(--po-overlay);
   box-shadow: 0 18px 44px color-mix(in srgb, var(--po-shadow) 86%, transparent);
   -webkit-app-region: no-drag;
+}
+
+.desktop-titlebar-external-open {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: var(--desktop-chrome-control-size);
+  border-radius: var(--desktop-control-radius);
+}
+
+.desktop-titlebar-external-open:has(.desktop-titlebar-external-open-menu-button[aria-expanded="true"]) {
+  background: var(--po-hover);
+}
+
+.desktop-titlebar-external-open-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.desktop-titlebar-external-open-menu-button {
+  width: 17px;
+  margin-left: -2px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.desktop-titlebar-external-open-menu-button[aria-expanded="true"] {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-titlebar-external-app-icon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  overflow: hidden;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+
+.desktop-titlebar-external-app-icon.fallback {
+  background: color-mix(in srgb, var(--po-text-muted) 13%, transparent);
+  color: var(--po-text);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.desktop-titlebar-external-open-loader {
+  transform: scale(1.23);
+  transform-origin: center;
+}
+
+.desktop-titlebar-external-app-loader {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--po-text-muted);
+}
+
+.desktop-titlebar-external-app-icon img {
+  display: block;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.desktop-titlebar-external-open-menu {
+  right: 0;
+  left: auto;
+  width: 260px;
+}
+
+.desktop-titlebar-external-open-row {
+  gap: 9px;
+  justify-content: flex-start;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.desktop-titlebar-external-open-row > .desktop-titlebar-external-app-icon {
+  min-width: 16px;
+  flex: 0 0 16px;
+}
+
+.desktop-titlebar-external-open-row > span:not(.desktop-titlebar-external-app-icon) {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.desktop-titlebar-menu-separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--po-divider);
 }
 
 .desktop-titlebar-branch-wrap {

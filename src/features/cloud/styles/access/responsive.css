@@ -1,0 +1,14 @@
+@media (max-width: 860px) {
+  .desktop-cloud-access-method-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .desktop-cloud-access-method-card.remote {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .desktop-cloud-access-method-remote-button {
+    justify-self: flex-start;
+  }
+}

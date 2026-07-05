@@ -1424,6 +1424,8 @@ function getSemanticKindForFormat(format) {
       return "markdown";
     case "html-artifact":
       return "html";
+    case "app-preview":
+      return "app";
     case "image-preview":
       return "image";
     case "audio-preview":
@@ -1441,6 +1443,8 @@ function getSemanticKindForFormat(format) {
   switch (format.category) {
     case "markdown":
       return "markdown";
+    case "app":
+      return "app";
     case "image":
       return "image";
     case "audio":

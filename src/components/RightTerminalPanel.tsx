@@ -9,25 +9,33 @@ type RightTerminalPanelProps = {
   active: boolean;
 };
 
+type TerminalSize = {
+  cols: number;
+  rows: number;
+};
+
 export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const terminalSessionReadyRef = useRef(false);
+  const pendingTerminalSizeRef = useRef<TerminalSize | null>(null);
+  const fitFrameRef = useRef<number | null>(null);
   const activeRef = useRef(active);
   const [hasStarted, setHasStarted] = useState(active);
 
   const handleTerminalDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
-    if (!hasExplorerNodePath(event.dataTransfer)) return;
+    if (!hasTerminalDroppablePaths(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = "copy";
   }, []);
 
   const handleTerminalDrop = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
-    const nodePath = readExplorerNodePath(event.dataTransfer);
-    if (!nodePath) return;
+    const paths = readTerminalDroppedPaths(event.dataTransfer, workspace.path);
+    if (paths.length === 0) return;
 
     event.preventDefault();
     event.stopPropagation();
@@ -38,7 +46,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
 
     bridge.writeTerminal({
       id: sessionId,
-      data: shellQuotePath(joinWorkspacePath(workspace.path, nodePath)),
+      data: paths.map(shellQuotePath).join(" "),
     });
     terminalRef.current?.focus();
   }, [workspace.path]);
@@ -47,6 +55,20 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
     activeRef.current = active;
     if (active) setHasStarted(true);
   }, [active]);
+
+  const syncTerminalSizeToPty = useCallback((size: TerminalSize) => {
+    const sessionId = sessionIdRef.current;
+    const bridge = window.puppyoneDesktop;
+
+    pendingTerminalSizeRef.current = size;
+    if (!terminalSessionReadyRef.current || !sessionId || !bridge?.resizeTerminal) return;
+
+    bridge.resizeTerminal({
+      id: sessionId,
+      cols: size.cols,
+      rows: size.rows,
+    });
+  }, []);
 
   const fitAndResize = useCallback(() => {
     const terminal = terminalRef.current;
@@ -59,15 +81,19 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
       return;
     }
 
-    const sessionId = sessionIdRef.current;
-    if (sessionId && window.puppyoneDesktop?.resizeTerminal) {
-      window.puppyoneDesktop.resizeTerminal({
-        id: sessionId,
-        cols: terminal.cols,
-        rows: terminal.rows,
-      });
-    }
-  }, []);
+    syncTerminalSizeToPty({
+      cols: terminal.cols,
+      rows: terminal.rows,
+    });
+  }, [syncTerminalSizeToPty]);
+
+  const scheduleFitAndResize = useCallback(() => {
+    if (fitFrameRef.current !== null) return;
+    fitFrameRef.current = requestAnimationFrame(() => {
+      fitFrameRef.current = null;
+      fitAndResize();
+    });
+  }, [fitAndResize]);
 
   useEffect(() => {
     if (!hasStarted || !containerRef.current) return undefined;
@@ -86,6 +112,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
       fontWeightBold: 700,
       letterSpacing: 0,
       lineHeight: 1.24,
+      rescaleOverlappingGlyphs: true,
       scrollback: 6000,
       theme: terminalTheme,
     });
@@ -100,9 +127,12 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
     sessionIdRef.current = sessionId;
+    terminalSessionReadyRef.current = false;
+    pendingTerminalSizeRef.current = null;
 
     terminal.loadAddon(fitAddon);
     terminal.open(containerRef.current);
+    fitAndResize();
 
     const writeSystemLine = (message: string) => {
       terminal.writeln(`\x1b[38;5;244m${message}\x1b[0m`);
@@ -140,7 +170,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
 
     if (bodyRef.current) {
       resizeObserver = new ResizeObserver(() => {
-        if (activeRef.current) fitAndResize();
+        if (activeRef.current) scheduleFitAndResize();
       });
       resizeObserver.observe(bodyRef.current);
     }
@@ -165,6 +195,11 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
         void bridge.closeTerminal(result.id);
         return;
       }
+      terminalSessionReadyRef.current = true;
+      syncTerminalSizeToPty(pendingTerminalSizeRef.current ?? {
+        cols: terminal.cols,
+        rows: terminal.rows,
+      });
       if (activeRef.current) terminal.focus();
     }).catch((error) => {
       if (disposed) return;
@@ -173,6 +208,12 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
 
     return () => {
       disposed = true;
+      terminalSessionReadyRef.current = false;
+      pendingTerminalSizeRef.current = null;
+      if (fitFrameRef.current !== null) {
+        cancelAnimationFrame(fitFrameRef.current);
+        fitFrameRef.current = null;
+      }
       if (fitTimer !== undefined) window.clearTimeout(fitTimer);
       resizeObserver?.disconnect();
       removeDataListener?.();
@@ -184,7 +225,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
       fitAddonRef.current = null;
       sessionIdRef.current = null;
     };
-  }, [fitAndResize, hasStarted, workspace.path]);
+  }, [fitAndResize, hasStarted, scheduleFitAndResize, syncTerminalSizeToPty, workspace.path]);
 
   useEffect(() => {
     if (!hasStarted) return undefined;
@@ -208,11 +249,11 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
   useEffect(() => {
     if (!active) return undefined;
     const frame = requestAnimationFrame(() => {
-      fitAndResize();
+      scheduleFitAndResize();
       terminalRef.current?.focus();
     });
     return () => cancelAnimationFrame(frame);
-  }, [active, fitAndResize]);
+  }, [active, scheduleFitAndResize]);
 
   return (
     <section className="desktop-terminal-panel" aria-label="Terminal">
@@ -232,9 +273,40 @@ function hasExplorerNodePath(dataTransfer: DataTransfer) {
   return Array.from(dataTransfer.types).includes(EXPLORER_TREE_NODE_DRAG_TYPE);
 }
 
-function readExplorerNodePath(dataTransfer: DataTransfer) {
-  const value = dataTransfer.getData(EXPLORER_TREE_NODE_DRAG_TYPE).trim();
-  return value || null;
+function hasTerminalDroppablePaths(dataTransfer: DataTransfer) {
+  return hasExplorerNodePath(dataTransfer) || hasDataTransferFiles(dataTransfer);
+}
+
+function hasDataTransferFiles(dataTransfer: DataTransfer) {
+  if (dataTransfer.files.length > 0) return true;
+  if (Array.from(dataTransfer.types).includes("Files")) return true;
+  return Array.from(dataTransfer.items).some((item) => item.kind === "file");
+}
+
+function readTerminalDroppedPaths(dataTransfer: DataTransfer, rootPath: string) {
+  const explorerPaths = readExplorerNodePaths(dataTransfer)
+    .map((nodePath) => joinWorkspacePath(rootPath, nodePath));
+  if (explorerPaths.length > 0) return explorerPaths;
+
+  return Array.from(dataTransfer.files)
+    .map(readDroppedFilePath)
+    .filter((pathValue): pathValue is string => Boolean(pathValue));
+}
+
+function readExplorerNodePaths(dataTransfer: DataTransfer) {
+  if (!hasExplorerNodePath(dataTransfer)) return [];
+  return dataTransfer
+    .getData(EXPLORER_TREE_NODE_DRAG_TYPE)
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function readDroppedFilePath(file: File) {
+  const bridgePath = window.puppyoneDesktop?.getPathForFile?.(file);
+  const legacyPath = (file as File & { path?: string }).path;
+  const pathValue = bridgePath || legacyPath || "";
+  return pathValue.trim() || null;
 }
 
 function joinWorkspacePath(rootPath: string, nodePath: string) {

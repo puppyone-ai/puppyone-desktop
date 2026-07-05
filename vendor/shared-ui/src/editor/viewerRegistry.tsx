@@ -7,6 +7,7 @@ import type {
   EditorViewer,
   EditorViewerMatch,
 } from "./viewerTypes";
+import { AppPreviewViewer } from "./viewers/AppPreviewViewer";
 import { JsonViewer, TextFileViewer, canEditTextFile } from "./viewers/CodeViewer";
 import { CsvViewer, canEditCsv } from "./viewers/CsvViewer";
 import { DocumentPreview } from "./viewers/DocumentFallbackViewer";
@@ -22,6 +23,12 @@ import {
 import { formatJson, isTextPreviewKind } from "./viewers/viewerUtils";
 
 export const EDITOR_VIEWERS: EditorViewer[] = [
+  {
+    id: "app-preview",
+    source: "content",
+    match: ({ document, format }) => document.type === "app" || format.defaultViewer === "app-preview",
+    render: (context) => <AppPreviewViewer {...context} />,
+  },
   {
     id: "markdown",
     source: "content",
