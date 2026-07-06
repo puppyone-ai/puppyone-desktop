@@ -32,7 +32,10 @@
   --desktop-sidebar-row-radius: 6px;
   --desktop-sidebar-row-left-gap: 12px;
   --desktop-sidebar-row-right-gap: 8px;
-  --desktop-sidebar-scrollbar-width: 4px;
+  --po-scrollbar-size: 6px;
+  --po-scrollbar-radius: 3px;
+  --po-scrollbar-transition: 0.16s ease;
+  --desktop-sidebar-scrollbar-width: var(--po-scrollbar-size);
   --desktop-sidebar-row-content-left: 6px;
   --desktop-sidebar-row-content-right: 6px;
   --desktop-sidebar-section-top-gap: 5px;

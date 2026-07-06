@@ -230,8 +230,8 @@ body {
 }
 
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: var(--po-scrollbar-size, 6px);
+  height: var(--po-scrollbar-size, 6px);
 }
 
 *::-webkit-scrollbar-track {
@@ -240,8 +240,8 @@ body {
 
 *::-webkit-scrollbar-thumb {
   background: var(--po-scrollbar-thumb);
-  border-radius: 3px;
-  transition: background-color 0.16s ease;
+  border-radius: var(--po-scrollbar-radius, 3px);
+  transition: background-color var(--po-scrollbar-transition, 0.16s ease);
 }
 
 .po-scrollbar-active {

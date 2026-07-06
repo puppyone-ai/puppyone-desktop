@@ -179,7 +179,9 @@ body.data-sidebar-resizing * {
   --tree-icon-slot-size: var(--po-tree-icon-slot-size, 18px);
   --tree-root-top-gap: var(--po-tree-root-top-gap, 5px);
   --tree-list-bottom-gap: var(--po-tree-list-bottom-gap, 6px);
-  --tree-scrollbar-width: var(--po-tree-scrollbar-width, 4px);
+  --tree-scrollbar-width: var(--po-tree-scrollbar-width, var(--po-scrollbar-size, 6px));
+  --tree-scrollbar-radius: var(--po-scrollbar-radius, 3px);
+  --tree-scrollbar-transition: var(--po-scrollbar-transition, 0.16s ease);
 
   position: relative;
   display: flex;
@@ -203,38 +205,30 @@ body.data-sidebar-resizing * {
   min-height: 0;
   overflow: auto;
   overflow-x: hidden;
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  scrollbar-color: var(--po-scrollbar-thumb) transparent;
 }
 
 .explorer-tree-scroll::-webkit-scrollbar {
   width: var(--tree-scrollbar-width);
   height: var(--tree-scrollbar-width);
+  background: transparent;
 }
 
-.explorer-tree-scroll::-webkit-scrollbar-track {
+.explorer-tree-scroll::-webkit-scrollbar-track,
+.explorer-tree-scroll::-webkit-scrollbar-corner {
   background: transparent;
 }
 
 .explorer-tree-scroll::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: transparent;
-}
-
-.explorer-tree-scroll.is-scrollable:hover,
-.explorer-tree-scroll.is-scrollable:focus-within,
-.explorer-tree-scroll.is-scrollable.po-scrollbar-active {
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
-}
-
-.explorer-tree-scroll.is-scrollable:hover::-webkit-scrollbar-thumb,
-.explorer-tree-scroll.is-scrollable:focus-within::-webkit-scrollbar-thumb,
-.explorer-tree-scroll.is-scrollable.po-scrollbar-active::-webkit-scrollbar-thumb {
+  border-radius: var(--tree-scrollbar-radius);
   background: var(--po-scrollbar-thumb);
+  transition: background-color var(--tree-scrollbar-transition);
 }
 
-.explorer-tree-scroll.is-scrollable:hover::-webkit-scrollbar-thumb:hover,
-.explorer-tree-scroll.is-scrollable.po-scrollbar-active::-webkit-scrollbar-thumb:hover {
+.explorer-tree-scroll::-webkit-scrollbar-thumb:hover,
+.explorer-tree-scroll.po-scrollbar-active::-webkit-scrollbar-thumb:hover {
   background: var(--po-scrollbar-thumb-hover);
 }
 
@@ -243,10 +237,6 @@ body.data-sidebar-resizing * {
   width: 100%;
   box-sizing: border-box;
   padding: 0 0 var(--tree-list-bottom-gap);
-}
-
-.explorer-tree-scroll.is-scrollable .explorer-tree-list {
-  --tree-row-right-gap: max(0px, calc(var(--po-tree-row-right-gap, 4px) - var(--tree-scrollbar-width)));
 }
 
 .data-explorer-footer {
