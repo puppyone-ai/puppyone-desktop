@@ -238,6 +238,7 @@
   --po-tree-row-radius: var(--desktop-sidebar-row-radius);
   --po-tree-row-content-left: var(--desktop-sidebar-row-content-left);
   --po-tree-row-content-right: var(--desktop-sidebar-row-content-right);
+  --po-tree-row-icon-label-gap: 4px;
   --po-tree-root-top-gap: var(--desktop-sidebar-section-top-gap);
   --po-tree-list-bottom-gap: var(--desktop-sidebar-section-bottom-gap);
   --data-explorer-footer-height: var(--desktop-sidebar-nav-height);
@@ -249,6 +250,26 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.desktop-data-workspace-wrap .desktop-explorer-list-end-create-row {
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  opacity: 0.86;
+}
+
+.desktop-data-workspace-wrap .desktop-explorer-list-end-create-row:hover,
+.desktop-data-workspace-wrap .desktop-explorer-list-end-create-row:focus-visible {
+  color: var(--po-text-muted);
+  opacity: 1;
+}
+
+.desktop-data-workspace-wrap .desktop-explorer-list-end-create-command {
+  font-weight: 560;
+}
+
+.desktop-data-workspace-wrap .desktop-explorer-list-end-create-row .tree-icon-slot {
+  opacity: 0.82;
 }
 
 .app-shell.dark .desktop-data-workspace-wrap .explorer-column {

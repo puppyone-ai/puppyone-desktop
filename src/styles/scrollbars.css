@@ -1,0 +1,42 @@
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: var(--po-scrollbar-size, 6px);
+  height: var(--po-scrollbar-size, 6px);
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--po-scrollbar-thumb);
+  border-radius: var(--po-scrollbar-radius, 3px);
+  transition: background-color var(--po-scrollbar-transition, 0.16s ease);
+}
+
+.po-scrollbar-active {
+  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+}
+
+.po-scrollbar-active::-webkit-scrollbar-thumb {
+  background: var(--po-scrollbar-thumb);
+}
+
+*::-webkit-scrollbar-thumb:hover,
+.po-scrollbar-active::-webkit-scrollbar-thumb:hover {
+  background: var(--po-scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *::-webkit-scrollbar-thumb {
+    transition: none;
+  }
+}

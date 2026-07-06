@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { ArrowLeft, Cloud, Folder, FolderOpen } from "lucide-react";
+import { DesktopMenuItem, DesktopMenuSection, DesktopMenuSurface } from "../../components/DesktopMenu";
 
 export type DesktopWorkspaceSwitcherItem = {
   id: string;
@@ -42,23 +43,16 @@ export function DesktopWorkspaceSwitcher({
   const localItems = items.filter((item) => item.kind === "local");
 
   const renderProjectRows = (items: DesktopWorkspaceSwitcherItem[]) => items.map((item) => (
-    <div
+    <DesktopMenuItem
       key={item.id}
-      className={`desktop-project-option-row ${item.id === workspace.id ? "active" : ""}`}
-    >
-      <button
-        className={`desktop-project-option ${item.id === workspace.id ? "active" : ""}`}
-        type="button"
-        title={item.title}
-        onClick={() => onOpenItem(item)}
-      >
-        <ProjectTypeMark kind={item.kind} className="desktop-project-mark" />
-        <span className="desktop-project-option-text">
-          <strong>{item.label}</strong>
-          <small>{item.detail}</small>
-        </span>
-      </button>
-    </div>
+      className="desktop-project-option"
+      title={item.title}
+      selected={item.id === workspace.id}
+      icon={<ProjectTypeMark kind={item.kind} className="desktop-project-mark" />}
+      label={item.label}
+      detail={item.detail}
+      onClick={() => onOpenItem(item)}
+    />
   ));
 
   return (
@@ -76,46 +70,42 @@ export function DesktopWorkspaceSwitcher({
       </button>
 
       {open && (
-        <div className="desktop-project-menu desktop-titlebar-menu">
-          <button className="desktop-project-add desktop-project-home" type="button" onClick={onGoHome}>
-            <span className="desktop-project-add-mark" aria-hidden="true">
-              <ArrowLeft size={14} />
-            </span>
-            <span>To homepage</span>
-          </button>
+        <DesktopMenuSurface className="desktop-project-menu desktop-titlebar-menu">
+          <DesktopMenuItem
+            className="desktop-project-add desktop-project-home"
+            icon={<ArrowLeft size={14} />}
+            label="To homepage"
+            onClick={onGoHome}
+          />
           <div className="desktop-project-list">
             {cloudItems.length > 0 && (
-              <section className="desktop-project-section" aria-label="Cloud projects">
+              <DesktopMenuSection className="desktop-project-section" aria-label="Cloud projects">
                 {renderProjectRows(cloudItems)}
-              </section>
+              </DesktopMenuSection>
             )}
             {localItems.length > 0 && (
-              <section className="desktop-project-section" aria-label="Local projects">
+              <DesktopMenuSection className="desktop-project-section" aria-label="Local projects">
                 {renderProjectRows(localItems)}
-              </section>
+              </DesktopMenuSection>
             )}
           </div>
           <div className="desktop-project-actions">
-            <button className="desktop-project-add" type="button" onClick={onOpenFolder}>
-              <span className="desktop-project-add-mark" aria-hidden="true">
-                <FolderOpen size={14} />
-              </span>
-              <span>Open local folder</span>
-            </button>
+            <DesktopMenuItem
+              className="desktop-project-add"
+              icon={<FolderOpen size={14} />}
+              label="Open local folder"
+              onClick={onOpenFolder}
+            />
             {onCreateCloudProject && (
-              <button
+              <DesktopMenuItem
                 className="desktop-project-add"
-                type="button"
+                icon={<Cloud size={14} />}
+                label="Create cloud project"
                 onClick={() => void onCreateCloudProject()}
-              >
-                <span className="desktop-project-add-mark" aria-hidden="true">
-                  <Cloud size={14} />
-                </span>
-                <span>Create cloud project</span>
-              </button>
+              />
             )}
           </div>
-        </div>
+        </DesktopMenuSurface>
       )}
     </div>
   );

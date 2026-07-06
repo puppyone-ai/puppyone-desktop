@@ -2,9 +2,9 @@ import {
   useCallback,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
+import { usePaneResizeDrag } from "@puppyone/shared-ui";
 
 export type DesktopView = "data" | "git" | "cloud" | "access" | "integrations" | "settings";
 
@@ -33,41 +33,27 @@ export function DesktopCloudShell({
   resizableRightSidebar = false,
   onRightSidebarWidthChange,
 }: DesktopCloudShellProps) {
-  const beginRightSidebarResize = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (!resizableRightSidebar || !onRightSidebarWidthChange) return;
+  const beginRightSidebarResize = usePaneResizeDrag({
+    enabled: resizableRightSidebar && Boolean(onRightSidebarWidthChange),
+    bodyClassName: "desktop-right-sidebar-resizing",
+    onDragStart: (event) => {
+      if (!onRightSidebarWidthChange) return null;
 
-      event.preventDefault();
       const startX = event.clientX;
       const startWidth = rightSidebarWidth ?? 560;
 
-      const moveRightSidebarResize = (moveEvent: PointerEvent) => {
-        const nextWidth = clamp(
-          startWidth + startX - moveEvent.clientX,
-          minRightSidebarWidth,
-          maxRightSidebarWidth,
-        );
-        onRightSidebarWidthChange(nextWidth);
+      return {
+        onMove: (point) => {
+          const nextWidth = clamp(
+            startWidth + startX - point.clientX,
+            minRightSidebarWidth,
+            maxRightSidebarWidth,
+          );
+          onRightSidebarWidthChange(nextWidth);
+        },
       };
-
-      const stopRightSidebarResize = () => {
-        window.removeEventListener("pointermove", moveRightSidebarResize);
-        window.removeEventListener("pointerup", stopRightSidebarResize);
-        document.body.classList.remove("desktop-right-sidebar-resizing");
-      };
-
-      document.body.classList.add("desktop-right-sidebar-resizing");
-      window.addEventListener("pointermove", moveRightSidebarResize);
-      window.addEventListener("pointerup", stopRightSidebarResize);
     },
-    [
-      maxRightSidebarWidth,
-      minRightSidebarWidth,
-      onRightSidebarWidthChange,
-      resizableRightSidebar,
-      rightSidebarWidth,
-    ],
-  );
+  });
 
   const rightSidebarStyle = rightSidebarWidth
     ? ({ "--desktop-right-sidebar-width": `${rightSidebarWidth}px` } as CSSProperties)

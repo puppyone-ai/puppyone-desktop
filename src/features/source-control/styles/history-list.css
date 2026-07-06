@@ -1,21 +1,23 @@
 .desktop-git-history-drawer {
   display: flex;
+  box-sizing: border-box;
   min-height: 0;
   flex: 0 0 auto;
   flex-direction: column;
   margin-top: 0;
-  padding: 3px 0 4px;
+  padding: 3px var(--git-sidebar-right-gap) 4px var(--git-sidebar-left-gap);
   border-top: 1px solid color-mix(in srgb, var(--po-border-subtle) 76%, transparent);
   background: color-mix(in srgb, var(--po-sidebar) 94%, var(--po-panel));
 }
 
 .desktop-git-history-drawer-header {
   display: flex;
+  box-sizing: border-box;
   align-items: center;
   gap: 6px;
-  width: var(--git-sidebar-row-width);
+  width: 100%;
   height: var(--desktop-sidebar-row-height);
-  margin: 1px var(--git-sidebar-right-gap) 1px var(--git-sidebar-left-gap);
+  margin: 1px 0;
   padding: 0 var(--git-sidebar-content-right) 0 var(--git-sidebar-content-left);
   border: 0;
   border-radius: var(--git-row-radius);
@@ -62,7 +64,9 @@
   max-height: min(360px, 42vh);
   min-height: 0;
   overflow: auto;
+  overflow-x: hidden;
   padding-bottom: 4px;
+  scrollbar-gutter: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--po-scrollbar-thumb) transparent;
 }
@@ -78,10 +82,10 @@
   position: relative;
   display: flex;
   align-items: center;
-  width: var(--git-sidebar-row-width);
+  width: 100%;
   height: var(--desktop-sidebar-row-height);
   min-height: var(--desktop-sidebar-row-height);
-  margin: 1px var(--git-sidebar-right-gap) 1px var(--git-sidebar-left-gap);
+  margin: 1px 0;
   padding: 0;
   border: 0;
   border-radius: var(--git-row-radius);
@@ -89,11 +93,6 @@
   color: var(--po-text-muted);
   text-align: left;
   outline: none;
-}
-
-.desktop-history-list.is-scrollable > .desktop-history-row {
-  width: var(--git-sidebar-scroll-row-width);
-  margin-right: var(--git-sidebar-scroll-row-right-gap);
 }
 
 .desktop-history-row:hover,

@@ -1,5 +1,7 @@
 @import "./styles/tokens.css";
 @import "./styles/base.css";
+@import "./styles/scrollbars.css";
+@import "./styles/animations.css";
 @import "./styles/shell.css";
 @import "./styles/titlebar.css";
 @import "./styles/dialogs.css";
@@ -12,6 +14,7 @@
 @import "./styles/settings-view.css";
 @import "./features/cloud/legacy-sidebar.css";
 @import "./styles/file-actions.css";
+@import "./styles/menus.css";
 @import "./features/data-workspace/data-shell.css";
 @import "./styles/onboarding.css";
 @import "./features/data-workspace/browser.css";

@@ -103,16 +103,18 @@
 }
 
 .desktop-settings-section {
+  --desktop-settings-content-max-width: 1040px;
+
   display: grid;
   width: 100%;
-  max-width: 920px;
-  gap: 14px;
+  max-width: var(--desktop-settings-content-max-width);
+  gap: 16px;
   margin: 0 auto;
 }
 
+.desktop-account-settings-section,
 .desktop-files-settings-section {
-  max-width: 680px;
-  gap: 10px;
+  max-width: var(--desktop-settings-content-max-width);
 }
 
 .desktop-settings-section + .desktop-settings-section {
@@ -125,7 +127,7 @@
   justify-content: space-between;
   width: 100%;
   gap: 14px;
-  max-width: 920px;
+  max-width: none;
 }
 
 .desktop-settings-section-header {
@@ -235,11 +237,11 @@
 .desktop-settings-remote-setting,
 .desktop-settings-muted-row {
   display: grid;
-  grid-template-columns: minmax(140px, 0.38fr) minmax(0, 1fr);
+  grid-template-columns: minmax(152px, 0.28fr) minmax(0, 1fr);
   min-height: 42px;
   align-items: center;
-  gap: 16px;
-  padding: 0 12px;
+  gap: 20px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--po-divider);
   color: var(--po-text-muted);
   font-size: 12.5px;
@@ -289,10 +291,6 @@
 
 .desktop-settings-line-value strong.success {
   color: var(--po-success);
-}
-
-.desktop-account-settings-section {
-  max-width: 760px;
 }
 
 .desktop-settings-account-actions-line {
@@ -485,8 +483,8 @@
 
 .desktop-settings-pattern-editor {
   display: grid;
-  gap: 7px;
-  padding: 10px 12px 11px;
+  gap: 9px;
+  padding: 12px 14px 13px;
   border-bottom: 1px solid var(--po-divider);
 }
 
@@ -523,9 +521,9 @@
 .desktop-settings-pattern-editor textarea {
   box-sizing: border-box;
   width: 100%;
-  min-height: 96px;
+  min-height: 148px;
   resize: vertical;
-  padding: 7px 8px;
+  padding: 9px 10px;
   border: 1px solid var(--po-divider);
   border-radius: 6px;
   outline: none;
@@ -887,6 +885,58 @@
 }
 
 @media (max-width: 760px) {
+  .desktop-settings-section {
+    gap: 14px;
+  }
+
+  .desktop-settings-heading-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .desktop-settings-heading-row .desktop-settings-action {
+    width: fit-content;
+  }
+
+  .desktop-settings-line,
+  .desktop-settings-muted-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+
+  .desktop-settings-toggle-line {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .desktop-settings-line-value {
+    justify-content: flex-start;
+  }
+
+  .desktop-settings-line-value strong {
+    text-align: left;
+  }
+
+  .desktop-settings-remote-setting {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px 12px;
+    padding: 10px 12px;
+  }
+
+  .desktop-settings-remote-setting-meta,
+  .desktop-settings-remote-setting-url {
+    justify-content: flex-start;
+    justify-items: start;
+  }
+
+  .desktop-settings-remote-setting-url {
+    grid-column: 1 / -1;
+  }
+
   .desktop-hosting-service-panel {
     align-items: stretch;
     flex-direction: column;

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
+import { DesktopMenuItem, DesktopMenuSection } from "../../components/DesktopMenu";
 import type { GitBranchSummary, GitStatusSnapshot } from "../../types/electron";
 import { PuppyGitIcon } from "../app-shell/navigation";
 
@@ -303,27 +304,25 @@ export function BranchMenuGroup({
   if (branches.length === 0) return null;
 
   return (
-    <div className="desktop-branch-menu-group">
-      <div className="desktop-branch-menu-label">{title}</div>
-      <div className="desktop-branch-menu-list">
-        {branches.map((branch) => (
-          <button
-            key={`${branch.remote ? "remote" : "local"}:${branch.name}`}
-            className={`desktop-branch-menu-row ${branch.current ? "current" : ""}`}
-            type="button"
-            title={branch.lastCommitMessage ?? branch.name}
-            disabled={Boolean(operationLoading) || branch.current}
-            onClick={async () => {
+    <DesktopMenuSection className="desktop-branch-menu-group" label={title}>
+      {branches.map((branch) => (
+        <DesktopMenuItem
+          key={`${branch.remote ? "remote" : "local"}:${branch.name}`}
+          className="desktop-branch-menu-row"
+          title={branch.lastCommitMessage ?? branch.name}
+          selected={branch.current}
+          disabled={Boolean(operationLoading) || branch.current}
+          icon={<PuppyGitIcon size={13} />}
+          label={branch.name}
+          trailing={branch.current ? "current" : undefined}
+          onClick={() => {
+            void (async () => {
               const checkedOut = await onCheckout(branch.name, branch.remote);
               if (checkedOut) onDone();
-            }}
-          >
-            <PuppyGitIcon size={13} />
-            <span>{branch.name}</span>
-            {branch.current && <small>current</small>}
-          </button>
-        ))}
-      </div>
-    </div>
+            })();
+          }}
+        />
+      ))}
+    </DesktopMenuSection>
   );
 }

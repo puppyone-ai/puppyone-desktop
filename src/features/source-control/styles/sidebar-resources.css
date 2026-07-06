@@ -52,6 +52,7 @@
   min-height: 0;
   overflow: auto;
   overflow-x: hidden;
+  scrollbar-gutter: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--po-scrollbar-thumb) transparent;
 }
@@ -151,6 +152,7 @@ body.desktop-git-sidebar-resizing {
   overflow: auto;
   overflow-x: hidden;
   padding-bottom: var(--desktop-sidebar-section-bottom-gap);
+  scrollbar-gutter: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--po-scrollbar-thumb) transparent;
 }
@@ -506,9 +508,10 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-git-remote-preview {
   display: grid;
+  box-sizing: border-box;
   gap: 0;
   margin: 0;
-  padding-top: var(--git-section-body-top-gap);
+  padding: var(--git-section-body-top-gap) var(--git-sidebar-right-gap) 0 var(--git-sidebar-left-gap);
   max-height: min(40vh, calc(var(--desktop-sidebar-row-height) * 7));
   overflow: auto;
   overflow-x: hidden;
@@ -624,7 +627,9 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-git-section-row {
   display: flex;
+  box-sizing: border-box;
   align-items: center;
+  width: 100%;
   min-height: var(--desktop-sidebar-row-height);
   padding: 0 var(--git-sidebar-right-gap) 0 var(--git-sidebar-left-gap);
   gap: 4px;
@@ -720,8 +725,9 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-working-tree-list {
   display: grid;
+  box-sizing: border-box;
   gap: 0;
-  padding-top: var(--git-section-body-top-gap);
+  padding: var(--git-section-body-top-gap) var(--git-sidebar-right-gap) 0 var(--git-sidebar-left-gap);
 }
 
 .desktop-git-section-row + .desktop-working-tree-list {
@@ -735,21 +741,15 @@ body.desktop-git-sidebar-resizing {
 .desktop-working-tree-row {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 18px;
+  grid-template-columns: minmax(0, 1fr) max-content 18px;
   column-gap: 6px;
   align-items: center;
-  width: var(--git-sidebar-row-width);
+  width: 100%;
   min-width: 0;
   height: var(--desktop-sidebar-row-height);
-  margin: 1px var(--git-sidebar-right-gap) 1px var(--git-sidebar-left-gap);
+  margin: 1px 0;
   border-radius: var(--git-row-radius);
   color: var(--po-text-muted);
-}
-
-.desktop-working-tree-list.is-scrollable > .desktop-working-tree-row,
-.desktop-git-remote-preview.is-scrollable > .desktop-working-tree-row {
-  width: var(--git-sidebar-scroll-row-width);
-  margin-right: var(--git-sidebar-scroll-row-right-gap);
 }
 
 .desktop-working-tree-row:hover,
@@ -763,6 +763,7 @@ body.desktop-git-sidebar-resizing {
 }
 
 .desktop-working-tree-main {
+  grid-column: 1;
   display: flex;
   min-width: 0;
   align-items: center;
@@ -816,6 +817,7 @@ body.desktop-git-sidebar-resizing {
 }
 
 .desktop-working-tree-state {
+  grid-column: 3;
   justify-self: end;
   padding-right: var(--git-sidebar-content-right);
   color: var(--po-text-subtle);
@@ -841,17 +843,20 @@ body.desktop-git-sidebar-resizing {
 }
 
 .desktop-working-tree-actions {
-  position: absolute;
-  top: 50%;
-  right: var(--git-sidebar-right-gap);
+  grid-column: 2;
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 2px;
+  max-width: 0;
+  overflow: hidden;
   padding: 0;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-50%);
-  transition: opacity 0.12s ease;
+  visibility: hidden;
+  transition:
+    max-width 0.12s ease,
+    opacity 0.12s ease;
 }
 
 .desktop-working-tree-actions .desktop-tool-sidebar-icon {
@@ -861,8 +866,10 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-working-tree-row:hover .desktop-working-tree-actions,
 .desktop-working-tree-row.active .desktop-working-tree-actions {
+  max-width: 54px;
   opacity: 1;
   pointer-events: auto;
+  visibility: visible;
 }
 
 .desktop-working-tree-actions .desktop-tool-sidebar-icon:hover,
@@ -876,9 +883,4 @@ body.desktop-git-sidebar-resizing {
 .desktop-working-tree-actions .desktop-tool-sidebar-icon.danger:focus-visible {
   background: color-mix(in srgb, var(--po-danger) 12%, transparent);
   color: var(--po-danger);
-}
-
-.desktop-working-tree-row:hover .desktop-working-tree-state,
-.desktop-working-tree-row.active .desktop-working-tree-state {
-  opacity: 0;
 }

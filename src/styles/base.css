@@ -10,6 +10,7 @@ body,
   min-width: 0;
   min-height: 0;
   margin: 0;
+  padding: 0;
 }
 
 #root {
@@ -24,6 +25,8 @@ body {
   background: var(--po-canvas);
   color: var(--po-text);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'ss01';
 }
 
 button {

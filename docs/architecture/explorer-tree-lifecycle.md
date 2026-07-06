@@ -7,6 +7,9 @@ lines.
 For the outer Data, Git, Cloud, and Settings sidebar view stack, see
 [Desktop Sidebar View Stack](desktop-sidebar-view-stack.md).
 
+For cross-sidebar scroll area, list padding, row width, and scrollbar gutter
+rules, see [Desktop Sidebar Scroll Lists](desktop-sidebar-scroll-lists.md).
+
 ## Problem
 
 The desktop explorer sidebar lazy-loads folder children and can display the file
@@ -39,6 +42,8 @@ The sidebar file tree must behave as a stable controlled view:
 - Returning to the data tab does not replay existing expansion animations.
 - Tree guide lines are rendered at subtree scope so each indentation level
   extends through its full child group.
+- File-tree rows keep symmetric visual horizontal gutters whether or not the
+  native sidebar scrollbar is present.
 
 ## Final Architecture
 
@@ -117,6 +122,33 @@ represents current state; subsequent state changes animate.
    stable mounted lifecycle from the sidebar stack and focus only on controlled
    tree state.
 
+8. Follow the shared sidebar scroll-list layout contract.
+
+   The files explorer follows
+   [Desktop Sidebar Scroll Lists](desktop-sidebar-scroll-lists.md): scroll
+   containers own scrollbar gutter, the list owns horizontal padding, and rows
+   use `width: 100%` without scrollbar-width compensation. In the desktop shell,
+   the list left and right padding are both `12px`.
+
+9. Keep root-level creation available without a root command row.
+
+   The desktop files sidebar should not repeat the project name already shown in
+   the titlebar. It also does not need a persistent root command row when that
+   row competes visually with the file tree. If the project-name root row is
+   hidden, the file tree should start directly with workspace children and may
+   end with a trailing `+ New` row for root-level creation. Preserve the root
+   row's top inset when hiding it so the first tree row does not collide with
+   the titlebar boundary; the desktop default no-root top inset is `12px`.
+
+   A trailing `+ New` row is a secondary action, not a file item. Keep it
+   visually quieter than folder and file rows through subtler color, slightly
+   smaller type, and lighter weight.
+
+   Creation remains available through contextual entry points too:
+   right-clicking the tree background opens root-level creation, right-clicking
+   a folder opens creation under that folder, and hovered folder rows may expose
+   their local create action. File rows should keep using the node action menu.
+
 ## Current Code Boundaries
 
 - `vendor/shared-ui/src/data/DataWorkspace.tsx`
@@ -130,10 +162,13 @@ represents current state; subsequent state changes animate.
   - receives `expandedPaths` and `loadingPaths`
   - renders the controlled tree
   - owns transient drag/drop UI state only
+  - exposes root and node context-menu hooks without owning desktop menu UI
   - contains subtree presence and motion helpers
 
 - `vendor/shared-ui/src/styles/data-workspace.css`
   - defines subtree-level guide lines
+  - defines native scrollbar styling and scrollable-state row gutter
+    compensation
   - preserves inactive frame layout through the sidebar view-stack styles
 
 These files live in `vendor/shared-ui` — the canonical copy in this standalone
@@ -157,6 +192,21 @@ Manual verification should cover:
 - switching from Data to Cloud and Settings and back
 - selecting a deep file path that auto-expands ancestor folders
 - verifying subtree guide lines are continuous through nested folders
+- verifying explorer row backgrounds keep `12px` left and right gutters inside
+  the scrollport, and that rows become narrower by the native scrollbar width
+  when a long scrollable tree reserves a scrollbar gutter
+- verifying long scrollable trees keep scrollbar layout space while the
+  scrollbar thumb is hidden before sidebar hover
+- clicking the trailing `+ New` row to create at the workspace root
+- verifying the trailing `+ New` menu uses automatic placement: below the row
+  when there is room, above the row near the sidebar bottom, and never clamped
+  to the viewport top or bottom; horizontally, its right edge aligns to the
+  trailing `+ New` row's right edge
+- verifying the first tree row keeps the expected top inset when the
+  project-name root row is hidden
+- right-clicking tree background to create at the workspace root when the
+  project-name root row is hidden
+- right-clicking a folder row to create under that folder
 
 ## Invariants
 
@@ -170,3 +220,11 @@ These invariants should remain true after future changes:
 - Inactive explorer frames preserve layout geometry.
 - Initial subtree presence does not animate; post-mount expansion/collapse does.
 - Tree guide lines are subtree-scoped, not row-scoped.
+- Explorer rows keep the same geometry in short and long lists. Native
+  scrollbars may overlay the scrollport and must not be compensated in row
+  spacing.
+- Scrollable explorer sidebars may hide the scrollbar thumb by default, then
+  reveal the platform scrollbar styling on hover, focus, or active scroll.
+- Hiding the project-name root row must not remove root-level creation; the tree
+  may expose a trailing `+ New` row, and the tree background context menu remains
+  a root creation entry point.

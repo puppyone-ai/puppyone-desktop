@@ -139,6 +139,9 @@ export function useScrollableDescendantClasses<T extends HTMLElement>(
       if (frameId !== null) window.cancelAnimationFrame(frameId);
       mutationObserver?.disconnect();
       resizeObserver?.disconnect();
+      observed.forEach((container) => {
+        container.classList.remove(className);
+      });
     };
   }, [className, rootRef, selector, threshold, ...dependencies]);
 }

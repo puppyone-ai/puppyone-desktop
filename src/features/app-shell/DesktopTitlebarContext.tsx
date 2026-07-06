@@ -10,6 +10,7 @@ import {
   DesktopWorkspaceSwitcher,
   type DesktopWorkspaceSwitcherItem,
 } from "./DesktopWorkspaceSwitcher";
+import { DesktopMenuSurface } from "../../components/DesktopMenu";
 import { PuppyGitIcon } from "./navigation";
 import { BranchMenuGroup } from "../source-control/operationDialogs";
 
@@ -102,7 +103,7 @@ export function DesktopTitlebarContext({
           </button>
 
           {branchReady && branchSwitcherOpen && (
-            <div className="desktop-branch-menu desktop-titlebar-menu">
+            <DesktopMenuSurface className="desktop-branch-menu desktop-titlebar-menu">
               <BranchMenuGroup
                 title="Local"
                 branches={localBranches}
@@ -119,7 +120,7 @@ export function DesktopTitlebarContext({
                   onDone={onBranchMenuDone}
                 />
               )}
-            </div>
+            </DesktopMenuSurface>
           )}
         </div>
       )}

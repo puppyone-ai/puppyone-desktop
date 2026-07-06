@@ -10,7 +10,6 @@
 .desktop-history-panel-tree {
   --git-sidebar-left-gap: var(--desktop-sidebar-row-left-gap);
   --git-sidebar-right-gap: var(--desktop-sidebar-row-right-gap);
-  --git-sidebar-row-width: calc(100% - var(--git-sidebar-left-gap) - var(--git-sidebar-right-gap));
   --git-sidebar-content-left: var(--desktop-sidebar-row-content-left);
   --git-sidebar-content-right: var(--desktop-sidebar-row-content-right);
   --git-row-radius: var(--desktop-sidebar-row-radius);
@@ -41,7 +40,9 @@ body.desktop-history-resizing .desktop-history-panel-tree {
 .desktop-history-panel-tree > .desktop-history-list {
   min-height: 0;
   overflow: auto;
-  padding-top: 8px;
+  overflow-x: hidden;
+  padding: 8px var(--git-sidebar-right-gap) 6px var(--git-sidebar-left-gap);
+  scrollbar-gutter: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--po-scrollbar-thumb) transparent;
 }

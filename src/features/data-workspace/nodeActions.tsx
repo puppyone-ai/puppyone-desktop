@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { ExternalLink, FileText, FolderOpen, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { FileGlyphIcon, getMatchedExtension, type DataNode, type FileIconThemeId } from "@puppyone/shared-ui";
 import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
+import { DesktopMenuItem, DesktopMenuSurface } from "../../components/DesktopMenu";
 
 export type DesktopCreateEntryKind = "folder" | "markdown" | "text" | "json" | "csv" | "app";
 export type DesktopCreateEntryAnchor = {
@@ -12,7 +13,9 @@ export type DesktopCreateEntryAnchor = {
   bottom: number;
   width: number;
   height: number;
+  placement?: "below-start" | "below-end" | "above-start" | "above-end" | "auto-start" | "auto-end";
 };
+export type DesktopCreateEntryAnchorInput = DOMRect | DesktopCreateEntryAnchor;
 export type DesktopCreateEntryDraft = {
   parentPath: string | null;
   anchor: DesktopCreateEntryAnchor;
@@ -189,11 +192,10 @@ export function DesktopCreateEntryMenu({
   }, [onCancel]);
 
   return (
-    <div
+    <DesktopMenuSurface
       ref={menuRef}
       className="desktop-create-entry-menu desktop-node-action-menu"
-      role="menu"
-      aria-label="Create new"
+      ariaLabel="Create new"
       style={menuStyle}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
@@ -206,7 +208,7 @@ export function DesktopCreateEntryMenu({
           onClick={() => onSelectKind(option.kind)}
         />
       ))}
-    </div>
+    </DesktopMenuSurface>
   );
 }
 
@@ -416,11 +418,10 @@ function DesktopNodeActionPopover({
   }, [onCancel]);
 
   return (
-    <div
+    <DesktopMenuSurface
       ref={menuRef}
       className="desktop-node-action-menu"
-      role="menu"
-      aria-label={`Actions for ${draft.node.name}`}
+      ariaLabel={`Actions for ${draft.node.name}`}
       style={menuStyle}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
@@ -473,7 +474,7 @@ function DesktopNodeActionPopover({
         onClick={onDelete}
       />
       {draft.error && <div className="desktop-node-action-error">{draft.error}</div>}
-    </div>
+    </DesktopMenuSurface>
   );
 }
 
@@ -618,20 +619,18 @@ function DesktopNodeActionMenuItem({
   onClick: () => void;
 }) {
   return (
-    <button
-      className={`desktop-node-action-menu-item ${destructive ? "danger" : ""}`}
-      type="button"
-      role="menuitem"
+    <DesktopMenuItem
+      className="desktop-node-action-menu-item"
+      destructive={destructive}
       disabled={disabled}
+      icon={icon}
+      label={label}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
         if (!disabled) onClick();
       }}
-    >
-      <span className="desktop-node-action-menu-icon">{icon}</span>
-      <span className="desktop-node-action-menu-label">{label}</span>
-    </button>
+    />
   );
 }
 
@@ -851,7 +850,10 @@ export function uniqueCreateEntryName(defaultName: string, existingNames: Set<st
   return `${stem} ${Date.now()}${extension}`;
 }
 
-export function rectToCreateEntryAnchor(rect: DOMRect): DesktopCreateEntryAnchor {
+export function rectToCreateEntryAnchor(
+  rect: DOMRect,
+  placement: DesktopCreateEntryAnchor["placement"] = "below-start",
+): DesktopCreateEntryAnchor {
   return {
     left: rect.left,
     top: rect.top,
@@ -859,6 +861,7 @@ export function rectToCreateEntryAnchor(rect: DOMRect): DesktopCreateEntryAnchor
     bottom: rect.bottom,
     width: rect.width,
     height: rect.height,
+    placement,
   };
 }
 
@@ -879,10 +882,25 @@ function getCreateEntryMenuPosition(anchor: DesktopCreateEntryAnchor) {
   const viewportHeight = typeof window === "undefined" ? 768 : window.innerHeight;
   const maxLeft = Math.max(CREATE_ENTRY_MENU_MARGIN, viewportWidth - CREATE_ENTRY_MENU_WIDTH - CREATE_ENTRY_MENU_MARGIN);
   const maxTop = Math.max(CREATE_ENTRY_MENU_MARGIN, viewportHeight - CREATE_ENTRY_MENU_ESTIMATED_HEIGHT - CREATE_ENTRY_MENU_MARGIN);
+  const gap = 6;
+  const belowTop = anchor.bottom + gap;
+  const aboveTop = anchor.top - CREATE_ENTRY_MENU_ESTIMATED_HEIGHT - gap;
+  const belowFits = belowTop <= maxTop;
+  const aboveFits = aboveTop >= CREATE_ENTRY_MENU_MARGIN;
+  const placement = anchor.placement ?? "below-start";
+  const alignEnd = placement.endsWith("-end");
+  const preferredTop = placement === "auto-start"
+    ? (belowFits || !aboveFits ? belowTop : aboveTop)
+    : placement === "auto-end"
+      ? (belowFits || !aboveFits ? belowTop : aboveTop)
+    : placement === "above-start" || placement === "above-end"
+      ? (aboveFits || !belowFits ? aboveTop : belowTop)
+      : (belowFits || !aboveFits ? belowTop : aboveTop);
+  const preferredLeft = alignEnd ? anchor.right - CREATE_ENTRY_MENU_WIDTH : anchor.left;
 
   return {
-    left: clampNumber(anchor.left, CREATE_ENTRY_MENU_MARGIN, maxLeft),
-    top: clampNumber(anchor.bottom + 6, CREATE_ENTRY_MENU_MARGIN, maxTop),
+    left: clampNumber(preferredLeft, CREATE_ENTRY_MENU_MARGIN, maxLeft),
+    top: clampNumber(preferredTop, CREATE_ENTRY_MENU_MARGIN, maxTop),
   };
 }
 

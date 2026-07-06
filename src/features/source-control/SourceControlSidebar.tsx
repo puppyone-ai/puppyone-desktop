@@ -76,6 +76,8 @@ const GIT_SCROLLABLE_LIST_SELECTOR = [
   ".desktop-working-tree-list",
   ".desktop-git-remote-preview",
   ".desktop-history-list",
+  ".desktop-git-changes-scroll",
+  ".desktop-git-history-scroll",
 ].join(",");
 const GIT_SIDEBAR_PANEL_MIN_HEIGHT: Record<GitSidebarPanelId, number> = {
   remote: 72,

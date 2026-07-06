@@ -117,7 +117,8 @@
 }
 
 .data-explorer-resizer:hover::after,
-.data-explorer-resizer:focus-visible::after {
+.data-explorer-resizer:focus-visible::after,
+body.data-sidebar-resizing .data-explorer-resizer::after {
   background: var(--po-border-strong);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-border-strong) 35%, transparent);
 }
@@ -126,6 +127,11 @@ body.data-sidebar-resizing,
 body.data-sidebar-resizing * {
   cursor: col-resize !important;
   user-select: none !important;
+}
+
+body.data-sidebar-resizing .data-main-view-frame,
+body.data-sidebar-resizing .data-preview-accessory {
+  pointer-events: none;
 }
 
 .desktop-explorer-toolbar {
@@ -169,15 +175,17 @@ body.data-sidebar-resizing * {
 }
 
 .explorer-tree-shell {
-  --tree-row-left-gap: var(--po-tree-row-left-gap, 6px);
-  --tree-row-right-gap: var(--po-tree-row-right-gap, 4px);
+  --tree-row-left-gap: var(--po-tree-row-left-gap, 12px);
+  --tree-row-right-gap: var(--po-tree-row-right-gap, 12px);
   --tree-row-height: var(--po-tree-row-height, 30px);
   --tree-row-radius: var(--po-tree-row-radius, 6px);
   --tree-row-content-left: var(--po-tree-row-content-left, 8px);
   --tree-row-content-right: var(--po-tree-row-content-right, 6px);
   --tree-row-indent: var(--po-tree-row-indent, 24px);
   --tree-icon-slot-size: var(--po-tree-icon-slot-size, 18px);
+  --tree-row-icon-label-gap: var(--po-tree-row-icon-label-gap, 6px);
   --tree-root-top-gap: var(--po-tree-root-top-gap, 5px);
+  --tree-no-root-top-gap: var(--po-tree-no-root-top-gap, 12px);
   --tree-list-bottom-gap: var(--po-tree-list-bottom-gap, 6px);
   --tree-scrollbar-width: var(--po-tree-scrollbar-width, var(--po-scrollbar-size, 6px));
   --tree-scrollbar-radius: var(--po-scrollbar-radius, 3px);
@@ -205,9 +213,9 @@ body.data-sidebar-resizing * {
   min-height: 0;
   overflow: auto;
   overflow-x: hidden;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+  scrollbar-color: transparent transparent;
 }
 
 .explorer-tree-scroll::-webkit-scrollbar {
@@ -223,8 +231,20 @@ body.data-sidebar-resizing * {
 
 .explorer-tree-scroll::-webkit-scrollbar-thumb {
   border-radius: var(--tree-scrollbar-radius);
-  background: var(--po-scrollbar-thumb);
+  background: transparent;
   transition: background-color var(--tree-scrollbar-transition);
+}
+
+.explorer-tree-shell.is-scrollable:hover .explorer-tree-scroll,
+.explorer-tree-shell.is-scrollable:focus-within .explorer-tree-scroll,
+.explorer-tree-scroll.is-scrollable.po-scrollbar-active {
+  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+}
+
+.explorer-tree-shell.is-scrollable:hover .explorer-tree-scroll::-webkit-scrollbar-thumb,
+.explorer-tree-shell.is-scrollable:focus-within .explorer-tree-scroll::-webkit-scrollbar-thumb,
+.explorer-tree-scroll.is-scrollable.po-scrollbar-active::-webkit-scrollbar-thumb {
+  background: var(--po-scrollbar-thumb);
 }
 
 .explorer-tree-scroll::-webkit-scrollbar-thumb:hover,
@@ -236,7 +256,11 @@ body.data-sidebar-resizing * {
   position: relative;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 0 var(--tree-list-bottom-gap);
+  padding: 0 var(--tree-row-right-gap) var(--tree-list-bottom-gap) var(--tree-row-left-gap);
+}
+
+.explorer-tree-shell.no-root .explorer-tree-list {
+  padding-top: var(--tree-no-root-top-gap);
 }
 
 .data-explorer-footer {
@@ -254,9 +278,9 @@ body.data-sidebar-resizing * {
   position: relative;
   display: flex;
   align-items: center;
-  width: calc(100% - var(--tree-row-left-gap) - var(--tree-row-right-gap));
+  width: 100%;
   height: var(--tree-row-height);
-  margin: 1px var(--tree-row-right-gap) 1px var(--tree-row-left-gap);
+  margin: 1px 0;
   padding: 0;
   border: 0;
   border-radius: var(--tree-row-radius);
@@ -279,6 +303,15 @@ body.data-sidebar-resizing * {
 .tree-row.root:hover {
   background: transparent;
   color: var(--po-text-muted);
+}
+
+.tree-row.root.root-command {
+  cursor: pointer;
+}
+
+.tree-row.root.root-command:hover {
+  background: var(--po-hover);
+  color: var(--po-text);
 }
 
 .tree-row:hover {
@@ -364,7 +397,7 @@ body.data-sidebar-resizing * {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--tree-row-icon-label-gap);
   width: 100%;
   min-width: 0;
   height: 100%;
@@ -503,8 +536,7 @@ body.data-sidebar-resizing * {
   top: 0;
   bottom: 0;
   left: calc(
-    var(--tree-row-left-gap)
-    + var(--tree-row-content-left)
+    var(--tree-row-content-left)
     + var(--depth, 0) * var(--tree-row-indent)
     - var(--tree-row-indent)
     + var(--tree-icon-slot-size) / 2
@@ -520,7 +552,7 @@ body.data-sidebar-resizing * {
   display: flex;
   align-items: center;
   height: var(--tree-row-height);
-  margin: 1px var(--tree-row-right-gap) 1px var(--tree-row-left-gap);
+  margin: 1px 0;
   padding-left: calc(var(--tree-row-content-left) + var(--depth, 0) * var(--tree-row-indent) + var(--tree-row-indent));
   box-sizing: border-box;
   color: var(--po-text-subtle);

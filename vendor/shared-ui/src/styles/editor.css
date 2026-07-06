@@ -2036,7 +2036,6 @@ button.editor-save-chip {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
-  scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: var(--po-scrollbar-thumb) transparent;
   touch-action: pan-x;

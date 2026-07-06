@@ -20,6 +20,7 @@ import {
   normalizeDesktopRenameName,
   rectToCreateEntryAnchor,
   uniqueCreateEntryName,
+  type DesktopCreateEntryAnchorInput,
   type DesktopCreateEntryDraft,
   type DesktopCreateEntryKind,
   type DesktopNodeActionMenuDraft,
@@ -59,12 +60,12 @@ export function useDataNodeActions({
     setNodeActionMenu(null);
   }, []);
 
-  const openCreateEntryMenu = useCallback((parentPath: string | null, anchorRect: DOMRect) => {
+  const openCreateEntryMenu = useCallback((parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => {
     onEnterDataView();
     setNodeActionMenu(null);
     setCreateEntryDraft({
       parentPath,
-      anchor: rectToCreateEntryAnchor(anchorRect),
+      anchor: normalizeCreateEntryAnchor(anchorRect),
       error: null,
       creatingKind: null,
       selectedKind: null,
@@ -320,4 +321,8 @@ export function useDataNodeActions({
     revealNodeInFinderFromMenu,
     openNodeInDefaultAppFromMenu,
   };
+}
+
+function normalizeCreateEntryAnchor(anchor: DesktopCreateEntryAnchorInput) {
+  return "toJSON" in anchor ? rectToCreateEntryAnchor(anchor) : anchor;
 }

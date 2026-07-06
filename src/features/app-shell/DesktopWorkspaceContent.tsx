@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useState, type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
 import { DataWorkspace, type AiEditRequest, type DataNode, type Workspace } from "@puppyone/shared-ui";
+import { Plus } from "lucide-react";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
 import { GitSidebar, GitStatusView } from "../source-control";
 import type { DesktopGitController } from "../source-control/useDesktopGitController";
@@ -22,7 +23,11 @@ import type { DesktopCloudSession } from "../../lib/cloudApi";
 import { openExternalUrl } from "../../lib/localFiles";
 import type { FilesVisibilitySettings } from "../../preferences";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import { DesktopExplorerRowActions } from "../data-workspace/nodeActions";
+import {
+  DesktopExplorerRowActions,
+  rectToCreateEntryAnchor,
+  type DesktopCreateEntryAnchorInput,
+} from "../data-workspace/nodeActions";
 import type { DesktopPreferencesController } from "./useDesktopPreferences";
 import {
   COLLAPSED_EXPLORER_WIDTH,
@@ -64,7 +69,7 @@ type DesktopWorkspaceContentProps = {
   git: DesktopGitController;
   onActiveDataPathChange: (path: string | null, node?: DataNode | null) => void;
   onActiveDataNodeChange: (node: DataNode | null) => void;
-  onCreateEntryMenu: (parentPath: string | null, anchorRect: DOMRect) => void;
+  onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
   onNavigate: (view: DesktopView) => void;
   onNodeActionMenu: (node: DataNode, anchorRect: DOMRect) => void;
@@ -291,6 +296,41 @@ export function DesktopWorkspaceContent({
         collapsedExplorerWidth={COLLAPSED_EXPLORER_WIDTH}
         onExplorerWidthChange={preferences.setExplorerWidth}
         showHeader={false}
+        showExplorerRoot={false}
+        onExplorerRootContextMenu={(_state, event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onCreateEntryMenu(null, getContextMenuAnchorRect(event));
+        }}
+        onExplorerNodeContextMenu={(_state, node, event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const anchorRect = getContextMenuAnchorRect(event);
+          if (node.type === "folder") {
+            onCreateEntryMenu(node.path, anchorRect);
+            return;
+          }
+          onNodeActionMenu(node, anchorRect);
+        }}
+        explorerListEndSlot={
+          <button
+            className="tree-row desktop-explorer-list-end-create-row"
+            type="button"
+            onClick={(event) => onCreateEntryMenu(
+              null,
+              rectToCreateEntryAnchor(event.currentTarget.getBoundingClientRect(), "auto-end"),
+            )}
+          >
+            <span className="tree-row-content desktop-explorer-list-end-create-command">
+              <span className="tree-icon-slot">
+                <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
+              </span>
+              <span className="tree-label">
+                <span className="tree-label-primary">New</span>
+              </span>
+            </span>
+          </button>
+        }
         showExplorerToolbar={preferences.sidebarNavigationPlacement === "top"}
         explorerToolbarSlot={preferences.sidebarNavigationPlacement === "top" ? (
           <DesktopSidebarTopNavigation
@@ -315,13 +355,6 @@ export function DesktopWorkspaceContent({
         enableMarkdownLinkContentIndexing={!cloudWorkspace}
         folderExpansionStrategy={cloudWorkspace ? "optimistic" : "load-before-expand"}
         refreshKey={workspaceRefreshToken}
-        explorerRootActionSlot={
-          <DesktopExplorerRowActions
-            parentPath={null}
-            onCreate={onCreateEntryMenu}
-            onOpenNodeMenu={onNodeActionMenu}
-          />
-        }
         explorerNodeActionSlot={(_state, node) => (
           <DesktopExplorerRowActions
             node={node}
@@ -442,6 +475,10 @@ export function DesktopWorkspaceContent({
       )}
     </div>
   );
+}
+
+function getContextMenuAnchorRect(event: ReactMouseEvent<HTMLElement>): DOMRect {
+  return new DOMRect(event.clientX, event.clientY, 0, 0);
 }
 
 function getDesktopWorkspaceChangeCount(

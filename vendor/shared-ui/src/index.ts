@@ -81,6 +81,12 @@ export type {
   ScrollableDescendantClassOptions,
   ScrollableStateOptions,
 } from "./primitives/useScrollableClass";
+export { usePaneResizeDrag } from "./primitives/usePaneResizeDrag";
+export type {
+  PaneResizeDragPoint,
+  PaneResizeDragSession,
+  UsePaneResizeDragOptions,
+} from "./primitives/usePaneResizeDrag";
 export { ConflictMarkerBanner } from "./editor/ConflictMarkerBanner";
 export {
   createAiEditFile,

@@ -1,5 +1,6 @@
 import type { Dispatch, ReactNode, Ref, SetStateAction } from "react";
 import { ChevronDown, Eraser, ExternalLink, Settings, SquareTerminal, type LucideIcon } from "lucide-react";
+import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
 import { ExternalAppIcon } from "../external-apps/ExternalAppIcon";
 import type { RightSidebarToolId, TitlebarActionId } from "../../preferences";
 import type { WorkspaceExternalOpenTarget } from "../../types/electron";
@@ -74,13 +75,21 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
             <ChevronDown size={12} />
           </button>
           {externalOpen.menuOpen && (
-            <div className="desktop-titlebar-menu desktop-branch-menu desktop-titlebar-external-open-menu" role="menu">
+            <DesktopMenuSurface className="desktop-titlebar-menu desktop-branch-menu desktop-titlebar-external-open-menu">
               {externalOpen.menuTargets.map((target, index) => (
-                <button
+                <DesktopMenuItem
                   className="desktop-branch-menu-row desktop-titlebar-external-open-row"
-                  type="button"
-                  role="menuitem"
                   key={`${target.appPath ?? "default"}:${index}`}
+                  icon={(
+                    <ExternalAppIcon
+                      appName={target.appName}
+                      className="desktop-titlebar-external-app-icon"
+                      iconDataUrl={target.iconDataUrl}
+                      loadingClassName="desktop-titlebar-external-app-loader"
+                      loaderClassName="desktop-titlebar-external-open-loader"
+                    />
+                  )}
+                  label={`${target.appName ?? "macOS Default"}${index === 0 ? " (default)" : ""}`}
                   onClick={() => {
                     externalOpen.setMenuOpen(false);
                     if (index === 0) {
@@ -89,31 +98,19 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
                     }
                     externalOpen.onOpenWithApp(target.appPath);
                   }}
-                >
-                  <ExternalAppIcon
-                    appName={target.appName}
-                    className="desktop-titlebar-external-app-icon"
-                    iconDataUrl={target.iconDataUrl}
-                    loadingClassName="desktop-titlebar-external-app-loader"
-                    loaderClassName="desktop-titlebar-external-open-loader"
-                  />
-                  <span>{target.appName ?? "macOS Default"}{index === 0 ? " (default)" : ""}</span>
-                </button>
+                />
               ))}
-              <div className="desktop-titlebar-menu-separator" aria-hidden="true" />
-              <button
+              <DesktopMenuSeparator />
+              <DesktopMenuItem
                 className="desktop-branch-menu-row desktop-titlebar-external-open-row"
-                type="button"
-                role="menuitem"
+                icon={<Settings size={15} />}
+                label="Customize..."
                 onClick={() => {
                   externalOpen.setMenuOpen(false);
                   externalOpen.onCustomize();
                 }}
-              >
-                <Settings size={15} />
-                <span>Customize...</span>
-              </button>
-            </div>
+              />
+            </DesktopMenuSurface>
           )}
         </div>
       );

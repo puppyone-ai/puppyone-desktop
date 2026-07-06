@@ -51,26 +51,6 @@
 
 .desktop-right-sidebar {
   --desktop-right-sidebar-width: clamp(500px, 36vw, 680px);
-  --po-terminal-bg: var(--po-header);
-  --po-terminal-fg: #6d665d;
-  --po-terminal-cursor: #80786d;
-  --po-terminal-selection: rgba(91, 82, 70, 0.14);
-  --po-terminal-black: #5d574f;
-  --po-terminal-red: #a66b65;
-  --po-terminal-green: #687a55;
-  --po-terminal-yellow: #98774b;
-  --po-terminal-blue: #687f9f;
-  --po-terminal-magenta: #86709a;
-  --po-terminal-cyan: #668789;
-  --po-terminal-white: #8f877c;
-  --po-terminal-bright-black: #9a9287;
-  --po-terminal-bright-red: #b77c75;
-  --po-terminal-bright-green: #778a62;
-  --po-terminal-bright-yellow: #a9895a;
-  --po-terminal-bright-blue: #7890ad;
-  --po-terminal-bright-magenta: #967faa;
-  --po-terminal-bright-cyan: #789799;
-  --po-terminal-bright-white: #766f65;
 
   position: relative;
   z-index: 25;
@@ -84,27 +64,8 @@
   transition: flex-basis 160ms ease, width 160ms ease, border-color 160ms ease;
 }
 
-.app-shell.dark .desktop-right-sidebar {
-  --po-terminal-bg: var(--po-header);
-  --po-terminal-fg: #b9b6ae;
-  --po-terminal-cursor: #d1cec6;
-  --po-terminal-selection: rgba(211, 208, 197, 0.16);
-  --po-terminal-black: #626059;
-  --po-terminal-red: #bd8581;
-  --po-terminal-green: #9ba67b;
-  --po-terminal-yellow: #c2a46c;
-  --po-terminal-blue: #92a9be;
-  --po-terminal-magenta: #b19bbd;
-  --po-terminal-cyan: #8fb2ad;
-  --po-terminal-white: #b9b6ae;
-  --po-terminal-bright-black: #807d76;
-  --po-terminal-bright-red: #cc9692;
-  --po-terminal-bright-green: #aab78b;
-  --po-terminal-bright-yellow: #d0b47d;
-  --po-terminal-bright-blue: #a2b8ca;
-  --po-terminal-bright-magenta: #c1aacb;
-  --po-terminal-bright-cyan: #9fc1bc;
-  --po-terminal-bright-white: #d2cec5;
+body.desktop-right-sidebar-resizing .desktop-right-sidebar {
+  transition: border-color 160ms ease;
 }
 
 .desktop-right-sidebar::before {
@@ -156,7 +117,8 @@
 }
 
 .desktop-right-sidebar-resizer:hover::after,
-.desktop-right-sidebar-resizer:focus-visible::after {
+.desktop-right-sidebar-resizer:focus-visible::after,
+body.desktop-right-sidebar-resizing .desktop-right-sidebar-resizer::after {
   background: var(--po-border-strong);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-border-strong) 35%, transparent);
 }
@@ -165,6 +127,11 @@ body.desktop-right-sidebar-resizing,
 body.desktop-right-sidebar-resizing * {
   cursor: col-resize !important;
   user-select: none !important;
+}
+
+body.desktop-right-sidebar-resizing .desktop-surface,
+body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
+  pointer-events: none;
 }
 
 .desktop-right-sidebar-inner {
@@ -359,14 +326,6 @@ body.desktop-right-sidebar-resizing * {
   text-transform: uppercase;
 }
 
-.desktop-project-option-row {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-  border-radius: 6px;
-}
-
 .desktop-project-menu {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -391,115 +350,25 @@ body.desktop-right-sidebar-resizing * {
   border-top: 1px solid var(--po-divider);
 }
 
-.desktop-project-option-row:hover,
-.desktop-project-option-row.active {
-  background: var(--po-hover);
-}
-
-.desktop-project-option,
-.desktop-project-add {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--po-text);
-  text-align: left;
-}
-
-.desktop-project-option {
-  gap: 8px;
-  height: var(--desktop-sidebar-row-height);
-  flex: 1;
-  padding: 0 8px;
-}
-
-.desktop-project-option:hover,
-.desktop-project-option.active,
-.desktop-project-add:hover {
-  background: var(--po-hover);
-}
-
-.desktop-project-option-row:hover .desktop-project-option,
-.desktop-project-option-row.active .desktop-project-option {
-  background: transparent;
-}
-
 .desktop-project-mark {
   position: relative;
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
+  width: var(--po-menu-icon-slot-size);
+  height: var(--po-menu-icon-slot-size);
+  flex: 0 0 var(--po-menu-icon-slot-size);
   color: var(--po-text-muted);
 }
 
 .desktop-project-option:hover .desktop-project-mark,
-.desktop-project-option.active .desktop-project-mark,
-.desktop-project-option-row:hover .desktop-project-mark,
-.desktop-project-option-row.active .desktop-project-mark {
+.desktop-project-option.selected .desktop-project-mark {
   color: var(--po-text);
-}
-
-.desktop-project-option-text {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  flex: 1;
-  min-width: 0;
-}
-
-.desktop-project-option strong,
-.desktop-project-option small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-project-option strong {
-  flex: 0 1 auto;
-  min-width: 42px;
-  max-width: 42%;
-  color: var(--po-text);
-  font-size: 12.5px;
-  font-weight: 600;
-  line-height: 18px;
-}
-
-.desktop-project-option small {
-  flex: 1 1 auto;
-  min-width: 0;
-  color: var(--po-text-subtle);
-  font-size: 11.5px;
-  font-weight: 500;
-  line-height: 18px;
-}
-
-.desktop-project-add {
-  gap: 8px;
-  height: var(--desktop-sidebar-row-height);
-  padding: 0 8px;
-  color: var(--po-text-muted);
-  font-size: 12.5px;
-  font-weight: 600;
 }
 
 .desktop-project-actions {
   display: grid;
   gap: 2px;
   margin-top: 6px;
-}
-
-.desktop-project-add-mark {
-  display: grid;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  place-items: center;
 }
 
 .desktop-project-home {

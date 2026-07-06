@@ -16,6 +16,9 @@ single product area can evolve without turning this file into a catch-all.
     mount lifecycle.
 - [Desktop Sidebar View Stack](architecture/desktop-sidebar-view-stack.md)
   - Keep-alive behavior for the Data, Git, Cloud, and Settings sidebar surfaces.
+- [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)
+  - Scroll area, list padding, row width, and native scrollbar gutter
+    boundaries for sidebar lists.
 - [Explorer Tree Lifecycle](architecture/explorer-tree-lifecycle.md)
   - File-tree loading, expansion, subtree motion, and indentation guide rules.
 - [Desktop Multi-Window Workspaces](architecture/desktop-multi-window-workspaces.md)
@@ -24,6 +27,9 @@ single product area can evolve without turning this file into a catch-all.
 - [Desktop Auto Update Lifecycle](architecture/desktop-auto-update-lifecycle.md)
   - Electron updater ownership, one-click update flow, restart preflight, and
     release-channel behavior.
+- [Desktop Menu Surface](architecture/desktop-menu-surface.md)
+  - Shared menu background, border, shadow, radius, and component boundary
+    rules.
 
 ## Document Boundary
 

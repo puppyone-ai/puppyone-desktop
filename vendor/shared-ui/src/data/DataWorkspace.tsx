@@ -7,7 +7,7 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import type { DataCapabilities, DataNode, DataPort, FileContent, Workspace } from "../core/types";
@@ -26,6 +26,7 @@ import type { MarkdownHtmlTrustMode } from "../editor/viewerTypes";
 import { getAiEditFileForPath } from "../editor/ai-edits/diff";
 import type { AiEditRequest } from "../editor/ai-edits/types";
 import type { FileIconThemeId } from "../file/fileIcons";
+import { usePaneResizeDrag } from "../primitives/usePaneResizeDrag";
 
 export type DataWorkspaceState = {
   tree: DataNode[];
@@ -81,6 +82,9 @@ export type DataWorkspaceProps = {
   explorerSlot?: DataWorkspaceSlot;
   explorerFooterSlot?: DataWorkspaceSlot;
   collapsedExplorerSlot?: DataWorkspaceSlot;
+  explorerListEndSlot?: DataWorkspaceSlot;
+  showExplorerRoot?: boolean;
+  explorerRootContentSlot?: DataWorkspaceSlot;
   explorerRootActionSlot?: DataWorkspaceSlot;
   explorerFolderActionSlot?: DataWorkspaceFolderSlot;
   explorerNodeActionSlot?: DataWorkspaceNodeSlot;
@@ -109,6 +113,13 @@ export type DataWorkspaceProps = {
   onExplorerCollapsedChange?: (collapsed: boolean) => void;
   onActivePathChange?: (path: string | null, node: DataNode | null) => void;
   onActiveNodeChange?: (node: DataNode | null) => void;
+  onExplorerRootClick?: (state: DataWorkspaceState, event: ReactMouseEvent<HTMLElement>) => void;
+  onExplorerRootContextMenu?: (state: DataWorkspaceState, event: ReactMouseEvent<HTMLDivElement>) => void;
+  onExplorerNodeContextMenu?: (
+    state: DataWorkspaceState,
+    node: DataNode,
+    event: ReactMouseEvent<HTMLButtonElement>,
+  ) => void;
   onOpenExternalUrl?: (href: string) => void | Promise<void>;
   onCreate?: (folderPath: string | null) => void;
   onMore?: (state: DataWorkspaceState) => void;
@@ -140,6 +151,9 @@ export function DataWorkspace({
   explorerSlot,
   explorerFooterSlot,
   collapsedExplorerSlot,
+  explorerListEndSlot,
+  showExplorerRoot = true,
+  explorerRootContentSlot,
   explorerRootActionSlot,
   explorerFolderActionSlot,
   explorerNodeActionSlot,
@@ -168,6 +182,9 @@ export function DataWorkspace({
   onExplorerCollapsedChange,
   onActivePathChange,
   onActiveNodeChange,
+  onExplorerRootClick,
+  onExplorerRootContextMenu,
+  onExplorerNodeContextMenu,
   onOpenExternalUrl,
   onCreate,
   onMore,
@@ -967,11 +984,10 @@ export function DataWorkspace({
     [moveNodes],
   );
 
-  const beginExplorerResize = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (!resizableExplorer) return;
-
-      event.preventDefault();
+  const beginExplorerResize = usePaneResizeDrag({
+    enabled: resizableExplorer,
+    bodyClassName: "data-sidebar-resizing",
+    onDragStart: (event) => {
       const startX = event.clientX;
       const startWidth = explorerCollapsed ? minExplorerWidth : expandedExplorerWidth;
 
@@ -979,22 +995,13 @@ export function DataWorkspace({
         onExplorerCollapsedChange?.(false);
       }
 
-      const moveExplorerResize = (moveEvent: PointerEvent) => {
-        setExplorerWidth(startWidth + moveEvent.clientX - startX);
+      return {
+        onMove: (point) => {
+          setExplorerWidth(startWidth + point.clientX - startX);
+        },
       };
-
-      const stopExplorerResize = () => {
-        window.removeEventListener("pointermove", moveExplorerResize);
-        window.removeEventListener("pointerup", stopExplorerResize);
-        document.body.classList.remove("data-sidebar-resizing");
-      };
-
-      document.body.classList.add("data-sidebar-resizing");
-      window.addEventListener("pointermove", moveExplorerResize);
-      window.addEventListener("pointerup", stopExplorerResize);
     },
-    [expandedExplorerWidth, explorerCollapsed, minExplorerWidth, onExplorerCollapsedChange, resizableExplorer, setExplorerWidth],
-  );
+  });
 
   const nudgeExplorerWidth = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (!resizableExplorer) return;
@@ -1082,7 +1089,7 @@ export function DataWorkspace({
                     rootLoading={rootLoading}
                     rootError={loadError}
                     rootLabel={labels?.root ?? "Root"}
-                    showRoot
+                    showRoot={showExplorerRoot}
                     loadingLabel={labels?.loadingWorkspace ?? "Loading workspace..."}
                     onToggleFolder={toggleFolder}
                     onSelectNode={activateNode}
@@ -1091,6 +1098,11 @@ export function DataWorkspace({
                     onMoveNode={moveNode}
                     onMoveNodes={moveNodes}
                     onImportFiles={dataPort.importFiles ? importFiles : undefined}
+                    onRootClick={onExplorerRootClick ? (event) => onExplorerRootClick(workspaceState, event) : undefined}
+                    onRootContextMenu={onExplorerRootContextMenu ? (event) => onExplorerRootContextMenu(workspaceState, event) : undefined}
+                    onNodeContextMenu={onExplorerNodeContextMenu ? (node, event) => onExplorerNodeContextMenu(workspaceState, node, event) : undefined}
+                    renderRootContent={explorerRootContentSlot ? () => renderWorkspaceSlot(explorerRootContentSlot, workspaceState) : undefined}
+                    renderListEnd={explorerListEndSlot ? () => renderWorkspaceSlot(explorerListEndSlot, workspaceState) : undefined}
                     renderRootActions={explorerRootActionSlot ? () => renderWorkspaceSlot(explorerRootActionSlot, workspaceState) : undefined}
                     renderFolderActions={explorerFolderActionSlot ? (folder) => renderWorkspaceFolderSlot(explorerFolderActionSlot, workspaceState, folder) : undefined}
                     renderNodeActions={explorerNodeActionSlot ? (node) => renderWorkspaceNodeSlot(explorerNodeActionSlot, workspaceState, node) : undefined}

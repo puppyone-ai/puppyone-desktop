@@ -26,6 +26,11 @@ export type ExplorerTreeProps = {
   onMoveNode?: (node: DataNode, targetFolderPath: string | null) => void | Promise<void>;
   onMoveNodes?: (nodes: DataNode[], targetFolderPath: string | null) => void | Promise<void>;
   onImportFiles?: (files: File[], targetFolderPath: string | null) => void | Promise<void>;
+  onRootContextMenu?: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onNodeContextMenu?: (node: DataNode, event: ReactMouseEvent<HTMLButtonElement>) => void;
+  onRootClick?: (event: ReactMouseEvent<HTMLElement>) => void;
+  renderRootContent?: () => ReactNode;
+  renderListEnd?: () => ReactNode;
   renderRootActions?: () => ReactNode;
   renderFolderActions?: (node: DataNode) => ReactNode;
   renderNodeActions?: (node: DataNode) => ReactNode;
@@ -96,6 +101,11 @@ export function ExplorerTree({
   onMoveNode,
   onMoveNodes,
   onImportFiles,
+  onRootContextMenu,
+  onNodeContextMenu,
+  onRootClick,
+  renderRootContent,
+  renderListEnd,
   renderRootActions,
   renderFolderActions,
   renderNodeActions,
@@ -241,31 +251,54 @@ export function ExplorerTree({
 
   return (
     <div
-      className={`explorer-tree-shell ${scrollable ? "is-scrollable" : ""} ${draggedNodes.length > 0 ? "is-dragging-node" : ""} ${dropTarget && draggedNodes.length === 0 ? "is-importing-files" : ""}`}
+      className={`explorer-tree-shell ${showRoot ? "has-root" : "no-root"} ${scrollable ? "is-scrollable" : ""} ${draggedNodes.length > 0 ? "is-dragging-node" : ""} ${dropTarget && draggedNodes.length === 0 ? "is-importing-files" : ""}`}
       onDragEnter={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
       onDragOver={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
       onDragLeave={dropEnabled ? leaveTree : undefined}
       onDrop={dropEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
+      onContextMenu={onRootContextMenu}
     >
       {showRoot && (
         <div className="explorer-tree-root-scope">
-          <div
-            className={`tree-row root ${dropTarget?.rowPath === null && dropTarget.valid ? "drop-target" : ""} ${dropTarget?.rowPath === null && !dropTarget.valid ? "drop-invalid" : ""}`}
-            style={{ "--depth": 0 } as CSSProperties}
-            onDragEnter={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
-            onDragOver={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
-            onDragLeave={dropEnabled ? (event) => dragController.onRowDragLeave(event, null) : undefined}
-            onDrop={dropEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
-          >
-            <span className="tree-row-content">
-              <span className="tree-label">{rootLabel}</span>
-              {renderRootActions && (
-                <span className="tree-row-actions root-actions" onClick={(event) => event.stopPropagation()}>
-                  {renderRootActions()}
+          {onRootClick ? (
+            <button
+              className={`tree-row root root-command ${dropTarget?.rowPath === null && dropTarget.valid ? "drop-target" : ""} ${dropTarget?.rowPath === null && !dropTarget.valid ? "drop-invalid" : ""}`}
+              type="button"
+              style={{ "--depth": 0 } as CSSProperties}
+              onDragEnter={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
+              onDragOver={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
+              onDragLeave={dropEnabled ? (event) => dragController.onRowDragLeave(event, null) : undefined}
+              onDrop={dropEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
+              onClick={(event) => {
+                event.stopPropagation();
+                onRootClick(event);
+              }}
+            >
+              {renderRootContent ? renderRootContent() : (
+                <span className="tree-row-content">
+                  <span className="tree-label">{rootLabel}</span>
                 </span>
               )}
-            </span>
-          </div>
+            </button>
+          ) : (
+            <div
+              className={`tree-row root ${dropTarget?.rowPath === null && dropTarget.valid ? "drop-target" : ""} ${dropTarget?.rowPath === null && !dropTarget.valid ? "drop-invalid" : ""}`}
+              style={{ "--depth": 0 } as CSSProperties}
+              onDragEnter={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
+              onDragOver={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
+              onDragLeave={dropEnabled ? (event) => dragController.onRowDragLeave(event, null) : undefined}
+              onDrop={dropEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
+            >
+              <span className="tree-row-content">
+                <span className="tree-label">{rootLabel}</span>
+                {renderRootActions && (
+                  <span className="tree-row-actions root-actions" onClick={(event) => event.stopPropagation()}>
+                    {renderRootActions()}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -294,11 +327,13 @@ export function ExplorerTree({
                 onToggleFolder={onToggleFolder}
                 onSelectNode={onSelectNode}
                 dragController={dragController}
+                onNodeContextMenu={onNodeContextMenu}
                 renderFolderActions={renderFolderActions}
                 renderNodeActions={renderNodeActions}
               />
             ))
           )}
+          {renderListEnd?.()}
         </div>
       </div>
     </div>
@@ -319,6 +354,7 @@ function TreeNodeRow({
   onToggleFolder,
   onSelectNode,
   dragController,
+  onNodeContextMenu,
   renderFolderActions,
   renderNodeActions,
 }: {
@@ -335,6 +371,7 @@ function TreeNodeRow({
   onToggleFolder?: (node: DataNode, expanded: boolean) => void;
   onSelectNode: ExplorerTreeProps["onSelectNode"];
   dragController: TreeDragController;
+  onNodeContextMenu?: ExplorerTreeProps["onNodeContextMenu"];
   renderFolderActions?: (node: DataNode) => ReactNode;
   renderNodeActions?: (node: DataNode) => ReactNode;
 }) {
@@ -437,6 +474,10 @@ function TreeNodeRow({
             return;
           }
         }}
+        onContextMenu={onNodeContextMenu ? (event) => {
+          event.stopPropagation();
+          onNodeContextMenu(node, event);
+        } : undefined}
         style={{ "--depth": depth } as CSSProperties}
       >
         <span className="tree-row-content">
@@ -504,6 +545,7 @@ function TreeNodeRow({
               onToggleFolder={onToggleFolder}
               onSelectNode={onSelectNode}
               dragController={dragController}
+              onNodeContextMenu={onNodeContextMenu}
               renderFolderActions={renderFolderActions}
               renderNodeActions={renderNodeActions}
             />
