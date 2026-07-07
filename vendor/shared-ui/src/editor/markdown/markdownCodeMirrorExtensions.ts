@@ -1,14 +1,21 @@
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, bracketMatching, indentOnInput, syntaxHighlighting } from "@codemirror/language";
-import { EditorSelection, EditorState, Facet, StateField, type Extension, type Range } from "@codemirror/state";
+import {
+  EditorSelection,
+  EditorState,
+  StateEffect,
+  StateField,
+  type ChangeSpec,
+  type Extension,
+  type Range,
+  type Transaction,
+} from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
   EditorView,
   type MouseSelectionStyle,
-  type Rect,
-  WidgetType,
   dropCursor,
   highlightActiveLine,
   highlightSpecialChars,
@@ -16,31 +23,51 @@ import {
   placeholder,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { renderMarkdownInlineInto } from "./rendering/inlineRenderer";
 import {
   getMarkdownTableBlock,
   isMarkdownTableLine,
-  type MarkdownTableCell,
-  type MarkdownTableRow,
 } from "./rendering/tableModel";
 import { getMarkdownTaskLine, type MarkdownTaskLine } from "./rendering/taskModel";
 import { getMarkdownHtmlBlock, type MarkdownHtmlBlock } from "./rendering/htmlBlockModel";
 import { isSafeHref } from "./rendering/markdownHtmlPolicy";
-import { createSanitizedBlockHtmlFragment } from "./rendering/sanitizeHtml";
 import { puppyMarkdownParserExtensions } from "./syntax/markdownParserExtensions";
 import {
-  findMarkdownImageTokens,
-  isSafeMarkdownImageUrl,
-  resolveMarkdownHtmlImageSources,
-} from "./links/markdownImageModel";
+  markdownAssetUrlResolverFacet,
+  markdownDocumentPathFacet,
+  markdownHtmlTrustModeFacet,
+  markdownLinkGraphFacet,
+  markdownLivePreviewContextExtension,
+} from "./markdownLivePreviewContext";
+import {
+  getBlockMarkerAtVisibleStart,
+  getInlineRevealElement,
+  getMarkdownElements,
+  isInlineRevealKind,
+  type MarkdownElement,
+} from "./syntax/markdownElements";
+import { findMarkdownImageTokens } from "./links/markdownImageModel";
 import { findMarkdownLinkTokens, isExternalMarkdownHref } from "./links/markdownLinkModel";
 import { findWikiLinkTokens } from "./links/wikiLinkModel";
-import { getHtmlPreviewInteractionCss } from "../htmlPreviewInteraction";
+import { markdownExpandedImageEffect, type ExpandedImageRange } from "./markdownLivePreviewState";
+import {
+  CodeBlockWidget,
+  HiddenMarkdownSyntaxWidget,
+  HorizontalRuleWidget,
+  HtmlBlockWidget,
+  ImagePreviewWidget,
+  MarkdownTableWidget,
+  TaskCheckboxWidget,
+  type MarkdownSourceSyntaxKind,
+} from "./widgets/markdownLivePreviewWidgets";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
 
 type LivePreviewDecorations = {
   decorations: DecorationSet;
   atomicRanges: DecorationSet;
+  focused: boolean;
+  inputComposing: boolean;
+  composingLineKey: string;
+  revealSetKey: string;
 };
 
 type MarkdownDecorationBuilders = {
@@ -53,6 +80,16 @@ type OccupiedRange = {
   to: number;
 };
 
+type InlineRevealRange = {
+  from: number;
+  to: number;
+};
+
+type ComposingBlockLine = {
+  from: number;
+  to: number;
+};
+
 type MarkdownCodeBlock = {
   from: number;
   to: number;
@@ -60,30 +97,6 @@ type MarkdownCodeBlock = {
   language: string;
   code: string;
 };
-
-const markdownHtmlTrustModeFacet = Facet.define<MarkdownHtmlTrustMode, MarkdownHtmlTrustMode>({
-  combine(values) {
-    return values.length > 0 ? values[values.length - 1] : "safe";
-  },
-});
-
-const markdownLinkGraphFacet = Facet.define<MarkdownLinkGraph | null, MarkdownLinkGraph | null>({
-  combine(values) {
-    return values.length > 0 ? values[values.length - 1] : null;
-  },
-});
-
-const markdownDocumentPathFacet = Facet.define<string, string>({
-  combine(values) {
-    return values.length > 0 ? values[values.length - 1] : "";
-  },
-});
-
-const markdownAssetUrlResolverFacet = Facet.define<MarkdownAssetUrlResolver | null, MarkdownAssetUrlResolver | null>({
-  combine(values) {
-    return values.length > 0 ? values[values.length - 1] : null;
-  },
-});
 
 export function markdownCodeMirrorBaseExtensions(readOnly: boolean): Extension[] {
   return [
@@ -102,7 +115,7 @@ export function markdownCodeMirrorBaseExtensions(readOnly: boolean): Extension[]
       autocapitalize: "off",
     }),
     highlightActiveLine(),
-    keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+    keymap.of([...markdownEditingKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
     placeholder(readOnly ? "" : "Start writing..."),
     puppyMarkdownEditorTheme,
   ];
@@ -115,11 +128,11 @@ export function markdownLivePreviewExtension(
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null = null,
 ): Extension {
   return [
-    markdownHtmlTrustModeFacet.of(htmlTrustMode),
-    markdownLinkGraphFacet.of(markdownLinkGraph),
-    markdownDocumentPathFacet.of(documentPath),
-    markdownAssetUrlResolverFacet.of(markdownAssetUrlResolver),
-    markdownLinkOpenHandler,
+    markdownLivePreviewContextExtension(htmlTrustMode, markdownLinkGraph, documentPath, markdownAssetUrlResolver),
+    markdownLivePreviewFocusExtension,
+    markdownInputCompositionExtension,
+    markdownComposingBlockLineField,
+    markdownExpandedImageField,
     markdownLivePreviewDecorations,
   ];
 }
@@ -153,6 +166,32 @@ const puppyMarkdownHighlightStyle = HighlightStyle.define([
   { tag: tags.quote, class: "cm-md-syntax-quote" },
   { tag: tags.list, class: "cm-md-syntax-list" },
 ]);
+
+const markdownEditingKeymap = [
+  { key: "Backspace", run: deleteMarkdownMarkerBackward },
+  { key: "Delete", run: deleteMarkdownMarkerForward },
+  { key: "Enter", run: handleMarkdownEnter },
+  { key: "Home", run: moveMarkdownCaretToVisibleLineStart },
+  { key: "Mod-ArrowLeft", run: moveMarkdownCaretToVisibleLineStart },
+  { key: "Tab", run: indentMarkdownListItem },
+  { key: "Shift-Tab", run: outdentMarkdownListItem },
+  { key: "Mod-0", run: setMarkdownHeadingLevel(0), preventDefault: true },
+  { key: "Mod-1", run: setMarkdownHeadingLevel(1), preventDefault: true },
+  { key: "Mod-2", run: setMarkdownHeadingLevel(2), preventDefault: true },
+  { key: "Mod-3", run: setMarkdownHeadingLevel(3), preventDefault: true },
+  { key: "Mod-4", run: setMarkdownHeadingLevel(4), preventDefault: true },
+  { key: "Mod-5", run: setMarkdownHeadingLevel(5), preventDefault: true },
+  { key: "Mod-6", run: setMarkdownHeadingLevel(6), preventDefault: true },
+  { key: "Mod-Shift-7", run: toggleMarkdownList("ordered"), preventDefault: true },
+  { key: "Mod-Shift-8", run: toggleMarkdownList("bullet"), preventDefault: true },
+  { key: "Mod-Shift-9", run: toggleMarkdownList("task"), preventDefault: true },
+  { key: "Mod-Shift-.", run: toggleMarkdownQuote, preventDefault: true },
+  { key: "Mod-b", run: toggleMarkdownInline("**"), preventDefault: true },
+  { key: "Mod-i", run: toggleMarkdownInline("*"), preventDefault: true },
+  { key: "Mod-e", run: toggleMarkdownInline("`"), preventDefault: true },
+  { key: "Mod-Shift-x", run: toggleMarkdownInline("~~"), preventDefault: true },
+  { key: "Mod-k", run: wrapMarkdownLink, preventDefault: true },
+];
 
 const TRAILING_LINE_WHITESPACE_SELECTION_GAP = 3;
 
@@ -213,17 +252,520 @@ function getTrailingLineSelectionEdge(
   };
 }
 
+function deleteMarkdownMarkerBackward(view: EditorView): boolean {
+  const { state } = view;
+  if (state.readOnly || state.selection.ranges.length !== 1) return false;
+
+  const selection = state.selection.main;
+  if (!selection.empty) return false;
+
+  const deletion =
+    getBlockMarkerAtVisibleStart(state, selection.from) ??
+    getCollapsedInlineMarkerDeletion(state, selection.from, "backward");
+  if (!deletion) return false;
+
+  view.dispatch({
+    changes: deletion,
+    selection: EditorSelection.cursor(deletion.from),
+  });
+  return true;
+}
+
+function deleteMarkdownMarkerForward(view: EditorView): boolean {
+  const { state } = view;
+  if (state.readOnly || state.selection.ranges.length !== 1) return false;
+
+  const selection = state.selection.main;
+  if (!selection.empty) return false;
+
+  const deletion = getCollapsedInlineMarkerDeletion(state, selection.from, "forward");
+  if (!deletion) return false;
+
+  view.dispatch({
+    changes: deletion,
+    selection: EditorSelection.cursor(deletion.from),
+  });
+  return true;
+}
+
+function getCollapsedInlineMarkerDeletion(
+  state: EditorState,
+  caret: number,
+  direction: "backward" | "forward",
+): { from: number; to: number } | null {
+  const elements = getMarkdownElements(state);
+  for (const element of elements) {
+    if (!isInlineRevealKind(element.kind)) continue;
+    const markerRange = direction === "backward"
+      ? element.markerRanges[element.markerRanges.length - 1]
+      : element.markerRanges[0];
+    if (!markerRange) continue;
+    if (direction === "backward" && caret === element.to) return markerRange;
+    if (direction === "forward" && caret === element.from) return markerRange;
+  }
+  return null;
+}
+
+function setMarkdownHeadingLevel(level: 0 | 1 | 2 | 3 | 4 | 5 | 6) {
+  return (view: EditorView): boolean => {
+    const { state } = view;
+    if (state.readOnly) return false;
+
+    const changes: ChangeSpec[] = [];
+    const touchedLines = new Set<number>();
+    const marker = level > 0 ? `${"#".repeat(level)} ` : "";
+
+    for (const range of state.selection.ranges) {
+      const fromLine = state.doc.lineAt(range.from);
+      const toLine = state.doc.lineAt(range.to);
+      for (let lineNumber = fromLine.number; lineNumber <= toLine.number; lineNumber += 1) {
+        if (touchedLines.has(lineNumber)) continue;
+        touchedLines.add(lineNumber);
+
+        const line = state.doc.line(lineNumber);
+        const headingMatch = /^(#{1,6})(\s|$)/.exec(line.text);
+        const replaceTo = line.from + (headingMatch?.[0].length ?? 0);
+        if (state.sliceDoc(line.from, replaceTo) === marker) continue;
+        changes.push({ from: line.from, to: replaceTo, insert: marker });
+      }
+    }
+
+    if (changes.length > 0) view.dispatch({ changes });
+    return true;
+  };
+}
+
+function toggleMarkdownList(kind: "bullet" | "ordered" | "task") {
+  return (view: EditorView): boolean => {
+    const { state } = view;
+    if (state.readOnly) return false;
+
+    const lines = getSelectedLineNumbers(state);
+    const allMatching = lines.every((lineNumber) => {
+      const text = state.doc.line(lineNumber).text;
+      if (kind === "task") return /^\s*(?:[-*+]|\d+[.)])\s+\[[ xX]\]\s+/.test(text);
+      if (kind === "ordered") return /^\s*\d+[.)]\s+/.test(text);
+      return /^\s*[-*+]\s+/.test(text) && !/^\s*[-*+]\s+\[[ xX]\]\s+/.test(text);
+    });
+
+    const changes: ChangeSpec[] = [];
+    lines.forEach((lineNumber, index) => {
+      const line = state.doc.line(lineNumber);
+      const leadingWhitespace = /^\s*/.exec(line.text)?.[0] ?? "";
+      const markerMatch = /^(\s*)(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s*)?/.exec(line.text);
+      const markerTo = markerMatch ? line.from + markerMatch[0].length : line.from + leadingWhitespace.length;
+      const markerFrom = line.from + leadingWhitespace.length;
+
+      if (allMatching) {
+        if (markerMatch) changes.push({ from: markerFrom, to: markerTo, insert: "" });
+        return;
+      }
+
+      const marker = kind === "ordered" ? `${index + 1}. ` : kind === "task" ? "- [ ] " : "- ";
+      changes.push({ from: markerFrom, to: markerTo, insert: marker });
+    });
+
+    if (changes.length === 0) return false;
+    view.dispatch({ changes });
+    if (kind === "ordered") renumberOrderedLists(view);
+    return true;
+  };
+}
+
+function toggleMarkdownQuote(view: EditorView): boolean {
+  const { state } = view;
+  if (state.readOnly) return false;
+
+  const lines = getSelectedLineNumbers(state);
+  const allQuoted = lines.every((lineNumber) => /^\s*>\s?/.test(state.doc.line(lineNumber).text));
+  const changes: ChangeSpec[] = [];
+
+  for (const lineNumber of lines) {
+    const line = state.doc.line(lineNumber);
+    const leadingWhitespace = /^\s*/.exec(line.text)?.[0] ?? "";
+    if (allQuoted) {
+      const quoteMatch = /^(\s*)>\s?/.exec(line.text);
+      if (quoteMatch) changes.push({ from: line.from + quoteMatch[1].length, to: line.from + quoteMatch[0].length, insert: "" });
+      continue;
+    }
+    changes.push({ from: line.from + leadingWhitespace.length, insert: "> " });
+  }
+
+  if (changes.length === 0) return false;
+  view.dispatch({ changes });
+  return true;
+}
+
+function handleMarkdownEnter(view: EditorView): boolean {
+  const { state } = view;
+  if (state.readOnly || state.selection.ranges.length !== 1) return false;
+  if (expandSelectedMarkdownImage(view)) return true;
+
+  const selection = state.selection.main;
+  if (!selection.empty) return false;
+
+  const line = state.doc.lineAt(selection.from);
+  const prefix = getContinuationPrefix(line.text);
+  if (!prefix) return false;
+
+  const content = getListOrQuoteContent(line.text);
+  if (selection.from === line.to && content.trim() === "") {
+    const marker = getLineMarkerPrefixRange(line.from, line.text);
+    if (!marker) return false;
+    view.dispatch({
+      changes: { from: marker.from, to: marker.to, insert: "" },
+      selection: EditorSelection.cursor(marker.from),
+    });
+    return true;
+  }
+
+  view.dispatch({
+    changes: { from: selection.from, to: selection.to, insert: `\n${prefix}` },
+    selection: EditorSelection.cursor(selection.from + 1 + prefix.length),
+  });
+  renumberOrderedLists(view);
+  return true;
+}
+
+function expandSelectedMarkdownImage(view: EditorView): boolean {
+  const selection = view.state.selection.main;
+  if (selection.empty) return false;
+
+  const imageElement = getMarkdownElements(view.state).find((element) => (
+    element.kind === "image" &&
+    element.from === selection.from &&
+    element.to === selection.to
+  ));
+  if (!imageElement) return false;
+
+  view.dispatch({
+    effects: markdownExpandedImageEffect.of({ from: imageElement.from, to: imageElement.to }),
+    selection: EditorSelection.cursor(imageElement.from + 2),
+  });
+  return true;
+}
+
+function moveMarkdownCaretToVisibleLineStart(view: EditorView): boolean {
+  const { state } = view;
+  if (state.selection.ranges.length !== 1) return false;
+
+  const selection = state.selection.main;
+  if (!selection.empty) return false;
+
+  const line = state.doc.lineAt(selection.from);
+  const visibleStart = getMarkdownVisibleLineStart(state, line.from);
+  if (visibleStart == null || selection.from === visibleStart) return false;
+
+  view.dispatch({ selection: EditorSelection.cursor(visibleStart) });
+  return true;
+}
+
+function getMarkdownVisibleLineStart(state: EditorState, lineFrom: number): number | null {
+  const element = getMarkdownElements(state).find((candidate) => (
+    candidate.lineFrom === lineFrom &&
+    (candidate.kind === "blockquote" || candidate.kind === "heading" || candidate.kind === "list" || candidate.kind === "task")
+  ));
+  if (!element) return null;
+  return element.markerRanges.reduce((start, range) => Math.max(start, range.to), element.from);
+}
+
+function indentMarkdownListItem(view: EditorView): boolean {
+  return adjustMarkdownListIndent(view, 1);
+}
+
+function outdentMarkdownListItem(view: EditorView): boolean {
+  return adjustMarkdownListIndent(view, -1);
+}
+
+function adjustMarkdownListIndent(view: EditorView, direction: 1 | -1): boolean {
+  const { state } = view;
+  if (state.readOnly) return false;
+
+  const changes: ChangeSpec[] = [];
+  const touchedLines = getSelectedLineNumbers(state);
+  for (const lineNumber of touchedLines) {
+    const line = state.doc.line(lineNumber);
+    if (!/^\s*(?:[-*+]|\d+[.)])\s+/.test(line.text)) continue;
+    if (direction > 0) {
+      changes.push({ from: line.from, to: line.from, insert: "  " });
+      continue;
+    }
+
+    const outdentWidth = line.text.startsWith("  ") ? 2 : line.text.startsWith("\t") ? 1 : 0;
+    if (outdentWidth > 0) changes.push({ from: line.from, to: line.from + outdentWidth, insert: "" });
+  }
+
+  if (changes.length === 0) return false;
+  view.dispatch({ changes });
+  renumberOrderedLists(view);
+  return true;
+}
+
+function toggleMarkdownInline(delimiter: "**" | "*" | "`" | "~~") {
+  return (view: EditorView): boolean => {
+    const { state } = view;
+    if (state.readOnly || state.selection.ranges.length !== 1) return false;
+
+    const selection = state.selection.main;
+    const range = selection.empty ? getWordRangeAt(state, selection.from) : { from: selection.from, to: selection.to };
+    if (!range || range.from === range.to) return false;
+
+    const beforeFrom = Math.max(0, range.from - delimiter.length);
+    const afterTo = Math.min(state.doc.length, range.to + delimiter.length);
+    const before = state.sliceDoc(beforeFrom, range.from);
+    const after = state.sliceDoc(range.to, afterTo);
+
+    if (before === delimiter && after === delimiter) {
+      view.dispatch({
+        changes: [
+          { from: range.to, to: afterTo, insert: "" },
+          { from: beforeFrom, to: range.from, insert: "" },
+        ],
+        selection: EditorSelection.range(beforeFrom, range.to - delimiter.length),
+      });
+      return true;
+    }
+
+    view.dispatch({
+      changes: [
+        { from: range.to, insert: delimiter },
+        { from: range.from, insert: delimiter },
+      ],
+      selection: EditorSelection.range(range.from + delimiter.length, range.to + delimiter.length),
+    });
+    return true;
+  };
+}
+
+function wrapMarkdownLink(view: EditorView): boolean {
+  const { state } = view;
+  if (state.readOnly || state.selection.ranges.length !== 1) return false;
+
+  const selection = state.selection.main;
+  const range = selection.empty ? getWordRangeAt(state, selection.from) : { from: selection.from, to: selection.to };
+  if (!range || range.from === range.to) return false;
+
+  const selectedText = state.sliceDoc(range.from, range.to);
+  view.dispatch({
+    changes: { from: range.from, to: range.to, insert: `[${selectedText}]()` },
+    selection: EditorSelection.cursor(range.from + selectedText.length + 3),
+  });
+  return true;
+}
+
+function getSelectedLineNumbers(state: EditorState): number[] {
+  const lines = new Set<number>();
+  for (const range of state.selection.ranges) {
+    const fromLine = state.doc.lineAt(range.from);
+    const toLine = state.doc.lineAt(range.to);
+    for (let lineNumber = fromLine.number; lineNumber <= toLine.number; lineNumber += 1) {
+      lines.add(lineNumber);
+    }
+  }
+  return [...lines].sort((left, right) => left - right);
+}
+
+function getWordRangeAt(state: EditorState, pos: number): { from: number; to: number } | null {
+  const line = state.doc.lineAt(pos);
+  const offset = pos - line.from;
+  const isWord = (char: string | undefined) => Boolean(char && /[\p{L}\p{N}_-]/u.test(char));
+  let fromOffset = offset;
+  let toOffset = offset;
+  while (fromOffset > 0 && isWord(line.text[fromOffset - 1])) fromOffset -= 1;
+  while (toOffset < line.text.length && isWord(line.text[toOffset])) toOffset += 1;
+  if (fromOffset === toOffset) return null;
+  return { from: line.from + fromOffset, to: line.from + toOffset };
+}
+
+function getContinuationPrefix(text: string): string | null {
+  const taskMatch = /^(\s*)([-*+]|\d+[.)])\s+\[[ xX]\]\s+/.exec(text);
+  if (taskMatch) return `${taskMatch[1]}${getNextListMarker(taskMatch[2])} [ ] `;
+
+  const listMatch = /^(\s*)([-*+]|\d+[.)])\s+/.exec(text);
+  if (listMatch) return `${listMatch[1]}${getNextListMarker(listMatch[2])} `;
+
+  const quoteMatch = /^(\s*>+\s?)/.exec(text);
+  if (quoteMatch) return quoteMatch[1].endsWith(" ") ? quoteMatch[1] : `${quoteMatch[1]} `;
+
+  return null;
+}
+
+function getListOrQuoteContent(text: string): string {
+  return text
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s*)?/, "")
+    .replace(/^\s*>+\s?/, "");
+}
+
+function getLineMarkerPrefixRange(lineFrom: number, text: string): { from: number; to: number } | null {
+  const match = /^(\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s*)?|\s*>+\s?)/.exec(text);
+  if (!match) return null;
+  return { from: lineFrom, to: lineFrom + match[0].length };
+}
+
+function getNextListMarker(marker: string): string {
+  const orderedMatch = /^(\d+)([.)])$/.exec(marker);
+  if (!orderedMatch) return marker;
+  return `${Number.parseInt(orderedMatch[1], 10) + 1}${orderedMatch[2]}`;
+}
+
+function renumberOrderedLists(view: EditorView) {
+  const { state } = view;
+  const changes: ChangeSpec[] = [];
+  const countersByIndent = new Map<string, number>();
+
+  for (let lineNumber = 1; lineNumber <= state.doc.lines; lineNumber += 1) {
+    const line = state.doc.line(lineNumber);
+    const match = /^(\s*)(\d+)([.)])\s+/.exec(line.text);
+    if (!match) {
+      if (!/^\s*(?:[-*+]|\d+[.)])\s+/.test(line.text)) countersByIndent.clear();
+      continue;
+    }
+
+    const indentKey = match[1].replace(/\t/g, "  ");
+    const nextNumber = (countersByIndent.get(indentKey) ?? 0) + 1;
+    countersByIndent.set(indentKey, nextNumber);
+    if (match[2] === String(nextNumber)) continue;
+
+    const markerFrom = line.from + match[1].length;
+    changes.push({ from: markerFrom, to: markerFrom + match[2].length, insert: String(nextNumber) });
+  }
+
+  if (changes.length > 0) view.dispatch({ changes });
+}
+
+const markdownComposingBlockLineField = StateField.define<ComposingBlockLine | null>({
+  create() {
+    return null;
+  },
+  update(value, transaction) {
+    if (getLivePreviewFocusState(true, transaction.effects) === false) return null;
+    if (transaction.isUserEvent("input.paste") || transaction.isUserEvent("input.drop")) return null;
+
+    let next = value
+      ? {
+          from: transaction.changes.mapPos(value.from),
+          to: transaction.changes.mapPos(value.to),
+        }
+      : null;
+
+    const selection = transaction.state.selection.main;
+    const selectionLine = transaction.state.doc.lineAt(selection.head);
+    if (next && selectionLine.from !== next.from) next = null;
+
+    if (
+      transaction.docChanged &&
+      (transaction.isUserEvent("input.type") ||
+        transaction.isUserEvent("delete.backward") ||
+        transaction.isUserEvent("delete.forward"))
+    ) {
+      const composingRange = getComposingBlockPrefixRange(selectionLine.from, selectionLine.text);
+      if (composingRange && transactionTouchesRange(transaction, composingRange.from, composingRange.to)) {
+        return { from: selectionLine.from, to: selectionLine.to };
+      }
+    }
+
+    return next;
+  },
+});
+
+const markdownInputCompositionEffect = StateEffect.define<boolean>();
+
+const markdownInputCompositionExtension = EditorView.domEventHandlers({
+  compositionstart(_event, view) {
+    view.dispatch({ effects: markdownInputCompositionEffect.of(true) });
+    return false;
+  },
+  compositionend(_event, view) {
+    view.dispatch({ effects: markdownInputCompositionEffect.of(false) });
+    return false;
+  },
+});
+
+function getInputCompositionState(inputComposing: boolean, effects: readonly StateEffect<unknown>[]): boolean {
+  for (const effect of effects) {
+    if (effect.is(markdownInputCompositionEffect)) return effect.value;
+  }
+  return inputComposing;
+}
+
+function getComposingBlockLineKey(state: EditorState): string {
+  const line = state.field(markdownComposingBlockLineField, false);
+  return line ? `${line.from}:${line.to}` : "";
+}
+
+function getComposingBlockPrefixRange(lineFrom: number, text: string): { from: number; to: number } | null {
+  const match = /^(#{1,6}\s?|\s*>+\s?|\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s*)?|\s{0,3}(?:`{3,}|~{3,})[^\n`]*|\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*|\|.*\|)/.exec(text);
+  if (!match) return null;
+  return { from: lineFrom, to: lineFrom + match[0].length };
+}
+
+function transactionTouchesRange(transaction: Transaction, from: number, to: number): boolean {
+  let touches = false;
+  transaction.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
+    if (fromB <= to && Math.max(fromB, toB) >= from) touches = true;
+  });
+  return touches;
+}
+
+const markdownExpandedImageField = StateField.define<ExpandedImageRange | null>({
+  create() {
+    return null;
+  },
+  update(value, transaction) {
+    for (const effect of transaction.effects) {
+      if (effect.is(markdownExpandedImageEffect)) return effect.value;
+    }
+
+    const mapped = value
+      ? {
+          from: transaction.changes.mapPos(value.from),
+          to: transaction.changes.mapPos(value.to),
+        }
+      : null;
+    if (!mapped) return null;
+
+    const selection = transaction.state.selection.main;
+    if (selection.from >= mapped.from && selection.to <= mapped.to) return mapped;
+    return null;
+  },
+});
+
 const markdownLivePreviewDecorations = StateField.define<LivePreviewDecorations>({
   create(state) {
-    return buildMarkdownDecorations(state);
+    return buildMarkdownDecorations(state, false, false);
   },
   update(decorations, transaction) {
-    if (transaction.docChanged || transaction.reconfigured) {
-      return buildMarkdownDecorations(transaction.state);
+    const focused = getLivePreviewFocusState(decorations.focused, transaction.effects);
+    const inputComposing = getInputCompositionState(decorations.inputComposing, transaction.effects);
+    const composingLineKey = getComposingBlockLineKey(transaction.state);
+    const revealSetKey = getLivePreviewRevealSetKey(transaction.state, focused);
+    if (inputComposing && transaction.docChanged && !transaction.reconfigured) {
+      return {
+        decorations: decorations.decorations.map(transaction.changes),
+        atomicRanges: decorations.atomicRanges.map(transaction.changes),
+        focused,
+        inputComposing,
+        composingLineKey,
+        revealSetKey: decorations.revealSetKey,
+      };
+    }
+    if (
+      transaction.docChanged ||
+      transaction.reconfigured ||
+      focused !== decorations.focused ||
+      inputComposing !== decorations.inputComposing ||
+      composingLineKey !== decorations.composingLineKey ||
+      revealSetKey !== decorations.revealSetKey
+    ) {
+      return buildMarkdownDecorations(transaction.state, focused, inputComposing);
     }
     return {
       decorations: decorations.decorations.map(transaction.changes),
       atomicRanges: decorations.atomicRanges.map(transaction.changes),
+      focused,
+      inputComposing,
+      composingLineKey,
+      revealSetKey,
     };
   },
   provide(field) {
@@ -234,119 +776,49 @@ const markdownLivePreviewDecorations = StateField.define<LivePreviewDecorations>
   },
 });
 
-let suppressNextMouseLinkClickUntil = 0;
+const markdownLivePreviewFocusEffect = StateEffect.define<boolean>();
 
-const markdownLinkOpenHandler = EditorView.domEventHandlers({
-  mousedown(event, view) {
-    if (event.button !== 0) return false;
-    const opened = openMarkdownLinkFromEvent(event, view);
-    if (opened) suppressNextMouseLinkClickUntil = Date.now() + 700;
-    return opened;
-  },
-  click(event, view) {
-    if (
-      event.detail > 0 &&
-      suppressNextMouseLinkClickUntil >= Date.now() &&
-      getMarkdownLinkElementFromEvent(event, view)
-    ) {
-      suppressNextMouseLinkClickUntil = 0;
-      event.preventDefault();
-      event.stopPropagation();
-      return true;
-    }
-    return openMarkdownLinkFromEvent(event, view);
-  },
-  keydown(event, view) {
-    if (event.key !== "Enter") return false;
-    const linkElement = getMarkdownLinkElementFromEvent(event, view);
-    if (!linkElement) return false;
-    return openMarkdownLinkFromEvent(event, view);
-  },
-});
+const markdownLivePreviewFocusExtension = EditorView.focusChangeEffect.of((_state, focusing) => (
+  markdownLivePreviewFocusEffect.of(focusing)
+));
 
-function openMarkdownLinkFromEvent(event: Event, view: EditorView): boolean {
-  if (event.defaultPrevented) return false;
-  const linkElement = getMarkdownLinkElementFromEvent(event, view);
-  if (!linkElement) return false;
-
-  const opened = openMarkdownLinkElement(linkElement, view);
-  if (!opened) return false;
-
-  event.preventDefault();
-  event.stopPropagation();
-  return true;
-}
-
-function getMarkdownLinkElementFromEvent(event: Event, view: EditorView): HTMLElement | null {
-  const targetElement = getEventTargetElement(event.target);
-  if (!targetElement) return null;
-
-  const linkElement = targetElement.closest<HTMLElement>(
-    ".cm-md-wiki-link-label[data-wiki-target], .cm-md-link-label[data-md-href]",
-  );
-  if (!linkElement || !view.dom.contains(linkElement)) return null;
-  return linkElement;
-}
-
-function openMarkdownLinkElement(linkElement: HTMLElement, view: EditorView): boolean {
-  const linkGraph = view.state.facet(markdownLinkGraphFacet);
-  const sourcePath = view.state.facet(markdownDocumentPathFacet);
-  const wikiTarget = linkElement.dataset.wikiTarget;
-  if (wikiTarget) {
-    if (!linkGraph?.openWikiLink) return false;
-
-    const resolvedTarget = linkGraph.resolveWikiLink(sourcePath, wikiTarget);
-    if (!resolvedTarget.exists && (!resolvedTarget.candidatePaths || resolvedTarget.candidatePaths.length === 0)) {
-      return false;
-    }
-
-    linkGraph.openWikiLink(resolvedTarget, sourcePath);
-    return true;
+function getLivePreviewFocusState(focused: boolean, effects: readonly StateEffect<unknown>[]): boolean {
+  for (const effect of effects) {
+    if (effect.is(markdownLivePreviewFocusEffect)) return effect.value;
   }
-
-  const href = linkElement.dataset.mdHref;
-  if (!href) return false;
-
-  if (isExternalMarkdownHref(href) && isSafeHref(href)) {
-    return openExternalMarkdownHref(href, view);
-  }
-
-  const resolvedTarget = linkGraph?.resolveMarkdownLink(sourcePath, href) ?? null;
-  if (!resolvedTarget || !linkGraph?.openWikiLink) return false;
-  if (!resolvedTarget.exists && (!resolvedTarget.candidatePaths || resolvedTarget.candidatePaths.length === 0)) {
-    return false;
-  }
-
-  linkGraph.openWikiLink(resolvedTarget, sourcePath);
-  return true;
+  return focused;
 }
 
-function openExternalMarkdownHref(href: string, view: EditorView): boolean {
-  const linkGraph = view.state.facet(markdownLinkGraphFacet);
-  if (linkGraph?.openExternalUrl) {
-    linkGraph.openExternalUrl(href);
-    return true;
-  }
-
-  window.open(href, "_blank", "noopener,noreferrer");
-  return true;
+function getLivePreviewRevealSetKey(state: EditorState, focused: boolean): string {
+  const inlineRevealRange = getLivePreviewInlineRevealRange(state, focused);
+  return inlineRevealRange ? `${inlineRevealRange.from}:${inlineRevealRange.to}` : "";
 }
 
-function getEventTargetElement(target: EventTarget | null): Element | null {
-  if (target instanceof Element) return target;
-  if (target instanceof Node) return target.parentElement;
-  return null;
+function getLivePreviewInlineRevealRange(state: EditorState, focused: boolean): InlineRevealRange | null {
+  if (!focused || state.readOnly || state.selection.ranges.length !== 1) return null;
+
+  const selection = state.selection.main;
+  if (!selection.empty) return null;
+
+  const element = getInlineRevealElement(state, selection.from);
+  return element ? { from: element.from, to: element.to } : null;
 }
 
-function buildMarkdownDecorations(state: EditorState): LivePreviewDecorations {
+function buildMarkdownDecorations(state: EditorState, focused: boolean, inputComposing: boolean): LivePreviewDecorations {
   const builders: MarkdownDecorationBuilders = {
     decorations: [],
     atomicRanges: [],
   };
+  const inlineRevealRange = getLivePreviewInlineRevealRange(state, focused);
+  const composingLine = state.field(markdownComposingBlockLineField, false) ?? null;
+  const expandedImageRange = state.field(markdownExpandedImageField, false) ?? null;
 
   addMarkdownBlockAndLineDecorations(
     state,
     builders,
+    inlineRevealRange,
+    expandedImageRange,
+    composingLine,
     state.facet(markdownHtmlTrustModeFacet),
     state.facet(markdownLinkGraphFacet),
     state.facet(markdownDocumentPathFacet),
@@ -356,12 +828,19 @@ function buildMarkdownDecorations(state: EditorState): LivePreviewDecorations {
   return {
     decorations: builders.decorations.length > 0 ? Decoration.set(builders.decorations, true) : Decoration.none,
     atomicRanges: builders.atomicRanges.length > 0 ? Decoration.set(builders.atomicRanges, true) : Decoration.none,
+    focused,
+    inputComposing,
+    composingLineKey: composingLine ? `${composingLine.from}:${composingLine.to}` : "",
+    revealSetKey: inlineRevealRange ? `${inlineRevealRange.from}:${inlineRevealRange.to}` : "",
   };
 }
 
 function addMarkdownBlockAndLineDecorations(
   state: EditorState,
   builders: MarkdownDecorationBuilders,
+  inlineRevealRange: InlineRevealRange | null,
+  expandedImageRange: ExpandedImageRange | null,
+  composingLine: ComposingBlockLine | null,
   htmlTrustMode: MarkdownHtmlTrustMode,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
@@ -371,6 +850,16 @@ function addMarkdownBlockAndLineDecorations(
 
   for (let lineNumber = 1; lineNumber <= lineCount;) {
     const line = state.doc.line(lineNumber);
+    if (composingLine?.from === line.from) {
+      builders.decorations.push(
+        Decoration.line({
+          class: "cm-md-source-line",
+        }).range(line.from),
+      );
+      lineNumber += 1;
+      continue;
+    }
+
     const codeBlock = getMarkdownCodeBlock(state, line.number);
     if (codeBlock) {
       addReplacementDecoration(
@@ -406,7 +895,14 @@ function addMarkdownBlockAndLineDecorations(
       addReplacementDecoration(
         builders,
         Decoration.replace({
-          widget: new MarkdownTableWidget(tableBlock.rows, markdownLinkGraph, documentPath, markdownAssetUrlResolver),
+          widget: new MarkdownTableWidget(
+            tableBlock.from,
+            tableBlock.to,
+            tableBlock.rows,
+            markdownLinkGraph,
+            documentPath,
+            markdownAssetUrlResolver,
+          ),
           block: true,
         }),
         tableBlock.from,
@@ -416,7 +912,17 @@ function addMarkdownBlockAndLineDecorations(
       continue;
     }
 
-    decorateMarkdownLine(line.from, line.to, line.text, builders, markdownLinkGraph, documentPath, markdownAssetUrlResolver);
+    decorateMarkdownLine(
+      line.from,
+      line.to,
+      line.text,
+      builders,
+      inlineRevealRange,
+      expandedImageRange,
+      markdownLinkGraph,
+      documentPath,
+      markdownAssetUrlResolver,
+    );
     lineNumber += 1;
   }
 }
@@ -426,6 +932,8 @@ function decorateMarkdownLine(
   lineTo: number,
   text: string,
   builders: MarkdownDecorationBuilders,
+  inlineRevealRange: InlineRevealRange | null,
+  expandedImageRange: ExpandedImageRange | null,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
@@ -458,16 +966,16 @@ function decorateMarkdownLine(
 
   const headingMatch = /^(#{1,6})(\s|$)/.exec(text);
   if (headingMatch) {
-    addHiddenDecoration(builders, lineFrom, lineFrom + headingMatch[0].length);
+    addSourceSyntaxDecoration(builders, lineFrom, lineFrom + headingMatch[0].length, "heading", false);
   }
 
   const blockquoteMarker = /^(\s*>\s?)/.exec(text);
   if (blockquoteMarker) {
-    addHiddenDecoration(builders, lineFrom, lineFrom + blockquoteMarker[1].length);
+    addSourceSyntaxDecoration(builders, lineFrom, lineFrom + blockquoteMarker[1].length, "blockquote", false);
   }
 
   if (taskLine) {
-    addHiddenDecoration(builders, taskLine.prefixFrom, taskLine.prefixTo);
+    addSourceSyntaxDecoration(builders, taskLine.prefixFrom, taskLine.prefixTo, "task", false);
     builders.decorations.push(
       Decoration.widget({
         widget: new TaskCheckboxWidget(taskLine),
@@ -478,6 +986,8 @@ function decorateMarkdownLine(
       lineFrom,
       text,
       builders,
+      inlineRevealRange,
+      expandedImageRange,
       markdownLinkGraph,
       documentPath,
       markdownAssetUrlResolver,
@@ -487,10 +997,19 @@ function decorateMarkdownLine(
   }
 
   if (listMatch) {
-    addHiddenDecoration(builders, lineFrom, lineFrom + listMatch[0].length);
+    addSourceSyntaxDecoration(builders, lineFrom, lineFrom + listMatch[0].length, "list", false);
   }
 
-  addInlineMarkdownDecorations(lineFrom, text, builders, markdownLinkGraph, documentPath, markdownAssetUrlResolver);
+  addInlineMarkdownDecorations(
+    lineFrom,
+    text,
+    builders,
+    inlineRevealRange,
+    expandedImageRange,
+    markdownLinkGraph,
+    documentPath,
+    markdownAssetUrlResolver,
+  );
 }
 
 function getMarkdownLineAttributes(
@@ -532,6 +1051,8 @@ function addInlineMarkdownDecorations(
   lineFrom: number,
   text: string,
   builders: MarkdownDecorationBuilders,
+  inlineRevealRange: InlineRevealRange | null,
+  expandedImageRange: ExpandedImageRange | null,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
@@ -539,13 +1060,31 @@ function addInlineMarkdownDecorations(
 ) {
   const occupied = [...initialOccupied];
 
-  addDelimiterDecorations(lineFrom, text, /(`)([^`\n]+)(`)/g, 1, "cm-md-syntax-monospace", builders, occupied);
-  addImageDecorations(lineFrom, text, builders, occupied, documentPath, markdownAssetUrlResolver);
-  addWikiLinkDecorations(lineFrom, text, builders, occupied, markdownLinkGraph, documentPath);
-  addLinkDecorations(lineFrom, text, builders, occupied, markdownLinkGraph, documentPath);
-  addDelimiterDecorations(lineFrom, text, /(\*\*|__)(\S(?:.*?\S)?)\1/g, 1, "cm-md-syntax-strong", builders, occupied);
-  addDelimiterDecorations(lineFrom, text, /(~~)(\S(?:.*?\S)?)(~~)/g, 1, "cm-md-syntax-strikethrough", builders, occupied);
-  addItalicDecorations(lineFrom, text, builders, occupied);
+  addDelimiterDecorations(lineFrom, text, /(`)([^`\n]+)(`)/g, 1, "cm-md-syntax-monospace", builders, occupied, inlineRevealRange);
+  addImageDecorations(lineFrom, text, builders, occupied, expandedImageRange, documentPath, markdownAssetUrlResolver);
+  addWikiLinkDecorations(lineFrom, text, builders, occupied, inlineRevealRange, markdownLinkGraph, documentPath);
+  addLinkDecorations(lineFrom, text, builders, occupied, inlineRevealRange, markdownLinkGraph, documentPath);
+  addDelimiterDecorations(
+    lineFrom,
+    text,
+    /(\*\*|__)(\S(?:.*?\S)?)\1/g,
+    1,
+    "cm-md-syntax-strong",
+    builders,
+    occupied,
+    inlineRevealRange,
+  );
+  addDelimiterDecorations(
+    lineFrom,
+    text,
+    /(~~)(\S(?:.*?\S)?)(~~)/g,
+    1,
+    "cm-md-syntax-strikethrough",
+    builders,
+    occupied,
+    inlineRevealRange,
+  );
+  addItalicDecorations(lineFrom, text, builders, occupied, inlineRevealRange);
 }
 
 function addImageDecorations(
@@ -553,6 +1092,7 @@ function addImageDecorations(
   text: string,
   builders: MarkdownDecorationBuilders,
   occupied: OccupiedRange[],
+  expandedImageRange: ExpandedImageRange | null,
   documentPath: string,
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
 ) {
@@ -560,11 +1100,12 @@ function addImageDecorations(
     const matchFrom = lineFrom + token.from;
     const matchTo = lineFrom + token.to;
     if (!reserveRange(occupied, matchFrom, matchTo)) continue;
+    if (expandedImageRange?.from === matchFrom && expandedImageRange.to === matchTo) continue;
 
     addReplacementDecoration(
       builders,
       Decoration.replace({
-        widget: new ImagePreviewWidget(token.alt, token.href, token.title, documentPath, markdownAssetUrlResolver),
+        widget: new ImagePreviewWidget(matchFrom, matchTo, token.alt, token.href, token.title, documentPath, markdownAssetUrlResolver),
         inclusive: false,
       }),
       matchFrom,
@@ -578,6 +1119,7 @@ function addWikiLinkDecorations(
   text: string,
   builders: MarkdownDecorationBuilders,
   occupied: OccupiedRange[],
+  inlineRevealRange: InlineRevealRange | null,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
 ) {
@@ -597,8 +1139,9 @@ function addWikiLinkDecorations(
       resolvedTarget?.exists ? "is-resolved" : "is-missing",
       resolvedTarget?.ambiguous ? "is-ambiguous" : "",
     ].filter(Boolean).join(" ");
+    const revealSourceSyntax = isRevealedInlineRange(matchFrom, matchTo, inlineRevealRange);
 
-    addHiddenDecoration(builders, matchFrom, visibleFrom);
+    addSourceSyntaxDecoration(builders, matchFrom, visibleFrom, "wiki-link", revealSourceSyntax);
     builders.decorations.push(
       Decoration.mark({
         class: classes,
@@ -610,7 +1153,7 @@ function addWikiLinkDecorations(
         },
       }).range(visibleFrom, visibleTo),
     );
-    addHiddenDecoration(builders, visibleTo, matchTo);
+    addSourceSyntaxDecoration(builders, visibleTo, matchTo, "wiki-link", revealSourceSyntax);
   }
 }
 
@@ -619,6 +1162,7 @@ function addLinkDecorations(
   text: string,
   builders: MarkdownDecorationBuilders,
   occupied: OccupiedRange[],
+  inlineRevealRange: InlineRevealRange | null,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
 ) {
@@ -639,8 +1183,9 @@ function addLinkDecorations(
       resolvedTarget?.ambiguous ? "is-ambiguous" : "",
       isExternalMarkdownHref(token.href) && isSafeHref(token.href) ? "is-external" : "",
     ].filter(Boolean).join(" ");
+    const revealSourceSyntax = isRevealedInlineRange(matchFrom, matchTo, inlineRevealRange);
 
-    addHiddenDecoration(builders, matchFrom, labelFrom);
+    addSourceSyntaxDecoration(builders, matchFrom, labelFrom, "link", revealSourceSyntax);
     builders.decorations.push(
       Decoration.mark({
         class: linkClasses,
@@ -652,7 +1197,7 @@ function addLinkDecorations(
         },
       }).range(labelFrom, labelTo),
     );
-    addHiddenDecoration(builders, labelTo, matchTo);
+    addSourceSyntaxDecoration(builders, labelTo, matchTo, "link", revealSourceSyntax);
   }
 }
 
@@ -684,6 +1229,7 @@ function addDelimiterDecorations(
   contentClass: string,
   builders: MarkdownDecorationBuilders,
   occupied: OccupiedRange[],
+  inlineRevealRange: InlineRevealRange | null,
 ) {
   for (const match of text.matchAll(pattern)) {
     if (match.index == null) continue;
@@ -696,10 +1242,11 @@ function addDelimiterDecorations(
     const contentTo = openingTo + content.length;
     const closingTo = matchFrom + match[0].length;
     if (!reserveRange(occupied, matchFrom, closingTo)) continue;
+    const revealSourceSyntax = isRevealedInlineRange(matchFrom, closingTo, inlineRevealRange);
 
-    addHiddenDecoration(builders, matchFrom, openingTo);
+    addSourceSyntaxDecoration(builders, matchFrom, openingTo, "delimiter", revealSourceSyntax);
     builders.decorations.push(Decoration.mark({ class: contentClass }).range(openingTo, contentTo));
-    addHiddenDecoration(builders, contentTo, closingTo);
+    addSourceSyntaxDecoration(builders, contentTo, closingTo, "delimiter", revealSourceSyntax);
   }
 }
 
@@ -708,6 +1255,7 @@ function addItalicDecorations(
   text: string,
   builders: MarkdownDecorationBuilders,
   occupied: OccupiedRange[],
+  inlineRevealRange: InlineRevealRange | null,
 ) {
   const pattern = /(^|[^\*])(\*)([^\s*](?:.*?[^\s*])?)(\*)(?!\*)/g;
 
@@ -722,21 +1270,45 @@ function addItalicDecorations(
     const contentTo = contentFrom + content.length;
     const closingTo = contentTo + 1;
     if (!reserveRange(occupied, openingFrom, closingTo)) continue;
+    const revealSourceSyntax = isRevealedInlineRange(openingFrom, closingTo, inlineRevealRange);
 
-    addHiddenDecoration(builders, openingFrom, contentFrom);
+    addSourceSyntaxDecoration(builders, openingFrom, contentFrom, "delimiter", revealSourceSyntax);
     builders.decorations.push(Decoration.mark({ class: "cm-md-syntax-emphasis" }).range(contentFrom, contentTo));
-    addHiddenDecoration(builders, contentTo, closingTo);
+    addSourceSyntaxDecoration(builders, contentTo, closingTo, "delimiter", revealSourceSyntax);
   }
 }
 
-function addHiddenDecoration(builders: MarkdownDecorationBuilders, from: number, to: number) {
+function addSourceSyntaxDecoration(
+  builders: MarkdownDecorationBuilders,
+  from: number,
+  to: number,
+  kind: MarkdownSourceSyntaxKind,
+  revealSourceSyntax: boolean,
+) {
   if (from >= to) return;
-  builders.decorations.push(
-    Decoration.mark({
-      class: "cm-md-hidden-syntax",
+  if (revealSourceSyntax) {
+    builders.decorations.push(
+      Decoration.mark({
+        class: `cm-md-source-syntax cm-md-source-syntax-${kind}`,
+        inclusive: false,
+      }).range(from, to),
+    );
+    return;
+  }
+
+  addReplacementDecoration(
+    builders,
+    Decoration.replace({
+      widget: new HiddenMarkdownSyntaxWidget(kind),
       inclusive: false,
-    }).range(from, to),
+    }),
+    from,
+    to,
   );
+}
+
+function isRevealedInlineRange(from: number, to: number, inlineRevealRange: InlineRevealRange | null): boolean {
+  return inlineRevealRange?.from === from && inlineRevealRange.to === to;
 }
 
 function addReplacementDecoration(
@@ -803,1096 +1375,4 @@ function getMarkdownCodeBlock(state: EditorState, lineNumber: number): MarkdownC
     language,
     code: codeLines.join("\n"),
   };
-}
-
-class TaskCheckboxWidget extends WidgetType {
-  private pointerDown: { x: number; y: number } | null = null;
-
-  constructor(
-    private readonly task: MarkdownTaskLine,
-  ) {
-    super();
-  }
-
-  eq(widget: WidgetType): boolean {
-    return (
-      widget instanceof TaskCheckboxWidget &&
-      widget.task.checked === this.task.checked &&
-      widget.task.depth === this.task.depth &&
-      widget.task.checkboxFrom === this.task.checkboxFrom &&
-      widget.task.checkboxTo === this.task.checkboxTo
-    );
-  }
-
-  toDOM(view: EditorView): HTMLElement {
-    const wrapper = document.createElement("span");
-    wrapper.className = "cm-md-task-checkbox-widget";
-    wrapper.style.setProperty("--md-list-depth", String(this.task.depth));
-
-    const checkbox = document.createElement("span");
-    checkbox.role = "checkbox";
-    checkbox.className = this.task.checked ? "cm-md-task-checkbox is-checked" : "cm-md-task-checkbox";
-    checkbox.setAttribute("aria-label", this.task.checked ? "Mark task incomplete" : "Mark task complete");
-    checkbox.setAttribute("aria-checked", String(this.task.checked));
-
-    checkbox.addEventListener("mousedown", (event) => {
-      this.pointerDown = { x: event.clientX, y: event.clientY };
-    });
-
-    checkbox.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (this.pointerDown && hasPointerMoved(event, this.pointerDown)) return;
-      if (view.state.readOnly) return;
-
-      const nextValue = this.task.checked ? "[ ]" : "[x]";
-      view.dispatch({
-        changes: { from: this.task.checkboxFrom, to: this.task.checkboxTo, insert: nextValue },
-        selection: EditorSelection.cursor(this.task.checkboxFrom + nextValue.length),
-      });
-      view.focus();
-    });
-
-    wrapper.appendChild(checkbox);
-    return wrapper;
-  }
-
-  ignoreEvent() {
-    return false;
-  }
-
-  coordsAt(dom: HTMLElement, pos: number, side: number): Rect | null {
-    const line = dom.closest(".cm-line");
-    const lineRect = line?.getBoundingClientRect();
-    if (!line || !lineRect) return null;
-
-    const lineStyle = window.getComputedStyle(line);
-    const textLeft = lineRect.left + Number.parseFloat(lineStyle.paddingLeft || "0");
-    return getInlineWidgetTextCoords(dom, textLeft);
-  }
-}
-
-function getInlineWidgetEdgeX(dom: HTMLElement, pos: number, side: number): number {
-  const rect = dom.getBoundingClientRect();
-  return pos <= 0 || side < 0 ? rect.left : rect.right;
-}
-
-function getInlineWidgetTextCoords(dom: HTMLElement, x: number): Rect | null {
-  const line = dom.closest(".cm-line");
-  if (!(line instanceof HTMLElement)) return null;
-
-  const referenceRect = dom.getBoundingClientRect();
-  const textRect = getNearestVisibleTextRect(line, referenceRect) ?? getFallbackLineTextRect(line);
-
-  return {
-    left: x,
-    right: x,
-    top: textRect.top,
-    bottom: textRect.bottom,
-  };
-}
-
-function getNearestVisibleTextRect(line: HTMLElement, referenceRect: DOMRect): Rect | null {
-  const ownerDocument = line.ownerDocument;
-  const ownerWindow = ownerDocument.defaultView;
-  if (!ownerWindow) return null;
-
-  const textNodes = ownerDocument.createTreeWalker(
-    line,
-    ownerWindow.NodeFilter.SHOW_TEXT,
-    {
-      acceptNode(node) {
-        if (!node.nodeValue?.trim()) return ownerWindow.NodeFilter.FILTER_REJECT;
-        const parent = node.parentElement;
-        if (!parent) return ownerWindow.NodeFilter.FILTER_REJECT;
-        if (parent.closest(".cm-md-hidden-syntax, .cm-md-task-checkbox-widget")) {
-          return ownerWindow.NodeFilter.FILTER_REJECT;
-        }
-        return ownerWindow.NodeFilter.FILTER_ACCEPT;
-      },
-    },
-  );
-
-  const referenceY = referenceRect.top + referenceRect.height / 2;
-  const referenceX = referenceRect.left + referenceRect.width / 2;
-  let bestRect: Rect | null = null;
-  let bestDistance = Number.POSITIVE_INFINITY;
-
-  for (let node = textNodes.nextNode(); node; node = textNodes.nextNode()) {
-    const range = ownerDocument.createRange();
-    range.selectNodeContents(node);
-    for (const rect of Array.from(range.getClientRects())) {
-      if (rect.width <= 0 || rect.height <= 0) continue;
-
-      const verticalDistance = Math.abs(rect.top + rect.height / 2 - referenceY);
-      const horizontalDistance = referenceX < rect.left
-        ? rect.left - referenceX
-        : referenceX > rect.right
-          ? referenceX - rect.right
-          : 0;
-      const distance = verticalDistance * 4 + horizontalDistance;
-
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestRect = {
-          left: rect.left,
-          right: rect.right,
-          top: rect.top,
-          bottom: rect.bottom,
-        };
-      }
-    }
-    range.detach();
-  }
-
-  return bestRect;
-}
-
-function getFallbackLineTextRect(line: HTMLElement): Rect {
-  const lineRect = line.getBoundingClientRect();
-  const style = window.getComputedStyle(line);
-  const paddingTop = parseCssPixelValue(style.paddingTop);
-  const lineHeight = parseCssPixelValue(style.lineHeight) || parseCssPixelValue(style.fontSize) * 1.2;
-  const top = lineRect.top + paddingTop;
-  return {
-    top,
-    bottom: top + lineHeight,
-    left: lineRect.left,
-    right: lineRect.right,
-  };
-}
-
-function parseCssPixelValue(value: string): number {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-const MARKDOWN_HTML_WIDGET_VERTICAL_PADDING = 32;
-
-function estimateMarkdownHtmlBlockHeight(source: string): number {
-  const lineEstimate = Math.max(1, source.split("\n").length) * 24;
-  const imageEstimate = estimateHtmlImageHeight(source);
-  return clampNumber(Math.max(80, lineEstimate + imageEstimate) + MARKDOWN_HTML_WIDGET_VERTICAL_PADDING, 112, 2400);
-}
-
-function estimateHtmlImageHeight(source: string): number {
-  if (!source.includes("<img")) return 0;
-
-  const template = document.createElement("template");
-  template.innerHTML = source;
-  const images = Array.from(template.content.querySelectorAll<HTMLImageElement>("img"));
-  if (images.length === 0) return 0;
-
-  return images.reduce((total, image) => {
-    const explicitHeight = readPositiveNumberAttribute(image, "height");
-    if (explicitHeight) return total + explicitHeight;
-
-    const src = image.getAttribute("src") ?? "";
-    if (/img\.shields\.io|badge/i.test(src)) return total + 24;
-    return total + 320;
-  }, 0);
-}
-
-function readPositiveNumberAttribute(element: Element, name: string): number | null {
-  const value = Number.parseFloat(element.getAttribute(name) ?? "");
-  return Number.isFinite(value) && value > 0 ? value : null;
-}
-
-function estimateCodeBlockWidgetHeight(code: string): number {
-  const codeLines = Math.max(1, code.split("\n").length);
-  return clampNumber(42 + codeLines * 20, 80, 1600);
-}
-
-function estimateMarkdownTableWidgetHeight(rowCount: number): number {
-  return clampNumber(24 + Math.max(1, rowCount) * 42, 80, 1600);
-}
-
-class MarkdownWidgetMeasureController {
-  private resizeObserver: ResizeObserver | null = null;
-  private measureFrame: number | null = null;
-  private disposed = false;
-
-  get destroyed(): boolean {
-    return this.disposed;
-  }
-
-  observe(element: HTMLElement, view: EditorView) {
-    if (!("ResizeObserver" in window)) return;
-
-    this.resizeObserver?.disconnect();
-    this.resizeObserver = new ResizeObserver(() => {
-      this.schedule(view);
-    });
-    this.resizeObserver.observe(element);
-  }
-
-  schedule(view: EditorView) {
-    if (this.disposed || this.measureFrame !== null) return;
-
-    this.measureFrame = window.requestAnimationFrame(() => {
-      this.measureFrame = null;
-      if (!this.disposed) view.requestMeasure();
-    });
-  }
-
-  destroy() {
-    this.disposed = true;
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-      this.resizeObserver = null;
-    }
-    if (this.measureFrame !== null) {
-      window.cancelAnimationFrame(this.measureFrame);
-      this.measureFrame = null;
-    }
-  }
-}
-
-class HorizontalRuleWidget extends WidgetType {
-  eq(widget: WidgetType): boolean {
-    return widget instanceof HorizontalRuleWidget;
-  }
-
-  get estimatedHeight(): number {
-    return 24;
-  }
-
-  toDOM(): HTMLElement {
-    const rule = document.createElement("span");
-    rule.className = "cm-md-hr-widget";
-    return rule;
-  }
-
-  coordsAt(dom: HTMLElement, pos: number, side: number): Rect | null {
-    return getInlineWidgetTextCoords(dom, getInlineWidgetEdgeX(dom, pos, side));
-  }
-}
-
-class HtmlBlockWidget extends WidgetType {
-  private messageListener: ((event: MessageEvent) => void) | null = null;
-  private readyTimer: number | null = null;
-  private readonly measure = new MarkdownWidgetMeasureController();
-  private previewVersion = 0;
-
-  constructor(
-    private readonly block: MarkdownHtmlBlock,
-    private readonly htmlTrustMode: MarkdownHtmlTrustMode,
-    private readonly documentPath: string,
-    private readonly markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
-  ) {
-    super();
-  }
-
-  eq(widget: WidgetType): boolean {
-    return (
-      widget instanceof HtmlBlockWidget &&
-      widget.block.source === this.block.source &&
-      widget.block.tagName === this.block.tagName &&
-      widget.block.closed === this.block.closed &&
-      widget.htmlTrustMode === this.htmlTrustMode &&
-      widget.documentPath === this.documentPath &&
-      widget.markdownAssetUrlResolver === this.markdownAssetUrlResolver
-    );
-  }
-
-  get estimatedHeight(): number {
-    return estimateMarkdownHtmlBlockHeight(this.block.source);
-  }
-
-  toDOM(view: EditorView): HTMLElement {
-    const shell = document.createElement("div");
-    shell.className = "cm-md-html-widget";
-
-    const toolbar = document.createElement("div");
-    toolbar.className = "cm-md-html-widget-toolbar";
-
-    const toggleButton = document.createElement("button");
-    toggleButton.className = "cm-md-html-source-toggle";
-    toggleButton.type = "button";
-    toolbar.appendChild(toggleButton);
-
-    const content = document.createElement("div");
-    content.className = "cm-md-html-widget-content";
-
-    let showingSource = false;
-    const render = () => {
-      this.clearPreviewLifecycle();
-      const previewVersion = this.nextPreviewVersion();
-      content.replaceChildren(
-        showingSource ? createHtmlSourceBlock(this.block.source) : this.createPreviewBlock(previewVersion, view),
-      );
-      toggleButton.replaceChildren(createHtmlWidgetIcon(showingSource ? "preview" : "source"));
-      toggleButton.title = showingSource ? "Show HTML preview" : "Show HTML source";
-      toggleButton.setAttribute("aria-label", showingSource ? "Show HTML preview" : "Show HTML source");
-      toggleButton.classList.toggle("active", showingSource);
-      this.measure.schedule(view);
-    };
-
-    toggleButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      showingSource = !showingSource;
-      render();
-    });
-
-    render();
-    shell.append(toolbar, content);
-    this.measure.observe(shell, view);
-    return shell;
-  }
-
-  private createPreviewBlock(previewVersion: number, view: EditorView): HTMLElement {
-    if (!this.block.closed) {
-      return createUnsupportedHtmlBlock(this.block, ["HTML block is not closed"]);
-    }
-
-    if (this.htmlTrustMode === "localTrusted") {
-      return this.createTrustedHtmlBlock(this.block, previewVersion, view);
-    }
-
-    const resolver = this.markdownAssetUrlResolver;
-    if (!resolver) {
-      return createSanitizedHtmlPreviewBlock(this.block, this.block.source);
-    }
-
-    const wrapper = document.createElement("div");
-    wrapper.className = "cm-md-html-rendered-surface cm-md-html-block is-loading";
-    wrapper.appendChild(createTrustedHtmlLoader());
-
-    resolveMarkdownHtmlImageSources(this.block.source, this.documentPath, resolver)
-      .then((source) => {
-        if (!this.isPreviewVersionCurrent(previewVersion)) return;
-        replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, source);
-        this.measure.schedule(view);
-      })
-      .catch(() => {
-        if (!this.isPreviewVersionCurrent(previewVersion)) return;
-        replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, this.block.source);
-        this.measure.schedule(view);
-      });
-
-    return wrapper;
-  }
-
-  destroy() {
-    this.previewVersion += 1;
-    this.clearPreviewLifecycle();
-    this.measure.destroy();
-  }
-
-  private clearPreviewLifecycle() {
-    if (this.messageListener) {
-      window.removeEventListener("message", this.messageListener);
-      this.messageListener = null;
-    }
-    if (this.readyTimer !== null) {
-      window.clearTimeout(this.readyTimer);
-      this.readyTimer = null;
-    }
-  }
-
-  ignoreEvent() {
-    return true;
-  }
-
-  private nextPreviewVersion(): number {
-    this.previewVersion += 1;
-    return this.previewVersion;
-  }
-
-  private isPreviewVersionCurrent(previewVersion: number): boolean {
-    return !this.measure.destroyed && this.previewVersion === previewVersion;
-  }
-
-  private createTrustedHtmlBlock(block: MarkdownHtmlBlock, previewVersion: number, view: EditorView): HTMLElement {
-    const wrapper = document.createElement("div");
-    wrapper.className = "cm-md-html-trusted-block is-loading";
-
-    const sizer = createTrustedHtmlSizer(block.source);
-    const loader = createTrustedHtmlLoader();
-    wrapper.appendChild(sizer);
-    wrapper.appendChild(loader);
-
-    const frameId = createTrustedHtmlFrameId();
-    const iframe = document.createElement("iframe");
-    iframe.className = "cm-md-html-trusted-frame";
-    iframe.title = "Trusted Markdown HTML preview";
-    iframe.sandbox.add("allow-downloads", "allow-forms", "allow-modals", "allow-popups", "allow-scripts");
-    iframe.referrerPolicy = "no-referrer";
-    iframe.style.height = `${estimateTrustedHtmlFrameHeight(block.source)}px`;
-
-    const markReady = () => {
-      if (this.readyTimer !== null) {
-        window.clearTimeout(this.readyTimer);
-        this.readyTimer = null;
-      }
-      if (!wrapper.classList.contains("is-loading")) return;
-      wrapper.classList.remove("is-loading");
-      sizer.remove();
-      loader.remove();
-      this.measure.schedule(view);
-    };
-
-    let measuredHeight = false;
-    this.messageListener = (event: MessageEvent) => {
-      if (event.source !== iframe.contentWindow) return;
-      if (!isTrustedHtmlHeightMessage(event.data, frameId)) return;
-      measuredHeight = true;
-      iframe.style.height = `${clampNumber(event.data.height, 80, 2400)}px`;
-      markReady();
-      this.measure.schedule(view);
-    };
-    window.addEventListener("message", this.messageListener);
-
-    iframe.addEventListener("load", () => {
-      if (!wrapper.classList.contains("is-loading")) return;
-      this.readyTimer = window.setTimeout(() => {
-        if (!measuredHeight) markReady();
-      }, 120);
-    }, { once: true });
-
-    resolveMarkdownHtmlImageSources(block.source, this.documentPath, this.markdownAssetUrlResolver)
-      .then((source) => {
-        if (!this.isPreviewVersionCurrent(previewVersion)) return;
-        iframe.srcdoc = createTrustedHtmlDocument(source, frameId);
-        wrapper.appendChild(iframe);
-        this.measure.schedule(view);
-      })
-      .catch(() => {
-        if (!this.isPreviewVersionCurrent(previewVersion)) return;
-        iframe.srcdoc = createTrustedHtmlDocument(block.source, frameId);
-        wrapper.appendChild(iframe);
-        this.measure.schedule(view);
-      });
-
-    return wrapper;
-  }
-}
-
-function createHtmlSourceBlock(source: string): HTMLElement {
-  const pre = document.createElement("pre");
-  pre.className = "cm-md-html-source-block";
-
-  const code = document.createElement("code");
-  code.textContent = source;
-  pre.appendChild(code);
-
-  return pre;
-}
-
-function createSanitizedHtmlPreviewBlock(block: MarkdownHtmlBlock, source: string): HTMLElement {
-  const result = createSanitizedBlockHtmlFragment(source);
-  if (!result.supported) {
-    return createUnsupportedHtmlBlock(block, result.reasons);
-  }
-
-  const wrapper = document.createElement("div");
-  wrapper.className = "cm-md-html-rendered-surface cm-md-html-block";
-  wrapper.appendChild(result.fragment);
-  return wrapper;
-}
-
-function replaceWithSanitizedHtmlPreviewBlock(
-  target: HTMLElement,
-  block: MarkdownHtmlBlock,
-  source: string,
-) {
-  const nextBlock = createSanitizedHtmlPreviewBlock(block, source);
-  target.className = nextBlock.className;
-  target.replaceChildren(...Array.from(nextBlock.childNodes));
-}
-
-function createTrustedHtmlSizer(source: string): HTMLElement {
-  const wrapper = document.createElement("div");
-  wrapper.className = "cm-md-html-rendered-surface cm-md-html-trusted-sizer";
-  wrapper.setAttribute("aria-hidden", "true");
-
-  const result = createSanitizedBlockHtmlFragment(source);
-  if (result.fragment.childNodes.length > 0) {
-    wrapper.appendChild(result.fragment);
-    return wrapper;
-  }
-
-  const placeholder = document.createElement("div");
-  placeholder.className = "cm-md-html-sizing-placeholder";
-  wrapper.appendChild(placeholder);
-  return wrapper;
-}
-
-function createTrustedHtmlLoader(): HTMLElement {
-  const loader = document.createElement("div");
-  loader.className = "cm-md-html-trusted-loader";
-  loader.setAttribute("aria-hidden", "true");
-
-  for (let index = 0; index < 3; index += 1) {
-    const line = document.createElement("span");
-    loader.appendChild(line);
-  }
-
-  return loader;
-}
-
-function createHtmlWidgetIcon(kind: "preview" | "source"): SVGElement {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", "13");
-  svg.setAttribute("height", "13");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "2");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("stroke-linejoin", "round");
-  svg.setAttribute("aria-hidden", "true");
-
-  const paths = kind === "preview"
-    ? [
-        ["path", "M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"],
-        ["circle", "M12 12", "3"],
-      ] as const
-    : [
-        ["polyline", "16 18 22 12 16 6"],
-        ["polyline", "8 6 2 12 8 18"],
-      ] as const;
-
-  for (const item of paths) {
-    if (item[0] === "circle") {
-      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      circle.setAttribute("cx", "12");
-      circle.setAttribute("cy", "12");
-      circle.setAttribute("r", item[2]);
-      svg.appendChild(circle);
-      continue;
-    }
-
-    const element = document.createElementNS("http://www.w3.org/2000/svg", item[0]);
-    if (item[0] === "path") element.setAttribute("d", item[1]);
-    else element.setAttribute("points", item[1]);
-    svg.appendChild(element);
-  }
-
-  return svg;
-}
-
-function createTrustedHtmlDocument(source: string, frameId: string): string {
-  return `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<base target="_blank">
-<style>
-${getTrustedHtmlThemeCss()}
-* {
-  box-sizing: border-box;
-}
-html {
-  min-height: 0;
-  color-scheme: light dark;
-  background: transparent;
-}
-body {
-  margin: 0;
-  overflow: hidden;
-  background: transparent;
-  color: var(--text-normal);
-  font-family: var(--font-text);
-  font-size: 14px;
-  line-height: 1.6;
-}
-#puppyone-md-html-content {
-  display: flow-root;
-  min-height: 0;
-}
-a {
-  color: var(--text-accent);
-  text-decoration: none;
-}
-a:hover {
-  text-decoration: underline;
-}
-img,
-video,
-canvas,
-svg {
-  max-width: 100%;
-}
-pre,
-code {
-  font-family: var(--font-monospace);
-}
-${getHtmlPreviewInteractionCss("#puppyone-md-html-content")}
-</style>
-</head>
-<body>
-<div id="puppyone-md-html-content">
-${source}
-</div>
-<script>
-(() => {
-  const frameId = ${JSON.stringify(frameId)};
-  const postHeight = () => {
-    const content = document.getElementById("puppyone-md-html-content");
-    if (!content) return;
-    const rect = content.getBoundingClientRect();
-    const height = Math.ceil(Math.max(content.scrollHeight, rect.height));
-    parent.postMessage({ type: "puppyone:markdown-html-height", id: frameId, height }, "*");
-  };
-  addEventListener("load", postHeight);
-  if ("ResizeObserver" in window) {
-    const content = document.getElementById("puppyone-md-html-content");
-    if (content) new ResizeObserver(postHeight).observe(content);
-  }
-  requestAnimationFrame(postHeight);
-  setTimeout(postHeight, 120);
-})();
-</script>
-</body>
-</html>`;
-}
-
-function getTrustedHtmlThemeCss(): string {
-  const rootStyle = getComputedStyle(document.documentElement);
-  const read = (name: string, fallback: string) => rootStyle.getPropertyValue(name).trim() || fallback;
-
-  return `:root {
-  --background-primary: ${read("--po-editor-bg", "#ffffff")};
-  --background-primary-alt: ${read("--po-panel", "#f7f3ec")};
-  --background-modifier-border: ${read("--po-divider", "#ded4c7")};
-  --text-normal: ${read("--po-text", "#2f2a24")};
-  --text-muted: ${read("--po-text-muted", "#8a8073")};
-  --text-accent: ${read("--po-accent", "#2563eb")};
-  --font-text: ${read("--po-font-sans", "ui-sans-serif, system-ui, sans-serif")};
-  --font-monospace: ${read("--po-font-mono", "ui-monospace, SFMono-Regular, Menlo, monospace")};
-}`;
-}
-
-function createTrustedHtmlFrameId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-
-  return `md-html-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function estimateTrustedHtmlFrameHeight(source: string): number {
-  return source.trim() ? 160 : 80;
-}
-
-function isTrustedHtmlHeightMessage(
-  value: unknown,
-  frameId: string,
-): value is { type: "puppyone:markdown-html-height"; id: string; height: number } {
-  if (!value || typeof value !== "object") return false;
-  const message = value as { type?: unknown; id?: unknown; height?: unknown };
-  return (
-    message.type === "puppyone:markdown-html-height" &&
-    message.id === frameId &&
-    typeof message.height === "number" &&
-    Number.isFinite(message.height)
-  );
-}
-
-function clampNumber(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function createUnsupportedHtmlBlock(block: MarkdownHtmlBlock, reasons: string[]): HTMLElement {
-  const wrapper = document.createElement("div");
-  wrapper.className = "cm-md-html-unsupported";
-
-  const title = document.createElement("strong");
-  title.textContent = "Unsupported HTML";
-  wrapper.appendChild(title);
-
-  const detail = document.createElement("span");
-  detail.textContent = reasons[0] ?? `<${block.tagName}> is not supported in Markdown preview`;
-  wrapper.appendChild(detail);
-
-  const code = document.createElement("code");
-  code.textContent = getHtmlPreviewSnippet(block.source);
-  wrapper.appendChild(code);
-
-  return wrapper;
-}
-
-function getHtmlPreviewSnippet(source: string): string {
-  const normalized = source.trim().replace(/\s+/g, " ");
-  if (normalized.length <= 140) return normalized;
-  return `${normalized.slice(0, 137)}...`;
-}
-
-class CodeBlockWidget extends WidgetType {
-  constructor(
-    private readonly code: string,
-    private readonly language: string,
-    private readonly from: number,
-    private readonly to: number,
-  ) {
-    super();
-  }
-
-  eq(widget: WidgetType): boolean {
-    return (
-      widget instanceof CodeBlockWidget &&
-      widget.code === this.code &&
-      widget.language === this.language &&
-      widget.from === this.from &&
-      widget.to === this.to
-    );
-  }
-
-  get estimatedHeight(): number {
-    return estimateCodeBlockWidgetHeight(this.code);
-  }
-
-  toDOM(view: EditorView): HTMLElement {
-    const wrapper = document.createElement("div");
-    wrapper.className = "cm-md-code-widget";
-    const panel = document.createElement("div");
-    panel.className = "cm-md-code-panel";
-    const readOnly = view.state.readOnly;
-    let committed = false;
-    const commit = () => {
-      if (committed) return;
-      committed = true;
-      this.commitCodeBlockChange(view, languageInput.value, codeEditor.value);
-    };
-
-    const languageInput = document.createElement("input");
-    languageInput.className = "cm-md-code-language";
-    if (!this.language) languageInput.classList.add("is-empty");
-    languageInput.value = this.language;
-    languageInput.placeholder = "language";
-    languageInput.readOnly = readOnly;
-    languageInput.spellcheck = false;
-    languageInput.addEventListener("mousedown", stopCodeMirrorEvent);
-    languageInput.addEventListener("click", stopCodeMirrorEvent);
-    languageInput.addEventListener("keydown", (event) => {
-      event.stopPropagation();
-      if (event.key === "Enter") {
-        event.preventDefault();
-        languageInput.blur();
-      }
-      if (event.key === "Escape") {
-        event.preventDefault();
-        languageInput.value = this.language;
-        languageInput.blur();
-      }
-    });
-    languageInput.addEventListener("blur", () => {
-      if (readOnly) return;
-      commit();
-    });
-    panel.appendChild(languageInput);
-
-    const codeEditor = document.createElement("textarea");
-    codeEditor.className = "cm-md-code-textarea";
-    codeEditor.value = this.code;
-    codeEditor.readOnly = readOnly;
-    codeEditor.spellcheck = false;
-    codeEditor.rows = Math.max(1, this.code.split("\n").length);
-    codeEditor.addEventListener("mousedown", stopCodeMirrorEvent);
-    codeEditor.addEventListener("click", stopCodeMirrorEvent);
-    codeEditor.addEventListener("keydown", (event) => {
-      event.stopPropagation();
-      if (event.key === "Escape") {
-        event.preventDefault();
-        codeEditor.value = this.code;
-        codeEditor.blur();
-      }
-    });
-    codeEditor.addEventListener("blur", () => {
-      if (readOnly) return;
-      commit();
-    });
-    panel.appendChild(codeEditor);
-    wrapper.appendChild(panel);
-
-    return wrapper;
-  }
-
-  private commitCodeBlockChange(view: EditorView, nextLanguage: string, nextCode: string) {
-    const language = sanitizeCodeLanguage(nextLanguage);
-    const code = normalizeLineEndings(nextCode);
-    if (language === this.language && code === this.code) return;
-
-    view.dispatch({
-      changes: {
-        from: this.from,
-        to: this.to,
-        insert: serializeMarkdownCodeBlock(language, code),
-      },
-    });
-  }
-
-  ignoreEvent() {
-    return true;
-  }
-}
-
-class ImagePreviewWidget extends WidgetType {
-  private readonly measure = new MarkdownWidgetMeasureController();
-
-  constructor(
-    private readonly alt: string,
-    private readonly source: string,
-    private readonly title: string | null,
-    private readonly documentPath: string,
-    private readonly markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
-  ) {
-    super();
-  }
-
-  eq(widget: WidgetType): boolean {
-    return (
-      widget instanceof ImagePreviewWidget &&
-      widget.alt === this.alt &&
-      widget.source === this.source &&
-      widget.title === this.title &&
-      widget.documentPath === this.documentPath &&
-      widget.markdownAssetUrlResolver === this.markdownAssetUrlResolver
-    );
-  }
-
-  toDOM(view: EditorView): HTMLElement {
-    const wrapper = document.createElement("span");
-    wrapper.className = "cm-md-image-widget";
-    wrapper.title = this.title ?? this.source;
-
-    const directSource = this.source.trim();
-    if (isSafeMarkdownImageUrl(directSource)) {
-      wrapper.appendChild(this.createImage(directSource, view));
-      this.measure.observe(wrapper, view);
-      return wrapper;
-    }
-
-    if (!this.markdownAssetUrlResolver) {
-      wrapper.appendChild(this.createPlaceholder(this.alt || this.source));
-      this.measure.observe(wrapper, view);
-      return wrapper;
-    }
-
-    wrapper.appendChild(this.createPlaceholder("Loading image..."));
-    this.measure.observe(wrapper, view);
-
-    Promise.resolve(this.markdownAssetUrlResolver(this.documentPath, this.source))
-      .then((resolvedUrl) => {
-        if (!wrapper.isConnected) return;
-        wrapper.replaceChildren(
-          resolvedUrl && isSafeMarkdownImageUrl(resolvedUrl)
-            ? this.createImage(resolvedUrl, view)
-            : this.createPlaceholder(this.alt || this.source),
-        );
-        this.measure.schedule(view);
-      })
-      .catch(() => {
-        if (!wrapper.isConnected) return;
-        wrapper.replaceChildren(this.createPlaceholder(this.alt || this.source));
-        this.measure.schedule(view);
-      });
-
-    return wrapper;
-  }
-
-  destroy() {
-    this.measure.destroy();
-  }
-
-  private createImage(source: string, view: EditorView): HTMLImageElement {
-    const image = document.createElement("img");
-    image.src = source;
-    image.alt = this.alt;
-    image.loading = "lazy";
-    if (this.title) image.title = this.title;
-    image.addEventListener("load", () => this.measure.schedule(view));
-    image.addEventListener("error", () => this.measure.schedule(view));
-    return image;
-  }
-
-  private createPlaceholder(labelText: string): HTMLElement {
-    const label = document.createElement("span");
-    label.className = "cm-md-image-placeholder";
-    label.textContent = labelText;
-    return label;
-  }
-}
-
-class MarkdownTableWidget extends WidgetType {
-  private readonly measure = new MarkdownWidgetMeasureController();
-
-  constructor(
-    private readonly rows: MarkdownTableRow[],
-    private readonly markdownLinkGraph: MarkdownLinkGraph | null,
-    private readonly documentPath: string,
-    private readonly markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
-  ) {
-    super();
-  }
-
-  eq(widget: WidgetType): boolean {
-    return (
-      widget instanceof MarkdownTableWidget &&
-      JSON.stringify(widget.rows) === JSON.stringify(this.rows) &&
-      widget.markdownLinkGraph === this.markdownLinkGraph &&
-      widget.documentPath === this.documentPath &&
-      widget.markdownAssetUrlResolver === this.markdownAssetUrlResolver
-    );
-  }
-
-  get estimatedHeight(): number {
-    return estimateMarkdownTableWidgetHeight(this.rows.length);
-  }
-
-  toDOM(view: EditorView): HTMLElement {
-    const wrapper = document.createElement("div");
-    wrapper.className = "cm-md-table-widget-wrap";
-
-    const table = document.createElement("table");
-    table.className = "cm-md-table-widget";
-
-    const header = this.rows.find((row) => row.header);
-    if (header) {
-      const thead = document.createElement("thead");
-      const tr = document.createElement("tr");
-      for (const cell of header.cells) {
-        const th = document.createElement("th");
-        th.appendChild(createTableCellEditor(view, cell, this.markdownLinkGraph, this.documentPath, this.markdownAssetUrlResolver));
-        tr.appendChild(th);
-      }
-      thead.appendChild(tr);
-      table.appendChild(thead);
-    }
-
-    const bodyRows = this.rows.filter((row) => !row.header);
-    if (bodyRows.length > 0) {
-      const tbody = document.createElement("tbody");
-      for (const row of bodyRows) {
-        const tr = document.createElement("tr");
-        for (const cell of row.cells) {
-          const td = document.createElement("td");
-          td.appendChild(createTableCellEditor(view, cell, this.markdownLinkGraph, this.documentPath, this.markdownAssetUrlResolver));
-          tr.appendChild(td);
-        }
-        tbody.appendChild(tr);
-      }
-      table.appendChild(tbody);
-    }
-
-    wrapper.appendChild(table);
-    this.measure.observe(wrapper, view);
-
-    return wrapper;
-  }
-
-  destroy() {
-    this.measure.destroy();
-  }
-
-  ignoreEvent() {
-    return true;
-  }
-}
-
-function createTableCellEditor(
-  view: EditorView,
-  cell: MarkdownTableCell,
-  markdownLinkGraph: MarkdownLinkGraph | null,
-  documentPath: string,
-  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
-): HTMLElement {
-  const content = document.createElement("span");
-  content.className = "cm-md-table-cell-content";
-  content.spellcheck = false;
-  renderTableCellPreview(content, cell.text, markdownLinkGraph, documentPath, markdownAssetUrlResolver, () => {
-    view.requestMeasure();
-  });
-
-  if (!view.state.readOnly && cell.editable) {
-    let editing = false;
-    content.contentEditable = "true";
-    content.addEventListener("focus", () => {
-      if (editing) return;
-      editing = true;
-      content.textContent = cell.text;
-    });
-    content.addEventListener("keydown", (event) => {
-      event.stopPropagation();
-      if (event.key === "Enter") {
-        event.preventDefault();
-        content.blur();
-      }
-      if (event.key === "Escape") {
-        event.preventDefault();
-        content.textContent = cell.text;
-        content.blur();
-      }
-    });
-    content.addEventListener("blur", () => {
-      const nextValue = sanitizeMarkdownTableCell(content.textContent ?? "");
-      editing = false;
-      if (nextValue === cell.text) {
-        renderTableCellPreview(content, cell.text, markdownLinkGraph, documentPath, markdownAssetUrlResolver, () => {
-          view.requestMeasure();
-        });
-        view.requestMeasure();
-        return;
-      }
-      view.dispatch({
-        changes: {
-          from: cell.from,
-          to: cell.to,
-          insert: nextValue,
-        },
-      });
-    });
-  }
-
-  content.addEventListener("mousedown", stopCodeMirrorEvent);
-  content.addEventListener("click", stopCodeMirrorEvent);
-  content.addEventListener("input", stopCodeMirrorEvent);
-
-  return content;
-}
-
-function renderTableCellPreview(
-  content: HTMLElement,
-  source: string,
-  markdownLinkGraph: MarkdownLinkGraph | null,
-  documentPath: string,
-  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
-  onLayoutChange: () => void,
-) {
-  content.replaceChildren();
-  renderMarkdownInlineInto(content, source, {
-    markdownLinkGraph,
-    markdownAssetUrlResolver,
-    onLayoutChange,
-    sourcePath: documentPath,
-  });
-}
-
-function stopCodeMirrorEvent(event: Event) {
-  event.stopPropagation();
-}
-
-function sanitizeMarkdownTableCell(value: string): string {
-  return normalizeLineEndings(value).replace(/\n+/g, " ").replace(/\|/g, "\\|").trim();
-}
-
-function sanitizeCodeLanguage(value: string): string {
-  return value.trim().replace(/\s+/g, "-").replace(/[`~]/g, "");
-}
-
-function hasPointerMoved(event: MouseEvent, pointerDown: { x: number; y: number }): boolean {
-  return Math.abs(event.clientX - pointerDown.x) > 4 || Math.abs(event.clientY - pointerDown.y) > 4;
-}
-
-function normalizeLineEndings(value: string): string {
-  return value.replace(/\r\n?/g, "\n");
-}
-
-function serializeMarkdownCodeBlock(language: string, code: string): string {
-  const longestFence = Math.max(2, ...Array.from(code.matchAll(/`+/g), (match) => match[0].length));
-  const fence = "`".repeat(Math.max(3, longestFence + 1));
-  const info = language ? `${fence}${language}` : fence;
-  return `${info}\n${code}\n${fence}`;
 }

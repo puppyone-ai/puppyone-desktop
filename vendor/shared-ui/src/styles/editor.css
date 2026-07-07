@@ -1550,10 +1550,25 @@ button.editor-save-chip {
 }
 
 .markdown-codemirror-editor .cm-md-hidden-syntax {
+  display: inline-block;
+  width: 0;
+  max-width: 0;
+  overflow: hidden;
   color: transparent;
-  font-size: 0;
   letter-spacing: 0;
-  line-height: 0;
+  white-space: pre;
+  vertical-align: baseline;
+}
+
+.markdown-codemirror-editor .cm-md-source-syntax {
+  color: var(--po-text-disabled);
+  opacity: 1;
+}
+
+.markdown-codemirror-editor .cm-md-source-syntax-heading,
+.markdown-codemirror-editor .cm-md-source-syntax-list,
+.markdown-codemirror-editor .cm-md-source-syntax-task {
+  font-weight: 650;
 }
 
 .markdown-codemirror-editor .cm-md-task-line {
@@ -1568,6 +1583,20 @@ button.editor-save-chip {
   color: var(--po-text-subtle);
   text-decoration: line-through;
   text-decoration-thickness: 1px;
+}
+
+.markdown-codemirror-editor[data-live-preview="true"] .cm-md-source-line.cm-md-blockquote {
+  padding-left: 0;
+  border-left-color: transparent;
+}
+
+.markdown-codemirror-editor[data-live-preview="true"] .cm-md-source-line.cm-md-list-line,
+.markdown-codemirror-editor[data-live-preview="true"] .cm-md-source-line.cm-md-task-line {
+  padding-left: 0;
+}
+
+.markdown-codemirror-editor[data-live-preview="true"] .cm-md-source-line.cm-md-list-line:not(.cm-md-task-line)::before {
+  content: none;
 }
 
 .markdown-codemirror-editor .cm-md-task-checkbox-widget {
