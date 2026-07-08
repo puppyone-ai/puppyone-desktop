@@ -18,6 +18,7 @@ directly:
 - [Desktop Auto Update Lifecycle](architecture/desktop-auto-update-lifecycle.md)
 - [Desktop Menu Surface](architecture/desktop-menu-surface.md)
 - [Markdown Live Preview Editing UX](architecture/markdown-live-preview-ux.md)
+- [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
 
 ## Release
 

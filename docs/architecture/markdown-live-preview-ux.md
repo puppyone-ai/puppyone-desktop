@@ -821,6 +821,19 @@ Changes required by Part 1:
     public exports (`markdownCodeMirrorExtensions.ts`, `./editor.css`)
     did not move, so consumers are unaffected.
 
+11. **Vertical rhythm.** Two spacing systems, following the block-editor
+    convention: `line-height: 1.68` spaces wrapped visual lines *inside*
+    a block, and per-line vertical padding
+    (`--po-markdown-editor-line-spacing`, 4px top and bottom) spaces
+    source lines (blocks) apart — a single-line block advances ~2.25× the
+    font size. The token is defined at 0 and opened up only under
+    `[data-live-preview="true"]`, so source mode stays compact. Blank
+    separator lines (`.cm-line` with a lone `<br>`) and table source
+    lines are excluded so paragraph gaps and mono blocks don't compound.
+    Anything that positions against the first text line must add the
+    token (the task checkbox uses `top: calc(token + 0.84em)`); heading
+    line paddings override the token by specificity.
+
 ## 14. Background: architecture research
 
 | | contenteditable rich DOM (Typora) | Structured model (ProseMirror family) | Plain text + decorations (CM6) |

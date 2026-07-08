@@ -34,6 +34,11 @@ single product area can evolve without turning this file into a catch-all.
   - Part 1: the durable Typora-class editing contract (per-element syntax
     reveal, composing/commit lifecycle, hidden-marker deletion). Part 2: the
     one-time migration to-do list and code change map.
+- [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
+  - Part 1: the durable terminal contract (xterm + node-pty layering, the
+    character-grid width invariant, CJK `text-spacing-trim` failure mode,
+    fit/resize pipeline). Part 2: the remediation to-do list (spacing-trim
+    CSS fix, WebGL renderer with fallback, Unicode 11 widths).
 
 ## Document Boundary
 

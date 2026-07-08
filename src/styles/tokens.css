@@ -203,13 +203,13 @@
 .dark {
   color-scheme: dark;
 
-  --po-surface-canvas: #11100f;
+  --po-surface-canvas: #202020;
   --po-surface-chrome: #1d1b1a;
   --po-surface-panel: #1a1715;
   --po-surface-panel-raised: #211d1a;
   --po-surface-overlay: #29241f;
   --po-surface-inset: #0c0b0a;
-  --po-surface-editor: var(--po-surface-canvas);
+  --po-surface-editor: #161413;
   --po-surface-terminal: var(--po-surface-chrome);
 
   --po-canvas: var(--po-surface-canvas);
@@ -516,13 +516,13 @@
 }
 
 :where(.app-shell, .onboarding-shell, .desktop-overlay-root).dark[data-dark-theme-preset="graphite"] {
-  --po-surface-canvas: #101114;
+  --po-surface-canvas: #141519;
   --po-surface-chrome: #1b1c1f;
   --po-surface-panel: #18191d;
   --po-surface-panel-raised: #1d1f24;
   --po-surface-overlay: #23252b;
   --po-surface-inset: #0c0d10;
-  --po-surface-editor: #111215;
+  --po-surface-editor: #17181c;
   --po-surface-terminal: var(--po-surface-chrome);
 
   --po-canvas: var(--po-surface-canvas);

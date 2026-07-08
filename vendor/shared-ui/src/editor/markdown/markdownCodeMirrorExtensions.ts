@@ -75,7 +75,9 @@ const puppyMarkdownEditorTheme = EditorView.theme({
     overflow: "auto",
   },
   ".cm-line": {
-    padding: "0",
+    // Vertical block spacing token; 0 in source mode, opened up by
+    // markdown-editor.css in live preview (see "Vertical rhythm" note).
+    padding: "var(--po-markdown-editor-line-spacing, 0px) 0",
   },
   "&.cm-focused": {
     outline: "none",

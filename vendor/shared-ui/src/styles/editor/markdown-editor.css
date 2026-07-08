@@ -3,6 +3,7 @@
   --po-markdown-editor-gutter-min: 48px;
   --po-markdown-breakout-right-gutter: 48px;
   --po-markdown-breakout-max-width: 1180px;
+  --po-markdown-editor-line-spacing: 0px;
   position: relative;
   container-type: inline-size;
   width: 100%;
@@ -43,8 +44,34 @@
   overflow-wrap: anywhere;
 }
 
+/*
+ * Vertical rhythm: line-height (1.68) spaces wrapped lines inside a block;
+ * per-line padding spaces blocks apart (the block-editor convention). The
+ * token is 0 in source mode and only opens up in live preview; the editor
+ * theme applies it to every .cm-line.
+ */
+.markdown-codemirror-editor[data-live-preview="true"] {
+  --po-markdown-editor-line-spacing: 4px;
+}
+
 .markdown-codemirror-editor .cm-line {
   min-height: 1.68em;
+}
+
+/*
+ * Blank separator lines already contribute a full 1.68em box; skipping their
+ * padding keeps paragraph gaps from compounding (empty CM lines render as a
+ * lone <br>).
+ */
+.markdown-codemirror-editor .cm-line:has(> br:only-child) {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* Table source lines form one contiguous mono block; keep them compact. */
+.markdown-codemirror-editor .cm-line.cm-md-table-line {
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .markdown-codemirror-editor .cm-ai-edit-line {
@@ -321,7 +348,8 @@
 
 .markdown-codemirror-editor .cm-md-task-checkbox-widget {
   position: absolute;
-  top: 0.84em;
+  /* Center on the first text line: line padding + half the 1.68 line box. */
+  top: calc(var(--po-markdown-editor-line-spacing, 0px) + 0.84em);
   left: calc(var(--md-list-depth, 0) * 16px);
   display: inline-grid;
   width: var(--md-task-checkbox-size);

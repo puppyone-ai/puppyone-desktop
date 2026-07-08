@@ -9,7 +9,9 @@ import {
 } from "react";
 import { EXPLORER_TREE_NODE_DRAG_TYPE, type Workspace } from "@puppyone/shared-ui";
 import { FitAddon } from "@xterm/addon-fit";
-import { Terminal, type ITheme } from "@xterm/xterm";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { WebglAddon } from "@xterm/addon-webgl";
+import { Terminal, type IDisposable, type ITheme } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 
 type RightTerminalPanelProps = {
@@ -38,6 +40,7 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
   const terminalSessionReadyRef = useRef(false);
   const pendingTerminalSizeRef = useRef<TerminalSize | null>(null);
   const fitFrameRef = useRef<number | null>(null);
+  const fitSettleTimersRef = useRef<number[]>([]);
   const activeRef = useRef(active);
   const [hasStarted, setHasStarted] = useState(active);
 
@@ -99,7 +102,11 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
   const fitAndResize = useCallback(() => {
     const terminal = terminalRef.current;
     const fitAddon = fitAddonRef.current;
-    if (!terminal || !fitAddon || !bodyRef.current) return;
+    const fitTarget = containerRef.current;
+    if (!terminal || !fitAddon || !fitTarget) return;
+
+    const rect = fitTarget.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
 
     try {
       fitAddon.fit();
@@ -121,6 +128,19 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
     });
   }, [fitAndResize]);
 
+  const clearSettledFits = useCallback(() => {
+    fitSettleTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    fitSettleTimersRef.current = [];
+  }, []);
+
+  const scheduleSettledFits = useCallback(() => {
+    clearSettledFits();
+    scheduleFitAndResize();
+    fitSettleTimersRef.current = [80, 180, 260].map((delay) => window.setTimeout(() => {
+      if (activeRef.current) scheduleFitAndResize();
+    }, delay));
+  }, [clearSettledFits, scheduleFitAndResize]);
+
   useEffect(() => {
     if (!hasStarted || !containerRef.current) return undefined;
 
@@ -128,6 +148,7 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
     const bridge = window.puppyoneDesktop;
     const terminalTheme = readTerminalTheme(containerRef.current);
     const terminal = new Terminal({
+      allowProposedApi: true,
       customGlyphs: true,
       cursorBlink: true,
       cursorStyle: "block",
@@ -143,12 +164,17 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
       theme: terminalTheme,
     });
     const fitAddon = new FitAddon();
+    const unicode11Addon = new Unicode11Addon();
     const sessionId = createTerminalId();
     const disposables: Array<{ dispose: () => void }> = [];
     let removeDataListener: (() => void) | undefined;
     let removeExitListener: (() => void) | undefined;
     let resizeObserver: ResizeObserver | undefined;
-    let fitTimer: number | undefined;
+    let fitTimers: number[] = [];
+    let terminalSidebarElement: Element | null = null;
+    let handleSidebarTransitionEnd: ((event: Event) => void) | undefined;
+    let webglAddon: WebglAddon | null = null;
+    let webglContextLossDisposable: IDisposable | null = null;
 
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
@@ -157,8 +183,20 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
     pendingTerminalSizeRef.current = null;
 
     terminal.loadAddon(fitAddon);
+    terminal.loadAddon(unicode11Addon);
+    activateUnicode11(terminal);
     terminal.open(containerRef.current);
+    const webglRenderer = loadWebglRenderer(terminal, () => {
+      safeDispose(webglContextLossDisposable);
+      webglContextLossDisposable = null;
+      safeDispose(webglAddon);
+      webglAddon = null;
+      scheduleSettledFits();
+    });
+    webglAddon = webglRenderer?.addon ?? null;
+    webglContextLossDisposable = webglRenderer?.contextLossDisposable ?? null;
     fitAndResize();
+    if (webglAddon) scheduleFitAndResize();
 
     const writeSystemLine = (message: string) => {
       terminal.writeln(`\x1b[38;5;244m${message}\x1b[0m`);
@@ -168,6 +206,9 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
       writeSystemLine("Terminal bridge unavailable. Open this workspace in puppyone.");
       return () => {
         disposed = true;
+        safeDispose(webglContextLossDisposable);
+        safeDispose(webglAddon);
+        safeDispose(unicode11Addon);
         disposables.forEach((disposable) => disposable.dispose());
         terminal.dispose();
         terminalRef.current = null;
@@ -194,11 +235,22 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
       });
     }));
 
-    if (bodyRef.current) {
+    if (containerRef.current) {
       resizeObserver = new ResizeObserver(() => {
         if (activeRef.current) scheduleFitAndResize();
       });
-      resizeObserver.observe(bodyRef.current);
+      resizeObserver.observe(containerRef.current);
+    }
+
+    terminalSidebarElement = containerRef.current?.closest(".desktop-right-sidebar") ?? null;
+    if (terminalSidebarElement) {
+      handleSidebarTransitionEnd = (event: Event) => {
+        const transitionEvent = event as TransitionEvent;
+        if (transitionEvent.target !== terminalSidebarElement) return;
+        if (transitionEvent.propertyName !== "width" && transitionEvent.propertyName !== "flex-basis") return;
+        if (activeRef.current) scheduleFitAndResize();
+      };
+      terminalSidebarElement.addEventListener("transitionend", handleSidebarTransitionEnd);
     }
 
     requestAnimationFrame(() => {
@@ -207,9 +259,13 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
       if (activeRef.current) terminal.focus();
     });
 
-    fitTimer = window.setTimeout(() => {
+    fitTimers = [80, 180, 260].map((delay) => window.setTimeout(() => {
       if (!disposed && activeRef.current) fitAndResize();
-    }, 80);
+    }, delay));
+
+    void document.fonts?.ready.then(() => {
+      if (!disposed && activeRef.current) scheduleFitAndResize();
+    });
 
     void bridge.createTerminal({
       id: sessionId,
@@ -240,10 +296,17 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
         cancelAnimationFrame(fitFrameRef.current);
         fitFrameRef.current = null;
       }
-      if (fitTimer !== undefined) window.clearTimeout(fitTimer);
+      fitTimers.forEach((timer) => window.clearTimeout(timer));
+      clearSettledFits();
       resizeObserver?.disconnect();
+      if (terminalSidebarElement && handleSidebarTransitionEnd) {
+        terminalSidebarElement.removeEventListener("transitionend", handleSidebarTransitionEnd);
+      }
       removeDataListener?.();
       removeExitListener?.();
+      safeDispose(webglContextLossDisposable);
+      safeDispose(webglAddon);
+      safeDispose(unicode11Addon);
       disposables.forEach((disposable) => disposable.dispose());
       void bridge.closeTerminal(sessionId);
       terminal.dispose();
@@ -251,7 +314,7 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
       fitAddonRef.current = null;
       sessionIdRef.current = null;
     };
-  }, [fitAndResize, hasStarted, scheduleFitAndResize, syncTerminalSizeToPty, workspace.path]);
+  }, [clearSettledFits, fitAndResize, hasStarted, scheduleFitAndResize, scheduleSettledFits, syncTerminalSizeToPty, workspace.path]);
 
   useEffect(() => {
     if (!hasStarted) return undefined;
@@ -285,11 +348,14 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
   useEffect(() => {
     if (!active) return undefined;
     const frame = requestAnimationFrame(() => {
-      scheduleFitAndResize();
+      scheduleSettledFits();
       terminalRef.current?.focus();
     });
-    return () => cancelAnimationFrame(frame);
-  }, [active, scheduleFitAndResize]);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearSettledFits();
+    };
+  }, [active, clearSettledFits, scheduleSettledFits]);
 
   return (
     <section className="desktop-terminal-panel" aria-label="Terminal">
@@ -304,6 +370,46 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
     </section>
   );
 });
+
+type WebglRendererHandle = {
+  addon: WebglAddon;
+  contextLossDisposable: IDisposable;
+};
+
+function activateUnicode11(terminal: Terminal) {
+  try {
+    terminal.unicode.activeVersion = "11";
+  } catch {
+    // Keep the terminal usable if the proposed Unicode API is unavailable.
+  }
+}
+
+function loadWebglRenderer(terminal: Terminal, onContextLoss: () => void): WebglRendererHandle | null {
+  let addon: WebglAddon | null = null;
+  let contextLossDisposable: IDisposable | null = null;
+
+  try {
+    addon = new WebglAddon();
+    contextLossDisposable = addon.onContextLoss(onContextLoss);
+    terminal.loadAddon(addon);
+    return {
+      addon,
+      contextLossDisposable,
+    };
+  } catch {
+    safeDispose(contextLossDisposable);
+    safeDispose(addon);
+    return null;
+  }
+}
+
+function safeDispose(disposable: { dispose: () => void } | null | undefined) {
+  try {
+    disposable?.dispose();
+  } catch {
+    // Disposal should never break terminal teardown.
+  }
+}
 
 function hasExplorerNodePath(dataTransfer: DataTransfer) {
   return Array.from(dataTransfer.types).includes(EXPLORER_TREE_NODE_DRAG_TYPE);
