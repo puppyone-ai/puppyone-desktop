@@ -7,7 +7,7 @@
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  background: var(--po-sidebar);
+  background: var(--po-surface-chrome);
 }
 
 .desktop-git-sidebar {
@@ -20,6 +20,9 @@
   --git-sidebar-content-left: var(--desktop-sidebar-row-content-left);
   --git-sidebar-content-right: var(--desktop-sidebar-row-content-right);
   --git-section-action-size: 28px;
+  --git-working-tree-action-size: 24px;
+  --git-working-tree-actions-width: 52px;
+  --git-working-tree-state-width: 18px;
   --git-section-body-top-gap: 2px;
   --git-section-divider-height: 12px;
   --git-section-divider-line-offset: 5px;

@@ -15,8 +15,8 @@
   width: 47px;
   min-height: 0;
   flex-direction: column;
-  background: var(--po-sidebar);
-  border-right: 1px solid var(--po-divider);
+  background: var(--po-surface-chrome);
+  border-right: 1px solid transparent;
 }
 
 .desktop-surface {
@@ -42,7 +42,7 @@
 }
 
 .desktop-view-surface-sidebar {
-  background: var(--po-sidebar);
+  background: var(--po-surface-chrome);
 }
 
 .desktop-view-surface-main {
@@ -60,7 +60,7 @@
   min-height: 0;
   overflow: hidden;
   border-left: 0 solid transparent;
-  background: var(--po-terminal-bg);
+  background: var(--po-surface-terminal);
   transition: flex-basis 160ms ease, width 160ms ease, border-color 160ms ease;
 }
 
@@ -148,7 +148,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  background: var(--po-terminal-bg);
+  background: var(--po-surface-terminal);
   color: var(--po-terminal-fg);
 }
 
@@ -158,7 +158,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   min-height: 0;
   overflow: hidden;
   padding: 0;
-  background: var(--po-terminal-bg);
+  background: var(--po-surface-terminal);
 }
 
 .desktop-terminal-xterm {
@@ -170,8 +170,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background: var(--po-terminal-bg);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--po-border-subtle) 36%, transparent);
+  background: var(--po-surface-terminal);
 }
 
 .desktop-terminal-xterm .xterm {
@@ -179,13 +178,19 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   box-sizing: border-box;
   height: 100%;
   padding: 14px 16px 16px;
+  background: var(--po-surface-terminal);
   font-variant-ligatures: none;
 }
 
 .desktop-terminal-xterm .xterm-viewport {
-  background: transparent !important;
+  background: var(--po-surface-terminal) !important;
   scrollbar-width: thin;
   scrollbar-color: var(--po-scrollbar-thumb) transparent;
+}
+
+.desktop-terminal-xterm .xterm-screen,
+.desktop-terminal-xterm .xterm-helpers {
+  background: var(--po-surface-terminal);
 }
 
 .desktop-terminal-xterm .xterm-viewport::-webkit-scrollbar {
@@ -271,8 +276,8 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   height: 100%;
   min-height: 0;
   flex-direction: column;
-  background: var(--po-sidebar);
-  border-right: 1px solid var(--po-divider);
+  background: var(--po-surface-chrome);
+  border-right: 1px solid transparent;
 }
 
 .desktop-rail-header {
@@ -282,7 +287,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   justify-content: center;
   height: 46px;
   min-height: 46px;
-  border-bottom: 1px solid var(--po-divider);
+  border-bottom: 1px solid transparent;
   -webkit-app-region: drag;
   user-select: none;
 }
@@ -395,7 +400,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
 .desktop-rail-group-end {
   margin-bottom: 9px;
   padding-bottom: 9px;
-  border-bottom: 1px solid var(--po-divider);
+  border-bottom: 1px solid transparent;
 }
 
 .desktop-rail-footer {
@@ -404,7 +409,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   justify-content: center;
   height: 46px;
   min-height: 46px;
-  border-top: 1px solid var(--po-divider);
+  border-top: 1px solid transparent;
 }
 
 .desktop-rail-avatar {

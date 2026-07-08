@@ -30,6 +30,10 @@ single product area can evolve without turning this file into a catch-all.
 - [Desktop Menu Surface](architecture/desktop-menu-surface.md)
   - Shared menu background, border, shadow, radius, and component boundary
     rules.
+- [Markdown Live Preview Editing UX](architecture/markdown-live-preview-ux.md)
+  - Part 1: the durable Typora-class editing contract (per-element syntax
+    reveal, composing/commit lifecycle, hidden-marker deletion). Part 2: the
+    one-time migration to-do list and code change map.
 
 ## Document Boundary
 

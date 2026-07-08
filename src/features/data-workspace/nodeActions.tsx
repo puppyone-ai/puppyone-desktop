@@ -1,11 +1,13 @@
 import type { CSSProperties, Dispatch, ReactNode, SetStateAction } from "react";
-import { useEffect, useMemo, useRef } from "react";
-import { ExternalLink, FileText, FolderOpen, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronRight, ExternalLink, FileText, FolderOpen, MoreVertical, Pencil, Plus, Trash2, Workflow } from "lucide-react";
 import { FileGlyphIcon, getMatchedExtension, type DataNode, type FileIconThemeId } from "@puppyone/shared-ui";
 import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
 import { DesktopMenuItem, DesktopMenuSurface } from "../../components/DesktopMenu";
+import type { ExperimentalSettings } from "../../preferences";
+import { createDefaultPuppyFlowDocument, serializePuppyFlowDocument } from "../puppyflow/puppyflowModel";
 
-export type DesktopCreateEntryKind = "folder" | "markdown" | "text" | "json" | "csv" | "app";
+export type DesktopCreateEntryKind = "folder" | "markdown" | "text" | "json" | "csv" | "app" | "puppyflow";
 export type DesktopCreateEntryAnchor = {
   left: number;
   top: number;
@@ -83,6 +85,14 @@ const CREATE_ENTRY_OPTIONS = [
     defaultName: "Untitled.puppyoneapp",
   },
   {
+    kind: "puppyflow",
+    label: "PuppyFlow",
+    dialogTitle: "New PuppyFlow",
+    iconName: "Untitled.puppyflow",
+    iconType: "workflow",
+    defaultName: "Untitled.puppyflow",
+  },
+  {
     kind: "csv",
     label: "CSV",
     dialogTitle: "New CSV File",
@@ -100,6 +110,9 @@ const CREATE_ENTRY_OPTIONS = [
 }>;
 
 type CreateEntryOption = (typeof CREATE_ENTRY_OPTIONS)[number];
+const CUSTOM_CREATE_ENTRY_KINDS = new Set<DesktopCreateEntryKind>(["app", "puppyflow"]);
+const STANDARD_CREATE_ENTRY_OPTIONS = CREATE_ENTRY_OPTIONS.filter((option) => !CUSTOM_CREATE_ENTRY_KINDS.has(option.kind));
+const CUSTOM_CREATE_ENTRY_OPTIONS = CREATE_ENTRY_OPTIONS.filter((option) => CUSTOM_CREATE_ENTRY_KINDS.has(option.kind));
 
 export function DesktopExplorerRowActions({
   node,
@@ -144,16 +157,25 @@ export function DesktopExplorerRowActions({
 
 export function DesktopCreateEntryMenu({
   draft,
+  experimentalSettings,
   fileIconTheme,
   onCancel,
   onSelectKind,
 }: {
   draft: DesktopCreateEntryDraft;
+  experimentalSettings?: ExperimentalSettings | null;
   fileIconTheme?: FileIconThemeId | null;
   onCancel: () => void;
   onSelectKind: (kind: DesktopCreateEntryKind) => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const customMenuCloseTimerRef = useRef<number | null>(null);
+  const [customMenuOpen, setCustomMenuOpen] = useState(false);
+  const customCreateEntryOptions = CUSTOM_CREATE_ENTRY_OPTIONS.filter((option) => {
+    if (option.kind === "app") return experimentalSettings?.enablePuppyoneAppFiles === true;
+    if (option.kind === "puppyflow") return experimentalSettings?.enablePuppyFlowFiles === true;
+    return false;
+  });
   const position = getCreateEntryMenuPosition(draft.anchor);
   const menuStyle = {
     "--node-action-menu-left": `${position.left}px`,
@@ -161,11 +183,35 @@ export function DesktopCreateEntryMenu({
     "--node-action-menu-width": `${CREATE_ENTRY_MENU_WIDTH}px`,
   } as CSSProperties;
 
+  const openCustomMenu = () => {
+    if (customMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(customMenuCloseTimerRef.current);
+      customMenuCloseTimerRef.current = null;
+    }
+    setCustomMenuOpen(true);
+  };
+
+  const scheduleCloseCustomMenu = () => {
+    if (customMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(customMenuCloseTimerRef.current);
+    }
+    customMenuCloseTimerRef.current = window.setTimeout(() => {
+      customMenuCloseTimerRef.current = null;
+      setCustomMenuOpen(false);
+    }, 220);
+  };
+
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => () => {
+    if (customMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(customMenuCloseTimerRef.current);
+    }
   }, []);
 
   useEffect(() => {
@@ -200,7 +246,7 @@ export function DesktopCreateEntryMenu({
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
-      {CREATE_ENTRY_OPTIONS.map((option) => (
+      {STANDARD_CREATE_ENTRY_OPTIONS.map((option) => (
         <DesktopNodeActionMenuItem
           key={option.kind}
           icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}
@@ -208,6 +254,48 @@ export function DesktopCreateEntryMenu({
           onClick={() => onSelectKind(option.kind)}
         />
       ))}
+      {customCreateEntryOptions.length > 0 && (
+        <div
+          className="desktop-create-entry-submenu-wrap"
+          data-open={customMenuOpen ? "true" : "false"}
+          onPointerEnter={openCustomMenu}
+          onPointerLeave={scheduleCloseCustomMenu}
+          onFocus={openCustomMenu}
+          onBlur={(event) => {
+            const relatedTarget = event.relatedTarget;
+            if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) return;
+            scheduleCloseCustomMenu();
+          }}
+        >
+          <DesktopMenuItem
+            className="desktop-node-action-menu-item desktop-create-entry-submenu-trigger"
+            icon={<Workflow size={14} />}
+            label="Custom files"
+            trailing={<ChevronRight size={14} />}
+            aria-haspopup="menu"
+            aria-expanded={customMenuOpen}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              openCustomMenu();
+            }}
+          />
+          <DesktopMenuSurface
+            className="desktop-create-entry-submenu"
+            ariaLabel="Create custom file"
+            role="menu"
+          >
+            {customCreateEntryOptions.map((option) => (
+              <DesktopNodeActionMenuItem
+                key={option.kind}
+                icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}
+                label={option.label}
+                onClick={() => onSelectKind(option.kind)}
+              />
+            ))}
+          </DesktopMenuSurface>
+        </div>
+      )}
     </DesktopMenuSurface>
   );
 }
@@ -323,6 +411,7 @@ export function DesktopCreateEntryDialog({
 
 export function DesktopNodeActionMenu({
   draft,
+  experimentalSettings,
   showRevealInFinder = true,
   showOpenInDefaultApp = true,
   onChange,
@@ -333,6 +422,7 @@ export function DesktopNodeActionMenu({
   onRevealInFinder,
 }: {
   draft: DesktopNodeActionMenuDraft;
+  experimentalSettings?: ExperimentalSettings | null;
   showRevealInFinder?: boolean;
   showOpenInDefaultApp?: boolean;
   onChange: Dispatch<SetStateAction<DesktopNodeActionMenuDraft | null>>;
@@ -346,6 +436,7 @@ export function DesktopNodeActionMenu({
     return (
       <DesktopNodeRenameDialog
         draft={draft}
+        experimentalSettings={experimentalSettings}
         onChange={onChange}
         onCancel={onCancel}
         onRename={onRename}
@@ -480,11 +571,13 @@ function DesktopNodeActionPopover({
 
 function DesktopNodeRenameDialog({
   draft,
+  experimentalSettings,
   onChange,
   onCancel,
   onRename,
 }: {
   draft: DesktopNodeActionMenuDraft;
+  experimentalSettings?: ExperimentalSettings | null;
   onChange: Dispatch<SetStateAction<DesktopNodeActionMenuDraft | null>>;
   onCancel: () => void;
   onRename: () => void;
@@ -493,8 +586,8 @@ function DesktopNodeRenameDialog({
   const selectRef = useRef<HTMLSelectElement>(null);
   const isFile = draft.node.type !== "folder";
   const fileTypeOptions = useMemo(
-    () => getDesktopFileTypeOptions(draft.renameExtensionValue),
-    [draft.renameExtensionValue],
+    () => getDesktopFileTypeOptions(draft.renameExtensionValue, experimentalSettings),
+    [draft.renameExtensionValue, experimentalSettings],
   );
   const title = draft.renameFocus === "type" && isFile ? "Change type" : "Rename";
 
@@ -657,6 +750,12 @@ function getCreateEntryOption(kind: DesktopCreateEntryKind): CreateEntryOption {
   return CREATE_ENTRY_OPTIONS.find((option) => option.kind === kind) ?? CREATE_ENTRY_OPTIONS[0];
 }
 
+type DesktopFileTypeOption = {
+  label: string;
+  extension: string;
+  experimentalSetting?: keyof ExperimentalSettings;
+};
+
 const DESKTOP_FILE_TYPE_OPTIONS = [
   { label: "No extension", extension: "" },
   { label: "Markdown (.md)", extension: ".md" },
@@ -665,7 +764,8 @@ const DESKTOP_FILE_TYPE_OPTIONS = [
   { label: "Text (.txt)", extension: ".txt" },
   { label: "CSV (.csv)", extension: ".csv" },
   { label: "HTML (.html)", extension: ".html" },
-  { label: "Puppyone App (.puppyoneapp)", extension: ".puppyoneapp" },
+  { label: "Puppyone App (.puppyoneapp)", extension: ".puppyoneapp", experimentalSetting: "enablePuppyoneAppFiles" },
+  { label: "PuppyFlow (.puppyflow)", extension: ".puppyflow", experimentalSetting: "enablePuppyFlowFiles" },
   { label: "JavaScript (.js)", extension: ".js" },
   { label: "TypeScript (.ts)", extension: ".ts" },
   { label: "TSX (.tsx)", extension: ".tsx" },
@@ -676,7 +776,7 @@ const DESKTOP_FILE_TYPE_OPTIONS = [
   { label: "JPEG image (.jpg)", extension: ".jpg" },
   { label: "Archive (.zip)", extension: ".zip" },
   { label: "Tarball (.tar.gz)", extension: ".tar.gz" },
-] as const;
+] satisfies DesktopFileTypeOption[];
 
 export function getDesktopRenameDraft(node: DataNode): { nameValue: string; extensionValue: string } {
   if (node.type === "folder") return { nameValue: node.name, extensionValue: "" };
@@ -719,9 +819,14 @@ export function validateDesktopNodeName(name: string): void {
   }
 }
 
-export function getDesktopFileTypeOptions(currentExtension: string): Array<{ label: string; extension: string }> {
+export function getDesktopFileTypeOptions(
+  currentExtension: string,
+  experimentalSettings?: ExperimentalSettings | null,
+): Array<{ label: string; extension: string }> {
   const extension = normalizeDesktopExtension(currentExtension);
-  const options = [...DESKTOP_FILE_TYPE_OPTIONS];
+  const options = DESKTOP_FILE_TYPE_OPTIONS
+    .filter((option) => !option.experimentalSetting || experimentalSettings?.[option.experimentalSetting] === true)
+    .map(({ label, extension: optionExtension }) => ({ label, extension: optionExtension }));
   if (!extension || options.some((option) => option.extension === extension)) return options;
 
   return [
@@ -788,6 +893,9 @@ export function getCreateEntryInitialContent(kind: DesktopCreateEntryKind): stri
       "",
     ].join("\n");
   }
+  if (kind === "puppyflow") {
+    return serializePuppyFlowDocument(createDefaultPuppyFlowDocument("Untitled Flow"));
+  }
   return "";
 }
 
@@ -817,6 +925,9 @@ export function normalizeCreateEntryName(kind: DesktopCreateEntryKind, value: st
   if (kind === "app") {
     return ensureCreateEntryExtension(name, /\.puppyoneapp$/i, ".puppyoneapp");
   }
+  if (kind === "puppyflow") {
+    return ensureCreateEntryExtension(name, /\.(puppyflow|puppyflow\.json)$/i, ".puppyflow");
+  }
   return name;
 }
 
@@ -831,6 +942,7 @@ function getCreateEntryExtensionNote(kind: DesktopCreateEntryKind): string | nul
   if (kind === "json") return "Names without a JSON extension are saved as .json.";
   if (kind === "csv") return "Names without a table extension are saved as .csv.";
   if (kind === "app") return "Names without a Puppyone App extension are saved as .puppyoneapp.";
+  if (kind === "puppyflow") return "Names without a PuppyFlow extension are saved as .puppyflow.";
   return null;
 }
 

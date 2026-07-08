@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
-import { DataWorkspace, type AiEditRequest, type DataNode, type Workspace } from "@puppyone/shared-ui";
+import { DataWorkspace, type AiEditRequest, type DataNode, type FilePreviewBodyContext, type Workspace } from "@puppyone/shared-ui";
 import { Plus } from "lucide-react";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
 import { GitSidebar, GitStatusView } from "../source-control";
@@ -28,6 +28,8 @@ import {
   rectToCreateEntryAnchor,
   type DesktopCreateEntryAnchorInput,
 } from "../data-workspace/nodeActions";
+import { PuppyFlowEditor } from "../puppyflow/PuppyFlowEditor";
+import { isPuppyFlowFile } from "../puppyflow/puppyflowModel";
 import type { DesktopPreferencesController } from "./useDesktopPreferences";
 import {
   COLLAPSED_EXPLORER_WIDTH,
@@ -36,6 +38,7 @@ import {
 } from "./preferences";
 import {
   DesktopSidebarFooterNavigation,
+  DesktopSidebarRailNavigation,
   type DesktopWorkspaceSurfaceAction,
   DesktopSidebarTopNavigation,
 } from "./navigation";
@@ -155,6 +158,20 @@ export function DesktopWorkspaceContent({
   const handleIntegrationProviderChange = useCallback((provider: string | null) => {
     setActiveIntegrationProvider(provider);
   }, []);
+  const renderPreviewBody = useCallback((node: DataNode, context: FilePreviewBodyContext) => {
+    if (!isPuppyFlowFile(node.name, node.type)) return undefined;
+
+    return (
+      <PuppyFlowEditor
+        node={node}
+        fileContent={context.fileContent}
+        workspacePath={workspace?.path ?? null}
+        loading={context.loading}
+        error={context.error}
+        onSaveContent={context.onSaveContent}
+      />
+    );
+  }, [workspace?.path]);
   const settingsView = (
     <SettingsView
       workspace={workspace}
@@ -169,6 +186,7 @@ export function DesktopWorkspaceContent({
       sidebarNavigationLayout={preferences.sidebarNavigationLayout}
       filesVisibilitySettings={preferences.filesVisibilitySettings}
       externalAppsSettings={preferences.externalAppsSettings}
+      experimentalSettings={preferences.experimentalSettings}
       rightSidebarToolsSettings={preferences.rightSidebarToolsSettings}
       titlebarActionsSettings={preferences.titlebarActionsSettings}
       aiEditAssistEnabled={preferences.aiEditAssistEnabled}
@@ -188,6 +206,7 @@ export function DesktopWorkspaceContent({
       onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
       onFilesVisibilitySettingsChange={onFilesVisibilitySettingsChange}
       onExternalAppsSettingsChange={preferences.setExternalAppsSettings}
+      onExperimentalSettingsChange={preferences.setExperimentalSettings}
       onRightSidebarToolsSettingsChange={preferences.setRightSidebarToolsSettings}
       onTitlebarActionsSettingsChange={preferences.setTitlebarActionsSettings}
       onAiEditAssistEnabledChange={preferences.setAiEditAssistEnabled}
@@ -273,7 +292,7 @@ export function DesktopWorkspaceContent({
   }
 
   return (
-    <div className="desktop-data-workspace-wrap">
+    <div className="desktop-data-workspace-wrap" data-sidebar-navigation-placement={preferences.sidebarNavigationPlacement}>
       {workspaceSurfaceError && (
         <div className="desktop-workspace-surface-alert" role="status">
           {workspaceSurfaceError}
@@ -346,8 +365,23 @@ export function DesktopWorkspaceContent({
             onOpenSettings={onOpenSettings}
           />
         ) : undefined}
+        explorerRailSlot={preferences.sidebarNavigationPlacement === "left" ? (
+          <DesktopSidebarRailNavigation
+            activeView={resolvedActiveView}
+            accessEnabled={accessNavigationEnabled}
+            gitEnabled={gitEnabled}
+            gitIncomingCount={git.gitIncomingCount}
+            gitOperationLoading={git.gitOperationLoading}
+            gitStatus={git.activeGitStatus}
+            workspaceChangeCount={workspaceChangeCount}
+            surfaceAction={workspaceSurfaceAction}
+            onNavigate={onNavigate}
+            onOpenSettings={onOpenSettings}
+          />
+        ) : undefined}
         showPreviewHeader={false}
         hidePreviewSourceView
+        renderPreviewBody={renderPreviewBody}
         fileIconTheme={preferences.fileIconTheme}
         editorSaveMode="auto"
         htmlTrustMode="localTrusted"

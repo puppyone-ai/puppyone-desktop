@@ -62,6 +62,7 @@ export function DesktopWorkspaceSwitcher({
         type="button"
         aria-label={`Switch workspace: ${workspace.name}`}
         aria-expanded={open}
+        aria-haspopup="menu"
         title={workspace.name}
         onClick={onToggle}
       >

@@ -33,7 +33,7 @@ export type {
 export { EXPLORER_TREE_NODE_DRAG_TYPE, ExplorerTree } from "./data/ExplorerTree";
 export type { ExplorerSelectionIntent, ExplorerTreeProps } from "./data/ExplorerTree";
 export { FilePreview } from "./data/FilePreview";
-export type { FilePreviewProps } from "./data/FilePreview";
+export type { FilePreviewBodyContext, FilePreviewProps } from "./data/FilePreview";
 export { ProjectsHeader as WorkspaceHeader } from "./data/ProjectsHeader";
 export type {
   BreadcrumbSegment,
@@ -74,10 +74,13 @@ export type {
 } from "./editor/EditorSaveButton";
 export {
   hasVerticalOverflow,
+  useScrollEdgeState,
   useScrollableDescendantClasses,
   useScrollableState,
 } from "./primitives/useScrollableClass";
 export type {
+  ScrollEdgeState,
+  ScrollEdgeStateOptions,
   ScrollableDescendantClassOptions,
   ScrollableStateOptions,
 } from "./primitives/useScrollableClass";

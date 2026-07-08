@@ -55,6 +55,7 @@ export interface FileFormat {
 export type FileSemanticKind =
   | "folder"
   | "app"
+  | "workflow"
   | "markdown"
   | "json"
   | "html"
@@ -218,6 +219,7 @@ export function isTextLikeFileFormat(format: FileFormat): boolean {
 }
 
 export function getPreviewKindForFormat(format: FileFormat): FilePreviewKind {
+  if (format.id === "puppyflow") return "text";
   if (format.id === "json" || format.id === "jsonl") return "json";
 
   switch (format.defaultViewer) {
@@ -249,6 +251,7 @@ export function getPreviewKindForFormat(format: FileFormat): FilePreviewKind {
 }
 
 export function getSemanticKindForFormat(format: FileFormat): FileSemanticKind {
+  if (format.id === "puppyflow") return "workflow";
   if (format.id === "json" || format.id === "jsonl") return "json";
 
   switch (format.defaultViewer) {
@@ -420,6 +423,7 @@ function isFileSemanticKind(value: string | null | undefined): value is FileSema
   return Boolean(value && [
     "folder",
     "app",
+    "workflow",
     "markdown",
     "json",
     "html",

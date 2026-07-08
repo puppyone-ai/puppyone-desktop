@@ -1,0 +1,8 @@
+id,name,type,duration_seconds,description
+1,English Tone Preview,audio,2,"Short generated audio sample"
+2,Notification Tone,audio,2,"Generated sine-wave tone"
+3,Preview Image,image,0,"Small generated image for thumbnail testing"
+4,Sample Document,document,0,"English document preview sample"
+5,Short Landscape Video,video,2,"Motion JPEG AVI landscape video"
+6,Short Square Video,video,2,"Motion JPEG AVI square video"
+7,Short Portrait Video,video,2,"Motion JPEG AVI portrait video"

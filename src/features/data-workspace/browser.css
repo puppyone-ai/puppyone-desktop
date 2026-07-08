@@ -240,9 +240,10 @@
   --po-tree-row-content-right: var(--desktop-sidebar-row-content-right);
   --po-tree-row-icon-label-gap: 4px;
   --po-tree-root-top-gap: var(--desktop-sidebar-section-top-gap);
-  --po-tree-list-bottom-gap: var(--desktop-sidebar-section-bottom-gap);
-  --data-explorer-footer-height: var(--desktop-sidebar-nav-height);
-  --data-explorer-footer-min-height: var(--desktop-sidebar-nav-height);
+  --po-tree-no-root-top-gap: var(--desktop-sidebar-list-padding-y);
+  --po-tree-list-bottom-gap: var(--desktop-sidebar-list-padding-y);
+  --data-explorer-footer-height: var(--desktop-sidebar-navigation-height);
+  --data-explorer-footer-min-height: var(--desktop-sidebar-navigation-height);
 
   position: relative;
   display: flex;

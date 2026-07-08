@@ -1,5 +1,5 @@
 .desktop-cloud-service-sidebar {
-  background: var(--po-sidebar);
+  background: var(--po-surface-chrome);
 }
 
 .desktop-cloud-sidebar-context {
@@ -8,7 +8,7 @@
   min-height: var(--desktop-sidebar-toolbar-height);
   align-items: center;
   padding: 0 8px;
-  border-bottom: 1px solid var(--po-divider);
+  border-bottom: 1px solid transparent;
   box-sizing: border-box;
 }
 
@@ -163,7 +163,7 @@
   align-items: center;
   justify-content: flex-start;
   padding: 3px 9px 4px;
-  border-top: 1px solid var(--po-divider);
+  border-top: 1px solid transparent;
   box-sizing: border-box;
 }
 

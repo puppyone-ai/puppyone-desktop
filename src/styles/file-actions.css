@@ -152,6 +152,49 @@
   background: var(--po-menu-bg);
   font-size: 13px;
   box-shadow: var(--po-menu-shadow);
+  overflow: visible;
+}
+
+.desktop-create-entry-submenu-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.desktop-create-entry-submenu-wrap::after {
+  content: "";
+  display: none;
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  width: 14px;
+  height: calc(100% + 12px);
+  z-index: 1;
+}
+
+.desktop-create-entry-submenu-wrap[data-open="true"]::after {
+  display: block;
+}
+
+.desktop-create-entry-submenu-trigger .desktop-menu-item-trailing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.86;
+}
+
+.desktop-create-entry-submenu {
+  position: absolute;
+  top: -4px;
+  left: calc(100% + 4px);
+  z-index: 2;
+  width: 184px;
+  padding: var(--po-menu-padding);
+  display: none;
+  font-size: 13px;
+}
+
+.desktop-create-entry-submenu-wrap[data-open="true"] > .desktop-create-entry-submenu {
+  display: block;
 }
 
 .app-shell.dark .desktop-create-entry-menu,

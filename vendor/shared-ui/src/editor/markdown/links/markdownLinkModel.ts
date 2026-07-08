@@ -23,8 +23,9 @@ export function findMarkdownLinkTokens(source: string): MarkdownLinkToken[] {
     if (hrefTo <= hrefFrom) continue;
 
     const rawLabel = source.slice(index + 1, labelTo);
-    const rawHref = source.slice(hrefFrom, hrefTo);
-    if (!rawLabel.trim() || !rawHref.trim()) continue;
+    const rawDestination = source.slice(hrefFrom, hrefTo);
+    const href = parseMarkdownLinkDestination(rawDestination);
+    if (!rawLabel.trim() || !href) continue;
 
     tokens.push({
       from: index,
@@ -34,7 +35,7 @@ export function findMarkdownLinkTokens(source: string): MarkdownLinkToken[] {
       hrefFrom,
       hrefTo,
       label: rawLabel,
-      href: rawHref.trim(),
+      href,
     });
     index = hrefTo;
   }
@@ -58,6 +59,8 @@ function findClosingBracket(source: string, start: number): number {
 
 function findClosingParen(source: string, start: number): number {
   let escaped = false;
+  let quote: "\"" | "'" | null = null;
+  let depth = 0;
   for (let index = start; index < source.length; index += 1) {
     const character = source[index];
     if (character === "\n") return -1;
@@ -69,9 +72,50 @@ function findClosingParen(source: string, start: number): number {
       escaped = true;
       continue;
     }
-    if (character === ")") return index;
+    if (quote) {
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "\"" || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === "(") {
+      depth += 1;
+      continue;
+    }
+    if (character === ")") {
+      if (depth === 0) return index;
+      depth -= 1;
+    }
   }
   return -1;
+}
+
+function parseMarkdownLinkDestination(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const angleDestination = /^<([^>\n]+)>(?:\s+["'][^"']*["'])?$/.exec(trimmed);
+  if (angleDestination) return angleDestination[1].trim() || null;
+
+  const titleStart = findTrailingTitleStart(trimmed);
+  const href = (titleStart == null ? trimmed : trimmed.slice(0, titleStart)).trim();
+  return href || null;
+}
+
+function findTrailingTitleStart(value: string): number | null {
+  const quote = value[value.length - 1];
+  if (quote !== "\"" && quote !== "'") return null;
+
+  for (let index = value.length - 2; index >= 0; index -= 1) {
+    if (value[index] !== quote || isEscaped(value, index)) continue;
+    const beforeTitle = value.slice(0, index).trimEnd();
+    if (!beforeTitle || beforeTitle.length === index) return null;
+    return index;
+  }
+
+  return null;
 }
 
 function isEscaped(source: string, index: number): boolean {

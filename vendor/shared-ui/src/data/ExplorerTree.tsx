@@ -4,7 +4,7 @@ import type { DataNode } from "../core/types";
 import { getMatchedExtension } from "../core/fileFormats";
 import { FileGlyphIcon, type FileIconThemeId } from "../file/fileIcons";
 import { DotsLoader, InlineLoading } from "../primitives/LoadingIndicator";
-import { useScrollableState } from "../primitives/useScrollableClass";
+import { useScrollEdgeState } from "../primitives/useScrollableClass";
 
 export type ExplorerTreeProps = {
   nodes: DataNode[];
@@ -122,9 +122,10 @@ export function ExplorerTree({
     () => loadingPaths ?? (loadingPath ? new Set([loadingPath]) : EMPTY_PATH_SET),
     [loadingPath, loadingPaths],
   );
-  const scrollable = useScrollableState(scrollRef, {
+  const scrollEdgeState = useScrollEdgeState(scrollRef, {
     dependencies: [nodes, rootError, rootLoading, resolvedLoadingPaths, expandedPaths],
   });
+  const scrollable = scrollEdgeState.scrollable;
 
   const clearDragState = useCallback(() => {
     setDraggedNodes([]);
@@ -252,6 +253,12 @@ export function ExplorerTree({
   return (
     <div
       className={`explorer-tree-shell ${showRoot ? "has-root" : "no-root"} ${scrollable ? "is-scrollable" : ""} ${draggedNodes.length > 0 ? "is-dragging-node" : ""} ${dropTarget && draggedNodes.length === 0 ? "is-importing-files" : ""}`}
+      data-scroll-at-bottom={scrollEdgeState.atBottom ? "true" : "false"}
+      data-scroll-at-top={scrollEdgeState.atTop ? "true" : "false"}
+      style={{
+        "--tree-edge-fade-bottom": scrollEdgeState.bottomFade.toFixed(3),
+        "--tree-edge-fade-top": scrollEdgeState.topFade.toFixed(3),
+      } as CSSProperties}
       onDragEnter={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
       onDragOver={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
       onDragLeave={dropEnabled ? leaveTree : undefined}

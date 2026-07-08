@@ -2,7 +2,7 @@ import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
 import { getMarkdownHtmlBlock } from "../rendering/htmlBlockModel";
-import { isMarkdownTableLine } from "../rendering/tableModel";
+import { isMarkdownTableSourceLine } from "../rendering/tableModel";
 import { getMarkdownTaskLine } from "../rendering/taskModel";
 import { findMarkdownImageTokens } from "../links/markdownImageModel";
 import { findMarkdownLinkTokens } from "../links/markdownLinkModel";
@@ -11,6 +11,7 @@ import { findWikiLinkTokens } from "../links/wikiLinkModel";
 export type MarkdownElementKind =
   | "blockquote"
   | "emphasis"
+  | "escape"
   | "fence"
   | "heading"
   | "htmlBlock"
@@ -48,11 +49,29 @@ type LineSource = {
   text: string;
 };
 
+const markdownElementsCache = new WeakMap<object, MarkdownElement[]>();
+
 export function getMarkdownElements(state: EditorState): MarkdownElement[] {
+  const cached = markdownElementsCache.get(state.doc);
+  if (cached) return cached;
+  const elements = collectMarkdownElements(state, 0, state.doc.length);
+  markdownElementsCache.set(state.doc, elements);
+  return elements;
+}
+
+export function getMarkdownElementsInRange(state: EditorState, from: number, to: number): MarkdownElement[] {
+  const rangeFrom = Math.max(0, Math.min(from, to, state.doc.length));
+  const rangeTo = Math.max(rangeFrom, Math.min(Math.max(from, to), state.doc.length));
+  return collectMarkdownElements(state, rangeFrom, rangeTo);
+}
+
+function collectMarkdownElements(state: EditorState, from: number, to: number): MarkdownElement[] {
   const elements: MarkdownElement[] = [];
   const tree = syntaxTree(state);
 
   tree.iterate({
+    from,
+    to,
     enter(nodeRef) {
       const node = nodeRef.node;
       const line = getLineSource(state, node.from);
@@ -84,6 +103,9 @@ export function getMarkdownElements(state: EditorState): MarkdownElement[] {
         case "InlineCode":
           elements.push(createMarkedInlineElement("inlineCode", node, "CodeMark"));
           return true;
+        case "Escape":
+          elements.push(createEscapeElement(node));
+          return true;
         case "Link":
           elements.push(createLinkElement(node));
           return true;
@@ -110,7 +132,9 @@ export function getMarkdownElements(state: EditorState): MarkdownElement[] {
     },
   });
 
-  addExtendedLineElements(state, elements);
+  const fromLine = state.doc.lineAt(from);
+  const toLine = state.doc.lineAt(to);
+  addExtendedLineElements(state, elements, fromLine.number, toLine.number);
   elements.sort((left, right) => left.from - right.from || left.to - right.to || left.kind.localeCompare(right.kind));
   return dedupeElements(elements);
 }
@@ -118,10 +142,11 @@ export function getMarkdownElements(state: EditorState): MarkdownElement[] {
 export function getInlineRevealElement(
   state: EditorState,
   caret: number,
-  elements = getMarkdownElements(state),
+  elements?: MarkdownElement[],
 ): MarkdownElement | null {
+  const candidates = elements ?? getMarkdownElementsInRange(state, state.doc.lineAt(caret).from, state.doc.lineAt(caret).to);
   let best: MarkdownElement | null = null;
-  for (const element of elements) {
+  for (const element of candidates) {
     if (!isInlineRevealKind(element.kind)) continue;
     if (caret <= element.from || caret >= element.to) continue;
     if (!best || element.to - element.from < best.to - best.from) best = element;
@@ -142,7 +167,7 @@ export function isInlineRevealKind(kind: MarkdownElementKind): boolean {
 
 export function getBlockMarkerAtVisibleStart(state: EditorState, caret: number): MarkdownMarkerRange | null {
   const line = state.doc.lineAt(caret);
-  const element = getMarkdownElements(state).find((candidate) => (
+  const element = getMarkdownElementsInRange(state, line.from, line.to).find((candidate) => (
     candidate.lineFrom === line.from &&
     isBlockMarkerDeletionKind(candidate.kind) &&
     getVisibleStart(candidate) === caret
@@ -155,6 +180,28 @@ export function getBlockMarkerAtVisibleStart(state: EditorState, caret: number):
   }
 
   return element.markerRanges[0] ?? null;
+}
+
+export function getHiddenBlockMarkerCaretNormalization(state: EditorState, caret: number): number | null {
+  const line = state.doc.lineAt(caret);
+  const element = getMarkdownElementsInRange(state, line.from, line.to).find((candidate) => (
+    candidate.lineFrom === line.from &&
+    isBlockMarkerDeletionKind(candidate.kind)
+  ));
+  if (!element) return null;
+
+  const visibleStart = getVisibleStart(element);
+  if (caret >= element.from && caret < visibleStart) return visibleStart;
+  return null;
+}
+
+export function getMarkdownVisibleLineStart(state: EditorState, lineFrom: number): number | null {
+  const line = state.doc.lineAt(lineFrom);
+  const element = getMarkdownElementsInRange(state, line.from, line.to).find((candidate) => (
+    candidate.lineFrom === line.from &&
+    isBlockMarkerDeletionKind(candidate.kind)
+  ));
+  return element ? getVisibleStart(element) : null;
 }
 
 function isBlockMarkerDeletionKind(kind: MarkdownElementKind): boolean {
@@ -196,18 +243,34 @@ function createListElement(node: SyntaxNode, line: LineSource): MarkdownElement 
 }
 
 function createBlockquoteElement(node: SyntaxNode, line: LineSource): MarkdownElement | null {
-  const markerRange = directChildRanges(node, "QuoteMark")[0];
-  if (!markerRange) return null;
-  const markerTo = line.text[markerRange.to - line.from] === " " ? markerRange.to + 1 : markerRange.to;
+  const markerRanges = createBlockquoteMarkerRanges(line);
+  if (markerRanges.length === 0) return null;
+  const markerTo = markerRanges.reduce((end, range) => Math.max(end, range.to), markerRanges[0].to);
   return {
     kind: "blockquote",
     from: node.from,
     to: node.to,
-    markerRanges: [{ from: markerRange.from, to: markerTo }],
+    markerRanges,
     contentRange: { from: markerTo, to: node.to },
     lineFrom: line.from,
     lineTo: line.to,
   };
+}
+
+function createBlockquoteMarkerRanges(line: LineSource): MarkdownMarkerRange[] {
+  const match = /^(\s*)(>+)(\s?)/.exec(line.text);
+  if (!match) return [];
+
+  const ranges: MarkdownMarkerRange[] = [];
+  const quoteFrom = line.from + match[1].length;
+  const quotes = match[2];
+  const trailingSpaceLength = match[3].length;
+  for (let index = 0; index < quotes.length; index += 1) {
+    const from = quoteFrom + index;
+    const to = from + 1 + (index === quotes.length - 1 ? trailingSpaceLength : 0);
+    ranges.push({ from, to });
+  }
+  return ranges;
 }
 
 function createMarkedInlineElement(
@@ -253,8 +316,23 @@ function createAutolinkElement(node: SyntaxNode): MarkdownElement {
   };
 }
 
-function addExtendedLineElements(state: EditorState, elements: MarkdownElement[]) {
-  for (let lineNumber = 1; lineNumber <= state.doc.lines; lineNumber += 1) {
+function createEscapeElement(node: SyntaxNode): MarkdownElement {
+  return {
+    kind: "escape",
+    from: node.from,
+    to: node.to,
+    markerRanges: [{ from: node.from, to: Math.min(node.from + 1, node.to) }],
+    contentRange: { from: Math.min(node.from + 1, node.to), to: node.to },
+  };
+}
+
+function addExtendedLineElements(
+  state: EditorState,
+  elements: MarkdownElement[],
+  fromLineNumber: number,
+  toLineNumber: number,
+) {
+  for (let lineNumber = fromLineNumber; lineNumber <= toLineNumber; lineNumber += 1) {
     const line = state.doc.line(lineNumber);
     const taskLine = getMarkdownTaskLine(line);
     if (taskLine) {
@@ -300,7 +378,7 @@ function addExtendedLineElements(state: EditorState, elements: MarkdownElement[]
     }
 
     addStrikeElements(line, elements);
-    if (isMarkdownTableLine(line.text)) {
+    if (isMarkdownTableSourceLine(line.text)) {
       elements.push({
         kind: "table",
         from: line.from,

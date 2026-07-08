@@ -1,0 +1,6 @@
+PuppyOne editor rendering test.
+
+This plain text file contains short English paragraphs for preview testing.
+It includes multiple lines, simple punctuation, and a final sentence.
+
+The quick brown fox jumps over the lazy dog.

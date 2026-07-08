@@ -15,8 +15,8 @@
   flex-direction: column;
   height: 100%;
   min-width: 47px;
-  background: var(--po-sidebar);
-  border-right: 1px solid var(--po-divider);
+  background: var(--po-surface-chrome);
+  border-right: 1px solid transparent;
   transition: width 160ms ease;
 }
 
@@ -26,7 +26,7 @@
   height: 46px;
   min-height: 46px;
   padding: 0 6px 0 8px;
-  border-bottom: 1px solid var(--po-divider);
+  border-bottom: 1px solid transparent;
 }
 
 .workspace-switcher {
@@ -287,7 +287,7 @@
 .nav-group-end {
   margin-bottom: 9px;
   padding-bottom: 9px;
-  border-bottom: 1px solid var(--po-divider);
+  border-bottom: 1px solid transparent;
 }
 
 .cloud-sidebar-footer {
@@ -297,7 +297,7 @@
   height: 46px;
   min-height: 46px;
   padding: 0 14px;
-  border-top: 1px solid var(--po-divider);
+  border-top: 1px solid transparent;
 }
 
 .cloud-sidebar.is-collapsed .cloud-sidebar-footer {
@@ -333,8 +333,8 @@
   height: 46px;
   min-height: 46px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--po-divider);
-  background: var(--po-header);
+  border-bottom: 1px solid transparent;
+  background: var(--po-surface-chrome);
   -webkit-app-region: drag;
   user-select: none;
 }

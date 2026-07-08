@@ -1,0 +1,10 @@
+project: PuppyOne Editor Test
+language: English
+preview:
+  markdown: true
+  audio: true
+  images: true
+  office_documents: true
+notes:
+  - Use this file to test YAML syntax highlighting.
+  - All visible words are written in English.

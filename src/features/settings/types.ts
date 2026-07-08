@@ -1,9 +1,9 @@
 import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import type { DarkThemePreset, ExternalAppsSettings, FilesVisibilitySettings, LightThemePreset, RightSidebarToolsSettings, SidebarNavigationLayout, ThemeMode, TitlebarActionsSettings } from "../../preferences";
+import type { DarkThemePreset, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, LightThemePreset, RightSidebarToolsSettings, SidebarNavigationLayout, ThemeMode, TitlebarActionsSettings } from "../../preferences";
 
-export type SettingsSection = "account" | "workspace" | "editor" | "git" | "cloud" | "appearance" | "files" | "external-apps";
+export type SettingsSection = "account" | "workspace" | "editor" | "git" | "cloud" | "appearance" | "files" | "external-apps" | "experimental";
 
 export type SettingsViewProps = {
   workspace: Workspace;
@@ -18,6 +18,7 @@ export type SettingsViewProps = {
   sidebarNavigationLayout: SidebarNavigationLayout;
   filesVisibilitySettings: FilesVisibilitySettings;
   externalAppsSettings: ExternalAppsSettings;
+  experimentalSettings: ExperimentalSettings;
   rightSidebarToolsSettings: RightSidebarToolsSettings;
   titlebarActionsSettings: TitlebarActionsSettings;
   aiEditAssistEnabled: boolean;
@@ -37,6 +38,7 @@ export type SettingsViewProps = {
   onSidebarNavigationLayoutChange: (layout: SidebarNavigationLayout) => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
   onExternalAppsSettingsChange: (settings: ExternalAppsSettings) => void;
+  onExperimentalSettingsChange: (settings: ExperimentalSettings) => void;
   onRightSidebarToolsSettingsChange: (settings: RightSidebarToolsSettings) => void;
   onTitlebarActionsSettingsChange: (settings: TitlebarActionsSettings) => void;
   onAiEditAssistEnabledChange: (enabled: boolean) => void;

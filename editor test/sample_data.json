@@ -1,0 +1,25 @@
+{
+  "title": "English JSON Preview",
+  "createdFor": "PuppyOne editor test",
+  "items": [
+    {
+      "id": 1,
+      "name": "Audio sample",
+      "format": "mp3",
+      "status": "ready"
+    },
+    {
+      "id": 2,
+      "name": "Vector sample",
+      "format": "svg",
+      "status": "ready"
+    },
+    {
+      "id": 3,
+      "name": "Document sample",
+      "format": "pdf",
+      "status": "ready"
+    }
+  ],
+  "notes": "This file uses English keys and values for renderer testing."
+}

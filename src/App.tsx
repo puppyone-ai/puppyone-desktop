@@ -10,7 +10,7 @@ import {
   MinimalOnboarding,
   type OnboardingOperationStatus,
 } from "./components/MinimalOnboarding";
-import { RightTerminalPanel } from "./components/RightTerminalPanel";
+import { RightTerminalPanel, type RightTerminalPanelHandle } from "./components/RightTerminalPanel";
 import { useDesktopUpdates } from "./components/DesktopUpdateControls";
 import {
   configureWorkspaceCloudRemote,
@@ -165,7 +165,8 @@ export function App() {
     setThemeMode,
   } = preferences;
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("account");
-  const [terminalResetToken, setTerminalResetToken] = useState(0);
+  const [terminalSessionResetToken, setTerminalSessionResetToken] = useState(0);
+  const terminalPanelRef = useRef<RightTerminalPanelHandle | null>(null);
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
   const [activeDataPath, setActiveDataPath] = useState<string | null>(null);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
@@ -699,6 +700,22 @@ export function App() {
     setHomeOperationStatus(null);
   }, [forgetActiveWorkspace, resetDataNodeActions, workspaceIsCloud]);
 
+  const toggleWorkspaceSwitcher = useCallback(() => {
+    const nextOpen = !switcherOpen;
+    setSwitcherOpen(nextOpen);
+    setBranchSwitcherOpen(false);
+    if (nextOpen) void refreshHomeCloudProjects();
+  }, [refreshHomeCloudProjects, setBranchSwitcherOpen, switcherOpen]);
+
+  const toggleBranchSwitcher = useCallback(() => {
+    setBranchSwitcherOpen((open) => !open);
+    setSwitcherOpen(false);
+  }, [setBranchSwitcherOpen]);
+
+  const closeBranchSwitcher = useCallback(() => {
+    setBranchSwitcherOpen(false);
+  }, [setBranchSwitcherOpen]);
+
   if (restoringWorkspace && !workspace) {
     return (
       <RestoringWorkspaceScreen
@@ -781,37 +798,24 @@ export function App() {
       activeGitStatus={activeGitStatus}
       branchSwitcherOpen={branchSwitcherOpen}
       branchSwitcherRef={branchSwitcherRef}
-      gitOperationLoading={gitOperationLoading}
       gitStatusLoading={gitStatusLoading}
+      gitOperationLoading={gitOperationLoading}
       localBranches={localBranches}
-      onBranchCheckout={handleCheckoutGitBranch}
-      onBranchMenuDone={() => setBranchSwitcherOpen(false)}
-      onBranchToggle={() => {
-        setSwitcherOpen(false);
-        setBranchSwitcherOpen((open) => !open);
-      }}
+      remoteBranches={remoteBranches}
+      workspace={workspace}
+      workspaceKind={workspaceIsCloud ? "cloud" : "local"}
+      workspaceIsCloud={workspaceIsCloud}
+      workspaceSwitcherItems={workspaceSwitcherItems}
+      workspaceSwitcherOpen={switcherOpen}
+      workspaceSwitcherRef={switcherRef}
+      onCheckoutBranch={handleCheckoutGitBranch}
       onCreateCloudProject={cloudEnabled ? createCloudProjectFromHomepage : undefined}
       onGoHome={() => void goToHomepage()}
       onOpenFolder={openFolder}
-      onOpenGitView={() => {
-        setActiveView("git");
-        setSidebarCollapsed(false);
-        setSwitcherOpen(false);
-        setBranchSwitcherOpen(false);
-      }}
-      onOpenWorkspaceItem={openWorkspaceSwitcherItem}
-      onWorkspaceToggle={() => {
-        setBranchSwitcherOpen(false);
-        const nextOpen = !switcherOpen;
-        setSwitcherOpen(nextOpen);
-        if (nextOpen) void refreshHomeCloudProjects();
-      }}
-      remoteBranches={remoteBranches}
-      switcherOpen={switcherOpen}
-      switcherRef={switcherRef}
-      workspace={workspace}
-      workspaceIsCloud={workspaceIsCloud}
-      workspaceItems={workspaceSwitcherItems}
+      onOpenWorkspaceSwitcherItem={openWorkspaceSwitcherItem}
+      onCloseBranchSwitcher={closeBranchSwitcher}
+      onToggleBranchSwitcher={toggleBranchSwitcher}
+      onToggleWorkspaceSwitcher={toggleWorkspaceSwitcher}
     />
   );
 
@@ -829,11 +833,15 @@ export function App() {
       titlebarActionsSettings={titlebarActionsSettings}
       terminalSidebarOpen={terminalSidebarOpen && desktopTerminalEnabled}
       terminalToolEnabled={desktopTerminalEnabled}
+      onClearTerminal={() => {
+        terminalPanelRef.current?.clear();
+        setSwitcherOpen(false);
+      }}
       onOpenActiveFileExternal={() => void activeExternalOpen.openActiveFileExternal()}
       onOpenActiveFileWithApp={(appPath) => void activeExternalOpen.openActiveFileWithExternalApp(appPath)}
       onCustomizeExternalAppForActiveFile={() => void activeExternalOpen.setExternalAppDefaultForActiveFile()}
-      onClearTerminal={() => {
-        setTerminalResetToken((token) => token + 1);
+      onResetTerminal={() => {
+        setTerminalSessionResetToken((token) => token + 1);
         setSwitcherOpen(false);
       }}
       onToggleTerminal={() => {
@@ -865,7 +873,8 @@ export function App() {
         onRightSidebarWidthChange={setRightSidebarWidth}
         rightSidebar={desktopTerminalEnabled ? (
           <RightTerminalPanel
-            key={`${workspace.path}:${terminalResetToken}`}
+            key={`${workspace.path}:${terminalSessionResetToken}`}
+            ref={terminalPanelRef}
             workspace={workspace}
             active={terminalSidebarOpen && desktopTerminalEnabled}
           />
@@ -964,6 +973,7 @@ export function App() {
             ) : (
               <DesktopCreateEntryMenu
                 draft={createEntryDraft}
+                experimentalSettings={preferences.experimentalSettings}
                 fileIconTheme={fileIconTheme}
                 onCancel={() => setCreateEntryDraft(null)}
                 onSelectKind={selectCreateEntryKind}
@@ -973,6 +983,7 @@ export function App() {
           {nodeActionMenu && (
             <DesktopNodeActionMenu
               draft={nodeActionMenu}
+              experimentalSettings={preferences.experimentalSettings}
               showRevealInFinder={!workspaceIsCloud}
               showOpenInDefaultApp={!workspaceIsCloud}
               onChange={setNodeActionMenu}

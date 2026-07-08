@@ -11,6 +11,7 @@ import {
   FileVideo,
   Folder as LucideFolder,
   Joystick,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { getFileAccent, type FileIconThemeId, type FileIconThemeMetadata, type FileVisualKind } from "./fileIconTypes";
@@ -320,6 +321,7 @@ function DocShell({
 
 const DEFAULT_GLYPH_RENDERERS: Partial<Record<FileVisualKind, FileIconRenderer<FileIconRenderContext>>> = {
   app: renderDefaultAppGlyph,
+  workflow: renderDefaultWorkflowGlyph,
   audio: renderDefaultAudioGlyph,
   image: renderDefaultImageGlyph,
   html: renderDefaultCodeGlyph,
@@ -370,6 +372,10 @@ function renderDefaultAppGlyph({ color, size }: FileIconRenderContext): ReactNod
   );
 }
 
+function renderDefaultWorkflowGlyph({ color, size }: FileIconRenderContext): ReactNode {
+  return <Workflow size={size} color={color} strokeWidth={1.9} aria-hidden="true" />;
+}
+
 function renderDefaultCodeGlyph({ color, kind, size }: FileIconRenderContext): ReactNode {
   return (
     <svg width={size} height={size} viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -408,6 +414,7 @@ function renderDefaultDocumentGlyph({ color, size }: FileIconRenderContext): Rea
 
 const DEFAULT_PREVIEW_GLYPH_RENDERERS: Partial<Record<FileVisualKind, FileIconRenderer<FileIconRenderContext>>> = {
   app: renderDefaultAppPreviewGlyph,
+  workflow: renderDefaultWorkflowPreviewGlyph,
   image: renderDefaultImagePreviewGlyph,
   audio: renderDefaultAudioPreviewGlyph,
   video: renderDefaultVideoPreviewGlyph,
@@ -445,6 +452,16 @@ function renderDefaultAppPreviewGlyph({ color }: FileIconRenderContext): ReactNo
       <circle cx="14.95" cy="8.7" r="3.55" fill="color-mix(in srgb, var(--po-file-icon-body) 68%, transparent)" stroke={color} strokeWidth="2" />
       <circle cx="21.5" cy="23.6" r="1.15" fill={color} opacity="0.78" />
       <circle cx="10.65" cy="23.6" r="0.9" fill={color} opacity="0.56" />
+    </svg>
+  );
+}
+
+function renderDefaultWorkflowPreviewGlyph({ color }: FileIconRenderContext): ReactNode {
+  return (
+    <svg viewBox="0 0 32 32" width="100%" height="100%" fill="none" aria-hidden>
+      <rect x="6" y="6" width="9" height="9" rx="2.4" stroke={color} strokeWidth="2" />
+      <path d="M10.5 15v4.4c0 1.55 1.25 2.8 2.8 2.8H17" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="17" y="17" width="9" height="9" rx="2.4" stroke={color} strokeWidth="2" />
     </svg>
   );
 }
@@ -582,6 +599,13 @@ const VSCODE_SYMBOL_RENDERERS: Partial<Record<FileVisualKind, (context: SymbolCo
       <circle cx="11.65" cy="11.75" r="0.42" fill={color} opacity="0.78" />
     </>
   ),
+  workflow: ({ color }) => (
+    <>
+      <rect x="5.1" y="5.7" width="3.2" height="3.2" rx="0.8" stroke={color} strokeWidth="1" />
+      <path d="M6.7 8.9v2.05c0 .72.58 1.3 1.3 1.3h1.7" stroke={color} strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="9.7" y="10.5" width="3.2" height="3.2" rx="0.8" stroke={color} strokeWidth="1" />
+    </>
+  ),
   markdown: ({ color }) => <DocumentLinesSymbol color={color} />,
   json: ({ color }) => (
     <text x="8.75" y="12.15" textAnchor="middle" fontSize="8.2" fontWeight="850" fontFamily="var(--po-font-sans)" fill={color}>
@@ -681,6 +705,7 @@ function getVsCodeLabel(kind: FileVisualKind): string {
 
 const MATERIAL_GLYPH_RENDERERS: Partial<Record<FileVisualKind, FileIconRenderer<FileIconRenderContext>>> = {
   app: renderDefaultAppGlyph,
+  workflow: renderDefaultWorkflowGlyph,
   audio: renderMaterialAudioGlyph,
   image: renderMaterialImageGlyph,
   video: renderMaterialVideoGlyph,
@@ -822,6 +847,7 @@ function getMinimalLucideIcon(kind: FileVisualKind): LucideIcon {
   const icons: Partial<Record<FileVisualKind, LucideIcon>> = {
     app: Joystick,
     folder: LucideFolder,
+    workflow: Workflow,
     json: FileJson,
     html: FileCode,
     code: FileCode,

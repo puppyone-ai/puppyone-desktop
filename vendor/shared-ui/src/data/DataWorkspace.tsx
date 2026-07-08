@@ -79,6 +79,7 @@ export type DataWorkspaceProps = {
   headerSlot?: DataWorkspaceSlot;
   headerActionSlot?: DataWorkspaceSlot;
   explorerToolbarSlot?: DataWorkspaceSlot;
+  explorerRailSlot?: DataWorkspaceSlot;
   explorerSlot?: DataWorkspaceSlot;
   explorerFooterSlot?: DataWorkspaceSlot;
   collapsedExplorerSlot?: DataWorkspaceSlot;
@@ -148,6 +149,7 @@ export function DataWorkspace({
   headerSlot,
   headerActionSlot,
   explorerToolbarSlot,
+  explorerRailSlot,
   explorerSlot,
   explorerFooterSlot,
   collapsedExplorerSlot,
@@ -1046,75 +1048,82 @@ export function DataWorkspace({
       >
         <aside className="explorer-column">
           {!explorerCollapsed && (
-            <>
-              {showExplorerToolbar && (
-                explorerToolbarSlot ? (
-                  renderWorkspaceSlot(explorerToolbarSlot, workspaceState)
-                ) : (
-                  <div className="desktop-explorer-toolbar">
-                    <span>{labels?.root ?? "Root"}</span>
-                    <div className="desktop-explorer-actions">
-                      {resolvedCapabilities.create && onCreate && (
-                        <button type="button" aria-label="Create" onClick={() => onCreate(currentFolderPath)}>
-                          <Plus size={15} />
-                        </button>
-                      )}
-                      {onMore && (
-                        <button type="button" aria-label="More" onClick={() => onMore(workspaceState)}>
-                          <MoreVertical size={15} />
-                        </button>
-                      )}
-                      {resolvedCapabilities.accessPoints && onAccess && (
-                        <button type="button" aria-label="Access" onClick={() => onAccess(currentFolderPath)}>
-                          <Link2 size={15} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              )}
-              <div className="data-explorer-view-stack" data-view-mode={filesExplorerActive ? "files" : "custom"}>
-                <div
-                  className="data-explorer-view-frame"
-                  data-view-mode="files"
-                  data-active={filesExplorerActive ? "true" : "false"}
-                  aria-hidden={filesExplorerActive ? undefined : true}
-                >
-                  <ExplorerTree
-                    nodes={tree}
-                    activePath={resolvedActivePath}
-                    selectedPaths={selectedNodePaths}
-                    expandedPaths={expandedFolderPaths}
-                    loadingPaths={loadingFolderPaths}
-                    rootLoading={rootLoading}
-                    rootError={loadError}
-                    rootLabel={labels?.root ?? "Root"}
-                    showRoot={showExplorerRoot}
-                    loadingLabel={labels?.loadingWorkspace ?? "Loading workspace..."}
-                    onToggleFolder={toggleFolder}
-                    onSelectNode={activateNode}
-                    fileIconTheme={fileIconTheme}
-                    canMoveNodes={Boolean(resolvedCapabilities.move && dataPort.moveNode)}
-                    onMoveNode={moveNode}
-                    onMoveNodes={moveNodes}
-                    onImportFiles={dataPort.importFiles ? importFiles : undefined}
-                    onRootClick={onExplorerRootClick ? (event) => onExplorerRootClick(workspaceState, event) : undefined}
-                    onRootContextMenu={onExplorerRootContextMenu ? (event) => onExplorerRootContextMenu(workspaceState, event) : undefined}
-                    onNodeContextMenu={onExplorerNodeContextMenu ? (node, event) => onExplorerNodeContextMenu(workspaceState, node, event) : undefined}
-                    renderRootContent={explorerRootContentSlot ? () => renderWorkspaceSlot(explorerRootContentSlot, workspaceState) : undefined}
-                    renderListEnd={explorerListEndSlot ? () => renderWorkspaceSlot(explorerListEndSlot, workspaceState) : undefined}
-                    renderRootActions={explorerRootActionSlot ? () => renderWorkspaceSlot(explorerRootActionSlot, workspaceState) : undefined}
-                    renderFolderActions={explorerFolderActionSlot ? (folder) => renderWorkspaceFolderSlot(explorerFolderActionSlot, workspaceState, folder) : undefined}
-                    renderNodeActions={explorerNodeActionSlot ? (node) => renderWorkspaceNodeSlot(explorerNodeActionSlot, workspaceState, node) : undefined}
-                  />
+            <div className="data-explorer-layout" data-has-rail={explorerRailSlot ? "true" : undefined}>
+              {explorerRailSlot && (
+                <div className="data-explorer-rail">
+                  {renderWorkspaceSlot(explorerRailSlot, workspaceState)}
                 </div>
-                {explorerSlot && (
-                  <div className="data-explorer-view-frame" data-view-mode="custom" data-active="true">
-                    {renderWorkspaceSlot(explorerSlot, workspaceState)}
-                  </div>
+              )}
+              <div className="data-explorer-pane">
+                {showExplorerToolbar && (
+                  explorerToolbarSlot ? (
+                    renderWorkspaceSlot(explorerToolbarSlot, workspaceState)
+                  ) : (
+                    <div className="desktop-explorer-toolbar">
+                      <span>{labels?.root ?? "Root"}</span>
+                      <div className="desktop-explorer-actions">
+                        {resolvedCapabilities.create && onCreate && (
+                          <button type="button" aria-label="Create" onClick={() => onCreate(currentFolderPath)}>
+                            <Plus size={15} />
+                          </button>
+                        )}
+                        {onMore && (
+                          <button type="button" aria-label="More" onClick={() => onMore(workspaceState)}>
+                            <MoreVertical size={15} />
+                          </button>
+                        )}
+                        {resolvedCapabilities.accessPoints && onAccess && (
+                          <button type="button" aria-label="Access" onClick={() => onAccess(currentFolderPath)}>
+                            <Link2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
                 )}
+                <div className="data-explorer-view-stack" data-view-mode={filesExplorerActive ? "files" : "custom"}>
+                  <div
+                    className="data-explorer-view-frame"
+                    data-view-mode="files"
+                    data-active={filesExplorerActive ? "true" : "false"}
+                    aria-hidden={filesExplorerActive ? undefined : true}
+                  >
+                    <ExplorerTree
+                      nodes={tree}
+                      activePath={resolvedActivePath}
+                      selectedPaths={selectedNodePaths}
+                      expandedPaths={expandedFolderPaths}
+                      loadingPaths={loadingFolderPaths}
+                      rootLoading={rootLoading}
+                      rootError={loadError}
+                      rootLabel={labels?.root ?? "Root"}
+                      showRoot={showExplorerRoot}
+                      loadingLabel={labels?.loadingWorkspace ?? "Loading workspace..."}
+                      onToggleFolder={toggleFolder}
+                      onSelectNode={activateNode}
+                      fileIconTheme={fileIconTheme}
+                      canMoveNodes={Boolean(resolvedCapabilities.move && dataPort.moveNode)}
+                      onMoveNode={moveNode}
+                      onMoveNodes={moveNodes}
+                      onImportFiles={dataPort.importFiles ? importFiles : undefined}
+                      onRootClick={onExplorerRootClick ? (event) => onExplorerRootClick(workspaceState, event) : undefined}
+                      onRootContextMenu={onExplorerRootContextMenu ? (event) => onExplorerRootContextMenu(workspaceState, event) : undefined}
+                      onNodeContextMenu={onExplorerNodeContextMenu ? (node, event) => onExplorerNodeContextMenu(workspaceState, node, event) : undefined}
+                      renderRootContent={explorerRootContentSlot ? () => renderWorkspaceSlot(explorerRootContentSlot, workspaceState) : undefined}
+                      renderListEnd={explorerListEndSlot ? () => renderWorkspaceSlot(explorerListEndSlot, workspaceState) : undefined}
+                      renderRootActions={explorerRootActionSlot ? () => renderWorkspaceSlot(explorerRootActionSlot, workspaceState) : undefined}
+                      renderFolderActions={explorerFolderActionSlot ? (folder) => renderWorkspaceFolderSlot(explorerFolderActionSlot, workspaceState, folder) : undefined}
+                      renderNodeActions={explorerNodeActionSlot ? (node) => renderWorkspaceNodeSlot(explorerNodeActionSlot, workspaceState, node) : undefined}
+                    />
+                  </div>
+                  {explorerSlot && (
+                    <div className="data-explorer-view-frame" data-view-mode="custom" data-active="true">
+                      {renderWorkspaceSlot(explorerSlot, workspaceState)}
+                    </div>
+                  )}
+                </div>
               </div>
-            </>
+            </div>
           )}
           {explorerCollapsed && (
             <div className="data-explorer-collapsed-fill" aria-hidden="true" />

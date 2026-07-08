@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { Check, Cloud, Copy, ExternalLink, FileText, GitBranch, LogIn, LogOut, Monitor, Moon, PanelBottom, PanelTop, Pencil, RefreshCw, Settings, ShieldCheck, Sun, Unlink, UserRound } from "lucide-react";
+import { Check, Cloud, Copy, ExternalLink, FileText, FlaskConical, GitBranch, LogIn, LogOut, Monitor, Moon, PanelBottom, PanelLeft, PanelTop, Pencil, RefreshCw, Settings, ShieldCheck, Sun, Unlink, UserRound } from "lucide-react";
 import { FILE_ICON_THEMES, FileGlyphIcon } from "@puppyone/shared-ui";
 import { DesktopUpdateSettingsRow } from "../../components/DesktopUpdateControls";
 import { getDesktopCloudApiBaseUrl, isCloudSessionForApiBase, type DesktopCloudSession } from "../../lib/cloudApi";
 import { clearDesktopCloudSession, onDesktopCloudAuthError, startDesktopCloudOAuth, supportsDesktopCloudOAuth } from "../../lib/cloudSession";
 import { chooseWorkspaceExternalApp } from "../../lib/localFiles";
-import { DARK_THEME_PRESETS, DEFAULT_EXPLORER_EXCLUDE_PATTERNS, LIGHT_THEME_PRESETS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, normalizeExplorerExcludePatterns, normalizeExternalAppExtension, removeExternalAppOverride, upsertExternalAppOverride, type ExternalAppsSettings, type FilesVisibilitySettings, type TitlebarActionsSettings } from "../../preferences";
+import { DARK_THEME_PRESETS, DEFAULT_EXPLORER_EXCLUDE_PATTERNS, LIGHT_THEME_PRESETS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, normalizeExplorerExcludePatterns, normalizeExternalAppExtension, removeExternalAppOverride, upsertExternalAppOverride, type ExperimentalSettings, type ExternalAppsSettings, type FilesVisibilitySettings, type TitlebarActionsSettings } from "../../preferences";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements";
 import { ExternalAppIcon } from "../external-apps/ExternalAppIcon";
@@ -28,6 +28,7 @@ export function SettingsView({
   sidebarNavigationLayout,
   filesVisibilitySettings,
   externalAppsSettings,
+  experimentalSettings,
   rightSidebarToolsSettings,
   titlebarActionsSettings,
   aiEditAssistEnabled,
@@ -47,6 +48,7 @@ export function SettingsView({
   onSidebarNavigationLayoutChange,
   onFilesVisibilitySettingsChange,
   onExternalAppsSettingsChange,
+  onExperimentalSettingsChange,
   onRightSidebarToolsSettingsChange,
   onTitlebarActionsSettingsChange,
   onAiEditAssistEnabledChange,
@@ -150,6 +152,15 @@ export function SettingsView({
       <DefaultAppsSettingsView
         settings={externalAppsSettings}
         onChange={onExternalAppsSettingsChange}
+      />
+    );
+  }
+
+  if (activeSection === "experimental") {
+    return (
+      <ExperimentalSettingsView
+        settings={experimentalSettings}
+        onChange={onExperimentalSettingsChange}
       />
     );
   }
@@ -262,12 +273,15 @@ export function SettingsView({
                 <span>Navigation</span>
                 <div className="desktop-theme-segment desktop-sidebar-layout-segment" aria-label="Sidebar navigation layout">
                   {SIDEBAR_NAVIGATION_LAYOUT_OPTIONS.map((option) => {
-                    const Icon = option.placement === "top" ? PanelTop : PanelBottom;
+                    const Icon = option.placement === "top"
+                      ? PanelTop
+                      : option.placement === "left" ? PanelLeft : PanelBottom;
                     return (
                       <button
                         className={sidebarNavigationLayout === option.value ? "active" : ""}
                         type="button"
                         key={option.value}
+                        title={option.description}
                         onClick={() => onSidebarNavigationLayoutChange(option.value)}
                       >
                         <Icon size={14} />
@@ -551,6 +565,63 @@ function EditorSettingsView({
                   type="checkbox"
                   checked={aiEditAssistEnabled}
                   onChange={(event) => onAiEditAssistEnabledChange(event.target.checked)}
+                />
+                <span aria-hidden="true" />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ExperimentalSettingsView({
+  settings,
+  onChange,
+}: {
+  settings: ExperimentalSettings;
+  onChange: (settings: ExperimentalSettings) => void;
+}) {
+  return (
+    <section className="desktop-utility-view desktop-settings-view">
+      <div className="desktop-utility-body desktop-settings-body">
+        <div className="desktop-settings-section">
+          <SettingsSectionHeader
+            title="Experimental"
+            detail="Opt in to early file experiences. These entries are hidden by default."
+          />
+          <div className="desktop-settings-list">
+            <div className="desktop-settings-row desktop-settings-row-control">
+              <span className="desktop-settings-label-stack">
+                <strong>Puppyone App files</strong>
+                <small>Show Puppyone App in New &gt; Custom files.</small>
+              </span>
+              <label className="desktop-settings-switch">
+                <input
+                  type="checkbox"
+                  checked={settings.enablePuppyoneAppFiles}
+                  onChange={(event) => onChange({
+                    ...settings,
+                    enablePuppyoneAppFiles: event.target.checked,
+                  })}
+                />
+                <span aria-hidden="true" />
+              </label>
+            </div>
+            <div className="desktop-settings-row desktop-settings-row-control">
+              <span className="desktop-settings-label-stack">
+                <strong>PuppyFlow files</strong>
+                <small>Show PuppyFlow in New &gt; Custom files.</small>
+              </span>
+              <label className="desktop-settings-switch">
+                <input
+                  type="checkbox"
+                  checked={settings.enablePuppyFlowFiles}
+                  onChange={(event) => onChange({
+                    ...settings,
+                    enablePuppyFlowFiles: event.target.checked,
+                  })}
                 />
                 <span aria-hidden="true" />
               </label>
@@ -1049,6 +1120,7 @@ export function SettingsSidebar({ activeSection, onSelectSection }: SettingsSide
     { id: "git", label: "Git", icon: GitBranch, disabled: false },
     { id: "files", label: "Git Ignore", icon: FileText, disabled: false },
     { id: "editor", label: "Editor", icon: Pencil, disabled: false },
+    { id: "experimental", label: "Experimental", icon: FlaskConical, disabled: false },
     { id: "cloud", label: "Cloud Hosting", icon: Cloud, disabled: false },
   ] satisfies Array<{
     id: SettingsSection;
@@ -1076,7 +1148,7 @@ export function SettingsSidebar({ activeSection, onSelectSection }: SettingsSide
                 <span>{section.label}</span>
               </button>
               {section.id === "account" && <div className="desktop-settings-sidebar-divider" aria-hidden="true" />}
-              {section.id === "editor" && <div className="desktop-settings-sidebar-divider cloud" aria-hidden="true" />}
+              {section.id === "experimental" && <div className="desktop-settings-sidebar-divider cloud" aria-hidden="true" />}
             </div>
           );
         })}

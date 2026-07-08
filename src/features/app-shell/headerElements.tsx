@@ -1,5 +1,5 @@
 import type { Dispatch, ReactNode, Ref, SetStateAction } from "react";
-import { ChevronDown, Eraser, ExternalLink, Settings, SquareTerminal, type LucideIcon } from "lucide-react";
+import { ChevronDown, Eraser, ExternalLink, RotateCcw, Settings, SquareTerminal, type LucideIcon } from "lucide-react";
 import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
 import { ExternalAppIcon } from "../external-apps/ExternalAppIcon";
 import type { RightSidebarToolId, TitlebarActionId } from "../../preferences";
@@ -31,8 +31,13 @@ export type HeaderElementRenderContext = {
   };
   terminal: {
     enabled: boolean;
+    menuOpen: boolean;
     onClear: () => void;
+    onCloseMenu: () => void;
+    onReset: () => void;
+    onToggleMenu: () => void;
     onToggle: () => void;
+    ref: Ref<HTMLDivElement>;
     sidebarOpen: boolean;
   };
 };
@@ -125,20 +130,12 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
     render: (context) => {
       const terminal = context.terminal;
       return (
-        <span className="desktop-titlebar-action-cluster">
-          {terminal.sidebarOpen && (
-            <button
-              className="desktop-titlebar-action"
-              type="button"
-              title="Clear terminal"
-              aria-label="Clear terminal"
-              onClick={terminal.onClear}
-            >
-              <Eraser size={15} />
-            </button>
-          )}
+        <div
+          className={`desktop-titlebar-terminal ${terminal.sidebarOpen ? "has-menu" : ""}`}
+          ref={terminal.ref}
+        >
           <button
-            className="desktop-titlebar-action"
+            className="desktop-titlebar-action desktop-titlebar-terminal-main"
             type="button"
             title={terminal.sidebarOpen ? "Hide terminal" : "Show terminal"}
             aria-label={terminal.sidebarOpen ? "Hide terminal" : "Show terminal"}
@@ -147,7 +144,45 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
           >
             <SquareTerminal size={16} />
           </button>
-        </span>
+          {terminal.sidebarOpen && (
+            <button
+              className="desktop-titlebar-action desktop-titlebar-terminal-menu-button"
+              type="button"
+              title="Terminal actions"
+              aria-label="Terminal actions"
+              aria-expanded={terminal.menuOpen}
+              aria-haspopup="menu"
+              onClick={terminal.onToggleMenu}
+            >
+              <ChevronDown size={12} />
+            </button>
+          )}
+          {terminal.sidebarOpen && terminal.menuOpen && (
+            <DesktopMenuSurface
+              ariaLabel="Terminal actions"
+              className="desktop-titlebar-menu desktop-branch-menu desktop-titlebar-terminal-menu"
+            >
+              <DesktopMenuItem
+                className="desktop-branch-menu-row desktop-titlebar-terminal-menu-row"
+                icon={<Eraser size={15} />}
+                label="Clear"
+                onClick={() => {
+                  terminal.onCloseMenu();
+                  terminal.onClear();
+                }}
+              />
+              <DesktopMenuItem
+                className="desktop-branch-menu-row desktop-titlebar-terminal-menu-row"
+                icon={<RotateCcw size={15} />}
+                label="Reset session"
+                onClick={() => {
+                  terminal.onCloseMenu();
+                  terminal.onReset();
+                }}
+              />
+            </DesktopMenuSurface>
+          )}
+        </div>
       );
     },
   },

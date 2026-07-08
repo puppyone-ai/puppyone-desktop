@@ -1,6 +1,7 @@
 export type DataNodeKind =
   | "folder"
   | "app"
+  | "workflow"
   | "markdown"
   | "json"
   | "html"

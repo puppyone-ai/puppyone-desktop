@@ -583,8 +583,10 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-git-section-actions {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 2px;
+  white-space: nowrap;
 }
 
 .desktop-git-section-actions .desktop-tool-sidebar-icon {
@@ -741,15 +743,21 @@ body.desktop-git-sidebar-resizing {
 .desktop-working-tree-row {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content 18px;
+  grid-template-columns: minmax(0, 1fr) var(--git-working-tree-actions-width) var(--git-working-tree-state-width);
+  grid-template-rows: var(--desktop-sidebar-row-height);
   column-gap: 6px;
   align-items: center;
   width: 100%;
   min-width: 0;
   height: var(--desktop-sidebar-row-height);
   margin: 1px 0;
+  overflow: hidden;
   border-radius: var(--git-row-radius);
   color: var(--po-text-muted);
+}
+
+.desktop-git-remote-preview-row {
+  grid-template-columns: minmax(0, 1fr) var(--git-working-tree-state-width);
 }
 
 .desktop-working-tree-row:hover,
@@ -764,6 +772,7 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-working-tree-main {
   grid-column: 1;
+  grid-row: 1;
   display: flex;
   min-width: 0;
   align-items: center;
@@ -818,11 +827,16 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-working-tree-state {
   grid-column: 3;
+  grid-row: 1;
   justify-self: end;
   padding-right: var(--git-sidebar-content-right);
   color: var(--po-text-subtle);
   font-size: 11px;
   font-weight: 620;
+}
+
+.desktop-git-remote-preview-row .desktop-working-tree-state {
+  grid-column: 2;
 }
 
 .desktop-working-tree-state.modified {
@@ -844,29 +858,27 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-working-tree-actions {
   grid-column: 2;
+  grid-row: 1;
   justify-self: end;
   display: flex;
   align-items: center;
   gap: 2px;
-  max-width: 0;
+  width: var(--git-working-tree-actions-width);
   overflow: hidden;
   padding: 0;
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
-  transition:
-    max-width 0.12s ease,
-    opacity 0.12s ease;
+  transition: opacity 0.12s ease;
 }
 
 .desktop-working-tree-actions .desktop-tool-sidebar-icon {
-  width: 24px;
-  height: 24px;
+  width: var(--git-working-tree-action-size);
+  height: var(--git-working-tree-action-size);
 }
 
 .desktop-working-tree-row:hover .desktop-working-tree-actions,
 .desktop-working-tree-row.active .desktop-working-tree-actions {
-  max-width: 54px;
   opacity: 1;
   pointer-events: auto;
   visibility: visible;

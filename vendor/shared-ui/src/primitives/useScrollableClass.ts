@@ -9,9 +9,21 @@ export type ScrollableStateOptions = {
   threshold?: number;
 };
 
+export type ScrollEdgeStateOptions = ScrollableStateOptions & {
+  fadeDistance?: number;
+};
+
 export type ScrollableDescendantClassOptions = ScrollableStateOptions & {
   className?: string;
   selector: string;
+};
+
+export type ScrollEdgeState = {
+  atBottom: boolean;
+  atTop: boolean;
+  bottomFade: number;
+  scrollable: boolean;
+  topFade: number;
 };
 
 export function hasVerticalOverflow(element: HTMLElement, threshold = DEFAULT_OVERFLOW_THRESHOLD) {
@@ -62,6 +74,82 @@ export function useScrollableState<T extends HTMLElement>(
   }, [elementRef, threshold, ...dependencies]);
 
   return scrollable;
+}
+
+export function useScrollEdgeState<T extends HTMLElement>(
+  elementRef: RefObject<T | null>,
+  options: ScrollEdgeStateOptions = {},
+) {
+  const {
+    dependencies = EMPTY_DEPENDENCIES,
+    fadeDistance = 24,
+    threshold = DEFAULT_OVERFLOW_THRESHOLD,
+  } = options;
+  const [edgeState, setEdgeState] = useState<ScrollEdgeState>({
+    atBottom: true,
+    atTop: true,
+    bottomFade: 0,
+    scrollable: false,
+    topFade: 0,
+  });
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const element = elementRef.current;
+    if (!element) return undefined;
+
+    let frameId: number | null = null;
+
+    const updateEdgeState = () => {
+      frameId = null;
+      const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+      const scrollTop = clampNumber(element.scrollTop, 0, maxScrollTop);
+      const scrollable = maxScrollTop > threshold;
+      const nextState: ScrollEdgeState = {
+        atBottom: !scrollable || maxScrollTop - scrollTop <= threshold,
+        atTop: !scrollable || scrollTop <= threshold,
+        bottomFade: scrollable ? clampNumber((maxScrollTop - scrollTop) / fadeDistance, 0, 1) : 0,
+        scrollable,
+        topFade: scrollable ? clampNumber(scrollTop / fadeDistance, 0, 1) : 0,
+      };
+
+      setEdgeState((current) => (
+        current.atBottom === nextState.atBottom
+        && current.atTop === nextState.atTop
+        && current.scrollable === nextState.scrollable
+        && Math.abs(current.bottomFade - nextState.bottomFade) < 0.01
+        && Math.abs(current.topFade - nextState.topFade) < 0.01
+          ? current
+          : nextState
+      ));
+    };
+
+    const scheduleUpdate = () => {
+      if (frameId !== null) return;
+      frameId = window.requestAnimationFrame(updateEdgeState);
+    };
+
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleUpdate);
+    resizeObserver?.observe(element);
+    if (element.firstElementChild) resizeObserver?.observe(element.firstElementChild);
+
+    const mutationObserver = typeof MutationObserver === "undefined" ? null : new MutationObserver(scheduleUpdate);
+    mutationObserver?.observe(element, { characterData: true, childList: true, subtree: true });
+
+    scheduleUpdate();
+    element.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+
+    return () => {
+      if (frameId !== null) window.cancelAnimationFrame(frameId);
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+      element.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+    };
+  }, [elementRef, fadeDistance, threshold, ...dependencies]);
+
+  return edgeState;
 }
 
 export function useScrollableDescendantClasses<T extends HTMLElement>(
@@ -144,4 +232,8 @@ export function useScrollableDescendantClasses<T extends HTMLElement>(
       });
     };
   }, [className, rootRef, selector, threshold, ...dependencies]);
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }

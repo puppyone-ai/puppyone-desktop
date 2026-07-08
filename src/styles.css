@@ -18,6 +18,7 @@
 @import "./features/data-workspace/data-shell.css";
 @import "./styles/onboarding.css";
 @import "./features/data-workspace/browser.css";
+@import "./features/puppyflow/puppyflow.css";
 @import "./ai-edits/ai-edits.css";
 @import "./features/changes/changes.css";
 @import "./styles/utility-screens.css";

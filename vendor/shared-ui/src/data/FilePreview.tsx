@@ -18,7 +18,7 @@ export type FilePreviewProps = {
   showHeader?: boolean;
   emptySlot?: ReactNode;
   actionSlot?: ReactNode | ((node: DataNode) => ReactNode);
-  renderBody?: (node: DataNode) => ReactNode;
+  renderBody?: (node: DataNode, context: FilePreviewBodyContext) => ReactNode;
   onSaveContent?: (content: string) => Promise<void>;
   hideSourceView?: boolean;
   fileIconTheme?: FileIconThemeId;
@@ -27,6 +27,16 @@ export type FilePreviewProps = {
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
+};
+
+export type FilePreviewBodyContext = {
+  fileContent: FileContent | null;
+  fileUrl: string | null;
+  fileUrlLoading: boolean;
+  fileUrlError: string | null;
+  loading: boolean;
+  error: string | null;
+  onSaveContent?: (content: string) => Promise<void>;
 };
 
 export function FilePreview({
@@ -63,6 +73,16 @@ export function FilePreview({
 
   const actions = typeof actionSlot === "function" ? actionSlot(node) : actionSlot;
   const deferFallbackContent = loading && !fileContent;
+  const bodyContext: FilePreviewBodyContext = {
+    fileContent: fileContent ?? null,
+    fileUrl,
+    fileUrlLoading,
+    fileUrlError,
+    loading,
+    error,
+    onSaveContent,
+  };
+  const customBody = renderBody?.(node, bodyContext);
 
   return (
     <div className={`file-preview-shell ${showHeader ? "" : "without-header"}`}>
@@ -92,7 +112,7 @@ export function FilePreview({
       )}
 
       <div className="file-preview-body">
-        {renderBody ? renderBody(node) : (
+        {customBody !== undefined ? customBody : (
           <EditorPreviewBoundary key={node.path}>
             <EditorHost
               node={node}

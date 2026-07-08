@@ -6,9 +6,9 @@ export type GitDisplayMode = "simple" | "professional";
 export type SidebarNavigationLayout =
   | "bottom-horizontal"
   | "top-horizontal"
-  | "top-vertical";
+  | "left-vertical";
 
-export type SidebarNavigationPlacement = "top" | "bottom";
+export type SidebarNavigationPlacement = "top" | "left" | "bottom";
 export type SidebarNavigationOrientation = "horizontal" | "vertical";
 export type FilesVisibilitySettings = {
   showHiddenFiles: boolean;
@@ -39,6 +39,10 @@ export type TitlebarActionsSettings = {
   enabled: Record<TitlebarActionId, boolean>;
   order: TitlebarActionId[];
 };
+export type ExperimentalSettings = {
+  enablePuppyoneAppFiles: boolean;
+  enablePuppyFlowFiles: boolean;
+};
 
 export const THEME_STORAGE_KEY = "puppyone.desktop.theme";
 export const LEGACY_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.themePreset";
@@ -52,6 +56,7 @@ export const RIGHT_SIDEBAR_TOOLS_STORAGE_KEY = "puppyone.desktop.rightSidebarToo
 export const TITLEBAR_ACTIONS_STORAGE_KEY = "puppyone.desktop.titlebarActions";
 export const AI_EDIT_ASSIST_STORAGE_KEY = "puppyone.desktop.aiEditAssist";
 export const GIT_DISPLAY_MODE_STORAGE_KEY = "puppyone.desktop.gitDisplayMode";
+export const EXPERIMENTAL_SETTINGS_STORAGE_KEY = "puppyone.desktop.experimental";
 
 export const DEFAULT_THEME_MODE: ThemeMode = "system";
 export const DEFAULT_LIGHT_THEME_PRESET: LightThemePreset = "neutral";
@@ -89,15 +94,39 @@ export const DEFAULT_TITLEBAR_ACTIONS_SETTINGS: TitlebarActionsSettings = {
   order: [...TITLEBAR_ACTION_IDS],
 };
 export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
+export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
+  enablePuppyoneAppFiles: false,
+  enablePuppyFlowFiles: false,
+};
 
 export const SIDEBAR_NAVIGATION_LAYOUT_OPTIONS = [
-  { value: "bottom-horizontal", label: "Bottom", placement: "bottom" },
-  { value: "top-horizontal", label: "Top", placement: "top" },
-  { value: "top-vertical", label: "Top Vertical", placement: "top" },
+  {
+    value: "bottom-horizontal",
+    label: "Bottom",
+    description: "Horizontal controls at the bottom of the sidebar.",
+    placement: "bottom",
+    orientation: "horizontal",
+  },
+  {
+    value: "top-horizontal",
+    label: "Top",
+    description: "Horizontal controls above the file tree.",
+    placement: "top",
+    orientation: "horizontal",
+  },
+  {
+    value: "left-vertical",
+    label: "Left",
+    description: "Vertical controls on the left edge of the sidebar.",
+    placement: "left",
+    orientation: "vertical",
+  },
 ] as const satisfies ReadonlyArray<{
   value: SidebarNavigationLayout;
   label: string;
+  description: string;
   placement: SidebarNavigationPlacement;
+  orientation: SidebarNavigationOrientation;
 }>;
 
 export const LIGHT_THEME_PRESETS = [
@@ -131,13 +160,13 @@ export const DARK_THEME_PRESETS = [
     id: "default",
     label: "Default",
     description: "The current Puppyone dark palette.",
-    swatches: ["#0e0e0e", "#161616", "#60a5fa"],
+    swatches: ["#11100f", "#1d1b1a", "#60a5fa"],
   },
   {
     id: "graphite",
     label: "Graphite",
     description: "A cooler dark workspace palette.",
-    swatches: ["#101114", "#1d1f24", "#8b8cff"],
+    swatches: ["#101114", "#1b1c1f", "#8b8cff"],
   },
 ] as const satisfies ReadonlyArray<{
   id: DarkThemePreset;
@@ -173,22 +202,22 @@ export function parseGitDisplayMode(value: string | null | undefined): GitDispla
 export function parseSidebarNavigationLayout(value: string | null | undefined): SidebarNavigationLayout {
   if (value === "bottom") return "bottom-horizontal";
   if (value === "top") return "top-horizontal";
-  if (value === "vertical" || value === "bottom-vertical") return "top-vertical";
+  if (value === "vertical" || value === "bottom-vertical" || value === "top-vertical") return "left-vertical";
   return isSidebarNavigationLayout(value) ? value : DEFAULT_SIDEBAR_NAVIGATION_LAYOUT;
 }
 
 export function isSidebarNavigationLayout(value: string | null | undefined): value is SidebarNavigationLayout {
   return value === "bottom-horizontal"
     || value === "top-horizontal"
-    || value === "top-vertical";
+    || value === "left-vertical";
 }
 
 export function getSidebarNavigationPlacement(layout: SidebarNavigationLayout): SidebarNavigationPlacement {
-  return layout.startsWith("top") ? "top" : "bottom";
+  return SIDEBAR_NAVIGATION_LAYOUT_OPTIONS.find((option) => option.value === layout)?.placement ?? "bottom";
 }
 
 export function getSidebarNavigationOrientation(layout: SidebarNavigationLayout): SidebarNavigationOrientation {
-  return layout.endsWith("vertical") ? "vertical" : "horizontal";
+  return SIDEBAR_NAVIGATION_LAYOUT_OPTIONS.find((option) => option.value === layout)?.orientation ?? "horizontal";
 }
 
 export function parseFilesVisibilitySettings(value: string | null | undefined): FilesVisibilitySettings {
@@ -268,6 +297,22 @@ export function parseAiEditAssistEnabled(value: string | null | undefined): bool
   if (value === "true") return true;
   if (value === "false") return false;
   return DEFAULT_AI_EDIT_ASSIST_ENABLED;
+}
+
+export function parseExperimentalSettings(value: string | null | undefined): ExperimentalSettings {
+  if (!value) return DEFAULT_EXPERIMENTAL_SETTINGS;
+
+  try {
+    const parsed = JSON.parse(value) as Partial<ExperimentalSettings> | null;
+    if (!parsed || typeof parsed !== "object") return DEFAULT_EXPERIMENTAL_SETTINGS;
+
+    return {
+      enablePuppyoneAppFiles: parsed.enablePuppyoneAppFiles === true,
+      enablePuppyFlowFiles: parsed.enablePuppyFlowFiles === true,
+    };
+  } catch {
+    return DEFAULT_EXPERIMENTAL_SETTINGS;
+  }
 }
 
 function normalizeExternalAppOverrides(value: unknown): ExternalAppOverride[] {

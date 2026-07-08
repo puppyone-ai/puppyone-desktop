@@ -66,8 +66,13 @@ export function DesktopSidebarFooterNavigation({
 }) {
   const localItems = getDesktopLocalSidebarNavItems(gitEnabled);
   const accessItems = getDesktopAccessSidebarNavItems(accessEnabled);
+
   return (
-    <div className="desktop-sidebar-footer-bar actions-only horizontal">
+    <div
+      className="desktop-sidebar-footer-bar desktop-sidebar-navigation-surface actions-only horizontal"
+      data-placement="bottom"
+      data-orientation="horizontal"
+    >
       <div className="desktop-sidebar-footer-actions desktop-sidebar-footer-actions-left">
         <DesktopSidebarIconNavigation
           activeView={activeView}
@@ -104,13 +109,15 @@ export function DesktopSidebarFooterNavigation({
 
 function DesktopWorkspaceSurfaceActionButton({
   action,
+  buttonClassName = "desktop-sidebar-footer-button",
 }: {
   action: DesktopWorkspaceSurfaceAction;
+  buttonClassName?: string;
 }) {
   const config = getDesktopWorkspaceSurfaceActionConfig(action.kind);
   return (
     <button
-      className="desktop-sidebar-footer-button"
+      className={buttonClassName}
       type="button"
       title={config.title}
       aria-label={config.title}
@@ -173,7 +180,11 @@ export function DesktopSidebarTopNavigation({
   const localItems = getDesktopLocalSidebarNavItems(gitEnabled);
   const accessItems = getDesktopAccessSidebarNavItems(accessEnabled);
   return (
-    <div className={`desktop-sidebar-top-navigation ${orientation}`}>
+    <div
+      className={`desktop-sidebar-top-navigation desktop-sidebar-navigation-surface ${orientation}`}
+      data-placement="top"
+      data-orientation={orientation}
+    >
       <div className="desktop-sidebar-top-navigation-list" aria-label="Workspace navigation">
         <div className="desktop-sidebar-top-navigation-group desktop-sidebar-top-navigation-local">
           <DesktopSidebarButtonNavigation
@@ -204,6 +215,69 @@ export function DesktopSidebarTopNavigation({
             />
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+export function DesktopSidebarRailNavigation({
+  activeView,
+  accessEnabled = false,
+  gitEnabled = true,
+  gitIncomingCount,
+  gitOperationLoading,
+  gitStatus,
+  workspaceChangeCount,
+  surfaceAction,
+  onNavigate,
+  onOpenSettings,
+}: {
+  activeView: DesktopView;
+  accessEnabled?: boolean;
+  gitEnabled?: boolean;
+  gitIncomingCount: number;
+  gitOperationLoading: string | null;
+  gitStatus: GitStatusSnapshot | null;
+  workspaceChangeCount: number;
+  surfaceAction?: DesktopWorkspaceSurfaceAction | null;
+  onNavigate: (view: DesktopView) => void;
+  onOpenSettings: () => void;
+}) {
+  const localItems = getDesktopLocalSidebarNavItems(gitEnabled);
+  const accessItems = getDesktopAccessSidebarNavItems(accessEnabled);
+  return (
+    <div className="desktop-sidebar-rail-navigation" aria-label="Workspace navigation">
+      <div className="desktop-sidebar-rail-actions">
+        <DesktopSidebarIconNavigation
+          activeView={activeView}
+          buttonClassName="desktop-sidebar-rail-button"
+          items={localItems}
+          gitIncomingCount={gitIncomingCount}
+          gitOperationLoading={gitOperationLoading}
+          gitStatus={gitStatus}
+          workspaceChangeCount={workspaceChangeCount}
+          onNavigate={onNavigate}
+        />
+        {accessItems.length > 0 && (
+          <DesktopSidebarIconNavigation
+            activeView={activeView}
+            buttonClassName="desktop-sidebar-rail-button"
+            items={accessItems}
+            gitIncomingCount={gitIncomingCount}
+            gitOperationLoading={gitOperationLoading}
+            gitStatus={gitStatus}
+            workspaceChangeCount={workspaceChangeCount}
+            onNavigate={onNavigate}
+          />
+        )}
+      </div>
+      <div className="desktop-sidebar-rail-actions desktop-sidebar-rail-actions-end">
+        {surfaceAction && <DesktopWorkspaceSurfaceActionButton action={surfaceAction} buttonClassName="desktop-sidebar-rail-button" />}
+        <DesktopSidebarSettingsButton
+          activeView={activeView}
+          buttonClassName="desktop-sidebar-rail-button"
+          onOpenSettings={onOpenSettings}
+        />
       </div>
     </div>
   );
@@ -282,6 +356,7 @@ function DesktopSidebarButtonNavigation({
 
 function DesktopSidebarIconNavigation({
   activeView,
+  buttonClassName = "desktop-sidebar-footer-button",
   items,
   gitIncomingCount,
   gitOperationLoading,
@@ -290,6 +365,7 @@ function DesktopSidebarIconNavigation({
   onNavigate,
 }: {
   activeView: DesktopView;
+  buttonClassName?: string;
   items: typeof DESKTOP_NAV_ITEMS;
   gitIncomingCount: number;
   gitOperationLoading: string | null;
@@ -307,7 +383,7 @@ function DesktopSidebarIconNavigation({
           <button
             key={item.view}
             className={[
-              "desktop-sidebar-footer-button",
+              buttonClassName,
               activeView === item.view ? "active" : "",
             ].filter(Boolean).join(" ")}
             type="button"

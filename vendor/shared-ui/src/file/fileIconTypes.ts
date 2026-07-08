@@ -1,6 +1,7 @@
 export type FileVisualKind =
   | "folder"
   | "app"
+  | "workflow"
   | "json"
   | "markdown"
   | "html"
@@ -27,6 +28,7 @@ export type FileIconThemeMetadata = {
 const KIND_ACCENT: Record<FileVisualKind, string> = {
   folder: "var(--po-file-accent-default)",
   app: "var(--po-accent)",
+  workflow: "var(--po-accent)",
   json: "var(--po-file-accent-json)",
   markdown: "var(--po-file-accent-markdown)",
   html: "var(--po-file-accent-html)",

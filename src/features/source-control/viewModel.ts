@@ -463,8 +463,8 @@ export function getCommittedPrimaryAction(
   if (remote.state === "diverged") {
     return {
       label: state.pushLabel,
-      title: "Resolve incoming remote commits before pushing.",
-      disabled: true,
+      title: state.pushTitle,
+      disabled: false,
       kind: "push",
       loadingKey: "push",
       loadingLabel: "Pushing...",

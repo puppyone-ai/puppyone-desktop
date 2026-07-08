@@ -1,6 +1,25 @@
 {
   "formats": [
     {
+      "id": "puppyflow",
+      "label": "PuppyFlow",
+      "extensions": [
+        ".puppyflow",
+        ".puppyflow.json"
+      ],
+      "mimeTypes": [
+        "application/vnd.puppyone.puppyflow+json"
+      ],
+      "category": "data",
+      "defaultViewer": "monaco-code",
+      "availableViewers": [
+        "monaco-code"
+      ],
+      "editable": true,
+      "ingestStrategy": "parse-structured",
+      "monacoLanguage": "json"
+    },
+    {
       "id": "markdown",
       "label": "Markdown",
       "extensions": [

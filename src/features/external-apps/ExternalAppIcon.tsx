@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { PulseGridLoader } from "@puppyone/shared-ui";
 import { ExternalLink } from "lucide-react";
+import { Dots } from "../../components/loading";
 
 type ExternalAppIconProps = {
   appName?: string | null;
@@ -112,11 +112,11 @@ function ExternalAppLoadingIcon({
       ].filter(Boolean).join(" ")}
       aria-hidden="true"
     >
-      <PulseGridLoader
+      <Dots
         className={loaderClassName}
-        size="sm"
+        size="xs"
         tone="neutral"
-        ariaHidden
+        ariaLabel="Loading"
       />
     </span>
   );

@@ -3,6 +3,7 @@ import { EditorView } from "@codemirror/view";
 import { findWikiLinkTokens } from "./links/wikiLinkModel";
 import { findMarkdownLinkTokens, isExternalMarkdownHref } from "./links/markdownLinkModel";
 import { isSafeHref } from "./rendering/markdownHtmlPolicy";
+import { getInlineRevealElement, type MarkdownElement } from "./syntax/markdownElements";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
 
 export const markdownHtmlTrustModeFacet = Facet.define<MarkdownHtmlTrustMode, MarkdownHtmlTrustMode>({
@@ -40,8 +41,38 @@ export function markdownLivePreviewContextExtension(
     markdownLinkGraphFacet.of(markdownLinkGraph),
     markdownDocumentPathFacet.of(documentPath),
     markdownAssetUrlResolverFacet.of(markdownAssetUrlResolver),
+    markdownLinkModifierClassHandler,
     markdownLinkOpenHandler,
   ];
+}
+
+const MARKDOWN_LINK_OPEN_MODIFIER_CLASS = "cm-md-open-modifier-down";
+
+const markdownLinkModifierClassHandler = EditorView.domEventHandlers({
+  keydown(event, view) {
+    setMarkdownLinkModifierClass(view, event.metaKey || event.ctrlKey);
+    return false;
+  },
+  keyup(event, view) {
+    setMarkdownLinkModifierClass(view, event.metaKey || event.ctrlKey);
+    return false;
+  },
+  mousemove(event, view) {
+    setMarkdownLinkModifierClass(view, event.metaKey || event.ctrlKey);
+    return false;
+  },
+  mouseleave(_event, view) {
+    setMarkdownLinkModifierClass(view, false);
+    return false;
+  },
+  blur(_event, view) {
+    setMarkdownLinkModifierClass(view, false);
+    return false;
+  },
+});
+
+function setMarkdownLinkModifierClass(view: EditorView, active: boolean) {
+  view.dom.classList.toggle(MARKDOWN_LINK_OPEN_MODIFIER_CLASS, active);
 }
 
 const markdownLinkOpenHandler = EditorView.domEventHandlers({
@@ -65,7 +96,9 @@ const markdownLinkOpenHandler = EditorView.domEventHandlers({
     return openMarkdownLinkFromEvent(event, view);
   },
   keydown(event, view) {
-    if (event.key !== "Enter" || (!event.metaKey && !event.ctrlKey)) return false;
+    if (event.key !== "Enter" || !isMarkdownLinkOpenGesture(event, view)) return false;
+    if (openMarkdownLinkAtSelection(event, view)) return true;
+
     const linkElement = getMarkdownLinkElementFromEvent(event, view);
     if (!linkElement) return false;
     return openMarkdownLinkFromEvent(event, view);
@@ -76,7 +109,7 @@ let suppressNextMouseLinkClickUntil = 0;
 
 function openMarkdownLinkFromEvent(event: Event, view: EditorView): boolean {
   if (event.defaultPrevented) return false;
-  if (!isMarkdownLinkOpenGesture(event)) return false;
+  if (!isMarkdownLinkOpenGesture(event, view)) return false;
   const linkElement = getMarkdownLinkElementFromEvent(event, view);
   if (!linkElement) return false;
 
@@ -88,7 +121,8 @@ function openMarkdownLinkFromEvent(event: Event, view: EditorView): boolean {
   return true;
 }
 
-function isMarkdownLinkOpenGesture(event: Event): boolean {
+function isMarkdownLinkOpenGesture(event: Event, view: EditorView): boolean {
+  if (view.state.readOnly) return true;
   if (event instanceof MouseEvent) return event.metaKey || event.ctrlKey;
   if (event instanceof KeyboardEvent) return event.metaKey || event.ctrlKey;
   return false;
@@ -106,28 +140,67 @@ function getMarkdownLinkElementFromEvent(event: Event, view: EditorView): HTMLEl
 }
 
 function openMarkdownLinkElement(linkElement: HTMLElement, view: EditorView): boolean {
-  const linkGraph = view.state.facet(markdownLinkGraphFacet);
-  const sourcePath = view.state.facet(markdownDocumentPathFacet);
   const wikiTarget = linkElement.dataset.wikiTarget;
-  if (wikiTarget) {
-    if (!linkGraph?.openWikiLink) return false;
-
-    const resolvedTarget = linkGraph.resolveWikiLink(sourcePath, wikiTarget);
-    if (!resolvedTarget.exists && (!resolvedTarget.candidatePaths || resolvedTarget.candidatePaths.length === 0)) {
-      return false;
-    }
-
-    linkGraph.openWikiLink(resolvedTarget, sourcePath);
-    return true;
-  }
+  if (wikiTarget) return openWikiLinkTarget(wikiTarget, view);
 
   const href = linkElement.dataset.mdHref;
   if (!href) return false;
+  return openMarkdownHref(href, view);
+}
 
+function openMarkdownLinkAtSelection(event: Event, view: EditorView): boolean {
+  const { state } = view;
+  if (state.selection.ranges.length !== 1) return false;
+
+  const selection = state.selection.main;
+  if (!selection.empty) return false;
+
+  const element = getInlineRevealElement(state, selection.from);
+  if (!element || (element.kind !== "wikiLink" && element.kind !== "link")) return false;
+
+  const opened = openMarkdownLinkElementFromSource(element, view);
+  if (!opened) return false;
+
+  event.preventDefault();
+  event.stopPropagation();
+  return true;
+}
+
+function openMarkdownLinkElementFromSource(element: MarkdownElement, view: EditorView): boolean {
+  const source = view.state.sliceDoc(element.from, element.to);
+  if (element.kind === "wikiLink") {
+    const token = findWikiLinkTokenAt(source, 0, source.length);
+    return token ? openWikiLinkTarget(token.target, view) : false;
+  }
+
+  const token = findMarkdownLinkTokenAt(source, 0, source.length);
+  if (token) return openMarkdownHref(token.href, view);
+
+  const href = element.contentRange ? view.state.sliceDoc(element.contentRange.from, element.contentRange.to).trim() : "";
+  return href ? openMarkdownHref(href, view) : false;
+}
+
+function openWikiLinkTarget(wikiTarget: string, view: EditorView): boolean {
+  const linkGraph = view.state.facet(markdownLinkGraphFacet);
+  const sourcePath = view.state.facet(markdownDocumentPathFacet);
+  if (!linkGraph?.openWikiLink) return false;
+
+  const resolvedTarget = linkGraph.resolveWikiLink(sourcePath, wikiTarget);
+  if (!resolvedTarget.exists && (!resolvedTarget.candidatePaths || resolvedTarget.candidatePaths.length === 0)) {
+    return false;
+  }
+
+  linkGraph.openWikiLink(resolvedTarget, sourcePath);
+  return true;
+}
+
+function openMarkdownHref(href: string, view: EditorView): boolean {
   if (isExternalMarkdownHref(href) && isSafeHref(href)) {
     return openExternalMarkdownHref(href, view);
   }
 
+  const linkGraph = view.state.facet(markdownLinkGraphFacet);
+  const sourcePath = view.state.facet(markdownDocumentPathFacet);
   const resolvedTarget = linkGraph?.resolveMarkdownLink(sourcePath, href) ?? null;
   if (!resolvedTarget || !linkGraph?.openWikiLink) return false;
   if (!resolvedTarget.exists && (!resolvedTarget.candidatePaths || resolvedTarget.candidatePaths.length === 0)) {

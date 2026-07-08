@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent as ReactDragEvent } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type DragEvent as ReactDragEvent,
+} from "react";
 import { EXPLORER_TREE_NODE_DRAG_TYPE, type Workspace } from "@puppyone/shared-ui";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal, type ITheme } from "@xterm/xterm";
@@ -14,7 +22,14 @@ type TerminalSize = {
   rows: number;
 };
 
-export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProps) {
+export type RightTerminalPanelHandle = {
+  clear: () => void;
+};
+
+export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerminalPanelProps>(function RightTerminalPanel(
+  { workspace, active },
+  ref,
+) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -25,6 +40,17 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
   const fitFrameRef = useRef<number | null>(null);
   const activeRef = useRef(active);
   const [hasStarted, setHasStarted] = useState(active);
+
+  const handleClearTerminal = useCallback(() => {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
+    terminal.clear();
+    terminal.focus();
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    clear: handleClearTerminal,
+  }), [handleClearTerminal]);
 
   const handleTerminalDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (!hasTerminalDroppablePaths(event.dataTransfer)) return;
@@ -232,18 +258,28 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
 
     const applyTheme = () => {
       if (!containerRef.current || !terminalRef.current) return;
-      terminalRef.current.options.theme = readTerminalTheme(containerRef.current);
+      applyTerminalTheme(terminalRef.current, containerRef.current);
     };
     const shell = containerRef.current?.closest(".app-shell");
     applyTheme();
 
     if (!shell) return undefined;
-    const observer = new MutationObserver(applyTheme);
-    observer.observe(shell, {
+    const shellObserver = new MutationObserver(applyTheme);
+    shellObserver.observe(shell, {
       attributes: true,
-      attributeFilter: ["class", "data-theme-mode"],
+      attributeFilter: ["class", "data-theme-mode", "data-light-theme-preset", "data-dark-theme-preset"],
     });
-    return () => observer.disconnect();
+    const styleObserver = new MutationObserver(applyTheme);
+    styleObserver.observe(document.head, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      attributeFilter: ["href", "style"],
+    });
+    return () => {
+      shellObserver.disconnect();
+      styleObserver.disconnect();
+    };
   }, [hasStarted]);
 
   useEffect(() => {
@@ -267,7 +303,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
       </div>
     </section>
   );
-}
+});
 
 function hasExplorerNodePath(dataTransfer: DataTransfer) {
   return Array.from(dataTransfer.types).includes(EXPLORER_TREE_NODE_DRAG_TYPE);
@@ -323,7 +359,7 @@ function shellQuotePath(pathValue: string) {
 
 function readTerminalTheme(element: HTMLElement): ITheme {
   return {
-    background: cssColor(element, "--po-terminal-bg", cssColor(element, "--po-editor-bg", "#fbf6ed")),
+    background: cssColor(element, "--po-surface-terminal", cssColor(element, "--po-terminal-bg", "#fbf6ed")),
     foreground: cssColor(element, "--po-terminal-fg", cssColor(element, "--po-text", "#2f2a23")),
     cursor: cssColor(element, "--po-terminal-cursor", cssColor(element, "--po-text", "#2f2a23")),
     selectionBackground: cssColor(element, "--po-terminal-selection", cssColor(element, "--po-selected", "rgba(73, 55, 35, 0.17)")),
@@ -348,6 +384,11 @@ function readTerminalTheme(element: HTMLElement): ITheme {
     brightCyan: cssColor(element, "--po-terminal-bright-cyan", cssColor(element, "--po-info", "#0284c7")),
     brightWhite: cssColor(element, "--po-terminal-bright-white", cssColor(element, "--po-text", "#2f2a23")),
   };
+}
+
+function applyTerminalTheme(terminal: Terminal, element: HTMLElement) {
+  terminal.options.theme = readTerminalTheme(element);
+  terminal.refresh(0, Math.max(0, terminal.rows - 1));
 }
 
 function cssColor(element: HTMLElement, name: string, fallback: string) {

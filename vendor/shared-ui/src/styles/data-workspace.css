@@ -36,6 +36,29 @@
   pointer-events: none;
 }
 
+.data-explorer-layout {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.data-explorer-rail {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.data-explorer-pane {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .data-explorer-view-stack,
 .data-explorer-view-frame,
 .data-main-view-frame {
@@ -187,6 +210,25 @@ body.data-sidebar-resizing .data-preview-accessory {
   --tree-root-top-gap: var(--po-tree-root-top-gap, 5px);
   --tree-no-root-top-gap: var(--po-tree-no-root-top-gap, 12px);
   --tree-list-bottom-gap: var(--po-tree-list-bottom-gap, 6px);
+  --tree-row-hover-bg: var(--po-tree-row-hover-bg, color-mix(in srgb, var(--po-hover) 86%, transparent));
+  --tree-row-selected-bg: var(
+    --po-tree-row-selected-bg,
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--po-selected) 96%, transparent) 0%,
+      color-mix(in srgb, var(--po-selected) 88%, transparent) calc(100% - 36px),
+      color-mix(in srgb, var(--po-selected) 62%, transparent) 100%
+    )
+  );
+  --tree-row-selected-muted-bg: var(
+    --po-tree-row-selected-muted-bg,
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--po-selected) 70%, transparent) 0%,
+      color-mix(in srgb, var(--po-selected) 60%, transparent) calc(100% - 36px),
+      color-mix(in srgb, var(--po-selected) 38%, transparent) 100%
+    )
+  );
   --tree-scrollbar-width: var(--po-tree-scrollbar-width, var(--po-scrollbar-size, 6px));
   --tree-scrollbar-radius: var(--po-scrollbar-radius, 3px);
   --tree-scrollbar-transition: var(--po-scrollbar-transition, 0.16s ease);
@@ -292,7 +334,6 @@ body.data-sidebar-resizing .data-preview-accessory {
   text-align: left;
   user-select: none;
   outline: none;
-  transition: background 0.12s ease, color 0.12s ease, opacity 0.18s ease, box-shadow 0.12s ease;
   cursor: pointer;
 }
 
@@ -310,12 +351,12 @@ body.data-sidebar-resizing .data-preview-accessory {
 }
 
 .tree-row.root.root-command:hover {
-  background: var(--po-hover);
+  background: var(--tree-row-hover-bg);
   color: var(--po-text);
 }
 
 .tree-row:hover {
-  background: var(--po-hover);
+  background: var(--tree-row-hover-bg);
   color: var(--po-text);
 }
 
@@ -324,16 +365,16 @@ body.data-sidebar-resizing .data-preview-accessory {
 }
 
 .tree-row.selected {
-  background: var(--po-selected);
+  background: var(--tree-row-selected-bg);
   color: var(--po-text);
 }
 
 .tree-row.selected:not(.active) {
-  background: color-mix(in srgb, var(--po-selected) 74%, transparent);
+  background: var(--tree-row-selected-muted-bg);
 }
 
 .tree-row.active {
-  background: var(--po-selected);
+  background: var(--tree-row-selected-bg);
   color: var(--po-text);
 }
 

@@ -141,6 +141,8 @@ const mimeTypeByExtension = new Map(Object.entries({
   png: "image/png",
   ppt: "application/vnd.ms-powerpoint",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  puppyflow: "application/vnd.puppyone.puppyflow+json",
+  "puppyflow.json": "application/vnd.puppyone.puppyflow+json",
   psd: "image/vnd.adobe.photoshop",
   qt: "video/quicktime",
   rar: "application/vnd.rar",
@@ -1427,6 +1429,7 @@ function getMimeTypeOverride(name) {
 }
 
 function getSemanticKindForFormat(format) {
+  if (format.id === "puppyflow") return "workflow";
   if (format.id === "json" || format.id === "jsonl") return "json";
 
   switch (format.defaultViewer) {

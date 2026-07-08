@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed>
+  <title>English XML Preview</title>
+  <entry id="audio">
+    <name>English Tone Preview</name>
+    <format>MP3</format>
+    <description>Short generated audio sample.</description>
+  </entry>
+  <entry id="image">
+    <name>Preview Image</name>
+    <format>PNG</format>
+    <description>Generated image for thumbnail rendering.</description>
+  </entry>
+</feed>

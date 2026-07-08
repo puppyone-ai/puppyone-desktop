@@ -2,10 +2,14 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import {
+  getBlockMarkerAtVisibleStart,
+  getHiddenBlockMarkerCaretNormalization,
   getInlineRevealElement,
   getMarkdownElements,
+  getMarkdownElementsInRange,
 } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownElements";
 import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownParserExtensions";
+import { findMarkdownLinkTokens } from "../vendor/shared-ui/src/editor/markdown/links/markdownLinkModel";
 
 function createMarkdownState(source: string) {
   return EditorState.create({
@@ -75,5 +79,62 @@ describe("markdown live preview element model", () => {
       to: 17,
     });
     expect(getInlineRevealElement(state, 4)).toBeNull();
+  });
+
+  it("can query elements for the current line without scanning unrelated lines", () => {
+    const state = createMarkdownState("# Heading\nA **bold** word\n[[Target]]");
+    const line = state.doc.line(2);
+    const elements = getMarkdownElementsInRange(state, line.from, line.to);
+
+    expect(elements.map((element) => element.kind)).toContain("strong");
+    expect(elements.some((element) => element.kind === "heading")).toBe(false);
+    expect(elements.some((element) => element.kind === "wikiLink")).toBe(false);
+  });
+
+  it("normalizes hidden block marker cursor positions to the visible start", () => {
+    const state = createMarkdownState("# Heading");
+
+    expect(getHiddenBlockMarkerCaretNormalization(state, 0)).toBe(2);
+    expect(getHiddenBlockMarkerCaretNormalization(state, 1)).toBe(2);
+    expect(getHiddenBlockMarkerCaretNormalization(state, 2)).toBeNull();
+    expect(getBlockMarkerAtVisibleStart(state, 2)).toEqual({ from: 0, to: 2 });
+  });
+
+  it("normalizes escaped characters and autolinks", () => {
+    const state = createMarkdownState("\\*escaped\\* <https://example.com>");
+    const elements = getMarkdownElements(state);
+
+    expect(elements.filter((element) => element.kind === "escape").map((element) => element.markerRanges)).toEqual([
+      [{ from: 0, to: 1 }],
+      [{ from: 9, to: 10 }],
+    ]);
+    expect(elements.find((element) => element.kind === "link")).toMatchObject({
+      from: 12,
+      to: 33,
+      markerRanges: [
+        { from: 12, to: 13 },
+        { from: 32, to: 33 },
+      ],
+      contentRange: { from: 13, to: 32 },
+    });
+  });
+
+  it("keeps markdown link titles out of the href", () => {
+    expect(findMarkdownLinkTokens("[label](note.md \"Title\")")).toMatchObject([
+      {
+        from: 0,
+        to: 24,
+        label: "label",
+        href: "note.md",
+      },
+    ]);
+  });
+
+  it("uses the full nested blockquote prefix for visible start while deleting one level", () => {
+    const state = createMarkdownState(">> quote");
+
+    expect(getHiddenBlockMarkerCaretNormalization(state, 0)).toBe(3);
+    expect(getHiddenBlockMarkerCaretNormalization(state, 2)).toBe(3);
+    expect(getBlockMarkerAtVisibleStart(state, 3)).toEqual({ from: 0, to: 1 });
   });
 });

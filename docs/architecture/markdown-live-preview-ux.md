@@ -23,8 +23,8 @@ disk stays plain Markdown.
 
 The interaction model this spec rejects is **line-level source reveal**:
 flipping the caret line (or any line a selection touches) into raw source.
-Editors built that way (Obsidian's live preview, and this editor before this
-spec) all exhibit the same failures:
+Editors built that way (several mainstream live previews, and this editor
+before this spec) all exhibit the same failures:
 
 - Clicking into a heading just to place the caret rewraps and restyles the
   whole line (font size changes, hashes appear, text shifts horizontally).
@@ -93,10 +93,10 @@ hidden and the block style applies.
 - #285 / #1317: the reveal-on-focus preference loses the rendered style for
   headings, unlike bold/italic — inconsistent WYSIWYG.
 
-Obsidian solves #98 by revealing markers for anything the selection touches
-(active line included), at the cost of exactly the line-flipping churn this
-spec removes. The spec below takes Typora's model and patches these edges
-instead.
+Line-reveal live previews solve #98 by revealing markers for anything the
+selection touches (active line included), at the cost of exactly the
+line-flipping churn this spec removes. The spec below takes Typora's model
+and patches these edges instead.
 
 ## 3. Core principles
 
@@ -210,13 +210,94 @@ the hidden marker prefix — the leftmost place the caret can be on that line.
 - Backspace in an empty code block removes the whole block. Escape or caret
   exit commits edits back to the fenced source.
 
+### Mermaid diagram (```` ```mermaid ````)
+
+A fenced code block whose info string is `mermaid` renders as a diagram
+instead of a code editing panel.
+
+- Composing: the opening fence line stays raw like any fence. Return
+  commits and renders the diagram.
+- Rendered: the diagram replaces the whole block and is atomic — caret
+  positions exist before and after it, never inside the source.
+- Editing: clicking the diagram (or its Edit affordance) opens the in-place
+  editing surface — Mermaid source on top, live diagram preview below
+  (the common split-view pattern; Typora's focused fence). The preview
+  re-renders as the source changes, debounced. Arrow-key entry/exit
+  follows fenced code block rules; Escape or caret exit commits back to
+  the fence and collapses to diagram-only.
+- Errors: while editing, invalid intermediate syntax keeps the **last
+  successful diagram** plus an inline error message — the diagram never
+  flashes or gets replaced by an error graphic mid-typing. A block that has
+  never rendered successfully shows the error message with the source.
+- Read-only documents render the diagram with no edit affordance.
+- The diagram follows the app theme (light/dark) and re-renders on theme
+  change.
+
 ### Table (`| a | b |`)
 
-- Composing: the header row stays raw; Return commits and builds the table.
-  The delimiter row is generated automatically when missing.
-- Cells edit in place; Tab / Shift-Tab move between cells, Return commits a
-  cell. Pipe source is never shown in live preview; whole-table source
-  editing belongs to a source mode.
+The table renders as a grid at all times; pipe source is never shown in
+live preview (whole-table source editing belongs to a source mode). Every
+structural operation is a rewrite of the plain pipe-table source and undoes
+as a single step.
+
+Composing: the header row stays raw; Return commits and builds the table.
+The delimiter row is generated automatically when missing.
+
+Cell editing:
+
+- Cells edit in place; leaving a cell commits it, Escape reverts it.
+- Tab / Shift-Tab move to the next / previous cell. Tab in the **last**
+  cell appends a new empty row and focuses its first cell (the
+  Typora convention) instead of exiting the table.
+- Return commits the cell and moves to the cell below; on the last row it
+  exits below the table.
+- Arrow keys at the grid's boundary rows exit into the surrounding
+  document.
+
+Structure editing — four entry points converge on one operation set
+(insert row above/below, insert column left/right, move row up/down, move
+column left/right, duplicate row, delete row / column / table, set column
+alignment; sort-by-column is an enhancement):
+
+- **Keyboard**: Tab at the end appends a row; ⌘Enter inserts a row below
+  the current one.
+- **Context menu** on any cell: the full operation set. This is the
+  discoverable, complete surface.
+- **Hover affordances**: "+" strips along the table's right and bottom
+  edges append a column / row. The strips are subtle bars outside the
+  table border that highlight on direct hover — deliberate hit areas,
+  because thin edge-click affordances are a known source of accidental
+  column inserts.
+- **Drag handles**: exactly **one handle pair**
+  exists, driven by the hovered cell — never one handle per row/column at
+  once. The row handle is a small grip pill straddling the left border of
+  the hovered body row; the column handle straddles the top border of the
+  hovered column. The header row is fixed and gets no row handle. Handles
+  disappear when the pointer leaves the table. Clicking (or
+  right-clicking) a handle opens the operations menu scoped to that row
+  (row items) or column (column items + alignment). Dragging a handle
+  highlights the source row/column and shows an accent **drop indicator
+  line** at the insertion boundary under the pointer; releasing applies
+  one move operation, Escape cancels the drag.
+
+Alignment: the delimiter row's `:---:` markers drive per-column text
+alignment in the rendered grid; the context menu sets left / center /
+right per column.
+
+Focus continuity: a structural operation keeps the user in the table.
+After the edit, the same logical cell — or the natural target, e.g. the
+first cell of a freshly inserted row — regains focus. Structure edits
+never dump the caret outside the grid.
+
+Source normalization: structure edits rewrite the table with padded,
+column-aligned source so the plain-text file stays readable (unpadded
+output is a standing complaint against editors that emit it; Typora pads).
+Cell text is escaped so a user-typed `|` cannot break the grid.
+
+Not supported: column-width resizing — GFM has no width syntax to persist
+it (editors that offer resizing store widths in a proprietary block model,
+outside the Markdown). Read-only documents render the grid with no editing
+affordances.
 
 ### Horizontal rule (`---`, `***`, `___`)
 
@@ -241,7 +322,7 @@ hidden markers after, atomic Backspace at the boundary.
 Reveal predicate (all inline elements): the element expands when a
 **collapsed caret** is strictly inside the element's source range —
 `from < caret < to`. At exactly `from` or `to` the element stays collapsed.
-This is stricter than Obsidian (which reveals on any touch) and fixes
+This is stricter than reveal-on-any-touch live previews and fixes
 Typora's end-boundary leak (#443). Range selections never reveal
 (principle 6).
 
@@ -334,9 +415,10 @@ always raw, never guessed at.
   interior reveal predicate (fixes end-boundary leak #443); heading style is
   kept if a future preference reveals block markup (fixes #285); heading
   levels remain editable in place via shortcuts (fixes #98).
-- **From Obsidian**: no active-line source reveal, no selection-triggered
-  reveal — Obsidian accepts line churn to make markup always reachable; we
-  cover reachability with atomic backspace + commands instead.
+- **From line-reveal live previews**: no active-line source reveal, no
+  selection-triggered reveal — that model accepts line churn to make markup
+  always reachable; we cover reachability with atomic backspace + commands
+  instead.
 
 ## 10. UX references
 
@@ -396,8 +478,10 @@ Phases in dependency order; each phase lands independently.
       for headings, lists, tasks, quotes, emphasis/strong/strike, inline
       code, links, autolinks, images, wiki links, rules, fences, tables,
       and HTML blocks.
-- [x] Fixture unit tests: headings, wiki links, standard links, task
-      brackets, image atomicity, and strict inline reveal boundaries.
+- [x] Fixture unit tests: headings, wiki links, standard links, link titles,
+      autolinks, escaped characters, task brackets, image atomicity,
+      range-scoped lookup, hidden-marker caret normalization, nested quotes,
+      and strict inline reveal boundaries.
 
 **Phase 2 — new pipeline v1 (element reveal)**
 
@@ -409,8 +493,9 @@ Phases in dependency order; each phase lands independently.
       documents only.
 - [x] Hidden markers stay `Decoration.replace` + atomic ranges; rebuilds
       keyed on reveal-set identity, not raw selection positions.
-- [x] IME guard: no rebuilds touching the composition range while
-      `view.composing`.
+- [x] IME guard: composition state updates are deferred out of the DOM
+      composition event stack and cross-check `view.composing` before
+      suppressing decoration rebuilds.
 
 **Phase 3 — composing lifecycle**
 
@@ -420,7 +505,8 @@ Phases in dependency order; each phase lands independently.
 - [x] Commit on Return / caret-leave / blur / paste; a composing line
       renders raw through the existing `cm-md-source-line` styling path.
 
-**Phase 4 — keyboard layer** (pipeline-independent; can ship early)
+**Phase 4 — keyboard layer** (live-preview scoped; source mode uses normal
+CodeMirror text editing)
 
 - [x] `deleteMarkerBackward` / `deleteMarkerForward`: atomic hidden-prefix
       deletion (`#… `, `> `, `- `, `- [ ] ` staged) and closing-delimiter
@@ -429,15 +515,18 @@ Phases in dependency order; each phase lands independently.
 - [x] Inline toggles: ⌘B / ⌘I / ⌘E / ⌘⇧X / ⌘K.
 - [x] Return continuation/exit for lists, tasks, quotes; ordered-list
       renumbering.
+- [x] Source-mode isolation: commands that depend on hidden syntax are only
+      installed inside the live-preview compartment.
 
 **Phase 5 — interaction polish**
 
-- [x] Link click places the caret; ⌘-click opens (change in
-      `markdownLinkOpenHandler`).
+- [x] Link click places the caret; ⌘-click opens; read-only click opens;
+      Cmd/Ctrl+Enter follows the link under the caret; pointer cursor appears
+      only while the open modifier is down.
 - [x] Image atomic selection; Return / second click expands to source.
-- [x] Fence code block arrow-key exit; Home targets; caret geometry
-      (`coordsAt`) around hidden markers.
-- [x] Table arrow-key entry and exit.
+- [x] Fence code block arrow-key exit and empty-block Backspace delete; Home
+      targets; caret geometry (`coordsAt`) around hidden markers.
+- [x] Table arrow-key entry/exit and Tab / Shift-Tab cell movement.
 - [x] Copy/cut emit full Markdown source across collapsed elements.
 
 **Phase 6 — bake-off and removal**
@@ -447,8 +536,117 @@ Phases in dependency order; each phase lands independently.
       `npm test`, `npm run build`, `npm run lint`, `npm run check:shared-ui`,
       and `git diff --check`. The line-reveal pipeline has been removed, so
       there is no second pipeline to accept.
+- [ ] Manual CJK IME pass on macOS after the next desktop smoke run. The
+      implementation avoids synchronous composition-event dispatch, but IME
+      correctness is still a real-device interaction check.
 - [x] Flip the default to the new pipeline.
 - [x] Delete the line-reveal pipeline and the variant switch.
+
+**Phase 7 — Mermaid diagram block** (additive feature on the same
+pipeline; not part of the reveal migration). Infrastructure audit as of
+2026-07 — the `[x]` items already exist and need no work:
+
+- [x] Fence detection with language info: `getMarkdownCodeBlock` already
+      returns `language`; the composing lifecycle already keeps a
+      ```` ```mermaid ```` line raw until commit.
+- [x] Block widget pipeline: `Decoration.replace({ block: true })` + atomic
+      ranges via `addReplacementDecoration`.
+- [x] Edit-and-commit surface pattern: `CodeBlockWidget` (textarea, commit
+      on blur/Escape, ArrowUp/Down boundary exit).
+- [x] Async preview + toolbar + loading-state pattern: `HtmlBlockWidget`.
+- [x] Height stability: `estimatedHeight` estimators +
+      `MarkdownWidgetMeasureController`.
+- [x] Theme variable mapping pattern: `getTrustedHtmlThemeCss` reads
+      `--po-*`; Mermaid needs the same reads shaped as `themeVariables`.
+- [x] Sandbox escalation path if ever needed: trusted-iframe + height
+      postMessage infra in `HtmlBlockWidget`.
+
+New work:
+
+- [x] Add the `mermaid` dependency; load it only via dynamic `import()` so
+      it never enters the main bundle.
+- [x] `rendering/mermaidRenderer.ts` singleton: initialize on demand
+      (`startOnLoad: false`, `securityLevel: "strict"`,
+      `suppressErrorRendering: true`, theme mapped from `--po-*`);
+      `parse()` before `render()`; ~250 ms debounce while editing; SVG
+      cache keyed by source + theme; invalidate on theme change.
+- [x] `MermaidBlockWidget` (widgets/): diagram by default; Edit opens the
+      source-over-preview split; keeps the last successful SVG through
+      invalid intermediate states with an inline error strip; read-only
+      shows the diagram only.
+- [x] Detection branch in `addMarkdownBlockAndLineDecorations`:
+      `language === "mermaid"` → `MermaidBlockWidget` instead of
+      `CodeBlockWidget`.
+- [x] Widget CSS: container, toolbar, error strip, fit-to-width SVG.
+
+**Phase 8 — table structure editing** (additive feature on the same
+pipeline). Infrastructure audit as of 2026-07 — the `[x]` items already
+exist and need no work:
+
+- [x] Table block parser with cell positions:
+      `rendering/tableModel.ts` (`getMarkdownTableBlock` → rows/cells with
+      `from`/`to`).
+- [x] In-place cell editing: contenteditable cells committing precise
+      `cell.from`–`cell.to` changes on blur; Escape reverts; Enter commits.
+- [x] Cell navigation: Tab / Shift-Tab between cells; ArrowUp/Down
+      entry/exit at boundary rows.
+- [x] Pipe escaping for cell text (`sanitizeMarkdownTableCell`).
+- [x] Single-dispatch undo granularity (CM history already in the base
+      extensions; each op below must stay one dispatch).
+
+New work, in dependency order:
+
+- [x] Model layer (`tableModel.ts`): parse the delimiter row's `:---:`
+      alignments into the block model (currently discarded), and add a
+      `serializeMarkdownTable` that emits padded, column-aligned source.
+- [x] Pure structural operations on the parsed block, each returning the
+      replacement text for the whole `[from, to)` range: insert row
+      above/below, delete row, move row up/down, insert column left/right,
+      delete column, move column left/right, duplicate row, set column
+      alignment. Sort-by-column is an optional follow-up.
+- [x] Unit tests for the model ops (same fixture pattern as
+      `markdownElements` tests): ragged rows, escaped pipes, alignment
+      preservation, single-row/single-column edge cases.
+- [x] Render alignment: apply per-column `text-align` in
+      `MarkdownTableWidget` from the parsed alignments.
+- [x] Focus continuity: structural dispatches rebuild the widget DOM
+      (`eq()` fails), destroying the focused cell. Record the target
+      logical cell (row, column) before dispatch and refocus it after the
+      rebuilt widget mounts. Without this every structure edit kicks the
+      user out of the table.
+- [x] Keyboard layer: Tab in the last cell appends a row and focuses its
+      first cell (replaces today's exit behavior); Enter commits and moves
+      to the cell below (exits below the table from the last row);
+      Mod-Enter inserts a row below the current one.
+- [x] Context menu on cells with the full operation set, reusing the
+      shared desktop menu surface (`docs/architecture/desktop-menu-surface.md`).
+- [x] Hover "+" strips along the right/bottom table edges appending a
+      column/row, with deliberate hit areas (see Part 1 §5 on the
+      accidental-insert risk of thin edge affordances).
+- [x] Widget CSS: alignment classes, hover strips, menu affordances,
+      read-only suppression.
+- [x] Drag handles for row/column reorder: one handle pair
+      tracks the hovered cell (row handle on the hovered body row's left
+      border, column handle on the hovered column's top border; header row
+      has no row handle); click/right-click opens the scoped operations
+      menu; drag shows a source highlight plus an accent drop-indicator
+      line at the insertion boundary, applies one model-layer move on
+      release, and cancels on Escape.
+
+**Phase 9 — module split** (no behavior change; see §13 note 10 for the
+layout and layering rules):
+
+- [x] Split `widgets/markdownLivePreviewWidgets.ts` (~2 350 lines) into
+      per-widget modules plus a `widgets/table/` package.
+- [x] Split `markdownCodeMirrorExtensions.ts` (~1 490 lines) into
+      `keymap/`, `state/`, and `decorations/` layers; the original file
+      remains as the thin public assembly (base + live preview extension
+      factories, theme, highlight style).
+- [x] Split `styles/editor.css` (~2 840 lines) into `styles/editor/`
+      section files behind an ordered `@import` entry point (same public
+      path, so `package.json` exports and `shared-ui.css` are untouched).
+- [x] Full verification: `tsc --noEmit`, vite build, markdown unit tests,
+      ESLint (no new warnings), `check:shared-ui`.
 
 ## 12. Code change map
 
@@ -459,11 +657,13 @@ Phases in dependency order; each phase lands independently.
 | Composing state | None (line reveal doubles as it) | Explicit composing → commit lifecycle |
 | Backspace at block start | Deletes into revealed source text | Atomic hidden-marker deletion, one keystroke |
 | Heading level edit | Reveal line, edit hashes | ⌘1–⌘6/⌘0 commands (+ backspace demote) |
-| Inline detection | Regex per line | Lezer syntax tree |
+| Inline detection | Regex per line | Lezer syntax tree + custom scanners only for non-Lezer extensions |
 | Selection reveal | Selection lines reveal fully | Never |
 | IME guard | None | Skip rebuilds while composing |
 | Fences/tables/HTML/images | Block or inline widgets | Unchanged model; keyboard entry/exit polish |
 | Link click | Click opens link | Click edits; ⌘-click opens |
+| Mermaid fences | Generic editable code-block widget | Rendered diagram; in-place split editing (Phase 7) |
+| Table structure | Cell edit + navigation only; no row/column ops, alignment ignored | Model-layer ops behind keyboard / menu / hover entry points (Phase 8) |
 
 User-visible behavior changes shipped by this migration:
 
@@ -507,49 +707,134 @@ Changes required by Part 1:
    after a collapsed inline element, delete its closing delimiter unit.
    Forward Delete gets the mirrored behavior. Everything else falls
    through.
-4. **Syntax-tree-driven element detection.** The inline scanners are
-   regexes over line text today (`addDelimiterDecorations`,
-   `addItalicDecorations`, heading/list/quote regexes). Best practice — and
-   how Obsidian and every maintained CM6 example works — is iterating the
-   Lezer tree (`syntaxTree(state)`, node types `HeaderMark`,
-   `EmphasisMark`, `CodeMark`, `ListMark`, `QuoteMark`, `Link`, …). The
-   parser already runs for highlighting, handles
-   escaping/nesting/code-span precedence correctly, and removes the
-   regex/parser disagreement class of bugs. Migrate incrementally: keep
-   custom scanners only for non-Lezer syntax (wiki links already have a
-   parser extension).
+4. **Syntax-tree-driven element detection.** Inline decorations and reveal
+   now share `syntax/markdownElements.ts`, backed by Lezer ranges for core
+   Markdown (`EmphasisMark`, `CodeMark`, `LinkMark`, `QuoteMark`, …) and
+   custom scanners only where the parser does not provide first-class nodes
+   (wiki links, image embeds, task brackets, tables, HTML block discovery).
+   The model is cached by immutable `Text` document and supports
+   range-scoped lookup for caret/command paths, so plain cursor movement and
+   one-line commands do not repeatedly scan the whole document.
 5. **Reveal styling.** Revealed inline delimiters keep the content's
    rendered style (bold stays bold — avoids Typora issue #285). Dimmed
    delimiter color, no size change, no animation initially. If animation is
    added later, use the `max-width`/`font-size` transition technique (not
    `display:none`) so line height never jumps, and honor
    `prefers-reduced-motion`.
-6. **Guards.** Skip decoration rebuilds while `update.view.composing`
-   (IME). Drag flicker needs no guard because selections never reveal.
-   Rebuild cost stays acceptable by keying rebuilds on
-   `docChanged | reconfigured | focusChanged | revealSetChanged` — compute
-   the reveal set key from element ranges under the caret, not from raw
-   selection positions, so plain caret movement inside a paragraph does not
-   rebuild anything.
+6. **Guards.** Skip decoration rebuilds while the editor is composing text
+   (IME); composition state is deferred out of the DOM event stack and
+   checked against `view.composing`. Drag flicker needs no guard because
+   selections never reveal. Rebuild cost stays acceptable by keying rebuilds
+   on `docChanged | reconfigured | focusChanged | revealSetChanged` —
+   compute the reveal set key from element ranges under the caret, not from
+   raw selection positions, so plain caret movement inside a paragraph does
+   not rebuild anything.
 7. **Performance.** Current code decorates the whole document; acceptable
    for typical notes, but viewport-scoped iteration (`view.visibleRanges`)
    via a companion ViewPlugin is the escape hatch for very large files.
    Keep expensive widgets (if added, e.g. math) behind a render cache keyed
    by source text.
+8. **Mermaid rendering service (Phase 7).** One module owns the library
+   lifecycle: lazy `import("mermaid")` on first use (the library is >1 MB
+   minified and must never enter the main bundle — Vite code-splits dynamic
+   imports automatically); `initialize()` exactly once with
+   `startOnLoad: false`, `securityLevel: "strict"` (HTML in labels encoded,
+   click callbacks disabled — the strictest supported mode) and
+   `suppressErrorRendering: true`; validate with
+   `mermaid.parse(text, { suppressErrors: true })` before
+   `mermaid.render(id, text)` (v11 queues renders serially, which prevents
+   race conditions); unique render ids per call; cache SVG output keyed by
+   source + theme; map `--po-*` CSS variables into `themeVariables` the way
+   `getTrustedHtmlThemeCss` already does for HTML previews. The singleton
+   re-applies Mermaid config only when the theme key changes, and widgets
+   subscribe to one shared theme-change observer instead of each installing
+   its own `MutationObserver`. SVG output is sanitized after Mermaid renders:
+   keep `foreignObject` for diagram types that need it, but strip dangerous
+   nodes, event attributes, and resource-loading `href` / `src` attributes.
+   Widgets keep the last good SVG while the user types through invalid
+   intermediate states. Never use `startOnLoad` / `mermaid.run()` DOM scanning:
+   CodeMirror rebuilds widget DOM at will, so a global scan's lifecycle
+   cannot be controlled.
+9. **Table structure operations (Phase 8).** Structural edits are pure
+   text transforms: parse the block (`getMarkdownTableBlock`), mutate the
+   cell matrix, serialize back to normalized pipe source, and dispatch one
+   change replacing the whole `[from, to)` block — never cell-by-cell
+   patches. One dispatch is what makes each operation a single undo step
+   and keeps the parser, the widget, and the file trivially consistent.
+   The serializer pads cells to aligned column widths so the on-disk text
+   stays human-readable (the survey consensus: Typora pads; unpadded
+   output draws standing complaints wherever it ships; either way the
+   file stays plain Markdown).
+   The hard part is **focus continuity**: a structural dispatch changes
+   `rows`/`from`/`to`, so `eq()` fails and CodeMirror rebuilds the widget
+   DOM, destroying the focused contenteditable cell. Keep a module-level
+   pending-focus record `{ tableFrom, row, column }` written just before
+   the dispatch; when the rebuilt widget mounts (measure callback /
+   microtask after `toDOM`), look it up, focus the matching cell editor,
+   and clear it. All entry points (keymap commands, context menu items,
+   hover strips) call the same model functions — the UI layers own no
+   table-mutation logic of their own. Column-width resizing is explicitly
+   out of scope: GFM has no syntax to persist it.
+10. **Module layout (Phase 9).** The editor follows the CodeMirror
+    ecosystem convention — one module per feature, layered by role, thin
+    assembly at the top. Layering (imports point downward only):
+
+    ```text
+    editor/markdown/
+      markdownCodeMirrorExtensions.ts   assembly: extension factories, theme
+      keymap/                           commands (view → dispatch)
+        markdownEditingKeymap.ts        bindings + Backspace/Enter/caret cmds
+        markdownBlockCommands.ts        heading/list/quote/indent/renumber
+        markdownInlineCommands.ts       bold/italic/code/strike/link wrap
+      state/                            StateFields/effects, no DOM
+        livePreviewFocus.ts             focus effect + reader
+        composingBlockLine.ts           composing-line field + IME effects
+        expandedImage.ts                expanded-image effect + field
+        selectionBehavior.ts            caret normalizer, trailing-ws select
+      decorations/                      doc → DecorationSet (pure build)
+        livePreviewDecorations.ts       StateField, rebuild keys, reveal set
+        blockDecorations.ts             per-line walk, widget selection
+        inlineDecorations.ts            element → mark/replace decorations
+        decorationPrimitives.ts         builders, source-syntax helper
+      widgets/                          WidgetType classes + widget DOM
+        inlineWidgets.ts                hidden syntax, task checkbox, hr
+        codeBlockWidget.ts / mermaidBlockWidget.ts / htmlBlockWidget.ts
+        imagePreviewWidget.ts
+        widgetDom.ts                    shared DOM utilities
+        table/                          table feature package
+          tableWidget.ts               DOM assembly + add strips
+          tableCellEditor.ts           contenteditable cell lifecycle
+          tableDragLayer.ts            hover handles, drag, drop indicator
+          tableContextMenu.ts          scoped menu build/position
+          tableDispatch.ts             single-dispatch structural ops
+          tableFocus.ts                pending-focus continuity
+          tableMenuState.ts            active-menu registry (breaks cycles)
+      rendering/                        pure models/services (no CM imports)
+        codeBlockModel.ts               fence parse/serialize, mermaid detect
+        tableModel.ts, taskModel.ts, htmlBlockModel.ts, mermaidRenderer.ts …
+      syntax/                           Lezer-backed element model
+    ```
+
+    `styles/editor.css` is an ordered `@import` list over
+    `styles/editor/*.css` section files (preview surfaces, code editor,
+    chrome, markdown base, code/html/inline/table widgets, status). The
+    public exports (`markdownCodeMirrorExtensions.ts`, `./editor.css`)
+    did not move, so consumers are unaffected.
 
 ## 14. Background: architecture research
 
 | | contenteditable rich DOM (Typora) | Structured model (ProseMirror family) | Plain text + decorations (CM6) |
 | --- | --- | --- | --- |
 | Document model | DOM + parallel MD model, bidirectional sync | PM node tree; MD only at import/export | Markdown string is the model |
-| Examples | Typora | Milkdown, Tiptap, markora, typora-web | **Obsidian live preview**, HyperMD (CM5), ink-mde, codemirror-rich-markdoc |
+| Examples | Typora | Milkdown, Tiptap, markora, typora-web | HyperMD (CM5), ink-mde, codemirror-rich-markdoc, mainstream note-app live previews |
 | Source fidelity | Serializer output, can drift from input | Serializer output; delimiters/escapes normalized | Byte-perfect by construction |
 | Reveal-on-caret | Re-insert source text into DOM per element | Hard: model has no delimiter chars; needs hacks (typora-web stores delimiters *in* text) | Natural: stop hiding a decoration |
 | Effort/risk | Highest (own input pipeline on contenteditable, `beforeinput` interception) | High (round-trip fidelity, NodeView caret traps) | Lowest for an MD-source product |
 
 Conclusion: for a product whose files are Markdown on disk and whose editor
 already runs CodeMirror 6, the CM6 decoration architecture is the correct
-one — it is what Obsidian ships. A true second engine would have to
+one — it is the architecture proven at scale by the leading CM6-based
+note apps. A true second engine would have to
 reimplement every CM6 integration in this repo (AI edit decorations,
 conflict markers, save/external-update transaction flow, link graph
 handlers) and gives up byte-perfect round-tripping. No engine change; the
@@ -575,8 +860,8 @@ How Typora is built (for reference):
 
 ## 15. Implementation references
 
-- Obsidian decorations guide (CM6 StateField vs ViewPlugin):
-  <https://docs.obsidian.md/Plugins/Editor/Decorations>
+- CodeMirror decorations guide (StateField vs ViewPlugin):
+  <https://codemirror.net/docs/ref/#view.Decoration>
 - CodeMirror discuss — concealing syntax pattern:
   <https://discuss.codemirror.net/t/concealing-syntax/3135>
 - CM6 live-preview reference implementations:
@@ -591,3 +876,7 @@ How Typora is built (for reference):
   <https://github.com/KevinWang15/markora>,
   <https://github.com/Yuyz0112/typora-web>,
   <https://discuss.prosemirror.net/t/replicating-typoras-inline-display-math-editing/2906>
+- Mermaid usage/API (render, parse, securityLevel):
+  <https://mermaid.js.org/config/usage.html>
+- Typora table editing (⌘Enter row insert, Tab appends, context menu,
+  drag reorder): <https://support.typora.io/Table-Editing/>

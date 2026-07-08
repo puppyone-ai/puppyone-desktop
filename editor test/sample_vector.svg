@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+  <title id="title">English SVG Preview</title>
+  <desc id="desc">A simple vector preview card with English labels.</desc>
+  <rect width="640" height="360" fill="#f2f7f4"/>
+  <rect x="48" y="48" width="544" height="264" rx="8" fill="#ffffff" stroke="#7aa58f" stroke-width="3"/>
+  <circle cx="128" cy="132" r="48" fill="#2f7d68"/>
+  <rect x="208" y="96" width="304" height="28" rx="4" fill="#172026"/>
+  <rect x="208" y="144" width="240" height="18" rx="3" fill="#5f7f73"/>
+  <rect x="208" y="184" width="288" height="18" rx="3" fill="#9eb9ad"/>
+  <text x="64" y="280" fill="#172026" font-family="Arial, sans-serif" font-size="28" font-weight="700">English SVG Preview</text>
+</svg>

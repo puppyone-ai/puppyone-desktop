@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
+  EXPERIMENTAL_SETTINGS_STORAGE_KEY,
   EXTERNAL_APPS_STORAGE_KEY,
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
@@ -15,6 +16,7 @@ import {
   getSidebarNavigationOrientation,
   getSidebarNavigationPlacement,
   type ExternalAppsSettings,
+  type ExperimentalSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
   type RightSidebarToolsSettings,
@@ -27,6 +29,7 @@ import {
   RIGHT_SIDEBAR_WIDTH_STORAGE_KEY,
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   readInitialAiEditAssistEnabled,
+  readInitialExperimentalSettings,
   readInitialExplorerWidth,
   readInitialExternalAppsSettings,
   readInitialFileIconTheme,
@@ -52,6 +55,7 @@ export function useDesktopPreferences() {
   const [gitDisplayMode, setGitDisplayMode] = useState<GitDisplayMode>(() => readInitialGitDisplayMode());
   const [filesVisibilitySettings, setFilesVisibilitySettings] = useState<FilesVisibilitySettings>(() => readInitialFilesVisibilitySettings());
   const [externalAppsSettings, setExternalAppsSettings] = useState<ExternalAppsSettings>(() => readInitialExternalAppsSettings());
+  const [experimentalSettings, setExperimentalSettings] = useState<ExperimentalSettings>(() => readInitialExperimentalSettings());
   const [rightSidebarToolsSettings, setRightSidebarToolsSettings] = useState<RightSidebarToolsSettings>(() => readInitialRightSidebarToolsSettings());
   const [titlebarActionsSettings, setTitlebarActionsSettings] = useState<TitlebarActionsSettings>(() => readInitialTitlebarActionsSettings());
   const [aiEditAssistEnabled, setAiEditAssistEnabled] = useState(() => readInitialAiEditAssistEnabled());
@@ -92,6 +96,10 @@ export function useDesktopPreferences() {
   useEffect(() => {
     window.localStorage.setItem(EXTERNAL_APPS_STORAGE_KEY, JSON.stringify(externalAppsSettings));
   }, [externalAppsSettings]);
+
+  useEffect(() => {
+    window.localStorage.setItem(EXPERIMENTAL_SETTINGS_STORAGE_KEY, JSON.stringify(experimentalSettings));
+  }, [experimentalSettings]);
 
   useEffect(() => {
     window.localStorage.setItem(RIGHT_SIDEBAR_TOOLS_STORAGE_KEY, JSON.stringify(rightSidebarToolsSettings));
@@ -139,6 +147,7 @@ export function useDesktopPreferences() {
     aiEditAssistEnabled,
     explorerWidth,
     externalAppsSettings,
+    experimentalSettings,
     fileIconTheme,
     filesVisibilitySettings,
     gitDisplayMode,
@@ -160,6 +169,7 @@ export function useDesktopPreferences() {
     setDarkThemePreset,
     setExplorerWidth,
     setExternalAppsSettings,
+    setExperimentalSettings,
     setFileIconTheme,
     setFilesVisibilitySettings,
     setGitDisplayMode,

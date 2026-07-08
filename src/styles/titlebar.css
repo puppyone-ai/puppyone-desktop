@@ -2,33 +2,73 @@
   position: relative;
   z-index: 40;
   display: flex;
+  box-sizing: border-box;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   height: var(--desktop-chrome-height);
   min-height: var(--desktop-chrome-height);
-  padding: 0 8px 0 86px;
-  border-bottom: 1px solid var(--po-divider);
-  background: var(--po-sidebar);
+  padding: 4px 6px 4px 86px;
+  border-bottom: 1px solid var(--po-header-divider);
+  background: var(--po-surface-chrome);
   -webkit-app-region: drag;
   user-select: none;
 }
 
 .desktop-titlebar-left {
   display: flex;
+  flex: 0 1 auto;
   align-items: center;
   align-self: stretch;
   width: auto;
-  max-width: min(620px, calc(100vw - 128px));
+  max-width: none;
   min-width: 0;
   -webkit-app-region: no-drag;
 }
 
 .desktop-titlebar-context {
   display: flex;
+  flex: 0 1 auto;
   height: 100%;
   min-width: 0;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+}
+
+.desktop-titlebar-context-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--desktop-chrome-control-size);
+  max-width: none;
+  min-width: 0;
+  padding: 0 6px;
+  border-radius: var(--desktop-control-radius);
+  color: var(--po-text-muted);
+  pointer-events: none;
+}
+
+.desktop-titlebar-context-item svg {
+  flex: 0 0 auto;
+  color: var(--po-text-muted);
+}
+
+.desktop-titlebar-context-mark {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-titlebar-context-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-titlebar-drag-fill {
@@ -89,12 +129,6 @@
   animation: spin 900ms linear infinite;
 }
 
-.desktop-titlebar-action-cluster {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
 .desktop-update-titlebar-action.available,
 .desktop-update-titlebar-action.downloaded {
   color: var(--po-accent);
@@ -111,7 +145,7 @@
   right: 6px;
   width: 6px;
   height: 6px;
-  border: 1px solid var(--po-sidebar);
+  border: 1px solid var(--po-surface-chrome);
   border-radius: 999px;
   background: var(--po-accent);
   pointer-events: none;
@@ -120,6 +154,7 @@
 .desktop-titlebar-workspace-wrap {
   position: relative;
   display: flex;
+  flex: 0 1 auto;
   height: 100%;
   align-items: center;
   max-width: 100%;
@@ -129,17 +164,17 @@
 .desktop-titlebar-workspace-button {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   justify-content: flex-start;
   width: auto;
-  max-width: min(134px, 16vw);
+  max-width: 100%;
   height: var(--desktop-chrome-control-size);
   min-width: 0;
-  padding: 0 8px;
+  padding: 0 6px;
   border: 0;
   border-radius: var(--desktop-control-radius);
   background: transparent;
-  color: var(--po-text);
+  color: var(--po-text-muted);
   text-align: left;
   box-shadow: none;
   -webkit-app-region: no-drag;
@@ -150,6 +185,7 @@
 .desktop-titlebar-workspace-button:hover,
 .desktop-titlebar-workspace-button[aria-expanded="true"] {
   background: var(--po-hover);
+  color: var(--po-text);
 }
 
 .desktop-titlebar-workspace-mark {
@@ -173,8 +209,36 @@
   box-shadow: inset 0 0 0 1px var(--po-focus-ring);
 }
 
+.desktop-titlebar-context-icon-button {
+  position: relative;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--desktop-chrome-control-size);
+  height: var(--desktop-chrome-control-size);
+  border: 0;
+  border-radius: var(--desktop-control-radius);
+  background: transparent;
+  color: var(--po-text-muted);
+  outline: 0;
+  -webkit-app-region: no-drag;
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.desktop-titlebar-context-icon-button:hover,
+.desktop-titlebar-context-icon-button.active {
+  color: var(--po-text);
+}
+
+.desktop-titlebar-context-icon-button:focus-visible {
+  background: var(--po-hover);
+  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
+  color: var(--po-text);
+}
+
 .desktop-titlebar-workspace-name {
-  max-width: 82px;
+  max-width: none;
   min-width: 0;
   overflow: hidden;
   color: var(--po-text-muted);
@@ -252,8 +316,7 @@
 }
 
 .desktop-titlebar-external-open-loader {
-  transform: scale(1.23);
-  transform-origin: center;
+  justify-content: center;
 }
 
 .desktop-titlebar-external-app-loader {
@@ -282,24 +345,65 @@
   text-align: left;
 }
 
+.desktop-titlebar-terminal {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: var(--desktop-chrome-control-size);
+  border-radius: var(--desktop-control-radius);
+}
+
+.desktop-titlebar-terminal.has-menu:has(.desktop-titlebar-terminal-menu-button[aria-expanded="true"]) {
+  background: var(--po-hover);
+}
+
+.desktop-titlebar-terminal.has-menu .desktop-titlebar-terminal-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.desktop-titlebar-terminal-menu-button {
+  width: 17px;
+  margin-left: -2px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.desktop-titlebar-terminal-menu-button[aria-expanded="true"] {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-titlebar-terminal-menu {
+  right: 0;
+  left: auto;
+  width: 190px;
+}
+
+.desktop-titlebar-terminal-menu-row {
+  text-align: left;
+}
+
 .desktop-titlebar-branch-wrap {
   position: relative;
   display: flex;
+  flex: 0 1 auto;
   height: 100%;
   align-items: center;
   min-width: 0;
-  max-width: min(190px, 28vw);
+  max-width: 100%;
 }
 
 .desktop-titlebar-branch-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  justify-content: flex-start;
   width: auto;
   max-width: 100%;
   height: var(--desktop-chrome-control-size);
   min-width: 0;
-  padding: 0 8px;
+  padding: 0 6px;
   border: 0;
   border-radius: var(--desktop-control-radius);
   background: transparent;

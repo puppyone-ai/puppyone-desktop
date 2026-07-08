@@ -4,6 +4,7 @@ import {
   AI_EDIT_ASSIST_STORAGE_KEY,
   DEFAULT_SIDEBAR_NAVIGATION_LAYOUT,
   DEFAULT_THEME_MODE,
+  EXPERIMENTAL_SETTINGS_STORAGE_KEY,
   EXTERNAL_APPS_STORAGE_KEY,
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
@@ -17,6 +18,7 @@ import {
   TITLEBAR_ACTIONS_STORAGE_KEY,
   parseAiEditAssistEnabled,
   parseDarkThemePreset,
+  parseExperimentalSettings,
   parseExternalAppsSettings,
   parseFilesVisibilitySettings,
   parseGitDisplayMode,
@@ -26,6 +28,7 @@ import {
   parseThemeMode,
   parseTitlebarActionsSettings,
   type DarkThemePreset,
+  type ExperimentalSettings,
   type ExternalAppsSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
@@ -46,15 +49,6 @@ export const COLLAPSED_EXPLORER_WIDTH = 0;
 export const DEFAULT_RIGHT_SIDEBAR_WIDTH = 560;
 export const MIN_RIGHT_SIDEBAR_WIDTH = 420;
 export const MAX_RIGHT_SIDEBAR_WIDTH = 760;
-export const TITLEBAR_WORKSPACE_LABEL_CHARS = 12;
-export const TITLEBAR_BRANCH_LABEL_CHARS = 24;
-
-export function shortenTitlebarLabel(value: string, maxChars: number): string {
-  const trimmed = value.trim();
-  if (trimmed.length <= maxChars) return trimmed;
-  if (maxChars <= 3) return trimmed.slice(0, maxChars);
-  return `${trimmed.slice(0, maxChars - 3)}...`;
-}
 
 export function readInitialThemeMode(): ThemeMode {
   if (typeof window === "undefined") return DEFAULT_THEME_MODE;
@@ -170,6 +164,11 @@ export function mergePuppyoneWorkspaceConfig(
 export function readInitialAiEditAssistEnabled(): boolean {
   if (typeof window === "undefined") return parseAiEditAssistEnabled(null);
   return parseAiEditAssistEnabled(window.localStorage.getItem(AI_EDIT_ASSIST_STORAGE_KEY));
+}
+
+export function readInitialExperimentalSettings(): ExperimentalSettings {
+  if (typeof window === "undefined") return parseExperimentalSettings(null);
+  return parseExperimentalSettings(window.localStorage.getItem(EXPERIMENTAL_SETTINGS_STORAGE_KEY));
 }
 
 export function readInitialExplorerWidth(): number {

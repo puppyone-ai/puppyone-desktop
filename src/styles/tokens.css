@@ -40,8 +40,20 @@
   --desktop-control-radius: 6px;
   --desktop-chrome-height: 38px;
   --desktop-chrome-control-size: 30px;
-  --desktop-sidebar-nav-height: var(--desktop-chrome-height);
   --desktop-sidebar-control-size: var(--desktop-chrome-control-size);
+  --desktop-sidebar-nav-height: calc(var(--desktop-sidebar-control-size) + 8px);
+  --desktop-sidebar-nav-padding: 4px;
+  --desktop-sidebar-navigation-padding-outer: 12px;
+  --desktop-sidebar-navigation-padding-inner: 4px;
+  --desktop-sidebar-navigation-padding-inline: 12px;
+  --desktop-sidebar-navigation-height: calc(
+    var(--desktop-sidebar-control-size)
+    + var(--desktop-sidebar-navigation-padding-outer)
+    + var(--desktop-sidebar-navigation-padding-inner)
+  );
+  --desktop-sidebar-navigation-fade-size: 18px;
+  --desktop-sidebar-navigation-fade-scrollbar-inset: calc(var(--desktop-sidebar-scrollbar-width) + 8px);
+  --desktop-sidebar-nav-gap: 4px;
   --desktop-sidebar-toolbar-height: 46px;
   --desktop-sidebar-toolbar-padding-left: 22px;
   --desktop-sidebar-toolbar-padding-right: 16px;
@@ -55,19 +67,35 @@
   --desktop-sidebar-scrollbar-width: var(--po-scrollbar-size);
   --desktop-sidebar-row-content-left: 6px;
   --desktop-sidebar-row-content-right: 6px;
+  --desktop-sidebar-list-padding-y: 8px;
   --desktop-sidebar-section-top-gap: 5px;
   --desktop-sidebar-section-bottom-gap: 6px;
   --desktop-utility-page-padding-top: 24px;
   --desktop-utility-page-padding-inline: 28px;
   --desktop-utility-page-padding-bottom: 40px;
 
-  --po-canvas: #f1eadf;
-  --po-header: #f1eadf;
-  --po-sidebar: var(--po-header);
-  --po-panel: #fbf6ed;
-  --po-panel-raised: #fffaf1;
-  --po-overlay: #fff8ee;
-  --po-inset: #e6ded1;
+  --po-surface-canvas: #f1eadf;
+  --po-surface-chrome: #f1eadf;
+  --po-surface-panel: #fbf6ed;
+  --po-surface-panel-raised: #fffaf1;
+  --po-surface-overlay: #fff8ee;
+  --po-surface-inset: #e6ded1;
+  --po-surface-editor: var(--po-surface-panel);
+  --po-surface-terminal: var(--po-surface-chrome);
+
+  /* Compatibility aliases. New theme work should define the semantic surface tokens above. */
+  --po-canvas: var(--po-surface-canvas);
+  --po-header: var(--po-surface-chrome);
+  --po-sidebar: var(--po-surface-chrome);
+  --po-chrome: var(--po-surface-chrome);
+  --po-panel: var(--po-surface-panel);
+  --po-panel-raised: var(--po-surface-panel-raised);
+  --po-overlay: var(--po-surface-overlay);
+  --po-inset: var(--po-surface-inset);
+  --po-editor-bg: var(--po-surface-editor);
+  --po-jsoneditor-bg: var(--po-surface-editor);
+  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
+  --po-terminal-bg: var(--po-surface-terminal);
   --po-project-card-tab: color-mix(in srgb, var(--po-inset) 58%, var(--po-panel) 42%);
   --po-project-card-bg: var(--po-panel);
   --po-project-card-hover-bg: var(--po-overlay);
@@ -79,7 +107,8 @@
   --po-border: rgba(73, 55, 35, 0.16);
   --po-border-subtle: rgba(73, 55, 35, 0.09);
   --po-border-strong: rgba(73, 55, 35, 0.28);
-  --po-divider: rgba(73, 55, 35, 0.085);
+  --po-divider: rgba(73, 55, 35, 0.12);
+  --po-header-divider: var(--po-divider);
   --po-skeleton-base: rgba(73, 55, 35, 0.07);
   --po-skeleton-shimmer: rgba(255, 250, 241, 0.50);
   --po-skeleton-edge: rgba(73, 55, 35, 0.04);
@@ -126,18 +155,14 @@
   --po-file-accent-video: #4f86a4;
   --po-file-accent-code: #4f86a4;
   --po-file-accent-sheet: #6d8b4f;
-  --po-tree-guide: color-mix(in srgb, var(--po-sidebar) 93%, var(--po-text));
-  --po-editor-bg: #fbf6ed;
+  --po-tree-guide: color-mix(in srgb, var(--po-surface-chrome) 93%, var(--po-text));
   --po-editor-line: rgba(73, 55, 35, 0.085);
-  --po-jsoneditor-bg: var(--po-editor-bg);
-  --po-jsoneditor-toolbar-bg: var(--po-panel);
   --po-json-key: #3f3a33;
   --po-json-string: #116329;
   --po-json-number: #8250df;
   --po-json-boolean: #b42318;
   --po-json-null: #6f6a60;
   --po-json-icon: #70685e;
-  --po-terminal-bg: var(--po-header);
   --po-terminal-fg: #6d665d;
   --po-terminal-cursor: #80786d;
   --po-terminal-selection: rgba(91, 82, 70, 0.14);
@@ -178,13 +203,27 @@
 .dark {
   color-scheme: dark;
 
-  --po-canvas: #0e0e0e;
-  --po-sidebar: #121212;
-  --po-header: #0e0e0e;
-  --po-panel: #161616;
-  --po-panel-raised: #1a1a1a;
-  --po-overlay: #1f1f23;
-  --po-inset: #0a0a0a;
+  --po-surface-canvas: #11100f;
+  --po-surface-chrome: #1d1b1a;
+  --po-surface-panel: #1a1715;
+  --po-surface-panel-raised: #211d1a;
+  --po-surface-overlay: #29241f;
+  --po-surface-inset: #0c0b0a;
+  --po-surface-editor: var(--po-surface-canvas);
+  --po-surface-terminal: var(--po-surface-chrome);
+
+  --po-canvas: var(--po-surface-canvas);
+  --po-header: var(--po-surface-chrome);
+  --po-sidebar: var(--po-surface-chrome);
+  --po-chrome: var(--po-surface-chrome);
+  --po-panel: var(--po-surface-panel);
+  --po-panel-raised: var(--po-surface-panel-raised);
+  --po-overlay: var(--po-surface-overlay);
+  --po-inset: var(--po-surface-inset);
+  --po-editor-bg: var(--po-surface-editor);
+  --po-jsoneditor-bg: var(--po-surface-editor);
+  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
+  --po-terminal-bg: var(--po-surface-terminal);
   --po-project-card-tab: color-mix(in srgb, var(--po-panel-raised) 84%, var(--po-canvas) 16%);
   --po-project-card-bg: var(--po-panel);
   --po-project-card-hover-bg: color-mix(in srgb, var(--po-panel) 94%, var(--po-text) 6%);
@@ -195,19 +234,20 @@
   --po-text-disabled: #52525b;
   --po-text-inverse: #0a0a0a;
 
-  --po-border: rgba(255, 255, 255, 0.08);
-  --po-border-subtle: rgba(255, 255, 255, 0.06);
-  --po-border-strong: rgba(255, 255, 255, 0.14);
-  --po-divider: rgba(255, 255, 255, 0.07);
+  --po-border: rgba(255, 250, 242, 0.075);
+  --po-border-subtle: rgba(255, 250, 242, 0.052);
+  --po-border-strong: rgba(255, 250, 242, 0.13);
+  --po-divider: rgba(255, 250, 242, 0.075);
+  --po-header-divider: rgba(255, 250, 242, 0.12);
   --po-skeleton-base: rgba(255, 255, 255, 0.055);
   --po-skeleton-shimmer: rgba(255, 255, 255, 0.08);
   --po-skeleton-edge: rgba(255, 255, 255, 0.025);
 
-  --po-hover: rgba(255, 255, 255, 0.04);
-  --po-active: rgba(255, 255, 255, 0.07);
-  --po-selected: rgba(255, 255, 255, 0.08);
-  --po-control: rgba(255, 255, 255, 0.04);
-  --po-control-hover: rgba(255, 255, 255, 0.08);
+  --po-hover: rgba(255, 250, 242, 0.052);
+  --po-active: rgba(255, 250, 242, 0.082);
+  --po-selected: rgba(255, 250, 242, 0.095);
+  --po-control: rgba(255, 250, 242, 0.044);
+  --po-control-hover: rgba(255, 250, 242, 0.082);
   --po-switch-track-on: var(--po-success);
   --po-switch-track-off: var(--po-control-hover);
   --po-switch-border-on: rgba(52, 211, 153, 0.34);
@@ -234,7 +274,7 @@
   --po-text-fill-hover: #ffffff;
 
   --po-filetree-rail: rgba(255, 255, 255, 0.10);
-  --po-tree-guide: color-mix(in srgb, var(--po-sidebar) 90%, var(--po-text));
+  --po-tree-guide: color-mix(in srgb, var(--po-surface-chrome) 90%, var(--po-text));
   --po-file-icon-body: #222225;
   --po-file-icon-fold: #2a2a2d;
   --po-file-icon-stroke: rgba(255, 255, 255, 0.18);
@@ -253,15 +293,13 @@
   --po-diff-added-text: #86efac;
   --po-diff-removed-bg: rgba(239, 68, 68, 0.14);
   --po-diff-removed-text: #fca5a5;
-  --po-editor-bg: #0e0e0e;
-  --po-editor-line: rgba(255, 255, 255, 0.08);
+  --po-editor-line: rgba(255, 250, 242, 0.065);
   --po-json-key: #cbd5e1;
   --po-json-string: #7dd3fc;
   --po-json-number: #c084fc;
   --po-json-boolean: #fb7185;
   --po-json-null: #94a3b8;
   --po-json-icon: #cbd5e1;
-  --po-terminal-bg: var(--po-header);
   --po-terminal-fg: #b9b6ae;
   --po-terminal-cursor: #d1cec6;
   --po-terminal-selection: rgba(211, 208, 197, 0.16);
@@ -292,14 +330,27 @@
 :where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-light-theme-preset="neutral"]:not(.dark) {
   color-scheme: light;
 
-  --po-canvas: #f5f4f0;
-  --po-header: #f5f4f0;
-  --po-terminal-bg: var(--po-header);
-  --po-sidebar: #ece9e2;
-  --po-panel: #fbfaf7;
-  --po-panel-raised: #ffffff;
-  --po-overlay: #fffdf9;
-  --po-inset: #e7e3db;
+  --po-surface-canvas: #f5f4f0;
+  --po-surface-chrome: #ece9e2;
+  --po-surface-panel: #fbfaf7;
+  --po-surface-panel-raised: #ffffff;
+  --po-surface-overlay: #fffdf9;
+  --po-surface-inset: #e7e3db;
+  --po-surface-editor: var(--po-surface-panel);
+  --po-surface-terminal: var(--po-surface-chrome);
+
+  --po-canvas: var(--po-surface-canvas);
+  --po-header: var(--po-surface-chrome);
+  --po-sidebar: var(--po-surface-chrome);
+  --po-chrome: var(--po-surface-chrome);
+  --po-panel: var(--po-surface-panel);
+  --po-panel-raised: var(--po-surface-panel-raised);
+  --po-overlay: var(--po-surface-overlay);
+  --po-inset: var(--po-surface-inset);
+  --po-editor-bg: var(--po-surface-editor);
+  --po-jsoneditor-bg: var(--po-surface-editor);
+  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
+  --po-terminal-bg: var(--po-surface-terminal);
   --po-project-card-tab: color-mix(in srgb, var(--po-inset) 52%, var(--po-panel) 48%);
   --po-project-card-bg: var(--po-panel);
   --po-project-card-hover-bg: var(--po-overlay);
@@ -313,7 +364,7 @@
   --po-border: rgba(45, 43, 38, 0.14);
   --po-border-subtle: rgba(45, 43, 38, 0.075);
   --po-border-strong: rgba(45, 43, 38, 0.24);
-  --po-divider: rgba(45, 43, 38, 0.07);
+  --po-divider: rgba(45, 43, 38, 0.105);
   --po-skeleton-base: rgba(45, 43, 38, 0.055);
   --po-skeleton-shimmer: rgba(255, 255, 255, 0.62);
   --po-skeleton-edge: rgba(45, 43, 38, 0.035);
@@ -342,7 +393,7 @@
   --po-text-fill-hover: #22201d;
 
   --po-filetree-rail: rgba(45, 43, 38, 0.14);
-  --po-tree-guide: color-mix(in srgb, var(--po-sidebar) 94%, var(--po-text));
+  --po-tree-guide: color-mix(in srgb, var(--po-surface-chrome) 94%, var(--po-text));
   --po-file-icon-body: #f0ede6;
   --po-file-icon-fold: #e1ddd4;
   --po-file-icon-stroke: rgba(45, 43, 38, 0.31);
@@ -358,10 +409,7 @@
   --po-file-accent-code: #397c8f;
   --po-file-accent-sheet: #5f844a;
 
-  --po-editor-bg: #fbfaf7;
   --po-editor-line: rgba(45, 43, 38, 0.07);
-  --po-jsoneditor-bg: var(--po-editor-bg);
-  --po-jsoneditor-toolbar-bg: var(--po-panel);
   --po-json-key: #383631;
   --po-json-string: #116329;
   --po-json-number: #6d56b5;
@@ -376,14 +424,27 @@
 :where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-light-theme-preset="graphite"]:not(.dark) {
   color-scheme: light;
 
-  --po-canvas: #f3f4f6;
-  --po-header: #f3f4f6;
-  --po-terminal-bg: var(--po-header);
-  --po-sidebar: #e9ecef;
-  --po-panel: #fbfbfc;
-  --po-panel-raised: #ffffff;
-  --po-overlay: #ffffff;
-  --po-inset: #e2e5e9;
+  --po-surface-canvas: #f3f4f6;
+  --po-surface-chrome: #e9ecef;
+  --po-surface-panel: #fbfbfc;
+  --po-surface-panel-raised: #ffffff;
+  --po-surface-overlay: #ffffff;
+  --po-surface-inset: #e2e5e9;
+  --po-surface-editor: var(--po-surface-panel);
+  --po-surface-terminal: var(--po-surface-chrome);
+
+  --po-canvas: var(--po-surface-canvas);
+  --po-header: var(--po-surface-chrome);
+  --po-sidebar: var(--po-surface-chrome);
+  --po-chrome: var(--po-surface-chrome);
+  --po-panel: var(--po-surface-panel);
+  --po-panel-raised: var(--po-surface-panel-raised);
+  --po-overlay: var(--po-surface-overlay);
+  --po-inset: var(--po-surface-inset);
+  --po-editor-bg: var(--po-surface-editor);
+  --po-jsoneditor-bg: var(--po-surface-editor);
+  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
+  --po-terminal-bg: var(--po-surface-terminal);
   --po-project-card-tab: color-mix(in srgb, var(--po-inset) 54%, var(--po-panel) 46%);
   --po-project-card-bg: var(--po-panel);
   --po-project-card-hover-bg: var(--po-overlay);
@@ -397,7 +458,7 @@
   --po-border: rgba(31, 41, 55, 0.135);
   --po-border-subtle: rgba(31, 41, 55, 0.075);
   --po-border-strong: rgba(31, 41, 55, 0.24);
-  --po-divider: rgba(31, 41, 55, 0.07);
+  --po-divider: rgba(31, 41, 55, 0.105);
   --po-skeleton-base: rgba(31, 41, 55, 0.052);
   --po-skeleton-shimmer: rgba(255, 255, 255, 0.64);
   --po-skeleton-edge: rgba(31, 41, 55, 0.034);
@@ -426,7 +487,7 @@
   --po-text-fill-hover: #1f2329;
 
   --po-filetree-rail: rgba(31, 41, 55, 0.13);
-  --po-tree-guide: color-mix(in srgb, var(--po-sidebar) 94%, var(--po-text));
+  --po-tree-guide: color-mix(in srgb, var(--po-surface-chrome) 94%, var(--po-text));
   --po-file-icon-body: #eef0f3;
   --po-file-icon-fold: #dde1e7;
   --po-file-icon-stroke: rgba(31, 41, 55, 0.30);
@@ -442,10 +503,7 @@
   --po-file-accent-code: #327b8a;
   --po-file-accent-sheet: #5f8148;
 
-  --po-editor-bg: #fbfbfc;
   --po-editor-line: rgba(31, 41, 55, 0.07);
-  --po-jsoneditor-bg: var(--po-editor-bg);
-  --po-jsoneditor-toolbar-bg: var(--po-panel);
   --po-json-key: #34373d;
   --po-json-string: #116329;
   --po-json-number: #6d56b5;
@@ -458,15 +516,28 @@
 }
 
 :where(.app-shell, .onboarding-shell, .desktop-overlay-root).dark[data-dark-theme-preset="graphite"] {
-  --po-canvas: #101114;
-  --po-header: #101114;
-  --po-terminal-bg: var(--po-header);
-  --po-sidebar: #131417;
-  --po-panel: #18191d;
-  --po-panel-raised: #1d1f24;
-  --po-overlay: #23252b;
-  --po-inset: #0c0d10;
-  --po-editor-bg: #111215;
+  --po-surface-canvas: #101114;
+  --po-surface-chrome: #1b1c1f;
+  --po-surface-panel: #18191d;
+  --po-surface-panel-raised: #1d1f24;
+  --po-surface-overlay: #23252b;
+  --po-surface-inset: #0c0d10;
+  --po-surface-editor: #111215;
+  --po-surface-terminal: var(--po-surface-chrome);
+
+  --po-canvas: var(--po-surface-canvas);
+  --po-header: var(--po-surface-chrome);
+  --po-sidebar: var(--po-surface-chrome);
+  --po-chrome: var(--po-surface-chrome);
+  --po-panel: var(--po-surface-panel);
+  --po-panel-raised: var(--po-surface-panel-raised);
+  --po-overlay: var(--po-surface-overlay);
+  --po-inset: var(--po-surface-inset);
+  --po-editor-bg: var(--po-surface-editor);
+  --po-jsoneditor-bg: var(--po-surface-editor);
+  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
+  --po-terminal-bg: var(--po-surface-terminal);
+
   --po-editor-line: rgba(255, 255, 255, 0.075);
   --po-accent: #8b8cff;
   --po-accent-text: #b7b8ff;

@@ -1,0 +1,111 @@
+.code-preview,
+.document-preview {
+  min-height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: var(--po-editor-bg);
+}
+
+.code-preview-toolbar {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--po-editor-line);
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.code-preview pre {
+  margin: 0;
+  padding: 10px 0;
+  overflow: auto;
+  color: var(--po-text);
+  font-family: var(--po-font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.code-line {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  min-height: 19px;
+}
+
+.line-number {
+  padding-right: 12px;
+  color: var(--po-text-disabled);
+  text-align: right;
+  user-select: none;
+}
+
+.code-codemirror-editor {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--po-editor-bg);
+  color: var(--po-text);
+}
+
+.code-codemirror-editor__host {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.code-codemirror-editor .cm-editor {
+  height: 100%;
+  background: transparent;
+  color: var(--po-text);
+  font-family: var(--po-font-mono);
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: 0;
+}
+
+.code-codemirror-editor .cm-scroller {
+  font-family: var(--po-font-mono);
+}
+
+.code-codemirror-editor .cm-content {
+  min-height: 100%;
+  padding: var(--po-editor-code-padding-block) var(--po-editor-code-padding-inline) var(--po-editor-code-padding-bottom) 12px;
+  caret-color: var(--po-accent);
+}
+
+.code-codemirror-editor .cm-line {
+  padding: 0 4px;
+}
+
+.code-codemirror-editor .cm-gutters {
+  border-right: 1px solid var(--po-editor-line);
+  background: color-mix(in srgb, var(--po-editor-bg) 94%, var(--po-surface));
+  color: var(--po-text-disabled);
+}
+
+.code-codemirror-editor .cm-lineNumbers .cm-gutterElement {
+  min-width: 38px;
+  padding: 0 10px 0 8px;
+  font-size: 12px;
+}
+
+.code-codemirror-editor .cm-activeLine,
+.code-codemirror-editor .cm-activeLineGutter {
+  background: color-mix(in srgb, var(--po-accent) 9%, transparent);
+}
+
+.code-codemirror-editor .cm-selectionBackground,
+.code-codemirror-editor .cm-focused .cm-selectionBackground {
+  background: var(--po-selected);
+}
+
+.code-codemirror-editor .cm-cursor {
+  border-left-color: var(--po-accent);
+}
+
+.code-codemirror-editor .cm-focused {
+  outline: none;
+}
