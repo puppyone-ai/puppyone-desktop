@@ -1,6 +1,6 @@
 .markdown-codemirror-editor {
   --po-markdown-editor-text-width: 724px;
-  --po-markdown-editor-gutter-min: 48px;
+  --po-markdown-editor-gutter-min: 64px;
   --po-markdown-breakout-right-gutter: 48px;
   --po-markdown-breakout-max-width: 1180px;
   --po-markdown-editor-line-spacing: 0px;
@@ -38,7 +38,7 @@
   max-width: none;
   min-height: 100%;
   margin: 0;
-  padding: 48px max(var(--po-markdown-editor-gutter-min), calc((100% - var(--po-markdown-editor-text-width)) / 2)) 84px;
+  padding: 64px max(var(--po-markdown-editor-gutter-min), calc((100% - var(--po-markdown-editor-text-width)) / 2)) 64px;
   caret-color: var(--po-text);
   color: color-mix(in srgb, var(--po-text) 78%, var(--po-text-muted));
   overflow-wrap: anywhere;
@@ -51,7 +51,7 @@
  * theme applies it to every .cm-line.
  */
 .markdown-codemirror-editor[data-live-preview="true"] {
-  --po-markdown-editor-line-spacing: 4px;
+  --po-markdown-editor-line-spacing: 3px;
 }
 
 .markdown-codemirror-editor .cm-line {
@@ -333,8 +333,8 @@
 }
 
 .markdown-codemirror-editor .cm-md-task-line {
-  --md-task-checkbox-size: 1em;
-  --md-task-prefix-width: calc(29px + var(--md-list-depth, 0) * 16px);
+  --md-task-checkbox-size: 1.08em;
+  --md-task-prefix-width: calc(31px + var(--md-list-depth, 0) * 16px);
   position: relative;
   padding-left: var(--md-task-prefix-width);
   color: color-mix(in srgb, var(--po-text) 78%, var(--po-text-muted));
@@ -370,34 +370,51 @@
   justify-content: center;
   margin: 0;
   padding: 0;
-  border: 2px solid var(--po-text-disabled);
-  border-radius: 2px;
+  border: 1px solid color-mix(in srgb, var(--po-text-muted) 58%, transparent);
+  border-radius: 1px;
   background: transparent;
-  color: var(--po-inset);
+  color: var(--po-text-inverse);
   cursor: pointer;
   text-indent: 0;
   text-decoration: none;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
   user-select: none;
 }
 
 .markdown-codemirror-editor .cm-md-task-checkbox:hover {
-  border-color: var(--po-text-subtle);
-  background: color-mix(in srgb, var(--po-control) 44%, transparent);
+  border-color: color-mix(in srgb, var(--po-text-muted) 78%, transparent);
+  background: color-mix(in srgb, var(--po-control-hover) 48%, transparent);
 }
 
 .markdown-codemirror-editor .cm-md-task-checkbox.is-checked {
-  border-color: var(--po-success);
-  background: var(--po-success);
+  border-color: var(--po-accent);
+  background: var(--po-accent);
 }
 
 .markdown-codemirror-editor .cm-md-task-checkbox.is-checked::after {
   content: "";
-  width: 0.34em;
-  height: 0.62em;
+  width: 0.32em;
+  height: 0.58em;
   margin-top: -0.12em;
-  border: solid var(--po-inset);
-  border-width: 0 0.14em 0.14em 0;
+  border: solid currentColor;
+  border-width: 0 0.11em 0.11em 0;
   transform: rotate(45deg);
+}
+
+/*
+ * Block-selected state: when the document selection covers a replaced
+ * widget's whole range, the widget is marked is-doc-selected (native
+ * selection cannot paint replaced-widget interiors). Table styling lives in
+ * markdown-table-widget.css; the other block widgets share one accent ring.
+ */
+.markdown-codemirror-editor .cm-md-code-widget.is-doc-selected,
+.markdown-codemirror-editor .cm-md-mermaid-widget.is-doc-selected,
+.markdown-codemirror-editor .cm-md-html-widget.is-doc-selected,
+.markdown-codemirror-editor .cm-md-image-widget.is-doc-selected {
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-accent) 30%, transparent);
 }
 
 .markdown-codemirror-editor .cm-md-hr-widget {

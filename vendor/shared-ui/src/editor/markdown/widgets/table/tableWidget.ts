@@ -166,6 +166,26 @@ export class MarkdownTableWidget extends WidgetType {
     this.measure.observe(wrapper, view);
     restorePendingMarkdownTableFocus(wrapper, view, this.from);
 
+    if (!view.state.readOnly) {
+      // Clicks on cell padding land on td/th (the contenteditable often does
+      // not fill the full row height). Route those to the cell editor — never
+      // to whole-table selection. Block select stays for document sweeps /
+      // drag-handle menus, not for in-cell clicks.
+      table.addEventListener("mousedown", (event) => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest(".cm-md-table-cell-content")) return;
+        const cell = target.closest("td, th");
+        if (!(cell instanceof HTMLTableCellElement) || !table.contains(cell)) return;
+        const editor = cell.querySelector<HTMLElement>(".cm-md-table-cell-content[contenteditable='true']");
+        if (!editor) return;
+        event.preventDefault();
+        event.stopPropagation();
+        editor.focus();
+      });
+    }
+
     return wrapper;
   }
 

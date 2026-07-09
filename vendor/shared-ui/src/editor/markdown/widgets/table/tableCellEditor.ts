@@ -119,6 +119,12 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
       editing = true;
       content.dataset.mdTableEditing = "true";
       content.textContent = cell.text;
+      // Cell edit owns the chrome; drop the block selection so the table ring
+      // and the cell ring never compete.
+      const selection = view.state.selection.main;
+      if (!selection.empty && selection.from <= tableFrom && selection.to >= tableTo) {
+        view.dispatch({ selection: EditorSelection.cursor(tableFrom) });
+      }
     });
     content.addEventListener("keydown", (event) => {
       event.stopPropagation();

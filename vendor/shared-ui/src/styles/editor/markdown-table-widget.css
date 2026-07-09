@@ -77,10 +77,35 @@
   color: color-mix(in srgb, var(--po-text) 82%, var(--po-text-muted));
   font-size: 12.5px;
   line-height: 1.45;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+/* Hover model: the table frame brightens as one object; only the hovered
+   cell tints — never a whole row. */
+.markdown-codemirror-editor .cm-md-table-widget-wrap:hover .cm-md-table-widget {
+  border-color: color-mix(in srgb, var(--po-text-muted) 30%, var(--po-divider));
+}
+
+/* Document selection sweeping over the table selects it as one block. */
+.markdown-codemirror-editor .cm-md-table-widget-wrap.is-doc-selected .cm-md-table-widget {
+  border-color: color-mix(in srgb, var(--po-accent) 52%, var(--po-divider));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-accent) 22%, transparent);
+}
+
+.markdown-codemirror-editor .cm-md-table-widget-wrap.is-doc-selected .cm-md-table-widget td {
+  background: color-mix(in srgb, var(--po-accent) 8%, transparent);
+}
+
+.markdown-codemirror-editor .cm-md-table-widget-wrap.is-doc-selected .cm-md-table-widget th {
+  background: color-mix(in srgb, var(--po-accent) 12%, color-mix(in srgb, var(--po-control) 46%, transparent));
 }
 
 .markdown-codemirror-editor .cm-md-table-widget th,
 .markdown-codemirror-editor .cm-md-table-widget td {
+  position: relative;
+  /* Classic table trick: height:1px lets the child stretch to the row's
+     computed height so cell padding clicks hit the editor, not the td. */
+  height: 1px;
   min-width: 96px;
   max-width: 280px;
   padding: 0;
@@ -90,6 +115,7 @@
   text-align: left;
   vertical-align: top;
   white-space: normal;
+  transition: background-color 120ms ease;
 }
 
 .markdown-codemirror-editor .cm-md-table-widget th {
@@ -111,7 +137,7 @@
   border-bottom: 0;
 }
 
-.markdown-codemirror-editor .cm-md-table-widget tbody tr:hover td {
+.markdown-codemirror-editor .cm-md-table-widget tbody td:hover {
   background: color-mix(in srgb, var(--po-hover) 48%, transparent);
 }
 
@@ -129,9 +155,12 @@
 
 .markdown-codemirror-editor .cm-md-table-cell-content {
   display: block;
+  box-sizing: border-box;
+  width: 100%;
   min-width: 96px;
   max-width: 280px;
-  min-height: 24px;
+  min-height: 100%;
+  height: 100%;
   padding: 6px 10px;
   outline: 0;
   overflow-wrap: anywhere;
@@ -139,9 +168,23 @@
   cursor: text;
 }
 
-.markdown-codemirror-editor .cm-md-table-cell-content[contenteditable="true"]:focus {
+/*
+ * Focus chrome belongs on the cell (td/th), not the text span. Row height is
+ * driven by the tallest cell in the row, so a ring on the contenteditable
+ * hugs the text and leaves empty padding — the block-editor convention is a
+ * full-cell inset ring instead.
+ */
+.markdown-codemirror-editor .cm-md-table-widget th:focus-within,
+.markdown-codemirror-editor .cm-md-table-widget td:focus-within {
+  position: relative;
+  z-index: 1;
   background: color-mix(in srgb, var(--po-selected) 58%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-accent) 48%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--po-accent) 55%, transparent);
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.markdown-codemirror-editor .cm-md-table-widget th:focus-within {
+  background: color-mix(in srgb, var(--po-selected) 52%, color-mix(in srgb, var(--po-control) 40%, transparent));
 }
 
 .markdown-codemirror-editor .cm-md-table-drag-layer {
@@ -162,12 +205,26 @@
   box-shadow: 0 1px 4px color-mix(in srgb, var(--po-shadow) 14%, transparent);
   color: color-mix(in srgb, var(--po-text-muted) 74%, var(--po-text));
   cursor: grab;
-  pointer-events: auto;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    opacity 140ms ease,
+    left 160ms cubic-bezier(0.2, 0, 0, 1),
+    top 160ms cubic-bezier(0.2, 0, 0, 1);
 }
 
-.markdown-codemirror-editor .cm-md-table-drag-handle[hidden] {
-  display: none;
+/* While hidden, position changes apply instantly so the fade-in starts at
+   the hovered row/column instead of gliding over from a stale one. */
+.markdown-codemirror-editor .cm-md-table-drag-handle:not(.is-visible) {
+  transition-property: background, border-color, color, opacity;
+}
+
+.markdown-codemirror-editor .cm-md-table-drag-handle.is-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .markdown-codemirror-editor .cm-md-table-drag-handle::before {
@@ -306,6 +363,8 @@
   z-index: 10000;
   display: grid;
   width: 236px;
+  animation: cm-md-table-menu-in 120ms cubic-bezier(0.2, 0, 0, 1);
+  transform-origin: top left;
   max-height: min(520px, calc(100vh - 16px));
   gap: 0;
   padding: 6px;
@@ -436,4 +495,26 @@
 .markdown-codemirror-editor .cm-md-table-cell-content i {
   color: inherit;
   font-style: italic;
+}
+
+@keyframes cm-md-table-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markdown-codemirror-editor .cm-md-table-widget,
+  .markdown-codemirror-editor .cm-md-table-widget th,
+  .markdown-codemirror-editor .cm-md-table-widget td,
+  .markdown-codemirror-editor .cm-md-table-cell-content,
+  .markdown-codemirror-editor .cm-md-table-drag-handle,
+  .markdown-codemirror-editor .cm-md-table-structure-button {
+    transition: none;
+  }
+
+  .cm-md-table-context-menu.desktop-menu-surface {
+    animation: none;
+  }
 }

@@ -365,17 +365,22 @@ body.data-sidebar-resizing .data-preview-accessory {
 }
 
 .tree-row.selected {
-  background: var(--tree-row-selected-bg);
+  background: var(--tree-row-hover-bg);
   color: var(--po-text);
 }
 
 .tree-row.selected:not(.active) {
-  background: var(--tree-row-selected-muted-bg);
+  background: var(--tree-row-hover-bg);
 }
 
 .tree-row.active {
-  background: var(--tree-row-selected-bg);
+  background: var(--tree-row-hover-bg);
   color: var(--po-text);
+}
+
+.tree-row.selected:hover,
+.tree-row.active:hover {
+  background: var(--tree-row-selected-bg);
 }
 
 .tree-row.drop-target {

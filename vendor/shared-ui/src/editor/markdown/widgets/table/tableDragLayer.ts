@@ -35,10 +35,11 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
   dropIndicator.hidden = true;
   layer.append(columnHandle, rowHandle, dropIndicator);
 
-  // Single handle pair driven by the hovered cell (Obsidian model): the row
-  // handle straddles the left border of the hovered row, the column handle
-  // straddles the top border of the hovered column. The header row is fixed
-  // and gets no row handle.
+  // Single handle pair driven by the hovered cell: the row handle straddles
+  // the left border of the hovered row, the column handle straddles the top
+  // border of the hovered column. The header row is fixed and gets no row
+  // handle. Visibility is class-driven (not [hidden]) so show/hide can fade
+  // and position changes can glide.
   const hover: { columnIndex: number | null; rowIndex: number | null; dragging: boolean } = {
     columnIndex: null,
     rowIndex: null,
@@ -48,6 +49,22 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
   const getBodyRowElements = () => Array.from(context.table.querySelectorAll<HTMLTableRowElement>("tbody tr"));
   const getHeaderCellElements = () => Array.from(context.table.querySelectorAll<HTMLTableCellElement>("thead th"));
 
+  const setHandleVisible = (handle: HTMLElement, visible: boolean) => {
+    handle.classList.toggle("is-visible", visible);
+  };
+
+  const showHandleAt = (handle: HTMLElement, left: string, top: string) => {
+    const wasVisible = handle.classList.contains("is-visible");
+    handle.style.left = left;
+    handle.style.top = top;
+    if (!wasVisible) {
+      // Flush the position write first so the fade-in starts in place
+      // instead of gliding over from the previous row/column.
+      handle.getBoundingClientRect();
+      handle.classList.add("is-visible");
+    }
+  };
+
   const positionHandles = () => {
     const surface = layer.parentElement;
     if (!surface || !layer.isConnected) return;
@@ -56,12 +73,10 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
     const headerCell = hover.columnIndex == null ? null : getHeaderCellElements()[hover.columnIndex] ?? null;
     if (headerCell && hover.columnIndex != null) {
       const rect = headerCell.getBoundingClientRect();
-      columnHandle.hidden = false;
-      columnHandle.style.left = `${rect.left - surfaceRect.left + rect.width / 2}px`;
-      columnHandle.style.top = "0px";
+      showHandleAt(columnHandle, `${rect.left - surfaceRect.left + rect.width / 2}px`, "0px");
       columnHandle.setAttribute("aria-label", `Column ${hover.columnIndex + 1} actions`);
     } else {
-      columnHandle.hidden = true;
+      setHandleVisible(columnHandle, false);
     }
 
     const bodyRow = hover.rowIndex == null || hover.rowIndex < 1
@@ -69,12 +84,10 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
       : getBodyRowElements()[hover.rowIndex - 1] ?? null;
     if (bodyRow && hover.rowIndex != null) {
       const rect = bodyRow.getBoundingClientRect();
-      rowHandle.hidden = false;
-      rowHandle.style.left = "0px";
-      rowHandle.style.top = `${rect.top - surfaceRect.top + rect.height / 2}px`;
+      showHandleAt(rowHandle, "0px", `${rect.top - surfaceRect.top + rect.height / 2}px`);
       rowHandle.setAttribute("aria-label", `Row ${hover.rowIndex} actions`);
     } else {
-      rowHandle.hidden = true;
+      setHandleVisible(rowHandle, false);
     }
   };
 
@@ -209,7 +222,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
 
     const beginVisualDrag = () => {
       handle.classList.add("is-dragging");
-      otherHandle.hidden = true;
+      setHandleVisible(otherHandle, false);
       context.wrapper.classList.add("is-table-dragging");
       setDragSourceHighlight(kind, sourceIndex, true);
     };
@@ -325,7 +338,9 @@ function createMarkdownTableHandleElement(doc: Document, kind: MarkdownTableDrag
   const handle = doc.createElement("button");
   handle.type = "button";
   handle.className = `cm-md-table-drag-handle cm-md-table-${kind}-handle`;
-  handle.hidden = true;
+  // Pointer-only affordance: it fades with hover, so keep it out of the tab
+  // order (the context menu covers keyboard access to the same operations).
+  handle.tabIndex = -1;
   handle.title = kind === "column"
     ? "Click for column options. Drag to move column"
     : "Click for row options. Drag to move row";

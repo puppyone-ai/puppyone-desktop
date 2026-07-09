@@ -12,6 +12,7 @@ import {
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { markdownLivePreviewDecorations } from "./decorations/livePreviewDecorations";
+import { markdownBlockWidgetSelectionExtension } from "./widgets/blockWidgetSelection";
 import { markdownEditingKeymap } from "./keymap/markdownEditingKeymap";
 import { markdownLivePreviewContextExtension } from "./markdownLivePreviewContext";
 import { markdownComposingBlockLineField, markdownInputCompositionExtension } from "./state/composingBlockLine";
@@ -62,6 +63,7 @@ export function markdownLivePreviewExtension(
     markdownComposingBlockLineField,
     markdownExpandedImageField,
     markdownLivePreviewDecorations,
+    markdownBlockWidgetSelectionExtension,
   ];
 }
 

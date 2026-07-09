@@ -110,6 +110,10 @@
 }
 
 .desktop-tool-sidebar-row.active {
+  background: var(--po-hover);
+}
+
+.desktop-tool-sidebar-row.active:hover:not(:disabled) {
   background: var(--po-selected);
 }
 

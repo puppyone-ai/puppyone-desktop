@@ -268,8 +268,12 @@ body.data-sidebar-resizing * {
 }
 
 .desktop-sidebar-footer-button.active {
-  background: var(--po-selected);
+  background: var(--po-hover);
   color: var(--po-text);
+}
+
+.desktop-sidebar-footer-button.active:hover {
+  background: var(--po-selected);
 }
 
 .desktop-sidebar-surface-switch-icon {
@@ -339,8 +343,12 @@ body.data-sidebar-resizing * {
 }
 
 .desktop-sidebar-rail-button.active {
-  background: var(--po-selected);
+  background: var(--po-hover);
   color: var(--po-text);
+}
+
+.desktop-sidebar-rail-button.active:hover {
+  background: var(--po-selected);
 }
 
 .desktop-sidebar-rail-button:disabled {
@@ -480,34 +488,40 @@ body.data-sidebar-resizing * {
 }
 
 .desktop-sidebar-top-navigation-button.active {
-  background: var(--po-selected);
+  background: var(--po-hover);
   color: var(--po-text);
+}
+
+.desktop-sidebar-top-navigation-button.active:hover {
+  background: var(--po-selected);
 }
 
 .desktop-sidebar-nav-badge {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: -1px;
+  right: -1px;
   display: inline-flex;
   box-sizing: border-box;
-  min-width: 13px;
-  height: 13px;
+  min-width: 16px;
+  height: 16px;
   align-items: center;
   justify-content: center;
-  padding: 0 3px;
+  padding: 0 4px;
   border-radius: 999px;
-  background: #4599df;
-  box-shadow: 0 0 0 1px var(--po-surface-chrome);
-  color: var(--po-text-inverse);
-  font-size: 9px;
+  background: var(--po-notification);
+  box-shadow:
+    0 0 0 1px var(--po-surface-chrome),
+    0 5px 12px color-mix(in srgb, var(--po-notification) 26%, transparent);
+  color: var(--po-notification-text);
+  font-size: 10px;
   font-style: normal;
-  font-weight: 760;
+  font-weight: 780;
   line-height: 1;
   pointer-events: none;
 }
 
 .desktop-sidebar-nav-badge.workspace {
-  background: #c86f17;
+  background: var(--po-notification);
 }
 
 .desktop-sidebar-nav-popover {
@@ -613,13 +627,13 @@ body.data-sidebar-resizing * {
 }
 
 .desktop-sidebar-top-navigation.horizontal .desktop-sidebar-nav-badge {
-  top: 1px;
-  right: 1px;
+  top: -1px;
+  right: -1px;
 }
 
 .desktop-sidebar-top-navigation.vertical .desktop-sidebar-nav-badge {
-  top: 5px;
-  right: 5px;
+  top: 3px;
+  right: 3px;
 }
 
 .browser-column,
@@ -651,6 +665,7 @@ body.data-sidebar-resizing * {
   display: grid;
   min-height: 0;
   place-items: center;
+  background: var(--po-editor-bg);
   border-bottom: 0;
   color: var(--po-text-muted);
   text-align: center;

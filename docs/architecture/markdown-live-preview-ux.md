@@ -280,6 +280,34 @@ alignment; sort-by-column is an enhancement):
   line** at the insertion boundary under the pointer; releasing applies
   one move operation, Escape cancels the drag.
 
+Pointer feedback and motion: hover feedback is scoped to what the pointer
+is actually over — the hovered **cell** tints and the table **frame**
+brightens as one object; whole rows never highlight on mere hover (row/
+column-level highlight is reserved for drag operations, where it marks the
+drag source). All transient affordances (handles, hover tints, "+"
+strips) fade in and out over ~120–160 ms instead of popping; a handle that
+is already visible glides to the next row/column, while a hidden one
+appears in place. Menus animate open with a short fade/scale. All motion
+is suppressed under `prefers-reduced-motion`.
+
+Selection: the table has two visual layers, and they must not be confused:
+
+- **Cell focus** (click anywhere inside a cell — text *or* empty padding):
+  the focused **cell** (`td`/`th`) shows a full-cell inset ring. This is
+  the primary interaction. Empty padding must never select the whole
+  table; that was a hit-target bug (the contenteditable did not fill the
+  row height, so padding clicks landed on `td` and were misrouted).
+- **Block select** (document selection that covers the table's source
+  range, e.g. drag across the table or ⌘A): the whole table shows an
+  accent ring and wash. Copy yields the pipe-table source; Delete
+  removes the table. Block select is *not* triggered by clicking inside
+  a cell.
+
+Native browser selection cannot paint inside a replaced widget, so without
+the block-selected state a selection that covers the table gives no
+feedback at all. Entering a cell clears any covering block selection so
+the two chromes never compete.
+
 Alignment: the delimiter row's `:---:` markers drive per-column text
 alignment in the rendered grid; the context menu sets left / center /
 right per column.
@@ -391,6 +419,15 @@ always raw, never guessed at.
   selected range. Cut behaves identically.
 - Undo of any marker-unit deletion restores the marker and the rendered
   state in one step.
+- A selection that fully covers a replaced widget (table, code block,
+  diagram, HTML block, image) marks that widget **block-selected**: the
+  whole widget shows an accent ring, because native selection painting
+  cannot enter replaced widgets. The state is visual only — copy/delete
+  already operate on the underlying source range. For tables, clicking
+  anywhere inside a cell (text or empty padding) focuses that cell; it
+  does **not** block-select the table. Cell-edit chrome is a full-cell
+  inset ring on the `td`/`th`, not a ring on the text. Block select for
+  tables comes from document-level selection only (drag / ⌘A).
 
 ## 8. Input edge cases
 
@@ -648,6 +685,34 @@ layout and layering rules):
 - [x] Full verification: `tsc --noEmit`, vite build, markdown unit tests,
       ESLint (no new warnings), `check:shared-ui`.
 
+**Phase 10 — table interaction polish** (Part 1 §5 Table, "Pointer
+feedback and motion" / "Selection"; §7 block-selected rule):
+
+- [x] Cell-scoped hover: drop the whole-row hover tint; tint only the
+      hovered body cell and brighten the table frame on wrapper hover.
+- [x] Motion: drag handles fade in/out via an `is-visible` class instead
+      of the `hidden` attribute; visible handles glide (`left`/`top`
+      transition) to the next row/column, hidden ones reposition
+      instantly before fading in (`showHandleAt` flushes the position
+      write first). Context menu opens with a 120 ms fade/scale. All
+      table transitions are disabled under `prefers-reduced-motion`.
+- [x] Block-selected state: a `ViewPlugin`
+      (`widgets/blockWidgetSelection.ts`) toggles `is-doc-selected` on
+      replaced widgets whose source range is fully covered by a non-empty
+      focused selection — accent ring + cell wash on tables, shared
+      accent ring on code/mermaid/HTML/image widgets. For tables, block
+      select is document-selection only; clicking inside a cell never
+      selects the whole table.
+- [x] Cell hit target fills the cell: `td`/`th` use the classic
+      `height: 1px` stretch so `.cm-md-table-cell-content` covers the full
+      row height; padding clicks that still land on `td`/`th` are routed
+      to `editor.focus()`. Clicking empty cell space focuses that cell —
+      never the whole table.
+- [x] Cell-edit chrome on `td`/`th:focus-within` (full-cell inset ring),
+      not on the contenteditable text span — row height is driven by the
+      tallest cell, so a ring on the span hugged the text and left empty
+      padding.
+
 ## 12. Code change map
 
 | Area | Current (`markdownCodeMirrorExtensions.ts`) | Target (Part 1) |
@@ -824,8 +889,8 @@ Changes required by Part 1:
 11. **Vertical rhythm.** Two spacing systems, following the block-editor
     convention: `line-height: 1.68` spaces wrapped visual lines *inside*
     a block, and per-line vertical padding
-    (`--po-markdown-editor-line-spacing`, 4px top and bottom) spaces
-    source lines (blocks) apart — a single-line block advances ~2.25× the
+    (`--po-markdown-editor-line-spacing`, 3px top and bottom) spaces
+    source lines (blocks) apart — a single-line block advances ~2.1× the
     font size. The token is defined at 0 and opened up only under
     `[data-live-preview="true"]`, so source mode stays compact. Blank
     separator lines (`.cm-line` with a lone `<br>`) and table source
@@ -833,6 +898,54 @@ Changes required by Part 1:
     Anything that positions against the first text line must add the
     token (the task checkbox uses `top: calc(token + 0.84em)`); heading
     line paddings override the token by specificity.
+
+12. **Block-widget selection state (Phase 10).** Native selection cannot
+    paint a replaced widget's interior: CM6 replaces the source range
+    with a `contenteditable="false"` DOM island, so a drag or ⌘A that
+    covers a table highlights the text around it and nothing inside it.
+    `drawSelection` doesn't fix this either — no text layer exists there
+    to paint. The remedy is state-driven, not selection-driven:
+    `widgets/blockWidgetSelection.ts` is a `ViewPlugin` that, on
+    selection / doc / viewport / focus changes, finds the rendered block
+    widgets in `contentDOM`, maps each to its source range
+    (`posAtDOM` + the decoration set), and toggles `is-doc-selected`
+    when a non-empty, focused selection fully covers the range. Class
+    toggling runs in a `requestMeasure` write phase (never during
+    `update`), touches only widget-owned DOM, and rebuilds nothing —
+    the visual state costs no decoration churn. Editing semantics need
+    no help: copy/cut/delete already operate on the covered source
+    range.
+
+13. **Table motion (Phase 10).** Handle visibility is class-driven
+    (`is-visible`), never the `hidden` attribute — `display: none`
+    cannot transition. The one subtlety is repositioning while hidden:
+    `left`/`top` are in the transition list so a *visible* handle glides
+    between rows/columns, but a *hidden* handle must not glide in from
+    its stale position, so the base (not `.is-visible`) rule excludes
+    the position properties from the transition and `showHandleAt`
+    flushes the position write (a `getBoundingClientRect` read) before
+    adding the class. Handles are `tabIndex = -1`: they are a
+    pointer-only affordance and the context menu covers keyboard access.
+    Hover tint lives on `td:hover` (cell-scoped), the frame brightens
+    via wrapper `:hover`, and every transition is disabled under
+    `prefers-reduced-motion`.
+
+14. **Table click / focus chrome (Phase 10).** Primary interaction is
+    cell focus, not block select. Clicking anywhere inside a cell —
+    including empty padding below short text in a tall row — focuses
+    that cell's contenteditable and paints a full-cell inset ring via
+    `td:focus-within` / `th:focus-within`. Two mechanisms make padding
+    clicks reliable: (1) the classic table stretch (`td { height: 1px }`
+    + child `height: 100% / min-height: 100%`) so the editor fills the
+    cell; (2) a `table` mousedown fallback that, when the event target
+    is `td`/`th` rather than `.cm-md-table-cell-content`, calls
+    `editor.focus()` instead of selecting the table. Block select
+    (`is-doc-selected`) remains for document-level selections that
+    cover the table source range; it is never the result of an in-cell
+    click. Entering a cell collapses any covering block selection so
+    the two chromes never stack. (An earlier "first click selects the
+    table" model was wrong for tables — that pattern fits atomic media
+    like images, not grids whose primary unit is the cell.)
 
 ## 14. Background: architecture research
 

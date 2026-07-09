@@ -137,6 +137,8 @@
   --po-success-contrast: #fffaf2;
   --po-warning: #b45309;
   --po-danger: #dc2626;
+  --po-notification: #d56c5e;
+  --po-notification-text: #fffaf8;
   --po-info: #0284c7;
   --po-purple: #8057a8;
   --po-text-fill-hover: #241f1a;
@@ -203,7 +205,7 @@
 .dark {
   color-scheme: dark;
 
-  --po-surface-canvas: #202020;
+  --po-surface-canvas: #161413;
   --po-surface-chrome: #1d1b1a;
   --po-surface-panel: #1a1715;
   --po-surface-panel-raised: #211d1a;
@@ -269,6 +271,8 @@
   --po-success-contrast: #0a0a0a;
   --po-warning: #fbbf24;
   --po-danger: #f87171;
+  --po-notification: #d56c5e;
+  --po-notification-text: #fffaf8;
   --po-info: #67e8f9;
   --po-purple: #c084fc;
   --po-text-fill-hover: #ffffff;
@@ -388,6 +392,8 @@
   --po-success: #168145;
   --po-warning: #b46b08;
   --po-danger: #dc2626;
+  --po-notification: #d56c5e;
+  --po-notification-text: #fffaf8;
   --po-info: #0277a8;
   --po-purple: #7457a6;
   --po-text-fill-hover: #22201d;
@@ -482,6 +488,8 @@
   --po-success: #13834a;
   --po-warning: #a66705;
   --po-danger: #dc2626;
+  --po-notification: #d56c5e;
+  --po-notification-text: #fffaf8;
   --po-info: #0f7490;
   --po-purple: #7560b7;
   --po-text-fill-hover: #1f2329;
@@ -516,7 +524,7 @@
 }
 
 :where(.app-shell, .onboarding-shell, .desktop-overlay-root).dark[data-dark-theme-preset="graphite"] {
-  --po-surface-canvas: #141519;
+  --po-surface-canvas: #17181c;
   --po-surface-chrome: #1b1c1f;
   --po-surface-panel: #18191d;
   --po-surface-panel-raised: #1d1f24;

@@ -60,6 +60,10 @@
 }
 
 .file-row.active {
+  background: var(--po-hover);
+}
+
+.file-row.active:hover {
   background: var(--po-selected);
 }
 
