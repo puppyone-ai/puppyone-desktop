@@ -298,13 +298,17 @@
   border-spacing: 0;
   color: var(--po-text);
   font-size: 12px;
+  table-layout: fixed;
+}
+
+.office-spreadsheet-grid__row-header-col {
+  width: 42px;
 }
 
 .office-spreadsheet-grid th,
 .office-spreadsheet-grid td {
   box-sizing: border-box;
-  min-width: 96px;
-  max-width: 260px;
+  min-width: 0;
   height: 30px;
   padding: 0 9px;
   overflow: hidden;
@@ -320,7 +324,6 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  min-width: 42px;
   width: 42px;
   background: var(--po-panel);
   color: var(--po-text-muted);
@@ -335,6 +338,12 @@
 
 .office-spreadsheet-grid tr:nth-child(even) td {
   background: color-mix(in srgb, var(--po-panel) 22%, var(--po-editor-bg));
+}
+
+.office-spreadsheet-grid__spacer td {
+  padding: 0;
+  border: 0;
+  background: transparent !important;
 }
 
 .office-preview__note {

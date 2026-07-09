@@ -17,9 +17,22 @@ type OfficePreviewResult =
 
 type SpreadsheetSheet = {
   name: string;
-  rows: string[][];
+  rows: SpreadsheetRow[];
+  columnWidths: number[];
   totalRows: number;
   totalColumns: number;
+};
+
+type SpreadsheetRow = {
+  rowIndex: number;
+  cells: SpreadsheetCell[];
+};
+
+type SpreadsheetCell = {
+  columnIndex: number;
+  value: string;
+  colSpan: number;
+  rowSpan: number;
 };
 
 type PresentationSlide = {
@@ -28,8 +41,10 @@ type PresentationSlide = {
   lines: string[];
 };
 
-const MAX_SHEET_ROWS = 250;
+const MAX_SHEET_ROWS = 5_000;
 const MAX_SHEET_COLUMNS = 36;
+const SPREADSHEET_ROW_HEIGHT = 30;
+const SPREADSHEET_OVERSCAN_ROWS = 12;
 const MAX_ODF_LINES = 400;
 const MAX_OFFICE_PREVIEW_BYTES = 25 * 1024 * 1024;
 const LEGACY_WORD_EXTENSIONS = new Set(["doc"]);
@@ -164,50 +179,12 @@ function OfficePreviewContent({
   }
 
   if (result.kind === "spreadsheet") {
-    if (result.sheets.length === 0) {
-      return <OfficeEmptyState title="Empty workbook" message="No sheets were found in this workbook." />;
-    }
-
-    const selectedSheet = result.sheets[Math.min(activeSheet, result.sheets.length - 1)];
-    const hasTruncatedRows = selectedSheet.totalRows > selectedSheet.rows.length;
-    const hasTruncatedColumns = selectedSheet.totalColumns > MAX_SHEET_COLUMNS;
-
     return (
-      <div className="office-spreadsheet-preview">
-        <div className="office-spreadsheet-tabs" role="tablist" aria-label="Sheets">
-          {result.sheets.map((sheet, index) => (
-            <button
-              key={sheet.name}
-              type="button"
-              role="tab"
-              aria-selected={index === activeSheet}
-              onClick={() => onActiveSheetChange(index)}
-            >
-              {sheet.name}
-            </button>
-          ))}
-        </div>
-        <div className="office-spreadsheet-grid-wrap">
-          <table className="office-spreadsheet-grid">
-            <tbody>
-              {selectedSheet.rows.map((row, rowIndex) => (
-                <tr key={rowIndex}>
-                  <th scope="row">{rowIndex + 1}</th>
-                  {row.map((cell, columnIndex) => (
-                    <td key={`${rowIndex}-${columnIndex}`}>{cell}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {(hasTruncatedRows || hasTruncatedColumns) && (
-          <div className="office-preview__note">
-            Showing {selectedSheet.rows.length} of {selectedSheet.totalRows} rows
-            {hasTruncatedColumns ? ` and ${MAX_SHEET_COLUMNS} of ${selectedSheet.totalColumns} columns` : ""}.
-          </div>
-        )}
-      </div>
+      <SpreadsheetPreview
+        result={result}
+        activeSheet={activeSheet}
+        onActiveSheetChange={onActiveSheetChange}
+      />
     );
   }
 
@@ -249,6 +226,129 @@ function OfficePreviewContent({
           <p>No readable text was found.</p>
         )}
       </article>
+    </div>
+  );
+}
+
+function SpreadsheetPreview({
+  result,
+  activeSheet,
+  onActiveSheetChange,
+}: {
+  result: Extract<OfficePreviewResult, { kind: "spreadsheet" }>;
+  activeSheet: number;
+  onActiveSheetChange: (index: number) => void;
+}) {
+  const gridWrapRef = useRef<HTMLDivElement | null>(null);
+  const [viewport, setViewport] = useState({ scrollTop: 0, height: 0 });
+
+  const selectedSheet = result.sheets[Math.min(activeSheet, result.sheets.length - 1)];
+
+  useEffect(() => {
+    const gridWrap = gridWrapRef.current;
+    if (!gridWrap) return undefined;
+
+    gridWrap.scrollTop = 0;
+    const updateViewport = () => {
+      setViewport({
+        scrollTop: gridWrap.scrollTop,
+        height: gridWrap.clientHeight,
+      });
+    };
+    const resizeObserver = new ResizeObserver(updateViewport);
+    resizeObserver.observe(gridWrap);
+    updateViewport();
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [selectedSheet?.name]);
+
+  if (result.sheets.length === 0 || !selectedSheet) {
+    return <OfficeEmptyState title="Empty workbook" message="No sheets were found in this workbook." />;
+  }
+
+  const rowCount = selectedSheet.rows.length;
+  const visibleRowCount = viewport.height > 0
+    ? Math.ceil(viewport.height / SPREADSHEET_ROW_HEIGHT) + (SPREADSHEET_OVERSCAN_ROWS * 2)
+    : 60;
+  const startRow = Math.max(0, Math.floor(viewport.scrollTop / SPREADSHEET_ROW_HEIGHT) - SPREADSHEET_OVERSCAN_ROWS);
+  const endRow = Math.min(rowCount, startRow + visibleRowCount);
+  const topSpacerHeight = startRow * SPREADSHEET_ROW_HEIGHT;
+  const bottomSpacerHeight = Math.max(0, (rowCount - endRow) * SPREADSHEET_ROW_HEIGHT);
+  const renderedRows = selectedSheet.rows.slice(startRow, endRow);
+  const hasTruncatedRows = selectedSheet.totalRows > selectedSheet.rows.length;
+  const hasTruncatedColumns = selectedSheet.totalColumns > MAX_SHEET_COLUMNS;
+  const columnSpan = selectedSheet.columnWidths.length + 1;
+
+  const handleScroll = () => {
+    const gridWrap = gridWrapRef.current;
+    if (!gridWrap) return;
+    setViewport({
+      scrollTop: gridWrap.scrollTop,
+      height: gridWrap.clientHeight,
+    });
+  };
+
+  return (
+    <div className="office-spreadsheet-preview">
+      <div className="office-spreadsheet-tabs" role="tablist" aria-label="Sheets">
+        {result.sheets.map((sheet, index) => (
+          <button
+            key={sheet.name}
+            type="button"
+            role="tab"
+            aria-selected={index === activeSheet}
+            onClick={() => onActiveSheetChange(index)}
+          >
+            {sheet.name}
+          </button>
+        ))}
+      </div>
+      <div className="office-spreadsheet-grid-wrap" ref={gridWrapRef} onScroll={handleScroll}>
+        <table className="office-spreadsheet-grid">
+          <colgroup>
+            <col className="office-spreadsheet-grid__row-header-col" />
+            {selectedSheet.columnWidths.map((width, index) => (
+              <col key={index} style={{ width }} />
+            ))}
+          </colgroup>
+          <tbody>
+            {topSpacerHeight > 0 && (
+              <tr className="office-spreadsheet-grid__spacer" aria-hidden="true">
+                <td colSpan={columnSpan} style={{ height: topSpacerHeight }} />
+              </tr>
+            )}
+            {renderedRows.map((row, visibleIndex) => {
+              const rowIndexInSheet = startRow + visibleIndex;
+              return (
+              <tr key={row.rowIndex}>
+                <th scope="row">{row.rowIndex + 1}</th>
+                {row.cells.map((cell) => (
+                  <td
+                    key={`${row.rowIndex}-${cell.columnIndex}`}
+                    colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
+                    rowSpan={cell.rowSpan > 1 ? Math.min(cell.rowSpan, endRow - rowIndexInSheet) : undefined}
+                  >
+                    {cell.value}
+                  </td>
+                ))}
+              </tr>
+              );
+            })}
+            {bottomSpacerHeight > 0 && (
+              <tr className="office-spreadsheet-grid__spacer" aria-hidden="true">
+                <td colSpan={columnSpan} style={{ height: bottomSpacerHeight }} />
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {(hasTruncatedRows || hasTruncatedColumns) && (
+        <div className="office-preview__note">
+          Showing {selectedSheet.rows.length} of {selectedSheet.totalRows} rows
+          {hasTruncatedColumns ? ` and ${MAX_SHEET_COLUMNS} of ${selectedSheet.totalColumns} columns` : ""}.
+        </div>
+      )}
     </div>
   );
 }
@@ -491,21 +591,30 @@ async function parseSpreadsheet(arrayBuffer: ArrayBuffer): Promise<OfficePreview
     sheets: workbook.SheetNames.slice(0, 12).map((sheetName) => {
       const worksheet = workbook.Sheets[sheetName];
       const range = worksheet?.["!ref"] ? XLSX.utils.decode_range(worksheet["!ref"]) : null;
-      const rows = XLSX.utils.sheet_to_json<Array<string | number | boolean | Date | null>>(worksheet, {
-        header: 1,
-        blankrows: false,
-        defval: "",
-        raw: false,
-      });
-      const visibleRows = rows.slice(0, MAX_SHEET_ROWS).map((row) => (
-        row.slice(0, MAX_SHEET_COLUMNS).map(formatCellValue)
-      ));
-      const totalRows = range ? range.e.r - range.s.r + 1 : rows.length;
-      const totalColumns = range ? range.e.c - range.s.c + 1 : Math.max(0, ...rows.map((row) => row.length));
+      const totalRows = range ? range.e.r - range.s.r + 1 : 0;
+      const totalColumns = range ? range.e.c - range.s.c + 1 : 0;
+      const startRowIndex = range?.s.r ?? 0;
+      const startColumnIndex = range?.s.c ?? 0;
+      const endRowIndex = range ? Math.min(range.e.r, range.s.r + MAX_SHEET_ROWS - 1) : -1;
+      const endColumnIndex = range ? Math.min(range.e.c, range.s.c + MAX_SHEET_COLUMNS - 1) : -1;
+      const columnWidths = range
+        ? createSpreadsheetColumnWidths(worksheet?.["!cols"], startColumnIndex, endColumnIndex)
+        : [];
+      const merges = Array.isArray(worksheet?.["!merges"]) ? worksheet["!merges"] : [];
 
       return {
         name: sheetName,
-        rows: normalizeSpreadsheetRows(visibleRows),
+        rows: range
+          ? createSpreadsheetRows({
+            worksheet,
+            merges,
+            startRowIndex,
+            endRowIndex,
+            startColumnIndex,
+            endColumnIndex,
+          })
+          : [],
+        columnWidths,
         totalRows,
         totalColumns,
       };
@@ -559,19 +668,124 @@ async function parseOpenDocument(arrayBuffer: ArrayBuffer, filename: string): Pr
   };
 }
 
-function normalizeSpreadsheetRows(rows: string[][]): string[][] {
-  const columnCount = Math.max(1, ...rows.map((row) => row.length));
-  return rows.map((row) => {
-    const nextRow = row.slice();
-    while (nextRow.length < columnCount) nextRow.push("");
-    return nextRow;
-  });
-}
-
 function formatCellValue(value: string | number | boolean | Date | null | undefined): string {
   if (value === null || value === undefined) return "";
   if (value instanceof Date) return value.toLocaleDateString();
   return String(value);
+}
+
+function createSpreadsheetRows({
+  worksheet,
+  merges,
+  startRowIndex,
+  endRowIndex,
+  startColumnIndex,
+  endColumnIndex,
+}: {
+  worksheet: Record<string, unknown> | undefined;
+  merges: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }>;
+  startRowIndex: number;
+  endRowIndex: number;
+  startColumnIndex: number;
+  endColumnIndex: number;
+}): SpreadsheetRow[] {
+  const coveredCells = new Set<string>();
+  const mergeStarts = new Map<string, { rowSpan: number; colSpan: number }>();
+
+  for (const merge of merges) {
+    if (
+      merge.e.r < startRowIndex
+      || merge.s.r > endRowIndex
+      || merge.e.c < startColumnIndex
+      || merge.s.c > endColumnIndex
+    ) {
+      continue;
+    }
+
+    const mergeStartRow = Math.max(merge.s.r, startRowIndex);
+    const mergeStartColumn = Math.max(merge.s.c, startColumnIndex);
+    const mergeEndRow = Math.min(merge.e.r, endRowIndex);
+    const mergeEndColumn = Math.min(merge.e.c, endColumnIndex);
+    mergeStarts.set(spreadsheetCellKey(mergeStartRow, mergeStartColumn), {
+      rowSpan: mergeEndRow - mergeStartRow + 1,
+      colSpan: mergeEndColumn - mergeStartColumn + 1,
+    });
+
+    for (let rowIndex = mergeStartRow; rowIndex <= mergeEndRow; rowIndex += 1) {
+      for (let columnIndex = mergeStartColumn; columnIndex <= mergeEndColumn; columnIndex += 1) {
+        if (rowIndex === mergeStartRow && columnIndex === mergeStartColumn) continue;
+        coveredCells.add(spreadsheetCellKey(rowIndex, columnIndex));
+      }
+    }
+  }
+
+  const rows: SpreadsheetRow[] = [];
+  for (let rowIndex = startRowIndex; rowIndex <= endRowIndex; rowIndex += 1) {
+    const cells: SpreadsheetCell[] = [];
+    for (let columnIndex = startColumnIndex; columnIndex <= endColumnIndex; columnIndex += 1) {
+      if (coveredCells.has(spreadsheetCellKey(rowIndex, columnIndex))) continue;
+
+      const merge = mergeStarts.get(spreadsheetCellKey(rowIndex, columnIndex));
+      const address = encodeSpreadsheetCell(rowIndex, columnIndex);
+      const cell = worksheet?.[address] as { v?: string | number | boolean | Date | null; w?: string } | undefined;
+      cells.push({
+        columnIndex,
+        value: cell?.w ?? formatCellValue(cell?.v),
+        colSpan: merge?.colSpan ?? 1,
+        rowSpan: merge?.rowSpan ?? 1,
+      });
+    }
+
+    rows.push({ rowIndex, cells });
+  }
+  return rows;
+}
+
+function createSpreadsheetColumnWidths(
+  columns: Array<{ wpx?: number; wch?: number; hidden?: boolean }> | undefined,
+  startColumnIndex: number,
+  endColumnIndex: number,
+): number[] {
+  const widths: number[] = [];
+  for (let columnIndex = startColumnIndex; columnIndex <= endColumnIndex; columnIndex += 1) {
+    const column = columns?.[columnIndex];
+    widths.push(normalizeSpreadsheetColumnWidth(column));
+  }
+  return widths;
+}
+
+function normalizeSpreadsheetColumnWidth(column: { wpx?: number; wch?: number; hidden?: boolean } | undefined): number {
+  if (column?.hidden) return 0;
+  if (typeof column?.wpx === "number" && Number.isFinite(column.wpx)) {
+    return clampSpreadsheetColumnWidth(column.wpx);
+  }
+  if (typeof column?.wch === "number" && Number.isFinite(column.wch)) {
+    return clampSpreadsheetColumnWidth((column.wch * 7) + 12);
+  }
+  return 96;
+}
+
+function clampSpreadsheetColumnWidth(width: number): number {
+  return Math.max(42, Math.min(320, Math.round(width)));
+}
+
+function spreadsheetCellKey(rowIndex: number, columnIndex: number): string {
+  return `${rowIndex}:${columnIndex}`;
+}
+
+function encodeSpreadsheetCell(rowIndex: number, columnIndex: number): string {
+  return `${encodeSpreadsheetColumn(columnIndex)}${rowIndex + 1}`;
+}
+
+function encodeSpreadsheetColumn(columnIndex: number): string {
+  let index = columnIndex + 1;
+  let column = "";
+  while (index > 0) {
+    const remainder = (index - 1) % 26;
+    column = String.fromCharCode(65 + remainder) + column;
+    index = Math.floor((index - 1) / 26);
+  }
+  return column;
 }
 
 function extractXmlText(xml: string): string[] {
