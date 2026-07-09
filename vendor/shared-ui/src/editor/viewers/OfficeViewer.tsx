@@ -11,7 +11,8 @@ type OfficeState =
 type OfficePreviewResult =
   | { kind: "word"; arrayBuffer: ArrayBuffer }
   | { kind: "spreadsheet"; sheets: SpreadsheetSheet[] }
-  | { kind: "presentation"; slides: PresentationSlide[] }
+  | { kind: "presentation"; arrayBuffer: ArrayBuffer }
+  | { kind: "presentationText"; slides: PresentationSlide[] }
   | { kind: "opendocument"; title: string; lines: string[] }
   | { kind: "unsupported"; message: string };
 
@@ -189,31 +190,17 @@ function OfficePreviewContent({
   }
 
   if (result.kind === "presentation") {
-    if (result.slides.length === 0) {
-      return <OfficeEmptyState title="Empty presentation" message="No slide text was found in this presentation." />;
-    }
-
     return (
-      <div className="office-presentation-preview">
-        {result.slides.map((slide) => (
-          <article className="office-slide-card" key={slide.index}>
-            <div className="office-slide-card__number">{slide.index}</div>
-            <div className="office-slide-card__content">
-              <h2>{slide.title}</h2>
-              {slide.lines.length > 0 ? (
-                <ul>
-                  {slide.lines.map((line, index) => (
-                    <li key={`${line}-${index}`}>{line}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>No readable text on this slide.</p>
-              )}
-            </div>
-          </article>
-        ))}
-      </div>
+      <PptxPresentationPreview
+        arrayBuffer={result.arrayBuffer}
+        documentPath={documentPath}
+        openExternalFile={openExternalFile}
+      />
     );
+  }
+
+  if (result.kind === "presentationText") {
+    return <PresentationTextPreview slides={result.slides} />;
   }
 
   return (
@@ -226,6 +213,149 @@ function OfficePreviewContent({
           <p>No readable text was found.</p>
         )}
       </article>
+    </div>
+  );
+}
+
+function PresentationTextPreview({ slides }: { slides: PresentationSlide[] }) {
+  if (slides.length === 0) {
+    return <OfficeEmptyState title="Empty presentation" message="No slide text was found in this presentation." />;
+  }
+
+  return (
+    <div className="office-presentation-preview">
+      {slides.map((slide) => (
+        <article className="office-slide-card" key={slide.index}>
+          <div className="office-slide-card__number">{slide.index}</div>
+          <div className="office-slide-card__content">
+            <h2>{slide.title}</h2>
+            {slide.lines.length > 0 ? (
+              <ul>
+                {slide.lines.map((line, index) => (
+                  <li key={`${line}-${index}`}>{line}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>No readable text on this slide.</p>
+            )}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function PptxPresentationPreview({
+  arrayBuffer,
+  documentPath,
+  openExternalFile,
+}: {
+  arrayBuffer: ArrayBuffer;
+  documentPath: string;
+  openExternalFile?: (path: string) => Promise<void>;
+}) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [renderState, setRenderState] = useState<
+    | { status: "loading" | "ready" }
+    | { status: "fallback"; message: string; slides: PresentationSlide[] }
+    | { status: "error"; message: string }
+  >({ status: "loading" });
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return undefined;
+
+    const abortController = new AbortController();
+    let cancelled = false;
+    let viewer: { destroy: () => void } | null = null;
+
+    host.replaceChildren();
+    setRenderState({ status: "loading" });
+
+    import("@aiden0z/pptx-renderer")
+      .then(({ PptxViewer, RECOMMENDED_ZIP_LIMITS }) => PptxViewer.open(arrayBuffer.slice(0), host, {
+        fitMode: "contain",
+        lazyMedia: true,
+        lazySlides: true,
+        pdfjs: false,
+        renderMode: "list",
+        signal: abortController.signal,
+        zipLimits: RECOMMENDED_ZIP_LIMITS,
+        listOptions: {
+          windowed: true,
+          initialSlides: 4,
+          batchSize: 4,
+        },
+      }))
+      .then((nextViewer) => {
+        if (cancelled) {
+          nextViewer.destroy();
+          return;
+        }
+        viewer = nextViewer;
+        setRenderState({ status: "ready" });
+      })
+      .catch(async (error) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : String(error);
+        try {
+          const fallback = await parsePresentationText(arrayBuffer);
+          if (!cancelled && fallback.kind === "presentationText") {
+            setRenderState({
+              status: "fallback",
+              message: `PuppyOne could not render the high-fidelity PPTX preview. Showing extracted slide text instead. ${message}`,
+              slides: fallback.slides,
+            });
+          }
+        } catch (fallbackError) {
+          if (!cancelled) {
+            const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+            setRenderState({
+              status: "error",
+              message: `PuppyOne could not render this PPTX preview. ${message} Text fallback also failed: ${fallbackMessage}`,
+            });
+          }
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      abortController.abort();
+      viewer?.destroy();
+      host.replaceChildren();
+    };
+  }, [arrayBuffer]);
+
+  if (renderState.status === "fallback") {
+    return (
+      <div className="office-pptx-render-preview">
+        <div className="office-preview__note">{renderState.message}</div>
+        <PresentationTextPreview slides={renderState.slides} />
+      </div>
+    );
+  }
+
+  if (renderState.status === "error") {
+    return (
+      <OfficeEmptyState
+        title="Preview failed"
+        message={renderState.message}
+        documentPath={documentPath}
+        openExternalFile={openExternalFile}
+      />
+    );
+  }
+
+  return (
+    <div className="office-pptx-render-preview">
+      <div
+        ref={hostRef}
+        className="office-pptx-render-host"
+        data-rendering={renderState.status === "loading" ? "true" : undefined}
+      />
+      {renderState.status === "loading" && (
+        <div className="office-pptx-render-state">Rendering presentation...</div>
+      )}
     </div>
   );
 }
@@ -321,18 +451,18 @@ function SpreadsheetPreview({
             {renderedRows.map((row, visibleIndex) => {
               const rowIndexInSheet = startRow + visibleIndex;
               return (
-              <tr key={row.rowIndex}>
-                <th scope="row">{row.rowIndex + 1}</th>
-                {row.cells.map((cell) => (
-                  <td
-                    key={`${row.rowIndex}-${cell.columnIndex}`}
-                    colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
-                    rowSpan={cell.rowSpan > 1 ? Math.min(cell.rowSpan, endRow - rowIndexInSheet) : undefined}
-                  >
-                    {cell.value}
-                  </td>
-                ))}
-              </tr>
+                <tr key={row.rowIndex}>
+                  <th scope="row">{row.rowIndex + 1}</th>
+                  {row.cells.map((cell) => (
+                    <td
+                      key={`${row.rowIndex}-${cell.columnIndex}`}
+                      colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
+                      rowSpan={cell.rowSpan > 1 ? Math.min(cell.rowSpan, endRow - rowIndexInSheet) : undefined}
+                    >
+                      {cell.value}
+                    </td>
+                  ))}
+                </tr>
               );
             })}
             {bottomSpacerHeight > 0 && (
@@ -554,7 +684,12 @@ async function loadOfficePreview({
       if (!isOpenDocumentExtension(extension)) throw error;
     }
   }
-  if (isPresentationExtension(extension)) return parsePresentation(arrayBuffer);
+  if (isPresentationExtension(extension)) {
+    return {
+      kind: "presentation",
+      arrayBuffer,
+    };
+  }
   if (isOpenDocumentExtension(extension)) return parseOpenDocument(arrayBuffer, filename);
 
   return {
@@ -622,7 +757,7 @@ async function parseSpreadsheet(arrayBuffer: ArrayBuffer): Promise<OfficePreview
   };
 }
 
-async function parsePresentation(arrayBuffer: ArrayBuffer): Promise<OfficePreviewResult> {
+async function parsePresentationText(arrayBuffer: ArrayBuffer): Promise<OfficePreviewResult> {
   const { default: JSZip } = await import("jszip");
   const zip = await JSZip.loadAsync(arrayBuffer);
   const slideEntries = Object.values(zip.files)
@@ -643,7 +778,7 @@ async function parsePresentation(arrayBuffer: ArrayBuffer): Promise<OfficePrevie
     }),
   );
 
-  return { kind: "presentation", slides };
+  return { kind: "presentationText", slides };
 }
 
 async function parseOpenDocument(arrayBuffer: ArrayBuffer, filename: string): Promise<OfficePreviewResult> {
