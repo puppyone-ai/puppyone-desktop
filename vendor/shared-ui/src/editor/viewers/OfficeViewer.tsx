@@ -718,6 +718,7 @@ async function parseSpreadsheet(arrayBuffer: ArrayBuffer): Promise<OfficePreview
   const workbook = XLSX.read(arrayBuffer, {
     type: "array",
     cellDates: true,
+    cellStyles: true,
     dense: false,
   });
 
