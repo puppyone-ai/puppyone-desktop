@@ -84,6 +84,11 @@ export type AppPreviewController = {
   openExternal?: (path: string) => Promise<void>;
 };
 
+export type OfficeDocumentConversionResult = {
+  arrayBuffer: ArrayBuffer;
+  warnings?: string[];
+};
+
 export type DataImportResult = {
   paths: string[];
 };
@@ -105,6 +110,8 @@ export type DataPort = {
   listChildren: (folderPath: string | null) => Promise<DataNode[]>;
   readFile?: (path: string) => Promise<FileContent>;
   getFileUrl?: (path: string) => string | Promise<string>;
+  openExternalFile?: (path: string) => Promise<void>;
+  convertOfficeDocumentToDocx?: (path: string) => Promise<OfficeDocumentConversionResult>;
   appPreview?: AppPreviewController;
   writeFile?: (path: string, content: string) => Promise<void>;
   createFolder?: (path: string) => Promise<void>;

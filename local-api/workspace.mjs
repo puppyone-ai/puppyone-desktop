@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -11,6 +12,9 @@ const MAX_EDITOR_BYTES = 1024 * 1024;
 // Cap for whole-file reads served over the puppyone-local:// protocol (media
 // preview). Bounds main-process memory so a huge file can't OOM the app.
 const MAX_LOCAL_FILE_BYTES = 100 * 1024 * 1024;
+const MAX_OFFICE_CONVERSION_INPUT_BYTES = 25 * 1024 * 1024;
+const MAX_OFFICE_CONVERSION_OUTPUT_BYTES = 8 * 1024 * 1024;
+const OFFICE_CONVERSION_TIMEOUT_MS = 8000;
 const GIT_HISTORY_LIMIT = 100;
 const GIT_ALL_BRANCH_HISTORY_LIMIT = 320;
 const GIT_REMOTE_PREVIEW_LIMIT = 12;
@@ -259,7 +263,7 @@ export async function listFolderChildren(rootPath, folderPath) {
   return nodes;
 }
 
-export async function readWorkspaceFile(rootPath, relativePath) {
+export async function readWorkspaceFile(rootPath, relativePath, options = undefined) {
   const filePath = resolveWorkspacePath(rootPath, relativePath);
   const metadata = await fs.stat(filePath).catch((error) => {
     throw new Error(`Unable to read file: ${error.message}`);
@@ -270,6 +274,43 @@ export async function readWorkspaceFile(rootPath, relativePath) {
   if (metadata.size > MAX_LOCAL_FILE_BYTES) {
     throw new Error("File is too large to serve.");
   }
+
+  if (options && Object.prototype.hasOwnProperty.call(options, "rangeHeader")) {
+    const range = parseByteRange(options.rangeHeader, metadata.size);
+    if (range?.unsatisfiable) {
+      return {
+        bytes: Buffer.alloc(0),
+        size: metadata.size,
+        start: 0,
+        end: 0,
+        partial: false,
+        unsatisfiable: true,
+      };
+    }
+
+    if (range) {
+      const bytes = await readFileSlice(filePath, range.start, range.end);
+      return {
+        bytes,
+        size: metadata.size,
+        start: range.start,
+        end: range.start + bytes.length - 1,
+        partial: true,
+        unsatisfiable: false,
+      };
+    }
+
+    const bytes = await fs.readFile(filePath);
+    return {
+      bytes,
+      size: metadata.size,
+      start: 0,
+      end: Math.max(0, metadata.size - 1),
+      partial: false,
+      unsatisfiable: false,
+    };
+  }
+
   return fs.readFile(filePath);
 }
 
@@ -306,6 +347,121 @@ export async function readWorkspaceTextFile(rootPath, relativePath) {
     mimeType: getMimeType(filePath) ?? "text/plain; charset=utf-8",
     size: formatFileSize(metadata.size),
   };
+}
+
+export async function convertWorkspaceOfficeDocumentToDocx(rootPath, relativePath) {
+  if (process.platform !== "darwin") {
+    throw new Error("Desktop Office conversion is only available on macOS.");
+  }
+
+  const filePath = resolveWorkspacePath(rootPath, relativePath);
+  const metadata = await fs.stat(filePath).catch((error) => {
+    throw new Error(`Unable to read file metadata: ${error.message}`);
+  });
+
+  if (metadata.isDirectory()) {
+    throw new Error("Selected path is a folder.");
+  }
+  if (metadata.size > MAX_OFFICE_CONVERSION_INPUT_BYTES) {
+    throw new Error(`File is larger than the ${formatFileSize(MAX_OFFICE_CONVERSION_INPUT_BYTES)} Office preview limit.`);
+  }
+
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension !== ".doc" && extension !== ".rtf") {
+    throw new Error("Only .doc and .rtf files can be converted by this preview bridge.");
+  }
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "puppyone-office-"));
+  const outputPath = path.join(tempDir, `${path.basename(filePath, extension)}.docx`);
+  let stderr = "";
+
+  try {
+    const result = await execFileAsync("textutil", ["-convert", "docx", filePath, "-output", outputPath], {
+      encoding: "utf8",
+      maxBuffer: MAX_OFFICE_CONVERSION_OUTPUT_BYTES,
+      timeout: OFFICE_CONVERSION_TIMEOUT_MS,
+      windowsHide: true,
+    }).catch((error) => {
+      if (error?.killed || error?.signal === "SIGTERM") {
+        throw new Error("Office conversion timed out.");
+      }
+      if (error?.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
+        throw new Error(`Office conversion output exceeded the ${formatFileSize(MAX_OFFICE_CONVERSION_OUTPUT_BYTES)} process output limit.`);
+      }
+      throw new Error(`Office conversion failed: ${error.message}`);
+    });
+    stderr = String(result.stderr ?? "");
+
+    const outputMetadata = await fs.stat(outputPath).catch((error) => {
+      throw new Error(`Office conversion did not produce a DOCX file: ${error.message}`);
+    });
+    if (!outputMetadata.isFile()) {
+      throw new Error("Office conversion did not produce a DOCX file.");
+    }
+    if (outputMetadata.size > MAX_OFFICE_CONVERSION_INPUT_BYTES) {
+      throw new Error(`Converted DOCX is larger than the ${formatFileSize(MAX_OFFICE_CONVERSION_INPUT_BYTES)} Office preview limit.`);
+    }
+
+    const warnings = stderr
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    return {
+      bytes: await fs.readFile(outputPath),
+      warnings,
+    };
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+function parseByteRange(rangeHeader, size) {
+  if (typeof rangeHeader !== "string" || rangeHeader.trim().length === 0) return null;
+
+  const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
+  if (!match || size <= 0) return { unsatisfiable: true };
+
+  const [, startValue, endValue] = match;
+  if (!startValue && !endValue) return { unsatisfiable: true };
+
+  if (!startValue) {
+    const suffixLength = Number(endValue);
+    if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0) return { unsatisfiable: true };
+    return {
+      start: Math.max(size - suffixLength, 0),
+      end: size - 1,
+    };
+  }
+
+  const start = Number(startValue);
+  const end = endValue ? Number(endValue) : size - 1;
+  if (
+    !Number.isSafeInteger(start) ||
+    !Number.isSafeInteger(end) ||
+    start < 0 ||
+    end < start ||
+    start >= size
+  ) {
+    return { unsatisfiable: true };
+  }
+
+  return {
+    start,
+    end: Math.min(end, size - 1),
+  };
+}
+
+async function readFileSlice(filePath, start, end) {
+  const length = end - start + 1;
+  const handle = await fs.open(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(length);
+    const { bytesRead } = await handle.read(buffer, 0, length, start);
+    return bytesRead === length ? buffer : buffer.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
+  }
 }
 
 export function getMimeType(filePath) {

@@ -35,7 +35,7 @@
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  background: var(--po-surface-chrome);
+  background: var(--po-sidebar);
   border-right: 1px solid var(--po-divider);
 }
 
@@ -56,11 +56,11 @@
 }
 
 .data-explorer-view-frame {
-  background: var(--po-surface-chrome);
+  background: var(--po-sidebar);
 }
 
 .data-explorer-rail {
-  background: var(--po-surface-chrome);
+  background: var(--po-sidebar);
   border-right: 1px solid var(--po-divider);
 }
 
@@ -167,7 +167,7 @@ body.data-sidebar-resizing * {
   box-sizing: border-box;
   flex: 0 0 var(--desktop-sidebar-navigation-height);
   min-height: var(--desktop-sidebar-navigation-height);
-  background: var(--po-surface-chrome);
+  background: var(--po-sidebar);
 }
 
 .desktop-sidebar-navigation-surface[data-placement="top"] {
@@ -186,7 +186,7 @@ body.data-sidebar-resizing * {
 
 .data-explorer-footer:has(.desktop-sidebar-navigation-surface[data-placement="bottom"]) {
   border-top: 0;
-  background: var(--po-surface-chrome);
+  background: var(--po-sidebar);
 }
 
 .desktop-data-workspace-wrap[data-sidebar-navigation-placement="top"] .explorer-tree-shell::before,
@@ -205,8 +205,8 @@ body.data-sidebar-resizing * {
   background:
     linear-gradient(
       to bottom,
-      var(--po-surface-chrome) 0%,
-      color-mix(in srgb, var(--po-surface-chrome) 78%, transparent) 46%,
+      var(--po-sidebar) 0%,
+      color-mix(in srgb, var(--po-sidebar) 78%, transparent) 46%,
       transparent 100%
     );
   opacity: var(--tree-edge-fade-top, 0);
@@ -218,8 +218,8 @@ body.data-sidebar-resizing * {
   background:
     linear-gradient(
       to top,
-      var(--po-surface-chrome) 0%,
-      color-mix(in srgb, var(--po-surface-chrome) 78%, transparent) 46%,
+      var(--po-sidebar) 0%,
+      color-mix(in srgb, var(--po-sidebar) 78%, transparent) 46%,
       transparent 100%
     );
   opacity: var(--tree-edge-fade-bottom, 0);
@@ -293,7 +293,7 @@ body.data-sidebar-resizing * {
   position: absolute;
   right: 1px;
   bottom: 1px;
-  filter: drop-shadow(0 0 1px var(--po-surface-chrome));
+  filter: drop-shadow(0 0 1px var(--po-sidebar));
 }
 
 .desktop-sidebar-footer-button:disabled {
@@ -311,7 +311,7 @@ body.data-sidebar-resizing * {
   align-items: center;
   gap: var(--desktop-sidebar-nav-gap);
   padding: var(--desktop-sidebar-nav-padding);
-  background: var(--po-surface-chrome);
+  background: var(--po-sidebar);
 }
 
 .desktop-sidebar-rail-actions {
@@ -510,7 +510,7 @@ body.data-sidebar-resizing * {
   border-radius: 999px;
   background: var(--po-notification);
   box-shadow:
-    0 0 0 1px var(--po-surface-chrome),
+    0 0 0 1px var(--po-sidebar),
     0 5px 12px color-mix(in srgb, var(--po-notification) 26%, transparent);
   color: var(--po-notification-text);
   font-size: 10px;

@@ -15,8 +15,8 @@
   flex-direction: column;
   height: 100%;
   min-width: 47px;
-  background: var(--po-surface-chrome);
-  border-right: 1px solid transparent;
+  background: var(--po-sidebar);
+  border-right: 1px solid var(--po-divider);
   transition: width 160ms ease;
 }
 
@@ -338,7 +338,7 @@
   min-height: 46px;
   padding: 0 16px;
   border-bottom: 1px solid transparent;
-  background: var(--po-surface-chrome);
+  background: var(--po-header);
   -webkit-app-region: drag;
   user-select: none;
 }

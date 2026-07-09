@@ -7,7 +7,7 @@
   margin-top: 0;
   padding: 3px var(--git-sidebar-right-gap) 4px var(--git-sidebar-left-gap);
   border-top: 1px solid color-mix(in srgb, var(--po-border-subtle) 76%, transparent);
-  background: color-mix(in srgb, var(--po-surface-chrome) 94%, var(--po-panel));
+  background: color-mix(in srgb, var(--po-sidebar) 94%, var(--po-panel));
 }
 
 .desktop-git-history-drawer-header {
@@ -144,7 +144,7 @@
   height: 7px;
   border: 1.5px solid var(--po-text-disabled);
   border-radius: 2px;
-  background: var(--po-surface-chrome);
+  background: var(--po-sidebar);
   transform: translateY(-50%);
 }
 

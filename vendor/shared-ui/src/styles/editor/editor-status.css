@@ -144,6 +144,44 @@
   color: var(--po-danger);
 }
 
+.editor-state--stacked {
+  place-content: center;
+  gap: 7px;
+  padding: 24px;
+  text-align: center;
+}
+
+.editor-state--stacked strong {
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.editor-state--stacked span {
+  max-width: 520px;
+  overflow-wrap: anywhere;
+}
+
+.editor-state--stacked button {
+  height: 30px;
+  justify-self: center;
+  margin-top: 6px;
+  padding: 0 11px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: var(--desktop-control-radius, 6px);
+  background: var(--po-control);
+  color: var(--po-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.editor-state--stacked button:hover {
+  background: var(--po-control-hover);
+}
+
 .editor-crash-state {
   display: grid;
   width: 100%;

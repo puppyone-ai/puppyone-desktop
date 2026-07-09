@@ -32,15 +32,15 @@
 .change-list-panel {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid transparent;
-  background: var(--po-surface-chrome);
+  border-right: 1px solid var(--po-divider);
+  background: var(--po-sidebar);
 }
 
 .change-list-panel .browser-toolbar {
   height: var(--desktop-sidebar-toolbar-height);
   min-height: var(--desktop-sidebar-toolbar-height);
   padding: 0 var(--desktop-sidebar-toolbar-padding-right) 0 var(--desktop-sidebar-toolbar-padding-left);
-  background: var(--po-surface-chrome);
+  background: var(--po-sidebar);
 }
 
 .change-list-panel .browser-toolbar h1 {

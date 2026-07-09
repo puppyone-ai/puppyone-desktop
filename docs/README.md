@@ -13,6 +13,8 @@ directly:
 - [Smooth Preview Transitions](architecture/smooth-preview-transitions.md)
 - [Desktop Sidebar View Stack](architecture/desktop-sidebar-view-stack.md)
 - [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)
+- [File Format and Viewer Pipeline](architecture/file-format-viewer-pipeline.md)
+- [Viewer Plugin Architecture (Reserved)](architecture/viewer-plugin-architecture.md)
 - [Explorer Tree Lifecycle](architecture/explorer-tree-lifecycle.md)
 - [Desktop Multi-Window Workspaces](architecture/desktop-multi-window-workspaces.md)
 - [Desktop Auto Update Lifecycle](architecture/desktop-auto-update-lifecycle.md)

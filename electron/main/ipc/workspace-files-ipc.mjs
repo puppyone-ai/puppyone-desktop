@@ -1,6 +1,7 @@
 import path from "node:path";
 import {
   createWorkspaceEntry,
+  convertWorkspaceOfficeDocumentToDocx,
   deleteWorkspaceEntry,
   importWorkspaceEntries,
   listFolderChildren,
@@ -47,6 +48,18 @@ export function registerWorkspaceFileIpcHandlers({
       throw new Error("File path is required.");
     }
     return readWorkspaceTextFile(rootPath, filePath);
+  });
+
+  ipcMain.handle("workspace:convert-office-docx", async (_event, request) => {
+    const rootPath = request?.rootPath;
+    const filePath = request?.path;
+    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
+      throw new Error("Workspace root path is required.");
+    }
+    if (typeof filePath !== "string" || filePath.trim().length === 0) {
+      throw new Error("File path is required.");
+    }
+    return convertWorkspaceOfficeDocumentToDocx(rootPath, filePath);
   });
 
   ipcMain.handle("workspace:write-file", async (_event, request) => {

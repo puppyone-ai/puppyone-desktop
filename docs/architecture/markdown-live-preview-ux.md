@@ -184,7 +184,10 @@ the hidden marker prefix — the leftmost place the caret can be on that line.
 ### Task items (`- [ ]`, `- [x]`)
 
 - Rendered as a clickable checkbox; clicking toggles `[ ]`/`[x]` in the
-  source.
+  source. Visually: a crisp near-square control (~1.5px radius) with a
+  solid ~1.5px stroke in plain text color (never a muted-gray mix, which
+  reads muddy); checked fills with the accent and a white checkmark. The
+  box-to-text gap is ~9px — the tight to-do list convention.
 - Composing/commit/backspace follow list rules; Backspace at visible start
   first removes the `[ ] ` bracket (leaving a plain list item), a second
   removes the list marker.

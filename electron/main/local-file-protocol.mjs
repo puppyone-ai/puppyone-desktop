@@ -17,13 +17,40 @@ export function registerLocalFileProtocol({
       }
 
       const contentType = getMimeType(relativePath) ?? "application/octet-stream";
-      return new Response(await readWorkspaceFile(canonicalRoot, relativePath), {
-        headers: {
-          "Content-Type": contentType,
-          "Access-Control-Allow-Origin": "*",
-          "Accept-Ranges": "bytes",
-        },
-      });
+      const rangeHeader = request.headers.get("range");
+      const fileResult = await readWorkspaceFile(canonicalRoot, relativePath, { rangeHeader });
+      if (fileResult?.unsatisfiable) {
+        return new Response(null, {
+          status: 416,
+          headers: {
+            "Content-Range": `bytes */${fileResult.size}`,
+            "Access-Control-Allow-Origin": "*",
+            "Accept-Ranges": "bytes",
+          },
+        });
+      }
+
+      const bytes = Buffer.isBuffer(fileResult) ? fileResult : fileResult.bytes;
+      const size = Buffer.isBuffer(fileResult) ? bytes.length : fileResult.size;
+      const headers = {
+        "Content-Type": contentType,
+        "Content-Length": String(bytes.length),
+        "Access-Control-Allow-Origin": "*",
+        "Accept-Ranges": "bytes",
+      };
+      const responseInit = {
+        status: Buffer.isBuffer(fileResult) || !fileResult.partial ? 200 : 206,
+        headers,
+      };
+
+      if (!Buffer.isBuffer(fileResult) && fileResult.partial) {
+        responseInit.headers = {
+          ...headers,
+          "Content-Range": `bytes ${fileResult.start}-${fileResult.end}/${size}`,
+        };
+      }
+
+      return new Response(bytes, responseInit);
     } catch {
       return new Response("Not found", { status: 404 });
     }

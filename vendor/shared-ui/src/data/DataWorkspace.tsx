@@ -1183,6 +1183,8 @@ export function DataWorkspace({
                   markdownLinkGraph={markdownLinkGraph}
                   markdownAssetUrlResolver={markdownAssetUrlResolver}
                   appPreview={dataPort.appPreview ?? null}
+                  openExternalFile={dataPort.openExternalFile}
+                  convertOfficeDocumentToDocx={dataPort.convertOfficeDocumentToDocx}
                   emptySlot={emptySlot}
                   actionSlot={previewActionSlot}
                   renderBody={renderPreviewBody}

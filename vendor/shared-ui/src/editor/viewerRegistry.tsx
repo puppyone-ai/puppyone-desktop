@@ -144,11 +144,13 @@ export function shouldReadEditorContent(input: {
 
 function isOfficeDocument(name: string, mimeType?: string | null): boolean {
   const lowerName = name.toLowerCase();
-  if (/\.(docx?|xlsx?|xlsm|xlsb|pptx?|ppsx?|odt|ott|ods|ots|odp|otp)$/.test(lowerName)) return true;
+  if (/\.(docx?|rtf|xlsx?|xlsm|xlsb|pptx?|ppsx?|odt|ott|ods|ots|odp|otp)$/.test(lowerName)) return true;
 
   const normalizedMime = mimeType?.toLowerCase().split(";")[0].trim() ?? "";
   return (
     normalizedMime === "application/msword" ||
+    normalizedMime === "application/rtf" ||
+    normalizedMime === "text/rtf" ||
     normalizedMime === "application/vnd.ms-excel" ||
     normalizedMime === "application/vnd.ms-powerpoint" ||
     normalizedMime.startsWith("application/vnd.openxmlformats-officedocument.") ||

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { AppPreviewController } from "../core/types";
+import type { AppPreviewController, OfficeDocumentConversionResult } from "../core/types";
 import type { FileFormat } from "../core/fileFormats";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
@@ -101,6 +101,8 @@ export type EditorViewerContext = EditorViewerMatch & {
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
+  openExternalFile?: (path: string) => Promise<void>;
+  convertOfficeDocumentToDocx?: (path: string) => Promise<OfficeDocumentConversionResult>;
   onSaveContent?: (content: string) => Promise<void>;
 };
 

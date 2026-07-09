@@ -465,7 +465,7 @@ function shellQuotePath(pathValue: string) {
 
 function readTerminalTheme(element: HTMLElement): ITheme {
   return {
-    background: cssColor(element, "--po-surface-terminal", cssColor(element, "--po-terminal-bg", "#fbf6ed")),
+    background: cssColor(element, "--po-terminal-bg", cssColor(element, "--po-surface-terminal", "#fbf6ed")),
     foreground: cssColor(element, "--po-terminal-fg", cssColor(element, "--po-text", "#2f2a23")),
     cursor: cssColor(element, "--po-terminal-cursor", cssColor(element, "--po-text", "#2f2a23")),
     selectionBackground: cssColor(element, "--po-terminal-selection", cssColor(element, "--po-selected", "rgba(73, 55, 35, 0.17)")),

@@ -366,6 +366,16 @@ export type WorkspaceRevealEntryRequest = {
   path: string;
 };
 
+export type WorkspaceConvertOfficeDocumentToDocxRequest = {
+  rootPath: string;
+  path: string;
+};
+
+export type WorkspaceConvertOfficeDocumentToDocxResult = {
+  bytes: ArrayBuffer;
+  warnings?: string[];
+};
+
 export type WorkspaceOpenEntryExternalRequest = {
   rootPath: string;
   path: string;
@@ -522,6 +532,9 @@ declare global {
         rootPath: string;
         path: string;
       }) => Promise<FileContent>;
+      convertOfficeDocumentToDocx: (
+        request: WorkspaceConvertOfficeDocumentToDocxRequest,
+      ) => Promise<WorkspaceConvertOfficeDocumentToDocxResult>;
       writeFile: (request: {
         rootPath: string;
         path: string;

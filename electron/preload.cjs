@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   getPathForFile: (file) => webUtils.getPathForFile(file),
   listFolderChildren: (request) => ipcRenderer.invoke("workspace:list-folder-children", request),
   readFile: (request) => ipcRenderer.invoke("workspace:read-file", request),
+  convertOfficeDocumentToDocx: (request) => ipcRenderer.invoke("workspace:convert-office-docx", request),
   writeFile: (request) => ipcRenderer.invoke("workspace:write-file", request),
   createEntry: (request) => ipcRenderer.invoke("workspace:create-entry", request),
   renameEntry: (request) => ipcRenderer.invoke("workspace:rename-entry", request),

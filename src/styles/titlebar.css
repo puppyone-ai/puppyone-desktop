@@ -9,7 +9,9 @@
   min-height: var(--desktop-chrome-height);
   padding: 4px 6px 4px 86px;
   border-bottom: 1px solid var(--po-header-divider);
-  background: var(--po-surface-chrome);
+  /* Header belongs to the content region: same surface as the editor
+     (unified-toolbar convention); only sidebars keep the chrome tint. */
+  background: var(--po-header);
   -webkit-app-region: drag;
   user-select: none;
 }
@@ -145,7 +147,7 @@
   right: 6px;
   width: 6px;
   height: 6px;
-  border: 1px solid var(--po-surface-chrome);
+  border: 1px solid var(--po-header);
   border-radius: 999px;
   background: var(--po-accent);
   pointer-events: none;

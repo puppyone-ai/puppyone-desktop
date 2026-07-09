@@ -23,6 +23,8 @@ export type PuppyoneEditorHostProps = {
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
+  openExternalFile?: (path: string) => Promise<void>;
+  convertOfficeDocumentToDocx?: (path: string) => Promise<{ arrayBuffer: ArrayBuffer; warnings?: string[] }>;
 };
 
 export function PuppyoneEditorHost({
@@ -40,6 +42,8 @@ export function PuppyoneEditorHost({
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
   appPreview = null,
+  openExternalFile,
+  convertOfficeDocumentToDocx,
 }: PuppyoneEditorHostProps) {
   const { viewer, format } = resolveEditorViewer(document);
   const rawContent = viewer.allowPreviewContent === false
@@ -53,7 +57,14 @@ export function PuppyoneEditorHost({
   }
 
   if (viewer.source !== "resource" && error && !content) {
-    return <div className="editor-state danger">{error}</div>;
+    return (
+      <EditorUnavailableState
+        title="Cannot open in editor"
+        message={error}
+        documentPath={document.path}
+        openExternalFile={openExternalFile}
+      />
+    );
   }
 
   return (
@@ -76,8 +87,34 @@ export function PuppyoneEditorHost({
         markdownLinkGraph,
         markdownAssetUrlResolver,
         appPreview,
+        openExternalFile,
+        convertOfficeDocumentToDocx,
         onSaveContent,
       })}
     </>
+  );
+}
+
+function EditorUnavailableState({
+  title,
+  message,
+  documentPath,
+  openExternalFile,
+}: {
+  title: string;
+  message: string;
+  documentPath: string;
+  openExternalFile?: (path: string) => Promise<void>;
+}) {
+  return (
+    <div className="editor-state editor-state--stacked danger">
+      <strong>{title}</strong>
+      <span>{message}</span>
+      {openExternalFile && (
+        <button type="button" onClick={() => void openExternalFile(documentPath)}>
+          Open in default app
+        </button>
+      )}
+    </div>
   );
 }

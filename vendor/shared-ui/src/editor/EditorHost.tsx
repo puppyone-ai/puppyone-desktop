@@ -21,6 +21,8 @@ export type EditorHostProps = {
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
+  openExternalFile?: (path: string) => Promise<void>;
+  convertOfficeDocumentToDocx?: (path: string) => Promise<{ arrayBuffer: ArrayBuffer; warnings?: string[] }>;
   deferFallbackContent?: boolean;
 };
 
@@ -41,6 +43,8 @@ export function EditorHost({
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
   appPreview = null,
+  openExternalFile,
+  convertOfficeDocumentToDocx,
   deferFallbackContent = false,
 }: EditorHostProps) {
   return (
@@ -67,6 +71,8 @@ export function EditorHost({
       markdownLinkGraph={markdownLinkGraph}
       markdownAssetUrlResolver={markdownAssetUrlResolver}
       appPreview={appPreview}
+      openExternalFile={openExternalFile}
+      convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
     />
   );
 }

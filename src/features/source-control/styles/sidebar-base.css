@@ -7,7 +7,7 @@
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  background: var(--po-surface-chrome);
+  background: var(--po-sidebar);
 }
 
 .desktop-git-sidebar {

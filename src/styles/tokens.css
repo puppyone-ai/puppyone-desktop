@@ -80,25 +80,7 @@
   --po-surface-panel-raised: #fffaf1;
   --po-surface-overlay: #fff8ee;
   --po-surface-inset: #e6ded1;
-  --po-surface-editor: var(--po-surface-panel);
-  --po-surface-terminal: var(--po-surface-chrome);
 
-  /* Compatibility aliases. New theme work should define the semantic surface tokens above. */
-  --po-canvas: var(--po-surface-canvas);
-  --po-header: var(--po-surface-chrome);
-  --po-sidebar: var(--po-surface-chrome);
-  --po-chrome: var(--po-surface-chrome);
-  --po-panel: var(--po-surface-panel);
-  --po-panel-raised: var(--po-surface-panel-raised);
-  --po-overlay: var(--po-surface-overlay);
-  --po-inset: var(--po-surface-inset);
-  --po-editor-bg: var(--po-surface-editor);
-  --po-jsoneditor-bg: var(--po-surface-editor);
-  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
-  --po-terminal-bg: var(--po-surface-terminal);
-  --po-project-card-tab: color-mix(in srgb, var(--po-inset) 58%, var(--po-panel) 42%);
-  --po-project-card-bg: var(--po-panel);
-  --po-project-card-hover-bg: var(--po-overlay);
   --po-text: #2f2a23;
   --po-text-muted: #70685e;
   --po-text-subtle: #958b7f;
@@ -108,7 +90,6 @@
   --po-border-subtle: rgba(73, 55, 35, 0.09);
   --po-border-strong: rgba(73, 55, 35, 0.28);
   --po-divider: rgba(73, 55, 35, 0.12);
-  --po-header-divider: var(--po-divider);
   --po-skeleton-base: rgba(73, 55, 35, 0.07);
   --po-skeleton-shimmer: rgba(255, 250, 241, 0.50);
   --po-skeleton-edge: rgba(73, 55, 35, 0.04);
@@ -117,8 +98,6 @@
   --po-selected: rgba(73, 55, 35, 0.17);
   --po-control: rgba(73, 55, 35, 0.10);
   --po-control-hover: rgba(73, 55, 35, 0.15);
-  --po-switch-track-on: var(--po-success);
-  --po-switch-track-off: var(--po-control-hover);
   --po-switch-border-on: rgba(21, 128, 61, 0.28);
   --po-switch-border-off: rgba(73, 55, 35, 0.14);
   --po-switch-thumb: #fffaf1;
@@ -157,7 +136,6 @@
   --po-file-accent-video: #4f86a4;
   --po-file-accent-code: #4f86a4;
   --po-file-accent-sheet: #6d8b4f;
-  --po-tree-guide: color-mix(in srgb, var(--po-surface-chrome) 93%, var(--po-text));
   --po-editor-line: rgba(73, 55, 35, 0.085);
   --po-json-key: #3f3a33;
   --po-json-string: #116329;
@@ -188,9 +166,6 @@
   --po-diff-added-text: #166534;
   --po-diff-removed-bg: rgba(220, 38, 38, 0.10);
   --po-diff-removed-text: #991b1b;
-  --po-menu-bg: color-mix(in srgb, var(--po-overlay) 92%, var(--po-panel) 8%);
-  --po-menu-border: color-mix(in srgb, var(--po-border) 82%, transparent);
-  --po-menu-shadow: 0 18px 44px color-mix(in srgb, var(--po-shadow) 86%, transparent);
   --po-menu-radius: 8px;
   --po-menu-padding: 4px;
   --po-menu-item-radius: var(--desktop-control-radius);
@@ -200,6 +175,63 @@
   --po-menu-icon-slot-size: 18px;
   --po-scrollbar-thumb: rgba(73, 55, 35, 0.14);
   --po-scrollbar-thumb-hover: rgba(73, 55, 35, 0.24);
+}
+
+/*
+ * Semantic tier: aliases that derive from other tokens via var().
+ *
+ * CSS custom properties substitute var() eagerly, on the element where the
+ * property is DECLARED — descendants inherit the resolved value, not the
+ * reference. Themes are applied on shell elements (.app-shell /
+ * .onboarding-shell / .desktop-overlay-root, plus .dark and the preset
+ * attributes), which are descendants of :root. So these aliases must be
+ * (re)declared on every theme scope, or they freeze to the :root light
+ * values and dark mode / presets break.
+ *
+ * This rule declares the mapping exactly once and applies it to :root and
+ * to every theme scope. :where() keeps it at zero specificity, so any theme
+ * block (e.g. .dark) can still override an individual semantic token.
+ *
+ * Rules:
+ * - Components style app regions through these tokens — never through the
+ *   --po-surface-* primitives directly.
+ * - Theme blocks override primitives (and, rarely, a semantic token).
+ * - Future per-region user customization = overriding exactly these tokens
+ *   inline on the shell root, which beats any stylesheet rule.
+ *
+ * Current design: one unified content material — canvas (tool-view main
+ * areas: settings, git, data, cloud pages), header, sidebar, editor, and
+ * terminal all share the editor surface. Use --po-inset or explicit mixes
+ * where a region needs to read as recessed.
+ */
+:root,
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root, .dark) {
+  --po-surface-editor: var(--po-surface-panel);
+  --po-surface-terminal: var(--po-surface-editor);
+
+  --po-canvas: var(--po-surface-editor);
+  --po-header: var(--po-surface-editor);
+  --po-sidebar: var(--po-surface-editor);
+  --po-chrome: var(--po-surface-chrome);
+  --po-panel: var(--po-surface-panel);
+  --po-panel-raised: var(--po-surface-panel-raised);
+  --po-overlay: var(--po-surface-overlay);
+  --po-inset: var(--po-surface-inset);
+  --po-editor-bg: var(--po-surface-editor);
+  --po-jsoneditor-bg: var(--po-surface-editor);
+  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
+  --po-terminal-bg: var(--po-surface-terminal);
+
+  --po-header-divider: var(--po-divider);
+  --po-switch-track-on: var(--po-success);
+  --po-switch-track-off: var(--po-control-hover);
+  --po-project-card-tab: color-mix(in srgb, var(--po-inset) 58%, var(--po-panel) 42%);
+  --po-project-card-bg: var(--po-panel);
+  --po-project-card-hover-bg: var(--po-overlay);
+  --po-tree-guide: color-mix(in srgb, var(--po-sidebar) 93%, var(--po-text));
+  --po-menu-bg: color-mix(in srgb, var(--po-overlay) 92%, var(--po-panel) 8%);
+  --po-menu-border: color-mix(in srgb, var(--po-border) 82%, transparent);
+  --po-menu-shadow: 0 18px 44px color-mix(in srgb, var(--po-shadow) 86%, transparent);
 }
 
 .dark {
@@ -212,22 +244,9 @@
   --po-surface-overlay: #29241f;
   --po-surface-inset: #0c0b0a;
   --po-surface-editor: #161413;
-  --po-surface-terminal: var(--po-surface-chrome);
 
-  --po-canvas: var(--po-surface-canvas);
-  --po-header: var(--po-surface-chrome);
-  --po-sidebar: var(--po-surface-chrome);
-  --po-chrome: var(--po-surface-chrome);
-  --po-panel: var(--po-surface-panel);
-  --po-panel-raised: var(--po-surface-panel-raised);
-  --po-overlay: var(--po-surface-overlay);
-  --po-inset: var(--po-surface-inset);
-  --po-editor-bg: var(--po-surface-editor);
-  --po-jsoneditor-bg: var(--po-surface-editor);
-  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
-  --po-terminal-bg: var(--po-surface-terminal);
+  /* Semantic tokens inherit the shared tier; only divergent ones below. */
   --po-project-card-tab: color-mix(in srgb, var(--po-panel-raised) 84%, var(--po-canvas) 16%);
-  --po-project-card-bg: var(--po-panel);
   --po-project-card-hover-bg: color-mix(in srgb, var(--po-panel) 94%, var(--po-text) 6%);
 
   --po-text: #fafafa;
@@ -250,8 +269,6 @@
   --po-selected: rgba(255, 250, 242, 0.095);
   --po-control: rgba(255, 250, 242, 0.044);
   --po-control-hover: rgba(255, 250, 242, 0.082);
-  --po-switch-track-on: var(--po-success);
-  --po-switch-track-off: var(--po-control-hover);
   --po-switch-border-on: rgba(52, 211, 153, 0.34);
   --po-switch-border-off: rgba(255, 255, 255, 0.10);
   --po-switch-thumb: #f8fafc;
@@ -278,7 +295,7 @@
   --po-text-fill-hover: #ffffff;
 
   --po-filetree-rail: rgba(255, 255, 255, 0.10);
-  --po-tree-guide: color-mix(in srgb, var(--po-surface-chrome) 90%, var(--po-text));
+  --po-tree-guide: color-mix(in srgb, var(--po-sidebar) 90%, var(--po-text));
   --po-file-icon-body: #222225;
   --po-file-icon-fold: #2a2a2d;
   --po-file-icon-stroke: rgba(255, 255, 255, 0.18);
@@ -340,24 +357,9 @@
   --po-surface-panel-raised: #ffffff;
   --po-surface-overlay: #fffdf9;
   --po-surface-inset: #e7e3db;
-  --po-surface-editor: var(--po-surface-panel);
-  --po-surface-terminal: var(--po-surface-chrome);
 
-  --po-canvas: var(--po-surface-canvas);
-  --po-header: var(--po-surface-chrome);
-  --po-sidebar: var(--po-surface-chrome);
-  --po-chrome: var(--po-surface-chrome);
-  --po-panel: var(--po-surface-panel);
-  --po-panel-raised: var(--po-surface-panel-raised);
-  --po-overlay: var(--po-surface-overlay);
-  --po-inset: var(--po-surface-inset);
-  --po-editor-bg: var(--po-surface-editor);
-  --po-jsoneditor-bg: var(--po-surface-editor);
-  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
-  --po-terminal-bg: var(--po-surface-terminal);
+  /* Semantic tokens inherit the shared tier; only divergent ones below. */
   --po-project-card-tab: color-mix(in srgb, var(--po-inset) 52%, var(--po-panel) 48%);
-  --po-project-card-bg: var(--po-panel);
-  --po-project-card-hover-bg: var(--po-overlay);
 
   --po-text: #292723;
   --po-text-muted: #68645c;
@@ -378,7 +380,6 @@
   --po-selected: rgba(45, 43, 38, 0.115);
   --po-control: rgba(45, 43, 38, 0.075);
   --po-control-hover: rgba(45, 43, 38, 0.12);
-  --po-switch-track-off: var(--po-control-hover);
   --po-switch-border-off: rgba(45, 43, 38, 0.12);
   --po-switch-thumb: #fffdf9;
   --po-switch-thumb-shadow: rgba(45, 43, 38, 0.18);
@@ -399,7 +400,7 @@
   --po-text-fill-hover: #22201d;
 
   --po-filetree-rail: rgba(45, 43, 38, 0.14);
-  --po-tree-guide: color-mix(in srgb, var(--po-surface-chrome) 94%, var(--po-text));
+  --po-tree-guide: color-mix(in srgb, var(--po-sidebar) 94%, var(--po-text));
   --po-file-icon-body: #f0ede6;
   --po-file-icon-fold: #e1ddd4;
   --po-file-icon-stroke: rgba(45, 43, 38, 0.31);
@@ -436,24 +437,9 @@
   --po-surface-panel-raised: #ffffff;
   --po-surface-overlay: #ffffff;
   --po-surface-inset: #e2e5e9;
-  --po-surface-editor: var(--po-surface-panel);
-  --po-surface-terminal: var(--po-surface-chrome);
 
-  --po-canvas: var(--po-surface-canvas);
-  --po-header: var(--po-surface-chrome);
-  --po-sidebar: var(--po-surface-chrome);
-  --po-chrome: var(--po-surface-chrome);
-  --po-panel: var(--po-surface-panel);
-  --po-panel-raised: var(--po-surface-panel-raised);
-  --po-overlay: var(--po-surface-overlay);
-  --po-inset: var(--po-surface-inset);
-  --po-editor-bg: var(--po-surface-editor);
-  --po-jsoneditor-bg: var(--po-surface-editor);
-  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
-  --po-terminal-bg: var(--po-surface-terminal);
+  /* Semantic tokens inherit the shared tier; only divergent ones below. */
   --po-project-card-tab: color-mix(in srgb, var(--po-inset) 54%, var(--po-panel) 46%);
-  --po-project-card-bg: var(--po-panel);
-  --po-project-card-hover-bg: var(--po-overlay);
 
   --po-text: #25272c;
   --po-text-muted: #656a73;
@@ -474,7 +460,6 @@
   --po-selected: rgba(31, 41, 55, 0.11);
   --po-control: rgba(31, 41, 55, 0.07);
   --po-control-hover: rgba(31, 41, 55, 0.115);
-  --po-switch-track-off: var(--po-control-hover);
   --po-switch-border-off: rgba(31, 41, 55, 0.12);
   --po-switch-thumb: #ffffff;
   --po-switch-thumb-shadow: rgba(31, 41, 55, 0.17);
@@ -495,7 +480,7 @@
   --po-text-fill-hover: #1f2329;
 
   --po-filetree-rail: rgba(31, 41, 55, 0.13);
-  --po-tree-guide: color-mix(in srgb, var(--po-surface-chrome) 94%, var(--po-text));
+  --po-tree-guide: color-mix(in srgb, var(--po-sidebar) 94%, var(--po-text));
   --po-file-icon-body: #eef0f3;
   --po-file-icon-fold: #dde1e7;
   --po-file-icon-stroke: rgba(31, 41, 55, 0.30);
@@ -531,21 +516,8 @@
   --po-surface-overlay: #23252b;
   --po-surface-inset: #0c0d10;
   --po-surface-editor: #17181c;
-  --po-surface-terminal: var(--po-surface-chrome);
 
-  --po-canvas: var(--po-surface-canvas);
-  --po-header: var(--po-surface-chrome);
-  --po-sidebar: var(--po-surface-chrome);
-  --po-chrome: var(--po-surface-chrome);
-  --po-panel: var(--po-surface-panel);
-  --po-panel-raised: var(--po-surface-panel-raised);
-  --po-overlay: var(--po-surface-overlay);
-  --po-inset: var(--po-surface-inset);
-  --po-editor-bg: var(--po-surface-editor);
-  --po-jsoneditor-bg: var(--po-surface-editor);
-  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
-  --po-terminal-bg: var(--po-surface-terminal);
-
+  /* Semantic tokens inherit the shared tier; only divergent ones below. */
   --po-editor-line: rgba(255, 255, 255, 0.075);
   --po-accent: #8b8cff;
   --po-accent-text: #b7b8ff;

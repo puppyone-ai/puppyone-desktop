@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EditorViewerContext } from "../viewerTypes";
 
 type OfficeState =
@@ -9,7 +9,7 @@ type OfficeState =
   | { status: "ready"; result: OfficePreviewResult };
 
 type OfficePreviewResult =
-  | { kind: "word"; html: string; warnings: string[] }
+  | { kind: "word"; arrayBuffer: ArrayBuffer }
   | { kind: "spreadsheet"; sheets: SpreadsheetSheet[] }
   | { kind: "presentation"; slides: PresentationSlide[] }
   | { kind: "opendocument"; title: string; lines: string[] }
@@ -28,51 +28,50 @@ type PresentationSlide = {
   lines: string[];
 };
 
-type MammothApi = {
-  convertToHtml: (
-    input: { arrayBuffer: ArrayBuffer },
-    options?: {
-      convertImage?: unknown;
-      includeDefaultStyleMap?: boolean;
-    },
-  ) => Promise<{
-    value: string;
-    messages: Array<{ message: string }>;
-  }>;
-  images: {
-    dataUri: unknown;
-  };
-};
-
 const MAX_SHEET_ROWS = 250;
 const MAX_SHEET_COLUMNS = 36;
 const MAX_ODF_LINES = 400;
+const MAX_OFFICE_PREVIEW_BYTES = 25 * 1024 * 1024;
 const LEGACY_WORD_EXTENSIONS = new Set(["doc"]);
 const LEGACY_PRESENTATION_EXTENSIONS = new Set(["ppt", "pps"]);
+const NATIVE_DOCX_CONVERTIBLE_EXTENSIONS = new Set(["doc", "rtf"]);
 
 export function OfficeViewer({
   document,
   fileUrl,
   fileUrlLoading,
   fileUrlError,
+  openExternalFile,
+  convertOfficeDocumentToDocx,
 }: EditorViewerContext) {
   const [state, setState] = useState<OfficeState>({ status: "idle" });
   const [activeSheet, setActiveSheet] = useState(0);
+  const extension = getExtension(document.name);
+  const canUseNativeDocxConversion = Boolean(
+    convertOfficeDocumentToDocx && NATIVE_DOCX_CONVERTIBLE_EXTENSIONS.has(extension),
+  );
+  const previewResourceUrl = canUseNativeDocxConversion ? null : fileUrl;
+  const previewResourceLoading = canUseNativeDocxConversion ? false : fileUrlLoading;
 
   useEffect(() => {
     setActiveSheet(0);
   }, [document.path]);
 
   useEffect(() => {
-    if (!fileUrl) {
-      setState(fileUrlLoading ? { status: "loading" } : { status: "idle" });
+    if (!previewResourceUrl && !canUseNativeDocxConversion) {
+      setState(previewResourceLoading ? { status: "loading" } : { status: "idle" });
       return undefined;
     }
 
     let cancelled = false;
 
     setState({ status: "loading" });
-    loadOfficePreview(fileUrl, document.name)
+    loadOfficePreview({
+      fileUrl: previewResourceUrl,
+      filename: document.name,
+      path: document.path,
+      convertOfficeDocumentToDocx,
+    })
       .then((result) => {
         if (!cancelled) setState({ status: "ready", result });
       })
@@ -88,17 +87,17 @@ export function OfficeViewer({
     return () => {
       cancelled = true;
     };
-  }, [document.name, fileUrl, fileUrlLoading]);
+  }, [canUseNativeDocxConversion, convertOfficeDocumentToDocx, document.name, document.path, previewResourceLoading, previewResourceUrl]);
 
-  if (fileUrlError) {
+  if (fileUrlError && !canUseNativeDocxConversion) {
     return <div className="editor-state danger">Failed to load file: {fileUrlError}</div>;
   }
 
-  if ((fileUrlLoading || state.status === "loading") && !fileUrl) {
+  if ((previewResourceLoading || state.status === "loading") && !previewResourceUrl && !canUseNativeDocxConversion) {
     return <div className="editor-state">Loading preview...</div>;
   }
 
-  if (!fileUrl && state.status !== "ready") {
+  if (!previewResourceUrl && !canUseNativeDocxConversion && state.status !== "ready") {
     return <div className="editor-state">No preview available for this file.</div>;
   }
 
@@ -106,16 +105,23 @@ export function OfficeViewer({
     <div className="office-preview">
       <div className="office-preview__body">
         {state.status === "error" && (
-          <OfficeEmptyState title="Preview failed" message={state.message} />
+          <OfficeEmptyState
+            title="Preview failed"
+            message={state.message}
+            documentPath={document.path}
+            openExternalFile={openExternalFile}
+          />
         )}
         {state.status === "idle" || state.status === "loading" ? (
           <div className="editor-state">Loading preview...</div>
         ) : null}
         {state.status === "ready" && (
           <OfficePreviewContent
+            documentPath={document.path}
             result={state.result}
             activeSheet={activeSheet}
             onActiveSheetChange={setActiveSheet}
+            openExternalFile={openExternalFile}
           />
         )}
       </div>
@@ -124,26 +130,36 @@ export function OfficeViewer({
 }
 
 function OfficePreviewContent({
+  documentPath,
   result,
   activeSheet,
   onActiveSheetChange,
+  openExternalFile,
 }: {
+  documentPath: string;
   result: OfficePreviewResult;
   activeSheet: number;
   onActiveSheetChange: (index: number) => void;
+  openExternalFile?: (path: string) => Promise<void>;
 }) {
   if (result.kind === "unsupported") {
-    return <OfficeEmptyState title="Preview not available" message={result.message} />;
+    return (
+      <OfficeEmptyState
+        title="Preview not available"
+        message={result.message}
+        documentPath={documentPath}
+        openExternalFile={openExternalFile}
+      />
+    );
   }
 
   if (result.kind === "word") {
     return (
-      <div className="office-document-preview">
-        <article
-          className="office-document-page"
-          dangerouslySetInnerHTML={{ __html: result.html || "<p></p>" }}
-        />
-      </div>
+      <DocxDocumentPreview
+        arrayBuffer={result.arrayBuffer}
+        documentPath={documentPath}
+        openExternalFile={openExternalFile}
+      />
     );
   }
 
@@ -237,35 +253,200 @@ function OfficePreviewContent({
   );
 }
 
-function OfficeEmptyState({ title, message }: { title: string; message: string }) {
+function DocxDocumentPreview({
+  arrayBuffer,
+  documentPath,
+  openExternalFile,
+}: {
+  arrayBuffer: ArrayBuffer;
+  documentPath: string;
+  openExternalFile?: (path: string) => Promise<void>;
+}) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [renderState, setRenderState] = useState<{ status: "loading" | "ready" | "error"; message?: string }>({
+    status: "loading",
+  });
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return undefined;
+
+    let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
+    const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: "open" });
+    shadowRoot.replaceChildren();
+
+    const baseStyle = document.createElement("style");
+    baseStyle.textContent = DOCX_SHADOW_BASE_CSS;
+    const styleContainer = document.createElement("div");
+    styleContainer.className = "office-docx-style-container";
+    const bodyContainer = document.createElement("div");
+    bodyContainer.className = "office-docx-body";
+    shadowRoot.append(baseStyle, styleContainer, bodyContainer);
+    setRenderState({ status: "loading" });
+
+    import("docx-preview")
+      .then(({ renderAsync }) => renderAsync(
+        arrayBuffer.slice(0),
+        bodyContainer,
+        styleContainer,
+        {
+          renderAltChunks: false,
+          ignoreLastRenderedPageBreak: false,
+          renderHeaders: true,
+          renderFooters: true,
+          renderFootnotes: true,
+          renderEndnotes: true,
+          renderComments: false,
+          renderChanges: false,
+          breakPages: true,
+          ignoreWidth: false,
+          ignoreHeight: false,
+          ignoreFonts: false,
+          useBase64URL: true,
+          inWrapper: true,
+          className: "office-docx",
+        },
+      ))
+      .then(() => {
+        if (cancelled) return;
+        removeExternalDocumentResources(bodyContainer);
+        fitDocxPreviewToWidth(host, bodyContainer);
+        resizeObserver = new ResizeObserver(() => fitDocxPreviewToWidth(host, bodyContainer));
+        resizeObserver.observe(host);
+        setRenderState({ status: "ready" });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setRenderState({
+            status: "error",
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      resizeObserver?.disconnect();
+      shadowRoot.replaceChildren();
+    };
+  }, [arrayBuffer]);
+
+  if (renderState.status === "error") {
+    return (
+      <OfficeEmptyState
+        title="Preview failed"
+        message={`PuppyOne could not render this DOCX preview. ${renderState.message ?? ""}`.trim()}
+        documentPath={documentPath}
+        openExternalFile={openExternalFile}
+      />
+    );
+  }
+
   return (
-    <div className="office-preview-empty">
-      <strong>{title}</strong>
-      <span>{message}</span>
+    <div className="office-document-preview office-document-preview--docx">
+      {renderState.status === "loading" && (
+        <div className="office-docx-render-state">Rendering Word document...</div>
+      )}
+      <div
+        ref={hostRef}
+        className="office-docx-host"
+        data-rendering={renderState.status === "loading" ? "true" : undefined}
+      />
     </div>
   );
 }
 
-async function loadOfficePreview(fileUrl: string, filename: string): Promise<OfficePreviewResult> {
+function OfficeEmptyState({
+  title,
+  message,
+  documentPath,
+  openExternalFile,
+}: {
+  title: string;
+  message: string;
+  documentPath?: string;
+  openExternalFile?: (path: string) => Promise<void>;
+}) {
+  return (
+    <div className="office-preview-empty">
+      <strong>{title}</strong>
+      <span>{message}</span>
+      {documentPath && openExternalFile && (
+        <button type="button" onClick={() => void openExternalFile(documentPath)}>
+          Open in default app
+        </button>
+      )}
+    </div>
+  );
+}
+
+async function loadOfficePreview({
+  fileUrl,
+  filename,
+  path,
+  convertOfficeDocumentToDocx,
+}: {
+  fileUrl?: string | null;
+  filename: string;
+  path: string;
+  convertOfficeDocumentToDocx?: (path: string) => Promise<{ arrayBuffer: ArrayBuffer; warnings?: string[] }>;
+}): Promise<OfficePreviewResult> {
   const extension = getExtension(filename);
 
-  if (LEGACY_WORD_EXTENSIONS.has(extension)) {
-    return {
-      kind: "unsupported",
-      message: "Legacy .doc files need the native Office format bridge. Use .docx for lightweight preview.",
-    };
+  if (NATIVE_DOCX_CONVERTIBLE_EXTENSIONS.has(extension)) {
+    if (!convertOfficeDocumentToDocx) {
+      return unsupportedNativeConversionMessage(extension);
+    }
+
+    try {
+      const result = await convertOfficeDocumentToDocx(path);
+      return {
+        kind: "word",
+        arrayBuffer: result.arrayBuffer,
+      };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      return {
+        kind: "unsupported",
+        message: `PuppyOne could not convert this .${extension} file for preview. Open it in a desktop app or re-save it as .docx. ${reason}`,
+      };
+    }
   }
 
   if (LEGACY_PRESENTATION_EXTENSIONS.has(extension)) {
     return {
       kind: "unsupported",
-      message: "Legacy PowerPoint files need the native Office format bridge. Use .pptx for lightweight preview.",
+      message: "Legacy binary PowerPoint files do not have a built-in preview. Open this file in a desktop app or re-save it as .pptx.",
     };
   }
 
-  const arrayBuffer = await fetchArrayBuffer(fileUrl);
+  if (!fileUrl) {
+    return {
+      kind: "unsupported",
+      message: "No file resource is available for the lightweight Office preview.",
+    };
+  }
 
-  if (isWordExtension(extension)) return parseWordDocument(arrayBuffer);
+  let arrayBuffer: ArrayBuffer;
+  try {
+    arrayBuffer = await fetchArrayBuffer(fileUrl);
+  } catch (error) {
+    if (error instanceof OfficePreviewLimitError) {
+      return {
+        kind: "unsupported",
+        message: error.message,
+      };
+    }
+    throw error;
+  }
+
+  if (isWordExtension(extension)) {
+    return {
+      kind: "word",
+      arrayBuffer,
+    };
+  }
   if (isSpreadsheetExtension(extension)) {
     try {
       return await parseSpreadsheet(arrayBuffer);
@@ -285,25 +466,16 @@ async function loadOfficePreview(fileUrl: string, filename: string): Promise<Off
 async function fetchArrayBuffer(fileUrl: string): Promise<ArrayBuffer> {
   const response = await fetch(fileUrl);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.arrayBuffer();
-}
+  const contentLength = Number(response.headers.get("content-length") ?? "0");
+  if (Number.isFinite(contentLength) && contentLength > MAX_OFFICE_PREVIEW_BYTES) {
+    throw new OfficePreviewLimitError(`This file is larger than the ${formatBytes(MAX_OFFICE_PREVIEW_BYTES)} Office preview limit. Open it in a desktop app for full fidelity.`);
+  }
 
-async function parseWordDocument(arrayBuffer: ArrayBuffer): Promise<OfficePreviewResult> {
-  const mammothModule = await import("mammoth");
-  const mammoth = ("default" in mammothModule ? mammothModule.default : mammothModule) as MammothApi;
-  const result = await mammoth.convertToHtml(
-    { arrayBuffer },
-    {
-      convertImage: mammoth.images.dataUri,
-      includeDefaultStyleMap: true,
-    },
-  );
-
-  return {
-    kind: "word",
-    html: result.value,
-    warnings: result.messages.map((message) => message.message),
-  };
+  const arrayBuffer = await response.arrayBuffer();
+  if (arrayBuffer.byteLength > MAX_OFFICE_PREVIEW_BYTES) {
+    throw new OfficePreviewLimitError(`This file is larger than the ${formatBytes(MAX_OFFICE_PREVIEW_BYTES)} Office preview limit. Open it in a desktop app for full fidelity.`);
+  }
+  return arrayBuffer;
 }
 
 async function parseSpreadsheet(arrayBuffer: ArrayBuffer): Promise<OfficePreviewResult> {
@@ -452,3 +624,97 @@ function isPresentationExtension(extension: string): boolean {
 function isOpenDocumentExtension(extension: string): boolean {
   return extension === "odt" || extension === "ods" || extension === "odp" || extension === "ott" || extension === "ots" || extension === "otp";
 }
+
+function unsupportedNativeConversionMessage(extension: string): OfficePreviewResult {
+  if (LEGACY_WORD_EXTENSIONS.has(extension)) {
+    return {
+      kind: "unsupported",
+      message: "Legacy binary Word files do not have a built-in preview here. Open this file in a desktop app or re-save it as .docx.",
+    };
+  }
+
+  return {
+    kind: "unsupported",
+    message: "Rich Text files need the desktop converter for lightweight preview. Open this file in a desktop app or re-save it as .docx.",
+  };
+}
+
+function fitDocxPreviewToWidth(host: HTMLElement, bodyContainer: HTMLElement) {
+  const wrapper = bodyContainer.querySelector<HTMLElement>(".docx-wrapper") ?? bodyContainer;
+  const firstPage = bodyContainer.querySelector<HTMLElement>(".office-docx");
+  if (!firstPage) return;
+
+  wrapper.style.zoom = "1";
+  const availableWidth = Math.max(320, host.clientWidth - 28);
+  const pageWidth = firstPage.getBoundingClientRect().width;
+  if (!Number.isFinite(pageWidth) || pageWidth <= 0) return;
+
+  const scale = Math.min(1, Math.max(0.35, availableWidth / pageWidth));
+  wrapper.style.zoom = String(scale);
+}
+
+function removeExternalDocumentResources(container: HTMLElement) {
+  container.querySelectorAll<HTMLElement>("script, iframe, object, embed, link, meta, base, form, input, button, textarea, select").forEach((node) => {
+    node.remove();
+  });
+
+  for (const element of Array.from(container.querySelectorAll<HTMLElement>("*"))) {
+    for (const attribute of Array.from(element.attributes)) {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim();
+      if (name.startsWith("on") || name === "srcdoc" || name === "srcset") {
+        element.removeAttribute(attribute.name);
+        continue;
+      }
+      if ((name === "src" || name === "poster") && value && !isSafeDocxResourceUrl(value)) {
+        element.removeAttribute(attribute.name);
+      }
+    }
+  }
+}
+
+function isSafeDocxResourceUrl(value: string): boolean {
+  return /^(data:|blob:|about:blank$)/i.test(value);
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
+}
+
+class OfficePreviewLimitError extends Error {}
+
+const DOCX_SHADOW_BASE_CSS = `
+  :host {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .office-docx-style-container {
+    display: contents;
+  }
+
+  .office-docx-body {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .office-docx-body .docx-wrapper {
+    box-sizing: border-box;
+    display: block;
+    width: max-content;
+    max-width: none;
+    min-width: 0;
+    padding: 0 !important;
+    background: transparent !important;
+    transform-origin: top center;
+  }
+
+  .office-docx-body .office-docx {
+    margin: 0 auto 18px !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  }
+`;

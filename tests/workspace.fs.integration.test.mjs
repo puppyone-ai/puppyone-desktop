@@ -12,6 +12,7 @@ import {
   listFolderChildren,
   readWorkspaceFile,
   readWorkspaceTextFile,
+  convertWorkspaceOfficeDocumentToDocx,
   writeWorkspaceTextFile,
   createWorkspaceEntry,
   renameWorkspaceEntry,
@@ -136,10 +137,28 @@ describe("read / write round-trips", () => {
     expect(Buffer.compare(out, bytes)).toBe(0);
   });
 
+  it("returns partial bytes for puppyone-local Range reads", async () => {
+    await writeFile(path.join(root, "letters.txt"), "abcdefghijklmnopqrstuvwxyz");
+    const out = await readWorkspaceFile(root, "letters.txt", { rangeHeader: "bytes=2-5" });
+    expect(out.partial).toBe(true);
+    expect(out.start).toBe(2);
+    expect(out.end).toBe(5);
+    expect(out.size).toBe(26);
+    expect(out.bytes.toString("utf8")).toBe("cdef");
+  });
+
   it("readWorkspaceFile (puppyone-local protocol path) rejects a directory and traversal", async () => {
     await createWorkspaceEntry(root, { parentPath: null, name: "dir", kind: "folder" });
     await expect(readWorkspaceFile(root, "dir")).rejects.toThrow(/folder/i);
     await expect(readWorkspaceFile(root, "../../etc/passwd")).rejects.toThrow(/outside the selected workspace/i);
+  });
+
+  it("converts RTF to DOCX bytes on macOS", async () => {
+    if (process.platform !== "darwin") return;
+
+    await writeFile(path.join(root, "sample.rtf"), "{\\rtf1\\ansi PuppyOne}");
+    const out = await convertWorkspaceOfficeDocumentToDocx(root, "sample.rtf");
+    expect(out.bytes.subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
   });
 
   it("surfaces binary files (null bytes) with content=null", async () => {

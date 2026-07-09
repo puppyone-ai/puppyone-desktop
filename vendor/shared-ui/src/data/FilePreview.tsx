@@ -27,6 +27,8 @@ export type FilePreviewProps = {
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
+  openExternalFile?: (path: string) => Promise<void>;
+  convertOfficeDocumentToDocx?: (path: string) => Promise<{ arrayBuffer: ArrayBuffer; warnings?: string[] }>;
 };
 
 export type FilePreviewBodyContext = {
@@ -60,6 +62,8 @@ export function FilePreview({
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
   appPreview = null,
+  openExternalFile,
+  convertOfficeDocumentToDocx,
 }: FilePreviewProps) {
   if (!node) {
     if (emptySlot) return <>{emptySlot}</>;
@@ -131,6 +135,8 @@ export function FilePreview({
               markdownLinkGraph={markdownLinkGraph}
               markdownAssetUrlResolver={markdownAssetUrlResolver}
               appPreview={appPreview}
+              openExternalFile={openExternalFile}
+              convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
               deferFallbackContent={deferFallbackContent}
             />
           </EditorPreviewBoundary>

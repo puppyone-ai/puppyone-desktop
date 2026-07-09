@@ -29,6 +29,14 @@ export function createLocalDataPort(rootPath: string): DataPort {
       url: buildLocalFileUrl(rootPath, path),
     }),
     getFileUrl: (path) => buildLocalFileUrl(rootPath, path),
+    openExternalFile: (path) => getDesktopBridge().openEntryExternal({ rootPath, path }).then(() => undefined),
+    convertOfficeDocumentToDocx: async (path) => {
+      const result = await getDesktopBridge().convertOfficeDocumentToDocx({ rootPath, path });
+      return {
+        arrayBuffer: toArrayBuffer(result.bytes),
+        warnings: result.warnings,
+      };
+    },
     appPreview: {
       start: (path) => getDesktopBridge().startAppPreview({ rootPath, path }),
       restart: (path) => getDesktopBridge().restartAppPreview({ rootPath, path }),
@@ -408,4 +416,11 @@ function buildLocalFileUrl(rootPath: string, relativePath: string): string {
     .map((segment) => encodeURIComponent(segment))
     .join("/");
   return `puppyone-local://file/${encodedRoot}/${encodedPath}`;
+}
+
+function toArrayBuffer(bytes: ArrayBuffer | ArrayBufferView): ArrayBuffer {
+  if (bytes instanceof ArrayBuffer) return bytes.slice(0);
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+  return copy.buffer;
 }

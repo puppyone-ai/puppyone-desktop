@@ -20,8 +20,8 @@
   min-height: 0;
   flex: 0 0 auto;
   flex-direction: column;
-  border-right: 1px solid transparent;
-  background: var(--po-surface-chrome);
+  border-right: 1px solid var(--po-divider);
+  background: var(--po-sidebar);
   transition:
     width 140ms ease,
     min-width 140ms ease;

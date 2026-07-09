@@ -31,6 +31,9 @@ export default defineConfig({
     ],
     dedupe: ["react", "react-dom"],
   },
+  optimizeDeps: {
+    include: ["docx-preview"],
+  },
   server: {
     strictPort: true,
     port: 5173,

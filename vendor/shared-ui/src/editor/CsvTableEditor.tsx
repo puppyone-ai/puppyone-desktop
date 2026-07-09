@@ -17,6 +17,8 @@ type ParsedTable = {
   warning?: string;
 };
 
+const MAX_RENDERED_CSV_ROWS = 10000;
+
 export function CsvTableEditor({
   documentId,
   content,
@@ -31,6 +33,8 @@ export function CsvTableEditor({
   const [headerEnabled, setHeaderEnabled] = useState(() => inferHeaderRow(parsed.rows));
   const columnCount = Math.max(1, ...matrix.map((row) => row.length));
   const dataRows = headerEnabled ? matrix.slice(1) : matrix;
+  const visibleDataRows = dataRows.slice(0, MAX_RENDERED_CSV_ROWS);
+  const hiddenRowCount = Math.max(0, dataRows.length - visibleDataRows.length);
   const rowCount = content.trim() ? dataRows.length : 0;
   const gridTemplateColumns = `44px repeat(${columnCount}, minmax(128px, 1fr))`;
 
@@ -85,6 +89,11 @@ export function CsvTableEditor({
         </div>
         <div className="csv-table-editor__actions">
           {parsed.warning && <span className="csv-table-editor__warning">{parsed.warning}</span>}
+          {hiddenRowCount > 0 && (
+            <span className="csv-table-editor__warning">
+              Showing {visibleDataRows.length} of {dataRows.length} rows
+            </span>
+          )}
           <label className="csv-table-editor__header-toggle">
             <input
               type="checkbox"
@@ -136,7 +145,7 @@ export function CsvTableEditor({
             </div>
           ))}
 
-          {dataRows.length === 0 ? (
+          {visibleDataRows.length === 0 ? (
             <div className="csv-table-editor__empty" style={{ gridColumn: `1 / span ${columnCount + 1}` }}>
               {!readOnly && (
                 <button type="button" onClick={addRow}>
@@ -146,7 +155,7 @@ export function CsvTableEditor({
               )}
             </div>
           ) : (
-            dataRows.map((row, visibleRowIndex) => {
+            visibleDataRows.map((row, visibleRowIndex) => {
               const rowIndex = headerEnabled ? visibleRowIndex + 1 : visibleRowIndex;
               return (
                 <Fragment key={`row-${rowIndex}`}>

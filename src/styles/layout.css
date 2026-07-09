@@ -15,7 +15,7 @@
   width: 47px;
   min-height: 0;
   flex-direction: column;
-  background: var(--po-surface-chrome);
+  background: var(--po-sidebar);
   border-right: 1px solid transparent;
 }
 
@@ -42,7 +42,9 @@
 }
 
 .desktop-view-surface-sidebar {
-  background: var(--po-surface-chrome);
+  background: var(--po-sidebar);
+  /* Sidebar and content share one material; the hairline is the separator. */
+  border-right: 1px solid var(--po-divider);
 }
 
 .desktop-view-surface-main {
@@ -60,7 +62,7 @@
   min-height: 0;
   overflow: hidden;
   border-left: 0 solid transparent;
-  background: var(--po-surface-terminal);
+  background: var(--po-terminal-bg);
   transition: flex-basis 160ms ease, width 160ms ease, border-color 160ms ease;
 }
 
@@ -150,7 +152,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  background: var(--po-surface-terminal);
+  background: var(--po-terminal-bg);
   color: var(--po-terminal-fg);
 }
 
@@ -161,7 +163,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   min-height: 0;
   overflow: hidden;
   padding: 14px 0 16px 16px;
-  background: var(--po-surface-terminal);
+  background: var(--po-terminal-bg);
 }
 
 .desktop-terminal-xterm {
@@ -180,7 +182,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background: var(--po-surface-terminal);
+  background: var(--po-terminal-bg);
 }
 
 .desktop-terminal-xterm .xterm {
@@ -191,21 +193,21 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   height: 100%;
   overflow: hidden;
   padding: 0;
-  background: var(--po-surface-terminal);
+  background: var(--po-terminal-bg);
   font-variant-ligatures: none;
   /* Preserve xterm DOM-renderer measurement parity for CJK punctuation. */
   text-spacing-trim: space-all;
 }
 
 .desktop-terminal-xterm .xterm-viewport {
-  background: var(--po-surface-terminal) !important;
+  background: var(--po-terminal-bg) !important;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 
 .desktop-terminal-xterm .xterm-screen,
 .desktop-terminal-xterm .xterm-helpers {
-  background: var(--po-surface-terminal);
+  background: var(--po-terminal-bg);
 }
 
 .desktop-terminal-xterm .xterm-viewport::-webkit-scrollbar {
@@ -306,7 +308,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   height: 100%;
   min-height: 0;
   flex-direction: column;
-  background: var(--po-surface-chrome);
+  background: var(--po-sidebar);
   border-right: 1px solid transparent;
 }
 

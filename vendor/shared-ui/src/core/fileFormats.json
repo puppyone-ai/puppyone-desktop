@@ -2322,7 +2322,7 @@
         "text/rtf"
       ],
       "category": "document",
-      "defaultViewer": "binary-placeholder",
+      "defaultViewer": "office-preview",
       "editable": false,
       "ingestStrategy": "ocr"
     },

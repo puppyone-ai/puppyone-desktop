@@ -296,11 +296,6 @@
   font-weight: 650;
 }
 
-.markdown-codemirror-editor .cm-md-task-checked {
-  color: var(--po-text-subtle);
-  text-decoration: line-through;
-}
-
 .markdown-codemirror-editor .cm-md-table-line {
   font-family: var(--po-font-mono);
   color: color-mix(in srgb, var(--po-text) 76%, var(--po-text-muted));
@@ -333,8 +328,10 @@
 }
 
 .markdown-codemirror-editor .cm-md-task-line {
-  --md-task-checkbox-size: 1.08em;
-  --md-task-prefix-width: calc(31px + var(--md-list-depth, 0) * 16px);
+  --md-task-checkbox-size: 1.05em;
+  /* Checkbox (~14.7px) + ~9px gap to the text — the to-do list convention;
+     wider gaps read as disconnected. */
+  --md-task-prefix-width: calc(24px + var(--md-list-depth, 0) * 16px);
   position: relative;
   padding-left: var(--md-task-prefix-width);
   color: color-mix(in srgb, var(--po-text) 78%, var(--po-text-muted));
@@ -344,6 +341,7 @@
   color: var(--po-text-subtle);
   text-decoration: line-through;
   text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, var(--po-text-subtle) 72%, transparent);
 }
 
 .markdown-codemirror-editor .cm-md-task-checkbox-widget {
@@ -361,8 +359,14 @@
   user-select: none;
 }
 
+/*
+ * Task checkbox: crisp near-square control — a solid stroke in plain text
+ * color (no muted mixing, which reads muddy), barely-there 1.5px radius,
+ * accent fill + white check when done.
+ */
 .markdown-codemirror-editor .cm-md-task-checkbox {
   position: relative;
+  box-sizing: border-box;
   display: inline-grid;
   width: var(--md-task-checkbox-size);
   height: var(--md-task-checkbox-size);
@@ -370,8 +374,8 @@
   justify-content: center;
   margin: 0;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--po-text-muted) 58%, transparent);
-  border-radius: 1px;
+  border: 1.5px solid color-mix(in srgb, var(--po-text) 72%, transparent);
+  border-radius: 1.5px;
   background: transparent;
   color: var(--po-text-inverse);
   cursor: pointer;
@@ -384,22 +388,29 @@
 }
 
 .markdown-codemirror-editor .cm-md-task-checkbox:hover {
-  border-color: color-mix(in srgb, var(--po-text-muted) 78%, transparent);
-  background: color-mix(in srgb, var(--po-control-hover) 48%, transparent);
+  border-color: color-mix(in srgb, var(--po-text) 88%, transparent);
+  background: color-mix(in srgb, var(--po-text) 6%, transparent);
+}
+
+.markdown-codemirror-editor .cm-md-task-checkbox:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--po-accent) 55%, transparent);
+  outline-offset: 2px;
 }
 
 .markdown-codemirror-editor .cm-md-task-checkbox.is-checked {
   border-color: var(--po-accent);
   background: var(--po-accent);
+  /* White check on the accent fill in every theme (text-inverse flips dark). */
+  color: #fff;
 }
 
 .markdown-codemirror-editor .cm-md-task-checkbox.is-checked::after {
   content: "";
-  width: 0.32em;
-  height: 0.58em;
-  margin-top: -0.12em;
+  width: 0.3em;
+  height: 0.55em;
+  margin-top: -0.1em;
   border: solid currentColor;
-  border-width: 0 0.11em 0.11em 0;
+  border-width: 0 0.13em 0.13em 0;
   transform: rotate(45deg);
 }
 

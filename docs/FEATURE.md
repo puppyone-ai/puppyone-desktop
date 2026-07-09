@@ -19,6 +19,14 @@ single product area can evolve without turning this file into a catch-all.
 - [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)
   - Scroll area, list padding, row width, and native scrollbar gutter
     boundaries for sidebar lists.
+- [File Format and Viewer Pipeline](architecture/file-format-viewer-pipeline.md)
+  - Part 1: the durable format registry → viewer registry → content/resource
+    source pipeline contract, plus the Office preview support matrix. Part 2:
+    the remediation to-do list for Word/Office document support gaps.
+- [Viewer Plugin Architecture (Reserved)](architecture/viewer-plugin-architecture.md)
+  - The deferred long-term viewer plugin system: built-in vs plugin format
+    boundary, manifest/sandbox/host-API shape, distribution staging, the
+    disciplines in force today, and the triggers for actually building it.
 - [Explorer Tree Lifecycle](architecture/explorer-tree-lifecycle.md)
   - File-tree loading, expansion, subtree motion, and indentation guide rules.
 - [Desktop Multi-Window Workspaces](architecture/desktop-multi-window-workspaces.md)
