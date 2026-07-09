@@ -9,8 +9,6 @@
   overflow: auto;
   background: var(--po-canvas);
   animation: desktop-cloud-page-fade 160ms ease-out;
-  scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
 }
 
 .desktop-cloud-access-web-detail::-webkit-scrollbar {

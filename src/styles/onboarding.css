@@ -324,8 +324,6 @@
   border: 1px solid var(--po-divider);
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-panel-raised) 24%, transparent);
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--po-text-muted) 28%, transparent) transparent;
 }
 
 .onboarding-project-list::-webkit-scrollbar {

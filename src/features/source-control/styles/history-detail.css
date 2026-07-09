@@ -41,10 +41,11 @@ body.desktop-history-resizing .desktop-history-panel-tree {
   min-height: 0;
   overflow: auto;
   overflow-x: hidden;
-  padding: 8px var(--git-sidebar-right-gap) 6px var(--git-sidebar-left-gap);
-  scrollbar-gutter: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+  /* Reserved gutter + reduced right padding keep rows at the standard inset
+     whether or not the list scrolls. */
+  padding: 8px calc(var(--git-sidebar-right-gap) - var(--desktop-sidebar-scrollbar-width)) 6px
+    var(--git-sidebar-left-gap);
+  scrollbar-gutter: stable;
 }
 
 .desktop-history-panel-tree-resizer {

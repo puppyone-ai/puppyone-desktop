@@ -66,9 +66,9 @@
   overflow: auto;
   overflow-x: hidden;
   padding-bottom: 4px;
-  scrollbar-gutter: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+  /* Compensate the drawer's right padding for the reserved gutter. */
+  margin-right: calc(-1 * var(--git-sidebar-scrollbar-width));
+  scrollbar-gutter: stable;
 }
 
 .desktop-history-list {

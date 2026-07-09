@@ -79,9 +79,11 @@
   min-height: 0;
   overflow: auto;
   overflow-x: hidden;
-  padding: var(--desktop-sidebar-section-top-gap) var(--desktop-sidebar-row-right-gap)
+  /* Reserved gutter + reduced right padding keep the content inset equal to
+     --desktop-sidebar-row-right-gap whether or not the list scrolls. */
+  padding: var(--desktop-sidebar-section-top-gap) var(--desktop-sidebar-scroll-right-gap)
     var(--desktop-sidebar-section-bottom-gap) var(--desktop-sidebar-row-left-gap);
-  scrollbar-gutter: auto;
+  scrollbar-gutter: stable;
 }
 
 .desktop-tool-sidebar-row {
@@ -274,8 +276,9 @@
   align-items: flex-start;
   min-height: 34px;
   margin: 4px 0 0;
-  padding: 6px calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right)) 0
-    calc(var(--git-sidebar-left-gap) + var(--git-sidebar-content-left) + 20px);
+  padding: 6px
+    calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right) - var(--git-sidebar-scrollbar-width))
+    0 calc(var(--git-sidebar-left-gap) + var(--git-sidebar-content-left) + 20px);
   color: var(--po-text-subtle);
   font-size: 12px;
   font-weight: 500;

@@ -191,8 +191,8 @@ Cross-cutting bars that apply to **every** viewer:
 - `resource` viewers never trigger a text read (stage 3 contract).
 - Whenever a preview truncates (rows, columns, sheets, lines), the
   truncation must be stated in the UI, never silent.
-- Heavy parsers (mammoth, SheetJS, JSZip, mermaid) load via dynamic
-  `import()` only.
+- Heavy parsers (docx-preview, SheetJS, pptx-renderer, JSZip, mermaid)
+  load via dynamic `import()` only.
 - An unsupported state always names the reason and, on desktop, offers
   the external-open action.
 
@@ -304,16 +304,37 @@ source-code extensions)
 
 **Excel — `.xlsx`, `.xls`, `.xlsm`, `.xlsb`**
 
-- Bar: SheetJS grid with sheet tabs; caps (12 sheets × 250 rows × 36
-  columns) with a visible truncation note; values-only (no formatting)
-  is the accepted fidelity limit.
-- Status: met.
+- Bar: SheetJS grid with sheet tabs, upgraded to everything the parser
+  already provides: merged cells (`!merges`), real column widths
+  (`!cols`), formatted cell values; virtualized rows so large sheets
+  render smoothly with a raised cap and a visible truncation note.
+  SheetJS stays — its parse breadth (`.xls`/`.xlsb`/`.ods`) is the
+  reason to keep it.
+- Accepted fidelity limit (state in the doc, not the UI): cell *styling*
+  — colors, borders, fonts — is not rendered. SheetJS Community Edition
+  does not parse styles (a Pro paywall feature), and the open-source
+  alternative that does (exceljs) is widely considered unmaintained.
+  Values, merges, and geometry are the honest ceiling for a lightweight
+  open-source preview.
+- Status: partial — merges/column widths are dropped today and the row
+  cap is a hard cut, below what the community parser gives us for free
+  (Phase 7).
 
 **PowerPoint — `.pptx`, `.ppsx`**
 
-- Bar: slide-by-slide text cards (title + text lines); no layout/images
-  is the accepted fidelity limit.
-- Status: met.
+- Bar: high-fidelity slide rendering via `@aiden0z/pptx-renderer`
+  (Apache-2.0; browser-native OOXML → HTML/SVG): shapes, text boxes,
+  images, tables, charts, SmartArt, gradients, groups, embedded fonts;
+  verified upstream against PowerPoint ground truth with 450+ visual
+  regression cases. Loaded via dynamic `import()` like every heavy
+  parser; large decks use its `lazyMedia`/`lazySlides`/windowed options.
+  Render failure falls back to the unsupported state with external-open.
+- Risk note (deliberate): the library is young (first published
+  2026-02) but rigorously tested and actively released; as a lazy-loaded
+  read-only preview with an honest fallback, the exposure is bounded.
+  Keep the current text-extraction path as the fallback branch rather
+  than deleting it.
+- Status: gap — current preview is text-only slide cards (Phase 8).
 
 **PowerPoint — `.ppt`, `.pps` (legacy)**
 
@@ -421,6 +442,14 @@ viewer → source pipeline stays exactly as specified in Part 1.
    files surface a raw error string instead of a designed state with an
    external-open action; HEIC/RAW images may hit a broken `<img>` instead
    of the placeholder; CSV behavior on very large files is unverified.
+9. **The Excel grid renders below what SheetJS already parses.** Merged
+   cells (`!merges`) and column widths (`!cols`) are available from the
+   community parser and are dropped on the floor; the 250-row cap is a
+   hard cut with no virtualization.
+10. **The `.pptx` preview is text-only while a real renderer now
+    exists.** The text-card approach predates `@aiden0z/pptx-renderer`;
+    slides with shapes, images, tables, and charts reduce to bullet
+    lines today.
 
 ## 9. To-do list
 
@@ -542,6 +571,35 @@ which the Phase 2 renderer takes over. One renderer, one fidelity story.
       main-process runtime deps: `node-pty`, `electron-updater`,
       `electron-log`. Verify with a `dist:mac` build.
 
+**Phase 7 — spreadsheet fidelity pass (zero new dependencies)**
+
+Everything here uses data the community SheetJS parser already returns:
+
+- [ ] Render merged cells: read `worksheet["!merges"]` and emit
+      `colspan`/`rowspan` on the grid (skip covered cells).
+- [ ] Render column widths: map `worksheet["!cols"]` (`wch`/`wpx`) to
+      `<col>` widths instead of browser auto-layout.
+- [ ] Virtualize rows: replace the hard 250-row cut with windowed
+      rendering; raise the parse cap (e.g. 5 000 rows) and keep the
+      visible truncation note for anything beyond it.
+- [ ] Do **not** chase cell styling (colors/borders/fonts): SheetJS CE
+      does not parse styles (Pro paywall) and exceljs is unmaintained —
+      this limit is accepted in the §6 bar.
+
+**Phase 8 — high-fidelity `.pptx` rendering**
+
+- [ ] Add `@aiden0z/pptx-renderer` (Apache-2.0), dynamic `import()`
+      only; do not enable the optional `pdfjs` EMF fallback initially.
+- [ ] Replace the presentation branch of `OfficeViewer` for
+      `.pptx`/`.ppsx`: render into the preview pane with
+      `lazyMedia: true`, `lazySlides: true`, and windowed list options
+      for large decks; scale slides to fit the pane width.
+- [ ] Keep the existing JSZip text-extraction path as the fallback
+      branch when the renderer throws (young library — see the §6 risk
+      note); final fallback remains the unsupported state.
+- [ ] `.ppt`/`.pps` stay on the Phase 1 unsupported state (no
+      conversion bridge exists for legacy presentations).
+
 ## 10. Code change map
 
 | Area | Current | Target |
@@ -555,6 +613,8 @@ which the Phase 2 renderer takes over. One renderer, one fidelity story.
 | Local protocol Range requests | Header advertised, not honored | 206 partial responses for media seeking |
 | Over-cap text files | Raw error string | Designed state + external-open action |
 | HEIC / RAW images | Possibly routed to broken `<img>` | Verified `binary-placeholder` routing |
+| Excel grid | Values only; merges/widths dropped; hard 250-row cut | Merges + column widths + virtualized rows (SheetJS data already there) |
+| `.pptx` preview | Text-only slide cards | `@aiden0z/pptx-renderer` slides; text cards demoted to fallback |
 
 ## 11. Verification
 
@@ -568,8 +628,11 @@ Manual checks: a `.docx` with images, tables, headers/footers, and
 multiple pages (layout fidelity: page breaks, margins, fonts); a `.docx`
 whose styles would leak (confirm isolation container); a legacy `.doc`
 (converted preview on desktop, unsupported + open-externally in cloud);
-a multi-sheet `.xlsx` above the row cap; a `.pptx`; corrupt files with
-each extension (error state, no crash); the external-open action from
-the unsupported card; scrubbing a large local video; a >1 MB text file
-(designed over-cap state); a `.heic` image (placeholder, not a broken
-image); a 10k-row CSV.
+a multi-sheet `.xlsx` above the row cap with merged cells and custom
+column widths (merges/widths render, scrolling stays smooth); a `.pptx`
+with shapes, images, tables, and charts (slides render visually; a
+corrupt one falls back to text cards); corrupt files with each extension
+(error state, no crash); the external-open action from the unsupported
+card; scrubbing a large local video; a >1 MB text file (designed
+over-cap state); a `.heic` image (placeholder, not a broken image); a
+10k-row CSV.

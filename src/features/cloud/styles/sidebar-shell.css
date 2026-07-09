@@ -48,13 +48,15 @@
   overflow-x: hidden;
   overflow-y: auto;
   padding: var(--desktop-sidebar-section-top-gap) 0 var(--desktop-sidebar-section-bottom-gap);
-  scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+  scrollbar-gutter: stable;
+  /* Rows in this list own their horizontal margins through this token, so
+     compensate the reserved gutter here instead of on the list padding. */
+  --desktop-sidebar-row-right-gap: var(--desktop-sidebar-scroll-right-gap);
 }
 
 .desktop-cloud-sidebar-list::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: var(--desktop-sidebar-scrollbar-width);
+  height: var(--desktop-sidebar-scrollbar-width);
 }
 
 .desktop-cloud-sidebar-list::-webkit-scrollbar-track {
@@ -205,8 +207,6 @@
     var(--desktop-utility-page-padding-bottom);
   background: var(--po-canvas);
   color: var(--po-text);
-  scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
 }
 
 .desktop-cloud-main-view::-webkit-scrollbar {

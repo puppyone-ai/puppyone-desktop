@@ -219,8 +219,6 @@
   height: 368px;
   overflow: auto;
   padding: 6px 0 10px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
 }
 
 .desktop-cloud-create-access-tree-body::-webkit-scrollbar {

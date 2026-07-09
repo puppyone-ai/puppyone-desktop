@@ -125,10 +125,12 @@ represents current state; subsequent state changes animate.
 8. Follow the shared sidebar scroll-list layout contract.
 
    The files explorer follows
-   [Desktop Sidebar Scroll Lists](desktop-sidebar-scroll-lists.md): scroll
-   containers own scrollbar gutter, the list owns horizontal padding, and rows
-   use `width: 100%` without scrollbar-width compensation. In the desktop shell,
-   the list left and right padding are both `12px`.
+   [Desktop Sidebar Scroll Lists](desktop-sidebar-scroll-lists.md): the scroll
+   container reserves the scrollbar gutter (`scrollbar-gutter: stable`), the
+   list owns horizontal padding, and rows use `width: 100%` without
+   scrollbar-width compensation. In the desktop shell, the effective left and
+   right content insets are both `12px`; on the right that is the reserved
+   `6px` gutter plus `6px` list padding.
 
 9. Keep root-level creation available without a root command row.
 
@@ -167,8 +169,8 @@ represents current state; subsequent state changes animate.
 
 - `vendor/shared-ui/src/styles/data-workspace.css`
   - defines subtree-level guide lines
-  - defines native scrollbar styling and scrollable-state row gutter
-    compensation
+  - defines the explorer WebKit scrollbar styling, the reserved scrollbar
+    gutter, and the gutter-compensated list padding
   - preserves inactive frame layout through the sidebar view-stack styles
 
 These files live in `vendor/shared-ui` — the canonical copy in this standalone
@@ -192,11 +194,11 @@ Manual verification should cover:
 - switching from Data to Cloud and Settings and back
 - selecting a deep file path that auto-expands ancestor folders
 - verifying subtree guide lines are continuous through nested folders
-- verifying explorer row backgrounds keep `12px` left and right gutters inside
-  the scrollport, and that rows become narrower by the native scrollbar width
-  when a long scrollable tree reserves a scrollbar gutter
-- verifying long scrollable trees keep scrollbar layout space while the
-  scrollbar thumb is hidden before sidebar hover
+- verifying explorer row backgrounds keep `12px` visual left and right gutters
+  inside the scrollport, and that row width stays identical between short
+  (non-scrolling) and long (scrolling) trees
+- verifying the scrollbar gutter stays reserved while the scrollbar thumb is
+  hidden before sidebar hover
 - clicking the trailing `+ New` row to create at the workspace root
 - verifying the trailing `+ New` menu uses automatic placement: below the row
   when there is room, above the row near the sidebar bottom, and never clamped
@@ -220,11 +222,12 @@ These invariants should remain true after future changes:
 - Inactive explorer frames preserve layout geometry.
 - Initial subtree presence does not animate; post-mount expansion/collapse does.
 - Tree guide lines are subtree-scoped, not row-scoped.
-- Explorer rows keep the same geometry in short and long lists. Native
-  scrollbars may overlay the scrollport and must not be compensated in row
-  spacing.
+- Explorer rows keep the same geometry in short and long lists. The scroll
+  container reserves the scrollbar gutter; rows never compensate for scrollbar
+  width in their own spacing.
 - Scrollable explorer sidebars may hide the scrollbar thumb by default, then
-  reveal the platform scrollbar styling on hover, focus, or active scroll.
+  reveal it on hover, focus, or active scroll. Thumb visibility changes only
+  `::-webkit-scrollbar-thumb` colors, never layout.
 - Hiding the project-name root row must not remove root-level creation; the tree
   may expose a trailing `+ New` row, and the tree background context menu remains
   a root creation entry point.

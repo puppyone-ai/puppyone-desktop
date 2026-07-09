@@ -1,7 +1,15 @@
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
-}
+/*
+ * Scrollbars are styled exclusively through ::-webkit-scrollbar pseudo-elements.
+ *
+ * Do NOT set the standard `scrollbar-width` / `scrollbar-color` properties
+ * anywhere in this app: since Chromium 121, setting either standard property
+ * on an element makes Chromium ignore ALL ::-webkit-scrollbar styling for it
+ * and fall back to native scrollbars. On macOS, native scrollbars overlay or
+ * reserve space depending on System Settings > Appearance > "Show scroll
+ * bars", which makes layout non-deterministic across machines.
+ *
+ * See docs/architecture/desktop-sidebar-scroll-lists.md.
+ */
 
 *::-webkit-scrollbar {
   width: var(--po-scrollbar-size, 6px);
@@ -16,10 +24,6 @@
   background: var(--po-scrollbar-thumb);
   border-radius: var(--po-scrollbar-radius, 3px);
   transition: background-color var(--po-scrollbar-transition, 0.16s ease);
-}
-
-.po-scrollbar-active {
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
 }
 
 .po-scrollbar-active::-webkit-scrollbar-thumb {

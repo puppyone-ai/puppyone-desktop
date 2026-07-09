@@ -255,9 +255,9 @@ body.data-sidebar-resizing .data-preview-accessory {
   min-height: 0;
   overflow: auto;
   overflow-x: hidden;
-  scrollbar-gutter: auto;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  /* Always reserve the scrollbar gutter so row width never depends on
+     scroll state. The list compensates in its right padding. */
+  scrollbar-gutter: stable;
 }
 
 .explorer-tree-scroll::-webkit-scrollbar {
@@ -277,12 +277,6 @@ body.data-sidebar-resizing .data-preview-accessory {
   transition: background-color var(--tree-scrollbar-transition);
 }
 
-.explorer-tree-shell.is-scrollable:hover .explorer-tree-scroll,
-.explorer-tree-shell.is-scrollable:focus-within .explorer-tree-scroll,
-.explorer-tree-scroll.is-scrollable.po-scrollbar-active {
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
-}
-
 .explorer-tree-shell.is-scrollable:hover .explorer-tree-scroll::-webkit-scrollbar-thumb,
 .explorer-tree-shell.is-scrollable:focus-within .explorer-tree-scroll::-webkit-scrollbar-thumb,
 .explorer-tree-scroll.is-scrollable.po-scrollbar-active::-webkit-scrollbar-thumb {
@@ -298,7 +292,10 @@ body.data-sidebar-resizing .data-preview-accessory {
   position: relative;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 var(--tree-row-right-gap) var(--tree-list-bottom-gap) var(--tree-row-left-gap);
+  /* Right padding is reduced by the reserved scrollbar gutter so the total
+     right inset (gutter + padding) matches --tree-row-right-gap. */
+  padding: 0 calc(var(--tree-row-right-gap) - var(--tree-scrollbar-width))
+    var(--tree-list-bottom-gap) var(--tree-row-left-gap);
 }
 
 .explorer-tree-shell.no-root .explorer-tree-list {

@@ -2,7 +2,6 @@
 .desktop-titlebar-menu,
 .desktop-node-action-menu {
   box-sizing: border-box;
-  scrollbar-color: var(--po-scrollbar-thumb) var(--po-menu-bg);
   border: 1px solid var(--po-menu-border);
   border-radius: var(--po-menu-radius);
   background: var(--po-menu-bg);

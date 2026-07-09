@@ -154,8 +154,6 @@
   border: 1px solid color-mix(in srgb, var(--po-divider) 70%, transparent);
   border-radius: 6px;
   background: color-mix(in srgb, var(--po-panel) 28%, transparent);
-  scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
 }
 
 .markdown-codemirror-editor[data-readonly="false"] .cm-md-mermaid-preview {

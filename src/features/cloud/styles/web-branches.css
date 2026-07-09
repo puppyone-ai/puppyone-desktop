@@ -599,7 +599,6 @@ button.desktop-cloud-branch-graph-row {
     justify-content: flex-start;
     overflow-x: auto;
     padding-bottom: 1px;
-    scrollbar-width: none;
   }
 
   .desktop-cloud-branches-toolbar::-webkit-scrollbar {

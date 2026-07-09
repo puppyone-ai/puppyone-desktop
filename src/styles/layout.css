@@ -201,8 +201,6 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
 
 .desktop-terminal-xterm .xterm-viewport {
   background: var(--po-terminal-bg) !important;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
 }
 
 .desktop-terminal-xterm .xterm-screen,
@@ -235,12 +233,6 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   background: transparent;
   background-clip: padding-box;
   transition: background-color var(--po-scrollbar-transition, 0.16s ease);
-}
-
-.desktop-terminal-xterm:hover .xterm-viewport,
-.desktop-terminal-xterm:focus-within .xterm-viewport,
-.desktop-terminal-xterm .xterm-viewport.po-scrollbar-active {
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
 }
 
 .desktop-terminal-xterm:hover .xterm-viewport::-webkit-scrollbar-thumb,

@@ -17,8 +17,8 @@ single product area can evolve without turning this file into a catch-all.
 - [Desktop Sidebar View Stack](architecture/desktop-sidebar-view-stack.md)
   - Keep-alive behavior for the Data, Git, Cloud, and Settings sidebar surfaces.
 - [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)
-  - Scroll area, list padding, row width, and native scrollbar gutter
-    boundaries for sidebar lists.
+  - App-wide WebKit-only scrollbar styling rule, reserved scrollbar gutters,
+    and scroll area / list padding / row width boundaries for sidebar lists.
 - [File Format and Viewer Pipeline](architecture/file-format-viewer-pipeline.md)
   - Part 1: the durable format registry → viewer registry → content/resource
     source pipeline contract, plus the Office preview support matrix. Part 2:

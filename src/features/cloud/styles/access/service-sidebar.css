@@ -28,13 +28,12 @@
   overflow: auto;
   overflow-x: hidden;
   padding: 6px 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+  scrollbar-gutter: stable;
 }
 
 .desktop-cloud-service-sidebar .desktop-cloud-access-scope-list::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: var(--desktop-sidebar-scrollbar-width);
+  height: var(--desktop-sidebar-scrollbar-width);
 }
 
 .desktop-cloud-service-sidebar .desktop-cloud-access-scope-list::-webkit-scrollbar-track {

@@ -3,6 +3,9 @@
   flex-direction: column;
   overflow: hidden;
   padding: var(--desktop-sidebar-section-top-gap) 0 0;
+  /* Not a scrolling surface: opt out of the reserved gutter inherited from
+     .desktop-tool-sidebar-list (stable reserves space even on hidden). */
+  scrollbar-gutter: auto;
 }
 
 .desktop-git-fixed-region {

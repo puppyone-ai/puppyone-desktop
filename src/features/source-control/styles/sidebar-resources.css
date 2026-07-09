@@ -52,9 +52,7 @@
   min-height: 0;
   overflow: auto;
   overflow-x: hidden;
-  scrollbar-gutter: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+  scrollbar-gutter: stable;
 }
 
 .desktop-git-resizable-section .desktop-git-remote-preview {
@@ -152,9 +150,7 @@ body.desktop-git-sidebar-resizing {
   overflow: auto;
   overflow-x: hidden;
   padding-bottom: var(--desktop-sidebar-section-bottom-gap);
-  scrollbar-gutter: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+  scrollbar-gutter: stable;
 }
 
 .desktop-git-changes-scroll::-webkit-scrollbar,
@@ -511,12 +507,13 @@ body.desktop-git-sidebar-resizing {
   box-sizing: border-box;
   gap: 0;
   margin: 0;
-  padding: var(--git-section-body-top-gap) var(--git-sidebar-right-gap) 0 var(--git-sidebar-left-gap);
+  padding: var(--git-section-body-top-gap)
+    calc(var(--git-sidebar-right-gap) - var(--git-sidebar-scrollbar-width)) 0
+    var(--git-sidebar-left-gap);
   max-height: min(40vh, calc(var(--desktop-sidebar-row-height) * 7));
   overflow: auto;
   overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
+  scrollbar-gutter: stable;
 }
 
 .desktop-git-committed-preview {
@@ -729,7 +726,11 @@ body.desktop-git-sidebar-resizing {
   display: grid;
   box-sizing: border-box;
   gap: 0;
-  padding: var(--git-section-body-top-gap) var(--git-sidebar-right-gap) 0 var(--git-sidebar-left-gap);
+  /* Right padding is reduced by the reserved scrollbar gutter (see the
+     scroll container rules above) so rows keep the standard right inset. */
+  padding: var(--git-section-body-top-gap)
+    calc(var(--git-sidebar-right-gap) - var(--git-sidebar-scrollbar-width)) 0
+    var(--git-sidebar-left-gap);
 }
 
 .desktop-git-section-row + .desktop-working-tree-list {

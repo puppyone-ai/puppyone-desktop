@@ -65,6 +65,15 @@
   --po-scrollbar-radius: 3px;
   --po-scrollbar-transition: 0.16s ease;
   --desktop-sidebar-scrollbar-width: var(--po-scrollbar-size);
+  /*
+   * Right gap for content inside sidebar scroll containers that reserve a
+   * scrollbar gutter (scrollbar-gutter: stable). gutter + this gap equals
+   * --desktop-sidebar-row-right-gap, so rows keep the same visual inset as
+   * non-scrolling siblings.
+   */
+  --desktop-sidebar-scroll-right-gap: calc(
+    var(--desktop-sidebar-row-right-gap) - var(--desktop-sidebar-scrollbar-width)
+  );
   --desktop-sidebar-row-content-left: 6px;
   --desktop-sidebar-row-content-right: 6px;
   --desktop-sidebar-list-padding-y: 8px;
