@@ -3,7 +3,7 @@
 // real init, real staging, real commits, real branches, real diffs. This covers
 // the source-control half of the "端" (desktop/local) product surface.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, symlink } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -122,6 +122,20 @@ describe("diffs", () => {
     const diff = await getWorkspaceGitFileDiff(root, "new.txt", "untracked");
     expect(diff.files.length).toBe(1);
     expect(JSON.stringify(diff.files)).toContain("brand new line");
+  });
+
+  it("refuses to read an untracked symbolic link outside the workspace", async () => {
+    await initRepoWithIdentity();
+    const external = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-external-"));
+    try {
+      const secretPath = path.join(external, "secret.txt");
+      await writeFile(secretPath, "outside secret\n");
+      await symlink(secretPath, path.join(root, "linked.txt"));
+      await expect(getWorkspaceGitFileDiff(root, "linked.txt", "untracked"))
+        .rejects.toThrow(/symbolic links|workspace entry/i);
+    } finally {
+      await rm(external, { recursive: true, force: true });
+    }
   });
 });
 

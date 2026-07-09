@@ -41,6 +41,7 @@ export type DataNode = {
   name: string;
   path: string;
   type: DataNodeKind;
+  mimeType?: string | null;
   size?: string | null;
   modified?: string | null;
   status?: DataNodeStatus;
@@ -89,6 +90,15 @@ export type OfficeDocumentConversionResult = {
   warnings?: string[];
 };
 
+export type OfficeDocumentConversionOptions = {
+  signal?: AbortSignal;
+};
+
+export type OfficeDocumentConverter = (
+  path: string,
+  options?: OfficeDocumentConversionOptions,
+) => Promise<OfficeDocumentConversionResult>;
+
 export type DataImportResult = {
   paths: string[];
 };
@@ -111,7 +121,7 @@ export type DataPort = {
   readFile?: (path: string) => Promise<FileContent>;
   getFileUrl?: (path: string) => string | Promise<string>;
   openExternalFile?: (path: string) => Promise<void>;
-  convertOfficeDocumentToDocx?: (path: string) => Promise<OfficeDocumentConversionResult>;
+  convertOfficeDocumentToDocx?: OfficeDocumentConverter;
   appPreview?: AppPreviewController;
   writeFile?: (path: string, content: string) => Promise<void>;
   createFolder?: (path: string) => Promise<void>;

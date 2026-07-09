@@ -779,22 +779,12 @@ function DefaultAppsSettingsView({
                 <span className="desktop-settings-badge connected">System</span>
               )}
             />
-            <div className="desktop-settings-line desktop-settings-toggle-line">
+            <div className="desktop-settings-line">
               <span className="desktop-settings-label-stack">
-                <strong>Confirm executable files</strong>
-                <small>Ask before opening files that may run code or install software.</small>
+                <strong>Executable file protection</strong>
+                <small>Always ask before opening files that may run code or install software.</small>
               </span>
-              <label className="desktop-settings-switch">
-                <input
-                  type="checkbox"
-                  checked={settings.confirmExecutableFiles}
-                  onChange={(event) => onChange({
-                    ...settings,
-                    confirmExecutableFiles: event.target.checked,
-                  })}
-                />
-                <span aria-hidden="true" />
-              </label>
+              <span className="desktop-settings-badge connected">Always on</span>
             </div>
           </SettingsGroup>
 

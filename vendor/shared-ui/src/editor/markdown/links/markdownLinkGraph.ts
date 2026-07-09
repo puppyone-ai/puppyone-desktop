@@ -17,7 +17,7 @@ export type CreateMarkdownLinkGraphOptions = {
   isIndexing?: boolean;
   onOpenPath?: (path: string) => void;
   onOpenCandidatePaths?: (paths: readonly string[]) => void;
-  onOpenExternalUrl?: (href: string) => void;
+  onOpenExternalUrl?: (href: string) => void | Promise<void>;
 };
 
 type IndexedDocument = {
@@ -67,7 +67,7 @@ export function createMarkdownLinkGraph(
       options.onOpenPath?.(path);
     },
     openExternalUrl(href) {
-      options.onOpenExternalUrl?.(href);
+      return options.onOpenExternalUrl?.(href);
     },
     getBacklinks(path) {
       return backlinksByTargetPath.get(normalizeDataPath(path)) ?? [];

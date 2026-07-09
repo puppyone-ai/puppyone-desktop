@@ -2,7 +2,7 @@
 
 import { resolveEditorViewer } from "./viewerRegistry";
 import type { EditorDocument, EditorSaveMode, MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "./viewerTypes";
-import type { AppPreviewController } from "../core/types";
+import type { AppPreviewController, OfficeDocumentConverter } from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
 
@@ -24,7 +24,7 @@ export type PuppyoneEditorHostProps = {
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
-  convertOfficeDocumentToDocx?: (path: string) => Promise<{ arrayBuffer: ArrayBuffer; warnings?: string[] }>;
+  convertOfficeDocumentToDocx?: OfficeDocumentConverter;
 };
 
 export function PuppyoneEditorHost({
@@ -45,12 +45,12 @@ export function PuppyoneEditorHost({
   openExternalFile,
   convertOfficeDocumentToDocx,
 }: PuppyoneEditorHostProps) {
-  const { viewer, format } = resolveEditorViewer(document);
+  const { viewer, format, resolvedExtension } = resolveEditorViewer(document);
   const rawContent = viewer.allowPreviewContent === false
     ? document.content ?? ""
     : document.content ?? document.preview ?? "";
   const content = viewer.normalizeContent?.(rawContent, document) ?? rawContent;
-  const canEdit = Boolean(onSaveContent && viewer.isEditable?.({ document, format, content }));
+  const canEdit = Boolean(onSaveContent && viewer.isEditable?.({ document, format, resolvedExtension, content }));
 
   if (viewer.source !== "resource" && loading && !content) {
     return <div className="editor-state">Loading file...</div>;
@@ -72,6 +72,7 @@ export function PuppyoneEditorHost({
       {viewer.render({
         document,
         format,
+        resolvedExtension,
         content,
         aiEditFile,
         fileUrl: document.url,

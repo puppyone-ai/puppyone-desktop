@@ -2186,6 +2186,10 @@
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       ],
+      "mimeTypesByExtension": {
+        ".doc": "application/msword",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      },
       "category": "document",
       "defaultViewer": "office-preview",
       "editable": false,
@@ -2202,8 +2206,16 @@
       ],
       "mimeTypes": [
         "application/vnd.ms-excel",
+        "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
+        "application/vnd.ms-excel.sheet.macroEnabled.12",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       ],
+      "mimeTypesByExtension": {
+        ".xls": "application/vnd.ms-excel",
+        ".xlsb": "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
+        ".xlsm": "application/vnd.ms-excel.sheet.macroEnabled.12",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      },
       "category": "document",
       "defaultViewer": "office-preview",
       "editable": false,
@@ -2220,8 +2232,15 @@
       ],
       "mimeTypes": [
         "application/vnd.ms-powerpoint",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.openxmlformats-officedocument.presentationml.slideshow"
       ],
+      "mimeTypesByExtension": {
+        ".pps": "application/vnd.ms-powerpoint",
+        ".ppsx": "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+        ".ppt": "application/vnd.ms-powerpoint",
+        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      },
       "category": "document",
       "defaultViewer": "office-preview",
       "editable": false,
@@ -2235,8 +2254,13 @@
         ".ott"
       ],
       "mimeTypes": [
-        "application/vnd.oasis.opendocument.text"
+        "application/vnd.oasis.opendocument.text",
+        "application/vnd.oasis.opendocument.text-template"
       ],
+      "mimeTypesByExtension": {
+        ".odt": "application/vnd.oasis.opendocument.text",
+        ".ott": "application/vnd.oasis.opendocument.text-template"
+      },
       "category": "document",
       "defaultViewer": "office-preview",
       "editable": false,
@@ -2250,8 +2274,13 @@
         ".ots"
       ],
       "mimeTypes": [
-        "application/vnd.oasis.opendocument.spreadsheet"
+        "application/vnd.oasis.opendocument.spreadsheet",
+        "application/vnd.oasis.opendocument.spreadsheet-template"
       ],
+      "mimeTypesByExtension": {
+        ".ods": "application/vnd.oasis.opendocument.spreadsheet",
+        ".ots": "application/vnd.oasis.opendocument.spreadsheet-template"
+      },
       "category": "document",
       "defaultViewer": "office-preview",
       "editable": false,
@@ -2265,8 +2294,13 @@
         ".otp"
       ],
       "mimeTypes": [
-        "application/vnd.oasis.opendocument.presentation"
+        "application/vnd.oasis.opendocument.presentation",
+        "application/vnd.oasis.opendocument.presentation-template"
       ],
+      "mimeTypesByExtension": {
+        ".odp": "application/vnd.oasis.opendocument.presentation",
+        ".otp": "application/vnd.oasis.opendocument.presentation-template"
+      },
       "category": "document",
       "defaultViewer": "office-preview",
       "editable": false,
@@ -2321,6 +2355,9 @@
         "application/rtf",
         "text/rtf"
       ],
+      "mimeTypesByExtension": {
+        ".rtf": "application/rtf"
+      },
       "category": "document",
       "defaultViewer": "office-preview",
       "editable": false,

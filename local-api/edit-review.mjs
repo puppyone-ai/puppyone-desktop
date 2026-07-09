@@ -181,11 +181,8 @@ async function collectCandidateFiles(state, pendingPaths) {
 
   for (const pendingPath of pendingPaths) {
     if (shouldIgnoreRelativePath(pendingPath)) continue;
-    const absolutePath = resolveWorkspacePath(state.rootPath, pendingPath);
-    const metadata = await fs.stat(absolutePath).catch((error) => {
-      if (error?.code === "ENOENT") return null;
-      return null;
-    });
+    const absolutePath = await resolveExistingWorkspacePath(state.rootPath, pendingPath).catch(() => null);
+    const metadata = absolutePath ? await fs.lstat(absolutePath).catch(() => null) : null;
 
     if (!metadata) {
       addBaselineMatches(state.baseline, pendingPath, candidates);
@@ -223,11 +220,8 @@ function addBaselineMatches(baseline, relativePath, candidates) {
 async function updateBaselineForPaths(state, pathsToUpdate) {
   for (const relativePath of pathsToUpdate) {
     if (!relativePath || shouldIgnoreRelativePath(relativePath)) continue;
-    const absolutePath = resolveWorkspacePath(state.rootPath, relativePath);
-    const metadata = await fs.stat(absolutePath).catch((error) => {
-      if (error?.code === "ENOENT") return null;
-      return null;
-    });
+    const absolutePath = await resolveExistingWorkspacePath(state.rootPath, relativePath).catch(() => null);
+    const metadata = absolutePath ? await fs.lstat(absolutePath).catch(() => null) : null;
 
     if (!metadata) {
       removeBaselinePath(state.baseline, relativePath);
@@ -286,7 +280,8 @@ function removeBaselinePath(baseline, relativePath) {
 async function walkTextFiles(rootPath, relativeDirectory, budget, onFile) {
   if (budget.files >= MAX_SNAPSHOT_FILES || budget.bytes >= MAX_SNAPSHOT_TOTAL_BYTES) return;
 
-  const directory = resolveWorkspacePath(rootPath, relativeDirectory);
+  const directory = await resolveExistingWorkspacePath(rootPath, relativeDirectory).catch(() => null);
+  if (!directory) return;
   const entries = await fs.readdir(directory, { withFileTypes: true }).catch(() => []);
 
   for (const entry of entries) {
@@ -306,7 +301,8 @@ async function walkTextFiles(rootPath, relativeDirectory, budget, onFile) {
     const content = await readReviewTextFile(rootPath, relativePath);
     if (content === null) continue;
 
-    const metadata = await fs.stat(resolveWorkspacePath(rootPath, relativePath)).catch(() => null);
+    const absolutePath = await resolveExistingWorkspacePath(rootPath, relativePath).catch(() => null);
+    const metadata = absolutePath ? await fs.lstat(absolutePath).catch(() => null) : null;
     if (!metadata || !metadata.isFile()) continue;
 
     budget.files += 1;
@@ -316,11 +312,9 @@ async function walkTextFiles(rootPath, relativeDirectory, budget, onFile) {
 }
 
 async function readReviewTextFile(rootPath, relativePath) {
-  const absolutePath = resolveWorkspacePath(rootPath, relativePath);
-  const metadata = await fs.stat(absolutePath).catch((error) => {
-    if (error?.code === "ENOENT") return null;
-    return null;
-  });
+  const absolutePath = await resolveExistingWorkspacePath(rootPath, relativePath).catch(() => null);
+  if (!absolutePath) return null;
+  const metadata = await fs.lstat(absolutePath).catch(() => null);
   if (!metadata || !metadata.isFile()) return null;
   if (metadata.size > MAX_SNAPSHOT_FILE_BYTES) return null;
 
@@ -503,6 +497,23 @@ function resolveWorkspacePath(rootPath, relativePath) {
   }
 
   return target;
+}
+
+async function resolveExistingWorkspacePath(rootPath, relativePath) {
+  const canonicalRoot = await fs.realpath(path.resolve(rootPath));
+  const candidatePath = resolveWorkspacePath(canonicalRoot, relativePath);
+  const metadata = await fs.lstat(candidatePath);
+  if (candidatePath !== canonicalRoot && metadata.isSymbolicLink()) {
+    throw new Error("Symbolic links cannot be scanned by edit review.");
+  }
+  const canonicalCandidate = await fs.realpath(candidatePath);
+  if (
+    canonicalCandidate !== canonicalRoot
+    && !canonicalCandidate.startsWith(`${canonicalRoot}${path.sep}`)
+  ) {
+    throw new Error("Path escapes the workspace root.");
+  }
+  return canonicalCandidate;
 }
 
 function normalizeRelativePath(value) {

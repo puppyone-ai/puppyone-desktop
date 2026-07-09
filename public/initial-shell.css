@@ -1,0 +1,28 @@
+:root {
+  background: #f1eadf;
+  color-scheme: light;
+}
+
+:root[data-initial-theme="dark"] {
+  background: #0e0e0e;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body,
+#root:empty {
+  overflow: hidden;
+  background: #f1eadf;
+}
+
+:root[data-initial-theme="dark"] body,
+:root[data-initial-theme="dark"] #root:empty {
+  background: #0e0e0e;
+}

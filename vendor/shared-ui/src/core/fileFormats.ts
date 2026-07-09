@@ -44,6 +44,8 @@ export interface FileFormat {
   filenamePatterns?: string[];
   extensions?: string[];
   mimeTypes?: string[];
+  /** Preferred MIME keyed by the registered extension, including its leading dot. */
+  mimeTypesByExtension?: Record<string, string>;
   category: FileCategory;
   defaultViewer: ViewerId;
   availableViewers?: ViewerId[];
@@ -304,7 +306,34 @@ export function getSemanticKindForFormat(format: FileFormat): FileSemanticKind {
 
 export function getPreferredMimeType(name: string): string | null {
   const format = resolveFileFormat({ name });
+  const extension = getFormatExtensionFromName(format, name);
+  if (extension) {
+    const extensionMime = format.mimeTypesByExtension?.[`.${extension}`];
+    if (extensionMime) return extensionMime;
+  }
   return format.mimeTypes?.[0] ?? null;
+}
+
+/**
+ * Resolves the concrete registered extension represented by a name or MIME.
+ * This keeps family formats (for example doc/docx and xls/xlsx/xlsm/xlsb)
+ * data-driven while still allowing a viewer to select the right parser.
+ */
+export function getResolvedFileExtension(
+  input: ResolveInput,
+  format: FileFormat = resolveFileFormat(input),
+): string | null {
+  if (input.name) {
+    const extension = getFormatExtensionFromName(format, input.name);
+    if (extension) return extension;
+  }
+
+  const normalizedMime = input.mimeType?.toLowerCase().split(";")[0].trim();
+  if (!normalizedMime) return null;
+  for (const [extension, mimeType] of Object.entries(format.mimeTypesByExtension ?? {})) {
+    if (mimeType.toLowerCase() === normalizedMime) return extension.replace(/^\./, "");
+  }
+  return null;
 }
 
 export function getMatchedExtension(name: string): string | null {
@@ -319,6 +348,15 @@ export function getMatchedExtension(name: string): string | null {
   }
 
   return lower.slice(lastDot + 1);
+}
+
+function getFormatExtensionFromName(format: FileFormat, name: string): string | null {
+  const lowerName = basename(name).toLowerCase();
+  const extensions = [...(format.extensions ?? [])]
+    .map((extension) => extension.toLowerCase())
+    .sort((left, right) => right.length - left.length);
+  const match = extensions.find((extension) => lowerName.endsWith(extension));
+  return match?.replace(/^\./, "") ?? null;
 }
 
 function getPreviewKindForSemanticType(type?: string | null): FilePreviewKind | null {

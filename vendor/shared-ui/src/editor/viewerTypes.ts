@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { AppPreviewController, OfficeDocumentConversionResult } from "../core/types";
+import type { AppPreviewController, OfficeDocumentConverter } from "../core/types";
 import type { FileFormat } from "../core/fileFormats";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
@@ -71,7 +71,7 @@ export type MarkdownLinkGraph = {
   resolveMarkdownLink: (sourcePath: string, href: string) => MarkdownWikiLinkResolvedTarget | null;
   openWikiLink?: (target: MarkdownWikiLinkResolvedTarget, sourcePath: string) => void;
   openPath?: (path: string) => void;
-  openExternalUrl?: (href: string) => void;
+  openExternalUrl?: (href: string) => void | Promise<void>;
   getBacklinks?: (path: string) => MarkdownBacklink[];
 };
 
@@ -83,6 +83,7 @@ export type MarkdownAssetUrlResolver = (
 export type EditorViewerMatch = {
   document: EditorDocument;
   format: FileFormat;
+  resolvedExtension: string | null;
 };
 
 export type EditorViewerContext = EditorViewerMatch & {
@@ -102,7 +103,7 @@ export type EditorViewerContext = EditorViewerMatch & {
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
-  convertOfficeDocumentToDocx?: (path: string) => Promise<OfficeDocumentConversionResult>;
+  convertOfficeDocumentToDocx?: OfficeDocumentConverter;
   onSaveContent?: (content: string) => Promise<void>;
 };
 

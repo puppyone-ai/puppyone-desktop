@@ -19,6 +19,8 @@ import {
   moveWorkspaceEntry,
   deleteWorkspaceEntry,
   importWorkspaceEntries,
+  readPuppyoneWorkspaceConfig,
+  writePuppyoneWorkspaceConfig,
 } from "../local-api/workspace.mjs";
 
 let root;
@@ -153,12 +155,41 @@ describe("read / write round-trips", () => {
     await expect(readWorkspaceFile(root, "../../etc/passwd")).rejects.toThrow(/outside the selected workspace/i);
   });
 
+  it("rejects direct reads, writes, and conversion through symbolic links", async () => {
+    const externalFile = path.join(external, "secret.rtf");
+    await writeFile(externalFile, "{\\rtf1\\ansi SECRET}");
+    try {
+      await symlink(externalFile, path.join(root, "linked.rtf"));
+    } catch {
+      return;
+    }
+
+    await expect(readWorkspaceFile(root, "linked.rtf")).rejects.toThrow(/symbolic links/i);
+    await expect(readWorkspaceTextFile(root, "linked.rtf")).rejects.toThrow(/symbolic links/i);
+    await expect(writeWorkspaceTextFile(root, "linked.rtf", "changed")).rejects.toThrow(/symbolic links/i);
+    if (process.platform === "darwin") {
+      await expect(convertWorkspaceOfficeDocumentToDocx(root, "linked.rtf")).rejects.toThrow(/symbolic links/i);
+    }
+    expect(await readFile(externalFile, "utf8")).toBe("{\\rtf1\\ansi SECRET}");
+  });
+
   it("converts RTF to DOCX bytes on macOS", async () => {
     if (process.platform !== "darwin") return;
 
     await writeFile(path.join(root, "sample.rtf"), "{\\rtf1\\ansi PuppyOne}");
     const out = await convertWorkspaceOfficeDocumentToDocx(root, "sample.rtf");
     expect(out.bytes.subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+  });
+
+  it("honors an already-aborted Office conversion signal", async () => {
+    if (process.platform !== "darwin") return;
+
+    await writeFile(path.join(root, "cancelled.rtf"), "{\\rtf1\\ansi PuppyOne}");
+    const controller = new AbortController();
+    controller.abort();
+    await expect(convertWorkspaceOfficeDocumentToDocx(root, "cancelled.rtf", {
+      signal: controller.signal,
+    })).rejects.toThrow(/cancelled/i);
   });
 
   it("surfaces binary files (null bytes) with content=null", async () => {
@@ -173,6 +204,27 @@ describe("read / write round-trips", () => {
   });
 });
 
+describe("workspace config containment", () => {
+  it("writes config atomically as a regular in-workspace file", async () => {
+    const result = await writePuppyoneWorkspaceConfig(root, {
+      version: 1,
+      cloud: { projectId: "safe-project" },
+    });
+    expect(result.cloud.projectId).toBe("safe-project");
+    expect((await lstat(path.join(root, ".puppyone", "config.json"))).isFile()).toBe(true);
+    expect((await readPuppyoneWorkspaceConfig(root)).cloud.projectId).toBe("safe-project");
+  });
+
+  it("rejects a symlinked config directory instead of reading or writing outside", async () => {
+    await mkdir(path.join(external, "config-target"));
+    await writeFile(path.join(external, "config-target", "config.json"), '{"project":{"name":"secret"}}');
+    await symlink(path.join(external, "config-target"), path.join(root, ".puppyone"));
+
+    await expect(readPuppyoneWorkspaceConfig(root)).rejects.toThrow(/real directory/i);
+    await expect(writePuppyoneWorkspaceConfig(root, { version: 1 })).rejects.toThrow(/real directory/i);
+  });
+});
+
 describe("listFolderChildren", () => {
   it("lists entries folders-first then alphabetical, with content preview for small files", async () => {
     await createWorkspaceEntry(root, { parentPath: null, name: "zeta.txt", kind: "file", content: "z" });
@@ -182,9 +234,26 @@ describe("listFolderChildren", () => {
     const nodes = await listFolderChildren(root, null);
     expect(nodes.map((n) => n.name)).toEqual(["beta", "alpha.txt", "zeta.txt"]);
     expect(nodes[0].type).toBe("folder");
+    expect(nodes[0].mimeType).toBeNull();
     const alpha = nodes.find((n) => n.name === "alpha.txt");
     expect(alpha.content).toBe("a"); // small text file preview
     expect(alpha.path).toBe("alpha.txt");
+    expect(alpha.mimeType).toMatch(/^text\/plain/);
+  });
+
+  it("publishes the concrete MIME for each Office family extension", async () => {
+    await writeFile(path.join(root, "legacy.doc"), "placeholder");
+    await writeFile(path.join(root, "modern.docx"), "placeholder");
+    await writeFile(path.join(root, "macro.xlsm"), "placeholder");
+
+    const nodes = await listFolderChildren(root, null);
+    expect(nodes.find((node) => node.name === "legacy.doc")?.mimeType).toBe("application/msword");
+    expect(nodes.find((node) => node.name === "modern.docx")?.mimeType).toBe(
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+    expect(nodes.find((node) => node.name === "macro.xlsm")?.mimeType).toBe(
+      "application/vnd.ms-excel.sheet.macroEnabled.12",
+    );
   });
 
   it("skips symbolic links (no symlink escape)", async () => {
@@ -215,6 +284,41 @@ describe("rename / move / delete", () => {
     await createWorkspaceEntry(root, { parentPath: null, name: "a.txt", kind: "file", content: "a" });
     await createWorkspaceEntry(root, { parentPath: null, name: "b.txt", kind: "file", content: "b" });
     await expect(renameWorkspaceEntry(root, { path: "a.txt", nextName: "b.txt" })).rejects.toThrow(/already exists/i);
+  });
+
+  it("rejects direct symbolic-link sources and symbolic-link target folders", async () => {
+    const externalFile = path.join(external, "secret.txt");
+    const externalFolder = path.join(external, "folder");
+    await writeFile(externalFile, "SECRET");
+    await mkdir(externalFolder);
+    await writeFile(path.join(root, "real.txt"), "REAL");
+    try {
+      await symlink(externalFile, path.join(root, "linked.txt"));
+      await symlink(externalFolder, path.join(root, "escape"));
+    } catch {
+      return;
+    }
+
+    await expect(renameWorkspaceEntry(root, { path: "linked.txt", nextName: "renamed.txt" }))
+      .rejects.toThrow(/symbolic links/i);
+    await expect(deleteWorkspaceEntry(root, { path: "linked.txt" }))
+      .rejects.toThrow(/symbolic links/i);
+    await expect(createWorkspaceEntry(root, {
+      parentPath: "escape",
+      name: "created.txt",
+      kind: "file",
+      content: "created",
+    })).rejects.toThrow(/symbolic links/i);
+    await expect(moveWorkspaceEntry(root, { fromPath: "real.txt", toPath: "escape/moved.txt" }))
+      .rejects.toThrow(/symbolic links/i);
+    await expect(importWorkspaceEntries(root, {
+      sourcePaths: [externalFile],
+      targetFolderPath: "escape",
+    })).rejects.toThrow(/symbolic links/i);
+
+    expect(await readFile(externalFile, "utf8")).toBe("SECRET");
+    await expect(readFile(path.join(externalFolder, "created.txt"), "utf8")).rejects.toThrow();
+    await expect(readFile(path.join(externalFolder, "moved.txt"), "utf8")).rejects.toThrow();
   });
 
   it("refuses to rename the workspace root", async () => {

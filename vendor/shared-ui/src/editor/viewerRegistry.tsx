@@ -1,6 +1,6 @@
 "use client";
 
-import { resolveFileFormat } from "../core/fileFormats";
+import { getResolvedFileExtension, resolveFileFormat } from "../core/fileFormats";
 import type {
   EditorDocument,
   EditorSourceRequirement,
@@ -20,7 +20,7 @@ import {
   PdfResourceViewer,
   VideoResourceViewer,
 } from "./viewers/ResourceViewers";
-import { formatJson, isTextPreviewKind } from "./viewers/viewerUtils";
+import { formatJson } from "./viewers/viewerUtils";
 
 export const EDITOR_VIEWERS: EditorViewer[] = [
   {
@@ -73,7 +73,7 @@ export const EDITOR_VIEWERS: EditorViewer[] = [
   {
     id: "office-preview",
     source: "resource",
-    match: ({ document, format }) => format.defaultViewer === "office-preview" || isOfficeDocument(document.name, document.mimeType),
+    match: ({ format }) => format.defaultViewer === "office-preview",
     render: (context) => <OfficeViewer {...context} />,
   },
   {
@@ -92,7 +92,8 @@ export const EDITOR_VIEWERS: EditorViewer[] = [
     id: "text",
     source: "content",
     match: ({ document, format }) => (
-      isTextPreviewKind(document.type) ||
+      document.type === "code" ||
+      document.type === "text" ||
       format.defaultViewer === "plain-text" ||
       format.defaultViewer === "monaco-code"
     ),
@@ -110,12 +111,21 @@ const FALLBACK_VIEWER: EditorViewer = {
   ),
 };
 
-export function resolveEditorViewer(document: EditorDocument): { viewer: EditorViewer; format: EditorViewerMatch["format"] } {
+export function resolveEditorViewer(document: EditorDocument): {
+  viewer: EditorViewer;
+  format: EditorViewerMatch["format"];
+  resolvedExtension: string | null;
+} {
   const format = resolveFileFormat({ name: document.name, mimeType: document.mimeType });
-  const match = { document, format };
+  const resolvedExtension = getResolvedFileExtension(
+    { name: document.name, mimeType: document.mimeType },
+    format,
+  );
+  const match = { document, format, resolvedExtension };
   return {
     viewer: EDITOR_VIEWERS.find((viewer) => viewer.match(match)) ?? FALLBACK_VIEWER,
     format,
+    resolvedExtension,
   };
 }
 
@@ -140,20 +150,4 @@ export function shouldReadEditorContent(input: {
 }): boolean {
   const requirement = getEditorSourceRequirement(input);
   return requirement === "content" || requirement === "content-and-resource";
-}
-
-function isOfficeDocument(name: string, mimeType?: string | null): boolean {
-  const lowerName = name.toLowerCase();
-  if (/\.(docx?|rtf|xlsx?|xlsm|xlsb|pptx?|ppsx?|odt|ott|ods|ots|odp|otp)$/.test(lowerName)) return true;
-
-  const normalizedMime = mimeType?.toLowerCase().split(";")[0].trim() ?? "";
-  return (
-    normalizedMime === "application/msword" ||
-    normalizedMime === "application/rtf" ||
-    normalizedMime === "text/rtf" ||
-    normalizedMime === "application/vnd.ms-excel" ||
-    normalizedMime === "application/vnd.ms-powerpoint" ||
-    normalizedMime.startsWith("application/vnd.openxmlformats-officedocument.") ||
-    normalizedMime.startsWith("application/vnd.oasis.opendocument.")
-  );
 }

@@ -316,6 +316,7 @@ function toDataNode(entry: DesktopCloudTreeEntry): DataNode {
     name,
     path,
     type,
+    mimeType: entry.mime_type ?? getPreferredMimeType(name),
     size: typeof entry.size_bytes === "number" ? formatFileSize(entry.size_bytes) : null,
     modified: null,
     preview: null,

@@ -1,17 +1,22 @@
-export function registerTerminalIpcHandlers({ ipcMain, terminalService, getWorkspaceRootForSender }) {
+export function registerTerminalIpcHandlers({
+  ipcMain,
+  terminalService,
+  authorizeWorkspaceRoot,
+}) {
   ipcMain.handle("terminal:create", async (event, request) => {
-    return terminalService.create(event.sender, request, getWorkspaceRootForSender?.(event.sender) ?? null);
+    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
+    return terminalService.create(event.sender, request, workspaceRoot);
   });
 
-  ipcMain.on("terminal:input", (_event, request) => {
-    terminalService.input(request);
+  ipcMain.on("terminal:input", (event, request) => {
+    terminalService.input(event.sender, request);
   });
 
-  ipcMain.on("terminal:resize", (_event, request) => {
-    terminalService.resize(request);
+  ipcMain.on("terminal:resize", (event, request) => {
+    terminalService.resize(event.sender, request);
   });
 
-  ipcMain.handle("terminal:close", async (_event, id) => {
-    terminalService.close(id);
+  ipcMain.handle("terminal:close", async (event, id) => {
+    terminalService.close(event.sender, id);
   });
 }

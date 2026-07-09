@@ -1,30 +1,43 @@
 import { randomUUID } from "node:crypto";
-import os from "node:os";
 import path from "node:path";
 import pty from "node-pty";
+import { resolveCanonicalWorkspaceDirectory } from "./workspace-authorization.mjs";
 
 export function createTerminalService({
   appVersion,
   initializeWorkspaceEditReview,
   logger = console,
+  ptyService = pty,
 }) {
   const sessions = new Map();
 
   async function create(sender, request, workspaceRoot = null) {
-    const cwd = normalizeTerminalCwd(request?.cwd, workspaceRoot);
+    const senderId = requireSenderId(sender);
+    if (typeof workspaceRoot !== "string" || workspaceRoot.trim().length === 0) {
+      throw new Error("No local workspace is assigned to this window.");
+    }
+    const cwd = await resolveCanonicalWorkspaceDirectory(
+      workspaceRoot,
+      request?.cwd ?? workspaceRoot,
+      { label: "Terminal cwd" },
+    );
     const id = normalizeTerminalId(request?.id);
     const cols = normalizeTerminalSize(request?.cols, 80, 20, 400);
     const rows = normalizeTerminalSize(request?.rows, 24, 8, 120);
     const spawnConfig = buildTerminalSpawnConfig();
 
-    close(id);
-    await initializeWorkspaceEditReview(cwd).catch((error) => {
+    const existing = get(id);
+    if (existing && existing.sender.id !== senderId) {
+      throw new Error("Terminal session id is already owned by another window.");
+    }
+    if (existing) closeSession(existing);
+    await initializeWorkspaceEditReview(workspaceRoot).catch((error) => {
       logger.warn("Unable to initialize edit review baseline:", error);
     });
 
     let terminal;
     try {
-      terminal = pty.spawn(spawnConfig.file, spawnConfig.args, {
+      terminal = ptyService.spawn(spawnConfig.file, spawnConfig.args, {
         name: "xterm-256color",
         cwd,
         cols,
@@ -48,7 +61,7 @@ export function createTerminalService({
     terminal.onData((data) => sendTerminalData(session, data));
     terminal.onExit(({ exitCode, signal }) => {
       sendTerminalExit(session, exitCode, signal ? String(signal) : null);
-      sessions.delete(id);
+      if (sessions.get(id) === session) sessions.delete(id);
     });
 
     return {
@@ -59,26 +72,33 @@ export function createTerminalService({
     };
   }
 
-  function input(request) {
-    const session = get(request?.id);
+  function input(sender, request) {
+    const session = getOwnedSession(sender, request?.id);
     const data = request?.data;
-    if (!session || typeof data !== "string" || data.length === 0) return;
+    if (!session || typeof data !== "string" || data.length === 0) return false;
     session.terminal.write(data);
+    return true;
   }
 
-  function resize(request) {
-    const session = get(request?.id);
-    if (!session) return;
+  function resize(sender, request) {
+    const session = getOwnedSession(sender, request?.id);
+    if (!session) return false;
     const cols = normalizeTerminalSize(request?.cols, 80, 20, 400);
     const rows = normalizeTerminalSize(request?.rows, 24, 8, 120);
     session.cols = cols;
     session.rows = rows;
     session.terminal.resize(cols, rows);
+    return true;
   }
 
-  function close(id) {
-    const session = get(id);
-    if (!session) return;
+  function close(sender, id) {
+    const session = getOwnedSession(sender, id);
+    if (!session) return false;
+    closeSession(session);
+    return true;
+  }
+
+  function closeSession(session) {
     sessions.delete(session.id);
     try {
       session.terminal.kill();
@@ -88,16 +108,16 @@ export function createTerminalService({
   }
 
   function closeSessionsForWindow(webContentsId) {
-    for (const [id, session] of Array.from(sessions.entries())) {
+    for (const session of Array.from(sessions.values())) {
       if (session.sender.id === webContentsId) {
-        close(id);
+        closeSession(session);
       }
     }
   }
 
   function closeAll() {
-    for (const id of Array.from(sessions.keys())) {
-      close(id);
+    for (const session of Array.from(sessions.values())) {
+      closeSession(session);
     }
   }
 
@@ -108,6 +128,11 @@ export function createTerminalService({
   function get(id) {
     if (typeof id !== "string") return null;
     return sessions.get(id) ?? null;
+  }
+
+  function getOwnedSession(sender, id) {
+    const session = get(id);
+    return session && sender?.id === session.sender.id ? session : null;
   }
 
   return {
@@ -121,22 +146,12 @@ export function createTerminalService({
   };
 }
 
-function normalizeTerminalCwd(cwd, workspaceRoot) {
-  if (typeof workspaceRoot === "string" && workspaceRoot.trim().length > 0) {
-    const root = path.resolve(workspaceRoot);
-    if (typeof cwd === "string" && cwd.trim().length > 0) {
-      const resolved = path.resolve(root, cwd);
-      if (resolved === root || resolved.startsWith(`${root}${path.sep}`)) {
-        return resolved;
-      }
-    }
-    return root;
+function requireSenderId(sender) {
+  const senderId = sender?.id;
+  if (!Number.isSafeInteger(senderId) || senderId <= 0) {
+    throw new Error("Terminal sender is invalid.");
   }
-
-  if (typeof cwd === "string" && cwd.trim().length > 0) {
-    return path.resolve(cwd);
-  }
-  return os.homedir();
+  return senderId;
 }
 
 function normalizeTerminalId(id) {

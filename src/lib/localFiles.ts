@@ -24,18 +24,46 @@ export type FileNode = DataNode;
 export function createLocalDataPort(rootPath: string): DataPort {
   return {
     listChildren: (folderPath) => loadFolderChildren(rootPath, folderPath),
-    readFile: async (path) => ({
-      ...(await getDesktopBridge().readFile({ rootPath, path })),
-      url: buildLocalFileUrl(rootPath, path),
-    }),
-    getFileUrl: (path) => buildLocalFileUrl(rootPath, path),
+    readFile: async (path) => {
+      const bridge = getDesktopBridge();
+      const [content, resource] = await Promise.all([
+        bridge.readFile({ rootPath, path }),
+        bridge.getFileUrl({ rootPath, path }),
+      ]);
+      return { ...content, url: resource.url };
+    },
+    getFileUrl: (path) => getDesktopBridge()
+      .getFileUrl({ rootPath, path })
+      .then((result) => result.url),
     openExternalFile: (path) => getDesktopBridge().openEntryExternal({ rootPath, path }).then(() => undefined),
-    convertOfficeDocumentToDocx: async (path) => {
-      const result = await getDesktopBridge().convertOfficeDocumentToDocx({ rootPath, path });
-      return {
-        arrayBuffer: toArrayBuffer(result.bytes),
-        warnings: result.warnings,
+    convertOfficeDocumentToDocx: async (path, options) => {
+      const signal = options?.signal;
+      if (signal?.aborted) throw createOfficeConversionAbortError();
+
+      const bridge = getDesktopBridge();
+      const requestId = createOfficeConversionRequestId();
+      const cancel = () => {
+        try {
+          void bridge.cancelOfficeDocumentToDocxConversion({ requestId }).catch(() => {});
+        } catch {
+          // The conversion request may already have completed or the window may be closing.
+        }
       };
+      signal?.addEventListener("abort", cancel, { once: true });
+
+      try {
+        const result = await bridge.convertOfficeDocumentToDocx({ rootPath, path, requestId });
+        if (signal?.aborted) throw createOfficeConversionAbortError();
+        return {
+          arrayBuffer: toArrayBuffer(result.bytes),
+          warnings: result.warnings,
+        };
+      } catch (error) {
+        if (signal?.aborted) throw createOfficeConversionAbortError();
+        throw error;
+      } finally {
+        signal?.removeEventListener("abort", cancel);
+      }
     },
     appPreview: {
       start: (path) => getDesktopBridge().startAppPreview({ rootPath, path }),
@@ -89,10 +117,6 @@ export async function getInitialWorkspace(): Promise<LastWorkspaceResult> {
 
 export async function getRecentWorkspaces(): Promise<RecentWorkspacesResult> {
   return getDesktopBridge().getRecentWorkspaces();
-}
-
-export async function rememberLastWorkspace(folderPath: string): Promise<void> {
-  await getDesktopBridge().rememberLastWorkspace(folderPath);
 }
 
 export async function openExternalUrl(href: string): Promise<void> {
@@ -161,10 +185,6 @@ export async function selectWorkspaceFolderInNewWindow(): Promise<WorkspaceOpenR
   return getDesktopBridge().selectFolderInNewWindow();
 }
 
-export async function workspaceFromPath(folderPath: string): Promise<Workspace> {
-  return getDesktopBridge().workspaceFromPath(folderPath);
-}
-
 export async function createWorkspaceEntry(
   rootPath: string,
   request: {
@@ -182,18 +202,10 @@ export async function importWorkspaceFiles(
   targetFolderPath: string | null,
   files: File[],
 ): Promise<WorkspaceImportEntriesResult> {
-  const sourcePaths = files
-    .map((file) => getDesktopBridge().getPathForFile(file))
-    .filter((sourcePath) => sourcePath.trim().length > 0);
-
-  if (sourcePaths.length === 0) {
-    throw new Error("No dropped files could be resolved.");
-  }
-
   return getDesktopBridge().importEntries({
     rootPath,
     targetFolderPath,
-    sourcePaths,
+    files,
   });
 }
 
@@ -408,14 +420,20 @@ function getDesktopBridge() {
   return window.puppyoneDesktop;
 }
 
-function buildLocalFileUrl(rootPath: string, relativePath: string): string {
-  const encodedRoot = encodeURIComponent(rootPath);
-  const encodedPath = relativePath
-    .split("/")
-    .filter(Boolean)
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-  return `puppyone-local://file/${encodedRoot}/${encodedPath}`;
+let officeConversionRequestSequence = 0;
+
+function createOfficeConversionRequestId(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  officeConversionRequestSequence += 1;
+  return `office-${Date.now().toString(36)}-${officeConversionRequestSequence.toString(36)}`;
+}
+
+function createOfficeConversionAbortError(): Error {
+  const error = new Error("Office conversion was cancelled.");
+  error.name = "AbortError";
+  return error;
 }
 
 function toArrayBuffer(bytes: ArrayBuffer | ArrayBufferView): ArrayBuffer {

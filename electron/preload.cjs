@@ -23,7 +23,6 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   getInitialWorkspace: () => ipcRenderer.invoke("window:get-initial-workspace"),
   getLastWorkspace: () => ipcRenderer.invoke("workspace:get-last"),
   getRecentWorkspaces: () => ipcRenderer.invoke("workspace:get-recent"),
-  rememberLastWorkspace: (folderPath) => ipcRenderer.invoke("workspace:remember-last", folderPath),
   forgetLastWorkspace: () => ipcRenderer.invoke("workspace:forget-last"),
   showHomepage: () => ipcRenderer.invoke("workspace:show-homepage"),
   openWorkspaceInCurrentWindow: (folderPath) => ipcRenderer.invoke("workspace:open-current", folderPath),
@@ -31,16 +30,30 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   openCloudProjectInNewWindow: (request) => ipcRenderer.invoke("workspace:open-cloud-project-new-window", request),
   selectFolder: () => ipcRenderer.invoke("workspace:select-folder-current"),
   selectFolderInNewWindow: () => ipcRenderer.invoke("workspace:select-folder-new-window"),
-  workspaceFromPath: (folderPath) => ipcRenderer.invoke("workspace:from-path", folderPath),
   getPathForFile: (file) => webUtils.getPathForFile(file),
   listFolderChildren: (request) => ipcRenderer.invoke("workspace:list-folder-children", request),
   readFile: (request) => ipcRenderer.invoke("workspace:read-file", request),
+  getFileUrl: (request) => ipcRenderer.invoke("workspace:get-file-url", request),
   convertOfficeDocumentToDocx: (request) => ipcRenderer.invoke("workspace:convert-office-docx", request),
+  cancelOfficeDocumentToDocxConversion: (request) => ipcRenderer.invoke("workspace:convert-office-docx-cancel", request),
   writeFile: (request) => ipcRenderer.invoke("workspace:write-file", request),
   createEntry: (request) => ipcRenderer.invoke("workspace:create-entry", request),
   renameEntry: (request) => ipcRenderer.invoke("workspace:rename-entry", request),
   moveEntry: (request) => ipcRenderer.invoke("workspace:move-entry", request),
-  importEntries: (request) => ipcRenderer.invoke("workspace:import-entries", request),
+  importEntries: (request) => {
+    const files = Array.isArray(request?.files) ? request.files : [];
+    const sourcePaths = files
+      .map((file) => webUtils.getPathForFile(file))
+      .filter((sourcePath) => typeof sourcePath === "string" && sourcePath.trim().length > 0);
+    if (sourcePaths.length === 0) {
+      return Promise.reject(new Error("No dropped files could be resolved."));
+    }
+    return ipcRenderer.invoke("workspace:import-entries", {
+      rootPath: request?.rootPath,
+      targetFolderPath: request?.targetFolderPath ?? null,
+      sourcePaths,
+    });
+  },
   deleteEntry: (request) => ipcRenderer.invoke("workspace:delete-entry", request),
   revealEntryInFinder: (request) => ipcRenderer.invoke("workspace:reveal-entry-in-finder", request),
   openEntryExternal: (request) => ipcRenderer.invoke("workspace:open-entry-external", request),

@@ -4,6 +4,7 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { BrowserWindow } from "electron";
+import { resolveCanonicalWorkspaceDirectory } from "./main/workspace-authorization.mjs";
 
 const APP_PREVIEW_TYPE = "puppyone.app";
 const APP_PREVIEW_EXTENSION = ".puppyoneapp";
@@ -29,16 +30,17 @@ export function createAppPreviewRuntime({
     const existing = sessions.get(key);
 
     if (existing?.status === "running" && existing.child && !existing.child.killed) {
-      attachOwner(existing, sender);
+      requireSessionOwner(existing, sender);
       return serializeSession(existing);
     }
 
     if (existing?.status === "starting" && existing.startPromise) {
-      attachOwner(existing, sender);
+      requireSessionOwner(existing, sender);
       return existing.startPromise;
     }
 
     if (existing) {
+      requireSessionOwner(existing, sender);
       await stopSession(existing, "restart");
       sessions.delete(key);
     }
@@ -69,13 +71,14 @@ export function createAppPreviewRuntime({
     const key = getSessionKey(context.rootPath, context.appPath);
     const existing = sessions.get(key);
     if (existing) {
+      requireSessionOwner(existing, sender);
       await stopSession(existing, "restart");
       sessions.delete(key);
     }
     return start(sender, request);
   }
 
-  async function stop(_sender, request) {
+  async function stop(sender, request) {
     const context = await loadAppPreviewContext(request);
     const key = getSessionKey(context.rootPath, context.appPath);
     const existing = sessions.get(key);
@@ -93,13 +96,15 @@ export function createAppPreviewRuntime({
         logs: "",
       };
     }
+    requireSessionOwner(existing, sender);
     await stopSession(existing, "stop");
     return serializeSession(existing);
   }
 
-  async function getLogs(_sender, request) {
+  async function getLogs(sender, request) {
     const context = await loadAppPreviewContext(request);
     const existing = sessions.get(getSessionKey(context.rootPath, context.appPath));
+    if (existing) requireSessionOwner(existing, sender);
     return existing?.logs ?? "";
   }
 
@@ -138,7 +143,10 @@ export function createAppPreviewRuntime({
     const manifestHash = createHash("sha256").update(content).digest("hex");
     const appDir = getRelativeDir(appPath);
     const cwdRelativePath = joinManifestRelativePath(appDir, manifest.launch.cwd ?? ".");
-    const cwdPath = resolveWorkspacePath(rootPath, cwdRelativePath);
+    const unresolvedCwdPath = resolveWorkspacePath(rootPath, cwdRelativePath);
+    const cwdPath = await resolveCanonicalWorkspaceDirectory(rootPath, unresolvedCwdPath, {
+      label: "App preview cwd",
+    });
     const appId = manifest.id || `${rootPath}:${appPath}`;
 
     return {
@@ -592,8 +600,10 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function attachOwner(session, sender) {
-  session.ownerIds.add(sender.id);
+function requireSessionOwner(session, sender) {
+  if (!session.ownerIds.has(sender?.id)) {
+    throw new Error("App preview session belongs to another window.");
+  }
 }
 
 function appendLog(session, value) {

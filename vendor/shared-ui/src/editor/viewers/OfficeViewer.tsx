@@ -1,7 +1,31 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  assertDocxDomWithinBudget,
+  CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE,
+  getControlledDocxExternalHref,
+  sanitizeDocxDom,
+} from "../security/docxDomSanitizer";
+import { validateOfficePackageInWorker } from "../security/officePackageValidationClient";
+import {
+  preflightOoxmlPackage,
+  preflightZipCentralDirectory,
+  ZipPreflightError,
+} from "../security/zipCentralDirectoryPreflight";
 import type { EditorViewerContext } from "../viewerTypes";
+import {
+  fetchOfficeArrayBuffer,
+  OfficeResourceLimitError,
+} from "./officeResourceLoader";
+import { extractOfficeTextFallbackInWorker } from "./officeTextFallbackClient";
+import {
+  getSpreadsheetArchiveKind,
+  getSpreadsheetRenderRows,
+  type SpreadsheetPreviewResult,
+  type SpreadsheetSheet,
+} from "./spreadsheetPreview";
+import { parseSpreadsheetInWorker } from "./spreadsheetPreviewClient";
 
 type OfficeState =
   | { status: "idle" | "loading" }
@@ -10,31 +34,11 @@ type OfficeState =
 
 type OfficePreviewResult =
   | { kind: "word"; arrayBuffer: ArrayBuffer }
-  | { kind: "spreadsheet"; sheets: SpreadsheetSheet[] }
+  | SpreadsheetPreviewResult
   | { kind: "presentation"; arrayBuffer: ArrayBuffer }
-  | { kind: "presentationText"; slides: PresentationSlide[] }
-  | { kind: "opendocument"; title: string; lines: string[] }
+  | { kind: "presentationText"; slides: PresentationSlide[]; truncatedSlideCount: number }
+  | { kind: "opendocument"; title: string; lines: string[]; truncatedLines: boolean }
   | { kind: "unsupported"; message: string };
-
-type SpreadsheetSheet = {
-  name: string;
-  rows: SpreadsheetRow[];
-  columnWidths: number[];
-  totalRows: number;
-  totalColumns: number;
-};
-
-type SpreadsheetRow = {
-  rowIndex: number;
-  cells: SpreadsheetCell[];
-};
-
-type SpreadsheetCell = {
-  columnIndex: number;
-  value: string;
-  colSpan: number;
-  rowSpan: number;
-};
 
 type PresentationSlide = {
   index: number;
@@ -42,27 +46,40 @@ type PresentationSlide = {
   lines: string[];
 };
 
-const MAX_SHEET_ROWS = 5_000;
-const MAX_SHEET_COLUMNS = 36;
 const SPREADSHEET_ROW_HEIGHT = 30;
 const SPREADSHEET_OVERSCAN_ROWS = 12;
-const MAX_ODF_LINES = 400;
-const MAX_OFFICE_PREVIEW_BYTES = 25 * 1024 * 1024;
 const LEGACY_WORD_EXTENSIONS = new Set(["doc"]);
 const LEGACY_PRESENTATION_EXTENSIONS = new Set(["ppt", "pps"]);
 const NATIVE_DOCX_CONVERTIBLE_EXTENSIONS = new Set(["doc", "rtf"]);
+const OOXML_PACKAGE_EXTENSIONS = new Set(["docx", "xlsx", "xlsb", "xlsm", "pptx", "ppsx"]);
+const OPEN_DOCUMENT_PACKAGE_EXTENSIONS = new Set(["odt", "ods", "odp", "ott", "ots", "otp"]);
+const DOCX_DECOMPRESSION_BUDGET = {
+  maxEntryUncompressedBytes: 32 * 1024 * 1024,
+  maxTotalUncompressedBytes: 128 * 1024 * 1024,
+  maxDocxXmlStartTags: 150_000,
+} as const;
+const PRESENTATION_DECOMPRESSION_BUDGET = {
+  maxEntryUncompressedBytes: 64 * 1024 * 1024,
+  maxTotalUncompressedBytes: 192 * 1024 * 1024,
+} as const;
+const OPEN_DOCUMENT_DECOMPRESSION_BUDGET = {
+  maxEntryUncompressedBytes: 16 * 1024 * 1024,
+  maxTotalUncompressedBytes: 64 * 1024 * 1024,
+} as const;
 
 export function OfficeViewer({
   document,
+  resolvedExtension,
   fileUrl,
   fileUrlLoading,
   fileUrlError,
   openExternalFile,
   convertOfficeDocumentToDocx,
+  markdownLinkGraph,
 }: EditorViewerContext) {
   const [state, setState] = useState<OfficeState>({ status: "idle" });
   const [activeSheet, setActiveSheet] = useState(0);
-  const extension = getExtension(document.name);
+  const extension = resolvedExtension ?? getExtension(document.name);
   const canUseNativeDocxConversion = Boolean(
     convertOfficeDocumentToDocx && NATIVE_DOCX_CONVERTIBLE_EXTENSIONS.has(extension),
   );
@@ -80,13 +97,16 @@ export function OfficeViewer({
     }
 
     let cancelled = false;
+    const abortController = new AbortController();
 
     setState({ status: "loading" });
     loadOfficePreview({
       fileUrl: previewResourceUrl,
       filename: document.name,
+      extension,
       path: document.path,
       convertOfficeDocumentToDocx,
+      signal: abortController.signal,
     })
       .then((result) => {
         if (!cancelled) setState({ status: "ready", result });
@@ -102,11 +122,19 @@ export function OfficeViewer({
 
     return () => {
       cancelled = true;
+      abortController.abort();
     };
-  }, [canUseNativeDocxConversion, convertOfficeDocumentToDocx, document.name, document.path, previewResourceLoading, previewResourceUrl]);
+  }, [canUseNativeDocxConversion, convertOfficeDocumentToDocx, document.name, document.path, extension, previewResourceLoading, previewResourceUrl]);
 
   if (fileUrlError && !canUseNativeDocxConversion) {
-    return <div className="editor-state danger">Failed to load file: {fileUrlError}</div>;
+    return (
+      <OfficeEmptyState
+        title="Failed to load file"
+        message={fileUrlError}
+        documentPath={document.path}
+        openExternalFile={openExternalFile}
+      />
+    );
   }
 
   if ((previewResourceLoading || state.status === "loading") && !previewResourceUrl && !canUseNativeDocxConversion) {
@@ -114,7 +142,14 @@ export function OfficeViewer({
   }
 
   if (!previewResourceUrl && !canUseNativeDocxConversion && state.status !== "ready") {
-    return <div className="editor-state">No preview available for this file.</div>;
+    return (
+      <OfficeEmptyState
+        title="Preview not available"
+        message="No preview resource is available for this file."
+        documentPath={document.path}
+        openExternalFile={openExternalFile}
+      />
+    );
   }
 
   return (
@@ -138,6 +173,7 @@ export function OfficeViewer({
             activeSheet={activeSheet}
             onActiveSheetChange={setActiveSheet}
             openExternalFile={openExternalFile}
+            openExternalUrl={markdownLinkGraph?.openExternalUrl}
           />
         )}
       </div>
@@ -151,12 +187,14 @@ function OfficePreviewContent({
   activeSheet,
   onActiveSheetChange,
   openExternalFile,
+  openExternalUrl,
 }: {
   documentPath: string;
   result: OfficePreviewResult;
   activeSheet: number;
   onActiveSheetChange: (index: number) => void;
   openExternalFile?: (path: string) => Promise<void>;
+  openExternalUrl?: (href: string) => void | Promise<void>;
 }) {
   if (result.kind === "unsupported") {
     return (
@@ -175,6 +213,7 @@ function OfficePreviewContent({
         arrayBuffer={result.arrayBuffer}
         documentPath={documentPath}
         openExternalFile={openExternalFile}
+        openExternalUrl={openExternalUrl}
       />
     );
   }
@@ -200,7 +239,12 @@ function OfficePreviewContent({
   }
 
   if (result.kind === "presentationText") {
-    return <PresentationTextPreview slides={result.slides} />;
+    return (
+      <PresentationTextPreview
+        slides={result.slides}
+        truncatedSlideCount={result.truncatedSlideCount}
+      />
+    );
   }
 
   return (
@@ -212,18 +256,32 @@ function OfficePreviewContent({
         ) : (
           <p>No readable text was found.</p>
         )}
+        {result.truncatedLines && (
+          <div className="office-preview__note">Showing the first 400 extracted text lines.</div>
+        )}
       </article>
     </div>
   );
 }
 
-function PresentationTextPreview({ slides }: { slides: PresentationSlide[] }) {
+function PresentationTextPreview({
+  slides,
+  truncatedSlideCount = 0,
+}: {
+  slides: PresentationSlide[];
+  truncatedSlideCount?: number;
+}) {
   if (slides.length === 0) {
     return <OfficeEmptyState title="Empty presentation" message="No slide text was found in this presentation." />;
   }
 
   return (
     <div className="office-presentation-preview">
+      {truncatedSlideCount > 0 && (
+        <div className="office-preview__note">
+          {truncatedSlideCount} additional slides were omitted by the text fallback safety budget.
+        </div>
+      )}
       {slides.map((slide) => (
         <article className="office-slide-card" key={slide.index}>
           <div className="office-slide-card__number">{slide.index}</div>
@@ -299,11 +357,11 @@ function PptxPresentationPreview({
         if (cancelled) return;
         const message = error instanceof Error ? error.message : String(error);
         try {
-          const fallback = await parsePresentationText(arrayBuffer);
+          const fallback = await parsePresentationText(arrayBuffer.slice(0), abortController.signal);
           if (!cancelled && fallback.kind === "presentationText") {
             setRenderState({
               status: "fallback",
-              message: `PuppyOne could not render the high-fidelity PPTX preview. Showing extracted slide text instead. ${message}`,
+              message: `PuppyOne could not render the high-fidelity PPTX preview. Showing bounded extracted slide text instead.${fallback.truncatedSlideCount > 0 ? ` ${fallback.truncatedSlideCount} additional slides were omitted.` : ""} ${message}`,
               slides: fallback.slides,
             });
           }
@@ -394,7 +452,10 @@ function SpreadsheetPreview({
   }, [selectedSheet?.name]);
 
   if (result.sheets.length === 0 || !selectedSheet) {
-    return <OfficeEmptyState title="Empty workbook" message="No sheets were found in this workbook." />;
+    const hiddenMessage = result.hiddenSheetCount > 0
+      ? `${result.hiddenSheetCount} hidden ${pluralize("sheet", result.hiddenSheetCount)} omitted.`
+      : "No sheets were found in this workbook.";
+    return <OfficeEmptyState title="No visible sheets" message={hiddenMessage} />;
   }
 
   const rowCount = selectedSheet.rows.length;
@@ -405,10 +466,9 @@ function SpreadsheetPreview({
   const endRow = Math.min(rowCount, startRow + visibleRowCount);
   const topSpacerHeight = startRow * SPREADSHEET_ROW_HEIGHT;
   const bottomSpacerHeight = Math.max(0, (rowCount - endRow) * SPREADSHEET_ROW_HEIGHT);
-  const renderedRows = selectedSheet.rows.slice(startRow, endRow);
-  const hasTruncatedRows = selectedSheet.totalRows > selectedSheet.rows.length;
-  const hasTruncatedColumns = selectedSheet.totalColumns > MAX_SHEET_COLUMNS;
-  const columnSpan = selectedSheet.columnWidths.length + 1;
+  const renderedRows = getSpreadsheetRenderRows(selectedSheet, startRow, endRow);
+  const columnSpan = selectedSheet.columns.length + 1;
+  const previewNotes = createSpreadsheetPreviewNotes(result, selectedSheet);
 
   const handleScroll = () => {
     const gridWrap = gridWrapRef.current;
@@ -438,8 +498,8 @@ function SpreadsheetPreview({
         <table className="office-spreadsheet-grid">
           <colgroup>
             <col className="office-spreadsheet-grid__row-header-col" />
-            {selectedSheet.columnWidths.map((width, index) => (
-              <col key={index} style={{ width }} />
+            {selectedSheet.columns.map((column) => (
+              <col key={column.columnIndex} style={{ width: column.width }} />
             ))}
           </colgroup>
           <tbody>
@@ -448,23 +508,20 @@ function SpreadsheetPreview({
                 <td colSpan={columnSpan} style={{ height: topSpacerHeight }} />
               </tr>
             )}
-            {renderedRows.map((row, visibleIndex) => {
-              const rowIndexInSheet = startRow + visibleIndex;
-              return (
-                <tr key={row.rowIndex}>
-                  <th scope="row">{row.rowIndex + 1}</th>
-                  {row.cells.map((cell) => (
-                    <td
-                      key={`${row.rowIndex}-${cell.columnIndex}`}
-                      colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
-                      rowSpan={cell.rowSpan > 1 ? Math.min(cell.rowSpan, endRow - rowIndexInSheet) : undefined}
-                    >
-                      {cell.value}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
+            {renderedRows.map((row) => (
+              <tr key={row.rowIndex}>
+                <th scope="row">{row.rowIndex + 1}</th>
+                {row.cells.map((cell) => (
+                  <td
+                    key={`${row.rowIndex}-${cell.columnIndex}`}
+                    colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
+                    rowSpan={cell.rowSpan > 1 ? cell.rowSpan : undefined}
+                  >
+                    {cell.value}
+                  </td>
+                ))}
+              </tr>
+            ))}
             {bottomSpacerHeight > 0 && (
               <tr className="office-spreadsheet-grid__spacer" aria-hidden="true">
                 <td colSpan={columnSpan} style={{ height: bottomSpacerHeight }} />
@@ -473,24 +530,61 @@ function SpreadsheetPreview({
           </tbody>
         </table>
       </div>
-      {(hasTruncatedRows || hasTruncatedColumns) && (
+      {previewNotes.length > 0 && (
         <div className="office-preview__note">
-          Showing {selectedSheet.rows.length} of {selectedSheet.totalRows} rows
-          {hasTruncatedColumns ? ` and ${MAX_SHEET_COLUMNS} of ${selectedSheet.totalColumns} columns` : ""}.
+          {previewNotes.join(" ")}
         </div>
       )}
     </div>
   );
 }
 
+function createSpreadsheetPreviewNotes(
+  result: SpreadsheetPreviewResult,
+  sheet: SpreadsheetSheet,
+): string[] {
+  const notes: string[] = [];
+  if (result.budget.truncated) {
+    const reasons = result.budget.truncationReasons.map((reason) => (
+      reason === "materialized-cell-limit" ? "cell-count" : "text-memory"
+    ));
+    notes.push(`Preview stopped at the spreadsheet ${reasons.join(" and ")} safety budget.`);
+  }
+  if (result.truncatedSheetCount > 0) {
+    notes.push(`Showing ${result.sheets.length} of ${result.totalVisibleSheets} visible sheets.`);
+  }
+  if (result.hiddenSheetCount > 0) {
+    notes.push(`${result.hiddenSheetCount} hidden ${pluralize("sheet", result.hiddenSheetCount)} omitted.`);
+  }
+  if (sheet.truncatedRows) {
+    notes.push(`Showing ${sheet.rows.length} of ${sheet.totalVisibleRows} visible rows.`);
+  }
+  if (sheet.truncatedColumns) {
+    notes.push(`Showing ${sheet.columns.length} of ${sheet.totalVisibleColumns} visible columns.`);
+  }
+  if (sheet.hiddenRowCount > 0) {
+    notes.push(`${sheet.hiddenRowCount} hidden ${pluralize("row", sheet.hiddenRowCount)} omitted.`);
+  }
+  if (sheet.hiddenColumnCount > 0) {
+    notes.push(`${sheet.hiddenColumnCount} hidden ${pluralize("column", sheet.hiddenColumnCount)} omitted.`);
+  }
+  return notes;
+}
+
+function pluralize(noun: string, count: number): string {
+  return count === 1 ? noun : `${noun}s`;
+}
+
 function DocxDocumentPreview({
   arrayBuffer,
   documentPath,
   openExternalFile,
+  openExternalUrl,
 }: {
   arrayBuffer: ArrayBuffer;
   documentPath: string;
   openExternalFile?: (path: string) => Promise<void>;
+  openExternalUrl?: (href: string) => void | Promise<void>;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [renderState, setRenderState] = useState<{ status: "loading" | "ready" | "error"; message?: string }>({
@@ -506,14 +600,42 @@ function DocxDocumentPreview({
     const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: "open" });
     shadowRoot.replaceChildren();
 
+    const fragment = document.createDocumentFragment();
     const baseStyle = document.createElement("style");
     baseStyle.textContent = DOCX_SHADOW_BASE_CSS;
     const styleContainer = document.createElement("div");
     styleContainer.className = "office-docx-style-container";
     const bodyContainer = document.createElement("div");
     bodyContainer.className = "office-docx-body";
-    shadowRoot.append(baseStyle, styleContainer, bodyContainer);
+    fragment.append(baseStyle, styleContainer, bodyContainer);
     setRenderState({ status: "loading" });
+
+    const activateControlledLink = (event: Event) => {
+      const link = findDocxLinkInEvent(event);
+      if (!link) return;
+
+      if (event instanceof KeyboardEvent && event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const internalHref = link.getAttribute("href");
+      if (internalHref?.startsWith("#")) {
+        findDocxFragmentTarget(shadowRoot, internalHref)?.scrollIntoView({ block: "start" });
+        return;
+      }
+
+      const externalHref = getControlledDocxExternalHref(link);
+      if (externalHref && openExternalUrl) {
+        void Promise.resolve().then(() => openExternalUrl(externalHref)).catch((error) => {
+          setRenderState({
+            status: "error",
+            message: `The external link could not be opened. ${error instanceof Error ? error.message : String(error)}`,
+          });
+        });
+      }
+    };
+    shadowRoot.addEventListener("click", activateControlledLink);
+    shadowRoot.addEventListener("keydown", activateControlledLink);
 
     import("docx-preview")
       .then(({ renderAsync }) => renderAsync(
@@ -540,7 +662,9 @@ function DocxDocumentPreview({
       ))
       .then(() => {
         if (cancelled) return;
-        removeExternalDocumentResources(bodyContainer);
+        assertDocxDomWithinBudget(fragment);
+        sanitizeDocxDom(fragment);
+        shadowRoot.replaceChildren(fragment);
         fitDocxPreviewToWidth(host, bodyContainer);
         resizeObserver = new ResizeObserver(() => fitDocxPreviewToWidth(host, bodyContainer));
         resizeObserver.observe(host);
@@ -558,9 +682,11 @@ function DocxDocumentPreview({
     return () => {
       cancelled = true;
       resizeObserver?.disconnect();
+      shadowRoot.removeEventListener("click", activateControlledLink);
+      shadowRoot.removeEventListener("keydown", activateControlledLink);
       shadowRoot.replaceChildren();
     };
-  }, [arrayBuffer]);
+  }, [arrayBuffer, openExternalUrl]);
 
   if (renderState.status === "error") {
     return (
@@ -598,15 +724,25 @@ function OfficeEmptyState({
   documentPath?: string;
   openExternalFile?: (path: string) => Promise<void>;
 }) {
+  const [externalOpenError, setExternalOpenError] = useState<string | null>(null);
+  const openExternally = () => {
+    if (!documentPath || !openExternalFile) return;
+    setExternalOpenError(null);
+    void Promise.resolve().then(() => openExternalFile(documentPath)).catch((error) => {
+      setExternalOpenError(error instanceof Error ? error.message : String(error));
+    });
+  };
+
   return (
     <div className="office-preview-empty">
       <strong>{title}</strong>
       <span>{message}</span>
       {documentPath && openExternalFile && (
-        <button type="button" onClick={() => void openExternalFile(documentPath)}>
+        <button type="button" onClick={openExternally}>
           Open in default app
         </button>
       )}
+      {externalOpenError && <span role="alert">Could not open the desktop app. {externalOpenError}</span>}
     </div>
   );
 }
@@ -614,33 +750,50 @@ function OfficeEmptyState({
 async function loadOfficePreview({
   fileUrl,
   filename,
+  extension,
   path,
   convertOfficeDocumentToDocx,
+  signal,
 }: {
   fileUrl?: string | null;
   filename: string;
+  extension: string;
   path: string;
-  convertOfficeDocumentToDocx?: (path: string) => Promise<{ arrayBuffer: ArrayBuffer; warnings?: string[] }>;
+  convertOfficeDocumentToDocx?: EditorViewerContext["convertOfficeDocumentToDocx"];
+  signal?: AbortSignal;
 }): Promise<OfficePreviewResult> {
-  const extension = getExtension(filename);
-
   if (NATIVE_DOCX_CONVERTIBLE_EXTENSIONS.has(extension)) {
     if (!convertOfficeDocumentToDocx) {
       return unsupportedNativeConversionMessage(extension);
     }
 
+    let convertedBuffer: ArrayBuffer;
     try {
-      const result = await convertOfficeDocumentToDocx(path);
-      return {
-        kind: "word",
-        arrayBuffer: result.arrayBuffer,
-      };
+      const result = await convertOfficeDocumentToDocx(path, { signal });
+      signal?.throwIfAborted();
+      convertedBuffer = result.arrayBuffer;
     } catch (error) {
+      if (isAbortError(error)) throw error;
       const reason = error instanceof Error ? error.message : String(error);
       return {
         kind: "unsupported",
         message: `PuppyOne could not convert this .${extension} file for preview. Open it in a desktop app or re-save it as .docx. ${reason}`,
       };
+    }
+
+    const packageRejection = getOfficePackageRejection("docx", convertedBuffer);
+    if (packageRejection) return packageRejection;
+    try {
+      const validatedBuffer = await validateOfficePackageForPreview(
+        convertedBuffer,
+        "docx",
+        DOCX_DECOMPRESSION_BUDGET,
+        signal,
+      );
+      return { kind: "word", arrayBuffer: validatedBuffer };
+    } catch (error) {
+      if (isAbortError(error)) throw error;
+      return unsafeOfficePackageMessage("converted Word document", error);
     }
   }
 
@@ -660,9 +813,9 @@ async function loadOfficePreview({
 
   let arrayBuffer: ArrayBuffer;
   try {
-    arrayBuffer = await fetchArrayBuffer(fileUrl);
+    arrayBuffer = await fetchOfficeArrayBuffer(fileUrl, { signal });
   } catch (error) {
-    if (error instanceof OfficePreviewLimitError) {
+    if (error instanceof OfficeResourceLimitError) {
       return {
         kind: "unsupported",
         message: error.message,
@@ -671,26 +824,67 @@ async function loadOfficePreview({
     throw error;
   }
 
+  const packageRejection = getOfficePackageRejection(extension, arrayBuffer);
+  if (packageRejection) return packageRejection;
+
   if (isWordExtension(extension)) {
-    return {
-      kind: "word",
-      arrayBuffer,
-    };
+    try {
+      arrayBuffer = await validateOfficePackageForPreview(
+        arrayBuffer,
+        "docx",
+        DOCX_DECOMPRESSION_BUDGET,
+        signal,
+      );
+      return { kind: "word", arrayBuffer };
+    } catch (error) {
+      if (isAbortError(error)) throw error;
+      return unsafeOfficePackageMessage("Word document", error);
+    }
   }
   if (isSpreadsheetExtension(extension)) {
     try {
-      return await parseSpreadsheet(arrayBuffer);
+      return await parseSpreadsheetInWorker(arrayBuffer, {
+        archiveKind: getSpreadsheetArchiveKind(extension),
+        signal,
+      });
     } catch (error) {
-      if (!isOpenDocumentExtension(extension)) throw error;
+      if (isZipPreflightError(error)) {
+        return {
+          kind: "unsupported",
+          message: `This spreadsheet was rejected before preview because its package is unsafe or malformed. ${error.message}`,
+        };
+      }
+      throw error;
     }
   }
   if (isPresentationExtension(extension)) {
-    return {
-      kind: "presentation",
-      arrayBuffer,
-    };
+    try {
+      arrayBuffer = await validateOfficePackageForPreview(
+        arrayBuffer,
+        "ooxml",
+        PRESENTATION_DECOMPRESSION_BUDGET,
+        signal,
+      );
+      return { kind: "presentation", arrayBuffer };
+    } catch (error) {
+      if (isAbortError(error)) throw error;
+      return unsafeOfficePackageMessage("presentation", error);
+    }
   }
-  if (isOpenDocumentExtension(extension)) return parseOpenDocument(arrayBuffer, filename);
+  if (isOpenDocumentExtension(extension)) {
+    try {
+      arrayBuffer = await validateOfficePackageForPreview(
+        arrayBuffer,
+        "zip",
+        OPEN_DOCUMENT_DECOMPRESSION_BUDGET,
+        signal,
+      );
+      return await parseOpenDocument(arrayBuffer, filename, signal);
+    } catch (error) {
+      if (isAbortError(error)) throw error;
+      return unsafeOfficePackageMessage("OpenDocument file", error);
+    }
+  }
 
   return {
     kind: "unsupported",
@@ -698,260 +892,64 @@ async function loadOfficePreview({
   };
 }
 
-async function fetchArrayBuffer(fileUrl: string): Promise<ArrayBuffer> {
-  const response = await fetch(fileUrl);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const contentLength = Number(response.headers.get("content-length") ?? "0");
-  if (Number.isFinite(contentLength) && contentLength > MAX_OFFICE_PREVIEW_BYTES) {
-    throw new OfficePreviewLimitError(`This file is larger than the ${formatBytes(MAX_OFFICE_PREVIEW_BYTES)} Office preview limit. Open it in a desktop app for full fidelity.`);
-  }
-
-  const arrayBuffer = await response.arrayBuffer();
-  if (arrayBuffer.byteLength > MAX_OFFICE_PREVIEW_BYTES) {
-    throw new OfficePreviewLimitError(`This file is larger than the ${formatBytes(MAX_OFFICE_PREVIEW_BYTES)} Office preview limit. Open it in a desktop app for full fidelity.`);
-  }
-  return arrayBuffer;
+async function validateOfficePackageForPreview(
+  arrayBuffer: ArrayBuffer,
+  profile: "zip" | "ooxml" | "docx",
+  budget: {
+    maxEntryUncompressedBytes: number;
+    maxTotalUncompressedBytes: number;
+    maxDocxXmlStartTags?: number;
+  },
+  signal?: AbortSignal,
+): Promise<ArrayBuffer> {
+  const result = await validateOfficePackageInWorker(arrayBuffer, {
+    profile,
+    budget,
+    signal,
+  });
+  return result.arrayBuffer;
 }
 
-async function parseSpreadsheet(arrayBuffer: ArrayBuffer): Promise<OfficePreviewResult> {
-  const XLSX = await import("xlsx");
-  const workbook = XLSX.read(arrayBuffer, {
-    type: "array",
-    cellDates: true,
-    cellStyles: true,
-    dense: false,
-  });
-
+function unsafeOfficePackageMessage(
+  label: string,
+  error: unknown,
+): Extract<OfficePreviewResult, { kind: "unsupported" }> {
   return {
-    kind: "spreadsheet",
-    sheets: workbook.SheetNames.slice(0, 12).map((sheetName) => {
-      const worksheet = workbook.Sheets[sheetName];
-      const range = worksheet?.["!ref"] ? XLSX.utils.decode_range(worksheet["!ref"]) : null;
-      const totalRows = range ? range.e.r - range.s.r + 1 : 0;
-      const totalColumns = range ? range.e.c - range.s.c + 1 : 0;
-      const startRowIndex = range?.s.r ?? 0;
-      const startColumnIndex = range?.s.c ?? 0;
-      const endRowIndex = range ? Math.min(range.e.r, range.s.r + MAX_SHEET_ROWS - 1) : -1;
-      const endColumnIndex = range ? Math.min(range.e.c, range.s.c + MAX_SHEET_COLUMNS - 1) : -1;
-      const columnWidths = range
-        ? createSpreadsheetColumnWidths(worksheet?.["!cols"], startColumnIndex, endColumnIndex)
-        : [];
-      const merges = Array.isArray(worksheet?.["!merges"]) ? worksheet["!merges"] : [];
-
-      return {
-        name: sheetName,
-        rows: range
-          ? createSpreadsheetRows({
-            worksheet,
-            merges,
-            startRowIndex,
-            endRowIndex,
-            startColumnIndex,
-            endColumnIndex,
-          })
-          : [],
-        columnWidths,
-        totalRows,
-        totalColumns,
-      };
-    }),
+    kind: "unsupported",
+    message: `This ${label} was rejected before preview because decompression exceeded a safety budget or the package was malformed. ${error instanceof Error ? error.message : String(error)}`,
   };
 }
 
-async function parsePresentationText(arrayBuffer: ArrayBuffer): Promise<OfficePreviewResult> {
-  const { default: JSZip } = await import("jszip");
-  const zip = await JSZip.loadAsync(arrayBuffer);
-  const slideEntries = Object.values(zip.files)
-    .filter((file) => /^ppt\/slides\/slide\d+\.xml$/i.test(file.name))
-    .sort((left, right) => getSlideIndex(left.name) - getSlideIndex(right.name));
-
-  const slides = await Promise.all(
-    slideEntries.map(async (file, index) => {
-      const xml = await file.async("text");
-      const lines = extractXmlText(xml);
-      const [title, ...body] = lines;
-
-      return {
-        index: index + 1,
-        title: title || `Slide ${index + 1}`,
-        lines: body,
-      };
-    }),
-  );
-
-  return { kind: "presentationText", slides };
+async function parsePresentationText(
+  arrayBuffer: ArrayBuffer,
+  signal?: AbortSignal,
+): Promise<OfficePreviewResult> {
+  const result = await extractOfficeTextFallbackInWorker(arrayBuffer, {
+    operation: "extract-presentation-text",
+    signal,
+  });
+  return {
+    kind: "presentationText",
+    slides: result.slides,
+    truncatedSlideCount: result.report.truncatedSlideCount,
+  };
 }
 
-async function parseOpenDocument(arrayBuffer: ArrayBuffer, filename: string): Promise<OfficePreviewResult> {
-  const { default: JSZip } = await import("jszip");
-  const zip = await JSZip.loadAsync(arrayBuffer);
-  const contentFile = zip.file("content.xml");
-
-  if (!contentFile) {
-    return {
-      kind: "unsupported",
-      message: "This OpenDocument file does not contain readable content.xml.",
-    };
-  }
-
-  const xml = await contentFile.async("text");
-  const lines = extractXmlText(xml).slice(0, MAX_ODF_LINES);
-
+async function parseOpenDocument(
+  arrayBuffer: ArrayBuffer,
+  filename: string,
+  signal?: AbortSignal,
+): Promise<OfficePreviewResult> {
+  const result = await extractOfficeTextFallbackInWorker(arrayBuffer, {
+    operation: "extract-opendocument-text",
+    signal,
+  });
   return {
     kind: "opendocument",
     title: filename,
-    lines,
+    lines: result.lines,
+    truncatedLines: result.report.truncatedLines,
   };
-}
-
-function formatCellValue(value: string | number | boolean | Date | null | undefined): string {
-  if (value === null || value === undefined) return "";
-  if (value instanceof Date) return value.toLocaleDateString();
-  return String(value);
-}
-
-function createSpreadsheetRows({
-  worksheet,
-  merges,
-  startRowIndex,
-  endRowIndex,
-  startColumnIndex,
-  endColumnIndex,
-}: {
-  worksheet: Record<string, unknown> | undefined;
-  merges: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }>;
-  startRowIndex: number;
-  endRowIndex: number;
-  startColumnIndex: number;
-  endColumnIndex: number;
-}): SpreadsheetRow[] {
-  const coveredCells = new Set<string>();
-  const mergeStarts = new Map<string, { rowSpan: number; colSpan: number }>();
-
-  for (const merge of merges) {
-    if (
-      merge.e.r < startRowIndex
-      || merge.s.r > endRowIndex
-      || merge.e.c < startColumnIndex
-      || merge.s.c > endColumnIndex
-    ) {
-      continue;
-    }
-
-    const mergeStartRow = Math.max(merge.s.r, startRowIndex);
-    const mergeStartColumn = Math.max(merge.s.c, startColumnIndex);
-    const mergeEndRow = Math.min(merge.e.r, endRowIndex);
-    const mergeEndColumn = Math.min(merge.e.c, endColumnIndex);
-    mergeStarts.set(spreadsheetCellKey(mergeStartRow, mergeStartColumn), {
-      rowSpan: mergeEndRow - mergeStartRow + 1,
-      colSpan: mergeEndColumn - mergeStartColumn + 1,
-    });
-
-    for (let rowIndex = mergeStartRow; rowIndex <= mergeEndRow; rowIndex += 1) {
-      for (let columnIndex = mergeStartColumn; columnIndex <= mergeEndColumn; columnIndex += 1) {
-        if (rowIndex === mergeStartRow && columnIndex === mergeStartColumn) continue;
-        coveredCells.add(spreadsheetCellKey(rowIndex, columnIndex));
-      }
-    }
-  }
-
-  const rows: SpreadsheetRow[] = [];
-  for (let rowIndex = startRowIndex; rowIndex <= endRowIndex; rowIndex += 1) {
-    const cells: SpreadsheetCell[] = [];
-    for (let columnIndex = startColumnIndex; columnIndex <= endColumnIndex; columnIndex += 1) {
-      if (coveredCells.has(spreadsheetCellKey(rowIndex, columnIndex))) continue;
-
-      const merge = mergeStarts.get(spreadsheetCellKey(rowIndex, columnIndex));
-      const address = encodeSpreadsheetCell(rowIndex, columnIndex);
-      const cell = worksheet?.[address] as { v?: string | number | boolean | Date | null; w?: string } | undefined;
-      cells.push({
-        columnIndex,
-        value: cell?.w ?? formatCellValue(cell?.v),
-        colSpan: merge?.colSpan ?? 1,
-        rowSpan: merge?.rowSpan ?? 1,
-      });
-    }
-
-    rows.push({ rowIndex, cells });
-  }
-  return rows;
-}
-
-function createSpreadsheetColumnWidths(
-  columns: Array<{ wpx?: number; wch?: number; hidden?: boolean }> | undefined,
-  startColumnIndex: number,
-  endColumnIndex: number,
-): number[] {
-  const widths: number[] = [];
-  for (let columnIndex = startColumnIndex; columnIndex <= endColumnIndex; columnIndex += 1) {
-    const column = columns?.[columnIndex];
-    widths.push(normalizeSpreadsheetColumnWidth(column));
-  }
-  return widths;
-}
-
-function normalizeSpreadsheetColumnWidth(column: { wpx?: number; wch?: number; hidden?: boolean } | undefined): number {
-  if (column?.hidden) return 0;
-  if (typeof column?.wpx === "number" && Number.isFinite(column.wpx)) {
-    return clampSpreadsheetColumnWidth(column.wpx);
-  }
-  if (typeof column?.wch === "number" && Number.isFinite(column.wch)) {
-    return clampSpreadsheetColumnWidth((column.wch * 7) + 12);
-  }
-  return 96;
-}
-
-function clampSpreadsheetColumnWidth(width: number): number {
-  return Math.max(42, Math.min(320, Math.round(width)));
-}
-
-function spreadsheetCellKey(rowIndex: number, columnIndex: number): string {
-  return `${rowIndex}:${columnIndex}`;
-}
-
-function encodeSpreadsheetCell(rowIndex: number, columnIndex: number): string {
-  return `${encodeSpreadsheetColumn(columnIndex)}${rowIndex + 1}`;
-}
-
-function encodeSpreadsheetColumn(columnIndex: number): string {
-  let index = columnIndex + 1;
-  let column = "";
-  while (index > 0) {
-    const remainder = (index - 1) % 26;
-    column = String.fromCharCode(65 + remainder) + column;
-    index = Math.floor((index - 1) / 26);
-  }
-  return column;
-}
-
-function extractXmlText(xml: string): string[] {
-  const doc = new DOMParser().parseFromString(xml, "application/xml");
-  const parserError = doc.querySelector("parsererror");
-  if (parserError) return [];
-
-  const nodes = Array.from(doc.getElementsByTagName("*"));
-  const paragraphNodes = nodes.filter((node) => node.localName === "p");
-  const textNodes = paragraphNodes.length > 0
-    ? paragraphNodes
-    : nodes.filter((node) => node.localName === "t");
-  const textLines = textNodes
-    .map((node) => node.textContent?.replace(/\s+/g, " ").trim() ?? "")
-    .filter(Boolean);
-
-  return dedupeConsecutive(textLines);
-}
-
-function dedupeConsecutive(lines: string[]): string[] {
-  const result: string[] = [];
-  for (const line of lines) {
-    if (result[result.length - 1] !== line) result.push(line);
-  }
-  return result;
-}
-
-function getSlideIndex(path: string): number {
-  const match = /slide(\d+)\.xml$/i.exec(path);
-  return match ? Number(match[1]) : 0;
 }
 
 function getExtension(filename: string): string {
@@ -964,7 +962,12 @@ function isWordExtension(extension: string): boolean {
 }
 
 function isSpreadsheetExtension(extension: string): boolean {
-  return extension === "xlsx" || extension === "xls" || extension === "xlsm" || extension === "xlsb" || extension === "ods";
+  return extension === "xlsx"
+    || extension === "xls"
+    || extension === "xlsm"
+    || extension === "xlsb"
+    || extension === "ods"
+    || extension === "ots";
 }
 
 function isPresentationExtension(extension: string): boolean {
@@ -1003,36 +1006,59 @@ function fitDocxPreviewToWidth(host: HTMLElement, bodyContainer: HTMLElement) {
   wrapper.style.zoom = String(scale);
 }
 
-function removeExternalDocumentResources(container: HTMLElement) {
-  container.querySelectorAll<HTMLElement>("script, iframe, object, embed, link, meta, base, form, input, button, textarea, select").forEach((node) => {
-    node.remove();
-  });
-
-  for (const element of Array.from(container.querySelectorAll<HTMLElement>("*"))) {
-    for (const attribute of Array.from(element.attributes)) {
-      const name = attribute.name.toLowerCase();
-      const value = attribute.value.trim();
-      if (name.startsWith("on") || name === "srcdoc" || name === "srcset") {
-        element.removeAttribute(attribute.name);
-        continue;
-      }
-      if ((name === "src" || name === "poster") && value && !isSafeDocxResourceUrl(value)) {
-        element.removeAttribute(attribute.name);
-      }
+function getOfficePackageRejection(
+  extension: string,
+  arrayBuffer: ArrayBuffer,
+): Extract<OfficePreviewResult, { kind: "unsupported" }> | null {
+  try {
+    if (OOXML_PACKAGE_EXTENSIONS.has(extension)) {
+      preflightOoxmlPackage(arrayBuffer);
+    } else if (OPEN_DOCUMENT_PACKAGE_EXTENSIONS.has(extension)) {
+      preflightZipCentralDirectory(arrayBuffer);
     }
+    return null;
+  } catch (error) {
+    if (!(error instanceof ZipPreflightError)) throw error;
+    return {
+      kind: "unsupported",
+      message: `This Office file was rejected before preview because its package is unsafe or malformed. ${error.message}`,
+    };
   }
 }
 
-function isSafeDocxResourceUrl(value: string): boolean {
-  return /^(data:|blob:|about:blank$)/i.test(value);
+function findDocxLinkInEvent(event: Event): Element | null {
+  for (const target of event.composedPath()) {
+    if (!(target instanceof Element)) continue;
+    if (
+      target.hasAttribute(CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE)
+      || target.getAttribute("href")?.startsWith("#")
+    ) {
+      return target;
+    }
+  }
+  return null;
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${Math.round(bytes / (1024 * 1024))} MB`;
+function findDocxFragmentTarget(shadowRoot: ShadowRoot, href: string): Element | null {
+  let fragmentId = href.slice(1);
+  try {
+    fragmentId = decodeURIComponent(fragmentId);
+  } catch {
+    return null;
+  }
+  return fragmentId ? shadowRoot.getElementById(fragmentId) : null;
 }
 
-class OfficePreviewLimitError extends Error {}
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === "AbortError"
+    : error instanceof Error && error.name === "AbortError";
+}
+
+function isZipPreflightError(error: unknown): error is Error {
+  return error instanceof ZipPreflightError
+    || (error instanceof Error && error.name === "ZipPreflightError");
+}
 
 const DOCX_SHADOW_BASE_CSS = `
   :host {
@@ -1066,5 +1092,16 @@ const DOCX_SHADOW_BASE_CSS = `
   .office-docx-body .office-docx {
     margin: 0 auto 18px !important;
     box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  }
+
+  [${CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE}] {
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  [${CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE}]:focus-visible {
+    border-radius: 2px;
+    outline: 2px solid #5b8def;
+    outline-offset: 2px;
   }
 `;

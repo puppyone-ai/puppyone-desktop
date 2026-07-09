@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import type { AppPreviewController, DataNode, FileContent } from "../core/types";
+import type { AppPreviewController, DataNode, FileContent, OfficeDocumentConverter } from "../core/types";
 import { EditorHost } from "../editor/EditorHost";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../editor/viewerTypes";
@@ -28,7 +28,7 @@ export type FilePreviewProps = {
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
-  convertOfficeDocumentToDocx?: (path: string) => Promise<{ arrayBuffer: ArrayBuffer; warnings?: string[] }>;
+  convertOfficeDocumentToDocx?: OfficeDocumentConverter;
 };
 
 export type FilePreviewBodyContext = {

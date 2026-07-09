@@ -8,14 +8,11 @@ This document has two parts with different lifetimes:
   document preview matrix, and the per-format support bar (§6) every
   required format must meet. It remains the reference for everyone adding
   a file format or viewer after the current work is done.
-- **Part 2 — Remediation plan.** The to-do list and code change map for
-  closing the gaps against the §6 support bar — chiefly Word document
-  support (`.doc` has no preview at all; `.docx` renders through mammoth,
-  a semantic extractor that discards layout by design and is replaced by
-  `docx-preview`; the unsupported-format copy points at a bridge that
-  does not exist), plus a cross-format compliance sweep. It is scoped to
-  this one round of work; delete or archive it once the fixes have
-  shipped and stabilized.
+- **Part 2 — Implementation record and remaining limitations.** The
+  completed Office/viewer remediation is archived as checked items, and
+  the limitations that still affect security, fidelity, performance, or
+  cloud parity remain explicit. It is a release-readiness record rather
+  than a second source of implementation requirements.
 
 ---
 
@@ -126,13 +123,18 @@ file and loads only what the viewer needs:
   `readWorkspaceTextFile` in `local-api/workspace.mjs` — capped at
   `MAX_EDITOR_BYTES` (1 MB), and a NUL byte marks the file binary
   (`content: null`). Office files never take this path (`source:
-  "resource"`), so their size cap is the resource cap, not the editor cap.
+  "resource"`), so their preview has its own 25 MiB streamed input cap,
+  not the editor cap.
 - **Resource URL** (`dataPort.getFileUrl`): local files are served over
   the `puppyone-local://` protocol (registered in
   `electron/main/local-file-protocol.mjs`), which validates the workspace
-  root, reads at most `MAX_LOCAL_FILE_BYTES` (100 MB), and sets
-  `Content-Type` from the registry via `getMimeType`. Cloud files resolve
-  to a signed URL from the cloud API (`src/lib/cloudDataPort.ts`).
+  root, reads at most `MAX_LOCAL_FILE_BYTES` (100 MB), supports single
+  byte ranges with 206/416 responses, and sets `Content-Type` from the
+  registry via `getMimeType`. Cloud files resolve to a signed URL from
+  the cloud API (`src/lib/cloudDataPort.ts`). Office preview first probes
+  a local resource with a one-byte range, then streams the response while
+  enforcing its 25 MiB cap even when `Content-Length` is absent or
+  inaccurate.
 
 The render chain is `FilePreview` → `EditorHost` (adapts a `DataNode` +
 loaded content into an `EditorDocument`) → `PuppyoneEditorHost` (resolves
@@ -142,34 +144,55 @@ rules for this chain live in
 
 ## 5. Office document preview — current contract
 
-`OfficeViewer.tsx` fetches the resource URL into an `ArrayBuffer` and
-dispatches on the file extension. All parsers are dynamic `import()`s so
-mammoth/SheetJS/JSZip never enter the main bundle.
+`OfficeViewer.tsx` dispatches on the file extension and keeps Office
+parsers out of the startup bundle with dynamic `import()`. Resource
+loading is abortable and capped at 25 MiB while the response is streamed;
+local files are range-probed before a full read. ZIP-based packages pass
+a central-directory preflight before a parser is invoked.
 
 | Format | Preview | Parser | Fidelity |
 | --- | --- | --- | --- |
-| `.docx` | HTML document render | mammoth (`convertToHtml`, images as data URIs) | Text, headings, lists, tables, inline images. No pagination, headers/footers, columns, or exact layout |
-| `.doc` | **None** — "unsupported" message | — | Legacy binary Word is not parsed at all |
-| `.xlsx` `.xls` `.xlsm` `.xlsb` | Sheet grid with tabs | SheetJS | Values only (no formatting); capped at 12 sheets × 250 rows × 36 columns, truncation noted |
-| `.pptx` `.ppsx` | Slide text cards | JSZip + XML text extraction | Slide titles and text lines only — no layout, images, or theming |
-| `.ppt` `.pps` | **None** — "unsupported" message | — | Legacy binary PowerPoint is not parsed |
-| `.odt` `.ods` `.odp` (+templates) | Plain text lines | JSZip `content.xml` text extraction (max 400 lines); `.ods` tries SheetJS first | Text only |
-| `.rtf`, `.pages`, `.numbers`, `.key`, `.epub` | Placeholder card | — | Registered in the registry as `binary-placeholder`; never reach OfficeViewer |
+| `.docx` | Paginated HTML/CSS pages in a shadow root | `docx-preview` | Authored page breaks, page geometry, headers/footers, footnotes/endnotes, tables, images, fonts, and document styling; HTML alt-chunks disabled |
+| `.doc` `.rtf` (local macOS) | Native conversion to `.docx`, then the same Word surface | bounded `textutil` subprocess + `docx-preview` | One Word rendering path; conversion has workspace authorization, input/output limits, timeout, and temporary-file cleanup |
+| `.doc` `.rtf` (cloud or conversion failure) | Honest unsupported state + external-open when available | — | Cloud has no native conversion capability |
+| `.xlsx` `.xls` `.xlsm` `.xlsb` | Virtualized grid with sheet tabs | SheetJS CE 0.20.3 in a dedicated worker | Up to 12 visible sheets × the first 5,000 source rows × 36 visible columns; formatted values, formulas/cached values, merged cells, and column widths; hidden content omitted and reported |
+| `.pptx` `.ppsx` | Visual slide list | `@aiden0z/pptx-renderer` | Shapes, text, media, tables, and themes where supported; lazy/windowed rendering; JSZip text cards remain the error fallback |
+| `.ppt` `.pps` | Honest unsupported state + external-open | — | Legacy binary PowerPoint is not parsed or converted |
+| `.ods` `.ots` | The same spreadsheet worker/grid | SheetJS CE | Same spreadsheet budgets and visible truncation notes |
+| `.odt` `.odp` `.ott` `.otp` | Plain text lines | JSZip `content.xml` extraction | Text only, capped at 400 lines |
+| `.pages` `.numbers` `.key` `.epub` | Placeholder card | — | Deliberate Tier 3 support; they do not reach `OfficeViewer` |
 
-This is by design a **lightweight preview**, not an editor and not a
-high-fidelity renderer. The escape hatch for real fidelity is the
-external-app surface: `electron/main/external-apps/inventory.mjs` scans
-installed macOS apps and ranks candidates per extension (with UTI hints
-for `doc`/`docx`), and the titlebar "open externally" control launches
-the file in Word/Pages/etc. Preview and escape hatch together are the
-product answer for Office files.
+The package preflight rejects malformed/multi-disk/ZIP64 packages,
+encryption, unsafe or duplicate paths, unsupported compression methods,
+more than 4,096 entries, a single declared expansion above 64 MiB, total
+declared expansion above 256 MiB, or compression ratios above 100:1.
+OOXML packages must also contain their required package markers; ODS has
+its stricter marker checks inside the spreadsheet worker. This is a
+metadata gate, not an inflater sandbox; the residual runtime-resource
+limit is listed in Part 2.
+
+`docx-preview` renders into a detached fragment. Before that fragment is
+attached, `sanitizeDocxDom()` removes active elements, event handlers,
+network-capable resource URLs, unsafe CSS, and other non-allowlisted
+attributes. External hyperlinks are converted to inert markers and open
+only through the host's controlled external-navigation capability after
+a user gesture. The sanitized result is then attached to a shadow root
+for style isolation.
+
+These are read-only previews, not Office editors. The escape hatch for
+unsupported formats, fidelity gaps, and large files is the external-app
+surface: `electron/main/external-apps/inventory.mjs` scans installed
+macOS apps and ranks candidates per extension, while the titlebar and
+Office empty/error states expose the open-externally action when the
+desktop capability exists.
 
 ## 6. Required formats and per-format support bar
 
 This section is the product commitment: which formats the app must
 support, at which tier, and what "supported" means for each. It is the
-implementation target for Part 2 — every "Bar" bullet is meant to be
-individually checkable.
+acceptance reference for Part 2 — every "Bar" bullet is individually
+checkable, and deliberate fidelity limits stay visible instead of being
+mistaken for defects.
 
 Tiers:
 
@@ -216,7 +239,7 @@ source-code extensions)
   byte) and under the 1 MB editor cap; over-cap and binary files get an
   honest state with the external-open action, not a truncated buffer.
 - Status: met, except the over-cap state currently surfaces as a raw
-  read error rather than a designed state (Phase 6).
+  read error rather than a designed state (remaining in Part 2 §9).
 
 **JSON / JSONL** (`.json`, `.jsonl`, `.json5`, `.jsonc`, `.puppyflow`)
 
@@ -229,8 +252,8 @@ source-code extensions)
 - Bar: table editor by default with in-cell editing and a source-mode
   toggle; delimiter inferred from the format; must stay responsive on
   large files (target: 10k rows) or truncate with a visible note.
-- Status: met for typical files; large-file behavior unverified
-  (Phase 6).
+- Status: met for typical files; 10k-row behavior remains unverified
+  (Part 2 §9).
 
 ### Tier 2 — preview-grade
 
@@ -249,8 +272,8 @@ source-code extensions)
   formats Chromium cannot decode (`.heic`, `.heif`, camera RAW) must
   route to the placeholder card, not a broken `<img>`.
 - Status: met for web-decodable formats; HEIC/RAW routing unverified
-  (Phase 6). Optional enhancement: macOS `sips` conversion bridge for
-  HEIC, same shape as the Phase 3 `textutil` bridge.
+  (Part 2 §9). Optional enhancement: a bounded macOS `sips` conversion
+  bridge following the same authorization pattern as `textutil`.
 
 **PDF** (`.pdf`)
 
@@ -265,9 +288,10 @@ source-code extensions)
   codec coverage is whatever Chromium decodes — formats it cannot play
   fall back to the media element's error state; seeking/scrubbing must
   work for large local files, which requires the `puppyone-local://`
-  handler to honor `Range` requests with 206 responses (it currently
-  advertises `Accept-Ranges: bytes` but returns whole bodies).
-- Status: playback met; Range handling is a gap (Phase 6).
+  handler to honor single `Range` requests with 206 responses and reject
+  unsatisfiable ranges with 416.
+- Status: met, including local 206/416 Range handling and integration
+  coverage.
 
 **Word — `.docx`**
 
@@ -278,19 +302,24 @@ source-code extensions)
   an isolated shadow-root container so document styles cannot leak into
   app CSS (an iframe sandbox is a plugin-host concern, not needed for
   first-party rendering); `renderAltChunks` disabled (embedded HTML
-  chunks are the injection surface). Render failure falls back to the
+  chunks are the injection surface). The OOXML central directory is
+  preflighted before parsing, and the detached output DOM/CSS is
+  sanitized before it is attached. Render failure falls back to the
   unsupported state with the external-open action.
 - Accepted fidelity limits (inherent to HTML-based rendering, state them
   in the doc, not the UI): no live reflow pagination for documents
   without `lastRenderedPageBreak` points; TOC/field codes, SmartArt,
   and floating text boxes render approximately.
-- Rationale: mammoth (the previous renderer) is a *semantic extractor*
+- Rationale: mammoth (the previous renderer) was a *semantic extractor*
   by design — it deliberately discards fonts, colors, alignment, page
   layout, and headers/footers. Higher-fidelity engines (SuperDoc-class
   OOXML editors, LibreOffice headless) cost AGPL licensing or a +300 MB
   bundle; `docx-preview` is ~73 KB minified and its only dependency
   (jszip) is already bundled.
-- Status: gap — current preview is mammoth semantic HTML (Phase 2).
+- Status: met. `docx-preview` is loaded dynamically and renders in a
+  shadow root with alt-chunks disabled, sanitized detached output,
+  controlled hyperlinks, package preflight, abortable/capped input, and
+  an external-open error fallback.
 
 **Word — `.doc` (legacy)**
 
@@ -300,25 +329,33 @@ source-code extensions)
   fidelity story.
 - Bar (cloud, or conversion failure): honest unsupported state with the
   external-open action.
-- Status: gap — no preview at all today (Phases 1 and 3).
+- Status: met on local macOS: the converter is workspace-authorized and
+  has a 25 MiB input/output cap, an 8-second timeout, bounded process
+  output, and guaranteed temporary-directory cleanup. Cloud and
+  conversion failure deliberately remain unsupported with honest copy.
 
 **Excel — `.xlsx`, `.xls`, `.xlsm`, `.xlsb`**
 
-- Bar: SheetJS grid with sheet tabs, upgraded to everything the parser
-  already provides: merged cells (`!merges`), real column widths
-  (`!cols`), formatted cell values; virtualized rows so large sheets
-  render smoothly with a raised cap and a visible truncation note.
-  SheetJS stays — its parse breadth (`.xls`/`.xlsb`/`.ods`) is the
-  reason to keep it.
-- Accepted fidelity limit (state in the doc, not the UI): cell *styling*
-  — colors, borders, fonts — is not rendered. SheetJS Community Edition
-  does not parse styles (a Pro paywall feature), and the open-source
-  alternative that does (exceljs) is widely considered unmaintained.
-  Values, merges, and geometry are the honest ceiling for a lightweight
-  open-source preview.
-- Status: partial — merges/column widths are dropped today and the row
-  cap is a hard cut, below what the community parser gives us for free
-  (Phase 7).
+- Bar: SheetJS grid with sheet tabs, formatted values, formulas/cached
+  values, merged cells (`!merges`), real column widths (`!cols`), and
+  virtualized rows. Parsing runs in a disposable Web Worker; aborting a
+  selection terminates that worker. A metadata pass excludes hidden
+  sheets and chooses at most 12 visible sheets before the content pass.
+  Each selected sheet is capped at the first 5,000 source rows and 36
+  visible columns; hidden rows inside that window are omitted. Every
+  sheet/row/column truncation and hidden-content omission is stated in
+  the UI.
+- Security/resource bar: no VBA or HTML is requested, formulas are never
+  executed or recalculated, OOXML packages pass the shared ZIP preflight,
+  declared ranges must remain within Excel's row/column limits, and the
+  input buffer is transferred to rather than copied into the worker.
+- Accepted fidelity limits: colors, borders, fonts, charts, images,
+  pivots, and macros are not rendered. Formula cells use cached values
+  when present and show the formula text when no cached value exists.
+  Hidden rows, columns, and sheets are omitted rather than revealed.
+- Status: met for the lightweight grid contract. Tests cover supported
+  workbook families, formulas, sheet/row/column budgets, hidden content,
+  merged cells crossing virtual-window boundaries, and cancellation.
 
 **PowerPoint — `.pptx`, `.ppsx`**
 
@@ -334,15 +371,17 @@ source-code extensions)
   read-only preview with an honest fallback, the exposure is bounded.
   Keep the current text-extraction path as the fallback branch rather
   than deleting it.
-- Status: gap — current preview is text-only slide cards (Phase 8).
+- Status: met. The visual renderer uses recommended ZIP limits,
+  abortable lazy media/slides, and a windowed list; the former JSZip text
+  extraction remains a visible fallback when visual rendering fails.
 
 **PowerPoint — `.ppt`, `.pps` (legacy)**
 
 - Bar: honest unsupported state with the external-open action.
   (`textutil` cannot convert presentations, so unlike `.doc` there is no
   cheap native bridge; Tier 3 by design.)
-- Status: message exists but names a nonexistent bridge and offers no
-  action (Phase 1).
+- Status: met as a deliberate unsupported tier. The message is honest
+  and the external-open action is shown when the host provides it.
 
 **OpenDocument — `.odt`, `.ods`, `.odp` (+ templates)**
 
@@ -351,12 +390,13 @@ source-code extensions)
   the unsupported state.
 - Status: met.
 
-**RTF — `.rtf`** (target tier; currently Tier 3)
+**RTF — `.rtf`**
 
-- Bar: once the Phase 3 `textutil` bridge exists, convert to `.docx` on
-  desktop and render through the same `docx-preview` surface; registry
-  entry flips to `office-preview` at that point.
-- Status: placeholder today (Phase 5).
+- Bar: convert to `.docx` through the bounded macOS `textutil` bridge and
+  render through the same preflighted/sanitized `docx-preview` surface.
+  Cloud and conversion failure use the honest unsupported state.
+- Status: met on local macOS; the registry now routes `.rtf` to
+  `office-preview`. Cloud conversion remains unavailable by design.
 
 ### Tier 3 — placeholder-grade
 
@@ -384,8 +424,20 @@ source-code extensions)
 - A viewer's `source` declaration is honored: `resource` viewers must
   never trigger a text read (binary files through the text path would be
   wasted I/O and a 1 MB cap they shouldn't inherit).
-- Office parsing happens in the renderer from a fetched buffer; the main
-  process never parses documents.
+- Browser Office parsing/rendering happens from a capped, abortable
+  buffer. Spreadsheet parsing is isolated in a disposable Web Worker;
+  Word and PowerPoint DOM rendering remain in the renderer. The main
+  process does not interpret Office DOM or workbook content; its only
+  format-specific operation is the authorized, bounded macOS `textutil`
+  conversion for local `.doc`/`.rtf` files.
+- ZIP-based Office inputs pass a metadata preflight before any archive
+  parser is invoked. `docx-preview` output is built detached, sanitized,
+  and only then attached to its shadow root; document-controlled external
+  URLs never become live DOM navigation/resource attributes.
+- An Office preview never buffers more than 25 MiB in the renderer.
+  Declared length is checked when available, local resources are probed
+  with Range, and the stream is counted independently of response
+  headers.
 - Unsupported is a first-class state: a format with no viable preview
   must say so honestly and point at the external-open escape hatch — not
   render a broken approximation.
@@ -402,237 +454,141 @@ source-code extensions)
 
 ---
 
-# Part 2 — Remediation plan (current work)
+# Part 2 — Implementation record and remaining limitations
 
-Scope: close the gaps between the current implementation and the Part 1
-§6 support bars — primarily Word/Office document support, plus the
-cross-format items Phase 6 collects. No engine change: the registry →
-viewer → source pipeline stays exactly as specified in Part 1.
+Part 2 records what shipped against the Part 1 support bars and keeps the
+remaining constraints explicit. Checked items describe the current tree;
+they are not future promises.
 
-## 8. Known gaps
+## 8. Completed and archived
 
-1. **`.doc` / `.ppt` / `.pps` have no preview.** `OfficeViewer` returns an
-   unsupported message. Worse, the copy says "Legacy .doc files need the
-   native Office format bridge" — **no such bridge exists in this
-   codebase**. The message names internal machinery that was never built,
-   and offers the user no action.
-2. **The unsupported state has no escape-hatch action.** The external-app
-   open surface exists (titlebar), but the unsupported preview card does
-   not link to it.
-3. **The `.docx` renderer is a fidelity ceiling.** mammoth is a semantic
-   extractor by design: fonts, colors, alignment, page geometry,
-   headers/footers, and pagination are discarded no matter how much work
-   is layered on top. Its conversion warnings are also collected and
-   dropped (`parseWordDocument` returns `warnings` that no UI renders).
-   The fix is replacing the renderer (§6 Word bar), not patching mammoth.
-4. **Whole-file parse on the renderer main thread.** The resource fetch
-   buffers up to 100 MB and mammoth/SheetJS parse synchronously; a large
-   workbook freezes the UI. There is no office-specific size guard.
-5. **mammoth HTML is injected unsanitized.** The word preview renders via
-   `dangerouslySetInnerHTML`. mammoth generates markup rather than
-   passing raw document HTML through, so exposure is low — but a
-   sanitization pass (or an allowlist post-filter) is cheap defense in
-   depth for a file that may come from anywhere.
-6. **`.rtf` renders as a bare placeholder** even though it is a text-based
-   format that macOS can convert natively (`textutil`).
-7. **Media seeking may not work on large local files.** The
-   `puppyone-local://` handler advertises `Accept-Ranges: bytes` but
-   ignores `Range` request headers and always returns the whole body.
-8. **Edge states below the §6 cross-format bar.** Over-cap (>1 MB) text
-   files surface a raw error string instead of a designed state with an
-   external-open action; HEIC/RAW images may hit a broken `<img>` instead
-   of the placeholder; CSV behavior on very large files is unverified.
-9. **The Excel grid renders below what SheetJS already parses.** Merged
-   cells (`!merges`) and column widths (`!cols`) are available from the
-   community parser and are dropped on the floor; the 250-row cap is a
-   hard cut with no virtualization.
-10. **The `.pptx` preview is text-only while a real renderer now
-    exists.** The text-card approach predates `@aiden0z/pptx-renderer`;
-    slides with shapes, images, tables, and charts reduce to bullet
-    lines today.
+**Office routing and user experience**
 
-## 9. To-do list
+- [x] Unsupported and failed previews explain the limitation and expose
+      “Open in default app” whenever the desktop host provides that
+      capability. Legacy `.ppt`/`.pps` stays deliberately unsupported.
+- [x] `.docx` renders through dynamically imported `docx-preview` in a
+      shadow root. Alt-chunks are disabled; authored page breaks,
+      headers/footers, notes, images, fonts, and page geometry are enabled.
+- [x] DOCX output is rendered into a detached fragment, sanitized, and
+      only then attached. External links become inert markers and require
+      a user gesture through the controlled external-navigation callback.
+- [x] Local macOS `.doc` and `.rtf` use the same Word renderer after a
+      workspace-authorized `textutil` conversion. The bridge has a 25 MiB
+      input/output cap, timeout, bounded process output, and guaranteed
+      temporary-directory cleanup.
+- [x] `.rtf` now routes to `office-preview`. Cloud workspaces and native
+      conversion failures use the honest unsupported state.
 
-Phases in dependency order; each lands independently.
+**Input and package containment**
 
-**Phase 1 — honest unsupported state (small, ship first)**
+- [x] Office resources use an abortable streaming reader with a hard
+      25 MiB buffered-byte limit. Declared length is checked when present;
+      local files are one-byte range-probed before a full request.
+- [x] ZIP-based Office/OpenDocument inputs receive a central-directory
+      preflight before parser dispatch. The default policy rejects unsafe
+      paths, duplicates, encryption, ZIP64/multi-disk input, unsupported
+      methods/flags, more than 4,096 entries, declared single-entry
+      expansion above 64 MiB, declared total expansion above 256 MiB, and
+      per-entry or overall ratios above 100:1.
+- [x] OOXML package markers are required before Word, Excel, or PowerPoint
+      rendering; ODS performs its stricter marker checks in the worker.
+- [x] The local protocol implements single-range byte semantics, including
+      206 responses and 416 responses for unsatisfiable ranges. Media
+      seeking and Office size probes share that path.
 
-- [ ] Rewrite the unsupported copy: state plainly that legacy binary
-      Office formats have no built-in preview and that `.docx`/`.pptx`
-      save-as re-export or an external app are the paths forward. Remove
-      the reference to the nonexistent "native Office format bridge".
-- [ ] Add an "Open in default app" action to `OfficeEmptyState`. Plumbing:
-      add an optional `onOpenExternal?: () => Promise<void>` capability to
-      `EditorViewerContext`, threaded from the desktop app (the existing
-      `useActiveExternalOpenTarget` flow) through `FilePreview` →
-      `EditorHost` → `PuppyoneEditorHost`. Cloud workspaces simply don't
-      provide it, and the button hides when the capability is absent.
-      (This is deliberately the same shape as `openExternal()` in the
-      future plugin host API — see
-      [Viewer Plugin Architecture §3](viewer-plugin-architecture.md).)
+**Spreadsheet and presentation fidelity**
 
-**Phase 2 — replace the `.docx` renderer with `docx-preview`**
+- [x] SheetJS Community Edition 0.20.3 parses spreadsheets in a dedicated,
+      disposable Web Worker. Input is transferred, not cloned; aborting
+      terminates the worker.
+- [x] Spreadsheet metadata selection limits work to 12 visible sheets.
+      Each selected sheet reads at most the first 5,000 source rows and 36
+      visible columns; hidden sheets/rows/columns are omitted and counted.
+- [x] The virtualized grid renders formatted values, formula/cached-value
+      fallbacks, column widths, and merged cells, including merges crossing
+      a virtual-window boundary. Every truncation or omission is visible.
+- [x] `.pptx`/`.ppsx` use `@aiden0z/pptx-renderer` with lazy media/slides,
+      abort support, recommended ZIP limits, and a windowed slide list.
+      The old JSZip text-card renderer remains the visible error fallback.
 
-- [ ] Add the `docx-preview` dependency (Apache-2.0; jszip peer is
-      already bundled). Load it via dynamic `import()` only, like the
-      other office parsers.
-- [ ] Rewrite the word branch of `OfficeViewer`: render the fetched
-      buffer with `renderAsync` into a **shadow root** (attach one to the
-      preview container; pass it as both `bodyContainer` and
-      `styleContainer`). The need here is CSS isolation — document
-      styles/fonts must not leak into app CSS and vice versa — and
-      shadow DOM delivers that without an iframe's height/scroll/bridge
-      overhead. A sandboxed iframe is *not* required for this phase: that
-      is the security boundary for third-party code, which belongs to the
-      future plugin host (see
-      [Viewer Plugin Architecture §3](viewer-plugin-architecture.md));
-      docx-preview is first-party code rendering inert markup. Options:
-      `renderAltChunks: false` (embedded HTML chunks are the one
-      injection surface), `ignoreLastRenderedPageBreak: false` (honor
-      Word-written page breaks), headers/footers/footnotes on.
-- [ ] Scale the rendered page to fit the preview pane width (the library
-      renders at true page size).
-- [ ] On render failure, fall back to the Phase 1 unsupported state —
-      not a blank pane. Very long documents render every page into the
-      DOM; rely on the Phase 4 size guard, and if a many-page document
-      still stalls, cap rendered pages with a visible note (same
-      truncation pattern as the spreadsheet grid).
-- [ ] Verify image and embedded-font rendering end to end: docx-preview
-      emits `blob:`/`data:` URLs for them. The renderer currently ships
-      no CSP (`index.html` has none), so this should just work — if a CSP
-      is ever added, it must allow `img-src blob: data:` and
-      `font-src blob: data:` or docx images/fonts silently disappear.
-- [ ] Remove the mammoth dependency and the warnings plumbing once the
-      new branch ships (`package.json`, `parseWordDocument`).
+**Build, tests, and release hygiene**
 
-**Phase 3 — legacy `.doc` conversion bridge (macOS)**
+- [x] Heavy renderer libraries remain dynamic imports and renderer-only
+      packages are `devDependencies`; the build runs a lazy-chunk/entry
+      bundle-budget gate.
+- [x] Automated coverage includes package preflight, DOCX DOM sanitizing,
+      spreadsheet families/budgets/hidden content/merges/cancellation,
+      text conversion authorization, and local Range behavior.
+- [x] `NOTICE` identifies `docx-preview`, SheetJS Community Edition, and
+      JSZip with their selected licenses. Electron Builder explicitly
+      includes `LICENSE` and `NOTICE` in packaged applications.
 
-The actual "bridge" the old copy gestured at. macOS ships `textutil`,
-which converts `.doc` to `.docx` without any Office install — after
-which the Phase 2 renderer takes over. One renderer, one fidelity story.
+## 9. Remaining engineering follow-ups
 
-- [ ] Main-process helper (`local-api` or `electron/main`): run
-      `textutil -convert docx <file> -output <tmp>` with a timeout and
-      size cap, return the converted bytes, delete the temp file; expose
-      over IPC gated to open workspace roots, mirroring the
-      `puppyone-local://` root checks.
-- [ ] `OfficeViewer`: for `.doc` on desktop, request the converted
-      buffer and render it through the Phase 2 `docx-preview` branch;
-      keep the Phase 1 unsupported state as the fallback when conversion
-      fails or in cloud workspaces.
+These are the unresolved items. They do not negate the completed metadata
+and DOM gates above.
 
-**Phase 4 — hardening and large files**
+- [ ] Add measured decompression, CPU, and memory budgets around each
+      inflater/parser. Central-directory limits use archive-declared
+      metadata; they cannot by themselves prove the actual work or output
+      produced by a malicious stream.
+- [ ] Add a rendered-page/DOM-node budget for DOCX. A 25 MiB compressed
+      input can still produce a very large page tree and block the renderer
+      because `docx-preview` must build DOM on the renderer thread.
+- [ ] Move or bound the remaining JSZip text extraction paths
+      (`.odt`/`.odp` and the PPTX text fallback). They currently run in the
+      renderer rather than a disposable worker.
+- [ ] Decide whether cloud `.doc`/`.rtf` deserves a server conversion
+      service. Today it is intentionally unsupported, and cloud hosts do
+      not necessarily provide the desktop external-open capability.
+- [ ] Add low-cardinality telemetry for size/package rejection, parser
+      failure, fallback use, and truncation so limits can be tuned from
+      evidence without logging document names or contents.
+- [ ] Finish the non-Office §6 sweep: design the over-cap text-file state,
+      verify HEIC/RAW placeholder routing, load-test the CSV editor at
+      10,000 rows, and audit every viewer's loading/error/empty states.
 
-- [ ] Add an office-preview size guard (e.g. decline above ~25 MB with the
-      unsupported/escape-hatch state) before fetching the full buffer.
-- [ ] Verify the isolation container blocks remote resource loads from
-      document content (external image relationships); document images
-      must come only from the archive (blob/base64 URLs).
-- [ ] Optional: move SheetJS/docx parsing into a Web Worker if size
-      telemetry shows real-world freezes; not blocking. (`docx-preview`
-      renders DOM and cannot fully move off-thread; its parse phase can.)
+## 10. Accepted product limitations
 
-**Phase 5 — `.rtf` preview (optional, after Phase 3)**
-
-- [ ] Route `.rtf` through the `textutil -convert docx` bridge on
-      desktop; registry entry flips `defaultViewer` from
-      `binary-placeholder` to `office-preview` once the bridge exists.
-
-**Phase 6 — cross-format bar compliance (§6 sweep)**
-
-- [ ] `puppyone-local://` handler: honor `Range` request headers with 206
-      partial responses so `<video>`/`<audio>` scrubbing works on large
-      files (`electron/main/local-file-protocol.mjs`; keep the
-      workspace-root and size checks).
-- [ ] Over-cap text files (>1 MB): replace the raw error string with a
-      designed state (file name, size, reason) plus the external-open
-      action.
-- [ ] HEIC/HEIF and camera-RAW extensions: verify registry routing sends
-      them to `binary-placeholder`, not `image-preview`; fix entries that
-      produce a broken `<img>`.
-- [ ] CSV: load a 10k-row file; if the table editor stalls, cap rendered
-      rows with a visible truncation note (same pattern as the
-      spreadsheet grid).
-- [ ] Audit every viewer against the three-state (loading/error/empty)
-      bar; `OfficeViewer` and `ResourcePreviewState` already comply —
-      confirm CSV/JSON/text frames do too.
-- [ ] Build the bundle budget gate the invariants reference:
-      `scripts/check-bundle-budget.mjs`, wired into `npm run build` like
-      `check:boundaries`. Assert (a) the entry chunk stays under budget
-      (set it from the current ~1.9 MB baseline), and (b) no heavy parser
-      (mermaid, xlsx, jszip, docx-preview) appears in the entry chunk —
-      this turns the lazy-loading discipline into a build failure instead
-      of a review hope.
-- [ ] Packaging hygiene: move renderer-only packages (react, react-dom,
-      codemirror/lezer family, lucide-react, mermaid, xlsx, jszip,
-      docx-preview, xterm family) to `devDependencies` so electron-builder
-      stops double-shipping them into `app.asar` (~55 MB today; Vite
-      bundles them into `dist` regardless of dependency type). Keep only
-      main-process runtime deps: `node-pty`, `electron-updater`,
-      `electron-log`. Verify with a `dist:mac` build.
-
-**Phase 7 — spreadsheet fidelity pass (zero new dependencies)**
-
-Everything here uses data the community SheetJS parser already returns:
-
-- [ ] Render merged cells: read `worksheet["!merges"]` and emit
-      `colspan`/`rowspan` on the grid (skip covered cells).
-- [ ] Render column widths: map `worksheet["!cols"]` (`wch`/`wpx`) to
-      `<col>` widths instead of browser auto-layout.
-- [ ] Virtualize rows: replace the hard 250-row cut with windowed
-      rendering; raise the parse cap (e.g. 5 000 rows) and keep the
-      visible truncation note for anything beyond it.
-- [ ] Do **not** chase cell styling (colors/borders/fonts): SheetJS CE
-      does not parse styles (Pro paywall) and exceljs is unmaintained —
-      this limit is accepted in the §6 bar.
-
-**Phase 8 — high-fidelity `.pptx` rendering**
-
-- [ ] Add `@aiden0z/pptx-renderer` (Apache-2.0), dynamic `import()`
-      only; do not enable the optional `pdfjs` EMF fallback initially.
-- [ ] Replace the presentation branch of `OfficeViewer` for
-      `.pptx`/`.ppsx`: render into the preview pane with
-      `lazyMedia: true`, `lazySlides: true`, and windowed list options
-      for large decks; scale slides to fit the pane width.
-- [ ] Keep the existing JSZip text-extraction path as the fallback
-      branch when the renderer throws (young library — see the §6 risk
-      note); final fallback remains the unsupported state.
-- [ ] `.ppt`/`.pps` stay on the Phase 1 unsupported state (no
-      conversion bridge exists for legacy presentations).
-
-## 10. Code change map
-
-| Area | Current | Target |
-| --- | --- | --- |
-| Unsupported copy (`OfficeViewer.tsx`) | Names a nonexistent "bridge", no action | Honest copy + external-open action |
-| `.docx` renderer | mammoth semantic HTML (layout discarded), raw `dangerouslySetInnerHTML` | `docx-preview` layout render in an isolated container, `renderAltChunks` off |
-| `.doc` / legacy Word | Unsupported message only | `textutil -convert docx` on macOS desktop → `docx-preview`; unsupported fallback elsewhere |
-| mammoth dependency | In `package.json`, warnings computed and dropped | Removed with Phase 2 |
-| Large files | Unbounded fetch + sync parse | Size guard; worker parse as follow-up |
-| `.rtf` | `binary-placeholder` | Optional `textutil -convert docx` route |
-| Local protocol Range requests | Header advertised, not honored | 206 partial responses for media seeking |
-| Over-cap text files | Raw error string | Designed state + external-open action |
-| HEIC / RAW images | Possibly routed to broken `<img>` | Verified `binary-placeholder` routing |
-| Excel grid | Values only; merges/widths dropped; hard 250-row cut | Merges + column widths + virtualized rows (SheetJS data already there) |
-| `.pptx` preview | Text-only slide cards | `@aiden0z/pptx-renderer` slides; text cards demoted to fallback |
+- Word preview is HTML-based: pagination without authored break hints,
+  TOC/field codes, SmartArt, floating text boxes, and exact Word reflow
+  remain approximate. Password-protected/encrypted Office files are not
+  previewed.
+- The spreadsheet grid does not render cell fonts/colors/borders, charts,
+  images, pivots, or macros. It never executes VBA or recalculates formulas;
+  cached formula values are used when present. Hidden content is omitted.
+- Only the first 12 visible sheets, first 5,000 source rows per selected
+  sheet, and first 36 visible columns are previewed. The UI states every
+  truncation and hidden-content omission.
+- Legacy `.ppt`/`.pps` has no built-in conversion. PPTX rendering may fall
+  back to extracted text when the visual renderer rejects a deck.
+- `.odt`/`.odp` preview is extracted text only and stops at 400 lines.
+  `.ods`/`.ots` inherits the spreadsheet grid's budgets and fidelity.
+- Office input above 25 MiB is rejected from in-app preview. Desktop users
+  can open it externally; cloud behavior depends on host capabilities.
 
 ## 11. Verification
 
+Fast automated verification:
+
 ```bash
 npm test
-npm run build
-npm run check:shared-ui
+npx tsc --noEmit
+npm run check:boundaries
 ```
 
-Manual checks: a `.docx` with images, tables, headers/footers, and
-multiple pages (layout fidelity: page breaks, margins, fonts); a `.docx`
-whose styles would leak (confirm isolation container); a legacy `.doc`
-(converted preview on desktop, unsupported + open-externally in cloud);
-a multi-sheet `.xlsx` above the row cap with merged cells and custom
-column widths (merges/widths render, scrolling stays smooth); a `.pptx`
-with shapes, images, tables, and charts (slides render visually; a
-corrupt one falls back to text cards); corrupt files with each extension
-(error state, no crash); the external-open action from the unsupported
-card; scrubbing a large local video; a >1 MB text file (designed
-over-cap state); a `.heic` image (placeholder, not a broken image); a
-10k-row CSV.
+Release verification (also exercises the bundle-budget gate):
+
+```bash
+npm run build
+npm run dist:mac
+```
+
+Manual fixtures should include: a styled multi-page DOCX with local images,
+headers/footers and external/internal links; malicious DOCX CSS/URLs; a
+legacy DOC and RTF; oversized and malformed/encrypted/ZIP-bomb-shaped
+packages; XLS/XLSX/XLSM/XLSB/ODS workbooks with formulas, hidden content,
+wide ranges, merges crossing the virtual window, and more than 12 sheets;
+a visual PPTX plus a corrupt deck that takes the text fallback; a legacy
+PPT; and a large local video scrubbed across multiple byte ranges.

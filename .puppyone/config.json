@@ -2,7 +2,7 @@
   "version": 1,
   "sync": {
     "sourceOfTruth": {
-      "service": "puppyone",
+      "service": "github",
       "remote": null,
       "branch": null
     }
@@ -20,5 +20,5 @@
   "cloud": {
     "projectId": null
   },
-  "updatedAt": "2026-07-02T10:16:12.345Z"
+  "updatedAt": "2026-07-09T14:29:15.871Z"
 }

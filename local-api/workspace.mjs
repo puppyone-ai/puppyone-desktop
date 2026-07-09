@@ -231,7 +231,7 @@ export async function workspaceFromPath(folderPath) {
 }
 
 export async function listFolderChildren(rootPath, folderPath) {
-  const folder = resolveWorkspacePath(rootPath, folderPath);
+  const folder = await resolveExistingWorkspacePath(rootPath, folderPath);
   const metadata = await fs.stat(folder).catch((error) => {
     throw new Error(`Unable to read folder metadata: ${error.message}`);
   });
@@ -264,7 +264,7 @@ export async function listFolderChildren(rootPath, folderPath) {
 }
 
 export async function readWorkspaceFile(rootPath, relativePath, options = undefined) {
-  const filePath = resolveWorkspacePath(rootPath, relativePath);
+  const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
   const metadata = await fs.stat(filePath).catch((error) => {
     throw new Error(`Unable to read file: ${error.message}`);
   });
@@ -315,7 +315,7 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
 }
 
 export async function readWorkspaceTextFile(rootPath, relativePath) {
-  const filePath = resolveWorkspacePath(rootPath, relativePath);
+  const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
   const metadata = await fs.stat(filePath).catch((error) => {
     throw new Error(`Unable to read file metadata: ${error.message}`);
   });
@@ -349,12 +349,15 @@ export async function readWorkspaceTextFile(rootPath, relativePath) {
   };
 }
 
-export async function convertWorkspaceOfficeDocumentToDocx(rootPath, relativePath) {
+export async function convertWorkspaceOfficeDocumentToDocx(rootPath, relativePath, options = undefined) {
   if (process.platform !== "darwin") {
     throw new Error("Desktop Office conversion is only available on macOS.");
   }
+  if (options?.signal?.aborted) {
+    throw new Error("Office conversion was cancelled.");
+  }
 
-  const filePath = resolveWorkspacePath(rootPath, relativePath);
+  const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
   const metadata = await fs.stat(filePath).catch((error) => {
     throw new Error(`Unable to read file metadata: ${error.message}`);
   });
@@ -381,7 +384,11 @@ export async function convertWorkspaceOfficeDocumentToDocx(rootPath, relativePat
       maxBuffer: MAX_OFFICE_CONVERSION_OUTPUT_BYTES,
       timeout: OFFICE_CONVERSION_TIMEOUT_MS,
       windowsHide: true,
+      signal: options?.signal,
     }).catch((error) => {
+      if (options?.signal?.aborted || error?.name === "AbortError" || error?.code === "ABORT_ERR") {
+        throw new Error("Office conversion was cancelled.");
+      }
       if (error?.killed || error?.signal === "SIGTERM") {
         throw new Error("Office conversion timed out.");
       }
@@ -466,16 +473,28 @@ async function readFileSlice(filePath, start, end) {
 
 export function getMimeType(filePath) {
   const format = resolveLocalFileFormat({ name: filePath });
-  const mimeType = getMimeTypeOverride(filePath) ?? format.mimeTypes?.[0] ?? null;
+  const mimeType = getRegistryMimeTypeForName(format, filePath)
+    ?? getMimeTypeOverride(filePath)
+    ?? format.mimeTypes?.[0]
+    ?? null;
   if (!mimeType) return null;
   return shouldUseUtf8Mime(format, mimeType) ? `${mimeType}; charset=utf-8` : mimeType;
+}
+
+function getRegistryMimeTypeForName(format, name) {
+  const lowerName = path.basename(name).toLowerCase();
+  const extension = [...(format.extensions ?? [])]
+    .map((value) => value.toLowerCase())
+    .sort((left, right) => right.length - left.length)
+    .find((value) => lowerName.endsWith(value));
+  return extension ? format.mimeTypesByExtension?.[extension] ?? null : null;
 }
 
 export async function writeWorkspaceTextFile(rootPath, relativePath, content) {
   if (typeof content !== "string") {
     throw new Error("File content must be text.");
   }
-  const filePath = resolveWorkspacePath(rootPath, relativePath);
+  const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
   const metadata = await fs.stat(filePath).catch((error) => {
     throw new Error(`Unable to write file: ${error.message}`);
   });
@@ -489,7 +508,7 @@ export async function createWorkspaceEntry(rootPath, request) {
   const parentPath = request?.parentPath ?? null;
   const name = normalizeNewEntryName(request?.name);
   const kind = request?.kind;
-  const parent = resolveWorkspacePath(rootPath, parentPath);
+  const parent = await resolveExistingWorkspacePath(rootPath, parentPath);
   const parentMetadata = await fs.stat(parent).catch((error) => {
     throw new Error(`Unable to create entry: ${error.message}`);
   });
@@ -528,11 +547,12 @@ export async function renameWorkspaceEntry(rootPath, request) {
   }
 
   const nextName = normalizeNewEntryName(request?.nextName);
-  const sourcePath = resolveWorkspacePath(rootPath, relativePath);
+  const sourcePath = await resolveExistingWorkspacePath(rootPath, relativePath);
   const parentPath = path.posix.dirname(relativePath);
   const normalizedParent = parentPath === "." ? "" : parentPath;
   const nextRelativePath = joinRelativePath(normalizedParent, nextName);
-  const targetPath = resolveWorkspacePath(rootPath, nextRelativePath);
+  const targetParentPath = await resolveExistingWorkspacePath(rootPath, normalizedParent);
+  const targetPath = path.join(targetParentPath, nextName);
 
   if (sourcePath === targetPath) {
     return { path: nextRelativePath };
@@ -573,9 +593,11 @@ export async function moveWorkspaceEntry(rootPath, request) {
     throw new Error("Cannot move a folder into itself.");
   }
 
-  const sourcePath = resolveWorkspacePath(rootPath, fromRelativePath);
-  const targetPath = resolveWorkspacePath(rootPath, toRelativePath);
-  const targetParentPath = path.dirname(targetPath);
+  const sourcePath = await resolveExistingWorkspacePath(rootPath, fromRelativePath);
+  const targetParentRelativePath = path.posix.dirname(toRelativePath);
+  const normalizedTargetParent = targetParentRelativePath === "." ? "" : targetParentRelativePath;
+  const targetParentPath = await resolveExistingWorkspacePath(rootPath, normalizedTargetParent);
+  const targetPath = path.join(targetParentPath, path.posix.basename(toRelativePath));
 
   await fs.stat(sourcePath).catch((error) => {
     throw new Error(`Unable to move entry: ${error.message}`);
@@ -606,7 +628,7 @@ export async function importWorkspaceEntries(rootPath, request) {
   }
 
   const targetFolderPath = request?.targetFolderPath ?? null;
-  const targetFolder = resolveWorkspacePath(rootPath, targetFolderPath);
+  const targetFolder = await resolveExistingWorkspacePath(rootPath, targetFolderPath);
   const targetFolderMetadata = await fs.stat(targetFolder).catch((error) => {
     throw new Error(`Unable to import entries: ${error.message}`);
   });
@@ -639,7 +661,7 @@ export async function importWorkspaceEntries(rootPath, request) {
 
     const name = normalizeNewEntryName(path.basename(sourcePath));
     const relativePath = joinRelativePath(normalizedTargetParent, name);
-    const targetPath = resolveWorkspacePath(rootPath, relativePath);
+    const targetPath = path.join(targetFolder, name);
     if (sourceMetadata.isDirectory() && isSameOrInsidePath(sourcePath, targetPath)) {
       throw new Error("Cannot import a folder into itself.");
     }
@@ -690,7 +712,7 @@ export async function deleteWorkspaceEntry(rootPath, request) {
     throw new Error("Cannot delete the workspace root.");
   }
 
-  const targetPath = resolveWorkspacePath(rootPath, relativePath);
+  const targetPath = await resolveExistingWorkspacePath(rootPath, relativePath);
   await fs.rm(targetPath, { recursive: true, force: false }).catch((error) => {
     throw new Error(`Unable to delete entry: ${error.message}`);
   });
@@ -889,8 +911,25 @@ export async function configureWorkspaceCloudRemote(rootPath, remoteUrl, remoteN
 }
 
 export async function readPuppyoneWorkspaceConfig(rootPath) {
-  const root = resolveWorkspacePath(rootPath, null);
+  const root = await resolveExistingWorkspacePath(rootPath, null);
+  const configDir = path.join(root, PUPPYONE_CONFIG_DIR);
   const configPath = path.join(root, PUPPYONE_CONFIG_DIR, PUPPYONE_CONFIG_FILE);
+  const configDirMetadata = await fs.lstat(configDir).catch((error) => {
+    if (error?.code === "ENOENT") return null;
+    throw new Error(`Unable to inspect PuppyOne config directory: ${error.message}`);
+  });
+  if (!configDirMetadata) return normalizePuppyoneWorkspaceConfig(null);
+  if (configDirMetadata.isSymbolicLink() || !configDirMetadata.isDirectory()) {
+    throw new Error("PuppyOne config directory must be a real directory inside the workspace.");
+  }
+  const configMetadata = await fs.lstat(configPath).catch((error) => {
+    if (error?.code === "ENOENT") return null;
+    throw new Error(`Unable to inspect PuppyOne config: ${error.message}`);
+  });
+  if (!configMetadata) return normalizePuppyoneWorkspaceConfig(null);
+  if (configMetadata.isSymbolicLink() || !configMetadata.isFile()) {
+    throw new Error("PuppyOne config must be a regular file inside the workspace.");
+  }
   const rawConfig = await fs.readFile(configPath, "utf8").catch((error) => {
     if (error?.code === "ENOENT") return null;
     throw new Error(`Unable to read PuppyOne config: ${error.message}`);
@@ -906,19 +945,52 @@ export async function readPuppyoneWorkspaceConfig(rootPath) {
 }
 
 export async function writePuppyoneWorkspaceConfig(rootPath, config) {
-  const root = resolveWorkspacePath(rootPath, null);
+  const root = await resolveExistingWorkspacePath(rootPath, null);
   const configDir = path.join(root, PUPPYONE_CONFIG_DIR);
-  const configPath = path.join(configDir, PUPPYONE_CONFIG_FILE);
   const normalizedConfig = normalizePuppyoneWorkspaceConfig(config, {
     updatedAt: new Date().toISOString(),
   });
 
-  await fs.mkdir(configDir, { recursive: true }).catch((error) => {
+  await fs.mkdir(configDir, { recursive: false }).catch((error) => {
+    if (error?.code === "EEXIST") return;
     throw new Error(`Unable to create PuppyOne config directory: ${error.message}`);
   });
-  await fs.writeFile(configPath, `${JSON.stringify(normalizedConfig, null, 2)}\n`, "utf8").catch((error) => {
-    throw new Error(`Unable to write PuppyOne config: ${error.message}`);
+  const configDirMetadata = await fs.lstat(configDir).catch((error) => {
+    throw new Error(`Unable to inspect PuppyOne config directory: ${error.message}`);
   });
+  if (configDirMetadata.isSymbolicLink() || !configDirMetadata.isDirectory()) {
+    throw new Error("PuppyOne config directory must be a real directory inside the workspace.");
+  }
+  const canonicalConfigDir = await fs.realpath(configDir);
+  if (!isSameOrInsidePath(root, canonicalConfigDir)) {
+    throw new Error("PuppyOne config directory resolves outside the workspace.");
+  }
+
+  const configPath = path.join(canonicalConfigDir, PUPPYONE_CONFIG_FILE);
+  const existingMetadata = await fs.lstat(configPath).catch((error) => {
+    if (error?.code === "ENOENT") return null;
+    throw new Error(`Unable to inspect PuppyOne config: ${error.message}`);
+  });
+  if (existingMetadata?.isSymbolicLink() || (existingMetadata && !existingMetadata.isFile())) {
+    throw new Error("PuppyOne config must be a regular file inside the workspace.");
+  }
+
+  const temporaryPath = path.join(
+    canonicalConfigDir,
+    `.config.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`,
+  );
+  try {
+    await fs.writeFile(
+      temporaryPath,
+      `${JSON.stringify(normalizedConfig, null, 2)}\n`,
+      { encoding: "utf8", flag: "wx", mode: 0o600 },
+    );
+    await fs.rename(temporaryPath, configPath);
+  } catch (error) {
+    throw new Error(`Unable to write PuppyOne config: ${error.message}`);
+  } finally {
+    await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+  }
 
   return normalizedConfig;
 }
@@ -1349,6 +1421,7 @@ async function nodeFromEntry(folder, entry, parentRelative) {
     name: entry.name,
     path: relativePath,
     type: kind,
+    mimeType: isFolder ? null : getMimeType(entryPath),
     size: isFolder ? null : formatFileSize(metadata.size),
     modified: Number.isFinite(metadata.mtimeMs)
       ? String(Math.floor(metadata.mtimeMs / 1000))
@@ -1367,6 +1440,30 @@ export function resolveWorkspacePath(rootPath, relativePath) {
     throw new Error("Folder path is outside the selected workspace.");
   }
   return resolved;
+}
+
+export async function resolveExistingWorkspacePath(rootPath, relativePath) {
+  const resolvedRoot = path.resolve(rootPath);
+  const canonicalRoot = await fs.realpath(resolvedRoot).catch((error) => {
+    throw new Error(`Unable to resolve workspace root: ${error.message}`);
+  });
+  const candidatePath = resolveWorkspacePath(canonicalRoot, relativePath);
+  const candidateMetadata = await fs.lstat(candidatePath).catch((error) => {
+    throw new Error(`Unable to resolve workspace entry: ${error.message}`);
+  });
+
+  if (candidatePath !== canonicalRoot && candidateMetadata.isSymbolicLink()) {
+    throw new Error("Symbolic links cannot be accessed through workspace file operations.");
+  }
+
+  const canonicalCandidate = await fs.realpath(candidatePath).catch((error) => {
+    throw new Error(`Unable to resolve workspace entry: ${error.message}`);
+  });
+  if (!isSameOrInsidePath(canonicalRoot, canonicalCandidate)) {
+    throw new Error("Workspace entry resolves outside the selected workspace.");
+  }
+
+  return canonicalCandidate;
 }
 
 function isSameOrInsidePath(parentPath, candidatePath) {
@@ -3024,7 +3121,7 @@ function assertSafeCommitId(commitId) {
 }
 
 async function buildUntrackedFileDiff(rootPath, relativePath) {
-  const filePath = resolveWorkspacePath(rootPath, relativePath);
+  const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
   const metadata = await fs.stat(filePath).catch((error) => {
     throw new Error(`Unable to read untracked file: ${error.message}`);
   });

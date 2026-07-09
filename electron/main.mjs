@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from "electron";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -26,8 +26,11 @@ import { registerWorkspaceGitIpcHandlers } from "./main/ipc/workspace-git-ipc.mj
 import { registerWorkspaceNavigationIpcHandlers } from "./main/ipc/workspace-navigation-ipc.mjs";
 import { registerWorkspaceWatchIpcHandlers } from "./main/ipc/workspace-watch-ipc.mjs";
 import { registerLocalFileProtocol } from "./main/local-file-protocol.mjs";
-import { requireNonEmptyString } from "./main/security.mjs";
+import { createLocalFileCapabilityStore } from "./main/local-file-capabilities.mjs";
+import { installWindowNavigationSecurity, requireNonEmptyString } from "./main/security.mjs";
 import { createTerminalService } from "./main/terminal-service.mjs";
+import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
+import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 
@@ -37,6 +40,7 @@ const preloadPath = path.join(__dirname, "preload.cjs");
 const rendererDistPath = path.join(projectRoot, "dist", "index.html");
 const appName = "puppyone";
 const devServerUrl = process.env.PUPPYONE_DESKTOP_DEV_URL;
+const rendererApplicationUrl = devServerUrl || pathToFileURL(rendererDistPath).toString();
 const workspaceStateFilename = "desktop-workspace-state.json";
 const cloudAuthProtocol = "puppyone";
 const macTitlebarOptions = process.platform === "darwin"
@@ -66,7 +70,15 @@ let appPreviewRuntime = null;
 const windowsById = new Map();
 const windowStateById = new Map();
 const workspaceWindowByPath = new Map();
+const localFileCapabilities = createLocalFileCapabilityStore();
 let lastFocusedWindowId = null;
+const trustedIpcMain = createTrustedIpcMain({
+  ipcMain,
+  applicationUrl: rendererApplicationUrl,
+});
+const authorizeWorkspaceRoot = createSenderWorkspaceAuthorization({
+  getWorkspaceRootForSender,
+});
 const terminalService = createTerminalService({
   appVersion: app.getVersion(),
   initializeWorkspaceEditReview,
@@ -123,6 +135,11 @@ async function createWindow(options = {}) {
     },
   });
   const webContentsId = window.webContents.id;
+  installWindowNavigationSecurity({
+    webContents: window.webContents,
+    applicationUrl: rendererApplicationUrl,
+    shell,
+  });
   windowsById.set(webContentsId, window);
   windowStateById.set(webContentsId, {
     initialWorkspacePath,
@@ -334,10 +351,12 @@ app.whenReady().then(async () => {
     getMimeType,
     canonicalizeWorkspacePath,
     isOpenWorkspaceRoot,
+    validateCapability: localFileCapabilities.validate,
+    applicationUrl: rendererApplicationUrl,
   });
   updateService = createUpdateService({
     app,
-    ipcMain,
+    ipcMain: trustedIpcMain,
     getWindows: () => BrowserWindow.getAllWindows(),
     getRestartBlockers: getUpdateRestartBlockers,
   });
@@ -380,7 +399,7 @@ app.on("before-quit", () => {
 
 function registerIpcHandlers() {
   registerWorkspaceNavigationIpcHandlers({
-    ipcMain,
+    ipcMain: trustedIpcMain,
     workspaceStateStore,
     getInitialWorkspaceResultForWindow,
     forgetCurrentWindowWorkspace,
@@ -391,25 +410,43 @@ function registerIpcHandlers() {
     openVirtualWorkspaceInNewWindow,
     selectWorkspaceForCurrentWindow,
     selectWorkspaceForNewWindow,
-    workspaceFromPath,
   });
-  registerCloudIpcHandlers({ ipcMain, cloudAuthService });
-  registerSystemIpcHandlers({ ipcMain, shell });
+  registerCloudIpcHandlers({ ipcMain: trustedIpcMain, cloudAuthService });
+  registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell });
 
   registerWorkspaceFileIpcHandlers({
     app,
-    ipcMain,
+    ipcMain: trustedIpcMain,
     BrowserWindow,
     dialog,
     fs,
     shell,
+    authorizeWorkspaceRoot,
+    localFileCapabilities,
   });
 
-  registerAppPreviewIpcHandlers({ ipcMain, appPreviewRuntime });
-  registerWorkspaceWatchIpcHandlers({ ipcMain, workspaceWatchService });
+  registerAppPreviewIpcHandlers({
+    ipcMain: trustedIpcMain,
+    appPreviewRuntime,
+    authorizeWorkspaceRoot,
+  });
+  registerWorkspaceWatchIpcHandlers({
+    ipcMain: trustedIpcMain,
+    workspaceWatchService,
+    authorizeWorkspaceRoot,
+  });
 
-  registerWorkspaceGitIpcHandlers({ ipcMain, BrowserWindow, dialog });
-  registerTerminalIpcHandlers({ ipcMain, terminalService, getWorkspaceRootForSender });
+  registerWorkspaceGitIpcHandlers({
+    ipcMain: trustedIpcMain,
+    BrowserWindow,
+    dialog,
+    authorizeWorkspaceRoot,
+  });
+  registerTerminalIpcHandlers({
+    ipcMain: trustedIpcMain,
+    terminalService,
+    authorizeWorkspaceRoot,
+  });
 }
 
 function getUpdateRestartBlockers() {
@@ -602,11 +639,13 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
   const previousPath = state.workspacePath;
 
   if (previousPath && previousPath !== canonicalPath) {
+    localFileCapabilities.revokeSender(webContentsId);
     const previousWindow = workspaceWindowByPath.get(previousPath);
     if (previousWindow === window || previousWindow?.isDestroyed()) {
       workspaceWindowByPath.delete(previousPath);
     }
     if (options.cleanupPrevious !== false) {
+      appPreviewRuntime?.closeSessionsForWindow(webContentsId);
       terminalService.closeSessionsForWindow(webContentsId);
       workspaceWatchService.stopForWindow(webContentsId);
     }
@@ -633,6 +672,7 @@ function releaseWindowWorkspace(window) {
 }
 
 function releaseWindowWorkspaceById(webContentsId, window = null) {
+  localFileCapabilities.revokeSender(webContentsId);
   const state = windowStateById.get(webContentsId);
   const workspacePath = state?.workspacePath ?? null;
   if (workspacePath) {
@@ -661,6 +701,7 @@ async function forgetCurrentWindowWorkspace(sender) {
   }
 
   const releasedPath = releaseWindowWorkspace(window);
+  appPreviewRuntime?.closeSessionsForWindow(window.webContents.id);
   terminalService.closeSessionsForWindow(window.webContents.id);
   workspaceWatchService.stopForWindow(window.webContents.id);
   if (releasedPath) await workspaceStateStore.removeRecentWorkspacePath(releasedPath);
@@ -754,6 +795,7 @@ async function showHomepageForCurrentWindow(sender) {
   const window = BrowserWindow.fromWebContents(sender);
   if (!window || window.isDestroyed()) return;
   releaseWindowWorkspace(window);
+  appPreviewRuntime?.closeSessionsForWindow(window.webContents.id);
   terminalService.closeSessionsForWindow(window.webContents.id);
   workspaceWatchService.stopForWindow(window.webContents.id);
 }

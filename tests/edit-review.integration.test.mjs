@@ -3,7 +3,7 @@
 // review requests (before/after diffs) for the AI-edit-assist feature. Tests run
 // against real temp workspaces with real file edits — no mocks.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -146,5 +146,20 @@ describe("path-traversal containment", () => {
   it("rejects noting a path outside the workspace root", async () => {
     await initializeWorkspaceEditReview(root);
     expect(() => noteWorkspaceEditReviewPath(root, "../escape.txt")).toThrow(/escapes the workspace root/i);
+  });
+
+  it("never snapshots or reports a symbolic link to an external file", async () => {
+    const external = await mkdtemp(path.join(os.tmpdir(), "puppyone-review-external-"));
+    try {
+      const secretPath = path.join(external, "secret.txt");
+      await writeFile(secretPath, "outside secret\n");
+      await symlink(secretPath, path.join(root, "linked.txt"));
+
+      await initializeWorkspaceEditReview(root);
+      noteWorkspaceEditReviewPath(root, "linked.txt");
+      expect(await flushWorkspaceEditReviewChanges(root)).toBeNull();
+    } finally {
+      await rm(external, { recursive: true, force: true });
+    }
   });
 });

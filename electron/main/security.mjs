@@ -15,6 +15,13 @@ export function requireCloudApiPath(value) {
 }
 
 export function requireSafeExternalUrl(value) {
+  if (
+    typeof value !== "string"
+    || /[\u0000-\u001f\u007f]/.test(value)
+    || /%(?:0[0-9a-f]|1[0-9a-f]|7f)/i.test(value)
+  ) {
+    throw new Error("External URL contains control characters.");
+  }
   const rawUrl = requireNonEmptyString(value, "External URL is required.");
   let url;
   try {
@@ -26,21 +33,152 @@ export function requireSafeExternalUrl(value) {
   if (!["http:", "https:", "mailto:"].includes(url.protocol)) {
     throw new Error("External URL protocol is not allowed.");
   }
+  if (
+    (url.protocol === "http:" || url.protocol === "https:")
+    && (!url.hostname || url.username || url.password)
+  ) {
+    throw new Error("External web URL host or credentials are not allowed.");
+  }
+  if (url.protocol === "mailto:" && !url.pathname) {
+    throw new Error("External mail URL must include a recipient.");
+  }
 
   return url.toString();
+}
+
+export function classifyWindowNavigation(targetValue, applicationValue) {
+  if (
+    typeof targetValue !== "string"
+    || /[\u0000-\u001f\u007f]/.test(targetValue)
+    || /%(?:0[0-9a-f]|1[0-9a-f]|7f)/i.test(targetValue)
+  ) {
+    return { action: "deny" };
+  }
+  let targetUrl;
+  let applicationUrl;
+  try {
+    targetUrl = new URL(targetValue);
+    applicationUrl = new URL(applicationValue);
+  } catch {
+    return { action: "deny" };
+  }
+
+  if (isApplicationNavigation(targetUrl, applicationUrl)) {
+    return { action: "allow-application" };
+  }
+
+  try {
+    return {
+      action: "open-external",
+      url: requireSafeExternalUrl(targetValue),
+    };
+  } catch {
+    return { action: "deny" };
+  }
+}
+
+export function installWindowNavigationSecurity({
+  webContents,
+  applicationUrl,
+  shell,
+  logger = console,
+}) {
+  const openExternal = (url) => {
+    try {
+      Promise.resolve(shell.openExternal(url)).catch((error) => {
+        logger.warn("Unable to open external navigation target:", error);
+      });
+    } catch (error) {
+      logger.warn("Unable to open external navigation target:", error);
+    }
+  };
+
+  const handleTopLevelNavigation = (event, targetUrl) => {
+    const decision = classifyWindowNavigation(targetUrl, applicationUrl);
+    if (decision.action === "allow-application") return;
+
+    event.preventDefault();
+    if (decision.action === "open-external") {
+      openExternal(decision.url);
+    }
+  };
+
+  webContents.on("will-navigate", handleTopLevelNavigation);
+  webContents.on("will-redirect", handleTopLevelNavigation);
+
+  webContents.setWindowOpenHandler(({ url }) => {
+    const decision = classifyWindowNavigation(url, applicationUrl);
+    if (decision.action === "open-external") {
+      openExternal(decision.url);
+    }
+    return { action: "deny" };
+  });
+}
+
+function isApplicationNavigation(targetUrl, applicationUrl) {
+  if (applicationUrl.protocol === "http:" || applicationUrl.protocol === "https:") {
+    return targetUrl.protocol === applicationUrl.protocol && targetUrl.origin === applicationUrl.origin;
+  }
+
+  if (applicationUrl.protocol === "file:") {
+    return (
+      targetUrl.protocol === "file:" &&
+      targetUrl.host === applicationUrl.host &&
+      targetUrl.pathname === applicationUrl.pathname &&
+      targetUrl.search === applicationUrl.search &&
+      targetUrl.username === applicationUrl.username &&
+      targetUrl.password === applicationUrl.password
+    );
+  }
+
+  return targetUrl.href === applicationUrl.href;
 }
 
 export function isPotentiallyExecutableFile(filePath, stats) {
   const extension = path.extname(filePath).toLowerCase();
   if ([
+    ".apk",
     ".app",
+    ".application",
+    ".appimage",
+    ".bat",
+    ".cmd",
+    ".com",
     ".command",
+    ".cpl",
+    ".deb",
+    ".desktop",
     ".dmg",
     ".exe",
+    ".gadget",
+    ".hta",
+    ".jar",
+    ".js",
+    ".jse",
+    ".lnk",
+    ".msi",
+    ".msp",
+    ".mst",
+    ".pif",
+    ".pl",
     ".pkg",
+    ".ps1",
+    ".py",
+    ".pyw",
+    ".rb",
+    ".reg",
+    ".rpm",
+    ".run",
     ".scpt",
+    ".scr",
     ".sh",
     ".tool",
+    ".url",
+    ".vbe",
+    ".vbs",
+    ".workflow",
+    ".wsf",
+    ".wsh",
   ].includes(extension)) {
     return true;
   }

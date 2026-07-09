@@ -163,7 +163,6 @@ export function useActiveExternalOpenTarget({
         path: activeDataNode.path,
         strategy: activeExternalAppOverride ? "app" : externalAppsSettings.openMode,
         appPath: activeExternalAppOverride?.appPath ?? null,
-        confirmExecutableFiles: externalAppsSettings.confirmExecutableFiles,
       });
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
@@ -173,7 +172,6 @@ export function useActiveExternalOpenTarget({
   }, [
     activeDataNode,
     activeExternalAppOverride,
-    externalAppsSettings.confirmExecutableFiles,
     externalAppsSettings.openMode,
     onActionSettled,
     onError,
@@ -192,7 +190,6 @@ export function useActiveExternalOpenTarget({
         path: activeDataNode.path,
         strategy: "app",
         appPath,
-        confirmExecutableFiles: externalAppsSettings.confirmExecutableFiles,
       });
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
@@ -201,7 +198,6 @@ export function useActiveExternalOpenTarget({
     }
   }, [
     activeDataNode,
-    externalAppsSettings.confirmExecutableFiles,
     onActionSettled,
     onError,
     workspace,

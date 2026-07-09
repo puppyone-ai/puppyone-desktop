@@ -598,7 +598,7 @@ export function DataWorkspace({
         void openMarkdownLinkCandidates(paths);
       },
       onOpenExternalUrl: (href) => {
-        void onOpenExternalUrl?.(href);
+        return onOpenExternalUrl?.(href);
       },
     }),
     [markdownLinkDocuments, markdownLinkIndexing, onOpenExternalUrl, openMarkdownLinkCandidates],

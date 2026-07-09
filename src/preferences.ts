@@ -24,7 +24,6 @@ export type ExternalAppOverride = {
 };
 export type ExternalAppsSettings = {
   openMode: ExternalAppOpenMode;
-  confirmExecutableFiles: boolean;
   overrides: ExternalAppOverride[];
 };
 export const RIGHT_SIDEBAR_TOOL_IDS = ["terminal"] as const;
@@ -77,7 +76,6 @@ export const DEFAULT_FILES_VISIBILITY_SETTINGS: FilesVisibilitySettings = {
 };
 export const DEFAULT_EXTERNAL_APPS_SETTINGS: ExternalAppsSettings = {
   openMode: "system",
-  confirmExecutableFiles: true,
   overrides: [],
 };
 export const DEFAULT_RIGHT_SIDEBAR_TOOLS_SETTINGS: RightSidebarToolsSettings = {
@@ -247,7 +245,6 @@ export function parseExternalAppsSettings(value: string | null | undefined): Ext
 
     return {
       openMode: "system",
-      confirmExecutableFiles: parsed.confirmExecutableFiles !== false,
       overrides: normalizeExternalAppOverrides(parsed.overrides),
     };
   } catch {

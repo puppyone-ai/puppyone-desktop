@@ -287,7 +287,6 @@ export function useDataNodeActions({
         path: nodeActionMenu.node.path,
         strategy: override ? "app" : externalAppsSettings.openMode,
         appPath: override?.appPath ?? null,
-        confirmExecutableFiles: externalAppsSettings.confirmExecutableFiles,
       });
       setNodeActionMenu(null);
     } catch (error) {
@@ -298,9 +297,7 @@ export function useDataNodeActions({
       } : current);
     }
   }, [
-    externalAppsSettings.confirmExecutableFiles,
-    externalAppsSettings.openMode,
-    externalAppsSettings.overrides,
+    externalAppsSettings,
     nodeActionMenu,
     workspace,
     workspaceIsCloud,

@@ -3,12 +3,13 @@ import {
   createWorkspaceEntry,
   convertWorkspaceOfficeDocumentToDocx,
   deleteWorkspaceEntry,
+  getMimeType,
   importWorkspaceEntries,
   listFolderChildren,
   moveWorkspaceEntry,
   readWorkspaceTextFile,
   renameWorkspaceEntry,
-  resolveWorkspacePath,
+  resolveExistingWorkspacePath,
   writeWorkspaceTextFile,
 } from "../../../local-api/workspace.mjs";
 import { absorbWorkspaceEditReviewPath } from "../../../local-api/edit-review.mjs";
@@ -20,6 +21,9 @@ import {
   validateExternalApplicationPath,
 } from "../external-apps.mjs";
 import { isPotentiallyExecutableFile } from "../security.mjs";
+import { buildLocalFileCapabilityUrl } from "../local-file-capabilities.mjs";
+
+const MAX_OFFICE_CONVERSIONS_PER_WINDOW = 2;
 
 export function registerWorkspaceFileIpcHandlers({
   app,
@@ -28,47 +32,106 @@ export function registerWorkspaceFileIpcHandlers({
   dialog,
   fs,
   shell,
+  authorizeWorkspaceRoot,
+  localFileCapabilities,
+  convertOfficeDocument = convertWorkspaceOfficeDocumentToDocx,
 }) {
-  ipcMain.handle("workspace:list-folder-children", async (_event, request) => {
-    const rootPath = request?.rootPath;
+  const officeConversionSessionsBySender = new Map();
+
+  ipcMain.handle("workspace:list-folder-children", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const folderPath = request?.folderPath ?? null;
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
     return listFolderChildren(rootPath, folderPath);
   });
 
-  ipcMain.handle("workspace:read-file", async (_event, request) => {
-    const rootPath = request?.rootPath;
+  ipcMain.handle("workspace:read-file", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const filePath = request?.path;
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
     if (typeof filePath !== "string" || filePath.trim().length === 0) {
       throw new Error("File path is required.");
     }
     return readWorkspaceTextFile(rootPath, filePath);
   });
 
-  ipcMain.handle("workspace:convert-office-docx", async (_event, request) => {
-    const rootPath = request?.rootPath;
+  ipcMain.handle("workspace:get-file-url", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const filePath = request?.path;
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
     if (typeof filePath !== "string" || filePath.trim().length === 0) {
       throw new Error("File path is required.");
     }
-    return convertWorkspaceOfficeDocumentToDocx(rootPath, filePath);
+    const canonicalFilePath = await resolveExistingWorkspacePath(rootPath, filePath);
+    const metadata = await fs.promises.stat(canonicalFilePath).catch((error) => {
+      throw new Error(`Unable to resolve local file resource: ${error.message}`);
+    });
+    if (!metadata.isFile()) throw new Error("Local file resource must be a regular file.");
+
+    const relativePath = path.relative(rootPath, canonicalFilePath).split(path.sep).join("/");
+    const token = localFileCapabilities.issue({
+      senderId: requireIpcSenderId(event),
+      rootPath,
+      relativePath,
+      scope: getMimeType(canonicalFilePath)?.toLowerCase().startsWith("text/html")
+        ? "directory"
+        : "exact",
+    });
+    return {
+      url: buildLocalFileCapabilityUrl({ rootPath, relativePath, token }),
+    };
   });
 
-  ipcMain.handle("workspace:write-file", async (_event, request) => {
-    const rootPath = request?.rootPath;
+  ipcMain.handle("workspace:convert-office-docx", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
+    const filePath = request?.path;
+    if (typeof filePath !== "string" || filePath.trim().length === 0) {
+      throw new Error("File path is required.");
+    }
+    const requestId = requireOfficeConversionRequestId(request?.requestId);
+    const senderId = requireIpcSenderId(event);
+    let senderSessions = officeConversionSessionsBySender.get(senderId);
+    if (!senderSessions) {
+      senderSessions = new Map();
+      officeConversionSessionsBySender.set(senderId, senderSessions);
+    }
+    if (senderSessions.has(requestId)) {
+      throw new Error("An Office conversion with this request id is already running.");
+    }
+    if (senderSessions.size >= MAX_OFFICE_CONVERSIONS_PER_WINDOW) {
+      throw new Error(`Only ${MAX_OFFICE_CONVERSIONS_PER_WINDOW} Office conversions may run in one window at a time.`);
+    }
+
+    const controller = new AbortController();
+    const session = { controller, requestId };
+    const abortWhenSenderCloses = () => controller.abort();
+    event.sender.once?.("destroyed", abortWhenSenderCloses);
+    senderSessions.set(requestId, session);
+
+    try {
+      return await convertOfficeDocument(rootPath, filePath, { signal: controller.signal });
+    } finally {
+      event.sender.removeListener?.("destroyed", abortWhenSenderCloses);
+      if (senderSessions.get(requestId) === session) {
+        senderSessions.delete(requestId);
+      }
+      if (senderSessions.size === 0 && officeConversionSessionsBySender.get(senderId) === senderSessions) {
+        officeConversionSessionsBySender.delete(senderId);
+      }
+    }
+  });
+
+  ipcMain.handle("workspace:convert-office-docx-cancel", async (event, request) => {
+    const requestId = requireOfficeConversionRequestId(request?.requestId);
+    const senderId = requireIpcSenderId(event);
+    const session = officeConversionSessionsBySender.get(senderId)?.get(requestId) ?? null;
+    if (!session) return { cancelled: false };
+
+    session.controller.abort();
+    return { cancelled: true };
+  });
+
+  ipcMain.handle("workspace:write-file", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const filePath = request?.path;
     const content = request?.content;
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
     if (typeof filePath !== "string" || filePath.trim().length === 0) {
       throw new Error("File path is required.");
     }
@@ -76,21 +139,15 @@ export function registerWorkspaceFileIpcHandlers({
     await absorbWorkspaceEditReviewPath(rootPath, filePath);
   });
 
-  ipcMain.handle("workspace:create-entry", async (_event, request) => {
-    const rootPath = request?.rootPath;
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
+  ipcMain.handle("workspace:create-entry", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const result = await createWorkspaceEntry(rootPath, request);
     await absorbWorkspaceEditReviewPath(rootPath, result.path);
     return result;
   });
 
-  ipcMain.handle("workspace:rename-entry", async (_event, request) => {
-    const rootPath = request?.rootPath;
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
+  ipcMain.handle("workspace:rename-entry", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const previousPath = request?.path;
     const result = await renameWorkspaceEntry(rootPath, request);
     await absorbWorkspaceEditReviewPath(rootPath, previousPath);
@@ -98,11 +155,8 @@ export function registerWorkspaceFileIpcHandlers({
     return result;
   });
 
-  ipcMain.handle("workspace:move-entry", async (_event, request) => {
-    const rootPath = request?.rootPath;
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
+  ipcMain.handle("workspace:move-entry", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const previousPath = request?.fromPath;
     const result = await moveWorkspaceEntry(rootPath, request);
     await absorbWorkspaceEditReviewPath(rootPath, previousPath);
@@ -110,32 +164,23 @@ export function registerWorkspaceFileIpcHandlers({
     return result;
   });
 
-  ipcMain.handle("workspace:import-entries", async (_event, request) => {
-    const rootPath = request?.rootPath;
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
+  ipcMain.handle("workspace:import-entries", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const result = await importWorkspaceEntries(rootPath, request);
     await Promise.all(result.paths.map((importedPath) => absorbWorkspaceEditReviewPath(rootPath, importedPath)));
     return result;
   });
 
-  ipcMain.handle("workspace:delete-entry", async (_event, request) => {
-    const rootPath = request?.rootPath;
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
+  ipcMain.handle("workspace:delete-entry", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const result = await deleteWorkspaceEntry(rootPath, request);
     await absorbWorkspaceEditReviewPath(rootPath, result.path);
     return result;
   });
 
-  ipcMain.handle("workspace:reveal-entry-in-finder", async (_event, request) => {
-    const rootPath = request?.rootPath;
+  ipcMain.handle("workspace:reveal-entry-in-finder", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const entryPath = request?.path;
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
     if (typeof entryPath !== "string" || entryPath.trim().length === 0) {
       throw new Error("Entry path is required.");
     }
@@ -143,7 +188,7 @@ export function registerWorkspaceFileIpcHandlers({
       throw new Error("Unsupported external app opening strategy.");
     }
 
-    const targetPath = resolveWorkspacePath(rootPath, entryPath);
+    const targetPath = await resolveExistingWorkspacePath(rootPath, entryPath);
     await fs.promises.stat(targetPath).catch((error) => {
       throw new Error(`Unable to reveal entry in Finder: ${error.message}`);
     });
@@ -152,12 +197,9 @@ export function registerWorkspaceFileIpcHandlers({
   });
 
   ipcMain.handle("workspace:open-entry-external", async (event, request) => {
-    const rootPath = request?.rootPath;
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const entryPath = request?.path;
     const strategy = request?.strategy ?? "system";
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
     if (typeof entryPath !== "string" || entryPath.trim().length === 0) {
       throw new Error("Entry path is required.");
     }
@@ -165,15 +207,15 @@ export function registerWorkspaceFileIpcHandlers({
       throw new Error("Unsupported external app opening strategy.");
     }
 
-    const targetPath = resolveWorkspacePath(rootPath, entryPath);
-    const stats = await fs.promises.stat(targetPath).catch((error) => {
+    let targetPath = await resolveExistingWorkspacePath(rootPath, entryPath);
+    let stats = await fs.promises.stat(targetPath).catch((error) => {
       throw new Error(`Unable to open entry: ${error.message}`);
     });
     if (!stats.isFile()) {
       throw new Error("Only files can be opened in another app.");
     }
 
-    if (request?.confirmExecutableFiles !== false && isPotentiallyExecutableFile(targetPath, stats)) {
+    if (isPotentiallyExecutableFile(targetPath, stats)) {
       const window = BrowserWindow.fromWebContents(event.sender);
       const confirmOptions = {
         type: "warning",
@@ -188,6 +230,16 @@ export function registerWorkspaceFileIpcHandlers({
         ? await dialog.showMessageBox(window, confirmOptions)
         : await dialog.showMessageBox(confirmOptions);
       if (result.response !== 0) return { ok: false, cancelled: true };
+    }
+
+    // The user may spend an arbitrary amount of time in the confirmation
+    // dialog. Resolve and stat again so a swapped symlink/path is not opened.
+    targetPath = await resolveExistingWorkspacePath(rootPath, entryPath);
+    stats = await fs.promises.stat(targetPath).catch((error) => {
+      throw new Error(`Unable to revalidate entry before opening: ${error.message}`);
+    });
+    if (!stats.isFile()) {
+      throw new Error("Only files can be opened in another app.");
     }
 
     if (strategy === "app") {
@@ -205,20 +257,17 @@ export function registerWorkspaceFileIpcHandlers({
     return { ok: true };
   });
 
-  ipcMain.handle("workspace:resolve-external-open-target", async (_event, request) => {
-    const rootPath = request?.rootPath;
+  ipcMain.handle("workspace:resolve-external-open-target", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const entryPath = request?.path;
     const overrideAppPath = typeof request?.overrideAppPath === "string"
       ? request.overrideAppPath.trim()
       : "";
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
     if (typeof entryPath !== "string" || entryPath.trim().length === 0) {
       throw new Error("Entry path is required.");
     }
 
-    const targetPath = resolveWorkspacePath(rootPath, entryPath);
+    const targetPath = await resolveExistingWorkspacePath(rootPath, entryPath);
     const stats = await fs.promises.stat(targetPath).catch((error) => {
       throw new Error(`Unable to resolve external app: ${error.message}`);
     });
@@ -237,20 +286,17 @@ export function registerWorkspaceFileIpcHandlers({
     });
   });
 
-  ipcMain.handle("workspace:list-external-open-targets", async (_event, request) => {
-    const rootPath = request?.rootPath;
+  ipcMain.handle("workspace:list-external-open-targets", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const entryPath = request?.path;
     const overrideAppPath = typeof request?.overrideAppPath === "string"
       ? request.overrideAppPath.trim()
       : "";
-    if (typeof rootPath !== "string" || rootPath.trim().length === 0) {
-      throw new Error("Workspace root path is required.");
-    }
     if (typeof entryPath !== "string" || entryPath.trim().length === 0) {
       throw new Error("Entry path is required.");
     }
 
-    const targetPath = resolveWorkspacePath(rootPath, entryPath);
+    const targetPath = await resolveExistingWorkspacePath(rootPath, entryPath);
     const stats = await fs.promises.stat(targetPath).catch((error) => {
       throw new Error(`Unable to resolve external apps: ${error.message}`);
     });
@@ -277,6 +323,21 @@ export function registerWorkspaceFileIpcHandlers({
       extension,
     });
   });
+}
+
+function requireOfficeConversionRequestId(value) {
+  if (typeof value !== "string" || !/^[A-Za-z0-9._:-]{1,128}$/.test(value)) {
+    throw new Error("Office conversion request id is invalid.");
+  }
+  return value;
+}
+
+function requireIpcSenderId(event) {
+  const senderId = event?.sender?.id;
+  if (!Number.isSafeInteger(senderId) || senderId <= 0) {
+    throw new Error("Office conversion sender is invalid.");
+  }
+  return senderId;
 }
 
 function normalizeFileExtension(value) {

@@ -349,7 +349,7 @@ export type WorkspaceMoveEntryRequest = {
 export type WorkspaceImportEntriesRequest = {
   rootPath: string;
   targetFolderPath: string | null;
-  sourcePaths: string[];
+  files: File[];
 };
 
 export type WorkspaceImportEntriesResult = {
@@ -369,6 +369,15 @@ export type WorkspaceRevealEntryRequest = {
 export type WorkspaceConvertOfficeDocumentToDocxRequest = {
   rootPath: string;
   path: string;
+  requestId: string;
+};
+
+export type WorkspaceCancelOfficeDocumentToDocxRequest = {
+  requestId: string;
+};
+
+export type WorkspaceCancelOfficeDocumentToDocxResult = {
+  cancelled: boolean;
 };
 
 export type WorkspaceConvertOfficeDocumentToDocxResult = {
@@ -381,7 +390,6 @@ export type WorkspaceOpenEntryExternalRequest = {
   path: string;
   strategy?: "system" | "app";
   appPath?: string | null;
-  confirmExecutableFiles?: boolean;
 };
 
 export type WorkspaceExternalOpenTargetSource = "system" | "override" | "candidate" | "unknown";
@@ -514,7 +522,6 @@ declare global {
       getInitialWorkspace: () => Promise<LastWorkspaceResult>;
       getLastWorkspace: () => Promise<LastWorkspaceResult>;
       getRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
-      rememberLastWorkspace: (folderPath: string) => Promise<void>;
       forgetLastWorkspace: () => Promise<void>;
       showHomepage: () => Promise<{ ok: boolean }>;
       openWorkspaceInCurrentWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
@@ -522,7 +529,6 @@ declare global {
       openCloudProjectInNewWindow: (request: { projectId: string; name: string }) => Promise<WorkspaceOpenResult>;
       selectFolder: () => Promise<WorkspaceOpenResult | null>;
       selectFolderInNewWindow: () => Promise<WorkspaceOpenResult | null>;
-      workspaceFromPath: (folderPath: string) => Promise<Workspace>;
       getPathForFile: (file: File) => string;
       listFolderChildren: (request: {
         rootPath: string;
@@ -532,9 +538,16 @@ declare global {
         rootPath: string;
         path: string;
       }) => Promise<FileContent>;
+      getFileUrl: (request: {
+        rootPath: string;
+        path: string;
+      }) => Promise<{ url: string }>;
       convertOfficeDocumentToDocx: (
         request: WorkspaceConvertOfficeDocumentToDocxRequest,
       ) => Promise<WorkspaceConvertOfficeDocumentToDocxResult>;
+      cancelOfficeDocumentToDocxConversion: (
+        request: WorkspaceCancelOfficeDocumentToDocxRequest,
+      ) => Promise<WorkspaceCancelOfficeDocumentToDocxResult>;
       writeFile: (request: {
         rootPath: string;
         path: string;

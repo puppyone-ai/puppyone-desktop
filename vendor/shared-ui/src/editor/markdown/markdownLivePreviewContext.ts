@@ -214,7 +214,9 @@ function openMarkdownHref(href: string, view: EditorView): boolean {
 function openExternalMarkdownHref(href: string, view: EditorView): boolean {
   const linkGraph = view.state.facet(markdownLinkGraphFacet);
   if (linkGraph?.openExternalUrl) {
-    linkGraph.openExternalUrl(href);
+    void Promise.resolve().then(() => linkGraph.openExternalUrl?.(href)).catch((error) => {
+      console.warn("Unable to open external Markdown link:", error);
+    });
     return true;
   }
 

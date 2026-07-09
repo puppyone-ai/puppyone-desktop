@@ -88,6 +88,19 @@ export function createWorkspaceStateStore({
     });
   }
 
+  async function requireRecentWorkspacePath(folderPath) {
+    if (typeof folderPath !== "string" || folderPath.trim().length === 0) {
+      throw new Error("Folder path is required.");
+    }
+    const requestedPath = await canonicalizeWorkspacePath(folderPath);
+    const state = normalizeWorkspaceState(await readWorkspaceState());
+    for (const record of state.recentWorkspaceRecords) {
+      const persistedPath = await canonicalizeWorkspacePath(record.path);
+      if (persistedPath === requestedPath) return persistedPath;
+    }
+    throw new Error("Workspace path is not in the main-process recent workspace list.");
+  }
+
   async function removeRecentWorkspacePath(folderPath) {
     const canonicalPath = await canonicalizeWorkspacePath(folderPath);
     const state = normalizeWorkspaceState(await readWorkspaceState());
@@ -134,6 +147,7 @@ export function createWorkspaceStateStore({
     getRecentWorkspacesResult,
     readLastActiveWorkspacePath,
     rememberRecentWorkspacePath,
+    requireRecentWorkspacePath,
     removeRecentWorkspacePath,
     forgetLastWorkspacePath,
   };

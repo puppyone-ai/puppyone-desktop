@@ -1,4 +1,4 @@
-import type { AppPreviewController, DataNode, FileContent } from "../core/types";
+import type { AppPreviewController, DataNode, FileContent, OfficeDocumentConverter } from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import { PuppyoneEditorHost, type EditorSaveMode } from "./PuppyoneEditorHost";
 import type { AiEditFile } from "./ai-edits/types";
@@ -22,7 +22,7 @@ export type EditorHostProps = {
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
-  convertOfficeDocumentToDocx?: (path: string) => Promise<{ arrayBuffer: ArrayBuffer; warnings?: string[] }>;
+  convertOfficeDocumentToDocx?: OfficeDocumentConverter;
   deferFallbackContent?: boolean;
 };
 
@@ -55,7 +55,7 @@ export function EditorHost({
         type: fileContent?.type ?? node.type,
         content: fileContent?.content ?? (deferFallbackContent ? undefined : node.content),
         preview: deferFallbackContent ? undefined : node.preview,
-        mimeType: fileContent?.mimeType,
+        mimeType: fileContent?.mimeType ?? node.mimeType ?? null,
         url: fileContent?.url ?? fileUrl,
       }}
       loading={loading}
