@@ -22,10 +22,9 @@ described as current behavior before its implementation and verification land.
   - Owns renderer state, sidebar view-model rules, UI actions, IPC boundaries,
     and the end-to-end local Git data flow.
 - [Repository Status Refresh Lifecycle](status-refresh-lifecycle.md)
-  - Records the **implemented known gap** that leaves status stale after some
-    external Git operations.
-  - Defines the **proposed** repository watcher, refresh scheduler, focus
-    reconciliation, error recovery, and test contract.
+  - **Implemented**.
+  - Owns the repository watcher, refresh scheduler, focus reconciliation, error
+    recovery, fast status / lazy history split, and lifecycle verification.
 - [Cloud Branch Graph Layout](cloud-branch-graph-layout.md)
   - **Implemented**.
   - Owns Git topology, ref markers, graph continuation rows, and Cloud Branches
@@ -47,6 +46,16 @@ described as current behavior before its implementation and verification land.
   - current workspace content watcher
 - `local-api/workspace.mjs`
   - Git CLI execution, parsing, status snapshots, history, and mutations
+- `electron/main/git-metadata-watch-service.mjs`
+  - Git metadata watcher (separate from workspace content watch)
+- `electron/main/ipc/git-metadata-watch-ipc.mjs`
+  - authorized metadata watch start/stop IPC
+- `src/features/source-control/gitRefreshScheduler.ts`
+  - single-flight, dirty trailing, generation-ordered refresh scheduler
+- `tests/gitRefreshScheduler.test.ts`
+  - scheduler ordering and focus/error unit coverage
+- `tests/electron.git-metadata-watch.integration.test.mjs`
+  - real-repository metadata watcher and external Git freshness coverage
 - `tests/workspace.git.integration.test.mjs`
   - real-repository integration coverage for the local Git engine
 

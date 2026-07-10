@@ -2,8 +2,8 @@
 
 Architecture home: [Git and Source Control Architecture](README.md).
 
-**Status:** Implemented. Repository freshness after external Git operations has
-a known gap documented in
+**Status:** Implemented. Repository freshness after external Git operations is
+owned by
 [Repository Status Refresh Lifecycle](status-refresh-lifecycle.md).
 
 ## Purpose
@@ -157,19 +157,15 @@ not be reloaded in full after every filesystem event.
 
 ## Current Refresh Boundary
 
-The controller performs an initial status read when the local workspace becomes
-active. It also accepts refreshes from workspace file events, explicit product
-actions, configuration changes, and Git operation results.
+The controller performs an initial status read after the Git metadata
+subscription is ready. It also accepts refreshes from working-tree content
+events, Git metadata events, explicit product actions, configuration changes,
+focus reconciliation, and Git operation results.
 
-The current workspace watcher excludes all `.git/**` events while the renderer
-uses that watcher as its external-change refresh signal. External `git add`,
-`git commit`, ref-only updates, and similar commands can therefore leave this
-implemented sidebar displaying an old snapshot.
-
-That defect and its proposed replacement are owned only by
-[Repository Status Refresh Lifecycle](status-refresh-lifecycle.md). This
-document describes how the sidebar consumes a snapshot, not how repository
-freshness is detected.
+Working-tree and Git-metadata invalidations are separate channels. Frequent
+status reads stay lightweight; History and Cloud branch graphs load commit
+history lazily. See
+[Repository Status Refresh Lifecycle](status-refresh-lifecycle.md).
 
 ## Current Code Boundaries
 

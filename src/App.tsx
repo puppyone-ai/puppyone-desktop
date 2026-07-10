@@ -249,6 +249,7 @@ export function App() {
     handleStashAndCheckoutBranch,
     handleUnstageAllGitChanges,
     handleUnstageGitPaths,
+    invalidateGitStatus,
     refreshGitStatus,
     refreshGitStatusWithFetch,
     selectGitCommit,
@@ -298,7 +299,7 @@ export function App() {
     [cloudDataPort, filesVisibilitySettings, localDataPort, workspaceIsCloud],
   );
   useWorkspaceFileWatch({
-    onGitRefresh: refreshGitStatus,
+    onGitRefresh: invalidateGitStatus,
     onWorkspaceContentChanged: refreshWorkspaceContent,
     workspace,
     workspaceIsCloud,

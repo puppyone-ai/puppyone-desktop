@@ -8,6 +8,7 @@ import { registerTerminalIpcHandlers } from "../electron/main/ipc/terminal-ipc.m
 import { registerWorkspaceGitIpcHandlers } from "../electron/main/ipc/workspace-git-ipc.mjs";
 import { registerWorkspaceNavigationIpcHandlers } from "../electron/main/ipc/workspace-navigation-ipc.mjs";
 import { registerWorkspaceWatchIpcHandlers } from "../electron/main/ipc/workspace-watch-ipc.mjs";
+import { registerGitMetadataWatchIpcHandlers } from "../electron/main/ipc/git-metadata-watch-ipc.mjs";
 import { createTerminalService } from "../electron/main/terminal-service.mjs";
 import {
   createSenderWorkspaceAuthorization,
@@ -81,6 +82,7 @@ describe("sender-bound workspace authorization", () => {
       openExternal: vi.fn(),
     };
     const workspaceWatchService = { start: vi.fn(), stop: vi.fn() };
+    const gitMetadataWatchService = { start: vi.fn(), stop: vi.fn(), stopForWindow: vi.fn(), closeAll: vi.fn() };
     const terminalService = {
       create: vi.fn(),
       input: vi.fn(),
@@ -95,6 +97,7 @@ describe("sender-bound workspace authorization", () => {
       authorizeWorkspaceRoot,
     });
     registerWorkspaceWatchIpcHandlers({ ipcMain, workspaceWatchService, authorizeWorkspaceRoot });
+    registerGitMetadataWatchIpcHandlers({ ipcMain, gitMetadataWatchService, authorizeWorkspaceRoot });
     registerAppPreviewIpcHandlers({ ipcMain, appPreviewRuntime, authorizeWorkspaceRoot });
     registerTerminalIpcHandlers({ ipcMain, terminalService, authorizeWorkspaceRoot });
 
@@ -102,6 +105,7 @@ describe("sender-bound workspace authorization", () => {
     for (const [channel, request] of [
       ["workspace:git-status", { rootPath: otherRoot }],
       ["workspace:watch-start", { rootPath: otherRoot }],
+      ["git-repository:watch-start", { rootPath: otherRoot }],
       ["ai-edit-review:get-latest", { rootPath: otherRoot }],
       ["app-preview:start", { rootPath: otherRoot, path: "app.puppyoneapp" }],
       ["terminal:create", { rootPath: otherRoot, cwd: otherRoot }],

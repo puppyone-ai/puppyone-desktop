@@ -6,14 +6,11 @@ snapshot consumer and sidebar state model are documented in
 
 ## Status
 
-- **Current implementation:** Implemented with a known correctness gap.
-- **Target lifecycle:** Proposed. The watcher, scheduler, query split, and tests
-  described under Target Architecture are not current behavior until their code
-  changes land.
-
-This distinction is intentional. The document records the present failure
-without turning it into a durable architecture rule, and defines the contract
-the implementation must satisfy next.
+- **Lifecycle:** Implemented.
+- The watcher, scheduler, query split, focus fallback, and verification matrix
+  described under Target Architecture are current behavior.
+- Historical diagnosis of the pre-fix stale-status gap is retained below for
+  rationale; it is no longer the product contract.
 
 ## Requirement
 
@@ -107,6 +104,25 @@ file after the last rendered snapshot.
 The Git reader itself is not a persistent cache. A manual status request runs
 new Git commands and returns current repository truth. The defect is missing
 invalidation and reconciliation.
+
+### Why the failure appears intermittent
+
+The current 200 ms workspace-event debounce makes the defect timing-dependent,
+not random.
+
+If an external `git add` and `git commit` both finish before the debounced
+working-tree event starts its status read, that read observes the post-commit
+repository and the UI appears correct. If the status read finishes after the
+file edit but before the metadata-only operations, it publishes the pre-commit
+snapshot; the later index and ref events are excluded, so that snapshot remains
+visible. A later ordinary file change, application-owned Git operation, manual
+refresh, or workspace reload can make the UI catch up and further obscure the
+cause.
+
+An automated reproduction must therefore wait until the edited-file snapshot is
+visible before running the external metadata-only operation. Tests that perform
+edit, add, and commit in one uninterrupted burst can pass accidentally because
+the single delayed refresh runs after the whole burst.
 
 ## Target Architecture
 
@@ -269,6 +285,340 @@ At minimum, generation ordering prevents an old request from overwriting a new
 one. The implementation may additionally compare a cheap HEAD/index/ref
 fingerprint before and after a multi-command read and retry once when repository
 identity changes during the query.
+
+## Implementation Handoff
+
+This section is the execution contract for the agent implementing the target
+architecture. The diagnosis and architectural direction are settled; an
+implementing agent should begin with the failing lifecycle tests and should not
+replace the design with polling or an undifferentiated recursive watcher.
+
+The implementation scope is local PuppyOne Desktop Git freshness for the active
+repository. It must preserve the existing Source Control UI, main-process
+workspace authorization, one-repository-per-window ownership, and Cloud-facing
+snapshot consumers.
+
+### Accepted ownership decisions
+
+- The Electron main process owns repository path resolution, metadata watchers,
+  subscription tokens, watcher recovery, and window-scoped cleanup.
+- Watcher identity is worktree-aware: key ownership by the canonical worktree
+  root and its resolved worktree Git directory. Linked worktrees may share a
+  common Git directory, but must not be collapsed into one worktree snapshot.
+- Renderer code owns the window-local `GitStatusSnapshot`. A small testable
+  scheduler beside `useDesktopGitController` owns refresh ordering; React
+  components do not coordinate requests themselves.
+- The existing workspace watcher remains the content invalidation channel for
+  Explorer and edit-review. It may also dirty the Git scheduler for working-tree
+  changes, but it continues to exclude `.git/**`.
+- A separate Git metadata channel dirties only repository state. It never
+  refreshes Explorer and never submits paths to edit-review.
+- Git commands remain the source of truth. Watcher payloads carry invalidation
+  reasons, not inferred staged, branch, or commit state.
+- Application-owned mutations and manual refreshes use the same generation and
+  ordering rules as watcher refreshes. No direct `setGitStatus` path may allow an
+  older in-flight read to overwrite a mutation result.
+- Frequent status and history/graph loading are separate queries. The Changes
+  surface must not pay for current-branch and all-branch history on every save.
+- Integrated-terminal command detection is optional latency optimization. It is
+  not a correctness dependency and must not be required for external clients.
+
+### Subscription and event contract
+
+Metadata subscription setup is an authorized request containing only the active
+workspace root. Main resolves and owns every derived path. The renderer never
+sends a Git directory, common directory, ref path, or arbitrary watch path.
+
+The logical bridge contract is:
+
+```text
+startGitRepositoryWatch({ rootPath })
+    -> { subscriptionId, rootPath, repository: true | false }
+
+gitRepositoryInvalidated
+    -> { subscriptionId, rootPath, reason }
+
+stopGitRepositoryWatch({ subscriptionId })
+    -> { ok: true }
+```
+
+`reason` is diagnostic and scheduling context such as `metadata`,
+`watcher-recovered`, or `watcher-error`; it is never repository truth. The
+existing workspace-content channel supplies the separate `working-tree` reason
+to the same scheduler. Metadata paths remain in main-process logs and are not
+needed by the renderer.
+
+The main process creates or joins the repository watcher before resolving
+`startGitRepositoryWatch`. The renderer installs its event listener, awaits the
+ready subscription, and only then requests the initial snapshot. Cleanup is by
+opaque `subscriptionId`, not `(webContents.id, rootPath)` alone. If a React
+effect is cleaned up while start is still pending, it stops that returned token
+as soon as the promise settles. An old cleanup can therefore never remove a
+newer subscription.
+
+### Refresh scheduler state machine
+
+The scheduler is repository-scoped and framework-independent enough to unit
+test with a deferred fake status reader. It tracks at least:
+
+- active canonical workspace root
+- requested and last-applied generations
+- one in-flight read, if present
+- dirty state accumulated during the read
+- queued priority (`debounced` or `immediate`)
+- last successful refresh time
+- focused/visible state
+- last refresh or watcher error
+
+Its required transitions are:
+
+```text
+invalidate while idle
+    -> debounce unless immediate
+    -> start one read
+
+invalidate while reading
+    -> mark dirty
+    -> do not start a second read
+
+read succeeds and no newer generation exists
+    -> publish snapshot
+    -> record lastSuccessfulAt
+
+read settles while dirty
+    -> clear dirty
+    -> run exactly one trailing read
+
+older read settles after a newer mutation snapshot or generation
+    -> discard older result
+
+application mutation returns a snapshot
+    -> advance the applied generation
+    -> publish the mutation snapshot
+    -> make every older in-flight read ineligible to publish
+
+hidden or unfocused window receives background invalidation
+    -> retain dirty state
+    -> drain on visibility/focus restoration
+
+manual refresh
+    -> bypass debounce
+    -> preserve single-flight and generation ordering
+```
+
+Loading state belongs to the active generation. Completion of an obsolete read
+must not clear loading for a newer read. A transient read failure preserves the
+last good snapshot, records an error, and leaves manual retry available.
+
+Timing policy lives in named, test-injectable constants rather than scattered
+timers. Initial defaults are a 250 ms refresh debounce, a 5 second maximum age
+before focus reconciliation, and exponential watcher retry beginning at 250 ms
+and capped at 30 seconds. Measurements may tune those values without weakening
+the ordering or eventual-freshness invariants.
+
+### Work packages
+
+The work packages below are ordered and independently reviewable. Before writing
+Package 1 production code, take two tests from Package 6 and make them fail
+against the current implementation: the external edit -> observed dirty -> add
+-> commit lifecycle, and the deferred-reader generation-ordering case. Then land
+Packages 1 through 5 in order and complete the remaining Package 6 matrix. Later
+packages may rely on contracts established by earlier ones.
+
+#### Package 1: Repository identity and metadata watcher
+
+Primary files:
+
+- `local-api/workspace.mjs`
+- new `electron/main/git-metadata-watch-service.mjs`
+- `electron/main.mjs`
+
+Deliverables:
+
+- Add an internal repository resolver based on Git `rev-parse` with
+  `--show-toplevel`, `--git-dir`, and `--git-common-dir`, followed by absolute
+  path normalization.
+- Create one reference-counted metadata watcher entry per resolved worktree
+  identity. Common-directory watches may be shared internally, but invalidation
+  must reach every subscribed worktree whose snapshot can be affected.
+- Watch worktree-specific and common Git metadata surfaces needed for status,
+  refs, upstream, config, and in-progress operations.
+- Filter `index.lock`, object storage, watcher cookies, and other known feedback
+  noise.
+- Re-arm watches after atomic replacement, deletion/recreation, and recoverable
+  watcher failure with bounded backoff.
+- Clean up only the closing window's subscriptions; close shared watcher
+  resources when their final token is released.
+
+Acceptance boundary: a real temporary repository emits a Git invalidation after
+external stage, unstage, commit, ref-only change, and relevant config change,
+including from a linked worktree whose Git directory is outside the opened root.
+
+#### Package 2: Authorized IPC and race-free bootstrap
+
+Primary files:
+
+- `electron/main/ipc/workspace-git-ipc.mjs`
+- `electron/preload.cjs`
+- `src/types/electron.d.ts`
+- `src/features/source-control/useDesktopGitController.ts`
+- `src/features/data-workspace/useWorkspaceFileWatch.ts`
+
+Deliverables:
+
+- Expose token-based start, invalidation, and stop operations through the
+  context-isolated bridge.
+- Give the existing workspace-content subscription equivalent token semantics,
+  or join content and metadata readiness under one lifecycle token, so stale
+  content-watch cleanup cannot remove a newer subscription.
+- Authorize the workspace root before repository resolution and watcher setup.
+- Move initial Git refresh behind successful subscription readiness.
+- Route working-tree and metadata invalidations to the Git scheduler while
+  retaining their separate Explorer/edit-review behavior.
+- Make pending start and cleanup safe under React Strict Mode and rapid workspace
+  switches.
+
+Acceptance boundary: no mutation between subscription readiness and the initial
+snapshot can be lost, and a stale cleanup cannot stop the active subscription.
+
+#### Package 3: Ordered refresh scheduling
+
+Primary files:
+
+- new `src/features/source-control/gitRefreshScheduler.ts`
+- `src/features/source-control/useDesktopGitController.ts`
+- `src/App.tsx`
+
+Deliverables:
+
+- Centralize initial, watcher, focus, manual, configuration, and operation
+  refreshes behind one scheduler.
+- Enforce debounce, single-flight, dirty trailing refresh, and monotonically
+  ordered result application.
+- Prevent a status read started before stage, commit, checkout, pull, or another
+  mutation from overwriting that operation's returned snapshot.
+- Preserve the last good snapshot on transient errors.
+- Keep selection cleanup and existing view-model behavior after a new snapshot
+  is accepted.
+
+Acceptance boundary: a burst permits one active read and at most one trailing
+read, and deferred fake responses prove an old generation cannot overwrite a
+newer one.
+
+#### Package 4: Fast status and lazy history
+
+Primary files:
+
+- `local-api/workspace.mjs`
+- `electron/main/ipc/workspace-git-ipc.mjs`
+- `src/lib/localFiles.ts`
+- `src/features/source-control/useDesktopGitController.ts`
+- History and Cloud branch-graph consumers
+
+Deliverables:
+
+- Split the frequent Changes snapshot from current-branch and all-branch history
+  queries.
+- Keep HEAD, upstream, ahead/behind, remotes, resource groups, and operation
+  state required by the Source Control surface in the fast reader.
+- Load history/graph lazily when its surface is active, with pagination or
+  existing bounded limits and explicit HEAD/ref invalidation.
+- Run background read-only status with `GIT_OPTIONAL_LOCKS=0`; do not apply that
+  environment to mutating commands.
+- Avoid duplicate Git queries when porcelain-v2 branch headers already provide
+  equivalent information.
+
+Acceptance boundary: a working-tree save refreshes Changes without invoking
+either full history reader, while opening History still displays correct current
+and all-branch data.
+
+#### Package 5: Focus fallback, recovery, and observability
+
+Primary files:
+
+- `electron/main.mjs`
+- `electron/main/git-metadata-watch-service.mjs`
+- renderer scheduler/controller files
+
+Deliverables:
+
+- Queue invalidations while the window is hidden or unfocused and drain them on
+  restoration.
+- On focus, reconcile when the last successful snapshot is older than a bounded
+  freshness threshold even if no watcher event arrived.
+- Log watcher setup, invalidation reason, refresh duration, recovery attempt, and
+  terminal failure with repository identity but without credentials or remote
+  secrets.
+- Use bounded retry/backoff and expose manual retry; never spin in a tight loop.
+
+Acceptance boundary: a deliberately dropped watcher event is healed on stale
+focus, while an unchanged hidden window does not continuously poll.
+
+#### Package 6: Lifecycle verification
+
+Primary files:
+
+- new `tests/electron.git-metadata-watch.integration.test.mjs`
+- new `tests/gitRefreshScheduler.test.ts`
+- existing `tests/workspace.git.integration.test.mjs`
+- existing Electron authorization tests
+
+Deliverables:
+
+- Implement the full Verification Matrix below against real temporary Git
+  repositories and deterministic deferred readers.
+- Use eventual predicates with timeouts for filesystem behavior; do not make
+  correctness depend on fixed sleeps.
+- Assert watcher/client cleanup so the test runner exits with no live handles.
+- Run the full test suite and production build after targeted tests pass.
+
+Acceptance boundary: the lifecycle tests fail against the old implementation,
+pass against the new implementation, and the existing Git, authorization, and
+build checks remain green.
+
+### Prohibited shortcuts and non-goals
+
+- Do not remove the `.git/**` exclusion from the existing shared workspace
+  watcher. Git metadata needs a separate consumer and noise policy.
+- Do not add unconditional interval polling or hidden-window polling as the
+  primary solution.
+- Do not make shell/terminal command parsing the correctness mechanism.
+- Do not let the renderer nominate Git metadata paths or accept a watcher event
+  as repository truth.
+- Do not fix stale React rendering with forced re-renders, remount keys, or
+  timers; the stale value is an old snapshot, not a component rendering defect.
+- Do not run unbounded concurrent status reads or let each consumer create its
+  own refresh loop.
+- Do not reload full history or the branch graph on every working-tree event.
+- Do not clear the last good snapshot because of a transient watcher or refresh
+  error.
+- Do not redesign Source Control presentation, Git hosting policy, Cloud
+  authentication, or multi-window ownership as part of this change.
+
+### Definition of Done
+
+The target lifecycle can be relabeled **Implemented** only when all of the
+following are true:
+
+- External terminal and Git-client stage, unstage, commit, reset, fetch/ref, and
+  branch operations reconcile without manual refresh or workspace reload.
+- Linked worktrees, packed refs, nested branch names, and Git directories outside
+  the opened folder pass real-repository tests.
+- Startup and React Strict Mode cannot lose the active subscription.
+- There is at most one status read in flight per active repository and at most
+  one required trailing read after a burst.
+- Older reads cannot overwrite mutation results or newer generations.
+- Focus heals deliberately missed events within the documented freshness bound,
+  without continuous hidden-window polling.
+- Background status takes no optional index locks and frequent refresh does not
+  load full history.
+- Watcher and refresh failures preserve the last good snapshot, are observable,
+  recover with bounded retry where possible, and retain manual retry.
+- The Verification Matrix, complete test suite, boundary checks, TypeScript
+  build, and production bundle all pass.
+- This document and the Git architecture index are updated from **Proposed** to
+  **Implemented** in the same change that lands the verified code; target
+  invariants and rationale are retained as permanent architecture documentation.
 
 ## Verification Matrix
 

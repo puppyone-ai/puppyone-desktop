@@ -10,6 +10,7 @@ import path from "node:path";
 import {
   initializeWorkspaceGitRepository,
   getWorkspaceGitStatus,
+  getWorkspaceGitBranchGraph,
   stageAllWorkspaceGitChanges,
   stageWorkspaceGitPaths,
   commitWorkspaceGit,
@@ -75,7 +76,10 @@ describe("stage → commit lifecycle", () => {
     expect(status.totalCommits).toBe(1);
     expect(status.headCommitId).toBeTruthy();
     expect(status.entries).toEqual([]);
-    expect(status.commits[0].message).toMatch(/add app\.js/);
+    // The fast status path no longer loads history; commit messages come from
+    // the lazily-loaded branch graph (getWorkspaceGitBranchGraph).
+    const graph = await getWorkspaceGitBranchGraph(root);
+    expect(graph.commits[0].message).toMatch(/add app\.js/);
   });
 
   it("detects modifications to a committed file as unstaged", async () => {
@@ -203,5 +207,24 @@ describe("cloud remote configuration (端 → 云 link)", () => {
     await expect(
       configureWorkspaceCloudRemote(root, "https://api.puppyone.ai/git/x.git", "-evil"),
     ).rejects.toThrow(/Remote name is invalid/i);
+  });
+});
+
+describe("fast status vs lazy history", () => {
+  it("keeps frequent status free of history while branch graph still loads commits", async () => {
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "app.js", kind: "file", content: "console.log(1)\n" });
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "feat: add app.js");
+
+    const status = await getWorkspaceGitStatus(root);
+    expect(status.isRepo).toBe(true);
+    expect(status.commits).toEqual([]);
+    expect(status.allCommits).toEqual([]);
+    expect(status.totalCommits).toBe(1);
+
+    const graph = await getWorkspaceGitBranchGraph(root);
+    expect(graph.commits[0].message).toMatch(/add app\.js/);
+    expect(graph.allCommits.length).toBeGreaterThan(0);
   });
 });

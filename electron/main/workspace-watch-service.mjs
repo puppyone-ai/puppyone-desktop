@@ -8,8 +8,14 @@ import {
   noteWorkspaceEditReviewPath,
 } from "../../local-api/edit-review.mjs";
 
+let workspaceWatchSubscriptionSequence = 0;
+
 export function createWorkspaceWatchService({ logger = console } = {}) {
   const watchers = new Map();
+  // Token-based subscriptions: cleanup keys on a unique subscriptionId, not on
+  // the sender id or root, so a React Strict Mode setup/cleanup cycle cannot let
+  // an old stop remove a newer subscription for the same webContents.
+  const subscriptions = new Map();
 
   function start(sender, rootPath) {
     const resolvedRoot = path.resolve(rootPath);
@@ -20,30 +26,41 @@ export function createWorkspaceWatchService({ logger = console } = {}) {
       watchers.set(resolvedRoot, entry);
     }
 
-    entry.clients.set(sender.id, sender);
+    const subscriptionId = `workspace-watch-${(workspaceWatchSubscriptionSequence += 1)}-${Date.now().toString(36)}`;
+    entry.clients.set(subscriptionId, sender);
+    subscriptions.set(subscriptionId, { root: resolvedRoot, senderId: sender.id });
     sender.once("destroyed", () => {
-      stop(sender.id, resolvedRoot);
+      stop(subscriptionId);
     });
+
+    return { subscriptionId, rootPath: resolvedRoot };
   }
 
-  function stop(webContentsId, rootPath) {
-    const resolvedRoot = path.resolve(rootPath);
-    const entry = watchers.get(resolvedRoot);
-    if (!entry) return;
+  function stop(subscriptionId, expectedSenderId = null) {
+    const subscription = subscriptions.get(subscriptionId);
+    if (!subscription) return { ok: true };
+    if (expectedSenderId !== null && subscription.senderId !== expectedSenderId) {
+      return { ok: true };
+    }
+    subscriptions.delete(subscriptionId);
 
-    entry.clients.delete(webContentsId);
+    const entry = watchers.get(subscription.root);
+    if (!entry) return { ok: true };
+
+    entry.clients.delete(subscriptionId);
     if (entry.clients.size === 0) {
       clearTimeout(entry.debounceTimer);
       clearTimeout(entry.editReviewTimer);
       entry.watcher.close();
-      disposeWorkspaceEditReview(resolvedRoot);
-      watchers.delete(resolvedRoot);
+      disposeWorkspaceEditReview(subscription.root);
+      watchers.delete(subscription.root);
     }
+    return { ok: true };
   }
 
   function stopForWindow(webContentsId) {
-    for (const rootPath of Array.from(watchers.keys())) {
-      stop(webContentsId, rootPath);
+    for (const [subscriptionId, subscription] of Array.from(subscriptions.entries())) {
+      if (subscription.senderId === webContentsId) stop(subscriptionId);
     }
   }
 
@@ -57,6 +74,7 @@ export function createWorkspaceWatchService({ logger = console } = {}) {
       disposeWorkspaceEditReview(rootPath);
     }
     watchers.clear();
+    subscriptions.clear();
   }
 
   return {

@@ -296,6 +296,18 @@ export type AiEditReviewUpdatedEvent = {
   request: AiEditRequest;
 };
 
+export type GitRepositoryWatchResult = {
+  subscriptionId: string;
+  rootPath: string;
+  repository: boolean;
+};
+
+export type GitRepositoryInvalidatedEvent = {
+  subscriptionId: string;
+  rootPath: string;
+  reason: string;
+};
+
 export type LastWorkspaceResult = {
   path: string | null;
   workspace: Workspace | null;
@@ -600,6 +612,15 @@ declare global {
       watchWorkspace: (
         rootPath: string,
         callback: (event: WorkspaceChangedEvent) => void,
+      ) => () => void;
+      startGitRepositoryWatch: (request: {
+        rootPath: string;
+      }) => Promise<GitRepositoryWatchResult>;
+      stopGitRepositoryWatch: (request: {
+        subscriptionId: string;
+      }) => Promise<{ ok: boolean }>;
+      onGitRepositoryInvalidated: (
+        callback: (event: GitRepositoryInvalidatedEvent) => void,
       ) => () => void;
       getLatestAiEditReviewRequest: (request: {
         rootPath: string;
