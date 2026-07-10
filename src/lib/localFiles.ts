@@ -84,6 +84,12 @@ export function createLocalDataPort(rootPath: string): DataPort {
     importFiles: (files, targetFolderPath) => importWorkspaceFiles(rootPath, targetFolderPath, files),
     renameNode: (path, nextName) => getDesktopBridge().renameEntry({ rootPath, path, nextName }).then(() => undefined),
     moveNode: (from, to) => getDesktopBridge().moveEntry({ rootPath, fromPath: from, toPath: to }).then(() => undefined),
+    copyNode: (fromPath, targetFolderPath, options) => getDesktopBridge().copyEntry({
+      rootPath,
+      fromPath,
+      targetFolderPath,
+      ...options,
+    }),
     deleteNode: (path) => getDesktopBridge().deleteEntry({ rootPath, path }).then(() => undefined),
   };
 }

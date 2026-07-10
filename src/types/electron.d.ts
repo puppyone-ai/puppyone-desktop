@@ -346,6 +346,14 @@ export type WorkspaceMoveEntryRequest = {
   toPath: string;
 };
 
+export type WorkspaceCopyEntryRequest = {
+  rootPath: string;
+  fromPath: string;
+  targetFolderPath: string | null;
+  preferredName?: string;
+  forceDuplicateName?: boolean;
+};
+
 export type WorkspaceImportEntriesRequest = {
   rootPath: string;
   targetFolderPath: string | null;
@@ -556,6 +564,7 @@ declare global {
       createEntry: (request: WorkspaceCreateEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       renameEntry: (request: WorkspaceRenameEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       moveEntry: (request: WorkspaceMoveEntryRequest) => Promise<WorkspaceCreateEntryResult>;
+      copyEntry: (request: WorkspaceCopyEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       importEntries: (request: WorkspaceImportEntriesRequest) => Promise<WorkspaceImportEntriesResult>;
       deleteEntry: (request: WorkspaceDeleteEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       revealEntryInFinder: (request: WorkspaceRevealEntryRequest) => Promise<{ ok: boolean }>;

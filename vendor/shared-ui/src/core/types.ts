@@ -103,11 +103,21 @@ export type DataImportResult = {
   paths: string[];
 };
 
+export type DataCopyOptions = {
+  preferredName?: string;
+  forceDuplicateName?: boolean;
+};
+
+export type DataCopyResult = {
+  path: string;
+};
+
 export type DataCapabilities = {
   create?: boolean;
   rename?: boolean;
   delete?: boolean;
   move?: boolean;
+  copy?: boolean;
   write?: boolean;
   history?: boolean;
   accessPoints?: boolean;
@@ -130,6 +140,11 @@ export type DataPort = {
   renameNode?: (path: string, nextName: string) => Promise<void>;
   deleteNode?: (path: string) => Promise<void>;
   moveNode?: (from: string, to: string) => Promise<void>;
+  copyNode?: (
+    fromPath: string,
+    targetFolderPath: string | null,
+    options?: DataCopyOptions,
+  ) => Promise<DataCopyResult>;
 };
 
 export const defaultDataCapabilities: DataCapabilities = {
@@ -137,6 +152,7 @@ export const defaultDataCapabilities: DataCapabilities = {
   rename: false,
   delete: false,
   move: false,
+  copy: false,
   write: false,
   history: false,
   accessPoints: false,

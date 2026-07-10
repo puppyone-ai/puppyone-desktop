@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   createEntry: (request) => ipcRenderer.invoke("workspace:create-entry", request),
   renameEntry: (request) => ipcRenderer.invoke("workspace:rename-entry", request),
   moveEntry: (request) => ipcRenderer.invoke("workspace:move-entry", request),
+  copyEntry: (request) => ipcRenderer.invoke("workspace:copy-entry", request),
   importEntries: (request) => {
     const files = Array.isArray(request?.files) ? request.files : [];
     const sourcePaths = files

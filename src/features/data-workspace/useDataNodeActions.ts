@@ -30,6 +30,8 @@ import {
   joinDataPath,
   remapActivePathAfterRename,
 } from "./explorer";
+import { collapseNestedNodes } from "./fileClipboard";
+import { useFileClipboard } from "./useFileClipboard";
 
 export function useDataNodeActions({
   dataPort,
@@ -54,6 +56,16 @@ export function useDataNodeActions({
 }) {
   const [createEntryDraft, setCreateEntryDraft] = useState<DesktopCreateEntryDraft | null>(null);
   const [nodeActionMenu, setNodeActionMenu] = useState<DesktopNodeActionMenuDraft | null>(null);
+  const fileClipboardController = useFileClipboard({
+    dataPort,
+    onEnterDataView,
+    onLocalWorkspaceContentChanged,
+    onWorkspaceContentChanged,
+    setActiveDataNode,
+    setActiveDataPath,
+    workspace,
+    workspaceIsCloud,
+  });
 
   const resetDataNodeActions = useCallback(() => {
     setCreateEntryDraft(null);
@@ -73,12 +85,16 @@ export function useDataNodeActions({
     });
   }, [onEnterDataView]);
 
-  const openNodeActionMenu = useCallback((node: DataNode, anchorRect: DOMRect) => {
-    const renameDraft = getDesktopRenameDraft(node);
+  const openNodeActionMenu = useCallback((node: DataNode, anchorRect: DOMRect, selectedNodes: readonly DataNode[] = [node]) => {
+    const selectedNodeIsInSelection = selectedNodes.some((selectedNode) => selectedNode.path === node.path);
+    const nodes = collapseNestedNodes(selectedNodeIsInSelection ? selectedNodes : [node]);
+    const primaryNode = nodes.find((selectedNode) => selectedNode.path === node.path) ?? nodes[0] ?? node;
+    const renameDraft = getDesktopRenameDraft(primaryNode);
     onEnterDataView();
     setCreateEntryDraft(null);
     setNodeActionMenu({
-      node,
+      node: primaryNode,
+      nodes,
       anchor: rectToCreateEntryAnchor(anchorRect),
       mode: "actions",
       renameNameValue: renameDraft.nameValue,
@@ -158,7 +174,7 @@ export function useDataNodeActions({
   ]);
 
   const renameNodeFromMenu = useCallback(async () => {
-    if (!dataPort?.renameNode || !nodeActionMenu || nodeActionMenu.operation) return;
+    if (!dataPort?.renameNode || !nodeActionMenu || nodeActionMenu.operation || nodeActionMenu.nodes.length !== 1) return;
 
     let nextName: string;
     try {
@@ -224,27 +240,45 @@ export function useDataNodeActions({
   const deleteNodeFromMenu = useCallback(async () => {
     if (!dataPort?.deleteNode || !nodeActionMenu || nodeActionMenu.operation) return;
 
-    const { node } = nodeActionMenu;
-    const confirmed = window.confirm(`Delete "${node.name}"? This cannot be undone.`);
+    const nodes = collapseNestedNodes(nodeActionMenu.nodes);
+    if (nodes.length === 0) return;
+    const confirmed = window.confirm(nodes.length === 1
+      ? `Delete "${nodes[0].name}"? This cannot be undone.`
+      : `Delete ${nodes.length} items? This cannot be undone.`);
     if (!confirmed) return;
 
     setNodeActionMenu((current) => current ? { ...current, operation: "delete", error: null } : current);
-    try {
-      await dataPort.deleteNode(node.path);
-      setNodeActionMenu(null);
+    const deletedNodes: DataNode[] = [];
+    const failures: string[] = [];
+    for (const node of nodes) {
+      try {
+        await dataPort.deleteNode(node.path);
+        deletedNodes.push(node);
+      } catch (error) {
+        failures.push(`${node.name}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    if (deletedNodes.length > 0) {
       setActiveDataPath((current) => (
-        current === node.path || current?.startsWith(`${node.path}/`) ? null : current
+        deletedNodes.some((node) => current === node.path || current?.startsWith(`${node.path}/`)) ? null : current
       ));
       setActiveDataNode((current) => (
-        current?.path === node.path || current?.path.startsWith(`${node.path}/`) ? null : current
+        deletedNodes.some((node) => current?.path === node.path || current?.path.startsWith(`${node.path}/`)) ? null : current
       ));
       onWorkspaceContentChanged();
       if (!workspaceIsCloud) onLocalWorkspaceContentChanged();
-    } catch (error) {
+    }
+
+    if (failures.length === 0) {
+      setNodeActionMenu(null);
+    } else {
       setNodeActionMenu((current) => current ? {
         ...current,
         operation: null,
-        error: error instanceof Error ? error.message : String(error),
+        error: deletedNodes.length > 0
+          ? `Deleted ${formatItemCount(deletedNodes.length)}; ${failures.length} failed. ${failures[0]}`
+          : failures[0],
       } : current);
     }
   }, [
@@ -306,6 +340,7 @@ export function useDataNodeActions({
   return {
     createEntryDraft,
     nodeActionMenu,
+    fileClipboardController,
     resetDataNodeActions,
     setCreateEntryDraft,
     setNodeActionMenu,
@@ -322,4 +357,8 @@ export function useDataNodeActions({
 
 function normalizeCreateEntryAnchor(anchor: DesktopCreateEntryAnchorInput) {
   return "toJSON" in anchor ? rectToCreateEntryAnchor(anchor) : anchor;
+}
+
+function formatItemCount(count: number): string {
+  return `${count} ${count === 1 ? "item" : "items"}`;
 }

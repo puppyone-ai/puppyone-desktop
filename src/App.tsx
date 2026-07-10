@@ -317,6 +317,7 @@ export function App() {
   const {
     createEntryDraft,
     nodeActionMenu,
+    fileClipboardController,
     resetDataNodeActions,
     setCreateEntryDraft,
     setNodeActionMenu,
@@ -916,6 +917,7 @@ export function App() {
           onActiveDataNodeChange={setActiveDataNode}
           onActiveDataPathChange={handleActiveDataPathChange}
           onCreateEntryMenu={openCreateEntryMenu}
+          fileClipboardController={fileClipboardController}
           onFilesVisibilitySettingsChange={handleFilesVisibilitySettingsChange}
           onNavigate={navigateDesktopView}
           onNodeActionMenu={openNodeActionMenu}
@@ -976,6 +978,12 @@ export function App() {
                 experimentalSettings={preferences.experimentalSettings}
                 fileIconTheme={fileIconTheme}
                 onCancel={() => setCreateEntryDraft(null)}
+                onPaste={() => {
+                  setCreateEntryDraft(null);
+                  void fileClipboardController.pasteNodes(createEntryDraft.parentPath);
+                }}
+                pasteDisabled={!fileClipboardController.canPasteInto(createEntryDraft.parentPath)}
+                pasteLabel={getPasteMenuLabel(fileClipboardController.clipboard?.nodes.length ?? 0)}
                 onSelectKind={selectCreateEntryKind}
               />
             )
@@ -986,8 +994,29 @@ export function App() {
               experimentalSettings={preferences.experimentalSettings}
               showRevealInFinder={!workspaceIsCloud}
               showOpenInDefaultApp={!workspaceIsCloud}
+              canPaste={nodeActionMenu.node.type === "folder" && fileClipboardController.canPasteInto(nodeActionMenu.node.path)}
+              canCopy={fileClipboardController.canCopy}
+              canCut={fileClipboardController.canCut}
+              canDuplicate={fileClipboardController.canDuplicate}
               onChange={setNodeActionMenu}
               onCancel={() => setNodeActionMenu(null)}
+              onCopy={() => {
+                fileClipboardController.copyNodes(nodeActionMenu.nodes);
+                setNodeActionMenu(null);
+              }}
+              onCut={() => {
+                fileClipboardController.cutNodes(nodeActionMenu.nodes);
+                setNodeActionMenu(null);
+              }}
+              onPaste={() => {
+                setNodeActionMenu(null);
+                void fileClipboardController.pasteNodes(nodeActionMenu.node.path);
+              }}
+              onDuplicate={() => {
+                setNodeActionMenu(null);
+                void fileClipboardController.duplicateNodes(nodeActionMenu.nodes);
+              }}
+              onCreateInside={() => openCreateEntryMenu(nodeActionMenu.node.path, nodeActionMenu.anchor)}
               onRename={renameNodeFromMenu}
               onDelete={deleteNodeFromMenu}
               onOpenInDefaultApp={openNodeInDefaultAppFromMenu}
@@ -1039,4 +1068,9 @@ export function App() {
       </DesktopOverlayPortal>
     </div>
   );
+}
+
+function getPasteMenuLabel(itemCount: number): string {
+  if (itemCount <= 0) return "Paste";
+  return itemCount === 1 ? "Paste Item" : `Paste ${itemCount} Items`;
 }

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { constants as fsConstants, readFileSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -209,6 +209,8 @@ for (const format of fileFormatRegistry.formats) {
     mimeIndex.set(mimeType.toLowerCase(), format);
   }
 }
+
+const copyNameExtensions = [...extensionIndex.keys()].sort((left, right) => right.length - left.length);
 
 export async function workspaceFromPath(folderPath) {
   const resolvedPath = path.resolve(folderPath);
@@ -619,6 +621,247 @@ export async function moveWorkspaceEntry(rootPath, request) {
   });
 
   return { path: toRelativePath };
+}
+
+export async function copyWorkspaceEntry(rootPath, request) {
+  const fromRelativePath = normalizeRelativePath(request?.fromPath);
+  const targetFolderRelativePath = normalizeRelativePath(request?.targetFolderPath ?? null);
+
+  if (!fromRelativePath) {
+    throw new Error("Cannot copy the workspace root.");
+  }
+  if (fromRelativePath.includes("\0") || targetFolderRelativePath.includes("\0")) {
+    throw new Error("Path contains an invalid character.");
+  }
+  const sourcePath = await resolveExistingWorkspacePath(rootPath, fromRelativePath);
+  const sourceMetadata = await fs.lstat(sourcePath).catch((error) => {
+    throw new Error(`Unable to copy entry: ${error.message}`);
+  });
+  if (sourceMetadata.isSymbolicLink()) {
+    throw new Error("Symbolic links cannot be copied.");
+  }
+  if (!sourceMetadata.isFile() && !sourceMetadata.isDirectory()) {
+    throw new Error("Only files and folders can be copied.");
+  }
+  if (
+    sourceMetadata.isDirectory()
+    && (
+      targetFolderRelativePath === fromRelativePath
+      || targetFolderRelativePath.startsWith(`${fromRelativePath}/`)
+    )
+  ) {
+    throw new Error("Cannot copy a folder into itself.");
+  }
+
+  const targetParentPath = await resolveExistingWorkspacePath(rootPath, targetFolderRelativePath);
+  const targetParentMetadata = await fs.stat(targetParentPath).catch((error) => {
+    throw new Error(`Unable to copy entry: ${error.message}`);
+  });
+  if (!targetParentMetadata.isDirectory()) {
+    throw new Error("Copy target parent is not a folder.");
+  }
+  if (sourceMetadata.isDirectory() && isSameOrInsidePath(sourcePath, targetParentPath)) {
+    throw new Error("Cannot copy a folder into itself.");
+  }
+
+  const preferredName = request?.preferredName == null
+    ? path.posix.basename(fromRelativePath)
+    : normalizeNewEntryName(request.preferredName);
+  const startWithDuplicateName = request?.forceDuplicateName === true
+    || path.dirname(sourcePath) === targetParentPath;
+
+  // Validate the complete tree before copying so a folder containing a link is
+  // rejected as one operation instead of producing a surprising partial copy.
+  const canonicalRoot = await fs.realpath(path.resolve(rootPath)).catch((error) => {
+    throw new Error(`Unable to resolve workspace root: ${error.message}`);
+  });
+  await assertCopyableWorkspaceTree(canonicalRoot, sourcePath);
+
+  for (let copyIndex = startWithDuplicateName ? 1 : 0; copyIndex <= 10_000; copyIndex += 1) {
+    const candidateName = createKeepBothCopyName(preferredName, copyIndex, sourceMetadata.isDirectory());
+    const targetPath = path.join(targetParentPath, candidateName);
+    let targetCreated = false;
+    try {
+      // copyWorkspaceTree claims its root with mkdir/copyFile EXCL. Name
+      // selection therefore remains correct even when two windows paste at the
+      // same time; renderer-side folder listings are never trusted for this.
+      await copyWorkspaceTree(canonicalRoot, sourcePath, targetPath);
+      targetCreated = true;
+
+      // Revalidate both ends after the asynchronous copy. This catches a source
+      // entry being replaced with a link while the operation was in flight and
+      // guarantees that no link is introduced into the workspace result.
+      await assertCopyableWorkspaceTree(canonicalRoot, sourcePath);
+      await assertCopyableWorkspaceTree(canonicalRoot, targetPath);
+      return {
+        path: joinRelativePath(targetFolderRelativePath, candidateName),
+      };
+    } catch (error) {
+      if (targetCreated) {
+        await removeWorkspaceCopyTarget(canonicalRoot, targetPath, true);
+      }
+      if (!targetCreated && isCopyTargetConflict(error)) {
+        continue;
+      }
+      throw new Error(`Unable to copy entry: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  throw new Error("Unable to copy entry: too many items use the requested name.");
+}
+
+function createKeepBothCopyName(preferredName, copyIndex, isDirectory) {
+  if (copyIndex === 0) return preferredName;
+
+  const extension = isDirectory ? "" : resolveCopyNameExtension(preferredName);
+  const originalStem = extension ? preferredName.slice(0, -extension.length) : preferredName;
+  const existingCopySuffix = parseKeepBothCopySuffix(originalStem);
+  const stem = existingCopySuffix?.stem ?? originalStem;
+  const copyNumber = (existingCopySuffix?.copyNumber ?? 0) + copyIndex;
+  const suffix = copyNumber === 1 ? " copy" : ` copy ${copyNumber}`;
+  return `${stem}${suffix}${extension}`;
+}
+
+function parseKeepBothCopySuffix(stem) {
+  const match = /^(.*) copy(?: (\d+))?$/i.exec(stem);
+  if (!match?.[1]) return null;
+  const copyNumber = match[2] ? Number.parseInt(match[2], 10) : 1;
+  if (!Number.isSafeInteger(copyNumber) || copyNumber < 1) return null;
+  return { stem: match[1], copyNumber };
+}
+
+function resolveCopyNameExtension(name) {
+  const lowerName = name.toLowerCase();
+  const registeredExtension = copyNameExtensions.find((extension) => (
+    lowerName.endsWith(extension) && name.length > extension.length
+  ));
+  if (registeredExtension) {
+    return name.slice(-registeredExtension.length);
+  }
+
+  const lastDot = name.lastIndexOf(".");
+  return lastDot > 0 ? name.slice(lastDot) : "";
+}
+
+function isCopyTargetConflict(error) {
+  return error?.code === "EEXIST" || error?.code === "ERR_FS_CP_EEXIST";
+}
+
+async function copyWorkspaceTree(canonicalRoot, sourcePath, targetPath) {
+  const metadata = await fs.lstat(sourcePath).catch((error) => {
+    throw new Error(`Unable to inspect copy source: ${error.message}`);
+  });
+  if (metadata.isSymbolicLink()) {
+    throw new Error("Symbolic links cannot be copied.");
+  }
+  await assertWorkspaceCopySourcePath(canonicalRoot, sourcePath);
+
+  if (metadata.isFile()) {
+    let targetCreated = false;
+    try {
+      await assertWorkspaceCopyTargetParent(canonicalRoot, targetPath);
+      await fs.copyFile(sourcePath, targetPath, fsConstants.COPYFILE_EXCL);
+      targetCreated = true;
+      await fs.chmod(targetPath, metadata.mode);
+      await fs.utimes(targetPath, metadata.atime, metadata.mtime);
+      await assertWorkspaceCopySourcePath(canonicalRoot, sourcePath);
+      const sourceAfterCopy = await fs.lstat(sourcePath);
+      if (sourceAfterCopy.isSymbolicLink() || !sourceAfterCopy.isFile()) {
+        throw new Error("Copy source changed while it was being copied.");
+      }
+      return;
+    } catch (error) {
+      if (targetCreated) {
+        await removeWorkspaceCopyTarget(canonicalRoot, targetPath, false);
+      }
+      throw error;
+    }
+  }
+
+  if (!metadata.isDirectory()) {
+    throw new Error("Only files and folders can be copied.");
+  }
+
+  let targetCreated = false;
+  try {
+    await assertWorkspaceCopyTargetParent(canonicalRoot, targetPath);
+    // The destination must remain writable while its children are populated.
+    // Restore the source directory's exact mode after the tree is complete.
+    await fs.mkdir(targetPath, { mode: metadata.mode | 0o700 });
+    targetCreated = true;
+    const children = await fs.readdir(sourcePath);
+    for (const childName of children) {
+      await copyWorkspaceTree(
+        canonicalRoot,
+        path.join(sourcePath, childName),
+        path.join(targetPath, childName),
+      );
+    }
+    await fs.chmod(targetPath, metadata.mode);
+    await fs.utimes(targetPath, metadata.atime, metadata.mtime);
+    await assertWorkspaceCopySourcePath(canonicalRoot, sourcePath);
+    const sourceAfterCopy = await fs.lstat(sourcePath);
+    if (sourceAfterCopy.isSymbolicLink() || !sourceAfterCopy.isDirectory()) {
+      throw new Error("Copy source changed while it was being copied.");
+    }
+  } catch (error) {
+    if (targetCreated) {
+      await removeWorkspaceCopyTarget(canonicalRoot, targetPath, true);
+    }
+    throw error;
+  }
+}
+
+async function assertCopyableWorkspaceTree(canonicalRoot, entryPath) {
+  const metadata = await fs.lstat(entryPath).catch((error) => {
+    throw new Error(`Unable to inspect copy source: ${error.message}`);
+  });
+  if (metadata.isSymbolicLink()) {
+    throw new Error("Symbolic links cannot be copied.");
+  }
+  await assertWorkspaceCopySourcePath(canonicalRoot, entryPath);
+  if (metadata.isFile()) return;
+  if (!metadata.isDirectory()) {
+    throw new Error("Only files and folders can be copied.");
+  }
+
+  const children = await fs.readdir(entryPath);
+  for (const childName of children) {
+    await assertCopyableWorkspaceTree(canonicalRoot, path.join(entryPath, childName));
+  }
+}
+
+async function assertWorkspaceCopySourcePath(canonicalRoot, entryPath) {
+  const canonicalEntry = await fs.realpath(entryPath).catch((error) => {
+    throw new Error(`Unable to resolve copy source: ${error.message}`);
+  });
+  if (!isSameOrInsidePath(canonicalRoot, canonicalEntry)) {
+    throw new Error("Copy source resolves outside the selected workspace.");
+  }
+}
+
+async function assertWorkspaceCopyTargetParent(canonicalRoot, targetPath) {
+  const targetParentPath = path.dirname(targetPath);
+  const parentMetadata = await fs.lstat(targetParentPath).catch((error) => {
+    throw new Error(`Unable to resolve copy target folder: ${error.message}`);
+  });
+  if (parentMetadata.isSymbolicLink()) {
+    throw new Error("Symbolic links cannot be used as a copy target.");
+  }
+  const canonicalParent = await fs.realpath(targetParentPath).catch((error) => {
+    throw new Error(`Unable to resolve copy target folder: ${error.message}`);
+  });
+  if (!isSameOrInsidePath(canonicalRoot, canonicalParent)) {
+    throw new Error("Copy target resolves outside the selected workspace.");
+  }
+}
+
+async function removeWorkspaceCopyTarget(canonicalRoot, targetPath, recursive) {
+  const metadata = await fs.lstat(targetPath).catch(() => null);
+  if (!metadata || metadata.isSymbolicLink()) return;
+  const canonicalTarget = await fs.realpath(targetPath).catch(() => null);
+  if (!canonicalTarget || !isSameOrInsidePath(canonicalRoot, canonicalTarget)) return;
+  await fs.rm(canonicalTarget, { recursive, force: true }).catch(() => {});
 }
 
 export async function importWorkspaceEntries(rootPath, request) {

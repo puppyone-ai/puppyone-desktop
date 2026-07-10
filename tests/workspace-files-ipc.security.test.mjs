@@ -35,6 +35,7 @@ describe("workspace file IPC authorization", () => {
       ["workspace:create-entry", { rootPath: otherRoot, parentPath: null, name: "new.txt", kind: "file" }],
       ["workspace:rename-entry", { rootPath: otherRoot, path: "secret.txt", nextName: "renamed.txt" }],
       ["workspace:move-entry", { rootPath: otherRoot, fromPath: "secret.txt", toPath: "moved.txt" }],
+      ["workspace:copy-entry", { rootPath: otherRoot, fromPath: "secret.txt", targetFolderPath: null }],
       ["workspace:import-entries", { rootPath: otherRoot, sourcePaths: [path.join(otherRoot, "secret.txt")], targetFolderPath: null }],
       ["workspace:delete-entry", { rootPath: otherRoot, path: "secret.txt" }],
       ["workspace:reveal-entry-in-finder", { rootPath: otherRoot, path: "secret.txt" }],
@@ -115,6 +116,17 @@ describe("workspace file IPC authorization", () => {
       { rootPath: root, path: "linked.txt" },
     )).rejects.toThrow(/symbolic links/i);
     expect(shell.showItemInFolder).not.toHaveBeenCalled();
+  });
+
+  it("copies only inside the sender-authorized workspace", async () => {
+    const { handlers } = createHarness(() => root);
+    await writeFile(path.join(root, "source.txt"), "inside");
+
+    await expect(handlers.get("workspace:copy-entry")(
+      { sender: { id: 101 } },
+      { rootPath: root, fromPath: "source.txt", targetFolderPath: null },
+    )).resolves.toEqual({ path: "source copy.txt" });
+    expect(await readFile(path.join(root, "source copy.txt"), "utf8")).toBe("inside");
   });
 
   it("cannot bypass executable confirmation and revalidates after the dialog", async () => {

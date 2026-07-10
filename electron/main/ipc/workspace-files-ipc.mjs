@@ -1,5 +1,6 @@
 import path from "node:path";
 import {
+  copyWorkspaceEntry,
   createWorkspaceEntry,
   convertWorkspaceOfficeDocumentToDocx,
   deleteWorkspaceEntry,
@@ -160,6 +161,13 @@ export function registerWorkspaceFileIpcHandlers({
     const previousPath = request?.fromPath;
     const result = await moveWorkspaceEntry(rootPath, request);
     await absorbWorkspaceEditReviewPath(rootPath, previousPath);
+    await absorbWorkspaceEditReviewPath(rootPath, result.path);
+    return result;
+  });
+
+  ipcMain.handle("workspace:copy-entry", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
+    const result = await copyWorkspaceEntry(rootPath, request);
     await absorbWorkspaceEditReviewPath(rootPath, result.path);
     return result;
   });

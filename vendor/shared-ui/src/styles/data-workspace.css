@@ -361,6 +361,15 @@ body.data-sidebar-resizing .data-preview-accessory {
   opacity: 0.46;
 }
 
+.tree-row.clipboard-cut .tree-row-content {
+  opacity: 0.48;
+}
+
+.tree-row.clipboard-cut:focus-visible .tree-row-content,
+.tree-row.clipboard-cut:hover .tree-row-content {
+  opacity: 0.64;
+}
+
 .tree-row.selected {
   background: var(--tree-row-hover-bg);
   color: var(--po-text);

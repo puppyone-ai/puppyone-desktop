@@ -1,4 +1,10 @@
-import type { CSSProperties, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import type {
+  CSSProperties,
+  DragEvent as ReactDragEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  ReactNode,
+} from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DataNode } from "../core/types";
 import { getMatchedExtension } from "../core/fileFormats";
@@ -10,6 +16,8 @@ export type ExplorerTreeProps = {
   nodes: DataNode[];
   activePath: string | null;
   selectedPaths?: ReadonlySet<string>;
+  cutPaths?: ReadonlySet<string>;
+  currentFolderPath?: string | null;
   loadingPath?: string | null;
   expandedPaths: ReadonlySet<string>;
   loadingPaths?: ReadonlySet<string>;
@@ -25,6 +33,10 @@ export type ExplorerTreeProps = {
   onToggleFolder?: (node: DataNode, expanded: boolean) => void;
   onMoveNode?: (node: DataNode, targetFolderPath: string | null) => void | Promise<void>;
   onMoveNodes?: (nodes: DataNode[], targetFolderPath: string | null) => void | Promise<void>;
+  onCopyNodes?: (nodes: DataNode[]) => void | Promise<void>;
+  onCutNodes?: (nodes: DataNode[]) => void | Promise<void>;
+  onPasteNodes?: (targetFolderPath: string | null) => void | Promise<void>;
+  onDuplicateNodes?: (nodes: DataNode[]) => void | Promise<void>;
   onImportFiles?: (files: File[], targetFolderPath: string | null) => void | Promise<void>;
   onRootContextMenu?: (event: ReactMouseEvent<HTMLDivElement>) => void;
   onNodeContextMenu?: (node: DataNode, event: ReactMouseEvent<HTMLButtonElement>) => void;
@@ -85,6 +97,8 @@ export function ExplorerTree({
   nodes,
   activePath,
   selectedPaths = EMPTY_PATH_SET,
+  cutPaths = EMPTY_PATH_SET,
+  currentFolderPath = null,
   loadingPath = null,
   expandedPaths,
   loadingPaths,
@@ -100,6 +114,10 @@ export function ExplorerTree({
   onToggleFolder,
   onMoveNode,
   onMoveNodes,
+  onCopyNodes,
+  onCutNodes,
+  onPasteNodes,
+  onDuplicateNodes,
   onImportFiles,
   onRootContextMenu,
   onNodeContextMenu,
@@ -250,6 +268,31 @@ export function ExplorerTree({
     moveEnabled,
   ]);
 
+  const handleClipboardShortcut = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!isPrimaryModifierShortcut(event) || isEditableEventTarget(event.target)) return;
+
+    const key = event.key.toLowerCase();
+    const selectedNodes = selectedDragNodes;
+    let command: (() => void | Promise<void>) | null = null;
+
+    if (key === "c" && onCopyNodes && selectedNodes.length > 0) {
+      command = () => onCopyNodes(selectedNodes);
+    } else if (key === "x" && onCutNodes && selectedNodes.length > 0) {
+      command = () => onCutNodes(selectedNodes);
+    } else if (key === "v" && onPasteNodes) {
+      command = () => onPasteNodes(currentFolderPath);
+    } else if (key === "d" && onDuplicateNodes && selectedNodes.length > 0) {
+      command = () => onDuplicateNodes(selectedNodes);
+    }
+
+    if (!command || event.repeat) return;
+    event.preventDefault();
+    event.stopPropagation();
+    void Promise.resolve(command()).catch((error) => {
+      console.error("Unable to run explorer clipboard command:", error);
+    });
+  }, [currentFolderPath, onCopyNodes, onCutNodes, onDuplicateNodes, onPasteNodes, selectedDragNodes]);
+
   return (
     <div
       className={`explorer-tree-shell ${showRoot ? "has-root" : "no-root"} ${scrollable ? "is-scrollable" : ""} ${draggedNodes.length > 0 ? "is-dragging-node" : ""} ${dropTarget && draggedNodes.length === 0 ? "is-importing-files" : ""}`}
@@ -264,6 +307,7 @@ export function ExplorerTree({
       onDragLeave={dropEnabled ? leaveTree : undefined}
       onDrop={dropEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
       onContextMenu={onRootContextMenu}
+      onKeyDown={handleClipboardShortcut}
     >
       {showRoot && (
         <div className="explorer-tree-root-scope">
@@ -327,6 +371,7 @@ export function ExplorerTree({
                 expandedPaths={expandedPaths}
                 activePath={activePath}
                 selectedPaths={selectedPaths}
+                cutPaths={cutPaths}
                 loadingPaths={resolvedLoadingPaths}
                 emptyLabel={emptyLabel}
                 loadingLabel={loadingLabel}
@@ -354,6 +399,7 @@ function TreeNodeRow({
   expandedPaths,
   activePath,
   selectedPaths,
+  cutPaths,
   loadingPaths,
   emptyLabel,
   loadingLabel,
@@ -371,6 +417,7 @@ function TreeNodeRow({
   expandedPaths: ReadonlySet<string>;
   activePath: string | null;
   selectedPaths: ReadonlySet<string>;
+  cutPaths: ReadonlySet<string>;
   loadingPaths: ReadonlySet<string>;
   emptyLabel: string;
   loadingLabel: string;
@@ -387,6 +434,7 @@ function TreeNodeRow({
   const hoverExpandTimer = useRef<number | null>(null);
   const active = activePath === node.path;
   const selected = selectedPaths.has(node.path);
+  const cut = isPathInClipboardCut(node.path, cutPaths);
   const loading = loadingPaths.has(node.path);
   const dragging = dragController.draggedNodes.some((draggedNode) => draggedNode.path === node.path);
   const dropMatchesRow = dragController.dropTarget?.rowPath === node.path;
@@ -441,7 +489,7 @@ function TreeNodeRow({
   return (
     <>
       <button
-        className={`tree-row ${isFolder ? "folder" : "file"} ${selected ? "selected" : ""} ${active ? "active" : ""} ${loading ? "loading" : ""} ${dragging ? "dragging" : ""} ${dropOver ? "drop-target" : ""} ${dropParentOver ? "drop-parent-target" : ""} ${dropInvalid ? "drop-invalid" : ""} ${node.status ? `status-${node.status}` : ""}`}
+        className={`tree-row ${isFolder ? "folder" : "file"} ${selected ? "selected" : ""} ${active ? "active" : ""} ${cut ? "clipboard-cut" : ""} ${loading ? "loading" : ""} ${dragging ? "dragging" : ""} ${dropOver ? "drop-target" : ""} ${dropParentOver ? "drop-parent-target" : ""} ${dropInvalid ? "drop-invalid" : ""} ${node.status ? `status-${node.status}` : ""}`}
         type="button"
         draggable={dragController.enabled}
         aria-current={active ? "true" : undefined}
@@ -449,7 +497,7 @@ function TreeNodeRow({
         aria-expanded={isFolder ? isExpanded : undefined}
         aria-busy={loading || undefined}
         aria-grabbed={dragging ? "true" : undefined}
-        aria-label={node.name}
+        aria-label={cut ? `${node.name}, cut` : node.name}
         title={displayName.hidden || showExtensionDisambiguator ? node.name : undefined}
         onDragStart={(event) => dragController.onNodeDragStart(event, node)}
         onDragEnd={dragController.onNodeDragEnd}
@@ -483,6 +531,7 @@ function TreeNodeRow({
         }}
         onContextMenu={onNodeContextMenu ? (event) => {
           event.stopPropagation();
+          if (!selected) onSelectNode(node);
           onNodeContextMenu(node, event);
         } : undefined}
         style={{ "--depth": depth } as CSSProperties}
@@ -545,6 +594,7 @@ function TreeNodeRow({
               expandedPaths={expandedPaths}
               activePath={activePath}
               selectedPaths={selectedPaths}
+              cutPaths={cutPaths}
               loadingPaths={loadingPaths}
               emptyLabel={emptyLabel}
               loadingLabel={loadingLabel}
@@ -845,6 +895,22 @@ function getSelectionIntent(event: ReactMouseEvent<HTMLElement>): ExplorerSelect
     additive: event.metaKey || event.ctrlKey,
     range: event.shiftKey,
   };
+}
+
+function isPrimaryModifierShortcut(event: ReactKeyboardEvent<HTMLElement>): boolean {
+  return (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey;
+}
+
+function isEditableEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || target.matches("input, textarea, select");
+}
+
+function isPathInClipboardCut(path: string, cutPaths: ReadonlySet<string>): boolean {
+  for (const cutPath of cutPaths) {
+    if (path === cutPath || path.startsWith(`${cutPath}/`)) return true;
+  }
+  return false;
 }
 
 function getParentPath(path: string): string | null {
