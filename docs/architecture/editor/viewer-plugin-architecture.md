@@ -1,23 +1,44 @@
-# Local Viewer Pack Architecture
+# Viewer Extension and Dormant Viewer Pack Architecture
 
-**Status:** Stage B0/B1 host implementation is present. Distribution remains
-fail-closed until release engineering adds at least one reviewed production
-public signer to `electron/main/viewer-packs/trusted-signers.mjs`. Stage C
-(third-party marketplace) is not open.
+**Status:** The versioned preset Viewer Contract is active. A Stage B0/B1 local
+Viewer Pack Host implementation is retained as a dormant external adapter. The
+signed default product uses the `preset-viewers-only` profile: no Pack schemes,
+Host, IPC/preload bridge, install CTA, catalog, or signer requirement is
+registered. A future explicitly enabled external-Pack profile remains
+fail-closed without a reviewed production signer. Stage C (third-party
+marketplace) is not open or committed.
 
 ## 1. Decision and scope
 
-Viewer Packs extend local file viewing without growing the base installer with
-every vertical runtime. They are deliberately narrower than a general desktop
-plugin system.
+PuppyOne's production viewer surface is the immutable
+`PRESET_VIEWER_REGISTRY`. Markdown, text/code, CSV, HTML, Office, image, PDF,
+audio, video, and the placeholder are reviewed contributions compiled with the
+application. Adding one requires a versioned contribution plus canonical format
+data, not an App-shell or source-acquisition branch.
+
+Viewer Packs are a reserved adapter for potentially extending local file
+viewing without growing the base installer with every vertical runtime. They
+are deliberately narrower than a general desktop plugin system and are not
+enabled in the default product.
 
 - Built-in editors and functional previews always win.
 - Only a placeholder-grade, explicitly local document is plugin-eligible.
 - Packs render files; they do not add commands, panels, settings, agents, or
   background startup hooks.
 - V1 has no network permission, cloud-file access, or related-file access.
-- The catalog transport is disabled by default. No marketplace backend is
-  required for local installation.
+- The catalog transport remains disabled. No marketplace backend or concrete
+  Pack is part of the current product scope.
+
+```text
+canonical resolveFileFormat()
+          |
+          v
+versioned PRESET_VIEWER_REGISTRY ---> content/resource acquisition ---> render
+          |
+          `..... external Pack adapter (product capability OFF by default)
+                       |
+                       `--> main-owned activation + sandbox, only if enabled
+```
 
 ## 2. Authority model
 
@@ -70,8 +91,10 @@ The authoritative order is:
    actual MIME type.
 5. Prefer the longest matching compound extension (`.tar.gz` over `.gz`), then
    MIME.
-6. Zero matches means unsupported/install CTA; one means plugin; multiple
-   equal-priority matches mean chooser.
+6. Zero matches means the normal unsupported preset fallback. In an explicitly
+   enabled external-Pack profile only, one match means plugin and multiple
+   equal-priority matches mean chooser; its local install CTA may be injected
+   only in that profile.
 
 The main process never accepts `coreViewerCapability` or a contribution object
 from the renderer.
@@ -102,7 +125,8 @@ keys require an unpackaged app plus an explicit test flag. Removing a key from
 the compiled key ring revokes installed packs signed by that key on next app
 start.
 
-`npm run check:viewer-pack-trust` intentionally blocks distributable builds
+`npm run check:viewer-pack-trust` skips the default `preset-viewers-only`
+profile. It intentionally blocks any explicitly enabled external-Pack release
 when the production key ring is empty. Private keys never belong in this
 repository; release CI or an offline signing process owns them.
 
@@ -126,9 +150,11 @@ in existing state after an app update.
 
 ### 4.3 Host-owned installation
 
-The install CTA invokes a main-process file picker. Package bytes never cross
-the app-renderer bridge. Main opens the two selected files with no-follow
-semantics, validates regular-file type and size, and only then allocates.
+When and only when the external-Pack profile is explicitly enabled, the install
+CTA invokes a main-process file picker. Package bytes never cross the
+app-renderer bridge. Main opens the two selected files with no-follow semantics,
+validates regular-file type and size, and only then allocates. The default
+profile never constructs this CTA or exposes its bridge.
 
 Install order:
 
@@ -254,9 +280,9 @@ delete path.
 
 ## 9. Catalog and future marketplace
 
-Stage B does not need a marketplace backend. The desktop already owns a
-disabled catalog interface so Stage C can add a verified transport without
-changing routing or installation authority.
+The current stage does not need a marketplace backend. The dormant Host owns a
+disabled catalog interface so a future, separately approved delivery issue can
+add a verified transport without changing routing or installation authority.
 
 A future service may publish a static signed index and immutable package
 objects through object storage/CDN. It must not return executable catalog
@@ -272,8 +298,11 @@ Only the lightweight host, `jszip`, and SemVer validator ship in the app.
 them at runtime.
 
 `scripts/check-packaged-artifact-budgets.mjs` rejects embedded
-`.puppyplugin` payloads. `scripts/check-viewer-pack-release.mjs` rejects a
-distributable build without a production trust root.
+`.puppyplugin` payloads. `scripts/check-viewer-pack-release.mjs` skips the
+default preset-only profile and rejects an explicitly enabled external-Pack
+release without a production trust root. Packaged enablement comes from signed
+`package.json` capability metadata; unpackaged development may opt in with
+`PUPPYONE_ENABLE_EXTERNAL_VIEWER_PACKS=1`.
 
 ## 11. Verification
 
@@ -289,6 +318,12 @@ distributable build without a production trust root.
 - revision-pinned resource ranges, suffix/invalid ranges, HEAD, and revocation;
 - packaged runtime dependency classification.
 
+`tests/viewerRegistryContract.test.ts` covers the preset contract, source
+shapes, order, fallback, and strict validation.
+`tests/viewerPackFeatureGate.test.mjs` proves default-off product metadata,
+packaged environment fail-closure, preload bridge omission, explicit opt-in,
+and profile-sensitive signer enforcement.
+
 `npm run smoke:viewer-pack` exercises a real hidden Electron window, signed
 fixture install, custom protocols, fixed preload, `WebContentsView`, and Range
 read. The release pipeline must additionally build an unpacked application and
@@ -298,9 +333,10 @@ inspect `app.asar` for production runtime dependencies.
 
 | Stage | Intent | Status |
 | --- | --- | --- |
-| A | Built-in viewers + installer budget | In force |
-| B0 | Local host, registry, broker, sandbox, protocols | Implemented |
-| B1 | Signed first-party local pack path | Implemented; production public key required |
-| B1+ | Explicit verified remote catalog | Not started |
-| C | Third-party marketplace | Not open |
-| Release | App signing/notarization + Viewer Pack trust root | Release engineering gate |
+| Preset | Versioned built-in contribution contract + deterministic registry | Active default product |
+| External adapter | Product capability seam | Reserved; default off |
+| B0 | Local host, registry, broker, sandbox, protocols | Experimental implementation retained; not registered by default |
+| B1 | Signed first-party local pack path | Dormant; explicit profile requires production public key |
+| B1+ | Explicit verified remote catalog | Not started or committed |
+| C | Third-party marketplace | Not open or committed |
+| Release | App signing/notarization + Viewer Pack trust root | Applies only to an explicitly enabled external-Pack profile |

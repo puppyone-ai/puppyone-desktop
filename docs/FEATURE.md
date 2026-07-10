@@ -14,8 +14,8 @@ single product area can evolve without turning this file into a catch-all.
     lifecycle, Git topology source of truth, and branch/ref display rules.
 - [Editor and Viewer Architecture](architecture/editor/README.md)
   - Architecture home for file-format routing, source acquisition, committed
-    preview lifecycle, viewer boundaries, format-specific editors, and the
-    reserved viewer-plugin model.
+    preview lifecycle, the versioned preset Viewer Contract, format-specific
+    editors, and the dormant external Viewer Pack adapter boundary.
 - [Desktop Sidebar View Stack](architecture/desktop-sidebar-view-stack.md)
   - Keep-alive behavior for the Data, Git, Cloud, and Settings sidebar surfaces.
 - [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)

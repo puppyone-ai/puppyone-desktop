@@ -4,6 +4,9 @@
   "version": "0.1.2",
   "type": "module",
   "main": "electron/main.mjs",
+  "puppyoneCapabilities": {
+    "externalViewerPacks": false
+  },
   "scripts": {
     "check:boundaries": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs",
     "check:shared-ui": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs",

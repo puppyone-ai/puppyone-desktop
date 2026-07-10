@@ -40,7 +40,7 @@ name + mimeType
 fileFormats.json ──► resolveFileFormat() ──► FileFormat { defaultViewer, category, … }
       │                                             │
       │                                             ▼
-      │                    viewerRegistry: first EDITOR_VIEWERS entry whose match() passes
+      │                    PRESET_VIEWER_REGISTRY: first contribution whose match() passes
       │                                             │
       │                                             ▼
       │                    viewer.source: "content" | "resource" | "content-and-resource" | "none"
@@ -91,11 +91,18 @@ formats; that distinction is a *viewer capability*, handled in stage 2/3.
 
 ## 3. Stage 2 — the viewer registry
 
-`vendor/shared-ui/src/editor/viewerRegistry.tsx` holds the ordered
-`EDITOR_VIEWERS` list. `resolveEditorViewer(document)` resolves the format
-(stage 1), then returns the **first** viewer whose `match({ document,
-format })` passes — order is load-bearing (e.g. `markdown` must win over
-`text`). If nothing matches, the `document-placeholder` fallback renders
+`vendor/shared-ui/src/editor/viewerRegistry.tsx` owns the immutable
+`PRESET_VIEWER_REGISTRY`. Each entry implements the versioned
+`PresetViewerContribution` contract: stable `id`, core `capability`, source
+requirement, runtime boundary, format-aware `match`, optional normalization /
+editability, and `render(context)`. The registry rejects unknown fields,
+unsupported authority values, duplicate ids, and any fallback that is not a
+metadata-only placeholder.
+
+`resolveEditorViewer(document)` resolves the format (stage 1), then returns the
+**first** contribution whose `match({ document, format, resolvedExtension })`
+passes — order is load-bearing (e.g. `markdown` must win over `text`). If
+nothing matches, the separately owned `document-placeholder` fallback renders
 the `DocumentPreview` card ("Preview unavailable" + name/MIME metadata).
 
 Each viewer declares its `source` requirement, which stage 3 uses to
@@ -108,11 +115,14 @@ decide what to load:
 | `content-and-resource` | Needs both | html artifact |
 | `none` | Renders from metadata alone | placeholder fallback |
 
-The `office-preview` entry matches on `format.defaultViewer ===
-"office-preview"` **or** an independent name/MIME sniff
-(`isOfficeDocument`) covering `docx?`, `xlsx?`/`xlsm`/`xlsb`,
-`pptx?`/`ppsx?`, and the OpenDocument family — so Office files still route
-correctly when only a MIME type is known.
+The contract's `runtime` is `eager` or `lazy`. `lazy` means the contribution
+owns a dynamic-import or worker boundary for heavy format runtimes; it does not
+grant worker, network, filesystem, or Electron authority. Format extensions and
+MIME types never enter the contribution contract: `resolveFileFormat()` remains
+the only routing fact source, including MIME-only Office inputs.
+
+`EDITOR_VIEWERS` remains a deprecated compatibility alias for downstream code.
+New code uses `PRESET_VIEWERS` or `PRESET_VIEWER_REGISTRY`.
 
 ## 4. Stage 3 — the source pipeline
 
@@ -419,8 +429,9 @@ source-code extensions)
   `OfficeViewer`, which is a capability statement, not format detection.
 - The two registry resolvers (shared-ui TS, local-api mjs) stay
   behaviorally identical.
-- `EDITOR_VIEWERS` order is part of the contract; new entries are placed
-  deliberately, and the fallback stays last.
+- `PRESET_VIEWER_REGISTRY` order is part of the contract; new contributions are
+  placed deliberately, ids are unique, and the fallback remains separate and
+  last by construction.
 - A viewer's `source` declaration is honored: `resource` viewers must
   never trigger a text read (binary files through the text path would be
   wasted I/O and a 1 MB cap they shouldn't inherit).
@@ -441,9 +452,9 @@ source-code extensions)
 - Unsupported is a first-class state: a format with no viable preview
   must say so honestly and point at the external-open escape hatch — not
   render a broken approximation.
-- **Plugin-readiness disciplines** (rationale and target architecture in
-  [Viewer Plugin Architecture](viewer-plugin-architecture.md); viewers
-  are written as plugins that happen to ship in the box):
+- **Extension-readiness disciplines** (rationale and external adapter boundary
+  in [Viewer Plugin Architecture](viewer-plugin-architecture.md); built-in
+  viewers are preset contributions, not downloadable packages):
   - Viewers depend only on the `viewerTypes` contract — never on app
     internals.
   - Heavy parsers load via dynamic `import()` only; adding a format must
@@ -451,6 +462,9 @@ source-code extensions)
   - Document-controlled render surfaces (Office HTML, HTML preview) live
     in isolated containers (iframe / shadow root) with a minimal explicit
     bridge.
+  - External Viewer Pack activation is an adapter outside the preset contract.
+    The signed default product does not register that adapter or expose install
+    UI; enabling it never expands the preset contribution authority model.
 
 ---
 
