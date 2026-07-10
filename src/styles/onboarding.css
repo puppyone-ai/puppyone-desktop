@@ -124,20 +124,40 @@
 }
 
 .folder-drop-cloud-paint-paper {
-  stop-color: var(--po-panel-raised);
+  stop-color: color-mix(
+    in oklab,
+    var(--po-info) 26%,
+    color-mix(in oklab, white 6%, var(--po-panel-raised))
+  );
+}
+
+.folder-drop-cloud-paint-haze {
+  stop-color: color-mix(
+    in oklab,
+    var(--po-info) 38%,
+    color-mix(in oklab, var(--po-accent) 16%, var(--po-panel-raised))
+  );
 }
 
 .folder-drop-cloud-paint-mist {
-  stop-color: color-mix(in oklab, var(--po-info) 5%, var(--po-panel-raised));
+  stop-color: color-mix(
+    in oklab,
+    var(--po-info) 50%,
+    color-mix(in oklab, var(--po-accent) 20%, var(--po-panel))
+  );
 }
 
 .folder-drop-cloud-paint-sky {
-  stop-color: color-mix(in oklab, var(--po-info) 10%, var(--po-panel-raised));
+  stop-color: color-mix(
+    in oklab,
+    var(--po-info) 56%,
+    color-mix(in oklab, var(--po-accent) 26%, var(--po-panel))
+  );
 }
 
 .folder-drop-zone.cloud-mode {
-  --onboarding-cloud-pigment: color-mix(in oklab, var(--po-info) 78%, var(--po-accent));
-  color: color-mix(in srgb, var(--onboarding-cloud-pigment) 88%, var(--po-text) 12%);
+  --onboarding-cloud-pigment: color-mix(in oklab, var(--po-info) 72%, var(--po-accent));
+  color: color-mix(in srgb, var(--onboarding-cloud-pigment) 86%, var(--po-text) 14%);
 }
 
 .folder-drop-zone.cloud-mode .folder-drop-fill {
@@ -145,12 +165,12 @@
 }
 
 .folder-drop-zone.cloud-mode .folder-drop-border {
-  stroke: color-mix(in srgb, var(--onboarding-cloud-pigment) 54%, var(--po-panel-raised));
+  stroke: color-mix(in srgb, var(--onboarding-cloud-pigment) 62%, var(--po-panel-raised));
 }
 
 .folder-drop-zone.cloud-mode .folder-drop-shadow {
-  fill: var(--onboarding-cloud-pigment);
-  opacity: 0.065;
+  fill: color-mix(in oklab, var(--onboarding-cloud-pigment) 70%, var(--po-accent));
+  opacity: 0.12;
 }
 
 .folder-drop-body {
@@ -194,11 +214,11 @@
 
 .folder-drop-zone.cloud-mode:hover .folder-drop-border,
 .folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) .folder-drop-border {
-  stroke: color-mix(in srgb, var(--onboarding-cloud-pigment) 72%, var(--po-border));
+  stroke: color-mix(in srgb, var(--onboarding-cloud-pigment) 78%, var(--po-border));
 }
 
 .folder-drop-zone.cloud-mode:hover .folder-drop-shadow {
-  opacity: 0.15;
+  opacity: 0.2;
 }
 
 .folder-drop-zone.dragging,

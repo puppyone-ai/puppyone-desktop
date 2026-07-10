@@ -246,9 +246,10 @@ export function MinimalOnboarding({
                 aria-hidden="true"
               >
                 <defs>
-                  <linearGradient id="onboarding-cloud-project-paint" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <linearGradient id="onboarding-cloud-project-paint" x1="20%" y1="0%" x2="80%" y2="100%">
                     <stop className="folder-drop-cloud-paint-paper" offset="0%" />
-                    <stop className="folder-drop-cloud-paint-mist" offset="48%" />
+                    <stop className="folder-drop-cloud-paint-haze" offset="28%" />
+                    <stop className="folder-drop-cloud-paint-mist" offset="58%" />
                     <stop className="folder-drop-cloud-paint-sky" offset="100%" />
                   </linearGradient>
                 </defs>
