@@ -244,7 +244,7 @@
 .folder-drop-zone strong {
   margin: 0;
   color: currentColor;
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 620;
   line-height: 1.25;
   transition: color 150ms ease-out;
@@ -280,7 +280,7 @@
   color: var(--po-text-subtle);
   cursor: pointer;
   font: inherit;
-  font-size: calc(11.5px * var(--po-text-scale, 1));
+  font-size: 11.5px;
   font-weight: 560;
   line-height: 1;
   white-space: nowrap;
@@ -326,7 +326,7 @@
   justify-items: center;
   gap: 5px;
   color: var(--po-text-subtle);
-  font-size: calc(11.5px * var(--po-text-scale, 1));
+  font-size: 11.5px;
   font-weight: 560;
   line-height: 1.35;
   text-align: center;
@@ -335,7 +335,7 @@
 
 .onboarding-operation-status > span:last-child {
   color: var(--po-text-disabled);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 520;
 }
 
@@ -351,7 +351,7 @@
 
 .onboarding-recent-heading {
   color: var(--po-text-muted);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 560;
   line-height: 1.25;
 }
@@ -490,7 +490,7 @@
 .onboarding-project-row-title {
   display: block;
   color: var(--po-text-muted);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 560;
   line-height: 1.25;
 }
@@ -507,7 +507,7 @@
   max-width: 88px;
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: calc(11.5px * var(--po-text-scale, 1));
+  font-size: 11.5px;
   font-weight: 560;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -534,7 +534,7 @@
 .onboarding-project-row-path span {
   display: block;
   color: var(--po-text-muted);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 560;
   line-height: 1.25;
 }
@@ -542,7 +542,7 @@
 .onboarding-project-row-time {
   justify-self: end;
   color: var(--po-text-subtle);
-  font-size: calc(11.5px * var(--po-text-scale, 1));
+  font-size: 11.5px;
   font-weight: 500;
   line-height: 1.25;
 }
@@ -558,7 +558,7 @@
   gap: 9px;
   -webkit-app-region: no-drag;
   color: var(--po-text-subtle);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 560;
   line-height: 1.25;
 }
@@ -598,7 +598,7 @@
   align-items: center;
   gap: 10px;
   color: var(--po-text-muted);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 680;
   letter-spacing: 0;
 }
@@ -611,7 +611,7 @@
 
 .onboarding-heading > span {
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 650;
 }
 
@@ -620,7 +620,7 @@
   max-width: 430px;
   margin: 0;
   color: var(--po-text);
-  font-size: calc(24px * var(--po-text-scale, 1));
+  font-size: 24px;
   font-weight: 720;
   letter-spacing: 0;
   line-height: 1.15;
@@ -628,7 +628,7 @@
 }
 
 .onboarding-heading.compact h1 {
-  font-size: calc(22px * var(--po-text-scale, 1));
+  font-size: 22px;
   line-height: 1.16;
 }
 
@@ -641,7 +641,7 @@
   max-width: 380px;
   margin: 0;
   color: var(--po-text-subtle);
-  font-size: calc(14px * var(--po-text-scale, 1));
+  font-size: 14px;
   font-weight: 500;
   line-height: 1.55;
 }
@@ -661,13 +661,13 @@
 
 .onboarding-drop-context span {
   color: var(--po-text);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 680;
 }
 
 .onboarding-drop-context small {
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.35;
 }
@@ -684,7 +684,7 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-danger) 6%, transparent);
   color: var(--po-danger);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 520;
   line-height: 1.4;
 }
@@ -704,7 +704,7 @@
   }
 
   .onboarding-heading h1 {
-    font-size: calc(28px * var(--po-text-scale, 1));
+    font-size: 28px;
   }
 }
 
@@ -781,7 +781,7 @@
   height: 100%;
   place-items: center;
   color: var(--po-text-subtle);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
 }
 
 .folder-state.compact {

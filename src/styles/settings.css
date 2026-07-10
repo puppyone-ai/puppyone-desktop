@@ -36,7 +36,7 @@
 
 .desktop-utility-title span {
   color: var(--po-text-subtle);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 650;
   text-transform: uppercase;
 }
@@ -44,7 +44,7 @@
 .desktop-utility-title strong {
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -85,7 +85,7 @@
   height: 32px;
   padding: 0 10px;
   color: var(--po-text-subtle);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
 }
 
 .desktop-utility-empty.danger {
@@ -138,13 +138,13 @@
 
 .desktop-settings-section-header strong {
   color: var(--po-text);
-  font-size: calc(14px * var(--po-text-scale, 1));
+  font-size: 14px;
   font-weight: 720;
 }
 
 .desktop-settings-section-header span {
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -155,7 +155,7 @@
   min-height: 30px;
   border-radius: 6px;
   color: var(--po-text-muted);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
 }
 
 .desktop-settings-row:hover {
@@ -183,7 +183,7 @@
 
 .desktop-settings-row .desktop-settings-label-stack strong {
   color: var(--po-text);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 620;
   line-height: 1.25;
   text-align: left;
@@ -191,7 +191,7 @@
 
 .desktop-settings-row .desktop-settings-label-stack small {
   color: var(--po-text-subtle);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 520;
   line-height: 1.35;
 }
@@ -200,7 +200,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 600;
   text-align: right;
   text-overflow: ellipsis;
@@ -209,7 +209,7 @@
 
 .desktop-settings-code {
   font-family: var(--po-font-mono);
-  font-size: calc(11.5px * var(--po-text-scale, 1)) !important;
+  font-size: 11.5px !important;
 }
 
 .desktop-settings-group {
@@ -220,7 +220,7 @@
 .desktop-settings-group-title {
   padding: 0 2px;
   color: var(--po-text-subtle);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 760;
   text-transform: uppercase;
 }
@@ -244,7 +244,7 @@
   padding: 0 14px;
   border-bottom: 1px solid var(--po-divider);
   color: var(--po-text-muted);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
 }
 
 .desktop-settings-line:last-child,
@@ -282,7 +282,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 650;
   text-align: right;
   text-overflow: ellipsis;
@@ -306,7 +306,7 @@
   padding: 9px 12px;
   border-bottom: 1px solid var(--po-divider);
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -334,7 +334,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -374,7 +374,7 @@
   background: var(--po-input, var(--po-panel-raised));
   color: var(--po-text);
   font: inherit;
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 560;
   outline: none;
 }
@@ -405,13 +405,13 @@
 
 .desktop-settings-default-app-add .desktop-settings-label-stack strong {
   color: var(--po-text);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 650;
 }
 
 .desktop-settings-default-app-add .desktop-settings-label-stack small {
   color: var(--po-text-subtle);
-  font-size: calc(11.5px * var(--po-text-scale, 1));
+  font-size: 11.5px;
   font-weight: 560;
 }
 
@@ -503,18 +503,18 @@
   gap: 10px;
   min-height: 20px;
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
 }
 
 .desktop-files-pattern-editor-toolbar span {
   color: var(--po-text);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 600;
 }
 
 .desktop-files-pattern-editor-toolbar small {
   color: var(--po-text-subtle);
-  font-size: calc(11.5px * var(--po-text-scale, 1));
+  font-size: 11.5px;
   font-weight: 500;
 }
 
@@ -530,7 +530,7 @@
   background: var(--po-input, var(--po-panel-raised));
   color: var(--po-text);
   font-family: var(--po-font-mono);
-  font-size: calc(11.5px * var(--po-text-scale, 1));
+  font-size: 11.5px;
   line-height: 17px;
 }
 
@@ -544,7 +544,7 @@
   justify-content: flex-end;
   gap: 6px;
   color: var(--po-text-subtle);
-  font-size: calc(11.5px * var(--po-text-scale, 1));
+  font-size: 11.5px;
 }
 
 .desktop-settings-muted-row {
@@ -584,7 +584,7 @@
 .desktop-settings-external-app-icon.fallback {
   background: color-mix(in srgb, var(--po-text-muted) 13%, transparent);
   color: var(--po-text);
-  font-size: calc(10px * var(--po-text-scale, 1));
+  font-size: 10px;
   font-weight: 700;
   line-height: 1;
 }
@@ -652,7 +652,7 @@
   min-width: 0;
   overflow: hidden;
   color: inherit;
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   text-align: center;
@@ -678,7 +678,7 @@
   gap: 12px;
   padding: 7px 12px;
   color: var(--po-text-subtle);
-  font-size: calc(11.5px * var(--po-text-scale, 1));
+  font-size: 11.5px;
 }
 
 .desktop-puppyone-config-footer > span {
@@ -710,7 +710,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 680;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -728,13 +728,13 @@
 
 .desktop-settings-remote-setting-meta strong {
   color: var(--po-text);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 700;
 }
 
 .desktop-settings-remote-setting-meta span {
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
 }
 
 .desktop-settings-remote-setting-url {
@@ -751,7 +751,7 @@
   overflow: hidden;
   color: var(--po-text);
   font-family: var(--po-font-mono);
-  font-size: calc(11.5px * var(--po-text-scale, 1));
+  font-size: 11.5px;
   font-weight: 620;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -760,7 +760,7 @@
 .desktop-settings-remote-setting-url small {
   color: var(--po-text-subtle);
   font-family: inherit;
-  font-size: calc(11.5px * var(--po-text-scale, 1));
+  font-size: 11.5px;
   font-weight: 600;
 }
 
@@ -786,7 +786,7 @@
 .desktop-git-cloud-grid span {
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 700;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -798,7 +798,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -829,7 +829,7 @@
 .desktop-settings-panel-header strong {
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -839,7 +839,7 @@
 .desktop-settings-panel-empty {
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -869,7 +869,7 @@
   border-radius: 999px;
   background: var(--po-control);
   color: var(--po-text-subtle);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 750;
   text-transform: none;
 }

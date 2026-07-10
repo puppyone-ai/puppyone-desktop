@@ -33,11 +33,11 @@ Accepted, because they are accessibility or curated choices:
 
 | Item | Shape |
 | --- | --- |
-| Text size | One three-tier control (Small / Default / Large). UI and code text scale together from one root factor. Never two free px inputs. |
-| Dock icon | Curated set of 2-3 official icons only. No custom image upload. macOS only. |
+| Text size | One three-tier control (Small / Default / Large). `Default` is an exact identity state that preserves every hand-tuned component font size, line height, and spacing value. Small/Large may scale semantic typography tokens; never bulk-rewrite existing component CSS or introduce two free px inputs. |
+| Dock icon | Curated set of 2-3 official icons only, presented in the shared content-sized segmented control. No custom image upload. macOS only. |
 | Pointer cursors | Single toggle. Default off (macOS-native arrow cursor). |
 | Third dark preset | A warm dark preset pairing with the light `warm` preset, giving 3 light + 3 dark. |
-| Theme preview cards | Mini app-preview cards for theme mode and preset pickers, rendered from live tokens with CSS (no screenshots). Replaces swatch dots. |
+| Theme previews | Mini app-preview cards for System / Light / Dark mode, rendered from live tokens with CSS (no screenshots). Individual light and dark presets use compact palette swatches inside the same segmented-control pattern as Text size, File icons, and Navigation. |
 | Reduce motion | Zero-UI. Respect system `prefers-reduced-motion` automatically. Not a settings row. |
 | Diff markers | Color vs `+/-` markers toggle for diff surfaces (color-blind accessibility). Lives in the Editor section, not Appearance. |
 
@@ -61,6 +61,35 @@ File icons, Navigation, Header elements, Pointer cursors, Dock icon). It must
 fit in roughly one screen. Do not adopt grouped-card layouts while the list
 stays this small.
 
+Light theme, dark theme, Text size, File icons, Navigation, and Dock icon reuse
+the same segmented-control surface. Buttons are content-sized around their icon
+or palette glyph and label; do not add a fixed group width, equal-width flex
+growth, control-specific background, or control-specific active treatment.
+
+Every ordinary row uses the same single-line muted label treatment. Do not turn
+Pointer cursors or Dock icon into a separate subsection with a bold title and
+visible description. Explanatory copy may remain as a native tooltip and an
+accessible description without changing the page hierarchy.
+
+### Typography Preset Matrix
+
+Text size is a curated token set, not a multiplier. Every value is an integer
+pixel size. Changing text size does not modify line height, padding, gaps, row
+height, or any other spacing token.
+
+| Role | Small | Default | Large |
+| --- | ---: | ---: | ---: |
+| Micro | 9px | 10px | 11px |
+| Caption | 10px | 11px | 12px |
+| Metadata | 11px | 12px | 13px |
+| Sidebar / chrome | 12px | 13px | 14px |
+| UI body | 12px | 13px | 14px |
+| Content body | 13px | 14px | 16px |
+| Code | 12px | 13px | 15px |
+| Title | 15px | 16px | 18px |
+| Page title | 18px | 20px | 22px |
+| Display | 22px | 24px | 28px |
+
 ## Part 2: Implementation Status
 
 All accepted items were implemented on 2026-07-10. Current code boundaries:
@@ -78,14 +107,17 @@ All accepted items were implemented on 2026-07-10. Current code boundaries:
 Implemented:
 
 1. **Text size.** `puppyone.desktop.textSize` has values
-   `small | default | large`. It is applied as a root attribute that scales the
-   `--po-text-size-*` tokens by one factor. Code font size follows the same
-   factor.
+   `small | default | large`. It is applied as a root attribute that selects
+   one explicit integer-valued `--po-text-size-*` token set. `default` preserves
+   the original 13px sidebar / 14px content / 13px code sizes and does not
+   change component spacing. Broader token adoption must be deliberate and
+   reviewed component by component.
 2. **Third dark preset.** A warm dark preset is included in `DARK_THEME_PRESETS` and
    `tokens.css`, mirroring the light `warm` palette direction.
-3. **Theme preview cards.** Mini preview cards (sidebar + panel + accent bar)
-   drawn with CSS from each preset's tokens replace text-only theme-mode
-   buttons and swatch dots.
+3. **Theme previews.** Mini preview cards (sidebar + panel + accent bar) drawn
+   with CSS from live tokens replace the text-only System / Light / Dark mode
+   buttons. Light and dark preset rows use compact three-color palette swatches
+   inside the shared segmented-control treatment.
 4. **Reduce motion.** `src/styles/animations.css` disables animations and
    transition-heavy styles behind `@media (prefers-reduced-motion: reduce)`.
    No setting row.
@@ -106,6 +138,11 @@ Implemented:
   or unbounded numeric value.
 - Do not add an appearance option whose visual result the team has not
   designed and verified.
+- `textSize=default` must remain visually identical to the pre-setting product.
+  Do not bulk-convert hard-coded font sizes, line heights, row heights, padding,
+  or gaps merely to make them respond to the text-size preference.
+- Typography preset values are always whole pixels. Do not derive them with a
+  scale factor or introduce fractional computed sizes such as `15.68px`.
 - New visual variety ships as a complete preset in `preferences.ts` +
   `tokens.css`, keeping light and dark preset counts balanced.
 - Preset counts stay small (3-4 per mode); adding a preset beyond that

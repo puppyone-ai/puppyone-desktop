@@ -1,0 +1,338 @@
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
+import { EditorState } from "@codemirror/state";
+import { describe, expect, it } from "vitest";
+import { addInlineMarkdownDecorations } from "../vendor/shared-ui/src/editor/markdown/decorations/inlineDecorations";
+import { markdownLivePreviewDecorations } from "../vendor/shared-ui/src/editor/markdown/decorations/livePreviewDecorations";
+import {
+  markdownCodeMirrorBaseExtensions,
+  markdownLivePreviewExtension,
+} from "../vendor/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
+import { getMarkdownHtmlBlock } from "../vendor/shared-ui/src/editor/markdown/rendering/htmlBlockModel";
+import { compileInlineHtmlRenderPlan } from "../vendor/shared-ui/src/editor/markdown/rendering/inlineHtmlPolicy";
+import { isAllowedStyleProperty } from "../vendor/shared-ui/src/editor/markdown/rendering/markdownHtmlPolicy";
+import {
+  getMarkdownInlineHtml,
+  type MarkdownInlineHtml,
+} from "../vendor/shared-ui/src/editor/markdown/semantic/inlineHtmlModel";
+import {
+  parseMarkdownHtmlTagToken,
+  scanMarkdownHtmlTagTokens,
+} from "../vendor/shared-ui/src/editor/markdown/semantic/htmlTagTokenizer";
+import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownParserExtensions";
+import { getInlineRevealElement } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownElements";
+import { InlineHtmlLineBreakWidget } from "../vendor/shared-ui/src/editor/markdown/widgets/inlineWidgets";
+
+function createMarkdownState(source: string) {
+  return EditorState.create({
+    doc: source,
+    extensions: [
+      markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
+    ],
+  });
+}
+
+function getCompleteInlineHtml(source: string, tagName = "span"): MarkdownInlineHtml {
+  const element = getMarkdownInlineHtml(createMarkdownState(source)).find((candidate) => (
+    candidate.tagName === tagName && candidate.status === "complete" && candidate.closingMarker !== null
+  ));
+  if (!element) throw new Error(`Expected complete <${tagName}> in ${source}`);
+  return element;
+}
+
+function buildInlineDecorations(source: string, reveal: { from: number; to: number } | null = null) {
+  const state = createMarkdownState(source);
+  const line = state.doc.line(1);
+  const builders = {
+    decorations: [],
+    atomicRanges: [],
+  } satisfies Parameters<typeof addInlineMarkdownDecorations>[3];
+
+  addInlineMarkdownDecorations(
+    state,
+    line.from,
+    line.text,
+    builders,
+    reveal,
+    null,
+    null,
+    "",
+    null,
+  );
+  return builders;
+}
+
+function getInlineHtmlDecorationRanges(state: EditorState) {
+  const ranges: Array<{ from: number; to: number }> = [];
+  state.field(markdownLivePreviewDecorations).decorations.between(
+    0,
+    state.doc.length,
+    (from, to, decoration) => {
+      if (decoration.spec.class === "cm-md-inline-html") ranges.push({ from, to });
+    },
+  );
+  return ranges;
+}
+
+describe("Markdown inline HTML semantic model", () => {
+  it("normalizes a styled span inside a list item", () => {
+    const source = '- <span style="color: #B45309;">四层资产对应的产品截图或示意素材</span>';
+    const element = getCompleteInlineHtml(source);
+    const openingTo = source.indexOf(">") + 1;
+    const closingFrom = source.indexOf("</span>");
+
+    expect(element).toMatchObject({
+      kind: "inlineHtml",
+      from: 2,
+      to: source.length,
+      tagName: "span",
+      openingMarker: { from: 2, to: openingTo },
+      contentRange: { from: openingTo, to: closingFrom },
+      closingMarker: { from: closingFrom, to: source.length },
+      status: "complete",
+    });
+    expect(element.attributes).toMatchObject([
+      { name: "style", value: "color: #B45309;" },
+    ]);
+  });
+
+  it("supports nested inline HTML and Markdown without flattening ranges", () => {
+    const source = '<span style="color: red"><em>This is **important**</em></span>';
+    const state = createMarkdownState(source);
+    const elements = getMarkdownInlineHtml(state);
+
+    expect(elements.filter((element) => element.status === "complete").map((element) => element.tagName)).toEqual([
+      "span",
+      "em",
+    ]);
+    expect(getInlineRevealElement(state, source.indexOf("important") + 2)?.kind).toBe("strong");
+  });
+
+  it("keeps adjacent elements independent", () => {
+    const source = '<span style="color: red">red</span> <span style="color: blue">blue</span>';
+    const elements = getMarkdownInlineHtml(createMarkdownState(source)).filter((element) => element.status === "complete");
+
+    expect(elements.map((element) => ({ tagName: element.tagName, from: element.from, to: element.to }))).toEqual([
+      { tagName: "span", from: 0, to: source.indexOf("</span>") + 7 },
+      { tagName: "span", from: source.indexOf("<span", 1), to: source.length },
+    ]);
+  });
+
+  it("pairs tags across soft line breaks in the same paragraph", () => {
+    const source = "Text <span>one\ntwo</span> end";
+    const element = getCompleteInlineHtml(source);
+
+    expect(element.contentRange).toEqual({
+      from: source.indexOf(">") + 1,
+      to: source.indexOf("</span>"),
+    });
+  });
+
+  it("keeps incomplete and mismatched tags out of reveal state", () => {
+    const incompleteSource = "Text <span>unfinished";
+    const incompleteState = createMarkdownState(incompleteSource);
+    const incomplete = getMarkdownInlineHtml(incompleteState).find((element) => element.tagName === "span");
+
+    expect(incomplete?.status).toBe("incomplete");
+    expect(getInlineRevealElement(incompleteState, incompleteSource.length - 1)).toBeNull();
+
+    const malformed = getMarkdownInlineHtml(createMarkdownState("<span><em>x</span></em>"));
+    expect(malformed.every((element) => element.status !== "complete")).toBe(true);
+  });
+
+  it("tokenizes quoted tag delimiters and unquoted URL slashes safely", () => {
+    const token = parseMarkdownHtmlTagToken('<span title="1 > 0" data-url=https://example.com/a>');
+
+    expect(token).toMatchObject({
+      tagName: "span",
+      closing: false,
+      selfClosing: false,
+      attributes: [
+        { name: "title", value: "1 > 0" },
+        { name: "data-url", value: "https://example.com/a" },
+      ],
+    });
+  });
+
+  it("does not let plain less-than text hide a later closing tag", () => {
+    const tokens = scanMarkdownHtmlTagTokens("<script>if (a < b) run()</script>");
+
+    expect(tokens.map((token) => ({ tagName: token.tagName, closing: token.closing }))).toEqual([
+      { tagName: "script", closing: false },
+      { tagName: "script", closing: true },
+    ]);
+  });
+
+  it("invalidates semantic and decoration caches when background parsing advances", () => {
+    const early = '<span style="color: red">early</span>';
+    const late = '<span style="color: blue">late</span>';
+    const filler = Array.from({ length: 2_500 }, (_, index) => (
+      `- Paragraph ${index}: **context** [reference](note-${index}.md) ${"detail ".repeat(6)}`
+    )).join("\n");
+    const source = `${early}\n${filler}\n${late}`;
+    const initialState = EditorState.create({
+      doc: source,
+      extensions: [
+        ...markdownCodeMirrorBaseExtensions(false),
+        markdownLivePreviewExtension(),
+      ],
+    });
+
+    expect(syntaxTree(initialState).length).toBeLessThan(initialState.doc.length);
+    expect(getMarkdownInlineHtml(initialState).some((element) => element.from === source.indexOf(late))).toBe(false);
+    expect(getInlineHtmlDecorationRanges(initialState)).toHaveLength(1);
+
+    expect(ensureSyntaxTree(initialState, initialState.doc.length, 3_000)).not.toBeNull();
+    const parsedState = initialState.update({}).state;
+
+    expect(parsedState.doc).toBe(initialState.doc);
+    expect(syntaxTree(parsedState).length).toBe(parsedState.doc.length);
+    expect(getMarkdownInlineHtml(parsedState).some((element) => element.from === source.indexOf(late))).toBe(true);
+    expect(getInlineHtmlDecorationRanges(parsedState)).toHaveLength(2);
+  });
+});
+
+describe("Markdown inline HTML policy", () => {
+  it("compiles the presentation-only style subset", () => {
+    const result = compileInlineHtmlRenderPlan(
+      getCompleteInlineHtml('<span style="color: #B45309; font-weight: 700">text</span>'),
+    );
+
+    expect(result).toEqual({
+      supported: true,
+      value: {
+        kind: "mark",
+        tagName: "span",
+        attributes: { style: "color: #B45309; font-weight: 700" },
+      },
+    });
+  });
+
+  it("compiles a bare br into a typed line-break plan", () => {
+    const element = getMarkdownInlineHtml(createMarkdownState("before<br>after"))
+      .find((candidate) => candidate.tagName === "br");
+
+    expect(element).toBeDefined();
+    expect(element && compileInlineHtmlRenderPlan(element)).toEqual({
+      supported: true,
+      value: { kind: "lineBreak" },
+    });
+  });
+
+  it("uses a narrower style capability in inline surfaces than sandboxed blocks", () => {
+    expect(isAllowedStyleProperty("color", "inline")).toBe(true);
+    expect(isAllowedStyleProperty("display", "inline")).toBe(false);
+    expect(isAllowedStyleProperty("display", "block")).toBe(true);
+  });
+
+  it.each([
+    ['<span style="display: none">text</span>', "display"],
+    ['<span style="color: url(https://example.com/x)">text</span>', "color"],
+    ['<span onclick="alert(1)">text</span>', "onclick"],
+    ['before <script>alert(1)</script>', "script"],
+  ])("rejects unsafe or editor-breaking HTML: %s", (source, reason) => {
+    const tagName = source.includes("script") ? "script" : "span";
+    const result = compileInlineHtmlRenderPlan(getCompleteInlineHtml(source, tagName));
+
+    expect(result.supported).toBe(false);
+    if (!result.supported) expect(result.reasons.join(" ")).toContain(reason);
+  });
+});
+
+describe("Markdown inline HTML live decorations", () => {
+  it("marks safe content and atomically hides only the HTML markers", () => {
+    const source = '- <span style="color: #B45309;">orange</span>';
+    const element = getCompleteInlineHtml(source);
+    const builders = buildInlineDecorations(source);
+    const htmlMark = builders.decorations.find((range) => range.value.spec.class === "cm-md-inline-html");
+
+    expect(htmlMark).toMatchObject({
+      from: element.contentRange?.from,
+      to: element.contentRange?.to,
+    });
+    expect(htmlMark?.value.spec).toMatchObject({
+      tagName: "span",
+      attributes: { style: "color: #B45309" },
+    });
+    expect(builders.atomicRanges.map(({ from, to }) => ({ from, to }))).toEqual([
+      element.openingMarker,
+      element.closingMarker,
+    ]);
+  });
+
+  it("renders br as an atomic typed widget and reveals its source on demand", () => {
+    const source = "before<br>after";
+    const from = source.indexOf("<br>");
+    const to = from + "<br>".length;
+    const collapsed = buildInlineDecorations(source);
+    const lineBreak = collapsed.decorations.find((range) => (
+      range.value.spec.widget instanceof InlineHtmlLineBreakWidget
+    ));
+
+    expect(lineBreak).toMatchObject({ from, to });
+    expect(collapsed.atomicRanges).toContain(lineBreak);
+
+    const revealed = buildInlineDecorations(source, { from, to });
+    expect(revealed.decorations.some((range) => (
+      range.value.spec.widget instanceof InlineHtmlLineBreakWidget
+    ))).toBe(false);
+    expect(revealed.decorations.some((range) => (
+      range.from === from &&
+      range.to === to &&
+      range.value.spec.class === "cm-md-source-syntax cm-md-source-syntax-inline-html"
+    ))).toBe(true);
+  });
+
+  it("keeps nested Markdown decorations while rendering the outer HTML mark", () => {
+    const source = '<span style="color: red">This is **important**</span>';
+    const builders = buildInlineDecorations(source);
+    const classes = builders.decorations.map((range) => range.value.spec.class).filter(Boolean);
+
+    expect(classes).toContain("cm-md-inline-html");
+    expect(classes).toContain("cm-md-syntax-strong");
+  });
+
+  it("reveals HTML markers without dropping the safe content style", () => {
+    const source = '<span style="color: red">text</span>';
+    const element = getCompleteInlineHtml(source);
+    const builders = buildInlineDecorations(source, { from: element.from, to: element.to });
+
+    expect(builders.decorations.some((range) => range.value.spec.class === "cm-md-inline-html")).toBe(true);
+    expect(builders.decorations.filter((range) => (
+      String(range.value.spec.class).includes("cm-md-source-syntax-inline-html")
+    ))).toHaveLength(2);
+    expect(builders.atomicRanges).toHaveLength(0);
+  });
+
+  it("leaves unsupported inline HTML source visible", () => {
+    const source = '<span style="display: none">text</span>';
+    const builders = buildInlineDecorations(source);
+
+    expect(builders.decorations).toHaveLength(0);
+    expect(builders.atomicRanges).toHaveLength(0);
+  });
+});
+
+describe("Markdown HTML block classification", () => {
+  it("uses Lezer block context instead of line-start tag guessing", () => {
+    const inlineState = createMarkdownState('<strong style="color: red">text</strong>');
+    expect(getMarkdownHtmlBlock(inlineState, 1)).toBeNull();
+
+    const blockSource = "<div>\ncontent\n</div>";
+    const blockState = createMarkdownState(blockSource);
+    expect(getMarkdownHtmlBlock(blockState, 1)).toMatchObject({
+      from: 0,
+      to: blockSource.length,
+      nextLineNumber: 4,
+      tagName: "div",
+      closed: true,
+    });
+    expect(getMarkdownHtmlBlock(blockState, 2)).toBeNull();
+
+    const scriptBlock = getMarkdownHtmlBlock(
+      createMarkdownState("<script>\nif (a < b) run()\n</script>"),
+      1,
+    );
+    expect(scriptBlock).toMatchObject({ tagName: "script", closed: true });
+  });
+});

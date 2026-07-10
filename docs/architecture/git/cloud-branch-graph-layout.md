@@ -1,5 +1,7 @@
 # Cloud Branch Graph Layout
 
+Architecture home: [Git and Source Control Architecture](README.md).
+
 ## Requirement
 
 The desktop Cloud `Branches` page must render a compact Git history graph that
@@ -12,15 +14,15 @@ compaction.
 
 The graph layout has three layers:
 
-1. `desktop/local-api/workspace.mjs` is the topology source. `readGitHistory`
+1. `local-api/workspace.mjs` is the topology source. `readGitHistory`
    calls stock `git log --graph --topo-order` and returns `graph_prefix` plus
    `graph_continuation_prefixes` alongside commit metadata.
-2. `desktop/src/features/cloud/model.ts` converts those Git graph prefixes into
+2. `src/features/cloud/model.ts` converts those Git graph prefixes into
    `CloudBranchGraphLine` / `CloudBranchGraphSegment` view-model objects. This
    layer may assign product colors, labels, and branch-ref markers, but it must
    not infer commit topology from React state. It also owns ref-only rows for
    branch heads that do not map to a visible commit.
-3. `desktop/src/features/cloud/sections/BranchesSection.tsx` renders the graph
+3. `src/features/cloud/sections/BranchesSection.tsx` renders the graph
    lines and commit rows. It owns SVG drawing only; it must not decide lane
    order, merge routing, or branch lifetime.
 

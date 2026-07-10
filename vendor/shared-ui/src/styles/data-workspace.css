@@ -170,7 +170,7 @@ body.data-sidebar-resizing .data-preview-accessory {
 
 .desktop-explorer-toolbar > span {
   color: var(--po-text-muted);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: var(--po-text-size-sidebar, 13px);
   font-weight: 650;
 }
 
@@ -325,7 +325,7 @@ body.data-sidebar-resizing .data-preview-accessory {
   border-radius: var(--tree-row-radius);
   background: transparent;
   color: var(--po-text-muted);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: var(--po-text-size-sidebar, 13px);
   font-weight: 500;
   line-height: 18px;
   text-align: left;
@@ -556,7 +556,7 @@ body.data-sidebar-resizing .data-preview-accessory {
 .tree-label-extension {
   flex: 0 0 auto;
   color: var(--po-text-subtle);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 650;
   line-height: 1;
 }
@@ -608,7 +608,7 @@ body.data-sidebar-resizing .data-preview-accessory {
   padding-left: calc(var(--tree-row-content-left) + var(--depth, 0) * var(--tree-row-indent) + var(--tree-row-indent));
   box-sizing: border-box;
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 520;
   user-select: none;
 }
@@ -681,7 +681,7 @@ body.data-sidebar-resizing .data-preview-accessory {
   width: 16px;
   height: 16px;
   border-radius: 4px;
-  font-size: calc(10px * var(--po-text-scale, 1));
+  font-size: 10px;
   font-weight: 800;
 }
 
@@ -704,7 +704,7 @@ body.data-sidebar-resizing .data-preview-accessory {
   height: 100%;
   place-items: center;
   color: var(--po-text-subtle);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
 }
 
 .folder-state.compact {
@@ -760,12 +760,12 @@ body.data-sidebar-resizing .data-preview-accessory {
 
 .file-preview-title h2 {
   color: var(--po-text);
-  font-size: calc(14px * var(--po-text-scale, 1));
+  font-size: 14px;
 }
 
 .file-preview-title span {
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
 }
 
 .file-preview-actions {
@@ -793,7 +793,7 @@ body.data-sidebar-resizing .data-preview-accessory {
 
 .empty-preview span {
   color: var(--po-text-subtle);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 500;
   line-height: 18px;
 }

@@ -47,7 +47,7 @@
   overflow: hidden;
   max-width: 100%;
   color: var(--po-text-muted);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -104,12 +104,12 @@
 }
 
 .review-copy strong {
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
 }
 
 .review-copy small {
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
 }
 
 .diff-preview-panel {
@@ -144,7 +144,7 @@
   padding: 0 12px;
   border-bottom: 1px solid var(--po-editor-line);
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 800;
   line-height: 36px;
 }
@@ -167,7 +167,7 @@
   overflow: auto;
   color: var(--po-text);
   font-family: var(--po-font-mono);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   line-height: 1.6;
   white-space: pre-wrap;
 }

@@ -500,9 +500,9 @@ function applyTerminalTheme(terminal: Terminal, element: HTMLElement) {
 }
 
 function readTerminalFontSize(element: HTMLElement) {
-  const value = getComputedStyle(element).getPropertyValue("--po-text-scale").trim();
-  const scale = Number.parseFloat(value);
-  return 13 * (Number.isFinite(scale) ? scale : 1);
+  const value = getComputedStyle(element).getPropertyValue("--po-code-font-size").trim();
+  const fontSize = Number.parseFloat(value);
+  return Number.isInteger(fontSize) ? fontSize : 13;
 }
 
 function cssColor(element: HTMLElement, name: string, fallback: string) {

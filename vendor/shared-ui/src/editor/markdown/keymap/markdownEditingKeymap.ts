@@ -6,7 +6,7 @@ import {
   getBlockMarkerAtVisibleStart,
   getMarkdownElementsInRange,
   getMarkdownVisibleLineStart as getMarkdownVisibleLineStartPosition,
-  type MarkdownElement,
+  isInlineMarkerDeletionKind,
 } from "../syntax/markdownElements";
 import {
   getContinuationPrefix,
@@ -112,7 +112,7 @@ function getCollapsedInlineMarkerDeletion(
   const line = state.doc.lineAt(caret);
   const elements = getMarkdownElementsInRange(state, line.from, line.to);
   for (const element of elements) {
-    if (!isInlineMarkerKind(element.kind)) continue;
+    if (!isInlineMarkerDeletionKind(element.kind)) continue;
     const markerRange = direction === "backward"
       ? element.markerRanges[element.markerRanges.length - 1]
       : element.markerRanges[0];
@@ -121,19 +121,6 @@ function getCollapsedInlineMarkerDeletion(
     if (direction === "forward" && caret === element.from) return markerRange;
   }
   return null;
-}
-
-function isInlineMarkerKind(kind: MarkdownElement["kind"]): boolean {
-  return (
-    kind === "emphasis" ||
-    kind === "escape" ||
-    kind === "image" ||
-    kind === "inlineCode" ||
-    kind === "link" ||
-    kind === "strike" ||
-    kind === "strong" ||
-    kind === "wikiLink"
-  );
 }
 
 function handleMarkdownEnter(view: EditorView): boolean {

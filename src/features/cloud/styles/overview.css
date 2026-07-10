@@ -43,7 +43,7 @@
   max-width: 100%;
   overflow-wrap: anywhere;
   color: var(--po-text);
-  font-size: calc(24px * var(--po-text-scale, 1));
+  font-size: 24px;
   font-weight: 720;
   line-height: 1.14;
 }
@@ -52,7 +52,7 @@
   max-width: 560px;
   margin: 0;
   color: var(--po-text-muted);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -62,7 +62,7 @@
   overflow: hidden;
   color: var(--po-text-subtle);
   font-family: var(--po-font-mono);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 620;
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -143,7 +143,7 @@
 .desktop-cloud-overview-metric-label {
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 680;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -155,7 +155,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(14px * var(--po-text-scale, 1));
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -164,7 +164,7 @@
 
 .desktop-cloud-overview-metric.date strong {
   color: var(--po-text);
-  font-size: calc(15px * var(--po-text-scale, 1));
+  font-size: 15px;
   font-weight: 650;
 }
 
@@ -174,7 +174,7 @@
   max-width: 100%;
   overflow: hidden;
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 560;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -183,7 +183,7 @@
 
 .desktop-cloud-overview-metric.mono strong {
   font-family: var(--po-font-mono);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
 }
 
 .desktop-cloud-overview-metric.ready strong {
@@ -214,7 +214,7 @@
 .desktop-cloud-integrations-heading span {
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 680;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -223,7 +223,7 @@
 
 .desktop-cloud-integrations-heading strong {
   color: var(--po-text);
-  font-size: calc(14px * var(--po-text-scale, 1));
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.25;
 }
@@ -247,7 +247,7 @@
 
 .desktop-cloud-integrations-value strong {
   color: var(--po-text);
-  font-size: calc(14px * var(--po-text-scale, 1));
+  font-size: 14px;
   font-weight: 720;
   line-height: 1.25;
 }
@@ -256,7 +256,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 560;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -274,7 +274,7 @@
   border-radius: 6px;
   background: var(--po-panel);
   color: var(--po-text-muted);
-  font-size: calc(10px * var(--po-text-scale, 1));
+  font-size: 10px;
   font-weight: 720;
 }
 
@@ -313,7 +313,7 @@
 .desktop-cloud-local-map-main span {
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 680;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -327,7 +327,7 @@
   overflow: hidden;
   color: var(--po-text);
   font-family: var(--po-font-mono);
-  font-size: calc(14px * var(--po-text-scale, 1));
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -368,7 +368,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(25px * var(--po-text-scale, 1));
+  font-size: 25px;
   font-weight: 730;
   line-height: 1.16;
   text-overflow: ellipsis;
@@ -387,7 +387,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--po-success) 6%, transparent);
   color: color-mix(in srgb, var(--po-success) 82%, var(--po-text-muted));
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 620;
 }
 
@@ -406,7 +406,7 @@
 
 .desktop-cloud-repo-title > span {
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 650;
 }
 
@@ -414,7 +414,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(24px * var(--po-text-scale, 1));
+  font-size: 24px;
   font-weight: 720;
   line-height: 1.14;
   text-overflow: ellipsis;
@@ -424,7 +424,7 @@
 .desktop-cloud-repo-title p {
   max-width: 620px;
   color: var(--po-text-muted);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -449,7 +449,7 @@
 .desktop-cloud-authority-cell span {
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 620;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -458,7 +458,7 @@
 .desktop-cloud-authority-cell strong {
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 680;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -466,7 +466,7 @@
 
 .desktop-cloud-authority-cell.mono strong {
   font-family: var(--po-font-mono);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
 }
 
 .desktop-cloud-authority-cell.ready strong {
@@ -483,7 +483,7 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-danger) 8%, var(--po-panel));
   color: var(--po-danger);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -524,7 +524,7 @@
 .desktop-cloud-section-card-header span {
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -540,7 +540,7 @@
   border-radius: 999px;
   background: var(--po-control);
   color: var(--po-text-muted);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 650;
   line-height: 1;
   white-space: nowrap;
@@ -568,14 +568,14 @@
 
 .desktop-cloud-project-overview > div:first-child span {
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 600;
 }
 
 .desktop-cloud-project-overview > div:first-child strong {
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(15px * var(--po-text-scale, 1));
+  font-size: 15px;
   font-weight: 650;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -586,7 +586,7 @@
   max-width: 640px;
   margin: 0;
   color: var(--po-text-muted);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -610,7 +610,7 @@
   align-items: center;
   gap: 7px;
   color: var(--po-text-subtle);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 650;
 }
 
@@ -624,7 +624,7 @@
   background: color-mix(in srgb, var(--po-success) 10%, transparent);
   color: var(--po-success);
   font-style: normal;
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   line-height: 1;
 }
 
@@ -640,7 +640,7 @@
 .desktop-cloud-hosted-copy strong {
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(15px * var(--po-text-scale, 1));
+  font-size: 15px;
   font-weight: 650;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -651,7 +651,7 @@
   max-width: 640px;
   margin: 0;
   color: var(--po-text-muted);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   line-height: 1.45;
 }
 

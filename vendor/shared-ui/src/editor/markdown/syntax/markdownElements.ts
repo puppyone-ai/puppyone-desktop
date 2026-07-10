@@ -7,6 +7,10 @@ import { getMarkdownTaskLine } from "../rendering/taskModel";
 import { findMarkdownImageTokens } from "../links/markdownImageModel";
 import { findMarkdownLinkTokens } from "../links/markdownLinkModel";
 import { findWikiLinkTokens } from "../links/wikiLinkModel";
+import {
+  getMarkdownInlineHtmlInRange,
+  type MarkdownInlineHtml,
+} from "../semantic/inlineHtmlModel";
 
 export type MarkdownElementKind =
   | "blockquote"
@@ -16,6 +20,7 @@ export type MarkdownElementKind =
   | "heading"
   | "htmlBlock"
   | "image"
+  | "inlineHtml"
   | "inlineCode"
   | "link"
   | "list"
@@ -26,13 +31,38 @@ export type MarkdownElementKind =
   | "task"
   | "wikiLink";
 
+type MarkdownElementCapabilities = {
+  inlineDecoration: boolean;
+  inlineMarkerDeletion: boolean;
+  inlineReveal: boolean;
+};
+
+const MARKDOWN_ELEMENT_CAPABILITIES = {
+  blockquote: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
+  emphasis: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
+  escape: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: false },
+  fence: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
+  heading: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
+  htmlBlock: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
+  image: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: false },
+  inlineHtml: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
+  inlineCode: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
+  link: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
+  list: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
+  rule: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
+  strike: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
+  strong: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
+  table: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
+  task: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
+  wikiLink: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
+} satisfies Record<MarkdownElementKind, MarkdownElementCapabilities>;
+
 export type MarkdownMarkerRange = {
   from: number;
   to: number;
 };
 
-export type MarkdownElement = {
-  kind: MarkdownElementKind;
+type MarkdownElementBase = {
   from: number;
   to: number;
   markerRanges: MarkdownMarkerRange[];
@@ -42,6 +72,18 @@ export type MarkdownElement = {
   level?: number;
 };
 
+export type MarkdownInlineHtmlElement = MarkdownElementBase & {
+  kind: "inlineHtml";
+  inlineHtml: MarkdownInlineHtml;
+};
+
+export type MarkdownStandardElement = MarkdownElementBase & {
+  kind: Exclude<MarkdownElementKind, "inlineHtml">;
+  inlineHtml?: never;
+};
+
+export type MarkdownElement = MarkdownInlineHtmlElement | MarkdownStandardElement;
+
 type LineSource = {
   from: number;
   to: number;
@@ -49,13 +91,19 @@ type LineSource = {
   text: string;
 };
 
-const markdownElementsCache = new WeakMap<object, MarkdownElement[]>();
+type MarkdownElementsCacheEntry = {
+  tree: ReturnType<typeof syntaxTree>;
+  elements: MarkdownElement[];
+};
+
+const markdownElementsCache = new WeakMap<object, MarkdownElementsCacheEntry>();
 
 export function getMarkdownElements(state: EditorState): MarkdownElement[] {
+  const tree = syntaxTree(state);
   const cached = markdownElementsCache.get(state.doc);
-  if (cached) return cached;
+  if (cached?.tree === tree) return cached.elements;
   const elements = collectMarkdownElements(state, 0, state.doc.length);
-  markdownElementsCache.set(state.doc, elements);
+  markdownElementsCache.set(state.doc, { tree, elements });
   return elements;
 }
 
@@ -132,6 +180,20 @@ function collectMarkdownElements(state: EditorState, from: number, to: number): 
     },
   });
 
+  for (const inlineHtml of getMarkdownInlineHtmlInRange(state, from, to)) {
+    elements.push({
+      kind: "inlineHtml",
+      from: inlineHtml.from,
+      to: inlineHtml.to,
+      markerRanges: [
+        inlineHtml.openingMarker,
+        ...(inlineHtml.closingMarker ? [inlineHtml.closingMarker] : []),
+      ],
+      contentRange: inlineHtml.contentRange ?? undefined,
+      inlineHtml,
+    });
+  }
+
   const fromLine = state.doc.lineAt(from);
   const toLine = state.doc.lineAt(to);
   addExtendedLineElements(state, elements, fromLine.number, toLine.number);
@@ -148,6 +210,7 @@ export function getInlineRevealElement(
   let best: MarkdownElement | null = null;
   for (const element of candidates) {
     if (!isInlineRevealKind(element.kind)) continue;
+    if (element.kind === "inlineHtml" && element.inlineHtml?.status !== "complete") continue;
     if (caret <= element.from || caret >= element.to) continue;
     if (!best || element.to - element.from < best.to - best.from) best = element;
   }
@@ -155,14 +218,15 @@ export function getInlineRevealElement(
 }
 
 export function isInlineRevealKind(kind: MarkdownElementKind): boolean {
-  return (
-    kind === "emphasis" ||
-    kind === "inlineCode" ||
-    kind === "link" ||
-    kind === "strike" ||
-    kind === "strong" ||
-    kind === "wikiLink"
-  );
+  return MARKDOWN_ELEMENT_CAPABILITIES[kind].inlineReveal;
+}
+
+export function isInlineDecorationKind(kind: MarkdownElementKind): boolean {
+  return MARKDOWN_ELEMENT_CAPABILITIES[kind].inlineDecoration;
+}
+
+export function isInlineMarkerDeletionKind(kind: MarkdownElementKind): boolean {
+  return MARKDOWN_ELEMENT_CAPABILITIES[kind].inlineMarkerDeletion;
 }
 
 export function getBlockMarkerAtVisibleStart(state: EditorState, caret: number): MarkdownMarkerRange | null {
@@ -274,7 +338,7 @@ function createBlockquoteMarkerRanges(line: LineSource): MarkdownMarkerRange[] {
 }
 
 function createMarkedInlineElement(
-  kind: MarkdownElementKind,
+  kind: "emphasis" | "image" | "inlineCode" | "strong",
   node: SyntaxNode,
   markerNames: string | readonly string[],
 ): MarkdownElement {

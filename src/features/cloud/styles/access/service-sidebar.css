@@ -135,7 +135,7 @@
 
 .desktop-cloud-service-sidebar .desktop-cloud-access-resource-row .desktop-cloud-access-scope-name {
   flex: 0 1 auto;
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 540;
   line-height: 16px;
 }
@@ -149,7 +149,7 @@
   overflow: hidden;
   color: var(--po-text-subtle);
   font-family: var(--po-font-mono);
-  font-size: calc(10px * var(--po-text-scale, 1));
+  font-size: 10px;
   font-weight: 500;
   line-height: 15px;
   text-overflow: ellipsis;

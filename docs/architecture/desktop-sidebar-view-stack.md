@@ -7,6 +7,10 @@ without destroying the files explorer view.
 For file-tree loading, expansion, subtree animation, and guide-line behavior,
 see [Explorer Tree Lifecycle](explorer-tree-lifecycle.md).
 
+For Git snapshot ownership, sidebar resource semantics, and repository
+freshness, see
+[Git and Source Control Architecture](git/README.md).
+
 ## Problem
 
 The desktop explorer sidebar can display multiple view modes in the same column:

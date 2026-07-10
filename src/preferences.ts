@@ -190,26 +190,78 @@ export const DARK_THEME_PRESETS = [
   swatches: readonly [string, string, string];
 }>;
 
-export const TEXT_SIZE_OPTIONS = [
+export const TEXT_SIZE_PRESETS = [
   {
     value: "small",
     label: "Small",
-    description: "Compact text for information-dense work.",
+    description: "Sidebar 12px, content 13px, code 12px.",
+    sizes: {
+      micro: 9,
+      caption: 10,
+      meta: 11,
+      sidebar: 12,
+      body: 12,
+      bodyLarge: 13,
+      content: 13,
+      code: 12,
+      title: 15,
+      pageTitle: 18,
+      display: 22,
+    },
   },
   {
     value: "default",
     label: "Default",
-    description: "The standard PuppyOne text scale.",
+    description: "Sidebar 13px, content 14px, code 13px.",
+    sizes: {
+      micro: 10,
+      caption: 11,
+      meta: 12,
+      sidebar: 13,
+      body: 13,
+      bodyLarge: 14,
+      content: 14,
+      code: 13,
+      title: 16,
+      pageTitle: 20,
+      display: 24,
+    },
   },
   {
     value: "large",
     label: "Large",
-    description: "Larger interface and code text for easier reading.",
+    description: "Sidebar 14px, content 16px, code 15px.",
+    sizes: {
+      micro: 11,
+      caption: 12,
+      meta: 13,
+      sidebar: 14,
+      body: 14,
+      bodyLarge: 16,
+      content: 16,
+      code: 15,
+      title: 18,
+      pageTitle: 22,
+      display: 28,
+    },
   },
 ] as const satisfies ReadonlyArray<{
   value: TextSize;
   label: string;
   description: string;
+  sizes: {
+    micro: number;
+    caption: number;
+    meta: number;
+    sidebar: number;
+    body: number;
+    bodyLarge: number;
+    content: number;
+    code: number;
+    title: number;
+    pageTitle: number;
+    display: number;
+  };
 }>;
 
 export const DOCK_ICON_OPTIONS = [

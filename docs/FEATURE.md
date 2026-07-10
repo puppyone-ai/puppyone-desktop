@@ -9,8 +9,9 @@ single product area can evolve without turning this file into a catch-all.
 - [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
   - Cloud environment, auth, workspace binding, project data, and route-state
     boundaries.
-- [Cloud Branch Graph Layout](architecture/cloud-branch-graph-layout.md)
-  - Git topology source of truth, branch/ref display rules, and graph examples.
+- [Git and Source Control Architecture](architecture/git/README.md)
+  - Local Source Control sidebar and status ownership, external Git refresh
+    lifecycle, Git topology source of truth, and branch/ref display rules.
 - [Editor and Viewer Architecture](architecture/editor/README.md)
   - Architecture home for file-format routing, source acquisition, committed
     preview lifecycle, viewer boundaries, format-specific editors, and the

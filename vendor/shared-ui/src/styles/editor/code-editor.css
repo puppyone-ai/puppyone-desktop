@@ -14,7 +14,7 @@
   padding: 0 12px;
   border-bottom: 1px solid var(--po-editor-line);
   color: var(--po-text-subtle);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -24,7 +24,7 @@
   overflow: auto;
   color: var(--po-text);
   font-family: var(--po-font-mono);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   line-height: 1.6;
 }
 
@@ -61,7 +61,7 @@
   background: transparent;
   color: var(--po-text);
   font-family: var(--po-font-mono);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: var(--po-code-font-size, 13px);
   line-height: 20px;
   letter-spacing: 0;
 }
@@ -89,7 +89,7 @@
 .code-codemirror-editor .cm-lineNumbers .cm-gutterElement {
   min-width: 38px;
   padding: 0 10px 0 8px;
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
 }
 
 .code-codemirror-editor .cm-activeLine,

@@ -1,20 +1,11 @@
+import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
-
-const VOID_HTML_BLOCK_TAGS = new Set([
-  "area",
-  "base",
-  "br",
-  "col",
-  "embed",
-  "hr",
-  "img",
-  "input",
-  "link",
-  "meta",
-  "source",
-  "track",
-  "wbr",
-]);
+import type { SyntaxNode } from "@lezer/common";
+import {
+  MARKDOWN_HTML_VOID_TAGS,
+  scanMarkdownHtmlTagTokens,
+  type MarkdownHtmlTagToken,
+} from "../semantic/htmlTagTokenizer";
 
 export type MarkdownHtmlBlock = {
   from: number;
@@ -25,141 +16,65 @@ export type MarkdownHtmlBlock = {
   closed: boolean;
 };
 
-type HtmlTagToken = {
-  tagName: string;
-  closing: boolean;
-  selfClosing: boolean;
-};
-
 export function getMarkdownHtmlBlock(state: EditorState, lineNumber: number): MarkdownHtmlBlock | null {
   const doc = state.doc;
   const firstLine = doc.line(lineNumber);
-  const start = getHtmlBlockStart(firstLine.text);
-  if (!start) return null;
+  const blockNode = findHtmlBlockStartingOnLine(state, firstLine.from, firstLine.to);
+  if (!blockNode) return null;
 
-  const sourceLines: string[] = [];
-  let balance = 0;
-  let lastLine = firstLine;
-  let nextLineNumber = lineNumber;
-  let closed = false;
-
-  while (nextLineNumber <= doc.lines) {
-    const line = doc.line(nextLineNumber);
-    sourceLines.push(line.text);
-    lastLine = line;
-
-    // Obsidian-style container HTML can include blank lines; keep scanning until the root tag closes.
-    balance += getTagBalance(line.text, start.tagName);
-    nextLineNumber += 1;
-
-    if (VOID_HTML_BLOCK_TAGS.has(start.tagName) || balance <= 0) {
-      closed = true;
-      break;
-    }
-  }
+  const lastPosition = Math.max(blockNode.from, blockNode.to - 1);
+  const lastLine = doc.lineAt(lastPosition);
+  const from = firstLine.from;
+  const to = lastLine.to;
+  const source = state.sliceDoc(from, to);
+  const tokens = scanMarkdownHtmlTagTokens(source, from);
+  const opening = tokens.find((token) => !token.closing) ?? null;
+  if (!opening) return null;
 
   return {
-    from: firstLine.from,
-    to: lastLine.to,
-    nextLineNumber,
-    source: sourceLines.join("\n"),
-    tagName: start.tagName,
-    closed,
+    from,
+    to,
+    nextLineNumber: lastLine.number + 1,
+    source,
+    tagName: opening.tagName,
+    closed: isRootHtmlTagClosed(opening, tokens),
   };
 }
 
-function getHtmlBlockStart(text: string): { tagName: string } | null {
-  const contentStart = text.search(/\S/);
-  if (contentStart < 0 || text[contentStart] !== "<") return null;
+function findHtmlBlockStartingOnLine(
+  state: EditorState,
+  lineFrom: number,
+  lineTo: number,
+): SyntaxNode | null {
+  let match: SyntaxNode | null = null;
 
-  const token = readHtmlTagToken(text, contentStart);
-  if (!token || token.closing) return null;
-  return { tagName: token.tagName };
+  syntaxTree(state).iterate({
+    from: lineFrom,
+    to: lineTo,
+    enter(nodeRef) {
+      const node = nodeRef.node;
+      if (match || node.name !== "HTMLBlock") return !match;
+      if (node.from < lineFrom || node.from > lineTo) return false;
+      if (state.sliceDoc(lineFrom, node.from).trim() !== "") return false;
+      match = node;
+      return false;
+    },
+  });
+
+  return match;
 }
 
-function getTagBalance(text: string, tagName: string): number {
-  if (VOID_HTML_BLOCK_TAGS.has(tagName)) return 0;
+function isRootHtmlTagClosed(
+  opening: MarkdownHtmlTagToken,
+  tokens: readonly MarkdownHtmlTagToken[],
+): boolean {
+  if (opening.selfClosing || MARKDOWN_HTML_VOID_TAGS.has(opening.tagName)) return true;
 
   let balance = 0;
-  const tokens = scanHtmlTagTokens(text);
   for (const token of tokens) {
-    if (token.tagName !== tagName) continue;
-    if (token.closing) {
-      balance -= 1;
-    } else if (!token.selfClosing) {
-      balance += 1;
-    }
+    if (token.tagName !== opening.tagName) continue;
+    if (token.closing) balance -= 1;
+    else if (!token.selfClosing) balance += 1;
   }
-
-  return balance;
-}
-
-function scanHtmlTagTokens(text: string): HtmlTagToken[] {
-  const tokens: HtmlTagToken[] = [];
-  let cursor = 0;
-
-  while (cursor < text.length) {
-    const tagStart = text.indexOf("<", cursor);
-    if (tagStart === -1) break;
-
-    const token = readHtmlTagToken(text, tagStart);
-    if (!token) {
-      cursor = tagStart + 1;
-      continue;
-    }
-
-    tokens.push(token);
-    cursor = findHtmlTagEnd(text, tagStart) + 1;
-  }
-
-  return tokens;
-}
-
-function readHtmlTagToken(text: string, tagStart: number): HtmlTagToken | null {
-  if (text[tagStart] !== "<") return null;
-  const next = text[tagStart + 1];
-  if (!next || next === "!" || next === "?") return null;
-
-  let cursor = tagStart + 1;
-  const closing = text[cursor] === "/";
-  if (closing) cursor += 1;
-
-  const tagNameMatch = /^[a-z][a-z0-9-]*/i.exec(text.slice(cursor));
-  if (!tagNameMatch) return null;
-
-  const tagName = tagNameMatch[0].toLowerCase();
-  cursor += tagName.length;
-  const afterName = text[cursor];
-  if (afterName && !/[\s/>]/.test(afterName)) return null;
-
-  const tagEnd = findHtmlTagEnd(text, tagStart);
-  if (tagEnd === -1) return null;
-
-  const rawTag = text.slice(tagStart, tagEnd + 1);
-  return {
-    tagName,
-    closing,
-    selfClosing: !closing && (VOID_HTML_BLOCK_TAGS.has(tagName) || /\/\s*>$/.test(rawTag)),
-  };
-}
-
-function findHtmlTagEnd(text: string, tagStart: number): number {
-  let quote: '"' | "'" | null = null;
-
-  for (let index = tagStart + 1; index < text.length; index += 1) {
-    const character = text[index];
-    if (quote) {
-      if (character === quote) quote = null;
-      continue;
-    }
-
-    if (character === '"' || character === "'") {
-      quote = character;
-      continue;
-    }
-
-    if (character === ">") return index;
-  }
-
-  return -1;
+  return balance <= 0;
 }

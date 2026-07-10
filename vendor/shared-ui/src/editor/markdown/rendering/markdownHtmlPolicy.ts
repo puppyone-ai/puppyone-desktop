@@ -67,7 +67,16 @@ const BLOCKED_TAGS = [
   "template",
 ] as const;
 
-const STYLE_PROPERTIES = [
+const INLINE_STYLE_PROPERTIES = [
+  "background-color",
+  "color",
+  "font-style",
+  "font-weight",
+  "text-decoration",
+  "text-decoration-line",
+] as const;
+
+const BLOCK_STYLE_PROPERTIES = [
   "background",
   "background-color",
   "border",
@@ -145,7 +154,8 @@ export const MARKDOWN_HTML_POLICY = {
     ]),
   },
   styles: {
-    properties: new Set<string>(STYLE_PROPERTIES),
+    inlineProperties: new Set<string>(INLINE_STYLE_PROPERTIES),
+    blockProperties: new Set<string>(BLOCK_STYLE_PROPERTIES),
   },
   urls: {
     protocols: new Set(["http:", "https:", "mailto:"]),
@@ -181,8 +191,11 @@ export function isNumericHtmlAttribute(tagName: string, attributeName: string): 
   return MARKDOWN_HTML_POLICY.attributes.numeric.get(tagName)?.has(attributeName) === true;
 }
 
-export function isAllowedStyleProperty(property: string): boolean {
-  return MARKDOWN_HTML_POLICY.styles.properties.has(property);
+export function isAllowedStyleProperty(property: string, mode: HtmlSanitizerMode = "block"): boolean {
+  const properties = mode === "inline"
+    ? MARKDOWN_HTML_POLICY.styles.inlineProperties
+    : MARKDOWN_HTML_POLICY.styles.blockProperties;
+  return properties.has(property);
 }
 
 export function isSafeHref(href: string): boolean {

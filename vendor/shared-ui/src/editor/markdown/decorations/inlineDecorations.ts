@@ -4,10 +4,16 @@ import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../viewerTy
 import { findMarkdownImageTokens } from "../links/markdownImageModel";
 import { findMarkdownLinkTokens, isExternalMarkdownHref } from "../links/markdownLinkModel";
 import { findWikiLinkTokens } from "../links/wikiLinkModel";
+import { compileInlineHtmlRenderPlan } from "../rendering/inlineHtmlPolicy";
 import { isSafeHref } from "../rendering/markdownHtmlPolicy";
 import type { ExpandedImageRange } from "../state/expandedImage";
-import { getMarkdownElementsInRange, type MarkdownElement } from "../syntax/markdownElements";
+import {
+  getMarkdownElementsInRange,
+  isInlineDecorationKind,
+  type MarkdownElement,
+} from "../syntax/markdownElements";
 import { ImagePreviewWidget } from "../widgets/imagePreviewWidget";
+import { InlineHtmlLineBreakWidget } from "../widgets/inlineWidgets";
 import {
   addReplacementDecoration,
   addSourceSyntaxDecoration,
@@ -37,6 +43,14 @@ export function addInlineMarkdownDecorations(
     .sort(compareInlineDecorationPriority);
 
   for (const element of elements) {
+    if (element.kind === "inlineHtml") {
+      // A multi-line inline element intersects every physical line it spans.
+      // Emit its range decorations exactly once, from the line that owns the
+      // opening marker.
+      if (element.from < lineFrom || element.from > lineTo) continue;
+      addInlineHtmlElementDecoration(element, builders, inlineRevealRange);
+      continue;
+    }
     if (!reserveRange(occupied, element.from, element.to)) continue;
 
     switch (element.kind) {
@@ -70,44 +84,73 @@ export function addInlineMarkdownDecorations(
   }
 }
 
-function isInlineDecorationKind(kind: MarkdownElement["kind"]): boolean {
-  return (
-    kind === "emphasis" ||
-    kind === "escape" ||
-    kind === "image" ||
-    kind === "inlineCode" ||
-    kind === "link" ||
-    kind === "strike" ||
-    kind === "strong" ||
-    kind === "wikiLink"
-  );
-}
-
 function compareInlineDecorationPriority(left: MarkdownElement, right: MarkdownElement): number {
   const priority = (element: MarkdownElement): number => {
     switch (element.kind) {
       case "image":
         return 0;
-      case "wikiLink":
+      case "inlineHtml":
         return 1;
-      case "link":
+      case "wikiLink":
         return 2;
-      case "inlineCode":
+      case "link":
         return 3;
-      case "strong":
+      case "inlineCode":
         return 4;
-      case "strike":
+      case "strong":
         return 5;
-      case "emphasis":
+      case "strike":
         return 6;
-      case "escape":
+      case "emphasis":
         return 7;
-      default:
+      case "escape":
         return 8;
+      default:
+        return 9;
     }
   };
 
   return priority(left) - priority(right) || left.from - right.from || right.to - left.to;
+}
+
+function addInlineHtmlElementDecoration(
+  element: MarkdownElement,
+  builders: MarkdownDecorationBuilders,
+  inlineRevealRange: InlineRevealRange | null,
+) {
+  if (element.kind !== "inlineHtml") return;
+  const policy = compileInlineHtmlRenderPlan(element.inlineHtml);
+  if (!policy.supported) return;
+
+  const revealSourceSyntax = isRevealedInlineRange(element.from, element.to, inlineRevealRange);
+  for (const markerRange of element.markerRanges) {
+    addSourceSyntaxDecoration(builders, markerRange.from, markerRange.to, "inline-html", revealSourceSyntax);
+  }
+
+  if (policy.value.kind === "lineBreak") {
+    if (!revealSourceSyntax) {
+      addReplacementDecoration(
+        builders,
+        Decoration.replace({
+          widget: new InlineHtmlLineBreakWidget(),
+          inclusive: false,
+        }),
+        element.from,
+        element.to,
+      );
+    }
+    return;
+  }
+
+  if (!element.contentRange || element.contentRange.from >= element.contentRange.to) return;
+  builders.decorations.push(
+    Decoration.mark({
+      tagName: policy.value.tagName,
+      class: "cm-md-inline-html",
+      attributes: policy.value.attributes,
+      inclusive: false,
+    }).range(element.contentRange.from, element.contentRange.to),
+  );
 }
 
 function addDelimitedInlineElementDecoration(

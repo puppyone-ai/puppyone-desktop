@@ -1,3 +1,4 @@
+import { syntaxTree } from "@codemirror/language";
 import { EditorState, StateField } from "@codemirror/state";
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import {
@@ -31,6 +32,7 @@ export const markdownLivePreviewDecorations = StateField.define<LivePreviewDecor
     const inputComposing = getInputCompositionState(decorations.inputComposing, transaction.effects);
     const composingLineKey = getComposingBlockLineKey(transaction.state);
     const revealSetKey = getLivePreviewRevealSetKey(transaction.state, focused);
+    const syntaxTreeChanged = syntaxTree(transaction.startState) !== syntaxTree(transaction.state);
     if (inputComposing && transaction.docChanged && !transaction.reconfigured) {
       return {
         decorations: decorations.decorations.map(transaction.changes),
@@ -46,6 +48,7 @@ export const markdownLivePreviewDecorations = StateField.define<LivePreviewDecor
       transaction.reconfigured ||
       focused !== decorations.focused ||
       inputComposing !== decorations.inputComposing ||
+      syntaxTreeChanged ||
       composingLineKey !== decorations.composingLineKey ||
       revealSetKey !== decorations.revealSetKey
     ) {

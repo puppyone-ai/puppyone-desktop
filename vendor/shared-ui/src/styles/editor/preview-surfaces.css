@@ -133,7 +133,7 @@
   min-width: 0;
   max-width: 280px;
   overflow: hidden;
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -142,7 +142,7 @@
 
 .app-preview-title span {
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 600;
   line-height: 1;
 }
@@ -275,13 +275,13 @@
 
 .app-preview-state strong {
   color: var(--po-text);
-  font-size: calc(15px * var(--po-text-scale, 1));
+  font-size: 15px;
   line-height: 1.25;
 }
 
 .app-preview-state span {
   max-width: 460px;
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   line-height: 1.45;
 }
 

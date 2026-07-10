@@ -9,6 +9,7 @@ export type MarkdownSourceSyntaxKind =
   | "delimiter"
   | "escape"
   | "heading"
+  | "inline-html"
   | "link"
   | "list"
   | "task"
@@ -36,6 +37,23 @@ export class HiddenMarkdownSyntaxWidget extends WidgetType {
 
   coordsAt(dom: HTMLElement, pos: number, side: number): Rect | null {
     return getInlineWidgetTextCoords(dom, getInlineWidgetEdgeX(dom, pos, side));
+  }
+}
+
+export class InlineHtmlLineBreakWidget extends WidgetType {
+  eq(widget: WidgetType): boolean {
+    return widget instanceof InlineHtmlLineBreakWidget;
+  }
+
+  toDOM(): HTMLElement {
+    const lineBreak = document.createElement("br");
+    lineBreak.className = "cm-md-inline-html-break";
+    lineBreak.setAttribute("aria-hidden", "true");
+    return lineBreak;
+  }
+
+  ignoreEvent() {
+    return true;
   }
 }
 

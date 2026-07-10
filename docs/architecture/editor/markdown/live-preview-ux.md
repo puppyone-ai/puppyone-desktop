@@ -343,9 +343,14 @@ affordances.
 
 ### HTML block
 
-- Rendered through the sandboxed HTML preview, with a per-block
-  source/preview toggle. The caret cannot enter the rendered block; it is
-  atomic like the rule. Editing happens via the block's source toggle.
+- Common non-executable HTML uses the broad-safe preview by default, with a
+  per-block source/preview toggle; harmless formatting does not require a trust
+  prompt.
+- External `https` iframe syntax becomes an isolated web embed whose loading
+  follows workspace privacy policy. Local scripts, `srcdoc`, and executable
+  workspace HTML are not ordinary HTML previews.
+- The caret cannot enter a rendered block; it is atomic like the rule. Editing
+  happens through the block's source toggle.
 
 ### Not yet supported (spec reserved)
 
@@ -376,6 +381,7 @@ ranges are hidden and atomic.
 | `[[target]]` / `[[t\|alias]]` | wiki-link label | resolved/missing/ambiguous styling kept |
 | `![alt](src)` | inline image | atomic; see below |
 | `<https://…>` / bare URL | link text | brackets hidden |
+| common safe inline HTML, including `<span style="color: …">text</span>` | sanitized semantic/styled content | tags reveal per element; blocked capabilities are diagnosed and omitted when structure remains honest, otherwise source stays visible |
 | `\*` escapes | the escaped char | backslash hidden |
 
 Keyboard traversal example for `**bold**`, caret approaching from the right:
@@ -603,8 +609,9 @@ pipeline; not part of the reveal migration). Infrastructure audit as of
       `MarkdownWidgetMeasureController`.
 - [x] Theme variable mapping pattern: `getTrustedHtmlThemeCss` reads
       `--po-*`; Mermaid needs the same reads shaped as `themeVariables`.
-- [x] Sandbox escalation path if ever needed: trusted-iframe + height
-      postMessage infra in `HtmlBlockWidget`.
+- [x] Legacy trusted-iframe and height `postMessage` infrastructure exists in
+      `HtmlBlockWidget`; it is not the adopted active-content boundary and is
+      scheduled for replacement under Architecture §§7 and 12–15.
 
 New work:
 

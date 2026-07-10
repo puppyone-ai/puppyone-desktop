@@ -192,7 +192,7 @@ function copySafeInlineStyles(target: HTMLElement, source: HTMLElement, context:
   for (const property of Array.from(source.style)) {
     const name = property.toLowerCase();
     const value = source.style.getPropertyValue(property);
-    if (!isAllowedStyleProperty(name)) {
+    if (!isAllowedStyleProperty(name, context.mode)) {
       markUnsupported(context, `style "${name}" is not supported`);
       continue;
     }

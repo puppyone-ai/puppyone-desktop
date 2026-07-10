@@ -350,7 +350,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   border-radius: 5px;
   background: #4599df;
   color: var(--po-text-inverse);
-  font-size: calc(10px * var(--po-text-scale, 1));
+  font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -478,12 +478,12 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
 
 .desktop-view-placeholder span {
   color: var(--po-text-disabled);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   text-transform: capitalize;
 }
 
 .desktop-view-placeholder strong {
   display: block;
   color: var(--po-text);
-  font-size: calc(14px * var(--po-text-scale, 1));
+  font-size: 14px;
 }

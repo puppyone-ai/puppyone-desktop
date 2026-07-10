@@ -14,7 +14,7 @@
 
 .document-preview__eyebrow {
   color: var(--po-text-disabled);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.08em;
   line-height: 1.2;
@@ -25,7 +25,7 @@
   max-width: 100%;
   margin: 0;
   color: var(--po-text);
-  font-size: calc(15px * var(--po-text-scale, 1));
+  font-size: 15px;
   font-weight: 720;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -34,7 +34,7 @@
 .document-preview__status {
   margin: 0;
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -42,7 +42,7 @@
   max-width: 100%;
   color: var(--po-text-disabled);
   font-family: var(--po-font-mono);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -82,13 +82,13 @@
 }
 
 .csv-table-editor__title strong {
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 650;
 }
 
 .csv-table-editor__title span {
   color: var(--po-text-muted);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
 }
 
 .csv-table-editor__actions {
@@ -112,7 +112,7 @@
   background: var(--po-control);
   color: var(--po-text-muted);
   font: inherit;
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 650;
   letter-spacing: 0;
 }
@@ -133,7 +133,7 @@
   border-radius: 6px;
   background: var(--po-control);
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -149,7 +149,7 @@
   max-width: 180px;
   overflow: hidden;
   color: var(--po-danger);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -204,7 +204,7 @@
   align-items: center;
   justify-content: center;
   color: var(--po-text-muted);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 650;
 }
 
@@ -226,7 +226,7 @@
   background: transparent;
   color: var(--po-text);
   font: inherit;
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   letter-spacing: 0;
 }
 
@@ -247,7 +247,7 @@
   overflow: hidden;
   padding: 0 30px 0 9px;
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;

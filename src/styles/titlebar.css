@@ -67,7 +67,7 @@
 .desktop-titlebar-context-name {
   min-width: 0;
   overflow: hidden;
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: var(--po-font-size-chrome, 13px);
   font-weight: 600;
   line-height: 18px;
   text-overflow: ellipsis;
@@ -269,7 +269,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text-muted);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: var(--po-font-size-chrome, 13px);
   font-weight: 600;
   line-height: 18px;
   text-overflow: ellipsis;
@@ -337,7 +337,7 @@
 .desktop-titlebar-external-app-icon.fallback {
   background: color-mix(in srgb, var(--po-text-muted) 13%, transparent);
   color: var(--po-text);
-  font-size: calc(9px * var(--po-text-scale, 1));
+  font-size: 9px;
   font-weight: 700;
   line-height: 1;
 }
@@ -464,7 +464,7 @@
 .desktop-titlebar-branch-button span {
   min-width: 0;
   overflow: hidden;
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: var(--po-font-size-chrome, 13px);
   font-weight: 600;
   line-height: 18px;
   text-overflow: ellipsis;
@@ -489,7 +489,7 @@
 .desktop-branch-menu-label {
   padding: 0 7px 4px;
   color: var(--po-text-disabled);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 650;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -508,7 +508,7 @@
   border-radius: 6px;
   background: color-mix(in srgb, var(--po-danger) 9%, transparent);
   color: var(--po-danger);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   line-height: 1.35;
 }
 
@@ -520,7 +520,7 @@
   border-radius: 5px;
   background: transparent;
   color: var(--po-danger);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 650;
 }
 

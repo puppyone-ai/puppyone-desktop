@@ -25,7 +25,7 @@
   max-width: 100%;
   overflow: hidden;
   color: var(--po-text);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -49,7 +49,7 @@
 
 .office-preview__note {
   color: var(--po-text-muted);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
 }
 
 .office-preview__body {
@@ -103,7 +103,7 @@
   min-height: 120px;
   place-items: center;
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
 }
 
 .office-warning-note {
@@ -114,7 +114,7 @@
   border-radius: 6px;
   background: color-mix(in srgb, var(--po-warning) 10%, var(--po-panel));
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -128,7 +128,7 @@
 
 .office-warning-note strong {
   color: var(--po-text);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 650;
 }
 
@@ -147,7 +147,7 @@
   background: var(--po-control);
   color: var(--po-text);
   font: inherit;
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 650;
   letter-spacing: 0;
   cursor: pointer;
@@ -179,7 +179,7 @@
   background: var(--po-panel-raised);
   color: var(--po-text);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--po-shadow) 10%, transparent);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   line-height: 1.65;
 }
 
@@ -193,15 +193,15 @@
 }
 
 .office-document-page h1 {
-  font-size: calc(22px * var(--po-text-scale, 1));
+  font-size: 22px;
 }
 
 .office-document-page h2 {
-  font-size: calc(18px * var(--po-text-scale, 1));
+  font-size: 18px;
 }
 
 .office-document-page h3 {
-  font-size: calc(15px * var(--po-text-scale, 1));
+  font-size: 15px;
 }
 
 .office-document-page p,
@@ -262,7 +262,7 @@
   background: transparent;
   color: var(--po-text-muted);
   font: inherit;
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 650;
   line-height: 18px;
   letter-spacing: 0;
@@ -297,7 +297,7 @@
   border-collapse: separate;
   border-spacing: 0;
   color: var(--po-text);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   table-layout: fixed;
 }
 
@@ -327,7 +327,7 @@
   width: 42px;
   background: var(--po-panel);
   color: var(--po-text-muted);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 650;
   text-align: center;
 }
@@ -394,7 +394,7 @@
   display: grid;
   place-items: center;
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   pointer-events: none;
 }
 
@@ -418,7 +418,7 @@
   border-radius: 5px;
   background: var(--po-control);
   color: var(--po-text-muted);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -429,7 +429,7 @@
 .office-slide-card h2 {
   margin: 0 0 8px;
   color: var(--po-text);
-  font-size: calc(15px * var(--po-text-scale, 1));
+  font-size: 15px;
   font-weight: 650;
   line-height: 1.35;
 }
@@ -438,7 +438,7 @@
 .office-slide-card p {
   margin: 0;
   color: var(--po-text-muted);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   line-height: 1.55;
 }
 
@@ -458,12 +458,12 @@
 
 .office-preview-empty strong {
   color: var(--po-text);
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 650;
 }
 
 .office-preview-empty span {
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   line-height: 1.45;
 }
 

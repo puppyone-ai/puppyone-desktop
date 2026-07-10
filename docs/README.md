@@ -9,7 +9,9 @@ Architecture docs record durable product and frontend decisions. Start with
 directly:
 
 - [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
-- [Cloud Branch Graph Layout](architecture/cloud-branch-graph-layout.md)
+- [Git and Source Control Architecture](architecture/git/README.md)
+  - Local Source Control sidebar, repository status freshness, external Git
+    invalidation, and Cloud branch graph topology.
 - [Editor and Viewer Architecture](architecture/editor/README.md)
   - File format routing, preview lifecycle, viewer boundaries, and
     format-specific editors including Markdown.

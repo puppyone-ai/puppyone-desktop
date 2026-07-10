@@ -5,6 +5,9 @@ the files explorer, Git working tree, Git history, cloud sidebar lists, and
 future sidebar list surfaces. It also records the app-wide scrollbar styling
 rule that the contract depends on.
 
+Git status semantics and Source Control state ownership are documented in
+[Local Source Control Sidebar](git/local-source-control-sidebar.md).
+
 ## Problem
 
 Sidebar lists historically had two failure classes:

@@ -204,7 +204,7 @@ body.desktop-git-sidebar-resizing {
   border-radius: var(--git-inner-radius);
   background: transparent;
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 520;
   outline: none;
 }
@@ -228,7 +228,7 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-git-sidebar-tabs small {
   color: var(--po-text-subtle);
-  font-size: calc(10.5px * var(--po-text-scale, 1));
+  font-size: 10.5px;
   font-weight: 520;
 }
 
@@ -318,7 +318,7 @@ body.desktop-git-sidebar-resizing {
 .desktop-git-backup-error {
   grid-column: 1 / -1;
   color: var(--po-danger);
-  font-size: calc(10.5px * var(--po-text-scale, 1));
+  font-size: 10.5px;
   font-weight: 560;
   line-height: 1.35;
 }
@@ -355,13 +355,13 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-git-remote-prompt > div:first-child > span {
   color: var(--po-text);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 680;
 }
 
 .desktop-git-remote-prompt small {
   color: var(--po-text-subtle);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 540;
 }
 
@@ -377,7 +377,7 @@ body.desktop-git-sidebar-resizing {
   border-radius: var(--git-inner-radius);
   background: var(--po-control);
   color: var(--po-text-muted);
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 650;
 }
 
@@ -542,7 +542,7 @@ body.desktop-git-sidebar-resizing {
   border-radius: var(--git-control-radius);
   background: color-mix(in srgb, var(--po-danger) 8%, transparent);
   color: var(--po-danger);
-  font-size: calc(11.5px * var(--po-text-scale, 1));
+  font-size: 11.5px;
   line-height: 1.35;
 }
 
@@ -699,7 +699,7 @@ body.desktop-git-sidebar-resizing {
 .desktop-git-section-title span {
   min-width: 0;
   overflow: hidden;
-  font-size: calc(12px * var(--po-text-scale, 1));
+  font-size: 12px;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -707,7 +707,7 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-git-section-title small {
   color: var(--po-text-disabled);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 500;
 }
 
@@ -787,7 +787,7 @@ body.desktop-git-sidebar-resizing {
   border: 0;
   background: transparent;
   color: inherit;
-  font-size: calc(13px * var(--po-text-scale, 1));
+  font-size: 13px;
   font-weight: 500;
   text-align: left;
 }
@@ -824,7 +824,7 @@ body.desktop-git-sidebar-resizing {
   min-width: 32px;
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: calc(12.5px * var(--po-text-scale, 1));
+  font-size: 12.5px;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -836,7 +836,7 @@ body.desktop-git-sidebar-resizing {
   justify-self: end;
   padding-right: var(--git-sidebar-content-right);
   color: var(--po-text-subtle);
-  font-size: calc(11px * var(--po-text-scale, 1));
+  font-size: 11px;
   font-weight: 620;
 }
 

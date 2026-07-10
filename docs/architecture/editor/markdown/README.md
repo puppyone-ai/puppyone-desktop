@@ -6,9 +6,18 @@ subsystem.
 ## Decision
 
 PuppyOne uses a Markdown-source-first live-preview architecture. The Markdown
-source held by CodeMirror is the only mutable document model. Syntax trees,
-semantic elements, safe render plans, decorations, widgets, previews, links,
-and indexes are derived views of that source.
+source held by CodeMirror is the only canonical, committed, and persisted
+document model. Syntax trees, semantic elements, safe render plans,
+decorations, widgets, previews, links, and indexes are derived views of that
+source; embedded drafts are editor-scoped, ephemeral interaction state.
+
+The adopted target makes ordinary Markdown use an Obsidian-style broad
+sanitized HTML profile by default. Common non-executable tags, styles,
+structure, and workspace-scoped assets will not require a trust prompt.
+External web embeds and local executable HTML are separate capability paths;
+local filesystem location alone never authorizes scripts or application
+access. Sections 12 and 13 of `architecture.md` distinguish this target from
+the current narrower implementation.
 
 ## Authoritative documents
 
@@ -39,8 +48,11 @@ the other's contract; cross-layer changes must update both when necessary.
 
 ## Document lifecycle
 
-- `architecture.md` is currently a draft. Implementation starts only after its
-  open decisions are accepted.
+- `architecture.md` is the adopted target technical contract. Its Markdown
+  source, parser, and inline HTML foundations are implemented. Compiled render
+  plan convergence and trust hardening are active engineering work; the
+  per-editor embedded host is planned next. Sections 12 and 13 track the current
+  state and migration phases.
 - Part 1 of `live-preview-ux.md` is the durable UX contract.
 - Part 2 of `live-preview-ux.md` records the previous live-preview migration.
   It is retained during this reorganization so directory cleanup does not
