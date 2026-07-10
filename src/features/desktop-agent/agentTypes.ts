@@ -1,6 +1,11 @@
 export type AgentProviderId = "codex";
 
-export type AgentReadinessStatus = "not-installed" | "unsupported-version" | "ready" | "error";
+export type AgentReadinessStatus =
+  | "not-installed"
+  | "installed-not-authenticated"
+  | "unsupported-version"
+  | "ready"
+  | "error";
 
 export type AgentProviderReadiness = {
   provider: AgentProviderId;
@@ -116,12 +121,22 @@ export type AgentSessionSnapshot = {
   lastSequence: number;
 };
 
+export type AgentModelsListRequest = {
+  rootPath?: string | null;
+  refresh?: boolean;
+};
+
+export type AgentAccountReadRequest = {
+  rootPath?: string | null;
+  refresh?: boolean;
+};
+
 export type AgentSessionCreateRequest = {
   rootPath: string;
   model?: string | null;
 };
 
-export type AgentSessionRestoreRequest = {
+export type AgentSessionResumeRequest = {
   rootPath: string;
 };
 
@@ -134,6 +149,12 @@ export type AgentTurnStartRequest = {
   sessionId: string;
   prompt: string;
   model?: string | null;
+};
+
+export type AgentTurnSteerRequest = {
+  sessionId: string;
+  turnId: string;
+  message: string;
 };
 
 export type AgentTurnInterruptRequest = {
@@ -150,7 +171,19 @@ export type AgentApprovalResolution = {
   decision: AgentApprovalDecision;
 };
 
+export type AgentQuestionResolution = {
+  sessionId: string;
+  turnId: string;
+  requestId: string;
+  answer?: string | string[] | null;
+};
+
 export type AgentReplayRequest = {
   sessionId: string;
   afterSequence: number;
+};
+
+export type AgentSessionExitEvent = {
+  sessionId: string;
+  reason: "closed" | "provider-exited";
 };

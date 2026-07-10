@@ -8,16 +8,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const lifecycle = vi.hoisted(() => ({ agentMounts: 0, agentUnmounts: 0, terminalMounts: 0, terminalUnmounts: 0 }));
+const lifecycle = vi.hoisted(() => ({
+  agentMounts: 0,
+  agentUnmounts: 0,
+  terminalMounts: 0,
+  terminalUnmounts: 0,
+  runningChange: null as null | ((running: boolean) => void),
+}));
 
 vi.mock("../src/features/desktop-agent/RightAgentPanel", () => ({
-  RightAgentPanel: () => {
+  RightAgentPanel: React.forwardRef(({ onRunningChange }: { onRunningChange?: (running: boolean) => void }, _ref) => {
     useEffect(() => {
       lifecycle.agentMounts += 1;
+      lifecycle.runningChange = onRunningChange ?? null;
       return () => { lifecycle.agentUnmounts += 1; };
-    }, []);
+    }, [onRunningChange]);
     return React.createElement("div", { "data-testid": "agent" });
-  },
+  }),
 }));
 
 vi.mock("../src/components/RightTerminalPanel", () => ({
@@ -41,6 +48,7 @@ afterEach(() => {
   lifecycle.agentUnmounts = 0;
   lifecycle.terminalMounts = 0;
   lifecycle.terminalUnmounts = 0;
+  lifecycle.runningChange = null;
 });
 
 describe("Chat and Terminal companion switching", () => {
@@ -63,5 +71,26 @@ describe("Chat and Terminal companion switching", () => {
     expect(lifecycle.agentUnmounts).toBe(0);
     expect(lifecycle.terminalUnmounts).toBe(0);
     expect(container.querySelectorAll('[role="tabpanel"]')).toHaveLength(2);
+  });
+
+  it("shows a Chat activity indicator while a turn runs under Terminal", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const props = {
+      workspace: { id: "workspace", name: "Workspace", path: "/workspace" },
+      active: true,
+      terminalResetToken: 0,
+      onSurfaceChange: vi.fn(),
+    };
+    act(() => root?.render(React.createElement(RightCompanionPanel, { ...props, surface: "terminal" })));
+    expect(container.querySelector(".desktop-companion-tab-activity")).toBeNull();
+    act(() => lifecycle.runningChange?.(true));
+    const indicator = container.querySelector(".desktop-companion-tab-activity");
+    expect(indicator).not.toBeNull();
+    expect(indicator?.getAttribute("aria-label")).toBe("Codex turn running");
+    const chatTab = container.querySelector('[role="tab"][aria-selected="false"]')
+      ?? container.querySelectorAll('[role="tab"]')[0];
+    expect(chatTab?.textContent).toContain("Chat");
   });
 });

@@ -1,7 +1,9 @@
 import { ArrowUp, Square } from "lucide-react";
-import { useState, type KeyboardEvent } from "react";
+import type { KeyboardEvent } from "react";
 
 type AgentComposerProps = {
+  draft: string;
+  onDraftChange: (draft: string) => void;
   disabled: boolean;
   running: boolean;
   submitting: boolean;
@@ -10,12 +12,20 @@ type AgentComposerProps = {
   onStop: () => void;
 };
 
-export function AgentComposer({ disabled, running, submitting, placeholder, onSubmit, onStop }: AgentComposerProps) {
-  const [draft, setDraft] = useState("");
+export function AgentComposer({
+  draft,
+  onDraftChange,
+  disabled,
+  running,
+  submitting,
+  placeholder,
+  onSubmit,
+  onStop,
+}: AgentComposerProps) {
   const submit = async () => {
     const prompt = draft.trim();
     if (!prompt || disabled || running || submitting) return;
-    if (await onSubmit(prompt)) setDraft("");
+    if (await onSubmit(prompt)) onDraftChange("");
   };
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
@@ -30,7 +40,7 @@ export function AgentComposer({ disabled, running, submitting, placeholder, onSu
         rows={2}
         aria-label="Message Codex"
         placeholder={placeholder}
-        onChange={(event) => setDraft(event.target.value)}
+        onChange={(event) => onDraftChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
       {running ? (

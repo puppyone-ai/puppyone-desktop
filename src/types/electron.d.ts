@@ -1,15 +1,22 @@
 import type { AiEditRequest, AppPreviewResult, DataNode, FileContent, Workspace } from "@puppyone/shared-ui";
 import type {
+  AgentAccountReadRequest,
+  AgentAccountState,
   AgentApprovalResolution,
   AgentEvent,
+  AgentModel,
+  AgentModelsListRequest,
   AgentProviderInspection,
+  AgentQuestionResolution,
   AgentReplayRequest,
   AgentSessionCloseRequest,
   AgentSessionCreateRequest,
-  AgentSessionRestoreRequest,
+  AgentSessionExitEvent,
+  AgentSessionResumeRequest,
   AgentSessionSnapshot,
   AgentTurnInterruptRequest,
   AgentTurnStartRequest,
+  AgentTurnSteerRequest,
 } from "../features/desktop-agent/agentTypes";
 
 export type GitStatusEntry = {
@@ -752,12 +759,19 @@ declare global {
       onUpdateStateChanged: (
         callback: (state: DesktopUpdateState) => void,
       ) => () => void;
-      discoverAgentProvider: (request?: { refresh?: boolean }) => Promise<AgentProviderInspection>;
+      discoverAgentProviders: (request?: { refresh?: boolean }) => Promise<AgentProviderInspection>;
+      listAgentModels: (request?: AgentModelsListRequest) => Promise<AgentModel[]>;
+      readAgentAccount: (request?: AgentAccountReadRequest) => Promise<AgentAccountState | null>;
       createAgentSession: (request: AgentSessionCreateRequest) => Promise<AgentSessionSnapshot>;
-      restoreAgentSession: (request: AgentSessionRestoreRequest) => Promise<AgentSessionSnapshot | null>;
+      resumeAgentSession: (request: AgentSessionResumeRequest) => Promise<AgentSessionSnapshot | null>;
       replayAgentSession: (request: AgentReplayRequest) => Promise<AgentSessionSnapshot>;
       closeAgentSession: (request: AgentSessionCloseRequest) => Promise<{ sessionId: string; closed: boolean }>;
       startAgentTurn: (request: AgentTurnStartRequest) => Promise<{ sessionId: string; turnId: string }>;
+      steerAgentTurn: (request: AgentTurnSteerRequest) => Promise<{
+        sessionId: string;
+        turnId: string;
+        steered: boolean;
+      }>;
       interruptAgentTurn: (request: AgentTurnInterruptRequest) => Promise<{
         sessionId: string;
         turnId: string;
@@ -768,7 +782,12 @@ declare global {
         requestId: string;
         decision: AgentApprovalResolution["decision"];
       }>;
+      resolveAgentQuestion: (request: AgentQuestionResolution) => Promise<{
+        sessionId: string;
+        requestId: string;
+      }>;
       onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
+      onAgentSessionExit: (callback: (event: AgentSessionExitEvent) => void) => () => void;
       createTerminal: (request: TerminalCreateRequest) => Promise<TerminalCreateResult>;
       writeTerminal: (request: TerminalInputRequest) => void;
       resizeTerminal: (request: TerminalResizeRequest) => void;

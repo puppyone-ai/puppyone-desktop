@@ -20,11 +20,14 @@ type DesktopTitlebarActionsProps = {
   titlebarActionsSettings: TitlebarActionsSettings;
   terminalSidebarOpen: boolean;
   terminalToolEnabled: boolean;
+  rightSidebarSurface: "chat" | "terminal";
   onClearTerminal: () => void;
+  onNewAgentSession: () => void;
   onOpenActiveFileExternal: () => void;
   onOpenActiveFileWithApp: (appPath: string | null) => void;
   onCustomizeExternalAppForActiveFile: () => void;
   onResetTerminal: () => void;
+  onSelectCompanionSurface: (surface: "chat" | "terminal") => void;
   onToggleTerminal: () => void;
   onUpdateNow: () => void;
 };
@@ -40,11 +43,14 @@ export function DesktopTitlebarActions({
   titlebarActionsSettings,
   terminalSidebarOpen,
   terminalToolEnabled,
+  rightSidebarSurface,
   onClearTerminal,
+  onNewAgentSession,
   onOpenActiveFileExternal,
   onOpenActiveFileWithApp,
   onCustomizeExternalAppForActiveFile,
   onResetTerminal,
+  onSelectCompanionSurface,
   onToggleTerminal,
   onUpdateNow,
 }: DesktopTitlebarActionsProps) {
@@ -128,9 +134,12 @@ export function DesktopTitlebarActions({
     terminal: {
       enabled: terminalToolEnabled,
       menuOpen: terminalMenuOpen,
+      surface: rightSidebarSurface,
       onClear: onClearTerminal,
       onCloseMenu: () => setTerminalMenuOpen(false),
+      onNewAgentSession,
       onReset: onResetTerminal,
+      onSelectSurface: onSelectCompanionSurface,
       onToggle: () => {
         setTerminalMenuOpen(false);
         onToggleTerminal();

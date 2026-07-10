@@ -32,10 +32,12 @@ import {
   type TitlebarActionsSettings,
 } from "../../preferences";
 import {
+  AGENT_PREFERRED_MODEL_STORAGE_KEY,
   EXPLORER_WIDTH_STORAGE_KEY,
   RIGHT_SIDEBAR_WIDTH_STORAGE_KEY,
   RIGHT_SIDEBAR_SURFACE_STORAGE_KEY,
   SIDEBAR_COLLAPSED_STORAGE_KEY,
+  readInitialAgentPreferredModel,
   readInitialAiEditAssistEnabled,
   readInitialExperimentalSettings,
   readInitialExplorerWidth,
@@ -81,6 +83,7 @@ export function useDesktopPreferences() {
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(() => readInitialRightSidebarWidth());
   const [rightSidebarSurface, setRightSidebarSurface] = useState(() => readInitialRightSidebarSurface());
+  const [agentPreferredModel, setAgentPreferredModel] = useState<string | null>(() => readInitialAgentPreferredModel());
   const [systemDark, setSystemDark] = useState(() => readSystemDarkMode());
 
   useEffect(() => {
@@ -165,6 +168,11 @@ export function useDesktopPreferences() {
   }, [rightSidebarSurface]);
 
   useEffect(() => {
+    if (agentPreferredModel) window.localStorage.setItem(AGENT_PREFERRED_MODEL_STORAGE_KEY, agentPreferredModel);
+    else window.localStorage.removeItem(AGENT_PREFERRED_MODEL_STORAGE_KEY);
+  }, [agentPreferredModel]);
+
+  useEffect(() => {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
     const sync = () => setSystemDark(query.matches);
     sync();
@@ -197,6 +205,7 @@ export function useDesktopPreferences() {
     rightSidebarToolsSettings,
     rightSidebarWidth,
     rightSidebarSurface,
+    agentPreferredModel,
     sidebarCollapsed,
     sidebarNavigationLayout,
     sidebarNavigationOrientation,
@@ -223,6 +232,7 @@ export function useDesktopPreferences() {
     setRightSidebarToolsSettings,
     setRightSidebarWidth,
     setRightSidebarSurface,
+    setAgentPreferredModel,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setTitlebarActionsSettings,

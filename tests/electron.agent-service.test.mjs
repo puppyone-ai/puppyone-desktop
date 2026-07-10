@@ -104,20 +104,77 @@ describe("Electron AgentService ownership and lifecycle", () => {
     expect(harness.adapters.every((adapter) => adapter.disposed)).toBe(true);
     expect(harness.service.getSessionCount()).toBe(0);
   });
+
+  it("fails a pending approval closed then confirms the interrupt once the provider acknowledges it", async () => {
+    const harness = createServiceHarness();
+    const owner = createSender(10);
+    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    await harness.service.startTurn(owner, { sessionId: snapshot.session.id, prompt: "Run" });
+    const adapter = harness.adapters[0];
+    adapter.emit({
+      type: "approval.requested",
+      providerSessionId: "thread-1",
+      turnId: "turn-1",
+      itemId: "item-1",
+      payload: { requestId: "codex:interrupt", kind: "command", availableDecisions: ["accept", "decline", "cancel"] },
+    });
+    adapter.interruptTurn.mockImplementation(async () => {
+      adapter.emit({
+        type: "turn.interrupted",
+        providerSessionId: "thread-1",
+        turnId: "turn-1",
+        payload: { status: "interrupted" },
+      });
+    });
+
+    await harness.service.interruptTurn(owner, { sessionId: snapshot.session.id, turnId: "turn-1" });
+
+    const replay = harness.service.replay(owner, { sessionId: snapshot.session.id, afterSequence: 0 });
+    expect(replay.events.some((event) => (
+      event.type === "approval.resolved" && event.payload.decision === "cancel" && event.payload.requestId === "codex:interrupt"
+    ))).toBe(true);
+    expect(replay.events.filter((event) => event.type === "turn.interrupted")).toHaveLength(1);
+  });
+
+  it("emits a deterministic turn.interrupted event when the provider never confirms the interrupt", async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = createServiceHarness();
+      const owner = createSender(11);
+      const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+      await harness.service.startTurn(owner, { sessionId: snapshot.session.id, prompt: "Run" });
+
+      await harness.service.interruptTurn(owner, { sessionId: snapshot.session.id, turnId: "turn-1" });
+      // The fake adapter's interruptTurn resolves without ever emitting a
+      // turn.interrupted event itself, mirroring a provider that hangs.
+      await vi.advanceTimersByTimeAsync(2_100);
+
+      const replay = harness.service.replay(owner, { sessionId: snapshot.session.id, afterSequence: 0 });
+      const interrupted = replay.events.filter((event) => event.type === "turn.interrupted");
+      expect(interrupted).toHaveLength(1);
+      expect(interrupted[0].payload.message).toMatch(/did not confirm/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("Agent IPC workspace authorization", () => {
-  it("authorizes create and restore roots before invoking the service", async () => {
+  it("authorizes create and resume roots before invoking the service", async () => {
     const handlers = new Map();
     const agentService = {
-      discoverProvider: vi.fn(),
+      discoverProviders: vi.fn(),
+      listModels: vi.fn(),
+      readAccount: vi.fn(),
       createSession: vi.fn(),
-      restoreSession: vi.fn(),
+      resumeSession: vi.fn(),
       replay: vi.fn(),
       closeSession: vi.fn(),
       startTurn: vi.fn(),
+      steerTurn: vi.fn(),
       interruptTurn: vi.fn(),
       resolveApproval: vi.fn(),
+      resolveQuestion: vi.fn(),
     };
     const authorizeWorkspaceRoot = vi.fn(async (_event, requested) => {
       if (requested !== "/workspace") throw new Error("Requested workspace root does not match");
@@ -133,8 +190,52 @@ describe("Agent IPC workspace authorization", () => {
     expect(agentService.createSession).not.toHaveBeenCalled();
     await handlers.get("agent:session-create")(event, { rootPath: "/workspace" });
     expect(agentService.createSession).toHaveBeenCalledWith(event.sender, { rootPath: "/workspace" }, "/canonical/workspace");
-    await handlers.get("agent:session-restore")(event, { rootPath: "/workspace" });
-    expect(agentService.restoreSession).toHaveBeenCalledWith(event.sender, { rootPath: "/workspace" }, "/canonical/workspace");
+    await handlers.get("agent:session-resume")(event, { rootPath: "/workspace" });
+    expect(agentService.resumeSession).toHaveBeenCalledWith(event.sender, { rootPath: "/workspace" }, "/canonical/workspace");
+  });
+
+  it("registers the full README bridge list, including the fail-closed steer/question stubs", async () => {
+    const handlers = new Map();
+    const agentService = {
+      discoverProviders: vi.fn(),
+      listModels: vi.fn(),
+      readAccount: vi.fn(),
+      createSession: vi.fn(),
+      resumeSession: vi.fn(),
+      replay: vi.fn(),
+      closeSession: vi.fn(),
+      startTurn: vi.fn(),
+      steerTurn: vi.fn(),
+      interruptTurn: vi.fn(),
+      resolveApproval: vi.fn(),
+      resolveQuestion: vi.fn(),
+    };
+    registerAgentIpcHandlers({
+      ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },
+      agentService,
+      authorizeWorkspaceRoot: vi.fn(async () => "/canonical/workspace"),
+    });
+    for (const channel of [
+      "agent:providers-discover",
+      "agent:models-list",
+      "agent:account-read",
+      "agent:session-create",
+      "agent:session-resume",
+      "agent:session-replay",
+      "agent:session-close",
+      "agent:turn-start",
+      "agent:turn-steer",
+      "agent:turn-interrupt",
+      "agent:approval-resolve",
+      "agent:question-resolve",
+    ]) {
+      expect(handlers.has(channel)).toBe(true);
+    }
+    const event = { sender: createSender(8) };
+    await handlers.get("agent:turn-steer")(event, { sessionId: "s", turnId: "t", message: "steer" });
+    expect(agentService.steerTurn).toHaveBeenCalledWith(event.sender, { sessionId: "s", turnId: "t", message: "steer" });
+    await handlers.get("agent:question-resolve")(event, { sessionId: "s", turnId: "t", requestId: "r" });
+    expect(agentService.resolveQuestion).toHaveBeenCalledWith(event.sender, { sessionId: "s", turnId: "t", requestId: "r" });
   });
 });
 

@@ -1,3 +1,4 @@
+import os from "node:os";
 import { randomUUID } from "node:crypto";
 import { CodexAppServerAdapter, normalizeHistoricalThread } from "./adapters/codex-app-server-adapter.mjs";
 import { createAgentEventEnvelope, countTextBytes, isAgentEventEnvelope, redactSecretText } from "./agent-events.mjs";
@@ -5,6 +6,13 @@ import { createAgentEventEnvelope, countTextBytes, isAgentEventEnvelope, redactS
 const MAX_REPLAY_EVENTS = 1_000;
 const MAX_REPLAY_BYTES = 2 * 1024 * 1024;
 const PERSIST_DEBOUNCE_MS = 250;
+const INTERRUPT_FALLBACK_MS = 2_000;
+
+// Codex readiness/inspection outside a live session must never touch the
+// renderer-provided or process working directory; a fixed neutral directory
+// keeps discovery/account/model reads from depending on whatever workspace
+// happens to be active in this process.
+const NEUTRAL_INSPECTION_ROOT = os.tmpdir();
 
 export function createAgentService({
   appVersion,
@@ -16,7 +24,7 @@ export function createAgentService({
   const sessions = new Map();
   let inspectionCache = null;
 
-  async function discoverProvider(_sender, request = {}) {
+  async function discoverProviders(_sender, request = {}) {
     const internalReadiness = await discovery.discover({ refresh: Boolean(request?.refresh) });
     const readiness = publicReadiness(internalReadiness);
     if (readiness.status !== "ready") {
@@ -29,13 +37,13 @@ export function createAgentService({
     }
     const adapter = createAdapter({
       internalReadiness,
-      workspaceRoot: process.cwd(),
+      workspaceRoot: NEUTRAL_INSPECTION_ROOT,
       onEvent: () => {},
       onExit: () => {},
     });
     try {
       const inspection = await adapter.inspect();
-      const value = { readiness, ...inspection };
+      const value = { readiness: readinessWithAccountState(readiness, inspection.account), ...inspection };
       inspectionCache = { createdAt: now, value };
       return value;
     } catch (error) {
@@ -47,6 +55,48 @@ export function createAgentService({
         capabilities: null,
         warnings: [message],
       };
+    } finally {
+      adapter.dispose();
+    }
+  }
+
+  async function listModels(_sender, request = {}, workspaceRoot = null) {
+    const internalReadiness = await discovery.discover({ refresh: false });
+    if (internalReadiness.status !== "ready") return [];
+    const now = Date.now();
+    if (!request?.refresh && inspectionCache && now - inspectionCache.createdAt < 30_000) {
+      return inspectionCache.value.models;
+    }
+    const adapter = createAdapter({
+      internalReadiness,
+      workspaceRoot: workspaceRoot || NEUTRAL_INSPECTION_ROOT,
+      onEvent: () => {},
+      onExit: () => {},
+    });
+    try {
+      const inspection = await adapter.inspect();
+      return inspection.models;
+    } finally {
+      adapter.dispose();
+    }
+  }
+
+  async function readAccount(_sender, request = {}, workspaceRoot = null) {
+    const internalReadiness = await discovery.discover({ refresh: false });
+    if (internalReadiness.status !== "ready") return null;
+    const now = Date.now();
+    if (!request?.refresh && inspectionCache && now - inspectionCache.createdAt < 30_000) {
+      return inspectionCache.value.account;
+    }
+    const adapter = createAdapter({
+      internalReadiness,
+      workspaceRoot: workspaceRoot || NEUTRAL_INSPECTION_ROOT,
+      onEvent: () => {},
+      onExit: () => {},
+    });
+    try {
+      const inspection = await adapter.inspect();
+      return inspection.account;
     } finally {
       adapter.dispose();
     }
@@ -89,7 +139,7 @@ export function createAgentService({
     }
   }
 
-  async function restoreSession(sender, request, workspaceRoot) {
+  async function resumeSession(sender, request, workspaceRoot) {
     requireSenderId(sender);
     requireWorkspaceRoot(workspaceRoot);
     const persisted = await persistence.findLatest(workspaceRoot);
@@ -173,12 +223,39 @@ export function createAgentService({
     }
   }
 
+  async function steerTurn(sender, request) {
+    const session = requireOwnedSession(sender, request?.sessionId);
+    const turnId = normalizeRequiredId(request?.turnId, "Turn id");
+    if (session.activeTurnId !== turnId) throw new Error("That Codex turn is no longer running.");
+    if (!session.capabilities?.steer || typeof session.adapter.steerTurn !== "function") {
+      throw new Error("The active Codex session does not support steering a running turn.");
+    }
+    const message = normalizePrompt(request?.message);
+    await session.adapter.steerTurn({ turnId, message });
+    return { sessionId: session.id, turnId, steered: true };
+  }
+
   async function interruptTurn(sender, request) {
     const session = requireOwnedSession(sender, request?.sessionId);
     const turnId = normalizeRequiredId(request?.turnId, "Turn id");
     if (session.activeTurnId !== turnId) throw new Error("That Codex turn is no longer running.");
-    await session.adapter.interruptTurn({ turnId });
+    failPendingApprovalsClosed(session, "turn-interrupted");
+    scheduleInterruptFallback(session, turnId);
+    try {
+      await session.adapter.interruptTurn({ turnId });
+    } catch (error) {
+      throw new Error(redactSecretText(error instanceof Error ? error.message : String(error)));
+    }
     return { sessionId: session.id, turnId, interruptRequested: true };
+  }
+
+  function resolveQuestion(sender, request) {
+    requireOwnedSession(sender, request?.sessionId);
+    normalizeRequiredId(request?.turnId, "Turn id");
+    normalizeRequiredId(request?.requestId, "Question request id");
+    // Structured questions remain Proposed (capability-gated and unimplemented
+    // by every current adapter); every request fails closed rather than hang.
+    throw new Error("Structured questions are not supported by the active Codex session yet.");
   }
 
   function resolveApproval(sender, request) {
@@ -289,6 +366,7 @@ export function createAgentService({
     if (["turn.completed", "turn.failed", "turn.interrupted"].includes(event.type)) {
       session.activeTurnId = null;
       session.terminalState = event.type.slice("turn.".length);
+      clearInterruptFallback(session);
     }
     if (event.type === "approval.requested") {
       const requestId = event.payload?.requestId;
@@ -301,23 +379,18 @@ export function createAgentService({
       });
     }
     if (event.type === "approval.resolved") {
-      session.pendingApprovals.delete(event.payload?.requestId);
+      const requestId = event.payload?.requestId;
+      // Avoid re-emitting a resolution already surfaced by
+      // failPendingApprovalsClosed (interrupt/close) for the same request.
+      if (!session.pendingApprovals.delete(requestId)) return;
     }
     emit(session, event);
   }
 
   function handleAdapterExit(session, info) {
     if (sessions.get(session.id) !== session || session.closing || info?.expected) return;
-    for (const pending of session.pendingApprovals.values()) {
-      emit(session, {
-        type: "approval.resolved",
-        providerSessionId: session.providerSessionId,
-        turnId: pending.turnId,
-        itemId: pending.itemId,
-        payload: { requestId: pending.requestId, decision: "cancel", reason: "provider-exited" },
-      });
-    }
-    session.pendingApprovals.clear();
+    clearInterruptFallback(session);
+    failPendingApprovalsClosed(session, "provider-exited");
     if (session.activeTurnId) {
       emit(session, {
         type: "turn.failed",
@@ -337,7 +410,55 @@ export function createAgentService({
         recoverable: true,
       },
     });
+    sendSessionExit(session, "provider-exited");
     persistSoon(session);
+  }
+
+  function failPendingApprovalsClosed(session, reason) {
+    if (session.pendingApprovals.size === 0) return;
+    for (const pending of Array.from(session.pendingApprovals.values())) {
+      session.pendingApprovals.delete(pending.requestId);
+      emit(session, {
+        type: "approval.resolved",
+        providerSessionId: session.providerSessionId,
+        turnId: pending.turnId,
+        itemId: pending.itemId,
+        payload: { requestId: pending.requestId, decision: "cancel", reason },
+      });
+    }
+  }
+
+  function scheduleInterruptFallback(session, turnId) {
+    clearInterruptFallback(session);
+    session.interruptFallbackTimer = setTimeout(() => {
+      session.interruptFallbackTimer = null;
+      if (sessions.get(session.id) !== session || session.closing) return;
+      if (session.activeTurnId !== turnId) return;
+      session.activeTurnId = null;
+      session.terminalState = "interrupted";
+      emit(session, {
+        type: "turn.interrupted",
+        providerSessionId: session.providerSessionId,
+        turnId,
+        payload: { status: "interrupted", message: "Codex did not confirm the interrupt in time." },
+      });
+    }, INTERRUPT_FALLBACK_MS);
+    session.interruptFallbackTimer.unref?.();
+  }
+
+  function clearInterruptFallback(session) {
+    if (!session.interruptFallbackTimer) return;
+    clearTimeout(session.interruptFallbackTimer);
+    session.interruptFallbackTimer = null;
+  }
+
+  function sendSessionExit(session, reason) {
+    if (session.sender?.isDestroyed?.()) return;
+    try {
+      session.sender.send("agent:session-exit", { sessionId: session.id, reason });
+    } catch (error) {
+      logger.warn?.("Unable to deliver Desktop Agent session-exit:", redactSecretText(error?.message || String(error)));
+    }
   }
 
   function emit(session, adapterEvent, { deliver = true } = {}) {
@@ -376,6 +497,8 @@ export function createAgentService({
     session.closing = true;
     clearTimeout(session.persistTimer);
     session.persistTimer = null;
+    clearInterruptFallback(session);
+    failPendingApprovalsClosed(session, "session-closed");
     try {
       session.adapter?.dispose();
     } finally {
@@ -389,6 +512,7 @@ export function createAgentService({
         session.closing = true;
         sessions.delete(session.id);
       }
+      sendSessionExit(session, "closed");
       if (removePersistence) await persistence.remove(session.id);
       else if (persist) await persistNow(session);
     }
@@ -462,18 +586,23 @@ export function createAgentService({
       updatedAt: new Date().toISOString(),
       terminalState: "idle",
       persistTimer: null,
+      interruptFallbackTimer: null,
       closing: false,
       lifecycleEventSeen: false,
     };
   }
 
   return {
-    discoverProvider,
+    discoverProviders,
+    listModels,
+    readAccount,
     createSession,
-    restoreSession,
+    resumeSession,
     startTurn,
+    steerTurn,
     interruptTurn,
     resolveApproval,
+    resolveQuestion,
     replay,
     closeSession,
     closeSessionsForWindow,
@@ -528,6 +657,19 @@ function publicReadiness(readiness) {
     message: readiness.message || "",
     ...(readiness.diagnostic ? { diagnostic: redactSecretText(readiness.diagnostic) } : {}),
   };
+}
+
+function readinessWithAccountState(readiness, accountState) {
+  if (readiness.status === "ready" && accountState?.requiresOpenaiAuth && !accountState?.account) {
+    return {
+      ...readiness,
+      status: "installed-not-authenticated",
+      message: readiness.message && readiness.message !== "Codex is ready."
+        ? readiness.message
+        : "Codex is installed but not signed in. Run `codex login` in a terminal, then refresh.",
+    };
+  }
+  return readiness;
 }
 
 function assertReady(readiness) {

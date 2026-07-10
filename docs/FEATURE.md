@@ -43,6 +43,11 @@ single product area can evolve without turning this file into a catch-all.
     character-grid width invariant, CJK `text-spacing-trim` failure mode,
     fit/resize pipeline). Part 2: the remediation to-do list (spacing-trim
     CSS fix, WebGL renderer with fallback, Unicode 11 widths).
+- [Desktop Agent Architecture](architecture/desktop-agent/README.md)
+  - Proposed structured Agent Chat for the right sidebar, a normalized
+    session/turn/item event model, Codex/Claude/Cursor/ACP provider adapters,
+    approval and question flows, persistence, security, delivery phases, and
+    the sibling Chat/Terminal interaction contract.
 
 ## Document Boundary
 

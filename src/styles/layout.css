@@ -306,6 +306,9 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
 
 .desktop-companion-tabs button {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   height: 41px;
   padding: 0 9px;
   border: 0;
@@ -315,6 +318,14 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   font-size: 12px;
   font-weight: 590;
   cursor: pointer;
+}
+
+.desktop-companion-tab-activity {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--po-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-accent) 22%, transparent);
 }
 
 .desktop-companion-tabs button::after {
@@ -389,6 +400,40 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   min-width: 0;
   flex-direction: column;
   gap: 2px;
+}
+
+.desktop-agent-session-header-actions {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.desktop-agent-session-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  min-width: 220px;
+}
+
+.desktop-agent-plan-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.desktop-agent-plan-step {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0.2rem 0;
+}
+
+.desktop-agent-plan-step small {
+  color: var(--po-text-muted);
+  text-transform: lowercase;
 }
 
 .desktop-agent-session-header strong {
