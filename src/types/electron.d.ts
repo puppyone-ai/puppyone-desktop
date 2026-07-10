@@ -1,4 +1,16 @@
 import type { AiEditRequest, AppPreviewResult, DataNode, FileContent, Workspace } from "@puppyone/shared-ui";
+import type {
+  AgentApprovalResolution,
+  AgentEvent,
+  AgentProviderInspection,
+  AgentReplayRequest,
+  AgentSessionCloseRequest,
+  AgentSessionCreateRequest,
+  AgentSessionRestoreRequest,
+  AgentSessionSnapshot,
+  AgentTurnInterruptRequest,
+  AgentTurnStartRequest,
+} from "../features/desktop-agent/agentTypes";
 
 export type GitStatusEntry = {
   path: string;
@@ -707,6 +719,23 @@ declare global {
       onUpdateStateChanged: (
         callback: (state: DesktopUpdateState) => void,
       ) => () => void;
+      discoverAgentProvider: (request?: { refresh?: boolean }) => Promise<AgentProviderInspection>;
+      createAgentSession: (request: AgentSessionCreateRequest) => Promise<AgentSessionSnapshot>;
+      restoreAgentSession: (request: AgentSessionRestoreRequest) => Promise<AgentSessionSnapshot | null>;
+      replayAgentSession: (request: AgentReplayRequest) => Promise<AgentSessionSnapshot>;
+      closeAgentSession: (request: AgentSessionCloseRequest) => Promise<{ sessionId: string; closed: boolean }>;
+      startAgentTurn: (request: AgentTurnStartRequest) => Promise<{ sessionId: string; turnId: string }>;
+      interruptAgentTurn: (request: AgentTurnInterruptRequest) => Promise<{
+        sessionId: string;
+        turnId: string;
+        interruptRequested: boolean;
+      }>;
+      resolveAgentApproval: (request: AgentApprovalResolution) => Promise<{
+        sessionId: string;
+        requestId: string;
+        decision: AgentApprovalResolution["decision"];
+      }>;
+      onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
       createTerminal: (request: TerminalCreateRequest) => Promise<TerminalCreateResult>;
       writeTerminal: (request: TerminalInputRequest) => void;
       resizeTerminal: (request: TerminalResizeRequest) => void;

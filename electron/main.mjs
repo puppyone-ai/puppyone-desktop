@@ -12,11 +12,15 @@ import {
 import { initializeWorkspaceEditReview } from "../local-api/edit-review.mjs";
 import { createUpdateService } from "./update-service.mjs";
 import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
+import { createAgentPersistence } from "./main/agent/agent-persistence.mjs";
+import { createAgentService } from "./main/agent/agent-service.mjs";
+import { createCodexDiscovery } from "./main/agent/provider-discovery.mjs";
 import {
   getCloudApiErrorMessage,
   requestCloudApi,
 } from "./main/cloud-api-client.mjs";
 import { createCloudAuthService } from "./cloud-auth-service.mjs";
+import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
@@ -89,6 +93,12 @@ const authorizeWorkspaceRoot = createSenderWorkspaceAuthorization({
 const terminalService = createTerminalService({
   appVersion: app.getVersion(),
   initializeWorkspaceEditReview,
+});
+const agentPersistence = createAgentPersistence({ app });
+const agentService = createAgentService({
+  appVersion: app.getVersion(),
+  discovery: createCodexDiscovery(),
+  persistence: agentPersistence,
 });
 const workspaceWatchService = createWorkspaceWatchService();
 const workspaceStateStore = createWorkspaceStateStore({
@@ -220,6 +230,7 @@ async function createWindow(options = {}) {
     releaseWindowWorkspaceById(webContentsId, window);
     appPreviewRuntime?.closeSessionsForWindow(webContentsId);
     terminalService.closeSessionsForWindow(webContentsId);
+    void agentService.closeSessionsForWindow(webContentsId);
     workspaceWatchService.stopForWindow(webContentsId);
     windowsById.delete(webContentsId);
     windowStateById.delete(webContentsId);
@@ -422,6 +433,7 @@ app.on("before-quit", () => {
   updateService?.dispose();
   appPreviewRuntime?.closeAll();
   terminalService.closeAll();
+  void agentService.closeAll();
   workspaceWatchService.closeAll();
 });
 
@@ -485,6 +497,11 @@ function registerIpcHandlers() {
     terminalService,
     authorizeWorkspaceRoot,
   });
+  registerAgentIpcHandlers({
+    ipcMain: trustedIpcMain,
+    agentService,
+    authorizeWorkspaceRoot,
+  });
 }
 
 function getUpdateRestartBlockers() {
@@ -494,6 +511,13 @@ function getUpdateRestartBlockers() {
       id: "terminal-sessions",
       label: "Terminal session running",
       detail: "Close the active terminal session before restarting to update.",
+    });
+  }
+  if (agentService.getSessionCount() > 0) {
+    blockers.push({
+      id: "agent-sessions",
+      label: "Agent session running",
+      detail: "Close the active Agent session before restarting to update.",
     });
   }
   return blockers;
@@ -685,6 +709,7 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
     if (options.cleanupPrevious !== false) {
       appPreviewRuntime?.closeSessionsForWindow(webContentsId);
       terminalService.closeSessionsForWindow(webContentsId);
+      void agentService.closeSessionsForWindow(webContentsId);
       workspaceWatchService.stopForWindow(webContentsId);
     }
   }
@@ -741,6 +766,7 @@ async function forgetCurrentWindowWorkspace(sender) {
   const releasedPath = releaseWindowWorkspace(window);
   appPreviewRuntime?.closeSessionsForWindow(window.webContents.id);
   terminalService.closeSessionsForWindow(window.webContents.id);
+  void agentService.closeSessionsForWindow(window.webContents.id);
   workspaceWatchService.stopForWindow(window.webContents.id);
   if (releasedPath) await workspaceStateStore.removeRecentWorkspacePath(releasedPath);
 }
@@ -835,6 +861,7 @@ async function showHomepageForCurrentWindow(sender) {
   releaseWindowWorkspace(window);
   appPreviewRuntime?.closeSessionsForWindow(window.webContents.id);
   terminalService.closeSessionsForWindow(window.webContents.id);
+  void agentService.closeSessionsForWindow(window.webContents.id);
   workspaceWatchService.stopForWindow(window.webContents.id);
 }
 

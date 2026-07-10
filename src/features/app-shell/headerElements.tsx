@@ -123,7 +123,7 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
   },
   {
     id: "terminal",
-    label: "Terminal",
+    label: "Agent & Terminal",
     icon: SquareTerminal,
     linkedRightSidebarToolId: "terminal",
     isAvailable: (context) => context.terminal.enabled,
@@ -137,8 +137,8 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
           <button
             className="desktop-titlebar-action desktop-titlebar-terminal-main"
             type="button"
-            title={terminal.sidebarOpen ? "Hide terminal" : "Show terminal"}
-            aria-label={terminal.sidebarOpen ? "Hide terminal" : "Show terminal"}
+            title={terminal.sidebarOpen ? "Hide workspace companion" : "Show Agent Chat and Terminal"}
+            aria-label={terminal.sidebarOpen ? "Hide workspace companion" : "Show Agent Chat and Terminal"}
             aria-pressed={terminal.sidebarOpen}
             onClick={terminal.onToggle}
           >

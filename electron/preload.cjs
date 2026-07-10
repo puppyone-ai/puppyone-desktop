@@ -130,6 +130,19 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     ipcRenderer.on("updates:state", listener);
     return () => ipcRenderer.removeListener("updates:state", listener);
   },
+  discoverAgentProvider: (request) => ipcRenderer.invoke("agent:provider-discover", request),
+  createAgentSession: (request) => ipcRenderer.invoke("agent:session-create", request),
+  restoreAgentSession: (request) => ipcRenderer.invoke("agent:session-restore", request),
+  replayAgentSession: (request) => ipcRenderer.invoke("agent:session-replay", request),
+  closeAgentSession: (request) => ipcRenderer.invoke("agent:session-close", request),
+  startAgentTurn: (request) => ipcRenderer.invoke("agent:turn-start", request),
+  interruptAgentTurn: (request) => ipcRenderer.invoke("agent:turn-interrupt", request),
+  resolveAgentApproval: (request) => ipcRenderer.invoke("agent:approval-resolve", request),
+  onAgentEvent: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("agent:event", listener);
+    return () => ipcRenderer.removeListener("agent:event", listener);
+  },
   createTerminal: (request) => ipcRenderer.invoke("terminal:create", request),
   writeTerminal: (request) => ipcRenderer.send("terminal:input", request),
   resizeTerminal: (request) => ipcRenderer.send("terminal:resize", request),

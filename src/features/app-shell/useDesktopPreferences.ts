@@ -34,6 +34,7 @@ import {
 import {
   EXPLORER_WIDTH_STORAGE_KEY,
   RIGHT_SIDEBAR_WIDTH_STORAGE_KEY,
+  RIGHT_SIDEBAR_SURFACE_STORAGE_KEY,
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   readInitialAiEditAssistEnabled,
   readInitialExperimentalSettings,
@@ -44,6 +45,7 @@ import {
   readInitialGitDisplayMode,
   readInitialRightSidebarToolsSettings,
   readInitialRightSidebarWidth,
+  readInitialRightSidebarSurface,
   readInitialSidebarCollapsed,
   readInitialSidebarNavigationLayout,
   readInitialTitlebarActionsSettings,
@@ -78,6 +80,7 @@ export function useDesktopPreferences() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readInitialSidebarCollapsed());
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(() => readInitialRightSidebarWidth());
+  const [rightSidebarSurface, setRightSidebarSurface] = useState(() => readInitialRightSidebarSurface());
   const [systemDark, setSystemDark] = useState(() => readSystemDarkMode());
 
   useEffect(() => {
@@ -158,6 +161,10 @@ export function useDesktopPreferences() {
   }, [rightSidebarWidth]);
 
   useEffect(() => {
+    window.localStorage.setItem(RIGHT_SIDEBAR_SURFACE_STORAGE_KEY, rightSidebarSurface);
+  }, [rightSidebarSurface]);
+
+  useEffect(() => {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
     const sync = () => setSystemDark(query.matches);
     sync();
@@ -189,6 +196,7 @@ export function useDesktopPreferences() {
     rightSidebarOpen,
     rightSidebarToolsSettings,
     rightSidebarWidth,
+    rightSidebarSurface,
     sidebarCollapsed,
     sidebarNavigationLayout,
     sidebarNavigationOrientation,
@@ -214,6 +222,7 @@ export function useDesktopPreferences() {
     setRightSidebarOpen,
     setRightSidebarToolsSettings,
     setRightSidebarWidth,
+    setRightSidebarSurface,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setTitlebarActionsSettings,
