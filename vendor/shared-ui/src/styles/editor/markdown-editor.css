@@ -33,7 +33,7 @@
 }
 
 .markdown-codemirror-editor .cm-content {
-  --po-markdown-editor-content-gutter: max(
+  --po-markdown-editor-inline-gutter: max(
     var(--po-markdown-editor-gutter-min),
     calc((100% - var(--po-markdown-editor-text-width)) / 2)
   );
@@ -42,7 +42,7 @@
   max-width: none;
   min-height: 100%;
   margin: 0;
-  padding: var(--po-markdown-editor-content-gutter) var(--po-markdown-editor-content-gutter) 64px;
+  padding: var(--po-markdown-editor-gutter-min) var(--po-markdown-editor-inline-gutter);
   caret-color: var(--po-text);
   color: color-mix(in srgb, var(--po-text) 78%, var(--po-text-muted));
   overflow-wrap: anywhere;
