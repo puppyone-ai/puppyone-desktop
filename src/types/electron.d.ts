@@ -301,11 +301,29 @@ export type WorkspaceChangedEvent = {
   eventType: string;
   path: string | null;
   error?: string;
+  recovered?: boolean;
+  reason?: string;
 };
 
 export type AiEditReviewUpdatedEvent = {
   rootPath: string;
   request: AiEditRequest;
+};
+
+export type GitRepositoryWatchResult = {
+  subscriptionId: string;
+  rootPath: string;
+  repository: boolean;
+};
+
+export type GitRepositoryInvalidatedEvent = {
+  subscriptionId: string;
+  rootPath: string;
+  reason: string;
+};
+
+export type GitRepositoryWindowFocusEvent = {
+  focused: boolean;
 };
 
 export type LastWorkspaceResult = {
@@ -612,6 +630,21 @@ declare global {
       watchWorkspace: (
         rootPath: string,
         callback: (event: WorkspaceChangedEvent) => void,
+      ) => {
+        stop: () => void;
+        ready: Promise<{ subscriptionId: string | null; rootPath: string }>;
+      };
+      startGitRepositoryWatch: (request: {
+        rootPath: string;
+      }) => Promise<GitRepositoryWatchResult>;
+      stopGitRepositoryWatch: (request: {
+        subscriptionId: string;
+      }) => Promise<{ ok: boolean }>;
+      onGitRepositoryInvalidated: (
+        callback: (event: GitRepositoryInvalidatedEvent) => void,
+      ) => () => void;
+      onGitRepositoryWindowFocus?: (
+        callback: (event: GitRepositoryWindowFocusEvent) => void,
       ) => () => void;
       getLatestAiEditReviewRequest: (request: {
         rootPath: string;

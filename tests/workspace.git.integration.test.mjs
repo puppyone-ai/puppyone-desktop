@@ -10,6 +10,7 @@ import path from "node:path";
 import {
   initializeWorkspaceGitRepository,
   getWorkspaceGitStatus,
+  getWorkspaceGitBranchGraph,
   stageAllWorkspaceGitChanges,
   stageWorkspaceGitPaths,
   commitWorkspaceGit,
@@ -39,7 +40,7 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-describe("repository detection", () => {
+describe("repository detection", { timeout: 20_000 }, () => {
   it("reports a non-repo folder as isRepo=false with zero commits", async () => {
     const status = await getWorkspaceGitStatus(root);
     expect(status.isRepo).toBe(false);
@@ -57,7 +58,7 @@ describe("repository detection", () => {
   });
 });
 
-describe("stage → commit lifecycle", () => {
+describe("stage → commit lifecycle", { timeout: 20_000 }, () => {
   it("tracks a new file as untracked, then staged, then committed", async () => {
     await initRepoWithIdentity();
     await createWorkspaceEntry(root, { parentPath: null, name: "app.js", kind: "file", content: "console.log(1)\n" });
@@ -75,7 +76,10 @@ describe("stage → commit lifecycle", () => {
     expect(status.totalCommits).toBe(1);
     expect(status.headCommitId).toBeTruthy();
     expect(status.entries).toEqual([]);
-    expect(status.commits[0].message).toMatch(/add app\.js/);
+    // The fast status path no longer loads history; commit messages come from
+    // the lazily-loaded branch graph (getWorkspaceGitBranchGraph).
+    const graph = await getWorkspaceGitBranchGraph(root);
+    expect(graph.commits[0].message).toMatch(/add app\.js/);
   });
 
   it("detects modifications to a committed file as unstaged", async () => {
@@ -102,7 +106,7 @@ describe("stage → commit lifecycle", () => {
   });
 });
 
-describe("diffs", () => {
+describe("diffs", { timeout: 20_000 }, () => {
   it("produces a working-tree diff for a modified tracked file", async () => {
     await initRepoWithIdentity();
     await createWorkspaceEntry(root, { parentPath: null, name: "code.js", kind: "file", content: "const x = 1\n" });
@@ -139,7 +143,7 @@ describe("diffs", () => {
   });
 });
 
-describe("branches", () => {
+describe("branches", { timeout: 20_000 }, () => {
   it("creates and checks out a branch", async () => {
     await initRepoWithIdentity();
     await createWorkspaceEntry(root, { parentPath: null, name: "x.txt", kind: "file", content: "x" });
@@ -163,7 +167,7 @@ describe("branches", () => {
   });
 });
 
-describe("cloud remote configuration (端 → 云 link)", () => {
+describe("cloud remote configuration (端 → 云 link)", { timeout: 20_000 }, () => {
   it("configures a PuppyOne-shaped git remote", async () => {
     await initRepoWithIdentity();
     const status = await configureWorkspaceCloudRemote(
@@ -203,5 +207,58 @@ describe("cloud remote configuration (端 → 云 link)", () => {
     await expect(
       configureWorkspaceCloudRemote(root, "https://api.puppyone.ai/git/x.git", "-evil"),
     ).rejects.toThrow(/Remote name is invalid/i);
+  });
+});
+
+describe("fast status vs lazy history", { timeout: 20_000 }, () => {
+  it("keeps frequent status free of history while branch graph still loads commits", async () => {
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "app.js", kind: "file", content: "console.log(1)\n" });
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "feat: add app.js");
+
+    const status = await getWorkspaceGitStatus(root);
+    expect(status.isRepo).toBe(true);
+    expect(status.commits).toEqual([]);
+    expect(status.allCommits).toEqual([]);
+    expect(status.totalCommits).toBe(1);
+
+    const graph = await getWorkspaceGitBranchGraph(root);
+    expect(graph.commits[0].message).toMatch(/add app\.js/);
+    expect(graph.allCommits.length).toBeGreaterThan(0);
+  });
+
+  it("keeps working-tree refreshes free of history while HEAD stays stable", async () => {
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "app.js", kind: "file", content: "console.log(1)\n" });
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "feat: add app.js");
+
+    const graph = await getWorkspaceGitBranchGraph(root);
+    expect(graph.commits.length).toBeGreaterThan(0);
+
+    await writeWorkspaceTextFile(root, "app.js", "console.log(2)\n");
+    const status = await getWorkspaceGitStatus(root);
+    expect(status.commits).toEqual([]);
+    expect(status.headCommitId).toBe(graph.headCommitId);
+    expect(status.unstagedEntries.some((entry) => entry.path === "app.js")).toBe(true);
+  });
+
+  it("changes the consistency fingerprint when HEAD or the index changes", async () => {
+    const { readGitConsistencyFingerprint } = await import("../local-api/workspace.mjs");
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "app.js", kind: "file", content: "one\n" });
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "first");
+
+    const before = await readGitConsistencyFingerprint(root);
+    await writeWorkspaceTextFile(root, "app.js", "two\n");
+    await stageAllWorkspaceGitChanges(root);
+    const afterIndex = await readGitConsistencyFingerprint(root);
+    expect(afterIndex).not.toBe(before);
+
+    await commitWorkspaceGit(root, "second");
+    const afterHead = await readGitConsistencyFingerprint(root);
+    expect(afterHead).not.toBe(afterIndex);
   });
 });

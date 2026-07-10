@@ -31,6 +31,7 @@ import { registerWorkspaceFileIpcHandlers } from "./main/ipc/workspace-files-ipc
 import { registerWorkspaceGitIpcHandlers } from "./main/ipc/workspace-git-ipc.mjs";
 import { registerWorkspaceNavigationIpcHandlers } from "./main/ipc/workspace-navigation-ipc.mjs";
 import { registerWorkspaceWatchIpcHandlers } from "./main/ipc/workspace-watch-ipc.mjs";
+import { registerGitMetadataWatchIpcHandlers } from "./main/ipc/git-metadata-watch-ipc.mjs";
 import { registerLocalFileProtocol } from "./main/local-file-protocol.mjs";
 import { createLocalFileCapabilityStore } from "./main/local-file-capabilities.mjs";
 import { installWindowNavigationSecurity, requireNonEmptyString } from "./main/security.mjs";
@@ -39,6 +40,7 @@ import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
+import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
@@ -101,6 +103,7 @@ const agentService = createAgentService({
   persistence: agentPersistence,
 });
 const workspaceWatchService = createWorkspaceWatchService();
+const gitMetadataWatchService = createGitMetadataWatchService();
 const workspaceStateStore = createWorkspaceStateStore({
   app,
   filename: workspaceStateFilename,
@@ -171,6 +174,15 @@ async function createWindow(options = {}) {
     lastFocusedWindowId = webContentsId;
     const state = windowStateById.get(webContentsId);
     if (state) state.lastFocusedAt = Date.now();
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send("git-repository:window-focus", { focused: true });
+    }
+  });
+
+  window.on("blur", () => {
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send("git-repository:window-focus", { focused: false });
+    }
   });
 
   window.once("ready-to-show", () => {
@@ -232,6 +244,7 @@ async function createWindow(options = {}) {
     terminalService.closeSessionsForWindow(webContentsId);
     void agentService.closeSessionsForWindow(webContentsId);
     workspaceWatchService.stopForWindow(webContentsId);
+    gitMetadataWatchService.stopForWindow(webContentsId);
     windowsById.delete(webContentsId);
     windowStateById.delete(webContentsId);
     if (lastFocusedWindowId === webContentsId) {
@@ -435,6 +448,7 @@ app.on("before-quit", () => {
   terminalService.closeAll();
   void agentService.closeAll();
   workspaceWatchService.closeAll();
+  gitMetadataWatchService.closeAll();
 });
 
 function registerIpcHandlers() {
@@ -483,6 +497,11 @@ function registerIpcHandlers() {
   registerWorkspaceWatchIpcHandlers({
     ipcMain: trustedIpcMain,
     workspaceWatchService,
+    authorizeWorkspaceRoot,
+  });
+  registerGitMetadataWatchIpcHandlers({
+    ipcMain: trustedIpcMain,
+    gitMetadataWatchService,
     authorizeWorkspaceRoot,
   });
 
@@ -711,6 +730,7 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
       terminalService.closeSessionsForWindow(webContentsId);
       void agentService.closeSessionsForWindow(webContentsId);
       workspaceWatchService.stopForWindow(webContentsId);
+      gitMetadataWatchService.stopForWindow(webContentsId);
     }
   }
 
@@ -768,6 +788,7 @@ async function forgetCurrentWindowWorkspace(sender) {
   terminalService.closeSessionsForWindow(window.webContents.id);
   void agentService.closeSessionsForWindow(window.webContents.id);
   workspaceWatchService.stopForWindow(window.webContents.id);
+  gitMetadataWatchService.stopForWindow(window.webContents.id);
   if (releasedPath) await workspaceStateStore.removeRecentWorkspacePath(releasedPath);
 }
 
@@ -863,6 +884,7 @@ async function showHomepageForCurrentWindow(sender) {
   terminalService.closeSessionsForWindow(window.webContents.id);
   void agentService.closeSessionsForWindow(window.webContents.id);
   workspaceWatchService.stopForWindow(window.webContents.id);
+  gitMetadataWatchService.stopForWindow(window.webContents.id);
 }
 
 function findWorkspacePathArg(argv) {

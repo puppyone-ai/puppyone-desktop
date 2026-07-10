@@ -2,6 +2,8 @@ import type { AiEditRequest, DataNode, DataNodeKind, DataPort, Workspace } from 
 import type {
   GitCommitDetail,
   GitBranchGraphSnapshot,
+  GitRepositoryInvalidatedEvent,
+  GitRepositoryWatchResult,
   GitStatusSnapshot,
   GitWorkingDiffScope,
   LastWorkspaceResult,
@@ -227,6 +229,28 @@ export function subscribeAiEditReviewUpdates(
 
 export async function getWorkspaceGitStatus(rootPath: string): Promise<GitStatusSnapshot> {
   return getDesktopBridge().getGitStatus({ rootPath });
+}
+
+export async function startWorkspaceGitRepositoryWatch(
+  rootPath: string,
+): Promise<GitRepositoryWatchResult | null> {
+  const bridge = getDesktopBridge();
+  if (typeof bridge.startGitRepositoryWatch !== "function") return null;
+  return bridge.startGitRepositoryWatch({ rootPath });
+}
+
+export async function stopWorkspaceGitRepositoryWatch(subscriptionId: string): Promise<void> {
+  const bridge = getDesktopBridge();
+  if (typeof bridge.stopGitRepositoryWatch !== "function") return;
+  await bridge.stopGitRepositoryWatch({ subscriptionId }).catch(() => {});
+}
+
+export function subscribeWorkspaceGitRepositoryInvalidations(
+  callback: (event: GitRepositoryInvalidatedEvent) => void,
+): () => void {
+  const bridge = getDesktopBridge();
+  if (typeof bridge.onGitRepositoryInvalidated !== "function") return () => {};
+  return bridge.onGitRepositoryInvalidated(callback);
 }
 
 export async function getWorkspaceGitBranchGraph(rootPath: string): Promise<GitBranchGraphSnapshot> {

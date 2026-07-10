@@ -66,7 +66,6 @@ import {
 import { createExplorerDataPort } from "./features/data-workspace/explorer";
 import { useDataNodeActions } from "./features/data-workspace/useDataNodeActions";
 import { useAiEditReviewRequest } from "./features/data-workspace/useAiEditReviewRequest";
-import { useWorkspaceFileWatch } from "./features/data-workspace/useWorkspaceFileWatch";
 import {
   BranchSwitchConflictDialog,
   GitOperationErrorDialog,
@@ -300,12 +299,6 @@ export function App() {
     },
     [cloudDataPort, filesVisibilitySettings, localDataPort, workspaceIsCloud],
   );
-  useWorkspaceFileWatch({
-    onGitRefresh: refreshGitStatus,
-    onWorkspaceContentChanged: refreshWorkspaceContent,
-    workspace,
-    workspaceIsCloud,
-  });
   const latestAiEditRequest = useAiEditReviewRequest({
     aiEditAssistEnabled,
     onWorkspaceContentChanged: refreshWorkspaceContent,
@@ -560,7 +553,7 @@ export function App() {
     const savedConfig = await savePuppyoneConfig(nextConfig);
     if (savedConfig) {
       setWorkspaceRefreshToken((token) => token + 1);
-      await refreshGitStatus();
+      await refreshGitStatus("configuration");
     }
     return savedConfig;
   }, [refreshGitStatus, savePuppyoneConfig]);

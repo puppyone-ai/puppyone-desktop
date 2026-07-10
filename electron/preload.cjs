@@ -77,18 +77,49 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
       if (payload?.rootPath === rootPath) callback(payload);
     };
     ipcRenderer.on("workspace:changed", listener);
-    ipcRenderer.invoke("workspace:watch-start", { rootPath }).catch((error) => {
-      callback({
-        rootPath,
-        eventType: "error",
-        path: null,
-        error: error instanceof Error ? error.message : String(error),
+    let subscriptionId = null;
+    let stopped = false;
+    const ready = ipcRenderer.invoke("workspace:watch-start", { rootPath })
+      .then((result) => {
+        subscriptionId = result?.subscriptionId ?? null;
+        // If teardown ran before start resolved, stop the now-known subscription.
+        if (stopped && subscriptionId) {
+          ipcRenderer.invoke("workspace:watch-stop", { subscriptionId }).catch(() => {});
+        }
+        return {
+          subscriptionId,
+          rootPath: result?.rootPath ?? rootPath,
+        };
+      })
+      .catch((error) => {
+        callback({
+          rootPath,
+          eventType: "error",
+          path: null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
       });
-    });
-    return () => {
+    const stop = () => {
+      stopped = true;
       ipcRenderer.removeListener("workspace:changed", listener);
-      ipcRenderer.invoke("workspace:watch-stop", { rootPath }).catch(() => {});
+      if (subscriptionId) {
+        ipcRenderer.invoke("workspace:watch-stop", { subscriptionId }).catch(() => {});
+      }
     };
+    return { stop, ready };
+  },
+  startGitRepositoryWatch: (request) => ipcRenderer.invoke("git-repository:watch-start", request),
+  stopGitRepositoryWatch: (request) => ipcRenderer.invoke("git-repository:watch-stop", request),
+  onGitRepositoryInvalidated: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("git-repository:invalidated", listener);
+    return () => ipcRenderer.removeListener("git-repository:invalidated", listener);
+  },
+  onGitRepositoryWindowFocus: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("git-repository:window-focus", listener);
+    return () => ipcRenderer.removeListener("git-repository:window-focus", listener);
   },
   getLatestAiEditReviewRequest: (request) => ipcRenderer.invoke("ai-edit-review:get-latest", request),
   onAiEditReviewUpdated: (callback) => {

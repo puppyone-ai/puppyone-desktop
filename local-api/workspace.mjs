@@ -997,32 +997,75 @@ export async function getWorkspaceGitStatus(rootPath) {
     };
   }
 
-  const [
-    branchResult,
-    symbolicBranchResult,
-    headResult,
-    countResult,
-    statusResult,
-    branches,
-    remotes,
-    commits,
-    allCommits,
-  ] = await Promise.all([
-    execGit(root, ["branch", "--show-current"]).catch(() => ({ stdout: "" })),
-    execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"]).catch(() => ({ stdout: "" })),
-    execGit(root, ["rev-parse", "HEAD"]).catch(() => ({ stdout: "" })),
-    execGit(root, ["rev-list", "--count", "HEAD"]).catch(() => ({ stdout: "0" })),
-    execGit(root, ["status", "--porcelain=v2", "-z", "--branch"]).catch((error) => {
+  // Hot-path status reader. It loads only what the Source Control surface needs
+  // to reconcile (HEAD/branch identity, working/staged/untracked/merge resources,
+  // ahead/behind, refs/remotes, operation state). Full current-branch and
+  // all-branch histories are loaded lazily by the History/Cloud graph surface
+  // via getWorkspaceGitBranchGraph, so a normal file save never runs two
+  // complete history scans. Read-only queries disable optional Git locks so the
+  // background status never performs an optional index refresh or competes with
+  // terminal Git operations.
+  //
+  // Porcelain-v2 `--branch` headers already carry oid/head/upstream/ahead-behind,
+  // so we avoid duplicate branch/HEAD queries when those headers are present.
+  //
+  // Snapshot consistency: fingerprint HEAD + symbolic ref + index before/after
+  // the multi-command read and retry once when repository identity changes mid-query.
+  const beforeFingerprint = await readGitConsistencyFingerprint(root);
+  const first = await readFastWorkspaceGitStatus(root);
+  const afterFingerprint = await readGitConsistencyFingerprint(root);
+  if (beforeFingerprint !== afterFingerprint) {
+    return readFastWorkspaceGitStatus(root);
+  }
+  return first;
+}
+
+async function readFastWorkspaceGitStatus(root) {
+  const [statusResult, branches, remotes] = await Promise.all([
+    execGit(root, ["status", "--porcelain=v2", "-z", "--branch"], { optionalLocks: false }).catch((error) => {
       throw new Error(`Unable to read git status: ${error.message}`);
     }),
     readGitBranches(root),
     readGitRemotes(root),
-    readGitHistory(root, GIT_HISTORY_LIMIT),
-    readGitHistory(root, GIT_ALL_BRANCH_HISTORY_LIMIT, { allBranches: true }),
   ]);
   const parsedStatus = parseGitPorcelainV2Status(statusResult.stdout);
-  const branchName = branchResult.stdout.trim() || symbolicBranchResult.stdout.trim() || "detached";
-  const normalizedBranches = normalizeGitBranches(branches, branchName, headResult.stdout.trim());
+  const headerOid = typeof parsedStatus.headers["branch.oid"] === "string"
+    ? parsedStatus.headers["branch.oid"].trim()
+    : "";
+  const headerHead = typeof parsedStatus.headers["branch.head"] === "string"
+    ? parsedStatus.headers["branch.head"].trim()
+    : "";
+
+  let branchName = "";
+  let headCommitId = "";
+  if (headerHead && headerHead !== "(detached)") {
+    branchName = headerHead;
+  } else if (headerHead === "(detached)") {
+    branchName = "detached";
+  }
+  if (headerOid && headerOid !== "(null)") {
+    headCommitId = headerOid;
+  }
+
+  if (!branchName || !headCommitId) {
+    const [branchResult, symbolicBranchResult, headResult] = await Promise.all([
+      branchName
+        ? Promise.resolve({ stdout: branchName })
+        : execGit(root, ["branch", "--show-current"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+      branchName
+        ? Promise.resolve({ stdout: "" })
+        : execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+      headCommitId
+        ? Promise.resolve({ stdout: headCommitId })
+        : execGit(root, ["rev-parse", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+    ]);
+    branchName = branchName || branchResult.stdout.trim() || symbolicBranchResult.stdout.trim() || "detached";
+    headCommitId = headCommitId || headResult.stdout.trim();
+  }
+
+  const countResult = await execGit(root, ["rev-list", "--count", "HEAD"], { optionalLocks: false })
+    .catch(() => ({ stdout: "0" }));
+  const normalizedBranches = normalizeGitBranches(branches, branchName, headCommitId);
   const normalizedRemotes = remotes.map((remote) => ({
     ...remote,
     branches: normalizedBranches
@@ -1030,14 +1073,14 @@ export async function getWorkspaceGitStatus(rootPath) {
       .map((branch) => branch.name),
   }));
   const config = await readPuppyoneWorkspaceConfig(root).catch(() => null);
-  const syncTarget = await readGitSyncTarget(root, normalizedRemotes, normalizedBranches, branchName, headResult.stdout.trim(), config);
+  const syncTarget = await readGitSyncTarget(root, normalizedRemotes, normalizedBranches, branchName, headCommitId, config);
   const currentBranch = normalizedBranches.find((branch) => branch.current && !branch.remote) ?? null;
   const sourceControl = buildGitSourceControlSnapshot({
     entries: parsedStatus.entries,
     branchName,
     syncTarget,
     currentBranch,
-    headCommitId: headResult.stdout.trim() || null,
+    headCommitId: headCommitId || null,
   });
   const effectiveHosting = resolveGitEffectiveHosting({
     remotes: normalizedRemotes,
@@ -1050,8 +1093,8 @@ export async function getWorkspaceGitStatus(rootPath) {
   return {
     isRepo: true,
     branch: branchName,
-    headCommitId: headResult.stdout.trim() || null,
-    totalCommits: Number.parseInt(countResult.stdout.trim(), 10) || commits.length,
+    headCommitId: headCommitId || null,
+    totalCommits: Number.parseInt(countResult.stdout.trim(), 10) || 0,
     entries: parsedStatus.entries,
     stagedEntries: parsedStatus.entries.filter(hasStagedStatus),
     unstagedEntries: parsedStatus.entries.filter(hasUnstagedStatus),
@@ -1061,9 +1104,36 @@ export async function getWorkspaceGitStatus(rootPath) {
     syncTarget,
     effectiveHosting,
     sourceControl,
-    commits,
-    allCommits,
+    // History is intentionally empty on the fast status path; load it lazily via
+    // getWorkspaceGitBranchGraph when the History panel or Cloud graph needs it.
+    commits: [],
+    allCommits: [],
   };
+}
+
+// Cheap repository-identity fingerprint used to detect mid-query mutations.
+// Compares HEAD oid, symbolic ref, and index mtime/size — not full status truth.
+export async function readGitConsistencyFingerprint(rootPath) {
+  const root = resolveWorkspacePath(rootPath, null);
+  const [headResult, symbolicResult, indexPathResult] = await Promise.all([
+    execGit(root, ["rev-parse", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+    execGit(root, ["symbolic-ref", "-q", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+    execGit(root, ["rev-parse", "--git-path", "index"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+  ]);
+  const indexRelative = indexPathResult.stdout.trim();
+  const indexAbsolute = indexRelative
+    ? (path.isAbsolute(indexRelative) ? indexRelative : path.resolve(root, indexRelative))
+    : null;
+  let indexFingerprint = "missing";
+  if (indexAbsolute) {
+    const stat = await fs.stat(indexAbsolute).catch(() => null);
+    if (stat) indexFingerprint = `${Math.trunc(stat.mtimeMs)}:${stat.size}`;
+  }
+  return [
+    headResult.stdout.trim() || "no-head",
+    symbolicResult.stdout.trim() || "detached",
+    indexFingerprint,
+  ].join("|");
 }
 
 export async function getWorkspaceGitBranchGraph(rootPath) {
@@ -1091,9 +1161,9 @@ export async function getWorkspaceGitBranchGraph(rootPath) {
     commits,
     allCommits,
   ] = await Promise.all([
-    execGit(root, ["branch", "--show-current"]).catch(() => ({ stdout: "" })),
-    execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"]).catch(() => ({ stdout: "" })),
-    execGit(root, ["rev-parse", "HEAD"]).catch(() => ({ stdout: "" })),
+    execGit(root, ["branch", "--show-current"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+    execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+    execGit(root, ["rev-parse", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
     readGitBranches(root),
     readGitHistory(root, GIT_HISTORY_LIMIT),
     readGitHistory(root, GIT_ALL_BRANCH_HISTORY_LIMIT, { allBranches: true }),
@@ -1108,6 +1178,40 @@ export async function getWorkspaceGitBranchGraph(rootPath) {
     commits,
     allCommits,
   };
+}
+
+// Resolve the repository-owned paths for an authorized workspace root using
+// Git itself. The renderer never supplies these; they inherit authority from
+// the authorized root. Covers linked worktrees and repositories whose `.git`
+// is a file pointing outside the workspace.
+export async function resolveGitRepositoryIdentity(rootPath) {
+  const root = resolveWorkspacePath(rootPath, null);
+  try {
+    const { stdout } = await execGit(
+      root,
+      ["rev-parse", "--show-toplevel", "--git-dir", "--git-common-dir"],
+      { optionalLocks: false },
+    );
+    const [topLevelRaw, gitDirRaw, commonDirRaw] = stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim());
+    if (!gitDirRaw) {
+      return { repository: false, workspaceRoot: root, topLevel: null, gitDir: null, commonDir: null };
+    }
+    // `--git-dir` / `--git-common-dir` may be relative to the working tree;
+    // resolve against the root so linked worktrees normalize to absolute paths.
+    const gitDirResolved = path.resolve(root, gitDirRaw);
+    const commonDirResolved = commonDirRaw ? path.resolve(root, commonDirRaw) : gitDirResolved;
+    const topLevelResolved = topLevelRaw ? path.resolve(topLevelRaw) : root;
+    const [gitDir, commonDir, topLevel] = await Promise.all([
+      fs.realpath(gitDirResolved).catch(() => gitDirResolved),
+      fs.realpath(commonDirResolved).catch(() => commonDirResolved),
+      fs.realpath(topLevelResolved).catch(() => topLevelResolved),
+    ]);
+    return { repository: true, workspaceRoot: root, topLevel, gitDir, commonDir };
+  } catch {
+    return { repository: false, workspaceRoot: root, topLevel: null, gitDir: null, commonDir: null };
+  }
 }
 
 export async function initializeWorkspaceGitRepository(rootPath) {
@@ -2020,7 +2124,7 @@ function execGit(rootPath, args, options = {}) {
   return execFileAsync("git", ["-C", rootPath, "-c", "core.quotePath=false", ...args], {
     timeout,
     maxBuffer: GIT_MAX_BUFFER,
-    env: buildGitEnvironment(),
+    env: buildGitEnvironment({ optionalLocks: options.optionalLocks }),
   }).catch((error) => {
     if (error && typeof error === "object") {
       error.gitArgs = args;
@@ -2030,12 +2134,24 @@ function execGit(rootPath, args, options = {}) {
   });
 }
 
-function buildGitEnvironment() {
-  return {
+// Background/read-only status queries pass `{ optionalLocks: false }` so a
+// status read never performs an optional index refresh, competes with terminal
+// Git operations, or creates a metadata-event feedback loop. Mutating commands
+// keep normal locking behavior (the default).
+function buildGitEnvironment({ optionalLocks = true } = {}) {
+  const env = {
     ...process.env,
     GCM_INTERACTIVE: "never",
     GIT_TERMINAL_PROMPT: "0",
   };
+  if (optionalLocks === false) {
+    env.GIT_OPTIONAL_LOCKS = "0";
+  }
+  return env;
+}
+
+export function getGitEnvironmentForTests(options = {}) {
+  return buildGitEnvironment(options);
 }
 
 function getGitErrorOutput(error) {
@@ -2192,7 +2308,7 @@ async function readGitBranches(rootPath) {
     "refs/heads",
     "refs/remotes",
     "--format=%(refname)%09%(refname:short)%09%(HEAD)%09%(upstream:short)%09%(upstream:track,nobracket)%09%(objectname:short)%09%(contents:subject)%09%(committerdate:iso-strict)",
-  ]).catch(() => ({ stdout: "" }));
+  ], { optionalLocks: false }).catch(() => ({ stdout: "" }));
 
   return result.stdout
     .split(/\r?\n/)
@@ -2921,7 +3037,7 @@ function parseGitTrackingText(value) {
 }
 
 async function readGitRemotes(rootPath) {
-  const result = await execGit(rootPath, ["remote", "-v"]).catch(() => ({ stdout: "" }));
+  const result = await execGit(rootPath, ["remote", "-v"], { optionalLocks: false }).catch(() => ({ stdout: "" }));
   const remotes = new Map();
 
   for (const line of result.stdout.split(/\r?\n/)) {

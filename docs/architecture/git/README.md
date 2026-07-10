@@ -22,10 +22,9 @@ described as current behavior before its implementation and verification land.
   - Owns renderer state, sidebar view-model rules, UI actions, IPC boundaries,
     and the end-to-end local Git data flow.
 - [Repository Status Refresh Lifecycle](status-refresh-lifecycle.md)
-  - Records the **implemented known gap** that leaves status stale after some
-    external Git operations.
-  - Defines the **proposed** repository watcher, refresh scheduler, focus
-    reconciliation, error recovery, and test contract.
+  - **Implemented**.
+  - Owns the repository watcher, refresh scheduler, focus reconciliation, error
+    recovery, fast status / lazy history split, and lifecycle verification.
 - [Cloud Branch Graph Layout](cloud-branch-graph-layout.md)
   - **Implemented**.
   - Owns Git topology, ref markers, graph continuation rows, and Cloud Branches
@@ -35,18 +34,28 @@ described as current behavior before its implementation and verification land.
 
 - `src/features/source-control/`
   - local Source Control sidebar, detail view, view models, and renderer state
+- `src/features/source-control/gitRefreshScheduler.ts`
+  - single-flight, dirty trailing, generation-ordered refresh scheduler
 - `src/features/app-shell/DesktopWorkspaceContent.tsx`
   - mounts the Git sidebar and main Git view into the shared desktop shell
 - `src/lib/localFiles.ts`
-  - typed renderer bridge for Git status and operations
+  - typed renderer bridge for Git status, operations, and metadata watch
 - `electron/preload.cjs`
-  - context-isolated Git and workspace-watch bridge
+  - context-isolated Git, workspace-watch, and metadata-watch bridge
 - `electron/main/ipc/workspace-git-ipc.mjs`
   - authorized Git IPC handlers
+- `electron/main/ipc/git-metadata-watch-ipc.mjs`
+  - authorized metadata watch start/stop IPC
 - `electron/main/workspace-watch-service.mjs`
-  - current workspace content watcher
+  - workspace content watcher (continues to exclude `.git/**`)
+- `electron/main/git-metadata-watch-service.mjs`
+  - Git metadata watcher, pending-init promotion, common-dir fan-out
 - `local-api/workspace.mjs`
-  - Git CLI execution, parsing, status snapshots, history, and mutations
+  - Git CLI execution, parsing, fast status snapshots, history, and mutations
+- `tests/gitRefreshScheduler.test.ts`
+  - scheduler ordering, focus, and error unit coverage
+- `tests/electron.git-metadata-watch.integration.test.mjs`
+  - real-repository metadata watcher and external Git freshness coverage
 - `tests/workspace.git.integration.test.mjs`
   - real-repository integration coverage for the local Git engine
 

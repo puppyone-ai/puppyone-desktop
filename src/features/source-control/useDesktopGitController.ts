@@ -7,6 +7,7 @@ import {
   discardAllWorkspaceGitChanges,
   discardWorkspaceGitPaths,
   fetchWorkspaceGit,
+  getWorkspaceGitBranchGraph,
   getWorkspaceGitCommitDetail,
   getWorkspaceGitFileDiff,
   getWorkspaceGitStatus,
@@ -16,7 +17,10 @@ import {
   pushWorkspaceGit,
   stageAllWorkspaceGitChanges,
   stageWorkspaceGitPaths,
+  startWorkspaceGitRepositoryWatch,
   stashAndCheckoutWorkspaceGitBranch,
+  stopWorkspaceGitRepositoryWatch,
+  subscribeWorkspaceGitRepositoryInvalidations,
   unstageAllWorkspaceGitChanges,
   unstageWorkspaceGitPaths,
 } from "../../lib/localFiles";
@@ -30,6 +34,7 @@ import {
   isBranchOverwriteError,
   type GitOperationErrorState,
 } from "./operationDialogs";
+import { createGitRefreshScheduler } from "./gitRefreshScheduler";
 import type { GitMainPanel, GitWorkingSelection } from "./types";
 
 export type PendingBranchSwitch = {
@@ -46,6 +51,65 @@ type UseDesktopGitControllerOptions = {
   onEnterGitView: () => void;
 };
 
+export function mergePreservedHistory(
+  previous: GitStatusSnapshot | null,
+  next: GitStatusSnapshot,
+  options: { invalidateHistory?: boolean } = {},
+): GitStatusSnapshot {
+  if (options.invalidateHistory) {
+    return {
+      ...next,
+      commits: [],
+      allCommits: [],
+    };
+  }
+  if (
+    previous
+    && previous.isRepo
+    && next.isRepo
+    && previous.headCommitId === next.headCommitId
+    && previous.branch === next.branch
+    && (previous.commits.length > 0 || previous.allCommits.length > 0)
+  ) {
+    return {
+      ...next,
+      commits: previous.commits,
+      allCommits: previous.allCommits,
+    };
+  }
+  return next;
+}
+
+export function shouldInvalidateHistoryForReason(reason: string | null | undefined): boolean {
+  if (!reason) return false;
+  // Working-tree / index-only / ordinary manual+initial refreshes keep history when HEAD is unchanged.
+  if (
+    reason === "working-tree"
+    || reason === "index"
+    || reason === "manual"
+    || reason === "initial"
+    || reason === "external-apply"
+    || reason === "mutation"
+    ||     reason === "focus"
+    || reason === "focus-stale"
+    || reason === "focus-error"
+    || reason === "configuration"
+    || reason === "refresh-retry"
+    || reason.startsWith("refresh-retry:")
+  ) {
+    return false;
+  }
+  // Ref topology, fetch, merge/rebase/cherry-pick state, config, and watcher recovery
+  // can change history/graph without a working-tree edit.
+  return reason === "ref"
+    || reason === "fetch"
+    || reason === "config"
+    || reason === "merge"
+    || reason === "repository-initialized"
+    || reason === "git-metadata"
+    || reason.startsWith("watcher-");
+}
+
 export function useDesktopGitController({
   workspace,
   gitViewActive,
@@ -53,6 +117,9 @@ export function useDesktopGitController({
   onEnterGitView,
 }: UseDesktopGitControllerOptions) {
   const workspacePathRef = useRef<string | null>(null);
+  const gitStatusRef = useRef<GitStatusSnapshot | null>(null);
+  const gitMainPanelRef = useRef<GitMainPanel>("changes");
+  const historyRequestRef = useRef(0);
   const branchSwitcherRef = useRef<HTMLDivElement>(null);
   const [gitStatus, setGitStatus] = useState<GitStatusSnapshot | null>(null);
   const [gitStatusPath, setGitStatusPath] = useState<string | null>(null);
@@ -86,18 +153,104 @@ export function useDesktopGitController({
     [activeGitStatus],
   );
 
-  const applyGitStatus = useCallback((nextStatus: GitStatusSnapshot, rootPath?: string) => {
-    setGitStatus(nextStatus);
-    setGitStatusPath(rootPath ?? workspace?.path ?? null);
-  }, [workspace?.path]);
+  const schedulerRef = useRef<ReturnType<typeof createGitRefreshScheduler<GitStatusSnapshot>> | null>(null);
+
+  const ensureScheduler = useCallback(() => {
+    if (schedulerRef.current) return schedulerRef.current;
+    const created = createGitRefreshScheduler<GitStatusSnapshot>({
+      readStatus: async (_generation, rootPath) => {
+        if (!rootPath) throw new Error("No active workspace.");
+        return getWorkspaceGitStatus(rootPath);
+      },
+      onSnapshot: (nextStatus, meta) => {
+        const rootPath = workspacePathRef.current;
+        const state = schedulerRef.current?.getState();
+        // Discard cross-workspace publishes even if a caller bypassed the scheduler gate.
+        if (!rootPath || meta.rootPath !== rootPath) return;
+        if (state && meta.rootEpoch !== state.rootEpoch) return;
+        const invalidateHistory = shouldInvalidateHistoryForReason(meta.reason);
+        const merged = mergePreservedHistory(gitStatusRef.current, nextStatus, { invalidateHistory });
+        gitStatusRef.current = merged;
+        setGitStatus(merged);
+        setGitStatusPath(rootPath);
+        setGitStatusError(null);
+      },
+      onError: (error, meta) => {
+        const rootPath = workspacePathRef.current;
+        const state = schedulerRef.current?.getState();
+        if (!rootPath || meta.rootPath !== rootPath) return;
+        if (state && meta.rootEpoch !== state.rootEpoch) return;
+        // Preserve the last good snapshot; only surface the error.
+        setGitStatusError(error instanceof Error ? error.message : String(error));
+      },
+      onLog: (event) => {
+        if (event.type === "refresh-success" || event.type === "refresh-error" || event.type === "refresh-discarded") {
+          console.info("[git-refresh]", event.type, {
+            rootPath: event.rootPath,
+            rootEpoch: event.rootEpoch,
+            generation: event.generation,
+            reason: event.reason,
+            durationMs: event.durationMs,
+          });
+        }
+      },
+      onLoadingChange: (loading, generation, rootEpoch) => {
+        const state = schedulerRef.current?.getState();
+        if (!state) return;
+        if (rootEpoch !== state.rootEpoch) return;
+        // Obsolete reads must not clear loading for a newer generation.
+        if (!loading && generation < state.requestedGeneration && state.inFlight) return;
+        setGitStatusLoading(loading);
+      },
+    });
+    schedulerRef.current = created;
+    return created;
+  }, []);
+
+  const applyGitStatus = useCallback((nextStatus: GitStatusSnapshot, rootPath?: string, reason = "external-apply") => {
+    const resolvedRoot = rootPath ?? workspacePathRef.current;
+    if (!resolvedRoot) return;
+    const invalidateHistory = shouldInvalidateHistoryForReason(reason);
+    const merged = mergePreservedHistory(gitStatusRef.current, nextStatus, { invalidateHistory });
+    gitStatusRef.current = merged;
+    ensureScheduler().applyMutationSnapshot(merged, reason);
+    setGitStatusPath(resolvedRoot);
+  }, [ensureScheduler]);
 
   const clearGitSelection = useCallback(() => {
     setSelectedGitCommitId(null);
     setSelectedGitWorkingFile(null);
   }, []);
 
+  const refreshGitStatus = useCallback(async (reason = "manual") => {
+    if (!workspacePathRef.current) return;
+    ensureScheduler().refreshNow(reason);
+  }, [ensureScheduler]);
+
+  const invalidateGitStatus = useCallback((reason = "working-tree") => {
+    if (!workspacePathRef.current) return;
+    ensureScheduler().invalidate({ reason, priority: "debounced" });
+  }, [ensureScheduler]);
+
+  const refreshGitStatusWithFetch = useCallback(async () => {
+    if (!workspace) return;
+    const rootPath = workspace.path;
+    setGitStatusError(null);
+    try {
+      const nextStatus = await fetchWorkspaceGit(rootPath);
+      if (workspacePathRef.current !== rootPath) return;
+      // Fetch mutates remote-tracking refs; publish through the same generation
+      // rules as other application-owned operations and invalidate history.
+      applyGitStatus(nextStatus, rootPath, "fetch");
+    } catch (error) {
+      if (workspacePathRef.current !== rootPath) return;
+      setGitStatusError(error instanceof Error ? error.message : String(error));
+    }
+  }, [applyGitStatus, workspace]);
+
   useEffect(() => {
     workspacePathRef.current = workspace?.path ?? null;
+    gitStatusRef.current = null;
     setGitStatus(null);
     setGitStatusPath(null);
     setGitStatusError(null);
@@ -113,49 +266,160 @@ export function useDesktopGitController({
     setGitOperationLoading(null);
     setBranchSwitcherOpen(false);
     setPendingBranchSwitch(null);
-  }, [workspace?.path]);
+    ensureScheduler().setRootPath(workspace?.path ?? null);
+  }, [ensureScheduler, workspace?.path]);
 
-  const refreshGitStatus = useCallback(async () => {
-    if (!workspace) return;
-    const rootPath = workspace.path;
-    setGitStatusLoading(true);
-    setGitStatusError(null);
-    try {
-      const nextStatus = await getWorkspaceGitStatus(rootPath);
-      if (workspacePathRef.current !== rootPath) return;
-      setGitStatus(nextStatus);
-      setGitStatusPath(rootPath);
-    } catch (error) {
-      if (workspacePathRef.current !== rootPath) return;
-      setGitStatus(null);
-      setGitStatusPath(null);
-      setGitStatusError(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (workspacePathRef.current === rootPath) setGitStatusLoading(false);
-    }
-  }, [workspace]);
+  // Subscribe to content + metadata watchers and take the initial snapshot only
+  // after BOTH are ready (closes the startup race documented in the lifecycle).
+  useEffect(() => {
+    const rootPath = workspace?.path ?? null;
+    if (!rootPath) return undefined;
 
-  const refreshGitStatusWithFetch = useCallback(async () => {
-    if (!workspace) return;
-    const rootPath = workspace.path;
-    setGitStatusLoading(true);
-    setGitStatusError(null);
-    try {
-      const nextStatus = await fetchWorkspaceGit(rootPath);
-      if (workspacePathRef.current !== rootPath) return;
-      setGitStatus(nextStatus);
-      setGitStatusPath(rootPath);
-    } catch (error) {
-      if (workspacePathRef.current !== rootPath) return;
-      setGitStatusError(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (workspacePathRef.current === rootPath) setGitStatusLoading(false);
-    }
-  }, [workspace]);
+    const scheduler = ensureScheduler();
+    let cancelled = false;
+    let metadataSubscriptionId: string | null = null;
+    let stopContentWatch: (() => void) | null = null;
+
+    const unsubscribeInvalidations = subscribeWorkspaceGitRepositoryInvalidations((event) => {
+      if (cancelled) return;
+      if (metadataSubscriptionId && event.subscriptionId !== metadataSubscriptionId) return;
+      if (!metadataSubscriptionId && event.rootPath !== rootPath) return;
+      scheduler.invalidate({ reason: event.reason || "git-metadata", priority: "debounced" });
+    });
+
+    const bridge = window.puppyoneDesktop;
+    const contentWatch = typeof bridge?.watchWorkspace === "function"
+      ? bridge.watchWorkspace(rootPath, (event) => {
+        if (cancelled) return;
+        if (event.error && !("recovered" in event && event.recovered)) {
+          // Content-watch errors are observable but must not clear Git truth.
+          // The main-process watcher re-arms; focus + metadata remain fallbacks.
+          return;
+        }
+        onWorkspaceContentChanged();
+        scheduler.invalidate({ reason: "working-tree", priority: "debounced" });
+      })
+      : null;
+    stopContentWatch = contentWatch?.stop ?? null;
+
+    void (async () => {
+      try {
+        const contentReady = contentWatch?.ready ?? Promise.resolve(null);
+        const [metadataResult] = await Promise.all([
+          startWorkspaceGitRepositoryWatch(rootPath),
+          contentReady.catch(() => null),
+        ]);
+        if (cancelled) {
+          if (metadataResult?.subscriptionId) {
+            await stopWorkspaceGitRepositoryWatch(metadataResult.subscriptionId);
+          }
+          return;
+        }
+        metadataSubscriptionId = metadataResult?.subscriptionId ?? null;
+      } catch (error) {
+        if (!cancelled) {
+          setGitStatusError(error instanceof Error ? error.message : String(error));
+        }
+      } finally {
+        if (!cancelled && workspacePathRef.current === rootPath) {
+          scheduler.refreshNow("initial");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      unsubscribeInvalidations();
+      stopContentWatch?.();
+      if (metadataSubscriptionId) {
+        void stopWorkspaceGitRepositoryWatch(metadataSubscriptionId);
+      }
+    };
+  }, [ensureScheduler, onWorkspaceContentChanged, workspace?.path]);
 
   useEffect(() => {
-    void refreshGitStatus();
-  }, [refreshGitStatus]);
+    const scheduler = ensureScheduler();
+    const syncFocus = () => {
+      const focused = typeof document === "undefined"
+        ? true
+        : document.visibilityState === "visible" && (typeof document.hasFocus !== "function" || document.hasFocus());
+      scheduler.setFocused(focused);
+    };
+    syncFocus();
+    window.addEventListener("focus", syncFocus);
+    window.addEventListener("blur", syncFocus);
+    document.addEventListener("visibilitychange", syncFocus);
+
+    const bridge = window.puppyoneDesktop;
+    const unsubscribeWindowFocus = typeof bridge?.onGitRepositoryWindowFocus === "function"
+      ? bridge.onGitRepositoryWindowFocus((event) => {
+        scheduler.setFocused(event.focused);
+      })
+      : () => {};
+
+    return () => {
+      window.removeEventListener("focus", syncFocus);
+      window.removeEventListener("blur", syncFocus);
+      document.removeEventListener("visibilitychange", syncFocus);
+      unsubscribeWindowFocus();
+    };
+  }, [ensureScheduler]);
+
+  useEffect(() => {
+    gitMainPanelRef.current = gitMainPanel;
+  }, [gitMainPanel]);
+
+  // Lazy-load history/graph when the History surface is active, or when HEAD/refs
+  // change while History is already open (cached history was cleared).
+  useEffect(() => {
+    if (!gitViewActive || gitMainPanel !== "history" || !workspace || !activeGitStatus?.isRepo) {
+      return undefined;
+    }
+
+    const rootPath = workspace.path;
+    const headCommitId = activeGitStatus.headCommitId;
+    const alreadyLoaded = (activeGitStatus.allCommits?.length ?? 0) > 0
+      || (activeGitStatus.commits?.length ?? 0) > 0;
+    // If we already have history for this HEAD, keep it.
+    if (alreadyLoaded) return undefined;
+
+    const requestId = ++historyRequestRef.current;
+    let cancelled = false;
+    void getWorkspaceGitBranchGraph(rootPath)
+      .then((graph) => {
+        if (cancelled || historyRequestRef.current !== requestId) return;
+        if (workspacePathRef.current !== rootPath) return;
+        setGitStatus((current) => {
+          if (!current || current.headCommitId !== headCommitId) return current;
+          const merged = {
+            ...current,
+            commits: graph.commits,
+            allCommits: graph.allCommits,
+            totalCommits: Math.max(current.totalCommits, graph.commits.length),
+          };
+          gitStatusRef.current = merged;
+          return merged;
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setGitStatusError(error instanceof Error ? error.message : String(error));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeGitStatus?.allCommits?.length,
+    activeGitStatus?.branch,
+    activeGitStatus?.commits?.length,
+    activeGitStatus?.headCommitId,
+    activeGitStatus?.isRepo,
+    gitMainPanel,
+    gitViewActive,
+    workspace,
+  ]);
 
   useEffect(() => {
     if (!gitViewActive || !activeGitStatus?.isRepo) return;
@@ -269,7 +533,7 @@ export function useDesktopGitController({
     setGitOperationError(null);
     try {
       const nextStatus = await operation(workspace.path);
-      setGitStatus(nextStatus);
+      applyGitStatus(nextStatus, workspace.path);
       onWorkspaceContentChanged();
       return true;
     } catch (error) {
@@ -280,7 +544,7 @@ export function useDesktopGitController({
     } finally {
       setGitOperationLoading(null);
     }
-  }, [onWorkspaceContentChanged, workspace]);
+  }, [applyGitStatus, onWorkspaceContentChanged, workspace]);
 
   const selectGitCommit = useCallback((commitId: string) => {
     setGitMainPanel("history");
@@ -321,13 +585,13 @@ export function useDesktopGitController({
     try {
       let nextStatus = await stageAllWorkspaceGitChanges(workspace.path);
       if (nextStatus.stagedEntries.length === 0) {
-        setGitStatus(nextStatus);
+        applyGitStatus(nextStatus, workspace.path);
         onWorkspaceContentChanged();
         return false;
       }
 
       nextStatus = await commitWorkspaceGit(workspace.path, "");
-      setGitStatus(nextStatus);
+      applyGitStatus(nextStatus, workspace.path);
       clearGitSelection();
       onWorkspaceContentChanged();
       return true;
@@ -337,7 +601,7 @@ export function useDesktopGitController({
     } finally {
       setGitOperationLoading(null);
     }
-  }, [clearGitSelection, onWorkspaceContentChanged, workspace]);
+  }, [applyGitStatus, clearGitSelection, onWorkspaceContentChanged, workspace]);
 
   const handleUnstageGitPaths = useCallback((paths: string[]) => {
     return runGitOperation("unstage", (rootPath) => unstageWorkspaceGitPaths(rootPath, paths));
@@ -380,7 +644,7 @@ export function useDesktopGitController({
     setGitOperationError(null);
     try {
       const nextStatus = await commitWorkspaceGit(workspace.path, "");
-      setGitStatus(nextStatus);
+      applyGitStatus(nextStatus, workspace.path);
       clearGitSelection();
       onWorkspaceContentChanged();
       return true;
@@ -390,7 +654,7 @@ export function useDesktopGitController({
     } finally {
       setGitOperationLoading(null);
     }
-  }, [clearGitSelection, onWorkspaceContentChanged, workspace]);
+  }, [applyGitStatus, clearGitSelection, onWorkspaceContentChanged, workspace]);
 
   const handleCommitAndPushGit = useCallback(async () => {
     if (!workspace) return false;
@@ -414,7 +678,7 @@ export function useDesktopGitController({
       } else {
         nextStatus = await pushWorkspaceGit(workspace.path);
       }
-      setGitStatus(nextStatus);
+      applyGitStatus(nextStatus, workspace.path);
       clearGitSelection();
       onWorkspaceContentChanged();
       return true;
@@ -424,7 +688,7 @@ export function useDesktopGitController({
     } finally {
       setGitOperationLoading(null);
     }
-  }, [activeGitStatus, clearGitSelection, onWorkspaceContentChanged, workspace]);
+  }, [activeGitStatus, applyGitStatus, clearGitSelection, onWorkspaceContentChanged, workspace]);
 
   const handlePullGit = useCallback(() => {
     return runGitOperation("pull", (rootPath) => pullWorkspaceGit(rootPath));
@@ -449,7 +713,7 @@ export function useDesktopGitController({
     setPendingBranchSwitch(null);
     try {
       const nextStatus = await checkoutWorkspaceGitBranch(workspace.path, branchName, remote);
-      setGitStatus(nextStatus);
+      applyGitStatus(nextStatus, workspace.path);
       onWorkspaceContentChanged();
       clearGitSelection();
       setGitMainPanel("changes");
@@ -471,7 +735,7 @@ export function useDesktopGitController({
     } finally {
       setGitOperationLoading(null);
     }
-  }, [activeGitStatus, clearGitSelection, gitStatusPath, onWorkspaceContentChanged, workspace]);
+  }, [activeGitStatus, applyGitStatus, clearGitSelection, gitStatusPath, onWorkspaceContentChanged, workspace]);
 
   const handleStashAndCheckoutBranch = useCallback(async () => {
     if (!workspace || !pendingBranchSwitch) return false;
@@ -484,7 +748,7 @@ export function useDesktopGitController({
         pendingBranchSwitch.branchName,
         pendingBranchSwitch.remote,
       );
-      setGitStatus(nextStatus);
+      applyGitStatus(nextStatus, workspace.path);
       onWorkspaceContentChanged();
       clearGitSelection();
       setGitMainPanel("changes");
@@ -497,7 +761,7 @@ export function useDesktopGitController({
     } finally {
       setGitOperationLoading(null);
     }
-  }, [clearGitSelection, onWorkspaceContentChanged, pendingBranchSwitch, workspace]);
+  }, [applyGitStatus, clearGitSelection, onWorkspaceContentChanged, pendingBranchSwitch, workspace]);
 
   const handleCommitAndCheckoutBranch = useCallback(async () => {
     if (!workspace || !pendingBranchSwitch) return false;
@@ -510,7 +774,7 @@ export function useDesktopGitController({
         pendingBranchSwitch.branchName,
         pendingBranchSwitch.remote,
       );
-      setGitStatus(nextStatus);
+      applyGitStatus(nextStatus, workspace.path);
       onWorkspaceContentChanged();
       clearGitSelection();
       setGitMainPanel("changes");
@@ -524,7 +788,7 @@ export function useDesktopGitController({
     } finally {
       setGitOperationLoading(null);
     }
-  }, [clearGitSelection, onWorkspaceContentChanged, pendingBranchSwitch, workspace]);
+  }, [applyGitStatus, clearGitSelection, onWorkspaceContentChanged, pendingBranchSwitch, workspace]);
 
   const handleInitializeGitRepository = useCallback(async () => {
     const initialized = await runGitOperation("init", (rootPath) => initializeWorkspaceGitRepository(rootPath));
@@ -535,6 +799,13 @@ export function useDesktopGitController({
     }
     return initialized;
   }, [clearGitSelection, onEnterGitView, runGitOperation]);
+
+  useEffect(() => () => {
+    const scheduler = schedulerRef.current;
+    if (!scheduler) return;
+    scheduler.dispose();
+    schedulerRef.current = null;
+  }, []);
 
   return {
     activeGitStatus,
@@ -578,6 +849,7 @@ export function useDesktopGitController({
     handleStashAndCheckoutBranch,
     handleUnstageAllGitChanges,
     handleUnstageGitPaths,
+    invalidateGitStatus,
     refreshGitStatus,
     refreshGitStatusWithFetch,
     selectGitCommit,
