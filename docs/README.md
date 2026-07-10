@@ -23,6 +23,7 @@ directly:
 - [Desktop Menu Surface](architecture/desktop-menu-surface.md)
 - [Desktop Appearance Settings](architecture/desktop-appearance-settings.md)
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
+- [Desktop Agent Architecture](architecture/desktop-agent/README.md)
 
 ## Release
 

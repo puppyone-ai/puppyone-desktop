@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Circle, CircleAlert, FilePenLine, LoaderCircle, TerminalSquare } from "lucide-react";
-import type { AgentActivity, AgentProjection } from "./agentProjection";
+import { CircleAlert, LoaderCircle } from "lucide-react";
+import type { AgentProjection } from "./agentProjection";
+import { AgentMessage } from "./AgentMessage";
+import { AgentActivityItem } from "./AgentActivityItem";
 
 type AgentTranscriptProps = {
   projection: AgentProjection;
@@ -55,20 +57,9 @@ export function AgentTranscript({ projection, loading, onViewChanges }: AgentTra
           </div>
         )}
         {entries.map((entry) => entry.kind === "message" ? (
-          <article
-            className={`desktop-agent-message is-${entry.message.role}`}
-            key={entry.message.id}
-          >
-            <div className="desktop-agent-message-role">{entry.message.role === "user" ? "You" : "Codex"}</div>
-            <div className="desktop-agent-message-text">{entry.message.text || (entry.message.streaming ? "…" : "")}</div>
-            {entry.message.terminalState && entry.message.terminalState !== "completed" && (
-              <div className={`desktop-agent-message-state is-${entry.message.terminalState}`}>
-                {entry.message.terminalState}
-              </div>
-            )}
-          </article>
+          <AgentMessage message={entry.message} key={entry.message.id} />
         ) : (
-          <AgentActivityRow activity={entry.activity} key={entry.activity.id} onViewChanges={onViewChanges} />
+          <AgentActivityItem activity={entry.activity} key={entry.activity.id} onViewChanges={onViewChanges} />
         ))}
         <div
           className="desktop-agent-announcer"
@@ -93,76 +84,4 @@ export function AgentTranscript({ projection, loading, onViewChanges }: AgentTra
       )}
     </div>
   );
-}
-
-function AgentActivityRow({ activity, onViewChanges }: { activity: AgentActivity; onViewChanges?: () => void }) {
-  const [expanded, setExpanded] = useState(false);
-  const hasDetail = activity.output.length > 0 || Object.keys(activity.detail).length > 0;
-  const Icon = activity.kind === "command"
-    ? TerminalSquare
-    : activity.kind === "file-change"
-      ? FilePenLine
-      : activity.kind === "error" || activity.kind === "warning"
-        ? CircleAlert
-        : activity.status === "completed"
-          ? Check
-          : Circle;
-  return (
-    <div className={`desktop-agent-activity is-${activity.status}`}>
-      <button
-        type="button"
-        className="desktop-agent-activity-summary"
-        disabled={!hasDetail}
-        aria-expanded={hasDetail ? expanded : undefined}
-        onClick={() => hasDetail && setExpanded((value) => !value)}
-      >
-        <Icon size={14} aria-hidden="true" />
-        <span>{activity.label}</span>
-        <small>{activity.status}</small>
-        {hasDetail && <ChevronDown size={13} className={expanded ? "is-expanded" : ""} />}
-      </button>
-      {expanded && (
-        <div className="desktop-agent-activity-detail">
-          {activity.output && <pre>{activity.output}</pre>}
-          {!activity.output && <ActivityDetails detail={activity.detail} />}
-          {activity.kind === "file-change" && onViewChanges && (
-            <button type="button" className="desktop-agent-view-changes" onClick={onViewChanges}>View changes</button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ActivityDetails({ detail }: { detail: Record<string, unknown> }) {
-  const changes = Array.isArray(detail.changes) ? detail.changes : [];
-  if (changes.length > 0) {
-    return (
-      <ul>
-        {changes.map((change, index) => {
-          const value = change && typeof change === "object" ? change as Record<string, unknown> : {};
-          return (
-            <li key={`${String(value.path)}:${index}`}>
-              <span>{String(value.path ?? "Unknown file")}</span>
-              <small>+{String(value.additions ?? 0)} −{String(value.deletions ?? 0)}</small>
-            </li>
-          );
-        })}
-      </ul>
-    );
-  }
-  const command = typeof detail.command === "string" ? detail.command : null;
-  const reasoning = typeof detail.delta === "string" ? detail.delta : null;
-  const steps = Array.isArray(detail.steps) ? detail.steps : [];
-  if (steps.length > 0) {
-    return (
-      <ol>
-        {steps.map((step, index) => {
-          const value = step && typeof step === "object" ? step as Record<string, unknown> : {};
-          return <li key={index}>{String(value.step ?? "")} <small>{String(value.status ?? "")}</small></li>;
-        })}
-      </ol>
-    );
-  }
-  return <pre>{command || reasoning || JSON.stringify(detail, null, 2)}</pre>;
 }

@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { CircleAlert, LoaderCircle, Plus, RefreshCw } from "lucide-react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { CircleAlert, LoaderCircle, RefreshCw } from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { AgentApprovalDock } from "./AgentApprovalDock";
 import { AgentComposer } from "./AgentComposer";
+import { AgentControls } from "./AgentControls";
+import { AgentQuestionDock } from "./AgentQuestionDock";
+import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
 import { applyAgentEvent, applyAgentEvents, createAgentProjection } from "./agentProjection";
 import type {
@@ -13,21 +16,36 @@ import type {
   AgentSessionSnapshot,
 } from "./agentTypes";
 
+export type RightAgentPanelHandle = {
+  newSession: () => void;
+};
+
 type RightAgentPanelProps = {
   workspace: Workspace;
   active: boolean;
   onViewChanges?: () => void;
+  onRunningChange?: (running: boolean) => void;
+  preferredModel?: string | null;
+  onPreferredModelChange?: (model: string) => void;
 };
 
 type PanelState = "idle" | "discovering" | "restoring" | "ready" | "creating" | "failed";
 
-export function RightAgentPanel({ workspace, active, onViewChanges }: RightAgentPanelProps) {
+export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanelProps>(function RightAgentPanel({
+  workspace,
+  active,
+  onViewChanges,
+  onRunningChange,
+  preferredModel = null,
+  onPreferredModelChange,
+}, ref) {
   const [hasStarted, setHasStarted] = useState(active);
   const [panelState, setPanelState] = useState<PanelState>("idle");
   const [inspection, setInspection] = useState<AgentProviderInspection | null>(null);
   const [session, setSession] = useState<AgentSessionMetadata | null>(null);
   const [projection, setProjection] = useState(() => createAgentProjection());
-  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string | null>(preferredModel);
+  const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [resolvingApproval, setResolvingApproval] = useState(false);
@@ -39,6 +57,10 @@ export function RightAgentPanel({ workspace, active, onViewChanges }: RightAgent
     if (active) setHasStarted(true);
   }, [active]);
 
+  useEffect(() => {
+    onRunningChange?.(Boolean(projection.runningTurnId));
+  }, [onRunningChange, projection.runningTurnId]);
+
   const commitProjection = useCallback((next: ReturnType<typeof createAgentProjection>) => {
     projectionRef.current = next;
     setProjection(next);
@@ -47,7 +69,13 @@ export function RightAgentPanel({ workspace, active, onViewChanges }: RightAgent
   const applySnapshot = useCallback((snapshot: AgentSessionSnapshot) => {
     sessionIdRef.current = snapshot.session.id;
     setSession(snapshot.session);
-    setSelectedModel(snapshot.session.selectedModel || snapshot.models.find((model) => model.isDefault)?.model || snapshot.models[0]?.model || null);
+    setSelectedModel((current) => (
+      snapshot.session.selectedModel
+      || current
+      || snapshot.models.find((model) => model.isDefault)?.model
+      || snapshot.models[0]?.model
+      || null
+    ));
     setInspection((current) => ({
       readiness: current?.readiness ?? {
         provider: "codex",
@@ -122,7 +150,7 @@ export function RightAgentPanel({ workspace, active, onViewChanges }: RightAgent
 
   const initialize = useCallback(async (refresh = false) => {
     const bridge = window.puppyoneDesktop;
-    if (!bridge?.discoverAgentProvider || !bridge.restoreAgentSession) {
+    if (!bridge?.discoverAgentProviders || !bridge.resumeAgentSession) {
       setPanelState("failed");
       setError("Desktop Agent bridge unavailable. Restart PuppyOne so the native bridge can load.");
       return;
@@ -130,7 +158,7 @@ export function RightAgentPanel({ workspace, active, onViewChanges }: RightAgent
     setError(null);
     setPanelState("discovering");
     try {
-      const nextInspection = await bridge.discoverAgentProvider({ refresh });
+      const nextInspection = await bridge.discoverAgentProviders({ refresh });
       setInspection(nextInspection);
       setSelectedModel((current) => current
         || nextInspection.models.find((model) => model.isDefault)?.model
@@ -141,7 +169,7 @@ export function RightAgentPanel({ workspace, active, onViewChanges }: RightAgent
         return;
       }
       setPanelState("restoring");
-      const restored = await bridge.restoreAgentSession({ rootPath: workspace.path });
+      const restored = await bridge.resumeAgentSession({ rootPath: workspace.path });
       if (restored) applySnapshot(restored);
       setPanelState("ready");
     } catch (initializationError) {
@@ -156,6 +184,7 @@ export function RightAgentPanel({ workspace, active, onViewChanges }: RightAgent
     setSession(null);
     commitProjection(createAgentProjection());
     void initialize(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commitProjection, hasStarted, initialize, workspace.path]);
 
   const createSession = useCallback(async () => {
@@ -168,7 +197,7 @@ export function RightAgentPanel({ workspace, active, onViewChanges }: RightAgent
     return snapshot.session;
   }, [applySnapshot, selectedModel, workspace.path]);
 
-  const handleNewSession = async () => {
+  const handleNewSession = useCallback(async () => {
     const bridge = window.puppyoneDesktop;
     setError(null);
     try {
@@ -178,12 +207,36 @@ export function RightAgentPanel({ workspace, active, onViewChanges }: RightAgent
       sessionIdRef.current = null;
       setSession(null);
       commitProjection(createAgentProjection());
+      // The draft is intentionally left untouched: a fresh session should
+      // carry forward whatever the user was mid-typing.
       await createSession();
     } catch (newSessionError) {
       setPanelState("failed");
       setError(formatAgentError(newSessionError));
     }
-  };
+  }, [commitProjection, createSession]);
+
+  const handleResetSession = useCallback(() => {
+    void handleNewSession();
+  }, [handleNewSession]);
+
+  const handleCloseSession = useCallback(async () => {
+    const bridge = window.puppyoneDesktop;
+    if (!sessionIdRef.current || !bridge?.closeAgentSession) return;
+    setError(null);
+    try {
+      await bridge.closeAgentSession({ sessionId: sessionIdRef.current, removePersistence: true });
+      sessionIdRef.current = null;
+      setSession(null);
+      commitProjection(createAgentProjection());
+    } catch (closeError) {
+      setError(formatAgentError(closeError));
+    }
+  }, [commitProjection]);
+
+  useImperativeHandle(ref, () => ({
+    newSession: () => void handleNewSession(),
+  }), [handleNewSession]);
 
   const handleSubmit = async (prompt: string) => {
     const bridge = window.puppyoneDesktop;
@@ -239,57 +292,55 @@ export function RightAgentPanel({ workspace, active, onViewChanges }: RightAgent
     }
   };
 
+  const handleSelectModel = (model: string) => {
+    setSelectedModel(model || null);
+    if (model) onPreferredModelChange?.(model);
+  };
+
   const readiness = inspection?.readiness;
-  const setupRequired = Boolean(inspection?.account?.requiresOpenaiAuth && !inspection.account.account);
-  const unavailable = readiness?.status !== "ready" || setupRequired;
+  const setupRequired = readiness?.status === "installed-not-authenticated";
+  const unsupportedVersion = readiness?.status === "unsupported-version";
+  const unavailable = readiness?.status !== "ready";
   const loading = panelState === "discovering" || panelState === "restoring" || panelState === "creating";
 
   return (
     <section className="desktop-agent-panel" aria-label="Codex Chat">
-      <header className="desktop-agent-session-header">
-        <div>
-          <strong>{session?.title || "Codex"}</strong>
-          <span>{session ? session.terminalState : readinessLabel(readiness?.status, setupRequired)}</span>
-        </div>
-        <button
-          type="button"
-          className="desktop-agent-icon-button"
-          aria-label="New Codex session"
-          title="New Codex session"
-          disabled={loading || unavailable || Boolean(projection.runningTurnId)}
-          onClick={() => void handleNewSession()}
-        >
-          <Plus size={15} />
-        </button>
-      </header>
+      <AgentSurfaceHeader
+        title={session?.title || "Codex"}
+        statusLabel={session ? session.terminalState : readinessLabel(readiness?.status)}
+        loading={loading}
+        newSessionDisabled={unavailable || Boolean(projection.runningTurnId)}
+        onNewSession={() => void handleNewSession()}
+        diagnostic={readiness?.diagnostic || (inspection?.warnings.length ? inspection.warnings.join(" ") : null)}
+        closeDisabled={!session}
+        onCloseSession={() => void handleCloseSession()}
+        onResetSession={handleResetSession}
+      />
 
-      <div className="desktop-agent-controls">
-        <div className="desktop-agent-provider-control">
-          <span className="desktop-agent-provider-dot" /> Codex
-        </div>
-        {inspection?.capabilities?.modelSelection && inspection.models.length > 0 && (
-          <label>
-            <span className="desktop-agent-visually-hidden">Codex model</span>
-            <select
-              value={selectedModel ?? ""}
-              disabled={Boolean(projection.runningTurnId)}
-              onChange={(event) => setSelectedModel(event.target.value || null)}
-            >
-              {inspection.models.map((model) => (
-                <option value={model.model} key={model.id}>{model.displayName}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        <span className="desktop-agent-mode">Agent</span>
-      </div>
+      <AgentControls
+        providerLabel="Codex"
+        models={inspection?.models ?? []}
+        selectedModel={selectedModel}
+        modelSelectionAvailable={Boolean(inspection?.capabilities?.modelSelection)}
+        disabled={Boolean(projection.runningTurnId)}
+        onSelectModel={handleSelectModel}
+      />
 
       {(unavailable || panelState === "failed") && (
         <div className="desktop-agent-readiness" role="status">
           <CircleAlert size={15} />
           <div>
-            <strong>{setupRequired ? "Codex setup required" : "Codex unavailable"}</strong>
-            <p>{setupRequired ? "Run `codex login` in Terminal, then refresh." : readiness?.message || error || "Unable to inspect Codex."}</p>
+            <strong>{readinessHeading(readiness?.status)}</strong>
+            {unsupportedVersion ? (
+              <p>
+                Detected Codex {readiness?.version || "unknown version"}; PuppyOne requires{" "}
+                {readiness?.minimumVersion || "a newer version"}. Update Codex via its install channel, then refresh.
+              </p>
+            ) : setupRequired ? (
+              <p>Codex is installed but not signed in. Run `codex login` in Terminal, then refresh.</p>
+            ) : (
+              <p>{readiness?.message || error || "Unable to inspect Codex."}</p>
+            )}
           </div>
           <button type="button" aria-label="Refresh Codex readiness" onClick={() => void initialize(true)}>
             <RefreshCw size={14} /> Refresh
@@ -309,6 +360,13 @@ export function RightAgentPanel({ workspace, active, onViewChanges }: RightAgent
 
       <AgentTranscript projection={projection} loading={loading} onViewChanges={onViewChanges} />
 
+      <AgentQuestionDock
+        question={null}
+        capabilities={inspection?.capabilities ?? null}
+        onSubmit={() => {}}
+        onCancel={() => {}}
+      />
+
       {projection.approvals[0] && (
         <AgentApprovalDock
           approval={projection.approvals[0]}
@@ -319,23 +377,31 @@ export function RightAgentPanel({ workspace, active, onViewChanges }: RightAgent
       )}
 
       <AgentComposer
+        draft={draft}
+        onDraftChange={setDraft}
         disabled={loading || unavailable || panelState === "failed" || projection.approvals.length > 0}
         running={Boolean(projection.runningTurnId)}
         submitting={submitting}
-        placeholder={unavailable ? "Codex setup required" : "Message Codex…"}
+        placeholder={setupRequired ? "Codex setup required" : unavailable ? "Codex unavailable" : "Message Codex…"}
         onSubmit={handleSubmit}
         onStop={() => void handleStop()}
       />
     </section>
   );
-}
+});
 
-function readinessLabel(status: string | undefined, setupRequired: boolean) {
-  if (setupRequired) return "setup required";
+function readinessLabel(status: string | undefined) {
   if (status === "ready") return "ready";
+  if (status === "installed-not-authenticated") return "setup required";
   if (status === "not-installed") return "not installed";
   if (status === "unsupported-version") return "update required";
   return "checking";
+}
+
+function readinessHeading(status: string | undefined) {
+  if (status === "installed-not-authenticated") return "Codex setup required";
+  if (status === "unsupported-version") return "Codex update required";
+  return "Codex unavailable";
 }
 
 function formatAgentError(error: unknown) {

@@ -10,8 +10,7 @@ import {
   MinimalOnboarding,
   type OnboardingOperationStatus,
 } from "./components/MinimalOnboarding";
-import type { RightTerminalPanelHandle } from "./components/RightTerminalPanel";
-import { RightCompanionPanel } from "./features/desktop-agent/RightCompanionPanel";
+import { RightCompanionPanel, type RightCompanionPanelHandle } from "./features/desktop-agent/RightCompanionPanel";
 import { useDesktopUpdates } from "./components/DesktopUpdateControls";
 import {
   configureWorkspaceCloudRemote,
@@ -144,6 +143,7 @@ export function App() {
     rightSidebarToolsSettings,
     rightSidebarWidth,
     rightSidebarSurface,
+    agentPreferredModel,
     sidebarCollapsed,
     sidebarNavigationLayout,
     sidebarNavigationOrientation,
@@ -166,13 +166,14 @@ export function App() {
     setRightSidebarToolsSettings,
     setRightSidebarWidth,
     setRightSidebarSurface,
+    setAgentPreferredModel,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setThemeMode,
   } = preferences;
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("account");
   const [terminalSessionResetToken, setTerminalSessionResetToken] = useState(0);
-  const terminalPanelRef = useRef<RightTerminalPanelHandle | null>(null);
+  const companionPanelRef = useRef<RightCompanionPanelHandle | null>(null);
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
   const [activeDataPath, setActiveDataPath] = useState<string | null>(null);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
@@ -849,8 +850,15 @@ export function App() {
       titlebarActionsSettings={titlebarActionsSettings}
       terminalSidebarOpen={terminalSidebarOpen && desktopTerminalEnabled}
       terminalToolEnabled={desktopTerminalEnabled}
+      rightSidebarSurface={rightSidebarSurface}
       onClearTerminal={() => {
-        terminalPanelRef.current?.clear();
+        companionPanelRef.current?.clear();
+        setSwitcherOpen(false);
+      }}
+      onNewAgentSession={() => {
+        setRightSidebarSurface("chat");
+        setRightSidebarOpen(true);
+        companionPanelRef.current?.newSession();
         setSwitcherOpen(false);
       }}
       onOpenActiveFileExternal={() => void activeExternalOpen.openActiveFileExternal()}
@@ -858,6 +866,11 @@ export function App() {
       onCustomizeExternalAppForActiveFile={() => void activeExternalOpen.setExternalAppDefaultForActiveFile()}
       onResetTerminal={() => {
         setTerminalSessionResetToken((token) => token + 1);
+        setSwitcherOpen(false);
+      }}
+      onSelectCompanionSurface={(surface) => {
+        setRightSidebarSurface(surface);
+        setRightSidebarOpen(true);
         setSwitcherOpen(false);
       }}
       onToggleTerminal={() => {
@@ -893,11 +906,13 @@ export function App() {
         rightSidebar={desktopTerminalEnabled ? (
           <RightCompanionPanel
             key={workspace.path}
-            ref={terminalPanelRef}
+            ref={companionPanelRef}
             workspace={workspace}
             active={terminalSidebarOpen && desktopTerminalEnabled}
             surface={rightSidebarSurface}
             terminalResetToken={terminalSessionResetToken}
+            preferredModel={agentPreferredModel}
+            onPreferredModelChange={setAgentPreferredModel}
             onSurfaceChange={setRightSidebarSurface}
             onViewChanges={() => {
               setActiveView("git");

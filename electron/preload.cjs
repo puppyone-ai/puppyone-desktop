@@ -130,18 +130,27 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     ipcRenderer.on("updates:state", listener);
     return () => ipcRenderer.removeListener("updates:state", listener);
   },
-  discoverAgentProvider: (request) => ipcRenderer.invoke("agent:provider-discover", request),
+  discoverAgentProviders: (request) => ipcRenderer.invoke("agent:providers-discover", request),
+  listAgentModels: (request) => ipcRenderer.invoke("agent:models-list", request),
+  readAgentAccount: (request) => ipcRenderer.invoke("agent:account-read", request),
   createAgentSession: (request) => ipcRenderer.invoke("agent:session-create", request),
-  restoreAgentSession: (request) => ipcRenderer.invoke("agent:session-restore", request),
+  resumeAgentSession: (request) => ipcRenderer.invoke("agent:session-resume", request),
   replayAgentSession: (request) => ipcRenderer.invoke("agent:session-replay", request),
   closeAgentSession: (request) => ipcRenderer.invoke("agent:session-close", request),
   startAgentTurn: (request) => ipcRenderer.invoke("agent:turn-start", request),
+  steerAgentTurn: (request) => ipcRenderer.invoke("agent:turn-steer", request),
   interruptAgentTurn: (request) => ipcRenderer.invoke("agent:turn-interrupt", request),
   resolveAgentApproval: (request) => ipcRenderer.invoke("agent:approval-resolve", request),
+  resolveAgentQuestion: (request) => ipcRenderer.invoke("agent:question-resolve", request),
   onAgentEvent: (callback) => {
     const listener = (_event, payload) => callback(payload);
     ipcRenderer.on("agent:event", listener);
     return () => ipcRenderer.removeListener("agent:event", listener);
+  },
+  onAgentSessionExit: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("agent:session-exit", listener);
+    return () => ipcRenderer.removeListener("agent:session-exit", listener);
   },
   createTerminal: (request) => ipcRenderer.invoke("terminal:create", request),
   writeTerminal: (request) => ipcRenderer.send("terminal:input", request),
