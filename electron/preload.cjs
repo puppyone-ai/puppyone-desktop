@@ -79,13 +79,17 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     ipcRenderer.on("workspace:changed", listener);
     let subscriptionId = null;
     let stopped = false;
-    ipcRenderer.invoke("workspace:watch-start", { rootPath })
+    const ready = ipcRenderer.invoke("workspace:watch-start", { rootPath })
       .then((result) => {
         subscriptionId = result?.subscriptionId ?? null;
         // If teardown ran before start resolved, stop the now-known subscription.
         if (stopped && subscriptionId) {
           ipcRenderer.invoke("workspace:watch-stop", { subscriptionId }).catch(() => {});
         }
+        return {
+          subscriptionId,
+          rootPath: result?.rootPath ?? rootPath,
+        };
       })
       .catch((error) => {
         callback({
@@ -94,14 +98,16 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
           path: null,
           error: error instanceof Error ? error.message : String(error),
         });
+        throw error;
       });
-    return () => {
+    const stop = () => {
       stopped = true;
       ipcRenderer.removeListener("workspace:changed", listener);
       if (subscriptionId) {
         ipcRenderer.invoke("workspace:watch-stop", { subscriptionId }).catch(() => {});
       }
     };
+    return { stop, ready };
   },
   startGitRepositoryWatch: (request) => ipcRenderer.invoke("git-repository:watch-start", request),
   stopGitRepositoryWatch: (request) => ipcRenderer.invoke("git-repository:watch-stop", request),

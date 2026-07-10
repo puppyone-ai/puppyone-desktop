@@ -289,6 +289,8 @@ export type WorkspaceChangedEvent = {
   eventType: string;
   path: string | null;
   error?: string;
+  recovered?: boolean;
+  reason?: string;
 };
 
 export type AiEditReviewUpdatedEvent = {
@@ -616,7 +618,10 @@ declare global {
       watchWorkspace: (
         rootPath: string,
         callback: (event: WorkspaceChangedEvent) => void,
-      ) => () => void;
+      ) => {
+        stop: () => void;
+        ready: Promise<{ subscriptionId: string | null; rootPath: string }>;
+      };
       startGitRepositoryWatch: (request: {
         rootPath: string;
       }) => Promise<GitRepositoryWatchResult>;

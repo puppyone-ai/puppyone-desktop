@@ -420,7 +420,7 @@ describe("git metadata watch service", { timeout: 30_000 }, () => {
     expect(service.getWatcherCount()).toBe(0);
   });
 
-  it("re-arms after a recoverable watcher failure path", async () => {
+  it("re-arms after a recoverable watcher failure and keeps delivering events", async () => {
     initRepoWithIdentity();
     await writeFile(path.join(root, "a.txt"), "a\n");
     git(["add", "a.txt"]);
@@ -431,9 +431,12 @@ describe("git metadata watch service", { timeout: 30_000 }, () => {
     const subscription = await service.start(sender, root);
     expect(service.getWatcherCount()).toBe(1);
 
-    // Replace HEAD via update-ref (atomic replace) and ensure later events still flow.
-    const head = git(["rev-parse", "HEAD"]);
-    git(["update-ref", "HEAD", head]);
+    const forced = service.forceRearmForTests(root, "watcher-error");
+    expect(forced).toBe(true);
+    await waitFor(() => events.some((event) => event.payload?.reason === "watcher-error"), {
+      timeout: 8000,
+    });
+
     const baseline = events.length;
     git(["checkout", "-b", "after-rearm"]);
     await waitFor(() => events.length > baseline, { timeout: 8000 });

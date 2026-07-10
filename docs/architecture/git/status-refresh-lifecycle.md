@@ -7,8 +7,14 @@ snapshot consumer and sidebar state model are documented in
 ## Status
 
 - **Lifecycle:** Implemented.
-- The watcher, scheduler, query split, focus fallback, and verification matrix
-  described under Target Architecture are current behavior.
+- The watcher, scheduler, query split, focus fallback, recovery, and verification
+  matrix described under Target Architecture are current behavior.
+- Workspace switches are isolated by a monotonic `rootEpoch`; delayed reads from
+  a previous root cannot publish into the active repository.
+- Physical single-flight is preserved across mutation snapshots: an in-flight
+  status promise remains counted until it settles, even when it is no longer
+  publishable.
+- Initial snapshot waits for both content and metadata watcher readiness.
 - Historical diagnosis of the pre-fix stale-status gap is retained below for
   rationale; it is no longer the product contract.
 
@@ -485,15 +491,17 @@ Primary files:
 - `electron/preload.cjs`
 - `src/types/electron.d.ts`
 - `src/features/source-control/useDesktopGitController.ts`
-- `src/features/data-workspace/useWorkspaceFileWatch.ts`
+- `src/features/data-workspace/useWorkspaceFileWatch.ts` (compat shim; content
+  watch bootstrap now lives in the Git controller readiness barrier)
 
 Deliverables:
 
 - Expose token-based start, invalidation, and stop operations through the
   context-isolated bridge.
 - Give the existing workspace-content subscription equivalent token semantics,
-  or join content and metadata readiness under one lifecycle token, so stale
-  content-watch cleanup cannot remove a newer subscription.
+  and join content and metadata readiness under one bootstrap barrier, so stale
+  content-watch cleanup cannot remove a newer subscription and the initial
+  snapshot cannot race ahead of either watcher.
 - Authorize the workspace root before repository resolution and watcher setup.
 - Move initial Git refresh behind successful subscription readiness.
 - Route working-tree and metadata invalidations to the Git scheduler while
@@ -516,11 +524,14 @@ Deliverables:
 
 - Centralize initial, watcher, focus, manual, configuration, and operation
   refreshes behind one scheduler.
-- Enforce debounce, single-flight, dirty trailing refresh, and monotonically
-  ordered result application.
+- Enforce debounce, single-flight (physical + publishable generation), dirty
+  trailing refresh, monotonic `rootEpoch` workspace isolation, and ordered
+  result application.
 - Prevent a status read started before stage, commit, checkout, pull, or another
-  mutation from overwriting that operation's returned snapshot.
-- Preserve the last good snapshot on transient errors.
+  mutation from overwriting that operation's returned snapshot, without starting
+  a second physical status while the prior promise is still alive.
+- Preserve the last good snapshot on transient errors and retry with bounded
+  exponential backoff while focused.
 - Keep selection cleanup and existing view-model behavior after a new snapshot
   is accepted.
 

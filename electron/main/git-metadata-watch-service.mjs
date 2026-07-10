@@ -499,6 +499,34 @@ export function createGitMetadataWatchService({
     repository.clients.clear();
   }
 
+  function forceRearmForTests(workspaceRoot, reason = "watcher-error") {
+    const candidates = new Set([
+      path.resolve(workspaceRoot),
+    ]);
+    try {
+      candidates.add(path.resolve(fsModule.realpathSync(workspaceRoot)));
+    } catch {
+      // Workspace may not exist in synthetic tests.
+    }
+
+    for (const repository of repositories.values()) {
+      const top = path.resolve(repository.identity.topLevel);
+      let topReal = top;
+      try {
+        topReal = path.resolve(fsModule.realpathSync(top));
+      } catch {
+        // Keep unresolved top.
+      }
+      if (!candidates.has(top) && !candidates.has(topReal)) continue;
+      repository.rearmDelay = GIT_METADATA_REARM_MIN_DELAY_MS;
+      clearTimeout(repository.rearmTimer);
+      repository.rearmTimer = null;
+      scheduleRearm(repository, reason);
+      return true;
+    }
+    return false;
+  }
+
   return {
     start,
     stop,
@@ -508,6 +536,8 @@ export function createGitMetadataWatchService({
     getPendingRootCount,
     // Test seam: force a pending root to re-check for repository creation.
     promotePendingRootForTests: promotePendingRoot,
+    // Test seam: inject watcher failure recovery without relying on OS fs.watch quirks.
+    forceRearmForTests,
   };
 }
 

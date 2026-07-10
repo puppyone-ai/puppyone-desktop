@@ -3,6 +3,7 @@ import {
   createGitRefreshScheduler,
   GIT_FOCUS_STALE_MS,
   GIT_REFRESH_DEBOUNCE_MS,
+  GIT_REFRESH_RETRY_INITIAL_MS,
 } from "../src/features/source-control/gitRefreshScheduler";
 
 function createDeferred<T>() {
@@ -100,18 +101,130 @@ describe("gitRefreshScheduler", () => {
     scheduler.applyMutationSnapshot({ label: "mutation" }, "commit");
     expect(snapshots).toEqual([{ label: "mutation" }]);
     expect(scheduler.getState().appliedGeneration).toBe(2);
+    expect(scheduler.getState().physicalInFlight).toBe(1);
+
+    // Mutation must not start a second physical status while the first promise lives.
+    scheduler.refreshNow("manual");
+    expect(call).toBe(1);
+    expect(scheduler.getState().dirty).toBe(true);
 
     first.resolve({ label: "stale" });
     await flushMicrotasks();
 
     expect(snapshots).toEqual([{ label: "mutation" }]);
-
-    scheduler.refreshNow("manual");
     expect(call).toBe(2);
+
     second.resolve({ label: "fresh" });
     await flushMicrotasks();
 
     expect(snapshots).toEqual([{ label: "mutation" }, { label: "fresh" }]);
+    scheduler.dispose();
+  });
+
+  it("discards delayed responses across A → B workspace switches", async () => {
+    const repoA = createDeferred<{ label: string }>();
+    const repoB = createDeferred<{ label: string }>();
+    const snapshots: Array<{ label: string; rootPath: string }> = [];
+    const roots: string[] = [];
+    let call = 0;
+
+    const scheduler = createGitRefreshScheduler({
+      debounceMs: 0,
+      readStatus: async (_generation, rootPath) => {
+        call += 1;
+        roots.push(rootPath);
+        return call === 1 ? repoA.promise : repoB.promise;
+      },
+      onSnapshot: (snapshot, meta) => {
+        snapshots.push({ label: snapshot.label, rootPath: meta.rootPath });
+      },
+      setTimeoutFn: (callback) => {
+        callback();
+        return 1 as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimeoutFn: () => {},
+    });
+
+    scheduler.setRootPath("/repo-a");
+    const epochA = scheduler.getState().rootEpoch;
+    scheduler.refreshNow("initial");
+    expect(call).toBe(1);
+
+    scheduler.setRootPath("/repo-b");
+    const epochB = scheduler.getState().rootEpoch;
+    expect(epochB).toBeGreaterThan(epochA);
+    scheduler.refreshNow("initial");
+    // Physical single-flight: B waits until A's promise settles.
+    expect(call).toBe(1);
+    expect(scheduler.getState().physicalInFlight).toBe(1);
+    expect(scheduler.getState().dirty).toBe(true);
+
+    repoA.resolve({ label: "repo-a-stale" });
+    await flushMicrotasks();
+
+    expect(snapshots).toEqual([]);
+    expect(call).toBe(2);
+    expect(roots).toEqual(["/repo-a", "/repo-b"]);
+
+    repoB.resolve({ label: "repo-b-fresh" });
+    await flushMicrotasks();
+
+    expect(snapshots).toEqual([{ label: "repo-b-fresh", rootPath: "/repo-b" }]);
+    scheduler.dispose();
+  });
+
+  it("discards a delayed B response after A → B → A", async () => {
+    const pendingByRoot = new Map<string, Array<ReturnType<typeof createDeferred<{ label: string }>>>>();
+    const snapshots: Array<{ label: string; rootPath: string }> = [];
+
+    const scheduler = createGitRefreshScheduler({
+      debounceMs: 0,
+      readStatus: async (_generation, rootPath) => {
+        const deferred = createDeferred<{ label: string }>();
+        const queue = pendingByRoot.get(rootPath) ?? [];
+        queue.push(deferred);
+        pendingByRoot.set(rootPath, queue);
+        return deferred.promise;
+      },
+      onSnapshot: (snapshot, meta) => {
+        snapshots.push({ label: snapshot.label, rootPath: meta.rootPath });
+      },
+      setTimeoutFn: (callback) => {
+        callback();
+        return 1 as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimeoutFn: () => {},
+    });
+
+    scheduler.setRootPath("/repo-a");
+    scheduler.refreshNow("initial");
+    const firstA = pendingByRoot.get("/repo-a")?.[0];
+    expect(firstA).toBeTruthy();
+
+    scheduler.setRootPath("/repo-b");
+    scheduler.refreshNow("initial");
+    firstA?.resolve({ label: "stale-a" });
+    await flushMicrotasks();
+
+    const firstB = pendingByRoot.get("/repo-b")?.[0];
+    expect(firstB).toBeTruthy();
+
+    scheduler.setRootPath("/repo-a");
+    scheduler.refreshNow("initial");
+    // B is still physically in flight; A is dirty until B settles.
+    expect(scheduler.getState().physicalInFlight).toBe(1);
+
+    firstB?.resolve({ label: "late-b" });
+    await flushMicrotasks();
+
+    expect(snapshots.some((entry) => entry.label === "late-b")).toBe(false);
+
+    const secondA = pendingByRoot.get("/repo-a")?.[1];
+    expect(secondA).toBeTruthy();
+    secondA?.resolve({ label: "fresh-a" });
+    await flushMicrotasks();
+
+    expect(snapshots).toEqual([{ label: "fresh-a", rootPath: "/repo-a" }]);
     scheduler.dispose();
   });
 
@@ -180,6 +293,7 @@ describe("gitRefreshScheduler", () => {
   it("preserves the last good snapshot path by not clearing on transient read errors", async () => {
     const onError = vi.fn();
     const snapshots: string[] = [];
+    const timers: Array<{ callback: () => void; ms: number }> = [];
     let shouldFail = false;
 
     const scheduler = createGitRefreshScheduler({
@@ -192,9 +306,9 @@ describe("gitRefreshScheduler", () => {
         snapshots.push(snapshot);
       },
       onError,
-      setTimeoutFn: (callback) => {
-        callback();
-        return 1 as unknown as ReturnType<typeof setTimeout>;
+      setTimeoutFn: (callback, ms) => {
+        timers.push({ callback, ms });
+        return timers.length as unknown as ReturnType<typeof setTimeout>;
       },
       clearTimeoutFn: () => {},
     });
@@ -211,6 +325,47 @@ describe("gitRefreshScheduler", () => {
     expect(snapshots).toEqual(["ok"]);
     expect(onError).toHaveBeenCalledOnce();
     expect(scheduler.getState().lastError).toBeInstanceOf(Error);
+    expect(timers.some((timer) => timer.ms === GIT_REFRESH_RETRY_INITIAL_MS)).toBe(true);
+    scheduler.dispose();
+  });
+
+  it("retries failed refreshes with bounded exponential backoff", async () => {
+    const timers: Array<{ callback: () => void; ms: number }> = [];
+    let failures = 0;
+
+    const scheduler = createGitRefreshScheduler({
+      debounceMs: 0,
+      retryInitialMs: 100,
+      retryMaxMs: 400,
+      readStatus: async () => {
+        failures += 1;
+        if (failures <= 2) throw new Error(`fail-${failures}`);
+        return "recovered";
+      },
+      onSnapshot: () => {},
+      setTimeoutFn: (callback, ms) => {
+        timers.push({ callback, ms });
+        return timers.length as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimeoutFn: () => {},
+    });
+
+    scheduler.setRootPath("/repo");
+    scheduler.refreshNow("initial");
+    await flushMicrotasks();
+    expect(failures).toBe(1);
+    expect(timers[0]?.ms).toBe(100);
+
+    timers[0]?.callback();
+    await flushMicrotasks();
+    expect(failures).toBe(2);
+    expect(timers[1]?.ms).toBe(200);
+
+    timers[1]?.callback();
+    await flushMicrotasks();
+    expect(failures).toBe(3);
+    expect(scheduler.getState().lastError).toBeNull();
+    expect(scheduler.getState().lastSuccessfulAt).not.toBeNull();
     scheduler.dispose();
   });
 });

@@ -65,7 +65,6 @@ import {
 import { createExplorerDataPort } from "./features/data-workspace/explorer";
 import { useDataNodeActions } from "./features/data-workspace/useDataNodeActions";
 import { useAiEditReviewRequest } from "./features/data-workspace/useAiEditReviewRequest";
-import { useWorkspaceFileWatch } from "./features/data-workspace/useWorkspaceFileWatch";
 import {
   BranchSwitchConflictDialog,
   GitOperationErrorDialog,
@@ -249,7 +248,6 @@ export function App() {
     handleStashAndCheckoutBranch,
     handleUnstageAllGitChanges,
     handleUnstageGitPaths,
-    invalidateGitStatus,
     refreshGitStatus,
     refreshGitStatusWithFetch,
     selectGitCommit,
@@ -298,12 +296,6 @@ export function App() {
     },
     [cloudDataPort, filesVisibilitySettings, localDataPort, workspaceIsCloud],
   );
-  useWorkspaceFileWatch({
-    onGitRefresh: invalidateGitStatus,
-    onWorkspaceContentChanged: refreshWorkspaceContent,
-    workspace,
-    workspaceIsCloud,
-  });
   const latestAiEditRequest = useAiEditReviewRequest({
     aiEditAssistEnabled,
     onWorkspaceContentChanged: refreshWorkspaceContent,

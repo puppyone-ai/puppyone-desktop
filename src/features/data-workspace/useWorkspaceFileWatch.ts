@@ -1,28 +1,16 @@
 import { useEffect } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 
-export function useWorkspaceFileWatch({
-  onGitRefresh,
-  onWorkspaceContentChanged,
-  workspace,
-  workspaceIsCloud,
-}: {
+/**
+ * @deprecated Content watching is owned by `useDesktopGitController` so the
+ * initial Git snapshot waits for both content and metadata readiness.
+ * Kept as a no-op compatibility shim for any residual call sites.
+ */
+export function useWorkspaceFileWatch(_options: {
   onGitRefresh: (reason?: string) => void;
   onWorkspaceContentChanged: () => void;
   workspace: Workspace | null;
   workspaceIsCloud: boolean;
 }) {
-  useEffect(() => {
-    if (!workspace || workspaceIsCloud || !window.puppyoneDesktop?.watchWorkspace) return undefined;
-
-    return window.puppyoneDesktop.watchWorkspace(workspace.path, (event) => {
-      if (event.error) {
-        // Content-watch errors are observable but must not clear Git truth.
-        // Focus reconciliation and the metadata watcher remain the recovery path.
-        return;
-      }
-      onWorkspaceContentChanged();
-      onGitRefresh("working-tree");
-    });
-  }, [onGitRefresh, onWorkspaceContentChanged, workspace, workspaceIsCloud]);
+  useEffect(() => undefined, []);
 }

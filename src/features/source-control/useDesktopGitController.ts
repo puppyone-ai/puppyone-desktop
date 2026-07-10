@@ -90,9 +90,12 @@ export function shouldInvalidateHistoryForReason(reason: string | null | undefin
     || reason === "initial"
     || reason === "external-apply"
     || reason === "mutation"
-    || reason === "focus"
+    ||     reason === "focus"
     || reason === "focus-stale"
+    || reason === "focus-error"
     || reason === "configuration"
+    || reason === "refresh-retry"
+    || reason.startsWith("refresh-retry:")
   ) {
     return false;
   }
@@ -155,14 +158,16 @@ export function useDesktopGitController({
   const ensureScheduler = useCallback(() => {
     if (schedulerRef.current) return schedulerRef.current;
     const created = createGitRefreshScheduler<GitStatusSnapshot>({
-      readStatus: async () => {
-        const rootPath = workspacePathRef.current;
+      readStatus: async (_generation, rootPath) => {
         if (!rootPath) throw new Error("No active workspace.");
         return getWorkspaceGitStatus(rootPath);
       },
       onSnapshot: (nextStatus, meta) => {
         const rootPath = workspacePathRef.current;
-        if (!rootPath) return;
+        const state = schedulerRef.current?.getState();
+        // Discard cross-workspace publishes even if a caller bypassed the scheduler gate.
+        if (!rootPath || meta.rootPath !== rootPath) return;
+        if (state && meta.rootEpoch !== state.rootEpoch) return;
         const invalidateHistory = shouldInvalidateHistoryForReason(meta.reason);
         const merged = mergePreservedHistory(gitStatusRef.current, nextStatus, { invalidateHistory });
         gitStatusRef.current = merged;
@@ -170,23 +175,29 @@ export function useDesktopGitController({
         setGitStatusPath(rootPath);
         setGitStatusError(null);
       },
-      onError: (error) => {
+      onError: (error, meta) => {
+        const rootPath = workspacePathRef.current;
+        const state = schedulerRef.current?.getState();
+        if (!rootPath || meta.rootPath !== rootPath) return;
+        if (state && meta.rootEpoch !== state.rootEpoch) return;
         // Preserve the last good snapshot; only surface the error.
         setGitStatusError(error instanceof Error ? error.message : String(error));
       },
       onLog: (event) => {
-        if (event.type === "refresh-success" || event.type === "refresh-error") {
+        if (event.type === "refresh-success" || event.type === "refresh-error" || event.type === "refresh-discarded") {
           console.info("[git-refresh]", event.type, {
             rootPath: event.rootPath,
+            rootEpoch: event.rootEpoch,
             generation: event.generation,
             reason: event.reason,
             durationMs: event.durationMs,
           });
         }
       },
-      onLoadingChange: (loading, generation) => {
+      onLoadingChange: (loading, generation, rootEpoch) => {
         const state = schedulerRef.current?.getState();
         if (!state) return;
+        if (rootEpoch !== state.rootEpoch) return;
         // Obsolete reads must not clear loading for a newer generation.
         if (!loading && generation < state.requestedGeneration && state.inFlight) return;
         setGitStatusLoading(loading);
@@ -258,32 +269,53 @@ export function useDesktopGitController({
     ensureScheduler().setRootPath(workspace?.path ?? null);
   }, [ensureScheduler, workspace?.path]);
 
-  // Subscribe to Git metadata invalidations and take the initial snapshot only
-  // after the watch subscription is ready (closes the startup race).
+  // Subscribe to content + metadata watchers and take the initial snapshot only
+  // after BOTH are ready (closes the startup race documented in the lifecycle).
   useEffect(() => {
     const rootPath = workspace?.path ?? null;
     if (!rootPath) return undefined;
 
     const scheduler = ensureScheduler();
     let cancelled = false;
-    let subscriptionId: string | null = null;
+    let metadataSubscriptionId: string | null = null;
+    let stopContentWatch: (() => void) | null = null;
+
     const unsubscribeInvalidations = subscribeWorkspaceGitRepositoryInvalidations((event) => {
       if (cancelled) return;
-      if (subscriptionId && event.subscriptionId !== subscriptionId) return;
-      if (!subscriptionId && event.rootPath !== rootPath) return;
+      if (metadataSubscriptionId && event.subscriptionId !== metadataSubscriptionId) return;
+      if (!metadataSubscriptionId && event.rootPath !== rootPath) return;
       scheduler.invalidate({ reason: event.reason || "git-metadata", priority: "debounced" });
     });
 
+    const bridge = window.puppyoneDesktop;
+    const contentWatch = typeof bridge?.watchWorkspace === "function"
+      ? bridge.watchWorkspace(rootPath, (event) => {
+        if (cancelled) return;
+        if (event.error && !("recovered" in event && event.recovered)) {
+          // Content-watch errors are observable but must not clear Git truth.
+          // The main-process watcher re-arms; focus + metadata remain fallbacks.
+          return;
+        }
+        onWorkspaceContentChanged();
+        scheduler.invalidate({ reason: "working-tree", priority: "debounced" });
+      })
+      : null;
+    stopContentWatch = contentWatch?.stop ?? null;
+
     void (async () => {
       try {
-        const result = await startWorkspaceGitRepositoryWatch(rootPath);
+        const contentReady = contentWatch?.ready ?? Promise.resolve(null);
+        const [metadataResult] = await Promise.all([
+          startWorkspaceGitRepositoryWatch(rootPath),
+          contentReady.catch(() => null),
+        ]);
         if (cancelled) {
-          if (result?.subscriptionId) {
-            await stopWorkspaceGitRepositoryWatch(result.subscriptionId);
+          if (metadataResult?.subscriptionId) {
+            await stopWorkspaceGitRepositoryWatch(metadataResult.subscriptionId);
           }
           return;
         }
-        subscriptionId = result?.subscriptionId ?? null;
+        metadataSubscriptionId = metadataResult?.subscriptionId ?? null;
       } catch (error) {
         if (!cancelled) {
           setGitStatusError(error instanceof Error ? error.message : String(error));
@@ -298,11 +330,12 @@ export function useDesktopGitController({
     return () => {
       cancelled = true;
       unsubscribeInvalidations();
-      if (subscriptionId) {
-        void stopWorkspaceGitRepositoryWatch(subscriptionId);
+      stopContentWatch?.();
+      if (metadataSubscriptionId) {
+        void stopWorkspaceGitRepositoryWatch(metadataSubscriptionId);
       }
     };
-  }, [ensureScheduler, workspace?.path]);
+  }, [ensureScheduler, onWorkspaceContentChanged, workspace?.path]);
 
   useEffect(() => {
     const scheduler = ensureScheduler();
