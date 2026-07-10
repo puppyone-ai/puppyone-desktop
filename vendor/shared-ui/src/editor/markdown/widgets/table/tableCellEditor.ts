@@ -2,7 +2,8 @@ import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import type { MarkdownLinkGraph } from "../../../viewerTypes";
 import { getMarkdownEmbedHost } from "../../adapters/codemirror/embedHost";
-import { renderMarkdownInlineInto } from "../../rendering/inlineRenderer";
+import { renderMarkdownInlineFromSharedPolicy } from "../../adapters/preview/markdownInlinePlanAdapter";
+import { createPrincipalFromView } from "../../markdownLivePreviewContext";
 import {
   sanitizeMarkdownTableCell,
   type MarkdownTableAlignment,
@@ -11,7 +12,6 @@ import {
   type MarkdownTableRow,
   type MarkdownTableStructureOperation,
 } from "../../rendering/tableModel";
-import { createCapabilityPrincipal, workspaceIdForDocument } from "../../services/capabilityPrincipal";
 import { getDocRevision } from "../../services/transactionBroker";
 import { isContentEditableCaretAtBoundary, stopCodeMirrorEvent } from "../widgetDom";
 import {
@@ -65,6 +65,32 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
   let editing = false;
   let suppressBlurCommit = false;
 
+  // The recoverable draft lives in the per-view edit-session store, not only in
+  // the DOM. DOM contentEditable holds the transient IME buffer; the store is
+  // the single recoverable owner (range-mapped, revision-aware).
+  const host = getMarkdownEmbedHost(view);
+  const editSessionId = `table-cell:${tableFrom}:${rowIndex}:${columnIndex}`;
+  const beginEditSession = () => {
+    host.editSessions.set({
+      elementId: editSessionId,
+      featureId: "table-cell",
+      mappedRange: { from: cell.from, to: cell.to },
+      baseSource: cell.text,
+      baseRevision: getDocRevision(view.state.doc),
+      draft: { text: cell.text },
+      mode: "editing",
+      focusTarget: { rowIndex, columnIndex },
+    });
+  };
+  const updateEditSessionDraft = () => {
+    host.editSessions.update(editSessionId, {
+      draft: { text: normalizeMarkdownTableCellInput(content.textContent ?? "") },
+    });
+  };
+  const endEditSession = () => {
+    host.editSessions.delete(editSessionId);
+  };
+
   const getDraft = (): MarkdownTableCellDraft => ({
     columnIndex,
     rowIndex,
@@ -74,6 +100,8 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
   const commitCellEdit = (target: { exitPosition?: number; focus?: MarkdownTableFocusTarget }) => {
     const nextText = normalizeMarkdownTableCellInput(content.textContent ?? "");
     const changed = nextText !== cell.text;
+    // The commit dispatches a source transaction; the draft is no longer needed.
+    endEditSession();
 
     if (changed) {
       suppressBlurCommit = true;
@@ -120,6 +148,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
       editing = true;
       content.dataset.mdTableEditing = "true";
       content.textContent = cell.text;
+      beginEditSession();
       // Cell edit owns the chrome; drop the block selection so the table ring
       // and the cell ring never compete.
       const selection = view.state.selection.main;
@@ -175,11 +204,13 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
       }
       if (event.key === "Escape") {
         event.preventDefault();
+        endEditSession();
         content.textContent = cell.text;
         content.blur();
       }
     });
     content.addEventListener("blur", () => {
+      endEditSession();
       if (suppressBlurCommit) {
         suppressBlurCommit = false;
         editing = false;
@@ -230,7 +261,10 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
 
   content.addEventListener("mousedown", stopCodeMirrorEvent);
   content.addEventListener("click", stopCodeMirrorEvent);
-  content.addEventListener("input", stopCodeMirrorEvent);
+  content.addEventListener("input", (event) => {
+    stopCodeMirrorEvent(event);
+    if (editing) updateEditSessionDraft();
+  });
 
   return content;
 }
@@ -258,30 +292,18 @@ function renderTableCellPreview(
   view: EditorView,
   onLayoutChange: () => void,
 ) {
+  // Table cells render exclusively through the shared plan→DOM adapter with
+  // broker-backed image/link wrappers. No raw asset resolver reaches this path.
   const host = getMarkdownEmbedHost(view);
-  const principal = createCapabilityPrincipal({
-    editorViewId: host.viewId,
-    workspaceId: workspaceIdForDocument(documentPath),
-    documentPath,
-    documentRevision: getDocRevision(view.state.doc),
-    purpose: "asset-read",
-  });
   content.replaceChildren();
-  renderMarkdownInlineInto(content, source, {
+  renderMarkdownInlineFromSharedPolicy(content, source, {
     markdownLinkGraph,
     resolveAssetUrl: (sourcePath, href, signal) =>
-      host.assets.resolve({ principal, sourcePath, href, signal }).then((handle) => handle?.url ?? null),
+      host.assets
+        .resolve({ principal: createPrincipalFromView(view, "asset-read"), sourcePath, href, signal })
+        .then((handle) => handle?.url ?? null),
     openHref: (href) => {
-      const intent = host.links.resolve(
-        createCapabilityPrincipal({
-          editorViewId: host.viewId,
-          workspaceId: workspaceIdForDocument(documentPath),
-          documentPath,
-          documentRevision: getDocRevision(view.state.doc),
-          purpose: "link-open",
-        }),
-        href,
-      );
+      const intent = host.links.resolve(createPrincipalFromView(view, "link-open"), href);
       if (intent.action === "open-external") {
         if (markdownLinkGraph?.openExternalUrl) {
           void markdownLinkGraph.openExternalUrl(intent.href);

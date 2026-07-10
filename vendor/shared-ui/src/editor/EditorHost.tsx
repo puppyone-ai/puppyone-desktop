@@ -18,6 +18,8 @@ export type EditorHostProps = {
   fileIconTheme?: FileIconThemeId;
   saveMode?: EditorSaveMode;
   htmlTrustMode?: MarkdownHtmlTrustMode;
+  workspaceId?: string;
+  workspaceRoot?: string | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
@@ -40,6 +42,8 @@ export function EditorHost({
   fileIconTheme = "default",
   saveMode = "manual",
   htmlTrustMode = "safe",
+  workspaceId = "",
+  workspaceRoot = null,
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
   appPreview = null,
@@ -68,6 +72,8 @@ export function EditorHost({
       fileIconTheme={fileIconTheme}
       saveMode={saveMode}
       htmlTrustMode={htmlTrustMode}
+      workspaceId={workspaceId}
+      workspaceRoot={workspaceRoot}
       markdownLinkGraph={markdownLinkGraph}
       markdownAssetUrlResolver={markdownAssetUrlResolver}
       appPreview={appPreview}

@@ -6,11 +6,13 @@ import { createTransactionBroker, type TransactionBroker } from "../../services/
 import { createWebEmbedBroker, type WebEmbedBroker } from "../../services/webEmbedBroker";
 import { createEmbeddedEditSessionStore, type EmbeddedEditSessionStore } from "./embeddedEditSession";
 import { createWidgetSessionRegistry, type WidgetSessionRegistry } from "./widgetSession";
+import { createExecutionSessionStore, type ExecutionSessionStore } from "../../services/executionSession";
 
 export type MarkdownEmbedHost = {
   viewId: string;
   sessions: WidgetSessionRegistry;
   editSessions: EmbeddedEditSessionStore;
+  executionSessions: ExecutionSessionStore;
   assets: AssetBroker;
   asyncRender: AsyncRenderBroker;
   links: LinkBroker;
@@ -26,6 +28,7 @@ let viewSequence = 0;
 export type MarkdownEmbedHostOptions = {
   resolveAssetUrl?: AssetUrlResolver | null;
   allowAutomaticWebEmbedLoad?: boolean;
+  workspaceRoot?: string | null;
 };
 
 /**
@@ -41,7 +44,16 @@ export function getMarkdownEmbedHost(
 
   const sessions = createWidgetSessionRegistry();
   const editSessions = createEmbeddedEditSessionStore();
-  const assets = createAssetBroker(options.resolveAssetUrl ?? null);
+  const assets = createAssetBroker(options.resolveAssetUrl ?? null, {
+    workspaceRoot: options.workspaceRoot ?? null,
+  });
+  // Destroying an execution session revokes its principal-scoped asset handles
+  // so a dead revision cannot keep a live handle.
+  const executionSessions = createExecutionSessionStore({
+    onDestroy(session) {
+      assets.revokeExecutionSession(session.id);
+    },
+  });
   const asyncRender = createAsyncRenderBroker();
   const links = createLinkBroker();
   const transactions = createTransactionBroker();
@@ -54,6 +66,7 @@ export function getMarkdownEmbedHost(
     viewId: `md-view:${++viewSequence}`,
     sessions,
     editSessions,
+    executionSessions,
     assets,
     asyncRender,
     links,
@@ -74,6 +87,7 @@ export function getMarkdownEmbedHost(
     dispose() {
       sessions.disposeAll();
       editSessions.clear();
+      executionSessions.disposeAll();
       assets.disposeAll();
       asyncRender.disposeAll();
       webEmbeds.disposeAll();

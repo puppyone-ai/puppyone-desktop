@@ -10,10 +10,9 @@ import {
   subscribeMermaidThemeChanges,
   type MermaidRenderResult,
 } from "../rendering/mermaidRenderer";
-import { createCapabilityPrincipal, workspaceIdForDocument } from "../services/capabilityPrincipal";
 import { clampNumber, MarkdownWidgetMeasureController } from "./markdownWidgetMeasure";
 import { getDocRevision } from "../services/transactionBroker";
-import { markdownDocumentPathFacet } from "../markdownLivePreviewContext";
+import { createPrincipalFromView } from "../markdownLivePreviewContext";
 import { normalizeLineEndings, stopCodeMirrorEvent } from "./widgetDom";
 
 /**
@@ -132,13 +131,7 @@ export class MermaidBlockWidget extends WidgetType {
             policyVersion: MARKDOWN_HTML_PROFILE_VERSION,
             principalKey: host.viewId,
           },
-          principal: createCapabilityPrincipal({
-            editorViewId: host.viewId,
-            workspaceId: workspaceIdForDocument(view.state.facet(markdownDocumentPathFacet) || "mermaid"),
-            documentPath: view.state.facet(markdownDocumentPathFacet) || "mermaid",
-            documentRevision: baseRevision,
-            purpose: "async-render",
-          }),
+          principal: createPrincipalFromView(view, "async-render"),
           run: async () => renderMermaidDiagram({ source, theme }),
         })
         .then((result) => {

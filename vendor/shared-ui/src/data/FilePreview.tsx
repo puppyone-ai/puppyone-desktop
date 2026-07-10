@@ -24,6 +24,8 @@ export type FilePreviewProps = {
   fileIconTheme?: FileIconThemeId;
   editorSaveMode?: EditorSaveMode;
   htmlTrustMode?: MarkdownHtmlTrustMode;
+  workspaceId?: string;
+  workspaceRoot?: string | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
@@ -59,6 +61,8 @@ export function FilePreview({
   fileIconTheme = "default",
   editorSaveMode = "manual",
   htmlTrustMode = "safe",
+  workspaceId = "",
+  workspaceRoot = null,
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
   appPreview = null,
@@ -132,6 +136,8 @@ export function FilePreview({
               fileIconTheme={fileIconTheme}
               saveMode={editorSaveMode}
               htmlTrustMode={htmlTrustMode}
+              workspaceId={workspaceId}
+              workspaceRoot={workspaceRoot}
               markdownLinkGraph={markdownLinkGraph}
               markdownAssetUrlResolver={markdownAssetUrlResolver}
               appPreview={appPreview}

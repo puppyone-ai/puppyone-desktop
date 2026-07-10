@@ -1222,6 +1222,8 @@ export function DataWorkspace({
                   fileIconTheme={fileIconTheme}
                   editorSaveMode={editorSaveMode}
                   htmlTrustMode={htmlTrustMode}
+                  workspaceId={workspace.id}
+                  workspaceRoot={workspace.path}
                   markdownLinkGraph={markdownLinkGraph}
                   markdownAssetUrlResolver={markdownAssetUrlResolver}
                   appPreview={dataPort.appPreview ?? null}

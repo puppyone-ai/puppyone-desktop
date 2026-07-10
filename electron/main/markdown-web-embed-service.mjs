@@ -72,8 +72,15 @@ export function createMarkdownWebEmbedService({
       view.webContents.on("will-navigate", (event, url) => {
         if (!isAllowedMarkdownWebEmbedHref(url)) event.preventDefault();
       });
+      // Cancel redirects to any non-policy URL (e.g. https -> http downgrade,
+      // redirect to a private/loopback host, or a custom/file scheme).
+      view.webContents.on("will-redirect", (event, url) => {
+        if (!isAllowedMarkdownWebEmbedHref(url)) event.preventDefault();
+      });
       view.webContents.session.webRequest.onBeforeRequest((details, callback) => {
-        if (!details.url.startsWith("data:") && !isAllowedMarkdownWebEmbedHref(details.url)) {
+        // Deny EVERY non-policy subresource, including data: and blob:. Only
+        // public https URLs that pass the embed policy may load.
+        if (!isAllowedMarkdownWebEmbedHref(details.url)) {
           callback({ cancel: true });
           return;
         }

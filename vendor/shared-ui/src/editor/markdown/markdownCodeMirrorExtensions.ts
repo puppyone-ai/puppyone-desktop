@@ -20,8 +20,9 @@ import { markdownComposingBlockLineField, markdownInputCompositionExtension } fr
 import { markdownExpandedImageField } from "./state/expandedImage";
 import { markdownLivePreviewFocusExtension } from "./state/livePreviewFocus";
 import { markdownTableFocusField } from "./adapters/codemirror/tableFocusState";
-import { markdownAssetUrlResolverFacet } from "./markdownLivePreviewContext";
+import { markdownAssetUrlResolverFacet, markdownWorkspaceRootFacet } from "./markdownLivePreviewContext";
 import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "./adapters/codemirror/embedHost";
+import { getDocRevision } from "./services/transactionBroker";
 import {
   markdownHiddenMarkerSelectionNormalizer,
   trailingLineWhitespaceSelectionExtension,
@@ -57,10 +58,19 @@ export function markdownLivePreviewExtension(
   markdownLinkGraph: MarkdownLinkGraph | null = null,
   documentPath = "",
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null = null,
+  workspaceId = "",
+  workspaceRoot: string | null = null,
 ): Extension {
   return [
     keymap.of([...markdownEditingKeymap]),
-    markdownLivePreviewContextExtension(htmlTrustMode, markdownLinkGraph, documentPath, markdownAssetUrlResolver),
+    markdownLivePreviewContextExtension(
+      htmlTrustMode,
+      markdownLinkGraph,
+      documentPath,
+      markdownAssetUrlResolver,
+      workspaceId,
+      workspaceRoot,
+    ),
     markdownHiddenMarkerSelectionNormalizer,
     markdownLivePreviewFocusExtension,
     markdownInputCompositionExtension,
@@ -80,13 +90,20 @@ const markdownEmbedHostLifecycle = ViewPlugin.fromClass(class {
     this.view = view;
     getMarkdownEmbedHost(view, {
       resolveAssetUrl: view.state.facet(markdownAssetUrlResolverFacet),
+      workspaceRoot: view.state.facet(markdownWorkspaceRootFacet),
     });
   }
 
   update(update: import("@codemirror/view").ViewUpdate) {
     if (!update.docChanged) return;
     const host = getMarkdownEmbedHost(this.view);
+    const previousRevision = getDocRevision(update.startState.doc);
+    const nextRevision = getDocRevision(update.state.doc);
     host.editSessions.mapRanges((pos, assoc) => update.changes.mapPos(pos, assoc));
+    // A source revision change destroys revision-bound execution sessions,
+    // aborts their jobs, and revokes their principal-scoped asset handles.
+    host.executionSessions.destroyForRevisionChange(previousRevision, nextRevision);
+    host.assets.revokeStaleRevision(host.viewId, nextRevision);
   }
 
   destroy() {

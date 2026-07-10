@@ -1,5 +1,5 @@
 import { createDomFromInlineHtmlSource } from "../adapters/preview/inlineHtmlDomAdapter";
-import { isSafeHref } from "./markdownHtmlPolicy";
+import { isSafeHref } from "../policy/markdownUrlPolicy";
 import { appendSanitizedInlineHtml } from "./sanitizeHtml";
 import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../viewerTypes";
 import {
@@ -19,6 +19,12 @@ type InlineToken =
 
 export type MarkdownInlineRenderOptions = {
   markdownLinkGraph?: MarkdownLinkGraph | null;
+  /**
+   * @deprecated Raw asset resolver. Ignored whenever `resolveAssetUrl` (an
+   * AssetBroker wrapper) is present. New callers must use the broker path via
+   * `renderMarkdownInlineFromSharedPolicy`; direct raw-resolver use is only kept
+   * for legacy non-brokered preview surfaces.
+   */
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   /**
    * Preferred asset entry point. When set, table/preview image loads go through

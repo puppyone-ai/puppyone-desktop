@@ -18,6 +18,8 @@ export type MarkdownCodeMirrorEditorProps = {
   aiEditFile?: AiEditFile | null;
   htmlTrustMode?: MarkdownHtmlTrustMode;
   documentPath?: string;
+  workspaceId?: string;
+  workspaceRoot?: string | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   onChange?: (value: string) => void;
@@ -32,6 +34,8 @@ export function MarkdownCodeMirrorEditor({
   aiEditFile = null,
   htmlTrustMode = "safe",
   documentPath = "",
+  workspaceId = "",
+  workspaceRoot = null,
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
   onChange,
@@ -60,7 +64,7 @@ export function MarkdownCodeMirrorEditor({
           editableCompartmentRef.current.of(getEditableExtensions(readOnly)),
           livePreviewCompartmentRef.current.of(
             livePreview
-              ? markdownLivePreviewExtension(htmlTrustMode, markdownLinkGraph, documentPath, markdownAssetUrlResolver)
+              ? markdownLivePreviewExtension(htmlTrustMode, markdownLinkGraph, documentPath, markdownAssetUrlResolver, workspaceId, workspaceRoot)
               : [],
           ),
           aiEditCompartmentRef.current.of(markdownAiEditExtension(aiEditFile)),
@@ -97,11 +101,11 @@ export function MarkdownCodeMirrorEditor({
     view.dispatch({
       effects: livePreviewCompartmentRef.current.reconfigure(
         livePreview
-          ? markdownLivePreviewExtension(htmlTrustMode, markdownLinkGraph, documentPath, markdownAssetUrlResolver)
+          ? markdownLivePreviewExtension(htmlTrustMode, markdownLinkGraph, documentPath, markdownAssetUrlResolver, workspaceId, workspaceRoot)
           : [],
       ),
     });
-  }, [documentPath, livePreview, htmlTrustMode, markdownLinkGraph, markdownAssetUrlResolver]);
+  }, [documentPath, livePreview, htmlTrustMode, markdownLinkGraph, markdownAssetUrlResolver, workspaceId, workspaceRoot]);
 
   useLayoutEffect(() => {
     const view = viewRef.current;

@@ -13,6 +13,11 @@ import { createAsyncRenderBroker } from "../vendor/shared-ui/src/editor/markdown
 import { createLinkBroker } from "../vendor/shared-ui/src/editor/markdown/services/linkBroker";
 import { createWebEmbedBroker } from "../vendor/shared-ui/src/editor/markdown/services/webEmbedBroker";
 import { createCapabilityPrincipal, workspaceIdForDocument } from "../vendor/shared-ui/src/editor/markdown/services/capabilityPrincipal";
+import { createExecutionSessionStore } from "../vendor/shared-ui/src/editor/markdown/services/executionSession";
+import {
+  createDocumentTrustContext,
+  evaluateAuthorizationGrant,
+} from "../vendor/shared-ui/src/editor/markdown/policy/markdownTrustPolicy";
 import { createTransactionBroker, getDocRevision } from "../vendor/shared-ui/src/editor/markdown/services/transactionBroker";
 import { getMarkdownElements } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownElements";
 import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownParserExtensions";
@@ -216,6 +221,82 @@ describe("Markdown embed runtime foundations", () => {
     expect(runs).toBe(1);
     expect(first?.value).toBe("svg");
     expect(second?.value).toBe("svg");
+  });
+
+  it("destroys execution sessions bound to a superseded revision", () => {
+    let destroyed = 0;
+    const store = createExecutionSessionStore({ onDestroy: () => { destroyed += 1; } });
+    const base = createCapabilityPrincipal({
+      editorViewId: "view-1",
+      workspaceId: "ws",
+      documentPath: "note.md",
+      documentRevision: "10:1",
+      purpose: "web-embed",
+    });
+
+    const oldSession = store.create({ principal: base, documentRevision: "10:1", grantId: "grant-1" });
+    expect(oldSession.principal.executionSessionId).toBe(oldSession.id);
+    // A fresh session recreated against the new revision must survive.
+    const newSession = store.create({ principal: base, documentRevision: "12:1", grantId: "grant-1" });
+
+    const gone = store.destroyForRevisionChange("10:1", "12:1");
+    expect(gone.map((session) => session.id)).toEqual([oldSession.id]);
+    expect(store.get(oldSession.id)).toBeUndefined();
+    expect(store.get(newSession.id)).toBeDefined();
+    expect(destroyed).toBe(1);
+    expect(oldSession.grantId).toBe("grant-1"); // grant is independent of the session
+  });
+
+  it("requires an explicit grant for local active HTML (independent of revision)", () => {
+    const principal = createCapabilityPrincipal({
+      editorViewId: "view-1",
+      workspaceId: "ws",
+      documentPath: "note.md",
+      documentRevision: "1:1",
+      purpose: "web-embed",
+    });
+
+    // Safe trust mode: never granted, sanitized only.
+    expect(
+      evaluateAuthorizationGrant(
+        createDocumentTrustContext({
+          workspaceId: "ws",
+          documentPath: "note.md",
+          provenance: "local-workspace",
+          explicitGrants: [],
+        }),
+        principal,
+        "local-active-html",
+      ),
+    ).toBeNull();
+
+    // Provenance / localTrusted alone is NOT a grant.
+    expect(
+      evaluateAuthorizationGrant(
+        createDocumentTrustContext({
+          workspaceId: "ws",
+          documentPath: "note.md",
+          provenance: "local-workspace",
+          explicitGrants: [],
+        }),
+        principal,
+        "local-active-html",
+      ),
+    ).toBeNull();
+
+    const granted = evaluateAuthorizationGrant(
+      createDocumentTrustContext({
+        workspaceId: "ws",
+        documentPath: "note.md",
+        provenance: "local-workspace",
+        explicitGrants: ["local-active-html"],
+      }),
+      principal,
+      "local-active-html",
+    );
+    expect(granted).not.toBeNull();
+    expect(granted?.capability).toBe("local-active-html");
+    expect(granted?.revoked).toBe(false);
   });
 
   it("routes link intents through the link broker", () => {

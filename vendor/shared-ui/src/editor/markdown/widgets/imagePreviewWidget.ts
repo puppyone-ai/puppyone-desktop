@@ -2,11 +2,13 @@ import { EditorSelection } from "@codemirror/state";
 import { EditorView, type Rect, WidgetType } from "@codemirror/view";
 import { getMarkdownEmbedHost } from "../adapters/codemirror/embedHost";
 import { disposeWidgetSessionDom } from "../adapters/codemirror/widgetSession";
-import { createCapabilityPrincipal, workspaceIdForDocument } from "../services/capabilityPrincipal";
 import { isSafeMarkdownImageUrl } from "../links/markdownImageModel";
-import { markdownDocumentPathFacet, markdownAssetUrlResolverFacet } from "../markdownLivePreviewContext";
+import {
+  createPrincipalFromView,
+  markdownDocumentPathFacet,
+  markdownAssetUrlResolverFacet,
+} from "../markdownLivePreviewContext";
 import { markdownExpandedImageEffect } from "../state/expandedImage";
-import { getDocRevision } from "../services/transactionBroker";
 import {
   getInlineWidgetEdgeX,
   getInlineWidgetTextCoords,
@@ -109,13 +111,7 @@ export class ImagePreviewWidget extends WidgetType {
       const documentPath = this.documentPath || view.state.facet(markdownDocumentPathFacet);
       void host.assets
         .resolve({
-          principal: createCapabilityPrincipal({
-            editorViewId: host.viewId,
-            workspaceId: workspaceIdForDocument(documentPath),
-            documentPath,
-            documentRevision: getDocRevision(view.state.doc),
-            purpose: "asset-read",
-          }),
+          principal: createPrincipalFromView(view, "asset-read"),
           sourcePath: documentPath,
           href: this.source,
           signal: abort.signal,

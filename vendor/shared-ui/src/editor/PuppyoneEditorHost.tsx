@@ -20,6 +20,8 @@ export type PuppyoneEditorHostProps = {
   fileIconTheme?: FileIconThemeId;
   saveMode?: EditorSaveMode;
   htmlTrustMode?: MarkdownHtmlTrustMode;
+  workspaceId?: string;
+  workspaceRoot?: string | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
@@ -39,6 +41,8 @@ export function PuppyoneEditorHost({
   fileIconTheme = "default",
   saveMode = "manual",
   htmlTrustMode = "safe",
+  workspaceId = "",
+  workspaceRoot = null,
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
   appPreview = null,
@@ -85,6 +89,8 @@ export function PuppyoneEditorHost({
         fileIconTheme,
         saveMode,
         htmlTrustMode,
+        workspaceId,
+        workspaceRoot,
         markdownLinkGraph,
         markdownAssetUrlResolver,
         appPreview,

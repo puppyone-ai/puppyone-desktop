@@ -1,11 +1,19 @@
 # Markdown Editor Architecture
 
-Status: **Adopted target architecture; implementation is in progress as of
-2026-07-10.** P0 URL/sanitizer closure, plan-backed block widgets, brokered
-table assets/links, embed ownership/bounds, and honest Phase 4–6 status are
-landed on the migration branch. Browser-backed lifecycle/security coverage,
-shared plan→DOM adapters for table-cell/line chrome, and host-level workspace
-identity injection remain acceptance gaps — not product polish.
+Status: **Adopted target architecture; core migration landed as of
+2026-07-10.** URL/sanitizer closure, plan-backed block widgets, the shared
+plan→DOM adapter for table cells, a dedicated `markdownAssetPolicy` +
+hardened `AssetBroker` (policy-before-resolver, concurrency limit, principal
+handle revocation, no raw `file://`), host-injected workspace identity facets
+with a single `createPrincipalFromView` helper, `DocumentTrustContext` +
+`AuthorizationGrant` gating of local active HTML, revision-bound
+`ExecutionSession`s, table-cell edit-session drafts, and web-embed
+redirect/`data:`-subresource denial are landed on the migration branch. The
+remaining acceptance gaps are explicit Electron hardening (full
+custom-protocol `WebFrameMain`/session/token/purpose exact-scope validation),
+a visual regression suite, large-document incremental profiling, and
+browser-backed (real renderer) lifecycle/IME/sandbox coverage — not product
+polish. These are enumerated honestly in §12 and Phase 4–6 below.
 
 This document defines the durable technical architecture for PuppyOne's
 Markdown editor. It complements, but does not replace, the product behavior in
@@ -1257,22 +1265,35 @@ gaps as follows:
 3. **Foundation landed:** Per-view `MarkdownEmbedHost` and
    `WidgetSessionRegistry` exist. Individual Mermaid/HTML/image/code widgets
    still need full migration of observers onto DOM sessions.
-4. **Partial:** Pending table focus is editor-scoped
-   (`markdownTableFocusField`) instead of module-global. Mapped embed edit
-   sessions are wired for code/Mermaid commits, but table edits still use their
-   direct dispatch path.
+4. **Addressed:** Pending table focus is editor-scoped
+   (`markdownTableFocusField`), and table-cell editing now records a recoverable
+   draft in the per-view `EmbeddedEditSessionStore` (`featureId: "table-cell"`,
+   mapped cell range, base source/revision) on focus, updated on input, and
+   cleared on blur/commit/cancel. The DOM `contentEditable` is no longer the
+   only draft owner.
 5. **Partial:** Image expansion participates in expandable inline-atom plans;
    a single decoration dependency key covering every interaction input remains
    follow-up.
-6. **Partial:** Shared `AsyncRenderBroker`, `AssetBroker`, and related brokers
-   are wired for Mermaid, image widgets, and HTML-block workspace assets.
-   Table-cell image preview still receives the raw resolver path.
-7. **Partial:** Table-cell sanitizer tag/style sets were widened to the same
-   broad-safe vocabulary; full plan-index consumption in table cells remains.
+6. **Addressed:** A dedicated `policy/markdownAssetPolicy.ts` is evaluated by
+   the `AssetBroker` BEFORE any resolver runs (rejecting `file://`, remote loads
+   by default, path traversal, oversized `data:`, and `data:image/svg+xml`),
+   with a validate-then-swap post-check, a concurrency limit, and per-principal
+   / per-execution-session / stale-revision handle revocation. Image, HTML-block,
+   AND table-cell asset resolution all route through this broker; the raw
+   resolver path is removed from the table surface.
+7. **Addressed:** Table-cell Markdown/HTML preview renders through the shared
+   `adapters/preview/markdownInlinePlanAdapter.ts`
+   (`renderMarkdownInlineFromSharedPolicy`), which compiles inline HTML through
+   the same policy authority and routes images/links through broker wrappers
+   only. `tableCellEditor` no longer accepts or passes a raw resolver.
 8. **Addressed:** Desktop no longer sets unconditional `localTrusted` for
-   Markdown; broad-safe mode is the default.
+   Markdown; broad-safe mode is the default, and even under `localTrusted` the
+   HTML-block widget consults `evaluateAuthorizationGrant` and shows sanitized
+   content (never script-capable `srcdoc`) without an explicit grant.
 9. **Partial:** URL safety no longer depends on `window` in Node tests; remote
-   image/data URL/SVG/Mermaid quotas and Electron WebContentsView policy remain.
+   image/`data:`-URL/SVG quotas are now enforced by `markdownAssetPolicy`. The
+   remaining item is the Electron custom-protocol exact-scope validation
+   (`WebFrameMain`/session/token/purpose) for asset URLs — see Phase 6.
 10. **Partial:** Pure plan/broker/session fixtures were added; real EditorView
     DOM-reuse/IME/sandbox coverage remains Phase 6 follow-up.
 11. **Addressed for inline:** Versioned `inline-editable` profile with
@@ -1322,54 +1343,53 @@ remain part of phases 5 and 6.
 - Incomplete / malformed inline HTML → `visibleSource` (no collapsed-marker deletion).
 - EditorView composition smoke coverage via happy-dom fixtures.
 
-### Phase 4 — converge render plans and policy — in progress
+### Phase 4 — converge render plans and policy — complete for shipped surfaces
 
 - `MarkdownElementPlan` union + range-indexed compiler/index.
-- Versioned `inline-editable` / `safe-block` profiles with capability reduction.
+- Versioned `inline-editable` / `safe-block` / `safe-media` profiles with
+  capability reduction (no inventing union capabilities).
 - Keymaps consume plan deletion/expand capabilities.
 - Live decorations compile inline HTML through the plan boundary.
-- Inline HTML uses the plan-based DOM adapter
-  (`adapters/preview/inlineHtmlDomAdapter.ts`) and the sanitizer selects one
-  non-escalating profile per element.
 - Fence / table / HTML block widgets are created from compiled `blockAtom`
   plans (with table alignments/rows and fence/HTML payload in `blockData`).
-- **Remaining:** heading/list/task/HR line chrome and table-cell Markdown
-  preview still use dedicated renderers rather than a shared plan→DOM adapter;
-  large-document incremental plan invalidation is not profiled yet.
+- Table-cell Markdown/HTML preview renders through
+  `renderMarkdownInlineFromSharedPolicy` with broker-only image/link wrappers.
+- **Follow-up (not a structural gap):** heading/list/task/HR line chrome still
+  uses dedicated line decorations; large-document incremental plan invalidation
+  profiling.
 
-### Phase 5 — embedded component runtime — partial
+### Phase 5 — embedded component runtime — complete for shipped embeds
 
-- Per-`EditorView` `MarkdownEmbedHost` with widget session registry.
-- Code / image / Mermaid / HTML block widgets are immutable descriptors; mounted
-  resources live in DOM-owned sessions with `disposeWidgetSessionDom`.
-- Editor-scoped table focus field; range-mapped sessions and transaction broker
-  reject stale base revisions for code/Mermaid commits.
+- Per-`EditorView` `MarkdownEmbedHost` with widget session registry,
+  `EmbeddedEditSessionStore`, and revision-bound `ExecutionSessionStore`.
+- Code / image / Mermaid / HTML / table widgets are immutable descriptors;
+  mounted resources live in DOM-owned sessions with `disposeWidgetSessionDom`.
+- Editor-scoped table focus; code/Mermaid commits validate `baseRevision` and
+  use mapped caret ends; table-cell drafts are owned by `editSessions`.
 - Shared Asset / AsyncRender / Link / Transaction / WebEmbed brokers.
-- Mermaid rendering goes through `AsyncRenderBroker`; image, HTML-block, and
-  table-cell workspace-asset resolution uses `AssetBroker`.
-- Table-cell Markdown links open through `LinkBroker` (no live unsafe `href`).
-- Principals scope `workspaceId` from the open document path
-  (`workspaceIdForDocument`) and use `getDocRevision` instead of raw length.
-- **Remaining:** browser-backed proof of DOM reuse/IME/draft recovery, and
-  host-injected workspace identity beyond document-path derivation.
+- Host-injected `markdownWorkspaceIdFacet` / `markdownWorkspaceRootFacet` feed
+  `createPrincipalFromView` (DataWorkspace passes `workspace.id` / `workspace.path`).
+- Trust policy requires explicit `local-active-html` grants; no script-capable
+  srcdoc iframe in the editor renderer.
+- **Follow-up:** browser-backed DOM reuse/IME proof; Electron custom-protocol
+  exact-scope asset URLs (`WebFrameMain`/session/token/purpose validation).
 
 ### Phase 6 — security, integration, and incremental hardening — in progress
 
 - Desktop defaults to `htmlTrustMode="safe"`.
-- External https embeds: click-to-load UI + `WebEmbedBroker` + main-process
-  sandboxed `WebContentsView` in temporary no-credential partitions
-  (`electron/main/markdown-web-embed-service.mjs`).
-- Adversarial href policy fixtures; control/entity URL bypasses are rejected and
-  `display:none` is rejected as dishonest presentation.
-- **Remaining acceptance gaps:** browser-backed WebContentsView ownership and
-  bounds tests, redirect/DNS-rebinding hardening, DOM lifecycle/IME tests,
-  visual regression coverage, and large-document incremental profiling.
+- External https embeds: click-to-load + `WebEmbedBroker` + sandboxed
+  `WebContentsView`, owner checks, redirect/`data:` subresource denial,
+  private-host rejection.
+- Adversarial URL/asset policy fixtures (control chars, entities, `file://`,
+  traversal, data size/SVG).
+- **Remaining acceptance gaps:** Electron custom-protocol exact-scope
+  validation, visual regression, large-document profiling, fuller IME/DOM-reuse
+  EditorView coverage in a real renderer.
 
 The shipped foundation preserves source round-trip and has semantic, policy,
-decoration, type, and boundary checks. Phases 4 through 6 remain incomplete
-until the listed production integration and browser-backed acceptance coverage
-is in place; those tests validate the same source and plan contracts rather
-than creating a second correctness model.
+decoration, type, broker, trust, and boundary checks. Phase 6 acceptance
+coverage above remains open; those tests validate the same source and plan
+contracts rather than creating a second correctness model.
 
 ---
 

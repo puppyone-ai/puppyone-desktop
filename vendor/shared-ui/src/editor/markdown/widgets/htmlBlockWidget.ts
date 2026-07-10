@@ -5,9 +5,13 @@ import { disposeWidgetSessionDom } from "../adapters/codemirror/widgetSession";
 import { resolveMarkdownHtmlImageSources } from "../links/markdownImageModel";
 import type { MarkdownHtmlBlock } from "../rendering/htmlBlockModel";
 import { createSanitizedBlockHtmlFragment } from "../rendering/sanitizeHtml";
-import { createCapabilityPrincipal, workspaceIdForDocument } from "../services/capabilityPrincipal";
 import type { AssetUrlResolver } from "../services/assetBroker";
-import { getDocRevision } from "../services/transactionBroker";
+import {
+  createPrincipalFromView,
+  markdownWorkspaceIdFacet,
+} from "../markdownLivePreviewContext";
+import { evaluateAuthorizationGrant, createDocumentTrustContext, type DocumentTrustContext } from "../policy/markdownTrustPolicy";
+import { workspaceIdForDocument } from "../services/capabilityPrincipal";
 import {
   clampNumber,
   estimateMarkdownHtmlBlockHeight,
@@ -55,6 +59,13 @@ export class HtmlBlockWidget extends WidgetType {
     const host = getMarkdownEmbedHost(view, {
       resolveAssetUrl: this.markdownAssetUrlResolver,
     });
+    const documentTrustContext = (): DocumentTrustContext =>
+      createDocumentTrustContext({
+        workspaceId: view.state.facet(markdownWorkspaceIdFacet) || workspaceIdForDocument(this.documentPath),
+        documentPath: this.documentPath,
+        provenance: "unknown",
+        explicitGrants: [],
+      });
     const shell = document.createElement("div");
     shell.className = "cm-md-html-widget";
     const measure = new MarkdownWidgetMeasureController();
@@ -95,13 +106,7 @@ export class HtmlBlockWidget extends WidgetType {
     const isPreviewVersionCurrent = (version: number) => !measure.destroyed && previewVersion === version;
 
     const createWebEmbedPlaceholder = (href: string) => {
-      const principal = createCapabilityPrincipal({
-        editorViewId: host.viewId,
-        workspaceId: workspaceIdForDocument(this.documentPath),
-        documentPath: this.documentPath,
-        documentRevision: getDocRevision(view.state.doc),
-        purpose: "web-embed",
-      });
+      const principal = createPrincipalFromView(view, "web-embed");
       const embed = host.webEmbeds.create({
         principal,
         href,
@@ -170,13 +175,7 @@ export class HtmlBlockWidget extends WidgetType {
      */
     const buildBrokerAssetResolver = (): AssetUrlResolver | null => {
       if (!this.markdownAssetUrlResolver) return null;
-      const principal = createCapabilityPrincipal({
-        editorViewId: host.viewId,
-        workspaceId: workspaceIdForDocument(this.documentPath),
-        documentPath: this.documentPath,
-        documentRevision: getDocRevision(view.state.doc),
-        purpose: "asset-read",
-      });
+      const principal = createPrincipalFromView(view, "asset-read");
       return (docPath, href, signal) =>
         host.assets.resolve({ principal, sourcePath: docPath, href, signal })
           .then((handle) => handle?.url ?? null);
@@ -192,14 +191,32 @@ export class HtmlBlockWidget extends WidgetType {
         return createWebEmbedPlaceholder(externalHref);
       }
 
-      // localTrusted: show sanitized preview with a diagnostic instead of a
-      // script-capable srcdoc iframe. Active HTML requires an explicit
-      // AuthorizationGrant (not yet implemented).
-      if (this.htmlTrustMode === "localTrusted") {
+      // Active HTML (scripts/forms/srcdoc) requires an explicit, revocable
+      // local-active-html AuthorizationGrant evaluated by the trust policy.
+      // Without a grant we ALWAYS render sanitized content — never a
+      // script-capable srcdoc iframe — regardless of htmlTrustMode.
+      const activeHtmlGrant = evaluateAuthorizationGrant(
+        documentTrustContext(),
+        createPrincipalFromView(view, "web-embed"),
+        "local-active-html",
+      );
+      if ((!activeHtmlGrant || activeHtmlGrant.revoked) && this.htmlTrustMode === "localTrusted") {
         const wrapper = createSanitizedHtmlPreviewBlock(this.block, this.block.source);
         const notice = document.createElement("div");
         notice.className = "cm-md-html-local-trusted-notice";
         notice.textContent = "Active HTML (scripts/forms) requires explicit trust grant — showing sanitized preview.";
+        wrapper.prepend(notice);
+        return wrapper;
+      }
+
+      // Even with localTrusted mode, never mount a script-capable srcdoc
+      // iframe in the editor renderer. Active HTML requires a dedicated
+      // sandboxed surface that is not yet shipped.
+      if (activeHtmlGrant && !activeHtmlGrant.revoked) {
+        const wrapper = createSanitizedHtmlPreviewBlock(this.block, this.block.source);
+        const notice = document.createElement("div");
+        notice.className = "cm-md-html-local-trusted-notice";
+        notice.textContent = "Active HTML grant recorded — editor still uses sanitized preview (no srcdoc iframe).";
         wrapper.prepend(notice);
         return wrapper;
       }

@@ -13,6 +13,8 @@ import {
 } from "../vendor/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
 import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "../vendor/shared-ui/src/editor/markdown/adapters/codemirror/embedHost";
 import { createSanitizedBlockHtmlFragment } from "../vendor/shared-ui/src/editor/markdown/rendering/sanitizeHtml";
+import { createPrincipalFromView } from "../vendor/shared-ui/src/editor/markdown/markdownLivePreviewContext";
+import { renderMarkdownInlineFromSharedPolicy } from "../vendor/shared-ui/src/editor/markdown/adapters/preview/markdownInlinePlanAdapter";
 
 const views: EditorView[] = [];
 
@@ -23,7 +25,10 @@ afterEach(() => {
   }
 });
 
-function createView(source: string) {
+function createView(
+  source: string,
+  identity: { workspaceId?: string; workspaceRoot?: string | null } = {},
+) {
   const parent = document.createElement("div");
   document.body.appendChild(parent);
   const view = new EditorView({
@@ -32,7 +37,7 @@ function createView(source: string) {
       doc: source,
       extensions: [
         ...markdownCodeMirrorBaseExtensions(false),
-        markdownLivePreviewExtension("safe", null, "note.md", null),
+        markdownLivePreviewExtension("safe", null, "note.md", null, identity.workspaceId ?? "", identity.workspaceRoot ?? null),
       ],
     }),
   });
@@ -104,5 +109,59 @@ describe("Markdown preview/policy convergence", () => {
     const div = result.fragment.querySelector("div");
     expect(div?.style.color).toBe("red");
     expect(div?.style.display).toBe("");
+  });
+});
+
+describe("Markdown host workspace identity", () => {
+  it("builds principals from the host-injected workspace id facet", () => {
+    const view = createView("# Title", { workspaceId: "workspace:acme", workspaceRoot: "/acme" });
+    const principal = createPrincipalFromView(view, "asset-read");
+    expect(principal.workspaceId).toBe("workspace:acme");
+    expect(principal.documentPath).toBe("note.md");
+    expect(principal.editorViewId).toMatch(/^md-view:/);
+    expect(principal.purpose).toBe("asset-read");
+  });
+
+  it("falls back to a document-derived workspace id when no facet is set", () => {
+    const view = createView("# Title");
+    const principal = createPrincipalFromView(view, "link-open");
+    expect(principal.workspaceId).toBe("doc:note.md");
+  });
+});
+
+describe("Markdown table plan adapter", () => {
+  it("routes images through the broker-backed resolveAssetUrl (no raw resolver)", async () => {
+    const target = document.createElement("div");
+    document.body.appendChild(target);
+    let resolverCalls = 0;
+    renderMarkdownInlineFromSharedPolicy(target, "![alt](assets/pic.png)", {
+      sourcePath: "note.md",
+      resolveAssetUrl: (documentPath, href) => {
+        resolverCalls += 1;
+        expect(documentPath).toBe("note.md");
+        expect(href).toBe("assets/pic.png");
+        return "blob:https://app/pic";
+      },
+    });
+    // The renderer schedules the resolve microtask; flush it.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(resolverCalls).toBe(1);
+    const img = target.querySelector("img");
+    expect(img?.getAttribute("src")).toBe("blob:https://app/pic");
+    target.remove();
+  });
+
+  it("opens links through the broker-backed openHref wrapper", () => {
+    const target = document.createElement("div");
+    const opened: string[] = [];
+    renderMarkdownInlineFromSharedPolicy(target, "[docs](https://example.com)", {
+      sourcePath: "note.md",
+      openHref: (href) => opened.push(href),
+    });
+    const link = target.querySelector("a");
+    expect(link).not.toBeNull();
+    link?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    expect(opened).toEqual(["https://example.com"]);
   });
 });

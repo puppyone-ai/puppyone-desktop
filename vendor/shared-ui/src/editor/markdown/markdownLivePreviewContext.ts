@@ -3,7 +3,12 @@ import { EditorView } from "@codemirror/view";
 import { findWikiLinkTokens } from "./links/wikiLinkModel";
 import { findMarkdownLinkTokens, isExternalMarkdownHref } from "./links/markdownLinkModel";
 import { getMarkdownEmbedHost } from "./adapters/codemirror/embedHost";
-import { createCapabilityPrincipal, workspaceIdForDocument } from "./services/capabilityPrincipal";
+import {
+  createCapabilityPrincipal,
+  workspaceIdForDocument,
+  type CapabilityPrincipal,
+  type CapabilityPurpose,
+} from "./services/capabilityPrincipal";
 import { getDocRevision } from "./services/transactionBroker";
 import { isSafeHref } from "./policy/markdownUrlPolicy";
 import { getInlineRevealElement, type MarkdownElement } from "./syntax/markdownElements";
@@ -33,20 +38,70 @@ export const markdownAssetUrlResolverFacet = Facet.define<MarkdownAssetUrlResolv
   },
 });
 
+/**
+ * Host-injected stable workspace identity. When empty, principals fall back to
+ * `workspaceIdForDocument(documentPath)`.
+ */
+export const markdownWorkspaceIdFacet = Facet.define<string, string>({
+  combine(values) {
+    return values.length > 0 ? values[values.length - 1] : "";
+  },
+});
+
+/** Host-injected workspace root used for asset-policy containment checks. */
+export const markdownWorkspaceRootFacet = Facet.define<string | null, string | null>({
+  combine(values) {
+    return values.length > 0 ? values[values.length - 1] : null;
+  },
+});
+
 export function markdownLivePreviewContextExtension(
   htmlTrustMode: MarkdownHtmlTrustMode,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
+  workspaceId = "",
+  workspaceRoot: string | null = null,
 ): Extension {
   return [
     markdownHtmlTrustModeFacet.of(htmlTrustMode),
     markdownLinkGraphFacet.of(markdownLinkGraph),
     markdownDocumentPathFacet.of(documentPath),
     markdownAssetUrlResolverFacet.of(markdownAssetUrlResolver),
+    markdownWorkspaceIdFacet.of(workspaceId),
+    markdownWorkspaceRootFacet.of(workspaceRoot),
     markdownLinkModifierClassHandler,
     markdownLinkOpenHandler,
   ];
+}
+
+/**
+ * Build a capability principal from live editor state. This is the single,
+ * canonical way to mint a principal: it reads the host-injected workspace
+ * identity facets, the per-view embed host id, and the current document
+ * revision. Ad-hoc `"workspace"` / path-only principals are not permitted.
+ */
+export function createPrincipalFromView(
+  view: EditorView,
+  purpose: CapabilityPurpose,
+  extra: { executionSessionId?: string } = {},
+): CapabilityPrincipal {
+  const documentPath = view.state.facet(markdownDocumentPathFacet);
+  const workspaceId = view.state.facet(markdownWorkspaceIdFacet) || workspaceIdForDocument(documentPath);
+  const host = getMarkdownEmbedHost(view);
+  return createCapabilityPrincipal({
+    editorViewId: host.viewId,
+    workspaceId,
+    documentPath,
+    documentRevision: getDocRevision(view.state.doc),
+    purpose,
+    executionSessionId: extra.executionSessionId,
+  });
+}
+
+/** Read the host-injected workspace root, if any. */
+export function getMarkdownWorkspaceRoot(view: EditorView): string | null {
+  return view.state.facet(markdownWorkspaceRootFacet);
 }
 
 const MARKDOWN_LINK_OPEN_MODIFIER_CLASS = "cm-md-open-modifier-down";
@@ -203,13 +258,7 @@ function openMarkdownHref(href: string, view: EditorView): boolean {
   const host = getMarkdownEmbedHost(view);
   const documentPath = view.state.facet(markdownDocumentPathFacet);
   const result = host.links.resolve(
-    createCapabilityPrincipal({
-      editorViewId: host.viewId,
-      workspaceId: workspaceIdForDocument(documentPath),
-      documentPath,
-      documentRevision: getDocRevision(view.state.doc),
-      purpose: "link-open",
-    }),
+    createPrincipalFromView(view, "link-open"),
     href,
   );
 
