@@ -204,6 +204,44 @@ export function getSafeBlockProfile() {
   return MARKDOWN_HTML_PROFILES["safe-block"];
 }
 
+export function getSafeMediaProfile() {
+  return MARKDOWN_HTML_PROFILES["safe-media"];
+}
+
 export function isBlockedExecutableTag(tagName: string): boolean {
   return MARKDOWN_HTML_PROFILES.blocked.has(tagName);
+}
+
+export function getProfileForSanitizerMode(mode: "inline" | "block") {
+  return mode === "block" ? getSafeBlockProfile() : getInlineEditableProfile();
+}
+
+function getProfileForSanitizerElement(mode: "inline" | "block", tagName: string) {
+  if (getSafeMediaProfile().tags.has(tagName)) return getSafeMediaProfile();
+  return getProfileForSanitizerMode(mode);
+}
+
+export function isTagAllowedInProfile(
+  tagName: string,
+  mode: "inline" | "block",
+): boolean {
+  if (isBlockedExecutableTag(tagName)) return false;
+  return getProfileForSanitizerElement(mode, tagName).tags.has(tagName);
+}
+
+export function isAttributeAllowedInProfile(tagName: string, attributeName: string, mode: "inline" | "block"): boolean {
+  const profile = getProfileForSanitizerElement(mode, tagName);
+  return (
+    profile.attributes.global.has(attributeName) ||
+    profile.attributes.byTag.get(tagName)?.has(attributeName) === true
+  );
+}
+
+export function isStylePropertyAllowedInProfile(
+  property: string,
+  mode: "inline" | "block",
+  tagName?: string,
+): boolean {
+  return (tagName ? getProfileForSanitizerElement(mode, tagName) : getProfileForSanitizerMode(mode))
+    .styleProperties.has(property);
 }

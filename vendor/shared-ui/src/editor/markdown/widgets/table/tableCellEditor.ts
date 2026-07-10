@@ -1,6 +1,7 @@
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
-import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MarkdownLinkGraph } from "../../../viewerTypes";
+import { getMarkdownEmbedHost } from "../../adapters/codemirror/embedHost";
 import { renderMarkdownInlineInto } from "../../rendering/inlineRenderer";
 import {
   sanitizeMarkdownTableCell,
@@ -10,6 +11,8 @@ import {
   type MarkdownTableRow,
   type MarkdownTableStructureOperation,
 } from "../../rendering/tableModel";
+import { createCapabilityPrincipal, workspaceIdForDocument } from "../../services/capabilityPrincipal";
+import { getDocRevision } from "../../services/transactionBroker";
 import { isContentEditableCaretAtBoundary, stopCodeMirrorEvent } from "../widgetDom";
 import {
   dispatchMarkdownTableStructureOperation,
@@ -25,7 +28,6 @@ export type MarkdownTableCellEditorContext = {
   columnCount: number;
   columnIndex: number;
   documentPath: string;
-  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null;
   markdownLinkGraph: MarkdownLinkGraph | null;
   rowCount: number;
   rowIndex: number;
@@ -42,7 +44,6 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
     columnCount,
     columnIndex,
     documentPath,
-    markdownAssetUrlResolver,
     markdownLinkGraph,
     rowCount,
     rowIndex,
@@ -57,7 +58,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
   content.dataset.mdTableColumn = String(columnIndex);
   content.dataset.mdTableRow = String(rowIndex);
   content.spellcheck = false;
-  renderTableCellPreview(content, cell.text, markdownLinkGraph, documentPath, markdownAssetUrlResolver, () => {
+  renderTableCellPreview(content, cell.text, markdownLinkGraph, documentPath, view, () => {
     view.requestMeasure();
   });
 
@@ -189,7 +190,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
       editing = false;
       delete content.dataset.mdTableEditing;
       if (nextText === cell.text) {
-        renderTableCellPreview(content, cell.text, markdownLinkGraph, documentPath, markdownAssetUrlResolver, () => {
+        renderTableCellPreview(content, cell.text, markdownLinkGraph, documentPath, view, () => {
           view.requestMeasure();
         });
         view.requestMeasure();
@@ -254,13 +255,43 @@ function renderTableCellPreview(
   source: string,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
-  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
+  view: EditorView,
   onLayoutChange: () => void,
 ) {
+  const host = getMarkdownEmbedHost(view);
+  const principal = createCapabilityPrincipal({
+    editorViewId: host.viewId,
+    workspaceId: workspaceIdForDocument(documentPath),
+    documentPath,
+    documentRevision: getDocRevision(view.state.doc),
+    purpose: "asset-read",
+  });
   content.replaceChildren();
   renderMarkdownInlineInto(content, source, {
     markdownLinkGraph,
-    markdownAssetUrlResolver,
+    resolveAssetUrl: (sourcePath, href, signal) =>
+      host.assets.resolve({ principal, sourcePath, href, signal }).then((handle) => handle?.url ?? null),
+    openHref: (href) => {
+      const intent = host.links.resolve(
+        createCapabilityPrincipal({
+          editorViewId: host.viewId,
+          workspaceId: workspaceIdForDocument(documentPath),
+          documentPath,
+          documentRevision: getDocRevision(view.state.doc),
+          purpose: "link-open",
+        }),
+        href,
+      );
+      if (intent.action === "open-external") {
+        if (markdownLinkGraph?.openExternalUrl) {
+          void markdownLinkGraph.openExternalUrl(intent.href);
+        } else {
+          window.open(intent.href, "_blank", "noopener,noreferrer");
+        }
+      } else if (intent.action === "navigate-internal") {
+        markdownLinkGraph?.openPath?.(intent.path);
+      }
+    },
     onLayoutChange,
     sourcePath: documentPath,
   });

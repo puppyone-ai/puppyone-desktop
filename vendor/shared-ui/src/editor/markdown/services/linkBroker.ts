@@ -1,4 +1,4 @@
-import { isSafeHref } from "../rendering/markdownHtmlPolicy";
+import { isSafeHref } from "../policy/markdownUrlPolicy";
 import type { CapabilityPrincipal } from "./capabilityPrincipal";
 
 export type LinkIntent =
@@ -27,6 +27,7 @@ export function createLinkBroker(options: LinkBrokerOptions = {}) {
       principal: CapabilityPrincipal,
       href: string,
     ): LinkBrokerResult {
+      void principal;
       const trimmed = href.trim();
       if (!trimmed) return { action: "deny", reason: "empty-href" };
       if (!isSafeHref(trimmed)) return { action: "deny", reason: "unsafe-protocol" };
@@ -34,7 +35,16 @@ export function createLinkBroker(options: LinkBrokerOptions = {}) {
       const internal = options.resolveInternal?.(principal.documentPath, trimmed) ?? null;
       if (internal) return { action: "navigate-internal", path: internal };
 
-      if (/^https?:/i.test(trimmed)) {
+      // Relative markdown paths without scheme are internal candidates when
+      // resolveInternal is absent — still require an explicit resolver for
+      // navigation; otherwise deny ambient opens.
+      if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed) && !trimmed.startsWith("#") && !trimmed.startsWith("/")) {
+        if (options.resolveInternal) {
+          return { action: "deny", reason: "unresolved-internal" };
+        }
+      }
+
+      if (/^https?:/i.test(trimmed) || /^mailto:/i.test(trimmed)) {
         if (options.requireExternalConfirmation) {
           return { action: "confirm-external", href: trimmed };
         }

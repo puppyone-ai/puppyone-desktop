@@ -5,10 +5,8 @@ import {
   isBlockedExecutableTag,
   MARKDOWN_HTML_PROFILE_VERSION,
 } from "./markdownHtmlProfiles";
-import {
-  isSafeHref,
-  isSafeStyleValue,
-} from "../rendering/markdownHtmlPolicy";
+import { canonicalizeMarkdownHref, isSafeHref } from "./markdownUrlPolicy";
+import { isSafeStyleValue } from "../rendering/markdownHtmlPolicy";
 
 export type SafeInlineHtmlMark = {
   kind: "mark";
@@ -153,7 +151,7 @@ export function compileInlineHtmlRenderPlan(element: MarkdownInlineHtml): Inline
     }
 
     if (attribute.name === "href") {
-      const href = decodeHtmlAttributeValue(attribute.value).trim();
+      const href = canonicalizeMarkdownHref(decodeHtmlAttributeValue(attribute.value));
       if (!isSafeHref(href)) {
         // Anchors whose meaning depends on an unsafe href fall back to source.
         structuralFailure = true;
@@ -164,10 +162,11 @@ export function compileInlineHtmlRenderPlan(element: MarkdownInlineHtml): Inline
         });
         continue;
       }
-      attributes.href = href;
-      if (!attributes.rel && /^https?:/i.test(href)) {
-        attributes.rel = "noopener noreferrer";
-      }
+      // Never put a live href on editor DOM. Activation goes through LinkBroker
+      // via data-md-href + the live-preview open handler.
+      attributes["data-md-href"] = href;
+      attributes.role = "link";
+      attributes.tabindex = "0";
       continue;
     }
 

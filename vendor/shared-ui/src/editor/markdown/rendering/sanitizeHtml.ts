@@ -111,23 +111,25 @@ function copySafeAttributes(target: HTMLElement, source: HTMLElement, tagName: s
       continue;
     }
 
-    if (!isAllowedHtmlAttribute(tagName, name)) {
+    if (!isAllowedHtmlAttribute(tagName, name, context.mode)) {
       markUnsupported(context, `attribute "${name}" was omitted`, { fatal: false });
       continue;
     }
 
     if (name === "style") {
-      copySafeInlineStyles(target, source, context);
+      copySafeInlineStyles(target, source, tagName, context);
       continue;
     }
 
     if (tagName === "a" && name === "href") {
       if (isSafeHref(value)) {
-        target.setAttribute("href", value.trim());
-        target.setAttribute("rel", "noreferrer noopener");
-        target.setAttribute("target", "_blank");
+        // Never mount a live href in editor/preview DOM. Activation is mediated.
+        target.setAttribute("data-md-href", value.trim());
+        target.setAttribute("role", "link");
+        target.setAttribute("tabindex", "0");
+        target.removeAttribute("href");
       } else {
-        markUnsupported(context, "unsafe link URL is not supported");
+        markUnsupported(context, "unsafe link URL is not supported", { fatal: true });
       }
       continue;
     }
@@ -200,11 +202,16 @@ function copySafeAttributes(target: HTMLElement, source: HTMLElement, tagName: s
   }
 }
 
-function copySafeInlineStyles(target: HTMLElement, source: HTMLElement, context: SanitizeContext) {
+function copySafeInlineStyles(
+  target: HTMLElement,
+  source: HTMLElement,
+  tagName: string,
+  context: SanitizeContext,
+) {
   for (const property of Array.from(source.style)) {
     const name = property.toLowerCase();
     const value = source.style.getPropertyValue(property);
-    if (!isAllowedStyleProperty(name, context.mode)) {
+    if (!isAllowedStyleProperty(name, context.mode, tagName)) {
       markUnsupported(context, `style "${name}" was omitted`, { fatal: false });
       continue;
     }

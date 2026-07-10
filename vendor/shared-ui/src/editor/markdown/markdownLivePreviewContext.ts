@@ -2,7 +2,10 @@ import { Facet, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { findWikiLinkTokens } from "./links/wikiLinkModel";
 import { findMarkdownLinkTokens, isExternalMarkdownHref } from "./links/markdownLinkModel";
-import { isSafeHref } from "./rendering/markdownHtmlPolicy";
+import { getMarkdownEmbedHost } from "./adapters/codemirror/embedHost";
+import { createCapabilityPrincipal, workspaceIdForDocument } from "./services/capabilityPrincipal";
+import { getDocRevision } from "./services/transactionBroker";
+import { isSafeHref } from "./policy/markdownUrlPolicy";
 import { getInlineRevealElement, type MarkdownElement } from "./syntax/markdownElements";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
 
@@ -133,7 +136,7 @@ function getMarkdownLinkElementFromEvent(event: Event, view: EditorView): HTMLEl
   if (!targetElement) return null;
 
   const linkElement = targetElement.closest<HTMLElement>(
-    ".cm-md-wiki-link-label[data-wiki-target], .cm-md-link-label[data-md-href]",
+    ".cm-md-wiki-link-label[data-wiki-target], .cm-md-link-label[data-md-href], a.cm-md-inline-html[data-md-href], .cm-md-inline-html[data-md-href]",
   );
   if (!linkElement || !view.dom.contains(linkElement)) return null;
   return linkElement;
@@ -195,20 +198,39 @@ function openWikiLinkTarget(wikiTarget: string, view: EditorView): boolean {
 }
 
 function openMarkdownHref(href: string, view: EditorView): boolean {
-  if (isExternalMarkdownHref(href) && isSafeHref(href)) {
-    return openExternalMarkdownHref(href, view);
+  if (!isSafeHref(href)) return false;
+
+  const host = getMarkdownEmbedHost(view);
+  const documentPath = view.state.facet(markdownDocumentPathFacet);
+  const result = host.links.resolve(
+    createCapabilityPrincipal({
+      editorViewId: host.viewId,
+      workspaceId: workspaceIdForDocument(documentPath),
+      documentPath,
+      documentRevision: getDocRevision(view.state.doc),
+      purpose: "link-open",
+    }),
+    href,
+  );
+
+  if (result.action === "deny") return false;
+
+  if (result.action === "navigate-internal") {
+    const linkGraph = view.state.facet(markdownLinkGraphFacet);
+    const resolvedTarget = linkGraph?.resolveMarkdownLink(documentPath, result.path) ?? null;
+    if (!resolvedTarget || !linkGraph?.openWikiLink) return false;
+    if (!resolvedTarget.exists && (!resolvedTarget.candidatePaths || resolvedTarget.candidatePaths.length === 0)) {
+      return false;
+    }
+    linkGraph.openWikiLink(resolvedTarget, documentPath);
+    return true;
   }
 
-  const linkGraph = view.state.facet(markdownLinkGraphFacet);
-  const sourcePath = view.state.facet(markdownDocumentPathFacet);
-  const resolvedTarget = linkGraph?.resolveMarkdownLink(sourcePath, href) ?? null;
-  if (!resolvedTarget || !linkGraph?.openWikiLink) return false;
-  if (!resolvedTarget.exists && (!resolvedTarget.candidatePaths || resolvedTarget.candidatePaths.length === 0)) {
-    return false;
+  if (result.action === "open-external" || result.action === "confirm-external") {
+    return openExternalMarkdownHref(result.href, view);
   }
 
-  linkGraph.openWikiLink(resolvedTarget, sourcePath);
-  return true;
+  return false;
 }
 
 function openExternalMarkdownHref(href: string, view: EditorView): boolean {

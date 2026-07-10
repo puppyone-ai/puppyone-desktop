@@ -4,11 +4,13 @@ import { createAssetBroker, type AssetBroker, type AssetUrlResolver } from "../.
 import { createLinkBroker, type LinkBroker } from "../../services/linkBroker";
 import { createTransactionBroker, type TransactionBroker } from "../../services/transactionBroker";
 import { createWebEmbedBroker, type WebEmbedBroker } from "../../services/webEmbedBroker";
+import { createEmbeddedEditSessionStore, type EmbeddedEditSessionStore } from "./embeddedEditSession";
 import { createWidgetSessionRegistry, type WidgetSessionRegistry } from "./widgetSession";
 
 export type MarkdownEmbedHost = {
   viewId: string;
   sessions: WidgetSessionRegistry;
+  editSessions: EmbeddedEditSessionStore;
   assets: AssetBroker;
   asyncRender: AsyncRenderBroker;
   links: LinkBroker;
@@ -38,6 +40,7 @@ export function getMarkdownEmbedHost(
   if (existing) return existing;
 
   const sessions = createWidgetSessionRegistry();
+  const editSessions = createEmbeddedEditSessionStore();
   const assets = createAssetBroker(options.resolveAssetUrl ?? null);
   const asyncRender = createAsyncRenderBroker();
   const links = createLinkBroker();
@@ -50,6 +53,7 @@ export function getMarkdownEmbedHost(
   const host: MarkdownEmbedHost = {
     viewId: `md-view:${++viewSequence}`,
     sessions,
+    editSessions,
     assets,
     asyncRender,
     links,
@@ -69,6 +73,7 @@ export function getMarkdownEmbedHost(
     },
     dispose() {
       sessions.disposeAll();
+      editSessions.clear();
       assets.disposeAll();
       asyncRender.disposeAll();
       webEmbeds.disposeAll();

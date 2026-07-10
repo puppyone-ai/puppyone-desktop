@@ -83,6 +83,12 @@ const markdownEmbedHostLifecycle = ViewPlugin.fromClass(class {
     });
   }
 
+  update(update: import("@codemirror/view").ViewUpdate) {
+    if (!update.docChanged) return;
+    const host = getMarkdownEmbedHost(this.view);
+    host.editSessions.mapRanges((pos, assoc) => update.changes.mapPos(pos, assoc));
+  }
+
   destroy() {
     disposeMarkdownEmbedHost(this.view);
   }

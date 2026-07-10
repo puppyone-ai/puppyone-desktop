@@ -12,7 +12,8 @@ import { MARKDOWN_HTML_PROFILE_VERSION } from "../vendor/shared-ui/src/editor/ma
 import { createAsyncRenderBroker } from "../vendor/shared-ui/src/editor/markdown/services/asyncRenderBroker";
 import { createLinkBroker } from "../vendor/shared-ui/src/editor/markdown/services/linkBroker";
 import { createWebEmbedBroker } from "../vendor/shared-ui/src/editor/markdown/services/webEmbedBroker";
-import { createCapabilityPrincipal } from "../vendor/shared-ui/src/editor/markdown/services/capabilityPrincipal";
+import { createCapabilityPrincipal, workspaceIdForDocument } from "../vendor/shared-ui/src/editor/markdown/services/capabilityPrincipal";
+import { createTransactionBroker, getDocRevision } from "../vendor/shared-ui/src/editor/markdown/services/transactionBroker";
 import { getMarkdownElements } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownElements";
 import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownParserExtensions";
 
@@ -69,9 +70,53 @@ describe("Markdown render-plan compiler", () => {
     expect(plans.some((entry) => entry.plan.presentation === "inlineMark")).toBe(true);
     expect(MARKDOWN_HTML_PROFILE_VERSION).toMatch(/^2026-/);
   });
+
+  it("compiles fence and table blocks into blockAtom plans with payload", () => {
+    const source = [
+      "```ts",
+      "const x = 1;",
+      "```",
+      "",
+      "| A | B |",
+      "| --- | --- |",
+      "| 1 | 2 |",
+    ].join("\n");
+    const plans = getMarkdownPlanIndex(createMarkdownState(source));
+    const fence = plans.find((entry) => entry.plan.presentation === "blockAtom" && entry.plan.embed.kind === "codeBlock");
+    const table = plans.find((entry) => entry.plan.presentation === "blockAtom" && entry.plan.embed.kind === "table");
+    expect(fence?.plan).toMatchObject({
+      presentation: "blockAtom",
+      embed: { kind: "codeBlock", language: "ts", code: "const x = 1;" },
+    });
+    expect(table?.plan.presentation).toBe("blockAtom");
+    if (table?.plan.presentation === "blockAtom" && table.plan.embed.kind === "table") {
+      expect(table.plan.embed.rows.length).toBeGreaterThanOrEqual(2);
+      expect(table.plan.embed.alignments.length).toBeGreaterThanOrEqual(2);
+    }
+  });
 });
 
 describe("Markdown embed runtime foundations", () => {
+  it("rejects embedded commits from a stale base revision", () => {
+    const state = EditorState.create({ doc: "```ts\nold\n```" });
+    const view = { state, dispatch: () => { throw new Error("stale commit dispatched"); } } as never;
+    const broker = createTransactionBroker();
+
+    expect(broker.buildCommit(view, {
+      mappedRange: { from: 0, to: state.doc.length },
+      baseSource: state.doc.toString(),
+      baseRevision: "stale-revision",
+      nextSource: "```ts\nnew\n```",
+    })).toBeNull();
+    expect(broker.commit(view, {
+      mappedRange: { from: 0, to: state.doc.length },
+      baseSource: state.doc.toString(),
+      baseRevision: "stale-revision",
+      nextSource: "```ts\nnew\n```",
+    })).toEqual({ ok: false, mappedTo: null });
+    expect(getDocRevision(state.doc)).not.toBe("stale-revision");
+  });
+
   it("disposes widget sessions by exact DOM node and disposeAll", () => {
     const registry = createWidgetSessionRegistry();
     const domA = {} as HTMLElement;
@@ -179,12 +224,13 @@ describe("Markdown embed runtime foundations", () => {
     });
     const principal = createCapabilityPrincipal({
       editorViewId: "view-1",
-      workspaceId: "ws",
+      workspaceId: workspaceIdForDocument("note.md"),
       documentPath: "note.md",
       documentRevision: "1",
       purpose: "link-open",
     });
 
+    expect(workspaceIdForDocument("note.md")).toBe("doc:note.md");
     expect(broker.resolve(principal, "other.md")).toEqual({
       action: "navigate-internal",
       path: "other.md",

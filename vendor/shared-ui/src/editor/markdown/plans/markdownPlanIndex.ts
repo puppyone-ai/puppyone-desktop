@@ -12,6 +12,14 @@ export type IndexedMarkdownPlan = {
 type MarkdownPlanIndexCacheEntry = {
   tree: ReturnType<typeof syntaxTree>;
   plans: readonly IndexedMarkdownPlan[];
+  intervals: MarkdownPlanIntervalNode | null;
+};
+
+type MarkdownPlanIntervalNode = {
+  entry: IndexedMarkdownPlan;
+  maxTo: number;
+  left: MarkdownPlanIntervalNode | null;
+  right: MarkdownPlanIntervalNode | null;
 };
 
 const markdownPlanIndexCache = new WeakMap<object, MarkdownPlanIndexCacheEntry>();
@@ -26,11 +34,16 @@ export function getMarkdownPlanIndex(state: EditorState): readonly IndexedMarkdo
   const cached = markdownPlanIndexCache.get(state.doc);
   if (cached?.tree === tree) return cached.plans;
 
-  const plans = getMarkdownElements(state).map((element) => ({
-    element,
-    plan: compileMarkdownElementPlan(element),
-  }));
-  markdownPlanIndexCache.set(state.doc, { tree, plans });
+  const plans = getMarkdownElements(state)
+    .map((element) => ({
+      element,
+      plan: compileMarkdownElementPlan(element),
+    }))
+    .sort((left, right) => (
+      left.plan.sourceRange.from - right.plan.sourceRange.from ||
+      left.plan.sourceRange.to - right.plan.sourceRange.to
+    ));
+  markdownPlanIndexCache.set(state.doc, { tree, plans, intervals: buildIntervalIndex(plans, 0, plans.length) });
   return plans;
 }
 
@@ -41,9 +54,45 @@ export function getMarkdownPlansInRange(
 ): readonly IndexedMarkdownPlan[] {
   const rangeFrom = Math.max(0, Math.min(from, to, state.doc.length));
   const rangeTo = Math.max(rangeFrom, Math.min(Math.max(from, to), state.doc.length));
-  return getMarkdownPlanIndex(state).filter(({ plan }) => (
-    plan.sourceRange.from < rangeTo && plan.sourceRange.to > rangeFrom
-  ));
+  const result: IndexedMarkdownPlan[] = [];
+  getMarkdownPlanIndex(state);
+  const cached = markdownPlanIndexCache.get(state.doc);
+  queryIntervalIndex(cached?.intervals ?? null, rangeFrom, rangeTo, result);
+  return result;
+}
+
+function buildIntervalIndex(
+  entries: readonly IndexedMarkdownPlan[],
+  from: number,
+  to: number,
+): MarkdownPlanIntervalNode | null {
+  if (from >= to) return null;
+  const middle = (from + to) >>> 1;
+  const entry = entries[middle];
+  if (!entry) return null;
+  const left = buildIntervalIndex(entries, from, middle);
+  const right = buildIntervalIndex(entries, middle + 1, to);
+  return {
+    entry,
+    maxTo: Math.max(entry.plan.sourceRange.to, left?.maxTo ?? Number.NEGATIVE_INFINITY, right?.maxTo ?? Number.NEGATIVE_INFINITY),
+    left,
+    right,
+  };
+}
+
+function queryIntervalIndex(
+  node: MarkdownPlanIntervalNode | null,
+  from: number,
+  to: number,
+  result: IndexedMarkdownPlan[],
+) {
+  if (!node || node.maxTo <= from) return;
+  queryIntervalIndex(node.left, from, to, result);
+  const range = node.entry.plan.sourceRange;
+  if (range.from < to && range.to > from) result.push(node.entry);
+  // Entries in the right subtree start at or after this entry, so none can
+  // overlap once this source range begins at/after the query end.
+  if (range.from < to) queryIntervalIndex(node.right, from, to, result);
 }
 
 export function findMarkdownPlanAt(

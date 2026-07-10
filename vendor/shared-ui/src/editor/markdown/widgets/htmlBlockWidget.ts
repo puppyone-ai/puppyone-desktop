@@ -1,12 +1,13 @@
 import { EditorView, WidgetType } from "@codemirror/view";
-import { getHtmlPreviewInteractionCss } from "../../htmlPreviewInteraction";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode } from "../../viewerTypes";
 import { getMarkdownEmbedHost } from "../adapters/codemirror/embedHost";
 import { disposeWidgetSessionDom } from "../adapters/codemirror/widgetSession";
 import { resolveMarkdownHtmlImageSources } from "../links/markdownImageModel";
 import type { MarkdownHtmlBlock } from "../rendering/htmlBlockModel";
 import { createSanitizedBlockHtmlFragment } from "../rendering/sanitizeHtml";
-import { createCapabilityPrincipal } from "../services/capabilityPrincipal";
+import { createCapabilityPrincipal, workspaceIdForDocument } from "../services/capabilityPrincipal";
+import type { AssetUrlResolver } from "../services/assetBroker";
+import { getDocRevision } from "../services/transactionBroker";
 import {
   clampNumber,
   estimateMarkdownHtmlBlockHeight,
@@ -59,9 +60,9 @@ export class HtmlBlockWidget extends WidgetType {
     const measure = new MarkdownWidgetMeasureController();
     let previewVersion = 0;
     let showingSource = false;
-    let messageListener: ((event: MessageEvent) => void) | null = null;
-    let readyTimer: number | null = null;
     let webEmbedId: string | null = null;
+    let boundsUpdateListener: (() => void) | null = null;
+    let boundsResizeObserver: ResizeObserver | null = null;
 
     const toolbar = document.createElement("div");
     toolbar.className = "cm-md-html-widget-toolbar";
@@ -74,14 +75,13 @@ export class HtmlBlockWidget extends WidgetType {
     content.className = "cm-md-html-widget-content";
 
     const clearPreviewLifecycle = () => {
-      if (messageListener) {
-        window.removeEventListener("message", messageListener);
-        messageListener = null;
+      if (boundsUpdateListener) {
+        window.removeEventListener("scroll", boundsUpdateListener, { capture: true } as EventListenerOptions);
+        window.removeEventListener("resize", boundsUpdateListener);
+        boundsUpdateListener = null;
       }
-      if (readyTimer !== null) {
-        window.clearTimeout(readyTimer);
-        readyTimer = null;
-      }
+      boundsResizeObserver?.disconnect();
+      boundsResizeObserver = null;
       if (webEmbedId) {
         host.webEmbeds.destroy(webEmbedId);
         webEmbedId = null;
@@ -97,9 +97,9 @@ export class HtmlBlockWidget extends WidgetType {
     const createWebEmbedPlaceholder = (href: string) => {
       const principal = createCapabilityPrincipal({
         editorViewId: host.viewId,
-        workspaceId: "workspace",
+        workspaceId: workspaceIdForDocument(this.documentPath),
         documentPath: this.documentPath,
-        documentRevision: String(view.state.doc.length),
+        documentRevision: getDocRevision(view.state.doc),
         purpose: "web-embed",
       });
       const embed = host.webEmbeds.create({
@@ -127,7 +127,8 @@ export class HtmlBlockWidget extends WidgetType {
         event.stopPropagation();
         button.disabled = true;
         button.textContent = "Loading…";
-        const activated = await host.webEmbeds.activate(embed.id);
+        const initialBounds = domRectToWebEmbedBounds(wrapper.getBoundingClientRect());
+        const activated = await host.webEmbeds.activate(embed.id, initialBounds);
         if (!activated || !wrapper.isConnected) return;
         wrapper.dataset.embedState = activated.state;
         if (activated.state === "loaded") {
@@ -139,6 +140,20 @@ export class HtmlBlockWidget extends WidgetType {
           frame.textContent = `Embedded: ${href}`;
           wrapper.appendChild(frame);
           measure.schedule(view);
+
+          // Track position changes so the native view stays aligned.
+          const activeEmbedId = embed.id;
+          const updateBounds = () => {
+            if (!wrapper.isConnected || !webEmbedId) return;
+            void host.webEmbeds.setBounds(activeEmbedId, domRectToWebEmbedBounds(wrapper.getBoundingClientRect()));
+          };
+          boundsUpdateListener = updateBounds;
+          window.addEventListener("scroll", updateBounds, { passive: true, capture: true });
+          window.addEventListener("resize", updateBounds, { passive: true });
+          if ("ResizeObserver" in window) {
+            boundsResizeObserver = new ResizeObserver(updateBounds);
+            boundsResizeObserver.observe(wrapper);
+          }
         } else {
           button.disabled = false;
           button.textContent = `Load embed: ${href}`;
@@ -148,67 +163,23 @@ export class HtmlBlockWidget extends WidgetType {
       return wrapper;
     };
 
-    const createTrustedHtmlBlock = (block: typeof this.block, version: number) => {
-      const wrapper = document.createElement("div");
-      wrapper.className = "cm-md-html-trusted-block is-loading";
-      const sizer = createTrustedHtmlSizer(block.source);
-      const loader = createTrustedHtmlLoader();
-      wrapper.appendChild(sizer);
-      wrapper.appendChild(loader);
-
-      const frameId = createTrustedHtmlFrameId();
-      const iframe = document.createElement("iframe");
-      iframe.className = "cm-md-html-trusted-frame";
-      iframe.title = "Trusted Markdown HTML preview";
-      iframe.sandbox.add("allow-downloads", "allow-forms", "allow-modals", "allow-popups", "allow-scripts");
-      iframe.referrerPolicy = "no-referrer";
-      iframe.style.height = `${estimateTrustedHtmlFrameHeight(block.source)}px`;
-
-      const markReady = () => {
-        if (readyTimer !== null) {
-          window.clearTimeout(readyTimer);
-          readyTimer = null;
-        }
-        if (!wrapper.classList.contains("is-loading")) return;
-        wrapper.classList.remove("is-loading");
-        sizer.remove();
-        loader.remove();
-        measure.schedule(view);
-      };
-
-      let measuredHeight = false;
-      messageListener = (event: MessageEvent) => {
-        if (event.source !== iframe.contentWindow) return;
-        if (!isTrustedHtmlHeightMessage(event.data, frameId)) return;
-        measuredHeight = true;
-        iframe.style.height = `${clampNumber(event.data.height, 80, 2400)}px`;
-        markReady();
-        measure.schedule(view);
-      };
-      window.addEventListener("message", messageListener);
-
-      iframe.addEventListener("load", () => {
-        if (!wrapper.classList.contains("is-loading")) return;
-        readyTimer = window.setTimeout(() => {
-          if (!measuredHeight) markReady();
-        }, 120);
-      }, { once: true });
-
-      resolveMarkdownHtmlImageSources(block.source, this.documentPath, this.markdownAssetUrlResolver)
-        .then((source) => {
-          if (!isPreviewVersionCurrent(version)) return;
-          iframe.srcdoc = createTrustedHtmlDocument(source, frameId);
-          wrapper.appendChild(iframe);
-          measure.schedule(view);
-        })
-        .catch(() => {
-          if (!isPreviewVersionCurrent(version)) return;
-          iframe.srcdoc = createTrustedHtmlDocument(block.source, frameId);
-          wrapper.appendChild(iframe);
-          measure.schedule(view);
-        });
-
-      return wrapper;
+    /**
+     * Build an asset resolver that routes through the host's asset broker so
+     * all image loads are tracked under a capability principal and can be
+     * revoked on session dispose.
+     */
+    const buildBrokerAssetResolver = (): AssetUrlResolver | null => {
+      if (!this.markdownAssetUrlResolver) return null;
+      const principal = createCapabilityPrincipal({
+        editorViewId: host.viewId,
+        workspaceId: workspaceIdForDocument(this.documentPath),
+        documentPath: this.documentPath,
+        documentRevision: getDocRevision(view.state.doc),
+        purpose: "asset-read",
+      });
+      return (docPath, href, signal) =>
+        host.assets.resolve({ principal, sourcePath: docPath, href, signal })
+          .then((handle) => handle?.url ?? null);
     };
 
     const createPreviewBlock = (version: number) => {
@@ -221,19 +192,27 @@ export class HtmlBlockWidget extends WidgetType {
         return createWebEmbedPlaceholder(externalHref);
       }
 
+      // localTrusted: show sanitized preview with a diagnostic instead of a
+      // script-capable srcdoc iframe. Active HTML requires an explicit
+      // AuthorizationGrant (not yet implemented).
       if (this.htmlTrustMode === "localTrusted") {
-        return createTrustedHtmlBlock(this.block, version);
+        const wrapper = createSanitizedHtmlPreviewBlock(this.block, this.block.source);
+        const notice = document.createElement("div");
+        notice.className = "cm-md-html-local-trusted-notice";
+        notice.textContent = "Active HTML (scripts/forms) requires explicit trust grant — showing sanitized preview.";
+        wrapper.prepend(notice);
+        return wrapper;
       }
 
-      const resolver = this.markdownAssetUrlResolver;
-      if (!resolver) {
+      const brokerResolver = buildBrokerAssetResolver();
+      if (!brokerResolver) {
         return createSanitizedHtmlPreviewBlock(this.block, this.block.source);
       }
 
       const wrapper = document.createElement("div");
       wrapper.className = "cm-md-html-rendered-surface cm-md-html-block is-loading";
       wrapper.appendChild(createTrustedHtmlLoader());
-      resolveMarkdownHtmlImageSources(this.block.source, this.documentPath, resolver)
+      resolveMarkdownHtmlImageSources(this.block.source, this.documentPath, brokerResolver)
         .then((source) => {
           if (!isPreviewVersionCurrent(version)) return;
           replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, source);
@@ -319,21 +298,13 @@ function replaceWithSanitizedHtmlPreviewBlock(target: HTMLElement, block: Markdo
   target.replaceChildren(...Array.from(nextBlock.childNodes));
 }
 
-function createTrustedHtmlSizer(source: string): HTMLElement {
-  const wrapper = document.createElement("div");
-  wrapper.className = "cm-md-html-rendered-surface cm-md-html-trusted-sizer";
-  wrapper.setAttribute("aria-hidden", "true");
-
-  const result = createSanitizedBlockHtmlFragment(source);
-  if (result.fragment.childNodes.length > 0) {
-    wrapper.appendChild(result.fragment);
-    return wrapper;
-  }
-
-  const placeholder = document.createElement("div");
-  placeholder.className = "cm-md-html-sizing-placeholder";
-  wrapper.appendChild(placeholder);
-  return wrapper;
+function domRectToWebEmbedBounds(rect: DOMRect): { x: number; y: number; width: number; height: number } {
+  return {
+    x: Math.round(rect.left + window.scrollX),
+    y: Math.round(rect.top + window.scrollY),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+  };
 }
 
 function createTrustedHtmlLoader(): HTMLElement {
@@ -390,123 +361,6 @@ function createHtmlWidgetIcon(kind: "preview" | "source"): SVGElement {
   return svg;
 }
 
-function createTrustedHtmlDocument(source: string, frameId: string): string {
-  return `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<base target="_blank">
-<style>
-${getTrustedHtmlThemeCss()}
-* {
-  box-sizing: border-box;
-}
-html {
-  min-height: 0;
-  color-scheme: light dark;
-  background: transparent;
-}
-body {
-  margin: 0;
-  overflow: hidden;
-  background: transparent;
-  color: var(--text-normal);
-  font-family: var(--font-text);
-  font-size: 14px;
-  line-height: 1.6;
-}
-#puppyone-md-html-content {
-  display: flow-root;
-  min-height: 0;
-}
-a {
-  color: var(--text-accent);
-  text-decoration: none;
-}
-a:hover {
-  text-decoration: underline;
-}
-img,
-video,
-canvas,
-svg {
-  max-width: 100%;
-}
-pre,
-code {
-  font-family: var(--font-monospace);
-}
-${getHtmlPreviewInteractionCss("#puppyone-md-html-content")}
-</style>
-</head>
-<body>
-<div id="puppyone-md-html-content">
-${source}
-</div>
-<script>
-(() => {
-  const frameId = ${JSON.stringify(frameId)};
-  const postHeight = () => {
-    const content = document.getElementById("puppyone-md-html-content");
-    if (!content) return;
-    const rect = content.getBoundingClientRect();
-    const height = Math.ceil(Math.max(content.scrollHeight, rect.height));
-    parent.postMessage({ type: "puppyone:markdown-html-height", id: frameId, height }, "*");
-  };
-  addEventListener("load", postHeight);
-  if ("ResizeObserver" in window) {
-    const content = document.getElementById("puppyone-md-html-content");
-    if (content) new ResizeObserver(postHeight).observe(content);
-  }
-  requestAnimationFrame(postHeight);
-  setTimeout(postHeight, 120);
-})();
-</script>
-</body>
-</html>`;
-}
-
-function getTrustedHtmlThemeCss(): string {
-  const rootStyle = getComputedStyle(document.documentElement);
-  const read = (name: string, fallback: string) => rootStyle.getPropertyValue(name).trim() || fallback;
-
-  return `:root {
-  --background-primary: ${read("--po-editor-bg", "#ffffff")};
-  --background-primary-alt: ${read("--po-panel", "#f7f3ec")};
-  --background-modifier-border: ${read("--po-divider", "#ded4c7")};
-  --text-normal: ${read("--po-text", "#2f2a24")};
-  --text-muted: ${read("--po-text-muted", "#8a8073")};
-  --text-accent: ${read("--po-accent", "#2563eb")};
-  --font-text: ${read("--po-font-sans", "ui-sans-serif, system-ui, sans-serif")};
-  --font-monospace: ${read("--po-font-mono", "ui-monospace, SFMono-Regular, Menlo, monospace")};
-}`;
-}
-
-function createTrustedHtmlFrameId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-
-  return `md-html-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function estimateTrustedHtmlFrameHeight(source: string): number {
-  return source.trim() ? 160 : 80;
-}
-
-function isTrustedHtmlHeightMessage(
-  value: unknown,
-  frameId: string,
-): value is { type: "puppyone:markdown-html-height"; id: string; height: number } {
-  if (!value || typeof value !== "object") return false;
-  const message = value as { type?: unknown; id?: unknown; height?: unknown };
-  return (
-    message.type === "puppyone:markdown-html-height" &&
-    message.id === frameId &&
-    typeof message.height === "number" &&
-    Number.isFinite(message.height)
-  );
-}
 
 function createUnsupportedHtmlBlock(block: MarkdownHtmlBlock, reasons: string[]): HTMLElement {
   const wrapper = document.createElement("div");

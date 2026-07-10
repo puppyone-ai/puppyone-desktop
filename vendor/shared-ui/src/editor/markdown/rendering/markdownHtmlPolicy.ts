@@ -1,174 +1,39 @@
 import {
   getInlineEditableProfile,
   getSafeBlockProfile,
+  getSafeMediaProfile,
+  isAttributeAllowedInProfile,
   isBlockedExecutableTag,
+  isStylePropertyAllowedInProfile,
+  isTagAllowedInProfile,
 } from "../policy/markdownHtmlProfiles";
+import { isSafeHref as isSafeHrefFromPolicy } from "../policy/markdownUrlPolicy";
 
 export type HtmlSanitizerMode = "inline" | "block";
 
-const INLINE_TAGS = [
-  "a",
-  "abbr",
-  "b",
-  "br",
-  "cite",
-  "code",
-  "del",
-  "em",
-  "i",
-  "img",
-  "kbd",
-  "mark",
-  "q",
-  "rp",
-  "rt",
-  "ruby",
-  "s",
-  "small",
-  "span",
-  "strong",
-  "sub",
-  "sup",
-  "time",
-  "u",
-] as const;
-
-const BLOCK_TAGS = [
-  ...INLINE_TAGS,
-  "article",
-  "blockquote",
-  "caption",
-  "dd",
-  "details",
-  "div",
-  "dl",
-  "dt",
-  "figcaption",
-  "figure",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "hr",
-  "li",
-  "ol",
-  "p",
-  "pre",
-  "section",
-  "summary",
-  "table",
-  "tbody",
-  "td",
-  "tfoot",
-  "th",
-  "thead",
-  "tr",
-  "ul",
-] as const;
-
-const BLOCKED_TAGS = [
-  "base",
-  "embed",
-  "form",
-  "iframe",
-  "input",
-  "link",
-  "meta",
-  "object",
-  "script",
-  "style",
-  "template",
-] as const;
-
-const INLINE_STYLE_PROPERTIES = [
-  "background-color",
-  "color",
-  "font-size",
-  "font-style",
-  "font-weight",
-  "letter-spacing",
-  "line-height",
-  "text-align",
-  "text-decoration",
-  "text-decoration-line",
-  "vertical-align",
-] as const;
-
-const BLOCK_STYLE_PROPERTIES = [
-  "background",
-  "background-color",
-  "border",
-  "border-bottom",
-  "border-bottom-color",
-  "border-bottom-style",
-  "border-bottom-width",
-  "border-color",
-  "border-left",
-  "border-left-color",
-  "border-left-style",
-  "border-left-width",
-  "border-radius",
-  "border-right",
-  "border-right-color",
-  "border-right-style",
-  "border-right-width",
-  "border-style",
-  "border-top",
-  "border-top-color",
-  "border-top-style",
-  "border-top-width",
-  "border-width",
-  "color",
-  "cursor",
-  "display",
-  "flex-wrap",
-  "font-size",
-  "font-style",
-  "font-weight",
-  "gap",
-  "height",
-  "line-height",
-  "margin",
-  "margin-bottom",
-  "margin-left",
-  "margin-right",
-  "margin-top",
-  "max-width",
-  "min-width",
-  "overflow",
-  "padding",
-  "padding-bottom",
-  "padding-left",
-  "padding-right",
-  "padding-top",
-  "text-align",
-  "text-decoration",
-  "text-decoration-line",
-  "width",
-] as const;
-
+/**
+ * Compatibility surface for older call sites. Tag/attribute/style allowlists
+ * are owned exclusively by markdownHtmlProfiles — this object mirrors them
+ * and must not invent additional capabilities.
+ */
 export const MARKDOWN_HTML_POLICY = {
   tags: {
-    inline: new Set<string>(INLINE_TAGS),
-    block: new Set<string>(BLOCK_TAGS),
-    blocked: new Set<string>(BLOCKED_TAGS),
-    void: new Set<string>(["br", "hr", "img"]),
+    get inline() { return getInlineEditableProfile().tags; },
+    get block() { return getSafeBlockProfile().tags; },
+    get blocked() {
+      return new Set([
+        "base", "embed", "form", "iframe", "input", "link", "meta", "object", "script", "style", "template",
+      ]);
+    },
+    get void() { return getSafeBlockProfile().voidTags; },
   },
   attributes: {
-    global: new Set<string>(["aria-label", "class", "dir", "id", "lang", "style", "title"]),
-    byTag: new Map<string, Set<string>>([
-      ["a", new Set(["aria-label", "class", "dir", "href", "id", "lang", "rel", "style", "target", "title"])],
-      ["abbr", new Set(["aria-label", "class", "dir", "id", "lang", "style", "title"])],
-      ["details", new Set(["aria-label", "class", "dir", "id", "lang", "open", "style", "title"])],
-      ["img", new Set(["alt", "aria-label", "class", "height", "id", "loading", "src", "srcset", "style", "title", "width"])],
-      ["td", new Set(["aria-label", "class", "colspan", "dir", "id", "lang", "rowspan", "style", "title"])],
-      ["th", new Set(["aria-label", "class", "colspan", "dir", "id", "lang", "rowspan", "style", "title"])],
-      ["time", new Set(["aria-label", "class", "datetime", "dir", "id", "lang", "style", "title"])],
-    ]),
+    get global() { return getSafeBlockProfile().attributes.global; },
+    get byTag() { return getSafeBlockProfile().attributes.byTag; },
     boolean: new Map<string, Set<string>>([
       ["details", new Set(["open"])],
+      ["audio", new Set(["controls"])],
+      ["video", new Set(["controls"])],
     ]),
     numeric: new Map<string, Set<string>>([
       ["td", new Set(["colspan", "rowspan"])],
@@ -176,8 +41,8 @@ export const MARKDOWN_HTML_POLICY = {
     ]),
   },
   styles: {
-    inlineProperties: new Set<string>(INLINE_STYLE_PROPERTIES),
-    blockProperties: new Set<string>(BLOCK_STYLE_PROPERTIES),
+    get inlineProperties() { return getInlineEditableProfile().styleProperties; },
+    get blockProperties() { return getSafeBlockProfile().styleProperties; },
   },
   urls: {
     protocols: new Set(["http:", "https:", "mailto:"]),
@@ -186,36 +51,23 @@ export const MARKDOWN_HTML_POLICY = {
 } as const;
 
 export function isAllowedHtmlTag(tagName: string, mode: HtmlSanitizerMode): boolean {
-  const profile = mode === "block" ? getSafeBlockProfile() : getInlineEditableProfile();
-  if (profile.tags.has(tagName)) return true;
-  // Media tags are allowed in block surfaces via the safe-media adjacent set.
-  if (mode === "block" && (tagName === "img" || tagName === "audio" || tagName === "video" || tagName === "source")) {
-    return true;
-  }
-  if (mode === "inline" && tagName === "img") return true;
-  return MARKDOWN_HTML_POLICY.tags[mode].has(tagName);
+  return isTagAllowedInProfile(tagName, mode);
 }
 
 export function isBlockedHtmlTag(tagName: string): boolean {
-  return isBlockedExecutableTag(tagName) || MARKDOWN_HTML_POLICY.tags.blocked.has(tagName);
+  return isBlockedExecutableTag(tagName);
 }
 
 export function isVoidHtmlTag(tagName: string): boolean {
   return (
     getInlineEditableProfile().voidTags.has(tagName) ||
     getSafeBlockProfile().voidTags.has(tagName) ||
-    MARKDOWN_HTML_POLICY.tags.void.has(tagName)
+    getSafeMediaProfile().voidTags.has(tagName)
   );
 }
 
-export function isAllowedHtmlAttribute(tagName: string, attributeName: string): boolean {
-  const profile = getSafeBlockProfile();
-  return (
-    profile.attributes.global.has(attributeName) ||
-    profile.attributes.byTag.get(tagName)?.has(attributeName) === true ||
-    MARKDOWN_HTML_POLICY.attributes.global.has(attributeName) ||
-    MARKDOWN_HTML_POLICY.attributes.byTag.get(tagName)?.has(attributeName) === true
-  );
+export function isAllowedHtmlAttribute(tagName: string, attributeName: string, mode: HtmlSanitizerMode = "block"): boolean {
+  return isAttributeAllowedInProfile(tagName, attributeName, mode);
 }
 
 export function isBooleanHtmlAttribute(tagName: string, attributeName: string): boolean {
@@ -226,29 +78,16 @@ export function isNumericHtmlAttribute(tagName: string, attributeName: string): 
   return MARKDOWN_HTML_POLICY.attributes.numeric.get(tagName)?.has(attributeName) === true;
 }
 
-export function isAllowedStyleProperty(property: string, mode: HtmlSanitizerMode = "block"): boolean {
-  const properties = mode === "inline"
-    ? MARKDOWN_HTML_POLICY.styles.inlineProperties
-    : MARKDOWN_HTML_POLICY.styles.blockProperties;
-  return properties.has(property);
+export function isAllowedStyleProperty(
+  property: string,
+  mode: HtmlSanitizerMode = "block",
+  tagName?: string,
+): boolean {
+  return isStylePropertyAllowedInProfile(property, mode, tagName);
 }
 
 export function isSafeHref(href: string): boolean {
-  const value = href.trim();
-  if (!value) return false;
-  if (MARKDOWN_HTML_POLICY.urls.relativePrefixes.some((prefix) => value.startsWith(prefix))) return true;
-  if (!/^[a-z][a-z0-9+.-]*:/i.test(value)) return true;
-
-  try {
-    const base =
-      typeof window !== "undefined" && typeof window.location?.href === "string"
-        ? window.location.href
-        : "https://example.invalid/";
-    const url = new URL(value, base);
-    return MARKDOWN_HTML_POLICY.urls.protocols.has(url.protocol);
-  } catch {
-    return false;
-  }
+  return isSafeHrefFromPolicy(href);
 }
 
 export function isSafeStyleValue(property: string, value: string): boolean {

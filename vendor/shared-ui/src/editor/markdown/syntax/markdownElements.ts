@@ -2,7 +2,12 @@ import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
 import { getMarkdownHtmlBlock } from "../rendering/htmlBlockModel";
-import { isMarkdownTableSourceLine } from "../rendering/tableModel";
+import { getMarkdownCodeBlock } from "../rendering/codeBlockModel";
+import {
+  getMarkdownTableBlock,
+  type MarkdownTableAlignment,
+  type MarkdownTableRow,
+} from "../rendering/tableModel";
 import { getMarkdownTaskLine } from "../rendering/taskModel";
 import { findMarkdownImageTokens } from "../links/markdownImageModel";
 import { findMarkdownLinkTokens } from "../links/markdownLinkModel";
@@ -11,6 +16,17 @@ import {
   getMarkdownInlineHtmlInRange,
   type MarkdownInlineHtml,
 } from "../semantic/inlineHtmlModel";
+
+/**
+ * Typed block data carried on elements collected from the document.
+ * Consumed by the plan compiler to emit blockAtom plans without re-parsing.
+ */
+export type MarkdownElementBlockData =
+  | { kind: "fence"; language: string; code: string }
+  | { kind: "htmlBlock"; tagName: string | null; closed: boolean; source: string }
+  | { kind: "table"; alignments: readonly MarkdownTableAlignment[]; rows: readonly MarkdownTableRow[] }
+  | { kind: "task"; checked: boolean }
+  | { kind: "image"; alt: string; href: string; title: string | null };
 
 export type MarkdownElementKind =
   | "blockquote"
@@ -70,6 +86,7 @@ type MarkdownElementBase = {
   lineFrom?: number;
   lineTo?: number;
   level?: number;
+  blockData?: MarkdownElementBlockData;
 };
 
 export type MarkdownInlineHtmlElement = MarkdownElementBase & {
@@ -400,6 +417,56 @@ function addExtendedLineElements(
 ) {
   for (let lineNumber = fromLineNumber; lineNumber <= toLineNumber; lineNumber += 1) {
     const line = state.doc.line(lineNumber);
+
+    const codeBlock = getMarkdownCodeBlock(state, lineNumber);
+    if (codeBlock && codeBlock.from === line.from) {
+      elements.push({
+        kind: "fence",
+        from: codeBlock.from,
+        to: codeBlock.to,
+        markerRanges: [{ from: codeBlock.from, to: codeBlock.to }],
+        lineFrom: line.from,
+        lineTo: codeBlock.to,
+        blockData: { kind: "fence", language: codeBlock.language, code: codeBlock.code },
+      });
+      lineNumber = codeBlock.nextLineNumber - 1;
+      continue;
+    }
+
+    const htmlBlock = getMarkdownHtmlBlock(state, line.number);
+    if (htmlBlock?.from === line.from) {
+      elements.push({
+        kind: "htmlBlock",
+        from: htmlBlock.from,
+        to: htmlBlock.to,
+        markerRanges: [{ from: htmlBlock.from, to: htmlBlock.to }],
+        lineFrom: line.from,
+        lineTo: state.doc.line(htmlBlock.nextLineNumber - 1).to,
+        blockData: { kind: "htmlBlock", tagName: htmlBlock.tagName, closed: htmlBlock.closed, source: htmlBlock.source },
+      });
+      lineNumber = htmlBlock.nextLineNumber - 1;
+      continue;
+    }
+
+    const tableBlock = getMarkdownTableBlock(state, lineNumber);
+    if (tableBlock && tableBlock.from === line.from) {
+      elements.push({
+        kind: "table",
+        from: tableBlock.from,
+        to: tableBlock.to,
+        markerRanges: [{ from: tableBlock.from, to: tableBlock.to }],
+        lineFrom: line.from,
+        lineTo: tableBlock.to,
+        blockData: {
+          kind: "table",
+          alignments: tableBlock.alignments,
+          rows: tableBlock.rows,
+        },
+      });
+      lineNumber = tableBlock.nextLineNumber - 1;
+      continue;
+    }
+
     const taskLine = getMarkdownTaskLine(line);
     if (taskLine) {
       elements.push({
@@ -413,6 +480,7 @@ function addExtendedLineElements(
         contentRange: { from: taskLine.contentFrom, to: taskLine.contentTo },
         lineFrom: line.from,
         lineTo: line.to,
+        blockData: { kind: "task", checked: taskLine.checked },
       });
     }
 
@@ -440,32 +508,11 @@ function addExtendedLineElements(
         to: line.from + token.to,
         markerRanges: [{ from: line.from + token.from, to: line.from + token.to }],
         contentRange: { from: line.from + token.from, to: line.from + token.to },
+        blockData: { kind: "image", alt: token.alt, href: token.href, title: token.title },
       });
     }
 
     addStrikeElements(line, elements);
-    if (isMarkdownTableSourceLine(line.text)) {
-      elements.push({
-        kind: "table",
-        from: line.from,
-        to: line.to,
-        markerRanges: [{ from: line.from, to: line.to }],
-        lineFrom: line.from,
-        lineTo: line.to,
-      });
-    }
-
-    const htmlBlock = getMarkdownHtmlBlock(state, line.number);
-    if (htmlBlock?.from === line.from) {
-      elements.push({
-        kind: "htmlBlock",
-        from: htmlBlock.from,
-        to: htmlBlock.to,
-        markerRanges: [{ from: htmlBlock.from, to: htmlBlock.to }],
-        lineFrom: line.from,
-        lineTo: state.doc.line(htmlBlock.nextLineNumber - 1).to,
-      });
-    }
   }
 }
 

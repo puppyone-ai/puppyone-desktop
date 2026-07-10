@@ -33,3 +33,12 @@ export function createCapabilityPrincipal(
 ): CapabilityPrincipal {
   return { ...partial };
 }
+
+/**
+ * Stable workspace scope for broker principals. Prefer the open document path
+ * over a shared literal so grants/revokes do not collide across files.
+ */
+export function workspaceIdForDocument(documentPath: string): string {
+  const trimmed = documentPath.trim();
+  return trimmed ? `doc:${trimmed}` : "workspace:anonymous";
+}

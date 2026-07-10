@@ -55,7 +55,8 @@ export function createWebEmbedBroker(options: {
 
   return {
     create(request: WebEmbedRequest): WebEmbedSession {
-      if (!/^https:\/\//i.test(request.href)) {
+      const href = canonicalizeWebEmbedHref(request.href);
+      if (!href) {
         const denied: WebEmbedSession = {
           id: `web-embed-denied:${++sequence}`,
           href: request.href,
@@ -71,7 +72,7 @@ export function createWebEmbedBroker(options: {
       const id = `web-embed:${++sequence}`;
       const session: WebEmbedSession = {
         id,
-        href: request.href,
+        href,
         state: options.allowAutomaticLoad ? "loading" : "click-to-load",
         destroy() {
           destroySession(session);
@@ -135,3 +136,29 @@ export function createWebEmbedBroker(options: {
 }
 
 export type WebEmbedBroker = ReturnType<typeof createWebEmbedBroker>;
+
+function canonicalizeWebEmbedHref(value: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password || isPrivateWebEmbedHost(url.hostname)) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function isPrivateWebEmbedHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host === "::" || host === "::1") return true;
+  if (/^f[cd][0-9a-f]{2}:/i.test(host) || /^fe[89ab][0-9a-f]:/i.test(host)) return true;
+  const octets = host.split(".");
+  if (octets.length !== 4 || octets.some((octet) => !/^\d{1,3}$/.test(octet))) return false;
+  const values = octets.map(Number);
+  return values.some((part) => part > 255) ||
+    values[0] === 0 ||
+    values[0] === 10 ||
+    values[0] === 127 ||
+    (values[0] === 169 && values[1] === 254) ||
+    (values[0] === 172 && values[1] >= 16 && values[1] <= 31) ||
+    (values[0] === 192 && values[1] === 168);
+}

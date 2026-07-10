@@ -3,6 +3,7 @@ import { EditorView, WidgetType } from "@codemirror/view";
 import { disposeWidgetSessionDom } from "../adapters/codemirror/widgetSession";
 import { getMarkdownEmbedHost } from "../adapters/codemirror/embedHost";
 import { sanitizeCodeLanguage, serializeMarkdownCodeBlock } from "../rendering/codeBlockModel";
+import { getDocRevision } from "../services/transactionBroker";
 import { estimateCodeBlockWidgetHeight } from "./markdownWidgetMeasure";
 import { normalizeLineEndings, stopCodeMirrorEvent } from "./widgetDom";
 
@@ -42,8 +43,19 @@ export class CodeBlockWidget extends WidgetType {
     panel.className = "cm-md-code-panel";
     const readOnly = view.state.readOnly;
     const baseSource = serializeMarkdownCodeBlock(this.language, this.code);
-    const baseRevision = `${this.from}:${this.to}:${baseSource.length}`;
+    const baseRevision = getDocRevision(view.state.doc);
+    const elementId = `code:${this.from}:${this.to}`;
     let committed = false;
+
+    host.editSessions.set({
+      elementId,
+      featureId: "codeBlock",
+      mappedRange: { from: this.from, to: this.to },
+      baseSource,
+      baseRevision,
+      draft: { code: this.code, language: this.language },
+      mode: "preview",
+    });
 
     const languageInput = document.createElement("input");
     languageInput.className = "cm-md-code-language";
@@ -61,26 +73,28 @@ export class CodeBlockWidget extends WidgetType {
     codeEditor.rows = Math.max(1, this.code.split("\n").length);
 
     const commit = () => {
-      if (committed || readOnly) return;
+      if (committed || readOnly) return null;
       committed = true;
       const language = sanitizeCodeLanguage(languageInput.value);
       const code = normalizeLineEndings(codeEditor.value);
       const nextSource = serializeMarkdownCodeBlock(language, code);
       if (language === this.language && code === this.code) {
         committed = false;
-        return;
+        return host.editSessions.get(elementId)?.mappedRange ?? { from: this.from, to: this.to };
       }
 
-      const ok = host.transactions.commit(view, {
-        mappedRange: { from: this.from, to: this.to },
+      const session = host.editSessions.get(elementId);
+      const result = host.transactions.commit(view, {
+        mappedRange: session?.mappedRange ?? { from: this.from, to: this.to },
         baseSource,
-        baseRevision,
+        baseRevision: session?.baseRevision ?? baseRevision,
         nextSource,
       });
-      if (!ok) {
+      if (!result.ok) {
         // Conflict with external/Agent edit: keep draft visible, allow retry.
         committed = false;
       }
+      return result.mappedTo;
     };
 
     const onLanguageKeyDown = (event: KeyboardEvent) => {
@@ -110,8 +124,8 @@ export class CodeBlockWidget extends WidgetType {
         codeEditor.selectionEnd === codeEditor.value.length
       ) {
         event.preventDefault();
-        commit();
-        view.dispatch({ selection: EditorSelection.cursor(this.to) });
+        const mappedRange = commit();
+        view.dispatch({ selection: EditorSelection.cursor(mappedRange?.to ?? this.to) });
         view.focus();
         return;
       }
@@ -123,12 +137,14 @@ export class CodeBlockWidget extends WidgetType {
       ) {
         event.preventDefault();
         committed = true;
+        const session = host.editSessions.get(elementId);
+        const deleteFrom = session?.mappedRange.from ?? this.from;
         host.transactions.commit(view, {
-          mappedRange: { from: this.from, to: this.to },
+          mappedRange: session?.mappedRange ?? { from: this.from, to: this.to },
           baseSource,
-          baseRevision,
+          baseRevision: session?.baseRevision ?? baseRevision,
           nextSource: "",
-          selection: { from: this.from, to: this.from },
+          selection: { from: deleteFrom, to: deleteFrom },
         });
         view.focus();
         return;
@@ -160,6 +176,7 @@ export class CodeBlockWidget extends WidgetType {
       dispose() {
         languageInput.removeEventListener("keydown", onLanguageKeyDown);
         codeEditor.removeEventListener("keydown", onCodeKeyDown);
+        host.editSessions.delete(elementId);
       },
     }));
 

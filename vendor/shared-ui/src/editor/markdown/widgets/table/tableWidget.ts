@@ -1,5 +1,7 @@
 import { EditorView, WidgetType } from "@codemirror/view";
 import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../viewerTypes";
+import { getMarkdownEmbedHost } from "../../adapters/codemirror/embedHost";
+import { disposeWidgetSessionDom } from "../../adapters/codemirror/widgetSession";
 import type { MarkdownTableAlignment, MarkdownTableRow } from "../../rendering/tableModel";
 import { estimateMarkdownTableWidgetHeight, MarkdownWidgetMeasureController } from "../markdownWidgetMeasure";
 import { createTableCellEditor } from "./tableCellEditor";
@@ -8,8 +10,6 @@ import { createMarkdownTableDragLayer } from "./tableDragLayer";
 import { restorePendingMarkdownTableFocus } from "./tableFocus";
 
 export class MarkdownTableWidget extends WidgetType {
-  private readonly measure = new MarkdownWidgetMeasureController();
-
   constructor(
     private readonly from: number,
     private readonly to: number,
@@ -17,7 +17,7 @@ export class MarkdownTableWidget extends WidgetType {
     private readonly rows: MarkdownTableRow[],
     private readonly markdownLinkGraph: MarkdownLinkGraph | null,
     private readonly documentPath: string,
-    private readonly markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
+    private readonly _markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
   ) {
     super();
   }
@@ -31,7 +31,7 @@ export class MarkdownTableWidget extends WidgetType {
       JSON.stringify(widget.rows) === JSON.stringify(this.rows) &&
       widget.markdownLinkGraph === this.markdownLinkGraph &&
       widget.documentPath === this.documentPath &&
-      widget.markdownAssetUrlResolver === this.markdownAssetUrlResolver
+      widget._markdownAssetUrlResolver === this._markdownAssetUrlResolver
     );
   }
 
@@ -40,6 +40,9 @@ export class MarkdownTableWidget extends WidgetType {
   }
 
   toDOM(view: EditorView): HTMLElement {
+    const host = getMarkdownEmbedHost(view, {
+      resolveAssetUrl: this._markdownAssetUrlResolver,
+    });
     const wrapper = document.createElement("div");
     wrapper.className = view.state.readOnly ? "cm-md-table-widget-wrap is-readonly" : "cm-md-table-widget-wrap";
     const rowCount = this.rows.length;
@@ -66,7 +69,6 @@ export class MarkdownTableWidget extends WidgetType {
           columnCount,
           columnIndex,
           documentPath: this.documentPath,
-          markdownAssetUrlResolver: this.markdownAssetUrlResolver,
           markdownLinkGraph: this.markdownLinkGraph,
           rowCount,
           rowIndex: 0,
@@ -96,7 +98,6 @@ export class MarkdownTableWidget extends WidgetType {
             columnCount,
             columnIndex,
             documentPath: this.documentPath,
-            markdownAssetUrlResolver: this.markdownAssetUrlResolver,
             markdownLinkGraph: this.markdownLinkGraph,
             rowCount,
             rowIndex,
@@ -163,8 +164,16 @@ export class MarkdownTableWidget extends WidgetType {
     }));
     frame.appendChild(surface);
     wrapper.appendChild(frame);
-    this.measure.observe(wrapper, view);
+
+    const measure = new MarkdownWidgetMeasureController();
+    measure.observe(wrapper, view);
     restorePendingMarkdownTableFocus(wrapper, view, this.from);
+
+    host.sessions.mount(wrapper, () => ({
+      dispose() {
+        measure.destroy();
+      },
+    }));
 
     if (!view.state.readOnly) {
       // Clicks on cell padding land on td/th (the contenteditable often does
@@ -189,8 +198,8 @@ export class MarkdownTableWidget extends WidgetType {
     return wrapper;
   }
 
-  destroy() {
-    this.measure.destroy();
+  destroy(dom: HTMLElement) {
+    disposeWidgetSessionDom(dom);
   }
 
   ignoreEvent() {

@@ -1,3 +1,5 @@
+import type { MarkdownTableAlignment, MarkdownTableRow } from "../rendering/tableModel";
+
 export type SourceRange = {
   from: number;
   to: number;
@@ -42,7 +44,11 @@ export type InlineAtomModel =
 export type BlockEmbedModel =
   | { kind: "codeBlock"; language: string; code: string }
   | { kind: "mermaid"; language: string; code: string }
-  | { kind: "table" }
+  | {
+      kind: "table";
+      alignments: readonly MarkdownTableAlignment[];
+      rows: readonly MarkdownTableRow[];
+    }
   | { kind: "htmlBlock"; tagName: string | null; closed: boolean; source: string }
   | { kind: "horizontalRule" }
   | { kind: "taskCheckbox"; checked: boolean };

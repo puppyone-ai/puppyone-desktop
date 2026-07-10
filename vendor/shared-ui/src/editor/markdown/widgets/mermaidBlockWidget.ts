@@ -10,8 +10,10 @@ import {
   subscribeMermaidThemeChanges,
   type MermaidRenderResult,
 } from "../rendering/mermaidRenderer";
-import { createCapabilityPrincipal } from "../services/capabilityPrincipal";
+import { createCapabilityPrincipal, workspaceIdForDocument } from "../services/capabilityPrincipal";
 import { clampNumber, MarkdownWidgetMeasureController } from "./markdownWidgetMeasure";
+import { getDocRevision } from "../services/transactionBroker";
+import { markdownDocumentPathFacet } from "../markdownLivePreviewContext";
 import { normalizeLineEndings, stopCodeMirrorEvent } from "./widgetDom";
 
 /**
@@ -50,8 +52,19 @@ export class MermaidBlockWidget extends WidgetType {
     const readOnly = view.state.readOnly;
     const measure = new MarkdownWidgetMeasureController();
     const elementKey = `${this.from}:${this.to}`;
+    const elementId = `mermaid:${elementKey}`;
     const baseSource = serializeMarkdownCodeBlock(this.language || "mermaid", this.code);
-    const baseRevision = `${elementKey}:${baseSource.length}`;
+    const baseRevision = getDocRevision(view.state.doc);
+
+    host.editSessions.set({
+      elementId,
+      featureId: "mermaid",
+      mappedRange: { from: this.from, to: this.to },
+      baseSource,
+      baseRevision,
+      draft: { code: this.code, language: this.language },
+      mode: "preview",
+    });
 
     let editing = false;
     let committed = false;
@@ -95,13 +108,14 @@ export class MermaidBlockWidget extends WidgetType {
         return;
       }
 
-      const ok = host.transactions.commit(view, {
-        mappedRange: { from: this.from, to: this.to },
+      const session = host.editSessions.get(elementId);
+      const result = host.transactions.commit(view, {
+        mappedRange: session?.mappedRange ?? { from: this.from, to: this.to },
         baseSource,
-        baseRevision,
+        baseRevision: session?.baseRevision ?? baseRevision,
         nextSource: serializeMarkdownCodeBlock(this.language || "mermaid", nextCode),
       });
-      if (!ok) committed = false;
+      if (!result.ok) committed = false;
       if (options.focus) view.focus();
     };
 
@@ -120,8 +134,8 @@ export class MermaidBlockWidget extends WidgetType {
           },
           principal: createCapabilityPrincipal({
             editorViewId: host.viewId,
-            workspaceId: "workspace",
-            documentPath: "mermaid",
+            workspaceId: workspaceIdForDocument(view.state.facet(markdownDocumentPathFacet) || "mermaid"),
+            documentPath: view.state.facet(markdownDocumentPathFacet) || "mermaid",
             documentRevision: baseRevision,
             purpose: "async-render",
           }),
@@ -221,8 +235,24 @@ export class MermaidBlockWidget extends WidgetType {
             activeTextarea.selectionEnd === activeTextarea.value.length
           ) {
             event.preventDefault();
-            commit();
-            view.dispatch({ selection: EditorSelection.cursor(this.to) });
+            // Commit before reading the mapped-to position; the commit may
+            // change document length, making this.to stale.
+            const sessionBeforeCommit = host.editSessions.get(elementId);
+            const nextCode = normalizeLineEndings(activeTextarea.value);
+            const nextSource = serializeMarkdownCodeBlock(this.language || "mermaid", nextCode);
+            const commitResult = nextCode !== this.code
+              ? host.transactions.commit(view, {
+                  mappedRange: sessionBeforeCommit?.mappedRange ?? { from: this.from, to: this.to },
+                  baseSource,
+                  baseRevision: sessionBeforeCommit?.baseRevision ?? baseRevision,
+                  nextSource,
+                })
+              : { ok: true, mappedTo: sessionBeforeCommit?.mappedRange ?? { from: this.from, to: this.to } };
+            committed = commitResult.ok;
+            const cursorPos = commitResult.mappedTo?.to
+              ?? sessionBeforeCommit?.mappedRange.to
+              ?? this.to;
+            view.dispatch({ selection: EditorSelection.cursor(cursorPos) });
             view.focus();
             return;
           }
@@ -269,6 +299,7 @@ export class MermaidBlockWidget extends WidgetType {
         measure.destroy();
         unsubscribeTheme();
         host.asyncRender.abort(`mermaid\u0000${elementKey}`);
+        host.editSessions.delete(elementId);
       },
     }));
 

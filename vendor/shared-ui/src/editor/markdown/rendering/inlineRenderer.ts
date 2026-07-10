@@ -20,8 +20,18 @@ type InlineToken =
 export type MarkdownInlineRenderOptions = {
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  /**
+   * Preferred asset entry point. When set, table/preview image loads go through
+   * this callback (typically an AssetBroker wrapper) instead of the raw resolver.
+   */
+  resolveAssetUrl?: (
+    documentPath: string,
+    href: string,
+    signal?: AbortSignal,
+  ) => string | Promise<string | null> | null;
   onLayoutChange?: () => void;
   sourcePath?: string;
+  openHref?: (href: string) => void;
 };
 
 export function createMarkdownInlineFragment(
@@ -49,7 +59,7 @@ export function renderMarkdownInlineInto(
 }
 
 function appendInlineHtml(target: Node, source: string, options: MarkdownInlineRenderOptions) {
-  const resolver = options.markdownAssetUrlResolver ?? null;
+  const resolver = options.resolveAssetUrl ?? options.markdownAssetUrlResolver ?? null;
   const shouldResolveImages = Boolean(resolver && /<img\b/i.test(source));
   if (!shouldResolveImages) {
     renderSanitizedInlineHtml(target, source, options);
@@ -70,6 +80,7 @@ function appendInlineHtml(target: Node, source: string, options: MarkdownInlineR
       renderSanitizedInlineHtml(targetNode, resolvedSource, {
         ...options,
         markdownAssetUrlResolver: null,
+        resolveAssetUrl: undefined,
       });
       options.onLayoutChange?.();
     })
@@ -143,10 +154,22 @@ function appendToken(target: Node, token: InlineToken, options: MarkdownInlineRe
     }
 
     const link = document.createElement("a");
-    link.href = token.href;
+    link.className = "cm-md-inline-link";
+    link.setAttribute("data-md-href", token.href);
     link.rel = "noreferrer noopener";
-    link.target = "_blank";
-    renderMarkdownInlineInto(link, token.label);
+    link.href = "#";
+    renderMarkdownInlineInto(link, token.label, options);
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (options.openHref) {
+        options.openHref(token.href);
+        return;
+      }
+      if (/^https?:\/\//i.test(token.href)) {
+        window.open(token.href, "_blank", "noopener,noreferrer");
+      }
+    });
     target.appendChild(link);
     return;
   }
@@ -219,7 +242,7 @@ function appendImage(
     return;
   }
 
-  const resolver = options.markdownAssetUrlResolver ?? null;
+  const resolver = options.resolveAssetUrl ?? options.markdownAssetUrlResolver ?? null;
   if (!resolver) {
     target.appendChild(createImagePlaceholder(token.alt || token.href));
     return;

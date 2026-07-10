@@ -1,4 +1,5 @@
 import { WebContentsView, session as electronSession } from "electron";
+import { randomUUID } from "node:crypto";
 import { assertMarkdownWebEmbedHref } from "./markdown-web-embed-policy.mjs";
 
 /**
@@ -10,11 +11,17 @@ export function createMarkdownWebEmbedService({
   getOwnerWindow,
 }) {
   const embeds = new Map();
-  let sequence = 0;
 
-  const destroyEmbed = (id) => {
+  const generateId = () => `md-web-embed-${randomUUID()}`;
+
+  const destroyEmbed = (id, callerWebContentsId) => {
     const embed = embeds.get(id);
     if (!embed) return false;
+
+    if (callerWebContentsId !== undefined && embed.ownerWebContentsId !== callerWebContentsId) {
+      return false;
+    }
+
     embeds.delete(id);
     try {
       if (embed.window && !embed.window.isDestroyed() && typeof embed.window.contentView?.removeChildView === "function") {
@@ -38,9 +45,9 @@ export function createMarkdownWebEmbedService({
 
   return {
     async create({ href, bounds, ownerWebContentsId }) {
-      assertMarkdownWebEmbedHref(href);
+      const canonicalHref = assertMarkdownWebEmbedHref(href);
 
-      const id = `md-web-embed-${++sequence}`;
+      const id = generateId();
       const partition = `temp:md-embed-${id}`;
       const partitionSession = electronSession.fromPartition(partition, { cache: false });
 
@@ -63,10 +70,10 @@ export function createMarkdownWebEmbedService({
 
       view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
       view.webContents.on("will-navigate", (event, url) => {
-        if (!/^https:\/\//i.test(url)) event.preventDefault();
+        if (!isAllowedMarkdownWebEmbedHref(url)) event.preventDefault();
       });
       view.webContents.session.webRequest.onBeforeRequest((details, callback) => {
-        if (!/^https:\/\//i.test(details.url) && !details.url.startsWith("data:")) {
+        if (!details.url.startsWith("data:") && !isAllowedMarkdownWebEmbedHref(details.url)) {
           callback({ cancel: true });
           return;
         }
@@ -82,27 +89,39 @@ export function createMarkdownWebEmbedService({
       const nextBounds = normalizeBounds(bounds);
       view.setBounds(nextBounds);
       window.contentView.addChildView(view);
-      await view.webContents.loadURL(href);
+      await view.webContents.loadURL(canonicalHref);
 
-      embeds.set(id, { id, href, view, window, partitionSession });
-      return { id, href };
+      embeds.set(id, { id, href: canonicalHref, view, window, partitionSession, ownerWebContentsId });
+      return { id, href: canonicalHref };
     },
 
-    setBounds({ id, bounds }) {
+    setBounds({ id, bounds, callerWebContentsId }) {
       const embed = embeds.get(id);
       if (!embed) return { ok: false };
+      if (callerWebContentsId !== undefined && embed.ownerWebContentsId !== callerWebContentsId) {
+        return { ok: false };
+      }
       embed.view.setBounds(normalizeBounds(bounds));
       return { ok: true };
     },
 
-    destroy({ id }) {
-      return { ok: destroyEmbed(id) };
+    destroy({ id, callerWebContentsId }) {
+      return { ok: destroyEmbed(id, callerWebContentsId) };
     },
 
     destroyAll() {
-      for (const id of Array.from(embeds.keys())) destroyEmbed(id);
+      for (const id of Array.from(embeds.keys())) destroyEmbed(id, undefined);
     },
   };
+}
+
+function isAllowedMarkdownWebEmbedHref(href) {
+  try {
+    assertMarkdownWebEmbedHref(href);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function normalizeBounds(bounds) {

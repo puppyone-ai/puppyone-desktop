@@ -1,11 +1,11 @@
 # Markdown Editor Architecture
 
-Status: **Adopted target architecture implemented as of 2026-07-10.** Render
-plans, broad-safe profiles, embed-host/widget sessions, shared brokers,
-Desktop safe-trust default, table/preview policy convergence, and Electron
-WebContentsView web-embed wiring are landed. Remaining product polish (visual
-regression corpus growth, large-doc incremental profiling) is ordinary
-hardening rather than an open architecture gap.
+Status: **Adopted target architecture; implementation is in progress as of
+2026-07-10.** P0 URL/sanitizer closure, plan-backed block widgets, brokered
+table assets/links, embed ownership/bounds, and honest Phase 4–6 status are
+landed on the migration branch. Browser-backed lifecycle/security coverage,
+shared plan→DOM adapters for table-cell/line chrome, and host-level workspace
+identity injection remain acceptance gaps — not product polish.
 
 This document defines the durable technical architecture for PuppyOne's
 Markdown editor. It complements, but does not replace, the product behavior in
@@ -1257,15 +1257,16 @@ gaps as follows:
 3. **Foundation landed:** Per-view `MarkdownEmbedHost` and
    `WidgetSessionRegistry` exist. Individual Mermaid/HTML/image/code widgets
    still need full migration of observers onto DOM sessions.
-4. **Addressed for tables:** Pending table focus is editor-scoped
+4. **Partial:** Pending table focus is editor-scoped
    (`markdownTableFocusField`) instead of module-global. Mapped embed edit
-   session + transaction broker APIs exist for remaining widget migrations.
+   sessions are wired for code/Mermaid commits, but table edits still use their
+   direct dispatch path.
 5. **Partial:** Image expansion participates in expandable inline-atom plans;
    a single decoration dependency key covering every interaction input remains
    follow-up.
-6. **Foundation landed:** Shared `AsyncRenderBroker`, `AssetBroker`, and
-   related brokers exist; Mermaid/image/HTML still need to call them instead of
-   private caches.
+6. **Partial:** Shared `AsyncRenderBroker`, `AssetBroker`, and related brokers
+   are wired for Mermaid, image widgets, and HTML-block workspace assets.
+   Table-cell image preview still receives the raw resolver path.
 7. **Partial:** Table-cell sanitizer tag/style sets were widened to the same
    broad-safe vocabulary; full plan-index consumption in table cells remains.
 8. **Addressed:** Desktop no longer sets unconditional `localTrusted` for
@@ -1321,41 +1322,54 @@ remain part of phases 5 and 6.
 - Incomplete / malformed inline HTML → `visibleSource` (no collapsed-marker deletion).
 - EditorView composition smoke coverage via happy-dom fixtures.
 
-### Phase 4 — converge render plans and policy — complete
+### Phase 4 — converge render plans and policy — in progress
 
 - `MarkdownElementPlan` union + range-indexed compiler/index.
 - Versioned `inline-editable` / `safe-block` profiles with capability reduction.
 - Keymaps consume plan deletion/expand capabilities.
 - Live decorations compile inline HTML through the plan boundary.
-- Table-cell / sanitizer path shares profile authority and plan-based DOM adapter
-  (`adapters/preview/inlineHtmlDomAdapter.ts`); block sanitizer omits reduced
-  attributes/styles without failing honest structure.
+- Inline HTML uses the plan-based DOM adapter
+  (`adapters/preview/inlineHtmlDomAdapter.ts`) and the sanitizer selects one
+  non-escalating profile per element.
+- Fence / table / HTML block widgets are created from compiled `blockAtom`
+  plans (with table alignments/rows and fence/HTML payload in `blockData`).
+- **Remaining:** heading/list/task/HR line chrome and table-cell Markdown
+  preview still use dedicated renderers rather than a shared plan→DOM adapter;
+  large-document incremental plan invalidation is not profiled yet.
 
-### Phase 5 — embedded component runtime — complete
+### Phase 5 — embedded component runtime — partial
 
 - Per-`EditorView` `MarkdownEmbedHost` with widget session registry.
 - Code / image / Mermaid / HTML block widgets are immutable descriptors; mounted
   resources live in DOM-owned sessions with `disposeWidgetSessionDom`.
-- Editor-scoped table focus field; transaction broker for embed commits.
+- Editor-scoped table focus field; range-mapped sessions and transaction broker
+  reject stale base revisions for code/Mermaid commits.
 - Shared Asset / AsyncRender / Link / Transaction / WebEmbed brokers.
-- Mermaid rendering goes through `AsyncRenderBroker`; images through `AssetBroker`.
+- Mermaid rendering goes through `AsyncRenderBroker`; image, HTML-block, and
+  table-cell workspace-asset resolution uses `AssetBroker`.
+- Table-cell Markdown links open through `LinkBroker` (no live unsafe `href`).
+- Principals scope `workspaceId` from the open document path
+  (`workspaceIdForDocument`) and use `getDocRevision` instead of raw length.
+- **Remaining:** browser-backed proof of DOM reuse/IME/draft recovery, and
+  host-injected workspace identity beyond document-path derivation.
 
-### Phase 6 — security, integration, and incremental hardening — complete for architecture contract
+### Phase 6 — security, integration, and incremental hardening — in progress
 
 - Desktop defaults to `htmlTrustMode="safe"`.
 - External https embeds: click-to-load UI + `WebEmbedBroker` + main-process
   sandboxed `WebContentsView` in temporary no-credential partitions
   (`electron/main/markdown-web-embed-service.mjs`).
-- Adversarial href policy fixtures; EditorView session lifecycle tests
-  (happy-dom); display:none rejected as dishonest presentation.
-- Ordinary follow-ups (larger visual corpus, large-doc profiling) are not open
-  architecture blockers.
+- Adversarial href policy fixtures; control/entity URL bypasses are rejected and
+  `display:none` is rejected as dishonest presentation.
+- **Remaining acceptance gaps:** browser-backed WebContentsView ownership and
+  bounds tests, redirect/DNS-rebinding hardening, DOM lifecycle/IME tests,
+  visual regression coverage, and large-document incremental profiling.
 
 The shipped foundation preserves source round-trip and has semantic, policy,
-decoration, full-suite, type, boundary, and production-build checks. Completion
-of phases 3 through 6 requires browser-backed interaction and visual regression
-coverage; those tests validate the same source and plan contracts rather than
-creating a second correctness model.
+decoration, type, and boundary checks. Phases 4 through 6 remain incomplete
+until the listed production integration and browser-backed acceptance coverage
+is in place; those tests validate the same source and plan contracts rather
+than creating a second correctness model.
 
 ---
 

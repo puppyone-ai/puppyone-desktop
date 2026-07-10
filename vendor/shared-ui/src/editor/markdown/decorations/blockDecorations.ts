@@ -1,9 +1,9 @@
 import type { EditorState } from "@codemirror/state";
-import { Decoration } from "@codemirror/view";
+import { Decoration, type WidgetType } from "@codemirror/view";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../../viewerTypes";
-import { getMarkdownCodeBlock, isMermaidCodeBlockLanguage } from "../rendering/codeBlockModel";
-import { getMarkdownHtmlBlock } from "../rendering/htmlBlockModel";
-import { getMarkdownTableBlock, isMarkdownTableSourceLine } from "../rendering/tableModel";
+import { getMarkdownPlansInRange } from "../plans/markdownPlanIndex";
+import type { MarkdownElementPlan } from "../plans/markdownPlanTypes";
+import { isMarkdownTableSourceLine } from "../rendering/tableModel";
 import { getMarkdownTaskLine, type MarkdownTaskLine } from "../rendering/taskModel";
 import type { ComposingBlockLine } from "../state/composingBlockLine";
 import type { ExpandedImageRange } from "../state/expandedImage";
@@ -45,60 +45,32 @@ export function addMarkdownBlockAndLineDecorations(
       continue;
     }
 
-    const codeBlock = getMarkdownCodeBlock(state, line.number);
-    if (codeBlock) {
-      const widget = isMermaidCodeBlockLanguage(codeBlock.language)
-        ? new MermaidBlockWidget(codeBlock.code, codeBlock.language || "mermaid", codeBlock.from, codeBlock.to)
-        : new CodeBlockWidget(codeBlock.code, codeBlock.language, codeBlock.from, codeBlock.to);
-      addReplacementDecoration(
-        builders,
-        Decoration.replace({
-          widget,
-          block: true,
-        }),
-        codeBlock.from,
-        codeBlock.to,
+    const blockPlan = findBlockAtomPlanAtLineStart(state, line.from);
+    if (blockPlan) {
+      const widget = createWidgetFromBlockPlan(
+        blockPlan,
+        htmlTrustMode,
+        markdownLinkGraph,
+        documentPath,
+        markdownAssetUrlResolver,
       );
-      lineNumber = codeBlock.nextLineNumber;
-      continue;
-    }
-
-    const htmlBlock = getMarkdownHtmlBlock(state, line.number);
-    if (htmlBlock) {
-      addReplacementDecoration(
-        builders,
-        Decoration.replace({
-          widget: new HtmlBlockWidget(htmlBlock, htmlTrustMode, documentPath, markdownAssetUrlResolver),
-          block: true,
-        }),
-        htmlBlock.from,
-        htmlBlock.to,
-      );
-      lineNumber = htmlBlock.nextLineNumber;
-      continue;
-    }
-
-    const tableBlock = getMarkdownTableBlock(state, line.number);
-    if (tableBlock) {
-      addReplacementDecoration(
-        builders,
-        Decoration.replace({
-          widget: new MarkdownTableWidget(
-            tableBlock.from,
-            tableBlock.to,
-            tableBlock.alignments,
-            tableBlock.rows,
-            markdownLinkGraph,
-            documentPath,
-            markdownAssetUrlResolver,
-          ),
-          block: true,
-        }),
-        tableBlock.from,
-        tableBlock.to,
-      );
-      lineNumber = tableBlock.nextLineNumber;
-      continue;
+      if (widget) {
+        addReplacementDecoration(
+          builders,
+          Decoration.replace({
+            widget,
+            block: true,
+          }),
+          blockPlan.sourceRange.from,
+          blockPlan.sourceRange.to,
+        );
+        const lastCovered = Math.min(
+          Math.max(blockPlan.sourceRange.to - 1, blockPlan.sourceRange.from),
+          state.doc.length,
+        );
+        lineNumber = state.doc.lineAt(lastCovered).number + 1;
+        continue;
+      }
     }
 
     decorateMarkdownLine(
@@ -114,6 +86,71 @@ export function addMarkdownBlockAndLineDecorations(
       markdownAssetUrlResolver,
     );
     lineNumber += 1;
+  }
+}
+
+function findBlockAtomPlanAtLineStart(
+  state: EditorState,
+  lineFrom: number,
+): Extract<MarkdownElementPlan, { presentation: "blockAtom" }> | null {
+  for (const { plan } of getMarkdownPlansInRange(state, lineFrom, lineFrom + 1)) {
+    if (plan.presentation !== "blockAtom") continue;
+    if (plan.sourceRange.from !== lineFrom) continue;
+    if (
+      plan.embed.kind === "codeBlock" ||
+      plan.embed.kind === "mermaid" ||
+      plan.embed.kind === "table" ||
+      plan.embed.kind === "htmlBlock"
+    ) {
+      return plan;
+    }
+  }
+  return null;
+}
+
+function createWidgetFromBlockPlan(
+  plan: Extract<MarkdownElementPlan, { presentation: "blockAtom" }>,
+  htmlTrustMode: MarkdownHtmlTrustMode,
+  markdownLinkGraph: MarkdownLinkGraph | null,
+  documentPath: string,
+  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
+): WidgetType | null {
+  const { embed, sourceRange } = plan;
+  switch (embed.kind) {
+    case "codeBlock":
+      return new CodeBlockWidget(embed.code, embed.language, sourceRange.from, sourceRange.to);
+    case "mermaid":
+      return new MermaidBlockWidget(embed.code, embed.language || "mermaid", sourceRange.from, sourceRange.to);
+    case "table":
+      return new MarkdownTableWidget(
+        sourceRange.from,
+        sourceRange.to,
+        [...embed.alignments],
+        embed.rows.map((row) => ({
+          header: row.header,
+          lineTo: row.lineTo,
+          cells: row.cells.map((cell) => ({ ...cell })),
+        })),
+        markdownLinkGraph,
+        documentPath,
+        markdownAssetUrlResolver,
+      );
+    case "htmlBlock":
+      return new HtmlBlockWidget(
+        {
+          from: sourceRange.from,
+          to: sourceRange.to,
+          nextLineNumber: 0,
+          source: embed.source,
+          tagName: embed.tagName ?? "",
+          closed: embed.closed,
+        },
+        htmlTrustMode,
+        documentPath,
+        markdownAssetUrlResolver,
+      );
+    default:
+      return null;
   }
 }
 
