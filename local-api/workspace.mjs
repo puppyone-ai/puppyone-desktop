@@ -1005,19 +1005,10 @@ export async function getWorkspaceGitStatus(rootPath) {
   // complete history scans. Read-only queries disable optional Git locks so the
   // background status never performs an optional index refresh or competes with
   // terminal Git operations.
-  const [
-    branchResult,
-    symbolicBranchResult,
-    headResult,
-    countResult,
-    statusResult,
-    branches,
-    remotes,
-  ] = await Promise.all([
-    execGit(root, ["branch", "--show-current"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
-    execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
-    execGit(root, ["rev-parse", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
-    execGit(root, ["rev-list", "--count", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "0" })),
+  //
+  // Porcelain-v2 `--branch` headers already carry oid/head/upstream/ahead-behind,
+  // so we avoid duplicate branch/HEAD queries when those headers are present.
+  const [statusResult, branches, remotes] = await Promise.all([
     execGit(root, ["status", "--porcelain=v2", "-z", "--branch"], { optionalLocks: false }).catch((error) => {
       throw new Error(`Unable to read git status: ${error.message}`);
     }),
@@ -1025,8 +1016,43 @@ export async function getWorkspaceGitStatus(rootPath) {
     readGitRemotes(root),
   ]);
   const parsedStatus = parseGitPorcelainV2Status(statusResult.stdout);
-  const branchName = branchResult.stdout.trim() || symbolicBranchResult.stdout.trim() || "detached";
-  const normalizedBranches = normalizeGitBranches(branches, branchName, headResult.stdout.trim());
+  const headerOid = typeof parsedStatus.headers["branch.oid"] === "string"
+    ? parsedStatus.headers["branch.oid"].trim()
+    : "";
+  const headerHead = typeof parsedStatus.headers["branch.head"] === "string"
+    ? parsedStatus.headers["branch.head"].trim()
+    : "";
+
+  let branchName = "";
+  let headCommitId = "";
+  if (headerHead && headerHead !== "(detached)") {
+    branchName = headerHead;
+  } else if (headerHead === "(detached)") {
+    branchName = "detached";
+  }
+  if (headerOid && headerOid !== "(null)") {
+    headCommitId = headerOid;
+  }
+
+  if (!branchName || !headCommitId) {
+    const [branchResult, symbolicBranchResult, headResult] = await Promise.all([
+      branchName
+        ? Promise.resolve({ stdout: branchName })
+        : execGit(root, ["branch", "--show-current"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+      branchName
+        ? Promise.resolve({ stdout: "" })
+        : execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+      headCommitId
+        ? Promise.resolve({ stdout: headCommitId })
+        : execGit(root, ["rev-parse", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+    ]);
+    branchName = branchName || branchResult.stdout.trim() || symbolicBranchResult.stdout.trim() || "detached";
+    headCommitId = headCommitId || headResult.stdout.trim();
+  }
+
+  const countResult = await execGit(root, ["rev-list", "--count", "HEAD"], { optionalLocks: false })
+    .catch(() => ({ stdout: "0" }));
+  const normalizedBranches = normalizeGitBranches(branches, branchName, headCommitId);
   const normalizedRemotes = remotes.map((remote) => ({
     ...remote,
     branches: normalizedBranches
@@ -1034,14 +1060,14 @@ export async function getWorkspaceGitStatus(rootPath) {
       .map((branch) => branch.name),
   }));
   const config = await readPuppyoneWorkspaceConfig(root).catch(() => null);
-  const syncTarget = await readGitSyncTarget(root, normalizedRemotes, normalizedBranches, branchName, headResult.stdout.trim(), config);
+  const syncTarget = await readGitSyncTarget(root, normalizedRemotes, normalizedBranches, branchName, headCommitId, config);
   const currentBranch = normalizedBranches.find((branch) => branch.current && !branch.remote) ?? null;
   const sourceControl = buildGitSourceControlSnapshot({
     entries: parsedStatus.entries,
     branchName,
     syncTarget,
     currentBranch,
-    headCommitId: headResult.stdout.trim() || null,
+    headCommitId: headCommitId || null,
   });
   const effectiveHosting = resolveGitEffectiveHosting({
     remotes: normalizedRemotes,
@@ -1054,7 +1080,7 @@ export async function getWorkspaceGitStatus(rootPath) {
   return {
     isRepo: true,
     branch: branchName,
-    headCommitId: headResult.stdout.trim() || null,
+    headCommitId: headCommitId || null,
     totalCommits: Number.parseInt(countResult.stdout.trim(), 10) || 0,
     entries: parsedStatus.entries,
     stagedEntries: parsedStatus.entries.filter(hasStagedStatus),
@@ -2084,6 +2110,10 @@ function buildGitEnvironment({ optionalLocks = true } = {}) {
     env.GIT_OPTIONAL_LOCKS = "0";
   }
   return env;
+}
+
+export function getGitEnvironmentForTests(options = {}) {
+  return buildGitEnvironment(options);
 }
 
 function getGitErrorOutput(error) {

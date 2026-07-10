@@ -33,59 +33,74 @@ source of truth.
 Window ownership and watcher cleanup remain governed by
 [Desktop Multi-Window Workspaces](../desktop-multi-window-workspaces.md).
 
-## Implemented Lifecycle
+## Current Architecture
+
+The lifecycle follows the repository-scoped design used by mature Git clients:
+
+```text
+WorkingTreeWatcher --------\
+GitMetadataWatcher ---------+--> GitRefreshScheduler --> FastGitStatusReader
+PuppyOne Git operations ----+              |                    |
+Integrated terminal signal -+              |                    v
+Manual refresh -------------/              +------------> GitStatusSnapshot
+Window focus fallback ------/
+```
 
 ### Initial and application-owned updates
 
-`useDesktopGitController` reads status when the active local workspace changes.
-Application-owned Git operations return a new `GitStatusSnapshot` and update the
-controller directly, so stage, commit, checkout, pull, push, and related actions
-started in the UI normally refresh immediately.
+`useDesktopGitController` starts the authorized Git metadata subscription, then
+reads the initial snapshot only after that subscription is ready.
+Application-owned Git operations return a new `GitStatusSnapshot` and publish it
+through `GitRefreshScheduler.applyMutationSnapshot`, so stage, commit, checkout,
+pull, push, and related actions settle with generation-ordered reconciliation.
 
-### External workspace updates
+### External invalidation channels
 
-The current external-change path is:
+Working-tree content and Git metadata are separate channels:
 
 ```text
-fs.watch(workspace root, recursive)
-              |
-              v
-electron/main/workspace-watch-service.mjs
-              |
-              v
-       workspace:changed
-              |
-              v
-window.puppyoneDesktop.watchWorkspace
-              |
-              v
-      useWorkspaceFileWatch
-          /           \
-         v             v
-refresh Explorer   refresh Git status
+fs.watch(workspace root, recursive)          GitMetadataWatcher (.git surfaces)
+              |                                         |
+              v                                         v
+workspace-watch-service.mjs              git-metadata-watch-service.mjs
+              |                                         |
+       workspace:changed                     git-repository:invalidated
+              |                                         |
+              v                                         v
+   useWorkspaceFileWatch                    useDesktopGitController
+          /           \                                 |
+         v             v                                v
+   refresh Explorer   dirty scheduler <------ GitRefreshScheduler
 ```
 
-The main-process watcher applies a 200 ms debounce and shares a watcher among
-windows that subscribe to the same canonical root.
+The content watcher continues to exclude `.git/**` so Explorer and edit-review
+never ingest Git metadata noise. The metadata watcher resolves repository paths
+through Git (`--show-toplevel`, `--git-dir`, `--git-common-dir`), watches
+worktree-specific and common-dir surfaces, filters lock/object/cookie noise, and
+re-arms with bounded backoff. Non-repository folders keep a pending root watch
+that promotes into a full metadata watch after `git init`.
 
-### Implemented exclusion
+### Scheduler, focus, and errors
 
-Before broadcasting, the watcher discards every event whose relative path is
-`.git` or starts with `.git/`. That exclusion is appropriate for Explorer
-refresh and AI edit-review input, but it also removes the renderer's only
-automatic Git invalidation signal for metadata-only changes.
+`GitRefreshScheduler` owns debounce (250 ms), single-flight reads, dirty trailing
+refresh, generation ordering, focus/visibility drain, and stale-focus reconcile
+(5 s). Transient refresh failures preserve the last good snapshot, record an
+error, and leave manual Refresh available. Watcher and refresh paths log
+repository identity, reason, and duration without credentials or remote secrets.
 
-### Focus and error behavior
+### Fast status and lazy history
 
-The main process records the last-focused time when an Electron window gains
-focus, but it does not currently request a Git reconcile.
+Frequent status reads omit current-branch and all-branch history. Porcelain-v2
+`--branch` headers supply HEAD/branch identity when present so duplicate Git
+queries are avoided. History and Cloud branch graphs load through
+`getWorkspaceGitBranchGraph` when those surfaces are active. Background
+read-only status sets `GIT_OPTIONAL_LOCKS=0`; mutating commands keep normal
+locks.
 
-Watcher errors are broadcast as `workspace:changed` error events. The renderer
-does not refresh, report, retry, or fall back when such an event arrives.
+## Historical Failure (pre-fix)
 
-## Known Failure
-
-A normal external commit can follow this sequence:
+Before the metadata watcher and scheduler landed, a normal external commit could
+follow this sequence:
 
 1. A tracked workspace file changes.
 2. The non-Git workspace watcher event refreshes the UI, which displays the file
@@ -93,30 +108,31 @@ A normal external commit can follow this sequence:
 3. An external process runs `git add`. Git changes the repository index.
 4. The external process runs `git commit`. Git updates index, refs, logs, and
    other repository metadata.
-5. Those metadata events are all discarded by the `.git/**` exclusion.
-6. No later event calls `refreshGitStatus`, so the pre-commit snapshot remains
+5. Those metadata events were all discarded by the `.git/**` content-watch
+   exclusion.
+6. No later event refreshed Git status, so the pre-commit snapshot remained
    visible.
 
-The same gap affects external stage/unstage, `reset --soft`, fetch, ref-only
+The same gap affected external stage/unstage, `reset --soft`, fetch, ref-only
 branch changes, and other operations that do not modify a visible working-tree
 file after the last rendered snapshot.
 
-The Git reader itself is not a persistent cache. A manual status request runs
-new Git commands and returns current repository truth. The defect is missing
+The Git reader itself was not a persistent cache. A manual status request ran
+new Git commands and returned current repository truth. The defect was missing
 invalidation and reconciliation.
 
-### Why the failure appears intermittent
+### Why the failure appeared intermittent
 
-The current 200 ms workspace-event debounce makes the defect timing-dependent,
-not random.
+The 200 ms workspace-event debounce made the defect timing-dependent, not
+random.
 
-If an external `git add` and `git commit` both finish before the debounced
-working-tree event starts its status read, that read observes the post-commit
-repository and the UI appears correct. If the status read finishes after the
-file edit but before the metadata-only operations, it publishes the pre-commit
-snapshot; the later index and ref events are excluded, so that snapshot remains
+If an external `git add` and `git commit` both finished before the debounced
+working-tree event started its status read, that read observed the post-commit
+repository and the UI appeared correct. If the status read finished after the
+file edit but before the metadata-only operations, it published the pre-commit
+snapshot; the later index and ref events were excluded, so that snapshot remained
 visible. A later ordinary file change, application-owned Git operation, manual
-refresh, or workspace reload can make the UI catch up and further obscure the
+refresh, or workspace reload could make the UI catch up and further obscure the
 cause.
 
 An automated reproduction must therefore wait until the edited-file snapshot is
@@ -124,7 +140,10 @@ visible before running the external metadata-only operation. Tests that perform
 edit, add, and commit in one uninterrupted burst can pass accidentally because
 the single delayed refresh runs after the whole burst.
 
-## Target Architecture
+## Target Architecture (now current)
+
+The sections below remain the permanent contract. They originally described the
+accepted target; they are now the implemented architecture.
 
 The target lifecycle follows the repository-scoped design used by mature Git
 clients:

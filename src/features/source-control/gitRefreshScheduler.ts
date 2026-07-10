@@ -12,9 +12,16 @@ export type GitRefreshInvalidateOptions = {
 
 export type GitRefreshSchedulerOptions<TSnapshot> = {
   readStatus: (generation: number) => Promise<TSnapshot>;
-  onSnapshot: (snapshot: TSnapshot, meta: { generation: number; reason: string | null }) => void;
-  onError?: (error: unknown, meta: { generation: number; reason: string | null }) => void;
+  onSnapshot: (snapshot: TSnapshot, meta: { generation: number; reason: string | null; durationMs: number }) => void;
+  onError?: (error: unknown, meta: { generation: number; reason: string | null; durationMs: number }) => void;
   onLoadingChange?: (loading: boolean, generation: number) => void;
+  onLog?: (event: {
+    type: "refresh-start" | "refresh-success" | "refresh-error";
+    generation: number;
+    reason: string | null;
+    durationMs?: number;
+    rootPath: string | null;
+  }) => void;
   debounceMs?: number;
   focusStaleMs?: number;
   now?: () => number;
@@ -93,10 +100,18 @@ export function createGitRefreshScheduler<TSnapshot>(
     lastReason = reason;
     lastError = null;
     setLoading(true, generation);
+    const startedAt = now();
+    options.onLog?.({
+      type: "refresh-start",
+      generation,
+      reason,
+      rootPath,
+    });
 
     void Promise.resolve(options.readStatus(generation))
       .then((snapshot) => {
         if (disposed) return;
+        const durationMs = Math.max(0, now() - startedAt);
         const wasInFlight = generation === inFlightGeneration;
         if (wasInFlight) inFlightGeneration = null;
         if (generation < appliedGeneration) {
@@ -109,12 +124,20 @@ export function createGitRefreshScheduler<TSnapshot>(
         appliedGeneration = generation;
         lastSuccessfulAt = now();
         lastError = null;
-        options.onSnapshot(snapshot, { generation, reason });
+        options.onLog?.({
+          type: "refresh-success",
+          generation,
+          reason,
+          durationMs,
+          rootPath,
+        });
+        options.onSnapshot(snapshot, { generation, reason, durationMs });
         setLoading(false, generation);
         maybeRunTrailing();
       })
       .catch((error) => {
         if (disposed) return;
+        const durationMs = Math.max(0, now() - startedAt);
         const wasInFlight = generation === inFlightGeneration;
         if (wasInFlight) inFlightGeneration = null;
         if (generation < appliedGeneration) {
@@ -125,7 +148,14 @@ export function createGitRefreshScheduler<TSnapshot>(
           return;
         }
         lastError = error;
-        options.onError?.(error, { generation, reason });
+        options.onLog?.({
+          type: "refresh-error",
+          generation,
+          reason,
+          durationMs,
+          rootPath,
+        });
+        options.onError?.(error, { generation, reason, durationMs });
         setLoading(false, generation);
         maybeRunTrailing();
       });
@@ -222,7 +252,7 @@ export function createGitRefreshScheduler<TSnapshot>(
       lastSuccessfulAt = now();
       lastError = null;
       lastReason = reason;
-      options.onSnapshot(snapshot, { generation: appliedGeneration, reason });
+      options.onSnapshot(snapshot, { generation: appliedGeneration, reason, durationMs: 0 });
       setLoading(false, appliedGeneration);
     },
 

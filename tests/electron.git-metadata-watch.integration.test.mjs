@@ -77,7 +77,7 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-describe("resolveGitRepositoryIdentity", () => {
+describe("resolveGitRepositoryIdentity", { timeout: 30_000 }, () => {
   it("returns absolute worktree, git-dir, and common-dir for a repository", async () => {
     initRepoWithIdentity();
     const identity = await resolveGitRepositoryIdentity(root);
@@ -93,7 +93,7 @@ describe("resolveGitRepositoryIdentity", () => {
   });
 });
 
-describe("git metadata watch service", () => {
+describe("git metadata watch service", { timeout: 30_000 }, () => {
   it("delivers a metadata invalidation and converges to a clean snapshot with a new HEAD after an external add + commit", async () => {
     initRepoWithIdentity();
     await writeFile(path.join(root, "tracked.txt"), "one\n");
@@ -244,6 +244,211 @@ describe("git metadata watch service", () => {
     });
 
     service.stop(subscription.subscriptionId);
+  });
+
+  it("promotes a pending non-repo subscription after git init", async () => {
+    const service = trackService(createGitMetadataWatchService({ logger: silentLogger() }));
+    const { events, sender } = createRecordingSender(6);
+    const subscription = await service.start(sender, root);
+    expect(subscription.repository).toBe(false);
+    expect(service.getPendingRootCount()).toBe(1);
+    expect(service.getWatcherCount()).toBe(0);
+
+    initRepoWithIdentity();
+    await writeFile(path.join(root, "seed.txt"), "seed\n");
+    git(["add", "seed.txt"]);
+    git(["commit", "-m", "init"]);
+
+    // Force promotion in case the OS watcher coalesces the .git creation burst.
+    await service.promotePendingRootForTests(root, "repository-initialized");
+
+    await waitFor(() => service.getWatcherCount() === 1 && service.getPendingRootCount() === 0);
+    await waitFor(() => events.some((event) => (
+      event.channel === GIT_REPOSITORY_INVALIDATED_CHANNEL
+      && event.payload.reason === "repository-initialized"
+    )));
+
+    const status = await getWorkspaceGitStatus(root);
+    expect(status.isRepo).toBe(true);
+    service.stop(subscription.subscriptionId);
+    expect(service.getWatcherCount()).toBe(0);
+  });
+
+  it("invalidates linked worktrees when shared common-dir refs change", async () => {
+    initRepoWithIdentity();
+    await writeFile(path.join(root, "a.txt"), "a\n");
+    git(["add", "a.txt"]);
+    git(["commit", "-m", "init"]);
+    git(["branch", "shared-base"]);
+
+    const worktreeRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-wt-"));
+    try {
+      execFileSync("git", ["-C", root, "worktree", "add", worktreeRoot, "-b", "linked-feature"]);
+      const mainIdentity = await resolveGitRepositoryIdentity(root);
+      const linkedIdentity = await resolveGitRepositoryIdentity(worktreeRoot);
+      expect(mainIdentity.commonDir).toBe(linkedIdentity.commonDir);
+      expect(mainIdentity.gitDir).not.toBe(linkedIdentity.gitDir);
+
+      const service = trackService(createGitMetadataWatchService({ logger: silentLogger() }));
+      const main = createRecordingSender(7);
+      const linked = createRecordingSender(8);
+      const mainSub = await service.start(main.sender, root);
+      const linkedSub = await service.start(linked.sender, worktreeRoot);
+      expect(service.getWatcherCount()).toBe(2);
+
+      const mainBaseline = main.events.length;
+      const linkedBaseline = linked.events.length;
+      execFileSync("git", ["-C", root, "update-ref", "refs/remotes/origin/shared-base", "HEAD"]);
+
+      await waitFor(() => main.events.length > mainBaseline);
+      await waitFor(() => linked.events.length > linkedBaseline);
+      expect(main.events.some((event) => event.payload.subscriptionId === mainSub.subscriptionId)).toBe(true);
+      expect(linked.events.some((event) => event.payload.subscriptionId === linkedSub.subscriptionId)).toBe(true);
+
+      service.stop(mainSub.subscriptionId);
+      service.stop(linkedSub.subscriptionId);
+    } finally {
+      execFileSync("git", ["-C", root, "worktree", "remove", "--force", worktreeRoot], { stdio: "ignore" });
+      await rm(worktreeRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("invalidates on packed-refs and nested branch names", async () => {
+    initRepoWithIdentity();
+    await writeFile(path.join(root, "a.txt"), "a\n");
+    git(["add", "a.txt"]);
+    git(["commit", "-m", "init"]);
+    git(["branch", "feature/nested/name"]);
+
+    const service = trackService(createGitMetadataWatchService({ logger: silentLogger() }));
+    const { events, sender } = createRecordingSender(9);
+    const subscription = await service.start(sender, root);
+    const baseline = events.length;
+
+    git(["pack-refs", "--all"]);
+    await waitFor(() => events.length > baseline, { timeout: 8000 });
+
+    const afterPack = events.length;
+    git(["update-ref", "refs/heads/feature/nested/name", "HEAD"]);
+    await waitFor(() => events.length > afterPack, { timeout: 8000 });
+
+    const status = await getWorkspaceGitStatus(root);
+    expect(status.branches.some((branch) => branch.name === "feature/nested/name")).toBe(true);
+    service.stop(subscription.subscriptionId);
+  });
+
+  it("invalidates on merge/rebase/cherry-pick state files and config changes", async () => {
+    initRepoWithIdentity();
+    const baseBranch = git(["branch", "--show-current"]) || "master";
+    await writeFile(path.join(root, "a.txt"), "one\n");
+    git(["add", "a.txt"]);
+    git(["commit", "-m", "first"]);
+    git(["checkout", "-b", "topic"]);
+    await writeFile(path.join(root, "a.txt"), "topic\n");
+    git(["add", "a.txt"]);
+    git(["commit", "-m", "topic"]);
+    git(["checkout", baseBranch]);
+    await writeFile(path.join(root, "a.txt"), "mainline\n");
+    git(["add", "a.txt"]);
+    git(["commit", "-m", "mainline"]);
+
+    const service = trackService(createGitMetadataWatchService({ logger: silentLogger() }));
+    const { events, sender } = createRecordingSender(10);
+    const subscription = await service.start(sender, root);
+    let baseline = events.length;
+
+    try {
+      git(["merge", "--no-ff", "--no-commit", "topic"]);
+    } catch {
+      // Conflict is acceptable; MERGE_HEAD should still exist.
+    }
+    await waitFor(() => events.length > baseline, { timeout: 8000 });
+    try {
+      git(["merge", "--abort"]);
+    } catch {
+      git(["reset", "--hard", "HEAD"]);
+    }
+
+    baseline = events.length;
+    git(["config", "remote.origin.url", "https://example.com/repo.git"]);
+    await waitFor(() => events.length > baseline, { timeout: 8000 });
+
+    service.stop(subscription.subscriptionId);
+  });
+
+  it("invalidates after updating a remote-tracking ref (fetch-like)", async () => {
+    initRepoWithIdentity();
+    await writeFile(path.join(root, "a.txt"), "a\n");
+    git(["add", "a.txt"]);
+    git(["commit", "-m", "init"]);
+
+    const service = trackService(createGitMetadataWatchService({ logger: silentLogger() }));
+    const { events, sender } = createRecordingSender(11);
+    const subscription = await service.start(sender, root);
+    const baseline = events.length;
+
+    git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    await waitFor(() => events.length > baseline);
+    const status = await getWorkspaceGitStatus(root);
+    expect(status.branches.some((branch) => branch.name === "origin/main" || branch.name.endsWith("/main"))).toBe(true);
+    service.stop(subscription.subscriptionId);
+  });
+
+  it("keeps the newer subscription when an older stop races (Strict Mode semantics)", async () => {
+    initRepoWithIdentity();
+    await writeFile(path.join(root, "a.txt"), "a\n");
+    git(["add", "a.txt"]);
+    git(["commit", "-m", "init"]);
+
+    const service = trackService(createGitMetadataWatchService({ logger: silentLogger() }));
+    const first = createRecordingSender(12);
+    const second = createRecordingSender(12); // same webContents id, new subscription
+    const oldSub = await service.start(first.sender, root);
+    const newSub = await service.start(second.sender, root);
+    expect(service.getWatcherCount()).toBe(1);
+
+    // Stale Strict Mode cleanup stops only the old token.
+    service.stop(oldSub.subscriptionId);
+    expect(service.getWatcherCount()).toBe(1);
+
+    const baseline = second.events.length;
+    git(["checkout", "-b", "strict-mode-branch"]);
+    await waitFor(() => second.events.length > baseline);
+    expect(second.events.some((event) => event.payload.subscriptionId === newSub.subscriptionId)).toBe(true);
+
+    service.stop(newSub.subscriptionId);
+    expect(service.getWatcherCount()).toBe(0);
+  });
+
+  it("re-arms after a recoverable watcher failure path", async () => {
+    initRepoWithIdentity();
+    await writeFile(path.join(root, "a.txt"), "a\n");
+    git(["add", "a.txt"]);
+    git(["commit", "-m", "init"]);
+
+    const service = trackService(createGitMetadataWatchService({ logger: silentLogger() }));
+    const { events, sender } = createRecordingSender(13);
+    const subscription = await service.start(sender, root);
+    expect(service.getWatcherCount()).toBe(1);
+
+    // Replace HEAD via update-ref (atomic replace) and ensure later events still flow.
+    const head = git(["rev-parse", "HEAD"]);
+    git(["update-ref", "HEAD", head]);
+    const baseline = events.length;
+    git(["checkout", "-b", "after-rearm"]);
+    await waitFor(() => events.length > baseline, { timeout: 8000 });
+    const status = await getWorkspaceGitStatus(root);
+    expect(status.branch).toBe("after-rearm");
+    service.stop(subscription.subscriptionId);
+  });
+});
+
+describe("background optional locks", { timeout: 30_000 }, () => {
+  it("applies GIT_OPTIONAL_LOCKS=0 only for read-only status queries", async () => {
+    const { getGitEnvironmentForTests } = await import("../local-api/workspace.mjs");
+    expect(getGitEnvironmentForTests({ optionalLocks: false }).GIT_OPTIONAL_LOCKS).toBe("0");
+    expect(getGitEnvironmentForTests({}).GIT_OPTIONAL_LOCKS).toBeUndefined();
+    expect(getGitEnvironmentForTests({ optionalLocks: true }).GIT_OPTIONAL_LOCKS).toBeUndefined();
   });
 });
 

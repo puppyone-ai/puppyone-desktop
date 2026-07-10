@@ -138,6 +138,16 @@ export function useDesktopGitController({
         // Preserve the last good snapshot; only surface the error.
         setGitStatusError(error instanceof Error ? error.message : String(error));
       },
+      onLog: (event) => {
+        if (event.type === "refresh-success" || event.type === "refresh-error") {
+          console.info("[git-refresh]", event.type, {
+            rootPath: event.rootPath,
+            generation: event.generation,
+            reason: event.reason,
+            durationMs: event.durationMs,
+          });
+        }
+      },
       onLoadingChange: (loading, generation) => {
         const state = schedulerRef.current?.getState();
         if (!state) return;
@@ -223,8 +233,8 @@ export function useDesktopGitController({
     let subscriptionId: string | null = null;
     const unsubscribeInvalidations = subscribeWorkspaceGitRepositoryInvalidations((event) => {
       if (cancelled) return;
-      if (event.rootPath !== rootPath && workspacePathRef.current !== rootPath) return;
       if (subscriptionId && event.subscriptionId !== subscriptionId) return;
+      if (!subscriptionId && event.rootPath !== rootPath) return;
       scheduler.invalidate({ reason: event.reason || "git-metadata", priority: "debounced" });
     });
 
