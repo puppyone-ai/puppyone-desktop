@@ -1,7 +1,10 @@
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, type Rect, WidgetType } from "@codemirror/view";
-import type { MarkdownAssetUrlResolver } from "../../viewerTypes";
+import { getMarkdownEmbedHost } from "../adapters/codemirror/embedHost";
+import { disposeWidgetSessionDom } from "../adapters/codemirror/widgetSession";
+import { createCapabilityPrincipal } from "../services/capabilityPrincipal";
 import { isSafeMarkdownImageUrl } from "../links/markdownImageModel";
+import { markdownDocumentPathFacet, markdownAssetUrlResolverFacet } from "../markdownLivePreviewContext";
 import { markdownExpandedImageEffect } from "../state/expandedImage";
 import {
   getInlineWidgetEdgeX,
@@ -10,10 +13,11 @@ import {
 } from "./markdownWidgetMeasure";
 import { hasPointerMoved } from "./widgetDom";
 
+/**
+ * Immutable image atom descriptor. Asset resolution, measure, and listeners
+ * belong to the mounted DOM session.
+ */
 export class ImagePreviewWidget extends WidgetType {
-  private readonly measure = new MarkdownWidgetMeasureController();
-  private pointerDown: { x: number; y: number } | null = null;
-
   constructor(
     private readonly from: number,
     private readonly to: number,
@@ -21,7 +25,6 @@ export class ImagePreviewWidget extends WidgetType {
     private readonly source: string,
     private readonly title: string | null,
     private readonly documentPath: string,
-    private readonly markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
   ) {
     super();
   }
@@ -34,25 +37,32 @@ export class ImagePreviewWidget extends WidgetType {
       widget.alt === this.alt &&
       widget.source === this.source &&
       widget.title === this.title &&
-      widget.documentPath === this.documentPath &&
-      widget.markdownAssetUrlResolver === this.markdownAssetUrlResolver
+      widget.documentPath === this.documentPath
     );
   }
 
   toDOM(view: EditorView): HTMLElement {
+    const host = getMarkdownEmbedHost(view, {
+      resolveAssetUrl: view.state.facet(markdownAssetUrlResolverFacet),
+    });
     const wrapper = document.createElement("span");
     wrapper.className = "cm-md-image-widget";
     wrapper.title = this.title ?? this.source;
     wrapper.tabIndex = 0;
     wrapper.setAttribute("role", "img");
     wrapper.setAttribute("aria-label", this.alt || this.source);
-    wrapper.addEventListener("mousedown", (event) => {
-      this.pointerDown = { x: event.clientX, y: event.clientY };
-    });
-    wrapper.addEventListener("click", (event) => {
+
+    const measure = new MarkdownWidgetMeasureController();
+    const abort = new AbortController();
+    let pointerDown: { x: number; y: number } | null = null;
+
+    const onMouseDown = (event: MouseEvent) => {
+      pointerDown = { x: event.clientX, y: event.clientY };
+    };
+    const onClick = (event: MouseEvent) => {
       event.preventDefault();
       event.stopPropagation();
-      if (this.pointerDown && hasPointerMoved(event, this.pointerDown)) return;
+      if (pointerDown && hasPointerMoved(event, pointerDown)) return;
 
       const selection = view.state.selection.main;
       const alreadySelected = selection.from === this.from && selection.to === this.to;
@@ -68,45 +78,81 @@ export class ImagePreviewWidget extends WidgetType {
             },
       );
       view.focus();
-    });
+    };
+
+    wrapper.addEventListener("mousedown", onMouseDown);
+    wrapper.addEventListener("click", onClick);
+
+    const createImage = (source: string) => {
+      const image = document.createElement("img");
+      image.src = source;
+      image.alt = this.alt;
+      image.loading = "lazy";
+      if (this.title) image.title = this.title;
+      image.addEventListener("load", () => measure.schedule(view));
+      image.addEventListener("error", () => measure.schedule(view));
+      return image;
+    };
+    const createPlaceholder = (labelText: string) => {
+      const label = document.createElement("span");
+      label.className = "cm-md-image-placeholder";
+      label.textContent = labelText;
+      return label;
+    };
 
     const directSource = this.source.trim();
     if (isSafeMarkdownImageUrl(directSource)) {
-      wrapper.appendChild(this.createImage(directSource, view));
-      this.measure.observe(wrapper, view);
-      return wrapper;
+      wrapper.appendChild(createImage(directSource));
+    } else {
+      wrapper.appendChild(createPlaceholder("Loading image..."));
+      const documentPath = this.documentPath || view.state.facet(markdownDocumentPathFacet);
+      void host.assets
+        .resolve({
+          principal: createCapabilityPrincipal({
+            editorViewId: host.viewId,
+            workspaceId: "workspace",
+            documentPath,
+            documentRevision: String(view.state.doc.length),
+            purpose: "asset-read",
+          }),
+          sourcePath: documentPath,
+          href: this.source,
+          signal: abort.signal,
+        })
+        .then((handle) => {
+          if (abort.signal.aborted || !wrapper.isConnected) {
+            handle?.revoke();
+            return;
+          }
+          wrapper.replaceChildren(
+            handle && isSafeMarkdownImageUrl(handle.url)
+              ? createImage(handle.url)
+              : createPlaceholder(this.alt || this.source),
+          );
+          measure.schedule(view);
+        })
+        .catch(() => {
+          if (abort.signal.aborted || !wrapper.isConnected) return;
+          wrapper.replaceChildren(createPlaceholder(this.alt || this.source));
+          measure.schedule(view);
+        });
     }
 
-    if (!this.markdownAssetUrlResolver) {
-      wrapper.appendChild(this.createPlaceholder(this.alt || this.source));
-      this.measure.observe(wrapper, view);
-      return wrapper;
-    }
-
-    wrapper.appendChild(this.createPlaceholder("Loading image..."));
-    this.measure.observe(wrapper, view);
-
-    Promise.resolve(this.markdownAssetUrlResolver(this.documentPath, this.source))
-      .then((resolvedUrl) => {
-        if (!wrapper.isConnected) return;
-        wrapper.replaceChildren(
-          resolvedUrl && isSafeMarkdownImageUrl(resolvedUrl)
-            ? this.createImage(resolvedUrl, view)
-            : this.createPlaceholder(this.alt || this.source),
-        );
-        this.measure.schedule(view);
-      })
-      .catch(() => {
-        if (!wrapper.isConnected) return;
-        wrapper.replaceChildren(this.createPlaceholder(this.alt || this.source));
-        this.measure.schedule(view);
-      });
+    measure.observe(wrapper, view);
+    host.sessions.mount(wrapper, () => ({
+      dispose() {
+        abort.abort();
+        measure.destroy();
+        wrapper.removeEventListener("mousedown", onMouseDown);
+        wrapper.removeEventListener("click", onClick);
+      },
+    }));
 
     return wrapper;
   }
 
-  destroy() {
-    this.measure.destroy();
+  destroy(dom: HTMLElement) {
+    disposeWidgetSessionDom(dom);
   }
 
   ignoreEvent() {
@@ -115,23 +161,5 @@ export class ImagePreviewWidget extends WidgetType {
 
   coordsAt(dom: HTMLElement, pos: number, side: number): Rect | null {
     return getInlineWidgetTextCoords(dom, getInlineWidgetEdgeX(dom, pos, side));
-  }
-
-  private createImage(source: string, view: EditorView): HTMLImageElement {
-    const image = document.createElement("img");
-    image.src = source;
-    image.alt = this.alt;
-    image.loading = "lazy";
-    if (this.title) image.title = this.title;
-    image.addEventListener("load", () => this.measure.schedule(view));
-    image.addEventListener("error", () => this.measure.schedule(view));
-    return image;
-  }
-
-  private createPlaceholder(labelText: string): HTMLElement {
-    const label = document.createElement("span");
-    label.className = "cm-md-image-placeholder";
-    label.textContent = labelText;
-    return label;
   }
 }

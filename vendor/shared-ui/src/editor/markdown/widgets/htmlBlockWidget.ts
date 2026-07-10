@@ -1,21 +1,30 @@
 import { EditorView, WidgetType } from "@codemirror/view";
 import { getHtmlPreviewInteractionCss } from "../../htmlPreviewInteraction";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode } from "../../viewerTypes";
+import { getMarkdownEmbedHost } from "../adapters/codemirror/embedHost";
+import { disposeWidgetSessionDom } from "../adapters/codemirror/widgetSession";
 import { resolveMarkdownHtmlImageSources } from "../links/markdownImageModel";
 import type { MarkdownHtmlBlock } from "../rendering/htmlBlockModel";
 import { createSanitizedBlockHtmlFragment } from "../rendering/sanitizeHtml";
+import { createCapabilityPrincipal } from "../services/capabilityPrincipal";
 import {
   clampNumber,
   estimateMarkdownHtmlBlockHeight,
   MarkdownWidgetMeasureController,
 } from "./markdownWidgetMeasure";
 
-export class HtmlBlockWidget extends WidgetType {
-  private messageListener: ((event: MessageEvent) => void) | null = null;
-  private readyTimer: number | null = null;
-  private readonly measure = new MarkdownWidgetMeasureController();
-  private previewVersion = 0;
+function extractExternalHttpsEmbed(source: string): string | null {
+  const trimmed = source.trim();
+  const match = /^<iframe\b[^>]*\bsrc=["\'](https:\/\/[^"\']+)["\'][^>]*>\s*<\/iframe>$/i.exec(trimmed)
+    ?? /^<iframe\b[^>]*\bsrc=["\'](https:\/\/[^"\']+)["\'][^>]*\/>$/i.exec(trimmed);
+  return match?.[1] ?? null;
+}
 
+/**
+ * Immutable HTML-block descriptor. Message listeners, timers, measure, asset
+ * loads, and web-embed sessions belong to the mounted DOM session.
+ */
+export class HtmlBlockWidget extends WidgetType {
   constructor(
     private readonly block: MarkdownHtmlBlock,
     private readonly htmlTrustMode: MarkdownHtmlTrustMode,
@@ -42,12 +51,20 @@ export class HtmlBlockWidget extends WidgetType {
   }
 
   toDOM(view: EditorView): HTMLElement {
+    const host = getMarkdownEmbedHost(view, {
+      resolveAssetUrl: this.markdownAssetUrlResolver,
+    });
     const shell = document.createElement("div");
     shell.className = "cm-md-html-widget";
+    const measure = new MarkdownWidgetMeasureController();
+    let previewVersion = 0;
+    let showingSource = false;
+    let messageListener: ((event: MessageEvent) => void) | null = null;
+    let readyTimer: number | null = null;
+    let webEmbedId: string | null = null;
 
     const toolbar = document.createElement("div");
     toolbar.className = "cm-md-html-widget-toolbar";
-
     const toggleButton = document.createElement("button");
     toggleButton.className = "cm-md-html-source-toggle";
     toggleButton.type = "button";
@@ -56,18 +73,191 @@ export class HtmlBlockWidget extends WidgetType {
     const content = document.createElement("div");
     content.className = "cm-md-html-widget-content";
 
-    let showingSource = false;
+    const clearPreviewLifecycle = () => {
+      if (messageListener) {
+        window.removeEventListener("message", messageListener);
+        messageListener = null;
+      }
+      if (readyTimer !== null) {
+        window.clearTimeout(readyTimer);
+        readyTimer = null;
+      }
+      if (webEmbedId) {
+        host.webEmbeds.destroy(webEmbedId);
+        webEmbedId = null;
+      }
+    };
+
+    const nextPreviewVersion = () => {
+      previewVersion += 1;
+      return previewVersion;
+    };
+    const isPreviewVersionCurrent = (version: number) => !measure.destroyed && previewVersion === version;
+
+    const createWebEmbedPlaceholder = (href: string) => {
+      const principal = createCapabilityPrincipal({
+        editorViewId: host.viewId,
+        workspaceId: "workspace",
+        documentPath: this.documentPath,
+        documentRevision: String(view.state.doc.length),
+        purpose: "web-embed",
+      });
+      const embed = host.webEmbeds.create({
+        principal,
+        href,
+        privacyProfile: "temporary-no-credential",
+      });
+      webEmbedId = embed.id;
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "cm-md-html-web-embed";
+      wrapper.dataset.embedState = embed.state;
+
+      if (embed.state === "blocked") {
+        wrapper.textContent = "Blocked web embed";
+        return wrapper;
+      }
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "cm-md-html-web-embed-load";
+      button.textContent = `Load embed: ${href}`;
+      button.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        button.disabled = true;
+        button.textContent = "Loading…";
+        const activated = await host.webEmbeds.activate(embed.id);
+        if (!activated || !wrapper.isConnected) return;
+        wrapper.dataset.embedState = activated.state;
+        if (activated.state === "loaded") {
+          wrapper.replaceChildren();
+          const frame = document.createElement("div");
+          frame.className = "cm-md-html-web-embed-frame";
+          frame.dataset.embedId = activated.id;
+          frame.dataset.embedHref = href;
+          frame.textContent = `Embedded: ${href}`;
+          wrapper.appendChild(frame);
+          measure.schedule(view);
+        } else {
+          button.disabled = false;
+          button.textContent = `Load embed: ${href}`;
+        }
+      });
+      wrapper.appendChild(button);
+      return wrapper;
+    };
+
+    const createTrustedHtmlBlock = (block: typeof this.block, version: number) => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "cm-md-html-trusted-block is-loading";
+      const sizer = createTrustedHtmlSizer(block.source);
+      const loader = createTrustedHtmlLoader();
+      wrapper.appendChild(sizer);
+      wrapper.appendChild(loader);
+
+      const frameId = createTrustedHtmlFrameId();
+      const iframe = document.createElement("iframe");
+      iframe.className = "cm-md-html-trusted-frame";
+      iframe.title = "Trusted Markdown HTML preview";
+      iframe.sandbox.add("allow-downloads", "allow-forms", "allow-modals", "allow-popups", "allow-scripts");
+      iframe.referrerPolicy = "no-referrer";
+      iframe.style.height = `${estimateTrustedHtmlFrameHeight(block.source)}px`;
+
+      const markReady = () => {
+        if (readyTimer !== null) {
+          window.clearTimeout(readyTimer);
+          readyTimer = null;
+        }
+        if (!wrapper.classList.contains("is-loading")) return;
+        wrapper.classList.remove("is-loading");
+        sizer.remove();
+        loader.remove();
+        measure.schedule(view);
+      };
+
+      let measuredHeight = false;
+      messageListener = (event: MessageEvent) => {
+        if (event.source !== iframe.contentWindow) return;
+        if (!isTrustedHtmlHeightMessage(event.data, frameId)) return;
+        measuredHeight = true;
+        iframe.style.height = `${clampNumber(event.data.height, 80, 2400)}px`;
+        markReady();
+        measure.schedule(view);
+      };
+      window.addEventListener("message", messageListener);
+
+      iframe.addEventListener("load", () => {
+        if (!wrapper.classList.contains("is-loading")) return;
+        readyTimer = window.setTimeout(() => {
+          if (!measuredHeight) markReady();
+        }, 120);
+      }, { once: true });
+
+      resolveMarkdownHtmlImageSources(block.source, this.documentPath, this.markdownAssetUrlResolver)
+        .then((source) => {
+          if (!isPreviewVersionCurrent(version)) return;
+          iframe.srcdoc = createTrustedHtmlDocument(source, frameId);
+          wrapper.appendChild(iframe);
+          measure.schedule(view);
+        })
+        .catch(() => {
+          if (!isPreviewVersionCurrent(version)) return;
+          iframe.srcdoc = createTrustedHtmlDocument(block.source, frameId);
+          wrapper.appendChild(iframe);
+          measure.schedule(view);
+        });
+
+      return wrapper;
+    };
+
+    const createPreviewBlock = (version: number) => {
+      if (!this.block.closed) {
+        return createUnsupportedHtmlBlock(this.block, ["HTML block is not closed"]);
+      }
+
+      const externalHref = extractExternalHttpsEmbed(this.block.source);
+      if (externalHref) {
+        return createWebEmbedPlaceholder(externalHref);
+      }
+
+      if (this.htmlTrustMode === "localTrusted") {
+        return createTrustedHtmlBlock(this.block, version);
+      }
+
+      const resolver = this.markdownAssetUrlResolver;
+      if (!resolver) {
+        return createSanitizedHtmlPreviewBlock(this.block, this.block.source);
+      }
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "cm-md-html-rendered-surface cm-md-html-block is-loading";
+      wrapper.appendChild(createTrustedHtmlLoader());
+      resolveMarkdownHtmlImageSources(this.block.source, this.documentPath, resolver)
+        .then((source) => {
+          if (!isPreviewVersionCurrent(version)) return;
+          replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, source);
+          measure.schedule(view);
+        })
+        .catch(() => {
+          if (!isPreviewVersionCurrent(version)) return;
+          replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, this.block.source);
+          measure.schedule(view);
+        });
+      return wrapper;
+    };
+
     const render = () => {
-      this.clearPreviewLifecycle();
-      const previewVersion = this.nextPreviewVersion();
+      clearPreviewLifecycle();
+      const version = nextPreviewVersion();
       content.replaceChildren(
-        showingSource ? createHtmlSourceBlock(this.block.source) : this.createPreviewBlock(previewVersion, view),
+        showingSource ? createHtmlSourceBlock(this.block.source) : createPreviewBlock(version),
       );
       toggleButton.replaceChildren(createHtmlWidgetIcon(showingSource ? "preview" : "source"));
       toggleButton.title = showingSource ? "Show HTML preview" : "Show HTML source";
       toggleButton.setAttribute("aria-label", showingSource ? "Show HTML preview" : "Show HTML source");
       toggleButton.classList.toggle("active", showingSource);
-      this.measure.schedule(view);
+      measure.schedule(view);
     };
 
     toggleButton.addEventListener("click", (event) => {
@@ -79,135 +269,24 @@ export class HtmlBlockWidget extends WidgetType {
 
     render();
     shell.append(toolbar, content);
-    this.measure.observe(shell, view);
+    measure.observe(shell, view);
+
+    host.sessions.mount(shell, () => ({
+      dispose() {
+        clearPreviewLifecycle();
+        measure.destroy();
+      },
+    }));
+
     return shell;
   }
 
-  destroy() {
-    this.previewVersion += 1;
-    this.clearPreviewLifecycle();
-    this.measure.destroy();
+  destroy(dom: HTMLElement) {
+    disposeWidgetSessionDom(dom);
   }
 
   ignoreEvent() {
     return true;
-  }
-
-  private createPreviewBlock(previewVersion: number, view: EditorView): HTMLElement {
-    if (!this.block.closed) {
-      return createUnsupportedHtmlBlock(this.block, ["HTML block is not closed"]);
-    }
-
-    if (this.htmlTrustMode === "localTrusted") {
-      return this.createTrustedHtmlBlock(this.block, previewVersion, view);
-    }
-
-    const resolver = this.markdownAssetUrlResolver;
-    if (!resolver) {
-      return createSanitizedHtmlPreviewBlock(this.block, this.block.source);
-    }
-
-    const wrapper = document.createElement("div");
-    wrapper.className = "cm-md-html-rendered-surface cm-md-html-block is-loading";
-    wrapper.appendChild(createTrustedHtmlLoader());
-
-    resolveMarkdownHtmlImageSources(this.block.source, this.documentPath, resolver)
-      .then((source) => {
-        if (!this.isPreviewVersionCurrent(previewVersion)) return;
-        replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, source);
-        this.measure.schedule(view);
-      })
-      .catch(() => {
-        if (!this.isPreviewVersionCurrent(previewVersion)) return;
-        replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, this.block.source);
-        this.measure.schedule(view);
-      });
-
-    return wrapper;
-  }
-
-  private clearPreviewLifecycle() {
-    if (this.messageListener) {
-      window.removeEventListener("message", this.messageListener);
-      this.messageListener = null;
-    }
-    if (this.readyTimer !== null) {
-      window.clearTimeout(this.readyTimer);
-      this.readyTimer = null;
-    }
-  }
-
-  private nextPreviewVersion(): number {
-    this.previewVersion += 1;
-    return this.previewVersion;
-  }
-
-  private isPreviewVersionCurrent(previewVersion: number): boolean {
-    return !this.measure.destroyed && this.previewVersion === previewVersion;
-  }
-
-  private createTrustedHtmlBlock(block: MarkdownHtmlBlock, previewVersion: number, view: EditorView): HTMLElement {
-    const wrapper = document.createElement("div");
-    wrapper.className = "cm-md-html-trusted-block is-loading";
-
-    const sizer = createTrustedHtmlSizer(block.source);
-    const loader = createTrustedHtmlLoader();
-    wrapper.appendChild(sizer);
-    wrapper.appendChild(loader);
-
-    const frameId = createTrustedHtmlFrameId();
-    const iframe = document.createElement("iframe");
-    iframe.className = "cm-md-html-trusted-frame";
-    iframe.title = "Trusted Markdown HTML preview";
-    iframe.sandbox.add("allow-downloads", "allow-forms", "allow-modals", "allow-popups", "allow-scripts");
-    iframe.referrerPolicy = "no-referrer";
-    iframe.style.height = `${estimateTrustedHtmlFrameHeight(block.source)}px`;
-
-    const markReady = () => {
-      if (this.readyTimer !== null) {
-        window.clearTimeout(this.readyTimer);
-        this.readyTimer = null;
-      }
-      if (!wrapper.classList.contains("is-loading")) return;
-      wrapper.classList.remove("is-loading");
-      sizer.remove();
-      loader.remove();
-      this.measure.schedule(view);
-    };
-
-    let measuredHeight = false;
-    this.messageListener = (event: MessageEvent) => {
-      if (event.source !== iframe.contentWindow) return;
-      if (!isTrustedHtmlHeightMessage(event.data, frameId)) return;
-      measuredHeight = true;
-      iframe.style.height = `${clampNumber(event.data.height, 80, 2400)}px`;
-      markReady();
-      this.measure.schedule(view);
-    };
-    window.addEventListener("message", this.messageListener);
-
-    iframe.addEventListener("load", () => {
-      if (!wrapper.classList.contains("is-loading")) return;
-      this.readyTimer = window.setTimeout(() => {
-        if (!measuredHeight) markReady();
-      }, 120);
-    }, { once: true });
-
-    resolveMarkdownHtmlImageSources(block.source, this.documentPath, this.markdownAssetUrlResolver)
-      .then((source) => {
-        if (!this.isPreviewVersionCurrent(previewVersion)) return;
-        iframe.srcdoc = createTrustedHtmlDocument(source, frameId);
-        wrapper.appendChild(iframe);
-        this.measure.schedule(view);
-      })
-      .catch(() => {
-        if (!this.isPreviewVersionCurrent(previewVersion)) return;
-        iframe.srcdoc = createTrustedHtmlDocument(block.source, frameId);
-        wrapper.appendChild(iframe);
-        this.measure.schedule(view);
-      });
-
-    return wrapper;
   }
 }
 

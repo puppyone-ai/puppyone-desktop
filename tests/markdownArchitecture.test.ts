@@ -104,7 +104,7 @@ describe("Markdown embed runtime foundations", () => {
     expect(store.get("table:0")?.mappedRange).toEqual({ from: 15, to: 45 });
   });
 
-  it("defaults external web embeds to click-to-load and blocks non-https", () => {
+  it("defaults external web embeds to click-to-load and blocks non-https", async () => {
     const broker = createWebEmbedBroker();
     const principal = createCapabilityPrincipal({
       editorViewId: "view-1",
@@ -120,7 +120,7 @@ describe("Markdown embed runtime foundations", () => {
       privacyProfile: "temporary-no-credential",
     });
     expect(https.state).toBe("click-to-load");
-    expect(broker.activate(https.id)?.state).toBe("loaded");
+    expect((await broker.activate(https.id))?.state).toBe("loaded");
 
     const blocked = broker.create({
       principal,

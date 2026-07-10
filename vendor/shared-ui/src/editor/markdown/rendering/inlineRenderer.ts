@@ -1,3 +1,4 @@
+import { createDomFromInlineHtmlSource } from "../adapters/preview/inlineHtmlDomAdapter";
 import { isSafeHref } from "./markdownHtmlPolicy";
 import { appendSanitizedInlineHtml } from "./sanitizeHtml";
 import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../viewerTypes";
@@ -76,6 +77,22 @@ function appendInlineHtml(target: Node, source: string, options: MarkdownInlineR
 }
 
 function renderSanitizedInlineHtml(target: Node, source: string, options: MarkdownInlineRenderOptions) {
+  // Prefer the same policy compiler as live preview for a single complete
+  // inline HTML element (common table-cell case).
+  const trimmed = source.trim();
+  if (/^<[a-z][\s\S]*>[\s\S]*<\/[a-z][\s\S]*>$/i.test(trimmed) && (trimmed.match(/</g) ?? []).length <= 2) {
+    const planned = createDomFromInlineHtmlSource(trimmed);
+    if (planned) {
+      // Preserve nested Markdown inside the HTML content by re-rendering the
+      // inner text through the Markdown inline path.
+      const inner = planned.textContent ?? "";
+      planned.textContent = "";
+      appendMarkdownText(planned, inner, options);
+      target.appendChild(planned);
+      return;
+    }
+  }
+
   const template = document.createElement("template");
   template.innerHTML = source;
   appendSanitizedInlineHtml(target, template.content, (node, text) => appendMarkdownText(node, text, options));

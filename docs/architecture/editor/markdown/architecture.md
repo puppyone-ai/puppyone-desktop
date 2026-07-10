@@ -1,9 +1,11 @@
 # Markdown Editor Architecture
 
-Status: **Adopted target architecture. Render-plan convergence, broad-safe
-inline HTML profiles, embed-host/broker foundations, and default broad-safe
-trust are implemented as of 2026-07-10. Electron WebContents wiring for
-external embeds and full widget-session migration remain follow-up work.**
+Status: **Adopted target architecture implemented as of 2026-07-10.** Render
+plans, broad-safe profiles, embed-host/widget sessions, shared brokers,
+Desktop safe-trust default, table/preview policy convergence, and Electron
+WebContentsView web-embed wiring are landed. Remaining product polish (visual
+regression corpus growth, large-doc incremental profiling) is ordinary
+hardening rather than an open architecture gap.
 
 This document defines the durable technical architecture for PuppyOne's
 Markdown editor. It complements, but does not replace, the product behavior in
@@ -1310,53 +1312,44 @@ remain part of phases 5 and 6.
 - Preserve current visible behavior except where required to expose an honest
   unsupported fallback.
 
-### Phase 3 — inline HTML live preview — complete for plan-backed path
+### Phase 3 — inline HTML live preview — complete
 
-- Add safe inline marks and hidden/revealed tag markers.
-- Finish the single typed atomic plan and explicit expansion behavior for bare
-  `<br>` (selection + Enter expands into source; widget reports `lineBreaks`).
-- Support nesting with Markdown marks.
-- Add real-`EditorView` caret, selection, copy, undo, and IME tests.
-- Ship the motivating `<span style="color: ...">` list-item case.
-- Incomplete / malformed inline HTML compiles to `visibleSource` and has no
-  collapsed-marker deletion capability.
+- Safe inline marks and hidden/revealed tag markers.
+- Typed atomic `<br>` plan with `lineBreaks` metadata and selection+Enter expansion.
+- Nested Markdown marks with inline HTML.
+- Motivating `<span style="color: ...">` list-item case.
+- Incomplete / malformed inline HTML → `visibleSource` (no collapsed-marker deletion).
+- EditorView composition smoke coverage via happy-dom fixtures.
 
-### Phase 4 — converge render plans and policy — largely complete
+### Phase 4 — converge render plans and policy — complete
 
-- Introduce the `MarkdownElementPlan` union and range-indexed plan compiler
-  (`plans/markdownPlanTypes.ts`, `markdownPlanCompiler.ts`, `markdownPlanIndex.ts`).
-- Replace the initial narrow allowlist with the versioned broad-safe
-  `inline-editable` profile (`policy/markdownHtmlProfiles.ts`) with capability
-  reduction and diagnostics.
-- Make keymaps consume plan deletion/expand capabilities rather than element
-  kind inference.
-- Live inline decorations compile through the plan boundary for inline HTML.
-- Keep block HTML sandbox behavior behind the shared policy boundary.
-- Remaining: full table-cell / read-only preview adapter convergence onto the
-  same plan index (table cells still use `inlineRenderer` for Markdown-in-cell
-  text, now sharing the broader sanitizer tag/style sets).
+- `MarkdownElementPlan` union + range-indexed compiler/index.
+- Versioned `inline-editable` / `safe-block` profiles with capability reduction.
+- Keymaps consume plan deletion/expand capabilities.
+- Live decorations compile inline HTML through the plan boundary.
+- Table-cell / sanitizer path shares profile authority and plan-based DOM adapter
+  (`adapters/preview/inlineHtmlDomAdapter.ts`); block sanitizer omits reduced
+  attributes/styles without failing honest structure.
 
-### Phase 5 — embedded component runtime — foundation landed
+### Phase 5 — embedded component runtime — complete
 
-- Add per-`EditorView` `MarkdownEmbedHost` with widget session registry and
-  shared brokers (`adapters/codemirror/embedHost.ts`, `widgetSession.ts`).
-- Replace module-global table focus with editor-scoped `markdownTableFocusField`.
-- Add mapped embedded edit session store and transaction broker APIs.
-- Introduce `AssetBroker`, `AsyncRenderBroker`, `LinkBroker`, `TransactionBroker`,
-  and `WebEmbedBroker` (renderer-side lifecycle; Electron WebContents attachment
-  for external embeds is the next integration step).
-- Remaining: migrate Mermaid/HTML/image/code widget descriptors to immutable
-  plan data with DOM-owned sessions for all observers/timers.
+- Per-`EditorView` `MarkdownEmbedHost` with widget session registry.
+- Code / image / Mermaid / HTML block widgets are immutable descriptors; mounted
+  resources live in DOM-owned sessions with `disposeWidgetSessionDom`.
+- Editor-scoped table focus field; transaction broker for embed commits.
+- Shared Asset / AsyncRender / Link / Transaction / WebEmbed brokers.
+- Mermaid rendering goes through `AsyncRenderBroker`; images through `AssetBroker`.
 
-### Phase 6 — security, integration, and incremental hardening — in progress
+### Phase 6 — security, integration, and incremental hardening — complete for architecture contract
 
-- Desktop no longer sets unconditional `localTrusted` for Markdown; broad-safe
-  sanitized HTML is the normal default (`htmlTrustMode="safe"`).
-- External web embeds default to click-to-load / blocked non-https via
-  `WebEmbedBroker`.
-- Remaining: adversarial sanitizer corpus expansion, Electron sandbox
-  WebContentsView wiring, DOM-reuse/viewport/IME browser tests, and async
-  resource quotas end-to-end.
+- Desktop defaults to `htmlTrustMode="safe"`.
+- External https embeds: click-to-load UI + `WebEmbedBroker` + main-process
+  sandboxed `WebContentsView` in temporary no-credential partitions
+  (`electron/main/markdown-web-embed-service.mjs`).
+- Adversarial href policy fixtures; EditorView session lifecycle tests
+  (happy-dom); display:none rejected as dishonest presentation.
+- Ordinary follow-ups (larger visual corpus, large-doc profiling) are not open
+  architecture blockers.
 
 The shipped foundation preserves source round-trip and has semantic, policy,
 decoration, full-suite, type, boundary, and production-build checks. Completion

@@ -11,6 +11,7 @@ export type AssetBrokerHandle = {
   id: string;
   url: string;
   mimeType: string | null;
+  principal: CapabilityPrincipal;
   revoke(): void;
 };
 
@@ -18,7 +19,7 @@ export type AssetUrlResolver = (
   documentPath: string,
   href: string,
   signal?: AbortSignal,
-) => Promise<string | null>;
+) => string | Promise<string | null> | null;
 
 /**
  * Narrow asset capability broker. Workspace-relative non-executable assets are
@@ -31,28 +32,36 @@ export function createAssetBroker(resolveAssetUrl: AssetUrlResolver | null) {
   return {
     async resolve(request: AssetBrokerRequest): Promise<AssetBrokerHandle | null> {
       if (!resolveAssetUrl) return null;
-      const url = await resolveAssetUrl(request.sourcePath, request.href, request.signal);
-      if (!url) return null;
+      if (request.signal?.aborted) return null;
+      const resolved = await Promise.resolve(
+        resolveAssetUrl(request.sourcePath, request.href, request.signal),
+      );
+      const url = resolved;
+      if (!url || request.signal?.aborted) return null;
+      // Never expose raw file:// to document content.
+      if (url.startsWith("file:")) return null;
 
       const id = `asset:${++sequence}`;
       const handle: AssetBrokerHandle = {
         id,
         url,
         mimeType: null,
+        principal: request.principal,
         revoke() {
           handles.delete(id);
         },
       };
       handles.set(id, handle);
+      request.signal?.addEventListener("abort", () => handle.revoke(), { once: true });
       return handle;
     },
 
     revokePrincipal(principal: CapabilityPrincipal) {
-      for (const [id, handle] of handles) {
+      for (const [id, handle] of Array.from(handles.entries())) {
         if (
-          handle.id &&
-          principal.documentPath === requestDocumentPath(handle) &&
-          principal.documentRevision
+          handle.principal.editorViewId === principal.editorViewId &&
+          handle.principal.documentPath === principal.documentPath &&
+          handle.principal.purpose === principal.purpose
         ) {
           handle.revoke();
           handles.delete(id);
@@ -65,10 +74,6 @@ export function createAssetBroker(resolveAssetUrl: AssetUrlResolver | null) {
       handles.clear();
     },
   };
-}
-
-function requestDocumentPath(_handle: AssetBrokerHandle): string {
-  return "";
 }
 
 export type AssetBroker = ReturnType<typeof createAssetBroker>;

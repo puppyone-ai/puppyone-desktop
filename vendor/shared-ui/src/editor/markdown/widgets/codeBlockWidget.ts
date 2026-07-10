@@ -1,9 +1,15 @@
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, WidgetType } from "@codemirror/view";
+import { disposeWidgetSessionDom } from "../adapters/codemirror/widgetSession";
+import { getMarkdownEmbedHost } from "../adapters/codemirror/embedHost";
 import { sanitizeCodeLanguage, serializeMarkdownCodeBlock } from "../rendering/codeBlockModel";
 import { estimateCodeBlockWidgetHeight } from "./markdownWidgetMeasure";
 import { normalizeLineEndings, stopCodeMirrorEvent } from "./widgetDom";
 
+/**
+ * Immutable descriptor. Mounted listeners and draft commit ownership live in
+ * the per-view DOM session, not on this WidgetType instance.
+ */
 export class CodeBlockWidget extends WidgetType {
   constructor(
     private readonly code: string,
@@ -29,17 +35,15 @@ export class CodeBlockWidget extends WidgetType {
   }
 
   toDOM(view: EditorView): HTMLElement {
+    const host = getMarkdownEmbedHost(view);
     const wrapper = document.createElement("div");
     wrapper.className = "cm-md-code-widget";
     const panel = document.createElement("div");
     panel.className = "cm-md-code-panel";
     const readOnly = view.state.readOnly;
+    const baseSource = serializeMarkdownCodeBlock(this.language, this.code);
+    const baseRevision = `${this.from}:${this.to}:${baseSource.length}`;
     let committed = false;
-    const commit = () => {
-      if (committed) return;
-      committed = true;
-      this.commitCodeBlockChange(view, languageInput.value, codeEditor.value);
-    };
 
     const languageInput = document.createElement("input");
     languageInput.className = "cm-md-code-language";
@@ -48,9 +52,38 @@ export class CodeBlockWidget extends WidgetType {
     languageInput.placeholder = "language";
     languageInput.readOnly = readOnly;
     languageInput.spellcheck = false;
-    languageInput.addEventListener("mousedown", stopCodeMirrorEvent);
-    languageInput.addEventListener("click", stopCodeMirrorEvent);
-    languageInput.addEventListener("keydown", (event) => {
+
+    const codeEditor = document.createElement("textarea");
+    codeEditor.className = "cm-md-code-textarea";
+    codeEditor.value = this.code;
+    codeEditor.readOnly = readOnly;
+    codeEditor.spellcheck = false;
+    codeEditor.rows = Math.max(1, this.code.split("\n").length);
+
+    const commit = () => {
+      if (committed || readOnly) return;
+      committed = true;
+      const language = sanitizeCodeLanguage(languageInput.value);
+      const code = normalizeLineEndings(codeEditor.value);
+      const nextSource = serializeMarkdownCodeBlock(language, code);
+      if (language === this.language && code === this.code) {
+        committed = false;
+        return;
+      }
+
+      const ok = host.transactions.commit(view, {
+        mappedRange: { from: this.from, to: this.to },
+        baseSource,
+        baseRevision,
+        nextSource,
+      });
+      if (!ok) {
+        // Conflict with external/Agent edit: keep draft visible, allow retry.
+        committed = false;
+      }
+    };
+
+    const onLanguageKeyDown = (event: KeyboardEvent) => {
       event.stopPropagation();
       if (event.key === "Enter") {
         event.preventDefault();
@@ -61,22 +94,8 @@ export class CodeBlockWidget extends WidgetType {
         languageInput.value = this.language;
         languageInput.blur();
       }
-    });
-    languageInput.addEventListener("blur", () => {
-      if (readOnly) return;
-      commit();
-    });
-    panel.appendChild(languageInput);
-
-    const codeEditor = document.createElement("textarea");
-    codeEditor.className = "cm-md-code-textarea";
-    codeEditor.value = this.code;
-    codeEditor.readOnly = readOnly;
-    codeEditor.spellcheck = false;
-    codeEditor.rows = Math.max(1, this.code.split("\n").length);
-    codeEditor.addEventListener("mousedown", stopCodeMirrorEvent);
-    codeEditor.addEventListener("click", stopCodeMirrorEvent);
-    codeEditor.addEventListener("keydown", (event) => {
+    };
+    const onCodeKeyDown = (event: KeyboardEvent) => {
       event.stopPropagation();
       if (event.key === "ArrowUp" && codeEditor.selectionStart === 0 && codeEditor.selectionEnd === 0) {
         event.preventDefault();
@@ -104,9 +123,12 @@ export class CodeBlockWidget extends WidgetType {
       ) {
         event.preventDefault();
         committed = true;
-        view.dispatch({
-          changes: { from: this.from, to: this.to, insert: "" },
-          selection: EditorSelection.cursor(this.from),
+        host.transactions.commit(view, {
+          mappedRange: { from: this.from, to: this.to },
+          baseSource,
+          baseRevision,
+          nextSource: "",
+          selection: { from: this.from, to: this.from },
         });
         view.focus();
         return;
@@ -116,32 +138,39 @@ export class CodeBlockWidget extends WidgetType {
         codeEditor.value = this.code;
         codeEditor.blur();
       }
+    };
+
+    languageInput.addEventListener("mousedown", stopCodeMirrorEvent);
+    languageInput.addEventListener("click", stopCodeMirrorEvent);
+    languageInput.addEventListener("keydown", onLanguageKeyDown);
+    languageInput.addEventListener("blur", () => {
+      if (!readOnly) commit();
     });
+    codeEditor.addEventListener("mousedown", stopCodeMirrorEvent);
+    codeEditor.addEventListener("click", stopCodeMirrorEvent);
+    codeEditor.addEventListener("keydown", onCodeKeyDown);
     codeEditor.addEventListener("blur", () => {
-      if (readOnly) return;
-      commit();
+      if (!readOnly) commit();
     });
-    panel.appendChild(codeEditor);
+
+    panel.append(languageInput, codeEditor);
     wrapper.appendChild(panel);
+
+    host.sessions.mount(wrapper, () => ({
+      dispose() {
+        languageInput.removeEventListener("keydown", onLanguageKeyDown);
+        codeEditor.removeEventListener("keydown", onCodeKeyDown);
+      },
+    }));
 
     return wrapper;
   }
 
-  ignoreEvent() {
-    return true;
+  destroy(dom: HTMLElement) {
+    disposeWidgetSessionDom(dom);
   }
 
-  private commitCodeBlockChange(view: EditorView, nextLanguage: string, nextCode: string) {
-    const language = sanitizeCodeLanguage(nextLanguage);
-    const code = normalizeLineEndings(nextCode);
-    if (language === this.language && code === this.code) return;
-
-    view.dispatch({
-      changes: {
-        from: this.from,
-        to: this.to,
-        insert: serializeMarkdownCodeBlock(language, code),
-      },
-    });
+  ignoreEvent() {
+    return true;
   }
 }

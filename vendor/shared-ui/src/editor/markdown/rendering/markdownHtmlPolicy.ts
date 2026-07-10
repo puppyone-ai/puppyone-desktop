@@ -1,3 +1,9 @@
+import {
+  getInlineEditableProfile,
+  getSafeBlockProfile,
+  isBlockedExecutableTag,
+} from "../policy/markdownHtmlProfiles";
+
 export type HtmlSanitizerMode = "inline" | "block";
 
 const INLINE_TAGS = [
@@ -180,20 +186,33 @@ export const MARKDOWN_HTML_POLICY = {
 } as const;
 
 export function isAllowedHtmlTag(tagName: string, mode: HtmlSanitizerMode): boolean {
-  const allowedTags = mode === "block" ? MARKDOWN_HTML_POLICY.tags.block : MARKDOWN_HTML_POLICY.tags.inline;
-  return allowedTags.has(tagName);
+  const profile = mode === "block" ? getSafeBlockProfile() : getInlineEditableProfile();
+  if (profile.tags.has(tagName)) return true;
+  // Media tags are allowed in block surfaces via the safe-media adjacent set.
+  if (mode === "block" && (tagName === "img" || tagName === "audio" || tagName === "video" || tagName === "source")) {
+    return true;
+  }
+  if (mode === "inline" && tagName === "img") return true;
+  return MARKDOWN_HTML_POLICY.tags[mode].has(tagName);
 }
 
 export function isBlockedHtmlTag(tagName: string): boolean {
-  return MARKDOWN_HTML_POLICY.tags.blocked.has(tagName);
+  return isBlockedExecutableTag(tagName) || MARKDOWN_HTML_POLICY.tags.blocked.has(tagName);
 }
 
 export function isVoidHtmlTag(tagName: string): boolean {
-  return MARKDOWN_HTML_POLICY.tags.void.has(tagName);
+  return (
+    getInlineEditableProfile().voidTags.has(tagName) ||
+    getSafeBlockProfile().voidTags.has(tagName) ||
+    MARKDOWN_HTML_POLICY.tags.void.has(tagName)
+  );
 }
 
 export function isAllowedHtmlAttribute(tagName: string, attributeName: string): boolean {
+  const profile = getSafeBlockProfile();
   return (
+    profile.attributes.global.has(attributeName) ||
+    profile.attributes.byTag.get(tagName)?.has(attributeName) === true ||
     MARKDOWN_HTML_POLICY.attributes.global.has(attributeName) ||
     MARKDOWN_HTML_POLICY.attributes.byTag.get(tagName)?.has(attributeName) === true
   );
@@ -258,7 +277,10 @@ export function isSafeStyleValue(property: string, value: string): boolean {
   }
 
   if (property === "display") {
-    return /^(block|flex|grid|inline|inline-block|inline-flex|inline-grid|none)$/i.test(normalized);
+    const normalizedDisplay = normalized.toLowerCase();
+    // Hiding content is never an honest broad-safe presentation.
+    if (normalizedDisplay === "none") return false;
+    return /^(block|flex|grid|inline|inline-block|inline-flex|inline-grid)$/i.test(normalized);
   }
 
   if (property === "flex-wrap") {

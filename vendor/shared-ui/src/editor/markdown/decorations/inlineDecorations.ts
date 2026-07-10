@@ -219,7 +219,7 @@ function addImageElementDecoration(
   addReplacementDecoration(
     builders,
     Decoration.replace({
-      widget: new ImagePreviewWidget(element.from, element.to, token.alt, token.href, token.title, documentPath, markdownAssetUrlResolver),
+      widget: new ImagePreviewWidget(element.from, element.to, token.alt, token.href, token.title, documentPath),
       inclusive: false,
     }),
     element.from,

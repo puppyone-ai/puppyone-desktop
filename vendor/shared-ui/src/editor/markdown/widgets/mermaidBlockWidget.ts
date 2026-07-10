@@ -1,21 +1,24 @@
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, WidgetType } from "@codemirror/view";
+import { getMarkdownEmbedHost } from "../adapters/codemirror/embedHost";
+import { disposeWidgetSessionDom } from "../adapters/codemirror/widgetSession";
+import { MARKDOWN_HTML_PROFILE_VERSION } from "../policy/markdownHtmlProfiles";
 import { serializeMarkdownCodeBlock } from "../rendering/codeBlockModel";
 import {
-  createDebouncedMermaidRenderer,
   getMermaidThemeSnapshot,
+  renderMermaidDiagram,
   subscribeMermaidThemeChanges,
-  type MermaidThemeChangeUnsubscribe,
   type MermaidRenderResult,
 } from "../rendering/mermaidRenderer";
+import { createCapabilityPrincipal } from "../services/capabilityPrincipal";
 import { clampNumber, MarkdownWidgetMeasureController } from "./markdownWidgetMeasure";
 import { normalizeLineEndings, stopCodeMirrorEvent } from "./widgetDom";
 
+/**
+ * Immutable Mermaid descriptor. Debounce, theme subscription, measure, and
+ * async render cancellation belong to the DOM session.
+ */
 export class MermaidBlockWidget extends WidgetType {
-  private readonly measure = new MarkdownWidgetMeasureController();
-  private readonly debouncedRenderer = createDebouncedMermaidRenderer();
-  private unsubscribeThemeChanges: MermaidThemeChangeUnsubscribe | null = null;
-
   constructor(
     private readonly code: string,
     private readonly language: string,
@@ -41,15 +44,22 @@ export class MermaidBlockWidget extends WidgetType {
   }
 
   toDOM(view: EditorView): HTMLElement {
+    const host = getMarkdownEmbedHost(view);
     const shell = document.createElement("div");
     shell.className = "cm-md-mermaid-widget";
     const readOnly = view.state.readOnly;
+    const measure = new MarkdownWidgetMeasureController();
+    const elementKey = `${this.from}:${this.to}`;
+    const baseSource = serializeMarkdownCodeBlock(this.language || "mermaid", this.code);
+    const baseRevision = `${elementKey}:${baseSource.length}`;
 
     let editing = false;
     let committed = false;
     let draftCode = this.code;
     let lastGoodSvg: string | null = null;
     let textarea: HTMLTextAreaElement | null = null;
+    let debounceTimer: number | null = null;
+    let renderGeneration = 0;
 
     const toolbar = document.createElement("div");
     toolbar.className = "cm-md-mermaid-toolbar";
@@ -60,12 +70,18 @@ export class MermaidBlockWidget extends WidgetType {
 
     const body = document.createElement("div");
     body.className = "cm-md-mermaid-body";
-
     const preview = document.createElement("div");
     preview.className = "cm-md-mermaid-preview is-loading";
     const errorStrip = document.createElement("div");
     errorStrip.className = "cm-md-mermaid-error";
     errorStrip.hidden = true;
+
+    const clearDebounce = () => {
+      if (debounceTimer !== null) {
+        window.clearTimeout(debounceTimer);
+        debounceTimer = null;
+      }
+    };
 
     const commit = (options: { focus?: boolean } = {}) => {
       if (committed || readOnly) return;
@@ -79,14 +95,55 @@ export class MermaidBlockWidget extends WidgetType {
         return;
       }
 
-      view.dispatch({
-        changes: {
-          from: this.from,
-          to: this.to,
-          insert: serializeMarkdownCodeBlock(this.language || "mermaid", nextCode),
-        },
+      const ok = host.transactions.commit(view, {
+        mappedRange: { from: this.from, to: this.to },
+        baseSource,
+        baseRevision,
+        nextSource: serializeMarkdownCodeBlock(this.language || "mermaid", nextCode),
       });
+      if (!ok) committed = false;
       if (options.focus) view.focus();
+    };
+
+    const runRender = (source: string) => {
+      const theme = getMermaidThemeSnapshot();
+      const generation = ++renderGeneration;
+      void host.asyncRender
+        .run({
+          key: {
+            featureId: "mermaid",
+            elementKey,
+            source,
+            themeKey: theme.key,
+            policyVersion: MARKDOWN_HTML_PROFILE_VERSION,
+            principalKey: host.viewId,
+          },
+          principal: createCapabilityPrincipal({
+            editorViewId: host.viewId,
+            workspaceId: "workspace",
+            documentPath: "mermaid",
+            documentRevision: baseRevision,
+            purpose: "async-render",
+          }),
+          run: async () => renderMermaidDiagram({ source, theme }),
+        })
+        .then((result) => {
+          if (!result || generation !== renderGeneration || !shell.isConnected) return;
+          lastGoodSvg = result.value.svg;
+          setMermaidPreviewSvg(preview, result.value);
+          errorStrip.hidden = true;
+          errorStrip.textContent = "";
+          removeMermaidSourceFallback(preview);
+          measure.schedule(view);
+        })
+        .catch((error: unknown) => {
+          if (generation !== renderGeneration || !shell.isConnected) return;
+          preview.classList.remove("is-loading");
+          showMermaidError(errorStrip, error instanceof Error ? error : new Error(String(error)));
+          if (lastGoodSvg) preview.innerHTML = lastGoodSvg;
+          else preview.replaceChildren(createMermaidSourceFallback(source));
+          measure.schedule(view);
+        });
     };
 
     const renderPreview = (delayMs: number) => {
@@ -95,30 +152,15 @@ export class MermaidBlockWidget extends WidgetType {
         preview.classList.add("is-loading");
         preview.replaceChildren(createMermaidLoadingElement());
       }
-
-      this.debouncedRenderer.render({
-        source,
-        theme: getMermaidThemeSnapshot(),
-        delayMs,
-        onResult(result) {
-          lastGoodSvg = result.svg;
-          setMermaidPreviewSvg(preview, result);
-          errorStrip.hidden = true;
-          errorStrip.textContent = "";
-          removeMermaidSourceFallback(preview);
-          view.requestMeasure();
-        },
-        onError(error) {
-          preview.classList.remove("is-loading");
-          showMermaidError(errorStrip, error);
-          if (lastGoodSvg) {
-            preview.innerHTML = lastGoodSvg;
-          } else {
-            preview.replaceChildren(createMermaidSourceFallback(source));
-          }
-          view.requestMeasure();
-        },
-      });
+      clearDebounce();
+      if (delayMs <= 0) {
+        runRender(source);
+        return;
+      }
+      debounceTimer = window.setTimeout(() => {
+        debounceTimer = null;
+        runRender(source);
+      }, delayMs);
     };
 
     const openEditor = () => {
@@ -210,32 +252,35 @@ export class MermaidBlockWidget extends WidgetType {
 
       shell.appendChild(body);
       renderPreview(0);
-      this.measure.schedule(view);
+      measure.schedule(view);
     };
 
     renderSurface();
-    this.measure.observe(shell, view);
-    this.subscribeThemeChanges(view, () => renderPreview(0));
+    measure.observe(shell, view);
+    const unsubscribeTheme = subscribeMermaidThemeChanges(() => {
+      renderPreview(0);
+      measure.schedule(view);
+    });
+
+    host.sessions.mount(shell, () => ({
+      dispose() {
+        clearDebounce();
+        renderGeneration += 1;
+        measure.destroy();
+        unsubscribeTheme();
+        host.asyncRender.abort(`mermaid\u0000${elementKey}`);
+      },
+    }));
+
     return shell;
   }
 
-  destroy() {
-    this.debouncedRenderer.cancel();
-    this.measure.destroy();
-    this.unsubscribeThemeChanges?.();
-    this.unsubscribeThemeChanges = null;
+  destroy(dom: HTMLElement) {
+    disposeWidgetSessionDom(dom);
   }
 
   ignoreEvent() {
     return true;
-  }
-
-  private subscribeThemeChanges(view: EditorView, render: () => void) {
-    this.unsubscribeThemeChanges?.();
-    this.unsubscribeThemeChanges = subscribeMermaidThemeChanges(() => {
-      render();
-      this.measure.schedule(view);
-    });
   }
 }
 

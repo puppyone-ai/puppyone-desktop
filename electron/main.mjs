@@ -19,6 +19,8 @@ import {
 import { createCloudAuthService } from "./cloud-auth-service.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
+import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
+import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
 import { registerTerminalIpcHandlers } from "./main/ipc/terminal-ipc.mjs";
 import { registerWorkspaceFileIpcHandlers } from "./main/ipc/workspace-files-ipc.mjs";
@@ -439,6 +441,16 @@ function registerIpcHandlers() {
   });
   registerCloudIpcHandlers({ ipcMain: trustedIpcMain, cloudAuthService });
   registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell, setDockIcon });
+  registerMarkdownWebEmbedIpcHandlers({
+    ipcMain: trustedIpcMain,
+    createMarkdownWebEmbedService,
+    getOwnerWindow: (webContentsId) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (window.webContents?.id === webContentsId) return window;
+      }
+      return BrowserWindow.getFocusedWindow();
+    },
+  });
 
   registerWorkspaceFileIpcHandlers({
     app,

@@ -20,7 +20,8 @@ import { markdownComposingBlockLineField, markdownInputCompositionExtension } fr
 import { markdownExpandedImageField } from "./state/expandedImage";
 import { markdownLivePreviewFocusExtension } from "./state/livePreviewFocus";
 import { markdownTableFocusField } from "./adapters/codemirror/tableFocusState";
-import { disposeMarkdownEmbedHost } from "./adapters/codemirror/embedHost";
+import { markdownAssetUrlResolverFacet } from "./markdownLivePreviewContext";
+import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "./adapters/codemirror/embedHost";
 import {
   markdownHiddenMarkerSelectionNormalizer,
   trailingLineWhitespaceSelectionExtension,
@@ -66,14 +67,22 @@ export function markdownLivePreviewExtension(
     markdownComposingBlockLineField,
     markdownExpandedImageField,
     markdownTableFocusField,
-    markdownEmbedHostExtension,
+    markdownEmbedHostLifecycle,
     markdownLivePreviewDecorations,
     markdownBlockWidgetSelectionExtension,
   ];
 }
 
-const markdownEmbedHostExtension = ViewPlugin.fromClass(class {
-  constructor(private readonly view: EditorView) {}
+const markdownEmbedHostLifecycle = ViewPlugin.fromClass(class {
+  private readonly view: EditorView;
+
+  constructor(view: EditorView) {
+    this.view = view;
+    getMarkdownEmbedHost(view, {
+      resolveAssetUrl: view.state.facet(markdownAssetUrlResolverFacet),
+    });
+  }
+
   destroy() {
     disposeMarkdownEmbedHost(this.view);
   }

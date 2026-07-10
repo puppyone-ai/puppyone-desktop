@@ -12,11 +12,19 @@ export type WidgetSession = {
 export type WidgetSessionRegistry = {
   byDom: WeakMap<HTMLElement, WidgetSession>;
   active: Set<WidgetSession>;
-  mount(dom: HTMLElement, create: (generation: number) => Omit<WidgetSession, "dom" | "generation"> & { dispose(): void }): WidgetSession;
+  mount(dom: HTMLElement, create: (generation: number) => { dispose(): void }): WidgetSession;
   get(dom: HTMLElement): WidgetSession | undefined;
   dispose(dom: HTMLElement): void;
   disposeAll(): void;
 };
+
+const globalSessionByDom = new WeakMap<HTMLElement, WidgetSession>();
+
+/** Exact-DOM cleanup for WidgetType.destroy(dom), including eq() reuse paths. */
+export function disposeWidgetSessionDom(dom: HTMLElement | null | undefined) {
+  if (!dom) return;
+  globalSessionByDom.get(dom)?.dispose();
+}
 
 export function createWidgetSessionRegistry(): WidgetSessionRegistry {
   const byDom = new WeakMap<HTMLElement, WidgetSession>();
@@ -27,7 +35,7 @@ export function createWidgetSessionRegistry(): WidgetSessionRegistry {
     byDom,
     active,
     mount(dom, create) {
-      const existing = byDom.get(dom);
+      const existing = byDom.get(dom) ?? globalSessionByDom.get(dom);
       if (existing) {
         existing.dispose();
         active.delete(existing);
@@ -40,12 +48,15 @@ export function createWidgetSessionRegistry(): WidgetSessionRegistry {
         generation: currentGeneration,
         dispose() {
           if (session.generation !== currentGeneration) return;
+          session.generation = -1;
           created.dispose();
           active.delete(session);
           byDom.delete(dom);
+          if (globalSessionByDom.get(dom) === session) globalSessionByDom.delete(dom);
         },
       };
       byDom.set(dom, session);
+      globalSessionByDom.set(dom, session);
       active.add(session);
       return session;
     },
@@ -53,7 +64,7 @@ export function createWidgetSessionRegistry(): WidgetSessionRegistry {
       return byDom.get(dom);
     },
     dispose(dom) {
-      const session = byDom.get(dom);
+      const session = byDom.get(dom) ?? globalSessionByDom.get(dom);
       if (!session) return;
       session.dispose();
     },

@@ -20,6 +20,11 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   listCloudAccessPointDirectory: (request) => ipcRenderer.invoke("cloud:access-point-list-directory", request),
   getCloudAccessPointSemantics: (request) => ipcRenderer.invoke("cloud:access-point-semantics", request),
   openExternalUrl: (href) => ipcRenderer.invoke("system:open-external-url", href),
+  markdownWebEmbed: {
+    create: (request) => ipcRenderer.invoke("markdown-web-embed:create", request),
+    setBounds: (request) => ipcRenderer.invoke("markdown-web-embed:set-bounds", request),
+    destroy: (request) => ipcRenderer.invoke("markdown-web-embed:destroy", request),
+  },
   setDockIcon: (iconId) => ipcRenderer.invoke("system:set-dock-icon", iconId),
   getInitialWorkspace: () => ipcRenderer.invoke("window:get-initial-workspace"),
   getLastWorkspace: () => ipcRenderer.invoke("workspace:get-last"),

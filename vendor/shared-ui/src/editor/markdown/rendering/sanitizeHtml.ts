@@ -79,12 +79,12 @@ function appendSanitizedNode(target: Node, node: ChildNode, context: SanitizeCon
 
   const tagName = node.tagName.toLowerCase();
   if (isBlockedHtmlTag(tagName)) {
-    markUnsupported(context, `<${tagName}> is not supported`);
+    markUnsupported(context, `<${tagName}> is not supported`, { fatal: true });
     return;
   }
 
   if (!isAllowedHtmlTag(tagName, context.mode)) {
-    markUnsupported(context, `<${tagName}> is not supported`);
+    markUnsupported(context, `<${tagName}> is not supported`, { fatal: true });
     if (!context.strict) appendSanitizedChildren(target, node, context);
     return;
   }
@@ -107,12 +107,12 @@ function copySafeAttributes(target: HTMLElement, source: HTMLElement, tagName: s
     const value = attribute.value;
 
     if (name.startsWith("on")) {
-      markUnsupported(context, `event handler "${name}" is not supported`);
+      markUnsupported(context, `event handler "${name}" is not supported`, { fatal: true });
       continue;
     }
 
     if (!isAllowedHtmlAttribute(tagName, name)) {
-      markUnsupported(context, `attribute "${name}" is not supported`);
+      markUnsupported(context, `attribute "${name}" was omitted`, { fatal: false });
       continue;
     }
 
@@ -179,12 +179,24 @@ function copySafeAttributes(target: HTMLElement, source: HTMLElement, tagName: s
       continue;
     }
 
-    if (name === "title" || name === "aria-label") {
+    if (name === "title" || name === "aria-label" || name === "dir" || name === "lang") {
       target.setAttribute(name, value);
       continue;
     }
 
-    markUnsupported(context, `attribute "${name}" is not supported`);
+    if (name === "class" || name === "id") {
+      const scoped = value
+        .trim()
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter((token) => /^[A-Za-z_][\w-]*$/.test(token) && !token.startsWith("cm-") && !token.startsWith("po-"))
+        .map((token) => `md-doc-${token}`);
+      if (scoped.length > 0) target.setAttribute(name, scoped.join(" "));
+      else markUnsupported(context, `attribute "${name}" was omitted`, { fatal: false });
+      continue;
+    }
+
+    markUnsupported(context, `attribute "${name}" was omitted`, { fatal: false });
   }
 }
 
@@ -193,17 +205,26 @@ function copySafeInlineStyles(target: HTMLElement, source: HTMLElement, context:
     const name = property.toLowerCase();
     const value = source.style.getPropertyValue(property);
     if (!isAllowedStyleProperty(name, context.mode)) {
-      markUnsupported(context, `style "${name}" is not supported`);
+      markUnsupported(context, `style "${name}" was omitted`, { fatal: false });
       continue;
     }
     if (!isSafeStyleValue(name, value)) {
-      markUnsupported(context, `style value for "${name}" is not supported`);
+      markUnsupported(context, `style value for "${name}" was omitted`, { fatal: false });
       continue;
     }
     target.style.setProperty(name, value.trim());
   }
 }
 
-function markUnsupported(context: SanitizeContext, reason: string) {
+function markUnsupported(context: SanitizeContext, reason: string, options: { fatal?: boolean } = {}) {
+  if (options.fatal === false && !context.strict) {
+    // Capability reduction in non-strict surfaces: omit without failing the surface.
+    return;
+  }
+  if (options.fatal === false && context.strict) {
+    // Broad-safe block profile: omit reduced attributes/styles without failing
+    // the whole block when structure remains honest.
+    return;
+  }
   context.reasons.push(reason);
 }
