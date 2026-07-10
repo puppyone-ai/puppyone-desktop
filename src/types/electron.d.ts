@@ -788,6 +788,38 @@ declare global {
       }>;
       onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
       onAgentSessionExit: (callback: (event: AgentSessionExitEvent) => void) => () => void;
+      viewerPacks: {
+        getSnapshot: () => Promise<import("@puppyone/shared-ui").ViewerPackSnapshot>;
+        installLocal: (request: {
+          archiveBytes: Uint8Array | ArrayBuffer | number[];
+          signatureBase64Url: string;
+          expectedSha256?: string | null;
+          sourceLabel?: string;
+        }) => Promise<{
+          pluginId: string;
+          version: string;
+          contentHash: string;
+        }>;
+        disable: (request: { pluginId: string }) => Promise<{ ok: boolean; reason?: string }>;
+        uninstall: (request: { pluginId: string }) => Promise<{ ok: boolean }>;
+        activate: (request: {
+          pluginId: string;
+          version: string;
+          contentHash: string;
+          entry: string;
+          documentPath: string;
+          documentName: string;
+          documentMimeType?: string | null;
+          rootPath: string;
+          relativePath: string;
+          bounds?: { x: number; y: number; width: number; height: number };
+        }) => Promise<import("@puppyone/shared-ui").ViewerPackSessionDescriptor>;
+        setBounds: (request: {
+          sessionId: string;
+          bounds: { x: number; y: number; width: number; height: number };
+        }) => Promise<{ ok: boolean }>;
+        destroySession: (request: { sessionId: string }) => Promise<{ ok: boolean }>;
+      };
       createTerminal: (request: TerminalCreateRequest) => Promise<TerminalCreateResult>;
       writeTerminal: (request: TerminalInputRequest) => void;
       resizeTerminal: (request: TerminalResizeRequest) => void;

@@ -12,6 +12,8 @@ const MAX_EDITOR_BYTES = 1024 * 1024;
 // Cap for whole-file reads served over the puppyone-local:// protocol (media
 // preview). Bounds main-process memory so a huge file can't OOM the app.
 const MAX_LOCAL_FILE_BYTES = 100 * 1024 * 1024;
+// Maximum length of a single bounded Range read (media protocol + viewer packs).
+const MAX_RANGE_READ_BYTES = 8 * 1024 * 1024;
 const MAX_OFFICE_CONVERSION_INPUT_BYTES = 25 * 1024 * 1024;
 const MAX_OFFICE_CONVERSION_OUTPUT_BYTES = 8 * 1024 * 1024;
 const OFFICE_CONVERSION_TIMEOUT_MS = 8000;
@@ -273,11 +275,12 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
   if (metadata.isDirectory()) {
     throw new Error("Selected path is a folder.");
   }
-  if (metadata.size > MAX_LOCAL_FILE_BYTES) {
-    throw new Error("File is too large to serve.");
-  }
 
-  if (options && Object.prototype.hasOwnProperty.call(options, "rangeHeader")) {
+  const hasRangeOption = options && Object.prototype.hasOwnProperty.call(options, "rangeHeader");
+  if (hasRangeOption) {
+    // Bounded Range consumers (including Viewer Pack resource brokers) may
+    // address files larger than the whole-file media cap. Whole-file reads
+    // below still enforce MAX_LOCAL_FILE_BYTES.
     const range = parseByteRange(options.rangeHeader, metadata.size);
     if (range?.unsatisfiable) {
       return {
@@ -291,6 +294,10 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
     }
 
     if (range) {
+      const span = range.end - range.start + 1;
+      if (span > MAX_RANGE_READ_BYTES) {
+        throw new Error("Range length exceeds host maximum.");
+      }
       const bytes = await readFileSlice(filePath, range.start, range.end);
       return {
         bytes,
@@ -302,6 +309,9 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
       };
     }
 
+    if (metadata.size > MAX_LOCAL_FILE_BYTES) {
+      throw new Error("File is too large to serve without a Range request.");
+    }
     const bytes = await fs.readFile(filePath);
     return {
       bytes,
@@ -313,8 +323,103 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
     };
   }
 
+  if (metadata.size > MAX_LOCAL_FILE_BYTES) {
+    throw new Error("File is too large to serve.");
+  }
   return fs.readFile(filePath);
 }
+
+// Bounded Range reads for viewer packs and media use MAX_RANGE_READ_BYTES
+// (declared with the other size caps above).
+
+/**
+ * Metadata for a workspace file without reading its body. Unlike the media
+ * whole-file path this intentionally does NOT enforce MAX_LOCAL_FILE_BYTES —
+ * a viewer pack must be able to inspect files larger than 100 MiB through
+ * bounded Range reads. Returns a stable revision token (mtime + size) so a
+ * resource handle can detect underlying changes.
+ */
+export async function statWorkspaceFile(rootPath, relativePath) {
+  const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
+  const metadata = await fs.stat(filePath).catch((error) => {
+    throw new Error(`Unable to read file metadata: ${error.message}`);
+  });
+  if (metadata.isDirectory()) {
+    throw new Error("Selected path is a folder.");
+  }
+  if (!metadata.isFile()) {
+    throw new Error("Selected path is not a regular file.");
+  }
+  return {
+    path: normalizeRelativePath(relativePath),
+    name: path.basename(filePath),
+    size: metadata.size,
+    mimeType: getMimeType(filePath) ?? "application/octet-stream",
+    revision: `${Math.floor(metadata.mtimeMs)}:${metadata.size}`,
+  };
+}
+
+/**
+ * Bounded Range read for the resource broker. Allows files larger than the
+ * whole-file media cap because it only ever reads `[start, end]` (never the
+ * whole file) and refuses ranges longer than `maxLength` (default
+ * MAX_RANGE_READ_BYTES). Uses positional stream primitives, not
+ * `fs.readFile` of the whole file.
+ */
+export async function readWorkspaceFileRange(rootPath, relativePath, request = {}) {
+  const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
+  const metadata = await fs.stat(filePath).catch((error) => {
+    throw new Error(`Unable to read file metadata: ${error.message}`);
+  });
+  if (metadata.isDirectory()) {
+    throw new Error("Selected path is a folder.");
+  }
+  if (!metadata.isFile()) {
+    throw new Error("Selected path is not a regular file.");
+  }
+
+  const size = metadata.size;
+  const maxLength = Number.isSafeInteger(request.maxLength) && request.maxLength > 0
+    ? Math.min(request.maxLength, MAX_RANGE_READ_BYTES)
+    : MAX_RANGE_READ_BYTES;
+
+  const start = Number(request.start);
+  const end = Number(request.end);
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)) {
+    throw new Error("Range start and end must be integers.");
+  }
+  if (start < 0 || end < start) {
+    throw new Error("Range is invalid.");
+  }
+  if (size === 0 || start >= size) {
+    return {
+      bytes: Buffer.alloc(0),
+      size,
+      start: 0,
+      end: 0,
+      partial: false,
+      unsatisfiable: true,
+    };
+  }
+
+  const clampedEnd = Math.min(end, size - 1);
+  const length = clampedEnd - start + 1;
+  if (length > maxLength) {
+    throw new Error(`Requested range (${length} bytes) exceeds the ${formatFileSize(maxLength)} per-read limit.`);
+  }
+
+  const bytes = await readFileSlice(filePath, start, clampedEnd);
+  return {
+    bytes,
+    size,
+    start,
+    end: start + bytes.length - 1,
+    partial: true,
+    unsatisfiable: false,
+  };
+}
+
+export const RESOURCE_MAX_RANGE_READ_BYTES = MAX_RANGE_READ_BYTES;
 
 export async function readWorkspaceTextFile(rootPath, relativePath) {
   const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);

@@ -1,202 +1,145 @@
-# Viewer Plugin Architecture (Reserved)
+# Viewer Plugin Architecture
 
-**Status: reserved, deliberately not built.** This document records the
-long-term extensibility architecture for file viewers so that today's
-code keeps the option cheap. Nothing in here is current work. The only
-parts in force right now are the disciplines in §7 — they are also
-mirrored as invariants in
-[File Format and Viewer Pipeline](file-format-viewer-pipeline.md).
+**Status: Stage B0 host foundations + Stage B1 first-party local pack path
+landed in code and tests. Stage C (third-party marketplace) is not open.
+Production Apple signing/notarization for distributed `.puppyplugin`
+artifacts remains release-gated where certificates are unavailable.**
 
-## 1. The problem this reserves for
+This document is the target architecture for sandboxed Viewer Packs — a
+local plugin marketplace for file formats the core app will not absorb
+(3D, CAD, vertical binaries). Built-in Tier-1 editors stay in-process;
+plugin-eligible surfaces are placeholder-grade formats only.
 
-File formats are an unbounded set. The core app can and should ship
-viewers for universal knowledge-work formats, but it must never try to
-absorb the long tail — 3D scenes, game asset databases, CAD, medical
-imaging, proprietary vertical formats. At some point users will bring
-formats we will not own. The scalable answer is a viewer plugin system:
-third parties register formats and ship sandboxed preview surfaces.
+## 1. Problem
 
-We are not building it yet (see §8 for triggers). We are keeping the
-seam clean so that building it later is an exposure of existing
-boundaries, not an invention of new ones.
+File formats are unbounded. The core ships universal knowledge-work
+viewers. Vertical formats must install as signed, sandboxed packs without
+growing the base installer or trusting third-party code in the app
+renderer.
 
-## 2. The built-in / plugin boundary
-
-The test for whether a format belongs in the core:
+## 2. Built-in / plugin boundary
 
 > Would an ordinary user accept "install a plugin first" the first time
 > they open this file type?
 
-- **Built-in (answer: no).** Text, Markdown, code, JSON, CSV, images,
-  PDF, audio/video, HTML, and the Office document family. These are
-  table stakes; shipping them as plugins would read as a broken product.
-  Their weight is controlled by lazy loading and the bundle budget gate,
-  not by eviction.
-- **Plugin (answer: yes).** Everything vertical or professional: 3D,
-  game assets, CAD, scientific/medical, proprietary formats. None of
-  these are ever built in — the first real demand becomes the plugin
-  system's pilot case.
-- **Escape hatch (always).** The external-open surface remains available
-  for every format regardless of tier, before and after plugins exist.
+- **Built-in:** text, Markdown, code, JSON, CSV, images, PDF, audio/video,
+  HTML, Office.
+- **Plugin:** 3D / game assets / CAD / scientific / proprietary.
+- **Escape hatch:** external-open remains available for every format.
 
-## 3. Target architecture
-
-A viewer plugin is exactly the pair the internal pipeline already uses:
-declarative format registration plus a rendering surface.
+## 3. Target architecture (Stage B)
 
 ```text
-plugin package
-├── manifest.json          format registration + viewer declaration
-└── viewer bundle          runs in a sandboxed surface, talks to a host API
+.puppyplugin (signed zip)
+├── manifest.json
+└── dist/viewer.html (+ assets)
 
-host (main app)
-├── format registry        merges plugin manifest entries with fileFormats.json
-├── viewer registry        routes matches to the plugin's sandboxed surface
-├── plugin host            sandboxed iframe/webview + postMessage bridge
-└── host API               the only capabilities a plugin ever gets
+main process (sole authority)
+├── store <userData>/viewer-packs/
+├── package service (verify → extract → atomic enable)
+├── registry (immutable contribution snapshot)
+├── router (core vs plugin vs chooser vs unsupported)
+├── resource broker (audience-bound handles + bounded Range)
+├── session manager (WebContentsView + temp partition)
+├── puppyone-plugin://  (pack assets only)
+└── puppyone-resource:// (session-scoped Range)
+
+shared-ui
+├── coreViewerCapability / resolveViewerRoute (pure)
+└── ExternalViewerAdapter (DI surface slot — no Electron)
+
+desktop shell
+├── PluginSurfaceController (activate / bounds / destroy via app IPC)
+└── local install CTA (catalog disabled by default)
+
+plugin frame
+└── window.puppyoneViewer only (fixed plugin-preload)
 ```
 
-**Manifest.** A superset of a `fileFormats.json` entry — the schema is
-already the right one:
+## 4. Non-negotiable practices
 
-```jsonc
-{
-  "id": "gltf-viewer",
-  "publisher": "…",
-  "version": "1.0.0",
-  "formats": [
-    {
-      "id": "gltf",
-      "label": "glTF Scene",
-      "extensions": [".gltf", ".glb"],
-      "mimeTypes": ["model/gltf+json", "model/gltf-binary"],
-      "category": "binary",
-      "defaultViewer": "plugin:gltf-viewer"
-    }
-  ],
-  "viewer": {
-    "entry": "dist/viewer.html",
-    "source": "resource"            // same semantics as EditorViewer.source
-  }
-}
-```
+1. Main process is the sole authority for packages, grants, sessions, and
+   resource handles.
+2. shared-ui never imports Electron and never scans the pack store.
+3. Plugin code never runs in the app renderer, main process, or app
+   preload.
+4. Fixed `electron/plugin-preload.cjs` exposes only
+   `window.puppyoneViewer` — never `puppyoneDesktop`.
+5. Cloud / unknown document sources fail closed before plugin activation.
+6. Possession of a path is never authority; handles are audience-bound.
+7. Catalog transport is disabled by default; opening a file never hits
+   the network.
+8. Production packages execute only from the immutable version directory
+   under `<userData>/viewer-packs/packages/<id>/<version>/`.
+9. App IPC (install/activate/bounds) uses `trustedIpcMain`. Plugin bridge
+   IPC uses raw `ipcMain` with sender → session validation.
 
-**Rendering surface.** The plugin viewer runs inside a sandboxed
-iframe/webview. It never touches app DOM, app CSS, Node, or Electron
-APIs. The Phase 2 `docx-preview` isolation container in the office
-viewer is the in-house prototype of exactly this surface.
+## 5. Routing (§5.1)
 
-**Host API.** The complete capability set, delivered over a postMessage
-bridge. Small by design — viewers are the most tractable plugin surface
-precisely because this is all they need:
+1. If core capability is `edit` or `preview` → core owns the document.
+2. If capability is `placeholder` and source is not `local` →
+   `unsupported` (`cloud-source`).
+3. Else match enabled contributions by extension / MIME.
+4. Zero matches → `unsupported` (`no-match`) → Desktop shows local
+   install CTA.
+5. One match → `plugin`.
+6. Multiple → `chooser`.
 
-```ts
-interface ViewerHostApi {
-  // input
-  getDocumentMeta(): { path: string; name: string; mimeType: string | null };
-  getFileUrl(): Promise<string>;        // streamed resource (Range-capable)
-  readFileText(): Promise<string>;      // only if manifest declares "content"
-  // output / actions
-  setState(state: "loading" | "ready" | "error", message?: string): void;
-  requestSave(content: string): Promise<void>;   // only if manifest declares editable
-  openExternal(): Promise<void>;
-  // environment
-  getTheme(): { mode: "light" | "dark"; tokens: Record<string, string> };
-  onThemeChange(cb: (theme: ReturnType<ViewerHostApi["getTheme"]>) => void): void;
-}
-```
+## 6. Host API v1
 
-Anything not in this interface is not available to plugins. Permissions
-beyond it (network access, workspace-wide reads) would be explicit
-manifest-declared capabilities with user consent — designed only when a
-real plugin needs them.
+Delivered to the pack frame as `window.puppyoneViewer`:
 
-## 4. How today's pipeline maps onto it
+- `document.getMeta()`
+- `resource.open()` / `readRange()` / `createRangeUrl()` / `close()`
+- `ui.setState()` / `getTheme()` / `onThemeChange()`
+- `host.openExternal()`
 
-| Today (internal) | Future (plugin) |
-| --- | --- |
-| `fileFormats.json` entry | `manifest.formats[]` entry |
-| `EDITOR_VIEWERS` registration | Plugin host registering `plugin:<id>` viewers |
-| `EditorViewer.source` contract | `manifest.viewer.source` |
-| `EditorViewerContext` props | `ViewerHostApi` over postMessage |
-| Office viewer isolation container | The sandboxed plugin surface |
-| Dynamic `import()` of heavy parsers | Plugin bundle loaded on demand |
+Anything else is unavailable. Network permissions must be empty in
+manifest v1.
 
-The mapping is 1:1 by construction. That is the point of the §7
-disciplines: built-in viewers are plugins that happen to ship in the
-box, so the eventual plugin API is validated by a dozen first-party
-consumers before it is ever public.
+## 7. Large files
 
-## 5. Security model (fixed early, on purpose)
+Whole-file media reads remain capped at 100 MiB. Viewer Pack resource
+access uses `statWorkspaceFile` + bounded Range
+(`RESOURCE_MAX_RANGE_READ_BYTES` = 8 MiB) so files larger than 100 MiB
+are inspectable without buffering the whole body.
 
-- Plugin code executes only inside the sandboxed surface; no Node, no
-  Electron, no app globals, ever. This is non-negotiable and simpler to
-  hold than to retrofit (the Obsidian model — trusted plugins in the
-  app context — is explicitly rejected).
-- The postMessage bridge validates origin and plugin identity per
-  message; the host API is the whole attack surface and stays reviewable
-  at a glance.
-- Plugin packages are signed; unsigned plugins never load. Marketplace
-  or registry curation is a distribution question (§6), not a security
-  boundary.
-- A crashing or hanging plugin viewer degrades to the unsupported state
-  with the external-open action — it must never take the app down.
+## 8. First-party pilot (Stage B1)
 
-## 6. Distribution staging
+- Pack id: `ai.puppyone.viewer.glb`
+- Source: `viewer-packs/glb/`
+- Package: `scripts/package-viewer-pack.mjs` → `.puppyplugin` + `.sig`
+- Activation: local install → registry snapshot → open `.glb` →
+  `WebContentsView` loads `puppyone-plugin://…` and proves Range via
+  header inspection
 
-1. **Stage A — in the box (now).** Built-in viewers, lazy chunks,
-   budget gate. No plugin machinery.
-2. **Stage B — first-party packs.** The same plugin format, but authored,
-   signed, and hosted by us; downloadable on demand instead of shipped.
-   Motivation: installer size, and dogfooding the manifest/sandbox/host
-   API with zero third-party risk. An existing built-in family (the
-   office pack is the natural candidate) is ported onto the plugin host
-   as the proof.
-3. **Stage C — third party.** Public manifest schema, versioned host
-   API, signing + distribution channel, docs. Only after Stage B has
-   burned in.
+## 9. Verification
 
-## 7. Disciplines in force today
+See `tests/viewer-packs/`:
 
-These are the pre-commitments that keep the plugin option cheap. They
-cost nothing now and are enforced through the pipeline doc's invariants
-and the bundle budget gate:
+- manifest schema / reserved ids / network reject
+- signature + archive traversal reject + atomic install/disable
+- disabled catalog
+- router (core / plugin / cloud / chooser / no-match)
+- resource broker ranges / 416 / revoke / >100 MiB metadata+slice
+- app vs plugin IPC channel separation
 
-1. **Contract boundary.** Viewers depend only on the `viewerTypes`
-   contract (`EditorViewer`, `EditorDocument`, `EditorViewerContext`).
-   A viewer that imports app internals is a future plugin that can't be
-   extracted.
-2. **Data-driven registration.** New formats enter through
-   `fileFormats.json` + one `EDITOR_VIEWERS` entry only. The JSON entry
-   is the future manifest; keep it declarative.
-3. **Isolation for heavy render surfaces.** Document-controlled content
-   (Office HTML, sandboxed HTML preview) renders inside an isolated
-   container (iframe / shadow root) with a minimal explicit bridge —
-   the future plugin sandbox, prototyped in-house.
-4. **Lazy loading + budget gate.** Heavy parsers load via dynamic
-   `import()` only; the build fails if they leak into the entry chunk.
-   Adding formats must not add startup weight — that property is what
-   makes "built-in" viable for the whole universal tier.
+Artifact budget: `scripts/check-packaged-artifact-budgets.mjs`
+(on-demand packs must not land in base `dist/`).
 
-## 8. Triggers — when to actually build it
+## 10. Stage status
 
-Build Stage B/C when one of these becomes true, not before:
+| Stage | Intent | Status |
+| --- | --- | --- |
+| A | Built-in viewers + budget gate | In force |
+| B0 | Host foundations (store, registry, broker, session, protocols, DI) | Landed |
+| B1 | First-party local `.glb` pack install/activate | Landed |
+| B1+ | Verified remote catalog transport | Not started |
+| C | Third-party marketplace | Not open |
+| Release | Apple signing/notarization of distributed packs | Release-gated |
 
-- A real user/vertical demand lands for a format we do not want to own
-  (the 3D / game-asset / CAD class).
-- Installer size pressure makes on-demand first-party packs worth it.
-- Ecosystem becomes product strategy (marketplace, community formats).
+## 11. Anti-goals
 
-When triggered, the first milestone is always: port one built-in viewer
-family onto the plugin host and ship it in the box as a plugin. If that
-works invisibly, the architecture is real; then open it.
-
-## 9. Anti-goals
-
-- No general-purpose app plugin system (commands, panels, file-tree
-  hooks, settings pages). Viewers only. Broad plugin APIs are where
-  maintenance economics die; the viewer surface is small, stable, and
-  the actual product need.
-- No plugin-based replacement of Tier 1 editors (Markdown/code/CSV).
-  Editing surfaces are the product core, not an extension point.
-- No trusted-plugin execution model. Sandbox or nothing.
+- No general-purpose app plugin system (commands, panels, settings).
+- No plugin replacement of Tier-1 editors.
+- No Obsidian-style trusted plugins in the app context.

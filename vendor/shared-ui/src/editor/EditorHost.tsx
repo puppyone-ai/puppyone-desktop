@@ -1,8 +1,19 @@
 import type { AppPreviewController, DataNode, FileContent, OfficeDocumentConverter } from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
-import { PuppyoneEditorHost, type EditorSaveMode } from "./PuppyoneEditorHost";
+import {
+  PuppyoneEditorHost,
+  type EditorSaveMode,
+  type ViewerPackInstallFallbackRenderer,
+} from "./PuppyoneEditorHost";
 import type { AiEditFile } from "./ai-edits/types";
-import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "./viewerTypes";
+import type {
+  DocumentSourceKind,
+  ExternalViewerSurfaceRenderer,
+  MarkdownAssetUrlResolver,
+  MarkdownHtmlTrustMode,
+  MarkdownLinkGraph,
+} from "./viewerTypes";
+import type { ViewerPackSnapshot } from "./viewerPackTypes";
 
 export type EditorHostProps = {
   node: DataNode;
@@ -26,6 +37,10 @@ export type EditorHostProps = {
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
   deferFallbackContent?: boolean;
+  viewerPackSnapshot?: ViewerPackSnapshot | null;
+  externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
+  viewerPackInstallFallback?: ViewerPackInstallFallbackRenderer | null;
+  documentSourceKind?: DocumentSourceKind;
 };
 
 export function EditorHost({
@@ -50,6 +65,10 @@ export function EditorHost({
   openExternalFile,
   convertOfficeDocumentToDocx,
   deferFallbackContent = false,
+  viewerPackSnapshot = null,
+  externalViewerSurface = null,
+  viewerPackInstallFallback = null,
+  documentSourceKind = "local",
 }: EditorHostProps) {
   return (
     <PuppyoneEditorHost
@@ -61,7 +80,11 @@ export function EditorHost({
         preview: deferFallbackContent ? undefined : node.preview,
         mimeType: fileContent?.mimeType ?? node.mimeType ?? null,
         url: fileContent?.url ?? fileUrl,
+        sourceKind: documentSourceKind,
       }}
+      viewerPackSnapshot={viewerPackSnapshot}
+      externalViewerSurface={externalViewerSurface}
+      viewerPackInstallFallback={viewerPackInstallFallback}
       loading={loading}
       error={error}
       fileUrlLoading={fileUrlLoading}

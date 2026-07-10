@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session as electronSession, shell, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
@@ -41,6 +41,13 @@ import { createSenderWorkspaceAuthorization } from "./main/workspace-authorizati
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
+import {
+  createViewerPackHost,
+  registerViewerPackAppIpcHandlers,
+  registerViewerPackPluginIpcHandlers,
+} from "./main/viewer-packs/index.mjs";
+import { PLUGIN_PROTOCOL_SCHEME } from "./main/viewer-packs/plugin-protocol.mjs";
+import { RESOURCE_PROTOCOL_SCHEME } from "./main/viewer-packs/resource-protocol.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
@@ -76,10 +83,34 @@ protocol.registerSchemesAsPrivileged([
       stream: true,
     },
   },
+  {
+    // Viewer Pack asset origin. Bytes only come from an enabled, immutable
+    // version dir whose content hash matches the URL.
+    scheme: PLUGIN_PROTOCOL_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: false,
+      stream: true,
+    },
+  },
+  {
+    // Session-scoped, audience-bound bounded Range reads for pack documents.
+    scheme: RESOURCE_PROTOCOL_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: false,
+      stream: true,
+    },
+  },
 ]);
 
 let updateService = null;
 let appPreviewRuntime = null;
+let viewerPackHost = null;
 const windowsById = new Map();
 const windowStateById = new Map();
 const workspaceWindowByPath = new Map();
@@ -240,6 +271,7 @@ async function createWindow(options = {}) {
 
   window.on("closed", () => {
     releaseWindowWorkspaceById(webContentsId, window);
+    viewerPackHost?.destroySessionsForOwner(webContentsId);
     appPreviewRuntime?.closeSessionsForWindow(webContentsId);
     terminalService.closeSessionsForWindow(webContentsId);
     void agentService.closeSessionsForWindow(webContentsId);
@@ -419,6 +451,13 @@ app.whenReady().then(async () => {
     readWorkspaceTextFile,
     resolveWorkspacePath: resolveLocalWorkspacePath,
   });
+  viewerPackHost = createViewerPackHost({
+    WebContentsView,
+    sessionFromPartition: (partition, options) => electronSession.fromPartition(partition, options),
+    getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
+    getMimeType,
+    userDataPath: app.getPath("userData"),
+  });
   registerIpcHandlers();
   updateService.start();
   await createWindow({
@@ -444,6 +483,7 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   cloudAuthService.dispose();
   updateService?.dispose();
+  viewerPackHost?.destroyAllSessions();
   appPreviewRuntime?.closeAll();
   terminalService.closeAll();
   void agentService.closeAll();
@@ -521,6 +561,16 @@ function registerIpcHandlers() {
     agentService,
     authorizeWorkspaceRoot,
   });
+
+  if (viewerPackHost) {
+    // App authority (install/activate/bounds/destroy) is gated to the trusted
+    // application frame.
+    registerViewerPackAppIpcHandlers({ ipcMain: trustedIpcMain, host: viewerPackHost });
+    // Plugin bridge (document/resource/ui/host) uses RAW ipcMain because the
+    // sandboxed pack frame's URL is never the trusted application URL; each
+    // handler validates sender → session before doing anything.
+    registerViewerPackPluginIpcHandlers({ ipcMain, host: viewerPackHost });
+  }
 }
 
 function getUpdateRestartBlockers() {

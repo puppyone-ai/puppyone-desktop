@@ -43,11 +43,48 @@ export type {
 export { EditorHost } from "./editor/EditorHost";
 export type { EditorHostProps } from "./editor/EditorHost";
 export {
+  classifyEditorViewerCapability,
+  coreViewerCapability,
   EDITOR_VIEWERS,
+  ExternalViewerAdapter,
   getEditorSourceRequirement,
   resolveEditorViewer,
+  resolveViewerRoute,
+  resolveViewerRouteForDocument,
   shouldReadEditorContent,
 } from "./editor/viewerRegistry";
+export type { ExternalViewerAdapterProps } from "./editor/viewerRegistry";
+export { findPackCandidates } from "./editor/viewerCapability";
+export type { ResolveViewerRouteInput } from "./editor/viewerCapability";
+export { EMPTY_VIEWER_PACK_SNAPSHOT } from "./editor/viewerPackTypes";
+export type {
+  CoreViewerCapability,
+  DocumentSourceKind,
+  ViewerContribution,
+  ViewerPackDescriptor,
+  ViewerPackFormatContribution,
+  ViewerPackSessionDescriptor,
+  ViewerPackSnapshot,
+  ViewerRoutePlaceholderReason,
+  ViewerRouteResult,
+} from "./editor/viewerPackTypes";
+export type { ViewerPackInstallFallbackRenderer } from "./editor/PuppyoneEditorHost";
+export {
+  VIEWER_HOST_IPC_CHANNELS,
+} from "./editor/viewerHostApi";
+export type {
+  ViewerDocumentMeta,
+  ViewerHostApiV1,
+  ViewerHostApiVersion,
+  ViewerHostIpcChannel,
+  ViewerResourceApiV1,
+  ViewerResourceChunk,
+  ViewerResourceHandleMeta,
+  ViewerResourceRangeRequest,
+  ViewerStatus,
+  ViewerThemeMode,
+  ViewerThemeSnapshot,
+} from "./editor/viewerHostApi";
 export type {
   EditorDocument,
   EditorDocumentKind,
@@ -57,6 +94,8 @@ export type {
   EditorViewer,
   EditorViewerContext,
   EditorViewerMatch,
+  ExternalViewerSurfaceRenderer,
+  ExternalViewerSurfaceRequest,
   MarkdownBacklink,
   MarkdownBacklinkReference,
   MarkdownHtmlTrustMode,

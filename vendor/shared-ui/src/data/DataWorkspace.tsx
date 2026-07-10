@@ -22,7 +22,12 @@ import { ExplorerTree } from "./ExplorerTree";
 import { FilePreview, type FilePreviewProps } from "./FilePreview";
 import { ProjectsHeader } from "./ProjectsHeader";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
-import type { MarkdownHtmlTrustMode } from "../editor/viewerTypes";
+import type {
+  DocumentSourceKind,
+  ExternalViewerSurfaceRenderer,
+  MarkdownHtmlTrustMode,
+} from "../editor/viewerTypes";
+import type { ViewerPackSnapshot } from "../editor/viewerPackTypes";
 import { getAiEditFileForPath } from "../editor/ai-edits/diff";
 import type { AiEditRequest } from "../editor/ai-edits/types";
 import type { FileIconThemeId } from "../file/fileIcons";
@@ -106,6 +111,10 @@ export type DataWorkspaceProps = {
   previewActionSlot?: FilePreviewProps["actionSlot"];
   renderPreviewBody?: FilePreviewProps["renderBody"];
   previewAccessorySlot?: DataWorkspaceSlot;
+  viewerPackSnapshot?: ViewerPackSnapshot | null;
+  externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
+  viewerPackInstallFallback?: FilePreviewProps["viewerPackInstallFallback"];
+  documentSourceKind?: DocumentSourceKind;
   aiEditRequest?: AiEditRequest | null;
   enableMarkdownLinkContentIndexing?: boolean;
   folderExpansionStrategy?: DataWorkspaceFolderExpansionStrategy;
@@ -181,6 +190,10 @@ export function DataWorkspace({
   previewActionSlot,
   renderPreviewBody,
   previewAccessorySlot,
+  viewerPackSnapshot = null,
+  externalViewerSurface = null,
+  viewerPackInstallFallback = null,
+  documentSourceKind,
   aiEditRequest = null,
   enableMarkdownLinkContentIndexing = true,
   folderExpansionStrategy = "load-before-expand",
@@ -204,6 +217,9 @@ export function DataWorkspace({
   labels,
 }: DataWorkspaceProps) {
   const resolvedCapabilities = { ...defaultDataCapabilities, ...capabilities };
+  const resolvedDocumentSourceKind: DocumentSourceKind = workspace.path.startsWith("cloud://")
+    ? "cloud"
+    : "local";
   const [tree, setTree] = useState<DataNode[]>([]);
   const [internalActivePath, setInternalActivePath] = useState<string | null>(defaultActivePath);
   const [selectedNodePaths, setSelectedNodePaths] = useState<Set<string>>(() => (
@@ -1229,6 +1245,10 @@ export function DataWorkspace({
                   appPreview={dataPort.appPreview ?? null}
                   openExternalFile={dataPort.openExternalFile}
                   convertOfficeDocumentToDocx={dataPort.convertOfficeDocumentToDocx}
+                  viewerPackSnapshot={viewerPackSnapshot}
+                  externalViewerSurface={externalViewerSurface}
+                  viewerPackInstallFallback={viewerPackInstallFallback}
+                  documentSourceKind={documentSourceKind ?? resolvedDocumentSourceKind}
                   emptySlot={emptySlot}
                   actionSlot={previewActionSlot}
                   renderBody={renderPreviewBody}

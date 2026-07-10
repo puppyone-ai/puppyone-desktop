@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState, type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
-import { DataWorkspace, type AiEditRequest, type DataNode, type FilePreviewBodyContext, type Workspace } from "@puppyone/shared-ui";
+import {
+  DataWorkspace,
+  EMPTY_VIEWER_PACK_SNAPSHOT,
+  type AiEditRequest,
+  type DataNode,
+  type FilePreviewBodyContext,
+  type ViewerPackSnapshot,
+  type Workspace,
+} from "@puppyone/shared-ui";
 import { Plus } from "lucide-react";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
 import { GitSidebar, GitStatusView } from "../source-control";
@@ -43,6 +51,10 @@ import {
   type DesktopWorkspaceSurfaceAction,
   DesktopSidebarTopNavigation,
 } from "./navigation";
+import {
+  DesktopViewerPackFallback,
+  useDesktopViewerPackSurface,
+} from "../viewer-packs";
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopUpdatesController = ReturnType<typeof useDesktopUpdates>;
@@ -175,6 +187,50 @@ export function DesktopWorkspaceContent({
       />
     );
   }, [workspace?.path]);
+
+  const [viewerPackSnapshot, setViewerPackSnapshot] = useState<ViewerPackSnapshot>(EMPTY_VIEWER_PACK_SNAPSHOT);
+  const refreshViewerPackSnapshot = useCallback(async () => {
+    const bridge = window.puppyoneDesktop?.viewerPacks;
+    if (!bridge?.getSnapshot) {
+      setViewerPackSnapshot(EMPTY_VIEWER_PACK_SNAPSHOT);
+      return;
+    }
+    try {
+      const snapshot = await bridge.getSnapshot();
+      setViewerPackSnapshot(snapshot ?? EMPTY_VIEWER_PACK_SNAPSHOT);
+    } catch {
+      setViewerPackSnapshot(EMPTY_VIEWER_PACK_SNAPSHOT);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (cloudWorkspace) {
+      setViewerPackSnapshot(EMPTY_VIEWER_PACK_SNAPSHOT);
+      return;
+    }
+    void refreshViewerPackSnapshot();
+  }, [cloudWorkspace, refreshViewerPackSnapshot, workspaceKey]);
+
+  const externalViewerSurface = useDesktopViewerPackSurface({
+    workspaceRoot: cloudWorkspace ? null : workspace.path,
+    onInstalled: refreshViewerPackSnapshot,
+  });
+  const viewerPackInstallFallback = useCallback(
+    ({ document }: { document: { path: string; name: string; mimeType?: string | null } }) => (
+      <DesktopViewerPackFallback
+        document={{
+          path: document.path,
+          name: document.name,
+          type: "file",
+          mimeType: document.mimeType ?? null,
+          sourceKind: "local",
+        }}
+        onInstalled={refreshViewerPackSnapshot}
+      />
+    ),
+    [refreshViewerPackSnapshot],
+  );
+
   const settingsView = (
     <SettingsView
       workspace={workspace}
@@ -328,6 +384,10 @@ export function DesktopWorkspaceContent({
         onActivePathChange={onActiveDataPathChange}
         onActiveNodeChange={onActiveDataNodeChange}
         onOpenExternalUrl={openExternalUrl}
+        viewerPackSnapshot={cloudWorkspace ? EMPTY_VIEWER_PACK_SNAPSHOT : viewerPackSnapshot}
+        externalViewerSurface={cloudWorkspace ? null : externalViewerSurface}
+        viewerPackInstallFallback={cloudWorkspace ? null : viewerPackInstallFallback}
+        documentSourceKind={cloudWorkspace ? "cloud" : "local"}
         resizableExplorer
         explorerCollapsed={false}
         explorerWidth={preferences.explorerWidth}

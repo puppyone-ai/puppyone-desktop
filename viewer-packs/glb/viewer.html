@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>PuppyOne GLB Viewer Pack</title>
+    <style>
+      :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
+      body { margin: 0; padding: 16px; background: #111; color: #f5f5f5; }
+      pre { white-space: pre-wrap; word-break: break-word; background: #1b1b1b; padding: 12px; border-radius: 8px; }
+      .ok { color: #86efac; }
+      .err { color: #fca5a5; }
+    </style>
+  </head>
+  <body>
+    <h1>GLB Viewer Pack</h1>
+    <p id="status">Loading…</p>
+    <pre id="out"></pre>
+    <script type="module">
+      const status = document.getElementById("status");
+      const out = document.getElementById("out");
+
+      function setStatus(text, ok = true) {
+        status.textContent = text;
+        status.className = ok ? "ok" : "err";
+        window.puppyoneViewer?.ui.setState({
+          status: ok ? "ready" : "error",
+          message: text,
+        });
+      }
+
+      async function main() {
+        if (!window.puppyoneViewer) {
+          setStatus("puppyoneViewer bridge missing", false);
+          return;
+        }
+        window.puppyoneViewer.ui.setState({ status: "loading", message: "Opening document" });
+        const meta = await window.puppyoneViewer.document.getMeta();
+        const handle = await window.puppyoneViewer.resource.open();
+        const header = new Uint8Array(await window.puppyoneViewer.resource.readRange({
+          handle: handle.handle,
+          offset: 0,
+          length: Math.min(12, handle.sizeBytes || 12),
+        }));
+        const magic = String.fromCharCode(...header.slice(0, 4));
+        out.textContent = JSON.stringify({
+          name: meta.name,
+          sizeBytes: meta.sizeBytes,
+          revision: meta.revision,
+          magic,
+          headerHex: [...header].map((b) => b.toString(16).padStart(2, "0")).join(" "),
+        }, null, 2);
+        if (magic === "glTF") setStatus("GLB header verified via bounded Range read");
+        else setStatus(`Unexpected magic "${magic}"`, false);
+        await window.puppyoneViewer.resource.close(handle.handle);
+      }
+
+      main().catch((error) => {
+        setStatus(error?.message || String(error), false);
+        out.textContent = String(error?.stack || error);
+      });
+    </script>
+  </body>
+</html>

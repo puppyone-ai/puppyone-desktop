@@ -183,6 +183,15 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     ipcRenderer.on("agent:session-exit", listener);
     return () => ipcRenderer.removeListener("agent:session-exit", listener);
   },
+  viewerPacks: {
+    getSnapshot: () => ipcRenderer.invoke("viewer-pack:get-snapshot"),
+    installLocal: (request) => ipcRenderer.invoke("viewer-pack:install-local", request),
+    disable: (request) => ipcRenderer.invoke("viewer-pack:disable", request),
+    uninstall: (request) => ipcRenderer.invoke("viewer-pack:uninstall", request),
+    activate: (request) => ipcRenderer.invoke("viewer-pack:activate", request),
+    setBounds: (request) => ipcRenderer.invoke("viewer-pack:set-bounds", request),
+    destroySession: (request) => ipcRenderer.invoke("viewer-pack:destroy-session", request),
+  },
   createTerminal: (request) => ipcRenderer.invoke("terminal:create", request),
   writeTerminal: (request) => ipcRenderer.send("terminal:input", request),
   resizeTerminal: (request) => ipcRenderer.send("terminal:resize", request),

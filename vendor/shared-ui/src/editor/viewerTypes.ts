@@ -3,6 +3,13 @@ import type { AppPreviewController, OfficeDocumentConverter } from "../core/type
 import type { FileFormat } from "../core/fileFormats";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
+import type {
+  DocumentSourceKind,
+  ViewerContribution,
+  ViewerPackSnapshot,
+} from "./viewerPackTypes";
+
+export type { DocumentSourceKind } from "./viewerPackTypes";
 
 export type EditorDocumentKind =
   | "folder"
@@ -31,6 +38,26 @@ export type EditorDocument = {
   preview?: string | null;
   mimeType?: string | null;
   url?: string | null;
+  /**
+   * Where the document was sourced. Plugin routing fails closed for `cloud`
+   * and `unknown`; only `local` documents can activate a viewer pack. Defaults
+   * to `local` when omitted for backward compatibility with existing hosts.
+   */
+  sourceKind?: DocumentSourceKind;
+};
+
+/**
+ * A host-provided callback that renders the native/sandboxed surface slot for
+ * an activated plugin session. Dependency-injected by the desktop shell so
+ * shared-ui never imports Electron or spawns a session itself.
+ */
+export type ExternalViewerSurfaceRenderer = (
+  request: ExternalViewerSurfaceRequest,
+) => ReactNode;
+
+export type ExternalViewerSurfaceRequest = {
+  document: EditorDocument;
+  contribution: ViewerContribution;
 };
 
 export type EditorMode = "live" | "source";
@@ -107,6 +134,10 @@ export type EditorViewerContext = EditorViewerMatch & {
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
   onSaveContent?: (content: string) => Promise<void>;
+  /** Immutable, validated snapshot of enabled viewer-pack contributions. */
+  viewerPackSnapshot?: ViewerPackSnapshot | null;
+  /** Host-provided renderer for an activated plugin surface (DI, not Electron). */
+  externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
 };
 
 export type EditorViewer = {
