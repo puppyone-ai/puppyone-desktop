@@ -51,10 +51,18 @@ type UseDesktopGitControllerOptions = {
   onEnterGitView: () => void;
 };
 
-function mergePreservedHistory(
+export function mergePreservedHistory(
   previous: GitStatusSnapshot | null,
   next: GitStatusSnapshot,
+  options: { invalidateHistory?: boolean } = {},
 ): GitStatusSnapshot {
+  if (options.invalidateHistory) {
+    return {
+      ...next,
+      commits: [],
+      allCommits: [],
+    };
+  }
   if (
     previous
     && previous.isRepo
@@ -70,6 +78,33 @@ function mergePreservedHistory(
     };
   }
   return next;
+}
+
+export function shouldInvalidateHistoryForReason(reason: string | null | undefined): boolean {
+  if (!reason) return false;
+  // Working-tree / index-only / ordinary manual+initial refreshes keep history when HEAD is unchanged.
+  if (
+    reason === "working-tree"
+    || reason === "index"
+    || reason === "manual"
+    || reason === "initial"
+    || reason === "external-apply"
+    || reason === "mutation"
+    || reason === "focus"
+    || reason === "focus-stale"
+    || reason === "configuration"
+  ) {
+    return false;
+  }
+  // Ref topology, fetch, merge/rebase/cherry-pick state, config, and watcher recovery
+  // can change history/graph without a working-tree edit.
+  return reason === "ref"
+    || reason === "fetch"
+    || reason === "config"
+    || reason === "merge"
+    || reason === "repository-initialized"
+    || reason === "git-metadata"
+    || reason.startsWith("watcher-");
 }
 
 export function useDesktopGitController({
@@ -125,10 +160,11 @@ export function useDesktopGitController({
         if (!rootPath) throw new Error("No active workspace.");
         return getWorkspaceGitStatus(rootPath);
       },
-      onSnapshot: (nextStatus) => {
+      onSnapshot: (nextStatus, meta) => {
         const rootPath = workspacePathRef.current;
         if (!rootPath) return;
-        const merged = mergePreservedHistory(gitStatusRef.current, nextStatus);
+        const invalidateHistory = shouldInvalidateHistoryForReason(meta.reason);
+        const merged = mergePreservedHistory(gitStatusRef.current, nextStatus, { invalidateHistory });
         gitStatusRef.current = merged;
         setGitStatus(merged);
         setGitStatusPath(rootPath);
@@ -160,12 +196,13 @@ export function useDesktopGitController({
     return created;
   }, []);
 
-  const applyGitStatus = useCallback((nextStatus: GitStatusSnapshot, rootPath?: string) => {
+  const applyGitStatus = useCallback((nextStatus: GitStatusSnapshot, rootPath?: string, reason = "external-apply") => {
     const resolvedRoot = rootPath ?? workspacePathRef.current;
     if (!resolvedRoot) return;
-    const merged = mergePreservedHistory(gitStatusRef.current, nextStatus);
+    const invalidateHistory = shouldInvalidateHistoryForReason(reason);
+    const merged = mergePreservedHistory(gitStatusRef.current, nextStatus, { invalidateHistory });
     gitStatusRef.current = merged;
-    ensureScheduler().applyMutationSnapshot(merged, "external-apply");
+    ensureScheduler().applyMutationSnapshot(merged, reason);
     setGitStatusPath(resolvedRoot);
   }, [ensureScheduler]);
 
@@ -174,9 +211,9 @@ export function useDesktopGitController({
     setSelectedGitWorkingFile(null);
   }, []);
 
-  const refreshGitStatus = useCallback(async () => {
+  const refreshGitStatus = useCallback(async (reason = "manual") => {
     if (!workspacePathRef.current) return;
-    ensureScheduler().refreshNow("manual");
+    ensureScheduler().refreshNow(reason);
   }, [ensureScheduler]);
 
   const invalidateGitStatus = useCallback((reason = "working-tree") => {
@@ -187,17 +224,16 @@ export function useDesktopGitController({
   const refreshGitStatusWithFetch = useCallback(async () => {
     if (!workspace) return;
     const rootPath = workspace.path;
-    setGitStatusLoading(true);
     setGitStatusError(null);
     try {
       const nextStatus = await fetchWorkspaceGit(rootPath);
       if (workspacePathRef.current !== rootPath) return;
-      applyGitStatus(nextStatus, rootPath);
+      // Fetch mutates remote-tracking refs; publish through the same generation
+      // rules as other application-owned operations and invalidate history.
+      applyGitStatus(nextStatus, rootPath, "fetch");
     } catch (error) {
       if (workspacePathRef.current !== rootPath) return;
       setGitStatusError(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (workspacePathRef.current === rootPath) setGitStatusLoading(false);
     }
   }, [applyGitStatus, workspace]);
 
@@ -273,17 +309,26 @@ export function useDesktopGitController({
     const syncFocus = () => {
       const focused = typeof document === "undefined"
         ? true
-        : document.visibilityState === "visible" && document.hasFocus();
+        : document.visibilityState === "visible" && (typeof document.hasFocus !== "function" || document.hasFocus());
       scheduler.setFocused(focused);
     };
     syncFocus();
     window.addEventListener("focus", syncFocus);
     window.addEventListener("blur", syncFocus);
     document.addEventListener("visibilitychange", syncFocus);
+
+    const bridge = window.puppyoneDesktop;
+    const unsubscribeWindowFocus = typeof bridge?.onGitRepositoryWindowFocus === "function"
+      ? bridge.onGitRepositoryWindowFocus((event) => {
+        scheduler.setFocused(event.focused);
+      })
+      : () => {};
+
     return () => {
       window.removeEventListener("focus", syncFocus);
       window.removeEventListener("blur", syncFocus);
       document.removeEventListener("visibilitychange", syncFocus);
+      unsubscribeWindowFocus();
     };
   }, [ensureScheduler]);
 
@@ -291,8 +336,8 @@ export function useDesktopGitController({
     gitMainPanelRef.current = gitMainPanel;
   }, [gitMainPanel]);
 
-  // Lazy-load history/graph when the History surface is active, or when HEAD
-  // changes while History is already open.
+  // Lazy-load history/graph when the History surface is active, or when HEAD/refs
+  // change while History is already open (cached history was cleared).
   useEffect(() => {
     if (!gitViewActive || gitMainPanel !== "history" || !workspace || !activeGitStatus?.isRepo) {
       return undefined;
@@ -334,6 +379,7 @@ export function useDesktopGitController({
     };
   }, [
     activeGitStatus?.allCommits?.length,
+    activeGitStatus?.branch,
     activeGitStatus?.commits?.length,
     activeGitStatus?.headCommitId,
     activeGitStatus?.isRepo,

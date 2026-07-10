@@ -1008,6 +1008,19 @@ export async function getWorkspaceGitStatus(rootPath) {
   //
   // Porcelain-v2 `--branch` headers already carry oid/head/upstream/ahead-behind,
   // so we avoid duplicate branch/HEAD queries when those headers are present.
+  //
+  // Snapshot consistency: fingerprint HEAD + symbolic ref + index before/after
+  // the multi-command read and retry once when repository identity changes mid-query.
+  const beforeFingerprint = await readGitConsistencyFingerprint(root);
+  const first = await readFastWorkspaceGitStatus(root);
+  const afterFingerprint = await readGitConsistencyFingerprint(root);
+  if (beforeFingerprint !== afterFingerprint) {
+    return readFastWorkspaceGitStatus(root);
+  }
+  return first;
+}
+
+async function readFastWorkspaceGitStatus(root) {
   const [statusResult, branches, remotes] = await Promise.all([
     execGit(root, ["status", "--porcelain=v2", "-z", "--branch"], { optionalLocks: false }).catch((error) => {
       throw new Error(`Unable to read git status: ${error.message}`);
@@ -1096,6 +1109,31 @@ export async function getWorkspaceGitStatus(rootPath) {
     commits: [],
     allCommits: [],
   };
+}
+
+// Cheap repository-identity fingerprint used to detect mid-query mutations.
+// Compares HEAD oid, symbolic ref, and index mtime/size — not full status truth.
+export async function readGitConsistencyFingerprint(rootPath) {
+  const root = resolveWorkspacePath(rootPath, null);
+  const [headResult, symbolicResult, indexPathResult] = await Promise.all([
+    execGit(root, ["rev-parse", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+    execGit(root, ["symbolic-ref", "-q", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+    execGit(root, ["rev-parse", "--git-path", "index"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+  ]);
+  const indexRelative = indexPathResult.stdout.trim();
+  const indexAbsolute = indexRelative
+    ? (path.isAbsolute(indexRelative) ? indexRelative : path.resolve(root, indexRelative))
+    : null;
+  let indexFingerprint = "missing";
+  if (indexAbsolute) {
+    const stat = await fs.stat(indexAbsolute).catch(() => null);
+    if (stat) indexFingerprint = `${Math.trunc(stat.mtimeMs)}:${stat.size}`;
+  }
+  return [
+    headResult.stdout.trim() || "no-head",
+    symbolicResult.stdout.trim() || "detached",
+    indexFingerprint,
+  ].join("|");
 }
 
 export async function getWorkspaceGitBranchGraph(rootPath) {

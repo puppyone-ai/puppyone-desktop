@@ -164,6 +164,15 @@ async function createWindow(options = {}) {
     lastFocusedWindowId = webContentsId;
     const state = windowStateById.get(webContentsId);
     if (state) state.lastFocusedAt = Date.now();
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send("git-repository:window-focus", { focused: true });
+    }
+  });
+
+  window.on("blur", () => {
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send("git-repository:window-focus", { focused: false });
+    }
   });
 
   window.once("ready-to-show", () => {

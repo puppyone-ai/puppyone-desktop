@@ -243,4 +243,22 @@ describe("fast status vs lazy history", { timeout: 20_000 }, () => {
     expect(status.headCommitId).toBe(graph.headCommitId);
     expect(status.unstagedEntries.some((entry) => entry.path === "app.js")).toBe(true);
   });
+
+  it("changes the consistency fingerprint when HEAD or the index changes", async () => {
+    const { readGitConsistencyFingerprint } = await import("../local-api/workspace.mjs");
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "app.js", kind: "file", content: "one\n" });
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "first");
+
+    const before = await readGitConsistencyFingerprint(root);
+    await writeWorkspaceTextFile(root, "app.js", "two\n");
+    await stageAllWorkspaceGitChanges(root);
+    const afterIndex = await readGitConsistencyFingerprint(root);
+    expect(afterIndex).not.toBe(before);
+
+    await commitWorkspaceGit(root, "second");
+    const afterHead = await readGitConsistencyFingerprint(root);
+    expect(afterHead).not.toBe(afterIndex);
+  });
 });

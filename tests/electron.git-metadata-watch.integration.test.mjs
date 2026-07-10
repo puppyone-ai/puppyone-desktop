@@ -441,6 +441,52 @@ describe("git metadata watch service", { timeout: 30_000 }, () => {
     expect(status.branch).toBe("after-rearm");
     service.stop(subscription.subscriptionId);
   });
+
+  it("invalidates on cherry-pick and rebase state files", async () => {
+    initRepoWithIdentity();
+    const baseBranch = git(["branch", "--show-current"]) || "master";
+    await writeFile(path.join(root, "a.txt"), "one\n");
+    git(["add", "a.txt"]);
+    git(["commit", "-m", "first"]);
+    git(["checkout", "-b", "topic"]);
+    await writeFile(path.join(root, "a.txt"), "topic\n");
+    git(["add", "a.txt"]);
+    git(["commit", "-m", "topic"]);
+    const topicHead = git(["rev-parse", "HEAD"]);
+    git(["checkout", baseBranch]);
+
+    const service = trackService(createGitMetadataWatchService({ logger: silentLogger() }));
+    const { events, sender } = createRecordingSender(14);
+    const subscription = await service.start(sender, root);
+
+    let baseline = events.length;
+    try {
+      git(["cherry-pick", "--no-commit", topicHead]);
+    } catch {
+      // Conflict still creates CHERRY_PICK_HEAD.
+    }
+    await waitFor(() => events.length > baseline, { timeout: 8000 });
+    try {
+      git(["cherry-pick", "--abort"]);
+    } catch {
+      git(["reset", "--hard", "HEAD"]);
+    }
+
+    baseline = events.length;
+    try {
+      git(["rebase", "topic"]);
+    } catch {
+      // Conflict still creates rebase-merge / rebase-apply state.
+    }
+    await waitFor(() => events.length > baseline, { timeout: 8000 });
+    try {
+      git(["rebase", "--abort"]);
+    } catch {
+      git(["reset", "--hard", "HEAD"]);
+    }
+
+    service.stop(subscription.subscriptionId);
+  });
 });
 
 describe("background optional locks", { timeout: 30_000 }, () => {

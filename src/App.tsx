@@ -558,7 +558,7 @@ export function App() {
     const savedConfig = await savePuppyoneConfig(nextConfig);
     if (savedConfig) {
       setWorkspaceRefreshToken((token) => token + 1);
-      await refreshGitStatus();
+      await refreshGitStatus("configuration");
     }
     return savedConfig;
   }, [refreshGitStatus, savePuppyoneConfig]);

@@ -84,18 +84,22 @@ that promotes into a full metadata watch after `git init`.
 
 `GitRefreshScheduler` owns debounce (250 ms), single-flight reads, dirty trailing
 refresh, generation ordering, focus/visibility drain, and stale-focus reconcile
-(5 s). Transient refresh failures preserve the last good snapshot, record an
-error, and leave manual Refresh available. Watcher and refresh paths log
-repository identity, reason, and duration without credentials or remote secrets.
+(5 s). The Electron main process emits `git-repository:window-focus` on
+BrowserWindow focus/blur so the scheduler is not limited to DOM focus alone.
+Transient refresh failures preserve the last good snapshot, record an error,
+and leave manual Refresh available. Watcher and refresh paths log repository
+identity, reason, and duration without credentials or remote secrets.
 
 ### Fast status and lazy history
 
 Frequent status reads omit current-branch and all-branch history. Porcelain-v2
 `--branch` headers supply HEAD/branch identity when present so duplicate Git
-queries are avoided. History and Cloud branch graphs load through
-`getWorkspaceGitBranchGraph` when those surfaces are active. Background
-read-only status sets `GIT_OPTIONAL_LOCKS=0`; mutating commands keep normal
-locks.
+queries are avoided. A HEAD/symbolic-ref/index fingerprint is compared before
+and after the multi-command read; one retry runs when identity changes mid-query.
+History and Cloud branch graphs load through `getWorkspaceGitBranchGraph` when
+those surfaces are active, and cached history is dropped on ref/fetch/merge/
+config metadata invalidation. Background read-only status sets
+`GIT_OPTIONAL_LOCKS=0`; mutating commands keep normal locks.
 
 ## Historical Failure (pre-fix)
 
@@ -297,12 +301,12 @@ Terminal parsing is an optimization, not the sole correctness mechanism.
 
 ## Snapshot Consistency
 
-The current status reader executes several Git commands concurrently. An
-external mutation can occur between those commands and produce a mixed snapshot.
+The status reader executes several Git commands. An external mutation can occur
+between those commands and produce a mixed snapshot.
 
-At minimum, generation ordering prevents an old request from overwriting a new
-one. The implementation may additionally compare a cheap HEAD/index/ref
-fingerprint before and after a multi-command read and retry once when repository
+Generation ordering prevents an old request from overwriting a new one. The
+fast status reader also compares a cheap HEAD / symbolic-ref / index fingerprint
+before and after the multi-command read and retries once when repository
 identity changes during the query.
 
 ## Implementation Handoff

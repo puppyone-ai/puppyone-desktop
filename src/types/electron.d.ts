@@ -308,6 +308,10 @@ export type GitRepositoryInvalidatedEvent = {
   reason: string;
 };
 
+export type GitRepositoryWindowFocusEvent = {
+  focused: boolean;
+};
+
 export type LastWorkspaceResult = {
   path: string | null;
   workspace: Workspace | null;
@@ -621,6 +625,9 @@ declare global {
       }) => Promise<{ ok: boolean }>;
       onGitRepositoryInvalidated: (
         callback: (event: GitRepositoryInvalidatedEvent) => void,
+      ) => () => void;
+      onGitRepositoryWindowFocus?: (
+        callback: (event: GitRepositoryWindowFocusEvent) => void,
       ) => () => void;
       getLatestAiEditReviewRequest: (request: {
         rootPath: string;

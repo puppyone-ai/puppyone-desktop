@@ -110,6 +110,11 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     ipcRenderer.on("git-repository:invalidated", listener);
     return () => ipcRenderer.removeListener("git-repository:invalidated", listener);
   },
+  onGitRepositoryWindowFocus: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("git-repository:window-focus", listener);
+    return () => ipcRenderer.removeListener("git-repository:window-focus", listener);
+  },
   getLatestAiEditReviewRequest: (request) => ipcRenderer.invoke("ai-edit-review:get-latest", request),
   onAiEditReviewUpdated: (callback) => {
     const listener = (_event, payload) => callback(payload);
