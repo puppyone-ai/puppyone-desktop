@@ -1,5 +1,6 @@
 import path from "node:path";
 import {
+  copyWorkspaceEntry,
   createWorkspaceEntry,
   convertWorkspaceOfficeDocumentToDocx,
   deleteWorkspaceEntry,
@@ -22,6 +23,7 @@ import {
 } from "../external-apps.mjs";
 import { isPotentiallyExecutableFile } from "../security.mjs";
 import { buildLocalFileCapabilityUrl } from "../local-file-capabilities.mjs";
+import { parseLocalFileUrl } from "../local-file-protocol.mjs";
 
 const MAX_OFFICE_CONVERSIONS_PER_WINDOW = 2;
 
@@ -66,16 +68,38 @@ export function registerWorkspaceFileIpcHandlers({
     if (!metadata.isFile()) throw new Error("Local file resource must be a regular file.");
 
     const relativePath = path.relative(rootPath, canonicalFilePath).split(path.sep).join("/");
+    const purpose = requireLocalFileCapabilityPurpose(request?.purpose);
+    const scope = purpose === "file-preview" && getMimeType(canonicalFilePath)?.toLowerCase().startsWith("text/html")
+      ? "directory"
+      : "exact";
     const token = localFileCapabilities.issue({
       senderId: requireIpcSenderId(event),
       rootPath,
       relativePath,
-      scope: getMimeType(canonicalFilePath)?.toLowerCase().startsWith("text/html")
-        ? "directory"
-        : "exact",
+      scope,
+      purpose,
+      reuse: false,
     });
     return {
-      url: buildLocalFileCapabilityUrl({ rootPath, relativePath, token }),
+      url: buildLocalFileCapabilityUrl({ rootPath, relativePath, token, purpose }),
+    };
+  });
+
+  ipcMain.handle("workspace:revoke-file-url", async (event, request) => {
+    if (typeof request?.url !== "string" || request.url.length > 16_384) {
+      return { revoked: false };
+    }
+    let parsed;
+    try {
+      parsed = parseLocalFileUrl(request.url);
+    } catch {
+      return { revoked: false };
+    }
+    return {
+      revoked: localFileCapabilities.revoke({
+        token: parsed.token,
+        senderId: requireIpcSenderId(event),
+      }),
     };
   });
 
@@ -160,6 +184,13 @@ export function registerWorkspaceFileIpcHandlers({
     const previousPath = request?.fromPath;
     const result = await moveWorkspaceEntry(rootPath, request);
     await absorbWorkspaceEditReviewPath(rootPath, previousPath);
+    await absorbWorkspaceEditReviewPath(rootPath, result.path);
+    return result;
+  });
+
+  ipcMain.handle("workspace:copy-entry", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
+    const result = await copyWorkspaceEntry(rootPath, request);
     await absorbWorkspaceEditReviewPath(rootPath, result.path);
     return result;
   });
@@ -338,6 +369,12 @@ function requireIpcSenderId(event) {
     throw new Error("Office conversion sender is invalid.");
   }
   return senderId;
+}
+
+function requireLocalFileCapabilityPurpose(value) {
+  if (value === undefined || value === "file-preview") return "file-preview";
+  if (value === "markdown-asset") return value;
+  throw new Error("Local file capability purpose is invalid.");
 }
 
 function normalizeFileExtension(value) {

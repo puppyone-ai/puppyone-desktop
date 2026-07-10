@@ -7,9 +7,9 @@ import {
   getInlineRevealElement,
   getMarkdownElements,
   getMarkdownElementsInRange,
-} from "../vendor/shared-ui/src/editor/markdown/syntax/markdownElements";
-import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownParserExtensions";
-import { findMarkdownLinkTokens } from "../vendor/shared-ui/src/editor/markdown/links/markdownLinkModel";
+} from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownElements";
+import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
+import { findMarkdownLinkTokens } from "../vendor/shared-ui/src/editor/markdown/core/links/markdownLinkModel";
 
 function createMarkdownState(source: string) {
   return EditorState.create({

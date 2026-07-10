@@ -133,7 +133,7 @@ body.data-sidebar-resizing * {
 
 .desktop-explorer-toolbar > span {
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: var(--po-text-size-sidebar, 13px);
   font-weight: 650;
 }
 
@@ -374,6 +374,30 @@ body.data-sidebar-resizing * {
   pointer-events: none;
 }
 
+.desktop-file-operation-notice {
+  position: absolute;
+  z-index: 86;
+  right: 16px;
+  bottom: 16px;
+  max-width: min(420px, calc(100% - var(--data-explorer-width, 320px) - 40px));
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--po-border) 82%, transparent);
+  border-radius: var(--desktop-control-radius);
+  background: color-mix(in srgb, var(--po-panel-raised) 94%, transparent);
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1.35;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+}
+
+.desktop-file-operation-notice[data-tone="error"] {
+  border-color: color-mix(in srgb, var(--po-danger) 45%, var(--po-border));
+  background: color-mix(in srgb, var(--po-danger) 12%, var(--po-panel-raised));
+  color: color-mix(in srgb, var(--po-danger) 82%, var(--po-text));
+}
+
 .desktop-sidebar-top-navigation {
   display: flex;
   gap: var(--desktop-sidebar-nav-gap);
@@ -434,7 +458,7 @@ body.data-sidebar-resizing * {
   border-radius: var(--desktop-control-radius);
   background: transparent;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: var(--po-text-size-sidebar, 13px);
   font-weight: 650;
   line-height: 18px;
   text-align: left;

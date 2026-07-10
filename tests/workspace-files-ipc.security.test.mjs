@@ -35,6 +35,7 @@ describe("workspace file IPC authorization", () => {
       ["workspace:create-entry", { rootPath: otherRoot, parentPath: null, name: "new.txt", kind: "file" }],
       ["workspace:rename-entry", { rootPath: otherRoot, path: "secret.txt", nextName: "renamed.txt" }],
       ["workspace:move-entry", { rootPath: otherRoot, fromPath: "secret.txt", toPath: "moved.txt" }],
+      ["workspace:copy-entry", { rootPath: otherRoot, fromPath: "secret.txt", targetFolderPath: null }],
       ["workspace:import-entries", { rootPath: otherRoot, sourcePaths: [path.join(otherRoot, "secret.txt")], targetFolderPath: null }],
       ["workspace:delete-entry", { rootPath: otherRoot, path: "secret.txt" }],
       ["workspace:reveal-entry-in-finder", { rootPath: otherRoot, path: "secret.txt" }],
@@ -84,10 +85,42 @@ describe("workspace file IPC authorization", () => {
     );
     const parsed = parseLocalFileUrl(result.url);
 
-    expect(parsed.rootPath).toBe(await fs.promises.realpath(root));
-    expect(parsed.relativePath).toBe("note.txt");
-    expect(localFileCapabilities.validate(parsed)).toBe(true);
-    expect(localFileCapabilities.validate({ ...parsed, relativePath: "other.txt" })).toBe(false);
+    expect(parsed.requestPath).toBe("note.txt");
+    expect(localFileCapabilities.resolve(parsed)).toEqual({
+      rootPath: await fs.promises.realpath(root),
+      relativePath: "note.txt",
+    });
+    expect(localFileCapabilities.resolve({ ...parsed, requestPath: "other.txt" })).toBeNull();
+  });
+
+  it("issues unique Markdown asset leases and only their sender can revoke them", async () => {
+    const { handlers, localFileCapabilities } = createHarness(() => root);
+    await writeFile(path.join(root, "image.png"), "png");
+    const owner = { sender: { id: 82 } };
+    const request = { rootPath: root, path: "image.png", purpose: "markdown-asset" };
+    const first = await handlers.get("workspace:get-file-url")(owner, request);
+    const second = await handlers.get("workspace:get-file-url")(owner, request);
+    const parsed = parseLocalFileUrl(first.url);
+
+    expect(second.url).not.toBe(first.url);
+    expect(parsed.purpose).toBe("markdown-asset");
+    expect(localFileCapabilities.resolve(parsed)).toEqual({
+      rootPath: await fs.promises.realpath(root),
+      relativePath: "image.png",
+    });
+    await expect(handlers.get("workspace:revoke-file-url")(
+      { sender: { id: 83 } },
+      { url: first.url },
+    )).resolves.toEqual({ revoked: false });
+    await expect(handlers.get("workspace:revoke-file-url")(
+      owner,
+      { url: first.url },
+    )).resolves.toEqual({ revoked: true });
+    expect(localFileCapabilities.resolve(parsed)).toBeNull();
+    expect(localFileCapabilities.resolve(parseLocalFileUrl(second.url))).toEqual({
+      rootPath: await fs.promises.realpath(root),
+      relativePath: "image.png",
+    });
   });
 
   it("rejects local file operations when the sender has no local workspace", async () => {
@@ -115,6 +148,17 @@ describe("workspace file IPC authorization", () => {
       { rootPath: root, path: "linked.txt" },
     )).rejects.toThrow(/symbolic links/i);
     expect(shell.showItemInFolder).not.toHaveBeenCalled();
+  });
+
+  it("copies only inside the sender-authorized workspace", async () => {
+    const { handlers } = createHarness(() => root);
+    await writeFile(path.join(root, "source.txt"), "inside");
+
+    await expect(handlers.get("workspace:copy-entry")(
+      { sender: { id: 101 } },
+      { rootPath: root, fromPath: "source.txt", targetFolderPath: null },
+    )).resolves.toEqual({ path: "source copy.txt" });
+    expect(await readFile(path.join(root, "source copy.txt"), "utf8")).toBe("inside");
   });
 
   it("cannot bypass executable confirmation and revalidates after the dialog", async () => {

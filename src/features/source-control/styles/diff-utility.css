@@ -1,25 +1,31 @@
 .desktop-file-diff-list {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .desktop-file-diff {
+  --desktop-git-diff-code-bg: color-mix(in srgb, var(--po-panel) 62%, var(--po-inset));
+  --desktop-git-diff-added-bg: color-mix(in srgb, var(--po-success) 7%, var(--desktop-git-diff-code-bg));
+  --desktop-git-diff-removed-bg: color-mix(in srgb, var(--po-danger) 7%, var(--desktop-git-diff-code-bg));
+  --desktop-git-diff-added-text: color-mix(in srgb, var(--po-text-muted) 82%, var(--po-success));
+  --desktop-git-diff-removed-text: color-mix(in srgb, var(--po-text-muted) 82%, var(--po-danger));
+
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--po-border-subtle);
-  border-radius: 8px;
-  background: var(--po-panel);
+  border-radius: 6px;
+  background: var(--desktop-git-diff-code-bg);
 }
 
 .desktop-file-diff-header {
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 8px;
-  min-height: 38px;
-  padding: 0 12px;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
   border-bottom: 1px solid var(--po-border-subtle);
-  background: color-mix(in srgb, var(--po-canvas) 84%, var(--po-text) 4%);
+  background: color-mix(in srgb, var(--po-canvas) 94%, var(--po-text) 2%);
   color: var(--po-text-muted);
 }
 
@@ -29,7 +35,7 @@
   overflow: hidden;
   color: var(--po-text);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -45,73 +51,80 @@
 .desktop-change-badge {
   display: inline-flex;
   align-items: center;
-  height: 20px;
+  height: 18px;
   flex: 0 0 auto;
-  padding: 0 6px;
-  border-radius: 5px;
+  padding: 0 5px;
+  border-radius: 4px;
   background: var(--po-control);
   color: var(--po-text-muted);
-  font-size: 10.5px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 600;
 }
 
 .desktop-change-badge.added,
 .desktop-change-badge.untracked {
-  background: color-mix(in srgb, var(--po-success) 14%, transparent);
+  background: color-mix(in srgb, var(--po-success) 8%, transparent);
   color: var(--po-success);
 }
 
 .desktop-change-badge.deleted {
-  background: color-mix(in srgb, var(--po-danger) 14%, transparent);
+  background: color-mix(in srgb, var(--po-danger) 8%, transparent);
   color: var(--po-danger);
 }
 
 .desktop-change-badge.modified,
 .desktop-change-badge.renamed,
 .desktop-change-badge.copied {
-  background: color-mix(in srgb, var(--po-accent) 12%, transparent);
+  background: color-mix(in srgb, var(--po-accent) 8%, transparent);
   color: var(--po-accent);
 }
 
 .desktop-diff-lines {
   min-width: 0;
-  padding: 6px 0;
-  background: var(--po-inset);
+  padding: 0;
+  background: var(--desktop-git-diff-code-bg);
 }
 
 .desktop-diff-line {
   display: flex;
   min-width: 0;
-  min-height: 20px;
+  min-height: 18px;
+  align-items: flex-start;
   font-family: var(--po-font-mono);
   font-size: 12px;
-  line-height: 20px;
+  line-height: 18px;
 }
 
 .desktop-diff-line.add {
-  background: var(--po-diff-added-bg);
-  color: var(--po-diff-added-text);
+  background: var(--desktop-git-diff-added-bg);
+  color: var(--desktop-git-diff-added-text);
 }
 
 .desktop-diff-line.remove {
-  background: var(--po-diff-removed-bg);
-  color: var(--po-diff-removed-text);
+  background: var(--desktop-git-diff-removed-bg);
+  color: var(--desktop-git-diff-removed-text);
+}
+
+.desktop-diff-line.add .line-prefix {
+  color: var(--po-success);
+}
+
+.desktop-diff-line.remove .line-prefix {
+  color: var(--po-danger);
 }
 
 .desktop-diff-line.context {
   color: var(--po-text-muted);
 }
 
-.desktop-diff-line.hunk {
-  align-items: center;
-  height: 24px;
-  padding: 0 12px;
-  border-top: 1px solid var(--po-hover);
-  border-bottom: 1px solid var(--po-hover);
-  background: color-mix(in srgb, var(--po-canvas) 84%, var(--po-text) 4%);
-  color: var(--po-text-disabled);
-  font-family: var(--po-font-sans);
-  font-size: 11px;
+.desktop-diff-hunk-separator {
+  height: 7px;
+  border-top: 1px solid color-mix(in srgb, var(--po-border-subtle) 55%, transparent);
+  background: transparent;
+}
+
+.desktop-diff-hunk-separator:first-child {
+  display: none;
 }
 
 .desktop-diff-line .line-number {
@@ -119,6 +132,7 @@
   flex: 0 0 42px;
   padding-right: 10px;
   color: currentColor;
+  font-variant-numeric: tabular-nums;
   opacity: 0.52;
   text-align: right;
   user-select: none;
@@ -127,17 +141,20 @@
 .desktop-diff-line .line-prefix {
   width: 18px;
   flex: 0 0 18px;
+  font-weight: 650;
   text-align: center;
   user-select: none;
 }
 
 .desktop-diff-line code {
+  flex: 1;
   min-width: 0;
-  overflow: hidden;
+  padding-right: 10px;
+  overflow: visible;
+  overflow-wrap: anywhere;
   color: inherit;
   font: inherit;
-  text-overflow: ellipsis;
-  white-space: pre;
+  white-space: pre-wrap;
 }
 
 .desktop-diff-placeholder,
@@ -149,7 +166,7 @@
 }
 
 .desktop-diff-placeholder {
-  background: var(--po-inset);
+  background: var(--desktop-git-diff-code-bg, var(--po-inset));
 }
 
 .desktop-utility-center {
@@ -183,13 +200,13 @@
 }
 
 .desktop-utility-primary-button {
-  height: 30px;
-  padding: 0 12px;
+  height: var(--git-action-size, 24px);
+  padding: 0 var(--git-action-padding-inline, 7px);
   border: 1px solid color-mix(in srgb, var(--po-accent) 36%, var(--po-border));
-  border-radius: 6px;
+  border-radius: var(--git-action-radius, 5px);
   background: color-mix(in srgb, var(--po-accent) 12%, var(--po-panel));
   color: var(--po-accent);
-  font-size: 12.5px;
+  font-size: var(--git-action-font-size, 12px);
   font-weight: 650;
 }
 

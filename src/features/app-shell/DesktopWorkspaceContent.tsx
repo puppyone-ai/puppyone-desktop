@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState, type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
-import { DataWorkspace, type AiEditRequest, type DataNode, type FilePreviewBodyContext, type Workspace } from "@puppyone/shared-ui";
+import {
+  DataWorkspace,
+  EMPTY_VIEWER_PACK_SNAPSHOT,
+  type AiEditRequest,
+  type DataNode,
+  type FilePreviewBodyContext,
+  type ViewerPackSnapshot,
+  type Workspace,
+} from "@puppyone/shared-ui";
 import { Plus } from "lucide-react";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
 import { GitSidebar, GitStatusView } from "../source-control";
@@ -22,6 +30,7 @@ import type { useDesktopUpdates } from "../../components/DesktopUpdateControls";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import { openExternalUrl } from "../../lib/localFiles";
 import type { FilesVisibilitySettings } from "../../preferences";
+import type { FileClipboardController } from "../data-workspace/useFileClipboard";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import {
   DesktopExplorerRowActions,
@@ -42,6 +51,10 @@ import {
   type DesktopWorkspaceSurfaceAction,
   DesktopSidebarTopNavigation,
 } from "./navigation";
+import {
+  DesktopViewerPackFallback,
+  useDesktopViewerPackSurface,
+} from "../viewer-packs";
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopUpdatesController = ReturnType<typeof useDesktopUpdates>;
@@ -68,6 +81,7 @@ type DesktopWorkspaceContentProps = {
     onStartPuppyoneBackup: () => void;
   };
   dataPort: DataWorkspacePort | null;
+  fileClipboardController: FileClipboardController;
   desktopUpdates: DesktopUpdatesController;
   git: DesktopGitController;
   onActiveDataPathChange: (path: string | null, node?: DataNode | null) => void;
@@ -75,7 +89,7 @@ type DesktopWorkspaceContentProps = {
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
   onNavigate: (view: DesktopView) => void;
-  onNodeActionMenu: (node: DataNode, anchorRect: DOMRect) => void;
+  onNodeActionMenu: (node: DataNode, anchorRect: DOMRect, selectedNodes?: readonly DataNode[]) => void;
   onOpenSettings: () => void;
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
   onSelectSettingsSection: (section: SettingsSection) => void;
@@ -100,6 +114,7 @@ export function DesktopWorkspaceContent({
   activeView,
   cloud,
   dataPort,
+  fileClipboardController,
   desktopUpdates,
   git,
   onActiveDataPathChange,
@@ -158,6 +173,10 @@ export function DesktopWorkspaceContent({
   const handleIntegrationProviderChange = useCallback((provider: string | null) => {
     setActiveIntegrationProvider(provider);
   }, []);
+  const handleOpenGitFile = useCallback((path: string) => {
+    onActiveDataPathChange(path);
+    onNavigate("data");
+  }, [onActiveDataPathChange, onNavigate]);
   const renderPreviewBody = useCallback((node: DataNode, context: FilePreviewBodyContext) => {
     if (!isPuppyFlowFile(node.name, node.type)) return undefined;
 
@@ -172,6 +191,50 @@ export function DesktopWorkspaceContent({
       />
     );
   }, [workspace?.path]);
+
+  const [viewerPackSnapshot, setViewerPackSnapshot] = useState<ViewerPackSnapshot>(EMPTY_VIEWER_PACK_SNAPSHOT);
+  const refreshViewerPackSnapshot = useCallback(async () => {
+    const bridge = window.puppyoneDesktop?.viewerPacks;
+    if (!bridge?.getSnapshot) {
+      setViewerPackSnapshot(EMPTY_VIEWER_PACK_SNAPSHOT);
+      return;
+    }
+    try {
+      const snapshot = await bridge.getSnapshot();
+      setViewerPackSnapshot(snapshot ?? EMPTY_VIEWER_PACK_SNAPSHOT);
+    } catch {
+      setViewerPackSnapshot(EMPTY_VIEWER_PACK_SNAPSHOT);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (cloudWorkspace) {
+      setViewerPackSnapshot(EMPTY_VIEWER_PACK_SNAPSHOT);
+      return;
+    }
+    void refreshViewerPackSnapshot();
+  }, [cloudWorkspace, refreshViewerPackSnapshot, workspaceKey]);
+
+  const externalViewerSurface = useDesktopViewerPackSurface({
+    workspaceRoot: cloudWorkspace ? null : workspace.path,
+    onInstalled: refreshViewerPackSnapshot,
+  });
+  const viewerPackInstallFallback = useCallback(
+    ({ document }: { document: { path: string; name: string; mimeType?: string | null } }) => (
+      <DesktopViewerPackFallback
+        document={{
+          path: document.path,
+          name: document.name,
+          type: "file",
+          mimeType: document.mimeType ?? null,
+          sourceKind: "local",
+        }}
+        onInstalled={refreshViewerPackSnapshot}
+      />
+    ),
+    [refreshViewerPackSnapshot],
+  );
+
   const settingsView = (
     <SettingsView
       workspace={workspace}
@@ -182,6 +245,10 @@ export function DesktopWorkspaceContent({
       themeMode={preferences.themeMode}
       lightThemePreset={preferences.lightThemePreset}
       darkThemePreset={preferences.darkThemePreset}
+      textSize={preferences.textSize}
+      pointerCursors={preferences.pointerCursors}
+      dockIcon={preferences.dockIcon}
+      diffMarkers={preferences.diffMarkers}
       fileIconTheme={preferences.fileIconTheme}
       sidebarNavigationLayout={preferences.sidebarNavigationLayout}
       filesVisibilitySettings={preferences.filesVisibilitySettings}
@@ -202,6 +269,10 @@ export function DesktopWorkspaceContent({
       onThemeModeChange={preferences.setThemeMode}
       onLightThemePresetChange={preferences.setLightThemePreset}
       onDarkThemePresetChange={preferences.setDarkThemePreset}
+      onTextSizeChange={preferences.setTextSize}
+      onPointerCursorsChange={preferences.setPointerCursors}
+      onDockIconChange={preferences.setDockIcon}
+      onDiffMarkersChange={preferences.setDiffMarkers}
       onFileIconThemeChange={preferences.setFileIconTheme}
       onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
       onFilesVisibilitySettingsChange={onFilesVisibilitySettingsChange}
@@ -241,6 +312,7 @@ export function DesktopWorkspaceContent({
       onStagePaths={git.handleStageGitPaths}
       onUnstagePaths={git.handleUnstageGitPaths}
       onDiscardPaths={git.handleDiscardGitPaths}
+      onOpenWorkingFile={handleOpenGitFile}
       onInitializeRepository={git.handleInitializeGitRepository}
     />
   );
@@ -298,6 +370,16 @@ export function DesktopWorkspaceContent({
           {workspaceSurfaceError}
         </div>
       )}
+      {fileClipboardController.notice && (
+        <div
+          className="desktop-file-operation-notice"
+          data-tone={fileClipboardController.notice.tone}
+          role="status"
+          aria-live="polite"
+        >
+          {fileClipboardController.notice.message}
+        </div>
+      )}
       <DataWorkspace
         key={workspaceKey}
         workspace={workspace}
@@ -307,6 +389,10 @@ export function DesktopWorkspaceContent({
         onActivePathChange={onActiveDataPathChange}
         onActiveNodeChange={onActiveDataNodeChange}
         onOpenExternalUrl={openExternalUrl}
+        viewerPackSnapshot={cloudWorkspace ? EMPTY_VIEWER_PACK_SNAPSHOT : viewerPackSnapshot}
+        externalViewerSurface={cloudWorkspace ? null : externalViewerSurface}
+        viewerPackInstallFallback={cloudWorkspace ? null : viewerPackInstallFallback}
+        documentSourceKind={cloudWorkspace ? "cloud" : "local"}
         resizableExplorer
         explorerCollapsed={false}
         explorerWidth={preferences.explorerWidth}
@@ -321,16 +407,20 @@ export function DesktopWorkspaceContent({
           event.stopPropagation();
           onCreateEntryMenu(null, getContextMenuAnchorRect(event));
         }}
-        onExplorerNodeContextMenu={(_state, node, event) => {
+        onExplorerNodeContextMenu={(state, node, event) => {
           event.preventDefault();
           event.stopPropagation();
           const anchorRect = getContextMenuAnchorRect(event);
-          if (node.type === "folder") {
-            onCreateEntryMenu(node.path, anchorRect);
-            return;
-          }
-          onNodeActionMenu(node, anchorRect);
+          const selectedNodes = state.selectedNodes.some((selectedNode) => selectedNode.path === node.path)
+            ? state.selectedNodes
+            : [node];
+          onNodeActionMenu(node, anchorRect, selectedNodes);
         }}
+        explorerCutPaths={fileClipboardController.cutPaths}
+        onCopyNodes={fileClipboardController.copyNodes}
+        onCutNodes={fileClipboardController.cutNodes}
+        onPasteNodes={fileClipboardController.pasteNodes}
+        onDuplicateNodes={fileClipboardController.duplicateNodes}
         explorerListEndSlot={
           <button
             className="tree-row desktop-explorer-list-end-create-row"
@@ -384,17 +474,22 @@ export function DesktopWorkspaceContent({
         renderPreviewBody={renderPreviewBody}
         fileIconTheme={preferences.fileIconTheme}
         editorSaveMode="auto"
-        htmlTrustMode="localTrusted"
+        htmlTrustMode="safe"
         aiEditRequest={activeAiEditRequest}
         enableMarkdownLinkContentIndexing={!cloudWorkspace}
         folderExpansionStrategy={cloudWorkspace ? "optimistic" : "load-before-expand"}
         refreshKey={workspaceRefreshToken}
-        explorerNodeActionSlot={(_state, node) => (
+        explorerNodeActionSlot={(state, node) => (
           <DesktopExplorerRowActions
             node={node}
             parentPath={node.type === "folder" ? node.path : null}
             onCreate={onCreateEntryMenu}
-            onOpenNodeMenu={onNodeActionMenu}
+            onOpenNodeMenu={(targetNode, anchorRect) => {
+              const selectedNodes = state.selectedNodes.some((selectedNode) => selectedNode.path === targetNode.path)
+                ? state.selectedNodes
+                : [targetNode];
+              onNodeActionMenu(targetNode, anchorRect, selectedNodes);
+            }}
           />
         )}
         explorerSlot={resolvedActiveView === "data" ? undefined : (
@@ -490,6 +585,7 @@ export function DesktopWorkspaceContent({
           rename: true,
           delete: true,
           move: true,
+          copy: Boolean(dataPort.copyNode),
           write: true,
           history: true,
           accessPoints: false,
@@ -512,6 +608,9 @@ export function DesktopWorkspaceContent({
 }
 
 function getContextMenuAnchorRect(event: ReactMouseEvent<HTMLElement>): DOMRect {
+  if (event.clientX === 0 && event.clientY === 0) {
+    return event.currentTarget.getBoundingClientRect();
+  }
   return new DOMRect(event.clientX, event.clientY, 0, 0);
 }
 

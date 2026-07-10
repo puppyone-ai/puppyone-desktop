@@ -170,7 +170,7 @@ body.data-sidebar-resizing .data-preview-accessory {
 
 .desktop-explorer-toolbar > span {
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: var(--po-text-size-sidebar, 13px);
   font-weight: 650;
 }
 
@@ -294,12 +294,13 @@ body.data-sidebar-resizing .data-preview-accessory {
   box-sizing: border-box;
   /* Right padding is reduced by the reserved scrollbar gutter so the total
      right inset (gutter + padding) matches --tree-row-right-gap. */
-  padding: 0 calc(var(--tree-row-right-gap) - var(--tree-scrollbar-width))
-    var(--tree-list-bottom-gap) var(--tree-row-left-gap);
+  padding-block: 0 var(--tree-list-bottom-gap);
+  padding-inline: var(--tree-row-left-gap)
+    calc(var(--tree-row-right-gap) - var(--tree-scrollbar-width));
 }
 
 .explorer-tree-shell.no-root .explorer-tree-list {
-  padding-top: var(--tree-no-root-top-gap);
+  padding-block-start: var(--tree-no-root-top-gap);
 }
 
 .data-explorer-footer {
@@ -325,7 +326,7 @@ body.data-sidebar-resizing .data-preview-accessory {
   border-radius: var(--tree-row-radius);
   background: transparent;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: var(--po-text-size-sidebar, 13px);
   font-weight: 500;
   line-height: 18px;
   text-align: left;
@@ -359,6 +360,15 @@ body.data-sidebar-resizing .data-preview-accessory {
 
 .tree-row.dragging {
   opacity: 0.46;
+}
+
+.tree-row.clipboard-cut .tree-row-content {
+  opacity: 0.48;
+}
+
+.tree-row.clipboard-cut:focus-visible .tree-row-content,
+.tree-row.clipboard-cut:hover .tree-row-content {
+  opacity: 0.64;
 }
 
 .tree-row.selected {

@@ -1,8 +1,15 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import type { AppPreviewController, DataNode, FileContent, OfficeDocumentConverter } from "../core/types";
 import { EditorHost } from "../editor/EditorHost";
-import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
-import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../editor/viewerTypes";
+import type { EditorSaveMode, ViewerPackInstallFallbackRenderer } from "../editor/PuppyoneEditorHost";
+import type {
+  DocumentSourceKind,
+  ExternalViewerSurfaceRenderer,
+  MarkdownAssetUrlResolver,
+  MarkdownHtmlTrustMode,
+  MarkdownLinkGraph,
+} from "../editor/viewerTypes";
+import type { ViewerPackSnapshot } from "../editor/viewerPackTypes";
 import type { AiEditFile } from "../editor/ai-edits/types";
 import { FilePreviewIcon, type FileIconThemeId } from "../file/fileIcons";
 
@@ -24,11 +31,17 @@ export type FilePreviewProps = {
   fileIconTheme?: FileIconThemeId;
   editorSaveMode?: EditorSaveMode;
   htmlTrustMode?: MarkdownHtmlTrustMode;
+  workspaceId?: string;
+  workspaceRoot?: string | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
+  viewerPackSnapshot?: ViewerPackSnapshot | null;
+  externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
+  viewerPackInstallFallback?: ViewerPackInstallFallbackRenderer | null;
+  documentSourceKind?: DocumentSourceKind;
 };
 
 export type FilePreviewBodyContext = {
@@ -59,11 +72,17 @@ export function FilePreview({
   fileIconTheme = "default",
   editorSaveMode = "manual",
   htmlTrustMode = "safe",
+  workspaceId = "",
+  workspaceRoot = null,
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
+  viewerPackSnapshot = null,
+  externalViewerSurface = null,
+  viewerPackInstallFallback = null,
+  documentSourceKind = "local",
 }: FilePreviewProps) {
   if (!node) {
     if (emptySlot) return <>{emptySlot}</>;
@@ -132,12 +151,18 @@ export function FilePreview({
               fileIconTheme={fileIconTheme}
               saveMode={editorSaveMode}
               htmlTrustMode={htmlTrustMode}
+              workspaceId={workspaceId}
+              workspaceRoot={workspaceRoot}
               markdownLinkGraph={markdownLinkGraph}
               markdownAssetUrlResolver={markdownAssetUrlResolver}
               appPreview={appPreview}
               openExternalFile={openExternalFile}
               convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
               deferFallbackContent={deferFallbackContent}
+              viewerPackSnapshot={viewerPackSnapshot}
+              externalViewerSurface={externalViewerSurface}
+              viewerPackInstallFallback={viewerPackInstallFallback}
+              documentSourceKind={documentSourceKind}
             />
           </EditorPreviewBoundary>
         )}

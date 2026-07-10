@@ -115,7 +115,7 @@ export function DesktopCloudShell({
                 className="desktop-right-sidebar-resizer"
                 role="separator"
                 aria-orientation="vertical"
-                aria-label="Resize terminal sidebar"
+                aria-label="Resize right sidebar"
                 tabIndex={0}
                 onPointerDown={beginRightSidebarResize}
                 onKeyDown={nudgeRightSidebarWidth}

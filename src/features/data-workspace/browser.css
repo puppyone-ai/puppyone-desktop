@@ -234,6 +234,49 @@
   line-height: 18px;
 }
 
+.viewer-pack-surface,
+.viewer-pack-install-cta,
+.external-viewer-adapter,
+.external-viewer-chooser {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  padding: 16px;
+  color: var(--po-text);
+}
+
+.viewer-pack-surface-host {
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  border: 1px solid var(--po-divider);
+  background: transparent;
+}
+
+.viewer-pack-surface-status,
+.viewer-pack-install-cta-ok,
+.viewer-pack-install-cta-error {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.viewer-pack-surface-status--error,
+.viewer-pack-install-cta-error {
+  color: var(--po-danger, #b42318);
+}
+
+.viewer-pack-install-cta button,
+.external-viewer-chooser button {
+  justify-self: start;
+  padding: 8px 12px;
+  border: 1px solid var(--po-divider);
+  background: var(--po-canvas);
+  color: var(--po-text);
+  cursor: pointer;
+}
+
 .desktop-data-workspace-wrap {
   --po-tree-row-left-gap: var(--desktop-sidebar-row-left-gap);
   --po-tree-row-right-gap: var(--desktop-sidebar-row-right-gap);
@@ -244,8 +287,8 @@
   --po-tree-row-content-right: var(--desktop-sidebar-row-content-right);
   --po-tree-row-icon-label-gap: 4px;
   --po-tree-root-top-gap: var(--desktop-sidebar-section-top-gap);
-  --po-tree-no-root-top-gap: var(--desktop-sidebar-list-padding-y);
-  --po-tree-list-bottom-gap: var(--desktop-sidebar-list-padding-y);
+  --po-tree-no-root-top-gap: var(--desktop-sidebar-list-padding-block);
+  --po-tree-list-bottom-gap: var(--desktop-sidebar-list-padding-block);
   --data-explorer-footer-height: var(--desktop-sidebar-navigation-height);
   --data-explorer-footer-min-height: var(--desktop-sidebar-navigation-height);
 

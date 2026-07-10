@@ -1,8 +1,19 @@
 import type { AppPreviewController, DataNode, FileContent, OfficeDocumentConverter } from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
-import { PuppyoneEditorHost, type EditorSaveMode } from "./PuppyoneEditorHost";
+import {
+  PuppyoneEditorHost,
+  type EditorSaveMode,
+  type ViewerPackInstallFallbackRenderer,
+} from "./PuppyoneEditorHost";
 import type { AiEditFile } from "./ai-edits/types";
-import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "./viewerTypes";
+import type {
+  DocumentSourceKind,
+  ExternalViewerSurfaceRenderer,
+  MarkdownAssetUrlResolver,
+  MarkdownHtmlTrustMode,
+  MarkdownLinkGraph,
+} from "./viewerTypes";
+import type { ViewerPackSnapshot } from "./viewerPackTypes";
 
 export type EditorHostProps = {
   node: DataNode;
@@ -18,12 +29,18 @@ export type EditorHostProps = {
   fileIconTheme?: FileIconThemeId;
   saveMode?: EditorSaveMode;
   htmlTrustMode?: MarkdownHtmlTrustMode;
+  workspaceId?: string;
+  workspaceRoot?: string | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
   deferFallbackContent?: boolean;
+  viewerPackSnapshot?: ViewerPackSnapshot | null;
+  externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
+  viewerPackInstallFallback?: ViewerPackInstallFallbackRenderer | null;
+  documentSourceKind?: DocumentSourceKind;
 };
 
 export function EditorHost({
@@ -40,12 +57,18 @@ export function EditorHost({
   fileIconTheme = "default",
   saveMode = "manual",
   htmlTrustMode = "safe",
+  workspaceId = "",
+  workspaceRoot = null,
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
   deferFallbackContent = false,
+  viewerPackSnapshot = null,
+  externalViewerSurface = null,
+  viewerPackInstallFallback = null,
+  documentSourceKind = "local",
 }: EditorHostProps) {
   return (
     <PuppyoneEditorHost
@@ -57,7 +80,11 @@ export function EditorHost({
         preview: deferFallbackContent ? undefined : node.preview,
         mimeType: fileContent?.mimeType ?? node.mimeType ?? null,
         url: fileContent?.url ?? fileUrl,
+        sourceKind: documentSourceKind,
       }}
+      viewerPackSnapshot={viewerPackSnapshot}
+      externalViewerSurface={externalViewerSurface}
+      viewerPackInstallFallback={viewerPackInstallFallback}
       loading={loading}
       error={error}
       fileUrlLoading={fileUrlLoading}
@@ -68,6 +95,8 @@ export function EditorHost({
       fileIconTheme={fileIconTheme}
       saveMode={saveMode}
       htmlTrustMode={htmlTrustMode}
+      workspaceId={workspaceId}
+      workspaceRoot={workspaceRoot}
       markdownLinkGraph={markdownLinkGraph}
       markdownAssetUrlResolver={markdownAssetUrlResolver}
       appPreview={appPreview}

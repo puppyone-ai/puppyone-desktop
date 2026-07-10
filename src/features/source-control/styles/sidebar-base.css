@@ -1,3 +1,11 @@
+.desktop-git-sidebar,
+.desktop-history-detail-view {
+  --git-action-size: 24px;
+  --git-action-radius: 5px;
+  --git-action-padding-inline: 7px;
+  --git-action-font-size: 12px;
+}
+
 .desktop-tool-sidebar {
   display: flex;
   flex: 1;
@@ -19,8 +27,8 @@
   --git-sidebar-control-width: calc(100% - var(--git-sidebar-control-left-gap) - var(--git-sidebar-control-right-gap));
   --git-sidebar-content-left: var(--desktop-sidebar-row-content-left);
   --git-sidebar-content-right: var(--desktop-sidebar-row-content-right);
-  --git-section-action-size: 28px;
-  --git-working-tree-action-size: 24px;
+  --git-section-action-size: var(--git-action-size);
+  --git-working-tree-action-size: var(--git-action-size);
   --git-working-tree-actions-width: 52px;
   --git-working-tree-state-width: 18px;
   --git-section-body-top-gap: 2px;
@@ -29,10 +37,10 @@
   --git-control-radius: 8px;
   --git-inner-radius: 6px;
   --git-row-radius: var(--desktop-sidebar-row-radius);
-  --git-font-main: 13px;
-  --git-font-small: 13px;
-  --git-weight-regular: 520;
-  --git-weight-strong: 650;
+  --git-font-main: var(--po-text-size-sidebar, 13px);
+  --git-font-small: var(--po-text-size-meta, 12px);
+  --git-weight-regular: var(--po-text-weight-regular, 400);
+  --git-weight-strong: var(--po-text-weight-medium, 500);
 }
 
 .desktop-tool-sidebar-icon {
@@ -81,8 +89,8 @@
   overflow-x: hidden;
   /* Reserved gutter + reduced right padding keep the content inset equal to
      --desktop-sidebar-row-right-gap whether or not the list scrolls. */
-  padding: var(--desktop-sidebar-section-top-gap) var(--desktop-sidebar-scroll-right-gap)
-    var(--desktop-sidebar-section-bottom-gap) var(--desktop-sidebar-row-left-gap);
+  padding-block: var(--desktop-sidebar-list-padding-block);
+  padding-inline: var(--desktop-sidebar-row-left-gap) var(--desktop-sidebar-scroll-right-gap);
   scrollbar-gutter: stable;
 }
 
@@ -99,7 +107,7 @@
   border-radius: var(--desktop-sidebar-row-radius);
   background: transparent;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: var(--po-text-size-sidebar, 13px);
   font-weight: 500;
   line-height: 18px;
   text-align: left;
@@ -211,13 +219,13 @@
 }
 
 .desktop-tool-sidebar-action {
-  height: 26px;
-  padding: 0 9px;
+  height: var(--git-action-size);
+  padding: 0 var(--git-action-padding-inline);
   border: 1px solid color-mix(in srgb, var(--po-accent) 34%, var(--po-border));
-  border-radius: var(--git-control-radius, 8px);
+  border-radius: var(--git-action-radius);
   background: color-mix(in srgb, var(--po-accent) 10%, var(--po-panel));
   color: var(--po-accent);
-  font-size: 12px;
+  font-size: var(--git-action-font-size);
   font-weight: 650;
 }
 

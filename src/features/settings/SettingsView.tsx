@@ -5,10 +5,11 @@ import { DesktopUpdateSettingsRow } from "../../components/DesktopUpdateControls
 import { getDesktopCloudApiBaseUrl, isCloudSessionForApiBase, type DesktopCloudSession } from "../../lib/cloudApi";
 import { clearDesktopCloudSession, onDesktopCloudAuthError, startDesktopCloudOAuth, supportsDesktopCloudOAuth } from "../../lib/cloudSession";
 import { chooseWorkspaceExternalApp } from "../../lib/localFiles";
-import { DARK_THEME_PRESETS, DEFAULT_EXPLORER_EXCLUDE_PATTERNS, LIGHT_THEME_PRESETS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, normalizeExplorerExcludePatterns, normalizeExternalAppExtension, removeExternalAppOverride, upsertExternalAppOverride, type ExperimentalSettings, type ExternalAppsSettings, type FilesVisibilitySettings, type TitlebarActionsSettings } from "../../preferences";
+import { DARK_THEME_PRESETS, DEFAULT_EXPLORER_EXCLUDE_PATTERNS, DOCK_ICON_OPTIONS, LIGHT_THEME_PRESETS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, TEXT_SIZE_PRESETS, normalizeExplorerExcludePatterns, normalizeExternalAppExtension, removeExternalAppOverride, upsertExternalAppOverride, type DarkThemePreset, type DiffMarkers, type ExperimentalSettings, type ExternalAppsSettings, type FilesVisibilitySettings, type LightThemePreset, type ThemeMode, type TitlebarActionsSettings } from "../../preferences";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements";
 import { ExternalAppIcon } from "../external-apps/ExternalAppIcon";
+import { useFeatureFlag } from "../flags";
 import { getPuppyoneRemote, maskRemoteUrl, parsePuppyoneRemote } from "../source-control/remotes";
 import { SettingsGroup, SettingsLine, SettingsSectionHeader } from "./components";
 import { PuppyoneWorkspaceConfigSettings } from "./PuppyoneWorkspaceConfigSettings";
@@ -24,6 +25,10 @@ export function SettingsView({
   themeMode,
   lightThemePreset,
   darkThemePreset,
+  textSize,
+  pointerCursors,
+  dockIcon,
+  diffMarkers,
   fileIconTheme,
   sidebarNavigationLayout,
   filesVisibilitySettings,
@@ -44,6 +49,10 @@ export function SettingsView({
   onThemeModeChange,
   onLightThemePresetChange,
   onDarkThemePresetChange,
+  onTextSizeChange,
+  onPointerCursorsChange,
+  onDockIconChange,
+  onDiffMarkersChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onFilesVisibilitySettingsChange,
@@ -59,6 +68,8 @@ export function SettingsView({
   onCheckForUpdates,
   onUpdateNow,
 }: SettingsViewProps) {
+  const agentChatAvailable = useFeatureFlag("desktopAgentChat");
+  const assetLibraryHomeAvailable = useFeatureFlag("assetLibraryHome");
   const [unlinking, setUnlinking] = useState(false);
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
   const [copiedRemoteKey, setCopiedRemoteKey] = useState<string | null>(null);
@@ -160,6 +171,8 @@ export function SettingsView({
     return (
       <ExperimentalSettingsView
         settings={experimentalSettings}
+        agentChatAvailable={agentChatAvailable}
+        assetLibraryHomeAvailable={assetLibraryHomeAvailable}
         onChange={onExperimentalSettingsChange}
       />
     );
@@ -169,7 +182,9 @@ export function SettingsView({
     return (
       <EditorSettingsView
         aiEditAssistEnabled={aiEditAssistEnabled}
+        diffMarkers={diffMarkers}
         onAiEditAssistEnabledChange={onAiEditAssistEnabledChange}
+        onDiffMarkersChange={onDiffMarkersChange}
       />
     );
   }
@@ -181,44 +196,47 @@ export function SettingsView({
           <div className="desktop-settings-section">
             <SettingsSectionHeader title="Appearance" detail="Local display preferences for this device." />
             <div className="desktop-settings-list">
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-theme-mode-row">
                 <span>Theme</span>
-                <div className="desktop-theme-segment" aria-label="Theme mode">
-                  <button
-                    className={themeMode === "system" ? "active" : ""}
-                    type="button"
-                    onClick={() => onThemeModeChange("system")}
-                  >
-                    <Monitor size={14} />
-                    <span>System</span>
-                  </button>
-                  <button
-                    className={themeMode === "light" ? "active" : ""}
-                    type="button"
-                    onClick={() => onThemeModeChange("light")}
-                  >
-                    <Sun size={14} />
-                    <span>Light</span>
-                  </button>
-                  <button
-                    className={themeMode === "dark" ? "active" : ""}
-                    type="button"
-                    onClick={() => onThemeModeChange("dark")}
-                  >
-                    <Moon size={14} />
-                    <span>Dark</span>
-                  </button>
+                <div className="desktop-theme-choice-list" aria-label="Theme mode">
+                  {([
+                    { value: "system", label: "System", icon: Monitor },
+                    { value: "light", label: "Light", icon: Sun },
+                    { value: "dark", label: "Dark", icon: Moon },
+                  ] as const).map((option) => {
+                    const Icon = option.icon;
+                    return (
+                      <button
+                        className={`desktop-theme-choice ${themeMode === option.value ? "active" : ""}`}
+                        type="button"
+                        key={option.value}
+                        aria-pressed={themeMode === option.value}
+                        onClick={() => onThemeModeChange(option.value)}
+                      >
+                        <ThemePreview
+                          mode={option.value}
+                          lightThemePreset={lightThemePreset}
+                          darkThemePreset={darkThemePreset}
+                        />
+                        <span className="desktop-theme-choice-label">
+                          <Icon size={13} />
+                          <span>{option.label}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control desktop-theme-preset-row">
+              <div className="desktop-settings-row desktop-settings-row-control">
                 <span>Light theme</span>
-                <div className="desktop-theme-preset-list" aria-label="Light theme preset">
+                <div className="desktop-theme-segment desktop-theme-preset-list" aria-label="Light theme preset">
                   {LIGHT_THEME_PRESETS.map((preset) => (
                     <button
                       key={preset.id}
                       className={lightThemePreset === preset.id ? "active" : ""}
                       type="button"
                       title={preset.description}
+                      aria-pressed={lightThemePreset === preset.id}
                       onClick={() => onLightThemePresetChange(preset.id)}
                     >
                       <span className="desktop-theme-preset-swatches" aria-hidden="true">
@@ -231,15 +249,16 @@ export function SettingsView({
                   ))}
                 </div>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control desktop-theme-preset-row">
+              <div className="desktop-settings-row desktop-settings-row-control">
                 <span>Dark theme</span>
-                <div className="desktop-theme-preset-list" aria-label="Dark theme preset">
+                <div className="desktop-theme-segment desktop-theme-preset-list" aria-label="Dark theme preset">
                   {DARK_THEME_PRESETS.map((preset) => (
                     <button
                       key={preset.id}
                       className={darkThemePreset === preset.id ? "active" : ""}
                       type="button"
                       title={preset.description}
+                      aria-pressed={darkThemePreset === preset.id}
                       onClick={() => onDarkThemePresetChange(preset.id)}
                     >
                       <span className="desktop-theme-preset-swatches" aria-hidden="true">
@@ -248,6 +267,23 @@ export function SettingsView({
                         ))}
                       </span>
                       <span>{preset.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="desktop-settings-row desktop-settings-row-control">
+                <span>Text size</span>
+                <div className="desktop-theme-segment desktop-text-size-segment" aria-label="Text size">
+                  {TEXT_SIZE_PRESETS.map((option) => (
+                    <button
+                      key={option.value}
+                      className={textSize === option.value ? "active" : ""}
+                      type="button"
+                      title={option.description}
+                      aria-pressed={textSize === option.value}
+                      onClick={() => onTextSizeChange(option.value)}
+                    >
+                      <span>{option.label}</span>
                     </button>
                   ))}
                 </div>
@@ -340,6 +376,44 @@ export function SettingsView({
                   })}
                 </div>
               </div>
+              <div className="desktop-settings-row desktop-settings-row-control">
+                <span id="desktop-pointer-cursors-label">Pointer cursors</span>
+                <label
+                  className="desktop-settings-switch"
+                  title="Show a hand cursor over clickable controls."
+                >
+                  <input
+                    type="checkbox"
+                    checked={pointerCursors}
+                    aria-labelledby="desktop-pointer-cursors-label"
+                    onChange={(event) => onPointerCursorsChange(event.target.checked)}
+                  />
+                  <span aria-hidden="true" />
+                </label>
+              </div>
+              <div className="desktop-settings-row desktop-settings-row-control">
+                <span id="desktop-dock-icon-label">Dock icon</span>
+                <div
+                  className="desktop-theme-segment desktop-dock-icon-segment"
+                  aria-labelledby="desktop-dock-icon-label"
+                >
+                  {DOCK_ICON_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      className={dockIcon === option.id ? "active" : ""}
+                      type="button"
+                      title={option.description}
+                      aria-label={option.label}
+                      aria-description={option.description}
+                      aria-pressed={dockIcon === option.id}
+                      onClick={() => onDockIconChange(option.id)}
+                    >
+                      <img src={option.previewSrc} alt="" />
+                      <span>{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -395,6 +469,70 @@ export function SettingsView({
         </div>
       </div>
     </section>
+  );
+}
+
+function ThemePreview({
+  mode,
+  lightThemePreset,
+  darkThemePreset,
+}: {
+  mode: ThemeMode;
+  lightThemePreset: LightThemePreset;
+  darkThemePreset: DarkThemePreset;
+}) {
+  return (
+    <span className={`desktop-theme-preview ${mode === "system" ? "system" : ""}`} aria-hidden="true">
+      {mode === "system" ? (
+        <>
+          <ThemePreviewSurface
+            mode="light"
+            lightThemePreset={lightThemePreset}
+            darkThemePreset={darkThemePreset}
+          />
+          <ThemePreviewSurface
+            mode="dark"
+            lightThemePreset={lightThemePreset}
+            darkThemePreset={darkThemePreset}
+          />
+        </>
+      ) : (
+        <ThemePreviewSurface
+          mode={mode}
+          lightThemePreset={lightThemePreset}
+          darkThemePreset={darkThemePreset}
+        />
+      )}
+    </span>
+  );
+}
+
+function ThemePreviewSurface({
+  mode,
+  lightThemePreset,
+  darkThemePreset,
+}: {
+  mode: Exclude<ThemeMode, "system">;
+  lightThemePreset: LightThemePreset;
+  darkThemePreset: DarkThemePreset;
+}) {
+  return (
+    <span
+      className={`desktop-theme-preview-surface ${mode === "dark" ? "dark" : ""}`}
+      data-light-theme-preset={lightThemePreset}
+      data-dark-theme-preset={darkThemePreset}
+    >
+      <i className="desktop-theme-preview-sidebar">
+        <b />
+        <b />
+        <b />
+      </i>
+      <i className="desktop-theme-preview-panel">
+        <b className="accent" />
+        <b />
+        <b />
+      </i>
+    </span>
   );
 }
 
@@ -544,10 +682,14 @@ function AccountSettingsView({
 
 function EditorSettingsView({
   aiEditAssistEnabled,
+  diffMarkers,
   onAiEditAssistEnabledChange,
+  onDiffMarkersChange,
 }: {
   aiEditAssistEnabled: boolean;
+  diffMarkers: DiffMarkers;
   onAiEditAssistEnabledChange: (enabled: boolean) => void;
+  onDiffMarkersChange: (markers: DiffMarkers) => void;
 }) {
   return (
     <section className="desktop-utility-view desktop-settings-view">
@@ -569,6 +711,30 @@ function EditorSettingsView({
                 <span aria-hidden="true" />
               </label>
             </div>
+            <div className="desktop-settings-row desktop-settings-row-control">
+              <span className="desktop-settings-label-stack">
+                <strong>Diff markers</strong>
+                <small>Choose markers for compact AI reviews. Git Changes always shows +/−.</small>
+              </span>
+              <div className="desktop-theme-segment" aria-label="Diff markers">
+                <button
+                  type="button"
+                  className={diffMarkers === "color" ? "active" : ""}
+                  aria-pressed={diffMarkers === "color"}
+                  onClick={() => onDiffMarkersChange("color")}
+                >
+                  <span>Color</span>
+                </button>
+                <button
+                  type="button"
+                  className={diffMarkers === "symbols" ? "active" : ""}
+                  aria-pressed={diffMarkers === "symbols"}
+                  onClick={() => onDiffMarkersChange("symbols")}
+                >
+                  <span>+ / −</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -578,9 +744,13 @@ function EditorSettingsView({
 
 function ExperimentalSettingsView({
   settings,
+  agentChatAvailable,
+  assetLibraryHomeAvailable,
   onChange,
 }: {
   settings: ExperimentalSettings;
+  agentChatAvailable: boolean;
+  assetLibraryHomeAvailable: boolean;
   onChange: (settings: ExperimentalSettings) => void;
 }) {
   return (
@@ -589,9 +759,47 @@ function ExperimentalSettingsView({
         <div className="desktop-settings-section">
           <SettingsSectionHeader
             title="Experimental"
-            detail="Opt in to early file experiences. These entries are hidden by default."
+            detail="Opt in to early desktop experiences. Every experiment is off by default."
           />
           <div className="desktop-settings-list">
+            {assetLibraryHomeAvailable && (
+              <div className="desktop-settings-row desktop-settings-row-control">
+                <span className="desktop-settings-label-stack">
+                  <strong>Projects homepage</strong>
+                  <small>Try the experimental unified card layout for Cloud and local projects.</small>
+                </span>
+                <label className="desktop-settings-switch">
+                  <input
+                    type="checkbox"
+                    checked={settings.enableAssetLibraryHome}
+                    onChange={(event) => onChange({
+                      ...settings,
+                      enableAssetLibraryHome: event.target.checked,
+                    })}
+                  />
+                  <span aria-hidden="true" />
+                </label>
+              </div>
+            )}
+            {agentChatAvailable && (
+              <div className="desktop-settings-row desktop-settings-row-control">
+                <span className="desktop-settings-label-stack">
+                  <strong>Agent Chat</strong>
+                  <small>Show the experimental Chat icon in the header. Terminal remains a separate button and stays available when this is off.</small>
+                </span>
+                <label className="desktop-settings-switch">
+                  <input
+                    type="checkbox"
+                    checked={settings.enableAgentChat}
+                    onChange={(event) => onChange({
+                      ...settings,
+                      enableAgentChat: event.target.checked,
+                    })}
+                  />
+                  <span aria-hidden="true" />
+                </label>
+              </div>
+            )}
             <div className="desktop-settings-row desktop-settings-row-control">
               <span className="desktop-settings-label-stack">
                 <strong>Puppyone App files</strong>

@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import { MessageSquare } from "lucide-react";
 import {
   DesktopUpdateTitlebarButton,
   type useDesktopUpdates,
@@ -20,11 +21,14 @@ type DesktopTitlebarActionsProps = {
   titlebarActionsSettings: TitlebarActionsSettings;
   terminalSidebarOpen: boolean;
   terminalToolEnabled: boolean;
+  agentChatEnabled: boolean;
+  agentChatSidebarOpen: boolean;
   onClearTerminal: () => void;
   onOpenActiveFileExternal: () => void;
   onOpenActiveFileWithApp: (appPath: string | null) => void;
   onCustomizeExternalAppForActiveFile: () => void;
   onResetTerminal: () => void;
+  onToggleAgentChat: () => void;
   onToggleTerminal: () => void;
   onUpdateNow: () => void;
 };
@@ -40,11 +44,14 @@ export function DesktopTitlebarActions({
   titlebarActionsSettings,
   terminalSidebarOpen,
   terminalToolEnabled,
+  agentChatEnabled,
+  agentChatSidebarOpen,
   onClearTerminal,
   onOpenActiveFileExternal,
   onOpenActiveFileWithApp,
   onCustomizeExternalAppForActiveFile,
   onResetTerminal,
+  onToggleAgentChat,
   onToggleTerminal,
   onUpdateNow,
 }: DesktopTitlebarActionsProps) {
@@ -159,6 +166,36 @@ export function DesktopTitlebarActions({
           </Fragment>
         );
       })}
+      <AgentChatTitlebarButton
+        enabled={agentChatEnabled}
+        open={agentChatSidebarOpen}
+        onToggle={onToggleAgentChat}
+      />
     </>
+  );
+}
+
+export function AgentChatTitlebarButton({
+  enabled,
+  open,
+  onToggle,
+}: {
+  enabled: boolean;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  if (!enabled) return null;
+  const label = open ? "Hide Agent Chat" : "Show Agent Chat";
+  return (
+    <button
+      className="desktop-titlebar-action desktop-titlebar-agent-chat"
+      type="button"
+      title={label}
+      aria-label={label}
+      aria-pressed={open}
+      onClick={onToggle}
+    >
+      <MessageSquare size={16} />
+    </button>
   );
 }

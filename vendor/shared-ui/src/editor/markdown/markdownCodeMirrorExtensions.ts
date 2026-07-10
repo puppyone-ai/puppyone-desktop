@@ -4,6 +4,7 @@ import { HighlightStyle, bracketMatching, indentOnInput, syntaxHighlighting } fr
 import type { Extension } from "@codemirror/state";
 import {
   EditorView,
+  ViewPlugin,
   dropCursor,
   highlightActiveLine,
   highlightSpecialChars,
@@ -11,18 +12,22 @@ import {
   placeholder,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { markdownLivePreviewDecorations } from "./decorations/livePreviewDecorations";
-import { markdownBlockWidgetSelectionExtension } from "./widgets/blockWidgetSelection";
-import { markdownEditingKeymap } from "./keymap/markdownEditingKeymap";
-import { markdownLivePreviewContextExtension } from "./markdownLivePreviewContext";
-import { markdownComposingBlockLineField, markdownInputCompositionExtension } from "./state/composingBlockLine";
-import { markdownExpandedImageField } from "./state/expandedImage";
-import { markdownLivePreviewFocusExtension } from "./state/livePreviewFocus";
+import { markdownLivePreviewDecorations } from "./core/decorations/livePreviewDecorations";
+import { markdownBlockWidgetSelectionExtension } from "./core/interaction/blockWidgetSelection";
+import { markdownEditingKeymap } from "./core/commands/markdownEditingKeymap";
+import { markdownLivePreviewContextExtension } from "./core/editor/markdownLivePreviewContext";
+import { markdownComposingBlockLineField, markdownInputCompositionExtension } from "./core/state/composingBlockLine";
+import { markdownExpandedImageField } from "./core/state/expandedImage";
+import { markdownLivePreviewFocusExtension } from "./core/state/livePreviewFocus";
+import { markdownTableFocusExtension } from "./features/table/tableFocus";
+import { markdownAssetUrlResolverFacet, markdownWorkspaceRootFacet } from "./core/editor/markdownLivePreviewContext";
+import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "./platform/codemirror/embedHost";
+import { getDocRevision } from "./platform/brokers/transactionBroker";
 import {
   markdownHiddenMarkerSelectionNormalizer,
   trailingLineWhitespaceSelectionExtension,
-} from "./state/selectionBehavior";
-import { puppyMarkdownParserExtensions } from "./syntax/markdownParserExtensions";
+} from "./core/state/selectionBehavior";
+import { puppyMarkdownParserExtensions } from "./core/syntax/markdownParserExtensions";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
 
 export function markdownCodeMirrorBaseExtensions(readOnly: boolean): Extension[] {
@@ -53,19 +58,59 @@ export function markdownLivePreviewExtension(
   markdownLinkGraph: MarkdownLinkGraph | null = null,
   documentPath = "",
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null = null,
+  workspaceId = "",
+  workspaceRoot: string | null = null,
 ): Extension {
   return [
     keymap.of([...markdownEditingKeymap]),
-    markdownLivePreviewContextExtension(htmlTrustMode, markdownLinkGraph, documentPath, markdownAssetUrlResolver),
+    markdownLivePreviewContextExtension(
+      htmlTrustMode,
+      markdownLinkGraph,
+      documentPath,
+      markdownAssetUrlResolver,
+      workspaceId,
+      workspaceRoot,
+    ),
     markdownHiddenMarkerSelectionNormalizer,
     markdownLivePreviewFocusExtension,
     markdownInputCompositionExtension,
     markdownComposingBlockLineField,
     markdownExpandedImageField,
+    markdownTableFocusExtension,
+    markdownEmbedHostLifecycle,
     markdownLivePreviewDecorations,
     markdownBlockWidgetSelectionExtension,
   ];
 }
+
+const markdownEmbedHostLifecycle = ViewPlugin.fromClass(class {
+  private readonly view: EditorView;
+
+  constructor(view: EditorView) {
+    this.view = view;
+    getMarkdownEmbedHost(view, {
+      resolveAssetUrl: view.state.facet(markdownAssetUrlResolverFacet),
+      workspaceRoot: view.state.facet(markdownWorkspaceRootFacet),
+    });
+  }
+
+  update(update: import("@codemirror/view").ViewUpdate) {
+    if (!update.docChanged) return;
+    const host = getMarkdownEmbedHost(this.view);
+    const previousRevision = getDocRevision(update.startState.doc);
+    const nextRevision = getDocRevision(update.state.doc);
+    host.editSessions.mapRanges((pos, assoc) => update.changes.mapPos(pos, assoc));
+    // A source revision change destroys revision-bound execution sessions,
+    // aborts their jobs, and revokes their principal-scoped asset handles.
+    host.executionSessions.destroyForRevisionChange(previousRevision, nextRevision);
+    host.assets.revokeStaleRevision(host.viewId, nextRevision);
+    host.webEmbeds.destroyStaleRevision(host.viewId, nextRevision);
+  }
+
+  destroy() {
+    disposeMarkdownEmbedHost(this.view);
+  }
+});
 
 const puppyMarkdownEditorTheme = EditorView.theme({
   "&": {

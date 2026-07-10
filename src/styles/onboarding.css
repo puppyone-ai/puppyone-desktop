@@ -123,6 +123,63 @@
   transition: stroke 150ms ease-out;
 }
 
+.folder-drop-cloud-sky,
+.folder-drop-cloud-glaze {
+  opacity: 0;
+  transition: opacity 220ms ease-out;
+}
+
+.folder-drop-cloud-sky {
+  filter: grayscale(0.32) saturate(0.5) contrast(0.9) brightness(0.94);
+}
+
+.folder-drop-cloud-glaze {
+  fill: url("#onboarding-cloud-project-glaze");
+}
+
+.folder-drop-cloud-glaze-top {
+  stop-color: var(--po-panel-raised);
+  stop-opacity: 0.46;
+}
+
+.folder-drop-cloud-glaze-middle {
+  stop-color: var(--po-panel-raised);
+  stop-opacity: 0.16;
+}
+
+.folder-drop-cloud-glaze-bottom {
+  stop-color: var(--po-panel-raised);
+  stop-opacity: 0.56;
+}
+
+.folder-drop-zone.cloud-mode {
+  --onboarding-cloud-ink: var(--po-text);
+  color: var(--onboarding-cloud-ink);
+}
+
+.folder-drop-zone.cloud-mode .folder-drop-fill {
+  fill: color-mix(in srgb, var(--po-panel-raised) 90%, var(--po-info) 10%);
+}
+
+.folder-drop-zone.cloud-mode .folder-drop-cloud-sky {
+  opacity: 0.3;
+}
+
+.folder-drop-zone.cloud-mode .folder-drop-cloud-glaze {
+  opacity: 0.78;
+}
+
+.folder-drop-zone.cloud-mode .folder-drop-border {
+  stroke: color-mix(in srgb, var(--po-border-strong) 72%, transparent);
+  stroke-dasharray: none;
+  stroke-width: 1.5;
+}
+
+.folder-drop-zone.cloud-mode .folder-drop-shadow {
+  fill: var(--po-shadow);
+  opacity: 0;
+}
+
 .folder-drop-body {
   position: relative;
   z-index: 2;
@@ -155,6 +212,30 @@
 .folder-drop-zone.dragging .folder-drop-shadow,
 .onboarding-shell.dragging .folder-drop-zone:not(.cloud-mode) .folder-drop-shadow {
   opacity: 1;
+}
+
+.folder-drop-zone.cloud-mode:hover,
+.folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) {
+  color: var(--po-text);
+}
+
+.folder-drop-zone.cloud-mode:hover .folder-drop-border,
+.folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) .folder-drop-border {
+  stroke: var(--po-border-strong);
+}
+
+.folder-drop-zone.cloud-mode:hover .folder-drop-cloud-sky,
+.folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) .folder-drop-cloud-sky {
+  opacity: 0.42;
+}
+
+.folder-drop-zone.cloud-mode .folder-drop-icon {
+  color: color-mix(in srgb, var(--po-info) 62%, var(--po-text) 38%);
+}
+
+.folder-drop-zone.cloud-mode:hover .folder-drop-icon,
+.folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) .folder-drop-icon {
+  color: color-mix(in srgb, var(--po-info) 78%, var(--po-text) 22%);
 }
 
 .folder-drop-zone.dragging,

@@ -3,6 +3,13 @@ import type { AppPreviewController, OfficeDocumentConverter } from "../core/type
 import type { FileFormat } from "../core/fileFormats";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
+import type {
+  DocumentSourceKind,
+  ViewerContribution,
+  ViewerPackSnapshot,
+} from "./viewerPackTypes";
+
+export type { DocumentSourceKind } from "./viewerPackTypes";
 
 export type EditorDocumentKind =
   | "folder"
@@ -31,6 +38,25 @@ export type EditorDocument = {
   preview?: string | null;
   mimeType?: string | null;
   url?: string | null;
+  /**
+   * Where the document was sourced. Plugin routing fails closed for `cloud`
+   * and `unknown`; only explicit `local` documents can activate a Viewer Pack.
+   */
+  sourceKind?: DocumentSourceKind;
+};
+
+/**
+ * A host-provided callback that renders the native/sandboxed surface slot for
+ * an activated plugin session. Dependency-injected by the desktop shell so
+ * shared-ui never imports Electron or spawns a session itself.
+ */
+export type ExternalViewerSurfaceRenderer = (
+  request: ExternalViewerSurfaceRequest,
+) => ReactNode;
+
+export type ExternalViewerSurfaceRequest = {
+  document: EditorDocument;
+  contribution: ViewerContribution;
 };
 
 export type EditorMode = "live" | "source";
@@ -75,10 +101,20 @@ export type MarkdownLinkGraph = {
   getBacklinks?: (path: string) => MarkdownBacklink[];
 };
 
+export type MarkdownResolvedAssetUrl = {
+  url: string;
+  revoke?: () => void | Promise<void>;
+};
+
 export type MarkdownAssetUrlResolver = (
   sourcePath: string,
   href: string,
-) => string | null | Promise<string | null>;
+  signal?: AbortSignal,
+) =>
+  | string
+  | MarkdownResolvedAssetUrl
+  | null
+  | Promise<string | MarkdownResolvedAssetUrl | null>;
 
 export type EditorViewerMatch = {
   document: EditorDocument;
@@ -99,16 +135,23 @@ export type EditorViewerContext = EditorViewerMatch & {
   fileIconTheme: FileIconThemeId;
   saveMode: EditorSaveMode;
   htmlTrustMode: MarkdownHtmlTrustMode;
+  workspaceId?: string;
+  workspaceRoot?: string | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
   onSaveContent?: (content: string) => Promise<void>;
+  /** Immutable, validated snapshot of enabled viewer-pack contributions. */
+  viewerPackSnapshot?: ViewerPackSnapshot | null;
+  /** Host-provided renderer for an activated plugin surface (DI, not Electron). */
+  externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
 };
 
 export type EditorViewer = {
   id: string;
+  capability: import("./viewerPackTypes").CoreViewerCapability;
   source: EditorSourceRequirement;
   match: (match: EditorViewerMatch) => boolean;
   allowPreviewContent?: boolean;

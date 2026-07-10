@@ -10,7 +10,10 @@ import {
   MinimalOnboarding,
   type OnboardingOperationStatus,
 } from "./components/MinimalOnboarding";
+import { AssetLibraryHome } from "./components/AssetLibraryHome";
 import { RightTerminalPanel, type RightTerminalPanelHandle } from "./components/RightTerminalPanel";
+import { RightAgentPanel } from "./features/desktop-agent/RightAgentPanel";
+import { isDesktopAgentChatEnabled, isDesktopTerminalEnabled } from "./features/desktop-agent/featureGate";
 import { useDesktopUpdates } from "./components/DesktopUpdateControls";
 import {
   configureWorkspaceCloudRemote,
@@ -51,6 +54,7 @@ import { DesktopOverlayPortal } from "./features/app-shell/DesktopOverlayPortal"
 import type { DesktopWorkspaceSwitcherItem } from "./features/app-shell/DesktopWorkspaceSwitcher";
 import { RestoringWorkspaceScreen } from "./features/app-shell/RestoringWorkspaceScreen";
 import { useDesktopPreferences } from "./features/app-shell/useDesktopPreferences";
+import { isAssetLibraryHomeEnabled } from "./features/app-shell/homeFeatureGate";
 import { useWorkspaceLifecycle } from "./features/app-shell/useWorkspaceLifecycle";
 import { usePuppyoneConfig } from "./features/app-shell/usePuppyoneConfig";
 import { useActiveExternalOpenTarget } from "./features/external-apps/useActiveExternalOpenTarget";
@@ -65,12 +69,12 @@ import {
 import { createExplorerDataPort } from "./features/data-workspace/explorer";
 import { useDataNodeActions } from "./features/data-workspace/useDataNodeActions";
 import { useAiEditReviewRequest } from "./features/data-workspace/useAiEditReviewRequest";
-import { useWorkspaceFileWatch } from "./features/data-workspace/useWorkspaceFileWatch";
 import {
   BranchSwitchConflictDialog,
   GitOperationErrorDialog,
 } from "./features/source-control/operationDialogs";
 import { useDesktopGitController } from "./features/source-control/useDesktopGitController";
+import { createRepositoryRefreshReason } from "./features/source-control/repositoryRefreshPolicy";
 import { getPuppyoneRemote, parsePuppyoneRemote } from "./features/source-control/remotes";
 import { CloudProjectResolveDialog } from "./features/cloud/workspace/CloudProjectResolveDialog";
 import { useWorkspaceSurfaceSwitch } from "./features/cloud/workspace/useWorkspaceSurfaceSwitch";
@@ -83,6 +87,8 @@ export function App() {
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
   const cloudEnabled = useFeatureFlag("cloudWorkspace");
+  const assetLibraryHomeAvailable = useFeatureFlag("assetLibraryHome");
+  const agentChatAvailable = useFeatureFlag("desktopAgentChat");
   const {
     cloudSession,
     cloudSessionRestoring,
@@ -135,6 +141,7 @@ export function App() {
   const {
     aiEditAssistEnabled,
     explorerWidth,
+    experimentalSettings,
     externalAppsSettings,
     fileIconTheme,
     filesVisibilitySettings,
@@ -142,15 +149,19 @@ export function App() {
     rightSidebarOpen,
     rightSidebarToolsSettings,
     rightSidebarWidth,
+    rightSidebarSurface,
+    agentPreferredModel,
     sidebarCollapsed,
     sidebarNavigationLayout,
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
-    terminalSidebarOpen,
     terminalToolEnabled,
     titlebarActionsSettings,
     darkThemePreset,
+    diffMarkers,
     lightThemePreset,
+    pointerCursors,
+    textSize,
     themeMode,
     setAiEditAssistEnabled,
     setExplorerWidth,
@@ -160,10 +171,17 @@ export function App() {
     setRightSidebarOpen,
     setRightSidebarToolsSettings,
     setRightSidebarWidth,
+    setRightSidebarSurface,
+    setAgentPreferredModel,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setThemeMode,
   } = preferences;
+  const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
+    available: assetLibraryHomeAvailable,
+    optedIn: experimentalSettings.enableAssetLibraryHome,
+  });
+  const Homepage = assetLibraryHomeEnabled ? AssetLibraryHome : MinimalOnboarding;
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("account");
   const [terminalSessionResetToken, setTerminalSessionResetToken] = useState(0);
   const terminalPanelRef = useRef<RightTerminalPanelHandle | null>(null);
@@ -173,6 +191,35 @@ export function App() {
   const switcherRef = useRef<HTMLDivElement>(null);
   const cloudBrowserSignInInFlightRef = useRef(false);
   const workspaceIsCloud = isCloudWorkspace(workspace);
+  const desktopTerminalEnabled = isDesktopTerminalEnabled({ terminalToolEnabled, workspaceIsCloud });
+  const desktopAgentChatEnabled = isDesktopAgentChatEnabled({
+    available: agentChatAvailable,
+    optedIn: experimentalSettings.enableAgentChat,
+    workspaceIsCloud,
+  });
+  const desktopRightSidebarEnabled = desktopTerminalEnabled || desktopAgentChatEnabled;
+
+  useEffect(() => {
+    if (!desktopRightSidebarEnabled) {
+      if (rightSidebarOpen) setRightSidebarOpen(false);
+      return;
+    }
+    if (rightSidebarSurface === "terminal" && !desktopTerminalEnabled) {
+      setRightSidebarSurface("chat");
+      return;
+    }
+    if (rightSidebarSurface === "chat" && !desktopAgentChatEnabled) {
+      setRightSidebarSurface("terminal");
+    }
+  }, [
+    desktopAgentChatEnabled,
+    desktopRightSidebarEnabled,
+    desktopTerminalEnabled,
+    rightSidebarOpen,
+    rightSidebarSurface,
+    setRightSidebarOpen,
+    setRightSidebarSurface,
+  ]);
   const cloudProjectId = getCloudProjectIdFromWorkspace(workspace);
   useEffect(() => {
     if (workspace && homeOperationStatus) setHomeOperationStatus(null);
@@ -228,6 +275,7 @@ export function App() {
     selectedGitCommitId,
     selectedGitWorkingFile,
     applyGitStatus,
+    captureGitRepositoryContext,
     clearGitSelection,
     dismissGitOperationError,
     handleCheckoutGitBranch,
@@ -246,6 +294,7 @@ export function App() {
     handleStashAndCheckoutBranch,
     handleUnstageAllGitChanges,
     handleUnstageGitPaths,
+    isGitRepositoryContextCurrent,
     refreshGitStatus,
     refreshGitStatusWithFetch,
     selectGitCommit,
@@ -294,12 +343,6 @@ export function App() {
     },
     [cloudDataPort, filesVisibilitySettings, localDataPort, workspaceIsCloud],
   );
-  useWorkspaceFileWatch({
-    onGitRefresh: refreshGitStatus,
-    onWorkspaceContentChanged: refreshWorkspaceContent,
-    workspace,
-    workspaceIsCloud,
-  });
   const latestAiEditRequest = useAiEditReviewRequest({
     aiEditAssistEnabled,
     onWorkspaceContentChanged: refreshWorkspaceContent,
@@ -317,6 +360,7 @@ export function App() {
   const {
     createEntryDraft,
     nodeActionMenu,
+    fileClipboardController,
     resetDataNodeActions,
     setCreateEntryDraft,
     setNodeActionMenu,
@@ -553,7 +597,7 @@ export function App() {
     const savedConfig = await savePuppyoneConfig(nextConfig);
     if (savedConfig) {
       setWorkspaceRefreshToken((token) => token + 1);
-      await refreshGitStatus();
+      await refreshGitStatus("configuration");
     }
     return savedConfig;
   }, [refreshGitStatus, savePuppyoneConfig]);
@@ -625,7 +669,9 @@ export function App() {
     if (!cloudEnabled) return null;
     if (!workspace) return null;
     if (workspaceIsCloud) return null;
-    await configureWorkspaceCloudRemote(workspace.path, remoteUrl, "puppyone");
+    const context = captureGitRepositoryContext(workspace.path);
+    if (!context) return null;
+    await configureWorkspaceCloudRemote(context.rootPath, remoteUrl, "puppyone");
     const remoteProjectId = parsePuppyoneRemote(remoteUrl)?.projectId?.trim() || null;
     const nextProjectId = projectId?.trim() || remoteProjectId || puppyoneConfig?.cloud.projectId?.trim() || null;
     const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
@@ -661,11 +707,25 @@ export function App() {
         },
       }));
     }
-    const refreshedStatus = await getWorkspaceGitStatus(workspace.path);
-    applyGitStatus(refreshedStatus, workspace.path);
-    refreshWorkspaceContent();
+    const refreshedStatus = await getWorkspaceGitStatus(context.rootPath);
+    if (applyGitStatus(
+      refreshedStatus,
+      context,
+      createRepositoryRefreshReason("configure-remote", "mutation"),
+    )) {
+      refreshWorkspaceContent();
+    }
     return refreshedStatus;
-  }, [applyGitStatus, cloudEnabled, handlePuppyoneConfigChange, puppyoneConfig, refreshWorkspaceContent, workspace, workspaceIsCloud]);
+  }, [
+    applyGitStatus,
+    captureGitRepositoryContext,
+    cloudEnabled,
+    handlePuppyoneConfigChange,
+    puppyoneConfig,
+    refreshWorkspaceContent,
+    workspace,
+    workspaceIsCloud,
+  ]);
 
   const {
     cloudBackupError,
@@ -675,10 +735,12 @@ export function App() {
     activeCloudSession,
     activeGitStatus,
     applyGitStatus,
+    captureGitRepositoryContext,
     clearGitSelection,
     cloudEnabled,
     handleCloudSessionChange,
     handlePuppyoneConfigChange,
+    isGitRepositoryContextCurrent,
     puppyoneConfig,
     refreshWorkspaceContent,
     setActiveCloudSection,
@@ -722,6 +784,9 @@ export function App() {
         themeMode={themeMode}
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
+        textSize={textSize}
+        pointerCursors={pointerCursors}
+        diffMarkers={diffMarkers}
         resolvedTheme={resolvedTheme}
       />
     );
@@ -730,7 +795,7 @@ export function App() {
   if (!workspace) {
     return (
       <>
-        <MinimalOnboarding
+        <Homepage
           onChooseWorkspace={openFolder}
           onCreateCloudProject={cloudEnabled ? createCloudProjectFromHomepage : undefined}
           onOpenCloudProject={cloudEnabled ? openCloudProjectFromHomepage : undefined}
@@ -746,12 +811,18 @@ export function App() {
           themeMode={themeMode}
           lightThemePreset={lightThemePreset}
           darkThemePreset={darkThemePreset}
+          textSize={textSize}
+          pointerCursors={pointerCursors}
+          diffMarkers={diffMarkers}
           resolvedTheme={resolvedTheme}
         />
         <DesktopOverlayPortal
           theme={resolvedTheme}
           lightThemePreset={lightThemePreset}
           darkThemePreset={darkThemePreset}
+          textSize={textSize}
+          pointerCursors={pointerCursors}
+          diffMarkers={diffMarkers}
         >
           <CloudServicePanel
             open={cloudPanelOpen}
@@ -819,8 +890,6 @@ export function App() {
     />
   );
 
-  const desktopTerminalEnabled = terminalToolEnabled && !workspaceIsCloud;
-
   const titlebarActions = (
     <DesktopTitlebarActions
       desktopUpdates={desktopUpdates}
@@ -831,8 +900,10 @@ export function App() {
       activeFileExternalOpenLoading={activeExternalOpen.loading}
       externalOpenTargets={activeExternalOpen.targets}
       titlebarActionsSettings={titlebarActionsSettings}
-      terminalSidebarOpen={terminalSidebarOpen && desktopTerminalEnabled}
+      terminalSidebarOpen={rightSidebarOpen && desktopTerminalEnabled && rightSidebarSurface === "terminal"}
       terminalToolEnabled={desktopTerminalEnabled}
+      agentChatEnabled={desktopAgentChatEnabled}
+      agentChatSidebarOpen={rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat"}
       onClearTerminal={() => {
         terminalPanelRef.current?.clear();
         setSwitcherOpen(false);
@@ -845,7 +916,16 @@ export function App() {
         setSwitcherOpen(false);
       }}
       onToggleTerminal={() => {
-        setRightSidebarOpen((open) => !open);
+        const terminalIsOpen = rightSidebarOpen && rightSidebarSurface === "terminal";
+        setRightSidebarSurface("terminal");
+        setRightSidebarOpen(!terminalIsOpen);
+        setSwitcherOpen(false);
+      }}
+      onToggleAgentChat={() => {
+        if (!desktopAgentChatEnabled) return;
+        const chatIsOpen = rightSidebarOpen && rightSidebarSurface === "chat";
+        setRightSidebarSurface("chat");
+        setRightSidebarOpen(!chatIsOpen);
         setSwitcherOpen(false);
       }}
       onUpdateNow={() => {
@@ -861,23 +941,52 @@ export function App() {
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
+      data-text-size={textSize}
+      data-pointer-cursors={pointerCursors ? "true" : "false"}
+      data-diff-markers={diffMarkers}
     >
       <DesktopCloudShell
         titlebarSlot={titlebarSlot}
         titlebarActions={titlebarActions}
-        rightSidebarOpen={terminalSidebarOpen && desktopTerminalEnabled}
+        rightSidebarOpen={rightSidebarOpen && desktopRightSidebarEnabled}
         resizableRightSidebar
         rightSidebarWidth={rightSidebarWidth}
         minRightSidebarWidth={MIN_RIGHT_SIDEBAR_WIDTH}
         maxRightSidebarWidth={MAX_RIGHT_SIDEBAR_WIDTH}
         onRightSidebarWidthChange={setRightSidebarWidth}
-        rightSidebar={desktopTerminalEnabled ? (
-          <RightTerminalPanel
-            key={`${workspace.path}:${terminalSessionResetToken}`}
-            ref={terminalPanelRef}
-            workspace={workspace}
-            active={terminalSidebarOpen && desktopTerminalEnabled}
-          />
+        rightSidebar={desktopRightSidebarEnabled ? (
+          <div className="desktop-right-sidebar-stack" key={workspace.path}>
+            {desktopTerminalEnabled && (
+              <div
+                className={`desktop-right-sidebar-surface ${rightSidebarSurface === "terminal" ? "is-active" : ""}`}
+                aria-hidden={rightSidebarSurface !== "terminal"}
+              >
+                <RightTerminalPanel
+                  key={`${workspace.path}:${terminalSessionResetToken}`}
+                  ref={terminalPanelRef}
+                  workspace={workspace}
+                  active={rightSidebarOpen && rightSidebarSurface === "terminal"}
+                />
+              </div>
+            )}
+            {desktopAgentChatEnabled && (
+              <div
+                className={`desktop-right-sidebar-surface ${rightSidebarSurface === "chat" ? "is-active" : ""}`}
+                aria-hidden={rightSidebarSurface !== "chat"}
+              >
+                <RightAgentPanel
+                  workspace={workspace}
+                  active={rightSidebarOpen && rightSidebarSurface === "chat"}
+                  preferredModel={agentPreferredModel}
+                  onPreferredModelChange={setAgentPreferredModel}
+                  onViewChanges={() => {
+                    setActiveView("git");
+                    setSidebarCollapsed(false);
+                  }}
+                />
+              </div>
+            )}
+          </div>
         ) : undefined}
       >
         <DesktopWorkspaceContent
@@ -916,6 +1025,7 @@ export function App() {
           onActiveDataNodeChange={setActiveDataNode}
           onActiveDataPathChange={handleActiveDataPathChange}
           onCreateEntryMenu={openCreateEntryMenu}
+          fileClipboardController={fileClipboardController}
           onFilesVisibilitySettingsChange={handleFilesVisibilitySettingsChange}
           onNavigate={navigateDesktopView}
           onNodeActionMenu={openNodeActionMenu}
@@ -941,6 +1051,9 @@ export function App() {
         theme={resolvedTheme}
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
+        textSize={textSize}
+        pointerCursors={pointerCursors}
+        diffMarkers={diffMarkers}
       >
         <>
           {pendingBranchSwitch && (
@@ -976,6 +1089,12 @@ export function App() {
                 experimentalSettings={preferences.experimentalSettings}
                 fileIconTheme={fileIconTheme}
                 onCancel={() => setCreateEntryDraft(null)}
+                onPaste={() => {
+                  setCreateEntryDraft(null);
+                  void fileClipboardController.pasteNodes(createEntryDraft.parentPath);
+                }}
+                pasteDisabled={!fileClipboardController.canPasteInto(createEntryDraft.parentPath)}
+                pasteLabel={getPasteMenuLabel(fileClipboardController.clipboard?.nodes.length ?? 0)}
                 onSelectKind={selectCreateEntryKind}
               />
             )
@@ -986,8 +1105,29 @@ export function App() {
               experimentalSettings={preferences.experimentalSettings}
               showRevealInFinder={!workspaceIsCloud}
               showOpenInDefaultApp={!workspaceIsCloud}
+              canPaste={nodeActionMenu.node.type === "folder" && fileClipboardController.canPasteInto(nodeActionMenu.node.path)}
+              canCopy={fileClipboardController.canCopy}
+              canCut={fileClipboardController.canCut}
+              canDuplicate={fileClipboardController.canDuplicate}
               onChange={setNodeActionMenu}
               onCancel={() => setNodeActionMenu(null)}
+              onCopy={() => {
+                fileClipboardController.copyNodes(nodeActionMenu.nodes);
+                setNodeActionMenu(null);
+              }}
+              onCut={() => {
+                fileClipboardController.cutNodes(nodeActionMenu.nodes);
+                setNodeActionMenu(null);
+              }}
+              onPaste={() => {
+                setNodeActionMenu(null);
+                void fileClipboardController.pasteNodes(nodeActionMenu.node.path);
+              }}
+              onDuplicate={() => {
+                setNodeActionMenu(null);
+                void fileClipboardController.duplicateNodes(nodeActionMenu.nodes);
+              }}
+              onCreateInside={() => openCreateEntryMenu(nodeActionMenu.node.path, nodeActionMenu.anchor)}
               onRename={renameNodeFromMenu}
               onDelete={deleteNodeFromMenu}
               onOpenInDefaultApp={openNodeInDefaultAppFromMenu}
@@ -1039,4 +1179,9 @@ export function App() {
       </DesktopOverlayPortal>
     </div>
   );
+}
+
+function getPasteMenuLabel(itemCount: number): string {
+  if (itemCount <= 0) return "Paste";
+  return itemCount === 1 ? "Paste Item" : `Paste ${itemCount} Items`;
 }

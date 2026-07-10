@@ -1,6 +1,9 @@
 export type ThemeMode = "system" | "light" | "dark";
 export type LightThemePreset = "neutral" | "warm" | "graphite";
-export type DarkThemePreset = "default" | "graphite";
+export type DarkThemePreset = "default" | "warm" | "graphite";
+export type TextSize = "small" | "default" | "large";
+export type DockIcon = "polished" | "light" | "matte";
+export type DiffMarkers = "color" | "symbols";
 export type GitDisplayMode = "simple" | "professional";
 
 export type SidebarNavigationLayout =
@@ -39,6 +42,8 @@ export type TitlebarActionsSettings = {
   order: TitlebarActionId[];
 };
 export type ExperimentalSettings = {
+  enableAgentChat: boolean;
+  enableAssetLibraryHome: boolean;
   enablePuppyoneAppFiles: boolean;
   enablePuppyFlowFiles: boolean;
 };
@@ -47,6 +52,10 @@ export const THEME_STORAGE_KEY = "puppyone.desktop.theme";
 export const LEGACY_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.themePreset";
 export const LIGHT_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.lightThemePreset";
 export const DARK_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.darkThemePreset";
+export const TEXT_SIZE_STORAGE_KEY = "puppyone.desktop.textSize";
+export const POINTER_CURSORS_STORAGE_KEY = "puppyone.desktop.pointerCursors";
+export const DOCK_ICON_STORAGE_KEY = "puppyone.desktop.dockIcon";
+export const DIFF_MARKERS_STORAGE_KEY = "puppyone.desktop.diffMarkers";
 export const FILE_ICON_THEME_STORAGE_KEY = "puppyone.desktop.fileIconTheme";
 export const SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY = "puppyone.desktop.sidebarNavigationLayout";
 export const FILES_VISIBILITY_STORAGE_KEY = "puppyone.desktop.filesVisibility";
@@ -60,6 +69,10 @@ export const EXPERIMENTAL_SETTINGS_STORAGE_KEY = "puppyone.desktop.experimental"
 export const DEFAULT_THEME_MODE: ThemeMode = "system";
 export const DEFAULT_LIGHT_THEME_PRESET: LightThemePreset = "neutral";
 export const DEFAULT_DARK_THEME_PRESET: DarkThemePreset = "default";
+export const DEFAULT_TEXT_SIZE: TextSize = "default";
+export const DEFAULT_POINTER_CURSORS = false;
+export const DEFAULT_DOCK_ICON: DockIcon = "polished";
+export const DEFAULT_DIFF_MARKERS: DiffMarkers = "color";
 export const DEFAULT_GIT_DISPLAY_MODE: GitDisplayMode = "simple";
 export const DEFAULT_SIDEBAR_NAVIGATION_LAYOUT: SidebarNavigationLayout = "bottom-horizontal";
 export const DEFAULT_EXPLORER_EXCLUDE_PATTERNS = [
@@ -93,6 +106,8 @@ export const DEFAULT_TITLEBAR_ACTIONS_SETTINGS: TitlebarActionsSettings = {
 };
 export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
 export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
+  enableAgentChat: false,
+  enableAssetLibraryHome: false,
   enablePuppyoneAppFiles: false,
   enablePuppyFlowFiles: false,
 };
@@ -161,6 +176,12 @@ export const DARK_THEME_PRESETS = [
     swatches: ["#11100f", "#1d1b1a", "#60a5fa"],
   },
   {
+    id: "warm",
+    label: "Warm",
+    description: "A softly amber dark palette for late-night work.",
+    swatches: ["#18130f", "#211a14", "#f0a45d"],
+  },
+  {
     id: "graphite",
     label: "Graphite",
     description: "A cooler dark workspace palette.",
@@ -171,6 +192,106 @@ export const DARK_THEME_PRESETS = [
   label: string;
   description: string;
   swatches: readonly [string, string, string];
+}>;
+
+export const TEXT_SIZE_PRESETS = [
+  {
+    value: "small",
+    label: "Small",
+    description: "Sidebar 12px, content 13px, code 12px.",
+    sizes: {
+      micro: 9,
+      caption: 10,
+      meta: 11,
+      sidebar: 12,
+      body: 12,
+      bodyLarge: 13,
+      content: 13,
+      code: 12,
+      title: 15,
+      pageTitle: 18,
+      display: 22,
+    },
+  },
+  {
+    value: "default",
+    label: "Default",
+    description: "Sidebar 13px, content 14px, code 13px.",
+    sizes: {
+      micro: 10,
+      caption: 11,
+      meta: 12,
+      sidebar: 13,
+      body: 13,
+      bodyLarge: 14,
+      content: 14,
+      code: 13,
+      title: 16,
+      pageTitle: 20,
+      display: 24,
+    },
+  },
+  {
+    value: "large",
+    label: "Large",
+    description: "Sidebar 14px, content 16px, code 15px.",
+    sizes: {
+      micro: 11,
+      caption: 12,
+      meta: 13,
+      sidebar: 14,
+      body: 14,
+      bodyLarge: 16,
+      content: 16,
+      code: 15,
+      title: 18,
+      pageTitle: 22,
+      display: 28,
+    },
+  },
+] as const satisfies ReadonlyArray<{
+  value: TextSize;
+  label: string;
+  description: string;
+  sizes: {
+    micro: number;
+    caption: number;
+    meta: number;
+    sidebar: number;
+    body: number;
+    bodyLarge: number;
+    content: number;
+    code: number;
+    title: number;
+    pageTitle: number;
+    display: number;
+  };
+}>;
+
+export const DOCK_ICON_OPTIONS = [
+  {
+    id: "polished",
+    label: "Polished",
+    description: "The current high-contrast PuppyOne icon.",
+    previewSrc: "/logo-square.png",
+  },
+  {
+    id: "light",
+    label: "Light",
+    description: "A warm light icon with a quiet outline.",
+    previewSrc: "/logo-square-v0.1.3-light.png",
+  },
+  {
+    id: "matte",
+    label: "Matte",
+    description: "A flat dark icon without the metallic rim.",
+    previewSrc: "/logo-square-v0.1.3-dark.png",
+  },
+] as const satisfies ReadonlyArray<{
+  id: DockIcon;
+  label: string;
+  description: string;
+  previewSrc: string;
 }>;
 
 export function parseThemeMode(value: string | null | undefined): ThemeMode {
@@ -190,7 +311,25 @@ export function parseDarkThemePreset(value: string | null | undefined): DarkThem
 }
 
 export function isDarkThemePreset(value: string | null | undefined): value is DarkThemePreset {
-  return value === "default" || value === "graphite";
+  return value === "default" || value === "warm" || value === "graphite";
+}
+
+export function parseTextSize(value: string | null | undefined): TextSize {
+  return value === "small" || value === "large" || value === "default" ? value : DEFAULT_TEXT_SIZE;
+}
+
+export function parsePointerCursors(value: string | null | undefined): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return DEFAULT_POINTER_CURSORS;
+}
+
+export function parseDockIcon(value: string | null | undefined): DockIcon {
+  return value === "light" || value === "matte" || value === "polished" ? value : DEFAULT_DOCK_ICON;
+}
+
+export function parseDiffMarkers(value: string | null | undefined): DiffMarkers {
+  return value === "symbols" || value === "color" ? value : DEFAULT_DIFF_MARKERS;
 }
 
 export function parseGitDisplayMode(value: string | null | undefined): GitDisplayMode {
@@ -303,7 +442,10 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
     const parsed = JSON.parse(value) as Partial<ExperimentalSettings> | null;
     if (!parsed || typeof parsed !== "object") return DEFAULT_EXPERIMENTAL_SETTINGS;
 
+    const legacy = parsed as typeof parsed & { enableAgentCompanion?: unknown };
     return {
+      enableAgentChat: parsed.enableAgentChat === true || legacy.enableAgentCompanion === true,
+      enableAssetLibraryHome: parsed.enableAssetLibraryHome === true,
       enablePuppyoneAppFiles: parsed.enablePuppyoneAppFiles === true,
       enablePuppyFlowFiles: parsed.enablePuppyFlowFiles === true,
     };

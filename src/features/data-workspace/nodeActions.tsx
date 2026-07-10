@@ -1,9 +1,24 @@
 import type { CSSProperties, Dispatch, ReactNode, SetStateAction } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, ExternalLink, FileText, FolderOpen, MoreVertical, Pencil, Plus, Trash2, Workflow } from "lucide-react";
+import {
+  ChevronRight,
+  ClipboardPaste,
+  Copy,
+  CopyPlus,
+  ExternalLink,
+  FileText,
+  FolderOpen,
+  FolderPlus,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Scissors,
+  Trash2,
+  Workflow,
+} from "lucide-react";
 import { FileGlyphIcon, getMatchedExtension, type DataNode, type FileIconThemeId } from "@puppyone/shared-ui";
 import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
-import { DesktopMenuItem, DesktopMenuSurface } from "../../components/DesktopMenu";
+import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
 import type { ExperimentalSettings } from "../../preferences";
 import { createDefaultPuppyFlowDocument, serializePuppyFlowDocument } from "../puppyflow/puppyflowModel";
 
@@ -28,20 +43,21 @@ export type DesktopCreateEntryDraft = {
 };
 export type DesktopNodeActionMenuDraft = {
   node: DataNode;
+  nodes: DataNode[];
   anchor: DesktopCreateEntryAnchor;
   mode: "actions" | "rename";
   renameNameValue: string;
   renameExtensionValue: string;
   renameFocus: "name" | "type";
   error: string | null;
-  operation: "rename" | "delete" | "open" | "reveal" | null;
+  operation: "rename" | "delete" | "open" | "reveal" | "paste" | "duplicate" | null;
 };
 
 const CREATE_ENTRY_MENU_MARGIN = 12;
 const CREATE_ENTRY_MENU_WIDTH = 184;
 const CREATE_ENTRY_MENU_ESTIMATED_HEIGHT = 184;
-const NODE_ACTION_MENU_WIDTH = 176;
-const NODE_ACTION_MENU_ESTIMATED_HEIGHT = 168;
+const NODE_ACTION_MENU_WIDTH = 224;
+const NODE_ACTION_MENU_ESTIMATED_HEIGHT = 342;
 
 const CREATE_ENTRY_OPTIONS = [
   {
@@ -160,12 +176,18 @@ export function DesktopCreateEntryMenu({
   experimentalSettings,
   fileIconTheme,
   onCancel,
+  onPaste,
+  pasteDisabled = false,
+  pasteLabel = "Paste",
   onSelectKind,
 }: {
   draft: DesktopCreateEntryDraft;
   experimentalSettings?: ExperimentalSettings | null;
   fileIconTheme?: FileIconThemeId | null;
   onCancel: () => void;
+  onPaste?: () => void;
+  pasteDisabled?: boolean;
+  pasteLabel?: string;
   onSelectKind: (kind: DesktopCreateEntryKind) => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -203,7 +225,7 @@ export function DesktopCreateEntryMenu({
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      menuRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
@@ -246,6 +268,18 @@ export function DesktopCreateEntryMenu({
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
+      {onPaste && (
+        <>
+          <DesktopNodeActionMenuItem
+            icon={<ClipboardPaste size={14} />}
+            label={pasteLabel}
+            shortcut={getPlatformShortcut("V")}
+            disabled={pasteDisabled}
+            onClick={onPaste}
+          />
+          <DesktopMenuSeparator />
+        </>
+      )}
       {STANDARD_CREATE_ENTRY_OPTIONS.map((option) => (
         <DesktopNodeActionMenuItem
           key={option.kind}
@@ -414,8 +448,17 @@ export function DesktopNodeActionMenu({
   experimentalSettings,
   showRevealInFinder = true,
   showOpenInDefaultApp = true,
+  canPaste = false,
+  canCopy = true,
+  canCut = true,
+  canDuplicate = true,
   onChange,
   onCancel,
+  onCopy,
+  onCut,
+  onPaste,
+  onDuplicate,
+  onCreateInside,
   onRename,
   onDelete,
   onOpenInDefaultApp,
@@ -425,8 +468,17 @@ export function DesktopNodeActionMenu({
   experimentalSettings?: ExperimentalSettings | null;
   showRevealInFinder?: boolean;
   showOpenInDefaultApp?: boolean;
+  canPaste?: boolean;
+  canCopy?: boolean;
+  canCut?: boolean;
+  canDuplicate?: boolean;
   onChange: Dispatch<SetStateAction<DesktopNodeActionMenuDraft | null>>;
   onCancel: () => void;
+  onCopy: () => void;
+  onCut: () => void;
+  onPaste: () => void;
+  onDuplicate: () => void;
+  onCreateInside: () => void;
   onRename: () => void;
   onDelete: () => void;
   onOpenInDefaultApp: () => void;
@@ -449,8 +501,17 @@ export function DesktopNodeActionMenu({
         draft={draft}
         showRevealInFinder={showRevealInFinder}
         showOpenInDefaultApp={showOpenInDefaultApp}
+        canPaste={canPaste}
+        canCopy={canCopy}
+        canCut={canCut}
+        canDuplicate={canDuplicate}
         onChange={onChange}
         onCancel={onCancel}
+        onCopy={onCopy}
+        onCut={onCut}
+        onPaste={onPaste}
+        onDuplicate={onDuplicate}
+        onCreateInside={onCreateInside}
         onDelete={onDelete}
         onOpenInDefaultApp={onOpenInDefaultApp}
         onRevealInFinder={onRevealInFinder}
@@ -462,8 +523,17 @@ function DesktopNodeActionPopover({
   draft,
   showRevealInFinder,
   showOpenInDefaultApp,
+  canPaste,
+  canCopy,
+  canCut,
+  canDuplicate,
   onChange,
   onCancel,
+  onCopy,
+  onCut,
+  onPaste,
+  onDuplicate,
+  onCreateInside,
   onDelete,
   onOpenInDefaultApp,
   onRevealInFinder,
@@ -471,19 +541,37 @@ function DesktopNodeActionPopover({
   draft: DesktopNodeActionMenuDraft;
   showRevealInFinder: boolean;
   showOpenInDefaultApp: boolean;
+  canPaste: boolean;
+  canCopy: boolean;
+  canCut: boolean;
+  canDuplicate: boolean;
   onChange: Dispatch<SetStateAction<DesktopNodeActionMenuDraft | null>>;
   onCancel: () => void;
+  onCopy: () => void;
+  onCut: () => void;
+  onPaste: () => void;
+  onDuplicate: () => void;
+  onCreateInside: () => void;
   onDelete: () => void;
   onOpenInDefaultApp: () => void;
   onRevealInFinder: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const actionCount = Math.max(1, draft.nodes.length);
+  const singleNodeAction = actionCount === 1;
   const position = getNodeActionMenuPosition(draft.anchor, NODE_ACTION_MENU_WIDTH, NODE_ACTION_MENU_ESTIMATED_HEIGHT);
   const menuStyle = {
     "--node-action-menu-left": `${position.left}px`,
     "--node-action-menu-top": `${position.top}px`,
     "--node-action-menu-width": `${NODE_ACTION_MENU_WIDTH}px`,
   } as CSSProperties;
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -517,7 +605,51 @@ function DesktopNodeActionPopover({
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
-      {showOpenInDefaultApp && draft.node.type !== "folder" && (
+      {draft.node.type === "folder" && (
+        <DesktopNodeActionMenuItem
+          icon={<FolderPlus size={14} />}
+          label="New File or Folder"
+          disabled={draft.operation !== null}
+          onClick={onCreateInside}
+        />
+      )}
+      {draft.node.type === "folder" && (
+        <DesktopNodeActionMenuItem
+          icon={<ClipboardPaste size={14} />}
+          label="Paste into Folder"
+          shortcut={getPlatformShortcut("V")}
+          disabled={draft.operation !== null || !canPaste}
+          onClick={onPaste}
+        />
+      )}
+      {draft.node.type === "folder" && <DesktopMenuSeparator />}
+      <DesktopNodeActionMenuItem
+        icon={<Copy size={14} />}
+        label={actionCount > 1 ? `Copy ${actionCount} Items` : "Copy"}
+        shortcut={getPlatformShortcut("C")}
+        disabled={draft.operation !== null || !canCopy}
+        onClick={onCopy}
+      />
+      <DesktopNodeActionMenuItem
+        icon={<Scissors size={14} />}
+        label={actionCount > 1 ? `Cut ${actionCount} Items` : "Cut"}
+        shortcut={getPlatformShortcut("X")}
+        disabled={draft.operation !== null || !canCut}
+        onClick={onCut}
+      />
+      <DesktopNodeActionMenuItem
+        icon={<CopyPlus size={14} />}
+        label={draft.operation === "duplicate"
+          ? "Duplicating..."
+          : actionCount > 1
+            ? `Duplicate ${actionCount} Items`
+            : "Duplicate"}
+        shortcut={getPlatformShortcut("D")}
+        disabled={draft.operation !== null || !canDuplicate}
+        onClick={onDuplicate}
+      />
+      <DesktopMenuSeparator />
+      {singleNodeAction && showOpenInDefaultApp && draft.node.type !== "folder" && (
         <DesktopNodeActionMenuItem
           icon={<ExternalLink size={14} />}
           label={draft.operation === "open" ? "Opening..." : "Open in Default App"}
@@ -525,7 +657,7 @@ function DesktopNodeActionPopover({
           onClick={onOpenInDefaultApp}
         />
       )}
-      {showRevealInFinder && (
+      {singleNodeAction && showRevealInFinder && (
         <DesktopNodeActionMenuItem
           icon={<FolderOpen size={14} />}
           label={draft.operation === "reveal" ? "Opening..." : "Reveal in Finder"}
@@ -533,18 +665,20 @@ function DesktopNodeActionPopover({
           onClick={onRevealInFinder}
         />
       )}
-      <DesktopNodeActionMenuItem
-        icon={<Pencil size={14} />}
-        label="Rename"
-        disabled={draft.operation !== null}
-        onClick={() => onChange((current) => current ? {
-          ...current,
-          mode: "rename",
-          renameFocus: "name",
-          error: null,
-        } : current)}
-      />
-      {draft.node.type !== "folder" && (
+      {singleNodeAction && (
+        <DesktopNodeActionMenuItem
+          icon={<Pencil size={14} />}
+          label="Rename"
+          disabled={draft.operation !== null}
+          onClick={() => onChange((current) => current ? {
+            ...current,
+            mode: "rename",
+            renameFocus: "name",
+            error: null,
+          } : current)}
+        />
+      )}
+      {singleNodeAction && draft.node.type !== "folder" && (
         <DesktopNodeActionMenuItem
           icon={<FileText size={14} />}
           label="Change Type"
@@ -559,7 +693,11 @@ function DesktopNodeActionPopover({
       )}
       <DesktopNodeActionMenuItem
         icon={<Trash2 size={14} />}
-        label={draft.operation === "delete" ? "Deleting..." : "Delete"}
+        label={draft.operation === "delete"
+          ? "Deleting..."
+          : actionCount > 1
+            ? `Delete ${actionCount} Items`
+            : "Delete"}
         destructive
         disabled={draft.operation !== null}
         onClick={onDelete}
@@ -703,12 +841,14 @@ function DesktopNodeActionMenuItem({
   label,
   destructive,
   disabled,
+  shortcut,
   onClick,
 }: {
   icon: ReactNode;
   label: string;
   destructive?: boolean;
   disabled?: boolean;
+  shortcut?: string;
   onClick: () => void;
 }) {
   return (
@@ -718,6 +858,7 @@ function DesktopNodeActionMenuItem({
       disabled={disabled}
       icon={icon}
       label={label}
+      trailing={shortcut}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -725,6 +866,11 @@ function DesktopNodeActionMenuItem({
       }}
     />
   );
+}
+
+function getPlatformShortcut(key: string): string {
+  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
+  return isMac ? `⌘${key}` : `Ctrl+${key}`;
 }
 
 function CreateEntryGlyph({

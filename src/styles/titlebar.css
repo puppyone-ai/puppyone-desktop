@@ -67,8 +67,8 @@
 .desktop-titlebar-context-name {
   min-width: 0;
   overflow: hidden;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--po-font-size-chrome, 13px);
+  font-weight: var(--po-font-weight-chrome, 500);
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -191,6 +191,18 @@
   color: var(--po-text);
 }
 
+/* Keep the active execution context visible at a glance. Cloud projects use a
+   persistent sky-blue treatment; local projects retain the neutral chrome. */
+.desktop-titlebar-workspace-button.cloud {
+  --desktop-cloud-pigment: color-mix(in oklab, var(--po-info) 78%, var(--po-accent));
+  background: color-mix(in srgb, var(--desktop-cloud-pigment) 8%, transparent);
+}
+
+.desktop-titlebar-workspace-button.cloud:hover,
+.desktop-titlebar-workspace-button.cloud[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--desktop-cloud-pigment) 14%, transparent);
+}
+
 .desktop-titlebar-workspace-mark {
   position: relative;
   display: grid;
@@ -206,6 +218,18 @@
 .desktop-titlebar-workspace-button:hover .desktop-titlebar-workspace-mark,
 .desktop-titlebar-workspace-button[aria-expanded="true"] .desktop-titlebar-workspace-mark {
   color: var(--po-text);
+}
+
+.desktop-titlebar-workspace-button.cloud .desktop-titlebar-workspace-mark,
+.desktop-titlebar-workspace-button.cloud .desktop-titlebar-workspace-name {
+  color: color-mix(in srgb, var(--desktop-cloud-pigment) 88%, var(--po-text) 12%);
+}
+
+.desktop-titlebar-workspace-button.cloud:hover .desktop-titlebar-workspace-mark,
+.desktop-titlebar-workspace-button.cloud:hover .desktop-titlebar-workspace-name,
+.desktop-titlebar-workspace-button.cloud[aria-expanded="true"] .desktop-titlebar-workspace-mark,
+.desktop-titlebar-workspace-button.cloud[aria-expanded="true"] .desktop-titlebar-workspace-name {
+  color: var(--desktop-cloud-pigment);
 }
 
 .desktop-titlebar-workspace-button:focus-visible {
@@ -245,8 +269,8 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text-muted);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--po-font-size-chrome, 13px);
+  font-weight: var(--po-font-weight-chrome, 500);
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -440,8 +464,8 @@
 .desktop-titlebar-branch-button span {
   min-width: 0;
   overflow: hidden;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--po-font-size-chrome, 13px);
+  font-weight: var(--po-font-weight-chrome, 500);
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;

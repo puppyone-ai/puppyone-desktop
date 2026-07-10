@@ -6,10 +6,10 @@ import {
   commitWorkspaceGit,
   discardAllWorkspaceGitChanges,
   discardWorkspaceGitPaths,
-  fetchWorkspaceGit,
+  getWorkspaceGitBranchGraph,
+  cancelWorkspaceGitBranchGraph,
   getWorkspaceGitCommitDetail,
   getWorkspaceGitFileDiff,
-  getWorkspaceGitStatus,
   initializeWorkspaceGitRepository,
   publishWorkspaceGitBranch,
   pullWorkspaceGit,
@@ -30,7 +30,9 @@ import {
   isBranchOverwriteError,
   type GitOperationErrorState,
 } from "./operationDialogs";
+import { createRepositoryRefreshReason } from "./repositoryRefreshPolicy";
 import type { GitMainPanel, GitWorkingSelection } from "./types";
+import { useGitRepositoryLifecycle } from "./useGitRepositoryLifecycle";
 
 export type PendingBranchSwitch = {
   branchName: string;
@@ -52,12 +54,24 @@ export function useDesktopGitController({
   onWorkspaceContentChanged,
   onEnterGitView,
 }: UseDesktopGitControllerOptions) {
-  const workspacePathRef = useRef<string | null>(null);
+  const {
+    activeGitStatus,
+    gitStatus,
+    gitStatusError,
+    gitStatusLoading,
+    gitStatusPath,
+    applyGitHistory,
+    applyGitStatus,
+    captureGitRepositoryContext,
+    historyEpoch,
+    invalidateGitStatus,
+    isGitRepositoryContextCurrent,
+    refreshGitStatus,
+    refreshGitStatusWithFetch,
+    reportGitStatusError,
+  } = useGitRepositoryLifecycle({ workspace, onWorkspaceContentChanged });
+  const historyRequestRef = useRef(0);
   const branchSwitcherRef = useRef<HTMLDivElement>(null);
-  const [gitStatus, setGitStatus] = useState<GitStatusSnapshot | null>(null);
-  const [gitStatusPath, setGitStatusPath] = useState<string | null>(null);
-  const [gitStatusLoading, setGitStatusLoading] = useState(false);
-  const [gitStatusError, setGitStatusError] = useState<string | null>(null);
   const [selectedGitCommitId, setSelectedGitCommitId] = useState<string | null>(null);
   const [selectedGitWorkingFile, setSelectedGitWorkingFile] = useState<GitWorkingSelection | null>(null);
   const [gitMainPanel, setGitMainPanel] = useState<GitMainPanel>("changes");
@@ -72,7 +86,6 @@ export function useDesktopGitController({
   const [branchSwitcherOpen, setBranchSwitcherOpen] = useState(false);
   const [pendingBranchSwitch, setPendingBranchSwitch] = useState<PendingBranchSwitch | null>(null);
 
-  const activeGitStatus = gitStatusPath === workspace?.path ? gitStatus : null;
   const gitIncomingCount = activeGitStatus?.isRepo === true
     ? Math.max(0, activeGitStatus.sourceControl.remote.behind)
     : 0;
@@ -86,21 +99,12 @@ export function useDesktopGitController({
     [activeGitStatus],
   );
 
-  const applyGitStatus = useCallback((nextStatus: GitStatusSnapshot, rootPath?: string) => {
-    setGitStatus(nextStatus);
-    setGitStatusPath(rootPath ?? workspace?.path ?? null);
-  }, [workspace?.path]);
-
   const clearGitSelection = useCallback(() => {
     setSelectedGitCommitId(null);
     setSelectedGitWorkingFile(null);
   }, []);
 
   useEffect(() => {
-    workspacePathRef.current = workspace?.path ?? null;
-    setGitStatus(null);
-    setGitStatusPath(null);
-    setGitStatusError(null);
     setSelectedGitCommitId(null);
     setSelectedGitWorkingFile(null);
     setGitCommitDetail(null);
@@ -115,47 +119,54 @@ export function useDesktopGitController({
     setPendingBranchSwitch(null);
   }, [workspace?.path]);
 
-  const refreshGitStatus = useCallback(async () => {
-    if (!workspace) return;
-    const rootPath = workspace.path;
-    setGitStatusLoading(true);
-    setGitStatusError(null);
-    try {
-      const nextStatus = await getWorkspaceGitStatus(rootPath);
-      if (workspacePathRef.current !== rootPath) return;
-      setGitStatus(nextStatus);
-      setGitStatusPath(rootPath);
-    } catch (error) {
-      if (workspacePathRef.current !== rootPath) return;
-      setGitStatus(null);
-      setGitStatusPath(null);
-      setGitStatusError(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (workspacePathRef.current === rootPath) setGitStatusLoading(false);
-    }
-  }, [workspace]);
-
-  const refreshGitStatusWithFetch = useCallback(async () => {
-    if (!workspace) return;
-    const rootPath = workspace.path;
-    setGitStatusLoading(true);
-    setGitStatusError(null);
-    try {
-      const nextStatus = await fetchWorkspaceGit(rootPath);
-      if (workspacePathRef.current !== rootPath) return;
-      setGitStatus(nextStatus);
-      setGitStatusPath(rootPath);
-    } catch (error) {
-      if (workspacePathRef.current !== rootPath) return;
-      setGitStatusError(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (workspacePathRef.current === rootPath) setGitStatusLoading(false);
-    }
-  }, [workspace]);
-
+  // Lazy-load history/graph when the History surface is active, or when HEAD/refs
+  // change while History is already open (cached history was cleared).
   useEffect(() => {
-    void refreshGitStatus();
-  }, [refreshGitStatus]);
+    if (!gitViewActive || gitMainPanel !== "history" || !workspace || !activeGitStatus?.isRepo) {
+      return undefined;
+    }
+
+    const context = captureGitRepositoryContext(workspace.path);
+    if (!context) return undefined;
+    const headCommitId = activeGitStatus.headCommitId;
+    const requestHistoryEpoch = historyEpoch;
+    const alreadyLoaded = (activeGitStatus.allCommits?.length ?? 0) > 0
+      || (activeGitStatus.commits?.length ?? 0) > 0;
+    // If we already have history for this HEAD + history epoch, keep it.
+    if (alreadyLoaded) return undefined;
+
+    const requestId = `history-${++historyRequestRef.current}`;
+    let cancelled = false;
+    void getWorkspaceGitBranchGraph(context.rootPath, { requestId })
+      .then((graph) => {
+        if (cancelled) return;
+        applyGitHistory(context, headCommitId, requestHistoryEpoch, graph);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : String(error);
+        if (/cancelled|ABORT_ERR/i.test(message)) return;
+        reportGitStatusError(context, error);
+      });
+
+    return () => {
+      cancelled = true;
+      void cancelWorkspaceGitBranchGraph(requestId);
+    };
+  }, [
+    activeGitStatus?.allCommits?.length,
+    activeGitStatus?.branch,
+    activeGitStatus?.commits?.length,
+    activeGitStatus?.headCommitId,
+    activeGitStatus?.isRepo,
+    applyGitHistory,
+    captureGitRepositoryContext,
+    gitMainPanel,
+    gitViewActive,
+    historyEpoch,
+    reportGitStatusError,
+    workspace,
+  ]);
 
   useEffect(() => {
     if (!gitViewActive || !activeGitStatus?.isRepo) return;
@@ -264,23 +275,36 @@ export function useDesktopGitController({
     options: { showRendererError?: boolean } = {},
   ) => {
     if (!workspace) return false;
+    const context = captureGitRepositoryContext(workspace.path);
+    if (!context) return false;
 
     setGitOperationLoading(label);
     setGitOperationError(null);
     try {
-      const nextStatus = await operation(workspace.path);
-      setGitStatus(nextStatus);
+      const nextStatus = await operation(context.rootPath);
+      const applied = applyGitStatus(
+        nextStatus,
+        context,
+        createRepositoryRefreshReason(label, "mutation"),
+      );
+      if (!applied) return false;
       onWorkspaceContentChanged();
       return true;
     } catch (error) {
-      if (options.showRendererError !== false) {
-        setGitOperationError(createGitOperationErrorState(error, label, workspace.path));
+      if (isGitRepositoryContextCurrent(context) && options.showRendererError !== false) {
+        setGitOperationError(createGitOperationErrorState(error, label, context.rootPath));
       }
       return false;
     } finally {
-      setGitOperationLoading(null);
+      if (isGitRepositoryContextCurrent(context)) setGitOperationLoading(null);
     }
-  }, [onWorkspaceContentChanged, workspace]);
+  }, [
+    applyGitStatus,
+    captureGitRepositoryContext,
+    isGitRepositoryContextCurrent,
+    onWorkspaceContentChanged,
+    workspace,
+  ]);
 
   const selectGitCommit = useCallback((commitId: string) => {
     setGitMainPanel("history");
@@ -315,29 +339,48 @@ export function useDesktopGitController({
 
   const handleStageAndCommitGit = useCallback(async () => {
     if (!workspace) return false;
+    const context = captureGitRepositoryContext(workspace.path);
+    if (!context) return false;
 
     setGitOperationLoading("stage-commit");
     setGitOperationError(null);
     try {
-      let nextStatus = await stageAllWorkspaceGitChanges(workspace.path);
+      let nextStatus = await stageAllWorkspaceGitChanges(context.rootPath);
       if (nextStatus.stagedEntries.length === 0) {
-        setGitStatus(nextStatus);
+        if (!applyGitStatus(
+          nextStatus,
+          context,
+          createRepositoryRefreshReason("stage", "mutation"),
+        )) return false;
         onWorkspaceContentChanged();
         return false;
       }
 
-      nextStatus = await commitWorkspaceGit(workspace.path, "");
-      setGitStatus(nextStatus);
+      nextStatus = await commitWorkspaceGit(context.rootPath, "");
+      if (!applyGitStatus(
+        nextStatus,
+        context,
+        createRepositoryRefreshReason("commit", "mutation"),
+      )) return false;
       clearGitSelection();
       onWorkspaceContentChanged();
       return true;
     } catch (error) {
-      setGitOperationError(createGitOperationErrorState(error, "stage-commit", workspace.path));
+      if (isGitRepositoryContextCurrent(context)) {
+        setGitOperationError(createGitOperationErrorState(error, "stage-commit", context.rootPath));
+      }
       return false;
     } finally {
-      setGitOperationLoading(null);
+      if (isGitRepositoryContextCurrent(context)) setGitOperationLoading(null);
     }
-  }, [clearGitSelection, onWorkspaceContentChanged, workspace]);
+  }, [
+    applyGitStatus,
+    captureGitRepositoryContext,
+    clearGitSelection,
+    isGitRepositoryContextCurrent,
+    onWorkspaceContentChanged,
+    workspace,
+  ]);
 
   const handleUnstageGitPaths = useCallback((paths: string[]) => {
     return runGitOperation("unstage", (rootPath) => unstageWorkspaceGitPaths(rootPath, paths));
@@ -375,25 +418,42 @@ export function useDesktopGitController({
 
   const handleCommitGit = useCallback(async () => {
     if (!workspace) return false;
+    const context = captureGitRepositoryContext(workspace.path);
+    if (!context) return false;
 
     setGitOperationLoading("commit");
     setGitOperationError(null);
     try {
-      const nextStatus = await commitWorkspaceGit(workspace.path, "");
-      setGitStatus(nextStatus);
+      const nextStatus = await commitWorkspaceGit(context.rootPath, "");
+      if (!applyGitStatus(
+        nextStatus,
+        context,
+        createRepositoryRefreshReason("commit", "mutation"),
+      )) return false;
       clearGitSelection();
       onWorkspaceContentChanged();
       return true;
     } catch (error) {
-      setGitOperationError(createGitOperationErrorState(error, "commit", workspace.path));
+      if (isGitRepositoryContextCurrent(context)) {
+        setGitOperationError(createGitOperationErrorState(error, "commit", context.rootPath));
+      }
       return false;
     } finally {
-      setGitOperationLoading(null);
+      if (isGitRepositoryContextCurrent(context)) setGitOperationLoading(null);
     }
-  }, [clearGitSelection, onWorkspaceContentChanged, workspace]);
+  }, [
+    applyGitStatus,
+    captureGitRepositoryContext,
+    clearGitSelection,
+    isGitRepositoryContextCurrent,
+    onWorkspaceContentChanged,
+    workspace,
+  ]);
 
   const handleCommitAndPushGit = useCallback(async () => {
     if (!workspace) return false;
+    const context = captureGitRepositoryContext(workspace.path);
+    if (!context) return false;
 
     const remote = activeGitStatus?.sourceControl.remote;
     if (!remote?.target && !remote?.upstream) {
@@ -408,23 +468,37 @@ export function useDesktopGitController({
     setGitOperationLoading("commit-push");
     setGitOperationError(null);
     try {
-      let nextStatus = await commitWorkspaceGit(workspace.path, "");
+      let nextStatus = await commitWorkspaceGit(context.rootPath, "");
       if (nextStatus.sourceControl.remote.canPublish) {
-        nextStatus = await publishWorkspaceGitBranch(workspace.path);
+        nextStatus = await publishWorkspaceGitBranch(context.rootPath);
       } else {
-        nextStatus = await pushWorkspaceGit(workspace.path);
+        nextStatus = await pushWorkspaceGit(context.rootPath);
       }
-      setGitStatus(nextStatus);
+      if (!applyGitStatus(
+        nextStatus,
+        context,
+        createRepositoryRefreshReason("push", "mutation"),
+      )) return false;
       clearGitSelection();
       onWorkspaceContentChanged();
       return true;
     } catch (error) {
-      setGitOperationError(createGitOperationErrorState(error, "commit-push", workspace.path));
+      if (isGitRepositoryContextCurrent(context)) {
+        setGitOperationError(createGitOperationErrorState(error, "commit-push", context.rootPath));
+      }
       return false;
     } finally {
-      setGitOperationLoading(null);
+      if (isGitRepositoryContextCurrent(context)) setGitOperationLoading(null);
     }
-  }, [activeGitStatus, clearGitSelection, onWorkspaceContentChanged, workspace]);
+  }, [
+    activeGitStatus,
+    applyGitStatus,
+    captureGitRepositoryContext,
+    clearGitSelection,
+    isGitRepositoryContextCurrent,
+    onWorkspaceContentChanged,
+    workspace,
+  ]);
 
   const handlePullGit = useCallback(() => {
     return runGitOperation("pull", (rootPath) => pullWorkspaceGit(rootPath));
@@ -443,18 +517,25 @@ export function useDesktopGitController({
       setGitOperationError(createGitOperationMessageState("Current workspace is not a Git repository.", "checkout", workspace?.path ?? null));
       return false;
     }
+    const context = captureGitRepositoryContext(workspace.path);
+    if (!context) return false;
 
     setGitOperationLoading("checkout");
     setGitOperationError(null);
     setPendingBranchSwitch(null);
     try {
-      const nextStatus = await checkoutWorkspaceGitBranch(workspace.path, branchName, remote);
-      setGitStatus(nextStatus);
+      const nextStatus = await checkoutWorkspaceGitBranch(context.rootPath, branchName, remote);
+      if (!applyGitStatus(
+        nextStatus,
+        context,
+        createRepositoryRefreshReason("checkout", "mutation"),
+      )) return false;
       onWorkspaceContentChanged();
       clearGitSelection();
       setGitMainPanel("changes");
       return true;
     } catch (error) {
+      if (!isGitRepositoryContextCurrent(context)) return false;
       const formatted = formatGitOperationError(error, "checkout");
       if (isBranchOverwriteError(formatted)) {
         setPendingBranchSwitch({
@@ -465,66 +546,106 @@ export function useDesktopGitController({
         });
         setBranchSwitcherOpen(false);
       } else {
-        setGitOperationError(createGitOperationErrorState(error, "checkout", workspace.path));
+        setGitOperationError(createGitOperationErrorState(error, "checkout", context.rootPath));
       }
       return false;
     } finally {
-      setGitOperationLoading(null);
+      if (isGitRepositoryContextCurrent(context)) setGitOperationLoading(null);
     }
-  }, [activeGitStatus, clearGitSelection, gitStatusPath, onWorkspaceContentChanged, workspace]);
+  }, [
+    activeGitStatus,
+    applyGitStatus,
+    captureGitRepositoryContext,
+    clearGitSelection,
+    gitStatusPath,
+    isGitRepositoryContextCurrent,
+    onWorkspaceContentChanged,
+    workspace,
+  ]);
 
   const handleStashAndCheckoutBranch = useCallback(async () => {
     if (!workspace || !pendingBranchSwitch) return false;
+    const context = captureGitRepositoryContext(workspace.path);
+    if (!context) return false;
 
     setGitOperationLoading("stash");
     setGitOperationError(null);
     try {
       const nextStatus = await stashAndCheckoutWorkspaceGitBranch(
-        workspace.path,
+        context.rootPath,
         pendingBranchSwitch.branchName,
         pendingBranchSwitch.remote,
       );
-      setGitStatus(nextStatus);
+      if (!applyGitStatus(
+        nextStatus,
+        context,
+        createRepositoryRefreshReason("stash-checkout", "mutation"),
+      )) return false;
       onWorkspaceContentChanged();
       clearGitSelection();
       setGitMainPanel("changes");
       setPendingBranchSwitch(null);
       return true;
     } catch (error) {
-      setGitOperationError(createGitOperationErrorState(error, "checkout", workspace.path));
-      setPendingBranchSwitch((current) => current ? { ...current, error: "Could not stash changes. Review changes and try again." } : current);
+      if (isGitRepositoryContextCurrent(context)) {
+        setGitOperationError(createGitOperationErrorState(error, "checkout", context.rootPath));
+        setPendingBranchSwitch((current) => current ? { ...current, error: "Could not stash changes. Review changes and try again." } : current);
+      }
       return false;
     } finally {
-      setGitOperationLoading(null);
+      if (isGitRepositoryContextCurrent(context)) setGitOperationLoading(null);
     }
-  }, [clearGitSelection, onWorkspaceContentChanged, pendingBranchSwitch, workspace]);
+  }, [
+    applyGitStatus,
+    captureGitRepositoryContext,
+    clearGitSelection,
+    isGitRepositoryContextCurrent,
+    onWorkspaceContentChanged,
+    pendingBranchSwitch,
+    workspace,
+  ]);
 
   const handleCommitAndCheckoutBranch = useCallback(async () => {
     if (!workspace || !pendingBranchSwitch) return false;
+    const context = captureGitRepositoryContext(workspace.path);
+    if (!context) return false;
 
     setGitOperationLoading("commit-switch");
     setGitOperationError(null);
     try {
       const nextStatus = await commitAndCheckoutWorkspaceGitBranch(
-        workspace.path,
+        context.rootPath,
         pendingBranchSwitch.branchName,
         pendingBranchSwitch.remote,
       );
-      setGitStatus(nextStatus);
+      if (!applyGitStatus(
+        nextStatus,
+        context,
+        createRepositoryRefreshReason("commit-checkout", "mutation"),
+      )) return false;
       onWorkspaceContentChanged();
       clearGitSelection();
       setGitMainPanel("changes");
       setPendingBranchSwitch(null);
       return true;
     } catch (error) {
+      if (!isGitRepositoryContextCurrent(context)) return false;
       const formatted = formatGitOperationError(error, "commit-switch");
-      setGitOperationError(createGitOperationErrorState(error, "commit-switch", workspace.path));
+      setGitOperationError(createGitOperationErrorState(error, "commit-switch", context.rootPath));
       setPendingBranchSwitch((current) => current ? { ...current, error: formatted || "Could not commit changes." } : current);
       return false;
     } finally {
-      setGitOperationLoading(null);
+      if (isGitRepositoryContextCurrent(context)) setGitOperationLoading(null);
     }
-  }, [clearGitSelection, onWorkspaceContentChanged, pendingBranchSwitch, workspace]);
+  }, [
+    applyGitStatus,
+    captureGitRepositoryContext,
+    clearGitSelection,
+    isGitRepositoryContextCurrent,
+    onWorkspaceContentChanged,
+    pendingBranchSwitch,
+    workspace,
+  ]);
 
   const handleInitializeGitRepository = useCallback(async () => {
     const initialized = await runGitOperation("init", (rootPath) => initializeWorkspaceGitRepository(rootPath));
@@ -560,6 +681,7 @@ export function useDesktopGitController({
     selectedGitCommitId,
     selectedGitWorkingFile,
     applyGitStatus,
+    captureGitRepositoryContext,
     clearGitSelection,
     dismissGitOperationError: () => setGitOperationError(null),
     handleCheckoutGitBranch,
@@ -578,6 +700,8 @@ export function useDesktopGitController({
     handleStashAndCheckoutBranch,
     handleUnstageAllGitChanges,
     handleUnstageGitPaths,
+    invalidateGitStatus,
+    isGitRepositoryContextCurrent,
     refreshGitStatus,
     refreshGitStatusWithFetch,
     selectGitCommit,

@@ -97,6 +97,18 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root),
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) *,
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) *::before,
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) *::after {
+    scroll-behavior: auto !important;
+    transition-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
   [data-puppy-loader],
   [data-puppy-loader] * {
     animation: none !important;

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, session as electronSession, shell, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
@@ -12,19 +12,27 @@ import {
 import { initializeWorkspaceEditReview } from "../local-api/edit-review.mjs";
 import { createUpdateService } from "./update-service.mjs";
 import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
+import { createAgentPersistence } from "./main/agent/agent-persistence.mjs";
+import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
+import { createAgentService } from "./main/agent/agent-service.mjs";
+import { createCodexDiscovery } from "./main/agent/provider-discovery.mjs";
 import {
   getCloudApiErrorMessage,
   requestCloudApi,
 } from "./main/cloud-api-client.mjs";
 import { createCloudAuthService } from "./cloud-auth-service.mjs";
+import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
+import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
+import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
 import { registerTerminalIpcHandlers } from "./main/ipc/terminal-ipc.mjs";
 import { registerWorkspaceFileIpcHandlers } from "./main/ipc/workspace-files-ipc.mjs";
 import { registerWorkspaceGitIpcHandlers } from "./main/ipc/workspace-git-ipc.mjs";
 import { registerWorkspaceNavigationIpcHandlers } from "./main/ipc/workspace-navigation-ipc.mjs";
 import { registerWorkspaceWatchIpcHandlers } from "./main/ipc/workspace-watch-ipc.mjs";
+import { registerGitMetadataWatchIpcHandlers } from "./main/ipc/git-metadata-watch-ipc.mjs";
 import { registerLocalFileProtocol } from "./main/local-file-protocol.mjs";
 import { createLocalFileCapabilityStore } from "./main/local-file-capabilities.mjs";
 import { installWindowNavigationSecurity, requireNonEmptyString } from "./main/security.mjs";
@@ -33,6 +41,14 @@ import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
+import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
+import {
+  createViewerPackHost,
+  registerViewerPackAppIpcHandlers,
+  registerViewerPackPluginIpcHandlers,
+} from "./main/viewer-packs/index.mjs";
+import { PLUGIN_PROTOCOL_SCHEME } from "./main/viewer-packs/plugin-protocol.mjs";
+import { RESOURCE_PROTOCOL_SCHEME } from "./main/viewer-packs/resource-protocol.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
@@ -43,6 +59,11 @@ const devServerUrl = process.env.PUPPYONE_DESKTOP_DEV_URL;
 const rendererApplicationUrl = devServerUrl || pathToFileURL(rendererDistPath).toString();
 const workspaceStateFilename = "desktop-workspace-state.json";
 const cloudAuthProtocol = "puppyone";
+const dockIconResources = Object.freeze({
+  polished: "logo-square.png",
+  light: "dock-icon-light.png",
+  matte: "dock-icon-matte.png",
+});
 const macTitlebarOptions = process.platform === "darwin"
   ? {
       titleBarStyle: "hiddenInset",
@@ -63,10 +84,34 @@ protocol.registerSchemesAsPrivileged([
       stream: true,
     },
   },
+  {
+    // Viewer Pack asset origin. Bytes only come from an enabled, immutable
+    // version dir whose content hash matches the URL.
+    scheme: PLUGIN_PROTOCOL_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: false,
+      stream: true,
+    },
+  },
+  {
+    // Session-scoped, audience-bound bounded Range reads for pack documents.
+    scheme: RESOURCE_PROTOCOL_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: false,
+      stream: true,
+    },
+  },
 ]);
 
 let updateService = null;
 let appPreviewRuntime = null;
+let viewerPackHost = null;
 const windowsById = new Map();
 const windowStateById = new Map();
 const workspaceWindowByPath = new Map();
@@ -83,7 +128,14 @@ const terminalService = createTerminalService({
   appVersion: app.getVersion(),
   initializeWorkspaceEditReview,
 });
+const agentPersistence = createAgentPersistence({ app });
+const agentService = createAgentService({
+  appVersion: app.getVersion(),
+  discovery: createCodexDiscovery(),
+  persistence: agentPersistence,
+});
 const workspaceWatchService = createWorkspaceWatchService();
+const gitMetadataWatchService = createGitMetadataWatchService();
 const workspaceStateStore = createWorkspaceStateStore({
   app,
   filename: workspaceStateFilename,
@@ -154,6 +206,15 @@ async function createWindow(options = {}) {
     lastFocusedWindowId = webContentsId;
     const state = windowStateById.get(webContentsId);
     if (state) state.lastFocusedAt = Date.now();
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send("git-repository:window-focus", { focused: true });
+    }
+  });
+
+  window.on("blur", () => {
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send("git-repository:window-focus", { focused: false });
+    }
   });
 
   window.once("ready-to-show", () => {
@@ -165,12 +226,12 @@ async function createWindow(options = {}) {
     revealWindow(window);
   });
 
-  window.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+  window.webContents.on("console-message", (details) => {
     console.log("puppyone renderer console:", {
-      level,
-      message,
-      line,
-      sourceId,
+      level: details.level,
+      message: details.message,
+      line: details.lineNumber,
+      sourceId: details.sourceId,
     });
   });
 
@@ -211,9 +272,12 @@ async function createWindow(options = {}) {
 
   window.on("closed", () => {
     releaseWindowWorkspaceById(webContentsId, window);
+    viewerPackHost?.destroySessionsForOwner(webContentsId);
     appPreviewRuntime?.closeSessionsForWindow(webContentsId);
     terminalService.closeSessionsForWindow(webContentsId);
+    void agentService.closeSessionsForWindow(webContentsId);
     workspaceWatchService.stopForWindow(webContentsId);
+    gitMetadataWatchService.stopForWindow(webContentsId);
     windowsById.delete(webContentsId);
     windowStateById.delete(webContentsId);
     if (lastFocusedWindowId === webContentsId) {
@@ -283,13 +347,34 @@ function resolveAppIconPath() {
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
 }
 
-function setDockIcon() {
-  const appIconPath = resolveAppIconPath();
-  if (!appIconPath) return;
+function resolveDockIconPath(iconId) {
+  const normalizedIconId = Object.hasOwn(dockIconResources, iconId) ? iconId : "polished";
+  const resourceFilename = dockIconResources[normalizedIconId];
+  const sourceFilename = normalizedIconId === "light"
+    ? "logo-square-v0.1.3-light.png"
+    : normalizedIconId === "matte" ? "logo-square-v0.1.3-dark.png" : "logo-square.png";
+  const candidates = [
+    path.join(process.resourcesPath ?? projectRoot, resourceFilename),
+    path.join(projectRoot, "public", sourceFilename),
+  ];
+  return {
+    iconId: normalizedIconId,
+    path: candidates.find((candidate) => fs.existsSync(candidate)) ?? null,
+  };
+}
+
+function setDockIcon(iconId = "polished") {
+  if (process.platform !== "darwin" || !app.dock) {
+    return { supported: false, iconId: "polished" };
+  }
+  const resolved = resolveDockIconPath(iconId);
+  if (!resolved.path) return { supported: true, iconId: resolved.iconId, applied: false };
   try {
-    app.dock.setIcon(appIconPath);
+    app.dock.setIcon(resolved.path);
+    return { supported: true, iconId: resolved.iconId, applied: true };
   } catch (error) {
     console.warn("Unable to set puppyone dock icon:", error);
+    return { supported: true, iconId: resolved.iconId, applied: false };
   }
 }
 
@@ -351,7 +436,7 @@ app.whenReady().then(async () => {
     getMimeType,
     canonicalizeWorkspacePath,
     isOpenWorkspaceRoot,
-    validateCapability: localFileCapabilities.validate,
+    resolveCapability: localFileCapabilities.resolve,
     applicationUrl: rendererApplicationUrl,
   });
   updateService = createUpdateService({
@@ -366,6 +451,20 @@ app.whenReady().then(async () => {
     shell,
     readWorkspaceTextFile,
     resolveWorkspacePath: resolveLocalWorkspacePath,
+  });
+  viewerPackHost = createViewerPackHost({
+    WebContentsView,
+    sessionFromPartition: (partition, options) => electronSession.fromPartition(partition, options),
+    getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
+    getMimeType,
+    userDataPath: app.getPath("userData"),
+    appVersion: app.getVersion(),
+    isPackaged: app.isPackaged,
+    allowTestKeys: !app.isPackaged && process.env.PUPPYONE_VIEWER_PACK_ALLOW_TEST_KEYS === "1",
+    getThemeSnapshot: () => ({
+      mode: nativeTheme.shouldUseDarkColors ? "dark" : "light",
+      tokens: {},
+    }),
   });
   registerIpcHandlers();
   updateService.start();
@@ -389,13 +488,19 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", () => {
-  cloudAuthService.dispose();
-  updateService?.dispose();
-  appPreviewRuntime?.closeAll();
-  terminalService.closeAll();
-  workspaceWatchService.closeAll();
-});
+app.on("before-quit", createAgentQuitCoordinator({
+  app,
+  agentService,
+  disposeApplicationServices: () => {
+    cloudAuthService.dispose();
+    updateService?.dispose();
+    viewerPackHost?.destroyAllSessions();
+    appPreviewRuntime?.closeAll();
+    terminalService.closeAll();
+    workspaceWatchService.closeAll();
+    gitMetadataWatchService.closeAll();
+  },
+}));
 
 function registerIpcHandlers() {
   registerWorkspaceNavigationIpcHandlers({
@@ -412,7 +517,17 @@ function registerIpcHandlers() {
     selectWorkspaceForNewWindow,
   });
   registerCloudIpcHandlers({ ipcMain: trustedIpcMain, cloudAuthService });
-  registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell });
+  registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell, setDockIcon });
+  registerMarkdownWebEmbedIpcHandlers({
+    ipcMain: trustedIpcMain,
+    createMarkdownWebEmbedService,
+    getOwnerWindow: (webContentsId) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (window.webContents?.id === webContentsId) return window;
+      }
+      return null;
+    },
+  });
 
   registerWorkspaceFileIpcHandlers({
     app,
@@ -435,6 +550,11 @@ function registerIpcHandlers() {
     workspaceWatchService,
     authorizeWorkspaceRoot,
   });
+  registerGitMetadataWatchIpcHandlers({
+    ipcMain: trustedIpcMain,
+    gitMetadataWatchService,
+    authorizeWorkspaceRoot,
+  });
 
   registerWorkspaceGitIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -447,6 +567,27 @@ function registerIpcHandlers() {
     terminalService,
     authorizeWorkspaceRoot,
   });
+  registerAgentIpcHandlers({
+    ipcMain: trustedIpcMain,
+    agentService,
+    authorizeWorkspaceRoot,
+  });
+
+  if (viewerPackHost) {
+    // App authority (install/activate/bounds/destroy) is gated to the trusted
+    // application frame.
+    registerViewerPackAppIpcHandlers({
+      ipcMain: trustedIpcMain,
+      host: viewerPackHost,
+      authorizeWorkspaceRoot,
+      dialog,
+      getDialogOwnerWindow,
+    });
+    // Plugin bridge (document/resource/ui/host) uses RAW ipcMain because the
+    // sandboxed pack frame's URL is never the trusted application URL; each
+    // handler validates sender → session before doing anything.
+    registerViewerPackPluginIpcHandlers({ ipcMain, host: viewerPackHost });
+  }
 }
 
 function getUpdateRestartBlockers() {
@@ -456,6 +597,13 @@ function getUpdateRestartBlockers() {
       id: "terminal-sessions",
       label: "Terminal session running",
       detail: "Close the active terminal session before restarting to update.",
+    });
+  }
+  if (agentService.getSessionCount() > 0) {
+    blockers.push({
+      id: "agent-sessions",
+      label: "Agent session running",
+      detail: "Close the active Agent session before restarting to update.",
     });
   }
   return blockers;
@@ -639,6 +787,7 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
   const previousPath = state.workspacePath;
 
   if (previousPath && previousPath !== canonicalPath) {
+    viewerPackHost?.destroySessionsForOwner(webContentsId);
     localFileCapabilities.revokeSender(webContentsId);
     const previousWindow = workspaceWindowByPath.get(previousPath);
     if (previousWindow === window || previousWindow?.isDestroyed()) {
@@ -647,7 +796,9 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
     if (options.cleanupPrevious !== false) {
       appPreviewRuntime?.closeSessionsForWindow(webContentsId);
       terminalService.closeSessionsForWindow(webContentsId);
+      void agentService.closeSessionsForWindow(webContentsId);
       workspaceWatchService.stopForWindow(webContentsId);
+      gitMetadataWatchService.stopForWindow(webContentsId);
     }
   }
 
@@ -672,6 +823,7 @@ function releaseWindowWorkspace(window) {
 }
 
 function releaseWindowWorkspaceById(webContentsId, window = null) {
+  viewerPackHost?.destroySessionsForOwner(webContentsId);
   localFileCapabilities.revokeSender(webContentsId);
   const state = windowStateById.get(webContentsId);
   const workspacePath = state?.workspacePath ?? null;
@@ -703,7 +855,9 @@ async function forgetCurrentWindowWorkspace(sender) {
   const releasedPath = releaseWindowWorkspace(window);
   appPreviewRuntime?.closeSessionsForWindow(window.webContents.id);
   terminalService.closeSessionsForWindow(window.webContents.id);
+  void agentService.closeSessionsForWindow(window.webContents.id);
   workspaceWatchService.stopForWindow(window.webContents.id);
+  gitMetadataWatchService.stopForWindow(window.webContents.id);
   if (releasedPath) await workspaceStateStore.removeRecentWorkspacePath(releasedPath);
 }
 
@@ -797,7 +951,9 @@ async function showHomepageForCurrentWindow(sender) {
   releaseWindowWorkspace(window);
   appPreviewRuntime?.closeSessionsForWindow(window.webContents.id);
   terminalService.closeSessionsForWindow(window.webContents.id);
+  void agentService.closeSessionsForWindow(window.webContents.id);
   workspaceWatchService.stopForWindow(window.webContents.id);
+  gitMetadataWatchService.stopForWindow(window.webContents.id);
 }
 
 function findWorkspacePathArg(argv) {

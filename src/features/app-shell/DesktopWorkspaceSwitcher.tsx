@@ -58,9 +58,9 @@ export function DesktopWorkspaceSwitcher({
   return (
     <div className="desktop-titlebar-workspace-wrap" ref={refObject}>
       <button
-        className="desktop-titlebar-workspace-button"
+        className={`desktop-titlebar-workspace-button ${workspaceKind}`}
         type="button"
-        aria-label={`Switch workspace: ${workspace.name}`}
+        aria-label={`Switch ${workspaceKind} workspace: ${workspace.name}`}
         aria-expanded={open}
         aria-haspopup="menu"
         title={workspace.name}

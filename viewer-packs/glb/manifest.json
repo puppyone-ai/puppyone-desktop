@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "ai.puppyone.viewer.glb",
+  "publisher": "puppyone",
+  "version": "1.0.0",
+  "engines": {
+    "puppyone": ">=0.1.2 <1.0.0",
+    "viewerApi": "1"
+  },
+  "activationEvents": ["onFileExtension:.glb"],
+  "viewer": {
+    "entry": "viewer.html",
+    "source": "range-resource",
+    "sources": ["local"],
+    "runtime": []
+  },
+  "formats": [
+    {
+      "id": "glb",
+      "label": "glTF Binary Scene",
+      "extensions": [".glb"],
+      "mimeTypes": ["model/gltf-binary"],
+      "category": "binary",
+      "defaultViewer": "plugin:ai.puppyone.viewer.glb",
+      "editable": false
+    }
+  ],
+  "permissions": {
+    "currentDocument": ["metadata", "readRange"],
+    "relatedFiles": "none",
+    "network": []
+  }
+}

@@ -10,13 +10,18 @@ export function registerWorkspaceWatchIpcHandlers({
 }) {
   ipcMain.handle("workspace:watch-start", async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-    workspaceWatchService.start(event.sender, rootPath);
-    return { ok: true };
+    const result = workspaceWatchService.start(event.sender, rootPath) ?? {};
+    return { ok: true, subscriptionId: result.subscriptionId ?? null, rootPath: result.rootPath ?? rootPath };
   });
 
   ipcMain.handle("workspace:watch-stop", async (event, request) => {
-    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-    workspaceWatchService.stop(event.sender.id, rootPath);
+    // Token-based stop: the subscriptionId is server-issued and scoped to this
+    // sender, so no root re-authorization is required (and cannot remove a
+    // newer subscription that reused the same webContents).
+    const subscriptionId = request?.subscriptionId;
+    if (typeof subscriptionId === "string" && subscriptionId.length > 0) {
+      workspaceWatchService.stop(subscriptionId, event.sender.id);
+    }
     return { ok: true };
   });
 

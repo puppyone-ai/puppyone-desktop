@@ -2,9 +2,9 @@
 // These exercise the real filesystem: every test runs against a fresh temp
 // directory with real files, real folders, and real byte content — no mocks.
 // This is the "端" (desktop/local) side of the product: create/read/write/rename/
-// move/delete/import + the path-containment security boundaries.
+// move/copy/delete/import + the path-containment security boundaries.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile, readFile, stat, symlink, lstat } from "node:fs/promises";
+import { chmod, mkdtemp, rm, mkdir, writeFile, readFile, stat, symlink, lstat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -17,6 +17,7 @@ import {
   createWorkspaceEntry,
   renameWorkspaceEntry,
   moveWorkspaceEntry,
+  copyWorkspaceEntry,
   deleteWorkspaceEntry,
   importWorkspaceEntries,
   readPuppyoneWorkspaceConfig,
@@ -311,6 +312,10 @@ describe("rename / move / delete", () => {
     })).rejects.toThrow(/symbolic links/i);
     await expect(moveWorkspaceEntry(root, { fromPath: "real.txt", toPath: "escape/moved.txt" }))
       .rejects.toThrow(/symbolic links/i);
+    await expect(copyWorkspaceEntry(root, { fromPath: "real.txt", targetFolderPath: "escape" }))
+      .rejects.toThrow(/symbolic links/i);
+    await expect(copyWorkspaceEntry(root, { fromPath: "linked.txt", targetFolderPath: null }))
+      .rejects.toThrow(/symbolic links/i);
     await expect(importWorkspaceEntries(root, {
       sourcePaths: [externalFile],
       targetFolderPath: "escape",
@@ -353,6 +358,192 @@ describe("rename / move / delete", () => {
 
   it("refuses to delete the workspace root", async () => {
     await expect(deleteWorkspaceEntry(root, { path: "" })).rejects.toThrow(/root/i);
+  });
+});
+
+describe("copyWorkspaceEntry", () => {
+  it("copies files into another folder without changing the source", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "source.txt", kind: "file", content: "original" });
+    await createWorkspaceEntry(root, { parentPath: null, name: "destination", kind: "folder" });
+
+    const result = await copyWorkspaceEntry(root, {
+      fromPath: "source.txt",
+      targetFolderPath: "destination",
+    });
+
+    expect(result).toEqual({ path: "destination/source.txt" });
+    expect(await readFile(path.join(root, "source.txt"), "utf8")).toBe("original");
+    expect(await readFile(path.join(root, "destination", "source.txt"), "utf8")).toBe("original");
+  });
+
+  it("preserves an existing source basename exactly when no preferred name is requested", async () => {
+    await writeFile(path.join(root, " note "), "spaced");
+    await createWorkspaceEntry(root, { parentPath: null, name: "destination", kind: "folder" });
+
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: " note ",
+      targetFolderPath: "destination",
+    })).resolves.toEqual({ path: "destination/ note " });
+    expect(await readFile(path.join(root, "destination", " note "), "utf8")).toBe("spaced");
+  });
+
+  it("recursively copies folders", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "source", kind: "folder" });
+    await createWorkspaceEntry(root, { parentPath: "source", name: "nested", kind: "folder" });
+    await createWorkspaceEntry(root, { parentPath: "source/nested", name: "note.md", kind: "file", content: "# Copy" });
+    await createWorkspaceEntry(root, { parentPath: null, name: "destination", kind: "folder" });
+
+    const result = await copyWorkspaceEntry(root, {
+      fromPath: "source",
+      targetFolderPath: "destination",
+    });
+
+    expect(result).toEqual({ path: "destination/source" });
+    expect(await readFile(path.join(root, "source", "nested", "note.md"), "utf8")).toBe("# Copy");
+    expect(await readFile(path.join(root, "destination", "source", "nested", "note.md"), "utf8")).toBe("# Copy");
+  });
+
+  it("copies non-writable source folders and restores their mode", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "source", kind: "folder" });
+    await createWorkspaceEntry(root, { parentPath: "source", name: "note.txt", kind: "file", content: "readonly" });
+    await chmod(path.join(root, "source"), 0o555);
+
+    try {
+      const result = await copyWorkspaceEntry(root, {
+        fromPath: "source",
+        targetFolderPath: null,
+      });
+
+      expect(result).toEqual({ path: "source copy" });
+      expect(await readFile(path.join(root, "source copy", "note.txt"), "utf8")).toBe("readonly");
+      expect((await stat(path.join(root, "source copy"))).mode & 0o777).toBe(0o555);
+    } finally {
+      await chmod(path.join(root, "source"), 0o755).catch(() => {});
+      await chmod(path.join(root, "source copy"), 0o755).catch(() => {});
+    }
+  });
+
+  it("keeps both items when the preferred target name already exists", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "source.txt", kind: "file", content: "source" });
+    await createWorkspaceEntry(root, { parentPath: null, name: "destination", kind: "folder" });
+    await createWorkspaceEntry(root, { parentPath: "destination", name: "source.txt", kind: "file", content: "target" });
+
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: "source.txt",
+      targetFolderPath: "destination",
+    })).resolves.toEqual({ path: "destination/source copy.txt" });
+    expect(await readFile(path.join(root, "destination", "source.txt"), "utf8")).toBe("target");
+    expect(await readFile(path.join(root, "destination", "source copy.txt"), "utf8")).toBe("source");
+  });
+
+  it("uses Finder-style numbered names for repeated copies in the same folder", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "report.md", kind: "file", content: "report" });
+
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: "report.md",
+      targetFolderPath: null,
+    })).resolves.toEqual({ path: "report copy.md" });
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: "report.md",
+      targetFolderPath: null,
+    })).resolves.toEqual({ path: "report copy 2.md" });
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: "report copy.md",
+      targetFolderPath: null,
+    })).resolves.toEqual({ path: "report copy 3.md" });
+
+    expect(await readFile(path.join(root, "report copy.md"), "utf8")).toBe("report");
+    expect(await readFile(path.join(root, "report copy 2.md"), "utf8")).toBe("report");
+    expect(await readFile(path.join(root, "report copy 3.md"), "utf8")).toBe("report");
+  });
+
+  it("treats a leading-dot filename as extensionless and dotted folders as folders", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: ".env", kind: "file", content: "SECRET=false" });
+    await createWorkspaceEntry(root, { parentPath: null, name: "archive.tar.gz", kind: "file", content: "archive" });
+    await createWorkspaceEntry(root, { parentPath: null, name: "folder.name", kind: "folder" });
+    await createWorkspaceEntry(root, { parentPath: null, name: "destination", kind: "folder" });
+    await createWorkspaceEntry(root, { parentPath: "destination", name: ".env", kind: "file", content: "hidden conflict" });
+
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: ".env",
+      targetFolderPath: null,
+    })).resolves.toEqual({ path: ".env copy" });
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: ".env",
+      targetFolderPath: "destination",
+    })).resolves.toEqual({ path: "destination/.env copy" });
+    expect(await readFile(path.join(root, "destination", ".env"), "utf8")).toBe("hidden conflict");
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: "archive.tar.gz",
+      targetFolderPath: null,
+    })).resolves.toEqual({ path: "archive copy.tar.gz" });
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: "folder.name",
+      targetFolderPath: null,
+    })).resolves.toEqual({ path: "folder.name copy" });
+  });
+
+  it("honors a safe preferred name and an explicit duplicate-name request", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "source.txt", kind: "file", content: "source" });
+    await createWorkspaceEntry(root, { parentPath: null, name: "destination", kind: "folder" });
+
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: "source.txt",
+      targetFolderPath: "destination",
+      preferredName: "renamed.txt",
+      forceDuplicateName: true,
+    })).resolves.toEqual({ path: "destination/renamed copy.txt" });
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: "source.txt",
+      targetFolderPath: "destination",
+      preferredName: "../escape.txt",
+    })).rejects.toThrow(/single file or folder name/i);
+  });
+
+  it("resolves simultaneous same-name copies with atomic keep-both naming", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "source.txt", kind: "file", content: "source" });
+    await createWorkspaceEntry(root, { parentPath: null, name: "destination", kind: "folder" });
+
+    const results = await Promise.all([
+      copyWorkspaceEntry(root, { fromPath: "source.txt", targetFolderPath: "destination" }),
+      copyWorkspaceEntry(root, { fromPath: "source.txt", targetFolderPath: "destination" }),
+    ]);
+
+    expect(results.map((result) => result.path).sort()).toEqual([
+      "destination/source copy.txt",
+      "destination/source.txt",
+    ]);
+    expect(await readFile(path.join(root, "destination", "source.txt"), "utf8")).toBe("source");
+    expect(await readFile(path.join(root, "destination", "source copy.txt"), "utf8")).toBe("source");
+  });
+
+  it("rejects the workspace root and copying a folder into itself", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "source", kind: "folder" });
+
+    await expect(copyWorkspaceEntry(root, { fromPath: "", targetFolderPath: null })).rejects.toThrow(/root/i);
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: "source",
+      targetFolderPath: "source",
+    })).rejects.toThrow(/into itself/i);
+  });
+
+  it("rejects symbolic links anywhere in the copied tree and leaves no partial target", async () => {
+    const externalFile = path.join(external, "secret.txt");
+    await writeFile(externalFile, "SECRET");
+    await createWorkspaceEntry(root, { parentPath: null, name: "source", kind: "folder" });
+    await createWorkspaceEntry(root, { parentPath: "source", name: "safe.txt", kind: "file", content: "safe" });
+    try {
+      await symlink(externalFile, path.join(root, "source", "linked.txt"));
+    } catch {
+      return;
+    }
+
+    await expect(copyWorkspaceEntry(root, {
+      fromPath: "source",
+      targetFolderPath: null,
+      preferredName: "copied",
+    })).rejects.toThrow(/symbolic links/i);
+    await expect(lstat(path.join(root, "copied"))).rejects.toThrow();
   });
 });
 
@@ -423,10 +614,12 @@ describe("path-traversal containment (security)", () => {
     }
   });
 
-  it("blocks traversal in delete / rename / move", async () => {
+  it("blocks traversal in delete / rename / move / copy", async () => {
     await expect(deleteWorkspaceEntry(root, { path: "../x" })).rejects.toThrow(/outside the selected workspace/i);
     await expect(renameWorkspaceEntry(root, { path: "../x", nextName: "y" })).rejects.toThrow(/outside the selected workspace/i);
     await expect(moveWorkspaceEntry(root, { fromPath: "../x", toPath: "y" })).rejects.toThrow(/outside the selected workspace/i);
+    await expect(copyWorkspaceEntry(root, { fromPath: "../x", targetFolderPath: null })).rejects.toThrow(/outside the selected workspace/i);
+    await expect(copyWorkspaceEntry(root, { fromPath: "x", targetFolderPath: "../../y" })).rejects.toThrow(/outside the selected workspace/i);
   });
 
   it("does not write outside root even when traversal is attempted", async () => {

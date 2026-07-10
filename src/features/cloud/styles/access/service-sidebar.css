@@ -27,7 +27,8 @@
   min-height: 0;
   overflow: auto;
   overflow-x: hidden;
-  padding: 6px 0;
+  padding-block: var(--desktop-sidebar-list-padding-block);
+  padding-inline: 0;
   scrollbar-gutter: stable;
 }
 

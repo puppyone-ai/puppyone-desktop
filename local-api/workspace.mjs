@@ -1,10 +1,22 @@
-import { readFileSync } from "node:fs";
+import { constants as fsConstants, readFileSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import {
+  GIT_DEFAULT_TIMEOUT_MS,
+  GIT_MUTATION_TIMEOUT_MS,
+  GIT_NETWORK_TIMEOUT_MS,
+  execGit,
+  execGitStreaming,
+} from "./git/runner.mjs";
+import { parseGitPorcelainV2Status } from "./git/porcelain-v2.mjs";
+export { getGitEnvironmentForTests } from "./git/runner.mjs";
+
+/** Cache totalCommits by (root, HEAD) so working-tree refreshes skip rev-list. */
+const totalCommitsByHead = new Map();
 
 const MAX_ENTRIES_PER_FOLDER = 500;
 const MAX_PREVIEW_BYTES = 4096;
@@ -12,14 +24,16 @@ const MAX_EDITOR_BYTES = 1024 * 1024;
 // Cap for whole-file reads served over the puppyone-local:// protocol (media
 // preview). Bounds main-process memory so a huge file can't OOM the app.
 const MAX_LOCAL_FILE_BYTES = 100 * 1024 * 1024;
+// Maximum length of a single bounded Range read (media protocol + viewer packs).
+const MAX_RANGE_READ_BYTES = 8 * 1024 * 1024;
 const MAX_OFFICE_CONVERSION_INPUT_BYTES = 25 * 1024 * 1024;
 const MAX_OFFICE_CONVERSION_OUTPUT_BYTES = 8 * 1024 * 1024;
 const OFFICE_CONVERSION_TIMEOUT_MS = 8000;
 const GIT_HISTORY_LIMIT = 100;
 const GIT_ALL_BRANCH_HISTORY_LIMIT = 320;
 const GIT_REMOTE_PREVIEW_LIMIT = 12;
-const GIT_MAX_BUFFER = 1024 * 1024 * 4;
-const GIT_DEFAULT_TIMEOUT_MS = 5000;
+export const GIT_STATUS_ENTRY_LIMIT = 10_000;
+const GIT_STATUS_RECORD_LIMIT = (GIT_STATUS_ENTRY_LIMIT * 2) + 32;
 const GIT_DETAIL_MAX_TOTAL_DIFF_LINES = 4000;
 const GIT_DETAIL_MAX_FILE_DIFF_LINES = 900;
 const GIT_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -210,6 +224,8 @@ for (const format of fileFormatRegistry.formats) {
   }
 }
 
+const copyNameExtensions = [...extensionIndex.keys()].sort((left, right) => right.length - left.length);
+
 export async function workspaceFromPath(folderPath) {
   const resolvedPath = path.resolve(folderPath);
   const metadata = await fs.stat(resolvedPath).catch((error) => {
@@ -271,11 +287,12 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
   if (metadata.isDirectory()) {
     throw new Error("Selected path is a folder.");
   }
-  if (metadata.size > MAX_LOCAL_FILE_BYTES) {
-    throw new Error("File is too large to serve.");
-  }
 
-  if (options && Object.prototype.hasOwnProperty.call(options, "rangeHeader")) {
+  const hasRangeOption = options && Object.prototype.hasOwnProperty.call(options, "rangeHeader");
+  if (hasRangeOption) {
+    // Bounded Range consumers (including Viewer Pack resource brokers) may
+    // address files larger than the whole-file media cap. Whole-file reads
+    // below still enforce MAX_LOCAL_FILE_BYTES.
     const range = parseByteRange(options.rangeHeader, metadata.size);
     if (range?.unsatisfiable) {
       return {
@@ -289,6 +306,10 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
     }
 
     if (range) {
+      const span = range.end - range.start + 1;
+      if (span > MAX_RANGE_READ_BYTES) {
+        throw new Error("Range length exceeds host maximum.");
+      }
       const bytes = await readFileSlice(filePath, range.start, range.end);
       return {
         bytes,
@@ -300,6 +321,9 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
       };
     }
 
+    if (metadata.size > MAX_LOCAL_FILE_BYTES) {
+      throw new Error("File is too large to serve without a Range request.");
+    }
     const bytes = await fs.readFile(filePath);
     return {
       bytes,
@@ -311,8 +335,103 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
     };
   }
 
+  if (metadata.size > MAX_LOCAL_FILE_BYTES) {
+    throw new Error("File is too large to serve.");
+  }
   return fs.readFile(filePath);
 }
+
+// Bounded Range reads for viewer packs and media use MAX_RANGE_READ_BYTES
+// (declared with the other size caps above).
+
+/**
+ * Metadata for a workspace file without reading its body. Unlike the media
+ * whole-file path this intentionally does NOT enforce MAX_LOCAL_FILE_BYTES —
+ * a viewer pack must be able to inspect files larger than 100 MiB through
+ * bounded Range reads. Returns a stable revision token (mtime + size) so a
+ * resource handle can detect underlying changes.
+ */
+export async function statWorkspaceFile(rootPath, relativePath) {
+  const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
+  const metadata = await fs.stat(filePath).catch((error) => {
+    throw new Error(`Unable to read file metadata: ${error.message}`);
+  });
+  if (metadata.isDirectory()) {
+    throw new Error("Selected path is a folder.");
+  }
+  if (!metadata.isFile()) {
+    throw new Error("Selected path is not a regular file.");
+  }
+  return {
+    path: normalizeRelativePath(relativePath),
+    name: path.basename(filePath),
+    size: metadata.size,
+    mimeType: getMimeType(filePath) ?? "application/octet-stream",
+    revision: `${Math.floor(metadata.mtimeMs)}:${metadata.size}`,
+  };
+}
+
+/**
+ * Bounded Range read for the resource broker. Allows files larger than the
+ * whole-file media cap because it only ever reads `[start, end]` (never the
+ * whole file) and refuses ranges longer than `maxLength` (default
+ * MAX_RANGE_READ_BYTES). Uses positional stream primitives, not
+ * `fs.readFile` of the whole file.
+ */
+export async function readWorkspaceFileRange(rootPath, relativePath, request = {}) {
+  const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
+  const metadata = await fs.stat(filePath).catch((error) => {
+    throw new Error(`Unable to read file metadata: ${error.message}`);
+  });
+  if (metadata.isDirectory()) {
+    throw new Error("Selected path is a folder.");
+  }
+  if (!metadata.isFile()) {
+    throw new Error("Selected path is not a regular file.");
+  }
+
+  const size = metadata.size;
+  const maxLength = Number.isSafeInteger(request.maxLength) && request.maxLength > 0
+    ? Math.min(request.maxLength, MAX_RANGE_READ_BYTES)
+    : MAX_RANGE_READ_BYTES;
+
+  const start = Number(request.start);
+  const end = Number(request.end);
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)) {
+    throw new Error("Range start and end must be integers.");
+  }
+  if (start < 0 || end < start) {
+    throw new Error("Range is invalid.");
+  }
+  if (size === 0 || start >= size) {
+    return {
+      bytes: Buffer.alloc(0),
+      size,
+      start: 0,
+      end: 0,
+      partial: false,
+      unsatisfiable: true,
+    };
+  }
+
+  const clampedEnd = Math.min(end, size - 1);
+  const length = clampedEnd - start + 1;
+  if (length > maxLength) {
+    throw new Error(`Requested range (${length} bytes) exceeds the ${formatFileSize(maxLength)} per-read limit.`);
+  }
+
+  const bytes = await readFileSlice(filePath, start, clampedEnd);
+  return {
+    bytes,
+    size,
+    start,
+    end: start + bytes.length - 1,
+    partial: true,
+    unsatisfiable: false,
+  };
+}
+
+export const RESOURCE_MAX_RANGE_READ_BYTES = MAX_RANGE_READ_BYTES;
 
 export async function readWorkspaceTextFile(rootPath, relativePath) {
   const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
@@ -621,6 +740,247 @@ export async function moveWorkspaceEntry(rootPath, request) {
   return { path: toRelativePath };
 }
 
+export async function copyWorkspaceEntry(rootPath, request) {
+  const fromRelativePath = normalizeRelativePath(request?.fromPath);
+  const targetFolderRelativePath = normalizeRelativePath(request?.targetFolderPath ?? null);
+
+  if (!fromRelativePath) {
+    throw new Error("Cannot copy the workspace root.");
+  }
+  if (fromRelativePath.includes("\0") || targetFolderRelativePath.includes("\0")) {
+    throw new Error("Path contains an invalid character.");
+  }
+  const sourcePath = await resolveExistingWorkspacePath(rootPath, fromRelativePath);
+  const sourceMetadata = await fs.lstat(sourcePath).catch((error) => {
+    throw new Error(`Unable to copy entry: ${error.message}`);
+  });
+  if (sourceMetadata.isSymbolicLink()) {
+    throw new Error("Symbolic links cannot be copied.");
+  }
+  if (!sourceMetadata.isFile() && !sourceMetadata.isDirectory()) {
+    throw new Error("Only files and folders can be copied.");
+  }
+  if (
+    sourceMetadata.isDirectory()
+    && (
+      targetFolderRelativePath === fromRelativePath
+      || targetFolderRelativePath.startsWith(`${fromRelativePath}/`)
+    )
+  ) {
+    throw new Error("Cannot copy a folder into itself.");
+  }
+
+  const targetParentPath = await resolveExistingWorkspacePath(rootPath, targetFolderRelativePath);
+  const targetParentMetadata = await fs.stat(targetParentPath).catch((error) => {
+    throw new Error(`Unable to copy entry: ${error.message}`);
+  });
+  if (!targetParentMetadata.isDirectory()) {
+    throw new Error("Copy target parent is not a folder.");
+  }
+  if (sourceMetadata.isDirectory() && isSameOrInsidePath(sourcePath, targetParentPath)) {
+    throw new Error("Cannot copy a folder into itself.");
+  }
+
+  const preferredName = request?.preferredName == null
+    ? path.posix.basename(fromRelativePath)
+    : normalizeNewEntryName(request.preferredName);
+  const startWithDuplicateName = request?.forceDuplicateName === true
+    || path.dirname(sourcePath) === targetParentPath;
+
+  // Validate the complete tree before copying so a folder containing a link is
+  // rejected as one operation instead of producing a surprising partial copy.
+  const canonicalRoot = await fs.realpath(path.resolve(rootPath)).catch((error) => {
+    throw new Error(`Unable to resolve workspace root: ${error.message}`);
+  });
+  await assertCopyableWorkspaceTree(canonicalRoot, sourcePath);
+
+  for (let copyIndex = startWithDuplicateName ? 1 : 0; copyIndex <= 10_000; copyIndex += 1) {
+    const candidateName = createKeepBothCopyName(preferredName, copyIndex, sourceMetadata.isDirectory());
+    const targetPath = path.join(targetParentPath, candidateName);
+    let targetCreated = false;
+    try {
+      // copyWorkspaceTree claims its root with mkdir/copyFile EXCL. Name
+      // selection therefore remains correct even when two windows paste at the
+      // same time; renderer-side folder listings are never trusted for this.
+      await copyWorkspaceTree(canonicalRoot, sourcePath, targetPath);
+      targetCreated = true;
+
+      // Revalidate both ends after the asynchronous copy. This catches a source
+      // entry being replaced with a link while the operation was in flight and
+      // guarantees that no link is introduced into the workspace result.
+      await assertCopyableWorkspaceTree(canonicalRoot, sourcePath);
+      await assertCopyableWorkspaceTree(canonicalRoot, targetPath);
+      return {
+        path: joinRelativePath(targetFolderRelativePath, candidateName),
+      };
+    } catch (error) {
+      if (targetCreated) {
+        await removeWorkspaceCopyTarget(canonicalRoot, targetPath, true);
+      }
+      if (!targetCreated && isCopyTargetConflict(error)) {
+        continue;
+      }
+      throw new Error(`Unable to copy entry: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  throw new Error("Unable to copy entry: too many items use the requested name.");
+}
+
+function createKeepBothCopyName(preferredName, copyIndex, isDirectory) {
+  if (copyIndex === 0) return preferredName;
+
+  const extension = isDirectory ? "" : resolveCopyNameExtension(preferredName);
+  const originalStem = extension ? preferredName.slice(0, -extension.length) : preferredName;
+  const existingCopySuffix = parseKeepBothCopySuffix(originalStem);
+  const stem = existingCopySuffix?.stem ?? originalStem;
+  const copyNumber = (existingCopySuffix?.copyNumber ?? 0) + copyIndex;
+  const suffix = copyNumber === 1 ? " copy" : ` copy ${copyNumber}`;
+  return `${stem}${suffix}${extension}`;
+}
+
+function parseKeepBothCopySuffix(stem) {
+  const match = /^(.*) copy(?: (\d+))?$/i.exec(stem);
+  if (!match?.[1]) return null;
+  const copyNumber = match[2] ? Number.parseInt(match[2], 10) : 1;
+  if (!Number.isSafeInteger(copyNumber) || copyNumber < 1) return null;
+  return { stem: match[1], copyNumber };
+}
+
+function resolveCopyNameExtension(name) {
+  const lowerName = name.toLowerCase();
+  const registeredExtension = copyNameExtensions.find((extension) => (
+    lowerName.endsWith(extension) && name.length > extension.length
+  ));
+  if (registeredExtension) {
+    return name.slice(-registeredExtension.length);
+  }
+
+  const lastDot = name.lastIndexOf(".");
+  return lastDot > 0 ? name.slice(lastDot) : "";
+}
+
+function isCopyTargetConflict(error) {
+  return error?.code === "EEXIST" || error?.code === "ERR_FS_CP_EEXIST";
+}
+
+async function copyWorkspaceTree(canonicalRoot, sourcePath, targetPath) {
+  const metadata = await fs.lstat(sourcePath).catch((error) => {
+    throw new Error(`Unable to inspect copy source: ${error.message}`);
+  });
+  if (metadata.isSymbolicLink()) {
+    throw new Error("Symbolic links cannot be copied.");
+  }
+  await assertWorkspaceCopySourcePath(canonicalRoot, sourcePath);
+
+  if (metadata.isFile()) {
+    let targetCreated = false;
+    try {
+      await assertWorkspaceCopyTargetParent(canonicalRoot, targetPath);
+      await fs.copyFile(sourcePath, targetPath, fsConstants.COPYFILE_EXCL);
+      targetCreated = true;
+      await fs.chmod(targetPath, metadata.mode);
+      await fs.utimes(targetPath, metadata.atime, metadata.mtime);
+      await assertWorkspaceCopySourcePath(canonicalRoot, sourcePath);
+      const sourceAfterCopy = await fs.lstat(sourcePath);
+      if (sourceAfterCopy.isSymbolicLink() || !sourceAfterCopy.isFile()) {
+        throw new Error("Copy source changed while it was being copied.");
+      }
+      return;
+    } catch (error) {
+      if (targetCreated) {
+        await removeWorkspaceCopyTarget(canonicalRoot, targetPath, false);
+      }
+      throw error;
+    }
+  }
+
+  if (!metadata.isDirectory()) {
+    throw new Error("Only files and folders can be copied.");
+  }
+
+  let targetCreated = false;
+  try {
+    await assertWorkspaceCopyTargetParent(canonicalRoot, targetPath);
+    // The destination must remain writable while its children are populated.
+    // Restore the source directory's exact mode after the tree is complete.
+    await fs.mkdir(targetPath, { mode: metadata.mode | 0o700 });
+    targetCreated = true;
+    const children = await fs.readdir(sourcePath);
+    for (const childName of children) {
+      await copyWorkspaceTree(
+        canonicalRoot,
+        path.join(sourcePath, childName),
+        path.join(targetPath, childName),
+      );
+    }
+    await fs.chmod(targetPath, metadata.mode);
+    await fs.utimes(targetPath, metadata.atime, metadata.mtime);
+    await assertWorkspaceCopySourcePath(canonicalRoot, sourcePath);
+    const sourceAfterCopy = await fs.lstat(sourcePath);
+    if (sourceAfterCopy.isSymbolicLink() || !sourceAfterCopy.isDirectory()) {
+      throw new Error("Copy source changed while it was being copied.");
+    }
+  } catch (error) {
+    if (targetCreated) {
+      await removeWorkspaceCopyTarget(canonicalRoot, targetPath, true);
+    }
+    throw error;
+  }
+}
+
+async function assertCopyableWorkspaceTree(canonicalRoot, entryPath) {
+  const metadata = await fs.lstat(entryPath).catch((error) => {
+    throw new Error(`Unable to inspect copy source: ${error.message}`);
+  });
+  if (metadata.isSymbolicLink()) {
+    throw new Error("Symbolic links cannot be copied.");
+  }
+  await assertWorkspaceCopySourcePath(canonicalRoot, entryPath);
+  if (metadata.isFile()) return;
+  if (!metadata.isDirectory()) {
+    throw new Error("Only files and folders can be copied.");
+  }
+
+  const children = await fs.readdir(entryPath);
+  for (const childName of children) {
+    await assertCopyableWorkspaceTree(canonicalRoot, path.join(entryPath, childName));
+  }
+}
+
+async function assertWorkspaceCopySourcePath(canonicalRoot, entryPath) {
+  const canonicalEntry = await fs.realpath(entryPath).catch((error) => {
+    throw new Error(`Unable to resolve copy source: ${error.message}`);
+  });
+  if (!isSameOrInsidePath(canonicalRoot, canonicalEntry)) {
+    throw new Error("Copy source resolves outside the selected workspace.");
+  }
+}
+
+async function assertWorkspaceCopyTargetParent(canonicalRoot, targetPath) {
+  const targetParentPath = path.dirname(targetPath);
+  const parentMetadata = await fs.lstat(targetParentPath).catch((error) => {
+    throw new Error(`Unable to resolve copy target folder: ${error.message}`);
+  });
+  if (parentMetadata.isSymbolicLink()) {
+    throw new Error("Symbolic links cannot be used as a copy target.");
+  }
+  const canonicalParent = await fs.realpath(targetParentPath).catch((error) => {
+    throw new Error(`Unable to resolve copy target folder: ${error.message}`);
+  });
+  if (!isSameOrInsidePath(canonicalRoot, canonicalParent)) {
+    throw new Error("Copy target resolves outside the selected workspace.");
+  }
+}
+
+async function removeWorkspaceCopyTarget(canonicalRoot, targetPath, recursive) {
+  const metadata = await fs.lstat(targetPath).catch(() => null);
+  if (!metadata || metadata.isSymbolicLink()) return;
+  const canonicalTarget = await fs.realpath(targetPath).catch(() => null);
+  if (!canonicalTarget || !isSameOrInsidePath(canonicalRoot, canonicalTarget)) return;
+  await fs.rm(canonicalTarget, { recursive, force: true }).catch(() => {});
+}
+
 export async function importWorkspaceEntries(rootPath, request) {
   const sourcePaths = Array.isArray(request?.sourcePaths) ? request.sourcePaths : [];
   if (sourcePaths.length === 0) {
@@ -720,11 +1080,27 @@ export async function deleteWorkspaceEntry(rootPath, request) {
   return { path: relativePath };
 }
 
-export async function getWorkspaceGitStatus(rootPath) {
+function throwIfGitStatusAborted(signal) {
+  if (!signal?.aborted) return;
+  const error = new Error("Git status request was cancelled.");
+  error.name = "AbortError";
+  error.code = "ABORT_ERR";
+  throw error;
+}
+
+export async function getWorkspaceGitStatus(rootPath, options = {}) {
   const root = resolveWorkspacePath(rootPath, null);
-  const isRepo = await execGit(root, ["rev-parse", "--is-inside-work-tree"])
+  const signal = options.signal;
+  const statusLimit = Number.isInteger(options.statusEntryLimit) && options.statusEntryLimit > 0
+    ? Math.min(options.statusEntryLimit, GIT_STATUS_ENTRY_LIMIT)
+    : GIT_STATUS_ENTRY_LIMIT;
+  throwIfGitStatusAborted(signal);
+  const isRepo = await execGit(root, ["rev-parse", "--is-inside-work-tree"], { signal })
     .then((result) => result.stdout.trim() === "true")
-    .catch(() => false);
+    .catch(() => {
+      throwIfGitStatusAborted(signal);
+      return false;
+    });
 
   if (!isRepo) {
     const sourceControl = buildGitSourceControlSnapshot({
@@ -751,35 +1127,109 @@ export async function getWorkspaceGitStatus(rootPath) {
       sourceControl,
       commits: [],
       allCommits: [],
+      statusLimit,
+      didHitStatusLimit: false,
     };
   }
 
-  const [
-    branchResult,
-    symbolicBranchResult,
-    headResult,
-    countResult,
-    statusResult,
-    branches,
-    remotes,
-    commits,
-    allCommits,
-  ] = await Promise.all([
-    execGit(root, ["branch", "--show-current"]).catch(() => ({ stdout: "" })),
-    execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"]).catch(() => ({ stdout: "" })),
-    execGit(root, ["rev-parse", "HEAD"]).catch(() => ({ stdout: "" })),
-    execGit(root, ["rev-list", "--count", "HEAD"]).catch(() => ({ stdout: "0" })),
-    execGit(root, ["status", "--porcelain=v2", "-z", "--branch"]).catch((error) => {
+  // Hot-path status reader. It loads only what the Source Control surface needs
+  // to reconcile (HEAD/branch identity, working/staged/untracked/merge resources,
+  // ahead/behind, refs/remotes, operation state). Full current-branch and
+  // all-branch histories are loaded lazily by the History/Cloud graph surface
+  // via getWorkspaceGitBranchGraph, so a normal file save never runs two
+  // complete history scans. Read-only queries disable optional Git locks so the
+  // background status never performs an optional index refresh or competes with
+  // terminal Git operations.
+  //
+  // Porcelain-v2 `--branch` headers already carry oid/head/upstream/ahead-behind,
+  // so we avoid duplicate branch/HEAD queries when those headers are present.
+  //
+  // Snapshot consistency: fingerprint HEAD + symbolic ref + index before/after
+  // the multi-command read and retry once when repository identity changes mid-query.
+  const beforeFingerprint = await readGitConsistencyFingerprint(root, { signal });
+  const first = await readFastWorkspaceGitStatus(root, { signal, statusLimit });
+  const afterFingerprint = await readGitConsistencyFingerprint(root, { signal });
+  if (beforeFingerprint !== afterFingerprint) {
+    return readFastWorkspaceGitStatus(root, { signal, statusLimit });
+  }
+  return first;
+}
+
+async function readFastWorkspaceGitStatus(root, options = {}) {
+  const signal = options.signal;
+  const statusLimit = options.statusLimit ?? GIT_STATUS_ENTRY_LIMIT;
+  throwIfGitStatusAborted(signal);
+  const [statusResult, branches, remotes] = await Promise.all([
+    // Explicit untracked policy: never inherit status.showUntrackedFiles=no from
+    // the user's global Git config — the desktop model must see all untracked paths.
+    execGitStreaming(root, [
+      "status",
+      "--porcelain=v2",
+      "-z",
+      "--branch",
+      "--untracked-files=all",
+    ], {
+      optionalLocks: false,
+      recordLimit: Math.min(GIT_STATUS_RECORD_LIMIT, (statusLimit * 2) + 32),
+      signal,
+    }).catch((error) => {
+      throwIfGitStatusAborted(signal);
       throw new Error(`Unable to read git status: ${error.message}`);
     }),
-    readGitBranches(root),
-    readGitRemotes(root),
-    readGitHistory(root, GIT_HISTORY_LIMIT),
-    readGitHistory(root, GIT_ALL_BRANCH_HISTORY_LIMIT, { allBranches: true }),
+    readGitBranches(root, { signal }),
+    readGitRemotes(root, { signal }),
   ]);
+  throwIfGitStatusAborted(signal);
   const parsedStatus = parseGitPorcelainV2Status(statusResult.stdout);
-  const branchName = branchResult.stdout.trim() || symbolicBranchResult.stdout.trim() || "detached";
-  const normalizedBranches = normalizeGitBranches(branches, branchName, headResult.stdout.trim());
+  const didHitStatusLimit = statusResult.didHitLimit
+    || parsedStatus.entries.length > statusLimit;
+  const statusEntries = parsedStatus.entries.slice(0, statusLimit);
+  const headerOid = typeof parsedStatus.headers["branch.oid"] === "string"
+    ? parsedStatus.headers["branch.oid"].trim()
+    : "";
+  const headerHead = typeof parsedStatus.headers["branch.head"] === "string"
+    ? parsedStatus.headers["branch.head"].trim()
+    : "";
+
+  let branchName = "";
+  let headCommitId = "";
+  if (headerHead && headerHead !== "(detached)") {
+    branchName = headerHead;
+  } else if (headerHead === "(detached)") {
+    branchName = "detached";
+  }
+  if (headerOid && headerOid !== "(null)") {
+    headCommitId = headerOid;
+  }
+
+  if (!branchName || !headCommitId) {
+    const [branchResult, symbolicBranchResult, headResult] = await Promise.all([
+      branchName
+        ? Promise.resolve({ stdout: branchName })
+        : execGit(root, ["branch", "--show-current"], { optionalLocks: false, signal }).catch(() => {
+          throwIfGitStatusAborted(signal);
+          return { stdout: "" };
+        }),
+      branchName
+        ? Promise.resolve({ stdout: "" })
+        : execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], { optionalLocks: false, signal }).catch(() => {
+          throwIfGitStatusAborted(signal);
+          return { stdout: "" };
+        }),
+      headCommitId
+        ? Promise.resolve({ stdout: headCommitId })
+        : execGit(root, ["rev-parse", "HEAD"], { optionalLocks: false, signal }).catch(() => {
+          throwIfGitStatusAborted(signal);
+          return { stdout: "" };
+        }),
+    ]);
+    branchName = branchName || branchResult.stdout.trim() || symbolicBranchResult.stdout.trim() || "detached";
+    headCommitId = headCommitId || headResult.stdout.trim();
+  }
+
+  throwIfGitStatusAborted(signal);
+  const totalCommits = await readCachedTotalCommits(root, headCommitId, { signal });
+  const normalizedBranches = normalizeGitBranches(branches, branchName, headCommitId);
   const normalizedRemotes = remotes.map((remote) => ({
     ...remote,
     branches: normalizedBranches
@@ -787,14 +1237,23 @@ export async function getWorkspaceGitStatus(rootPath) {
       .map((branch) => branch.name),
   }));
   const config = await readPuppyoneWorkspaceConfig(root).catch(() => null);
-  const syncTarget = await readGitSyncTarget(root, normalizedRemotes, normalizedBranches, branchName, headResult.stdout.trim(), config);
+  throwIfGitStatusAborted(signal);
+  const syncTarget = await readGitSyncTarget(
+    root,
+    normalizedRemotes,
+    normalizedBranches,
+    branchName,
+    headCommitId,
+    config,
+    { signal },
+  );
   const currentBranch = normalizedBranches.find((branch) => branch.current && !branch.remote) ?? null;
   const sourceControl = buildGitSourceControlSnapshot({
-    entries: parsedStatus.entries,
+    entries: statusEntries,
     branchName,
     syncTarget,
     currentBranch,
-    headCommitId: headResult.stdout.trim() || null,
+    headCommitId: headCommitId || null,
   });
   const effectiveHosting = resolveGitEffectiveHosting({
     remotes: normalizedRemotes,
@@ -807,20 +1266,84 @@ export async function getWorkspaceGitStatus(rootPath) {
   return {
     isRepo: true,
     branch: branchName,
-    headCommitId: headResult.stdout.trim() || null,
-    totalCommits: Number.parseInt(countResult.stdout.trim(), 10) || commits.length,
-    entries: parsedStatus.entries,
-    stagedEntries: parsedStatus.entries.filter(hasStagedStatus),
-    unstagedEntries: parsedStatus.entries.filter(hasUnstagedStatus),
-    untrackedEntries: parsedStatus.entries.filter((entry) => entry.status === "untracked"),
+    headCommitId: headCommitId || null,
+    totalCommits,
+    entries: statusEntries,
+    stagedEntries: statusEntries.filter(hasStagedStatus),
+    unstagedEntries: statusEntries.filter(hasUnstagedStatus),
+    untrackedEntries: statusEntries.filter((entry) => entry.status === "untracked"),
     branches: normalizedBranches,
     remotes: normalizedRemotes,
     syncTarget,
     effectiveHosting,
     sourceControl,
-    commits,
-    allCommits,
+    // History is intentionally empty on the fast status path; load it lazily via
+    // getWorkspaceGitBranchGraph when the History panel or Cloud graph needs it.
+    commits: [],
+    allCommits: [],
+    statusLimit,
+    didHitStatusLimit,
   };
+}
+
+// Cheap repository-identity fingerprint used to detect mid-query mutations.
+// Compares HEAD oid, symbolic ref, and index mtime/size — not full status truth.
+async function readCachedTotalCommits(root, headCommitId, options = {}) {
+  const signal = options.signal;
+  const cacheKey = path.resolve(root);
+  if (!headCommitId) {
+    totalCommitsByHead.delete(cacheKey);
+    return 0;
+  }
+  const cached = totalCommitsByHead.get(cacheKey);
+  if (cached && cached.headCommitId === headCommitId) {
+    return cached.totalCommits;
+  }
+  const countResult = await execGit(root, ["rev-list", "--count", "HEAD"], {
+    optionalLocks: false,
+    signal,
+  }).catch(() => {
+    throwIfGitStatusAborted(signal);
+    return { stdout: "0" };
+  });
+  const totalCommits = Number.parseInt(countResult.stdout.trim(), 10) || 0;
+  totalCommitsByHead.set(cacheKey, { headCommitId, totalCommits });
+  return totalCommits;
+}
+
+export async function readGitConsistencyFingerprint(rootPath, options = {}) {
+  const root = resolveWorkspacePath(rootPath, null);
+  const signal = options.signal;
+  throwIfGitStatusAborted(signal);
+  const [headResult, symbolicResult, indexPathResult] = await Promise.all([
+    execGit(root, ["rev-parse", "HEAD"], { optionalLocks: false, signal }).catch(() => {
+      throwIfGitStatusAborted(signal);
+      return { stdout: "" };
+    }),
+    execGit(root, ["symbolic-ref", "-q", "HEAD"], { optionalLocks: false, signal }).catch(() => {
+      throwIfGitStatusAborted(signal);
+      return { stdout: "" };
+    }),
+    execGit(root, ["rev-parse", "--git-path", "index"], { optionalLocks: false, signal }).catch(() => {
+      throwIfGitStatusAborted(signal);
+      return { stdout: "" };
+    }),
+  ]);
+  throwIfGitStatusAborted(signal);
+  const indexRelative = indexPathResult.stdout.trim();
+  const indexAbsolute = indexRelative
+    ? (path.isAbsolute(indexRelative) ? indexRelative : path.resolve(root, indexRelative))
+    : null;
+  let indexFingerprint = "missing";
+  if (indexAbsolute) {
+    const stat = await fs.stat(indexAbsolute).catch(() => null);
+    if (stat) indexFingerprint = `${Math.trunc(stat.mtimeMs)}:${stat.size}`;
+  }
+  return [
+    headResult.stdout.trim() || "no-head",
+    symbolicResult.stdout.trim() || "detached",
+    indexFingerprint,
+  ].join("|");
 }
 
 export async function getWorkspaceGitBranchGraph(rootPath) {
@@ -848,9 +1371,9 @@ export async function getWorkspaceGitBranchGraph(rootPath) {
     commits,
     allCommits,
   ] = await Promise.all([
-    execGit(root, ["branch", "--show-current"]).catch(() => ({ stdout: "" })),
-    execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"]).catch(() => ({ stdout: "" })),
-    execGit(root, ["rev-parse", "HEAD"]).catch(() => ({ stdout: "" })),
+    execGit(root, ["branch", "--show-current"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+    execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
+    execGit(root, ["rev-parse", "HEAD"], { optionalLocks: false }).catch(() => ({ stdout: "" })),
     readGitBranches(root),
     readGitHistory(root, GIT_HISTORY_LIMIT),
     readGitHistory(root, GIT_ALL_BRANCH_HISTORY_LIMIT, { allBranches: true }),
@@ -867,6 +1390,40 @@ export async function getWorkspaceGitBranchGraph(rootPath) {
   };
 }
 
+// Resolve the repository-owned paths for an authorized workspace root using
+// Git itself. The renderer never supplies these; they inherit authority from
+// the authorized root. Covers linked worktrees and repositories whose `.git`
+// is a file pointing outside the workspace.
+export async function resolveGitRepositoryIdentity(rootPath) {
+  const root = resolveWorkspacePath(rootPath, null);
+  try {
+    const { stdout } = await execGit(
+      root,
+      ["rev-parse", "--show-toplevel", "--git-dir", "--git-common-dir"],
+      { optionalLocks: false },
+    );
+    const [topLevelRaw, gitDirRaw, commonDirRaw] = stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim());
+    if (!gitDirRaw) {
+      return { repository: false, workspaceRoot: root, topLevel: null, gitDir: null, commonDir: null };
+    }
+    // `--git-dir` / `--git-common-dir` may be relative to the working tree;
+    // resolve against the root so linked worktrees normalize to absolute paths.
+    const gitDirResolved = path.resolve(root, gitDirRaw);
+    const commonDirResolved = commonDirRaw ? path.resolve(root, commonDirRaw) : gitDirResolved;
+    const topLevelResolved = topLevelRaw ? path.resolve(topLevelRaw) : root;
+    const [gitDir, commonDir, topLevel] = await Promise.all([
+      fs.realpath(gitDirResolved).catch(() => gitDirResolved),
+      fs.realpath(commonDirResolved).catch(() => commonDirResolved),
+      fs.realpath(topLevelResolved).catch(() => topLevelResolved),
+    ]);
+    return { repository: true, workspaceRoot: root, topLevel, gitDir, commonDir };
+  } catch {
+    return { repository: false, workspaceRoot: root, topLevel: null, gitDir: null, commonDir: null };
+  }
+}
+
 export async function initializeWorkspaceGitRepository(rootPath) {
   const root = resolveWorkspacePath(rootPath, null);
   const isRepo = await execGit(root, ["rev-parse", "--is-inside-work-tree"])
@@ -874,7 +1431,7 @@ export async function initializeWorkspaceGitRepository(rootPath) {
     .catch(() => false);
 
   if (!isRepo) {
-    await execGit(root, ["init"]).catch((error) => {
+    await execGit(root, ["init"], { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
       throw new Error(`Unable to initialize repository: ${getGitErrorOutput(error)}`);
     });
   }
@@ -891,7 +1448,7 @@ export async function configureWorkspaceCloudRemote(rootPath, remoteUrl, remoteN
     .catch(() => false);
 
   if (!isRepo) {
-    await execGit(root, ["init"]).catch((error) => {
+    await execGit(root, ["init"], { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
       throw new Error(`Unable to initialize repository: ${getGitErrorOutput(error)}`);
     });
   }
@@ -903,7 +1460,7 @@ export async function configureWorkspaceCloudRemote(rootPath, remoteUrl, remoteN
     ? ["remote", "set-url", normalizedRemoteName, normalizedRemoteUrl]
     : ["remote", "add", normalizedRemoteName, normalizedRemoteUrl];
 
-  await execGit(root, args).catch((error) => {
+  await execGit(root, args, { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
     throw new Error(`Unable to configure Cloud remote: ${getGitErrorOutput(error)}`);
   });
 
@@ -1201,7 +1758,9 @@ export async function discardAllWorkspaceGitChanges(rootPath) {
 export async function commitWorkspaceGit(rootPath, message) {
   const root = resolveWorkspacePath(rootPath, null);
   const normalizedMessage = await normalizeCommitMessage(root, message);
-  await execGit(root, ["commit", "-m", normalizedMessage]).catch((error) => {
+  await execGit(root, ["commit", "-m", normalizedMessage], {
+    timeout: GIT_MUTATION_TIMEOUT_MS,
+  }).catch((error) => {
     throw new Error(`Unable to commit changes: ${error.message}`);
   });
   return getWorkspaceGitStatus(root);
@@ -1212,7 +1771,7 @@ export async function checkoutWorkspaceGitBranch(rootPath, branchName, options =
   const normalizedBranch = await normalizeGitBranchName(root, branchName);
   const args = await buildGitBranchSwitchArgs(root, normalizedBranch, options);
 
-  await execGit(root, args).catch((error) => {
+  await execGit(root, args, { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
     throw new Error(formatGitCheckoutError(error));
   });
 
@@ -1236,15 +1795,15 @@ export async function stashAndCheckoutWorkspaceGitBranch(rootPath, branchName, o
       "--include-untracked",
       "-m",
       `PuppyOne: before switching to ${normalizedBranch}`,
-    ]).catch((error) => {
+    ], { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
       throw new Error(`Unable to stash changes: ${getGitErrorOutput(error)}`);
     });
   }
 
   const args = await buildGitBranchSwitchArgs(root, normalizedBranch, options);
-  await execGit(root, args).catch(async (error) => {
+  await execGit(root, args, { timeout: GIT_MUTATION_TIMEOUT_MS }).catch(async (error) => {
     if (hasLocalChanges) {
-      await execGit(root, ["stash", "pop"]).catch(() => {});
+      await execGit(root, ["stash", "pop"], { timeout: GIT_MUTATION_TIMEOUT_MS }).catch(() => {});
     }
     throw new Error(formatGitCheckoutError(error));
   });
@@ -1262,16 +1821,18 @@ export async function commitAndCheckoutWorkspaceGitBranch(rootPath, branchName, 
   }
 
   if (status.entries.length > 0) {
-    await execGit(root, ["add", "--all"]).catch((error) => {
+    await execGit(root, ["add", "--all"], { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
       throw new Error(`Unable to stage changes: ${getGitErrorOutput(error)}`);
     });
-    await execGit(root, ["commit", "-m", `Commit before switching to ${normalizedBranch}`]).catch((error) => {
+    await execGit(root, ["commit", "-m", `Commit before switching to ${normalizedBranch}`], {
+      timeout: GIT_MUTATION_TIMEOUT_MS,
+    }).catch((error) => {
       throw new Error(`Unable to commit changes: ${getGitErrorOutput(error)}`);
     });
   }
 
   const args = await buildGitBranchSwitchArgs(root, normalizedBranch, options);
-  await execGit(root, args).catch((error) => {
+  await execGit(root, args, { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
     throw new Error(formatGitCheckoutError(error));
   });
 
@@ -1281,7 +1842,9 @@ export async function commitAndCheckoutWorkspaceGitBranch(rootPath, branchName, 
 export async function createWorkspaceGitBranch(rootPath, branchName) {
   const root = resolveWorkspacePath(rootPath, null);
   const normalizedBranch = await normalizeGitBranchName(root, branchName);
-  await execGit(root, ["switch", "-c", normalizedBranch]).catch((error) => {
+  await execGit(root, ["switch", "-c", normalizedBranch], {
+    timeout: GIT_MUTATION_TIMEOUT_MS,
+  }).catch((error) => {
     throw new Error(`Unable to create branch: ${error.message}`);
   });
   return getWorkspaceGitStatus(root);
@@ -1297,7 +1860,7 @@ export async function fetchWorkspaceGit(rootPath) {
 
   const failures = [];
   for (const remote of remotes) {
-    await execGit(root, ["fetch", "--prune", remote.name], { timeout: 30000 }).catch((error) => {
+    await execGit(root, ["fetch", "--prune", remote.name], { timeout: GIT_NETWORK_TIMEOUT_MS }).catch((error) => {
       failures.push(`remote '${remote.name}': ${getGitErrorOutput(error)}`);
     });
   }
@@ -1322,7 +1885,7 @@ export async function pullWorkspaceGit(rootPath) {
     if (!target.remote || !target.branch) {
       throw new Error("Unable to pull changes: PuppyOne Cloud remote is not configured.");
     }
-    await execGit(root, ["fetch", "--prune", target.remote], { timeout: 30000 }).catch((error) => {
+    await execGit(root, ["fetch", "--prune", target.remote], { timeout: GIT_NETWORK_TIMEOUT_MS }).catch((error) => {
       throw new Error(`Unable to fetch cloud changes: ${getGitErrorOutput(error)}`);
     });
 
@@ -1332,14 +1895,14 @@ export async function pullWorkspaceGit(rootPath) {
     const pullModeArgs = nextStatus.sourceControl.remote.ahead > 0
       ? ["pull", "--rebase", "--autostash", target.remote, target.branch]
       : ["pull", "--ff-only", "--autostash", target.remote, target.branch];
-    await execGit(root, pullModeArgs, { timeout: 30000 }).catch((error) => {
+    await execGit(root, pullModeArgs, { timeout: GIT_NETWORK_TIMEOUT_MS }).catch((error) => {
       throw new Error(`Unable to pull cloud changes: ${getGitErrorOutput(error)}`);
     });
     return getWorkspaceGitStatus(root);
   }
 
   const pullArgs = await buildDefaultPullArgs(root);
-  await execGit(root, pullArgs, { timeout: 30000 }).catch((error) => {
+  await execGit(root, pullArgs, { timeout: GIT_NETWORK_TIMEOUT_MS }).catch((error) => {
     throw new Error(`Unable to pull changes: ${getGitErrorOutput(error)}`);
   });
   return getWorkspaceGitStatus(root);
@@ -1357,7 +1920,7 @@ export async function pushWorkspaceGit(rootPath) {
     return getWorkspaceGitStatus(root);
   }
 
-  await execGit(root, ["push"], { timeout: 30000 }).catch((error) => {
+  await execGit(root, ["push"], { timeout: GIT_NETWORK_TIMEOUT_MS }).catch((error) => {
     if (isMissingUpstreamError(error)) {
       return pushWorkspaceGitWithDefaultUpstream(root);
     }
@@ -1386,14 +1949,14 @@ export async function syncWorkspaceGit(rootPath) {
 
   if (status.sourceControl.remote.behind > 0) {
     const pullArgs = await buildDefaultPullArgs(root);
-    await execGit(root, pullArgs, { timeout: 30000 }).catch((error) => {
+    await execGit(root, pullArgs, { timeout: GIT_NETWORK_TIMEOUT_MS }).catch((error) => {
       throw new Error(`Unable to sync changes: ${getGitErrorOutput(error)}`);
     });
   }
 
   const refreshedStatus = await getWorkspaceGitStatus(root);
   if (refreshedStatus.sourceControl.remote.ahead > 0) {
-    await execGit(root, ["push"], { timeout: 30000 }).catch((error) => {
+    await execGit(root, ["push"], { timeout: GIT_NETWORK_TIMEOUT_MS }).catch((error) => {
       if (isMissingUpstreamError(error)) {
         return pushWorkspaceGitWithDefaultUpstream(root);
       }
@@ -1772,29 +2335,6 @@ function stableWorkspaceId(folderPath) {
   return `local:${Buffer.from(folderPath).toString("base64url")}`;
 }
 
-function execGit(rootPath, args, options = {}) {
-  const timeout = options.timeout ?? GIT_DEFAULT_TIMEOUT_MS;
-  return execFileAsync("git", ["-C", rootPath, "-c", "core.quotePath=false", ...args], {
-    timeout,
-    maxBuffer: GIT_MAX_BUFFER,
-    env: buildGitEnvironment(),
-  }).catch((error) => {
-    if (error && typeof error === "object") {
-      error.gitArgs = args;
-      error.gitTimeoutMs = timeout;
-    }
-    throw error;
-  });
-}
-
-function buildGitEnvironment() {
-  return {
-    ...process.env,
-    GCM_INTERACTIVE: "never",
-    GIT_TERMINAL_PROMPT: "0",
-  };
-}
-
 function getGitErrorOutput(error) {
   const stderr = typeof error?.stderr === "string" ? error.stderr.trim() : "";
   const stdout = typeof error?.stdout === "string" ? error.stdout.trim() : "";
@@ -1862,7 +2402,7 @@ async function pushWorkspaceGitWithDefaultUpstream(rootPath, requestedRemoteName
   const targetBranch = getConfiguredSyncBranch(config, branch, hasEffectivePuppyoneHostingTarget(remotes, config));
   const refspec = targetBranch === branch ? branch : `HEAD:${targetBranch}`;
   const remote = await chooseDefaultPushRemote(rootPath, requestedRemoteName);
-  await execGit(rootPath, ["push", "--set-upstream", remote, refspec], { timeout: 30000 }).catch((error) => {
+  await execGit(rootPath, ["push", "--set-upstream", remote, refspec], { timeout: GIT_NETWORK_TIMEOUT_MS }).catch((error) => {
     throw new Error(`Unable to push changes: ${getGitErrorOutput(error)}`);
   });
 }
@@ -1943,13 +2483,17 @@ async function getWorkspaceCommitCount(rootPath) {
     .catch(() => 0);
 }
 
-async function readGitBranches(rootPath) {
+async function readGitBranches(rootPath, options = {}) {
+  const signal = options.signal;
   const result = await execGit(rootPath, [
     "for-each-ref",
     "refs/heads",
     "refs/remotes",
     "--format=%(refname)%09%(refname:short)%09%(HEAD)%09%(upstream:short)%09%(upstream:track,nobracket)%09%(objectname:short)%09%(contents:subject)%09%(committerdate:iso-strict)",
-  ]).catch(() => ({ stdout: "" }));
+  ], { optionalLocks: false, signal }).catch(() => {
+    throwIfGitStatusAborted(signal);
+    return { stdout: "" };
+  });
 
   return result.stdout
     .split(/\r?\n/)
@@ -1988,7 +2532,17 @@ function normalizeGitBranches(branches, currentBranchName, headCommitId) {
   ];
 }
 
-async function readGitSyncTarget(rootPath, remotes, branches, currentBranchName, headCommitId, config = undefined) {
+async function readGitSyncTarget(
+  rootPath,
+  remotes,
+  branches,
+  currentBranchName,
+  headCommitId,
+  config = undefined,
+  options = {},
+) {
+  const signal = options.signal;
+  throwIfGitStatusAborted(signal);
   const resolvedConfig = config === undefined
     ? await readPuppyoneWorkspaceConfig(rootPath).catch(() => null)
     : config;
@@ -2010,9 +2564,16 @@ async function readGitSyncTarget(rootPath, remotes, branches, currentBranchName,
   }
 
   const remoteRef = `refs/remotes/${remoteName}/${branchName}`;
-  const remoteExists = await execGit(rootPath, ["rev-parse", "--verify", "--quiet", remoteRef])
+  const remoteExists = await execGit(
+    rootPath,
+    ["rev-parse", "--verify", "--quiet", remoteRef],
+    { optionalLocks: false, signal },
+  )
     .then((result) => Boolean(result.stdout.trim()))
-    .catch(() => false);
+    .catch(() => {
+      throwIfGitStatusAborted(signal);
+      return false;
+    });
 
   if (!remoteExists) {
     return {
@@ -2027,12 +2588,14 @@ async function readGitSyncTarget(rootPath, remotes, branches, currentBranchName,
     };
   }
 
-  const counts = headCommitId ? await readGitAheadBehindCounts(rootPath, remoteRef) : { ahead: 0, behind: 0 };
+  const counts = headCommitId
+    ? await readGitAheadBehindCounts(rootPath, remoteRef, { signal })
+    : { ahead: 0, behind: 0 };
   const incomingPreview = counts.behind > 0
-    ? await readGitRemoteChangePreview(rootPath, `HEAD..${remoteRef}`)
+    ? await readGitRemoteChangePreview(rootPath, `HEAD..${remoteRef}`, { signal })
     : [];
   const outgoingPreview = counts.ahead > 0
-    ? await readGitOutgoingChangePreview(rootPath, `${remoteRef}..HEAD`)
+    ? await readGitOutgoingChangePreview(rootPath, `${remoteRef}..HEAD`, { signal })
     : [];
 
   return {
@@ -2476,15 +3039,31 @@ function parseGitAheadBehindCounts(output) {
   };
 }
 
-async function readGitAheadBehindCounts(rootPath, remoteRef) {
-  const symmetricCounts = await execGit(rootPath, ["rev-list", "--left-right", "--count", `HEAD...${remoteRef}`])
+async function readGitAheadBehindCounts(rootPath, remoteRef, options = {}) {
+  const signal = options.signal;
+  const symmetricCounts = await execGit(
+    rootPath,
+    ["rev-list", "--left-right", "--count", `HEAD...${remoteRef}`],
+    { optionalLocks: false, signal },
+  )
     .then((result) => parseGitAheadBehindCounts(result.stdout))
-    .catch(() => null);
+    .catch(() => {
+      throwIfGitStatusAborted(signal);
+      return null;
+    });
   if (symmetricCounts) return symmetricCounts;
 
   const [aheadResult, behindResult] = await Promise.all([
-    execGit(rootPath, ["rev-list", "--count", `${remoteRef}..HEAD`]).catch(() => ({ stdout: "0" })),
-    execGit(rootPath, ["rev-list", "--count", `HEAD..${remoteRef}`]).catch(() => ({ stdout: "0" })),
+    execGit(rootPath, ["rev-list", "--count", `${remoteRef}..HEAD`], { optionalLocks: false, signal })
+      .catch(() => {
+        throwIfGitStatusAborted(signal);
+        return { stdout: "0" };
+      }),
+    execGit(rootPath, ["rev-list", "--count", `HEAD..${remoteRef}`], { optionalLocks: false, signal })
+      .catch(() => {
+        throwIfGitStatusAborted(signal);
+        return { stdout: "0" };
+      }),
   ]);
 
   return {
@@ -2528,7 +3107,8 @@ function formatGitFileDiffError(scope, error) {
     : `Unable to preview committed change: ${message}`;
 }
 
-async function readGitRemoteChangePreview(rootPath, range) {
+async function readGitRemoteChangePreview(rootPath, range, options = {}) {
+  const signal = options.signal;
   const result = await execGit(rootPath, [
     "log",
     "--name-status",
@@ -2536,7 +3116,10 @@ async function readGitRemoteChangePreview(rootPath, range) {
     "-z",
     "--find-renames",
     range,
-  ]).catch(() => ({ stdout: "" }));
+  ], { optionalLocks: false, signal }).catch(() => {
+    throwIfGitStatusAborted(signal);
+    return { stdout: "" };
+  });
 
   return uniqueGitPreviewResources(
     parseGitNameStatusPreview(result.stdout, "remote", GIT_REMOTE_PREVIEW_LIMIT * 4),
@@ -2544,7 +3127,8 @@ async function readGitRemoteChangePreview(rootPath, range) {
   );
 }
 
-async function readGitOutgoingChangePreview(rootPath, range) {
+async function readGitOutgoingChangePreview(rootPath, range, options = {}) {
+  const signal = options.signal;
   const result = await execGit(rootPath, [
     "log",
     "--name-status",
@@ -2552,7 +3136,10 @@ async function readGitOutgoingChangePreview(rootPath, range) {
     "-z",
     "--find-renames",
     range,
-  ]).catch(() => ({ stdout: "" }));
+  ], { optionalLocks: false, signal }).catch(() => {
+    throwIfGitStatusAborted(signal);
+    return { stdout: "" };
+  });
 
   return uniqueGitPreviewResources(
     parseGitNameStatusPreview(result.stdout, "committed", GIT_REMOTE_PREVIEW_LIMIT * 4),
@@ -2677,8 +3264,12 @@ function parseGitTrackingText(value) {
   };
 }
 
-async function readGitRemotes(rootPath) {
-  const result = await execGit(rootPath, ["remote", "-v"]).catch(() => ({ stdout: "" }));
+async function readGitRemotes(rootPath, options = {}) {
+  const signal = options.signal;
+  const result = await execGit(rootPath, ["remote", "-v"], { optionalLocks: false, signal }).catch(() => {
+    throwIfGitStatusAborted(signal);
+    return { stdout: "" };
+  });
   const remotes = new Map();
 
   for (const line of result.stdout.split(/\r?\n/)) {
@@ -3265,145 +3856,6 @@ function normalizeGitRemoteUrl(remoteUrl) {
   return normalized;
 }
 
-function parseGitPorcelainV2Status(output) {
-  const entries = [];
-  const headers = {};
-  const records = output.split("\0");
-
-  for (let index = 0; index < records.length; index += 1) {
-    const record = records[index];
-    if (!record) continue;
-
-    if (record.startsWith("# ")) {
-      const spaceIndex = record.indexOf(" ", 2);
-      if (spaceIndex > 2) {
-        headers[record.slice(2, spaceIndex)] = record.slice(spaceIndex + 1);
-      }
-      continue;
-    }
-
-    const type = record[0];
-    if (type === "1") {
-      const entry = parseGitPorcelainV2OrdinaryRecord(record);
-      if (entry) entries.push(entry);
-      continue;
-    }
-
-    if (type === "2") {
-      const { entry, consumedNext } = parseGitPorcelainV2RenameRecord(record, records[index + 1]);
-      if (entry) entries.push(entry);
-      if (consumedNext) index += 1;
-      continue;
-    }
-
-    if (type === "u") {
-      const entry = parseGitPorcelainV2UnmergedRecord(record);
-      if (entry) entries.push(entry);
-      continue;
-    }
-
-    if (type === "?") {
-      const filePath = record.slice(2);
-      if (filePath) {
-        entries.push({
-          path: filePath,
-          oldPath: null,
-          staged: "?",
-          unstaged: "?",
-          status: "untracked",
-        });
-      }
-    }
-  }
-
-  return { headers, entries };
-}
-
-function parseGitPorcelainV2OrdinaryRecord(record) {
-  const fields = splitGitPorcelainRecord(record, 8);
-  if (fields.length < 9) return null;
-  const xy = fields[1] || "  ";
-  const filePath = fields[8];
-  if (!filePath) return null;
-  return buildGitStatusEntry({
-    path: filePath,
-    oldPath: null,
-    staged: xy[0] || " ",
-    unstaged: xy[1] || " ",
-  });
-}
-
-function parseGitPorcelainV2RenameRecord(record, nextRecord) {
-  const fields = splitGitPorcelainRecord(record, 9);
-  if (fields.length < 10) return { entry: null, consumedNext: false };
-
-  const xy = fields[1] || "  ";
-  const pathText = fields[9] || "";
-  const tabIndex = pathText.indexOf("\t");
-  const filePath = tabIndex >= 0 ? pathText.slice(0, tabIndex) : pathText;
-  const oldPathFromRecord = tabIndex >= 0 ? pathText.slice(tabIndex + 1) : null;
-  const oldPathFromNext = oldPathFromRecord ?? nextRecord ?? null;
-  const consumedNext = Boolean(!oldPathFromRecord && oldPathFromNext);
-
-  return {
-    consumedNext,
-    entry: filePath
-      ? buildGitStatusEntry({
-        path: filePath,
-        oldPath: oldPathFromNext,
-        staged: xy[0] || " ",
-        unstaged: xy[1] || " ",
-      })
-      : null,
-  };
-}
-
-function parseGitPorcelainV2UnmergedRecord(record) {
-  const fields = splitGitPorcelainRecord(record, 10);
-  if (fields.length < 11) return null;
-  const xy = fields[1] || "UU";
-  const filePath = fields[10];
-  if (!filePath) return null;
-  return buildGitStatusEntry({
-    path: filePath,
-    oldPath: null,
-    staged: xy[0] || "U",
-    unstaged: xy[1] || "U",
-    conflict: true,
-  });
-}
-
-function splitGitPorcelainRecord(record, fixedFieldCount) {
-  const fields = [];
-  let cursor = 0;
-
-  for (let index = 0; index < fixedFieldCount; index += 1) {
-    const nextSpace = record.indexOf(" ", cursor);
-    if (nextSpace < 0) {
-      fields.push(record.slice(cursor));
-      return fields;
-    }
-    fields.push(record.slice(cursor, nextSpace));
-    cursor = nextSpace + 1;
-  }
-
-  fields.push(record.slice(cursor));
-  return fields;
-}
-
-function buildGitStatusEntry({ path: filePath, oldPath, staged, unstaged, conflict = false }) {
-  const normalizedStaged = normalizeGitStatusCode(staged);
-  const normalizedUnstaged = normalizeGitStatusCode(unstaged);
-  return {
-    path: filePath,
-    oldPath: oldPath || null,
-    staged: normalizedStaged,
-    unstaged: normalizedUnstaged,
-    status: conflict ? "conflict" : getGitStatusLabel(normalizedStaged ?? " ", normalizedUnstaged ?? " "),
-    ...(conflict ? { conflict: true } : {}),
-  };
-}
-
 function buildGitSourceControlSnapshot({ entries, branchName, syncTarget, currentBranch, headCommitId }) {
   const resourcesByGroup = new Map(GIT_RESOURCE_GROUPS.map((group) => [group.id, []]));
 
@@ -3552,11 +4004,6 @@ function isConflictStatus(staged, unstaged) {
   return code.includes("U") || ["DD", "AA"].includes(code);
 }
 
-function normalizeGitStatusCode(code) {
-  if (!code || code === " " || code === ".") return null;
-  return code.trim() || null;
-}
-
 function gitStatusCodeToLabel(code) {
   if (!code || code === " " || code === "." || code === "?") return null;
   if (code === "M") return "modified";
@@ -3584,14 +4031,4 @@ function hasStagedStatus(entry) {
 
 function hasUnstagedStatus(entry) {
   return entry.status !== "untracked" && Boolean(entry.unstaged && entry.unstaged !== "?" && entry.unstaged !== ".");
-}
-
-function getGitStatusLabel(staged, unstaged) {
-  const code = `${staged}${unstaged}`;
-  if (code.includes("?")) return "untracked";
-  if (code.includes("A")) return "added";
-  if (code.includes("D")) return "deleted";
-  if (code.includes("R")) return "renamed";
-  if (code.includes("M")) return "modified";
-  return "changed";
 }

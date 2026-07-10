@@ -283,62 +283,148 @@
   color: var(--po-text);
 }
 
-.desktop-theme-preset-row {
+.desktop-theme-mode-row {
   align-items: flex-start;
-  min-height: 34px;
-  padding-block: 2px;
+  padding-block: 7px;
 }
 
-.desktop-theme-preset-list {
+.desktop-theme-choice-list {
   display: flex;
-  max-width: 480px;
+  max-width: 520px;
   flex: 0 1 auto;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 6px;
 }
 
-.desktop-theme-preset-list button {
+.desktop-theme-choice {
   display: inline-flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: flex-start;
-  gap: 7px;
-  height: 30px;
-  padding: 0 9px 0 7px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
+  gap: 5px;
+  width: 102px;
+  padding: 5px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel-raised) 82%, transparent);
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 650;
+  text-align: left;
 }
 
-.desktop-theme-preset-list button:hover,
-.desktop-theme-preset-list button.active {
-  background: var(--po-selected);
+.desktop-theme-choice:hover,
+.desktop-theme-choice.active {
+  border-color: color-mix(in srgb, var(--po-accent) 42%, var(--po-border));
+  background: color-mix(in srgb, var(--po-selected) 72%, var(--po-panel));
   color: var(--po-text);
 }
 
-.desktop-theme-preset-list button > span:not(.desktop-theme-preset-swatches) {
+.desktop-theme-choice.active {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-accent) 26%, transparent);
+}
+
+.desktop-theme-choice-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-inline: 2px;
   color: inherit;
+}
+
+.desktop-theme-preview {
+  display: flex;
+  width: 100%;
+  height: 38px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--po-border) 72%, transparent);
+  border-radius: 5px;
+  background: var(--po-inset);
+}
+
+.desktop-theme-preview.system .desktop-theme-preview-surface:first-child {
+  border-right: 1px solid color-mix(in srgb, var(--po-border-strong) 72%, transparent);
+}
+
+.desktop-theme-preview-surface {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: 31% 1fr;
+  background: var(--po-canvas);
+  color: var(--po-text);
+}
+
+.desktop-theme-preview-sidebar,
+.desktop-theme-preview-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 4px;
+}
+
+.desktop-theme-preview-sidebar {
+  border-right: 1px solid var(--po-divider);
+  background: var(--po-sidebar);
+}
+
+.desktop-theme-preview-panel {
+  background: var(--po-panel);
+}
+
+.desktop-theme-preview-sidebar b,
+.desktop-theme-preview-panel b {
+  display: block;
+  width: 78%;
+  height: 3px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--po-text-muted) 28%, transparent);
+}
+
+.desktop-theme-preview-sidebar b:nth-child(2),
+.desktop-theme-preview-panel b:nth-child(3) {
+  width: 58%;
+}
+
+.desktop-theme-preview-panel b.accent {
+  width: 42%;
+  height: 4px;
+  background: var(--po-accent);
 }
 
 .desktop-theme-preset-swatches {
   display: inline-flex;
-  flex: 0 0 auto !important;
+  flex: 0 0 auto;
   align-items: center;
   gap: 2px;
   padding: 2px;
-  border: 1px solid var(--po-border-subtle);
-  border-radius: 5px;
-  background: var(--po-panel-raised);
+  border: 1px solid color-mix(in srgb, var(--po-border) 58%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--po-panel-raised) 82%, transparent);
 }
 
 .desktop-theme-preset-swatches i {
-  width: 9px;
-  height: 12px;
-  border: 1px solid color-mix(in srgb, var(--po-border) 72%, transparent);
-  border-radius: 3px;
+  width: 7px;
+  height: 14px;
+  border: 1px solid color-mix(in srgb, var(--po-border) 56%, transparent);
+  border-radius: 2px;
+}
+
+.desktop-text-size-segment button {
+  min-width: 70px;
+}
+
+.desktop-dock-icon-segment img {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  object-fit: contain;
+}
+
+.desktop-dock-icon-segment span {
+  color: inherit;
 }
 
 .desktop-sidebar-layout-segment {

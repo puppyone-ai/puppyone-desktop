@@ -23,11 +23,14 @@
   --po-text-size-micro: 10px;
   --po-text-size-caption: 11px;
   --po-text-size-meta: 12px;
+  --po-text-size-sidebar: 13px;
   --po-text-size-body: 13px;
   --po-text-size-body-lg: 14px;
+  --po-text-size-content: 14px;
   --po-text-size-title: 16px;
   --po-text-size-page-title: 20px;
   --po-text-size-display: 24px;
+  --po-code-font-size: 13px;
   --po-text-weight-regular: 400;
   --po-text-weight-medium: 500;
   --po-text-weight-semibold: 600;
@@ -76,7 +79,8 @@
   );
   --desktop-sidebar-row-content-left: 6px;
   --desktop-sidebar-row-content-right: 6px;
-  --desktop-sidebar-list-padding-y: 8px;
+  /* Outer list edge rhythm. Section-to-section spacing remains separate. */
+  --desktop-sidebar-list-padding-block: 8px;
   --desktop-sidebar-section-top-gap: 5px;
   --desktop-sidebar-section-bottom-gap: 6px;
   --desktop-utility-page-padding-top: 24px;
@@ -214,7 +218,20 @@
  * where a region needs to read as recessed.
  */
 :root,
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root, .dark) {
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface, .dark) {
+  --po-text-size-micro: 10px;
+  --po-text-size-caption: 11px;
+  --po-text-size-meta: 12px;
+  --po-text-size-sidebar: 13px;
+  --po-text-size-body: 13px;
+  --po-text-size-body-lg: 14px;
+  --po-text-size-content: 14px;
+  --po-text-size-title: 16px;
+  --po-text-size-page-title: 20px;
+  --po-text-size-display: 24px;
+  --po-code-font-size: 13px;
+  --po-font-size-chrome: 13px;
+
   --po-surface-editor: var(--po-surface-panel);
   --po-surface-terminal: var(--po-surface-editor);
 
@@ -241,6 +258,36 @@
   --po-menu-bg: color-mix(in srgb, var(--po-overlay) 92%, var(--po-panel) 8%);
   --po-menu-border: color-mix(in srgb, var(--po-border) 82%, transparent);
   --po-menu-shadow: 0 18px 44px color-mix(in srgb, var(--po-shadow) 86%, transparent);
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="small"] {
+  --po-text-size-micro: 9px;
+  --po-text-size-caption: 10px;
+  --po-text-size-meta: 11px;
+  --po-text-size-sidebar: 12px;
+  --po-text-size-body: 12px;
+  --po-text-size-body-lg: 13px;
+  --po-text-size-content: 13px;
+  --po-text-size-title: 15px;
+  --po-text-size-page-title: 18px;
+  --po-text-size-display: 22px;
+  --po-code-font-size: 12px;
+  --po-font-size-chrome: 12px;
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="large"] {
+  --po-text-size-micro: 11px;
+  --po-text-size-caption: 12px;
+  --po-text-size-meta: 13px;
+  --po-text-size-sidebar: 14px;
+  --po-text-size-body: 14px;
+  --po-text-size-body-lg: 16px;
+  --po-text-size-content: 16px;
+  --po-text-size-title: 18px;
+  --po-text-size-page-title: 22px;
+  --po-text-size-display: 28px;
+  --po-code-font-size: 15px;
+  --po-font-size-chrome: 14px;
 }
 
 .dark {
@@ -357,7 +404,21 @@
   --po-menu-shadow: 0 18px 44px color-mix(in srgb, var(--po-shadow) 92%, transparent);
 }
 
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-light-theme-preset="neutral"]:not(.dark) {
+.desktop-theme-preview-surface[data-light-theme-preset="warm"]:not(.dark) {
+  color-scheme: light;
+  --po-surface-canvas: #f1eadf;
+  --po-surface-chrome: #f1eadf;
+  --po-surface-panel: #fbf6ed;
+  --po-surface-panel-raised: #fffaf1;
+  --po-surface-overlay: #fff8ee;
+  --po-surface-inset: #e6ded1;
+  --po-text: #2f2a23;
+  --po-text-muted: #70685e;
+  --po-divider: rgba(73, 55, 35, 0.12);
+  --po-accent: #2563eb;
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface)[data-light-theme-preset="neutral"]:not(.dark) {
   color-scheme: light;
 
   --po-surface-canvas: #f5f4f0;
@@ -437,7 +498,7 @@
   --po-scrollbar-thumb-hover: rgba(45, 43, 38, 0.22);
 }
 
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-light-theme-preset="graphite"]:not(.dark) {
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface)[data-light-theme-preset="graphite"]:not(.dark) {
   color-scheme: light;
 
   --po-surface-canvas: #f3f4f6;
@@ -517,7 +578,71 @@
   --po-scrollbar-thumb-hover: rgba(31, 41, 55, 0.22);
 }
 
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root).dark[data-dark-theme-preset="graphite"] {
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface).dark[data-dark-theme-preset="warm"] {
+  color-scheme: dark;
+
+  --po-surface-canvas: #18130f;
+  --po-surface-chrome: #211a14;
+  --po-surface-panel: #1d1712;
+  --po-surface-panel-raised: #261e17;
+  --po-surface-overlay: #30251c;
+  --po-surface-inset: #0e0b08;
+  --po-surface-editor: #18130f;
+
+  --po-text: #f8f1e7;
+  --po-text-muted: #b9aa98;
+  --po-text-subtle: #837565;
+  --po-text-disabled: #5e5246;
+  --po-text-inverse: #17100a;
+
+  --po-border: rgba(255, 226, 191, 0.10);
+  --po-border-subtle: rgba(255, 226, 191, 0.065);
+  --po-border-strong: rgba(255, 226, 191, 0.17);
+  --po-divider: rgba(255, 226, 191, 0.09);
+  --po-header-divider: rgba(255, 226, 191, 0.13);
+  --po-hover: rgba(255, 226, 191, 0.06);
+  --po-active: rgba(255, 226, 191, 0.095);
+  --po-selected: rgba(255, 226, 191, 0.115);
+  --po-control: rgba(255, 226, 191, 0.05);
+  --po-control-hover: rgba(255, 226, 191, 0.09);
+  --po-focus-ring: rgba(240, 164, 93, 0.44);
+
+  --po-accent: #f0a45d;
+  --po-accent-text: #ffc078;
+  --po-success: #7fca91;
+  --po-warning: #f3bd68;
+  --po-danger: #ef8d83;
+  --po-info: #84b9d3;
+  --po-purple: #c49ad9;
+  --po-text-fill-hover: #fffaf2;
+
+  --po-filetree-rail: rgba(255, 226, 191, 0.13);
+  --po-tree-guide: color-mix(in srgb, var(--po-sidebar) 90%, var(--po-text));
+  --po-file-icon-body: #2b2119;
+  --po-file-icon-fold: #36281e;
+  --po-file-icon-stroke: rgba(255, 226, 191, 0.22);
+  --po-file-icon-shadow: rgba(0, 0, 0, 0.40);
+  --po-file-accent-default: #d9c9b6;
+  --po-file-accent-markdown: #aeb9c3;
+  --po-file-accent-json: #d2bd68;
+  --po-file-accent-html: #e39a63;
+  --po-file-accent-pdf: #df7a7f;
+  --po-file-accent-image: #bd91d0;
+  --po-file-accent-audio: #bd91d0;
+  --po-file-accent-video: #83b5c5;
+  --po-file-accent-code: #83b5c5;
+  --po-file-accent-sheet: #93b978;
+
+  --po-diff-added-bg: rgba(92, 184, 113, 0.15);
+  --po-diff-added-text: #9bdaa9;
+  --po-diff-removed-bg: rgba(226, 108, 98, 0.16);
+  --po-diff-removed-text: #f0a19a;
+  --po-editor-line: rgba(255, 226, 191, 0.075);
+  --po-scrollbar-thumb: rgba(255, 226, 191, 0.10);
+  --po-scrollbar-thumb-hover: rgba(255, 226, 191, 0.18);
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface).dark[data-dark-theme-preset="graphite"] {
   --po-surface-canvas: #17181c;
   --po-surface-chrome: #1b1c1f;
   --po-surface-panel: #18191d;

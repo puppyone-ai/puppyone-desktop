@@ -1,6 +1,6 @@
 "use client";
 
-import { MarkdownCodeMirrorEditor } from "../markdown/MarkdownCodeMirrorEditor";
+import { MarkdownCodeMirrorEditor } from "../markdown";
 import type { EditorViewerContext } from "../viewerTypes";
 import { TextEditorFrame } from "./TextEditorFrame";
 
@@ -23,6 +23,8 @@ export function MarkdownViewer(context: EditorViewerContext) {
           aiEditFile={context.aiEditFile}
           htmlTrustMode={context.htmlTrustMode}
           documentPath={context.document.path}
+          workspaceId={context.workspaceId}
+          workspaceRoot={context.workspaceRoot}
           markdownLinkGraph={context.markdownLinkGraph}
           markdownAssetUrlResolver={context.markdownAssetUrlResolver}
           onChange={controls.canEdit ? controls.onChange : undefined}
@@ -36,6 +38,8 @@ export function MarkdownViewer(context: EditorViewerContext) {
           aiEditFile={context.aiEditFile}
           htmlTrustMode={context.htmlTrustMode}
           documentPath={context.document.path}
+          workspaceId={context.workspaceId}
+          workspaceRoot={context.workspaceRoot}
           markdownLinkGraph={context.markdownLinkGraph}
           markdownAssetUrlResolver={context.markdownAssetUrlResolver}
           onChange={controls.canEdit ? controls.onChange : undefined}

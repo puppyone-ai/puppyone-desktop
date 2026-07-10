@@ -58,9 +58,56 @@ describe("local file capability store", () => {
     const asset = parseLocalFileUrl(new URL("assets/app.css", baseUrl).toString());
 
     expect(asset.token).toBe(token);
-    expect(asset.relativePath).toBe("site/assets/app.css");
-    expect(store.validate(asset)).toBe(true);
-    expect(store.validate({ ...asset, relativePath: "outside.txt" })).toBe(false);
+    expect(asset.requestPath).toBe("assets/app.css");
+    expect(store.resolve(asset)).toEqual({
+      rootPath: ROOT,
+      relativePath: "site/assets/app.css",
+    });
+    expect(store.resolve({ ...asset, requestPath: "../outside.txt" })).toBeNull();
+  });
+
+  it("issues unique, purpose-bound Markdown leases and hard-revokes by owner", () => {
+    let sequence = 0;
+    const store = createLocalFileCapabilityStore({
+      createToken: () => `capability_${String(++sequence).padStart(40, "0")}`,
+    });
+    const request = {
+      senderId: 7,
+      rootPath: ROOT,
+      relativePath: "images/a.png",
+      purpose: "markdown-asset",
+      reuse: false,
+    };
+    const first = store.issue(request);
+    const second = store.issue(request);
+
+    expect(second).not.toBe(first);
+    expect(store.validate({
+      token: first,
+      rootPath: ROOT,
+      relativePath: "images/a.png",
+      purpose: "markdown-asset",
+    })).toBe(true);
+    expect(store.validate({
+      token: first,
+      rootPath: ROOT,
+      relativePath: "images/a.png",
+      purpose: "file-preview",
+    })).toBe(false);
+    expect(store.revoke({ token: first, senderId: 8 })).toBe(false);
+    expect(store.revoke({ token: first, senderId: 7 })).toBe(true);
+    expect(store.validate({
+      token: first,
+      rootPath: ROOT,
+      relativePath: "images/a.png",
+      purpose: "markdown-asset",
+    })).toBe(false);
+    expect(store.validate({
+      token: second,
+      rootPath: ROOT,
+      relativePath: "images/a.png",
+      purpose: "markdown-asset",
+    })).toBe(true);
   });
 });
 
@@ -82,6 +129,9 @@ describe("puppyone-local protocol capability enforcement", () => {
     const changedPath = new URL(url);
     changedPath.pathname = changedPath.pathname.replace("report.xlsx", "secret.txt");
     expect((await handler(createRequest(changedPath.toString(), "null"))).status).toBe(403);
+    const changedPurpose = new URL(url);
+    changedPurpose.pathname = changedPurpose.pathname.replace("file-preview", "markdown-asset");
+    expect((await handler(createRequest(changedPurpose.toString(), "null"))).status).toBe(403);
     expect((await handler(createRequest(url.replace(token, "invalid"), "null"))).status).toBe(403);
   });
 
@@ -103,11 +153,26 @@ describe("puppyone-local protocol capability enforcement", () => {
       relativePath: "docs/Q3 report.xlsx",
       token,
     });
+    expect(decodeURIComponent(url)).not.toContain("/Users/example/My Workspace");
+    expect(decodeURIComponent(url)).not.toContain("docs/");
     expect(parseLocalFileUrl(url)).toEqual({
-      rootPath: "/Users/example/My Workspace",
-      relativePath: "docs/Q3 report.xlsx",
+      requestPath: "Q3 report.xlsx",
       token,
+      purpose: "file-preview",
     });
+  });
+
+  it("rejects lookalike schemes and non-canonical URL adornments", () => {
+    const token = "z".repeat(43);
+    const canonical = buildLocalFileCapabilityUrl({
+      relativePath: "docs/plan.md",
+      token,
+      purpose: "markdown-asset",
+    });
+
+    expect(() => parseLocalFileUrl(canonical.replace("puppyone-local:", "https:"))).toThrow();
+    expect(() => parseLocalFileUrl(`${canonical}?download=1`)).toThrow();
+    expect(() => parseLocalFileUrl(`${canonical}#fragment`)).toThrow();
   });
 });
 
@@ -125,7 +190,7 @@ function createProtocolHarness(store) {
     getMimeType: () => "application/octet-stream",
     canonicalizeWorkspacePath: async (value) => value,
     isOpenWorkspaceRoot: () => true,
-    validateCapability: store.validate,
+    resolveCapability: store.resolve,
     applicationUrl: "file:///Applications/puppyone/dist/index.html",
   });
   if (!handler) throw new Error("Protocol handler was not registered.");

@@ -332,6 +332,18 @@
   text-align: right;
 }
 
+[data-diff-markers="color"] .ai-edit-review-line {
+  grid-template-columns: 38px 7px minmax(0, 1fr);
+}
+
+[data-diff-markers="color"] .ai-edit-review-line__prefix {
+  color: transparent;
+}
+
+[data-diff-markers="symbols"] .ai-edit-review-line__prefix {
+  font-weight: 750;
+}
+
 .ai-edit-review-line code {
   min-width: 0;
   padding: 2px 8px 2px 0;

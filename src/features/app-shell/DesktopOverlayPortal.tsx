@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { DarkThemePreset, LightThemePreset } from "../../preferences";
+import type { DarkThemePreset, DiffMarkers, LightThemePreset, TextSize } from "../../preferences";
 
 const DESKTOP_OVERLAY_ROOT_ID = "desktop-overlay-root";
 
@@ -11,24 +11,30 @@ export function DesktopOverlayPortal({
   theme,
   lightThemePreset,
   darkThemePreset,
+  textSize,
+  pointerCursors,
+  diffMarkers,
 }: {
   children: ReactNode;
   theme?: DesktopOverlayTheme;
   lightThemePreset?: LightThemePreset;
   darkThemePreset?: DarkThemePreset;
+  textSize?: TextSize;
+  pointerCursors?: boolean;
+  diffMarkers?: DiffMarkers;
 }) {
   const [root, setRoot] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     const overlayRoot = getDesktopOverlayRoot();
-    if (theme) applyDesktopOverlayTheme(overlayRoot, theme, lightThemePreset, darkThemePreset);
+    if (theme) applyDesktopOverlayTheme(overlayRoot, theme, lightThemePreset, darkThemePreset, textSize, pointerCursors, diffMarkers);
     setRoot(overlayRoot);
-  }, [theme, lightThemePreset, darkThemePreset]);
+  }, [theme, lightThemePreset, darkThemePreset, textSize, pointerCursors, diffMarkers]);
 
   useEffect(() => {
     if (!root || !theme) return;
-    applyDesktopOverlayTheme(root, theme, lightThemePreset, darkThemePreset);
-  }, [root, theme, lightThemePreset, darkThemePreset]);
+    applyDesktopOverlayTheme(root, theme, lightThemePreset, darkThemePreset, textSize, pointerCursors, diffMarkers);
+  }, [root, theme, lightThemePreset, darkThemePreset, textSize, pointerCursors, diffMarkers]);
 
   if (!root) return null;
   return createPortal(children, root);
@@ -36,11 +42,15 @@ export function DesktopOverlayPortal({
 
 function getDesktopOverlayRoot() {
   const existing = document.getElementById(DESKTOP_OVERLAY_ROOT_ID);
-  if (existing instanceof HTMLElement) return existing;
+  if (existing instanceof HTMLElement) {
+    existing.dataset.poOverlayRoot = "true";
+    return existing;
+  }
 
   const root = document.createElement("div");
   root.id = DESKTOP_OVERLAY_ROOT_ID;
   root.className = "desktop-overlay-root";
+  root.dataset.poOverlayRoot = "true";
   document.body.appendChild(root);
   return root;
 }
@@ -50,9 +60,15 @@ function applyDesktopOverlayTheme(
   theme: DesktopOverlayTheme,
   lightThemePreset?: LightThemePreset,
   darkThemePreset?: DarkThemePreset,
+  textSize?: TextSize,
+  pointerCursors?: boolean,
+  diffMarkers?: DiffMarkers,
 ) {
   root.className = `desktop-overlay-root ${theme === "dark" ? "dark" : ""}`.trim();
   root.dataset.themeMode = theme;
   if (lightThemePreset) root.dataset.lightThemePreset = lightThemePreset;
   if (darkThemePreset) root.dataset.darkThemePreset = darkThemePreset;
+  if (textSize) root.dataset.textSize = textSize;
+  if (pointerCursors !== undefined) root.dataset.pointerCursors = pointerCursors ? "true" : "false";
+  if (diffMarkers) root.dataset.diffMarkers = diffMarkers;
 }

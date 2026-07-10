@@ -15,14 +15,19 @@ import { defaultDataCapabilities } from "../core/types";
 import { getEditorSourceRequirement, shouldReadEditorContent } from "../editor/viewerRegistry";
 import {
   createMarkdownLinkGraph,
+  resolveMarkdownAssetPath,
   type MarkdownLinkGraphDocument,
-} from "../editor/markdown/links/markdownLinkGraph";
-import { resolveMarkdownAssetPath } from "../editor/markdown/links/markdownImageModel";
+} from "../editor/markdown";
 import { ExplorerTree } from "./ExplorerTree";
 import { FilePreview, type FilePreviewProps } from "./FilePreview";
 import { ProjectsHeader } from "./ProjectsHeader";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
-import type { MarkdownHtmlTrustMode } from "../editor/viewerTypes";
+import type {
+  DocumentSourceKind,
+  ExternalViewerSurfaceRenderer,
+  MarkdownHtmlTrustMode,
+} from "../editor/viewerTypes";
+import type { ViewerPackSnapshot } from "../editor/viewerPackTypes";
 import { getAiEditFileForPath } from "../editor/ai-edits/diff";
 import type { AiEditRequest } from "../editor/ai-edits/types";
 import type { FileIconThemeId } from "../file/fileIcons";
@@ -106,6 +111,10 @@ export type DataWorkspaceProps = {
   previewActionSlot?: FilePreviewProps["actionSlot"];
   renderPreviewBody?: FilePreviewProps["renderBody"];
   previewAccessorySlot?: DataWorkspaceSlot;
+  viewerPackSnapshot?: ViewerPackSnapshot | null;
+  externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
+  viewerPackInstallFallback?: FilePreviewProps["viewerPackInstallFallback"];
+  documentSourceKind?: DocumentSourceKind;
   aiEditRequest?: AiEditRequest | null;
   enableMarkdownLinkContentIndexing?: boolean;
   folderExpansionStrategy?: DataWorkspaceFolderExpansionStrategy;
@@ -121,6 +130,11 @@ export type DataWorkspaceProps = {
     node: DataNode,
     event: ReactMouseEvent<HTMLButtonElement>,
   ) => void;
+  explorerCutPaths?: ReadonlySet<string>;
+  onCopyNodes?: (nodes: DataNode[]) => void | Promise<void>;
+  onCutNodes?: (nodes: DataNode[]) => void | Promise<void>;
+  onPasteNodes?: (targetFolderPath: string | null) => void | Promise<void>;
+  onDuplicateNodes?: (nodes: DataNode[]) => void | Promise<void>;
   onOpenExternalUrl?: (href: string) => void | Promise<void>;
   onCreate?: (folderPath: string | null) => void;
   onMore?: (state: DataWorkspaceState) => void;
@@ -176,6 +190,10 @@ export function DataWorkspace({
   previewActionSlot,
   renderPreviewBody,
   previewAccessorySlot,
+  viewerPackSnapshot = null,
+  externalViewerSurface = null,
+  viewerPackInstallFallback = null,
+  documentSourceKind,
   aiEditRequest = null,
   enableMarkdownLinkContentIndexing = true,
   folderExpansionStrategy = "load-before-expand",
@@ -187,6 +205,11 @@ export function DataWorkspace({
   onExplorerRootClick,
   onExplorerRootContextMenu,
   onExplorerNodeContextMenu,
+  explorerCutPaths,
+  onCopyNodes,
+  onCutNodes,
+  onPasteNodes,
+  onDuplicateNodes,
   onOpenExternalUrl,
   onCreate,
   onMore,
@@ -194,6 +217,9 @@ export function DataWorkspace({
   labels,
 }: DataWorkspaceProps) {
   const resolvedCapabilities = { ...defaultDataCapabilities, ...capabilities };
+  const resolvedDocumentSourceKind: DocumentSourceKind = workspace.path.startsWith("cloud://")
+    ? "cloud"
+    : "local";
   const [tree, setTree] = useState<DataNode[]>([]);
   const [internalActivePath, setInternalActivePath] = useState<string | null>(defaultActivePath);
   const [selectedNodePaths, setSelectedNodePaths] = useState<Set<string>>(() => (
@@ -218,6 +244,7 @@ export function DataWorkspace({
   const lastRefreshKeyRef = useRef(refreshKey);
   const loadGenerationRef = useRef(0);
   const suppressSelectionSyncRef = useRef(false);
+  const activePathHydrationAttemptRef = useRef<{ path: string; refreshKey: unknown } | null>(null);
   const [internalExplorerWidth, setInternalExplorerWidth] = useState(() => (
     clampNumber(defaultExplorerWidth, minExplorerWidth, maxExplorerWidth)
   ));
@@ -350,7 +377,10 @@ export function DataWorkspace({
     }
 
     lastRefreshKeyRef.current = refreshKey;
-    const loadedFolderPaths = collectLoadedFolderPaths(tree);
+    const loadedFolderPaths = Array.from(new Set([
+      ...collectLoadedFolderPaths(tree),
+      ...collectAncestorFolderPaths(resolvedActivePath),
+    ])).sort((left, right) => left.split("/").length - right.split("/").length);
     let cancelled = false;
     const requestGeneration = loadGenerationRef.current;
 
@@ -392,7 +422,7 @@ export function DataWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [dataPort, refreshKey, setFolderLoading, tree]);
+  }, [dataPort, refreshKey, resolvedActivePath, setFolderLoading, tree]);
 
   const activeNode = useMemo(() => findDataNode(tree, resolvedActivePath), [resolvedActivePath, tree]);
   const selectedNodes = useMemo(() => findDataNodes(tree, selectedNodePaths), [selectedNodePaths, tree]);
@@ -564,6 +594,26 @@ export function DataWorkspace({
     },
     [dataPort, rootLoaded, setFolderLoading, tree],
   );
+
+  useEffect(() => {
+    if (!resolvedActivePath || activeNode) return undefined;
+    const previousAttempt = activePathHydrationAttemptRef.current;
+    if (previousAttempt?.path === resolvedActivePath && Object.is(previousAttempt.refreshKey, refreshKey)) {
+      return undefined;
+    }
+
+    activePathHydrationAttemptRef.current = { path: resolvedActivePath, refreshKey };
+    let cancelled = false;
+    void loadLinkedPathNode(resolvedActivePath).then((node) => {
+      if (cancelled || !node) return;
+      setExpandedFolderPaths((current) => addSetValues(current, collectAncestorFolderPaths(node.path)));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeNode, loadLinkedPathNode, refreshKey, resolvedActivePath]);
+
   const openMarkdownLinkCandidates = useCallback(
     async (paths: readonly string[]) => {
       const normalizedPaths = paths
@@ -604,13 +654,23 @@ export function DataWorkspace({
     [markdownLinkDocuments, markdownLinkIndexing, onOpenExternalUrl, openMarkdownLinkCandidates],
   );
   const markdownAssetUrlResolver = useCallback(
-    async (sourcePath: string, href: string) => {
-      if (!dataPort.getFileUrl) return null;
+    async (sourcePath: string, href: string, signal?: AbortSignal) => {
+      if (!dataPort.getFileUrl || signal?.aborted) return null;
       const assetPath = resolveMarkdownAssetPath(sourcePath, href);
       if (!assetPath) return null;
 
       try {
-        return await dataPort.getFileUrl(assetPath);
+        const url = await dataPort.getFileUrl(assetPath, { purpose: "markdown-asset" });
+        if (signal?.aborted) {
+          await dataPort.revokeFileUrl?.(url);
+          return null;
+        }
+        return {
+          url,
+          revoke: dataPort.revokeFileUrl
+            ? () => dataPort.revokeFileUrl?.(url)
+            : undefined,
+        };
       } catch {
         return null;
       }
@@ -759,6 +819,7 @@ export function DataWorkspace({
     }
 
     let cancelled = false;
+    let activeUrl: string | null = null;
     setFileUrl(null);
     setFileUrlPath(selectedFile.path);
     setFileUrlLoading(true);
@@ -766,7 +827,12 @@ export function DataWorkspace({
 
     Promise.resolve(dataPort.getFileUrl(selectedFile.path))
       .then((url) => {
-        if (!cancelled) setFileUrl(url);
+        if (cancelled) {
+          void Promise.resolve(dataPort.revokeFileUrl?.(url)).catch(() => undefined);
+          return;
+        }
+        activeUrl = url;
+        setFileUrl(url);
       })
       .catch((error) => {
         if (!cancelled) {
@@ -781,6 +847,10 @@ export function DataWorkspace({
 
     return () => {
       cancelled = true;
+      if (activeUrl) {
+        void Promise.resolve(dataPort.revokeFileUrl?.(activeUrl)).catch(() => undefined);
+        activeUrl = null;
+      }
     };
   }, [dataPort, selectedFile?.path, selectedFileNeedsResourceUrl]);
 
@@ -1092,6 +1162,8 @@ export function DataWorkspace({
                       nodes={tree}
                       activePath={resolvedActivePath}
                       selectedPaths={selectedNodePaths}
+                      cutPaths={explorerCutPaths}
+                      currentFolderPath={currentFolderPath}
                       expandedPaths={expandedFolderPaths}
                       loadingPaths={loadingFolderPaths}
                       rootLoading={rootLoading}
@@ -1105,6 +1177,12 @@ export function DataWorkspace({
                       canMoveNodes={Boolean(resolvedCapabilities.move && dataPort.moveNode)}
                       onMoveNode={moveNode}
                       onMoveNodes={moveNodes}
+                      onCopyNodes={resolvedCapabilities.copy && dataPort.copyNode ? onCopyNodes : undefined}
+                      onCutNodes={resolvedCapabilities.move && dataPort.moveNode ? onCutNodes : undefined}
+                      onPasteNodes={(resolvedCapabilities.copy && dataPort.copyNode) || (resolvedCapabilities.move && dataPort.moveNode)
+                        ? onPasteNodes
+                        : undefined}
+                      onDuplicateNodes={resolvedCapabilities.copy && dataPort.copyNode ? onDuplicateNodes : undefined}
                       onImportFiles={dataPort.importFiles ? importFiles : undefined}
                       onRootClick={onExplorerRootClick ? (event) => onExplorerRootClick(workspaceState, event) : undefined}
                       onRootContextMenu={onExplorerRootContextMenu ? (event) => onExplorerRootContextMenu(workspaceState, event) : undefined}
@@ -1180,11 +1258,17 @@ export function DataWorkspace({
                   fileIconTheme={fileIconTheme}
                   editorSaveMode={editorSaveMode}
                   htmlTrustMode={htmlTrustMode}
+                  workspaceId={workspace.id}
+                  workspaceRoot={workspace.path}
                   markdownLinkGraph={markdownLinkGraph}
                   markdownAssetUrlResolver={markdownAssetUrlResolver}
                   appPreview={dataPort.appPreview ?? null}
                   openExternalFile={dataPort.openExternalFile}
                   convertOfficeDocumentToDocx={dataPort.convertOfficeDocumentToDocx}
+                  viewerPackSnapshot={viewerPackSnapshot}
+                  externalViewerSurface={externalViewerSurface}
+                  viewerPackInstallFallback={viewerPackInstallFallback}
+                  documentSourceKind={documentSourceKind ?? resolvedDocumentSourceKind}
                   emptySlot={emptySlot}
                   actionSlot={previewActionSlot}
                   renderBody={renderPreviewBody}

@@ -129,6 +129,7 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
     isAvailable: (context) => context.terminal.enabled,
     render: (context) => {
       const terminal = context.terminal;
+      const toggleLabel = terminal.sidebarOpen ? "Hide Terminal" : "Show Terminal";
       return (
         <div
           className={`desktop-titlebar-terminal ${terminal.sidebarOpen ? "has-menu" : ""}`}
@@ -137,8 +138,8 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
           <button
             className="desktop-titlebar-action desktop-titlebar-terminal-main"
             type="button"
-            title={terminal.sidebarOpen ? "Hide terminal" : "Show terminal"}
-            aria-label={terminal.sidebarOpen ? "Hide terminal" : "Show terminal"}
+            title={toggleLabel}
+            aria-label={toggleLabel}
             aria-pressed={terminal.sidebarOpen}
             onClick={terminal.onToggle}
           >
@@ -165,7 +166,7 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
               <DesktopMenuItem
                 className="desktop-branch-menu-row desktop-titlebar-terminal-menu-row"
                 icon={<Eraser size={15} />}
-                label="Clear"
+                label="Clear Terminal"
                 onClick={() => {
                   terminal.onCloseMenu();
                   terminal.onClear();
@@ -174,7 +175,7 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
               <DesktopMenuItem
                 className="desktop-branch-menu-row desktop-titlebar-terminal-menu-row"
                 icon={<RotateCcw size={15} />}
-                label="Reset session"
+                label="Reset Terminal"
                 onClick={() => {
                   terminal.onCloseMenu();
                   terminal.onReset();

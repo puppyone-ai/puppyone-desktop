@@ -1,8 +1,12 @@
 # Desktop Multi-Window Workspaces
 
-PuppyOne Desktop supports multiple workspace windows with the same ownership
-model as VS Code: one app instance, many windows, and one active repo per
-window.
+PuppyOne Desktop supports one app instance with many workspace windows. Unlike
+VS Code's multi-repository model inside one window, PuppyOne intentionally owns
+one active repository per window; this is a product boundary, not a generic SCM
+provider contract.
+
+Repository metadata invalidation and focus reconciliation are documented in
+[Repository Status Refresh Lifecycle](git/status-refresh-lifecycle.md).
 
 ## Requirement
 

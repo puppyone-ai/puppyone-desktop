@@ -61,7 +61,7 @@
   background: transparent;
   color: var(--po-text);
   font-family: var(--po-font-mono);
-  font-size: 13px;
+  font-size: var(--po-code-font-size, 13px);
   line-height: 20px;
   letter-spacing: 0;
 }

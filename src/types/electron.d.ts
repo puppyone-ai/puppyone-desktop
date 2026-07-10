@@ -1,4 +1,23 @@
 import type { AiEditRequest, AppPreviewResult, DataNode, FileContent, Workspace } from "@puppyone/shared-ui";
+import type {
+  AgentAccountReadRequest,
+  AgentAccountState,
+  AgentApprovalResolution,
+  AgentEvent,
+  AgentModel,
+  AgentModelsListRequest,
+  AgentProviderInspection,
+  AgentQuestionResolution,
+  AgentReplayRequest,
+  AgentSessionCloseRequest,
+  AgentSessionCreateRequest,
+  AgentSessionExitEvent,
+  AgentSessionResumeRequest,
+  AgentSessionSnapshot,
+  AgentTurnInterruptRequest,
+  AgentTurnStartRequest,
+  AgentTurnSteerRequest,
+} from "../features/desktop-agent/agentTypes";
 
 export type GitStatusEntry = {
   path: string;
@@ -191,6 +210,8 @@ export type GitStatusSnapshot = {
   sourceControl: GitSourceControlSnapshot;
   commits: GitCommitSummary[];
   allCommits: GitCommitSummary[];
+  statusLimit: number;
+  didHitStatusLimit: boolean;
 };
 
 export type GitBranchGraphSnapshot = {
@@ -289,11 +310,29 @@ export type WorkspaceChangedEvent = {
   eventType: string;
   path: string | null;
   error?: string;
+  recovered?: boolean;
+  reason?: string;
 };
 
 export type AiEditReviewUpdatedEvent = {
   rootPath: string;
   request: AiEditRequest;
+};
+
+export type GitRepositoryWatchResult = {
+  subscriptionId: string;
+  rootPath: string;
+  repository: boolean;
+};
+
+export type GitRepositoryInvalidatedEvent = {
+  subscriptionId: string;
+  rootPath: string;
+  reason: string;
+};
+
+export type GitRepositoryWindowFocusEvent = {
+  focused: boolean;
 };
 
 export type LastWorkspaceResult = {
@@ -344,6 +383,14 @@ export type WorkspaceMoveEntryRequest = {
   rootPath: string;
   fromPath: string;
   toPath: string;
+};
+
+export type WorkspaceCopyEntryRequest = {
+  rootPath: string;
+  fromPath: string;
+  targetFolderPath: string | null;
+  preferredName?: string;
+  forceDuplicateName?: boolean;
 };
 
 export type WorkspaceImportEntriesRequest = {
@@ -519,6 +566,30 @@ declare global {
         };
       }>;
       openExternalUrl: (href: string) => Promise<{ ok: boolean }>;
+      markdownWebEmbed: {
+        create: (request: {
+          href: string;
+          bounds?: { x: number; y: number; width: number; height: number };
+          capability: {
+            editorViewId: string;
+            workspaceId: string;
+            documentPath: string;
+            documentRevision: string;
+            purpose: "web-embed";
+            executionSessionId?: string;
+          };
+        }) => Promise<{ id: string; href?: string; visible?: boolean }>;
+        setBounds: (request: {
+          id: string;
+          bounds: { x: number; y: number; width: number; height: number };
+        }) => Promise<{ ok?: boolean; visible?: boolean } | void>;
+        destroy: (request: { id: string }) => Promise<{ ok?: boolean } | void>;
+      };
+      setDockIcon: (iconId: "polished" | "light" | "matte") => Promise<{
+        supported: boolean;
+        iconId: "polished" | "light" | "matte";
+        applied?: boolean;
+      }>;
       getInitialWorkspace: () => Promise<LastWorkspaceResult>;
       getLastWorkspace: () => Promise<LastWorkspaceResult>;
       getRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
@@ -541,7 +612,9 @@ declare global {
       getFileUrl: (request: {
         rootPath: string;
         path: string;
+        purpose?: "file-preview" | "markdown-asset";
       }) => Promise<{ url: string }>;
+      revokeFileUrl: (request: { url: string }) => Promise<{ revoked: boolean }>;
       convertOfficeDocumentToDocx: (
         request: WorkspaceConvertOfficeDocumentToDocxRequest,
       ) => Promise<WorkspaceConvertOfficeDocumentToDocxResult>;
@@ -556,6 +629,7 @@ declare global {
       createEntry: (request: WorkspaceCreateEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       renameEntry: (request: WorkspaceRenameEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       moveEntry: (request: WorkspaceMoveEntryRequest) => Promise<WorkspaceCreateEntryResult>;
+      copyEntry: (request: WorkspaceCopyEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       importEntries: (request: WorkspaceImportEntriesRequest) => Promise<WorkspaceImportEntriesResult>;
       deleteEntry: (request: WorkspaceDeleteEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       revealEntryInFinder: (request: WorkspaceRevealEntryRequest) => Promise<{ ok: boolean }>;
@@ -586,6 +660,21 @@ declare global {
       watchWorkspace: (
         rootPath: string,
         callback: (event: WorkspaceChangedEvent) => void,
+      ) => {
+        stop: () => void;
+        ready: Promise<{ subscriptionId: string | null; rootPath: string }>;
+      };
+      startGitRepositoryWatch: (request: {
+        rootPath: string;
+      }) => Promise<GitRepositoryWatchResult>;
+      stopGitRepositoryWatch: (request: {
+        subscriptionId: string;
+      }) => Promise<{ ok: boolean }>;
+      onGitRepositoryInvalidated: (
+        callback: (event: GitRepositoryInvalidatedEvent) => void,
+      ) => () => void;
+      onGitRepositoryWindowFocus?: (
+        callback: (event: GitRepositoryWindowFocusEvent) => void,
       ) => () => void;
       getLatestAiEditReviewRequest: (request: {
         rootPath: string;
@@ -595,10 +684,18 @@ declare global {
       ) => () => void;
       getGitStatus: (request: {
         rootPath: string;
+        requestId?: string;
       }) => Promise<GitStatusSnapshot>;
+      cancelGitStatus?: (request: {
+        requestId: string;
+      }) => Promise<{ ok: boolean }>;
       getGitBranchGraph?: (request: {
         rootPath: string;
+        requestId?: string;
       }) => Promise<GitBranchGraphSnapshot>;
+      cancelGitBranchGraph?: (request: {
+        requestId: string;
+      }) => Promise<{ ok: boolean }>;
       initGitRepository: (request: {
         rootPath: string;
       }) => Promise<GitStatusSnapshot>;
@@ -693,6 +790,63 @@ declare global {
       onUpdateStateChanged: (
         callback: (state: DesktopUpdateState) => void,
       ) => () => void;
+      discoverAgentProviders: (request?: { refresh?: boolean }) => Promise<AgentProviderInspection>;
+      listAgentModels: (request?: AgentModelsListRequest) => Promise<AgentModel[]>;
+      readAgentAccount: (request?: AgentAccountReadRequest) => Promise<AgentAccountState | null>;
+      createAgentSession: (request: AgentSessionCreateRequest) => Promise<AgentSessionSnapshot>;
+      resumeAgentSession: (request: AgentSessionResumeRequest) => Promise<AgentSessionSnapshot | null>;
+      replayAgentSession: (request: AgentReplayRequest) => Promise<AgentSessionSnapshot>;
+      closeAgentSession: (request: AgentSessionCloseRequest) => Promise<{ sessionId: string; closed: boolean }>;
+      startAgentTurn: (request: AgentTurnStartRequest) => Promise<{ sessionId: string; turnId: string }>;
+      steerAgentTurn: (request: AgentTurnSteerRequest) => Promise<{
+        sessionId: string;
+        turnId: string;
+        steered: boolean;
+      }>;
+      interruptAgentTurn: (request: AgentTurnInterruptRequest) => Promise<{
+        sessionId: string;
+        turnId: string;
+        interruptRequested: boolean;
+      }>;
+      resolveAgentApproval: (request: AgentApprovalResolution) => Promise<{
+        sessionId: string;
+        requestId: string;
+        decision: AgentApprovalResolution["decision"];
+      }>;
+      resolveAgentQuestion: (request: AgentQuestionResolution) => Promise<{
+        sessionId: string;
+        requestId: string;
+      }>;
+      onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
+      onAgentSessionExit: (callback: (event: AgentSessionExitEvent) => void) => () => void;
+      viewerPacks: {
+        getSnapshot: () => Promise<import("@puppyone/shared-ui").ViewerPackSnapshot>;
+        installLocal: () => Promise<
+          | { canceled: true }
+          | { canceled: false; pluginId: string; version: string; contentHash: string }
+        >;
+        disable: (request: { pluginId: string }) => Promise<{ ok: boolean; reason?: string }>;
+        uninstall: (request: { pluginId: string }) => Promise<{ ok: boolean; canceled?: boolean }>;
+        activate: (request: {
+          pluginId: string;
+          rootPath: string;
+          relativePath: string;
+          bounds?: { x: number; y: number; width: number; height: number };
+        }) => Promise<import("@puppyone/shared-ui").ViewerPackSessionDescriptor>;
+        setBounds: (request: {
+          sessionId: string;
+          bounds: { x: number; y: number; width: number; height: number };
+        }) => Promise<{ ok: boolean }>;
+        destroySession: (request: { sessionId: string }) => Promise<{ ok: boolean }>;
+        onSessionState: (callback: (payload: {
+          sessionId: string;
+          state: {
+            status: "loading" | "ready" | "error";
+            message?: string;
+            progress?: number;
+          };
+        }) => void) => () => void;
+      };
       createTerminal: (request: TerminalCreateRequest) => Promise<TerminalCreateResult>;
       writeTerminal: (request: TerminalInputRequest) => void;
       resizeTerminal: (request: TerminalResizeRequest) => void;

@@ -1,9 +1,12 @@
 .markdown-codemirror-editor {
   --po-markdown-editor-text-width: 724px;
   --po-markdown-editor-gutter-min: 64px;
+  --po-markdown-editor-content-padding-block: 64px;
   --po-markdown-breakout-right-gutter: 48px;
   --po-markdown-breakout-max-width: 1180px;
   --po-markdown-editor-line-spacing: 0px;
+  --cm-md-block-hover-ring: color-mix(in srgb, var(--po-text-muted) 18%, transparent);
+  --cm-md-block-selected-ring: color-mix(in srgb, var(--po-accent) 30%, transparent);
   position: relative;
   container-type: inline-size;
   width: 100%;
@@ -20,7 +23,7 @@
   min-height: 100%;
   color: var(--po-text);
   font-family: var(--po-font-sans);
-  font-size: 14px;
+  font-size: var(--po-text-size-content, 14px);
   font-weight: 450;
   letter-spacing: 0;
 }
@@ -33,12 +36,20 @@
 }
 
 .markdown-codemirror-editor .cm-content {
+  /* The inline gutter grows to center the 724px reading rail. The block
+     padding is intentionally independent so horizontal resize never moves
+     the document's first line vertically. */
+  --po-markdown-editor-content-gutter-inline: max(
+    var(--po-markdown-editor-gutter-min),
+    calc((100% - var(--po-markdown-editor-text-width)) / 2)
+  );
   box-sizing: border-box;
   width: 100%;
   max-width: none;
   min-height: 100%;
   margin: 0;
-  padding: 64px max(var(--po-markdown-editor-gutter-min), calc((100% - var(--po-markdown-editor-text-width)) / 2)) 64px;
+  padding-block: var(--po-markdown-editor-content-padding-block);
+  padding-inline: var(--po-markdown-editor-content-gutter-inline);
   caret-color: var(--po-text);
   color: color-mix(in srgb, var(--po-text) 78%, var(--po-text-muted));
   overflow-wrap: anywhere;
@@ -222,7 +233,7 @@
   padding-top: 8px;
   padding-bottom: 5px;
   color: var(--po-text);
-  font-size: 14px;
+  font-size: var(--po-text-size-content, 14px);
   font-weight: 700;
   line-height: 1.4;
 }
@@ -414,18 +425,31 @@
   transform: rotate(45deg);
 }
 
+/* Rich replaced blocks expose their rendered surface before selection without
+   adding permanent chrome. The widget wrapper owns document rhythm; its inner
+   surface owns the ring, so vertical spacing never appears inside the frame. */
+.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget) {
+  --cm-md-block-current-ring: transparent;
+}
+
+.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget):is(:hover, :focus-within):not(.is-doc-selected) {
+  --cm-md-block-current-ring: var(--cm-md-block-hover-ring);
+}
+
+.markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget) {
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--cm-md-block-current-ring);
+  transition: box-shadow 140ms ease;
+}
+
 /*
  * Block-selected state: when the document selection covers a replaced
  * widget's whole range, the widget is marked is-doc-selected (native
  * selection cannot paint replaced-widget interiors). Table styling lives in
  * markdown-table-widget.css; the other block widgets share one accent ring.
  */
-.markdown-codemirror-editor .cm-md-code-widget.is-doc-selected,
-.markdown-codemirror-editor .cm-md-mermaid-widget.is-doc-selected,
-.markdown-codemirror-editor .cm-md-html-widget.is-doc-selected,
-.markdown-codemirror-editor .cm-md-image-widget.is-doc-selected {
-  border-radius: 6px;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-accent) 30%, transparent);
+.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget).is-doc-selected {
+  --cm-md-block-current-ring: var(--cm-md-block-selected-ring);
 }
 
 .markdown-codemirror-editor .cm-md-hr-widget {
@@ -444,4 +468,10 @@
   height: 1px;
   background: var(--po-divider);
   content: "";
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget) {
+    transition: none;
+  }
 }

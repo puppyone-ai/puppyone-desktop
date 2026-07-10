@@ -9,24 +9,18 @@ single product area can evolve without turning this file into a catch-all.
 - [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
   - Cloud environment, auth, workspace binding, project data, and route-state
     boundaries.
-- [Cloud Branch Graph Layout](architecture/cloud-branch-graph-layout.md)
-  - Git topology source of truth, branch/ref display rules, and graph examples.
-- [Smooth Preview Transitions](architecture/smooth-preview-transitions.md)
-  - File selection, loaded content, committed preview documents, and editor
-    mount lifecycle.
+- [Git and Source Control Architecture](architecture/git/README.md)
+  - Local Source Control sidebar and status ownership, external Git refresh
+    lifecycle, Git topology source of truth, and branch/ref display rules.
+- [Editor and Viewer Architecture](architecture/editor/README.md)
+  - Architecture home for file-format routing, source acquisition, committed
+    preview lifecycle, viewer boundaries, format-specific editors, and the
+    reserved viewer-plugin model.
 - [Desktop Sidebar View Stack](architecture/desktop-sidebar-view-stack.md)
   - Keep-alive behavior for the Data, Git, Cloud, and Settings sidebar surfaces.
 - [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)
   - App-wide WebKit-only scrollbar styling rule, reserved scrollbar gutters,
     and scroll area / list padding / row width boundaries for sidebar lists.
-- [File Format and Viewer Pipeline](architecture/file-format-viewer-pipeline.md)
-  - Part 1: the durable format registry → viewer registry → content/resource
-    source pipeline contract, plus the Office preview support matrix. Part 2:
-    the remediation to-do list for Word/Office document support gaps.
-- [Viewer Plugin Architecture (Reserved)](architecture/viewer-plugin-architecture.md)
-  - The deferred long-term viewer plugin system: built-in vs plugin format
-    boundary, manifest/sandbox/host-API shape, distribution staging, the
-    disciplines in force today, and the triggers for actually building it.
 - [Explorer Tree Lifecycle](architecture/explorer-tree-lifecycle.md)
   - File-tree loading, expansion, subtree motion, and indentation guide rules.
 - [Desktop Multi-Window Workspaces](architecture/desktop-multi-window-workspaces.md)
@@ -38,15 +32,22 @@ single product area can evolve without turning this file into a catch-all.
 - [Desktop Menu Surface](architecture/desktop-menu-surface.md)
   - Shared menu background, border, shadow, radius, and component boundary
     rules.
-- [Markdown Live Preview Editing UX](architecture/markdown-live-preview-ux.md)
-  - Part 1: the durable Typora-class editing contract (per-element syntax
-    reveal, composing/commit lifecycle, hidden-marker deletion). Part 2: the
-    one-time migration to-do list and code change map.
+- [Desktop Appearance Settings](architecture/desktop-appearance-settings.md)
+  - Part 1: the durable "curate, don't configure" contract for the Appearance
+    surface, plus the accepted/rejected decision record versus
+    deep-customization settings pages. Part 2: the implementation record (text size,
+    third dark preset, preview cards, reduce motion, pointer cursors, dock
+    icon, diff markers).
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
   - Part 1: the durable terminal contract (xterm + node-pty layering, the
     character-grid width invariant, CJK `text-spacing-trim` failure mode,
     fit/resize pipeline). Part 2: the remediation to-do list (spacing-trim
     CSS fix, WebGL renderer with fallback, Unicode 11 widths).
+- [Desktop Agent Architecture](architecture/desktop-agent/README.md)
+  - Existing Terminal plus an experimental, default-off Codex Agent Chat
+    header action and independent right-sidebar panel, with a normalized session/turn/item
+    event model, approval and recovery invariants, persistence and security
+    boundaries, plus proposed Claude/Cursor/ACP adapters.
 
 ## Document Boundary
 

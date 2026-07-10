@@ -7,7 +7,8 @@ const DESKTOP_CONTENT_SECURITY_POLICY = [
   "base-uri 'none'",
   "object-src 'none'",
   "form-action 'none'",
-  "frame-ancestors 'none'",
+  // `frame-ancestors` is ignored in a meta-delivered CSP. Electron main owns
+  // top-level navigation/window creation, so do not advertise a false guard.
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: puppyone-local: http: https:",
