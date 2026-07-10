@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 import packageMetadata from "../package.json";
@@ -61,17 +62,18 @@ describe("external Viewer Pack product capability", () => {
   });
 
   it("skips signer enforcement by default and fails closed when explicitly enabled", () => {
-    const script = new URL("../scripts/check-viewer-pack-release.mjs", import.meta.url);
-    const defaultResult = spawnSync(process.execPath, [script.pathname], {
-      cwd: new URL("..", import.meta.url),
+    const script = fileURLToPath(new URL("../scripts/check-viewer-pack-release.mjs", import.meta.url));
+    const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
+    const defaultResult = spawnSync(process.execPath, [script], {
+      cwd: repositoryRoot,
       encoding: "utf8",
       env: { ...process.env, [EXTERNAL_VIEWER_PACKS_DEV_ENV]: "0" },
     });
     expect(defaultResult.status).toBe(0);
     expect(defaultResult.stdout).toMatch(/skipped.*preset-viewers-only/i);
 
-    const enabledResult = spawnSync(process.execPath, [script.pathname], {
-      cwd: new URL("..", import.meta.url),
+    const enabledResult = spawnSync(process.execPath, [script], {
+      cwd: repositoryRoot,
       encoding: "utf8",
       env: { ...process.env, [EXTERNAL_VIEWER_PACKS_DEV_ENV]: "1" },
     });
