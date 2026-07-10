@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  createGitRefreshReason,
   createGitRefreshScheduler,
   GIT_FOCUS_STALE_MS,
   GIT_REFRESH_DEBOUNCE_MS,
   GIT_REFRESH_RETRY_INITIAL_MS,
 } from "../src/features/source-control/gitRefreshScheduler";
+
+const refreshReason = (
+  detail: string,
+  cause: "working-tree" | "index" | "refs" | "repository" | "ui-configuration" = "repository",
+  source: "initial" | "watcher" | "manual" | "focus" | "mutation" | "external" | "retry" = "external",
+) => createGitRefreshReason(cause, source, detail);
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
@@ -46,14 +53,14 @@ describe("gitRefreshScheduler", () => {
     });
 
     scheduler.setRootPath("/repo");
-    scheduler.invalidate({ reason: "working-tree" });
+    scheduler.invalidate({ reason: refreshReason("working-tree", "working-tree", "watcher") });
     expect(timers).toHaveLength(1);
     expect(timers[0]?.ms).toBe(GIT_REFRESH_DEBOUNCE_MS);
     timers[0]?.callback();
 
     expect(reads).toHaveLength(1);
-    scheduler.invalidate({ reason: "metadata" });
-    scheduler.invalidate({ reason: "metadata" });
+    scheduler.invalidate({ reason: refreshReason("metadata") });
+    scheduler.invalidate({ reason: refreshReason("metadata") });
     expect(reads).toHaveLength(1);
     expect(scheduler.getState().dirty).toBe(true);
 
@@ -95,16 +102,20 @@ describe("gitRefreshScheduler", () => {
     });
 
     scheduler.setRootPath("/repo");
-    scheduler.invalidate({ reason: "working-tree" });
+    scheduler.invalidate({ reason: refreshReason("working-tree", "working-tree", "watcher") });
     expect(call).toBe(1);
 
-    scheduler.applyMutationSnapshot({ label: "mutation" }, "commit");
+    scheduler.applyMutationSnapshot(
+      { label: "mutation" },
+      { rootPath: "/repo", rootEpoch: scheduler.getState().rootEpoch },
+      refreshReason("commit", "refs", "mutation"),
+    );
     expect(snapshots).toEqual([{ label: "mutation" }]);
     expect(scheduler.getState().appliedGeneration).toBe(2);
     expect(scheduler.getState().physicalInFlight).toBe(1);
 
     // Mutation must not start a second physical status while the first promise lives.
-    scheduler.refreshNow("manual");
+    scheduler.refreshNow(refreshReason("manual", "repository", "manual"));
     expect(call).toBe(1);
     expect(scheduler.getState().dirty).toBe(true);
 
@@ -147,13 +158,13 @@ describe("gitRefreshScheduler", () => {
 
     scheduler.setRootPath("/repo-a");
     const epochA = scheduler.getState().rootEpoch;
-    scheduler.refreshNow("initial");
+    scheduler.refreshNow(refreshReason("initial", "repository", "initial"));
     expect(call).toBe(1);
 
     scheduler.setRootPath("/repo-b");
     const epochB = scheduler.getState().rootEpoch;
     expect(epochB).toBeGreaterThan(epochA);
-    scheduler.refreshNow("initial");
+    scheduler.refreshNow(refreshReason("initial", "repository", "initial"));
     // Physical single-flight: B waits until A's promise settles.
     expect(call).toBe(1);
     expect(scheduler.getState().physicalInFlight).toBe(1);
@@ -197,12 +208,12 @@ describe("gitRefreshScheduler", () => {
     });
 
     scheduler.setRootPath("/repo-a");
-    scheduler.refreshNow("initial");
+    scheduler.refreshNow(refreshReason("initial", "repository", "initial"));
     const firstA = pendingByRoot.get("/repo-a")?.[0];
     expect(firstA).toBeTruthy();
 
     scheduler.setRootPath("/repo-b");
-    scheduler.refreshNow("initial");
+    scheduler.refreshNow(refreshReason("initial", "repository", "initial"));
     firstA?.resolve({ label: "stale-a" });
     await flushMicrotasks();
 
@@ -210,7 +221,7 @@ describe("gitRefreshScheduler", () => {
     expect(firstB).toBeTruthy();
 
     scheduler.setRootPath("/repo-a");
-    scheduler.refreshNow("initial");
+    scheduler.refreshNow(refreshReason("initial", "repository", "initial"));
     // B is still physically in flight; A is dirty until B settles.
     expect(scheduler.getState().physicalInFlight).toBe(1);
 
@@ -225,6 +236,62 @@ describe("gitRefreshScheduler", () => {
     await flushMicrotasks();
 
     expect(snapshots).toEqual([{ label: "fresh-a", rootPath: "/repo-a" }]);
+    scheduler.dispose();
+  });
+
+  it("rejects mutation snapshots captured before a workspace epoch change", () => {
+    const snapshots: Array<{ label: string; rootPath: string }> = [];
+    const scheduler = createGitRefreshScheduler({
+      readStatus: async () => ({ label: "read" }),
+      onSnapshot: (snapshot, meta) => {
+        snapshots.push({ label: snapshot.label, rootPath: meta.rootPath });
+      },
+    });
+
+    scheduler.setRootPath("/repo-a");
+    const staleContext = {
+      rootPath: "/repo-a",
+      rootEpoch: scheduler.getState().rootEpoch,
+    };
+
+    scheduler.setRootPath("/repo-b");
+    scheduler.setRootPath("/repo-a");
+
+    const applied = scheduler.applyMutationSnapshot(
+      { label: "stale-operation-result" },
+      staleContext,
+      refreshReason("commit", "refs", "mutation"),
+    );
+
+    expect(applied).toBe(false);
+    expect(snapshots).toEqual([]);
+    expect(scheduler.getState().appliedGeneration).toBe(0);
+    scheduler.dispose();
+  });
+
+  it("aborts an obsolete physical read before starting the next workspace", async () => {
+    const roots: string[] = [];
+    const signals: AbortSignal[] = [];
+    const scheduler = createGitRefreshScheduler({
+      readStatus: async (_generation, rootPath, signal) => {
+        roots.push(rootPath);
+        signals.push(signal);
+        if (rootPath === "/repo-b") return { label: "repo-b" };
+        return new Promise<{ label: string }>((_resolve, reject) => {
+          signal.addEventListener("abort", () => reject(new DOMException("cancelled", "AbortError")), { once: true });
+        });
+      },
+      onSnapshot: () => {},
+    });
+
+    scheduler.setRootPath("/repo-a");
+    scheduler.refreshNow(refreshReason("initial", "repository", "initial"));
+    scheduler.setRootPath("/repo-b");
+    scheduler.refreshNow(refreshReason("initial", "repository", "initial"));
+    await flushMicrotasks();
+
+    expect(signals[0]?.aborted).toBe(true);
+    expect(roots).toEqual(["/repo-a", "/repo-b"]);
     scheduler.dispose();
   });
 
@@ -247,7 +314,7 @@ describe("gitRefreshScheduler", () => {
 
     scheduler.setRootPath("/repo");
     scheduler.setFocused(false);
-    scheduler.invalidate({ reason: "metadata" });
+    scheduler.invalidate({ reason: refreshReason("metadata") });
     expect(timers).toHaveLength(0);
     expect(scheduler.getState().dirty).toBe(true);
 
@@ -277,7 +344,7 @@ describe("gitRefreshScheduler", () => {
     });
 
     scheduler.setRootPath("/repo");
-    scheduler.refreshNow("initial");
+    scheduler.refreshNow(refreshReason("initial", "repository", "initial"));
     await flushMicrotasks();
     expect(snapshots).toEqual(["status-1000"]);
 
@@ -314,12 +381,12 @@ describe("gitRefreshScheduler", () => {
     });
 
     scheduler.setRootPath("/repo");
-    scheduler.refreshNow("initial");
+    scheduler.refreshNow(refreshReason("initial", "repository", "initial"));
     await flushMicrotasks();
     expect(snapshots).toEqual(["ok"]);
 
     shouldFail = true;
-    scheduler.refreshNow("retry");
+    scheduler.refreshNow(refreshReason("retry"));
     await flushMicrotasks();
 
     expect(snapshots).toEqual(["ok"]);
@@ -351,7 +418,7 @@ describe("gitRefreshScheduler", () => {
     });
 
     scheduler.setRootPath("/repo");
-    scheduler.refreshNow("initial");
+    scheduler.refreshNow(refreshReason("initial", "repository", "initial"));
     await flushMicrotasks();
     expect(failures).toBe(1);
     expect(timers[0]?.ms).toBe(100);
@@ -366,6 +433,81 @@ describe("gitRefreshScheduler", () => {
     expect(failures).toBe(3);
     expect(scheduler.getState().lastError).toBeNull();
     expect(scheduler.getState().lastSuccessfulAt).not.toBeNull();
+    scheduler.dispose();
+  });
+
+  it("does not start a debounced read after the window loses focus", async () => {
+    const reads: string[] = [];
+    const timers: Array<{ callback: () => void; ms: number }> = [];
+
+    const scheduler = createGitRefreshScheduler({
+      debounceMs: GIT_REFRESH_DEBOUNCE_MS,
+      readStatus: async () => {
+        reads.push("read");
+        return "status";
+      },
+      onSnapshot: () => {},
+      setTimeoutFn: (callback, ms) => {
+        timers.push({ callback, ms });
+        return timers.length as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimeoutFn: () => {},
+    });
+
+    scheduler.setRootPath("/repo");
+    scheduler.invalidate({ reason: refreshReason("working-tree", "working-tree", "watcher") });
+    expect(timers).toHaveLength(1);
+    scheduler.setFocused(false);
+    timers[0]?.callback();
+    await flushMicrotasks();
+
+    expect(reads).toEqual([]);
+    expect(scheduler.getState().dirty).toBe(true);
+
+    scheduler.setFocused(true);
+    await flushMicrotasks();
+    expect(reads).toEqual(["read"]);
+    scheduler.dispose();
+  });
+
+  it("does not run a retry timer while unfocused", async () => {
+    const reads: number[] = [];
+    const timers: Array<{ callback: () => void; ms: number }> = [];
+    let shouldFail = true;
+
+    const scheduler = createGitRefreshScheduler({
+      debounceMs: 0,
+      retryInitialMs: 100,
+      readStatus: async () => {
+        reads.push(reads.length + 1);
+        if (shouldFail) throw new Error("boom");
+        return "ok";
+      },
+      onSnapshot: () => {},
+      setTimeoutFn: (callback, ms) => {
+        timers.push({ callback, ms });
+        return timers.length as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimeoutFn: () => {},
+    });
+
+    scheduler.setRootPath("/repo");
+    scheduler.refreshNow(refreshReason("initial", "repository", "initial"));
+    await flushMicrotasks();
+    expect(reads).toEqual([1]);
+    expect(timers.some((timer) => timer.ms === 100)).toBe(true);
+
+    scheduler.setFocused(false);
+    const retry = timers.find((timer) => timer.ms === 100);
+    retry?.callback();
+    await flushMicrotasks();
+    expect(reads).toEqual([1]);
+    expect(scheduler.getState().dirty).toBe(true);
+
+    shouldFail = false;
+    scheduler.setFocused(true);
+    await flushMicrotasks();
+    expect(reads.length).toBeGreaterThan(1);
     scheduler.dispose();
   });
 });

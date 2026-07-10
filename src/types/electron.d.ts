@@ -210,6 +210,8 @@ export type GitStatusSnapshot = {
   sourceControl: GitSourceControlSnapshot;
   commits: GitCommitSummary[];
   allCommits: GitCommitSummary[];
+  statusLimit: number;
+  didHitStatusLimit: boolean;
 };
 
 export type GitBranchGraphSnapshot = {
@@ -564,6 +566,25 @@ declare global {
         };
       }>;
       openExternalUrl: (href: string) => Promise<{ ok: boolean }>;
+      markdownWebEmbed: {
+        create: (request: {
+          href: string;
+          bounds?: { x: number; y: number; width: number; height: number };
+          capability: {
+            editorViewId: string;
+            workspaceId: string;
+            documentPath: string;
+            documentRevision: string;
+            purpose: "web-embed";
+            executionSessionId?: string;
+          };
+        }) => Promise<{ id: string; href?: string; visible?: boolean }>;
+        setBounds: (request: {
+          id: string;
+          bounds: { x: number; y: number; width: number; height: number };
+        }) => Promise<{ ok?: boolean; visible?: boolean } | void>;
+        destroy: (request: { id: string }) => Promise<{ ok?: boolean } | void>;
+      };
       setDockIcon: (iconId: "polished" | "light" | "matte") => Promise<{
         supported: boolean;
         iconId: "polished" | "light" | "matte";
@@ -591,7 +612,9 @@ declare global {
       getFileUrl: (request: {
         rootPath: string;
         path: string;
+        purpose?: "file-preview" | "markdown-asset";
       }) => Promise<{ url: string }>;
+      revokeFileUrl: (request: { url: string }) => Promise<{ revoked: boolean }>;
       convertOfficeDocumentToDocx: (
         request: WorkspaceConvertOfficeDocumentToDocxRequest,
       ) => Promise<WorkspaceConvertOfficeDocumentToDocxResult>;
@@ -661,10 +684,18 @@ declare global {
       ) => () => void;
       getGitStatus: (request: {
         rootPath: string;
+        requestId?: string;
       }) => Promise<GitStatusSnapshot>;
+      cancelGitStatus?: (request: {
+        requestId: string;
+      }) => Promise<{ ok: boolean }>;
       getGitBranchGraph?: (request: {
         rootPath: string;
+        requestId?: string;
       }) => Promise<GitBranchGraphSnapshot>;
+      cancelGitBranchGraph?: (request: {
+        requestId: string;
+      }) => Promise<{ ok: boolean }>;
       initGitRepository: (request: {
         rootPath: string;
       }) => Promise<GitStatusSnapshot>;
@@ -790,26 +821,14 @@ declare global {
       onAgentSessionExit: (callback: (event: AgentSessionExitEvent) => void) => () => void;
       viewerPacks: {
         getSnapshot: () => Promise<import("@puppyone/shared-ui").ViewerPackSnapshot>;
-        installLocal: (request: {
-          archiveBytes: Uint8Array | ArrayBuffer | number[];
-          signatureBase64Url: string;
-          expectedSha256?: string | null;
-          sourceLabel?: string;
-        }) => Promise<{
-          pluginId: string;
-          version: string;
-          contentHash: string;
-        }>;
+        installLocal: () => Promise<
+          | { canceled: true }
+          | { canceled: false; pluginId: string; version: string; contentHash: string }
+        >;
         disable: (request: { pluginId: string }) => Promise<{ ok: boolean; reason?: string }>;
-        uninstall: (request: { pluginId: string }) => Promise<{ ok: boolean }>;
+        uninstall: (request: { pluginId: string }) => Promise<{ ok: boolean; canceled?: boolean }>;
         activate: (request: {
           pluginId: string;
-          version: string;
-          contentHash: string;
-          entry: string;
-          documentPath: string;
-          documentName: string;
-          documentMimeType?: string | null;
           rootPath: string;
           relativePath: string;
           bounds?: { x: number; y: number; width: number; height: number };
@@ -819,6 +838,14 @@ declare global {
           bounds: { x: number; y: number; width: number; height: number };
         }) => Promise<{ ok: boolean }>;
         destroySession: (request: { sessionId: string }) => Promise<{ ok: boolean }>;
+        onSessionState: (callback: (payload: {
+          sessionId: string;
+          state: {
+            status: "loading" | "ready" | "error";
+            message?: string;
+            progress?: number;
+          };
+        }) => void) => () => void;
       };
       createTerminal: (request: TerminalCreateRequest) => Promise<TerminalCreateResult>;
       writeTerminal: (request: TerminalInputRequest) => void;

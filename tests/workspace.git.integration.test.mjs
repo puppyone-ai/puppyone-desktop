@@ -244,6 +244,27 @@ describe("fast status vs lazy history", { timeout: 20_000 }, () => {
     expect(status.unstagedEntries.some((entry) => entry.path === "app.js")).toBe(true);
   });
 
+  it("returns a bounded status snapshot and reports truncation", async () => {
+    await initRepoWithIdentity();
+    for (const name of ["one.txt", "two.txt", "three.txt", "four.txt"]) {
+      await createWorkspaceEntry(root, { parentPath: null, name, kind: "file", content: `${name}\n` });
+    }
+
+    const status = await getWorkspaceGitStatus(root, { statusEntryLimit: 2 });
+    expect(status.entries).toHaveLength(2);
+    expect(status.statusLimit).toBe(2);
+    expect(status.didHitStatusLimit).toBe(true);
+  });
+
+  it("honors an already-cancelled status request", async () => {
+    await initRepoWithIdentity();
+    const controller = new AbortController();
+    controller.abort();
+    await expect(getWorkspaceGitStatus(root, { signal: controller.signal })).rejects.toMatchObject({
+      name: "AbortError",
+    });
+  });
+
   it("changes the consistency fingerprint when HEAD or the index changes", async () => {
     const { readGitConsistencyFingerprint } = await import("../local-api/workspace.mjs");
     await initRepoWithIdentity();
@@ -261,4 +282,34 @@ describe("fast status vs lazy history", { timeout: 20_000 }, () => {
     const afterHead = await readGitConsistencyFingerprint(root);
     expect(afterHead).not.toBe(afterIndex);
   });
+
+  it("still reports untracked files when status.showUntrackedFiles=no", async () => {
+    await initRepoWithIdentity();
+    execFileSync("git", ["-C", root, "config", "status.showUntrackedFiles", "no"]);
+    await writeFile(path.join(root, "missing.txt"), "hidden-by-config\n");
+
+    const status = await getWorkspaceGitStatus(root);
+    expect(status.entries.some((entry) => entry.path === "missing.txt")).toBe(true);
+    expect(status.untrackedEntries.some((entry) => entry.path === "missing.txt")).toBe(true);
+  });
+
+  it("allows a slow pre-commit hook beyond the read timeout", async () => {
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "hooked.js", kind: "file", content: "ok\n" });
+    await stageAllWorkspaceGitChanges(root);
+
+    const hookDir = path.join(root, ".git", "hooks");
+    await writeFile(
+      path.join(hookDir, "pre-commit"),
+      "#!/bin/sh\nsleep 6\nexit 0\n",
+      { mode: 0o755 },
+    );
+
+    const started = Date.now();
+    const status = await commitWorkspaceGit(root, "slow hook commit");
+    const elapsed = Date.now() - started;
+    expect(elapsed).toBeGreaterThan(5_500);
+    expect(status.entries).toEqual([]);
+    expect(status.totalCommits).toBeGreaterThan(0);
+  }, 30_000);
 });

@@ -7,23 +7,72 @@ export const GIT_REFRESH_RETRY_MAX_MS = 30_000;
 
 export type GitRefreshPriority = "debounced" | "immediate";
 
+export type GitRefreshCause =
+  | "working-tree"
+  | "index"
+  | "refs"
+  | "repository"
+  | "ui-configuration";
+
+export type GitRefreshSource =
+  | "initial"
+  | "watcher"
+  | "manual"
+  | "focus"
+  | "mutation"
+  | "external"
+  | "retry";
+
+/**
+ * Structured refresh provenance. `cause` describes what repository truth may
+ * have changed, while `source` describes how reconciliation was requested.
+ * Keeping them separate means a retry never loses the original invalidation
+ * semantics.
+ */
+export type GitRefreshReason = Readonly<{
+  cause: GitRefreshCause;
+  source: GitRefreshSource;
+  detail: string;
+  attempt?: number;
+}>;
+
+export type GitRepositoryContext = Readonly<{
+  rootPath: string;
+  rootEpoch: number;
+}>;
+
+export function createGitRefreshReason(
+  cause: GitRefreshCause,
+  source: GitRefreshSource,
+  detail: string,
+  attempt?: number,
+): GitRefreshReason {
+  return attempt == null
+    ? { cause, source, detail }
+    : { cause, source, detail, attempt };
+}
+
 export type GitRefreshInvalidateOptions = {
   priority?: GitRefreshPriority;
-  reason?: string;
+  reason?: GitRefreshReason;
 };
 
 export type GitRefreshSchedulerOptions<TSnapshot> = {
-  readStatus: (generation: number, rootPath: string) => Promise<TSnapshot>;
+  readStatus: (
+    generation: number,
+    rootPath: string,
+    signal: AbortSignal,
+  ) => Promise<TSnapshot>;
   onSnapshot: (snapshot: TSnapshot, meta: {
     generation: number;
-    reason: string | null;
+    reason: GitRefreshReason;
     durationMs: number;
     rootPath: string;
     rootEpoch: number;
   }) => void;
   onError?: (error: unknown, meta: {
     generation: number;
-    reason: string | null;
+    reason: GitRefreshReason;
     durationMs: number;
     rootPath: string;
     rootEpoch: number;
@@ -32,7 +81,7 @@ export type GitRefreshSchedulerOptions<TSnapshot> = {
   onLog?: (event: {
     type: "refresh-start" | "refresh-success" | "refresh-error" | "refresh-discarded";
     generation: number;
-    reason: string | null;
+    reason: GitRefreshReason;
     durationMs?: number;
     rootPath: string | null;
     rootEpoch: number;
@@ -47,6 +96,7 @@ export type GitRefreshSchedulerOptions<TSnapshot> = {
 };
 
 type InFlightRead = {
+  abortController: AbortController;
   epoch: number;
   generation: number;
   rootPath: string;
@@ -57,8 +107,12 @@ export type GitRefreshScheduler<TSnapshot> = {
   setRootPath: (rootPath: string | null) => void;
   setFocused: (focused: boolean) => void;
   invalidate: (options?: GitRefreshInvalidateOptions) => void;
-  refreshNow: (reason?: string) => void;
-  applyMutationSnapshot: (snapshot: TSnapshot, reason?: string) => void;
+  refreshNow: (reason?: GitRefreshReason) => void;
+  applyMutationSnapshot: (
+    snapshot: TSnapshot,
+    context: GitRepositoryContext,
+    reason?: GitRefreshReason,
+  ) => boolean;
   getState: () => {
     rootPath: string | null;
     rootEpoch: number;
@@ -71,7 +125,7 @@ export type GitRefreshScheduler<TSnapshot> = {
     lastSuccessfulAt: number | null;
     focused: boolean;
     lastError: unknown | null;
-    lastReason: string | null;
+    lastReason: GitRefreshReason | null;
   };
   dispose: () => void;
 };
@@ -99,7 +153,7 @@ export function createGitRefreshScheduler<TSnapshot>(
   let lastSuccessfulAt: number | null = null;
   let focused = true;
   let lastError: unknown | null = null;
-  let lastReason: string | null = null;
+  let lastReason: GitRefreshReason | null = null;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let errorRetryTimer: ReturnType<typeof setTimeout> | null = null;
   let errorRetryDelayMs = retryInitialMs;
@@ -127,14 +181,14 @@ export function createGitRefreshScheduler<TSnapshot>(
     options.onLoadingChange?.(loading, generation, epoch);
   }
 
-  function startRead(priority: GitRefreshPriority, reason: string | null) {
+  function startRead(priority: GitRefreshPriority, reason: GitRefreshReason) {
     if (disposed || !rootPath) return;
     // Physical single-flight: never start a second status while any promise is live,
     // including reads that were made non-publishable by a mutation or root switch.
     if (physicalInFlightCount() > 0) {
       dirty = true;
       queuedPriority = mergePriority(queuedPriority, priority);
-      lastReason = reason ?? lastReason;
+      lastReason = reason;
       return;
     }
 
@@ -142,7 +196,9 @@ export function createGitRefreshScheduler<TSnapshot>(
     const generation = requestedGeneration;
     const epoch = rootEpoch;
     const capturedRoot = rootPath;
+    const abortController = new AbortController();
     const read: InFlightRead = {
+      abortController,
       epoch,
       generation,
       rootPath: capturedRoot,
@@ -164,7 +220,7 @@ export function createGitRefreshScheduler<TSnapshot>(
       rootEpoch: epoch,
     });
 
-    void Promise.resolve(options.readStatus(generation, capturedRoot))
+    void Promise.resolve(options.readStatus(generation, capturedRoot, abortController.signal))
       .then((snapshot) => {
         settleRead(read, { ok: true, snapshot, startedAt, reason });
       })
@@ -176,8 +232,8 @@ export function createGitRefreshScheduler<TSnapshot>(
   function settleRead(
     read: InFlightRead,
     result: (
-      | { ok: true; snapshot: TSnapshot; startedAt: number; reason: string | null }
-      | { ok: false; error: unknown; startedAt: number; reason: string | null }
+      | { ok: true; snapshot: TSnapshot; startedAt: number; reason: GitRefreshReason }
+      | { ok: false; error: unknown; startedAt: number; reason: GitRefreshReason }
     ),
   ) {
     if (disposed) return;
@@ -249,14 +305,26 @@ export function createGitRefreshScheduler<TSnapshot>(
     maybeRunTrailing();
   }
 
-  function scheduleErrorRetry(reason: string | null) {
+  function scheduleErrorRetry(reason: GitRefreshReason) {
     if (disposed || !rootPath || !focused || errorRetryTimer != null) return;
     const delay = errorRetryDelayMs;
     errorRetryDelayMs = Math.min(errorRetryDelayMs * 2, retryMaxMs);
     errorRetryTimer = setTimeoutFn(() => {
       errorRetryTimer = null;
       if (disposed || !rootPath) return;
-      schedule("immediate", reason ? `refresh-retry:${reason}` : "refresh-retry");
+      if (!focused) {
+        // Keep the failure visible for focus reconciliation; do not start a
+        // background status while the window is hidden.
+        dirty = true;
+        queuedPriority = mergePriority(queuedPriority, "immediate");
+        return;
+      }
+      schedule("immediate", createGitRefreshReason(
+        reason.cause,
+        "retry",
+        reason.detail,
+        (reason.attempt ?? 0) + 1,
+      ));
     }, delay);
   }
 
@@ -270,12 +338,15 @@ export function createGitRefreshScheduler<TSnapshot>(
       queuedPriority = priority;
       return;
     }
-    startRead(priority, lastReason);
+    startRead(
+      priority,
+      lastReason ?? createGitRefreshReason("repository", "external", "trailing-refresh"),
+    );
   }
 
-  function schedule(priority: GitRefreshPriority, reason: string | null) {
+  function schedule(priority: GitRefreshPriority, reason: GitRefreshReason) {
     if (disposed || !rootPath) return;
-    lastReason = reason ?? lastReason;
+    lastReason = reason;
 
     if (!focused && priority !== "immediate") {
       dirty = true;
@@ -299,9 +370,17 @@ export function createGitRefreshScheduler<TSnapshot>(
     clearDebounce();
     debounceTimer = setTimeoutFn(() => {
       debounceTimer = null;
+      if (!focused) {
+        dirty = true;
+        queuedPriority = mergePriority(queuedPriority, "debounced");
+        return;
+      }
       const nextPriority = queuedPriority ?? "debounced";
       queuedPriority = null;
-      startRead(nextPriority, lastReason);
+      startRead(
+        nextPriority,
+        lastReason ?? createGitRefreshReason("repository", "external", "debounced-refresh"),
+      );
     }, debounceMs);
   }
 
@@ -317,6 +396,7 @@ export function createGitRefreshScheduler<TSnapshot>(
       // Keep physical promises alive, but make them non-publishable.
       for (const read of inFlightReads) {
         read.publishable = false;
+        read.abortController.abort();
       }
       dirty = false;
       queuedPriority = null;
@@ -332,22 +412,37 @@ export function createGitRefreshScheduler<TSnapshot>(
       if (!wasFocused && nextFocused) {
         const stale = lastSuccessfulAt == null || (now() - lastSuccessfulAt) >= focusStaleMs;
         if (dirty || stale || lastError != null) {
-          schedule("immediate", dirty ? (lastReason ?? "focus") : (lastError != null ? "focus-error" : "focus-stale"));
+          schedule("immediate", dirty && lastReason
+            ? lastReason
+            : createGitRefreshReason(
+              "repository",
+              "focus",
+              lastError != null ? "focus-error" : "focus-stale",
+            ));
         }
       }
     },
 
     invalidate(invalidateOptions = {}) {
       const priority = invalidateOptions.priority ?? "debounced";
-      schedule(priority, invalidateOptions.reason ?? null);
+      schedule(
+        priority,
+        invalidateOptions.reason
+          ?? createGitRefreshReason("repository", "external", "unspecified-invalidation"),
+      );
     },
 
-    refreshNow(reason = "manual") {
+    refreshNow(reason = createGitRefreshReason("repository", "manual", "manual")) {
       schedule("immediate", reason);
     },
 
-    applyMutationSnapshot(snapshot, reason = "mutation") {
-      if (!rootPath) return;
+    applyMutationSnapshot(
+      snapshot,
+      context,
+      reason = createGitRefreshReason("repository", "mutation", "mutation"),
+    ) {
+      if (!rootPath) return false;
+      if (context.rootPath !== rootPath || context.rootEpoch !== rootEpoch) return false;
       clearDebounce();
       clearErrorRetry();
       requestedGeneration += 1;
@@ -356,6 +451,7 @@ export function createGitRefreshScheduler<TSnapshot>(
       // in flight so we do not start another status until they settle.
       for (const read of inFlightReads) {
         read.publishable = false;
+        read.abortController.abort();
       }
       dirty = false;
       queuedPriority = null;
@@ -371,6 +467,7 @@ export function createGitRefreshScheduler<TSnapshot>(
         rootEpoch,
       });
       setLoading(false, appliedGeneration, rootEpoch);
+      return true;
     },
 
     getState() {
@@ -396,6 +493,7 @@ export function createGitRefreshScheduler<TSnapshot>(
       clearErrorRetry();
       for (const read of inFlightReads) {
         read.publishable = false;
+        read.abortController.abort();
       }
       inFlightReads = [];
       dirty = false;

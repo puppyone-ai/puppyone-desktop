@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { GitCommitSummary, GitStatusSnapshot } from "../src/types/electron";
 import {
+  createRepositoryRefreshReason,
   mergePreservedHistory,
   shouldInvalidateHistoryForReason,
-} from "../src/features/source-control/useDesktopGitController";
+} from "../src/features/source-control/repositoryRefreshPolicy";
 
 const sampleCommit: GitCommitSummary = {
   commit_id: "abc",
@@ -63,25 +64,32 @@ function snapshot(partial: Partial<GitStatusSnapshot> = {}): GitStatusSnapshot {
     },
     commits: [],
     allCommits: [],
+    statusLimit: 10_000,
+    didHitStatusLimit: false,
     ...partial,
   };
 }
 
 describe("history invalidation policy", () => {
   it("invalidates cached history for ref/fetch/merge/config metadata reasons", () => {
-    expect(shouldInvalidateHistoryForReason("ref")).toBe(true);
-    expect(shouldInvalidateHistoryForReason("fetch")).toBe(true);
-    expect(shouldInvalidateHistoryForReason("merge")).toBe(true);
-    expect(shouldInvalidateHistoryForReason("config")).toBe(true);
-    expect(shouldInvalidateHistoryForReason("git-metadata")).toBe(true);
-    expect(shouldInvalidateHistoryForReason("watcher-recovered")).toBe(true);
+    expect(shouldInvalidateHistoryForReason(createRepositoryRefreshReason("ref", "watcher"))).toBe(true);
+    expect(shouldInvalidateHistoryForReason(createRepositoryRefreshReason("fetch", "watcher"))).toBe(true);
+    expect(shouldInvalidateHistoryForReason(createRepositoryRefreshReason("merge", "watcher"))).toBe(true);
+    expect(shouldInvalidateHistoryForReason(createRepositoryRefreshReason("config", "watcher"))).toBe(true);
+    expect(shouldInvalidateHistoryForReason(createRepositoryRefreshReason("git-metadata", "watcher"))).toBe(true);
+    expect(shouldInvalidateHistoryForReason(createRepositoryRefreshReason("watcher-recovered", "watcher"))).toBe(true);
   });
 
   it("preserves history across working-tree and index-only refreshes", () => {
-    expect(shouldInvalidateHistoryForReason("working-tree")).toBe(false);
-    expect(shouldInvalidateHistoryForReason("index")).toBe(false);
-    expect(shouldInvalidateHistoryForReason("manual")).toBe(false);
-    expect(shouldInvalidateHistoryForReason("configuration")).toBe(false);
+    expect(shouldInvalidateHistoryForReason(createRepositoryRefreshReason("working-tree", "watcher"))).toBe(false);
+    expect(shouldInvalidateHistoryForReason(createRepositoryRefreshReason("index", "watcher"))).toBe(false);
+    expect(shouldInvalidateHistoryForReason(createRepositoryRefreshReason("configuration", "external"))).toBe(false);
+  });
+
+  it("preserves repository-change semantics across retries", () => {
+    const original = createRepositoryRefreshReason("ref", "watcher");
+    const retry = { ...original, source: "retry" as const, attempt: 1 };
+    expect(shouldInvalidateHistoryForReason(retry)).toBe(true);
   });
 
   it("clears commits when invalidateHistory is requested even if HEAD is unchanged", () => {

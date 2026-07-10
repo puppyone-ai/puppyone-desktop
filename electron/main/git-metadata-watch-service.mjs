@@ -64,8 +64,7 @@ export function createGitMetadataWatchService({
         workspaceRoot,
         identityKey: null,
       });
-      armPendingRootWatch(workspaceRoot);
-      pendingRoots.get(workspaceRoot)?.subscriptionIds.add(subscriptionId);
+      subscribePendingRoot(workspaceRoot, subscriptionId);
 
       logger.info?.("git metadata watch pending (not a repository yet)", {
         subscriptionId,
@@ -183,17 +182,32 @@ export function createGitMetadataWatchService({
     };
   }
 
-  function armPendingRootWatch(workspaceRoot) {
-    if (pendingRoots.has(workspaceRoot)) return;
-    const entry = {
-      subscriptionIds: new Set(),
-      watcher: null,
-      rearmTimer: null,
-      rearmDelay: GIT_METADATA_REARM_MIN_DELAY_MS,
-      disposed: false,
-    };
-    pendingRoots.set(workspaceRoot, entry);
-    armPendingWatcher(workspaceRoot, entry);
+  function subscribePendingRoot(workspaceRoot, subscriptionId) {
+    let entry = pendingRoots.get(workspaceRoot);
+    if (!entry) {
+      entry = {
+        subscriptionIds: new Set(),
+        watcher: null,
+        rearmTimer: null,
+        rearmDelay: GIT_METADATA_REARM_MIN_DELAY_MS,
+        disposed: false,
+        promotionPromise: null,
+        promotionDirty: false,
+        promotionDirtyReason: null,
+      };
+      pendingRoots.set(workspaceRoot, entry);
+    }
+
+    // Register the subscription before arming. A `.git` event delivered as the
+    // watch handle is installed must already have a subscriber to promote.
+    entry.subscriptionIds.add(subscriptionId);
+    if (!entry.watcher && !entry.rearmTimer) {
+      armPendingWatcher(workspaceRoot, entry);
+    }
+
+    // Close the resolve-identity -> watcher-install TOCTOU gap. If `git init`
+    // completed between those two steps there may be no future root event.
+    void promotePendingRoot(workspaceRoot, "repository-initialized");
   }
 
   function armPendingWatcher(workspaceRoot, entry) {
@@ -252,8 +266,49 @@ export function createGitMetadataWatchService({
     const pending = pendingRoots.get(workspaceRoot);
     if (!pending || pending.subscriptionIds.size === 0) return;
 
+    // Single-flight with dirty trailing: concurrent .git events during an
+    // in-flight identity check must re-check after the current attempt settles.
+    if (pending.promotionPromise) {
+      pending.promotionDirty = true;
+      pending.promotionDirtyReason = mergeMetadataInvalidationReason(
+        pending.promotionDirtyReason,
+        reason,
+      );
+      return pending.promotionPromise;
+    }
+
+    pending.promotionPromise = (async () => {
+      let attemptReason = reason;
+      do {
+        pending.promotionDirty = false;
+        pending.promotionDirtyReason = null;
+        await promotePendingRootOnce(workspaceRoot, pending, attemptReason);
+        attemptReason = pending.promotionDirtyReason ?? attemptReason;
+      } while (
+        pending.promotionDirty
+        && pendingRoots.get(workspaceRoot) === pending
+        && !pending.disposed
+        && pending.subscriptionIds.size > 0
+      );
+    })();
+
+    try {
+      return await pending.promotionPromise;
+    } finally {
+      const current = pendingRoots.get(workspaceRoot);
+      if (current === pending) current.promotionPromise = null;
+    }
+  }
+
+  async function promotePendingRootOnce(workspaceRoot, pending, reason) {
+    if (pending.disposed || pending.subscriptionIds.size === 0) return;
+
     const identity = await resolveIdentity(workspaceRoot);
     if (!identity.repository || !identity.gitDir) return;
+
+    // The subscription may have been stopped or replaced while identity was
+    // resolving. Only promote the still-current pending entry.
+    if (pendingRoots.get(workspaceRoot) !== pending || pending.disposed) return;
 
     const subscriptionIds = Array.from(pending.subscriptionIds);
     disposePendingRootWatch(workspaceRoot);
@@ -351,10 +406,22 @@ export function createGitMetadataWatchService({
             message: error instanceof Error ? error.message : String(error),
           });
           const current = commonDirWatchers.get(commonDir);
-          if (!current) return;
-          for (const identityKey of Array.from(current.repositories)) {
+          if (!current || current.watcher !== watcher) return;
+          // Tear down the broken shared handle first. Otherwise each linked
+          // worktree's re-arm unbind/rebind leaves repositories.size > 0 and
+          // keeps reusing the dead watcher.
+          try {
+            current.watcher.close();
+          } catch {
+            // Best-effort.
+          }
+          const identityKeys = Array.from(current.repositories);
+          commonDirWatchers.delete(commonDir);
+          for (const identityKey of identityKeys) {
             const repo = repositories.get(identityKey);
-            if (repo) scheduleRearm(repo, "watcher-error");
+            if (!repo) continue;
+            repo.sharedCommonDirs?.delete(commonDir);
+            scheduleRearm(repo, "watcher-error");
           }
         });
         shared = { watcher, repositories: new Set(), target };
@@ -413,7 +480,7 @@ export function createGitMetadataWatchService({
     if (shouldIgnoreMetadataChange(normalized)) return;
 
     const reason = classifyMetadataReason(target, normalized);
-    repository.pendingReason = reason;
+    repository.pendingReason = mergeMetadataInvalidationReason(repository.pendingReason, reason);
 
     if (eventType === "rename" && (normalized === "" || target.recursive !== true)) {
       scheduleRearm(repository, "watcher-recovered");
@@ -602,4 +669,37 @@ function classifyMetadataReason(target, normalized) {
     return "merge";
   }
   return "git-metadata";
+}
+
+/**
+ * Debounce windows may observe multiple events. Keep the strongest reason so a
+ * HEAD/ref change is never downgraded to a later index-only event.
+ *
+ * Severity: repository > refs/fetch/merge/config > index > working-tree
+ */
+export function mergeMetadataInvalidationReason(current, next) {
+  if (!current) return next;
+  if (!next) return current;
+  return metadataReasonSeverity(next) >= metadataReasonSeverity(current) ? next : current;
+}
+
+function metadataReasonSeverity(reason) {
+  switch (reason) {
+    case "repository-initialized":
+    case "git-metadata":
+    case "watcher-error":
+    case "watcher-recovered":
+      return 40;
+    case "ref":
+    case "fetch":
+    case "merge":
+    case "config":
+      return 30;
+    case "index":
+      return 20;
+    case "working-tree":
+      return 10;
+    default:
+      return 25;
+  }
 }

@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   listFolderChildren: (request) => ipcRenderer.invoke("workspace:list-folder-children", request),
   readFile: (request) => ipcRenderer.invoke("workspace:read-file", request),
   getFileUrl: (request) => ipcRenderer.invoke("workspace:get-file-url", request),
+  revokeFileUrl: (request) => ipcRenderer.invoke("workspace:revoke-file-url", request),
   convertOfficeDocumentToDocx: (request) => ipcRenderer.invoke("workspace:convert-office-docx", request),
   cancelOfficeDocumentToDocxConversion: (request) => ipcRenderer.invoke("workspace:convert-office-docx-cancel", request),
   writeFile: (request) => ipcRenderer.invoke("workspace:write-file", request),
@@ -128,7 +129,9 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     return () => ipcRenderer.removeListener("ai-edit-review:updated", listener);
   },
   getGitStatus: (request) => ipcRenderer.invoke("workspace:git-status", request),
+  cancelGitStatus: (request) => ipcRenderer.invoke("workspace:git-status-cancel", request),
   getGitBranchGraph: (request) => ipcRenderer.invoke("workspace:git-branch-graph", request),
+  cancelGitBranchGraph: (request) => ipcRenderer.invoke("workspace:git-branch-graph-cancel", request),
   initGitRepository: (request) => ipcRenderer.invoke("workspace:git-init", request),
   configureGitCloudRemote: (request) => ipcRenderer.invoke("workspace:git-configure-cloud-remote", request),
   readPuppyoneConfig: (request) => ipcRenderer.invoke("workspace:puppyone-config-read", request),
@@ -185,12 +188,18 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   },
   viewerPacks: {
     getSnapshot: () => ipcRenderer.invoke("viewer-pack:get-snapshot"),
-    installLocal: (request) => ipcRenderer.invoke("viewer-pack:install-local", request),
+    installLocal: () => ipcRenderer.invoke("viewer-pack:install-local"),
     disable: (request) => ipcRenderer.invoke("viewer-pack:disable", request),
     uninstall: (request) => ipcRenderer.invoke("viewer-pack:uninstall", request),
     activate: (request) => ipcRenderer.invoke("viewer-pack:activate", request),
     setBounds: (request) => ipcRenderer.invoke("viewer-pack:set-bounds", request),
     destroySession: (request) => ipcRenderer.invoke("viewer-pack:destroy-session", request),
+    onSessionState: (callback) => {
+      if (typeof callback !== "function") return () => {};
+      const listener = (_event, payload) => callback(payload);
+      ipcRenderer.on("viewer-pack:session-state", listener);
+      return () => ipcRenderer.removeListener("viewer-pack:session-state", listener);
+    },
   },
   createTerminal: (request) => ipcRenderer.invoke("terminal:create", request),
   writeTerminal: (request) => ipcRenderer.send("terminal:input", request),

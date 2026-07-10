@@ -23,20 +23,20 @@ export type { Workspace };
 export type FileKind = DataNodeKind;
 export type FileNode = DataNode;
 
+let gitStatusRequestSequence = 0;
+
 export function createLocalDataPort(rootPath: string): DataPort {
   return {
     listChildren: (folderPath) => loadFolderChildren(rootPath, folderPath),
-    readFile: async (path) => {
-      const bridge = getDesktopBridge();
-      const [content, resource] = await Promise.all([
-        bridge.readFile({ rootPath, path }),
-        bridge.getFileUrl({ rootPath, path }),
-      ]);
-      return { ...content, url: resource.url };
-    },
-    getFileUrl: (path) => getDesktopBridge()
-      .getFileUrl({ rootPath, path })
+    // Text/content reads do not mint a browser capability URL. Resource URLs
+    // have their own mounted-preview lifecycle and are revoked separately.
+    readFile: (path) => getDesktopBridge().readFile({ rootPath, path }),
+    getFileUrl: (path, options) => getDesktopBridge()
+      .getFileUrl({ rootPath, path, purpose: options?.purpose ?? "file-preview" })
       .then((result) => result.url),
+    revokeFileUrl: (url) => getDesktopBridge()
+      .revokeFileUrl({ url })
+      .then(() => undefined),
     openExternalFile: (path) => getDesktopBridge().openEntryExternal({ rootPath, path }).then(() => undefined),
     convertOfficeDocumentToDocx: async (path, options) => {
       const signal = options?.signal;
@@ -227,8 +227,34 @@ export function subscribeAiEditReviewUpdates(
   return getDesktopBridge().onAiEditReviewUpdated(callback);
 }
 
-export async function getWorkspaceGitStatus(rootPath: string): Promise<GitStatusSnapshot> {
-  return getDesktopBridge().getGitStatus({ rootPath });
+export async function getWorkspaceGitStatus(
+  rootPath: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<GitStatusSnapshot> {
+  const { signal } = options;
+  if (signal?.aborted) throw createGitStatusAbortError();
+
+  const bridge = getDesktopBridge();
+  const requestId = `git-status-${Date.now().toString(36)}-${(gitStatusRequestSequence += 1).toString(36)}`;
+  const cancel = () => {
+    if (typeof bridge.cancelGitStatus === "function") {
+      void bridge.cancelGitStatus({ requestId }).catch(() => {});
+    }
+  };
+  signal?.addEventListener("abort", cancel, { once: true });
+
+  try {
+    return await bridge.getGitStatus({ rootPath, requestId });
+  } catch (error) {
+    if (signal?.aborted) throw createGitStatusAbortError();
+    throw error;
+  } finally {
+    signal?.removeEventListener("abort", cancel);
+  }
+}
+
+function createGitStatusAbortError(): DOMException {
+  return new DOMException("Git status request was cancelled.", "AbortError");
 }
 
 export async function startWorkspaceGitRepositoryWatch(
@@ -253,11 +279,17 @@ export function subscribeWorkspaceGitRepositoryInvalidations(
   return bridge.onGitRepositoryInvalidated(callback);
 }
 
-export async function getWorkspaceGitBranchGraph(rootPath: string): Promise<GitBranchGraphSnapshot> {
+export async function getWorkspaceGitBranchGraph(
+  rootPath: string,
+  options: { requestId?: string } = {},
+): Promise<GitBranchGraphSnapshot> {
   const bridge = getDesktopBridge();
   if (typeof bridge.getGitBranchGraph === "function") {
     try {
-      return await bridge.getGitBranchGraph({ rootPath });
+      return await bridge.getGitBranchGraph({
+        rootPath,
+        requestId: options.requestId,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (!/No handler registered.*workspace:git-branch-graph|workspace:git-branch-graph/i.test(message)) {
@@ -267,6 +299,12 @@ export async function getWorkspaceGitBranchGraph(rootPath: string): Promise<GitB
   }
   const status = await bridge.getGitStatus({ rootPath });
   return toWorkspaceGitBranchGraphSnapshot(status);
+}
+
+export async function cancelWorkspaceGitBranchGraph(requestId: string): Promise<void> {
+  const bridge = getDesktopBridge();
+  if (typeof bridge.cancelGitBranchGraph !== "function") return;
+  await bridge.cancelGitBranchGraph({ requestId }).catch(() => {});
 }
 
 export function toWorkspaceGitBranchGraphSnapshot(status: GitStatusSnapshot | GitBranchGraphSnapshot): GitBranchGraphSnapshot {

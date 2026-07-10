@@ -18,7 +18,7 @@ described as current behavior before its implementation and verification land.
 ## Documents
 
 - [Local Source Control Sidebar](local-source-control-sidebar.md)
-  - **Implemented**, with a freshness gap delegated to the lifecycle document.
+  - **Implemented**.
   - Owns renderer state, sidebar view-model rules, UI actions, IPC boundaries,
     and the end-to-end local Git data flow.
 - [Repository Status Refresh Lifecycle](status-refresh-lifecycle.md)
@@ -35,7 +35,13 @@ described as current behavior before its implementation and verification land.
 - `src/features/source-control/`
   - local Source Control sidebar, detail view, view models, and renderer state
 - `src/features/source-control/gitRefreshScheduler.ts`
-  - single-flight, dirty trailing, generation-ordered refresh scheduler
+  - cancellable single-flight, dirty trailing, repository-epoch and
+    generation-ordered refresh scheduler
+- `src/features/source-control/repositoryRefreshPolicy.ts`
+  - structured invalidation causes and history-preservation policy
+- `src/features/source-control/useGitRepositoryLifecycle.ts`
+  - watcher readiness, cancellable status state, repository contexts, focus and
+    history publication boundary
 - `src/features/app-shell/DesktopWorkspaceContent.tsx`
   - mounts the Git sidebar and main Git view into the shared desktop shell
 - `src/lib/localFiles.ts`
@@ -50,10 +56,23 @@ described as current behavior before its implementation and verification land.
   - workspace content watcher (continues to exclude `.git/**`)
 - `electron/main/git-metadata-watch-service.mjs`
   - Git metadata watcher, pending-init promotion, common-dir fan-out
+- `electron/main/git-operation-coordinator.mjs`
+  - per-repository serialization for application-owned Git mutations and
+    idle-gated reads
 - `local-api/workspace.mjs`
-  - Git CLI execution, parsing, fast status snapshots, history, and mutations
+  - workspace-facing Git status, history, parsing, and mutations
+- `local-api/git/runner.mjs`
+  - bounded/cancellable Git CLI execution and streaming output policy
+- `local-api/git/porcelain-v2.mjs`
+  - isolated porcelain-v2 parser for bounded status output
 - `tests/gitRefreshScheduler.test.ts`
-  - scheduler ordering, focus, and error unit coverage
+  - scheduler ordering, cancellation, repository epochs, focus, and error unit coverage
+- `tests/gitOperationCoordinator.test.mjs`
+  - per-repository mutation serialization and cancellable idle waits
+- `tests/electron.git-status-ipc.test.mjs`
+  - renderer-scoped status cancellation, including cancel-before-start races
+- `tests/gitPorcelainV2.test.mjs`
+  - isolated porcelain-v2 parsing coverage
 - `tests/electron.git-metadata-watch.integration.test.mjs`
   - real-repository metadata watcher and external Git freshness coverage
 - `tests/workspace.git.integration.test.mjs`

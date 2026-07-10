@@ -6,17 +6,46 @@ snapshot consumer and sidebar state model are documented in
 
 ## Status
 
-- **Lifecycle:** Implemented.
+- **Lifecycle:** Implemented, with the remaining large-repo hot-path work called
+  out under Known gaps below.
 - The watcher, scheduler, query split, focus fallback, recovery, and verification
   matrix described under Target Architecture are current behavior.
 - Workspace switches are isolated by a monotonic `rootEpoch`; delayed reads from
   a previous root cannot publish into the active repository.
+- History loads are isolated by a monotonic `historyEpoch` plus cancellable graph
+  IPC, so a stale graph cannot rewrite commits after a refs invalidation that
+  left HEAD unchanged.
+- Application-owned mutation results carry the captured `(rootPath, rootEpoch)`
+  and are rejected after any workspace epoch change, including A → B → A.
 - Physical single-flight is preserved across mutation snapshots: an in-flight
   status promise remains counted until it settles, even when it is no longer
   publishable.
+- Obsolete renderer reads cancel their main-process IPC request and Git child;
+  cancellation is scoped by `(webContents.id, requestId)`.
 - Initial snapshot waits for both content and metadata watcher readiness.
+- Status always uses `--untracked-files=all` so user `status.showUntrackedFiles`
+  settings cannot hide working-tree truth.
+- Local mutations use a dedicated hook-tolerant timeout; network operations use a
+  separate network timeout; fast reads keep the short read timeout.
+- Pending `git init` promotion uses single-flight with dirty trailing re-check.
+- Shared common-dir watchers are torn down on error before linked worktrees re-arm.
+- Metadata debounce merges invalidation reasons by severity so refs are never
+  downgraded to index.
+- Operation coordination uses worktree locks for index mutations and repository
+  (`commonDir`) locks for shared-ref / network mutations.
+- Hidden-window debounce and retry timers re-check focus before starting status.
+- Status output is streamed and bounded to 10,000 changes. A truncated snapshot
+  explicitly returns `didHitStatusLimit` and the UI reports the limit.
+- Git child processes run with `LC_ALL=C` so error classification stays locale-stable.
 - Historical diagnosis of the pre-fix stale-status gap is retained below for
   rationale; it is no longer the product contract.
+
+### Known gaps
+
+- Large-repository status still fans out multiple Git processes (fingerprint,
+  status, refs, remotes, sync preview). `totalCommits` is cached per HEAD, but
+  full refs / remote preview remain on the frequent path and should move behind
+  surface-scoped lazy loading for very large repos.
 
 ## Requirement
 
@@ -54,7 +83,7 @@ Window focus fallback ------/
 
 ### Initial and application-owned updates
 
-`useDesktopGitController` starts the authorized Git metadata subscription, then
+`useGitRepositoryLifecycle` starts the authorized Git metadata subscription, then
 reads the initial snapshot only after that subscription is ready.
 Application-owned Git operations return a new `GitStatusSnapshot` and publish it
 through `GitRefreshScheduler.applyMutationSnapshot`, so stage, commit, checkout,
@@ -72,11 +101,13 @@ workspace-watch-service.mjs              git-metadata-watch-service.mjs
               |                                         |
        workspace:changed                     git-repository:invalidated
               |                                         |
-              v                                         v
-   useWorkspaceFileWatch                    useDesktopGitController
-          /           \                                 |
-         v             v                                v
-   refresh Explorer   dirty scheduler <------ GitRefreshScheduler
+              \_________________________________________/
+                                |
+                                v
+                   useGitRepositoryLifecycle
+                       /                \
+                      v                  v
+             refresh Explorer     GitRefreshScheduler
 ```
 
 The content watcher continues to exclude `.git/**` so Explorer and edit-review
@@ -84,7 +115,9 @@ never ingest Git metadata noise. The metadata watcher resolves repository paths
 through Git (`--show-toplevel`, `--git-dir`, `--git-common-dir`), watches
 worktree-specific and common-dir surfaces, filters lock/object/cookie noise, and
 re-arms with bounded backoff. Non-repository folders keep a pending root watch
-that promotes into a full metadata watch after `git init`.
+that promotes into a full metadata watch after `git init`. The subscription is
+registered before the watch handle is armed, followed by an immediate identity
+recheck, so repository creation cannot fall into the resolve/watch startup gap.
 
 ### Scheduler, focus, and errors
 
@@ -93,8 +126,16 @@ refresh, generation ordering, focus/visibility drain, and stale-focus reconcile
 (5 s). The Electron main process emits `git-repository:window-focus` on
 BrowserWindow focus/blur so the scheduler is not limited to DOM focus alone.
 Transient refresh failures preserve the last good snapshot, record an error,
-and leave manual Refresh available. Watcher and refresh paths log repository
-identity, reason, and duration without credentials or remote secrets.
+and leave manual Refresh available. Refresh provenance is structured as
+`{ cause, source, detail, attempt }`; a retry changes only `source/attempt`, so a
+failed ref refresh still invalidates history when it recovers. Watcher and
+refresh paths log repository identity, reason, and duration without credentials
+or remote secrets.
+
+Application-owned mutations are serialized per canonical repository in the
+main process. Status/history reads wait for that operation coordinator to become
+idle. Mutation snapshots are accepted only when their captured repository
+context still matches the scheduler's current root and epoch.
 
 ### Fast status and lazy history
 
@@ -105,7 +146,11 @@ and after the multi-command read; one retry runs when identity changes mid-query
 History and Cloud branch graphs load through `getWorkspaceGitBranchGraph` when
 those surfaces are active, and cached history is dropped on ref/fetch/merge/
 config metadata invalidation. Background read-only status sets
-`GIT_OPTIONAL_LOCKS=0`; mutating commands keep normal locks.
+`GIT_OPTIONAL_LOCKS=0`; mutating commands keep normal locks. Porcelain status is
+read through a bounded stream rather than `execFile` buffering. The stream stops
+after the configured record/byte budget, returns the first 10,000 changes, and
+marks the snapshot as truncated. Workspace switches abort the IPC request and
+underlying Git process rather than waiting for an obsolete repository read.
 
 ## Historical Failure (pre-fix)
 
@@ -490,9 +535,7 @@ Primary files:
 - `electron/main/ipc/workspace-git-ipc.mjs`
 - `electron/preload.cjs`
 - `src/types/electron.d.ts`
-- `src/features/source-control/useDesktopGitController.ts`
-- `src/features/data-workspace/useWorkspaceFileWatch.ts` (compat shim; content
-  watch bootstrap now lives in the Git controller readiness barrier)
+- `src/features/source-control/useGitRepositoryLifecycle.ts`
 
 Deliverables:
 
@@ -712,6 +755,12 @@ watcher service.
 - At most one status read per repository is in flight.
 - One trailing refresh preserves changes that occur during an active read.
 - Older results never overwrite a newer generation.
+- Read and mutation results are scoped to a captured repository epoch.
+- Application-owned mutations are serialized per repository; reads wait for
+  that coordinator to become idle.
+- Obsolete status reads cancel across the renderer/main-process boundary.
+- Large change sets return a bounded, explicitly truncated snapshot instead of
+  exhausting the child-process output buffer.
 - Background status does not take optional Git locks.
 - Watcher errors are observable and recoverable.
 - Focus provides bounded reconciliation without hidden-window polling.
