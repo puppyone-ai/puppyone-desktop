@@ -281,7 +281,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   outline: none;
 }
 
-.desktop-companion-panel {
+.desktop-right-sidebar-stack {
   display: flex;
   width: 100%;
   height: 100%;
@@ -293,61 +293,6 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   color: var(--po-text);
 }
 
-.desktop-companion-tabs {
-  display: flex;
-  flex: 0 0 42px;
-  min-width: 0;
-  align-items: end;
-  gap: 4px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--po-divider);
-  background: var(--po-sidebar);
-}
-
-.desktop-companion-tabs button {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 41px;
-  padding: 0 9px;
-  border: 0;
-  background: transparent;
-  color: var(--po-text-muted);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 590;
-  cursor: pointer;
-}
-
-.desktop-companion-tab-activity {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--po-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-accent) 22%, transparent);
-}
-
-.desktop-companion-tabs button::after {
-  position: absolute;
-  right: 8px;
-  bottom: -1px;
-  left: 8px;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: transparent;
-  content: "";
-}
-
-.desktop-companion-tabs button.is-active {
-  color: var(--po-text);
-}
-
-.desktop-companion-tabs button.is-active::after {
-  background: var(--po-accent);
-}
-
-.desktop-companion-tabs button:focus-visible,
 .desktop-agent-panel button:focus-visible,
 .desktop-agent-panel select:focus-visible,
 .desktop-agent-panel textarea:focus-visible,
@@ -356,7 +301,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   outline-offset: -2px;
 }
 
-.desktop-companion-surface {
+.desktop-right-sidebar-surface {
   display: none;
   flex: 1;
   min-width: 0;
@@ -364,7 +309,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   overflow: hidden;
 }
 
-.desktop-companion-surface.is-active {
+.desktop-right-sidebar-surface.is-active {
   display: flex;
 }
 
@@ -861,6 +806,31 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   overflow-wrap: anywhere;
   color: var(--po-text-muted);
   font-size: 10px;
+}
+
+.desktop-agent-approval-material {
+  display: grid;
+  gap: 4px;
+  color: var(--po-text-muted);
+  font-size: 11px;
+}
+
+.desktop-agent-approval-material code {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.desktop-agent-approval-actions-list {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--po-text-muted);
+  font-size: 11px;
+}
+
+.desktop-agent-approval-policy-note {
+  color: var(--po-warning, #9a6700);
 }
 
 .desktop-agent-approval-actions {

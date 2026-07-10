@@ -45,6 +45,18 @@ Sidebar list layout keeps three separate responsibilities:
 
 Rows must not know whether the list is scrollable.
 
+The shared visual edge contract is:
+
+- `12px` effective inline space on both sides of a sidebar row;
+- `8px` block space at the outer start and end of a sidebar list;
+- `6px` internal row content inset after the row's outer edge.
+
+These are visual measurements, not a requirement that every sidebar use the
+same four-value `padding` declaration. A reserved `6px` scrollbar gutter means
+a scrolling list has only `6px` of CSS padding on the inline end while still
+producing the same effective `12px` edge. Git's outer wrapper does not scroll,
+so its section rows and nested scroll lists own the inline edge instead.
+
 ## Scrollbar Styling Rules (app-wide)
 
 1. Style scrollbars only through `::-webkit-scrollbar*` pseudo-elements.
@@ -129,6 +141,16 @@ Rows must not know whether the list is scrollable.
    Feature-specific aliases are acceptable, but they must not reintroduce
    row-level scrollbar compensation.
 
+6. Share visual contracts, not incidental shorthands.
+
+   Data, Git, Settings, Cloud, Access, Integrations, and Changes must resolve
+   to the same outer edge rhythm even though their scroll ownership differs. Use
+   `--desktop-sidebar-list-padding-block` for the `8px` list edge and the
+   shared row gap tokens for the `12px` inline edge. Use logical
+   `padding-block` / `padding-inline` properties when declaring those roles.
+   Keep tree depth indentation and section spacing on their own tokens; they
+   are content structure, not outer padding.
+
 ## Current Code Boundaries
 
 - `src/styles/scrollbars.css`
@@ -136,7 +158,10 @@ Rows must not know whether the list is scrollable.
     properties
 - `src/styles/tokens.css`
   - `--po-scrollbar-size`, `--desktop-sidebar-scrollbar-width`,
-    `--desktop-sidebar-scroll-right-gap`
+    `--desktop-sidebar-scroll-right-gap`, and
+    `--desktop-sidebar-list-padding-block`
+- `src/features/data-workspace/browser.css`
+  - maps the shared sidebar edge tokens into the shared explorer tree contract
 - `vendor/shared-ui/src/styles/data-workspace.css`
   - files explorer scroll area (`.explorer-tree-scroll`, reserved gutter),
     list padding compensation (`.explorer-tree-list`), tree row geometry
@@ -144,15 +169,23 @@ Rows must not know whether the list is scrollable.
   - generic tool sidebar scroll list (`.desktop-tool-sidebar-list`) and
     sidebar row model
 - `src/features/source-control/styles/sidebar-layout.css`
-  - `.desktop-git-sidebar-list` gutter opt-out (non-scrolling wrapper)
+  - `.desktop-git-sidebar-list` gutter opt-out and outer block edge
 - `src/features/source-control/styles/sidebar-resources.css`
   - Git section scroll containers (working tree, remote/committed previews)
     and their compensated list padding
 - `src/features/source-control/styles/history-list.css`,
   `src/features/source-control/styles/history-detail.css`
-  - Git history list rows and history scroll areas
+  - Git history list rows, history scroll areas, and bottom outer edge
+- `src/styles/settings-view.css`
+  - Settings-specific separators; list edges inherit the shared tool-sidebar
+    contract
 - `src/features/cloud/styles/sidebar-shell.css`
-  - cloud sidebar list (token-override compensation)
+  - Cloud and Integrations sidebar list edges (token-override compensation)
+- `src/features/cloud/styles/access/scope-sidebar.css`,
+  `src/features/cloud/styles/access/service-sidebar.css`
+  - Access scope list edges and service-shell scrollbar ownership
+- `src/features/changes/changes.css`
+  - legacy Changes review-list edge mapping
 - `vendor/shared-ui/src/primitives/useScrollableClass.ts`
   - scrollability detection and `is-scrollable` class assignment
 
@@ -168,6 +201,9 @@ Rows must not know whether the list is scrollable.
   list transitions between the two.
 - Total right inset of list content (reserved gutter + list right padding)
   equals `--desktop-sidebar-row-right-gap`, matching non-scrolling siblings.
+- Every page-level sidebar list uses `--desktop-sidebar-list-padding-block`
+  for its outer `8px` list edge; feature section gaps must not substitute for
+  it.
 - Sidebar rows use `width: 100%` inside their list.
 - `is-scrollable` must not appear in selectors that change row width, row
   margin, or row padding.

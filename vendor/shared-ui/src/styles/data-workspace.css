@@ -294,12 +294,13 @@ body.data-sidebar-resizing .data-preview-accessory {
   box-sizing: border-box;
   /* Right padding is reduced by the reserved scrollbar gutter so the total
      right inset (gutter + padding) matches --tree-row-right-gap. */
-  padding: 0 calc(var(--tree-row-right-gap) - var(--tree-scrollbar-width))
-    var(--tree-list-bottom-gap) var(--tree-row-left-gap);
+  padding-block: 0 var(--tree-list-bottom-gap);
+  padding-inline: var(--tree-row-left-gap)
+    calc(var(--tree-row-right-gap) - var(--tree-scrollbar-width));
 }
 
 .explorer-tree-shell.no-root .explorer-tree-list {
-  padding-top: var(--tree-no-root-top-gap);
+  padding-block-start: var(--tree-no-root-top-gap);
 }
 
 .data-explorer-footer {

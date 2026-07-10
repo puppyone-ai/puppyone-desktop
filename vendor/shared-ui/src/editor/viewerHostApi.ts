@@ -20,8 +20,6 @@ export const VIEWER_HOST_IPC_CHANNELS = Object.freeze({
   resourceClose: "viewer-pack:resource-close",
   uiSetState: "viewer-pack:ui-set-state",
   uiGetTheme: "viewer-pack:ui-get-theme",
-  themeChanged: "viewer-pack:theme-changed",
-  hostOpenExternal: "viewer-pack:host-open-external",
 } as const);
 
 export type ViewerHostIpcChannel =
@@ -48,7 +46,7 @@ export type ViewerResourceRangeRequest = {
 };
 
 /** A bounded slice of the resource, transferred as raw bytes. */
-export type ViewerResourceChunk = ArrayBuffer;
+export type ViewerResourceChunk = Uint8Array;
 
 export type ViewerResourceApiV1 = {
   open(): Promise<ViewerResourceHandleMeta>;
@@ -73,7 +71,7 @@ export type ViewerHostUiState = {
 };
 
 export type ViewerHostApiV1 = {
-  version?: ViewerHostApiVersion;
+  version: ViewerHostApiVersion;
   document: {
     getMeta(): Promise<ViewerDocumentMeta>;
   };
@@ -81,10 +79,6 @@ export type ViewerHostApiV1 = {
   ui: {
     setState(state: ViewerHostUiState): void;
     getTheme(): Promise<ViewerThemeSnapshot>;
-    onThemeChange(callback: (theme: ViewerThemeSnapshot) => void): () => void;
-  };
-  host: {
-    openExternal(): Promise<void>;
   };
 };
 

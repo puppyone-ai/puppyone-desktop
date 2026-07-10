@@ -44,10 +44,10 @@ single product area can evolve without turning this file into a catch-all.
     fit/resize pipeline). Part 2: the remediation to-do list (spacing-trim
     CSS fix, WebGL renderer with fallback, Unicode 11 widths).
 - [Desktop Agent Architecture](architecture/desktop-agent/README.md)
-  - Proposed structured Agent Chat for the right sidebar, a normalized
-    session/turn/item event model, Codex/Claude/Cursor/ACP provider adapters,
-    approval and question flows, persistence, security, delivery phases, and
-    the sibling Chat/Terminal interaction contract.
+  - Existing Terminal plus an experimental, default-off Codex Agent Chat
+    header action and independent right-sidebar panel, with a normalized session/turn/item
+    event model, approval and recovery invariants, persistence and security
+    boundaries, plus proposed Claude/Cursor/ACP adapters.
 
 ## Document Boundary
 

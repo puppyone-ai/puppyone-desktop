@@ -6,6 +6,7 @@ type AgentComposerProps = {
   onDraftChange: (draft: string) => void;
   disabled: boolean;
   running: boolean;
+  stopping: boolean;
   submitting: boolean;
   placeholder: string;
   onSubmit: (prompt: string) => Promise<boolean>;
@@ -17,6 +18,7 @@ export function AgentComposer({
   onDraftChange,
   disabled,
   running,
+  stopping,
   submitting,
   placeholder,
   onSubmit,
@@ -44,7 +46,13 @@ export function AgentComposer({
         onKeyDown={handleKeyDown}
       />
       {running ? (
-        <button type="button" className="desktop-agent-composer-action is-stop" aria-label="Stop Codex" onClick={onStop}>
+        <button
+          type="button"
+          className="desktop-agent-composer-action is-stop"
+          aria-label={stopping ? "Stopping Codex" : "Stop Codex"}
+          disabled={stopping}
+          onClick={onStop}
+        >
           <Square size={13} fill="currentColor" />
         </button>
       ) : (
@@ -58,7 +66,7 @@ export function AgentComposer({
           <ArrowUp size={16} />
         </button>
       )}
-      <div className="desktop-agent-composer-hint">Enter to send · Shift+Enter for a new line</div>
+      <div className="desktop-agent-composer-hint">{stopping ? "Waiting for Codex to stop…" : "Enter to send · Shift+Enter for a new line"}</div>
     </div>
   );
 }

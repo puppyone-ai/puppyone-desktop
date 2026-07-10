@@ -40,8 +40,7 @@ export type EditorDocument = {
   url?: string | null;
   /**
    * Where the document was sourced. Plugin routing fails closed for `cloud`
-   * and `unknown`; only `local` documents can activate a viewer pack. Defaults
-   * to `local` when omitted for backward compatibility with existing hosts.
+   * and `unknown`; only explicit `local` documents can activate a Viewer Pack.
    */
   sourceKind?: DocumentSourceKind;
 };
@@ -102,10 +101,20 @@ export type MarkdownLinkGraph = {
   getBacklinks?: (path: string) => MarkdownBacklink[];
 };
 
+export type MarkdownResolvedAssetUrl = {
+  url: string;
+  revoke?: () => void | Promise<void>;
+};
+
 export type MarkdownAssetUrlResolver = (
   sourcePath: string,
   href: string,
-) => string | null | Promise<string | null>;
+  signal?: AbortSignal,
+) =>
+  | string
+  | MarkdownResolvedAssetUrl
+  | null
+  | Promise<string | MarkdownResolvedAssetUrl | null>;
 
 export type EditorViewerMatch = {
   document: EditorDocument;
@@ -142,6 +151,7 @@ export type EditorViewerContext = EditorViewerMatch & {
 
 export type EditorViewer = {
   id: string;
+  capability: import("./viewerPackTypes").CoreViewerCapability;
   source: EditorSourceRequirement;
   match: (match: EditorViewerMatch) => boolean;
   allowPreviewContent?: boolean;

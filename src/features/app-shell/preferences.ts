@@ -225,8 +225,8 @@ export function readInitialRightSidebarWidth(): number {
 }
 
 export function readInitialRightSidebarSurface(): RightSidebarSurface {
-  if (typeof window === "undefined") return "chat";
-  return window.localStorage.getItem(RIGHT_SIDEBAR_SURFACE_STORAGE_KEY) === "terminal" ? "terminal" : "chat";
+  if (typeof window === "undefined") return "terminal";
+  return window.localStorage.getItem(RIGHT_SIDEBAR_SURFACE_STORAGE_KEY) === "chat" ? "chat" : "terminal";
 }
 
 export function readInitialAgentPreferredModel(): string | null {

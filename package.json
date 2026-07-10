@@ -5,8 +5,9 @@
   "type": "module",
   "main": "electron/main.mjs",
   "scripts": {
-    "check:boundaries": "node scripts/check-data-ui-boundaries.mjs",
-    "check:shared-ui": "node scripts/check-data-ui-boundaries.mjs",
+    "check:boundaries": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs",
+    "check:shared-ui": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs",
+    "check:markdown-architecture": "node scripts/check-markdown-architecture.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "dev": "node scripts/dev-electron.mjs",
@@ -16,19 +17,24 @@
     "build": "npm run check:boundaries && tsc && vite build && node scripts/check-bundle-budget.mjs && node scripts/check-packaged-artifact-budgets.mjs",
     "package:viewer-pack": "node scripts/package-viewer-pack.mjs",
     "check:artifact-budgets": "node scripts/check-packaged-artifact-budgets.mjs",
-    "dist:mac": "npm run check:shared-ui && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
-    "dist:mac:publish": "npm run check:shared-ui && npm run build && electron-builder --mac --publish always",
+    "check:viewer-pack-trust": "node scripts/check-viewer-pack-release.mjs",
+    "dist:mac": "npm run check:shared-ui && npm run build && npm run check:viewer-pack-trust && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
+    "dist:mac:publish": "npm run check:shared-ui && npm run build && npm run check:viewer-pack-trust && electron-builder --mac --publish always",
     "preview": "vite preview --host 127.0.0.1",
     "smoke:local-api": "node scripts/smoke-local-api.mjs",
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
+    "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
     "start": "node scripts/start-electron.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "bench:performance": "vitest bench --run benchmarks/performance --no-file-parallelism --maxWorkers=1 --minWorkers=1"
   },
   "dependencies": {
     "electron-log": "^5.4.4",
     "electron-updater": "^6.8.9",
-    "node-pty": "^1.1.0"
+    "jszip": "^3.10.1",
+    "node-pty": "^1.1.0",
+    "semver": "^7.7.3"
   },
   "devDependencies": {
     "@aiden0z/pptx-renderer": "^1.2.3",
@@ -57,7 +63,6 @@
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^17.7.0",
-    "jszip": "^3.10.1",
     "lucide-react": "^0.562.0",
     "mermaid": "^11.16.0",
     "postcss": "^8.5.15",

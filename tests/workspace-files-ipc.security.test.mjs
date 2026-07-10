@@ -85,10 +85,42 @@ describe("workspace file IPC authorization", () => {
     );
     const parsed = parseLocalFileUrl(result.url);
 
-    expect(parsed.rootPath).toBe(await fs.promises.realpath(root));
-    expect(parsed.relativePath).toBe("note.txt");
-    expect(localFileCapabilities.validate(parsed)).toBe(true);
-    expect(localFileCapabilities.validate({ ...parsed, relativePath: "other.txt" })).toBe(false);
+    expect(parsed.requestPath).toBe("note.txt");
+    expect(localFileCapabilities.resolve(parsed)).toEqual({
+      rootPath: await fs.promises.realpath(root),
+      relativePath: "note.txt",
+    });
+    expect(localFileCapabilities.resolve({ ...parsed, requestPath: "other.txt" })).toBeNull();
+  });
+
+  it("issues unique Markdown asset leases and only their sender can revoke them", async () => {
+    const { handlers, localFileCapabilities } = createHarness(() => root);
+    await writeFile(path.join(root, "image.png"), "png");
+    const owner = { sender: { id: 82 } };
+    const request = { rootPath: root, path: "image.png", purpose: "markdown-asset" };
+    const first = await handlers.get("workspace:get-file-url")(owner, request);
+    const second = await handlers.get("workspace:get-file-url")(owner, request);
+    const parsed = parseLocalFileUrl(first.url);
+
+    expect(second.url).not.toBe(first.url);
+    expect(parsed.purpose).toBe("markdown-asset");
+    expect(localFileCapabilities.resolve(parsed)).toEqual({
+      rootPath: await fs.promises.realpath(root),
+      relativePath: "image.png",
+    });
+    await expect(handlers.get("workspace:revoke-file-url")(
+      { sender: { id: 83 } },
+      { url: first.url },
+    )).resolves.toEqual({ revoked: false });
+    await expect(handlers.get("workspace:revoke-file-url")(
+      owner,
+      { url: first.url },
+    )).resolves.toEqual({ revoked: true });
+    expect(localFileCapabilities.resolve(parsed)).toBeNull();
+    expect(localFileCapabilities.resolve(parseLocalFileUrl(second.url))).toEqual({
+      rootPath: await fs.promises.realpath(root),
+      relativePath: "image.png",
+    });
   });
 
   it("rejects local file operations when the sender has no local workspace", async () => {

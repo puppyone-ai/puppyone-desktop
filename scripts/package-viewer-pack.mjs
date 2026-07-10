@@ -5,7 +5,7 @@
  * Usage:
  *   node scripts/package-viewer-pack.mjs \
  *     --source viewer-packs/glb \
- *     --out dist/viewer-packs/ai.puppyone.viewer.glb-1.0.0.puppyplugin \
+ *     --out artifacts/viewer-packs/ai.puppyone.viewer.glb-1.0.0.puppyplugin \
  *     --generate-test-key
  */
 
@@ -14,10 +14,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
 import {
+  createPackageSignatureEnvelope,
   generateTestKeyPair,
   sha256Hex,
-  signPayload,
+  serializePackageSignatureEnvelope,
 } from "../electron/main/viewer-packs/package-signature.mjs";
+import { validateViewerPackManifest } from "../electron/main/viewer-packs/manifest-schema.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -28,6 +30,7 @@ function parseArgs(argv) {
     out: null,
     privateKeyPemPath: null,
     generateTestKey: false,
+    keyId: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
@@ -35,6 +38,7 @@ function parseArgs(argv) {
     else if (token === "--out") args.out = argv[++i];
     else if (token === "--private-key-pem") args.privateKeyPemPath = argv[++i];
     else if (token === "--generate-test-key") args.generateTestKey = true;
+    else if (token === "--key-id") args.keyId = argv[++i];
   }
   return args;
 }
@@ -57,7 +61,7 @@ async function collectFiles(rootDir, relative = "") {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.source || !args.out) {
-    console.error("Usage: node scripts/package-viewer-pack.mjs --source <dir> --out <file.puppyplugin> [--generate-test-key]");
+    console.error("Usage: node scripts/package-viewer-pack.mjs --source <dir> --out <file.puppyplugin> (--private-key-pem <path> --key-id <id> | --generate-test-key)");
     process.exit(2);
   }
 
@@ -66,6 +70,11 @@ async function main() {
   const files = await collectFiles(sourceDir);
   if (!files.includes("manifest.json")) {
     throw new Error("manifest.json is required at the pack root.");
+  }
+  const manifestRaw = JSON.parse(await fsp.readFile(path.join(sourceDir, "manifest.json"), "utf8"));
+  const validatedManifest = validateViewerPackManifest(manifestRaw);
+  if (!validatedManifest.ok) {
+    throw new Error(`Invalid Viewer Pack manifest: ${validatedManifest.errors.join(", ")}`);
   }
 
   const zip = new JSZip();
@@ -79,23 +88,33 @@ async function main() {
     compressionOptions: { level: 9 },
   }));
 
-  let privateKeyPem = process.env.PUPPYONE_VIEWER_PACK_TEST_PRIVATE_KEY ?? null;
+  let privateKeyPem = process.env.PUPPYONE_VIEWER_PACK_PRIVATE_KEY_PEM ?? null;
   let publicKeyPem = null;
+  let keyId = args.keyId ?? process.env.PUPPYONE_VIEWER_PACK_KEY_ID ?? null;
   if (args.privateKeyPemPath) {
     privateKeyPem = await fsp.readFile(path.resolve(repoRoot, args.privateKeyPemPath), "utf8");
   }
-  if (args.generateTestKey || !privateKeyPem) {
+  if (args.generateTestKey) {
     const pair = generateTestKeyPair();
     privateKeyPem = pair.privateKeyPem;
     publicKeyPem = pair.publicKeyPem;
+    keyId = keyId ?? "puppyone-test-local";
+  }
+  if (!privateKeyPem || !keyId) {
+    throw new Error("A private signing key and --key-id are required; test keys are generated only with --generate-test-key.");
   }
 
-  const signatureBase64Url = signPayload(privateKeyPem, archiveBytes);
+  const signatureEnvelope = createPackageSignatureEnvelope({
+    privateKeyPem,
+    payloadBytes: archiveBytes,
+    keyId,
+    publisher: validatedManifest.value.publisher,
+  });
   await fsp.mkdir(path.dirname(outPath), { recursive: true });
   await fsp.writeFile(outPath, archiveBytes);
-  await fsp.writeFile(`${outPath}.sig`, `${signatureBase64Url}\n`, "utf8");
+  await fsp.writeFile(`${outPath}.sig`, serializePackageSignatureEnvelope(signatureEnvelope), "utf8");
   if (publicKeyPem) {
-    await fsp.writeFile(`${outPath}.test-public.pem`, publicKeyPem, "utf8");
+    await fsp.writeFile(`${outPath}.test-public-key.txt`, publicKeyPem, "utf8");
   }
 
   console.log(JSON.stringify({
@@ -104,7 +123,9 @@ async function main() {
     sha256: sha256Hex(archiveBytes),
     bytes: archiveBytes.length,
     files: files.length,
-    testPublicKey: publicKeyPem ? `${outPath}.test-public.pem` : null,
+    keyId,
+    publisher: validatedManifest.value.publisher,
+    testPublicKey: publicKeyPem ? `${outPath}.test-public-key.txt` : null,
   }, null, 2));
 }
 

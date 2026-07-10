@@ -2,26 +2,26 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
-import { addInlineMarkdownDecorations } from "../vendor/shared-ui/src/editor/markdown/decorations/inlineDecorations";
-import { markdownLivePreviewDecorations } from "../vendor/shared-ui/src/editor/markdown/decorations/livePreviewDecorations";
+import { addInlineMarkdownDecorations } from "../vendor/shared-ui/src/editor/markdown/core/decorations/inlineDecorations";
+import { markdownLivePreviewDecorations } from "../vendor/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
 import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
 } from "../vendor/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
-import { getMarkdownHtmlBlock } from "../vendor/shared-ui/src/editor/markdown/rendering/htmlBlockModel";
-import { compileInlineHtmlRenderPlan } from "../vendor/shared-ui/src/editor/markdown/rendering/inlineHtmlPolicy";
-import { isAllowedStyleProperty } from "../vendor/shared-ui/src/editor/markdown/rendering/markdownHtmlPolicy";
+import { getMarkdownHtmlBlock } from "../vendor/shared-ui/src/editor/markdown/features/html/htmlBlockModel";
+import { compileInlineHtmlRenderPlan } from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlPolicy";
+import { isAllowedStyleProperty } from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownHtmlSanitizerPolicy";
 import {
   getMarkdownInlineHtml,
   type MarkdownInlineHtml,
-} from "../vendor/shared-ui/src/editor/markdown/semantic/inlineHtmlModel";
+} from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlModel";
 import {
   parseMarkdownHtmlTagToken,
   scanMarkdownHtmlTagTokens,
-} from "../vendor/shared-ui/src/editor/markdown/semantic/htmlTagTokenizer";
-import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownParserExtensions";
-import { getInlineRevealElement } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownElements";
-import { InlineHtmlLineBreakWidget } from "../vendor/shared-ui/src/editor/markdown/widgets/inlineWidgets";
+} from "../vendor/shared-ui/src/editor/markdown/features/html/htmlTagTokenizer";
+import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
+import { getInlineRevealElement } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownElements";
+import { InlineHtmlLineBreakWidget } from "../vendor/shared-ui/src/editor/markdown/core/widgets/inlineWidgets";
 
 function createMarkdownState(source: string) {
   return EditorState.create({
@@ -126,6 +126,17 @@ describe("Markdown inline HTML semantic model", () => {
       from: source.indexOf(">") + 1,
       to: source.indexOf("</span>"),
     });
+  });
+
+  it("renders the motivating styled strong label instead of exposing its tags", () => {
+    const source = '<strong style="color: #92400E;">团队待提供：</strong>';
+    const builders = buildInlineDecorations(source);
+    const mark = builders.decorations.find((range) => (
+      range.value.spec.class === "cm-md-inline-html"
+    ));
+
+    expect(mark?.value.spec.tagName).toBe("strong");
+    expect(mark?.value.spec.attributes).toEqual({ style: "color: #92400E" });
   });
 
   it("keeps incomplete and mismatched tags out of reveal state", () => {
@@ -315,6 +326,14 @@ describe("Markdown inline HTML live decorations", () => {
 
     expect(classes).toContain("cm-md-inline-html");
     expect(classes).toContain("cm-md-syntax-strong");
+  });
+
+  it("composes nested Markdown marks instead of reserving the outer range", () => {
+    const builders = buildInlineDecorations("**bold and _italic_**");
+    const classes = builders.decorations.map((range) => range.value.spec.class).filter(Boolean);
+
+    expect(classes).toContain("cm-md-syntax-strong");
+    expect(classes).toContain("cm-md-syntax-emphasis");
   });
 
   it("reveals HTML markers without dropping the safe content style", () => {

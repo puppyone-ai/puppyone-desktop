@@ -2,11 +2,12 @@ import { randomBytes } from "node:crypto";
 import path from "node:path";
 
 const DEFAULT_MAX_CAPABILITIES_PER_SENDER = 2_048;
+const LOCAL_FILE_CAPABILITY_PURPOSES = new Set(["file-preview", "markdown-asset"]);
 
 /**
- * Issues opaque, sender-owned, path-scoped capabilities for local resources.
- * A URL for one file cannot be rewritten to read another file or another
- * window's workspace.
+ * Issues opaque, sender-owned, purpose/resource-scoped bearer leases for local
+ * resources. Public URLs contain no workspace path. Markdown leases are unique
+ * so revoking one mounted handle cannot invalidate a sibling consumer.
  */
 export function createLocalFileCapabilityStore({
   createToken = () => randomBytes(32).toString("base64url"),
@@ -19,25 +20,34 @@ export function createLocalFileCapabilityStore({
   const entriesByToken = new Map();
   const entriesBySender = new Map();
 
-  function issue({ senderId, rootPath, relativePath, scope = "exact" }) {
+  function issue({
+    senderId,
+    rootPath,
+    relativePath,
+    scope = "exact",
+    purpose = "file-preview",
+    reuse = true,
+  }) {
     const normalizedSenderId = requireSenderId(senderId);
     const normalizedRoot = path.resolve(requireNonEmpty(rootPath, "Capability workspace root is required."));
     const normalizedRelative = normalizeRelativePath(relativePath);
     const normalizedScope = requireScope(scope);
+    const normalizedPurpose = requirePurpose(purpose);
     const scopePath = normalizedScope === "directory"
       ? path.posix.dirname(normalizedRelative).replace(/^\.$/, "")
       : normalizedRelative;
+    const publicPath = path.posix.basename(normalizedRelative);
     let senderEntries = entriesBySender.get(normalizedSenderId);
     if (!senderEntries) {
       senderEntries = new Map();
       entriesBySender.set(normalizedSenderId, senderEntries);
     }
 
-    const key = `${normalizedRoot}\0${normalizedScope}\0${scopePath}`;
-    const existing = senderEntries.get(key);
-    if (existing) {
-      senderEntries.delete(key);
-      senderEntries.set(key, existing);
+    const baseKey = `${normalizedRoot}\0${normalizedScope}\0${scopePath}\0${normalizedPurpose}`;
+    const existing = reuse ? senderEntries.get(baseKey) : null;
+    if (existing && entriesByToken.has(existing.token)) {
+      senderEntries.delete(baseKey);
+      senderEntries.set(baseKey, existing);
       return existing.token;
     }
 
@@ -45,12 +55,15 @@ export function createLocalFileCapabilityStore({
     do {
       token = requireToken(createToken());
     } while (entriesByToken.has(token));
+    const key = reuse ? baseKey : `${baseKey}\0${token}`;
     const entry = {
       token,
       senderId: normalizedSenderId,
       rootPath: normalizedRoot,
       scope: normalizedScope,
       scopePath,
+      publicPath,
+      purpose: normalizedPurpose,
       key,
     };
     entriesByToken.set(token, entry);
@@ -64,23 +77,59 @@ export function createLocalFileCapabilityStore({
     return token;
   }
 
-  function validate({ token, rootPath, relativePath }) {
+  function validate({ token, rootPath, relativePath, purpose = "file-preview" }) {
     if (typeof token !== "string" || token.length === 0) return false;
     const entry = entriesByToken.get(token);
     if (!entry) return false;
     let normalizedRoot;
     let normalizedRelative;
+    let normalizedPurpose;
     try {
       normalizedRoot = path.resolve(requireNonEmpty(rootPath, "Capability workspace root is required."));
       normalizedRelative = normalizeRelativePath(relativePath);
+      normalizedPurpose = requirePurpose(purpose);
     } catch {
       return false;
     }
-    if (entry.rootPath !== normalizedRoot) return false;
+    if (entry.rootPath !== normalizedRoot || entry.purpose !== normalizedPurpose) return false;
     if (entry.scope === "exact") return entry.scopePath === normalizedRelative;
     return entry.scopePath === ""
       || normalizedRelative === entry.scopePath
       || normalizedRelative.startsWith(`${entry.scopePath}/`);
+  }
+
+  function resolve({ token, purpose, requestPath }) {
+    if (typeof token !== "string" || token.length === 0) return null;
+    const entry = entriesByToken.get(token);
+    if (!entry) return null;
+    let normalizedPurpose;
+    let normalizedRequestPath;
+    try {
+      normalizedPurpose = requirePurpose(purpose);
+      normalizedRequestPath = normalizeRelativePath(requestPath);
+    } catch {
+      return null;
+    }
+    if (entry.purpose !== normalizedPurpose) return null;
+    if (entry.scope === "exact") {
+      if (normalizedRequestPath !== entry.publicPath) return null;
+      return { rootPath: entry.rootPath, relativePath: entry.scopePath };
+    }
+    const relativePath = entry.scopePath
+      ? `${entry.scopePath}/${normalizedRequestPath}`
+      : normalizedRequestPath;
+    return { rootPath: entry.rootPath, relativePath };
+  }
+
+  function revoke({ token, senderId }) {
+    if (typeof token !== "string" || !Number.isSafeInteger(senderId)) return false;
+    const entry = entriesByToken.get(token);
+    if (!entry || entry.senderId !== senderId) return false;
+    entriesByToken.delete(token);
+    const senderEntries = entriesBySender.get(senderId);
+    senderEntries?.delete(entry.key);
+    if (senderEntries?.size === 0) entriesBySender.delete(senderId);
+    return true;
   }
 
   function revokeSender(senderId) {
@@ -91,16 +140,17 @@ export function createLocalFileCapabilityStore({
     entriesBySender.delete(senderId);
   }
 
-  return Object.freeze({ issue, validate, revokeSender });
+  return Object.freeze({ issue, validate, resolve, revoke, revokeSender });
 }
 
-export function buildLocalFileCapabilityUrl({ rootPath, relativePath, token }) {
-  const encodedRoot = encodeURIComponent(requireNonEmpty(rootPath, "Local file root is required."));
-  const encodedPath = normalizeRelativePath(relativePath)
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-  return `puppyone-local://file/${encodeURIComponent(requireToken(token))}/${encodedRoot}/${encodedPath}`;
+export function buildLocalFileCapabilityUrl({
+  relativePath,
+  token,
+  purpose = "file-preview",
+}) {
+  const encodedPurpose = encodeURIComponent(requirePurpose(purpose));
+  const encodedName = encodeURIComponent(path.posix.basename(normalizeRelativePath(relativePath)));
+  return `puppyone-local://file/${encodeURIComponent(requireToken(token))}/${encodedPurpose}/${encodedName}`;
 }
 
 function normalizeRelativePath(value) {
@@ -133,4 +183,9 @@ function requireToken(value) {
 function requireScope(value) {
   if (value === "exact" || value === "directory") return value;
   throw new Error("Local file capability scope is invalid.");
+}
+
+function requirePurpose(value) {
+  if (LOCAL_FILE_CAPABILITY_PURPOSES.has(value)) return value;
+  throw new Error("Local file capability purpose is invalid.");
 }

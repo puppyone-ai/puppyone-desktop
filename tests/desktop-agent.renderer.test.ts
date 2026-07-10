@@ -69,6 +69,10 @@ describe("Desktop Agent renderer surfaces", () => {
         title: "Run npm test",
         command: "npm test",
         cwd: "/workspace",
+        commandActions: [],
+        networkApprovalContext: null,
+        grantRoot: null,
+        policyChangeRequested: false,
         reason: null,
         availableDecisions: ["accept", "decline", "cancel"],
         sequence: 1,
@@ -82,12 +86,40 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(buttons.every((button) => button.disabled)).toBe(true);
   });
 
+  it("renders material network and filesystem approval scope", () => {
+    const container = render(React.createElement(AgentApprovalDock, {
+      approval: {
+        requestId: "req-network",
+        turnId: "turn-1",
+        itemId: "item-1",
+        kind: "command",
+        title: "Allow network access",
+        command: null,
+        cwd: "/workspace",
+        commandActions: [],
+        networkApprovalContext: { host: "registry.npmjs.org:443", protocol: "https" },
+        grantRoot: "/workspace/generated",
+        policyChangeRequested: true,
+        reason: "Download a package",
+        availableDecisions: ["accept", "decline", "cancel"],
+        sequence: 1,
+      },
+      queueLength: 1,
+      resolving: false,
+      onResolve: vi.fn(),
+    }));
+
+    expect(container.textContent).toContain("https://registry.npmjs.org:443");
+    expect(container.textContent).toContain("/workspace/generated");
+    expect(container.textContent).toContain("reusable policy change");
+  });
+
   it("renders unsupported-version readiness copy with detected and minimum versions", () => {
     const readiness: AgentProviderReadiness = {
       provider: "codex",
       status: "unsupported-version",
-      version: "0.40.0",
-      minimumVersion: "0.100.0",
+      version: "0.100.0",
+      minimumVersion: "0.144.1",
       message: "Codex is too old.",
     };
     const container = render(React.createElement("div", {
@@ -100,8 +132,8 @@ describe("Desktop Agent renderer surfaces", () => {
         ),
       ],
     }));
-    expect(container.textContent).toContain("0.40.0");
     expect(container.textContent).toContain("0.100.0");
+    expect(container.textContent).toContain("0.144.1");
     expect(container.textContent).toContain("Update Codex");
   });
 });

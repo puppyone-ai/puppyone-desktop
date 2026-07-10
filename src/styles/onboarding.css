@@ -123,34 +123,61 @@
   transition: stroke 150ms ease-out;
 }
 
-.folder-drop-cloud-paint-paper {
+.folder-drop-cloud-sky,
+.folder-drop-cloud-glaze {
+  opacity: 0;
+  transition: opacity 220ms ease-out;
+}
+
+.folder-drop-cloud-sky {
+  filter: grayscale(0.32) saturate(0.5) contrast(0.9) brightness(0.94);
+}
+
+.folder-drop-cloud-glaze {
+  fill: url("#onboarding-cloud-project-glaze");
+}
+
+.folder-drop-cloud-glaze-top {
   stop-color: var(--po-panel-raised);
+  stop-opacity: 0.46;
 }
 
-.folder-drop-cloud-paint-mist {
-  stop-color: color-mix(in oklab, var(--po-info) 5%, var(--po-panel-raised));
+.folder-drop-cloud-glaze-middle {
+  stop-color: var(--po-panel-raised);
+  stop-opacity: 0.16;
 }
 
-.folder-drop-cloud-paint-sky {
-  stop-color: color-mix(in oklab, var(--po-info) 10%, var(--po-panel-raised));
+.folder-drop-cloud-glaze-bottom {
+  stop-color: var(--po-panel-raised);
+  stop-opacity: 0.56;
 }
 
 .folder-drop-zone.cloud-mode {
-  --onboarding-cloud-pigment: color-mix(in oklab, var(--po-info) 78%, var(--po-accent));
-  color: color-mix(in srgb, var(--onboarding-cloud-pigment) 88%, var(--po-text) 12%);
+  --onboarding-cloud-ink: var(--po-text);
+  color: var(--onboarding-cloud-ink);
 }
 
 .folder-drop-zone.cloud-mode .folder-drop-fill {
-  fill: url("#onboarding-cloud-project-paint");
+  fill: color-mix(in srgb, var(--po-panel-raised) 90%, var(--po-info) 10%);
+}
+
+.folder-drop-zone.cloud-mode .folder-drop-cloud-sky {
+  opacity: 0.3;
+}
+
+.folder-drop-zone.cloud-mode .folder-drop-cloud-glaze {
+  opacity: 0.78;
 }
 
 .folder-drop-zone.cloud-mode .folder-drop-border {
-  stroke: color-mix(in srgb, var(--onboarding-cloud-pigment) 54%, var(--po-panel-raised));
+  stroke: color-mix(in srgb, var(--po-border-strong) 72%, transparent);
+  stroke-dasharray: none;
+  stroke-width: 1.5;
 }
 
 .folder-drop-zone.cloud-mode .folder-drop-shadow {
-  fill: var(--onboarding-cloud-pigment);
-  opacity: 0.065;
+  fill: var(--po-shadow);
+  opacity: 0;
 }
 
 .folder-drop-body {
@@ -189,16 +216,26 @@
 
 .folder-drop-zone.cloud-mode:hover,
 .folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) {
-  color: var(--onboarding-cloud-pigment);
+  color: var(--po-text);
 }
 
 .folder-drop-zone.cloud-mode:hover .folder-drop-border,
 .folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) .folder-drop-border {
-  stroke: color-mix(in srgb, var(--onboarding-cloud-pigment) 72%, var(--po-border));
+  stroke: var(--po-border-strong);
 }
 
-.folder-drop-zone.cloud-mode:hover .folder-drop-shadow {
-  opacity: 0.15;
+.folder-drop-zone.cloud-mode:hover .folder-drop-cloud-sky,
+.folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) .folder-drop-cloud-sky {
+  opacity: 0.42;
+}
+
+.folder-drop-zone.cloud-mode .folder-drop-icon {
+  color: color-mix(in srgb, var(--po-info) 62%, var(--po-text) 38%);
+}
+
+.folder-drop-zone.cloud-mode:hover .folder-drop-icon,
+.folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) .folder-drop-icon {
+  color: color-mix(in srgb, var(--po-info) 78%, var(--po-text) 22%);
 }
 
 .folder-drop-zone.dragging,

@@ -253,12 +253,14 @@
 .desktop-cloud-access-scope-list {
   display: grid;
   gap: 0;
-  padding: 8px;
+  padding-block: var(--desktop-sidebar-list-padding-block);
+  padding-inline: 8px;
 }
 
 .desktop-cloud-access-sidebar.collapsed .desktop-cloud-access-scope-list {
   gap: 7px;
-  padding: 8px;
+  padding-block: var(--desktop-sidebar-list-padding-block);
+  padding-inline: 8px;
 }
 
 .desktop-cloud-access-detail {

@@ -35,12 +35,14 @@ import { formatJson } from "./viewers/viewerUtils";
 export const EDITOR_VIEWERS: EditorViewer[] = [
   {
     id: "app-preview",
+    capability: "preview",
     source: "content",
     match: ({ document, format }) => document.type === "app" || format.defaultViewer === "app-preview",
     render: (context) => <AppPreviewViewer {...context} />,
   },
   {
     id: "markdown",
+    capability: "edit",
     source: "content",
     match: ({ document, format }) => document.type === "markdown" || format.defaultViewer === "markdown-editor",
     isEditable: canEditMarkdown,
@@ -48,6 +50,7 @@ export const EDITOR_VIEWERS: EditorViewer[] = [
   },
   {
     id: "json",
+    capability: "edit",
     source: "content",
     match: ({ document, format }) => document.type === "json" || format.id === "json" || format.id === "jsonl",
     normalizeContent: formatJson,
@@ -56,6 +59,7 @@ export const EDITOR_VIEWERS: EditorViewer[] = [
   },
   {
     id: "csv-table",
+    capability: "edit",
     source: "content",
     match: ({ format }) => format.defaultViewer === "csv-table",
     isEditable: canEditCsv,
@@ -63,6 +67,7 @@ export const EDITOR_VIEWERS: EditorViewer[] = [
   },
   {
     id: "html-artifact",
+    capability: "preview",
     source: "content-and-resource",
     allowPreviewContent: false,
     match: ({ document, format }) => document.type === "html" || format.defaultViewer === "html-artifact",
@@ -70,36 +75,42 @@ export const EDITOR_VIEWERS: EditorViewer[] = [
   },
   {
     id: "image-preview",
+    capability: "preview",
     source: "resource",
     match: ({ document, format }) => document.type === "image" || format.defaultViewer === "image-preview",
     render: (context) => <ImageResourceViewer {...context} />,
   },
   {
     id: "pdf-preview",
+    capability: "preview",
     source: "resource",
     match: ({ document, format }) => document.type === "pdf" || format.defaultViewer === "pdf-preview",
     render: (context) => <PdfResourceViewer {...context} />,
   },
   {
     id: "office-preview",
+    capability: "preview",
     source: "resource",
     match: ({ format }) => format.defaultViewer === "office-preview",
     render: (context) => <OfficeViewer {...context} />,
   },
   {
     id: "audio-preview",
+    capability: "preview",
     source: "resource",
     match: ({ document, format }) => document.type === "audio" || format.defaultViewer === "audio-preview",
     render: (context) => <AudioResourceViewer {...context} />,
   },
   {
     id: "video-preview",
+    capability: "preview",
     source: "resource",
     match: ({ document, format }) => document.type === "video" || format.defaultViewer === "video-preview",
     render: (context) => <VideoResourceViewer {...context} />,
   },
   {
     id: "text",
+    capability: "edit",
     source: "content",
     match: ({ document, format }) => (
       document.type === "code" ||
@@ -114,6 +125,7 @@ export const EDITOR_VIEWERS: EditorViewer[] = [
 
 const FALLBACK_VIEWER: EditorViewer = {
   id: "document-placeholder",
+  capability: "placeholder",
   source: "none",
   match: () => true,
   render: ({ document, content }) => (
@@ -171,7 +183,7 @@ export { coreViewerCapability, resolveViewerRoute } from "./viewerCapability";
  */
 export function classifyEditorViewerCapability(document: EditorDocument): CoreViewerCapability {
   const { viewer } = resolveEditorViewer(document);
-  return coreViewerCapability(viewer.id);
+  return viewer.capability;
 }
 
 /**
@@ -183,17 +195,16 @@ export function resolveViewerRouteForDocument(
   document: EditorDocument,
   snapshot: ViewerPackSnapshot | null | undefined = EMPTY_VIEWER_PACK_SNAPSHOT,
 ): ViewerRouteResult {
-  const { viewer, format, resolvedExtension } = resolveEditorViewer(document);
-  const extensions: string[] = [];
+  const { viewer, resolvedExtension } = resolveEditorViewer(document);
+  const extensions = candidateExtensions(document.name);
   if (resolvedExtension) extensions.push(`.${resolvedExtension}`);
-  for (const extension of format.extensions ?? []) extensions.push(extension);
 
   const mimeTypes: string[] = [];
   if (document.mimeType) mimeTypes.push(document.mimeType);
-  for (const mimeType of format.mimeTypes ?? []) mimeTypes.push(mimeType);
 
   return resolveViewerRoute({
     coreViewerId: viewer.id,
+    coreViewerCapability: viewer.capability,
     extensions,
     mimeTypes,
     snapshot: snapshot ?? EMPTY_VIEWER_PACK_SNAPSHOT,
@@ -201,8 +212,17 @@ export function resolveViewerRouteForDocument(
   });
 }
 
+function candidateExtensions(name: string): string[] {
+  const base = name.replace(/\\/g, "/").split("/").pop()?.toLowerCase() ?? "";
+  const extensions: string[] = [];
+  for (let index = base.indexOf("."); index >= 0; index = base.indexOf(".", index + 1)) {
+    if (index < base.length - 1) extensions.push(base.slice(index));
+  }
+  return [...new Set(extensions)].sort((left, right) => right.length - left.length);
+}
+
 function normalizeDocumentSourceKind(sourceKind: DocumentSourceKind | undefined): DocumentSourceKind {
-  return sourceKind === "cloud" || sourceKind === "unknown" ? sourceKind : "local";
+  return sourceKind === "local" || sourceKind === "cloud" ? sourceKind : "unknown";
 }
 
 export type ExternalViewerAdapterProps = {

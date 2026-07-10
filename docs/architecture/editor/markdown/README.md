@@ -11,13 +11,13 @@ document model. Syntax trees, semantic elements, safe render plans,
 decorations, widgets, previews, links, and indexes are derived views of that
 source; embedded drafts are editor-scoped, ephemeral interaction state.
 
-The adopted target makes ordinary Markdown use an Obsidian-style broad
+The adopted architecture makes ordinary Markdown use an Obsidian-style broad
 sanitized HTML profile by default. Common non-executable tags, styles,
-structure, and workspace-scoped assets will not require a trust prompt.
+structure, and workspace-scoped assets do not require a trust prompt.
 External web embeds and local executable HTML are separate capability paths;
 local filesystem location alone never authorizes scripts or application
-access. Sections 12 and 13 of `architecture.md` distinguish this target from
-the current narrower implementation.
+access. Sections 12–14 of `architecture.md` record implementation status and
+the remaining acceptance gaps without weakening this contract.
 
 ## Authoritative documents
 
@@ -34,6 +34,25 @@ Read these documents in this order:
 The architecture document answers **how the system is structured**. The UX
 document answers **what the user experiences**. Neither document may redefine
 the other's contract; cross-layer changes must update both when necessary.
+
+## Architecture diagram guide
+
+All durable diagrams use plain text so they remain readable in terminals,
+diffs, code review, and Markdown renderers without diagram support:
+
+1. [Editor system boundary](../README.md#system-boundary)
+   - Explorer selection, file-format routing, acquisition, and viewer choice.
+2. [End-to-end Markdown data flow](architecture.md#1-decision-summary)
+   - Source, parser, semantic model, policy, plan, and output adapters.
+3. [Source layout and feature composition](architecture.md#37-source-layout-and-feature-composition)
+   - Physical `core/`, `features/`, `platform/`, and `shared/` ownership.
+4. [Dependency direction](architecture.md#38-dependency-direction-current-state-and-target)
+   - Why Core/Feature is currently bidirectional at folder level and the
+     intended one-way Kernel/Composition structure.
+5. [Type constraints](architecture.md#39-type-constraints-and-impossible-states)
+   - Current optional union data versus a fully discriminated semantic model.
+6. [Transaction and widget lifecycle](architecture.md#310-transaction-and-widget-lifecycle)
+   - Atomic commands, DOM rebuild, focus coordination, and resource ownership.
 
 ## Related architecture
 

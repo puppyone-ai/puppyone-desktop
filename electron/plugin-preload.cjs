@@ -10,6 +10,7 @@ function invoke(channel, payload) {
 }
 
 const api = {
+  version: 1,
   document: {
     getMeta: () => invoke("viewer-pack:document-get-meta", {}),
   },
@@ -24,15 +25,6 @@ const api = {
       ipcRenderer.send("viewer-pack:ui-set-state", state);
     },
     getTheme: () => invoke("viewer-pack:ui-get-theme", {}),
-    onThemeChange: (callback) => {
-      if (typeof callback !== "function") return () => {};
-      const listener = (_event, theme) => callback(theme);
-      ipcRenderer.on("viewer-pack:theme-changed", listener);
-      return () => ipcRenderer.removeListener("viewer-pack:theme-changed", listener);
-    },
-  },
-  host: {
-    openExternal: () => invoke("viewer-pack:host-open-external", {}),
   },
 };
 

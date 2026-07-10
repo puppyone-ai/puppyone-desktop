@@ -50,6 +50,46 @@ describe("Codex JSONL JSON-RPC transport", () => {
     duplicateChild.stdout.write(`${JSON.stringify({ id: 1, result: { data: [] } })}\n`);
     expect(duplicateChild.kill).toHaveBeenCalledOnce();
   });
+
+  it("retires an ambiguous connection when a request times out", async () => {
+    vi.useFakeTimers();
+    try {
+      const child = createChild();
+      const connection = createConnection(child);
+      const exit = vi.fn();
+      connection.on("exit", exit);
+      const pending = connection.request("turn/start", {}, { timeoutMs: 20 });
+      const rejection = expect(pending).rejects.toMatchObject({
+        code: "CODEX_RPC_TIMEOUT",
+        method: "turn/start",
+      });
+
+      await vi.advanceTimersByTimeAsync(25);
+
+      await rejection;
+      expect(child.kill).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledWith(expect.objectContaining({ expected: false }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("escalates to a forced kill when the provider ignores graceful disposal", async () => {
+    vi.useFakeTimers();
+    try {
+      const child = createChild();
+      child.kill = vi.fn(() => true);
+      const connection = createConnection(child, { forceKillTimeoutMs: 50 });
+      connection.dispose();
+      expect(child.kill).toHaveBeenNthCalledWith(1);
+
+      await vi.advanceTimersByTimeAsync(55);
+
+      expect(child.kill).toHaveBeenNthCalledWith(2, "SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 function createConnection(child, options = {}) {

@@ -5,7 +5,8 @@
   flex: 0 0 auto;
   flex-direction: column;
   margin-top: 0;
-  padding: 3px var(--git-sidebar-right-gap) 4px var(--git-sidebar-left-gap);
+  padding-block: 3px var(--desktop-sidebar-list-padding-block);
+  padding-inline: var(--git-sidebar-left-gap) var(--git-sidebar-right-gap);
   border-top: 1px solid color-mix(in srgb, var(--po-border-subtle) 76%, transparent);
   background: color-mix(in srgb, var(--po-sidebar) 94%, var(--po-panel));
 }
@@ -245,7 +246,7 @@
   .desktop-tool-sidebar-action,
   .desktop-git-sidebar-empty-history strong,
   .desktop-git-section-title span,
-  .desktop-working-tree-name,
+  .desktop-git-history-drawer-header span,
   .desktop-working-tree-state
 ) {
   font-weight: var(--git-weight-strong);
@@ -274,4 +275,17 @@
   .desktop-head-badge
 ) {
   font-weight: var(--git-weight-strong);
+}
+
+.desktop-git-sidebar .desktop-working-tree-row.active .desktop-working-tree-name {
+  font-weight: var(--git-weight-strong);
+}
+
+.desktop-git-sidebar :is(
+  .desktop-git-backup-action,
+  .desktop-git-operation-button,
+  .desktop-git-remote-prompt button,
+  .desktop-tool-sidebar-action
+) {
+  font-size: var(--git-action-font-size);
 }

@@ -184,11 +184,6 @@ export function useDesktopPreferences() {
   const sidebarNavigationPlacement = getSidebarNavigationPlacement(sidebarNavigationLayout);
   const sidebarNavigationOrientation = getSidebarNavigationOrientation(sidebarNavigationLayout);
   const terminalToolEnabled = rightSidebarToolsSettings.enabled.terminal;
-  const terminalSidebarOpen = terminalToolEnabled && rightSidebarOpen;
-
-  useEffect(() => {
-    if (!terminalToolEnabled && rightSidebarOpen) setRightSidebarOpen(false);
-  }, [rightSidebarOpen, terminalToolEnabled]);
 
   return {
     aiEditAssistEnabled,
@@ -210,7 +205,6 @@ export function useDesktopPreferences() {
     sidebarNavigationLayout,
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
-    terminalSidebarOpen,
     terminalToolEnabled,
     titlebarActionsSettings,
     darkThemePreset,

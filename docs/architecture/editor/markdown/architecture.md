@@ -1,19 +1,20 @@
 # Markdown Editor Architecture
 
-Status: **Adopted target architecture; core migration landed as of
-2026-07-10.** URL/sanitizer closure, plan-backed block widgets, the shared
-plan→DOM adapter for table cells, a dedicated `markdownAssetPolicy` +
+Status: **Adopted architecture; core and vertical-feature migration landed as
+of 2026-07-11.** URL/sanitizer closure, plan-backed block widgets, the
+policy-converged isolated preview adapter for table cells, a dedicated
+`markdownAssetPolicy` +
 hardened `AssetBroker` (policy-before-resolver, concurrency limit, principal
 handle revocation, no raw `file://`), host-injected workspace identity facets
 with a single `createPrincipalFromView` helper, `DocumentTrustContext` +
 `AuthorizationGrant` gating of local active HTML, revision-bound
-`ExecutionSession`s, table-cell edit-session drafts, and web-embed
-redirect/`data:`-subresource denial are landed on the migration branch. The
-remaining acceptance gaps are explicit Electron hardening (full
-custom-protocol `WebFrameMain`/session/token/purpose exact-scope validation),
-a visual regression suite, large-document incremental profiling, and
-browser-backed (real renderer) lifecycle/IME/sandbox coverage — not product
-polish. These are enumerated honestly in §12 and Phase 4–6 below.
+`ExecutionSession`s, recoverable code/Mermaid/table drafts, revision-scoped
+Electron WebEmbed sessions, typed feature registries, and atomic table
+interaction/focus coordination are landed on the migration branch. The remaining
+acceptance gaps are full document-plan convergence for the isolated table-cell
+preview, a visual regression suite, incremental large-document decoration
+updates, and browser-backed (real renderer) lifecycle/IME/sandbox coverage —
+not product polish. These are enumerated honestly in §12 and Phase 4–6 below.
 
 This document defines the durable technical architecture for PuppyOne's
 Markdown editor. It complements, but does not replace, the product behavior in
@@ -50,33 +51,48 @@ PuppyOne uses a **Markdown-source-first, semantic-model-driven live preview**.
    active execution and broader resource capabilities, not whether a harmless
    `<span style="color: ...">` can render.
 
-The intended flow is:
+The end-to-end Markdown data flow is:
 
 ```text
-                    Markdown source
-             (only committed document truth)
-                           |
-                           | transaction
-                           v
-               Incremental syntax parser
-              (Lezer + PuppyOne dialect)
-                           |
-                           | derived, immutable
-                           v
-               Normalized semantic document
-          (kind, ranges, nesting, markers, state)
-                           |
-                           v
-                    Policy compiler
-            (HTML, URL, CSS, assets, trust)
-                           |
-                           | safe render plan
-             +-------------+--------------+
-             |             |              |
-             v             v              v
-      Live editor      Read-only       Export/index
-      decorations      preview         and automation
++-----------------------------+
+| Markdown source             | <-------------------------------+
+| only committed document     |                                 |
++-----------------------------+                                 |
+              |                                                 |
+              | CodeMirror transaction                          |
+              v                                                 |
++-----------------------------+                                 |
+| Incremental syntax parser   |                                 |
+| Lezer + PuppyOne dialect    |                                 |
++-----------------------------+                                 |
+              | derived and immutable                           |
+              v                                                 |
++-----------------------------+                                 |
+| Normalized semantic model   |                                 |
+| kind + range + metadata     |                                 |
++-----------------------------+                                 |
+              |                                                 |
+              v                                                 |
++-----------------------------+                                 |
+| Policy compiler             |                                 |
+| HTML + URL + asset + trust  |                                 |
++-----------------------------+                                 |
+              | typed safe plan                                 |
+              v                                                 |
++-----------------------------+                                 |
+| Markdown element plan       |                                 |
++-----------------------------+                                 |
+       |              |                |                         |
+       v              v                v                         |
+ Live editor     Read-only        Export / index                 |
+ decorations    preview                                       |
+       |                                                        |
+       +---------- user command + transaction ------------------+
 ```
+
+The loop back to source is deliberate: rendered DOM never becomes a second
+document. Every committed user action returns through a CodeMirror command and
+transaction.
 
 This is the source-first family used by Markdown-native editors. It is a
 better fit for PuppyOne than making a rich-text tree the canonical model,
@@ -85,16 +101,16 @@ external tools, and source-level interoperability.
 
 Implementation baseline:
 
-- `semantic/htmlTagTokenizer.ts` is the shared quote-aware HTML tag tokenizer.
-- `semantic/inlineHtmlModel.ts` pairs parser-recognized inline tags into
+- `features/html/htmlTagTokenizer.ts` is the shared quote-aware HTML tag tokenizer.
+- `features/html/inlineHtmlModel.ts` pairs parser-recognized inline tags into
   range-preserving semantic elements.
-- `rendering/inlineHtmlPolicy.ts` compiles the non-executable editor subset.
-- `decorations/inlineDecorations.ts` renders approved content with CodeMirror
+- `features/html/inlineHtmlPolicy.ts` compiles the non-executable editor subset.
+- `core/decorations/inlineDecorations.ts` renders approved content with CodeMirror
   marks and hides or reveals only source marker ranges.
-- `decorations/livePreviewDecorations.ts` rebuilds when CodeMirror publishes a
+- `core/decorations/livePreviewDecorations.ts` rebuilds when CodeMirror publishes a
   newer incremental syntax tree; semantic caches are keyed by both document
   and syntax-tree identity so partial initial parses cannot become permanent.
-- `rendering/htmlBlockModel.ts` uses Lezer `HTMLBlock` context rather than
+- `features/html/htmlBlockModel.ts` uses Lezer `HTMLBlock` context rather than
   line-start guessing.
 - `tests/markdownInlineHtml.test.ts` is the cross-layer conformance and
   security fixture suite for this feature.
@@ -363,6 +379,203 @@ Responsibilities:
 Interaction state refers to semantic element ranges. It must not infer element
 identity from CSS classes or rendered DOM ancestry.
 
+### 3.7 Source layout and feature composition
+
+The implementation is a hybrid modular monolith. Stable editor machinery is
+organized by layer; complex Markdown capabilities are vertical features:
+
+```text
+editor/markdown/
+  MarkdownCodeMirrorEditor.tsx         public editor surface
+  markdownCodeMirrorExtensions.ts      public CodeMirror assembly
+  core/                                source, syntax, plans, commands, adapters
+  features/
+    blockFeatureRegistry.ts            block-widget composition boundary
+    inlineFeatureRegistry.ts           inline-widget composition boundary
+    table/                              model + plan + commands + focus + widget
+    html/                               tokenizer + model + plan + policy + widget
+    code-block/                         model + plan + widget
+    mermaid/                            renderer + widget
+    image/                              model + plan + widget
+  platform/                            policy, brokers, sessions, CM host adapters
+  shared/                              feature-agnostic DOM/measure primitives
+```
+
+The core may consume a feature's pure model or plan compiler, but it constructs
+concrete feature widgets only through the typed registries. `platform/` never
+imports a feature, and `shared/` imports none of `core/`, `features/`, or
+`platform/`. `scripts/check-markdown-architecture.mjs` enforces these durable
+boundaries in CI.
+
+A feature widget is a rendering adapter, not a controller. Widget construction
+must not dispatch. Event handlers call feature commands; commands issue one
+atomic CodeMirror transaction; editor-scoped coordinators perform DOM work only
+after CodeMirror has committed its view update.
+
+### 3.8 Dependency direction: current state and target
+
+The physical folders are intentionally clearer than the old horizontal layout,
+but `core/` still contains both stable contracts and application composition.
+That creates a **folder-level two-way dependency**:
+
+```text
+Current transitional dependency
+
+       +---------------------------------------+
+       | core/                                 |
+       | contracts + compiler + decorations    |
+       +---------------------------------------+
+                    |                 ^
+                    | imports         | imports contracts
+                    v                 |
+       +---------------------------------------+
+       | features/                             |
+       | feature plans + commands + widgets    |
+       +---------------------------------------+
+```
+
+For example, `core/plans/markdownPlanCompiler.ts` imports the table, HTML,
+image, and code-block plan compilers, while those feature plan compilers import
+`core/plans/markdownPlanTypes.ts` and plan primitives. This is not currently a
+dangerous runtime module cycle: most edges back to core are types or leaf
+helpers. It does mean that the directory named `core` is not yet an independent
+kernel and that moving or testing it in isolation remains harder than necessary.
+
+The long-term one-way dependency should be:
+
+```text
+                         +-----------------------+
+                         | Public assembly       |
+                         +-----------------------+
+                                    |
+                                    v
+                         +-----------------------+
+                         | Composition           |
+                         | knows all features    |
+                         +-----------------------+
+                           |        |         |
+                           v        v         v
+                    +----------+ +----------+ +----------+
+                    | Adapters | | Features | | Platform |
+                    +----------+ +----------+ +----------+
+                         |        /    |    \       |
+                         |       /     |     \      |
+                         v      v      v      v     v
+                    +----------------+   +----------------+
+                    | Kernel         |   | Shared         |
+                    | contracts only |   | primitives     |
+                    +----------------+   +----------------+
+
+Allowed dependency direction:
+
+  Public assembly  ----> Composition
+  Composition      ----> Adapters / Features / Platform / Kernel
+  Adapters         ----> Features / Platform / Kernel / Shared
+  Features         ----> Platform ports / Kernel / Shared
+  Platform         ----> Kernel contracts only
+  Kernel           ----> no outer layer
+  Shared           ----> no outer layer
+```
+
+The important rule is not that features know nothing about shared contracts.
+They must know the contracts they implement. The rule is that the kernel never
+imports a concrete table, HTML, image, or Mermaid implementation. A dedicated
+composition layer imports both sides and connects them.
+
+### 3.9 Type constraints and impossible states
+
+The current semantic model ties `kind` and `blockData` only by convention:
+
+```text
+MarkdownStandardElement
+  |
+  +---- kind: table | image | fence | task | ...
+  |
+  +---- blockData?: TableData | ImageData | FenceData | TaskData | ...
+
+TypeScript therefore cannot prevent:
+
+  kind: table  +  blockData: ImageData
+  kind: image  +  blockData: FenceData
+  kind: fence  +  blockData: undefined
+```
+
+Feature plan compilers defend against those combinations at runtime, but the
+stronger target is a fully discriminated union:
+
+```text
+MarkdownElement
+  |
+  +---- TableElement
+  |       kind: table
+  |       blockData: TableData
+  |
+  +---- ImageElement
+  |       kind: image
+  |       blockData: ImageData
+  |
+  +---- FenceElement
+          kind: fence
+          blockData: FenceData
+```
+
+With that model, invalid combinations fail during compilation instead of
+requiring repeated `blockData.kind` checks in every feature. This is what
+"type constraints can still be strengthened" means in the architecture review.
+
+### 3.10 Transaction and widget lifecycle
+
+"Transaction and widget lifecycle follows best practice" means that ownership
+and update timing are explicit:
+
+```text
+User click / key / drag
+          |
+          v
+Widget event handler
+          |
+          | typed operation
+          v
+Feature command
+          |
+          | ONE transaction containing:
+          | source change + selection + state effects
+          v
+CodeMirror EditorView
+          |
+          +----> update canonical EditorState
+          |
+          +----> rebuild or reuse widget DOM
+          |
+          +----> publish ViewUpdate
+                         |
+                         v
+              Editor-scoped coordinator
+                         |
+                         | next animation frame / after commit
+                         v
+              restore logical DOM focus
+                         |
+                         v
+              clear the matching request token
+```
+
+The forbidden path is:
+
+```text
+Widget.toDOM()
+      |
+      +----> view.dispatch()        INVALID: view update may be in progress
+```
+
+`WidgetType` values are immutable descriptors. Timers, observers, listeners,
+abort controllers, asset handles, edit sessions, and execution sessions belong
+to the mounted widget session and have deterministic disposal. Revision-bound
+async work cannot commit into a newer source revision. This does not mean every
+widget operation is already optimal—for example, table descriptor equality can
+still become cheaper—but the transaction timing and resource ownership model is
+the correct one.
+
 ---
 
 ## 4. Render-plan boundary
@@ -564,12 +777,17 @@ type EmbeddedEditSession = {
 Embedded renderers receive narrow host capabilities instead of ambient browser
 or Electron authority:
 
-- Every request carries a `CapabilityPrincipal`: editor view, sender frame,
-  workspace, document and revision, execution session when applicable, and a
-  narrow purpose/audience. An authority-bearing custom-protocol token is
-  validated on every request against the requesting `WebFrameMain`, Electron
-  `Session`, token, resource scope, and purpose; it cannot be replayed by a
-  different principal.
+- Every broker request carries a `CapabilityPrincipal`: editor view, workspace,
+  document and revision, execution session when applicable, and a narrow
+  purpose/audience. Electron's `ProtocolRequest` does not expose a trustworthy
+  requesting `WebFrameMain`, so a custom-protocol URL is deliberately modeled
+  as a narrow bearer capability, not mislabeled as a non-transferable frame
+  identity. It is issued only through trusted main-frame IPC, unique for each
+  Markdown asset lease, bound to sender/resource/purpose, opaque (no workspace
+  path), checked against the trusted app origin and open workspace on every
+  fetch, and hard-revoked on handle/session/sender disposal. A future surface
+  that requires non-transferability must stream through sender-authenticated
+  IPC/MessagePort rather than placing that authority in a URL.
 - `AssetBroker` enforces asset policy and returns typed, revocable handles.
   Workspace-relative, non-executable assets inside the open workspace are part
   of the default broad-safe profile; they still use scoped broker handles and
@@ -588,7 +806,8 @@ or Electron authority:
 - Blob URLs are only origin/storage-partition scoped and are not exact-principal
   capabilities. If used, they are created inside the target isolated realm,
   remain subject to MIME/sink/sanitizer checks, and are revoked with that realm.
-  Exact document/view scoping uses the validated custom-protocol path above.
+  Local asset URLs remain the narrow, hard-revocable bearer leases described
+  above; neither form is described as frame-bound authority.
 - `LinkBroker` converts a typed link intent into internal navigation, controlled
   external opening, a confirmation, or denial.
 - `WebEmbedBroker` asks the main process to create, attach, position, and destroy
@@ -818,10 +1037,11 @@ The broad-safe family contains:
 - `safe-block`: common document structure such as paragraphs, sections,
   headings, lists, blockquotes, `div`, `details`/`summary`, figures, preformatted
   content, and tables;
-- `safe-media`: images and explicitly supported audio/video elements compiled
-  to typed atoms whose sources resolve through `AssetBroker`; autoplay,
-  capture, scriptable media fallback, and unsanctioned remote loads are not
-  baseline capabilities;
+- `safe-media`: currently only images, compiled to typed atoms whose every
+  `src`/`srcset` candidate resolves through `AssetBroker`. Audio/video/source
+  join this profile only after equivalent typed resource and lifecycle
+  adapters ship; autoplay, capture, scriptable fallback, and unsanctioned
+  remote loads are not baseline capabilities;
 
 Adjacent capability-specific profiles are:
 
@@ -975,10 +1195,15 @@ protocol and host policy. All adapters use the same validator and `LinkBroker`.
 
 Mermaid uses `securityLevel: "strict"`, disables HTML labels and click
 callbacks, validates and limits source/output size, and treats the resulting
-SVG sanitizer as a security boundary. Diagram features that require arbitrary
-execution follow the separate process-isolated executable-content rule in
-section 7.2. Images use `AssetBroker`; remote tracking loads, data URLs, SVG,
-MIME, byte limits, concurrency, and privacy are explicit policy decisions
+SVG sanitizer as a security boundary. The sanitizer removes executable/HTML/
+animation elements, denies non-local paint references, preserves only fragment
+references that resolve inside that SVG, and rewrites anchor navigation to an
+inert `data-md-href` intent. The sanitized SVG mounts inside a ShadowRoot so its
+generated CSS cannot style the editor document; link activation still exits
+that boundary only through `LinkBroker`. Diagram features that require
+arbitrary execution follow the separate process-isolated executable-content
+rule in section 7.2. Images use `AssetBroker`; remote tracking loads, data URLs,
+SVG, MIME, byte limits, concurrency, and privacy are explicit policy decisions
 rather than consequences of an `http(s)` prefix.
 
 ---
@@ -1223,87 +1448,74 @@ files remain in their current directories.
 
 ## 12. Current implementation state
 
-The implementation has a sound source-first foundation:
+The 2026-07-10 migration now enforces these shipped invariants:
 
-1. CodeMirror Markdown text remains the only canonical committed document model;
-   tables, code blocks, Mermaid, tasks, and source-changing image commands write
-   through source transactions. Image selection and expansion remain
-   non-source interaction state.
-2. Inline HTML has a range-preserving semantic representation, and Lezer syntax
-   context owns `HTMLBlock` versus paragraph `HTMLTag` classification.
-3. Inline HTML policy currently compiles an initial presentation-only tag,
-   attribute, and CSS subset before creating CodeMirror marks. Raw inline HTML
-   is not injected into the editor DOM; the broader profiles in section 6.4 are
-   target architecture, not yet the complete shipped surface.
-4. Background parser advancement invalidates semantic caches and the direct
-   decoration StateField even when the `Text` document object is unchanged.
-5. Code, table, Mermaid, HTML, and image previews use editor-native replacement
-   widgets. Code, table, and Mermaid edit commits write through CodeMirror
-   transactions; image and HTML widgets currently provide selection, expansion,
-   or preview/source interaction rather than equivalent embedded source-edit
-   commits. Block replacements are direct decorations with height estimates or
-   measurement hooks.
-6. Mermaid already has lazy loading, a source-and-theme cache, serialized
-   rendering, debouncing, request generations, last-good output, strict mode,
-   and an SVG cleanup pass.
-7. Safe HTML blocks reconstruct an allowlisted DOM. The current
-   `localTrusted` path uses a sandbox iframe without preload access, but it has
-   not yet converged on the external-web-embed versus local-active-content
-   split in section 7.2.
-8. The block-selection ViewPlugin correctly owns view-only selection chrome.
+1. CodeMirror Markdown text is the only committed document truth. A compiled,
+   range-indexed semantic/plan projection drives block widgets, inline HTML,
+   marker deletion, atom expansion, task checkboxes, and horizontal rules.
+2. Versioned `inline-editable`, `safe-block`, and explicitly composed
+   `safe-media` profiles are non-escalating. Safe event/style reduction keeps
+   honest structure; malformed, incomplete, blocked, or meaning-changing HTML
+   remains visible source. The motivating styled `<span>`/`<strong>` cases
+   render without a trust prompt. CSS variables cannot bypass display/network
+   policy, geometry values are bounded and non-negative, and block HTML is
+   contained with layout/paint clipping so presentation cannot cover app chrome.
+3. Links are canonicalized once and activated only through `LinkBroker` plus a
+   host-injected open capability. Raw HTML and preview DOM carry inert
+   `data-md-href`, never ambient external `href` or `window.open` authority.
+   Mermaid SVG anchors follow the same route rather than retaining live SVG
+   navigation.
+4. Every Markdown/HTML image load reaches `AssetBroker` before a sink. Remote
+   images default to denied; `file:`, replayed blob/custom-protocol URLs,
+   malformed escapes, traversal, SVG data, oversized data, wrong purpose, and
+   cross-document principal reuse fail closed. Workspace paths have one parser,
+   and broker handles are tied to view/document/revision/execution lifecycle.
+   Local Markdown resolutions receive unique purpose-bound bearer leases;
+   disposing a handle revokes the main-process token, and the public URL does
+   not reveal the workspace root or source path.
+5. Per-view widget, edit, execution, asset, async-render, transaction, link,
+   and web-embed owners replace module-global or DOM-only state. Code, Mermaid,
+   and table drafts mirror every input into a mapped recoverable session.
+   Commits compare the exact original source slice, explicitly rebase only when
+   that slice is unchanged, and commit source plus selection/effects in one
+   transaction.
+6. Mermaid work runs inside a real revision-bound `ExecutionSession`; revision
+   change, remount, or disposal rejects stale async work. Mermaid source/output
+   are byte-bounded, sanitized SVG uses local-only paint references, and its CSS
+   is ShadowRoot-contained. Table assets are cleaned by one table-widget session
+   rather than per-cell global observers; table drag/menu global listeners are
+   deterministically removed even when a widget is disposed mid-gesture.
+7. External HTTPS embeds are click-to-load and cross the renderer/preload/main
+   boundary with an exact `web-embed` capability scope. Main binds them to the
+   real trusted main-frame sender and owner window, uses a temporary
+   no-credential Session, resolves every request target to public addresses,
+   constrains top-level navigation to the initial origin, denies non-HTTPS
+   subresources, permissions, popups, downloads and login, clips finite bounds,
+   single-flights repeated activation, enforces pending+active quotas, and
+   destroys on revision/owner/load/runtime failure. There is no focused-window
+   fallback.
+8. Inline-HTML range queries and compiled plans use interval indexes; nested
+   Markdown marks compose instead of being dropped by an outer reserved range.
 
-The 2026-07-10 architecture audit identified gaps that prevent the subsystem
-from being considered complete. The migration branch addressed the structural
-gaps as follows:
+The remaining acceptance gaps are explicit rather than hidden behind passing
+unit tests:
 
-1. **Addressed:** A compiled plan index now exists
-   (`plans/markdownPlanCompiler.ts`, `plans/markdownPlanIndex.ts`) and is
-   consumed by inline HTML decorations and marker deletion/expand keymaps.
-2. **Addressed:** `<br>` compiles to one typed `inlineAtom` plan with
-   `lineBreaks` metadata and selection+Enter expansion. Incomplete/malformed
-   inline HTML compiles to `visibleSource` without collapsed-marker deletion.
-3. **Foundation landed:** Per-view `MarkdownEmbedHost` and
-   `WidgetSessionRegistry` exist. Individual Mermaid/HTML/image/code widgets
-   still need full migration of observers onto DOM sessions.
-4. **Addressed:** Pending table focus is editor-scoped
-   (`markdownTableFocusField`), and table-cell editing now records a recoverable
-   draft in the per-view `EmbeddedEditSessionStore` (`featureId: "table-cell"`,
-   mapped cell range, base source/revision) on focus, updated on input, and
-   cleared on blur/commit/cancel. The DOM `contentEditable` is no longer the
-   only draft owner.
-5. **Partial:** Image expansion participates in expandable inline-atom plans;
-   a single decoration dependency key covering every interaction input remains
-   follow-up.
-6. **Addressed:** A dedicated `policy/markdownAssetPolicy.ts` is evaluated by
-   the `AssetBroker` BEFORE any resolver runs (rejecting `file://`, remote loads
-   by default, path traversal, oversized `data:`, and `data:image/svg+xml`),
-   with a validate-then-swap post-check, a concurrency limit, and per-principal
-   / per-execution-session / stale-revision handle revocation. Image, HTML-block,
-   AND table-cell asset resolution all route through this broker; the raw
-   resolver path is removed from the table surface.
-7. **Addressed:** Table-cell Markdown/HTML preview renders through the shared
-   `adapters/preview/markdownInlinePlanAdapter.ts`
-   (`renderMarkdownInlineFromSharedPolicy`), which compiles inline HTML through
-   the same policy authority and routes images/links through broker wrappers
-   only. `tableCellEditor` no longer accepts or passes a raw resolver.
-8. **Addressed:** Desktop no longer sets unconditional `localTrusted` for
-   Markdown; broad-safe mode is the default, and even under `localTrusted` the
-   HTML-block widget consults `evaluateAuthorizationGrant` and shows sanitized
-   content (never script-capable `srcdoc`) without an explicit grant.
-9. **Partial:** URL safety no longer depends on `window` in Node tests; remote
-   image/`data:`-URL/SVG quotas are now enforced by `markdownAssetPolicy`. The
-   remaining item is the Electron custom-protocol exact-scope validation
-   (`WebFrameMain`/session/token/purpose) for asset URLs — see Phase 6.
-10. **Partial:** Pure plan/broker/session fixtures were added; real EditorView
-    DOM-reuse/IME/sandbox coverage remains Phase 6 follow-up.
-11. **Addressed for inline:** Versioned `inline-editable` profile with
-    capability reduction and scoped class/id tokens. Block/media/external-embed
-    profile depth and Obsidian-breadth parity continue.
+- The table-cell preview is an intentionally isolated string adapter that
+  shares policy/token helpers; it is not yet the full document Lezer semantic
+  plan. HTML-block plans also still carry raw source for the widget's final
+  profile/trust decision.
+- Inline HTML queries no longer add an O(lines × HTML-elements) scan, but the
+  live-decoration StateField still rebuilds the whole document after ordinary
+  non-composition edits. Incremental changed-range invalidation and profiling
+  remain required for large files.
+- Happy-DOM and main-process fixtures cover policy, conflicts, remount drafts,
+  async cancellation, ownership and sandbox request rules. Real Chromium
+  visual regression, viewport reuse, IME and sandbox tests are still required.
 
-The target architecture in sections 4 and 5 is therefore adopted. Render-plan
-convergence for inline HTML is active and wired; embed-runtime foundations are
-landed and widget migration continues. Neither requires a dynamic plugin system
-or an editor-engine replacement.
+The target architecture is therefore adopted and its shipped paths are
+closed; the bullets above are the bounded Phase 6 work, not permission to add a
+second parser, sanitizer, URL validator, asset path resolver, or ambient DOM
+authority.
 
 ---
 
@@ -1346,17 +1558,20 @@ remain part of phases 5 and 6.
 ### Phase 4 — converge render plans and policy — complete for shipped surfaces
 
 - `MarkdownElementPlan` union + range-indexed compiler/index.
-- Versioned `inline-editable` / `safe-block` / `safe-media` profiles with
-  capability reduction (no inventing union capabilities).
+- Versioned `inline-editable` / `safe-block` / image-only `safe-media`
+  profiles with explicit composition and capability reduction (no automatic
+  profile escalation and no inventing union capabilities).
 - Keymaps consume plan deletion/expand capabilities.
 - Live decorations compile inline HTML through the plan boundary.
 - Fence / table / HTML block widgets are created from compiled `blockAtom`
   plans (with table alignments/rows and fence/HTML payload in `blockData`).
-- Table-cell Markdown/HTML preview renders through
-  `renderMarkdownInlineFromSharedPolicy` with broker-only image/link wrappers.
-- **Follow-up (not a structural gap):** heading/list/task/HR line chrome still
-  uses dedicated line decorations; large-document incremental plan invalidation
-  profiling.
+- Table-cell Markdown/HTML preview renders through the isolated
+  `renderMarkdownInlineFromSharedPolicy` adapter with broker-only image/link
+  wrappers; it does not claim to be the full document plan adapter.
+- Inline HTML and plan range lookup use interval indexes, and nested Markdown
+  marks compose. **Follow-up:** heading/list/task/HR line chrome still uses
+  dedicated line decorations; whole-document decoration invalidation must
+  become changed-range incremental after profiling.
 
 ### Phase 5 — embedded component runtime — complete for shipped embeds
 
@@ -1364,27 +1579,40 @@ remain part of phases 5 and 6.
   `EmbeddedEditSessionStore`, and revision-bound `ExecutionSessionStore`.
 - Code / image / Mermaid / HTML / table widgets are immutable descriptors;
   mounted resources live in DOM-owned sessions with `disposeWidgetSessionDom`.
-- Editor-scoped table focus; code/Mermaid commits validate `baseRevision` and
-  use mapped caret ends; table-cell drafts are owned by `editSessions`.
+- Editor-scoped table focus uses one atomic source/selection/focus transaction;
+  a feature-owned ViewPlugin restores focus only after CodeMirror commits the
+  replacement DOM. Code/Mermaid/table commits compare the exact source slice,
+  validate opaque document revision, permit only explicit source-unchanged
+  rebase, and use mapped caret/effect positions. Drafts survive DOM
+  detach/remount and are deleted only by commit or explicit cancel.
 - Shared Asset / AsyncRender / Link / Transaction / WebEmbed brokers.
 - Host-injected `markdownWorkspaceIdFacet` / `markdownWorkspaceRootFacet` feed
   `createPrincipalFromView` (DataWorkspace passes `workspace.id` / `workspace.path`).
 - Trust policy requires explicit `local-active-html` grants; no script-capable
   srcdoc iframe in the editor renderer.
-- **Follow-up:** browser-backed DOM reuse/IME proof; Electron custom-protocol
-  exact-scope asset URLs (`WebFrameMain`/session/token/purpose validation).
+- Mermaid async renders own real revision-bound execution sessions. Table-cell
+  resource cleanup is centralized in the table widget session; no per-cell
+  document-wide observer exists.
+- Local asset leases are opaque, exact-resource/purpose scoped, unique for
+  Markdown handles, and hard-revoked through trusted IPC on handle/session/
+  sender disposal. Filesystem roots and document paths are absent from URLs.
+- Happy-DOM EditorView coverage now exercises table add-row/add-column, context
+  menu move, pointer column drag, pointer row drag, and disposal. **Follow-up:**
+  browser-backed DOM reuse/IME proof.
 
 ### Phase 6 — security, integration, and incremental hardening — in progress
 
 - Desktop defaults to `htmlTrustMode="safe"`.
-- External https embeds: click-to-load + `WebEmbedBroker` + sandboxed
-  `WebContentsView`, owner checks, redirect/`data:` subresource denial,
-  private-host rejection.
+- External HTTPS embeds: click-to-load + revision-scoped `WebEmbedBroker` +
+  sandboxed `WebContentsView`; exact trusted sender/owner binding; temporary
+  no-credential Session; same-origin top navigation; per-request public DNS and
+  HTTPS checks; finite clipped bounds; pending+active quotas; permission,
+  popup, download and login denial; deterministic failure/owner cleanup.
 - Adversarial URL/asset policy fixtures (control chars, entities, `file://`,
   traversal, data size/SVG).
-- **Remaining acceptance gaps:** Electron custom-protocol exact-scope
-  validation, visual regression, large-document profiling, fuller IME/DOM-reuse
-  EditorView coverage in a real renderer.
+- **Remaining acceptance gaps:** visual regression, full table-cell document
+  plan convergence, changed-range decoration updates with large-document
+  profiling, and fuller IME/DOM-reuse EditorView coverage in a real renderer.
 
 The shipped foundation preserves source round-trip and has semantic, policy,
 decoration, type, broker, trust, and boundary checks. Phase 6 acceptance
@@ -1422,11 +1650,12 @@ The migration is complete when:
   commit source plus mapped selection in one transaction.
 - Assets, links, async rendering, and transaction commits use narrow host
   brokers rather than ambient renderer or Electron authority.
-- Broker handles and authority-bearing caches are exact-scope, bound to a
+- Broker handles and authority-bearing caches are narrow-scope, bound to a
   capability principal, and immediately revoked or evicted when authorization
-  or execution-session state changes. Exact-scope asset URLs use a custom
-  protocol that validates the requesting frame/session/token/purpose on every
-  request; blob URLs are never treated as exact-principal capabilities.
+  or execution-session state changes. Local asset URLs are opaque,
+  purpose/resource-bound bearer leases issued over trusted IPC and hard-revoked
+  with their owner; they are not described as frame-bound capabilities. Blob
+  URLs are likewise never treated as exact-principal capabilities.
 - Unsafe inline HTML cannot enter the editor DOM.
 - Workspace-relative safe assets use scoped broker handles rather than raw
   `file://`. Canonical/real-path containment, symlink/special-file rejection,
@@ -1501,7 +1730,10 @@ The migration is complete when:
 13. Workspace-relative non-executable assets are allowed through scoped
     `AssetBroker` handles by the broad-safe profile. Raw `file://` access is not
     allowed; real-path containment, symlink and special-file rejection,
-    open-handle revalidation, and path non-disclosure are mandatory.
+    open-handle revalidation, path non-disclosure, purpose binding, unique
+    Markdown leases, and hard token revocation are mandatory. Capability URLs
+    are narrow bearer leases; non-transferable authority uses authenticated IPC
+    rather than pretending Electron protocol requests expose frame identity.
 14. Explicit external `https` iframe syntax compiles to an isolated web-embed
     plan governed by workspace privacy/network policy. Loading defaults to
     blocked or click-to-load and uses main-process-created sandboxed web

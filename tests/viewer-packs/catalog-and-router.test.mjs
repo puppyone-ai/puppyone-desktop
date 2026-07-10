@@ -4,6 +4,7 @@ import { createViewerPackCatalogService } from "../../electron/main/viewer-packs
 import { resolveViewerPackRoute } from "../../electron/main/viewer-packs/router.mjs";
 import { coreViewerCapability, resolveViewerRoute } from "../../vendor/shared-ui/src/editor/viewerCapability.ts";
 import { EMPTY_VIEWER_PACK_SNAPSHOT } from "../../vendor/shared-ui/src/editor/viewerPackTypes.ts";
+import { resolveCoreFormatPolicy } from "../../electron/main/viewer-packs/core-format-policy.mjs";
 
 describe("viewer pack catalog", () => {
   it("is disabled by default and never networks", async () => {
@@ -72,6 +73,13 @@ describe("viewer pack router", () => {
     expect(route.capability).toBe("edit");
   });
 
+  it("derives the authoritative core gate from the shared file-format registry", () => {
+    expect(resolveCoreFormatPolicy({ name: "notes.md", mimeType: "text/markdown" }))
+      .toMatchObject({ viewerId: "markdown-editor", capability: "edit" });
+    expect(resolveCoreFormatPolicy({ name: "scene.glb", mimeType: "model/gltf-binary" }))
+      .toMatchObject({ viewerId: "binary-placeholder", capability: "placeholder" });
+  });
+
   it("routes local placeholder .glb to the installed pack", () => {
     const route = resolveViewerPackRoute({
       name: "scene.glb",
@@ -93,6 +101,13 @@ describe("viewer pack router", () => {
       sourceKind: "cloud",
     });
     expect(route).toEqual({ kind: "unsupported", reason: "cloud-source" });
+    expect(resolveViewerRoute({
+      coreViewerId: "document-placeholder",
+      extensions: [".glb"],
+      mimeTypes: [],
+      snapshot,
+      sourceKind: "unknown",
+    })).toEqual({ kind: "unsupported", reason: "cloud-source" });
   });
 
   it("returns chooser when multiple packs match", () => {
@@ -125,5 +140,41 @@ describe("viewer pack router", () => {
       sourceKind: "local",
     });
     expect(route).toEqual({ kind: "unsupported", reason: "no-match" });
+  });
+
+  it("matches compound extensions deterministically", () => {
+    const compoundContribution = {
+      ...contribution,
+      pluginId: "ai.puppyone.viewer.tar-gz",
+      formats: [{
+        ...contribution.formats[0],
+        extensions: [".tar.gz"],
+        mimeTypes: [],
+        defaultViewer: "plugin:ai.puppyone.viewer.tar-gz",
+      }],
+    };
+    const route = resolveViewerPackRoute({
+      name: "model.tar.gz",
+      sourceKind: "local",
+      coreViewerCapability: "placeholder",
+      snapshot: {
+        ...snapshot,
+        contributions: [
+          compoundContribution,
+          {
+            ...contribution,
+            pluginId: "ai.puppyone.viewer.gz",
+            formats: [{
+              ...contribution.formats[0],
+              extensions: [".gz"],
+              mimeTypes: [],
+              defaultViewer: "plugin:ai.puppyone.viewer.gz",
+            }],
+          },
+        ],
+      },
+    });
+    expect(route.kind).toBe("plugin");
+    expect(route.pluginId).toBe(compoundContribution.pluginId);
   });
 });

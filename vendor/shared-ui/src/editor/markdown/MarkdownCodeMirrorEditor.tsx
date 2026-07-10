@@ -7,7 +7,7 @@ import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
 } from "./markdownCodeMirrorExtensions";
-import { markdownAiEditExtension } from "./markdownAiEditExtension";
+import { markdownAiEditExtension } from "./core/editor/markdownAiEditExtension";
 import type { AiEditFile } from "../ai-edits/types";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
 

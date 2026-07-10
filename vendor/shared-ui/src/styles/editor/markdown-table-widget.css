@@ -78,16 +78,17 @@
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
-/* Hover model: the table frame brightens as one object; only the hovered
-   cell tints — never a whole row. */
-.markdown-codemirror-editor .cm-md-table-widget-wrap:hover .cm-md-table-widget {
-  border-color: color-mix(in srgb, var(--po-text-muted) 30%, var(--po-divider));
+/* Hover model: one outer ring marks the table while its structural border
+   stays stable; only the hovered cell tints — never a whole row. */
+.markdown-codemirror-editor .cm-md-table-widget-wrap:hover:not(.is-doc-selected) .cm-md-table-widget,
+.markdown-codemirror-editor .cm-md-table-widget-wrap:focus-within:not(.is-doc-selected) .cm-md-table-widget {
+  box-shadow: 0 0 0 2px var(--cm-md-block-hover-ring);
 }
 
 /* Document selection sweeping over the table selects it as one block. */
 .markdown-codemirror-editor .cm-md-table-widget-wrap.is-doc-selected .cm-md-table-widget {
   border-color: color-mix(in srgb, var(--po-accent) 52%, var(--po-divider));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-accent) 22%, transparent);
+  box-shadow: 0 0 0 2px var(--cm-md-block-selected-ring);
 }
 
 .markdown-codemirror-editor .cm-md-table-widget-wrap.is-doc-selected .cm-md-table-widget td {
@@ -197,27 +198,37 @@
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--po-divider) 88%, var(--po-text-muted) 12%);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--po-panel) 94%, var(--po-control));
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--po-shadow) 14%, transparent);
-  color: color-mix(in srgb, var(--po-text-muted) 74%, var(--po-text));
+  border: 0;
+  background: transparent;
   cursor: grab;
   opacity: 0;
   pointer-events: none;
   transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease,
     opacity 140ms ease,
     left 160ms cubic-bezier(0.2, 0, 0, 1),
     top 160ms cubic-bezier(0.2, 0, 0, 1);
 }
 
+/* Keep the product's compact grip chrome while giving the pointer a quiet,
+   forgiving target. The outer button stays inside the reserved 14px gutter,
+   so moving from a cell to its handle never crosses a dead zone. */
+.markdown-codemirror-editor .cm-md-table-drag-handle-visual {
+  display: grid;
+  box-sizing: border-box;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--po-divider) 88%, var(--po-text-muted) 12%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--po-panel) 94%, var(--po-control));
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--po-shadow) 14%, transparent);
+  color: color-mix(in srgb, var(--po-text-muted) 74%, var(--po-text));
+  pointer-events: none;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
 /* While hidden, position changes apply instantly so the fade-in starts at
    the hovered row/column instead of gliding over from a stale one. */
 .markdown-codemirror-editor .cm-md-table-drag-handle:not(.is-visible) {
-  transition-property: background, border-color, color, opacity;
+  transition-property: opacity;
 }
 
 .markdown-codemirror-editor .cm-md-table-drag-handle.is-visible {
@@ -225,7 +236,7 @@
   pointer-events: auto;
 }
 
-.markdown-codemirror-editor .cm-md-table-drag-handle::before {
+.markdown-codemirror-editor .cm-md-table-drag-handle-visual::before {
   background-image: radial-gradient(currentColor 1.05px, transparent 1.2px);
   background-position: center;
   content: "";
@@ -233,35 +244,49 @@
 }
 
 .markdown-codemirror-editor .cm-md-table-column-handle {
-  width: 26px;
-  height: 13px;
-  transform: translate(-50%, -58%);
+  width: 32px;
+  height: 24px;
+  transform: translate(-50%, calc(-1 * var(--cm-md-table-handle-gutter)));
 }
 
-.markdown-codemirror-editor .cm-md-table-column-handle::before {
+.markdown-codemirror-editor .cm-md-table-column-handle .cm-md-table-drag-handle-visual {
+  width: 26px;
+  height: 13px;
+}
+
+.markdown-codemirror-editor .cm-md-table-row-handle {
+  width: 24px;
+  height: 32px;
+  transform: translate(calc(-1 * var(--cm-md-table-handle-gutter)), -50%);
+}
+
+.markdown-codemirror-editor .cm-md-table-column-handle .cm-md-table-drag-handle-visual::before {
   width: 14px;
   height: 5px;
   background-size: 4.5px 4.5px;
 }
 
-.markdown-codemirror-editor .cm-md-table-row-handle {
+.markdown-codemirror-editor .cm-md-table-row-handle .cm-md-table-drag-handle-visual {
   width: 13px;
   height: 26px;
-  transform: translate(-58%, -50%);
 }
 
-.markdown-codemirror-editor .cm-md-table-row-handle::before {
+.markdown-codemirror-editor .cm-md-table-row-handle .cm-md-table-drag-handle-visual::before {
   width: 5px;
   height: 14px;
   background-size: 4.5px 4.5px;
 }
 
-.markdown-codemirror-editor .cm-md-table-drag-handle:hover,
-.markdown-codemirror-editor .cm-md-table-drag-handle:focus-visible,
-.markdown-codemirror-editor .cm-md-table-drag-handle.is-dragging {
+.markdown-codemirror-editor .cm-md-table-drag-handle:hover .cm-md-table-drag-handle-visual,
+.markdown-codemirror-editor .cm-md-table-drag-handle:focus-visible .cm-md-table-drag-handle-visual,
+.markdown-codemirror-editor .cm-md-table-drag-handle.is-menu-active .cm-md-table-drag-handle-visual,
+.markdown-codemirror-editor .cm-md-table-drag-handle.is-dragging .cm-md-table-drag-handle-visual {
   border-color: color-mix(in srgb, var(--po-accent) 42%, var(--po-divider));
   background: color-mix(in srgb, var(--po-accent) 10%, var(--po-panel));
   color: color-mix(in srgb, var(--po-accent) 68%, var(--po-text));
+}
+
+.markdown-codemirror-editor .cm-md-table-drag-handle:focus-visible {
   outline: none;
 }
 
@@ -302,9 +327,12 @@
   margin-left: -1px;
 }
 
-.markdown-codemirror-editor .cm-md-table-widget th.cm-md-table-drag-source,
-.markdown-codemirror-editor .cm-md-table-widget td.cm-md-table-drag-source {
+.markdown-codemirror-editor .cm-md-table-widget-wrap .cm-md-table-widget td.cm-md-table-drag-source {
   background: color-mix(in srgb, var(--po-accent) 10%, transparent);
+}
+
+.markdown-codemirror-editor .cm-md-table-widget-wrap .cm-md-table-widget th.cm-md-table-drag-source {
+  background: color-mix(in srgb, var(--po-accent) 12%, color-mix(in srgb, var(--po-control) 42%, transparent));
 }
 
 .markdown-codemirror-editor .cm-md-table-structure-button {
@@ -313,17 +341,30 @@
   display: grid;
   place-items: center;
   padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+/* The button fills the action gutter and touches the table edge. Its visual
+   child keeps the existing 13px bar and breathing room, decoupling the hit
+   target from the chrome so the interface stays subtle without a hover gap. */
+.markdown-codemirror-editor .cm-md-table-structure-button-visual {
+  display: grid;
+  box-sizing: border-box;
+  place-items: center;
   border: 1px solid transparent;
   border-radius: 7px;
   background: color-mix(in srgb, var(--po-control) 42%, transparent);
   color: transparent;
-  cursor: pointer;
-  font: inherit;
   font-size: 12px;
   font-weight: 650;
   line-height: 1;
-  opacity: 0;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, opacity 0.12s ease;
+  pointer-events: none;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .markdown-codemirror-editor .cm-md-table-widget-wrap:hover .cm-md-table-structure-button,
@@ -331,26 +372,39 @@
   opacity: 1;
 }
 
-.markdown-codemirror-editor .cm-md-table-structure-button:hover,
-.markdown-codemirror-editor .cm-md-table-structure-button:focus-visible {
+.markdown-codemirror-editor .cm-md-table-structure-button:hover .cm-md-table-structure-button-visual,
+.markdown-codemirror-editor .cm-md-table-structure-button:focus-visible .cm-md-table-structure-button-visual {
   border-color: color-mix(in srgb, var(--po-accent) 32%, var(--po-divider));
   background: color-mix(in srgb, var(--po-accent) 10%, var(--po-panel));
   color: color-mix(in srgb, var(--po-accent) 78%, var(--po-text));
+}
+
+.markdown-codemirror-editor .cm-md-table-structure-button:focus-visible {
   outline: none;
 }
 
 .markdown-codemirror-editor .cm-md-table-add-row {
   left: 0;
   right: 0;
+  height: var(--cm-md-table-action-gutter);
+  bottom: calc(-1 * var(--cm-md-table-action-gutter));
+}
+
+.markdown-codemirror-editor .cm-md-table-add-row .cm-md-table-structure-button-visual {
+  width: 100%;
   height: 13px;
-  bottom: calc(var(--cm-md-table-action-gutter) * -1 + 3px);
 }
 
 .markdown-codemirror-editor .cm-md-table-add-column {
   top: 0;
   bottom: 0;
+  width: var(--cm-md-table-action-gutter);
+  right: calc(-1 * var(--cm-md-table-action-gutter));
+}
+
+.markdown-codemirror-editor .cm-md-table-add-column .cm-md-table-structure-button-visual {
   width: 13px;
-  right: calc(var(--cm-md-table-action-gutter) * -1 + 3px);
+  height: 100%;
 }
 
 .markdown-codemirror-editor .cm-md-table-widget-wrap.is-readonly .cm-md-table-structure-button {
@@ -365,13 +419,33 @@
   transform-origin: top left;
   max-height: min(520px, calc(100vh - 16px));
   gap: 0;
-  padding: 6px;
+  padding: var(--po-menu-padding, 4px);
   overflow: auto;
   border: 1px solid var(--po-menu-border);
   border-radius: var(--po-menu-radius);
   background: var(--po-menu-bg);
+  background-clip: padding-box;
   box-shadow: var(--po-menu-shadow);
   color: var(--po-text);
+  font-family: var(--po-font-sans, inherit);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-track,
+.cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-corner {
+  background: var(--po-menu-bg);
+}
+
+.cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-thumb {
+  border: 1px solid var(--po-menu-bg);
+  background: var(--po-scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+.cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-thumb:hover {
+  background: var(--po-scrollbar-thumb-hover);
+  background-clip: padding-box;
 }
 
 .cm-md-table-context-menu .desktop-menu-section {
@@ -418,6 +492,7 @@
   font-weight: 500;
   line-height: 18px;
   text-align: left;
+  transition: background 100ms ease, color 100ms ease;
 }
 
 .cm-md-table-context-menu .desktop-menu-item:hover:not(:disabled),
@@ -432,6 +507,11 @@
   color: var(--po-text-disabled);
   cursor: default;
   opacity: 0.58;
+}
+
+.cm-md-table-context-menu .desktop-menu-item.selected:disabled {
+  color: var(--po-text);
+  opacity: 1;
 }
 
 .cm-md-table-context-menu .desktop-menu-item.danger {
@@ -508,7 +588,9 @@
   .markdown-codemirror-editor .cm-md-table-widget td,
   .markdown-codemirror-editor .cm-md-table-cell-content,
   .markdown-codemirror-editor .cm-md-table-drag-handle,
-  .markdown-codemirror-editor .cm-md-table-structure-button {
+  .markdown-codemirror-editor .cm-md-table-drag-handle-visual,
+  .markdown-codemirror-editor .cm-md-table-structure-button,
+  .markdown-codemirror-editor .cm-md-table-structure-button-visual {
     transition: none;
   }
 

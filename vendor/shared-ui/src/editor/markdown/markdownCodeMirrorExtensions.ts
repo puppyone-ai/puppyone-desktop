@@ -12,22 +12,22 @@ import {
   placeholder,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { markdownLivePreviewDecorations } from "./decorations/livePreviewDecorations";
-import { markdownBlockWidgetSelectionExtension } from "./widgets/blockWidgetSelection";
-import { markdownEditingKeymap } from "./keymap/markdownEditingKeymap";
-import { markdownLivePreviewContextExtension } from "./markdownLivePreviewContext";
-import { markdownComposingBlockLineField, markdownInputCompositionExtension } from "./state/composingBlockLine";
-import { markdownExpandedImageField } from "./state/expandedImage";
-import { markdownLivePreviewFocusExtension } from "./state/livePreviewFocus";
-import { markdownTableFocusField } from "./adapters/codemirror/tableFocusState";
-import { markdownAssetUrlResolverFacet, markdownWorkspaceRootFacet } from "./markdownLivePreviewContext";
-import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "./adapters/codemirror/embedHost";
-import { getDocRevision } from "./services/transactionBroker";
+import { markdownLivePreviewDecorations } from "./core/decorations/livePreviewDecorations";
+import { markdownBlockWidgetSelectionExtension } from "./core/interaction/blockWidgetSelection";
+import { markdownEditingKeymap } from "./core/commands/markdownEditingKeymap";
+import { markdownLivePreviewContextExtension } from "./core/editor/markdownLivePreviewContext";
+import { markdownComposingBlockLineField, markdownInputCompositionExtension } from "./core/state/composingBlockLine";
+import { markdownExpandedImageField } from "./core/state/expandedImage";
+import { markdownLivePreviewFocusExtension } from "./core/state/livePreviewFocus";
+import { markdownTableFocusExtension } from "./features/table/tableFocus";
+import { markdownAssetUrlResolverFacet, markdownWorkspaceRootFacet } from "./core/editor/markdownLivePreviewContext";
+import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "./platform/codemirror/embedHost";
+import { getDocRevision } from "./platform/brokers/transactionBroker";
 import {
   markdownHiddenMarkerSelectionNormalizer,
   trailingLineWhitespaceSelectionExtension,
-} from "./state/selectionBehavior";
-import { puppyMarkdownParserExtensions } from "./syntax/markdownParserExtensions";
+} from "./core/state/selectionBehavior";
+import { puppyMarkdownParserExtensions } from "./core/syntax/markdownParserExtensions";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
 
 export function markdownCodeMirrorBaseExtensions(readOnly: boolean): Extension[] {
@@ -76,7 +76,7 @@ export function markdownLivePreviewExtension(
     markdownInputCompositionExtension,
     markdownComposingBlockLineField,
     markdownExpandedImageField,
-    markdownTableFocusField,
+    markdownTableFocusExtension,
     markdownEmbedHostLifecycle,
     markdownLivePreviewDecorations,
     markdownBlockWidgetSelectionExtension,
@@ -104,6 +104,7 @@ const markdownEmbedHostLifecycle = ViewPlugin.fromClass(class {
     // aborts their jobs, and revokes their principal-scoped asset handles.
     host.executionSessions.destroyForRevisionChange(previousRevision, nextRevision);
     host.assets.revokeStaleRevision(host.viewId, nextRevision);
+    host.webEmbeds.destroyStaleRevision(host.viewId, nextRevision);
   }
 
   destroy() {

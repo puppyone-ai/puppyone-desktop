@@ -42,6 +42,8 @@ export type TitlebarActionsSettings = {
   order: TitlebarActionId[];
 };
 export type ExperimentalSettings = {
+  enableAgentChat: boolean;
+  enableAssetLibraryHome: boolean;
   enablePuppyoneAppFiles: boolean;
   enablePuppyFlowFiles: boolean;
 };
@@ -104,6 +106,8 @@ export const DEFAULT_TITLEBAR_ACTIONS_SETTINGS: TitlebarActionsSettings = {
 };
 export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
 export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
+  enableAgentChat: false,
+  enableAssetLibraryHome: false,
   enablePuppyoneAppFiles: false,
   enablePuppyFlowFiles: false,
 };
@@ -438,7 +442,10 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
     const parsed = JSON.parse(value) as Partial<ExperimentalSettings> | null;
     if (!parsed || typeof parsed !== "object") return DEFAULT_EXPERIMENTAL_SETTINGS;
 
+    const legacy = parsed as typeof parsed & { enableAgentCompanion?: unknown };
     return {
+      enableAgentChat: parsed.enableAgentChat === true || legacy.enableAgentCompanion === true,
+      enableAssetLibraryHome: parsed.enableAssetLibraryHome === true,
       enablePuppyoneAppFiles: parsed.enablePuppyoneAppFiles === true,
       enablePuppyFlowFiles: parsed.enablePuppyFlowFiles === true,
     };

@@ -26,6 +26,7 @@ type GitStatusViewProps = {
   onStagePaths: (paths: string[]) => Promise<boolean>;
   onUnstagePaths: (paths: string[]) => Promise<boolean>;
   onDiscardPaths: (paths: string[]) => Promise<boolean>;
+  onOpenWorkingFile: (path: string) => void;
   onInitializeRepository: () => Promise<boolean>;
 };
 
@@ -58,6 +59,7 @@ export function GitStatusView({
   onStagePaths,
   onUnstagePaths,
   onDiscardPaths,
+  onOpenWorkingFile,
   onInitializeRepository,
 }: GitStatusViewProps) {
   const commits = status?.commits ?? [];
@@ -127,6 +129,7 @@ export function GitStatusView({
         onStagePaths={onStagePaths}
         onUnstagePaths={onUnstagePaths}
         onDiscardPaths={onDiscardPaths}
+        onOpenFile={onOpenWorkingFile}
       />
     );
   }
@@ -577,6 +580,7 @@ function WorkingFileDetail({
   onStagePaths,
   onUnstagePaths,
   onDiscardPaths,
+  onOpenFile,
 }: {
   selection: GitWorkingSelection;
   detail: GitCommitDetail | null;
@@ -587,34 +591,63 @@ function WorkingFileDetail({
   onStagePaths: (paths: string[]) => Promise<boolean>;
   onUnstagePaths: (paths: string[]) => Promise<boolean>;
   onDiscardPaths: (paths: string[]) => Promise<boolean>;
+  onOpenFile: (path: string) => void;
 }) {
   const files = detail?.files ?? [];
   const disabled = Boolean(operationLoading);
   const remote = selection.origin === "remote";
   const committed = selection.origin === "committed";
   const readOnly = remote || committed;
+  const canOpenFile = !readOnly && selection.status !== "deleted";
+  const singleFile = files.length === 1 ? files[0] : null;
+  const statusTone = remote
+    ? "remote"
+    : committed
+      ? "committed"
+      : selection.staged
+        ? "staged"
+        : selection.status;
 
   return (
-    <section className="desktop-utility-view desktop-history-detail-view">
+    <section className="desktop-utility-view desktop-history-detail-view desktop-working-file-detail-view">
       <div className="desktop-history-detail-scroll">
         <div className="desktop-commit-detail">
           <div className="desktop-commit-summary">
             <div className="desktop-commit-id-row">
               <strong title={selection.path}>{selection.path}</strong>
-              <span className="desktop-head-badge">{remote ? "REMOTE" : committed ? "COMMITTED" : selection.staged ? "STAGED" : shortGitStatus(selection.status)}</span>
+              <span className={`desktop-working-file-status ${statusTone}`}>
+                {remote ? "REMOTE" : committed ? "COMMITTED" : selection.staged ? "STAGED" : shortGitStatus(selection.status)}
+              </span>
+              {singleFile?.additions != null && singleFile.deletions != null && (
+                <span className="desktop-file-diff-stat desktop-working-file-stat">
+                  <span className="added">+{singleFile.additions}</span>
+                  <span className="deleted">-{singleFile.deletions}</span>
+                </span>
+              )}
               {!readOnly && (
                 <div className="desktop-working-file-actions">
+                  {canOpenFile && (
+                    <button
+                      type="button"
+                      className="secondary-action desktop-working-file-open"
+                      title="Open this file in Data"
+                      onClick={() => onOpenFile(selection.path)}
+                    >
+                      <FileText size={13} aria-hidden="true" />
+                      <span>Open file</span>
+                    </button>
+                  )}
                   {selection.staged ? (
                     <button type="button" className="secondary-action" disabled={disabled} onClick={() => void onUnstagePaths([selection.path])}>
                       Unstage
                     </button>
                   ) : (
                     <>
-                      <button type="button" className="danger-action" disabled={disabled} onClick={() => void onDiscardPaths([selection.path])}>
-                        Discard
-                      </button>
                       <button type="button" className="secondary-action" disabled={disabled} onClick={() => void onStagePaths([selection.path])}>
                         Stage
+                      </button>
+                      <button type="button" className="danger-action" disabled={disabled} onClick={() => void onDiscardPaths([selection.path])}>
+                        Discard
                       </button>
                     </>
                   )}
@@ -631,7 +664,11 @@ function WorkingFileDetail({
           ) : files.length > 0 ? (
             <div className="desktop-file-diff-list">
               {files.map((file) => (
-                <FileDiffBlock file={file} key={`${file.status}:${file.oldPath ?? ""}:${file.path}`} />
+                <FileDiffBlock
+                  file={file}
+                  hideHeader={files.length === 1}
+                  key={`${file.status}:${file.oldPath ?? ""}:${file.path}`}
+                />
               ))}
             </div>
           ) : (
@@ -643,25 +680,33 @@ function WorkingFileDetail({
   );
 }
 
-function FileDiffBlock({ file }: { file: GitFileDiff }) {
+function FileDiffBlock({
+  file,
+  hideHeader = false,
+}: {
+  file: GitFileDiff;
+  hideHeader?: boolean;
+}) {
   const omittedLines = file.omittedLines ?? 0;
 
   return (
-    <section className="desktop-file-diff">
-      <div className="desktop-file-diff-header">
-        <span className={`desktop-change-badge ${file.status}`}>{statusLabel(file.status)}</span>
-        <FileText size={14} />
-        <span className="desktop-file-diff-path" title={file.oldPath ? `${file.oldPath} -> ${file.path}` : file.path}>
-          {file.oldPath && file.oldPath !== file.path ? `${file.oldPath} -> ` : ""}
-          {file.path}
-        </span>
-        {file.additions != null && file.deletions != null && (
-          <span className="desktop-file-diff-stat">
-            <span className="added">+{file.additions}</span>
-            <span className="deleted">-{file.deletions}</span>
+    <section className={`desktop-file-diff ${hideHeader ? "without-header" : ""}`}>
+      {!hideHeader && (
+        <div className="desktop-file-diff-header">
+          <span className={`desktop-change-badge ${file.status}`}>{statusLabel(file.status)}</span>
+          <FileText size={14} />
+          <span className="desktop-file-diff-path" title={file.oldPath ? `${file.oldPath} -> ${file.path}` : file.path}>
+            {file.oldPath && file.oldPath !== file.path ? `${file.oldPath} -> ` : ""}
+            {file.path}
           </span>
-        )}
-      </div>
+          {file.additions != null && file.deletions != null && (
+            <span className="desktop-file-diff-stat">
+              <span className="added">+{file.additions}</span>
+              <span className="deleted">-{file.deletions}</span>
+            </span>
+          )}
+        </div>
+      )}
 
       {file.binary ? (
         <div className="desktop-diff-placeholder">Binary file</div>
@@ -694,14 +739,18 @@ function formatDiffTruncationMessage(omittedLines: number) {
 
 function DiffLineView({ line }: { line: GitDiffLine }) {
   if (line.kind === "hunk") {
-    return <div className="desktop-diff-line hunk">{line.text}</div>;
+    return <div className="desktop-diff-hunk-separator" aria-hidden="true" />;
   }
 
+  const displayLine = line.kind === "remove" ? line.oldLine : line.newLine ?? line.oldLine;
   const prefix = line.kind === "add" ? "+" : line.kind === "remove" ? "-" : " ";
   return (
-    <div className={`desktop-diff-line ${line.kind}`}>
-      <span className="line-number">{line.oldLine ?? ""}</span>
-      <span className="line-number">{line.newLine ?? ""}</span>
+    <div
+      className={`desktop-diff-line ${line.kind}`}
+      data-old-line={line.oldLine}
+      data-new-line={line.newLine}
+    >
+      <span className="line-number">{displayLine ?? ""}</span>
       <span className="line-prefix">{prefix}</span>
       <code>{line.text || " "}</code>
     </div>

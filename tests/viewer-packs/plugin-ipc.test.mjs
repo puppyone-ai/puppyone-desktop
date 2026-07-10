@@ -53,7 +53,9 @@ describe("viewer pack ipc separation", () => {
         contentView: { addChildView() {}, removeChildView() {} },
       }),
       userDataPath,
-      allowTestKeys: true,
+      appVersion: "0.1.2",
+      isPackaged: false,
+      trustedSigners: [],
       allowFileFallback: true,
     });
 
@@ -78,6 +80,48 @@ describe("viewer pack ipc separation", () => {
     await expect(raw.invoke(
       VIEWER_PACK_PLUGIN_IPC_CHANNELS.documentGetMeta,
       { sender: { id: 12345 } },
-    )).rejects.toThrow(/No active viewer pack session/);
+    )).rejects.toThrow(/No active Viewer Pack session/i);
+
+    await expect(host.openResourceForSession({
+      permissions: { currentDocument: ["metadata"] },
+    })).rejects.toThrow(/readRange/);
+  });
+
+  it("authorizes the workspace in main and ignores renderer-supplied package coordinates", async () => {
+    const trusted = createFakeIpc();
+    let activation = null;
+    const host = {
+      getSnapshot: async () => ({ sequence: 0, generatedAt: "", contributions: [] }),
+      installLocalPackageFromFiles: async () => ({}),
+      disablePack: async () => ({}),
+      uninstallPack: async () => ({}),
+      activateDocumentSession: async (request) => { activation = request; return { sessionId: "ok" }; },
+      sessions: { setBounds: () => ({ ok: true }), destroy: () => ({ ok: true }) },
+    };
+    const authorizeWorkspaceRoot = async (_event, requestedRoot) => {
+      expect(requestedRoot).toBe("/renderer-claim");
+      return "/main-authorized";
+    };
+    registerViewerPackAppIpcHandlers({ ipcMain: trusted, host, authorizeWorkspaceRoot });
+
+    await trusted.invoke(
+      VIEWER_PACK_APP_IPC_CHANNELS.activate,
+      { sender: { id: 42 } },
+      {
+        pluginId: "ai.puppyone.viewer.glb",
+        rootPath: "/renderer-claim",
+        relativePath: "scene.glb",
+        version: "attacker-version",
+        entry: "attacker.html",
+        contentHash: "attacker-hash",
+      },
+    );
+    expect(activation).toEqual({
+      pluginId: "ai.puppyone.viewer.glb",
+      rootPath: "/main-authorized",
+      relativePath: "scene.glb",
+      ownerWebContentsId: 42,
+      bounds: undefined,
+    });
   });
 });

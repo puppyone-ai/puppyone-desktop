@@ -10,13 +10,19 @@ Electron security boundary.
 
 ## Implementation status (July 2026)
 
-**Implemented:** the Codex vertical slice described by this handoff is present
+**Experimental and off by default:** the Codex vertical slice described by this
+handoff is present
 under `electron/main/agent/` and `src/features/desktop-agent/`. It includes the
 real app-server transport, account/model inspection, thread create/resume,
 turn streaming, command/file approvals, interrupt, bounded replay/persistence,
-Chat/Terminal keep-alive switching, tests, and an opt-in no-inference smoke
+independent Chat/Terminal header switching, tests, and an opt-in no-inference smoke
 script (`npm run smoke:codex-agent`, enabled with
 `RUN_CODEX_AGENT_SMOKE=1`).
+
+Shipping the code does not expose Chat automatically. Terminal remains
+available through its own header icon. The build availability flag and the
+persisted Settings → Experimental opt-in must both be true before the separate
+Chat header icon appears. The tested minimum Codex version is `0.144.1`.
 
 **Known gaps:** integrated Codex login is deferred in favor of external
 `codex login` plus Refresh. Experimental structured questions, permission
@@ -330,10 +336,10 @@ Do not add an unreviewed API-key text field to the renderer as a shortcut.
 
 ### 6. Right sidebar shell
 
-Evolve the existing right sidebar into one companion surface with:
+Keep two independent header actions:
 
 ```text
-Chat | Terminal
+[Chat icon] [Terminal icon]
 ```
 
 Requirements:
@@ -341,7 +347,9 @@ Requirements:
 - preserve the current 420px to 760px width preference;
 - preserve Terminal lazy mount, fit/resize, drag/drop, reset, and cleanup;
 - keep one sidebar width and one open/closed state;
-- store the last selected Chat/Terminal surface as a preference;
+- store the last selected right-sidebar panel as a preference;
+- do not render Chat/Terminal tabs inside either panel;
+- keep `RightAgentPanel` and `RightTerminalPanel` as separate components;
 - do not mount two independent right asides;
 - do not rename unrelated left-sidebar concepts to Agent;
 - keep the first slice limited to local workspaces.
@@ -353,7 +361,7 @@ Switching to Chat must not recreate the PTY.
 
 Implement a production-shaped minimal presentation, not a fake screenshot:
 
-- surface header with Chat/Terminal and New Session;
+- session header with New Session and diagnostics;
 - Codex readiness/account state;
 - model selection when `model/list` succeeds;
 - transcript with user and assistant messages;
@@ -465,7 +473,8 @@ Do not implement any of the following in this task:
 
 1. Add provider-neutral types and pure projection tests.
 2. Add AgentService with a fake in-memory adapter and IPC ownership tests.
-3. Add the Chat/Terminal sidebar shell without changing Terminal internals.
+3. Add the independent Chat header action and panel routing without changing
+   Terminal internals.
 4. Add the transcript, composer, activity rows, and approval dock against fake
    events.
 5. Add Codex discovery and app-server JSON-RPC transport.
@@ -508,7 +517,7 @@ provider protocol debugging out of React components.
 
 ### Renderer tests
 
-- Chat/Terminal switching preserves both surfaces;
+- independent Chat/Terminal header buttons preserve both surfaces;
 - model/readiness/account states;
 - streamed assistant text and activity ordering;
 - approval actions and disabled/stale states;

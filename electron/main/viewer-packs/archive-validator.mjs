@@ -17,6 +17,7 @@ export const VIEWER_PACK_ARCHIVE_LIMITS = Object.freeze({
   maxCompressedBytes: 80 * 1024 * 1024,
   maxEntryCount: 2_000,
   maxExtractedBytes: 250 * 1024 * 1024,
+  maxSingleEntryBytes: 64 * 1024 * 1024,
   maxCompressionRatio: 200,
   maxEntryNameLength: 512,
 });
@@ -38,7 +39,7 @@ export async function extractAndValidateViewerPackArchive({
   }
 
   // Fail closed on hostile raw names before JSZip can normalize them away.
-  assertSafeCentralDirectoryEntryNames(archiveBytes, limits);
+  const centralDirectory = assertSafeCentralDirectoryEntryNames(archiveBytes, limits);
 
   const zip = await JSZip.loadAsync(archiveBytes, { checkCRC32: true });
   const names = Object.keys(zip.files);
@@ -52,11 +53,17 @@ export async function extractAndValidateViewerPackArchive({
   let extractedTotal = 0;
 
   await fsp.rm(destinationDir, { recursive: true, force: true });
-  await fsp.mkdir(destinationDir, { recursive: true });
+  await fsp.mkdir(destinationDir, { recursive: true, mode: 0o700 });
 
   for (const name of names) {
     const entry = zip.files[name];
     if (!entry || entry.dir) continue;
+
+    const declared = centralDirectory.get(name);
+    if (!declared) throw new Error(`Archive entry missing from central directory: ${name}`);
+    if (declared.uncompressedSize > limits.maxSingleEntryBytes) {
+      throw new Error(`Archive entry exceeds single-entry size budget: ${name}`);
+    }
 
     if (name.length > limits.maxEntryNameLength) {
       throw new Error(`Archive entry name too long: ${name}`);
@@ -77,6 +84,9 @@ export async function extractAndValidateViewerPackArchive({
     }
 
     const bytes = Buffer.from(await entry.async("uint8array"));
+    if (bytes.length !== declared.uncompressedSize) {
+      throw new Error(`Archive entry size does not match central directory: ${name}`);
+    }
     extractedTotal += bytes.length;
     if (extractedTotal > limits.maxExtractedBytes) {
       throw new Error("Viewer pack archive exceeds extracted size budget.");
@@ -91,8 +101,8 @@ export async function extractAndValidateViewerPackArchive({
     if (resolvedTarget !== resolvedRoot && !resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`)) {
       throw new Error(`Archive entry escapes destination: ${name}`);
     }
-    await fsp.mkdir(path.dirname(resolvedTarget), { recursive: true });
-    await fsp.writeFile(resolvedTarget, bytes, { flag: "wx" });
+    await fsp.mkdir(path.dirname(resolvedTarget), { recursive: true, mode: 0o700 });
+    await fsp.writeFile(resolvedTarget, bytes, { flag: "wx", mode: 0o600 });
 
     inventory.push({
       path: normalized.path,
@@ -107,7 +117,7 @@ export async function extractAndValidateViewerPackArchive({
     extractedBytes: extractedTotal,
     compressedBytes,
     contentHash: createHash("sha256")
-      .update(inventory.map((item) => `${item.path}:${item.sha256}`).join("\n"))
+      .update(inventory.map((item) => `${item.path}:${item.sizeBytes}:${item.sha256}`).join("\n"))
       .digest("hex"),
   };
 }
@@ -123,19 +133,41 @@ export function assertSafeCentralDirectoryEntryNames(archiveBytes, limits = VIEW
   if (eocdOffset < 0) {
     throw new Error("Archive entry path rejected (missing-eocd): end of central directory not found.");
   }
+  const commentLength = bytes.readUInt16LE(eocdOffset + 20);
+  if (eocdOffset + 22 + commentLength !== bytes.length) {
+    throw new Error("Archive entry path rejected (trailing-data-or-invalid-comment).");
+  }
 
+  const diskNumber = bytes.readUInt16LE(eocdOffset + 4);
+  const centralDirectoryDisk = bytes.readUInt16LE(eocdOffset + 6);
+  const entriesOnDisk = bytes.readUInt16LE(eocdOffset + 8);
   const entryCount = bytes.readUInt16LE(eocdOffset + 10);
   const centralDirectoryBytes = bytes.readUInt32LE(eocdOffset + 12);
   const centralDirectoryOffset = bytes.readUInt32LE(eocdOffset + 16);
+  if (
+    diskNumber !== 0 ||
+    centralDirectoryDisk !== 0 ||
+    entriesOnDisk !== entryCount ||
+    entryCount === 0xffff ||
+    centralDirectoryBytes === 0xffffffff ||
+    centralDirectoryOffset === 0xffffffff
+  ) {
+    throw new Error("Archive entry path rejected (multi-disk-or-zip64-unsupported).");
+  }
   if (entryCount > limits.maxEntryCount) {
     throw new Error("Viewer pack archive has too many entries.");
   }
   if (centralDirectoryOffset + centralDirectoryBytes > bytes.length) {
     throw new Error("Archive entry path rejected (central-directory-bounds).");
   }
+  if (centralDirectoryOffset + centralDirectoryBytes !== eocdOffset) {
+    throw new Error("Archive entry path rejected (central-directory-not-contiguous).");
+  }
 
   let cursor = centralDirectoryOffset;
   const centralEnd = centralDirectoryOffset + centralDirectoryBytes;
+  const entries = new Map();
+  let declaredExtractedTotal = 0;
   for (let index = 0; index < entryCount; index += 1) {
     if (cursor + 46 > centralEnd) {
       throw new Error("Archive entry path rejected (truncated-central-directory).");
@@ -153,8 +185,50 @@ export function assertSafeCentralDirectoryEntryNames(archiveBytes, limits = VIEW
     }
     const rawName = bytes.subarray(nameStart, nameEnd).toString("utf8");
     assertRawZipEntryName(rawName, limits);
+    const flags = bytes.readUInt16LE(cursor + 8);
+    const compressionMethod = bytes.readUInt16LE(cursor + 10);
+    const compressedSize = bytes.readUInt32LE(cursor + 20);
+    const uncompressedSize = bytes.readUInt32LE(cursor + 24);
+    const madeByPlatform = bytes.readUInt16LE(cursor + 4) >> 8;
+    const externalAttributes = bytes.readUInt32LE(cursor + 38);
+    const unixMode = externalAttributes >>> 16;
+    if (madeByPlatform === 3 && (unixMode & 0o170000) === 0o120000) {
+      throw new Error(`Archive entry path rejected (symlink-entry): ${rawName}`);
+    }
+    if ((flags & 0x1) !== 0) {
+      throw new Error(`Archive entry path rejected (encrypted-entry): ${rawName}`);
+    }
+    if (compressionMethod !== 0 && compressionMethod !== 8) {
+      throw new Error(`Archive entry path rejected (unsupported-compression): ${rawName}`);
+    }
+    if (compressedSize === 0xffffffff || uncompressedSize === 0xffffffff) {
+      throw new Error(`Archive entry path rejected (zip64-entry-unsupported): ${rawName}`);
+    }
+    if (!rawName.endsWith("/")) {
+      if (uncompressedSize > limits.maxSingleEntryBytes) {
+        throw new Error(`Archive entry exceeds single-entry size budget: ${rawName}`);
+      }
+      if (compressedSize === 0 && uncompressedSize > 0) {
+        throw new Error(`Archive entry compression ratio looks hostile: ${rawName}`);
+      }
+      if (compressedSize > 0 && uncompressedSize / compressedSize > limits.maxCompressionRatio) {
+        throw new Error(`Archive entry compression ratio looks hostile: ${rawName}`);
+      }
+      declaredExtractedTotal += uncompressedSize;
+      if (declaredExtractedTotal > limits.maxExtractedBytes) {
+        throw new Error("Viewer pack archive exceeds declared extracted size budget.");
+      }
+    }
+    if (entries.has(rawName)) {
+      throw new Error(`Duplicate archive entry: ${rawName}`);
+    }
+    entries.set(rawName, { compressedSize, uncompressedSize, flags, compressionMethod });
     cursor = nameEnd + extraBytes + commentBytes;
   }
+  if (cursor !== centralEnd) {
+    throw new Error("Archive entry path rejected (central-directory-length-mismatch).");
+  }
+  return entries;
 }
 
 function assertRawZipEntryName(name, limits) {

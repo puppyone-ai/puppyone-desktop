@@ -32,4 +32,25 @@ describe("normalized AgentEvent envelopes", () => {
     expect(JSON.stringify(redacted)).not.toContain("secret-value");
     expect(redactSecretText("Bearer abcdefghijklmnopqrstuvwxyz")).toBe("Bearer [redacted]");
   });
+
+  it("preserves token usage metrics while redacting common environment secrets", () => {
+    const redacted = redactSecrets({
+      tokenUsage: {
+        inputTokens: 1200,
+        cachedInputTokens: 400,
+        outputTokens: 88,
+        totalTokens: 1288,
+      },
+      accessToken: "secret-access-token",
+    });
+    expect(redacted.tokenUsage).toEqual({
+      inputTokens: 1200,
+      cachedInputTokens: 400,
+      outputTokens: 88,
+      totalTokens: 1288,
+    });
+    expect(redacted.accessToken).toBe("[redacted]");
+    expect(redactSecretText("AWS_SECRET_ACCESS_KEY=very-secret-value")).toBe("AWS_SECRET_ACCESS_KEY=[redacted]");
+    expect(redactSecretText("CLIENT_SECRET=very-secret-value")).toBe("CLIENT_SECRET=[redacted]");
+  });
 });

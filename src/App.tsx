@@ -10,7 +10,10 @@ import {
   MinimalOnboarding,
   type OnboardingOperationStatus,
 } from "./components/MinimalOnboarding";
-import { RightCompanionPanel, type RightCompanionPanelHandle } from "./features/desktop-agent/RightCompanionPanel";
+import { AssetLibraryHome } from "./components/AssetLibraryHome";
+import { RightTerminalPanel, type RightTerminalPanelHandle } from "./components/RightTerminalPanel";
+import { RightAgentPanel } from "./features/desktop-agent/RightAgentPanel";
+import { isDesktopAgentChatEnabled, isDesktopTerminalEnabled } from "./features/desktop-agent/featureGate";
 import { useDesktopUpdates } from "./components/DesktopUpdateControls";
 import {
   configureWorkspaceCloudRemote,
@@ -51,6 +54,7 @@ import { DesktopOverlayPortal } from "./features/app-shell/DesktopOverlayPortal"
 import type { DesktopWorkspaceSwitcherItem } from "./features/app-shell/DesktopWorkspaceSwitcher";
 import { RestoringWorkspaceScreen } from "./features/app-shell/RestoringWorkspaceScreen";
 import { useDesktopPreferences } from "./features/app-shell/useDesktopPreferences";
+import { isAssetLibraryHomeEnabled } from "./features/app-shell/homeFeatureGate";
 import { useWorkspaceLifecycle } from "./features/app-shell/useWorkspaceLifecycle";
 import { usePuppyoneConfig } from "./features/app-shell/usePuppyoneConfig";
 import { useActiveExternalOpenTarget } from "./features/external-apps/useActiveExternalOpenTarget";
@@ -70,6 +74,7 @@ import {
   GitOperationErrorDialog,
 } from "./features/source-control/operationDialogs";
 import { useDesktopGitController } from "./features/source-control/useDesktopGitController";
+import { createRepositoryRefreshReason } from "./features/source-control/repositoryRefreshPolicy";
 import { getPuppyoneRemote, parsePuppyoneRemote } from "./features/source-control/remotes";
 import { CloudProjectResolveDialog } from "./features/cloud/workspace/CloudProjectResolveDialog";
 import { useWorkspaceSurfaceSwitch } from "./features/cloud/workspace/useWorkspaceSurfaceSwitch";
@@ -82,6 +87,8 @@ export function App() {
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
   const cloudEnabled = useFeatureFlag("cloudWorkspace");
+  const assetLibraryHomeAvailable = useFeatureFlag("assetLibraryHome");
+  const agentChatAvailable = useFeatureFlag("desktopAgentChat");
   const {
     cloudSession,
     cloudSessionRestoring,
@@ -134,6 +141,7 @@ export function App() {
   const {
     aiEditAssistEnabled,
     explorerWidth,
+    experimentalSettings,
     externalAppsSettings,
     fileIconTheme,
     filesVisibilitySettings,
@@ -147,7 +155,6 @@ export function App() {
     sidebarNavigationLayout,
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
-    terminalSidebarOpen,
     terminalToolEnabled,
     titlebarActionsSettings,
     darkThemePreset,
@@ -170,15 +177,49 @@ export function App() {
     setSidebarNavigationLayout,
     setThemeMode,
   } = preferences;
+  const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
+    available: assetLibraryHomeAvailable,
+    optedIn: experimentalSettings.enableAssetLibraryHome,
+  });
+  const Homepage = assetLibraryHomeEnabled ? AssetLibraryHome : MinimalOnboarding;
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("account");
   const [terminalSessionResetToken, setTerminalSessionResetToken] = useState(0);
-  const companionPanelRef = useRef<RightCompanionPanelHandle | null>(null);
+  const terminalPanelRef = useRef<RightTerminalPanelHandle | null>(null);
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
   const [activeDataPath, setActiveDataPath] = useState<string | null>(null);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
   const switcherRef = useRef<HTMLDivElement>(null);
   const cloudBrowserSignInInFlightRef = useRef(false);
   const workspaceIsCloud = isCloudWorkspace(workspace);
+  const desktopTerminalEnabled = isDesktopTerminalEnabled({ terminalToolEnabled, workspaceIsCloud });
+  const desktopAgentChatEnabled = isDesktopAgentChatEnabled({
+    available: agentChatAvailable,
+    optedIn: experimentalSettings.enableAgentChat,
+    workspaceIsCloud,
+  });
+  const desktopRightSidebarEnabled = desktopTerminalEnabled || desktopAgentChatEnabled;
+
+  useEffect(() => {
+    if (!desktopRightSidebarEnabled) {
+      if (rightSidebarOpen) setRightSidebarOpen(false);
+      return;
+    }
+    if (rightSidebarSurface === "terminal" && !desktopTerminalEnabled) {
+      setRightSidebarSurface("chat");
+      return;
+    }
+    if (rightSidebarSurface === "chat" && !desktopAgentChatEnabled) {
+      setRightSidebarSurface("terminal");
+    }
+  }, [
+    desktopAgentChatEnabled,
+    desktopRightSidebarEnabled,
+    desktopTerminalEnabled,
+    rightSidebarOpen,
+    rightSidebarSurface,
+    setRightSidebarOpen,
+    setRightSidebarSurface,
+  ]);
   const cloudProjectId = getCloudProjectIdFromWorkspace(workspace);
   useEffect(() => {
     if (workspace && homeOperationStatus) setHomeOperationStatus(null);
@@ -234,6 +275,7 @@ export function App() {
     selectedGitCommitId,
     selectedGitWorkingFile,
     applyGitStatus,
+    captureGitRepositoryContext,
     clearGitSelection,
     dismissGitOperationError,
     handleCheckoutGitBranch,
@@ -252,6 +294,7 @@ export function App() {
     handleStashAndCheckoutBranch,
     handleUnstageAllGitChanges,
     handleUnstageGitPaths,
+    isGitRepositoryContextCurrent,
     refreshGitStatus,
     refreshGitStatusWithFetch,
     selectGitCommit,
@@ -626,7 +669,9 @@ export function App() {
     if (!cloudEnabled) return null;
     if (!workspace) return null;
     if (workspaceIsCloud) return null;
-    await configureWorkspaceCloudRemote(workspace.path, remoteUrl, "puppyone");
+    const context = captureGitRepositoryContext(workspace.path);
+    if (!context) return null;
+    await configureWorkspaceCloudRemote(context.rootPath, remoteUrl, "puppyone");
     const remoteProjectId = parsePuppyoneRemote(remoteUrl)?.projectId?.trim() || null;
     const nextProjectId = projectId?.trim() || remoteProjectId || puppyoneConfig?.cloud.projectId?.trim() || null;
     const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
@@ -662,11 +707,25 @@ export function App() {
         },
       }));
     }
-    const refreshedStatus = await getWorkspaceGitStatus(workspace.path);
-    applyGitStatus(refreshedStatus, workspace.path);
-    refreshWorkspaceContent();
+    const refreshedStatus = await getWorkspaceGitStatus(context.rootPath);
+    if (applyGitStatus(
+      refreshedStatus,
+      context,
+      createRepositoryRefreshReason("configure-remote", "mutation"),
+    )) {
+      refreshWorkspaceContent();
+    }
     return refreshedStatus;
-  }, [applyGitStatus, cloudEnabled, handlePuppyoneConfigChange, puppyoneConfig, refreshWorkspaceContent, workspace, workspaceIsCloud]);
+  }, [
+    applyGitStatus,
+    captureGitRepositoryContext,
+    cloudEnabled,
+    handlePuppyoneConfigChange,
+    puppyoneConfig,
+    refreshWorkspaceContent,
+    workspace,
+    workspaceIsCloud,
+  ]);
 
   const {
     cloudBackupError,
@@ -676,10 +735,12 @@ export function App() {
     activeCloudSession,
     activeGitStatus,
     applyGitStatus,
+    captureGitRepositoryContext,
     clearGitSelection,
     cloudEnabled,
     handleCloudSessionChange,
     handlePuppyoneConfigChange,
+    isGitRepositoryContextCurrent,
     puppyoneConfig,
     refreshWorkspaceContent,
     setActiveCloudSection,
@@ -734,7 +795,7 @@ export function App() {
   if (!workspace) {
     return (
       <>
-        <MinimalOnboarding
+        <Homepage
           onChooseWorkspace={openFolder}
           onCreateCloudProject={cloudEnabled ? createCloudProjectFromHomepage : undefined}
           onOpenCloudProject={cloudEnabled ? openCloudProjectFromHomepage : undefined}
@@ -829,8 +890,6 @@ export function App() {
     />
   );
 
-  const desktopTerminalEnabled = terminalToolEnabled && !workspaceIsCloud;
-
   const titlebarActions = (
     <DesktopTitlebarActions
       desktopUpdates={desktopUpdates}
@@ -841,17 +900,12 @@ export function App() {
       activeFileExternalOpenLoading={activeExternalOpen.loading}
       externalOpenTargets={activeExternalOpen.targets}
       titlebarActionsSettings={titlebarActionsSettings}
-      terminalSidebarOpen={terminalSidebarOpen && desktopTerminalEnabled}
+      terminalSidebarOpen={rightSidebarOpen && desktopTerminalEnabled && rightSidebarSurface === "terminal"}
       terminalToolEnabled={desktopTerminalEnabled}
-      rightSidebarSurface={rightSidebarSurface}
+      agentChatEnabled={desktopAgentChatEnabled}
+      agentChatSidebarOpen={rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat"}
       onClearTerminal={() => {
-        companionPanelRef.current?.clear();
-        setSwitcherOpen(false);
-      }}
-      onNewAgentSession={() => {
-        setRightSidebarSurface("chat");
-        setRightSidebarOpen(true);
-        companionPanelRef.current?.newSession();
+        terminalPanelRef.current?.clear();
         setSwitcherOpen(false);
       }}
       onOpenActiveFileExternal={() => void activeExternalOpen.openActiveFileExternal()}
@@ -861,13 +915,17 @@ export function App() {
         setTerminalSessionResetToken((token) => token + 1);
         setSwitcherOpen(false);
       }}
-      onSelectCompanionSurface={(surface) => {
-        setRightSidebarSurface(surface);
-        setRightSidebarOpen(true);
+      onToggleTerminal={() => {
+        const terminalIsOpen = rightSidebarOpen && rightSidebarSurface === "terminal";
+        setRightSidebarSurface("terminal");
+        setRightSidebarOpen(!terminalIsOpen);
         setSwitcherOpen(false);
       }}
-      onToggleTerminal={() => {
-        setRightSidebarOpen((open) => !open);
+      onToggleAgentChat={() => {
+        if (!desktopAgentChatEnabled) return;
+        const chatIsOpen = rightSidebarOpen && rightSidebarSurface === "chat";
+        setRightSidebarSurface("chat");
+        setRightSidebarOpen(!chatIsOpen);
         setSwitcherOpen(false);
       }}
       onUpdateNow={() => {
@@ -890,28 +948,45 @@ export function App() {
       <DesktopCloudShell
         titlebarSlot={titlebarSlot}
         titlebarActions={titlebarActions}
-        rightSidebarOpen={terminalSidebarOpen && desktopTerminalEnabled}
+        rightSidebarOpen={rightSidebarOpen && desktopRightSidebarEnabled}
         resizableRightSidebar
         rightSidebarWidth={rightSidebarWidth}
         minRightSidebarWidth={MIN_RIGHT_SIDEBAR_WIDTH}
         maxRightSidebarWidth={MAX_RIGHT_SIDEBAR_WIDTH}
         onRightSidebarWidthChange={setRightSidebarWidth}
-        rightSidebar={desktopTerminalEnabled ? (
-          <RightCompanionPanel
-            key={workspace.path}
-            ref={companionPanelRef}
-            workspace={workspace}
-            active={terminalSidebarOpen && desktopTerminalEnabled}
-            surface={rightSidebarSurface}
-            terminalResetToken={terminalSessionResetToken}
-            preferredModel={agentPreferredModel}
-            onPreferredModelChange={setAgentPreferredModel}
-            onSurfaceChange={setRightSidebarSurface}
-            onViewChanges={() => {
-              setActiveView("git");
-              setSidebarCollapsed(false);
-            }}
-          />
+        rightSidebar={desktopRightSidebarEnabled ? (
+          <div className="desktop-right-sidebar-stack" key={workspace.path}>
+            {desktopTerminalEnabled && (
+              <div
+                className={`desktop-right-sidebar-surface ${rightSidebarSurface === "terminal" ? "is-active" : ""}`}
+                aria-hidden={rightSidebarSurface !== "terminal"}
+              >
+                <RightTerminalPanel
+                  key={`${workspace.path}:${terminalSessionResetToken}`}
+                  ref={terminalPanelRef}
+                  workspace={workspace}
+                  active={rightSidebarOpen && rightSidebarSurface === "terminal"}
+                />
+              </div>
+            )}
+            {desktopAgentChatEnabled && (
+              <div
+                className={`desktop-right-sidebar-surface ${rightSidebarSurface === "chat" ? "is-active" : ""}`}
+                aria-hidden={rightSidebarSurface !== "chat"}
+              >
+                <RightAgentPanel
+                  workspace={workspace}
+                  active={rightSidebarOpen && rightSidebarSurface === "chat"}
+                  preferredModel={agentPreferredModel}
+                  onPreferredModelChange={setAgentPreferredModel}
+                  onViewChanges={() => {
+                    setActiveView("git");
+                    setSidebarCollapsed(false);
+                  }}
+                />
+              </div>
+            )}
+          </div>
         ) : undefined}
       >
         <DesktopWorkspaceContent

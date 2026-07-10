@@ -4,7 +4,6 @@ import type { Workspace } from "@puppyone/shared-ui";
 import { AgentApprovalDock } from "./AgentApprovalDock";
 import { AgentComposer } from "./AgentComposer";
 import { AgentControls } from "./AgentControls";
-import { AgentQuestionDock } from "./AgentQuestionDock";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
 import { applyAgentEvent, applyAgentEvents, createAgentProjection } from "./agentProjection";
@@ -48,10 +47,13 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [resolvingApproval, setResolvingApproval] = useState(false);
   const sessionIdRef = useRef<string | null>(null);
   const projectionRef = useRef(projection);
   const replayInFlightRef = useRef(false);
+  const replayRequestedRef = useRef(false);
+  const bufferedEventsRef = useRef<AgentEvent[]>([]);
 
   useEffect(() => {
     if (active) setHasStarted(true);
@@ -59,6 +61,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
 
   useEffect(() => {
     onRunningChange?.(Boolean(projection.runningTurnId));
+    if (!projection.runningTurnId) setStopping(false);
   }, [onRunningChange, projection.runningTurnId]);
 
   const commitProjection = useCallback((next: ReturnType<typeof createAgentProjection>) => {
@@ -99,14 +102,41 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   const replayFrom = useCallback(async (afterSequence: number) => {
     const bridge = window.puppyoneDesktop;
     const sessionId = sessionIdRef.current;
-    if (!bridge?.replayAgentSession || !sessionId || replayInFlightRef.current) return;
+    if (!bridge?.replayAgentSession || !sessionId) return;
+    if (replayInFlightRef.current) {
+      replayRequestedRef.current = true;
+      return;
+    }
     replayInFlightRef.current = true;
     try {
-      const snapshot = await bridge.replayAgentSession({ sessionId, afterSequence });
-      let next = projectionRef.current;
-      next = applyAgentEvents(next, snapshot.events, { partialHistory: snapshot.partial });
-      commitProjection(next);
-      setSession(snapshot.session);
+      let cursor = afterSequence;
+      let attempts = 0;
+      do {
+        replayRequestedRef.current = false;
+        const snapshot = await bridge.replayAgentSession({ sessionId, afterSequence: cursor });
+        if (sessionIdRef.current !== sessionId) return;
+        let next = applyAgentEvents(
+          projectionRef.current,
+          snapshot.events,
+          { partialHistory: snapshot.partial },
+        );
+        const buffered = bufferedEventsRef.current
+          .filter((event) => event.sessionId === sessionId && event.sequence > next.lastSequence)
+          .sort((left, right) => left.sequence - right.sequence);
+        bufferedEventsRef.current = [];
+        for (const event of buffered) {
+          if (event.sequence > next.lastSequence + 1 && attempts < 2) {
+            bufferedEventsRef.current.push(event);
+            replayRequestedRef.current = true;
+            continue;
+          }
+          next = applyAgentEvent(next, event);
+        }
+        commitProjection(next);
+        setSession(snapshot.session);
+        cursor = next.lastSequence;
+        attempts += 1;
+      } while (replayRequestedRef.current && attempts < 3);
     } catch (replayError) {
       setError(formatAgentError(replayError));
     } finally {
@@ -121,7 +151,11 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
     return bridge.onAgentEvent((event: AgentEvent) => {
       if (event.sessionId !== sessionIdRef.current) return;
       const current = projectionRef.current;
-      if (current.lastSequence > 0 && event.sequence > current.lastSequence + 1) {
+      if (replayInFlightRef.current || event.sequence > current.lastSequence + 1) {
+        if (!bufferedEventsRef.current.some((entry) => entry.sequence === event.sequence)) {
+          bufferedEventsRef.current.push(event);
+        }
+        replayRequestedRef.current = true;
         void replayFrom(current.lastSequence);
         return;
       }
@@ -147,6 +181,34 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
       } : value);
     });
   }, [commitProjection, hasStarted, replayFrom]);
+
+  useEffect(() => {
+    if (!hasStarted) return undefined;
+    const bridge = window.puppyoneDesktop;
+    if (!bridge?.onAgentSessionExit) return undefined;
+    return bridge.onAgentSessionExit((event) => {
+      if (event.sessionId !== sessionIdRef.current || event.reason !== "provider-exited") return;
+      sessionIdRef.current = null;
+      replayRequestedRef.current = false;
+      bufferedEventsRef.current = [];
+      setStopping(false);
+      setSubmitting(false);
+      setResolvingApproval(false);
+      setSession((value) => value ? {
+        ...value,
+        activeTurnId: null,
+        terminalState: "provider-exited",
+      } : value);
+      commitProjection({
+        ...projectionRef.current,
+        approvals: [],
+        runningTurnId: null,
+        terminalState: projectionRef.current.runningTurnId ? "failed" : projectionRef.current.terminalState,
+      });
+      setPanelState("failed");
+      setError("Codex stopped unexpectedly. Files already changed were not reverted. Refresh to resume the saved session.");
+    });
+  }, [commitProjection, hasStarted]);
 
   const initialize = useCallback(async (refresh = false) => {
     const bridge = window.puppyoneDesktop;
@@ -181,10 +243,11 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   useEffect(() => {
     if (!hasStarted) return;
     sessionIdRef.current = null;
+    replayRequestedRef.current = false;
+    bufferedEventsRef.current = [];
     setSession(null);
     commitProjection(createAgentProjection());
     void initialize(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commitProjection, hasStarted, initialize, workspace.path]);
 
   const createSession = useCallback(async () => {
@@ -201,8 +264,9 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
     const bridge = window.puppyoneDesktop;
     setError(null);
     try {
-      if (sessionIdRef.current && bridge?.closeAgentSession) {
-        await bridge.closeAgentSession({ sessionId: sessionIdRef.current, removePersistence: true });
+      const previousSessionId = sessionIdRef.current ?? session?.id;
+      if (previousSessionId && bridge?.closeAgentSession) {
+        await bridge.closeAgentSession({ sessionId: previousSessionId, removePersistence: true });
       }
       sessionIdRef.current = null;
       setSession(null);
@@ -214,7 +278,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
       setPanelState("failed");
       setError(formatAgentError(newSessionError));
     }
-  }, [commitProjection, createSession]);
+  }, [commitProjection, createSession, session?.id]);
 
   const handleResetSession = useCallback(() => {
     void handleNewSession();
@@ -222,17 +286,18 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
 
   const handleCloseSession = useCallback(async () => {
     const bridge = window.puppyoneDesktop;
-    if (!sessionIdRef.current || !bridge?.closeAgentSession) return;
+    const sessionToClose = sessionIdRef.current ?? session?.id;
+    if (!sessionToClose || !bridge?.closeAgentSession) return;
     setError(null);
     try {
-      await bridge.closeAgentSession({ sessionId: sessionIdRef.current, removePersistence: true });
+      await bridge.closeAgentSession({ sessionId: sessionToClose, removePersistence: true });
       sessionIdRef.current = null;
       setSession(null);
       commitProjection(createAgentProjection());
     } catch (closeError) {
       setError(formatAgentError(closeError));
     }
-  }, [commitProjection]);
+  }, [commitProjection, session?.id]);
 
   useImperativeHandle(ref, () => ({
     newSession: () => void handleNewSession(),
@@ -264,9 +329,11 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
     const bridge = window.puppyoneDesktop;
     if (!bridge?.interruptAgentTurn || !session?.id || !projection.runningTurnId) return;
     setError(null);
+    setStopping(true);
     try {
       await bridge.interruptAgentTurn({ sessionId: session.id, turnId: projection.runningTurnId });
     } catch (stopError) {
+      setStopping(false);
       setError(formatAgentError(stopError));
     }
   };
@@ -307,7 +374,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
     <section className="desktop-agent-panel" aria-label="Codex Chat">
       <AgentSurfaceHeader
         title={session?.title || "Codex"}
-        statusLabel={session ? session.terminalState : readinessLabel(readiness?.status)}
+        statusLabel={session ? sessionStatusLabel(session.terminalState) : readinessLabel(readiness?.status)}
         loading={loading}
         newSessionDisabled={unavailable || Boolean(projection.runningTurnId)}
         onNewSession={() => void handleNewSession()}
@@ -330,7 +397,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         <div className="desktop-agent-readiness" role="status">
           <CircleAlert size={15} />
           <div>
-            <strong>{readinessHeading(readiness?.status)}</strong>
+            <strong>{panelState === "failed" ? "Codex session needs attention" : readinessHeading(readiness?.status)}</strong>
             {unsupportedVersion ? (
               <p>
                 Detected Codex {readiness?.version || "unknown version"}; PuppyOne requires{" "}
@@ -339,7 +406,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
             ) : setupRequired ? (
               <p>Codex is installed but not signed in. Run `codex login` in Terminal, then refresh.</p>
             ) : (
-              <p>{readiness?.message || error || "Unable to inspect Codex."}</p>
+              <p>{panelState === "failed" ? error : readiness?.message || error || "Unable to inspect Codex."}</p>
             )}
           </div>
           <button type="button" aria-label="Refresh Codex readiness" onClick={() => void initialize(true)}>
@@ -360,13 +427,6 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
 
       <AgentTranscript projection={projection} loading={loading} onViewChanges={onViewChanges} />
 
-      <AgentQuestionDock
-        question={null}
-        capabilities={inspection?.capabilities ?? null}
-        onSubmit={() => {}}
-        onCancel={() => {}}
-      />
-
       {projection.approvals[0] && (
         <AgentApprovalDock
           approval={projection.approvals[0]}
@@ -381,6 +441,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         onDraftChange={setDraft}
         disabled={loading || unavailable || panelState === "failed" || projection.approvals.length > 0}
         running={Boolean(projection.runningTurnId)}
+        stopping={stopping}
         submitting={submitting}
         placeholder={setupRequired ? "Codex setup required" : unavailable ? "Codex unavailable" : "Message Codex…"}
         onSubmit={handleSubmit}
@@ -396,6 +457,10 @@ function readinessLabel(status: string | undefined) {
   if (status === "not-installed") return "not installed";
   if (status === "unsupported-version") return "update required";
   return "checking";
+}
+
+function sessionStatusLabel(status: AgentSessionMetadata["terminalState"]) {
+  return status === "provider-exited" ? "provider exited" : status;
 }
 
 function readinessHeading(status: string | undefined) {

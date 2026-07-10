@@ -14,18 +14,32 @@ Explorer selection
 Format registry
         |
         v
-Viewer registry -------- reserved viewer plugins
+Viewer registry <........ reserved viewer packs
         |
         v
-Content/resource acquisition
+Content / resource acquisition
         |
         v
 Committed preview document
         |
-        +-------- read-only viewer
+        +----> Markdown editor
         |
-        +-------- format-specific editor
+        +----> Text / code editor
+        |
+        +----> CSV table editor
+        |
+        +----> HTML viewer
+        |
+        +----> Office preview
+        |
+        +----> Image / PDF / audio / video viewer
 ```
+
+The Explorer owns selection, not rendering. The format and viewer registries
+own the decision about which format-specific surface receives a committed
+document. A file-level HTML viewer and an HTML block embedded in Markdown are
+therefore different architectural layers even when both eventually render
+HTML.
 
 This subsystem owns:
 

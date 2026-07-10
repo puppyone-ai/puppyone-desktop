@@ -8,14 +8,13 @@ import { createViewerPackResourceBroker } from "./resource-broker.mjs";
 import { createViewerPackSessionManager } from "./session-manager.mjs";
 import { applyPluginSessionSecurity } from "./plugin-session-security.mjs";
 import { resolveViewerPackRoute } from "./router.mjs";
-import { getPinnedViewerPackPublicKeys } from "./package-signature.mjs";
+import { resolveCoreFormatPolicy } from "./core-format-policy.mjs";
+import { getPinnedViewerPackSigners, normalizeTrustedSigners } from "./package-signature.mjs";
 import { RESOURCE_PROTOCOL_SCHEME } from "./resource-protocol.mjs";
-import { resolveExistingWorkspacePath, statWorkspaceFile, readWorkspaceFileRange } from "../../../local-api/workspace.mjs";
+import { resolveExistingWorkspacePath, statWorkspaceFile } from "../../../local-api/workspace.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// App-frame channels — MUST be registered through trustedIpcMain (rejects any
-// non-application frame URL). These carry install/activate/bounds authority.
 export const VIEWER_PACK_APP_IPC_CHANNELS = Object.freeze({
   getSnapshot: "viewer-pack:get-snapshot",
   installLocal: "viewer-pack:install-local",
@@ -26,9 +25,6 @@ export const VIEWER_PACK_APP_IPC_CHANNELS = Object.freeze({
   destroySession: "viewer-pack:destroy-session",
 });
 
-// Plugin-frame channels — MUST use RAW ipcMain with sender → session validation.
-// trustedIpcMain would reject these because the sandboxed pack frame's URL is
-// never the trusted application URL.
 export const VIEWER_PACK_PLUGIN_IPC_CHANNELS = Object.freeze({
   documentGetMeta: "viewer-pack:document-get-meta",
   resourceOpen: "viewer-pack:resource-open",
@@ -37,55 +33,61 @@ export const VIEWER_PACK_PLUGIN_IPC_CHANNELS = Object.freeze({
   resourceClose: "viewer-pack:resource-close",
   uiSetState: "viewer-pack:ui-set-state",
   uiGetTheme: "viewer-pack:ui-get-theme",
-  hostOpenExternal: "viewer-pack:host-open-external",
 });
 
-/**
- * Build an opaque, session-scoped resource URL. The `puppyone-resource://`
- * protocol is registered per session partition and bound to that session's
- * audience, so this URL is only ever readable from the session it was minted
- * for.
- */
+export const VIEWER_PACK_APP_EVENTS = Object.freeze({
+  sessionState: "viewer-pack:session-state",
+});
+
 export function createRangeUrl(handleId) {
   return `${RESOURCE_PROTOCOL_SCHEME}://handle/${encodeURIComponent(handleId)}`;
 }
 
-/**
- * Compose Viewer Pack host services for the Electron main process.
- */
 export function createViewerPackHost({
   WebContentsView,
   sessionFromPartition,
   getOwnerWindow,
   userDataPath,
-  allowTestKeys = process.env.PUPPYONE_VIEWER_PACK_ALLOW_TEST_KEYS === "1",
+  appVersion,
+  isPackaged = true,
+  trustedSigners = null,
+  allowTestKeys = false,
   getMimeType = null,
+  getThemeSnapshot = () => ({ mode: "light", tokens: {} }),
   allowFileFallback = false,
 }) {
   if (typeof userDataPath !== "string" || !userDataPath.trim()) {
     throw new TypeError("userDataPath is required for createViewerPackHost.");
   }
+  if (typeof appVersion !== "string" || !appVersion.trim()) {
+    throw new TypeError("appVersion is required for createViewerPackHost.");
+  }
+  if (isPackaged && allowTestKeys) {
+    throw new Error("Packaged builds cannot enable Viewer Pack test signing keys.");
+  }
+
+  const getTrustedSigners = () => trustedSigners == null
+    ? getPinnedViewerPackSigners({ allowTestKeys, isPackaged })
+    : normalizeTrustedSigners(trustedSigners);
   const store = createViewerPackStore({ userDataPath });
-  const registry = createViewerPackRegistryService({ store });
+  const registry = createViewerPackRegistryService({
+    store,
+    hostVersion: appVersion,
+    getTrustedSigners,
+  });
   const packages = createViewerPackPackageService({
     store,
-    getPublicKeys: () => getPinnedViewerPackPublicKeys({ allowTestKeys }),
+    hostVersion: appVersion,
+    getTrustedSigners,
   });
-  const catalog = createViewerPackCatalogService({
-    transport: createDisabledCatalogTransport(),
-  });
+  const catalog = createViewerPackCatalogService({ transport: createDisabledCatalogTransport() });
 
   const resourceBroker = createViewerPackResourceBroker({
     resolveAuthorizedFilePath: async ({ rootPath, relativePath }) => {
       const absolutePath = await resolveExistingWorkspacePath(rootPath, relativePath);
-      return {
-        absolutePath,
-        rootPath,
-        relativePath,
-      };
+      return { absolutePath, rootPath, relativePath };
     },
   });
-
   const sessions = createViewerPackSessionManager({
     WebContentsView,
     sessionFromPartition,
@@ -99,21 +101,15 @@ export function createViewerPackHost({
     allowFileFallback,
   });
 
-  /**
-   * Map a plugin frame's WebContents back to its owning session id. Non-plugin
-   * senders resolve to null so plugin bridge handlers fail closed.
-   */
   function getSessionIdForSender(sender) {
     const senderId = typeof sender?.id === "number" ? sender.id : null;
     if (senderId === null) return null;
     for (const session of sessions.values()) {
-      let viewWebContentsId = null;
       try {
-        viewWebContentsId = session.view?.webContents?.id ?? null;
+        if (session.view?.webContents?.id === senderId) return session.sessionId;
       } catch {
-        viewWebContentsId = null;
+        // A destroyed WebContents is never authoritative.
       }
-      if (viewWebContentsId === senderId) return session.sessionId;
     }
     return null;
   }
@@ -121,11 +117,17 @@ export function createViewerPackHost({
   function requireSessionForSender(sender) {
     const sessionId = getSessionIdForSender(sender);
     const session = sessionId ? sessions.get(sessionId) : null;
-    if (!session) throw new Error("No active viewer pack session for sender.");
+    if (!session) throw new Error("No active Viewer Pack session for sender.");
     return session;
   }
 
-  return {
+  function requireCurrentDocumentPermission(session, permission) {
+    if (!session.permissions?.currentDocument?.includes(permission)) {
+      throw new Error(`Viewer Pack did not declare currentDocument.${permission}.`);
+    }
+  }
+
+  const host = {
     store,
     registry,
     packages,
@@ -135,42 +137,115 @@ export function createViewerPackHost({
     resolveRoute: resolveViewerPackRoute,
     getSessionIdForSender,
     requireSessionForSender,
+    requireCurrentDocumentPermission,
+    getThemeSnapshot,
+    publishUiState(session, state) {
+      const ownerWebContents = session.window?.webContents;
+      if (!ownerWebContents || session.window?.isDestroyed?.() || ownerWebContents.isDestroyed?.()) return;
+      ownerWebContents.send?.(VIEWER_PACK_APP_EVENTS.sessionState, {
+        sessionId: session.sessionId,
+        state,
+      });
+    },
     async getSnapshot() {
       return registry.getContributionSnapshot();
     },
-    async installLocalPackage(request) {
+    async installLocalPackageFromFiles(request) {
+      const result = await packages.installFromFiles(request);
+      registry.invalidate();
+      sessions.destroyForPlugin(result.pluginId);
+      return result;
+    },
+    async installLocalPackageBytesForTest(request) {
       const result = await packages.installFromBytes(request);
       registry.invalidate();
+      sessions.destroyForPlugin(result.pluginId);
       return result;
     },
     async disablePack(pluginId) {
+      sessions.destroyForPlugin(pluginId);
       const result = await packages.disable(pluginId);
       registry.invalidate();
-      sessions.destroyAll();
       return result;
     },
     async uninstallPack(pluginId) {
+      sessions.destroyForPlugin(pluginId);
       const result = await packages.uninstall(pluginId);
       registry.invalidate();
-      sessions.destroyAll();
       return result;
     },
-    async activateSession(request) {
-      return sessions.activate(request);
+    async activateDocumentSession({
+      pluginId,
+      rootPath,
+      relativePath,
+      ownerWebContentsId,
+      bounds,
+    }) {
+      const meta = await statWorkspaceFile(rootPath, relativePath);
+      const core = resolveCoreFormatPolicy({ name: meta.name, mimeType: meta.mimeType });
+      const snapshot = await registry.getContributionSnapshot();
+      const route = resolveViewerPackRoute({
+        name: meta.name,
+        mimeType: meta.mimeType,
+        sourceKind: "local",
+        coreViewerCapability: core.capability,
+        coreViewerId: core.viewerId,
+        snapshot,
+        preferredPluginId: pluginId,
+      });
+      if (route.kind === "core") {
+        throw new Error(`The built-in ${route.viewerId ?? "core"} viewer owns this file type.`);
+      }
+      if (route.kind !== "plugin" || route.pluginId !== pluginId) {
+        throw new Error("Selected Viewer Pack is not an enabled match for this local document.");
+      }
+      const contribution = route.contribution;
+      return sessions.activate({
+        pluginId: contribution.pluginId,
+        version: contribution.version,
+        contentHash: contribution.contentHash,
+        entry: contribution.viewer.entry,
+        permissions: contribution.permissions,
+        runtime: contribution.viewer.runtime,
+        documentPath: meta.path,
+        documentName: meta.name,
+        documentMimeType: meta.mimeType,
+        documentRevision: meta.revision,
+        rootPath,
+        relativePath: meta.path,
+        ownerWebContentsId,
+        bounds,
+      });
+    },
+    async getDocumentMetaForSession(session) {
+      requireCurrentDocumentPermission(session, "metadata");
+      const meta = await statWorkspaceFile(session.rootPath, session.relativePath);
+      if (meta.revision !== session.documentRevision) {
+        sessions.destroy(session.sessionId, session.ownerWebContentsId);
+        throw new Error("Document changed; reopen it to create a new Viewer Pack session.");
+      }
+      return {
+        id: session.documentPath,
+        name: session.documentName ?? meta.name,
+        mimeType: session.documentMimeType ?? meta.mimeType,
+        sizeBytes: meta.size,
+        revision: meta.revision,
+      };
     },
     async openResourceForSession(session) {
-      const meta = await statWorkspaceFile(session.rootPath, session.relativePath);
+      requireCurrentDocumentPermission(session, "readRange");
       return resourceBroker.openForDocument({
         pluginId: session.pluginId,
         instanceId: session.instanceId,
         ownerWebContentsId: session.ownerWebContentsId,
         documentPath: session.documentPath,
-        documentRevision: meta.revision,
+        documentRevision: session.documentRevision,
         rootPath: session.rootPath,
         relativePath: session.relativePath,
       });
     },
-    async readResourceRange(session, request) {
+    async readResourceRange(session, request = {}) {
+      requireCurrentDocumentPermission(session, "readRange");
       return resourceBroker.readRange({
         handle: request.handle,
         offset: request.offset,
@@ -181,6 +256,7 @@ export function createViewerPackHost({
       });
     },
     createRangeUrlForSession(session, handle) {
+      requireCurrentDocumentPermission(session, "readRange");
       const entry = resourceBroker.getHandle(handle);
       if (!entry) throw new Error("Unknown or revoked resource handle.");
       if (
@@ -192,8 +268,6 @@ export function createViewerPackHost({
       }
       return createRangeUrl(handle);
     },
-    readWorkspaceFileRange,
-    statWorkspaceFile,
     destroyAllSessions() {
       sessions.destroyAll();
     },
@@ -201,48 +275,85 @@ export function createViewerPackHost({
       sessions.destroyForOwner(ownerWebContentsId);
     },
   };
+  return host;
 }
 
-/**
- * Register APP-authority handlers (snapshot/install/activate/bounds/destroy)
- * through the trusted IPC facade. Pass `trustedIpcMain` as `ipcMain`.
- */
-export function registerViewerPackAppIpcHandlers({ ipcMain, host }) {
+export function registerViewerPackAppIpcHandlers({
+  ipcMain,
+  host,
+  authorizeWorkspaceRoot,
+  dialog,
+  getDialogOwnerWindow = () => undefined,
+}) {
   ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.getSnapshot, async () => host.getSnapshot());
 
-  ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.installLocal, async (_event, request) => {
-    return host.installLocalPackage({
-      archiveBytes: Buffer.from(request.archiveBytes),
-      signatureBase64Url: request.signatureBase64Url,
-      expectedSha256: request.expectedSha256 ?? null,
-      sourceLabel: request.sourceLabel ?? "local-selection",
+  ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.installLocal, async (event) => {
+    if (!dialog?.showOpenDialog) throw new Error("Viewer Pack file picker is unavailable.");
+    const owner = getDialogOwnerWindow(event.sender);
+    const options = {
+      title: "Install local Viewer Pack",
+      properties: ["openFile", "multiSelections"],
+      filters: [{ name: "Viewer Pack and signature", extensions: ["puppyplugin", "sig"] }],
+    };
+    const selected = owner
+      ? await dialog.showOpenDialog(owner, options)
+      : await dialog.showOpenDialog(options);
+    if (selected.canceled) return { canceled: true };
+    const archivePaths = selected.filePaths.filter((item) => item.toLowerCase().endsWith(".puppyplugin"));
+    const signaturePaths = selected.filePaths.filter((item) => item.toLowerCase().endsWith(".sig"));
+    if (archivePaths.length !== 1 || signaturePaths.length !== 1 || selected.filePaths.length !== 2) {
+      throw new Error("Select exactly one .puppyplugin file and its .sig envelope.");
+    }
+    const result = await host.installLocalPackageFromFiles({
+      archivePath: archivePaths[0],
+      signaturePath: signaturePaths[0],
+      sourceLabel: path.basename(archivePaths[0]),
     });
+    return { canceled: false, ...result };
   });
 
-  ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.disable, async (_event, request) => host.disablePack(request.pluginId));
-  ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.uninstall, async (_event, request) => host.uninstallPack(request.pluginId));
+  ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.disable, async (_event, request) =>
+    host.disablePack(request?.pluginId));
+  ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.uninstall, async (event, request) => {
+    if (!dialog?.showMessageBox) throw new Error("Viewer Pack uninstall confirmation is unavailable.");
+    const owner = getDialogOwnerWindow(event.sender);
+    const options = {
+      type: "warning",
+      buttons: ["Uninstall", "Cancel"],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true,
+      title: "Uninstall Viewer Pack",
+      message: "Uninstall this Viewer Pack?",
+      detail: "The pack will be removed from this computer. Your workspace files are not changed.",
+    };
+    const decision = owner
+      ? await dialog.showMessageBox(owner, options)
+      : await dialog.showMessageBox(options);
+    if (decision.response !== 0) return { ok: false, canceled: true };
+    return host.uninstallPack(request?.pluginId);
+  });
 
   ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.activate, async (event, request) => {
-    return host.activateSession({
-      ...request,
+    if (typeof authorizeWorkspaceRoot !== "function") {
+      throw new Error("Viewer Pack workspace authorization is unavailable.");
+    }
+    const canonicalRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
+    return host.activateDocumentSession({
+      pluginId: request?.pluginId,
+      rootPath: canonicalRoot,
+      relativePath: request?.relativePath,
       ownerWebContentsId: event.sender.id,
+      bounds: request?.bounds,
     });
   });
 
-  ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.setBounds, async (event, request) => {
-    return host.sessions.setBounds(request.sessionId, request.bounds, event.sender.id);
-  });
-
-  ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.destroySession, async (event, request) => {
-    return host.sessions.destroy(request.sessionId, event.sender.id);
-  });
+  ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.setBounds, async (event, request) =>
+    host.sessions.setBounds(request?.sessionId, request?.bounds, event.sender.id));
+  ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.destroySession, async (event, request) =>
+    host.sessions.destroy(request?.sessionId, event.sender.id));
 }
 
-/**
- * Register PLUGIN bridge handlers on RAW `ipcMain`. Every handler resolves the
- * sender back to its session first; a sender with no session fails closed.
- * trustedIpcMain must NOT be used here — it rejects the sandboxed pack frame.
- */
 export function registerViewerPackPluginIpcHandlers({
   ipcMain,
   host,
@@ -251,67 +362,61 @@ export function registerViewerPackPluginIpcHandlers({
   const requireSession = (sender) => {
     const sessionId = getSessionIdForSender(sender);
     const session = sessionId ? host.sessions.get(sessionId) : null;
-    if (!session) throw new Error("No active viewer pack session for sender.");
+    if (!session) throw new Error("No active Viewer Pack session for sender.");
     return session;
   };
 
-  ipcMain.handle(VIEWER_PACK_PLUGIN_IPC_CHANNELS.documentGetMeta, async (event) => {
-    const session = requireSession(event.sender);
-    const meta = await host.statWorkspaceFile(session.rootPath, session.relativePath);
-    return {
-      id: session.documentPath,
-      name: session.documentName ?? meta.name,
-      mimeType: session.documentMimeType ?? meta.mimeType,
-      sizeBytes: meta.size,
-      revision: meta.revision,
-    };
-  });
-
-  ipcMain.handle(VIEWER_PACK_PLUGIN_IPC_CHANNELS.resourceOpen, async (event) => {
-    const session = requireSession(event.sender);
-    return host.openResourceForSession(session);
-  });
-
+  ipcMain.handle(VIEWER_PACK_PLUGIN_IPC_CHANNELS.documentGetMeta, async (event) =>
+    host.getDocumentMetaForSession(requireSession(event.sender)));
+  ipcMain.handle(VIEWER_PACK_PLUGIN_IPC_CHANNELS.resourceOpen, async (event) =>
+    host.openResourceForSession(requireSession(event.sender)));
   ipcMain.handle(VIEWER_PACK_PLUGIN_IPC_CHANNELS.resourceReadRange, async (event, request) => {
-    const session = requireSession(event.sender);
-    const result = await host.readResourceRange(session, request);
+    const result = await host.readResourceRange(requireSession(event.sender), request);
     return result.bytes;
   });
-
-  ipcMain.handle(VIEWER_PACK_PLUGIN_IPC_CHANNELS.resourceCreateRangeUrl, async (event, request) => {
-    const session = requireSession(event.sender);
-    return host.createRangeUrlForSession(session, request.handle);
-  });
-
+  ipcMain.handle(VIEWER_PACK_PLUGIN_IPC_CHANNELS.resourceCreateRangeUrl, async (event, request) =>
+    host.createRangeUrlForSession(requireSession(event.sender), request?.handle));
   ipcMain.handle(VIEWER_PACK_PLUGIN_IPC_CHANNELS.resourceClose, async (event, request) => {
     const session = requireSession(event.sender);
+    host.requireCurrentDocumentPermission(session, "readRange");
     return {
-      ok: host.resourceBroker.close(request.handle, {
+      ok: host.resourceBroker.close(request?.handle, {
         pluginId: session.pluginId,
         instanceId: session.instanceId,
         ownerWebContentsId: session.ownerWebContentsId,
       }),
     };
   });
-
   ipcMain.handle(VIEWER_PACK_PLUGIN_IPC_CHANNELS.uiGetTheme, async (event) => {
     requireSession(event.sender);
-    return { mode: "light", tokens: {} };
-  });
-
-  ipcMain.handle(VIEWER_PACK_PLUGIN_IPC_CHANNELS.hostOpenExternal, async (event) => {
-    const session = requireSession(event.sender);
-    return { ok: true, path: session.documentPath };
+    return host.getThemeSnapshot();
   });
 
   if (typeof ipcMain.on === "function") {
-    ipcMain.on(VIEWER_PACK_PLUGIN_IPC_CHANNELS.uiSetState, (event) => {
-      // Validate the sender; state itself is advisory and not persisted here.
+    ipcMain.on(VIEWER_PACK_PLUGIN_IPC_CHANNELS.uiSetState, (event, state) => {
       try {
-        requireSession(event.sender);
+        const session = requireSession(event.sender);
+        const normalized = normalizeUiState(state);
+        if (normalized) host.publishUiState(session, normalized);
       } catch {
-        // Ignore state from a sender with no session.
+        // Ignore advisory UI state from a sender with no current session.
       }
     });
   }
+}
+
+function normalizeUiState(state) {
+  if (!state || typeof state !== "object" || Array.isArray(state)) return null;
+  if (!new Set(["loading", "ready", "error"]).has(state.status)) return null;
+  const message = typeof state.message === "string"
+    ? state.message.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 512)
+    : undefined;
+  const progress = Number.isFinite(state.progress)
+    ? Math.min(1, Math.max(0, Number(state.progress)))
+    : undefined;
+  return {
+    status: state.status,
+    ...(message ? { message } : {}),
+    ...(progress !== undefined ? { progress } : {}),
+  };
 }

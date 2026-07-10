@@ -15,9 +15,9 @@ import { defaultDataCapabilities } from "../core/types";
 import { getEditorSourceRequirement, shouldReadEditorContent } from "../editor/viewerRegistry";
 import {
   createMarkdownLinkGraph,
+  resolveMarkdownAssetPath,
   type MarkdownLinkGraphDocument,
-} from "../editor/markdown/links/markdownLinkGraph";
-import { resolveMarkdownAssetPath } from "../editor/markdown/links/markdownImageModel";
+} from "../editor/markdown";
 import { ExplorerTree } from "./ExplorerTree";
 import { FilePreview, type FilePreviewProps } from "./FilePreview";
 import { ProjectsHeader } from "./ProjectsHeader";
@@ -654,13 +654,23 @@ export function DataWorkspace({
     [markdownLinkDocuments, markdownLinkIndexing, onOpenExternalUrl, openMarkdownLinkCandidates],
   );
   const markdownAssetUrlResolver = useCallback(
-    async (sourcePath: string, href: string) => {
-      if (!dataPort.getFileUrl) return null;
+    async (sourcePath: string, href: string, signal?: AbortSignal) => {
+      if (!dataPort.getFileUrl || signal?.aborted) return null;
       const assetPath = resolveMarkdownAssetPath(sourcePath, href);
       if (!assetPath) return null;
 
       try {
-        return await dataPort.getFileUrl(assetPath);
+        const url = await dataPort.getFileUrl(assetPath, { purpose: "markdown-asset" });
+        if (signal?.aborted) {
+          await dataPort.revokeFileUrl?.(url);
+          return null;
+        }
+        return {
+          url,
+          revoke: dataPort.revokeFileUrl
+            ? () => dataPort.revokeFileUrl?.(url)
+            : undefined,
+        };
       } catch {
         return null;
       }
@@ -809,6 +819,7 @@ export function DataWorkspace({
     }
 
     let cancelled = false;
+    let activeUrl: string | null = null;
     setFileUrl(null);
     setFileUrlPath(selectedFile.path);
     setFileUrlLoading(true);
@@ -816,7 +827,12 @@ export function DataWorkspace({
 
     Promise.resolve(dataPort.getFileUrl(selectedFile.path))
       .then((url) => {
-        if (!cancelled) setFileUrl(url);
+        if (cancelled) {
+          void Promise.resolve(dataPort.revokeFileUrl?.(url)).catch(() => undefined);
+          return;
+        }
+        activeUrl = url;
+        setFileUrl(url);
       })
       .catch((error) => {
         if (!cancelled) {
@@ -831,6 +847,10 @@ export function DataWorkspace({
 
     return () => {
       cancelled = true;
+      if (activeUrl) {
+        void Promise.resolve(dataPort.revokeFileUrl?.(activeUrl)).catch(() => undefined);
+        activeUrl = null;
+      }
     };
   }, [dataPort, selectedFile?.path, selectedFileNeedsResourceUrl]);
 

@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { DarkThemePreset, DiffMarkers, LightThemePreset, TextSize, ThemeMode } from "../preferences";
 import { InlineLoading } from "./loading";
 
+const cloudProjectSkyUrl = new URL("../../public/cloud-project-sky-oil.webp", import.meta.url).href;
+
 export type RecentWorkspaceHomeItem = {
   workspace: Workspace;
   lastOpenedAt?: string | null;
@@ -34,7 +36,7 @@ export type OnboardingOperationStatus = {
   detail?: string;
 };
 
-type MinimalOnboardingProps = {
+export type MinimalOnboardingProps = {
   onChooseWorkspace: () => Promise<void>;
   onCreateCloudProject?: () => Promise<void>;
   onOpenCloudProject?: (projectId: string) => Promise<void> | void;
@@ -246,10 +248,13 @@ export function MinimalOnboarding({
                 aria-hidden="true"
               >
                 <defs>
-                  <linearGradient id="onboarding-cloud-project-paint" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop className="folder-drop-cloud-paint-paper" offset="0%" />
-                    <stop className="folder-drop-cloud-paint-mist" offset="48%" />
-                    <stop className="folder-drop-cloud-paint-sky" offset="100%" />
+                  <clipPath id="onboarding-cloud-project-clip">
+                    <path d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
+                  </clipPath>
+                  <linearGradient id="onboarding-cloud-project-glaze" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop className="folder-drop-cloud-glaze-top" offset="0%" />
+                    <stop className="folder-drop-cloud-glaze-middle" offset="52%" />
+                    <stop className="folder-drop-cloud-glaze-bottom" offset="100%" />
                   </linearGradient>
                 </defs>
                 <path
@@ -258,6 +263,21 @@ export function MinimalOnboarding({
                 />
                 <path
                   className="folder-drop-fill"
+                  d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z"
+                />
+                <g clipPath="url(#onboarding-cloud-project-clip)">
+                  <image
+                    className="folder-drop-cloud-sky"
+                    href={cloudProjectSkyUrl}
+                    x="-2"
+                    y="-2"
+                    width="264"
+                    height="264"
+                    preserveAspectRatio="xMidYMid slice"
+                  />
+                </g>
+                <path
+                  className="folder-drop-cloud-glaze"
                   d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z"
                 />
                 <path

@@ -4,7 +4,10 @@ import path from "node:path";
 import { spawn as nodeSpawn } from "node:child_process";
 import { redactSecretText } from "./agent-events.mjs";
 
-export const MIN_SUPPORTED_CODEX_VERSION = "0.100.0";
+// This is the oldest app-server schema exercised by the checked-in protocol
+// fixtures and the opt-in local smoke test. Lower versions may be compatible,
+// but the experimental surface must not claim unverified support.
+export const MIN_SUPPORTED_CODEX_VERSION = "0.144.1";
 const LOGIN_ENV_TIMEOUT_MS = 4_000;
 const VERSION_TIMEOUT_MS = 4_000;
 const MAX_DISCOVERY_OUTPUT = 64 * 1024;

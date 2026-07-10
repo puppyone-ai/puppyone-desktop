@@ -5,6 +5,7 @@ import { countTextBytes, redactSecrets } from "./agent-events.mjs";
 const MAX_SESSIONS = 20;
 const MAX_EVENTS_PER_SESSION = 400;
 const MAX_SESSION_BYTES = 512 * 1024;
+const MAX_JOURNAL_BYTES = MAX_SESSIONS * MAX_SESSION_BYTES + 128 * 1024;
 
 export function createAgentPersistence({ app, filename = "desktop-agent-sessions.json", fsModule = fs, logger = console }) {
   const filePath = path.join(app.getPath("userData"), filename);
@@ -12,6 +13,11 @@ export function createAgentPersistence({ app, filename = "desktop-agent-sessions
 
   async function readAll() {
     try {
+      const metadata = await fsModule.promises.stat(filePath);
+      if (metadata.size > MAX_JOURNAL_BYTES) {
+        logger.warn?.("Desktop Agent session journal exceeded its safety limit; ignoring it.");
+        return [];
+      }
       const parsed = JSON.parse(await fsModule.promises.readFile(filePath, "utf8"));
       return Array.isArray(parsed?.sessions) ? parsed.sessions : [];
     } catch (error) {
@@ -75,7 +81,12 @@ function normalizeRecord(record) {
     terminalState: record.terminalState,
     selectedModel: record.selectedModel || null,
     lastSequence: record.lastSequence,
-    events: Array.isArray(record.events) ? record.events.slice(-MAX_EVENTS_PER_SESSION) : [],
+    // Streaming command output is useful live, but persisting every raw delta
+    // increases credential exposure and evicts higher-value conversation
+    // events. The completed tool event retains a bounded, redacted preview.
+    events: Array.isArray(record.events)
+      ? record.events.filter((event) => event?.type !== "command.output.delta").slice(-MAX_EVENTS_PER_SESSION)
+      : [],
   });
   while (safe.events.length > 0 && countTextBytes(safe) > MAX_SESSION_BYTES) safe.events.shift();
   return safe;
@@ -85,4 +96,5 @@ export const agentPersistenceLimits = Object.freeze({
   maxSessions: MAX_SESSIONS,
   maxEventsPerSession: MAX_EVENTS_PER_SESSION,
   maxSessionBytes: MAX_SESSION_BYTES,
+  maxJournalBytes: MAX_JOURNAL_BYTES,
 });

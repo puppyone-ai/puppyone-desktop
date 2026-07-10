@@ -55,6 +55,18 @@ export function PluginSurfaceController({
   }, []);
 
   useEffect(() => {
+    const bridge = getDesktopBridge();
+    if (!bridge?.onSessionState) return undefined;
+    return bridge.onSessionState((payload) => {
+      if (payload.sessionId !== sessionIdRef.current) return;
+      setStatus(payload.state.status === "loading" ? "activating" : payload.state.status);
+      if (payload.state.status === "error") {
+        setError(payload.state.message ?? "Viewer Pack reported an error.");
+      }
+    });
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const bridge = getDesktopBridge();
     if (!bridge) {
@@ -76,12 +88,6 @@ export function PluginSurfaceController({
         setError(null);
         const next = await bridge.activate({
           pluginId: contribution.pluginId,
-          version: contribution.version,
-          contentHash: contribution.contentHash,
-          entry: contribution.viewer.entry,
-          documentPath: document.path,
-          documentName: document.name,
-          documentMimeType: document.mimeType ?? null,
           rootPath: workspaceRoot,
           relativePath: document.path,
           bounds,

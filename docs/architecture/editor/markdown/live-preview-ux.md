@@ -215,6 +215,17 @@ the hidden marker prefix — the leftmost place the caret can be on that line.
   area; arrow-down at the last code line (and arrow-up at the first) exits
   to the surrounding document. Return inside inserts newlines and never
   exits.
+- Fence metadata separates syntax language from source provenance. Legacy
+  evidence fences such as ```` ```83:99:package.json ```` are read as
+  `package.json · L83–99`, with `json` inferred from the extension; they are
+  never exposed as a fake language. The code header renders the source as a
+  read-only, ellipsized label and keeps the editable language independent.
+  On the next real edit, the fence is normalized to a portable first language
+  token plus structured metadata, for example
+  ```` ```json file="package.json" lines="83-99" ````.
+- The document remains the only vertical scroll owner: the code area grows
+  with its newline count and never shows an inner vertical scrollbar. Long,
+  unwrapped lines use one subtle horizontal scrollbar on demand.
 - Backspace in an empty code block removes the whole block. Escape or caret
   exit commits edits back to the fenced source.
 
@@ -270,7 +281,12 @@ alignment; sort-by-column is an enhancement):
 - **Keyboard**: Tab at the end appends a row; ⌘Enter inserts a row below
   the current one.
 - **Context menu** on any cell: the full operation set. This is the
-  discoverable, complete surface.
+  discoverable, complete surface. Menus mount into the host's theme-aware
+  overlay root (with a resolved-token fallback for hosts without one), use
+  `menu` / `menuitemradio` semantics, and provide roving focus with Arrow
+  keys, Home/End, character navigation, Escape restoration, and focus-exit
+  cleanup. Moving focus into a menu suspends cell blur commit so an active
+  draft is neither lost nor committed merely because the menu opened.
 - **Hover affordances**: "+" strips along the table's right and bottom
   edges append a column / row. The strips are subtle bars outside the
   table border that highlight on direct hover — deliberate hit areas,
@@ -283,16 +299,20 @@ alignment; sort-by-column is an enhancement):
   hovered column. The header row is fixed and gets no row handle. Handles
   disappear when the pointer leaves the table. Clicking (or
   right-clicking) a handle opens the operations menu scoped to that row
-  (row items) or column (column items + alignment). Dragging a handle
-  highlights the source row/column and shows an accent **drop indicator
+  (row items) or column (column items + alignment). Pointer-down gives the
+  scoped row/column a soft accent wash immediately; a short click keeps that
+  wash while the menu is open and clears it when the menu closes. Dragging a
+  handle highlights the source row/column and shows an accent **drop indicator
   line** at the insertion boundary under the pointer; releasing applies
   one move operation, Escape cancels the drag.
 
 Pointer feedback and motion: hover feedback is scoped to what the pointer
-is actually over — the hovered **cell** tints and the table **frame**
-brightens as one object; whole rows never highlight on mere hover (row/
-column-level highlight is reserved for drag operations, where it marks the
-drag source). All transient affordances (handles, hover tints, "+"
+is actually over — the hovered **cell** tints and the table gets one neutral
+outer ring while its structural border stays unchanged; whole rows never
+highlight on mere hover (row/
+column-level highlight is reserved for active handle operations — pressed,
+menu-scoped, or dragging — where it marks the action source). All transient
+affordances (handles, hover tints, "+"
 strips) fade in and out over ~120–160 ms instead of popping; a handle that
 is already visible glides to the next row/column, while a hidden one
 appears in place. Menus animate open with a short fade/scale. All motion
@@ -442,6 +462,17 @@ always raw, never guessed at.
   does **not** block-select the table. Cell-edit chrome is a full-cell
   inset ring on the `td`/`th`, not a ring on the text. Block select for
   tables comes from document-level selection only (drag / ⌘A).
+- Rich replaced widgets reveal the same boundary before selection: hover or
+  keyboard focus shows a quiet 2px neutral ring, while block selection uses a
+  2px accent ring. The ring is paint-only (`box-shadow`), so it never changes
+  layout. A widget's outer wrapper owns block spacing, while the rendered inner
+  surface owns the ring, so vertical rhythm stays outside the visible frame.
+  Tables likewise render the ring on the table frame to avoid double borders;
+  typographic constructs such as headings, lists, and horizontal rules do not
+  receive block chrome.
+- HTML blocks keep their source/preview toggle hidden at rest. The control
+  fades in when the block is hovered, contains keyboard focus, or is selected,
+  preserving both a quiet canvas and keyboard discoverability.
 
 ## 8. Input edge cases
 
@@ -516,7 +547,8 @@ Phases in dependency order; each phase lands independently.
 
 - [x] Split the widgets (code block, table, HTML, image, task checkbox,
       rule, hidden syntax) and the measure/coords helpers out of
-      `markdownCodeMirrorExtensions.ts` into `editor/markdown/widgets/`.
+      `markdownCodeMirrorExtensions.ts` into vertical `features/` modules and
+      feature-agnostic `shared/widgets/` primitives.
 - [x] Extract the link-open handlers and facets into their own modules.
 - [x] Replace the old line-reveal pipeline directly with the new default
       pipeline. No dev-facing variant switch remains because the rejected
@@ -524,7 +556,7 @@ Phases in dependency order; each phase lands independently.
 
 **Phase 1 — element model**
 
-- [x] `syntax/markdownElements.ts`: walk the Lezer syntax tree into
+- [x] `core/syntax/markdownElements.ts`: walk the Lezer syntax tree into
       normalized `{ kind, from, to, markerRanges, contentRange }` records
       for headings, lists, tasks, quotes, emphasis/strong/strike, inline
       code, links, autolinks, images, wiki links, rules, fences, tables,
@@ -617,7 +649,7 @@ New work:
 
 - [x] Add the `mermaid` dependency; load it only via dynamic `import()` so
       it never enters the main bundle.
-- [x] `rendering/mermaidRenderer.ts` singleton: initialize on demand
+- [x] `features/mermaid/mermaidRenderer.ts` singleton: initialize on demand
       (`startOnLoad: false`, `securityLevel: "strict"`,
       `suppressErrorRendering: true`, theme mapped from `--po-*`);
       `parse()` before `render()`; ~250 ms debounce while editing; SVG
@@ -636,7 +668,7 @@ pipeline). Infrastructure audit as of 2026-07 — the `[x]` items already
 exist and need no work:
 
 - [x] Table block parser with cell positions:
-      `rendering/tableModel.ts` (`getMarkdownTableBlock` → rows/cells with
+      `features/table/tableModel.ts` (`getMarkdownTableBlock` → rows/cells with
       `from`/`to`).
 - [x] In-place cell editing: contenteditable cells committing precise
       `cell.from`–`cell.to` changes on blur; Escape reverts; Enter commits.
@@ -689,7 +721,8 @@ New work, in dependency order:
 layout and layering rules):
 
 - [x] Split `widgets/markdownLivePreviewWidgets.ts` (~2 350 lines) into
-      per-widget modules plus a `widgets/table/` package.
+      vertical feature modules under `features/`, including the complete
+      `features/table/` package.
 - [x] Split `markdownCodeMirrorExtensions.ts` (~1 490 lines) into
       `keymap/`, `state/`, and `decorations/` layers; the original file
       remains as the thin public assembly (base + live preview extension
@@ -712,7 +745,7 @@ feedback and motion" / "Selection"; §7 block-selected rule):
       write first). Context menu opens with a 120 ms fade/scale. All
       table transitions are disabled under `prefers-reduced-motion`.
 - [x] Block-selected state: a `ViewPlugin`
-      (`widgets/blockWidgetSelection.ts`) toggles `is-doc-selected` on
+      (`core/interaction/blockWidgetSelection.ts`) toggles `is-doc-selected` on
       replaced widgets whose source range is fully covered by a non-empty
       focused selection — accent ring + cell wash on tables, shared
       accent ring on code/mermaid/HTML/image widgets. For tables, block
@@ -788,7 +821,7 @@ Changes required by Part 1:
    Forward Delete gets the mirrored behavior. Everything else falls
    through.
 4. **Syntax-tree-driven element detection.** Inline decorations and reveal
-   now share `syntax/markdownElements.ts`, backed by Lezer ranges for core
+   now share `core/syntax/markdownElements.ts`, backed by Lezer ranges for core
    Markdown (`EmphasisMark`, `CodeMark`, `LinkMark`, `QuoteMark`, …) and
    custom scanners only where the parser does not provide first-class nodes
    (wiki links, image embeds, task brackets, tables, HTML block discovery).
@@ -847,53 +880,43 @@ Changes required by Part 1:
    file stays plain Markdown).
    The hard part is **focus continuity**: a structural dispatch changes
    `rows`/`from`/`to`, so `eq()` fails and CodeMirror rebuilds the widget
-   DOM, destroying the focused contenteditable cell. Keep a module-level
-   pending-focus record `{ tableFrom, row, column }` written just before
-   the dispatch; when the rebuilt widget mounts (measure callback /
-   microtask after `toDOM`), look it up, focus the matching cell editor,
-   and clear it. All entry points (keymap commands, context menu items,
-   hover strips) call the same model functions — the UI layers own no
-   table-mutation logic of their own. Column-width resizing is explicitly
-   out of scope: GFM has no syntax to persist it.
-10. **Module layout (Phase 9).** The editor follows the CodeMirror
-    ecosystem convention — one module per feature, layered by role, thin
-    assembly at the top. Layering (imports point downward only):
+   DOM, destroying the focused contenteditable cell. The feature emits one
+   atomic source/selection/focus transaction. An editor-scoped StateField
+   carries a tokenized request, and a feature-owned ViewPlugin restores focus
+   only after CodeMirror has committed the replacement DOM. `toDOM()` never
+   dispatches. All entry points (keymap commands, context menu items, hover
+   strips, pointer drag) call the same feature command and model functions —
+   the UI layers own no table-mutation logic. Column-width resizing is
+   explicitly out of scope: GFM has no syntax to persist it.
+10. **Module layout (Phase 9, superseded by the vertical-feature migration).**
+    The editor is a hybrid modular monolith: stable machinery is layered, while
+    complex capabilities keep model, plan, interaction, and widget code
+    together. Public assembly remains thin:
 
     ```text
     editor/markdown/
       markdownCodeMirrorExtensions.ts   assembly: extension factories, theme
-      keymap/                           commands (view → dispatch)
-        markdownEditingKeymap.ts        bindings + Backspace/Enter/caret cmds
-        markdownBlockCommands.ts        heading/list/quote/indent/renumber
-        markdownInlineCommands.ts       bold/italic/code/strike/link wrap
-      state/                            StateFields/effects, no DOM
-        livePreviewFocus.ts             focus effect + reader
-        composingBlockLine.ts           composing-line field + IME effects
-        expandedImage.ts                expanded-image effect + field
-        selectionBehavior.ts            caret normalizer, trailing-ws select
-      decorations/                      doc → DecorationSet (pure build)
-        livePreviewDecorations.ts       StateField, rebuild keys, reveal set
-        blockDecorations.ts             per-line walk, widget selection
-        inlineDecorations.ts            element → mark/replace decorations
-        decorationPrimitives.ts         builders, source-syntax helper
-      widgets/                          WidgetType classes + widget DOM
-        inlineWidgets.ts                hidden syntax, task checkbox, hr
-        codeBlockWidget.ts / mermaidBlockWidget.ts / htmlBlockWidget.ts
-        imagePreviewWidget.ts
-        widgetDom.ts                    shared DOM utilities
-        table/                          table feature package
-          tableWidget.ts               DOM assembly + add strips
-          tableCellEditor.ts           contenteditable cell lifecycle
-          tableDragLayer.ts            hover handles, drag, drop indicator
-          tableContextMenu.ts          scoped menu build/position
-          tableDispatch.ts             single-dispatch structural ops
-          tableFocus.ts                pending-focus continuity
-          tableMenuState.ts            active-menu registry (breaks cycles)
-      rendering/                        pure models/services (no CM imports)
-        codeBlockModel.ts               fence parse/serialize, mermaid detect
-        tableModel.ts, taskModel.ts, htmlBlockModel.ts, mermaidRenderer.ts …
-      syntax/                           Lezer-backed element model
+      core/                             syntax, plans, commands, decorations
+        commands/                       view → transaction commands
+        syntax/                         Lezer-backed semantic projection
+        plans/                          typed plan contract + compiler
+        state/                          generic StateFields/effects
+        decorations/                    plan → CodeMirror decorations
+      features/
+        blockFeatureRegistry.ts         typed block composition boundary
+        inlineFeatureRegistry.ts        typed inline composition boundary
+        table/                          model/plan/commands/focus/widget/drag
+        html/                           tokenizer/model/plan/policy/widget
+        code-block/                     model/plan/widget
+        mermaid/                        renderer/widget
+        image/                          model/plan/widget
+      platform/                         security, policy, brokers, sessions
+      shared/                           feature-agnostic DOM/measure helpers
     ```
+
+    `scripts/check-markdown-architecture.mjs` rejects legacy horizontal
+    directories, platform-to-feature dependencies, shared upward dependencies,
+    DOM-backed plans, and core imports of concrete feature widgets.
 
     `styles/editor.css` is an ordered `@import` list over
     `styles/editor/*.css` section files (preview surfaces, code editor,
@@ -920,7 +943,7 @@ Changes required by Part 1:
     covers a table highlights the text around it and nothing inside it.
     `drawSelection` doesn't fix this either — no text layer exists there
     to paint. The remedy is state-driven, not selection-driven:
-    `widgets/blockWidgetSelection.ts` is a `ViewPlugin` that, on
+    `core/interaction/blockWidgetSelection.ts` is a `ViewPlugin` that, on
     selection / doc / viewport / focus changes, finds the rendered block
     widgets in `contentDOM`, maps each to its source range
     (`posAtDOM` + the decoration set), and toggles `is-doc-selected`

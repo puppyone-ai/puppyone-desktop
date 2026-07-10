@@ -47,7 +47,8 @@
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: var(--desktop-sidebar-section-top-gap) 0 var(--desktop-sidebar-section-bottom-gap);
+  padding-block: var(--desktop-sidebar-list-padding-block);
+  padding-inline: 0;
   scrollbar-gutter: stable;
   /* Rows in this list own their horizontal margins through this token, so
      compensate the reserved gutter here instead of on the list padding. */

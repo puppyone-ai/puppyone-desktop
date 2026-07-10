@@ -12,12 +12,24 @@
   background: color-mix(in srgb, var(--po-control) 34%, transparent);
 }
 
+.markdown-codemirror-editor .cm-md-code-header {
+  display: flex;
+  min-width: 0;
+  height: 24px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+}
+
 .markdown-codemirror-editor .cm-md-code-language {
   display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   width: 100%;
   height: 24px;
-  padding: 4px 12px 0;
+  padding: 4px 0 0;
   border: 0;
+  border-radius: 3px;
   outline: 0;
   background: transparent;
   color: var(--po-text-subtle);
@@ -25,6 +37,25 @@
   font-size: 11px;
   font-weight: 650;
   line-height: 20px;
+}
+
+.markdown-codemirror-editor .cm-md-code-header.has-source-reference .cm-md-code-language {
+  flex: 0 1 112px;
+  width: min(112px, 36%);
+  text-align: right;
+}
+
+.markdown-codemirror-editor .cm-md-code-source-reference {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--po-text-subtle);
+  font-family: var(--po-font-sans);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .markdown-codemirror-editor .cm-md-code-language.is-empty {
@@ -46,7 +77,9 @@
 
 .markdown-codemirror-editor .cm-md-code-textarea {
   display: block;
+  box-sizing: border-box;
   width: 100%;
+  max-width: 100%;
   min-height: 44px;
   margin: 0;
   padding: 12px 14px;
@@ -57,10 +90,30 @@
   color: inherit;
   font-family: var(--po-font-mono);
   font-size: 13px;
+  field-sizing: content;
   line-height: 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
   white-space: pre;
   overflow-wrap: normal;
   tab-size: 2;
+}
+
+.markdown-codemirror-editor .cm-md-code-textarea::-webkit-scrollbar {
+  width: 0;
+  height: 8px;
+}
+
+.markdown-codemirror-editor .cm-md-code-textarea::-webkit-scrollbar-track,
+.markdown-codemirror-editor .cm-md-code-textarea::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.markdown-codemirror-editor .cm-md-code-textarea::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--po-scrollbar-thumb);
+  background-clip: padding-box;
 }
 
 .markdown-codemirror-editor .cm-md-code-textarea:focus {

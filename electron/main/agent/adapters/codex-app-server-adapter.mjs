@@ -59,10 +59,7 @@ export class CodexAppServerAdapter {
     connection.on("notification", (message) => this.#handleNotification(message));
     connection.on("request", (message) => this.#handleServerRequest(message));
     connection.on("protocolError", (error) => {
-      this.onEvent({
-        type: "provider.error",
-        payload: { message: redactSecretText(error.message), recoverable: false },
-      });
+      this.lastConnectionError = redactSecretText(error.message);
     });
     connection.on("exit", (info) => {
       this.#clearPendingApprovals("cancel", false);
@@ -97,9 +94,16 @@ export class CodexAppServerAdapter {
       this.connection.request("account/read", { refreshToken: false }),
       this.connection.request("model/list", { includeHidden: false, limit: 100 }),
     ]);
+    if (accountResult.status === "rejected" && modelResult.status === "rejected") {
+      throw new Error(redactSecretText(
+        accountResult.reason?.message
+        || modelResult.reason?.message
+        || "Codex account and model inspection failed.",
+      ));
+    }
     const account = accountResult.status === "fulfilled"
       ? normalizeAccount(accountResult.value)
-      : { account: null, requiresOpenaiAuth: true, error: redactSecretText(accountResult.reason?.message || String(accountResult.reason)) };
+      : { account: null, requiresOpenaiAuth: false, error: redactSecretText(accountResult.reason?.message || String(accountResult.reason)) };
     const models = modelResult.status === "fulfilled"
       ? normalizeModels(modelResult.value)
       : [];
@@ -169,11 +173,11 @@ export class CodexAppServerAdapter {
 
   async interruptTurn({ turnId }) {
     if (!this.threadId) throw new Error("No Codex thread is active.");
-    this.#clearPendingApprovals("cancel", true);
     await this.connection.request("turn/interrupt", {
       threadId: this.threadId,
       turnId,
     });
+    this.#clearPendingApprovals("cancel", true);
   }
 
   resolveApproval({ requestId, decision, threadId, turnId }) {
@@ -185,18 +189,22 @@ export class CodexAppServerAdapter {
     if (!pending.availableDecisions.includes(decision)) {
       throw new Error("Codex did not offer that approval decision.");
     }
-    this.pendingApprovals.delete(requestId);
     this.connection.respond(pending.rpcId, { decision });
+    this.pendingApprovals.delete(requestId);
   }
 
-  dispose() {
+  dispose(reason = "Codex app-server adapter closed.") {
     if (this.disposed) return;
     this.disposed = true;
     this.#clearPendingApprovals("cancel", true);
-    this.connection?.dispose();
+    this.connection?.dispose(reason);
   }
 
   #handleNotification(message) {
+    if (message?.method === "serverRequest/resolved") {
+      this.#handleServerRequestResolved(message.params ?? {});
+      return;
+    }
     const events = normalizeCodexNotification(message);
     for (const event of events) {
       if (event.type === "session.started" && this.sessionLifecycleType === "session.resumed") {
@@ -206,6 +214,7 @@ export class CodexAppServerAdapter {
         if (event.type === "turn.started") this.activeTurnId = event.turnId;
         if (["turn.completed", "turn.failed", "turn.interrupted"].includes(event.type)) {
           this.activeTurnId = null;
+          this.#clearPendingApprovalsForTurn(event.turnId, "turn-ended");
         }
       }
       this.onEvent(event);
@@ -245,6 +254,7 @@ export class CodexAppServerAdapter {
       : ["accept", "decline", "cancel"];
     const requestId = `codex:${String(id)}`;
     const kind = method.includes("commandExecution") ? "command" : "file-change";
+    const networkApprovalContext = normalizeNetworkApprovalContext(params.networkApprovalContext);
     this.pendingApprovals.set(requestId, {
       rpcId: id,
       requestId,
@@ -262,15 +272,58 @@ export class CodexAppServerAdapter {
       payload: boundRendererValue(redactSecrets({
         requestId,
         kind,
-        title: kind === "command" ? "Run command" : "Apply file changes",
+        title: networkApprovalContext
+          ? "Allow network access"
+          : kind === "command"
+            ? "Run command"
+            : "Apply file changes",
         command: typeof params.command === "string" ? params.command : null,
         cwd: typeof params.cwd === "string" ? params.cwd : null,
+        commandActions: Array.isArray(params.commandActions) ? params.commandActions : [],
+        networkApprovalContext,
         reason: typeof params.reason === "string" ? params.reason : null,
         grantRoot: typeof params.grantRoot === "string" ? params.grantRoot : null,
+        proposedExecpolicyAmendment: params.proposedExecpolicyAmendment ?? null,
+        proposedNetworkPolicyAmendments: Array.isArray(params.proposedNetworkPolicyAmendments)
+          ? params.proposedNetworkPolicyAmendments
+          : [],
         availableDecisions,
         startedAtMs: Number.isFinite(params.startedAtMs) ? params.startedAtMs : Date.now(),
       })),
     });
+  }
+
+  #handleServerRequestResolved(params) {
+    const providerRequestId = params?.requestId;
+    if (typeof providerRequestId !== "string" && typeof providerRequestId !== "number") return;
+    const normalizedProviderId = String(providerRequestId).replace(/^codex:/, "");
+    const pending = Array.from(this.pendingApprovals.values()).find((entry) => (
+      String(entry.rpcId) === normalizedProviderId || entry.requestId === String(providerRequestId)
+    ));
+    if (!pending) return;
+    this.pendingApprovals.delete(pending.requestId);
+    this.onEvent({
+      type: "approval.resolved",
+      providerSessionId: pending.threadId,
+      turnId: pending.turnId,
+      itemId: pending.itemId,
+      payload: { requestId: pending.requestId, decision: "cancel", reason: "provider-resolved" },
+    });
+  }
+
+  #clearPendingApprovalsForTurn(turnId, reason) {
+    if (!turnId) return;
+    for (const pending of Array.from(this.pendingApprovals.values())) {
+      if (pending.turnId !== turnId) continue;
+      this.pendingApprovals.delete(pending.requestId);
+      this.onEvent({
+        type: "approval.resolved",
+        providerSessionId: pending.threadId,
+        turnId: pending.turnId,
+        itemId: pending.itemId,
+        payload: { requestId: pending.requestId, decision: "cancel", reason },
+      });
+    }
   }
 
   #clearPendingApprovals(decision, respond) {
@@ -287,7 +340,7 @@ export class CodexAppServerAdapter {
         providerSessionId: pending.threadId,
         turnId: pending.turnId,
         itemId: pending.itemId,
-        payload: { requestId: pending.requestId, decision },
+        payload: { requestId: pending.requestId, decision, reason: "adapter-closed" },
       });
     }
     this.pendingApprovals.clear();
@@ -365,7 +418,7 @@ export function normalizeCodexNotification(message) {
     case "warning":
     case "configWarning":
     case "deprecationNotice":
-      return [{ type: "provider.warning", providerSessionId: threadId, turnId, payload: { message: redactSecretText(params.message || "Codex warning") } }];
+      return [{ type: "provider.warning", providerSessionId: threadId, turnId, payload: { message: formatProviderWarning(params) } }];
     default:
       return [];
   }
@@ -531,6 +584,29 @@ function normalizeModels(result) {
 
 function isApprovalDecision(value) {
   return ["accept", "acceptForSession", "decline", "cancel"].includes(value);
+}
+
+function normalizeNetworkApprovalContext(value) {
+  if (!value || typeof value !== "object") return null;
+  const host = typeof value.host === "string" ? value.host.trim() : "";
+  const protocol = typeof value.protocol === "string" ? value.protocol.trim() : "";
+  if (!host || !protocol) return null;
+  return { host: host.slice(0, 512), protocol: protocol.slice(0, 40) };
+}
+
+function formatProviderWarning(params) {
+  const summary = typeof params?.message === "string"
+    ? params.message
+    : typeof params?.summary === "string"
+      ? params.summary
+      : "Codex warning";
+  const details = typeof params?.details === "string" ? params.details : null;
+  const warningPath = typeof params?.path === "string" ? params.path : null;
+  return redactSecretText([
+    summary,
+    details,
+    warningPath ? `(${warningPath})` : null,
+  ].filter(Boolean).join(" "));
 }
 
 function requireString(value, message) {

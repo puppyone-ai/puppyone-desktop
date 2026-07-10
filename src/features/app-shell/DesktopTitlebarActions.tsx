@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import { MessageSquare } from "lucide-react";
 import {
   DesktopUpdateTitlebarButton,
   type useDesktopUpdates,
@@ -20,14 +21,14 @@ type DesktopTitlebarActionsProps = {
   titlebarActionsSettings: TitlebarActionsSettings;
   terminalSidebarOpen: boolean;
   terminalToolEnabled: boolean;
-  rightSidebarSurface: "chat" | "terminal";
+  agentChatEnabled: boolean;
+  agentChatSidebarOpen: boolean;
   onClearTerminal: () => void;
-  onNewAgentSession: () => void;
   onOpenActiveFileExternal: () => void;
   onOpenActiveFileWithApp: (appPath: string | null) => void;
   onCustomizeExternalAppForActiveFile: () => void;
   onResetTerminal: () => void;
-  onSelectCompanionSurface: (surface: "chat" | "terminal") => void;
+  onToggleAgentChat: () => void;
   onToggleTerminal: () => void;
   onUpdateNow: () => void;
 };
@@ -43,14 +44,14 @@ export function DesktopTitlebarActions({
   titlebarActionsSettings,
   terminalSidebarOpen,
   terminalToolEnabled,
-  rightSidebarSurface,
+  agentChatEnabled,
+  agentChatSidebarOpen,
   onClearTerminal,
-  onNewAgentSession,
   onOpenActiveFileExternal,
   onOpenActiveFileWithApp,
   onCustomizeExternalAppForActiveFile,
   onResetTerminal,
-  onSelectCompanionSurface,
+  onToggleAgentChat,
   onToggleTerminal,
   onUpdateNow,
 }: DesktopTitlebarActionsProps) {
@@ -134,12 +135,9 @@ export function DesktopTitlebarActions({
     terminal: {
       enabled: terminalToolEnabled,
       menuOpen: terminalMenuOpen,
-      surface: rightSidebarSurface,
       onClear: onClearTerminal,
       onCloseMenu: () => setTerminalMenuOpen(false),
-      onNewAgentSession,
       onReset: onResetTerminal,
-      onSelectSurface: onSelectCompanionSurface,
       onToggle: () => {
         setTerminalMenuOpen(false);
         onToggleTerminal();
@@ -168,6 +166,36 @@ export function DesktopTitlebarActions({
           </Fragment>
         );
       })}
+      <AgentChatTitlebarButton
+        enabled={agentChatEnabled}
+        open={agentChatSidebarOpen}
+        onToggle={onToggleAgentChat}
+      />
     </>
+  );
+}
+
+export function AgentChatTitlebarButton({
+  enabled,
+  open,
+  onToggle,
+}: {
+  enabled: boolean;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  if (!enabled) return null;
+  const label = open ? "Hide Agent Chat" : "Show Agent Chat";
+  return (
+    <button
+      className="desktop-titlebar-action desktop-titlebar-agent-chat"
+      type="button"
+      title={label}
+      aria-label={label}
+      aria-pressed={open}
+      onClick={onToggle}
+    >
+      <MessageSquare size={16} />
+    </button>
   );
 }

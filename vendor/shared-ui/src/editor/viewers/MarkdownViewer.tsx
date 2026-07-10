@@ -1,6 +1,6 @@
 "use client";
 
-import { MarkdownCodeMirrorEditor } from "../markdown/MarkdownCodeMirrorEditor";
+import { MarkdownCodeMirrorEditor } from "../markdown";
 import type { EditorViewerContext } from "../viewerTypes";
 import { TextEditorFrame } from "./TextEditorFrame";
 

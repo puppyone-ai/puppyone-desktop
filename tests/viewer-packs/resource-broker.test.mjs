@@ -37,13 +37,14 @@ describe("viewer pack resource broker", () => {
     const broker = createViewerPackResourceBroker({
       resolveAuthorizedFilePath: async () => ({ absolutePath, rootPath: root, relativePath }),
     });
+    const documentMeta = await statWorkspaceFile(root, relativePath);
 
     const opened = await broker.openForDocument({
       pluginId: "ai.puppyone.viewer.glb",
       instanceId: "inst-1",
       ownerWebContentsId: 7,
       documentPath: relativePath,
-      documentRevision: "1",
+      documentRevision: documentMeta.revision,
       rootPath: root,
       relativePath,
     });
@@ -90,6 +91,32 @@ describe("viewer pack resource broker", () => {
     expect(protocolResult.status).toBe(206);
     expect(protocolResult.headers.get("Content-Range")).toBe("bytes 1-3/26");
 
+    const suffixResult = await handleResourceRequest({
+      request: new Request(`puppyone-resource://handle/${opened.handle}`, {
+        headers: { range: "bytes=-4" },
+      }),
+      broker,
+      audience: {
+        pluginId: "ai.puppyone.viewer.glb",
+        instanceId: "inst-1",
+        ownerWebContentsId: 7,
+      },
+    });
+    expect(Buffer.from(await suffixResult.arrayBuffer()).toString()).toBe("wxyz");
+
+    const invalidRange = await handleResourceRequest({
+      request: new Request(`puppyone-resource://handle/${opened.handle}`, {
+        headers: { range: "bytes=0-1,4-5" },
+      }),
+      broker,
+      audience: {
+        pluginId: "ai.puppyone.viewer.glb",
+        instanceId: "inst-1",
+        ownerWebContentsId: 7,
+      },
+    });
+    expect(invalidRange.status).toBe(400);
+
     broker.revokeInstance("inst-1");
     await expect(broker.readRange({
       handle: opened.handle,
@@ -99,6 +126,49 @@ describe("viewer pack resource broker", () => {
       instanceId: "inst-1",
       ownerWebContentsId: 7,
     })).rejects.toMatchObject({ code: "revoked" });
+  });
+
+  it("pins the opened file revision and invalidates the handle after a change", async () => {
+    const payload = Buffer.from("stable");
+    const { root, relativePath, absolutePath } = await makeWorkspaceWithFile(payload.length, payload);
+    const meta = await statWorkspaceFile(root, relativePath);
+    const broker = createViewerPackResourceBroker({
+      resolveAuthorizedFilePath: async () => ({ absolutePath, rootPath: root, relativePath }),
+    });
+    const opened = await broker.openForDocument({
+      pluginId: "ai.puppyone.viewer.glb",
+      instanceId: "inst-revision",
+      ownerWebContentsId: 8,
+      documentPath: relativePath,
+      documentRevision: meta.revision,
+      rootPath: root,
+      relativePath,
+    });
+    await fsp.appendFile(absolutePath, "changed");
+    await expect(broker.readRange({
+      handle: opened.handle,
+      offset: 0,
+      length: 1,
+      pluginId: "ai.puppyone.viewer.glb",
+      instanceId: "inst-revision",
+      ownerWebContentsId: 8,
+    })).rejects.toMatchObject({ code: "revision-mismatch" });
+  });
+
+  it("answers HEAD from handle metadata without reading file bytes", async () => {
+    let reads = 0;
+    const response = await handleResourceRequest({
+      request: new Request("puppyone-resource://handle/vpr_head", { method: "HEAD" }),
+      broker: {
+        inspect: async () => ({ sizeBytes: 32 }),
+        readRange: async () => { reads += 1; throw new Error("must not read"); },
+      },
+      audience: { pluginId: "p", instanceId: "i", ownerWebContentsId: 1 },
+      maxRangeLength: 8,
+    });
+    expect(response.status).toBe(206);
+    expect(response.headers.get("Content-Range")).toBe("bytes 0-7/32");
+    expect(reads).toBe(0);
   });
 
   it("allows metadata + bounded range for files larger than 100 MiB", async () => {

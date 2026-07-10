@@ -250,6 +250,26 @@ export function buildSourceControlSidebarModel({
   };
 }
 
+export type SourceControlPrimaryActionSlot = "staged" | "sync" | "committed" | "simple" | null;
+
+export function getSourceControlPrimaryActionSlot({
+  hasStagedAction,
+  hasSyncAction,
+  hasCommittedAction,
+  hasSimpleAction,
+}: {
+  hasStagedAction: boolean;
+  hasSyncAction: boolean;
+  hasCommittedAction: boolean;
+  hasSimpleAction: boolean;
+}): SourceControlPrimaryActionSlot {
+  if (hasStagedAction) return "staged";
+  if (hasSyncAction) return "sync";
+  if (hasCommittedAction) return "committed";
+  if (hasSimpleAction) return "simple";
+  return null;
+}
+
 export function displayGitBranch(status: GitStatusSnapshot) {
   return status.branch && status.branch !== "detached" ? status.branch : "initial branch";
 }

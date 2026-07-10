@@ -233,7 +233,8 @@
 .cloud-nav {
   flex: 1;
   min-height: 0;
-  padding: 8px 6px;
+  padding-block: var(--desktop-sidebar-list-padding-block);
+  padding-inline: 6px;
   overflow: auto;
 }
 

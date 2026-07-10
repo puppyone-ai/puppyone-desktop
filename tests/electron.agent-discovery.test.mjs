@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   compareVersions,
   discoverCodexExecutable,
+  MIN_SUPPORTED_CODEX_VERSION,
   parseCodexVersion,
 } from "../electron/main/agent/provider-discovery.mjs";
 
@@ -12,6 +13,7 @@ describe("Codex provider discovery", () => {
     expect(compareVersions("0.144.1", "0.100.0")).toBe(1);
     expect(compareVersions("0.99.0", "0.100.0")).toBe(-1);
     expect(compareVersions("0.100.0", "0.100.0")).toBe(0);
+    expect(MIN_SUPPORTED_CODEX_VERSION).toBe("0.144.1");
   });
 
   it("returns ready using an absolute executable without exposing shell interpolation", async () => {

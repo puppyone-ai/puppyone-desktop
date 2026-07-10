@@ -1,26 +1,26 @@
 import { EditorState } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { describe, expect, it } from "vitest";
-import { createWidgetSessionRegistry } from "../vendor/shared-ui/src/editor/markdown/adapters/codemirror/widgetSession";
-import { createEmbeddedEditSessionStore } from "../vendor/shared-ui/src/editor/markdown/adapters/codemirror/embeddedEditSession";
-import { compileMarkdownElementPlan } from "../vendor/shared-ui/src/editor/markdown/plans/markdownPlanCompiler";
+import { createWidgetSessionRegistry } from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/widgetSession";
+import { createEmbeddedEditSessionStore } from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/embeddedEditSession";
+import { compileMarkdownElementPlan } from "../vendor/shared-ui/src/editor/markdown/core/plans/markdownPlanCompiler";
 import {
   getCollapsedMarkerDeletionUnit,
   getMarkdownPlanIndex,
-} from "../vendor/shared-ui/src/editor/markdown/plans/markdownPlanIndex";
-import { MARKDOWN_HTML_PROFILE_VERSION } from "../vendor/shared-ui/src/editor/markdown/policy/markdownHtmlProfiles";
-import { createAsyncRenderBroker } from "../vendor/shared-ui/src/editor/markdown/services/asyncRenderBroker";
-import { createLinkBroker } from "../vendor/shared-ui/src/editor/markdown/services/linkBroker";
-import { createWebEmbedBroker } from "../vendor/shared-ui/src/editor/markdown/services/webEmbedBroker";
-import { createCapabilityPrincipal, workspaceIdForDocument } from "../vendor/shared-ui/src/editor/markdown/services/capabilityPrincipal";
-import { createExecutionSessionStore } from "../vendor/shared-ui/src/editor/markdown/services/executionSession";
+} from "../vendor/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
+import { MARKDOWN_HTML_PROFILE_VERSION } from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownHtmlProfiles";
+import { createAsyncRenderBroker } from "../vendor/shared-ui/src/editor/markdown/platform/brokers/asyncRenderBroker";
+import { createLinkBroker } from "../vendor/shared-ui/src/editor/markdown/platform/brokers/linkBroker";
+import { createWebEmbedBroker } from "../vendor/shared-ui/src/editor/markdown/platform/brokers/webEmbedBroker";
+import { createCapabilityPrincipal, workspaceIdForDocument } from "../vendor/shared-ui/src/editor/markdown/platform/security/capabilityPrincipal";
+import { createExecutionSessionStore } from "../vendor/shared-ui/src/editor/markdown/platform/sessions/executionSession";
 import {
   createDocumentTrustContext,
   evaluateAuthorizationGrant,
-} from "../vendor/shared-ui/src/editor/markdown/policy/markdownTrustPolicy";
-import { createTransactionBroker, getDocRevision } from "../vendor/shared-ui/src/editor/markdown/services/transactionBroker";
-import { getMarkdownElements } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownElements";
-import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownParserExtensions";
+} from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownTrustPolicy";
+import { createTransactionBroker, getDocRevision } from "../vendor/shared-ui/src/editor/markdown/platform/brokers/transactionBroker";
+import { getMarkdownElements } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownElements";
+import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
 
 function createMarkdownState(source: string) {
   return EditorState.create({
@@ -98,6 +98,29 @@ describe("Markdown render-plan compiler", () => {
       expect(table.plan.embed.rows.length).toBeGreaterThanOrEqual(2);
       expect(table.plan.embed.alignments.length).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  it("carries legacy code-source references into the block plan", () => {
+    const source = [
+      "```83:99:package.json",
+      '{"private": true}',
+      "```",
+    ].join("\n");
+    const plan = getMarkdownPlanIndex(createMarkdownState(source))
+      .find((entry) => entry.plan.presentation === "blockAtom")?.plan;
+
+    expect(plan).toMatchObject({
+      presentation: "blockAtom",
+      embed: {
+        kind: "codeBlock",
+        language: "json",
+        sourceReference: {
+          path: "package.json",
+          startLine: 83,
+          endLine: 99,
+        },
+      },
+    });
   });
 });
 
@@ -178,6 +201,105 @@ describe("Markdown embed runtime foundations", () => {
       privacyProfile: "temporary-no-credential",
     });
     expect(blocked.state).toBe("blocked");
+  });
+
+  it("binds native web embeds to an exact capability revision and revokes stale sessions", async () => {
+    const created: Array<Record<string, unknown>> = [];
+    const destroyed: string[] = [];
+    const runtime = globalThis as typeof globalThis & { puppyoneDesktop?: unknown };
+    runtime.puppyoneDesktop = {
+      markdownWebEmbed: {
+        async create(request: Record<string, unknown>) {
+          created.push(request);
+          return { id: "native-1" };
+        },
+        async setBounds() {},
+        async destroy({ id }: { id: string }) {
+          destroyed.push(id);
+        },
+      },
+    };
+
+    try {
+      const broker = createWebEmbedBroker();
+      const principal = createCapabilityPrincipal({
+        editorViewId: "view-1",
+        workspaceId: "ws",
+        documentPath: "note.md",
+        documentRevision: "revision-1",
+        purpose: "web-embed",
+      });
+      const session = broker.create({
+        principal,
+        href: "https://example.com/embed",
+        privacyProfile: "temporary-no-credential",
+      });
+      await broker.activate(session.id, { x: 1, y: 2, width: 300, height: 200 });
+      expect(created[0]).toMatchObject({
+        capability: {
+          editorViewId: "view-1",
+          workspaceId: "ws",
+          documentPath: "note.md",
+          documentRevision: "revision-1",
+          purpose: "web-embed",
+        },
+      });
+
+      broker.destroyStaleRevision("view-1", "revision-2");
+      await Promise.resolve();
+      expect(destroyed).toEqual(["native-1"]);
+      expect(session.state).toBe("destroyed");
+    } finally {
+      delete runtime.puppyoneDesktop;
+    }
+  });
+
+  it("single-flights repeated activation of one native web embed", async () => {
+    let createCalls = 0;
+    let finishCreate: ((value: { id: string }) => void) | null = null;
+    const createResult = new Promise<{ id: string }>((resolve) => {
+      finishCreate = resolve;
+    });
+    const runtime = globalThis as typeof globalThis & { puppyoneDesktop?: unknown };
+    runtime.puppyoneDesktop = {
+      markdownWebEmbed: {
+        async create() {
+          createCalls += 1;
+          return createResult;
+        },
+        async setBounds() {},
+        async destroy() {},
+      },
+    };
+
+    try {
+      const broker = createWebEmbedBroker();
+      const principal = createCapabilityPrincipal({
+        editorViewId: "view-single-flight",
+        workspaceId: "ws",
+        documentPath: "note.md",
+        documentRevision: "revision-1",
+        purpose: "web-embed",
+      });
+      const session = broker.create({
+        principal,
+        href: "https://example.com/embed",
+        privacyProfile: "temporary-no-credential",
+      });
+
+      const first = broker.activate(session.id);
+      const second = broker.activate(session.id);
+      expect(createCalls).toBe(1);
+      finishCreate?.({ id: "native-single" });
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+      expect(firstResult).toBe(session);
+      expect(secondResult).toBe(session);
+      expect((await broker.activate(session.id))?.nativeViewId).toBe("native-single");
+      expect(createCalls).toBe(1);
+      broker.disposeAll();
+    } finally {
+      delete runtime.puppyoneDesktop;
+    }
   });
 
   it("deduplicates async render work by principal-scoped key", async () => {
@@ -318,8 +440,15 @@ describe("Markdown embed runtime foundations", () => {
     });
     expect(broker.resolve(principal, "https://example.com")).toEqual({
       action: "open-external",
-      href: "https://example.com",
+      href: "https://example.com/",
     });
     expect(broker.resolve(principal, "javascript:alert(1)").action).toBe("deny");
+
+    // The production EmbedHost uses the default broker. Relative links must
+    // still be classified as internal and delegated to the host link graph.
+    expect(createLinkBroker().resolve(principal, "other.md")).toEqual({
+      action: "navigate-internal",
+      path: "other.md",
+    });
   });
 });

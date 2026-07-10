@@ -31,6 +31,10 @@ export type AgentApproval = {
   title: string;
   command: string | null;
   cwd: string | null;
+  commandActions: Array<Record<string, unknown>>;
+  networkApprovalContext: { host: string; protocol: string } | null;
+  grantRoot: string | null;
+  policyChangeRequested: boolean;
   reason: string | null;
   availableDecisions: Array<"accept" | "acceptForSession" | "decline" | "cancel">;
   sequence: number;
@@ -201,6 +205,13 @@ export function applyAgentEvent(previous: AgentProjection, event: AgentEvent): A
         title: readString(payload.title) || "Approval required",
         command: nullableString(payload.command),
         cwd: nullableString(payload.cwd),
+        commandActions: readRecordArray(payload.commandActions),
+        networkApprovalContext: readNetworkApprovalContext(payload.networkApprovalContext),
+        grantRoot: nullableString(payload.grantRoot),
+        policyChangeRequested: Boolean(
+          payload.proposedExecpolicyAmendment
+          || (Array.isArray(payload.proposedNetworkPolicyAmendments) && payload.proposedNetworkPolicyAmendments.length > 0)
+        ),
         reason: nullableString(payload.reason),
         availableDecisions: readApprovalDecisions(payload.availableDecisions),
         sequence: event.sequence,
@@ -300,7 +311,12 @@ function cloneProjection(value: AgentProjection): AgentProjection {
     missingRanges: [...value.missingRanges],
     messages: value.messages.map((message) => ({ ...message })),
     activities: value.activities.map((activity) => ({ ...activity, detail: { ...activity.detail } })),
-    approvals: value.approvals.map((approval) => ({ ...approval, availableDecisions: [...approval.availableDecisions] })),
+    approvals: value.approvals.map((approval) => ({
+      ...approval,
+      commandActions: approval.commandActions.map((action) => ({ ...action })),
+      networkApprovalContext: approval.networkApprovalContext ? { ...approval.networkApprovalContext } : null,
+      availableDecisions: [...approval.availableDecisions],
+    })),
   };
 }
 
@@ -315,6 +331,21 @@ function readString(value: unknown) {
 function nullableString(value: unknown) {
   const text = readString(value);
   return text || null;
+}
+
+function readRecordArray(value: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is Record<string, unknown> => (
+    Boolean(entry) && typeof entry === "object" && !Array.isArray(entry)
+  )).slice(0, 20);
+}
+
+function readNetworkApprovalContext(value: unknown): AgentApproval["networkApprovalContext"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const host = readString(record.host).trim();
+  const protocol = readString(record.protocol).trim();
+  return host && protocol ? { host, protocol } : null;
 }
 
 function defaultToolLabel(kind: AgentActivity["kind"]) {

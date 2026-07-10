@@ -39,7 +39,7 @@ Accepted, because they are accessibility or curated choices:
 | Third dark preset | A warm dark preset pairing with the light `warm` preset, giving 3 light + 3 dark. |
 | Theme previews | Mini app-preview cards for System / Light / Dark mode, rendered from live tokens with CSS (no screenshots). Individual light and dark presets use compact palette swatches inside the same segmented-control pattern as Text size, File icons, and Navigation. |
 | Reduce motion | Zero-UI. Respect system `prefers-reduced-motion` automatically. Not a settings row. |
-| Diff markers | Color vs `+/-` markers toggle for diff surfaces (color-blind accessibility). Lives in the Editor section, not Appearance. |
+| Diff markers | Color vs `+/-` markers toggle for compact AI review surfaces. The full Git Changes view always shows structural `+/-` markers. Lives in the Editor section, not Appearance. |
 
 Rejected, and why:
 
@@ -90,6 +90,18 @@ height, or any other spacing token.
 | Page title | 18px | 20px | 22px |
 | Display | 22px | 24px | 28px |
 
+### Header Typography Contract
+
+The desktop header is chrome, not a heading surface. Its project name, branch
+name, and any static context name use `--po-font-size-chrome` and
+`--po-font-weight-chrome`; individual titlebar selectors must not introduce a
+heavier local weight. The default chrome weight is medium (`500`), matching
+ordinary sidebar rows rather than promoting workspace identity to a heading.
+
+Keep all header context labels on the same token pair so project and branch
+typography cannot drift independently. The architecture test in
+`tests/titlebarTypographyArchitecture.test.ts` enforces this binding.
+
 ## Part 2: Implementation Status
 
 All accepted items were implemented on 2026-07-10. Current code boundaries:
@@ -129,8 +141,9 @@ Implemented:
    packaging contract in [Desktop App Icon](../DESKTOP_APP_ICON.md) (raw PNG
    resources, not `.icns` slots).
 7. **Diff markers.** `puppyone.desktop.diffMarkers`
-   (`color | symbols`) is rendered in diff surfaces; its settings row lives in the
-   Editor section.
+   (`color | symbols`) is rendered in compact AI review surfaces; its settings
+   row lives in the Editor section. The full Git Changes review surface always
+   renders `+/-` because color alone cannot communicate its row structure.
 
 ## Invariants
 
@@ -143,6 +156,9 @@ Implemented:
   or gaps merely to make them respond to the text-size preference.
 - Typography preset values are always whole pixels. Do not derive them with a
   scale factor or introduce fractional computed sizes such as `15.68px`.
+- Project, branch, and static context labels in the desktop header must use the
+  shared chrome size and weight tokens. Do not hard-code a heavier titlebar
+  label weight in a feature selector.
 - New visual variety ships as a complete preset in `preferences.ts` +
   `tokens.css`, keeping light and dark preset counts balanced.
 - Preset counts stay small (3-4 per mode); adding a preset beyond that

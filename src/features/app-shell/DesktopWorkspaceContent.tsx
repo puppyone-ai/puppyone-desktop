@@ -173,6 +173,10 @@ export function DesktopWorkspaceContent({
   const handleIntegrationProviderChange = useCallback((provider: string | null) => {
     setActiveIntegrationProvider(provider);
   }, []);
+  const handleOpenGitFile = useCallback((path: string) => {
+    onActiveDataPathChange(path);
+    onNavigate("data");
+  }, [onActiveDataPathChange, onNavigate]);
   const renderPreviewBody = useCallback((node: DataNode, context: FilePreviewBodyContext) => {
     if (!isPuppyFlowFile(node.name, node.type)) return undefined;
 
@@ -308,6 +312,7 @@ export function DesktopWorkspaceContent({
       onStagePaths={git.handleStageGitPaths}
       onUnstagePaths={git.handleUnstageGitPaths}
       onDiscardPaths={git.handleDiscardGitPaths}
+      onOpenWorkingFile={handleOpenGitFile}
       onInitializeRepository={git.handleInitializeGitRepository}
     />
   );

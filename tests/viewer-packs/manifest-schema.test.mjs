@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { validateViewerPackManifest, isReservedCoreViewerId } from "../../electron/main/viewer-packs/manifest-schema.mjs";
+import {
+  checkViewerPackEngineCompatibility,
+  validateViewerPackManifest,
+  isReservedCoreViewerId,
+} from "../../electron/main/viewer-packs/manifest-schema.mjs";
 
 const validManifest = {
   schemaVersion: 1,
@@ -7,6 +11,7 @@ const validManifest = {
   publisher: "puppyone",
   version: "1.0.0",
   engines: { puppyone: ">=0.2.0", viewerApi: "1" },
+  activationEvents: ["onFileExtension:.glb"],
   viewer: {
     entry: "viewer.html",
     source: "range-resource",
@@ -96,5 +101,39 @@ describe("viewer pack manifest schema", () => {
     });
     expect(result.ok).toBe(false);
     expect(result.errors).toContain("activationEvents-startup-forbidden");
+  });
+
+  it("rejects unknown fields and a viewer id that does not match the package", () => {
+    const unknown = validateViewerPackManifest({ ...validManifest, surprise: true });
+    expect(unknown.ok).toBe(false);
+    expect(unknown.errors).toContain("manifest-unknown-keys");
+
+    const mismatched = validateViewerPackManifest({
+      ...validManifest,
+      formats: [{
+        ...validManifest.formats[0],
+        defaultViewer: "plugin:ai.puppyone.viewer.other",
+      }],
+    });
+    expect(mismatched.ok).toBe(false);
+    expect(mismatched.errors).toContain("formats[0].defaultViewer-must-match-plugin-id");
+  });
+
+  it("rejects permissions that v1 does not implement", () => {
+    const result = validateViewerPackManifest({
+      ...validManifest,
+      permissions: { ...validManifest.permissions, relatedFiles: "same-directory" },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain("permissions.relatedFiles-must-be-none-v1");
+  });
+
+  it("enforces the declared PuppyOne engine range", () => {
+    const validated = validateViewerPackManifest(validManifest);
+    expect(validated.ok).toBe(true);
+    expect(checkViewerPackEngineCompatibility(validated.value, { hostVersion: "0.1.2" }))
+      .toEqual({ ok: false, reason: "host-version-incompatible" });
+    expect(checkViewerPackEngineCompatibility(validated.value, { hostVersion: "0.2.0" }))
+      .toEqual({ ok: true });
   });
 });

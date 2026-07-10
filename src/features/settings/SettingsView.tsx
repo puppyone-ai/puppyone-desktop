@@ -9,6 +9,7 @@ import { DARK_THEME_PRESETS, DEFAULT_EXPLORER_EXCLUDE_PATTERNS, DOCK_ICON_OPTION
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements";
 import { ExternalAppIcon } from "../external-apps/ExternalAppIcon";
+import { useFeatureFlag } from "../flags";
 import { getPuppyoneRemote, maskRemoteUrl, parsePuppyoneRemote } from "../source-control/remotes";
 import { SettingsGroup, SettingsLine, SettingsSectionHeader } from "./components";
 import { PuppyoneWorkspaceConfigSettings } from "./PuppyoneWorkspaceConfigSettings";
@@ -67,6 +68,8 @@ export function SettingsView({
   onCheckForUpdates,
   onUpdateNow,
 }: SettingsViewProps) {
+  const agentChatAvailable = useFeatureFlag("desktopAgentChat");
+  const assetLibraryHomeAvailable = useFeatureFlag("assetLibraryHome");
   const [unlinking, setUnlinking] = useState(false);
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
   const [copiedRemoteKey, setCopiedRemoteKey] = useState<string | null>(null);
@@ -168,6 +171,8 @@ export function SettingsView({
     return (
       <ExperimentalSettingsView
         settings={experimentalSettings}
+        agentChatAvailable={agentChatAvailable}
+        assetLibraryHomeAvailable={assetLibraryHomeAvailable}
         onChange={onExperimentalSettingsChange}
       />
     );
@@ -709,7 +714,7 @@ function EditorSettingsView({
             <div className="desktop-settings-row desktop-settings-row-control">
               <span className="desktop-settings-label-stack">
                 <strong>Diff markers</strong>
-                <small>Use +/− symbols as a color-independent change cue.</small>
+                <small>Choose markers for compact AI reviews. Git Changes always shows +/−.</small>
               </span>
               <div className="desktop-theme-segment" aria-label="Diff markers">
                 <button
@@ -739,9 +744,13 @@ function EditorSettingsView({
 
 function ExperimentalSettingsView({
   settings,
+  agentChatAvailable,
+  assetLibraryHomeAvailable,
   onChange,
 }: {
   settings: ExperimentalSettings;
+  agentChatAvailable: boolean;
+  assetLibraryHomeAvailable: boolean;
   onChange: (settings: ExperimentalSettings) => void;
 }) {
   return (
@@ -750,9 +759,47 @@ function ExperimentalSettingsView({
         <div className="desktop-settings-section">
           <SettingsSectionHeader
             title="Experimental"
-            detail="Opt in to early file experiences. These entries are hidden by default."
+            detail="Opt in to early desktop experiences. Every experiment is off by default."
           />
           <div className="desktop-settings-list">
+            {assetLibraryHomeAvailable && (
+              <div className="desktop-settings-row desktop-settings-row-control">
+                <span className="desktop-settings-label-stack">
+                  <strong>Projects homepage</strong>
+                  <small>Try the experimental unified card layout for Cloud and local projects.</small>
+                </span>
+                <label className="desktop-settings-switch">
+                  <input
+                    type="checkbox"
+                    checked={settings.enableAssetLibraryHome}
+                    onChange={(event) => onChange({
+                      ...settings,
+                      enableAssetLibraryHome: event.target.checked,
+                    })}
+                  />
+                  <span aria-hidden="true" />
+                </label>
+              </div>
+            )}
+            {agentChatAvailable && (
+              <div className="desktop-settings-row desktop-settings-row-control">
+                <span className="desktop-settings-label-stack">
+                  <strong>Agent Chat</strong>
+                  <small>Show the experimental Chat icon in the header. Terminal remains a separate button and stays available when this is off.</small>
+                </span>
+                <label className="desktop-settings-switch">
+                  <input
+                    type="checkbox"
+                    checked={settings.enableAgentChat}
+                    onChange={(event) => onChange({
+                      ...settings,
+                      enableAgentChat: event.target.checked,
+                    })}
+                  />
+                  <span aria-hidden="true" />
+                </label>
+              </div>
+            )}
             <div className="desktop-settings-row desktop-settings-row-control">
               <span className="desktop-settings-label-stack">
                 <strong>Puppyone App files</strong>

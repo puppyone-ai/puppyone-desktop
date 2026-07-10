@@ -3,11 +3,12 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { EditorState } from "@codemirror/state";
 import {
   canonicalizeMarkdownHref,
+  getSafeMarkdownHref,
   isSafeHref,
-} from "../vendor/shared-ui/src/editor/markdown/policy/markdownUrlPolicy";
-import { compileInlineHtmlRenderPlan } from "../vendor/shared-ui/src/editor/markdown/policy/inlineHtmlPolicy";
-import { getMarkdownInlineHtml } from "../vendor/shared-ui/src/editor/markdown/semantic/inlineHtmlModel";
-import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/syntax/markdownParserExtensions";
+} from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownUrlPolicy";
+import { compileInlineHtmlRenderPlan } from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlPolicy";
+import { getMarkdownInlineHtml } from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlModel";
+import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
 
 function createMarkdownState(source: string) {
   return EditorState.create({
@@ -20,7 +21,8 @@ describe("Markdown URL policy (P0 scheme bypass)", () => {
   it("rejects control-character obfuscated javascript: schemes", () => {
     expect(isSafeHref("java\nscript:alert(1)")).toBe(false);
     expect(isSafeHref("java\tscript:alert(1)")).toBe(false);
-    expect(canonicalizeMarkdownHref("java\nscript:alert(1)")).toBe("javascript:alert(1)");
+    expect(canonicalizeMarkdownHref("java\nscript:alert(1)")).toBe("java\nscript:alert(1)");
+    expect(getSafeMarkdownHref("java\nscript:alert(1)")).toBeNull();
   });
 
   it("rejects HTML-entity obfuscated javascript: schemes after decode", () => {
@@ -33,11 +35,18 @@ describe("Markdown URL policy (P0 scheme bypass)", () => {
     expect(isSafeHref("data:text/html,<script>alert(1)</script>")).toBe(false);
   });
 
+  it("rejects scheme-relative URLs, encoded controls, and credentials", () => {
+    expect(isSafeHref("//evil.example/path")).toBe(false);
+    expect(isSafeHref("https://example.com/%0aheader")).toBe(false);
+    expect(isSafeHref("https://user:pass@example.com/path")).toBe(false);
+  });
+
   it("allows https and relative paths", () => {
     expect(isSafeHref("https://example.com/a")).toBe(true);
     expect(isSafeHref("./note.md")).toBe(true);
     expect(isSafeHref("#section")).toBe(true);
     expect(isSafeHref("note.md")).toBe(true);
+    expect(getSafeMarkdownHref("HTTPS://EXAMPLE.COM/a")).toBe("https://example.com/a");
   });
 
   it("compiles unsafe HTML anchors to unsupported visible source", () => {
@@ -55,7 +64,7 @@ describe("Markdown URL policy (P0 scheme bypass)", () => {
     expect(plan.supported).toBe(true);
     if (plan.supported && plan.value.kind === "mark") {
       expect(plan.value.attributes.href).toBeUndefined();
-      expect(plan.value.attributes["data-md-href"]).toBe("https://example.com");
+      expect(plan.value.attributes["data-md-href"]).toBe("https://example.com/");
     }
   });
 });

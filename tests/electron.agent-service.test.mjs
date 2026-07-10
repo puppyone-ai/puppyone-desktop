@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import { createAgentService } from "../electron/main/agent/agent-service.mjs";
 import { registerAgentIpcHandlers } from "../electron/main/ipc/agent-ipc.mjs";
@@ -42,6 +43,35 @@ describe("Electron AgentService ownership and lifecycle", () => {
     expect(harness.service.getSessionCount()).toBe(0);
   });
 
+  it("does not resurrect a turn that completed before turn/start returned", async () => {
+    const harness = createServiceHarness();
+    const owner = createSender(31);
+    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const adapter = harness.adapters[0];
+    adapter.startTurn.mockImplementationOnce(async () => {
+      adapter.emit({
+        type: "turn.started",
+        providerSessionId: "thread-1",
+        turnId: "turn-fast",
+        payload: { status: "running" },
+      });
+      adapter.emit({
+        type: "turn.completed",
+        providerSessionId: "thread-1",
+        turnId: "turn-fast",
+        payload: { status: "completed" },
+      });
+      return { turnId: "turn-fast" };
+    });
+
+    await harness.service.startTurn(owner, { sessionId: snapshot.session.id, prompt: "Quick" });
+
+    const replay = harness.service.replay(owner, { sessionId: snapshot.session.id, afterSequence: 0 });
+    expect(replay.session.activeTurnId).toBeNull();
+    expect(replay.session.terminalState).toBe("completed");
+    expect(replay.events.filter((event) => event.type === "turn.started")).toHaveLength(1);
+  });
+
   it("fails pending approvals closed and emits terminal failure on provider exit", async () => {
     const harness = createServiceHarness();
     const owner = createSender(4);
@@ -56,10 +86,27 @@ describe("Electron AgentService ownership and lifecycle", () => {
       payload: { requestId: "codex:1", kind: "command", availableDecisions: ["accept", "decline", "cancel"] },
     });
     adapter.exit({ expected: false, diagnostics: "token=secret-value" });
-    const replay = harness.service.replay(owner, { sessionId: snapshot.session.id, afterSequence: 0 });
-    expect(replay.events.some((event) => event.type === "approval.resolved" && event.payload.decision === "cancel")).toBe(true);
-    expect(replay.events.some((event) => event.type === "turn.failed")).toBe(true);
-    expect(JSON.stringify(replay.events)).not.toContain("secret-value");
+    const events = sentAgentEvents(owner);
+    expect(events.some((event) => event.type === "approval.resolved" && event.payload.decision === "cancel")).toBe(true);
+    expect(events.some((event) => event.type === "turn.failed")).toBe(true);
+    expect(JSON.stringify(events)).not.toContain("secret-value");
+    expect(harness.service.getSessionCount()).toBe(0);
+  });
+
+  it("resumes immediately from the retired in-memory snapshot after provider exit", async () => {
+    const harness = createServiceHarness();
+    const owner = createSender(41);
+    const created = await harness.service.createSession(owner, {}, "/workspace");
+    harness.adapters[0].exit({ expected: false, diagnostics: "provider crashed" });
+    expect(harness.service.getSessionCount()).toBe(0);
+    expect(harness.service.getRetainedSessionCount()).toBe(1);
+
+    const resumed = await harness.service.resumeSession(owner, {}, "/workspace");
+
+    expect(resumed.session.id).toBe(created.session.id);
+    expect(harness.adapters).toHaveLength(2);
+    expect(harness.adapters[1].resumeSession).toHaveBeenCalledWith({ threadId: "thread-1", model: "gpt-5" });
+    expect(harness.service.getSessionCount()).toBe(1);
   });
 
   it("rejects stale approvals and bounds retained replay for a slow renderer", async () => {
@@ -136,7 +183,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
     expect(replay.events.filter((event) => event.type === "turn.interrupted")).toHaveLength(1);
   });
 
-  it("emits a deterministic turn.interrupted event when the provider never confirms the interrupt", async () => {
+  it("retires the provider instead of claiming an unconfirmed interrupt succeeded", async () => {
     vi.useFakeTimers();
     try {
       const harness = createServiceHarness();
@@ -145,17 +192,76 @@ describe("Electron AgentService ownership and lifecycle", () => {
       await harness.service.startTurn(owner, { sessionId: snapshot.session.id, prompt: "Run" });
 
       await harness.service.interruptTurn(owner, { sessionId: snapshot.session.id, turnId: "turn-1" });
-      // The fake adapter's interruptTurn resolves without ever emitting a
-      // turn.interrupted event itself, mirroring a provider that hangs.
-      await vi.advanceTimersByTimeAsync(2_100);
+      // The fake adapter acknowledges the interrupt request but never emits the
+      // authoritative turn/completed notification.
+      await vi.advanceTimersByTimeAsync(5_100);
 
-      const replay = harness.service.replay(owner, { sessionId: snapshot.session.id, afterSequence: 0 });
-      const interrupted = replay.events.filter((event) => event.type === "turn.interrupted");
-      expect(interrupted).toHaveLength(1);
-      expect(interrupted[0].payload.message).toMatch(/did not confirm/i);
+      const events = sentAgentEvents(owner);
+      expect(events.filter((event) => event.type === "turn.interrupted")).toHaveLength(0);
+      expect(events.some((event) => event.type === "turn.failed" && String(event.payload.message).includes("did not confirm"))).toBe(true);
+      expect(harness.adapters[0].disposed).toBe(true);
+      expect(harness.service.getSessionCount()).toBe(0);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("does not fabricate a terminal state when the interrupt request itself fails", async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = createServiceHarness();
+      const owner = createSender(12);
+      const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+      await harness.service.startTurn(owner, { sessionId: snapshot.session.id, prompt: "Run" });
+      harness.adapters[0].emit({
+        type: "approval.requested",
+        providerSessionId: "thread-1",
+        turnId: "turn-1",
+        itemId: "item-1",
+        payload: { requestId: "codex:still-actionable", kind: "command", availableDecisions: ["accept", "decline", "cancel"] },
+      });
+      harness.adapters[0].interruptTurn.mockRejectedValueOnce(new Error("transport unavailable"));
+
+      await expect(harness.service.interruptTurn(owner, {
+        sessionId: snapshot.session.id,
+        turnId: "turn-1",
+      })).rejects.toThrow(/transport unavailable/i);
+      await vi.advanceTimersByTimeAsync(5_100);
+
+      const replay = harness.service.replay(owner, { sessionId: snapshot.session.id, afterSequence: 0 });
+      expect(replay.session.activeTurnId).toBe("turn-1");
+      expect(replay.events.some((event) => ["turn.failed", "turn.interrupted"].includes(event.type))).toBe(false);
+      expect(replay.events.some((event) => (
+        event.type === "approval.resolved" && event.payload.requestId === "codex:still-actionable"
+      ))).toBe(false);
+      expect(() => harness.service.resolveApproval(owner, {
+        sessionId: snapshot.session.id,
+        turnId: "turn-1",
+        requestId: "codex:still-actionable",
+        decision: "decline",
+      })).not.toThrow();
+      expect(harness.service.getSessionCount()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps only one renderer-destroyed listener per owner and removes it after the final session", async () => {
+    const harness = createServiceHarness();
+    const owner = Object.assign(new EventEmitter(), {
+      id: 13,
+      isDestroyed: () => false,
+      send: vi.fn(),
+    });
+
+    const first = await harness.service.createSession(owner, {}, "/workspace-a");
+    const second = await harness.service.createSession(owner, {}, "/workspace-b");
+    expect(owner.listenerCount("destroyed")).toBe(1);
+
+    await harness.service.closeSession(owner, { sessionId: first.session.id, removePersistence: true });
+    expect(owner.listenerCount("destroyed")).toBe(1);
+    await harness.service.closeSession(owner, { sessionId: second.session.id, removePersistence: true });
+    expect(owner.listenerCount("destroyed")).toBe(0);
   });
 });
 
@@ -249,7 +355,7 @@ function createServiceHarness() {
         provider: "codex",
         status: "ready",
         version: "0.144.1",
-        minimumVersion: "0.100.0",
+        minimumVersion: "0.144.1",
         executablePath: "/usr/local/bin/codex",
         environment: {},
         message: "ready",
@@ -286,7 +392,13 @@ function createFakeAdapter(options) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })),
-    resumeSession: vi.fn(),
+    resumeSession: vi.fn(async () => ({
+      providerSessionId: "thread-1",
+      title: "Test session",
+      model: "gpt-5",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })),
     startTurn: vi.fn(async () => {
       options.onEvent({ type: "turn.started", providerSessionId: "thread-1", turnId: "turn-1", payload: { status: "running" } });
       return { turnId: "turn-1" };
@@ -305,5 +417,12 @@ function createSender(id) {
     isDestroyed: () => false,
     send: vi.fn(),
     once: vi.fn(),
+    removeListener: vi.fn(),
   };
+}
+
+function sentAgentEvents(sender) {
+  return sender.send.mock.calls
+    .filter(([channel]) => channel === "agent:event")
+    .map(([, event]) => event);
 }

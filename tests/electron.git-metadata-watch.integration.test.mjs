@@ -274,6 +274,40 @@ describe("git metadata watch service", { timeout: 30_000 }, () => {
     expect(service.getWatcherCount()).toBe(0);
   });
 
+  it("rechecks repository identity after arming a pending root watcher", async () => {
+    initRepoWithIdentity();
+    let identityReads = 0;
+    const service = trackService(createGitMetadataWatchService({
+      logger: silentLogger(),
+      resolveIdentity: async (rootPath) => {
+        identityReads += 1;
+        if (identityReads === 1) {
+          return {
+            repository: false,
+            workspaceRoot: path.resolve(rootPath),
+            topLevel: null,
+            gitDir: null,
+            commonDir: null,
+          };
+        }
+        return resolveGitRepositoryIdentity(rootPath);
+      },
+    }));
+    const { events, sender } = createRecordingSender(16);
+
+    const subscription = await service.start(sender, root);
+    expect(subscription.repository).toBe(false);
+
+    await waitFor(() => service.getWatcherCount() === 1 && service.getPendingRootCount() === 0);
+    expect(identityReads).toBeGreaterThanOrEqual(2);
+    expect(events.some((event) => (
+      event.channel === GIT_REPOSITORY_INVALIDATED_CHANNEL
+      && event.payload.reason === "repository-initialized"
+    ))).toBe(true);
+
+    service.stop(subscription.subscriptionId);
+  });
+
   it("invalidates linked worktrees when shared common-dir refs change", async () => {
     initRepoWithIdentity();
     await writeFile(path.join(root, "a.txt"), "a\n");

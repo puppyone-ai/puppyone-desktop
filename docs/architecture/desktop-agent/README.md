@@ -22,12 +22,22 @@ the **Proposed** architecture.
 
 ## Implementation status (July 2026)
 
-**Implemented:** the first Codex vertical slice now provides a structured
+**Experimental and off by default:** Terminal remains the normal right-sidebar
+surface for local workspaces. The build-time `desktopAgentChat`
+availability flag and the user's explicit **Settings → Experimental → Agent
+Chat** opt-in add a separate Chat icon to the application header. Turning the
+experiment off removes only that Chat icon; it does not disable, rename, or
+hide Terminal.
+
+**Implemented behind that gate:** the first Codex vertical slice provides a structured
 Chat surface beside Terminal, Codex executable discovery, app-server
 initialization over stdio JSONL/JSON-RPC, existing-account and model reads,
 thread create/resume, streamed normalized events, command/file approvals,
 interrupt, bounded live replay, a retained local session journal, owner-bound
 IPC, redacted diagnostics, and symmetric window/app cleanup.
+
+The tested minimum Codex CLI/app-server version is `0.144.1`. Older versions are
+reported as unsupported rather than being treated as implicitly compatible.
 
 **Known gaps:** PuppyOne does not host Codex login yet; users authenticate with
 Codex externally and use Refresh. Experimental structured questions,
@@ -40,7 +50,7 @@ described below.
 ## Documents
 
 1. [Right Sidebar Agent Chat](right-sidebar.md)
-   - Product hierarchy, Chat/Terminal switching, transcript, approval and
+   - Product hierarchy, independent Chat/Terminal header actions, transcript, approval and
      question docks, composer, resize, focus, accessibility, and state
      ownership.
 2. [Codex Implementation Brief](implementation-brief.md)
@@ -50,15 +60,16 @@ described below.
 ## Decision summary
 
 **Implemented for Codex; Proposed for additional providers:** A structured
-Agent Chat surface is present in the existing resizable right sidebar and the
-current Terminal remains a neighboring tab.
+Agent Chat panel and the existing Terminal panel share the resizable right-side
+area but remain separate surfaces selected by two independent header icons.
+There are no Chat/Terminal tabs inside the sidebar.
 
 The renderer consumes one normalized event model. Provider-specific protocols
 stay behind adapters in the Electron main process:
 
 ```mermaid
 flowchart LR
-  UI["Right sidebar<br/>Chat | Terminal"]
+  UI["Header icons<br/>Chat / Terminal<br/>independent right panels"]
   Bridge["Typed preload bridge"]
   Service["AgentService<br/>session ownership + event normalization"]
   Codex["Codex adapter<br/>app-server JSON-RPC"]
@@ -102,9 +113,10 @@ The following behavior is **Implemented**:
 - Window teardown and app shutdown close owned terminal sessions.
 - Workspace watchers, Git status, edit review, and file preview already react
   to filesystem changes independently from the terminal.
-- `RightCompanionPanel` keeps Chat and Terminal mounted as sibling surfaces,
-  retains their shared width and selected-surface preference, and preserves
-  Terminal's lazy PTY lifecycle.
+- `RightTerminalPanel` and `RightAgentPanel` remain separate components. The
+  application shell keeps them in independent right-sidebar surface slots so
+  switching header icons does not recreate the Terminal PTY or active Agent
+  projection.
 - `AgentService` and `CodexAppServerAdapter` own Codex discovery, app-server
   protocol state, session ownership, normalized replay, approvals,
   persistence, and cleanup in Electron main.
@@ -380,15 +392,19 @@ sequenceDiagram
 
 Hiding the sidebar never terminates an active turn. The main process continues
 to own it, and the renderer can resubscribe from the latest known sequence when
-the Chat surface remounts. Explicit Stop interrupts the turn; explicit Reset
-closes the session and starts a new one.
+the Chat surface remounts. Explicit Stop enters a stopping state until Codex
+emits its authoritative terminal notification. If Codex acknowledges the
+interrupt request but never confirms the terminal state, PuppyOne terminates the
+provider and records `turn.failed`; it never fabricates `turn.interrupted`.
+Explicit Reset closes the session and starts a new one.
 
 ## Persistence and source of truth
 
 **Implemented with bounded retention:** at most 20 local application sessions,
-400 events and 512 KiB per retained session. Credentials are redacted and are
-not persisted. Truncated journals restore with an explicit partial-history
-state.
+400 events and 512 KiB per retained session, with a bounded journal file. Raw
+streaming command-output deltas are not persisted; retained previews and
+diagnostics pass through schema-aware, best-effort credential redaction.
+Truncated journals restore with an explicit partial-history state.
 
 Provider-native histories remain the source of truth for provider resume.
 PuppyOne stores only what it needs to restore its own presentation and mapping:
@@ -402,9 +418,11 @@ PuppyOne stores only what it needs to restore its own presentation and mapping:
 - last committed event sequence.
 
 This data belongs under Electron `userData`, not inside the user's repository.
-Conversation transcripts and tool output may contain secrets, so persistence
-must have an explicit retention limit and a future user-facing delete action.
-No credential value is stored in the event journal.
+Conversation transcripts and tool output may still contain user-provided
+sensitive data that no heuristic can identify perfectly, so persistence has an
+explicit retention limit, file permissions, output minimization, and a
+user-facing session-delete path. Provider auth material and environment objects
+are never intentionally added to the event journal.
 
 When provider history and the local projection disagree, provider history wins
 for model context while PuppyOne rebuilds or marks its local presentation as
@@ -414,7 +432,7 @@ partial. The UI must not silently invent missing tool results.
 
 | Provider | Proposed integration | Capability expectation | Auth and product gate |
 | --- | --- | --- | --- |
-| Codex | `codex app-server` over stdio JSONL/JSON-RPC | Full chat, tools, diffs, approvals, questions, resume, fork, steer, interrupt, model and account state | **Proposed first provider.** Use Codex-managed ChatGPT OAuth or API-key auth. Identify PuppyOne through `clientInfo`; enterprise distribution may require OpenAI client registration. |
+| Codex | `codex app-server` over stdio JSONL/JSON-RPC | Chat, tools, diffs, command/file approvals, resume, interrupt, model and account state are implemented; questions, fork, and steer remain capability-gated gaps | **Implemented as an off-by-default experiment.** Use Codex-managed ChatGPT OAuth or API-key auth. Identify PuppyOne through `clientInfo`; enterprise distribution may require OpenAI client registration. |
 | Claude Code | TypeScript Claude Agent SDK | Full structured messages, `canUseTool`, questions, session resume/fork, file checkpointing | **Product gate.** Default to customer API keys or supported enterprise/cloud providers. Do not expose Claude.ai subscription login or rate limits without Anthropic approval. |
 | Cursor | Official Cursor SDK; stream-json CLI only as a compatibility experiment | Structured text/tool events, resume, modes, interruption; manual host approval parity requires verification | **Product gate.** The official SDK uses `CURSOR_API_KEY` and token billing. Do not market reuse of a user's Cursor subscription login until Cursor's embedding terms and manual-approval behavior are confirmed. |
 | ACP | ACP client over stdio JSON-RPC | Sessions, streaming messages, tools, diffs, terminal activity, approvals, questions, cancellation; exact optional features are capability-driven | **Proposed extensibility adapter.** Enables OpenCode, Hermes, and other ACP agents while they retain their own provider setup and credentials. |
@@ -432,6 +450,8 @@ approval semantics, and billing.
   or an equivalent unrestricted mode merely to avoid implementing approvals.
 - An approval resolution includes session ID, turn ID, request ID, and the
   expected provider so stale UI cannot approve a newer action accidentally.
+- Approval UI renders the material scope supplied by Codex: command/cwd,
+  network host and protocol, file/write root, and any reusable-policy proposal.
 - “Always allow” is shown only when the provider returns a durable permission
   update that PuppyOne can explain before it is persisted.
 - Provider suggestions can be displayed, but the main process and provider
@@ -478,6 +498,9 @@ The UI distinguishes `not-installed`, `installed-not-authenticated`,
 - Unknown additive provider fields are ignored. Missing required terminal
   events use process exit and adapter timeouts to produce a deterministic
   `turn.failed` rather than leaving a permanent running state.
+- A timed-out JSON-RPC request retires the whole connection because the result
+  of a mutating request is ambiguous; PuppyOne never retries it on that
+  connection.
 - Provider reconnect is capability-specific. The service never silently
   submits the same mutating turn twice after an ambiguous disconnect.
 
@@ -491,7 +514,7 @@ The UI distinguishes `not-installed`, `installed-not-authenticated`,
   one-workspace-per-window identity and native-window cleanup.
 - [Desktop Sidebar View Stack](../desktop-sidebar-view-stack.md) owns the
   left-side Data, Git, Cloud, and Settings surfaces. Agent Chat is a right-side
-  companion and must not be added to that left view stack.
+  panel and must not be added to that left view stack.
 - [Git and Source Control Architecture](../git/README.md) owns repository state,
   diff source of truth, and refresh behavior after agent edits.
 - [Editor and Viewer Architecture](../editor/README.md) owns file previews and
@@ -505,7 +528,8 @@ The UI distinguishes `not-installed`, `installed-not-authenticated`,
 ### Phase 1: Common contract and inert UI
 
 - Add typed event, capability, request, and IPC contracts.
-- Add Chat and Terminal tabs to the right sidebar.
+- Add an experimental Chat header icon beside the existing Terminal icon and
+  route each icon to its independent right-sidebar panel.
 - Build the transcript, composer, tool-card, approval-dock, and error states
   against deterministic fixtures.
 - Keep Terminal behavior unchanged.

@@ -4,15 +4,15 @@ import {
   isBrokerSafeResolvedAssetUrl,
   isPathInsideWorkspaceRoot,
   resolveWorkspaceRelativePath,
-} from "../vendor/shared-ui/src/editor/markdown/policy/markdownAssetPolicy";
-import { createAssetBroker } from "../vendor/shared-ui/src/editor/markdown/services/assetBroker";
-import { createCapabilityPrincipal } from "../vendor/shared-ui/src/editor/markdown/services/capabilityPrincipal";
+} from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownAssetPolicy";
+import { createAssetBroker } from "../vendor/shared-ui/src/editor/markdown/platform/brokers/assetBroker";
+import { createCapabilityPrincipal } from "../vendor/shared-ui/src/editor/markdown/platform/security/capabilityPrincipal";
 import {
   allowsLocalActiveHtml,
   createDocumentTrustContext,
   evaluateAuthorizationGrant,
-} from "../vendor/shared-ui/src/editor/markdown/policy/markdownTrustPolicy";
-import { createExecutionSessionStore } from "../vendor/shared-ui/src/editor/markdown/services/executionSession";
+} from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownTrustPolicy";
+import { createExecutionSessionStore } from "../vendor/shared-ui/src/editor/markdown/platform/sessions/executionSession";
 
 describe("markdownAssetPolicy", () => {
   it("denies file:// and executable schemes", () => {
@@ -33,22 +33,42 @@ describe("markdownAssetPolicy", () => {
 
   it("rejects workspace escape via ..", () => {
     expect(resolveWorkspaceRelativePath("notes/a.md", "../../etc/passwd")).toBeNull();
+    expect(resolveWorkspaceRelativePath("notes/a.md", "../bad%ZZ.png")).toBeNull();
+    expect(resolveWorkspaceRelativePath("notes/a.md", "../images%2Fsecret.png")).toBeNull();
     expect(
-      evaluateMarkdownAssetHref("../secret.png", {
+      evaluateMarkdownAssetHref("../../../secret.png", {
         documentPath: "notes/a.md",
-        workspaceRoot: "notes",
+        workspaceRoot: "/Users/example/workspace",
       }).ok,
     ).toBe(false);
   });
 
-  it("keeps contained relative paths", () => {
+  it("keeps workspace-relative document paths when the host root is absolute", () => {
     expect(isPathInsideWorkspaceRoot("/ws", "/ws/img/a.png")).toBe(true);
     expect(isPathInsideWorkspaceRoot("/ws", "/other/a.png")).toBe(false);
     const result = evaluateMarkdownAssetHref("./img/a.png", {
       documentPath: "notes/doc.md",
-      workspaceRoot: "notes",
+      workspaceRoot: "/Users/example/workspace",
     });
     expect(result).toMatchObject({ ok: true, kind: "workspace-relative", path: "notes/img/a.png" });
+  });
+
+  it("denies remote tracking loads and ambient capability URLs by default", () => {
+    expect(evaluateMarkdownAssetHref("https://tracker.example/pixel.gif", { documentPath: "a.md" }))
+      .toEqual({ ok: false, reason: "remote-load-denied" });
+    expect(evaluateMarkdownAssetHref("blob:https://app.example/id", { documentPath: "a.md" }).ok).toBe(false);
+    expect(evaluateMarkdownAssetHref("puppyone-local://file/token/root/a.png", { documentPath: "a.md" }).ok).toBe(false);
+  });
+
+  it("allows a canonical credential-free remote URL only with an explicit grant", () => {
+    expect(evaluateMarkdownAssetHref("https://example.com/a.png", {
+      documentPath: "a.md",
+      allowRemoteHttp: true,
+    })).toMatchObject({ ok: true, kind: "safe-direct", url: "https://example.com/a.png" });
+    expect(evaluateMarkdownAssetHref("https://user:pass@example.com/a.png", {
+      documentPath: "a.md",
+      allowRemoteHttp: true,
+    }).ok).toBe(false);
   });
 
   it("never treats file:// as a safe resolved broker URL", () => {
@@ -96,6 +116,77 @@ describe("AssetBroker policy gate", () => {
       workspaceRoot: null,
     });
     expect(handle).toBeNull();
+  });
+
+  it("rejects the wrong capability purpose or a mismatched source document", async () => {
+    let calls = 0;
+    const broker = createAssetBroker(async () => {
+      calls += 1;
+      return "puppyone-local://file/token/root/x.png";
+    });
+    const principal = createCapabilityPrincipal({
+      editorViewId: "v1",
+      workspaceId: "ws",
+      documentPath: "a.md",
+      documentRevision: "rev-1",
+      purpose: "link-open",
+    });
+    expect(await broker.resolve({ principal, sourcePath: "a.md", href: "./x.png" })).toBeNull();
+    expect(await broker.resolve({
+      principal: { ...principal, purpose: "asset-read" },
+      sourcePath: "other.md",
+      href: "./x.png",
+    })).toBeNull();
+    expect(calls).toBe(0);
+  });
+
+  it("propagates handle revocation to the host capability lease", async () => {
+    let revoked = 0;
+    const broker = createAssetBroker(async () => ({
+      url: "puppyone-local://file/token/markdown-asset/root/images/a.png",
+      revoke: () => {
+        revoked += 1;
+      },
+    }));
+    const principal = createCapabilityPrincipal({
+      editorViewId: "v1",
+      workspaceId: "ws",
+      documentPath: "notes/a.md",
+      documentRevision: "rev-1",
+      purpose: "asset-read",
+    });
+    const handle = await broker.resolve({
+      principal,
+      sourcePath: "notes/a.md",
+      href: "../images/a.png",
+    });
+
+    expect(handle).not.toBeNull();
+    handle?.revoke();
+    handle?.revoke();
+    await Promise.resolve();
+    expect(revoked).toBe(1);
+  });
+
+  it("revokes a host lease when the resolver result fails sink validation", async () => {
+    let revoked = 0;
+    const broker = createAssetBroker(async () => ({
+      url: "file:///tmp/unsafe.png",
+      revoke: () => {
+        revoked += 1;
+      },
+    }));
+    const principal = createCapabilityPrincipal({
+      editorViewId: "v1",
+      workspaceId: "ws",
+      documentPath: "a.md",
+      documentRevision: "rev-1",
+      purpose: "asset-read",
+    });
+
+    expect(await broker.resolve({ principal, sourcePath: "a.md", href: "./unsafe.png" })).toBeNull();
+    await Promise.resolve();
+    expect(revoked).toBe(1);
   });
 });
 

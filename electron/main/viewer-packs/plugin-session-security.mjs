@@ -2,18 +2,23 @@
  * Security policy applied to each Viewer Pack session partition.
  */
 
-export function applyPluginSessionSecurity(partitionSession, { pluginId, contentHash }) {
+export function applyPluginSessionSecurity(
+  partitionSession,
+  { pluginId, contentHash, allowFileFallback = false },
+) {
   partitionSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(false);
   });
   partitionSession.setPermissionCheckHandler(() => false);
+
+  partitionSession.on?.("will-download", (event) => event.preventDefault());
 
   partitionSession.webRequest.onBeforeRequest((details, callback) => {
     const url = details.url ?? "";
     const allowed =
       url.startsWith(`puppyone-plugin://${pluginId}/${contentHash}/`) ||
       url.startsWith("puppyone-resource://") ||
-      url.startsWith("file:") || // test fallback only; production protocol should win
+      (allowFileFallback && url.startsWith("file:")) ||
       url.startsWith("data:image/") ||
       url.startsWith("blob:");
     if (!allowed) {
@@ -29,7 +34,7 @@ export function applyPluginSessionSecurity(partitionSession, { pluginId, content
   });
 }
 
-export function buildPluginContentSecurityPolicy({ allowWasm = false } = {}) {
+export function buildPluginContentSecurityPolicy({ allowWasm = false, allowWorker = false } = {}) {
   const scriptSrc = allowWasm ? "'self' 'wasm-unsafe-eval'" : "'self'";
   return [
     "default-src 'none'",
@@ -42,6 +47,7 @@ export function buildPluginContentSecurityPolicy({ allowWasm = false } = {}) {
     "img-src 'self' data: blob: puppyone-resource:",
     "media-src 'self' blob: puppyone-resource:",
     "connect-src puppyone-resource:",
-    "worker-src 'self' blob:",
+    allowWorker ? "worker-src 'self' blob:" : "worker-src 'none'",
+    "frame-src 'none'",
   ].join("; ");
 }

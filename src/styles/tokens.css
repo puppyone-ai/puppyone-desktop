@@ -79,7 +79,8 @@
   );
   --desktop-sidebar-row-content-left: 6px;
   --desktop-sidebar-row-content-right: 6px;
-  --desktop-sidebar-list-padding-y: 8px;
+  /* Outer list edge rhythm. Section-to-section spacing remains separate. */
+  --desktop-sidebar-list-padding-block: 8px;
   --desktop-sidebar-section-top-gap: 5px;
   --desktop-sidebar-section-bottom-gap: 6px;
   --desktop-utility-page-padding-top: 24px;

@@ -6,19 +6,47 @@
  * only reachable from that session.
  */
 
-import fs from "node:fs/promises";
-
 export const PLUGIN_PROTOCOL_SCHEME = "puppyone-plugin";
 
-export function registerPluginProtocol({ session, registryService, getMimeType, logger = console }) {
-  session.protocol.handle(PLUGIN_PROTOCOL_SCHEME, (request) =>
-    handlePluginRequest({ request, registryService, getMimeType }).catch((error) => {
+export function registerPluginProtocol({
+  session,
+  registryService,
+  expectedPluginId,
+  expectedContentHash,
+  contentSecurityPolicy,
+  getMimeType,
+  logger = console,
+}) {
+  let inFlight = 0;
+  session.protocol.handle(PLUGIN_PROTOCOL_SCHEME, async (request) => {
+    if (inFlight >= 4) return new Response("Busy", { status: 429 });
+    inFlight += 1;
+    try {
+      return await handlePluginRequest({
+      request,
+      registryService,
+      expectedPluginId,
+      expectedContentHash,
+      contentSecurityPolicy,
+        getMimeType,
+      });
+    } catch (error) {
       logger.warn?.("puppyone-plugin request failed:", error);
       return new Response("Not found", { status: 404 });
-    }));
+    } finally {
+      inFlight -= 1;
+    }
+  });
 }
 
-export async function handlePluginRequest({ request, registryService, getMimeType }) {
+export async function handlePluginRequest({
+  request,
+  registryService,
+  expectedPluginId = null,
+  expectedContentHash = null,
+  contentSecurityPolicy = "default-src 'none'",
+  getMimeType,
+}) {
   if (request.method && request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method not allowed", { status: 405 });
   }
@@ -27,32 +55,41 @@ export async function handlePluginRequest({ request, registryService, getMimeTyp
   if (!parsed) {
     return new Response("Bad request", { status: 400 });
   }
+  if (
+    (expectedPluginId && parsed.pluginId !== expectedPluginId) ||
+    (expectedContentHash && parsed.contentHash !== expectedContentHash)
+  ) {
+    return new Response("Not found", { status: 404 });
+  }
 
   let resolved;
   try {
-    resolved = await registryService.resolvePackageFile({
+    resolved = request.method === "HEAD"
+      ? await registryService.resolvePackageFile({
+        pluginId: parsed.pluginId,
+        contentHash: parsed.contentHash,
+        relativePath: parsed.relativePath,
+      })
+      : await registryService.readPackageFile({
       pluginId: parsed.pluginId,
       contentHash: parsed.contentHash,
       relativePath: parsed.relativePath,
-    });
+      });
   } catch {
     // Disabled pack, hash mismatch, or traversal — all indistinguishable to a
     // plugin, deliberately.
     return new Response("Not found", { status: 404 });
   }
 
-  const bytes = await fs.readFile(resolved.absolutePath).catch(() => null);
-  if (!bytes) {
-    return new Response("Not found", { status: 404 });
-  }
-
   const contentType = resolveContentType(getMimeType, resolved.absolutePath);
-  return new Response(request.method === "HEAD" ? null : bytes, {
+  return new Response(request.method === "HEAD" ? null : resolved.bytes, {
     status: 200,
     headers: {
       "Content-Type": contentType,
-      "Content-Length": String(bytes.length),
+      "Content-Length": String(resolved.sizeBytes),
       "Cache-Control": "no-store",
+      "Content-Security-Policy": contentSecurityPolicy,
+      "Cross-Origin-Resource-Policy": "same-origin",
       "X-Content-Type-Options": "nosniff",
     },
   });
@@ -67,7 +104,15 @@ function parsePluginUrl(rawUrl) {
   }
   const pluginId = url.hostname;
   if (!pluginId) return null;
-  const segments = url.pathname.replace(/^\/+/, "").split("/").filter(Boolean).map(decodeURIComponent);
+  const rawSegments = url.pathname.split("/").slice(1);
+  if (rawSegments.length < 2 || rawSegments.some((segment) => !segment)) return null;
+  let segments;
+  try {
+    segments = rawSegments.map(decodeURIComponent);
+  } catch {
+    return null;
+  }
+  if (segments.some((segment) => segment.includes("/") || segment.includes("\\"))) return null;
   const contentHash = segments.shift();
   if (!contentHash || segments.length === 0) return null;
   const relativePath = segments.join("/");

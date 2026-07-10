@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session as electronSession, shell, WebContentsView } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, session as electronSession, shell, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
@@ -13,6 +13,7 @@ import { initializeWorkspaceEditReview } from "../local-api/edit-review.mjs";
 import { createUpdateService } from "./update-service.mjs";
 import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
 import { createAgentPersistence } from "./main/agent/agent-persistence.mjs";
+import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
 import { createAgentService } from "./main/agent/agent-service.mjs";
 import { createCodexDiscovery } from "./main/agent/provider-discovery.mjs";
 import {
@@ -225,12 +226,12 @@ async function createWindow(options = {}) {
     revealWindow(window);
   });
 
-  window.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+  window.webContents.on("console-message", (details) => {
     console.log("puppyone renderer console:", {
-      level,
-      message,
-      line,
-      sourceId,
+      level: details.level,
+      message: details.message,
+      line: details.lineNumber,
+      sourceId: details.sourceId,
     });
   });
 
@@ -435,7 +436,7 @@ app.whenReady().then(async () => {
     getMimeType,
     canonicalizeWorkspacePath,
     isOpenWorkspaceRoot,
-    validateCapability: localFileCapabilities.validate,
+    resolveCapability: localFileCapabilities.resolve,
     applicationUrl: rendererApplicationUrl,
   });
   updateService = createUpdateService({
@@ -457,6 +458,13 @@ app.whenReady().then(async () => {
     getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
     getMimeType,
     userDataPath: app.getPath("userData"),
+    appVersion: app.getVersion(),
+    isPackaged: app.isPackaged,
+    allowTestKeys: !app.isPackaged && process.env.PUPPYONE_VIEWER_PACK_ALLOW_TEST_KEYS === "1",
+    getThemeSnapshot: () => ({
+      mode: nativeTheme.shouldUseDarkColors ? "dark" : "light",
+      tokens: {},
+    }),
   });
   registerIpcHandlers();
   updateService.start();
@@ -480,16 +488,19 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", () => {
-  cloudAuthService.dispose();
-  updateService?.dispose();
-  viewerPackHost?.destroyAllSessions();
-  appPreviewRuntime?.closeAll();
-  terminalService.closeAll();
-  void agentService.closeAll();
-  workspaceWatchService.closeAll();
-  gitMetadataWatchService.closeAll();
-});
+app.on("before-quit", createAgentQuitCoordinator({
+  app,
+  agentService,
+  disposeApplicationServices: () => {
+    cloudAuthService.dispose();
+    updateService?.dispose();
+    viewerPackHost?.destroyAllSessions();
+    appPreviewRuntime?.closeAll();
+    terminalService.closeAll();
+    workspaceWatchService.closeAll();
+    gitMetadataWatchService.closeAll();
+  },
+}));
 
 function registerIpcHandlers() {
   registerWorkspaceNavigationIpcHandlers({
@@ -514,7 +525,7 @@ function registerIpcHandlers() {
       for (const window of BrowserWindow.getAllWindows()) {
         if (window.webContents?.id === webContentsId) return window;
       }
-      return BrowserWindow.getFocusedWindow();
+      return null;
     },
   });
 
@@ -565,7 +576,13 @@ function registerIpcHandlers() {
   if (viewerPackHost) {
     // App authority (install/activate/bounds/destroy) is gated to the trusted
     // application frame.
-    registerViewerPackAppIpcHandlers({ ipcMain: trustedIpcMain, host: viewerPackHost });
+    registerViewerPackAppIpcHandlers({
+      ipcMain: trustedIpcMain,
+      host: viewerPackHost,
+      authorizeWorkspaceRoot,
+      dialog,
+      getDialogOwnerWindow,
+    });
     // Plugin bridge (document/resource/ui/host) uses RAW ipcMain because the
     // sandboxed pack frame's URL is never the trusted application URL; each
     // handler validates sender → session before doing anything.
@@ -770,6 +787,7 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
   const previousPath = state.workspacePath;
 
   if (previousPath && previousPath !== canonicalPath) {
+    viewerPackHost?.destroySessionsForOwner(webContentsId);
     localFileCapabilities.revokeSender(webContentsId);
     const previousWindow = workspaceWindowByPath.get(previousPath);
     if (previousWindow === window || previousWindow?.isDestroyed()) {
@@ -805,6 +823,7 @@ function releaseWindowWorkspace(window) {
 }
 
 function releaseWindowWorkspaceById(webContentsId, window = null) {
+  viewerPackHost?.destroySessionsForOwner(webContentsId);
   localFileCapabilities.revokeSender(webContentsId);
   const state = windowStateById.get(webContentsId);
   const workspacePath = state?.workspacePath ?? null;

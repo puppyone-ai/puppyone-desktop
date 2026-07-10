@@ -42,11 +42,15 @@ export function DesktopOverlayPortal({
 
 function getDesktopOverlayRoot() {
   const existing = document.getElementById(DESKTOP_OVERLAY_ROOT_ID);
-  if (existing instanceof HTMLElement) return existing;
+  if (existing instanceof HTMLElement) {
+    existing.dataset.poOverlayRoot = "true";
+    return existing;
+  }
 
   const root = document.createElement("div");
   root.id = DESKTOP_OVERLAY_ROOT_ID;
   root.className = "desktop-overlay-root";
+  root.dataset.poOverlayRoot = "true";
   document.body.appendChild(root);
   return root;
 }

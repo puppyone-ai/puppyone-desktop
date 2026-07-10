@@ -161,6 +161,22 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
     var(--desktop-utility-page-padding-bottom);
 }
 
+.desktop-working-file-detail-view .desktop-commit-summary {
+  gap: 0;
+  padding-bottom: 12px;
+}
+
+.desktop-working-file-detail-view .desktop-commit-id-row {
+  min-height: 28px;
+  gap: 6px;
+}
+
+.desktop-working-file-detail-view .desktop-commit-id-row strong {
+  font-size: var(--po-text-size-title, 16px);
+  font-weight: var(--po-text-weight-semibold, 600);
+  line-height: 20px;
+}
+
 .desktop-commit-summary {
   display: grid;
   min-width: 0;
@@ -216,38 +232,35 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
 
 .desktop-commit-stats .secondary-action,
 .desktop-commit-stats .danger-action {
-  height: 30px;
-  padding: 0 11px;
-  border: 1px solid var(--po-border-subtle);
-  border-radius: 6px;
-  background: var(--po-panel-raised);
-  color: var(--po-text-muted);
-  font-size: 13px;
-  font-weight: 600;
+  height: var(--git-action-size);
+  padding: 0 var(--git-action-padding-inline);
+  border: 1px solid transparent;
+  border-radius: var(--git-action-radius);
+  background: transparent;
+  color: var(--po-text-subtle);
+  font-size: var(--git-action-font-size);
+  font-weight: 500;
 }
 
 .desktop-commit-stats .secondary-action:hover:not(:disabled) {
-  border-color: var(--po-border);
   background: var(--po-hover);
   color: var(--po-text);
 }
 
 .desktop-commit-stats .danger-action {
-  border-color: color-mix(in srgb, var(--po-danger) 18%, var(--po-border-subtle));
-  background: color-mix(in srgb, var(--po-danger) 6%, var(--po-panel-raised));
-  color: var(--po-danger);
+  background: transparent;
+  color: color-mix(in srgb, var(--po-danger) 72%, var(--po-text-muted));
 }
 
 .desktop-commit-stats .danger-action:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--po-danger) 28%, var(--po-border));
-  background: color-mix(in srgb, var(--po-danger) 10%, var(--po-panel-raised));
+  background: color-mix(in srgb, var(--po-danger) 8%, transparent);
   color: var(--po-danger);
 }
 
 .desktop-commit-stats .secondary-action:disabled,
 .desktop-commit-stats .danger-action:disabled {
-  border-color: var(--po-border-subtle);
-  background: var(--po-control);
+  border-color: transparent;
+  background: transparent;
   color: var(--po-text-disabled);
 }
 
@@ -266,45 +279,98 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
   flex: 0 0 auto;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 4px;
   margin-left: auto;
 }
 
 .desktop-working-file-actions .secondary-action,
 .desktop-working-file-actions .danger-action {
-  height: 30px;
-  padding: 0 11px;
-  border: 1px solid var(--po-border-subtle);
-  border-radius: 6px;
-  background: var(--po-panel-raised);
-  color: var(--po-text-muted);
-  font-size: 13px;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: var(--git-action-size);
+  padding: 0 var(--git-action-padding-inline);
+  border: 1px solid transparent;
+  border-radius: var(--git-action-radius);
+  background: transparent;
+  color: var(--po-text-subtle);
+  box-shadow: none;
+  font-size: var(--git-action-font-size);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.desktop-working-file-open svg {
+  flex: 0 0 auto;
+  color: var(--po-text-subtle);
 }
 
 .desktop-working-file-actions .secondary-action:hover:not(:disabled) {
-  border-color: var(--po-border);
   background: var(--po-hover);
   color: var(--po-text);
 }
 
 .desktop-working-file-actions .danger-action {
-  border-color: color-mix(in srgb, var(--po-danger) 18%, var(--po-border-subtle));
-  background: color-mix(in srgb, var(--po-danger) 6%, var(--po-panel-raised));
-  color: var(--po-danger);
+  background: transparent;
+  color: color-mix(in srgb, var(--po-danger) 72%, var(--po-text-muted));
 }
 
 .desktop-working-file-actions .danger-action:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--po-danger) 28%, var(--po-border));
-  background: color-mix(in srgb, var(--po-danger) 10%, var(--po-panel-raised));
+  background: color-mix(in srgb, var(--po-danger) 9%, transparent);
   color: var(--po-danger);
 }
 
 .desktop-working-file-actions .secondary-action:disabled,
 .desktop-working-file-actions .danger-action:disabled {
-  border-color: var(--po-border-subtle);
-  background: var(--po-control);
+  border-color: transparent;
+  background: transparent;
   color: var(--po-text-disabled);
+  opacity: 0.62;
+}
+
+.desktop-working-file-status {
+  display: inline-flex;
+  height: 18px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--po-control);
+  color: var(--po-text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.desktop-working-file-status.modified,
+.desktop-working-file-status.renamed,
+.desktop-working-file-status.copied {
+  background: color-mix(in srgb, var(--po-warning) 8%, transparent);
+  color: var(--po-warning);
+}
+
+.desktop-working-file-status.added,
+.desktop-working-file-status.untracked {
+  background: color-mix(in srgb, var(--po-success) 8%, transparent);
+  color: var(--po-success);
+}
+
+.desktop-working-file-status.deleted,
+.desktop-working-file-status.conflict {
+  background: color-mix(in srgb, var(--po-danger) 8%, transparent);
+  color: var(--po-danger);
+}
+
+.desktop-working-file-status.staged,
+.desktop-working-file-status.remote,
+.desktop-working-file-status.committed {
+  background: color-mix(in srgb, var(--po-accent) 7%, transparent);
+  color: var(--po-text-subtle);
+}
+
+.desktop-working-file-stat {
+  margin-left: 2px;
 }
 
 .desktop-initial-repo-state {

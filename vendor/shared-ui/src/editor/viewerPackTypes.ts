@@ -17,7 +17,7 @@ export type ViewerPackPermissionCurrentDocument = "metadata" | "readRange";
 
 export type ViewerPackManifestPermissions = {
   currentDocument: readonly ViewerPackPermissionCurrentDocument[];
-  relatedFiles: "none" | "same-directory";
+  relatedFiles: "none";
   network: readonly string[];
 };
 

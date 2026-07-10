@@ -68,7 +68,7 @@
   min-width: 0;
   overflow: hidden;
   font-size: var(--po-font-size-chrome, 13px);
-  font-weight: 600;
+  font-weight: var(--po-font-weight-chrome, 500);
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -270,7 +270,7 @@
   overflow: hidden;
   color: var(--po-text-muted);
   font-size: var(--po-font-size-chrome, 13px);
-  font-weight: 600;
+  font-weight: var(--po-font-weight-chrome, 500);
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -465,7 +465,7 @@
   min-width: 0;
   overflow: hidden;
   font-size: var(--po-font-size-chrome, 13px);
-  font-weight: 600;
+  font-weight: var(--po-font-weight-chrome, 500);
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;

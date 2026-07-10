@@ -12,8 +12,12 @@ For the first implementation handoff, follow the
 
 ## Status
 
-- **Implemented:** the local-workspace right sidebar is resizable, hosts Chat
-  and Terminal as sibling surfaces, preserves Terminal's lazy PTY lifecycle,
+- **Experimental, off by default:** Terminal remains available and is the
+  default right-sidebar surface. The Settings → Experimental opt-in adds a
+  separate Chat icon to the application header. A build-time availability flag
+  remains an independent release kill switch for Chat only.
+- **Implemented behind that gate:** the local-workspace right-side area is resizable, hosts separate
+  Chat and Terminal panels, preserves Terminal's lazy PTY lifecycle,
   retains the selected surface, and keeps a running Codex turn alive while
   Chat is hidden.
 - **Implemented:** Codex readiness/account/model states, transcript streaming,
@@ -27,12 +31,13 @@ For the first implementation handoff, follow the
 
 ## Product decision
 
-The right sidebar is one workspace companion with two surfaces:
+Chat and Terminal are selected from two independent application-header icons.
+They share the right-side layout area and width preference but remain separate
+panel components. The sidebar itself contains no Chat/Terminal selector.
 
 ```text
 +------------------------------------------------------+
-| Chat | Terminal                         New  More     |
-| Codex              Model: default       Mode: Agent  |
+| Codex session       Model: default       New  More   |
 |------------------------------------------------------|
 | User                                                 |
 | Explain the failing test and fix it.                 |
@@ -62,7 +67,7 @@ not introduce horizontal scrolling for ordinary messages or controls.
 
 The Chat surface has five regions in document order:
 
-1. **Surface header** — Chat/Terminal selection and session actions.
+1. **Session header** — session title and actions.
 2. **Agent controls** — provider, model, and operating mode.
 3. **Transcript** — user messages, assistant output, and activity items.
 4. **Blocking dock** — an approval or structured question when one is pending.
@@ -73,40 +78,40 @@ and composer remain visible without using `position: fixed`. The layout uses
 the sidebar's existing flex boundary so it behaves correctly during animated
 resize and window resizing.
 
-## Chat and Terminal switching
+## Chat and Terminal header actions
 
-- Chat and Terminal are peers, not separate sidebar instances.
-- Switching surfaces does not destroy the hidden surface's active session.
+- Terminal is not gated by the Agent experiment and remains the default
+  surface until the user explicitly selects Chat.
+- Chat and Terminal use two distinct icon buttons in the application header.
+- Each button opens or closes its corresponding panel in the shared right-side
+  layout area.
+- Switching header buttons does not destroy the hidden panel's active session.
 - The Terminal keeps its existing lazy first mount and PTY lifecycle.
-- Hiding Chat only detaches renderer subscriptions; `AgentService` continues
-  active work in the main process.
+- Hiding Chat keeps the mounted projection subscribed; `AgentService` remains
+  the owner of active work in the main process and replay repairs any missed
+  sequence after a renderer gap.
 - Returning to Chat replays events after the renderer's last committed sequence
   or restores from the latest projection checkpoint.
 - Closing the entire workspace window cleans up both terminal and agent
   resources through their respective main-process services.
 - “Reset Terminal” and “New Agent Session” remain separate actions.
 
-The titlebar's current Terminal action can evolve into one Agent Sidebar action.
-Its menu can select Chat or Terminal and expose surface-specific actions. The
-first implementation should avoid adding a second independent right sidebar or
-two competing width preferences.
+The Terminal icon and its Clear/Reset menu remain Terminal-only. The Chat icon
+does not appear unless the experiment is enabled. Chat session actions stay in
+the Chat panel header rather than being added to Terminal's menu.
 
-## Header
+## Application header
 
-The first row contains:
+The application header contains:
 
-- a two-option Chat/Terminal selector;
-- the active session title or “New session”;
-- a visible New Session action;
-- an overflow menu for session history, reset, provider diagnostics, and close.
+- the existing Terminal icon, always governed by the normal Terminal setting;
+- the experimental Chat icon, visible only when the Agent Chat experiment is
+  enabled;
+- independent pressed/open state and accessible labels for each icon.
 
-The active surface is conveyed through text and selection state, not color
-alone. Controls use native buttons and menus, preserve keyboard focus styles,
-and expose meaningful accessible names.
-
-When a turn runs in the background while Terminal is visible, Chat shows a
-small activity indicator in the selector. The indicator never replaces the
-surface name or becomes the sole source of status.
+The Chat panel has its own session header with title, New Session, diagnostics,
+reset, and close actions. Controls use native buttons and menus, preserve
+keyboard focus styles, and expose meaningful accessible names.
 
 ## Provider controls
 
@@ -217,6 +222,11 @@ The dock shows:
 - Always Allow only when the provider supplies an explainable durable rule;
 - expiration, cancellation, or stale-request state.
 
+For Codex network approvals, the target host and protocol are mandatory UI;
+for file approvals, `grantRoot` is shown when present. Provider
+`serverRequest/resolved` notifications remove stale docks without waiting for a
+renderer action.
+
 The focused action defaults to the safest choice. Keyboard order follows visual
 order. Escape does not silently approve; it either leaves the request open or
 denies only after an explicit product decision and accessible announcement.
@@ -313,7 +323,8 @@ retrying automatically reverted them.
 - When pinned to the bottom, new deltas keep the transcript pinned.
 - When scrolled away from the bottom, new deltas do not steal position; a
   “Jump to latest” action appears.
-- Switching Chat/Terminal stores independent scroll positions.
+- Switching the Chat and Terminal header buttons preserves independent scroll
+  positions.
 
 ## Focus and accessibility
 
@@ -386,7 +397,8 @@ event-to-view projection belongs in `agentProjection.ts`.
 
 The proposed sidebar contract is satisfied when:
 
-- Chat and Terminal switch without losing their active state;
+- the independent Chat and Terminal header buttons switch panels without losing
+  their active state;
 - a hidden running agent continues safely and reports completion on return;
 - provider selection is capability-driven and never migrates history silently;
 - streamed text, tools, plans, diffs, approvals, and questions preserve event

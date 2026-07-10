@@ -26,12 +26,36 @@ const SECRET_PATTERNS = [
   { pattern: /\bsk-[A-Za-z0-9_-]{12,}\b/g, replacement: "[redacted]" },
   { pattern: /\b(Bearer\s+)[A-Za-z0-9._~+\/-]{12,}/gi, replacement: "$1[redacted]" },
   {
-    pattern: /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|token|authorization|password)(\s*[:=]\s*)[^\s,;]+/gi,
+    pattern: /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|id[_-]?token|token|authorization|password|client[_-]?secret|secret[_-]?access[_-]?key|private[_-]?key)(\s*[:=]\s*)[^\s,;]+/gi,
+    replacement: "$1$2[redacted]",
+  },
+  {
+    pattern: /\b([A-Z][A-Z0-9_]*(?:_API_KEY|_ACCESS_TOKEN|_REFRESH_TOKEN|_AUTH_TOKEN|_ID_TOKEN|_SESSION_TOKEN|_CLIENT_SECRET|_SECRET_ACCESS_KEY|_PRIVATE_KEY|_PASSWORD|_CREDENTIALS?))(\s*=\s*)[^\s,;]+/g,
     replacement: "$1$2[redacted]",
   },
   { pattern: /\bAIza[0-9A-Za-z_-]{20,}\b/g, replacement: "[redacted]" },
   { pattern: /\bgh[pousr]_[A-Za-z0-9]{20,}\b/g, replacement: "[redacted]" },
 ];
+
+const SECRET_OBJECT_KEYS = new Set([
+  "token",
+  "apikey",
+  "accesstoken",
+  "refreshtoken",
+  "authtoken",
+  "idtoken",
+  "sessiontoken",
+  "authorization",
+  "password",
+  "clientsecret",
+  "secretaccesskey",
+  "privatekey",
+  "secret",
+  "credential",
+  "credentials",
+  "cookie",
+  "setcookie",
+]);
 
 export function isAgentEventEnvelope(value) {
   return Boolean(
@@ -87,13 +111,18 @@ export function redactSecrets(value, depth = 0) {
 
   const next = {};
   for (const [key, entry] of Object.entries(value)) {
-    if (/token|secret|password|authorization|credential|cookie/i.test(key)) {
+    if (isSecretObjectKey(key)) {
       next[key] = "[redacted]";
     } else {
       next[key] = redactSecrets(entry, depth + 1);
     }
   }
   return next;
+}
+
+function isSecretObjectKey(key) {
+  const normalized = String(key).replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+  return SECRET_OBJECT_KEYS.has(normalized);
 }
 
 export function redactSecretText(value) {

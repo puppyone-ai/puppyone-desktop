@@ -23,6 +23,7 @@ import {
   getGitHostingIdentity,
   getGitHostingMode,
   getGitScmSyncSection,
+  getSourceControlPrimaryActionSlot,
   getGitSyncState,
 } from "./viewModel";
 
@@ -143,7 +144,7 @@ export function GitSidebar({
   const professionalDisplayMode = hostingMode === "github" || hostingMode === "puppyone-cloud";
   const historyCount = historyCommits.length || status?.totalCommits || 0;
   const disabled = Boolean(operationLoading) || loading || !status?.isRepo;
-  const canCommit = !disabled && sourceControl?.actions.canCommit === true;
+  const canCommit = sourceControl?.actions.canCommit === true;
   const {
     professionalMode,
     mergeResources,
@@ -163,6 +164,15 @@ export function GitSidebar({
     canCommit,
   });
   const remoteSection = showRemoteSyncSection && !syncState.setupRequired ? getGitScmSyncSection(status, syncState) : null;
+  const cloudSyncActionAvailable = hostingMode === "puppyone-cloud"
+    && status?.sourceControl.remote?.canPull === true
+    && mergeResources.length === 0;
+  const primaryActionSlot = getSourceControlPrimaryActionSlot({
+    hasStagedAction: professionalMode && Boolean(stagedPrimaryAction && !stagedPrimaryAction.disabled),
+    hasSyncAction: cloudSyncActionAvailable || Boolean(remoteSection?.action && !remoteSection.action.disabled),
+    hasCommittedAction: Boolean(committedPrimaryAction && !committedPrimaryAction.disabled),
+    hasSimpleAction: !professionalMode && showSimpleChangeAction,
+  });
   const providerSlot = hostingMode === "puppyone-cloud" ? (
     <PuppyoneCloudProviderSection
       status={status}
@@ -171,6 +181,7 @@ export function GitSidebar({
       selectedWorkingFile={selectedWorkingFile}
       disabled={disabled}
       operationLoading={operationLoading}
+      primaryAction={primaryActionSlot === "sync"}
       onSelectWorkingFile={onSelectWorkingFile}
       onPull={onPull}
     />
@@ -286,6 +297,7 @@ export function GitSidebar({
           selectedWorkingFile={selectedWorkingFile}
           disabled={disabled}
           operationLoading={operationLoading}
+          primaryAction={primaryActionSlot === "sync"}
           onToggleExpanded={() => setRemoteExpanded((expanded) => !expanded)}
           onSelectWorkingFile={onSelectWorkingFile}
           onPull={onPull}
@@ -358,6 +370,7 @@ export function GitSidebar({
                 loadingKey={committedPrimaryAction.loadingKey}
                 loadingLabel={committedPrimaryAction.loadingLabel}
                 operationLoading={operationLoading}
+                primary={primaryActionSlot === "committed"}
                 onClick={() => {
                   if (committedPrimaryAction.kind === "push") void onPush();
                   if (committedPrimaryAction.kind === "publish") void onPublish();
@@ -425,6 +438,7 @@ export function GitSidebar({
                   loadingKey={stagedPrimaryAction.loadingKey}
                   loadingLabel={stagedPrimaryAction.loadingLabel}
                   operationLoading={operationLoading}
+                  primary={primaryActionSlot === "staged"}
                   onClick={() => {
                     if (stagedPrimaryAction.kind === "commit") void onCommit();
                     if (stagedPrimaryAction.kind === "commit-push") void onCommitAndPush();
@@ -522,6 +536,7 @@ export function GitSidebar({
                 loadingKey="stage-commit"
                 loadingLabel="Committing..."
                 operationLoading={operationLoading}
+                primary={primaryActionSlot === "simple"}
                 onClick={() => void onStageAndCommit()}
               />
             </div>
@@ -593,6 +608,11 @@ export function GitSidebar({
                   {operationError}
                 </div>
               )}
+              {status?.didHitStatusLimit && (
+                <div className="desktop-git-status-limit-warning" role="status">
+                  Showing the first {status.statusLimit.toLocaleString()} changes. Refine ignored files or open a smaller workspace for complete results.
+                </div>
+              )}
             </div>
 
             <div className="desktop-git-resizable-stack">
@@ -652,6 +672,7 @@ function PuppyoneCloudProviderSection({
   selectedWorkingFile,
   disabled,
   operationLoading,
+  primaryAction,
   onSelectWorkingFile,
   onPull,
 }: {
@@ -661,6 +682,7 @@ function PuppyoneCloudProviderSection({
   selectedWorkingFile: GitWorkingSelection | null;
   disabled: boolean;
   operationLoading: string | null;
+  primaryAction: boolean;
   onSelectWorkingFile: (selection: GitWorkingSelection) => void;
   onPull: () => Promise<boolean>;
 }) {
@@ -692,6 +714,7 @@ function PuppyoneCloudProviderSection({
             loadingKey="pull"
             loadingLabel="Downloading..."
             operationLoading={operationLoading}
+            primary={primaryAction}
             onClick={() => void onPull()}
           />
         )}
@@ -868,6 +891,7 @@ function GitScmSyncRow({
   selectedWorkingFile,
   disabled,
   operationLoading,
+  primaryAction,
   onToggleExpanded,
   onSelectWorkingFile,
   onPull,
@@ -881,6 +905,7 @@ function GitScmSyncRow({
   selectedWorkingFile: GitWorkingSelection | null;
   disabled: boolean;
   operationLoading: string | null;
+  primaryAction: boolean;
   onToggleExpanded: () => void;
   onSelectWorkingFile: (selection: GitWorkingSelection) => void;
   onPull: () => Promise<boolean>;
@@ -907,6 +932,7 @@ function GitScmSyncRow({
             loadingKey={section.action.kind}
             loadingLabel={section.action.loadingLabel}
             operationLoading={operationLoading}
+            primary={primaryAction}
             onClick={() => {
               if (section.action?.kind === "pull") void onPull();
               if (section.action?.kind === "push") void onPush();
@@ -945,6 +971,7 @@ function GitOperationButton({
   loadingKey,
   loadingLabel,
   operationLoading,
+  primary = false,
   onClick,
 }: {
   className: string;
@@ -955,12 +982,14 @@ function GitOperationButton({
   loadingKey: string;
   loadingLabel: string;
   operationLoading: string | null;
+  primary?: boolean;
   onClick: () => void;
 }) {
   const loading = operationLoading === loadingKey;
   const buttonClassName = [
     "desktop-git-operation-button",
     className,
+    primary ? "is-primary" : "",
     loading ? "is-loading" : "",
   ].filter(Boolean).join(" ");
 

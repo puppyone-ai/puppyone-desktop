@@ -112,6 +112,12 @@ export type DataCopyResult = {
   path: string;
 };
 
+export type DataFileUrlPurpose = "file-preview" | "markdown-asset";
+
+export type DataFileUrlOptions = {
+  purpose?: DataFileUrlPurpose;
+};
+
 export type DataCapabilities = {
   create?: boolean;
   rename?: boolean;
@@ -129,7 +135,8 @@ export type DataCapabilities = {
 export type DataPort = {
   listChildren: (folderPath: string | null) => Promise<DataNode[]>;
   readFile?: (path: string) => Promise<FileContent>;
-  getFileUrl?: (path: string) => string | Promise<string>;
+  getFileUrl?: (path: string, options?: DataFileUrlOptions) => string | Promise<string>;
+  revokeFileUrl?: (url: string) => void | Promise<void>;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
   appPreview?: AppPreviewController;

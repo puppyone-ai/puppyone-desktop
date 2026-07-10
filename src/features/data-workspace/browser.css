@@ -287,8 +287,8 @@
   --po-tree-row-content-right: var(--desktop-sidebar-row-content-right);
   --po-tree-row-icon-label-gap: 4px;
   --po-tree-root-top-gap: var(--desktop-sidebar-section-top-gap);
-  --po-tree-no-root-top-gap: var(--desktop-sidebar-list-padding-y);
-  --po-tree-list-bottom-gap: var(--desktop-sidebar-list-padding-y);
+  --po-tree-no-root-top-gap: var(--desktop-sidebar-list-padding-block);
+  --po-tree-list-bottom-gap: var(--desktop-sidebar-list-padding-block);
   --data-explorer-footer-height: var(--desktop-sidebar-navigation-height);
   --data-explorer-footer-min-height: var(--desktop-sidebar-navigation-height);
 

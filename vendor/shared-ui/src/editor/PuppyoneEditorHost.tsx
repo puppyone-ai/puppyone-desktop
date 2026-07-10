@@ -108,8 +108,7 @@ export function PuppyoneEditorHost({
       viewerPackInstallFallback &&
       route.kind === "unsupported" &&
       route.reason === "no-match" &&
-      document.sourceKind !== "cloud" &&
-      document.sourceKind !== "unknown"
+      document.sourceKind === "local"
     ) {
       return <>{viewerPackInstallFallback({ document })}</>;
     }

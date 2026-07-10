@@ -5,6 +5,16 @@ import { redactSecretText } from "./agent-events.mjs";
 const DEFAULT_MAX_LINE_BYTES = 1024 * 1024;
 const DEFAULT_MAX_STDERR_BYTES = 64 * 1024;
 const DEFAULT_MAX_PENDING = 128;
+const DEFAULT_FORCE_KILL_TIMEOUT_MS = 2_000;
+
+export class JsonlRpcRequestTimeoutError extends Error {
+  constructor(method) {
+    super(`Codex request timed out: ${method}`);
+    this.name = "JsonlRpcRequestTimeoutError";
+    this.code = "CODEX_RPC_TIMEOUT";
+    this.method = method;
+  }
+}
 
 export class JsonlRpcConnection extends EventEmitter {
   constructor({
@@ -16,6 +26,7 @@ export class JsonlRpcConnection extends EventEmitter {
     maxLineBytes = DEFAULT_MAX_LINE_BYTES,
     maxStderrBytes = DEFAULT_MAX_STDERR_BYTES,
     maxPending = DEFAULT_MAX_PENDING,
+    forceKillTimeoutMs = DEFAULT_FORCE_KILL_TIMEOUT_MS,
   }) {
     super();
     if (typeof executablePath !== "string" || executablePath.length === 0) {
@@ -24,6 +35,7 @@ export class JsonlRpcConnection extends EventEmitter {
     this.maxLineBytes = maxLineBytes;
     this.maxStderrBytes = maxStderrBytes;
     this.maxPending = maxPending;
+    this.forceKillTimeoutMs = forceKillTimeoutMs;
     this.nextRequestId = 1;
     this.pending = new Map();
     this.seenResponseIds = new Set();
@@ -31,6 +43,9 @@ export class JsonlRpcConnection extends EventEmitter {
     this.stderrBuffer = "";
     this.closed = false;
     this.exitInfo = null;
+    this.exitExpected = false;
+    this.closeReason = null;
+    this.forceKillTimer = null;
     this.child = spawn(executablePath, args, {
       cwd,
       env,
@@ -55,7 +70,12 @@ export class JsonlRpcConnection extends EventEmitter {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(String(id));
-        reject(new Error(`Codex request timed out: ${method}`));
+        const error = new JsonlRpcRequestTimeoutError(method);
+        reject(error);
+        // A timed-out JSON-RPC request has an ambiguous result, especially for
+        // mutating methods such as turn/start. Retrying on the same connection
+        // could submit the mutation twice, so retire the provider immediately.
+        this.dispose(error.message, { expected: false });
       }, timeoutMs);
       timer.unref?.();
       this.pending.set(String(id), { method, resolve, reject, timer });
@@ -85,9 +105,11 @@ export class JsonlRpcConnection extends EventEmitter {
     return redactSecretText(this.stderrBuffer.slice(-this.maxStderrBytes));
   }
 
-  dispose(reason = "Codex app-server connection closed.") {
+  dispose(reason = "Codex app-server connection closed.", { expected = true } = {}) {
     if (this.closed) return;
     this.closed = true;
+    this.exitExpected = Boolean(expected);
+    this.closeReason = redactSecretText(reason);
     this.#rejectPending(new Error(reason));
     try {
       this.child.stdin?.end?.();
@@ -98,6 +120,18 @@ export class JsonlRpcConnection extends EventEmitter {
       this.child.kill();
     } catch {
       // Provider may already have exited.
+    }
+    if (!this.exitInfo && this.forceKillTimeoutMs > 0) {
+      this.forceKillTimer = setTimeout(() => {
+        this.forceKillTimer = null;
+        if (this.exitInfo) return;
+        try {
+          this.child.kill("SIGKILL");
+        } catch {
+          // The process may have exited between the check and forced kill.
+        }
+      }, this.forceKillTimeoutMs);
+      this.forceKillTimer.unref?.();
     }
   }
 
@@ -191,29 +225,37 @@ export class JsonlRpcConnection extends EventEmitter {
   #receiveStderr(chunk) {
     if (this.closed) return;
     this.stderrBuffer += String(chunk);
-    if (Buffer.byteLength(this.stderrBuffer, "utf8") > this.maxStderrBytes) {
-      this.stderrBuffer = this.stderrBuffer.slice(-this.maxStderrBytes);
+    const bytes = Buffer.from(this.stderrBuffer, "utf8");
+    if (bytes.length > this.maxStderrBytes) {
+      this.stderrBuffer = bytes.subarray(bytes.length - this.maxStderrBytes).toString("utf8").replace(/^\uFFFD/, "");
     }
   }
 
   #protocolFailure(message) {
     const error = new Error(message);
     this.emit("protocolError", error);
-    this.dispose(message);
+    this.dispose(message, { expected: false });
   }
 
   #handleExit(code, signal, error) {
     if (this.exitInfo) return;
+    if (this.forceKillTimer) {
+      clearTimeout(this.forceKillTimer);
+      this.forceKillTimer = null;
+    }
     this.exitInfo = {
       code: Number.isInteger(code) ? code : null,
       signal: signal ? String(signal) : null,
-      error: error ? redactSecretText(error.message || String(error)) : null,
+      error: error
+        ? redactSecretText(error.message || String(error))
+        : this.exitExpected
+          ? null
+          : this.closeReason,
       diagnostics: this.getDiagnostics(),
     };
-    const wasClosed = this.closed;
     this.closed = true;
     this.#rejectPending(new Error(error?.message || `Codex app-server exited${code === null ? "" : ` with code ${code}`}.`));
-    this.emit("exit", { ...this.exitInfo, expected: wasClosed });
+    this.emit("exit", { ...this.exitInfo, expected: this.exitExpected });
   }
 
   #rejectPending(error) {

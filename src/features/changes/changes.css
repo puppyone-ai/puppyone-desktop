@@ -61,7 +61,8 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: var(--desktop-sidebar-section-top-gap) 0 var(--desktop-sidebar-section-bottom-gap);
+  padding-block: var(--desktop-sidebar-list-padding-block);
+  padding-inline: 0;
 }
 
 .review-row {

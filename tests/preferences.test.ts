@@ -7,6 +7,7 @@ import {
   parseDiffMarkers,
   parseDockIcon,
   parseExternalAppsSettings,
+  parseExperimentalSettings,
   parsePointerCursors,
   parseTextSize,
 } from "../src/preferences";
@@ -104,5 +105,25 @@ describe("external app preferences", () => {
       }],
     });
     expect(settings).not.toHaveProperty("confirmExecutableFiles");
+  });
+});
+
+describe("experimental preferences", () => {
+  it("keeps Agent Chat off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableAgentChat).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableAgentChat).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableAgentChat: true }))).toMatchObject({
+      enableAgentChat: true,
+      enableAssetLibraryHome: false,
+      enablePuppyoneAppFiles: false,
+      enablePuppyFlowFiles: false,
+    });
+    expect(parseExperimentalSettings(JSON.stringify({ enableAgentCompanion: true })).enableAgentChat).toBe(true);
+  });
+
+  it("keeps the Asset Library homepage off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableAssetLibraryHome).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableAssetLibraryHome: false })).enableAssetLibraryHome).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableAssetLibraryHome: true })).enableAssetLibraryHome).toBe(true);
   });
 });
