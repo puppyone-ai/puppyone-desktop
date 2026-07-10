@@ -14,7 +14,7 @@ Explorer selection
 Format registry
         |
         v
-Viewer registry -------- reserved viewer plugins
+Viewer registry -------- staged external Viewer Packs
         |
         v
 Content/resource acquisition
@@ -35,7 +35,7 @@ This subsystem owns:
 - editable versus read-only capability decisions;
 - shared viewer and editor host contracts;
 - format-specific preview and editing architecture;
-- the reserved external viewer-plugin boundary.
+- the accepted external Viewer Pack boundary and staged runtime contract.
 
 It does not own Explorer loading and tree state, app-shell navigation,
 workspace binding, or native-window lifecycle. Those remain in their focused
@@ -50,8 +50,9 @@ architecture documents one level above this directory.
    - Selection, loaded content, committed preview documents, and editor mount
      lifecycle without stale content or visual flashes.
 3. [Viewer Plugin Architecture](viewer-plugin-architecture.md)
-   - The reserved boundary for future third-party or separately distributed
-     viewers; not a commitment to ship a plugin runtime now.
+   - The accepted target for separately distributed viewers: product scope,
+     manifest and contribution model, large-file Resource Broker, sandbox,
+     packaging, distribution, compatibility, budgets, and delivery gates.
 4. [Markdown Editor](markdown/README.md)
    - The format-specific source-first architecture and Live Preview UX contract
      for Markdown files.
@@ -77,6 +78,6 @@ architecture package.
 ## Reading order
 
 Start with the file-format pipeline, then read the preview lifecycle. Read a
-format subdirectory only for the format being changed. Consult the plugin
-document only when work affects the viewer registry boundary or distribution
-model.
+format subdirectory only for the format being changed. Consult the Viewer Pack
+document whenever work affects the viewer registry boundary, large-resource
+delivery, external rendering, plugin packaging, or distribution.

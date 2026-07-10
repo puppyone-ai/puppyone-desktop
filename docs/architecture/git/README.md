@@ -26,6 +26,8 @@ described as current behavior before its implementation and verification land.
     external Git operations.
   - Defines the **proposed** repository watcher, refresh scheduler, focus
     reconciliation, error recovery, and test contract.
+  - Contains the handoff-ready work packages, accepted ownership decisions,
+    prohibited shortcuts, and Definition of Done for the implementing agent.
 - [Cloud Branch Graph Layout](cloud-branch-graph-layout.md)
   - **Implemented**.
   - Owns Git topology, ref markers, graph continuation rows, and Cloud Branches

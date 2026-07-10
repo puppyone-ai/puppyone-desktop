@@ -442,15 +442,29 @@ source-code extensions)
   must say so honestly and point at the external-open escape hatch — not
   render a broken approximation.
 - **Plugin-readiness disciplines** (rationale and target architecture in
-  [Viewer Plugin Architecture](viewer-plugin-architecture.md); viewers
-  are written as plugins that happen to ship in the box):
+  [Viewer Plugin Architecture](viewer-plugin-architecture.md); the external
+  runtime is accepted but has not shipped):
   - Viewers depend only on the `viewerTypes` contract — never on app
     internals.
+  - External contributions are declarative descriptors consumed through one
+    stable adapter. Third-party React code is never imported into the app
+    renderer, and shared-ui never imports Electron.
+  - Plugin eligibility follows viewer capability, not registry membership:
+    functional core edit/preview viewers win, while placeholder-grade and
+    unknown formats may route to a compatible pack. Viewer Pack v1 enters that
+    route for local documents only.
+  - Packs are installed per machine into PuppyOne's host-owned local store and
+    render locally. Workspaces are never plugin discovery/install roots, and
+    installed/enabled/grant state is not project or cloud-synced state.
   - Heavy parsers load via dynamic `import()` only; adding a format must
-    not add startup weight.
+    not add startup weight. Lazy chunks protect startup, not installer size;
+    total packaged-artifact budgets are a separate requirement.
   - Document-controlled render surfaces (Office HTML, HTML preview) live
     in isolated containers (iframe / shadow root) with a minimal explicit
-    bridge.
+    bridge. Separately distributed viewers use the stronger WebContents/session
+    boundary defined by the Viewer Pack architecture.
+  - Large-file Viewer Packs use bounded Range/stream resources. They never
+    inherit the text editor cap or require a whole-file main-process Buffer.
 
 ---
 
@@ -545,6 +559,17 @@ and DOM gates above.
 - [ ] Add low-cardinality telemetry for size/package rejection, parser
       failure, fallback use, and truncation so limits can be tuned from
       evidence without logging document names or contents.
+- [ ] Replace the local resource path's 100 MiB total-file rejection for
+      bounded Range consumers with the accepted streaming Resource Broker.
+      The current protocol supports `206`/`416`, but a file above the total
+      cap is rejected before even a small range can be served.
+- [ ] Implement the accepted Viewer Pack host in staged first-party form:
+      validated manifest registry, generic external-viewer adapter, isolated
+      WebContents/session, fixed preload, signed atomic package lifecycle,
+      local-only source gating, resource-handle revocation, and crash recovery.
+- [ ] Extend the build budget from entry/lazy chunks to total `dist`,
+      `app.asar`, unpacked resources, installed application, DMG, and ZIP size
+      per architecture. Dynamic imports alone do not reduce installer size.
 - [ ] Finish the non-Office §6 sweep: design the over-cap text-file state,
       verify HEIC/RAW placeholder routing, load-test the CSV editor at
       10,000 rows, and audit every viewer's loading/error/empty states.

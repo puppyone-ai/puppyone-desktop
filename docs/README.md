@@ -13,8 +13,8 @@ directly:
   - Local Source Control sidebar, repository status freshness, external Git
     invalidation, and Cloud branch graph topology.
 - [Editor and Viewer Architecture](architecture/editor/README.md)
-  - File format routing, preview lifecycle, viewer boundaries, and
-    format-specific editors including Markdown.
+  - File format routing, preview lifecycle, viewer boundaries, format-specific
+    editors including Markdown, and the staged Viewer Pack target.
 - [Desktop Sidebar View Stack](architecture/desktop-sidebar-view-stack.md)
 - [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)
 - [Explorer Tree Lifecycle](architecture/explorer-tree-lifecycle.md)
@@ -23,6 +23,10 @@ directly:
 - [Desktop Menu Surface](architecture/desktop-menu-surface.md)
 - [Desktop Appearance Settings](architecture/desktop-appearance-settings.md)
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
+- [Desktop Agent Architecture](architecture/desktop-agent/README.md)
+  - Structured Agent Chat in the right sidebar, provider adapters, normalized
+    events, sessions, approvals, security boundaries, and the Chat/Terminal
+    surface contract.
 
 ## Release
 
