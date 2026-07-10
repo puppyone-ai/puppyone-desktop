@@ -409,7 +409,7 @@ export function DesktopWorkspaceContent({
         renderPreviewBody={renderPreviewBody}
         fileIconTheme={preferences.fileIconTheme}
         editorSaveMode="auto"
-        htmlTrustMode="localTrusted"
+        htmlTrustMode="safe"
         aiEditRequest={activeAiEditRequest}
         enableMarkdownLinkContentIndexing={!cloudWorkspace}
         folderExpansionStrategy={cloudWorkspace ? "optimistic" : "load-before-expand"}

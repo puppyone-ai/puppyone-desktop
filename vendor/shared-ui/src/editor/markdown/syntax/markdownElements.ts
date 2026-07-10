@@ -210,6 +210,8 @@ export function getInlineRevealElement(
   let best: MarkdownElement | null = null;
   for (const element of candidates) {
     if (!isInlineRevealKind(element.kind)) continue;
+    // Incomplete / malformed inline HTML compiles to visibleSource and must not
+    // participate in collapsed-marker reveal or deletion.
     if (element.kind === "inlineHtml" && element.inlineHtml?.status !== "complete") continue;
     if (caret <= element.from || caret >= element.to) continue;
     if (!best || element.to - element.from < best.to - best.from) best = element;

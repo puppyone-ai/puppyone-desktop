@@ -4,7 +4,8 @@ import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../viewerTy
 import { findMarkdownImageTokens } from "../links/markdownImageModel";
 import { findMarkdownLinkTokens, isExternalMarkdownHref } from "../links/markdownLinkModel";
 import { findWikiLinkTokens } from "../links/wikiLinkModel";
-import { compileInlineHtmlRenderPlan } from "../rendering/inlineHtmlPolicy";
+import { compileMarkdownElementPlan } from "../plans/markdownPlanCompiler";
+import type { MarkdownElementPlan } from "../plans/markdownPlanTypes";
 import { isSafeHref } from "../rendering/markdownHtmlPolicy";
 import type { ExpandedImageRange } from "../state/expandedImage";
 import {
@@ -119,37 +120,60 @@ function addInlineHtmlElementDecoration(
   inlineRevealRange: InlineRevealRange | null,
 ) {
   if (element.kind !== "inlineHtml") return;
-  const policy = compileInlineHtmlRenderPlan(element.inlineHtml);
-  if (!policy.supported) return;
+  const plan = compileMarkdownElementPlan(element);
+  applyInlineHtmlPlan(plan, builders, inlineRevealRange);
+}
 
-  const revealSourceSyntax = isRevealedInlineRange(element.from, element.to, inlineRevealRange);
-  for (const markerRange of element.markerRanges) {
-    addSourceSyntaxDecoration(builders, markerRange.from, markerRange.to, "inline-html", revealSourceSyntax);
-  }
+function applyInlineHtmlPlan(
+  plan: MarkdownElementPlan,
+  builders: MarkdownDecorationBuilders,
+  inlineRevealRange: InlineRevealRange | null,
+) {
+  if (plan.presentation === "visibleSource") return;
 
-  if (policy.value.kind === "lineBreak") {
+  const revealSourceSyntax = isRevealedInlineRange(
+    plan.sourceRange.from,
+    plan.sourceRange.to,
+    inlineRevealRange,
+  );
+
+  if (plan.presentation === "inlineAtom" && plan.atom.kind === "lineBreak") {
     if (!revealSourceSyntax) {
       addReplacementDecoration(
         builders,
         Decoration.replace({
-          widget: new InlineHtmlLineBreakWidget(),
+          widget: new InlineHtmlLineBreakWidget(plan.layout.lineBreaks),
           inclusive: false,
         }),
-        element.from,
-        element.to,
+        plan.sourceRange.from,
+        plan.sourceRange.to,
+      );
+    } else {
+      addSourceSyntaxDecoration(
+        builders,
+        plan.sourceRange.from,
+        plan.sourceRange.to,
+        "inline-html",
+        true,
       );
     }
     return;
   }
 
-  if (!element.contentRange || element.contentRange.from >= element.contentRange.to) return;
+  if (plan.presentation !== "inlineMark" || plan.mark.kind !== "inlineHtmlMark") return;
+
+  for (const markerRange of plan.markerRanges) {
+    addSourceSyntaxDecoration(builders, markerRange.from, markerRange.to, "inline-html", revealSourceSyntax);
+  }
+
+  if (plan.contentRange.from >= plan.contentRange.to) return;
   builders.decorations.push(
     Decoration.mark({
-      tagName: policy.value.tagName,
-      class: "cm-md-inline-html",
-      attributes: policy.value.attributes,
+      tagName: plan.mark.tagName,
+      class: plan.mark.className ?? "cm-md-inline-html",
+      attributes: plan.mark.attributes,
       inclusive: false,
-    }).range(element.contentRange.from, element.contentRange.to),
+    }).range(plan.contentRange.from, plan.contentRange.to),
   );
 }
 

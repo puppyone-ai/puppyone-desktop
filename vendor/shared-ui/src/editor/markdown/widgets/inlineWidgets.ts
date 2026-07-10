@@ -41,19 +41,32 @@ export class HiddenMarkdownSyntaxWidget extends WidgetType {
 }
 
 export class InlineHtmlLineBreakWidget extends WidgetType {
+  constructor(private readonly visualLineBreaks = 1) {
+    super();
+  }
+
   eq(widget: WidgetType): boolean {
-    return widget instanceof InlineHtmlLineBreakWidget;
+    return widget instanceof InlineHtmlLineBreakWidget && widget.visualLineBreaks === this.visualLineBreaks;
+  }
+
+  get lineBreaks(): number {
+    return Math.max(0, this.visualLineBreaks);
+  }
+
+  get estimatedHeight(): number {
+    return this.lineBreaks * 16;
   }
 
   toDOM(): HTMLElement {
     const lineBreak = document.createElement("br");
     lineBreak.className = "cm-md-inline-html-break";
     lineBreak.setAttribute("aria-hidden", "true");
+    lineBreak.dataset.mdLineBreaks = String(this.visualLineBreaks);
     return lineBreak;
   }
 
   ignoreEvent() {
-    return true;
+    return false;
   }
 }
 

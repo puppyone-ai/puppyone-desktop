@@ -4,6 +4,7 @@ import { HighlightStyle, bracketMatching, indentOnInput, syntaxHighlighting } fr
 import type { Extension } from "@codemirror/state";
 import {
   EditorView,
+  ViewPlugin,
   dropCursor,
   highlightActiveLine,
   highlightSpecialChars,
@@ -18,6 +19,8 @@ import { markdownLivePreviewContextExtension } from "./markdownLivePreviewContex
 import { markdownComposingBlockLineField, markdownInputCompositionExtension } from "./state/composingBlockLine";
 import { markdownExpandedImageField } from "./state/expandedImage";
 import { markdownLivePreviewFocusExtension } from "./state/livePreviewFocus";
+import { markdownTableFocusField } from "./adapters/codemirror/tableFocusState";
+import { disposeMarkdownEmbedHost } from "./adapters/codemirror/embedHost";
 import {
   markdownHiddenMarkerSelectionNormalizer,
   trailingLineWhitespaceSelectionExtension,
@@ -62,10 +65,19 @@ export function markdownLivePreviewExtension(
     markdownInputCompositionExtension,
     markdownComposingBlockLineField,
     markdownExpandedImageField,
+    markdownTableFocusField,
+    markdownEmbedHostExtension,
     markdownLivePreviewDecorations,
     markdownBlockWidgetSelectionExtension,
   ];
 }
+
+const markdownEmbedHostExtension = ViewPlugin.fromClass(class {
+  constructor(private readonly view: EditorView) {}
+  destroy() {
+    disposeMarkdownEmbedHost(this.view);
+  }
+});
 
 const puppyMarkdownEditorTheme = EditorView.theme({
   "&": {

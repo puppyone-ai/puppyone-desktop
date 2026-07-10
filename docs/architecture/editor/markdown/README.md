@@ -48,11 +48,12 @@ the other's contract; cross-layer changes must update both when necessary.
 
 ## Document lifecycle
 
-- `architecture.md` is the adopted target technical contract. Its Markdown
-  source, parser, and inline HTML foundations are implemented. Compiled render
-  plan convergence and trust hardening are active engineering work; the
-  per-editor embedded host is planned next. Sections 12 and 13 track the current
-  state and migration phases.
+- `architecture.md` is the adopted target technical contract. Markdown source,
+  parser, inline HTML foundations, compiled render plans, broad-safe inline
+  profiles, embed-host/broker foundations, and default broad-safe trust are
+  implemented. Electron WebContents wiring for external embeds and full
+  widget-session migration of every block widget remain follow-up work.
+  Sections 12 and 13 track the current state and migration phases.
 - Part 1 of `live-preview-ux.md` is the durable UX contract.
 - Part 2 of `live-preview-ux.md` records the previous live-preview migration.
   It is retained during this reorganization so directory cleanup does not

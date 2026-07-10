@@ -2,19 +2,28 @@ export type HtmlSanitizerMode = "inline" | "block";
 
 const INLINE_TAGS = [
   "a",
+  "abbr",
   "b",
   "br",
+  "cite",
   "code",
   "del",
   "em",
   "i",
   "img",
+  "kbd",
   "mark",
+  "q",
+  "rp",
+  "rt",
+  "ruby",
   "s",
+  "small",
   "span",
   "strong",
   "sub",
   "sup",
+  "time",
   "u",
 ] as const;
 
@@ -70,10 +79,15 @@ const BLOCKED_TAGS = [
 const INLINE_STYLE_PROPERTIES = [
   "background-color",
   "color",
+  "font-size",
   "font-style",
   "font-weight",
+  "letter-spacing",
+  "line-height",
+  "text-align",
   "text-decoration",
   "text-decoration-line",
+  "vertical-align",
 ] as const;
 
 const BLOCK_STYLE_PROPERTIES = [
@@ -137,13 +151,15 @@ export const MARKDOWN_HTML_POLICY = {
     void: new Set<string>(["br", "hr", "img"]),
   },
   attributes: {
-    global: new Set<string>(["aria-label", "style", "title"]),
+    global: new Set<string>(["aria-label", "class", "dir", "id", "lang", "style", "title"]),
     byTag: new Map<string, Set<string>>([
-      ["a", new Set(["aria-label", "href", "style", "title"])],
-      ["details", new Set(["aria-label", "open", "style", "title"])],
-      ["img", new Set(["alt", "aria-label", "height", "loading", "src", "srcset", "style", "title", "width"])],
-      ["td", new Set(["aria-label", "colspan", "rowspan", "style", "title"])],
-      ["th", new Set(["aria-label", "colspan", "rowspan", "style", "title"])],
+      ["a", new Set(["aria-label", "class", "dir", "href", "id", "lang", "rel", "style", "target", "title"])],
+      ["abbr", new Set(["aria-label", "class", "dir", "id", "lang", "style", "title"])],
+      ["details", new Set(["aria-label", "class", "dir", "id", "lang", "open", "style", "title"])],
+      ["img", new Set(["alt", "aria-label", "class", "height", "id", "loading", "src", "srcset", "style", "title", "width"])],
+      ["td", new Set(["aria-label", "class", "colspan", "dir", "id", "lang", "rowspan", "style", "title"])],
+      ["th", new Set(["aria-label", "class", "colspan", "dir", "id", "lang", "rowspan", "style", "title"])],
+      ["time", new Set(["aria-label", "class", "datetime", "dir", "id", "lang", "style", "title"])],
     ]),
     boolean: new Map<string, Set<string>>([
       ["details", new Set(["open"])],
@@ -205,7 +221,11 @@ export function isSafeHref(href: string): boolean {
   if (!/^[a-z][a-z0-9+.-]*:/i.test(value)) return true;
 
   try {
-    const url = new URL(value, window.location.href);
+    const base =
+      typeof window !== "undefined" && typeof window.location?.href === "string"
+        ? window.location.href
+        : "https://example.invalid/";
+    const url = new URL(value, base);
     return MARKDOWN_HTML_POLICY.urls.protocols.has(url.protocol);
   } catch {
     return false;
@@ -255,6 +275,14 @@ export function isSafeStyleValue(property: string, value: string): boolean {
 
   if (property === "text-align") {
     return /^(left|center|right|start|end)$/i.test(normalized);
+  }
+
+  if (property === "vertical-align") {
+    return /^(baseline|sub|super|top|middle|bottom|text-top|text-bottom)$/i.test(normalized);
+  }
+
+  if (property === "letter-spacing") {
+    return isSafeLengthValue(normalized) || /^normal$/i.test(normalized);
   }
 
   if (property.startsWith("border")) {

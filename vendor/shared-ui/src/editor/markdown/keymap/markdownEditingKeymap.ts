@@ -1,12 +1,14 @@
-import { EditorSelection, type EditorState } from "@codemirror/state";
+import { EditorSelection } from "@codemirror/state";
 import { EditorView, type KeyBinding } from "@codemirror/view";
+import {
+  getCollapsedMarkerDeletionUnit,
+  getExpandableInlineAtomAtSelection,
+} from "../plans/markdownPlanIndex";
 import { markdownExpandedImageEffect } from "../state/expandedImage";
 import { isSelectionInComposingBlockLine, markdownComposingBlockLineField } from "../state/composingBlockLine";
 import {
   getBlockMarkerAtVisibleStart,
-  getMarkdownElementsInRange,
   getMarkdownVisibleLineStart as getMarkdownVisibleLineStartPosition,
-  isInlineMarkerDeletionKind,
 } from "../syntax/markdownElements";
 import {
   getContinuationPrefix,
@@ -76,7 +78,7 @@ function deleteMarkdownMarkerBackward(view: EditorView): boolean {
 
   const deletion =
     getBlockMarkerAtVisibleStart(state, selection.from) ??
-    getCollapsedInlineMarkerDeletion(state, selection.from, "backward");
+    getCollapsedMarkerDeletionUnit(state, selection.from, "backward");
   if (!deletion) return false;
 
   view.dispatch({
@@ -94,7 +96,7 @@ function deleteMarkdownMarkerForward(view: EditorView): boolean {
   if (!selection.empty) return false;
   if (isSelectionInComposingBlockLine(state, selection.from)) return false;
 
-  const deletion = getCollapsedInlineMarkerDeletion(state, selection.from, "forward");
+  const deletion = getCollapsedMarkerDeletionUnit(state, selection.from, "forward");
   if (!deletion) return false;
 
   view.dispatch({
@@ -104,29 +106,10 @@ function deleteMarkdownMarkerForward(view: EditorView): boolean {
   return true;
 }
 
-function getCollapsedInlineMarkerDeletion(
-  state: EditorState,
-  caret: number,
-  direction: "backward" | "forward",
-): { from: number; to: number } | null {
-  const line = state.doc.lineAt(caret);
-  const elements = getMarkdownElementsInRange(state, line.from, line.to);
-  for (const element of elements) {
-    if (!isInlineMarkerDeletionKind(element.kind)) continue;
-    const markerRange = direction === "backward"
-      ? element.markerRanges[element.markerRanges.length - 1]
-      : element.markerRanges[0];
-    if (!markerRange) continue;
-    if (direction === "backward" && caret === element.to) return markerRange;
-    if (direction === "forward" && caret === element.from) return markerRange;
-  }
-  return null;
-}
-
 function handleMarkdownEnter(view: EditorView): boolean {
   const { state } = view;
   if (state.readOnly || state.selection.ranges.length !== 1) return false;
-  if (expandSelectedMarkdownImage(view)) return true;
+  if (expandSelectedInlineAtom(view)) return true;
 
   const selection = state.selection.main;
   if (!selection.empty) return false;
@@ -154,22 +137,33 @@ function handleMarkdownEnter(view: EditorView): boolean {
   return true;
 }
 
-function expandSelectedMarkdownImage(view: EditorView): boolean {
+function expandSelectedInlineAtom(view: EditorView): boolean {
   const selection = view.state.selection.main;
   if (selection.empty) return false;
 
-  const imageElement = getMarkdownElementsInRange(view.state, selection.from, selection.to).find((element) => (
-    element.kind === "image" &&
-    element.from === selection.from &&
-    element.to === selection.to
-  ));
-  if (!imageElement) return false;
+  const entry = getExpandableInlineAtomAtSelection(view.state, selection.from, selection.to);
+  if (!entry || entry.plan.presentation !== "inlineAtom") return false;
 
-  view.dispatch({
-    effects: markdownExpandedImageEffect.of({ from: imageElement.from, to: imageElement.to }),
-    selection: EditorSelection.cursor(imageElement.from + 2),
-  });
-  return true;
+  if (entry.plan.atom.kind === "image") {
+    view.dispatch({
+      effects: markdownExpandedImageEffect.of({
+        from: entry.plan.sourceRange.from,
+        to: entry.plan.sourceRange.to,
+      }),
+      selection: EditorSelection.cursor(entry.plan.sourceRange.from + 2),
+    });
+    return true;
+  }
+
+  if (entry.plan.atom.kind === "lineBreak") {
+    // Explicit expansion: place the caret inside the revealed source tag.
+    view.dispatch({
+      selection: EditorSelection.cursor(entry.plan.sourceRange.from + 1),
+    });
+    return true;
+  }
+
+  return false;
 }
 
 function moveMarkdownCaretToVisibleLineStart(view: EditorView): boolean {

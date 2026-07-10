@@ -35,7 +35,9 @@ export function dispatchMarkdownTableStructureOperation(
     rows: getMarkdownTableRowsWithDraft(context.rows, context.currentDraft),
   }, operation);
 
-  if (result.focus) queuePendingMarkdownTableFocus(context.tableFrom, result.focus);
+  if (result.focus) {
+    queuePendingMarkdownTableFocus(context.view, context.tableFrom, result.focus);
+  }
   context.view.dispatch({
     changes: {
       from: context.tableFrom,

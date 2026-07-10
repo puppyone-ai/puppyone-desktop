@@ -198,13 +198,13 @@ describe("Markdown inline HTML policy", () => {
       getCompleteInlineHtml('<span style="color: #B45309; font-weight: 700">text</span>'),
     );
 
-    expect(result).toEqual({
-      supported: true,
-      value: {
-        kind: "mark",
-        tagName: "span",
-        attributes: { style: "color: #B45309; font-weight: 700" },
-      },
+    expect(result.supported).toBe(true);
+    if (!result.supported) return;
+    expect(result.value).toMatchObject({
+      kind: "mark",
+      tagName: "span",
+      attributes: { style: "color: #B45309; font-weight: 700" },
+      profile: "inline-editable",
     });
   });
 
@@ -213,9 +213,10 @@ describe("Markdown inline HTML policy", () => {
       .find((candidate) => candidate.tagName === "br");
 
     expect(element).toBeDefined();
-    expect(element && compileInlineHtmlRenderPlan(element)).toEqual({
+    const result = element && compileInlineHtmlRenderPlan(element);
+    expect(result).toMatchObject({
       supported: true,
-      value: { kind: "lineBreak" },
+      value: { kind: "lineBreak", profile: "inline-editable" },
     });
   });
 
@@ -225,17 +226,41 @@ describe("Markdown inline HTML policy", () => {
     expect(isAllowedStyleProperty("display", "block")).toBe(true);
   });
 
-  it.each([
-    ['<span style="display: none">text</span>', "display"],
-    ['<span style="color: url(https://example.com/x)">text</span>', "color"],
-    ['<span onclick="alert(1)">text</span>', "onclick"],
-    ['before <script>alert(1)</script>', "script"],
-  ])("rejects unsafe or editor-breaking HTML: %s", (source, reason) => {
-    const tagName = source.includes("script") ? "script" : "span";
-    const result = compileInlineHtmlRenderPlan(getCompleteInlineHtml(source, tagName));
+  it("reduces unsafe attributes while preserving honest safe structure", () => {
+    const reducedDisplay = compileInlineHtmlRenderPlan(
+      getCompleteInlineHtml('<span style="display: none; color: red">text</span>'),
+    );
+    expect(reducedDisplay.supported).toBe(true);
+    if (reducedDisplay.supported && reducedDisplay.value.kind === "mark") {
+      expect(reducedDisplay.value.attributes.style).toBe("color: red");
+      expect(reducedDisplay.value.diagnostics.some((item) => item.message.includes("display"))).toBe(true);
+    }
 
+    const reducedEvent = compileInlineHtmlRenderPlan(
+      getCompleteInlineHtml('<span onclick="alert(1)" style="color: blue">text</span>'),
+    );
+    expect(reducedEvent.supported).toBe(true);
+    if (reducedEvent.supported && reducedEvent.value.kind === "mark") {
+      expect(reducedEvent.value.attributes).toEqual({ style: "color: blue" });
+      expect(reducedEvent.value.diagnostics.some((item) => item.code === "inline-html.event-handler")).toBe(true);
+    }
+  });
+
+  it("rejects blocked executable tags", () => {
+    const result = compileInlineHtmlRenderPlan(getCompleteInlineHtml("before <script>alert(1)</script>", "script"));
     expect(result.supported).toBe(false);
-    if (!result.supported) expect(result.reasons.join(" ")).toContain(reason);
+    if (!result.supported) expect(result.reasons.join(" ")).toContain("script");
+  });
+
+  it("rejects unsafe style url() values", () => {
+    const result = compileInlineHtmlRenderPlan(
+      getCompleteInlineHtml('<span style="color: url(https://example.com/x)">text</span>'),
+    );
+    expect(result.supported).toBe(true);
+    if (result.supported && result.value.kind === "mark") {
+      expect(result.value.attributes.style ?? "").not.toContain("url");
+      expect(result.value.diagnostics.some((item) => item.message.includes("color"))).toBe(true);
+    }
   });
 });
 
@@ -305,11 +330,19 @@ describe("Markdown inline HTML live decorations", () => {
   });
 
   it("leaves unsupported inline HTML source visible", () => {
-    const source = '<span style="display: none">text</span>';
+    const source = "before <script>alert(1)</script>";
     const builders = buildInlineDecorations(source);
 
-    expect(builders.decorations).toHaveLength(0);
+    expect(builders.decorations.filter((range) => range.value.spec.class === "cm-md-inline-html")).toHaveLength(0);
     expect(builders.atomicRanges).toHaveLength(0);
+  });
+
+  it("keeps safe structure after reducing blocked style capabilities", () => {
+    const source = '<span style="display: none; color: red">text</span>';
+    const builders = buildInlineDecorations(source);
+    const htmlMark = builders.decorations.find((range) => range.value.spec.class === "cm-md-inline-html");
+
+    expect(htmlMark?.value.spec.attributes).toEqual({ style: "color: red" });
   });
 });
 

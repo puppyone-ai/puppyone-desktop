@@ -76,7 +76,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
 
     if (changed) {
       suppressBlurCommit = true;
-      if (target.focus) queuePendingMarkdownTableFocus(tableFrom, target.focus);
+      if (target.focus) queuePendingMarkdownTableFocus(view, tableFrom, target.focus);
       view.dispatch({
         changes: {
           from: cell.from,
