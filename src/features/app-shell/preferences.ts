@@ -53,6 +53,8 @@ import {
 export const EXPLORER_WIDTH_STORAGE_KEY = "puppyone.desktop.explorerWidth";
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = "puppyone.desktop.sidebarCollapsed";
 export const RIGHT_SIDEBAR_WIDTH_STORAGE_KEY = "puppyone.desktop.rightSidebarWidth";
+export const RIGHT_SIDEBAR_SURFACE_STORAGE_KEY = "puppyone.desktop.rightSidebarSurface";
+export type RightSidebarSurface = "chat" | "terminal";
 export const DEFAULT_EXPLORER_WIDTH = 320;
 export const MIN_EXPLORER_WIDTH = 240;
 export const MAX_EXPLORER_WIDTH = 520;
@@ -219,6 +221,11 @@ export function readInitialRightSidebarWidth(): number {
   const stored = Number(window.localStorage.getItem(RIGHT_SIDEBAR_WIDTH_STORAGE_KEY));
   if (!Number.isFinite(stored)) return DEFAULT_RIGHT_SIDEBAR_WIDTH;
   return Math.min(Math.max(Math.round(stored), MIN_RIGHT_SIDEBAR_WIDTH), MAX_RIGHT_SIDEBAR_WIDTH);
+}
+
+export function readInitialRightSidebarSurface(): RightSidebarSurface {
+  if (typeof window === "undefined") return "chat";
+  return window.localStorage.getItem(RIGHT_SIDEBAR_SURFACE_STORAGE_KEY) === "terminal" ? "terminal" : "chat";
 }
 
 export function readSystemDarkMode(): boolean {

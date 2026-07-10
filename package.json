@@ -18,6 +18,7 @@
     "dist:mac:publish": "npm run check:shared-ui && npm run build && electron-builder --mac --publish always",
     "preview": "vite preview --host 127.0.0.1",
     "smoke:local-api": "node scripts/smoke-local-api.mjs",
+    "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
     "start": "node scripts/start-electron.mjs",
     "test": "vitest run",
     "test:watch": "vitest"

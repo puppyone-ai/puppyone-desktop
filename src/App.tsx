@@ -10,7 +10,8 @@ import {
   MinimalOnboarding,
   type OnboardingOperationStatus,
 } from "./components/MinimalOnboarding";
-import { RightTerminalPanel, type RightTerminalPanelHandle } from "./components/RightTerminalPanel";
+import type { RightTerminalPanelHandle } from "./components/RightTerminalPanel";
+import { RightCompanionPanel } from "./features/desktop-agent/RightCompanionPanel";
 import { useDesktopUpdates } from "./components/DesktopUpdateControls";
 import {
   configureWorkspaceCloudRemote,
@@ -142,6 +143,7 @@ export function App() {
     rightSidebarOpen,
     rightSidebarToolsSettings,
     rightSidebarWidth,
+    rightSidebarSurface,
     sidebarCollapsed,
     sidebarNavigationLayout,
     sidebarNavigationOrientation,
@@ -163,6 +165,7 @@ export function App() {
     setRightSidebarOpen,
     setRightSidebarToolsSettings,
     setRightSidebarWidth,
+    setRightSidebarSurface,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setThemeMode,
@@ -888,11 +891,18 @@ export function App() {
         maxRightSidebarWidth={MAX_RIGHT_SIDEBAR_WIDTH}
         onRightSidebarWidthChange={setRightSidebarWidth}
         rightSidebar={desktopTerminalEnabled ? (
-          <RightTerminalPanel
-            key={`${workspace.path}:${terminalSessionResetToken}`}
+          <RightCompanionPanel
+            key={workspace.path}
             ref={terminalPanelRef}
             workspace={workspace}
             active={terminalSidebarOpen && desktopTerminalEnabled}
+            surface={rightSidebarSurface}
+            terminalResetToken={terminalSessionResetToken}
+            onSurfaceChange={setRightSidebarSurface}
+            onViewChanges={() => {
+              setActiveView("git");
+              setSidebarCollapsed(false);
+            }}
           />
         ) : undefined}
       >
