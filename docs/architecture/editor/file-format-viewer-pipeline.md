@@ -225,7 +225,7 @@ Cross-cutting bars that apply to **every** viewer:
 
 - Bar: Typora-class live preview editing with source mode, per the
   dedicated contract in
-  [Markdown Live Preview Editing UX](markdown-live-preview-ux.md);
+  [Markdown Live Preview Editing UX](markdown/live-preview-ux.md);
   byte-perfect round-trip; wiki links + backlinks; relative asset URLs
   resolved through the data port; manual and autosave modes; AI-edit
   review decorations.

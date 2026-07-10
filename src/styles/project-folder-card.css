@@ -43,7 +43,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 660;
   line-height: 1;
   text-overflow: ellipsis;
@@ -72,7 +72,7 @@
       color-mix(in srgb, var(--po-success) 18%, var(--po-panel))
     );
   color: color-mix(in srgb, var(--po-success) 28%, var(--po-text));
-  font-size: 10px;
+  font-size: calc(10px * var(--po-text-scale, 1));
   font-style: normal;
   font-weight: 820;
   line-height: 1;
@@ -145,7 +145,7 @@
   border-radius: 7px;
   background: color-mix(in srgb, var(--po-panel-raised) 88%, transparent);
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 680;
   white-space: nowrap;
   cursor: pointer;
@@ -207,7 +207,7 @@
   max-width: 100%;
   overflow: hidden;
   color: var(--po-text-muted);
-  font-size: 10px;
+  font-size: calc(10px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 1.15;
   text-align: center;
@@ -235,7 +235,7 @@
   overflow: hidden;
   margin: 0;
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 1.45;
   -webkit-box-orient: vertical;
@@ -321,7 +321,7 @@
   border-top: 1px solid var(--po-divider);
   padding: 0 12px;
   color: var(--po-text-subtle);
-  font-size: 10px;
+  font-size: calc(10px * var(--po-text-scale, 1));
   font-weight: 520;
 }
 
@@ -420,7 +420,7 @@
 .desktop-project-folder-new-card strong {
   max-width: 160px;
   color: currentColor;
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 680;
   line-height: 1.25;
   text-align: center;

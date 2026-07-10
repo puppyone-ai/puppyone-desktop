@@ -10,16 +10,16 @@ directly:
 
 - [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
 - [Cloud Branch Graph Layout](architecture/cloud-branch-graph-layout.md)
-- [Smooth Preview Transitions](architecture/smooth-preview-transitions.md)
+- [Editor and Viewer Architecture](architecture/editor/README.md)
+  - File format routing, preview lifecycle, viewer boundaries, and
+    format-specific editors including Markdown.
 - [Desktop Sidebar View Stack](architecture/desktop-sidebar-view-stack.md)
 - [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)
-- [File Format and Viewer Pipeline](architecture/file-format-viewer-pipeline.md)
-- [Viewer Plugin Architecture (Reserved)](architecture/viewer-plugin-architecture.md)
 - [Explorer Tree Lifecycle](architecture/explorer-tree-lifecycle.md)
 - [Desktop Multi-Window Workspaces](architecture/desktop-multi-window-workspaces.md)
 - [Desktop Auto Update Lifecycle](architecture/desktop-auto-update-lifecycle.md)
 - [Desktop Menu Surface](architecture/desktop-menu-surface.md)
-- [Markdown Live Preview Editing UX](architecture/markdown-live-preview-ux.md)
+- [Desktop Appearance Settings](architecture/desktop-appearance-settings.md)
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
 
 ## Release

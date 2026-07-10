@@ -67,7 +67,7 @@
 .desktop-titlebar-context-name {
   min-width: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 600;
   line-height: 18px;
   text-overflow: ellipsis;
@@ -191,6 +191,18 @@
   color: var(--po-text);
 }
 
+/* Keep the active execution context visible at a glance. Cloud projects use a
+   persistent sky-blue treatment; local projects retain the neutral chrome. */
+.desktop-titlebar-workspace-button.cloud {
+  --desktop-cloud-pigment: color-mix(in oklab, var(--po-info) 78%, var(--po-accent));
+  background: color-mix(in srgb, var(--desktop-cloud-pigment) 8%, transparent);
+}
+
+.desktop-titlebar-workspace-button.cloud:hover,
+.desktop-titlebar-workspace-button.cloud[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--desktop-cloud-pigment) 14%, transparent);
+}
+
 .desktop-titlebar-workspace-mark {
   position: relative;
   display: grid;
@@ -206,6 +218,18 @@
 .desktop-titlebar-workspace-button:hover .desktop-titlebar-workspace-mark,
 .desktop-titlebar-workspace-button[aria-expanded="true"] .desktop-titlebar-workspace-mark {
   color: var(--po-text);
+}
+
+.desktop-titlebar-workspace-button.cloud .desktop-titlebar-workspace-mark,
+.desktop-titlebar-workspace-button.cloud .desktop-titlebar-workspace-name {
+  color: color-mix(in srgb, var(--desktop-cloud-pigment) 88%, var(--po-text) 12%);
+}
+
+.desktop-titlebar-workspace-button.cloud:hover .desktop-titlebar-workspace-mark,
+.desktop-titlebar-workspace-button.cloud:hover .desktop-titlebar-workspace-name,
+.desktop-titlebar-workspace-button.cloud[aria-expanded="true"] .desktop-titlebar-workspace-mark,
+.desktop-titlebar-workspace-button.cloud[aria-expanded="true"] .desktop-titlebar-workspace-name {
+  color: var(--desktop-cloud-pigment);
 }
 
 .desktop-titlebar-workspace-button:focus-visible {
@@ -245,7 +269,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 600;
   line-height: 18px;
   text-overflow: ellipsis;
@@ -313,7 +337,7 @@
 .desktop-titlebar-external-app-icon.fallback {
   background: color-mix(in srgb, var(--po-text-muted) 13%, transparent);
   color: var(--po-text);
-  font-size: 9px;
+  font-size: calc(9px * var(--po-text-scale, 1));
   font-weight: 700;
   line-height: 1;
 }
@@ -440,7 +464,7 @@
 .desktop-titlebar-branch-button span {
   min-width: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 600;
   line-height: 18px;
   text-overflow: ellipsis;
@@ -465,7 +489,7 @@
 .desktop-branch-menu-label {
   padding: 0 7px 4px;
   color: var(--po-text-disabled);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 650;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -484,7 +508,7 @@
   border-radius: 6px;
   background: color-mix(in srgb, var(--po-danger) 9%, transparent);
   color: var(--po-danger);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   line-height: 1.35;
 }
 
@@ -496,7 +520,7 @@
   border-radius: 5px;
   background: transparent;
   color: var(--po-danger);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 

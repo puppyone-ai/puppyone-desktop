@@ -92,6 +92,14 @@
       {
         "from": "public/logo-square.png",
         "to": "logo-square.png"
+      },
+      {
+        "from": "public/logo-square-v0.1.3-light.png",
+        "to": "dock-icon-light.png"
+      },
+      {
+        "from": "public/logo-square-v0.1.3-dark.png",
+        "to": "dock-icon-matte.png"
       }
     ],
     "publish": [

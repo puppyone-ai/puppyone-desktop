@@ -28,7 +28,7 @@
   flex: 1;
   overflow: hidden;
   color: var(--po-text);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -38,7 +38,7 @@
   display: inline-flex;
   flex: 0 0 auto;
   gap: 6px;
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 520;
 }
 
@@ -51,7 +51,7 @@
   border-radius: 5px;
   background: var(--po-control);
   color: var(--po-text-muted);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--po-text-scale, 1));
   font-weight: 700;
 }
 
@@ -84,7 +84,7 @@
   min-width: 0;
   min-height: 20px;
   font-family: var(--po-font-mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 20px;
 }
 
@@ -111,7 +111,7 @@
   background: color-mix(in srgb, var(--po-canvas) 84%, var(--po-text) 4%);
   color: var(--po-text-disabled);
   font-family: var(--po-font-sans);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
 }
 
 .desktop-diff-line .line-number {
@@ -131,6 +131,16 @@
   user-select: none;
 }
 
+[data-diff-markers="color"] .desktop-diff-line .line-prefix {
+  width: 8px;
+  flex-basis: 8px;
+  color: transparent;
+}
+
+[data-diff-markers="symbols"] .desktop-diff-line .line-prefix {
+  font-weight: 750;
+}
+
 .desktop-diff-line code {
   min-width: 0;
   overflow: hidden;
@@ -144,7 +154,7 @@
 .desktop-commit-empty {
   padding: 14px 16px;
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-style: italic;
 }
 
@@ -167,14 +177,14 @@
 
 .desktop-utility-center strong {
   color: var(--po-text);
-  font-size: 14px;
+  font-size: calc(14px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 
 .desktop-utility-center span {
   max-width: min(520px, 80%);
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 1.45;
 }
 
@@ -189,7 +199,7 @@
   border-radius: 6px;
   background: color-mix(in srgb, var(--po-accent) 12%, var(--po-panel));
   color: var(--po-accent);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 

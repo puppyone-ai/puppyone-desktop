@@ -51,7 +51,7 @@
   background: color-mix(in srgb, var(--po-inset) 76%, transparent);
   color: color-mix(in srgb, var(--po-text) 78%, var(--po-text-muted));
   font-family: var(--po-font-mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 1.55;
   white-space: pre;
 }
@@ -71,7 +71,7 @@
   width: 100%;
   color: color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted));
   font-family: var(--po-font-sans);
-  font-size: 14px;
+  font-size: calc(14px * var(--po-text-scale, 1));
   line-height: 1.6;
 }
 
@@ -220,13 +220,13 @@
 
 .markdown-codemirror-editor .cm-md-html-unsupported strong {
   color: color-mix(in srgb, var(--po-warning) 38%, var(--po-text));
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 700;
   line-height: 1.3;
 }
 
 .markdown-codemirror-editor .cm-md-html-unsupported span {
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 1.4;
 }
 
@@ -236,7 +236,7 @@
   overflow: hidden;
   color: var(--po-text-subtle);
   font-family: var(--po-font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;

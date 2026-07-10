@@ -16,7 +16,7 @@
 .desktop-cloud-project-browser-header h1 {
   margin: 0;
   color: var(--po-text);
-  font-size: 24px;
+  font-size: calc(24px * var(--po-text-scale, 1));
   font-weight: 760;
   letter-spacing: 0;
   line-height: 1.16;
@@ -34,7 +34,7 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-panel-raised) 76%, transparent);
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 650;
   cursor: pointer;
 }

@@ -45,7 +45,7 @@
   background: var(--po-panel);
   color: var(--po-text-muted);
   font: inherit;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 
@@ -83,7 +83,7 @@
   display: block;
   min-width: 0;
   color: var(--po-text-subtle);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 14px;
@@ -102,7 +102,7 @@
   background: var(--po-panel-raised);
   color: var(--po-text);
   font-family: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   letter-spacing: 0;
   line-height: 18px;
   outline: none;
@@ -142,7 +142,7 @@
   backdrop-filter: blur(20px);
   color: var(--po-text);
   box-shadow: var(--po-menu-shadow);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
 }
 
 .desktop-create-entry-menu.desktop-node-action-menu {
@@ -150,7 +150,7 @@
   border-color: var(--po-menu-border);
   border-radius: var(--po-menu-radius);
   background: var(--po-menu-bg);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   box-shadow: var(--po-menu-shadow);
   overflow: visible;
 }
@@ -190,7 +190,7 @@
   width: 184px;
   padding: var(--po-menu-padding);
   display: none;
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
 }
 
 .desktop-create-entry-submenu-wrap[data-open="true"] > .desktop-create-entry-submenu {
@@ -215,6 +215,6 @@
 .desktop-node-action-error {
   margin: 4px 8px 2px;
   color: var(--po-danger);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   line-height: 15px;
 }

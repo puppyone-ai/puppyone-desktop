@@ -51,7 +51,7 @@
 .desktop-cloud-create-access-label {
   color: var(--po-text-subtle);
   font-family: var(--po-font-sans);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 650;
   letter-spacing: 0.04em;
   line-height: 14px;
@@ -61,7 +61,7 @@
 .desktop-cloud-create-access-intent-header strong {
   color: var(--po-text);
   font-family: var(--po-font-sans);
-  font-size: 17px;
+  font-size: calc(17px * var(--po-text-scale, 1));
   font-weight: 650;
   letter-spacing: 0;
   line-height: 22px;
@@ -69,7 +69,7 @@
 
 .desktop-cloud-create-access-intent-header small {
   color: var(--po-text-disabled);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 17px;
   white-space: nowrap;
 }
@@ -113,7 +113,7 @@
 .desktop-cloud-create-access-intent-title > span:last-child {
   overflow: hidden;
   color: var(--po-text);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 650;
   line-height: 17px;
   text-overflow: ellipsis;
@@ -160,7 +160,7 @@
 .desktop-cloud-create-access-intent-preview {
   min-height: 32px;
   color: var(--po-text-muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   line-height: 16px;
 }
 
@@ -183,7 +183,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--po-control) 70%, var(--po-panel) 30%);
   color: var(--po-text-disabled);
-  font-size: 10px;
+  font-size: calc(10px * var(--po-text-scale, 1));
   font-weight: 650;
   line-height: 14px;
 }
@@ -208,7 +208,7 @@
   border-bottom: 1px solid var(--po-border-subtle);
   color: var(--po-text-subtle);
   font-family: var(--po-font-sans);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 14px;
@@ -253,7 +253,7 @@
   background: transparent;
   color: var(--po-text-muted);
   font-family: var(--po-font-sans);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   line-height: 18px;
   text-align: left;
 }
@@ -303,7 +303,7 @@
 
 .desktop-cloud-create-access-tree-row.file {
   color: var(--po-filetree-rail);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   opacity: 0.82;
 }
 
@@ -311,7 +311,7 @@
   width: 100px;
   flex: 0 0 100px;
   color: var(--po-filetree-rail);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 17px;
   text-align: right;
@@ -366,7 +366,7 @@
   min-height: 28px;
   align-items: center;
   color: var(--po-filetree-rail);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
 }
 
 .desktop-cloud-create-access-form {
@@ -406,7 +406,7 @@
   background: var(--po-control);
   color: var(--po-text);
   font-family: var(--po-font-sans);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   line-height: 18px;
 }
 
@@ -457,7 +457,7 @@
 .desktop-cloud-create-access-field-note {
   margin-top: 6px;
   color: var(--po-text-disabled);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 17px;
 }
 
@@ -523,7 +523,7 @@
 .desktop-cloud-create-access-method-copy span {
   overflow: hidden;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 600;
   line-height: 18px;
   text-overflow: ellipsis;
@@ -542,7 +542,7 @@
   border: 1px solid var(--po-border-subtle);
   border-radius: 999px;
   color: var(--po-filetree-rail);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-style: normal;
   font-weight: 600;
   line-height: 16px;
@@ -552,7 +552,7 @@
   overflow: hidden;
   margin: 2px 0 0;
   color: var(--po-text-disabled);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -604,7 +604,7 @@
   border-radius: 7px;
   background: color-mix(in srgb, var(--po-danger) 7%, transparent);
   color: var(--po-danger);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 17px;
 }
 

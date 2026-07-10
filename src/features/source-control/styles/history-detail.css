@@ -129,7 +129,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
 
 .desktop-git-default-copy span {
   color: var(--po-text-subtle);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 18px;
 }
@@ -141,7 +141,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
   border: 1px solid var(--po-border-subtle);
   border-radius: 8px;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 1.4;
 }
@@ -180,7 +180,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
   overflow: hidden;
   color: var(--po-text);
   font-family: var(--po-font-sans);
-  font-size: 18px;
+  font-size: calc(18px * var(--po-text-scale, 1));
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -188,7 +188,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
 
 .desktop-commit-summary p {
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 1.45;
 }
@@ -198,7 +198,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
   flex-wrap: wrap;
   gap: 10px;
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 500;
 }
 
@@ -210,7 +210,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
   padding: 0;
   border: 0;
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 600;
 }
 
@@ -222,7 +222,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
   border-radius: 6px;
   background: var(--po-panel-raised);
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 600;
 }
 
@@ -278,7 +278,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
   border-radius: 6px;
   background: var(--po-panel-raised);
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 600;
 }
 
@@ -348,7 +348,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
 
 .desktop-initial-repo-header > div > span {
   color: var(--po-text-subtle);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 650;
   text-transform: uppercase;
 }
@@ -356,7 +356,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
 .desktop-initial-repo-header strong {
   overflow: hidden;
   color: var(--po-text);
-  font-size: 15px;
+  font-size: calc(15px * var(--po-text-scale, 1));
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -378,7 +378,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
 .desktop-initial-repo-card > p {
   max-width: 620px;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 1.55;
 }
@@ -405,14 +405,14 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
 
 .desktop-initial-repo-metrics span {
   color: var(--po-text-subtle);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 620;
 }
 
 .desktop-initial-repo-metrics strong {
   overflow: hidden;
   color: var(--po-text);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -423,7 +423,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
   border-radius: 8px;
   background: var(--po-control);
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 1.4;
 }
 

@@ -527,6 +527,11 @@ declare global {
         };
       }>;
       openExternalUrl: (href: string) => Promise<{ ok: boolean }>;
+      setDockIcon: (iconId: "polished" | "light" | "matte") => Promise<{
+        supported: boolean;
+        iconId: "polished" | "light" | "matte";
+        applied?: boolean;
+      }>;
       getInitialWorkspace: () => Promise<LastWorkspaceResult>;
       getLastWorkspace: () => Promise<LastWorkspaceResult>;
       getRecentWorkspaces: () => Promise<RecentWorkspacesResult>;

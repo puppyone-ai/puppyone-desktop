@@ -2,6 +2,8 @@ import { isFileIconThemeId, type FileIconThemeId } from "@puppyone/shared-ui";
 import type { PuppyoneWorkspaceConfig } from "../../types/electron";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
+  DIFF_MARKERS_STORAGE_KEY,
+  DOCK_ICON_STORAGE_KEY,
   DEFAULT_SIDEBAR_NAVIGATION_LAYOUT,
   DEFAULT_THEME_MODE,
   EXPERIMENTAL_SETTINGS_STORAGE_KEY,
@@ -12,22 +14,30 @@ import {
   DARK_THEME_PRESET_STORAGE_KEY,
   LEGACY_THEME_PRESET_STORAGE_KEY,
   LIGHT_THEME_PRESET_STORAGE_KEY,
+  POINTER_CURSORS_STORAGE_KEY,
   RIGHT_SIDEBAR_TOOLS_STORAGE_KEY,
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
+  TEXT_SIZE_STORAGE_KEY,
   THEME_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
   parseAiEditAssistEnabled,
   parseDarkThemePreset,
+  parseDiffMarkers,
+  parseDockIcon,
   parseExperimentalSettings,
   parseExternalAppsSettings,
   parseFilesVisibilitySettings,
   parseGitDisplayMode,
   parseLightThemePreset,
+  parsePointerCursors,
   parseRightSidebarToolsSettings,
   parseSidebarNavigationLayout,
   parseThemeMode,
+  parseTextSize,
   parseTitlebarActionsSettings,
   type DarkThemePreset,
+  type DiffMarkers,
+  type DockIcon,
   type ExperimentalSettings,
   type ExternalAppsSettings,
   type FilesVisibilitySettings,
@@ -36,6 +46,7 @@ import {
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
   type ThemeMode,
+  type TextSize,
   type TitlebarActionsSettings,
 } from "../../preferences";
 
@@ -66,6 +77,26 @@ export function readInitialLightThemePreset(): LightThemePreset {
 export function readInitialDarkThemePreset(): DarkThemePreset {
   if (typeof window === "undefined") return parseDarkThemePreset(null);
   return parseDarkThemePreset(window.localStorage.getItem(DARK_THEME_PRESET_STORAGE_KEY));
+}
+
+export function readInitialTextSize(): TextSize {
+  if (typeof window === "undefined") return parseTextSize(null);
+  return parseTextSize(window.localStorage.getItem(TEXT_SIZE_STORAGE_KEY));
+}
+
+export function readInitialPointerCursors(): boolean {
+  if (typeof window === "undefined") return parsePointerCursors(null);
+  return parsePointerCursors(window.localStorage.getItem(POINTER_CURSORS_STORAGE_KEY));
+}
+
+export function readInitialDockIcon(): DockIcon {
+  if (typeof window === "undefined") return parseDockIcon(null);
+  return parseDockIcon(window.localStorage.getItem(DOCK_ICON_STORAGE_KEY));
+}
+
+export function readInitialDiffMarkers(): DiffMarkers {
+  if (typeof window === "undefined") return parseDiffMarkers(null);
+  return parseDiffMarkers(window.localStorage.getItem(DIFF_MARKERS_STORAGE_KEY));
 }
 
 export function readInitialFileIconTheme(): FileIconThemeId {

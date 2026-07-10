@@ -133,7 +133,7 @@ body.data-sidebar-resizing * {
 
 .desktop-explorer-toolbar > span {
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 
@@ -367,7 +367,7 @@ body.data-sidebar-resizing * {
   border-radius: var(--desktop-control-radius);
   background: color-mix(in srgb, var(--po-warning) 14%, var(--po-panel-raised));
   color: color-mix(in srgb, var(--po-warning) 78%, var(--po-text));
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 620;
   line-height: 1.35;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
@@ -385,7 +385,7 @@ body.data-sidebar-resizing * {
   border-radius: var(--desktop-control-radius);
   background: color-mix(in srgb, var(--po-panel-raised) 94%, transparent);
   color: var(--po-text);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 620;
   line-height: 1.35;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
@@ -458,7 +458,7 @@ body.data-sidebar-resizing * {
   border-radius: var(--desktop-control-radius);
   background: transparent;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 650;
   line-height: 18px;
   text-align: left;
@@ -537,7 +537,7 @@ body.data-sidebar-resizing * {
     0 0 0 1px var(--po-sidebar),
     0 5px 12px color-mix(in srgb, var(--po-notification) 26%, transparent);
   color: var(--po-notification-text);
-  font-size: 10px;
+  font-size: calc(10px * var(--po-text-scale, 1));
   font-style: normal;
   font-weight: 780;
   line-height: 1;
@@ -572,7 +572,7 @@ body.data-sidebar-resizing * {
     0 4px 12px color-mix(in srgb, var(--po-shadow) 24%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--po-text-inverse) 22%, transparent);
   color: var(--desktop-git-bubble-text);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--po-text-scale, 1));
   font-weight: 680;
   line-height: 1;
   letter-spacing: 0;

@@ -150,7 +150,10 @@ export function App() {
     terminalToolEnabled,
     titlebarActionsSettings,
     darkThemePreset,
+    diffMarkers,
     lightThemePreset,
+    pointerCursors,
+    textSize,
     themeMode,
     setAiEditAssistEnabled,
     setExplorerWidth,
@@ -723,6 +726,9 @@ export function App() {
         themeMode={themeMode}
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
+        textSize={textSize}
+        pointerCursors={pointerCursors}
+        diffMarkers={diffMarkers}
         resolvedTheme={resolvedTheme}
       />
     );
@@ -747,12 +753,18 @@ export function App() {
           themeMode={themeMode}
           lightThemePreset={lightThemePreset}
           darkThemePreset={darkThemePreset}
+          textSize={textSize}
+          pointerCursors={pointerCursors}
+          diffMarkers={diffMarkers}
           resolvedTheme={resolvedTheme}
         />
         <DesktopOverlayPortal
           theme={resolvedTheme}
           lightThemePreset={lightThemePreset}
           darkThemePreset={darkThemePreset}
+          textSize={textSize}
+          pointerCursors={pointerCursors}
+          diffMarkers={diffMarkers}
         >
           <CloudServicePanel
             open={cloudPanelOpen}
@@ -862,6 +874,9 @@ export function App() {
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
+      data-text-size={textSize}
+      data-pointer-cursors={pointerCursors ? "true" : "false"}
+      data-diff-markers={diffMarkers}
     >
       <DesktopCloudShell
         titlebarSlot={titlebarSlot}
@@ -943,6 +958,9 @@ export function App() {
         theme={resolvedTheme}
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
+        textSize={textSize}
+        pointerCursors={pointerCursors}
+        diffMarkers={diffMarkers}
       >
         <>
           {pendingBranchSwitch && (

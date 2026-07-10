@@ -99,7 +99,7 @@
   border-radius: var(--desktop-sidebar-row-radius);
   background: transparent;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 18px;
   text-align: left;
@@ -146,7 +146,7 @@
   margin: 1px 0;
   padding: 0 var(--desktop-sidebar-row-content-right) 0 var(--desktop-sidebar-row-content-left);
   color: var(--po-text-subtle);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
 }
 
 .desktop-tool-sidebar-empty.vertical {
@@ -199,13 +199,13 @@
 
 .desktop-git-sidebar-empty-history strong {
   color: var(--po-text-muted);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
   font-weight: 620;
 }
 
 .desktop-git-sidebar-empty-history span {
   color: var(--po-text-subtle);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 1.35;
 }
@@ -217,7 +217,7 @@
   border-radius: var(--git-control-radius, 8px);
   background: color-mix(in srgb, var(--po-accent) 10%, var(--po-panel));
   color: var(--po-accent);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 
@@ -233,14 +233,14 @@
 
 .desktop-tool-sidebar-error-text {
   color: var(--po-danger);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--po-text-scale, 1));
   line-height: 1.35;
 }
 
 .desktop-tool-sidebar-empty.compact {
   min-height: 26px;
   padding-left: calc(var(--desktop-sidebar-row-content-left) + 20px);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
 }
 
 .desktop-git-sidebar .desktop-tool-sidebar-empty {
@@ -280,7 +280,7 @@
     calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right) - var(--git-sidebar-scrollbar-width))
     0 calc(var(--git-sidebar-left-gap) + var(--git-sidebar-content-left) + 20px);
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 1.35;
 }

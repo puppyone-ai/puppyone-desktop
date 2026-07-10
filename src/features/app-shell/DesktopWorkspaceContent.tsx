@@ -185,6 +185,10 @@ export function DesktopWorkspaceContent({
       themeMode={preferences.themeMode}
       lightThemePreset={preferences.lightThemePreset}
       darkThemePreset={preferences.darkThemePreset}
+      textSize={preferences.textSize}
+      pointerCursors={preferences.pointerCursors}
+      dockIcon={preferences.dockIcon}
+      diffMarkers={preferences.diffMarkers}
       fileIconTheme={preferences.fileIconTheme}
       sidebarNavigationLayout={preferences.sidebarNavigationLayout}
       filesVisibilitySettings={preferences.filesVisibilitySettings}
@@ -205,6 +209,10 @@ export function DesktopWorkspaceContent({
       onThemeModeChange={preferences.setThemeMode}
       onLightThemePresetChange={preferences.setLightThemePreset}
       onDarkThemePresetChange={preferences.setDarkThemePreset}
+      onTextSizeChange={preferences.setTextSize}
+      onPointerCursorsChange={preferences.setPointerCursors}
+      onDockIconChange={preferences.setDockIcon}
+      onDiffMarkersChange={preferences.setDiffMarkers}
       onFileIconThemeChange={preferences.setFileIconTheme}
       onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
       onFilesVisibilitySettingsChange={onFilesVisibilitySettingsChange}

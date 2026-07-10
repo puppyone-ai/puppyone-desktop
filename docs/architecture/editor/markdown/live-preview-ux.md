@@ -1,5 +1,10 @@
 # Markdown Live Preview Editing UX
 
+Technical ownership, parser/model boundaries, rendering adapters, and HTML
+security are defined in
+[Markdown Editor Architecture](architecture.md). This document
+defines the user-visible editing contract.
+
 This document has two parts with different lifetimes:
 
 - **Part 1 — UX specification.** The durable editing contract for the

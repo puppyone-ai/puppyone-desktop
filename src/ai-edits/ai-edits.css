@@ -52,14 +52,14 @@
 
 .stat-tile span:first-child {
   color: var(--po-text);
-  font-size: 18px;
+  font-size: calc(18px * var(--po-text-scale, 1));
   font-weight: 750;
   line-height: 1;
 }
 
 .stat-tile span:last-child {
   color: var(--po-text-subtle);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 700;
 }
 
@@ -95,12 +95,12 @@
 }
 
 .mini-change-row strong {
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
 }
 
 .mini-change-row small {
   color: var(--po-text-subtle);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
 }
 
 .ai-response-changes-card {
@@ -151,7 +151,7 @@
   min-width: 0;
   overflow: hidden;
   color: color-mix(in srgb, var(--po-text) 88%, var(--po-text-muted));
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 560;
   line-height: 18px;
   text-align: left;
@@ -164,7 +164,7 @@
   align-items: baseline;
   gap: 7px;
   font-family: var(--po-font-mono);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 650;
   line-height: 1;
   white-space: nowrap;
@@ -181,7 +181,7 @@
 .ai-response-changes-card__more {
   padding: 3px 7px 2px;
   color: var(--po-text-subtle);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
 }
 
 .ai-edit-review-popover {
@@ -222,7 +222,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 680;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -232,7 +232,7 @@
   flex: 0 0 auto;
   color: var(--po-text-subtle);
   font-family: var(--po-font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 
@@ -264,7 +264,7 @@
 .ai-edit-review-popover__empty {
   padding: 18px;
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
 }
 
 .ai-edit-review-hunk {
@@ -283,14 +283,14 @@
   padding: 0 9px;
   border-bottom: 1px solid var(--po-divider);
   color: var(--po-text-muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 
 .ai-edit-review-hunk > header small {
   color: var(--po-text-subtle);
   font-family: var(--po-font-mono);
-  font-size: 10px;
+  font-size: calc(10px * var(--po-text-scale, 1));
   font-weight: 560;
 }
 
@@ -306,7 +306,7 @@
   align-items: start;
   color: var(--po-text);
   font-family: var(--po-font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   line-height: 1.55;
 }
 
@@ -332,6 +332,18 @@
   text-align: right;
 }
 
+[data-diff-markers="color"] .ai-edit-review-line {
+  grid-template-columns: 38px 7px minmax(0, 1fr);
+}
+
+[data-diff-markers="color"] .ai-edit-review-line__prefix {
+  color: transparent;
+}
+
+[data-diff-markers="symbols"] .ai-edit-review-line__prefix {
+  font-weight: 750;
+}
+
 .ai-edit-review-line code {
   min-width: 0;
   padding: 2px 8px 2px 0;
@@ -346,5 +358,5 @@
   padding: 5px 10px;
   border-top: 1px solid var(--po-divider);
   color: var(--po-text-subtle);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
 }

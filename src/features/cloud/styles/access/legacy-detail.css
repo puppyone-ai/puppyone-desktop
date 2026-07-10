@@ -102,7 +102,7 @@
   overflow: hidden;
   margin: 0;
   color: var(--po-text);
-  font-size: 21px;
+  font-size: calc(21px * var(--po-text-scale, 1));
   font-weight: 680;
   letter-spacing: 0;
   line-height: 1.2;
@@ -115,7 +115,7 @@
 .desktop-cloud-access-expanded-note {
   margin: 0;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 1.45;
 }
@@ -203,7 +203,7 @@
 .desktop-cloud-access-rail-header strong {
   overflow: hidden;
   color: var(--po-text);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 750;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -213,7 +213,7 @@
 .desktop-cloud-access-rail-header small {
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -301,7 +301,7 @@
   overflow: hidden;
   margin: 0;
   color: var(--po-text);
-  font-size: 22px;
+  font-size: calc(22px * var(--po-text-scale, 1));
   font-weight: 650;
   letter-spacing: 0;
   line-height: 1.25;
@@ -316,13 +316,13 @@
   align-items: center;
   gap: 7px;
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 16px;
 }
 
 .desktop-cloud-access-aggregate strong {
   color: var(--po-success);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 600;
 }
 
@@ -343,7 +343,7 @@
   overflow: hidden;
   color: var(--po-text-muted);
   font-family: var(--po-font-mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -370,7 +370,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--po-text-muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 700;
 }
 
@@ -432,7 +432,7 @@
 .desktop-cloud-access-surface-main strong {
   overflow: hidden;
   color: var(--po-text);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 650;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -442,7 +442,7 @@
 .desktop-cloud-access-surface-main small {
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -568,7 +568,7 @@
 .desktop-cloud-access-connector-name strong {
   overflow: hidden;
   color: var(--po-text);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -577,7 +577,7 @@
 .desktop-cloud-access-connector-name small {
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -588,7 +588,7 @@
   align-items: center;
   gap: 7px;
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 650;
   white-space: nowrap;
 }
@@ -603,7 +603,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 700;
 }
 
@@ -642,6 +642,6 @@
 .desktop-cloud-access-expanded-note {
   margin: 0;
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 1.45;
 }

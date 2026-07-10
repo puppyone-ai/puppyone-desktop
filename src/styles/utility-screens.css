@@ -46,7 +46,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
 }
 
 .utility-row span {
@@ -67,7 +67,7 @@
   width: min(760px, 100%);
   margin-top: 14px;
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
 }
 
 .recording-strip {
@@ -81,7 +81,7 @@
   border-bottom: 1px solid rgba(180, 83, 9, 0.24);
   background: color-mix(in srgb, var(--po-warning) 10%, var(--po-panel-raised));
   color: var(--po-warning);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 
@@ -116,6 +116,6 @@
   background: color-mix(in srgb, var(--po-danger) 9%, var(--po-panel-raised));
   color: var(--po-danger);
   box-shadow: 0 12px 30px rgba(73, 55, 35, 0.16);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 750;
 }

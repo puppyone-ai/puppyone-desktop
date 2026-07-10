@@ -38,6 +38,17 @@ The generated bundle icon lives at:
 build/icon.icns
 ```
 
+The Appearance settings surface also exposes two curated runtime alternatives:
+
+```text
+public/logo-square-v0.1.3-light.png
+public/logo-square-v0.1.3-dark.png
+```
+
+They are packaged as `dock-icon-light.png` and `dock-icon-matte.png`. These
+alternatives affect the macOS Dock at runtime only; the bundle metadata and
+Finder icon continue to use `build/icon.icns`.
+
 These PNG files must have the same hash after an icon update:
 
 ```text
@@ -64,6 +75,13 @@ This produces:
 
 ```text
 release/mac-arm64/puppyone.app/Contents/Resources/logo-square.png
+```
+
+The two curated alternatives are copied beside it as:
+
+```text
+release/mac-arm64/puppyone.app/Contents/Resources/dock-icon-light.png
+release/mac-arm64/puppyone.app/Contents/Resources/dock-icon-matte.png
 ```
 
 The macOS bundle icon remains:

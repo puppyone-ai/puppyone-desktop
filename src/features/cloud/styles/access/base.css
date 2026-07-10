@@ -54,7 +54,7 @@
 
 .desktop-cloud-access-page-title {
   color: var(--po-text);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 500;
   letter-spacing: 0;
   line-height: 18px;
@@ -72,7 +72,7 @@
   border-radius: 999px;
   background: var(--po-border-subtle);
   color: var(--po-text-muted);
-  font-size: 10px;
+  font-size: calc(10px * var(--po-text-scale, 1));
   font-variant-numeric: tabular-nums;
   font-weight: 500;
   letter-spacing: 0;
@@ -92,7 +92,7 @@
   background: transparent;
   color: var(--po-text-muted);
   font: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 18px;
   cursor: pointer;

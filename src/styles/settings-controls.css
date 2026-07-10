@@ -16,7 +16,7 @@
   border-radius: 6px;
   background: var(--po-panel-raised);
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 
@@ -105,7 +105,7 @@
   align-items: center;
   gap: 7px;
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 
@@ -150,7 +150,7 @@
   padding: 0 12px;
   border-bottom: 1px solid var(--po-divider);
   color: var(--po-text-subtle);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 760;
   text-transform: uppercase;
 }
@@ -160,7 +160,7 @@
   padding: 8px 12px;
   border-bottom: 1px solid var(--po-divider);
   color: var(--po-text-muted);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
 }
 
 .desktop-settings-remote-row:last-child {
@@ -171,7 +171,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
   font-weight: 740;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -189,7 +189,7 @@
   overflow: hidden;
   color: var(--po-text);
   font-family: var(--po-font-mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--po-text-scale, 1));
   font-weight: 620;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -197,7 +197,7 @@
 
 .desktop-settings-remote-url small {
   color: var(--po-text-subtle);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 520;
 }
 
@@ -213,7 +213,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 700;
 }
 
@@ -246,7 +246,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -273,7 +273,7 @@
   border-radius: 5px;
   background: transparent;
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 
@@ -283,62 +283,163 @@
   color: var(--po-text);
 }
 
-.desktop-theme-preset-row {
+.desktop-theme-mode-row,
+.desktop-theme-preset-row,
+.desktop-dock-icon-row {
   align-items: flex-start;
-  min-height: 34px;
-  padding-block: 2px;
+  padding-block: 7px;
 }
 
-.desktop-theme-preset-list {
+.desktop-theme-choice-list,
+.desktop-theme-preset-list,
+.desktop-dock-icon-list {
   display: flex;
-  max-width: 480px;
+  max-width: 520px;
   flex: 0 1 auto;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 6px;
 }
 
-.desktop-theme-preset-list button {
+.desktop-theme-choice,
+.desktop-theme-preset-list button,
+.desktop-dock-icon-list button {
   display: inline-flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: flex-start;
-  gap: 7px;
-  height: 30px;
-  padding: 0 9px 0 7px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
+  gap: 5px;
+  width: 102px;
+  padding: 5px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel-raised) 82%, transparent);
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(11.5px * var(--po-text-scale, 1));
   font-weight: 650;
+  text-align: left;
 }
 
+.desktop-theme-choice:hover,
+.desktop-theme-choice.active,
 .desktop-theme-preset-list button:hover,
-.desktop-theme-preset-list button.active {
-  background: var(--po-selected);
+.desktop-theme-preset-list button.active,
+.desktop-dock-icon-list button:hover,
+.desktop-dock-icon-list button.active {
+  border-color: color-mix(in srgb, var(--po-accent) 42%, var(--po-border));
+  background: color-mix(in srgb, var(--po-selected) 72%, var(--po-panel));
   color: var(--po-text);
 }
 
-.desktop-theme-preset-list button > span:not(.desktop-theme-preset-swatches) {
+.desktop-theme-choice.active,
+.desktop-theme-preset-list button.active,
+.desktop-dock-icon-list button.active {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-accent) 26%, transparent);
+}
+
+.desktop-theme-choice-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-inline: 2px;
   color: inherit;
 }
 
-.desktop-theme-preset-swatches {
-  display: inline-flex;
-  flex: 0 0 auto !important;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--po-border-subtle);
+.desktop-theme-preview {
+  display: flex;
+  width: 100%;
+  height: 38px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--po-border) 72%, transparent);
   border-radius: 5px;
-  background: var(--po-panel-raised);
+  background: var(--po-inset);
 }
 
-.desktop-theme-preset-swatches i {
-  width: 9px;
-  height: 12px;
-  border: 1px solid color-mix(in srgb, var(--po-border) 72%, transparent);
-  border-radius: 3px;
+.desktop-theme-preview.system .desktop-theme-preview-surface:first-child {
+  border-right: 1px solid color-mix(in srgb, var(--po-border-strong) 72%, transparent);
+}
+
+.desktop-theme-preview-surface {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: 31% 1fr;
+  background: var(--po-canvas);
+  color: var(--po-text);
+}
+
+.desktop-theme-preview-sidebar,
+.desktop-theme-preview-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 4px;
+}
+
+.desktop-theme-preview-sidebar {
+  border-right: 1px solid var(--po-divider);
+  background: var(--po-sidebar);
+}
+
+.desktop-theme-preview-panel {
+  background: var(--po-panel);
+}
+
+.desktop-theme-preview-sidebar b,
+.desktop-theme-preview-panel b {
+  display: block;
+  width: 78%;
+  height: 3px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--po-text-muted) 28%, transparent);
+}
+
+.desktop-theme-preview-sidebar b:nth-child(2),
+.desktop-theme-preview-panel b:nth-child(3) {
+  width: 58%;
+}
+
+.desktop-theme-preview-panel b.accent {
+  width: 42%;
+  height: 4px;
+  background: var(--po-accent);
+}
+
+.desktop-theme-preset-list {
+  max-width: 520px;
+}
+
+.desktop-theme-preset-list button {
+  width: 102px;
+}
+
+.desktop-theme-preset-list button > span:last-child {
+  padding-inline: 2px;
+  color: inherit;
+}
+
+.desktop-text-size-segment button {
+  min-width: 70px;
+}
+
+.desktop-dock-icon-list button {
+  width: 74px;
+  align-items: center;
+  padding: 5px 5px 6px;
+  text-align: center;
+}
+
+.desktop-dock-icon-list img {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  object-fit: contain;
+}
+
+.desktop-dock-icon-list span {
+  color: inherit;
+  font-size: calc(10.5px * var(--po-text-scale, 1));
 }
 
 .desktop-sidebar-layout-segment {

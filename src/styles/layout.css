@@ -350,7 +350,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   border-radius: 5px;
   background: #4599df;
   color: var(--po-text-inverse);
-  font-size: 10px;
+  font-size: calc(10px * var(--po-text-scale, 1));
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -389,9 +389,22 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   color: var(--po-text-muted);
 }
 
+.desktop-project-mark.linked {
+  color: color-mix(
+    in srgb,
+    color-mix(in oklab, var(--po-info) 78%, var(--po-accent)) 86%,
+    var(--po-text) 14%
+  );
+}
+
 .desktop-project-option:hover .desktop-project-mark,
 .desktop-project-option.selected .desktop-project-mark {
   color: var(--po-text);
+}
+
+.desktop-project-option:hover .desktop-project-mark.linked,
+.desktop-project-option.selected .desktop-project-mark.linked {
+  color: color-mix(in oklab, var(--po-info) 78%, var(--po-accent));
 }
 
 .desktop-project-actions {
@@ -465,12 +478,12 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
 
 .desktop-view-placeholder span {
   color: var(--po-text-disabled);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   text-transform: capitalize;
 }
 
 .desktop-view-placeholder strong {
   display: block;
   color: var(--po-text);
-  font-size: 14px;
+  font-size: calc(14px * var(--po-text-scale, 1));
 }

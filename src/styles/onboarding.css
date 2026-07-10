@@ -123,6 +123,36 @@
   transition: stroke 150ms ease-out;
 }
 
+.folder-drop-cloud-paint-paper {
+  stop-color: var(--po-panel-raised);
+}
+
+.folder-drop-cloud-paint-mist {
+  stop-color: color-mix(in oklab, var(--po-info) 5%, var(--po-panel-raised));
+}
+
+.folder-drop-cloud-paint-sky {
+  stop-color: color-mix(in oklab, var(--po-info) 10%, var(--po-panel-raised));
+}
+
+.folder-drop-zone.cloud-mode {
+  --onboarding-cloud-pigment: color-mix(in oklab, var(--po-info) 78%, var(--po-accent));
+  color: color-mix(in srgb, var(--onboarding-cloud-pigment) 88%, var(--po-text) 12%);
+}
+
+.folder-drop-zone.cloud-mode .folder-drop-fill {
+  fill: url("#onboarding-cloud-project-paint");
+}
+
+.folder-drop-zone.cloud-mode .folder-drop-border {
+  stroke: color-mix(in srgb, var(--onboarding-cloud-pigment) 54%, var(--po-panel-raised));
+}
+
+.folder-drop-zone.cloud-mode .folder-drop-shadow {
+  fill: var(--onboarding-cloud-pigment);
+  opacity: 0.065;
+}
+
 .folder-drop-body {
   position: relative;
   z-index: 2;
@@ -155,6 +185,20 @@
 .folder-drop-zone.dragging .folder-drop-shadow,
 .onboarding-shell.dragging .folder-drop-zone:not(.cloud-mode) .folder-drop-shadow {
   opacity: 1;
+}
+
+.folder-drop-zone.cloud-mode:hover,
+.folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) {
+  color: var(--onboarding-cloud-pigment);
+}
+
+.folder-drop-zone.cloud-mode:hover .folder-drop-border,
+.folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) .folder-drop-border {
+  stroke: color-mix(in srgb, var(--onboarding-cloud-pigment) 72%, var(--po-border));
+}
+
+.folder-drop-zone.cloud-mode:hover .folder-drop-shadow {
+  opacity: 0.15;
 }
 
 .folder-drop-zone.dragging,
@@ -200,7 +244,7 @@
 .folder-drop-zone strong {
   margin: 0;
   color: currentColor;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
   font-weight: 620;
   line-height: 1.25;
   transition: color 150ms ease-out;
@@ -236,7 +280,7 @@
   color: var(--po-text-subtle);
   cursor: pointer;
   font: inherit;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--po-text-scale, 1));
   font-weight: 560;
   line-height: 1;
   white-space: nowrap;
@@ -282,7 +326,7 @@
   justify-items: center;
   gap: 5px;
   color: var(--po-text-subtle);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--po-text-scale, 1));
   font-weight: 560;
   line-height: 1.35;
   text-align: center;
@@ -291,7 +335,7 @@
 
 .onboarding-operation-status > span:last-child {
   color: var(--po-text-disabled);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 520;
 }
 
@@ -307,7 +351,7 @@
 
 .onboarding-recent-heading {
   color: var(--po-text-muted);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
   font-weight: 560;
   line-height: 1.25;
 }
@@ -446,7 +490,7 @@
 .onboarding-project-row-title {
   display: block;
   color: var(--po-text-muted);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
   font-weight: 560;
   line-height: 1.25;
 }
@@ -463,7 +507,7 @@
   max-width: 88px;
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--po-text-scale, 1));
   font-weight: 560;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -490,7 +534,7 @@
 .onboarding-project-row-path span {
   display: block;
   color: var(--po-text-muted);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
   font-weight: 560;
   line-height: 1.25;
 }
@@ -498,7 +542,7 @@
 .onboarding-project-row-time {
   justify-self: end;
   color: var(--po-text-subtle);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 1.25;
 }
@@ -514,7 +558,7 @@
   gap: 9px;
   -webkit-app-region: no-drag;
   color: var(--po-text-subtle);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
   font-weight: 560;
   line-height: 1.25;
 }
@@ -554,7 +598,7 @@
   align-items: center;
   gap: 10px;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 680;
   letter-spacing: 0;
 }
@@ -567,7 +611,7 @@
 
 .onboarding-heading > span {
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 
@@ -576,7 +620,7 @@
   max-width: 430px;
   margin: 0;
   color: var(--po-text);
-  font-size: 24px;
+  font-size: calc(24px * var(--po-text-scale, 1));
   font-weight: 720;
   letter-spacing: 0;
   line-height: 1.15;
@@ -584,7 +628,7 @@
 }
 
 .onboarding-heading.compact h1 {
-  font-size: 22px;
+  font-size: calc(22px * var(--po-text-scale, 1));
   line-height: 1.16;
 }
 
@@ -597,7 +641,7 @@
   max-width: 380px;
   margin: 0;
   color: var(--po-text-subtle);
-  font-size: 14px;
+  font-size: calc(14px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 1.55;
 }
@@ -617,13 +661,13 @@
 
 .onboarding-drop-context span {
   color: var(--po-text);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 680;
 }
 
 .onboarding-drop-context small {
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 1.35;
 }
@@ -640,7 +684,7 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-danger) 6%, transparent);
   color: var(--po-danger);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
   font-weight: 520;
   line-height: 1.4;
 }
@@ -660,7 +704,7 @@
   }
 
   .onboarding-heading h1 {
-    font-size: 28px;
+    font-size: calc(28px * var(--po-text-scale, 1));
   }
 }
 
@@ -737,7 +781,7 @@
   height: 100%;
   place-items: center;
   color: var(--po-text-subtle);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--po-text-scale, 1));
 }
 
 .folder-state.compact {

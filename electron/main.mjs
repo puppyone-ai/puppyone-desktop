@@ -43,6 +43,11 @@ const devServerUrl = process.env.PUPPYONE_DESKTOP_DEV_URL;
 const rendererApplicationUrl = devServerUrl || pathToFileURL(rendererDistPath).toString();
 const workspaceStateFilename = "desktop-workspace-state.json";
 const cloudAuthProtocol = "puppyone";
+const dockIconResources = Object.freeze({
+  polished: "logo-square.png",
+  light: "dock-icon-light.png",
+  matte: "dock-icon-matte.png",
+});
 const macTitlebarOptions = process.platform === "darwin"
   ? {
       titleBarStyle: "hiddenInset",
@@ -283,13 +288,34 @@ function resolveAppIconPath() {
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
 }
 
-function setDockIcon() {
-  const appIconPath = resolveAppIconPath();
-  if (!appIconPath) return;
+function resolveDockIconPath(iconId) {
+  const normalizedIconId = Object.hasOwn(dockIconResources, iconId) ? iconId : "polished";
+  const resourceFilename = dockIconResources[normalizedIconId];
+  const sourceFilename = normalizedIconId === "light"
+    ? "logo-square-v0.1.3-light.png"
+    : normalizedIconId === "matte" ? "logo-square-v0.1.3-dark.png" : "logo-square.png";
+  const candidates = [
+    path.join(process.resourcesPath ?? projectRoot, resourceFilename),
+    path.join(projectRoot, "public", sourceFilename),
+  ];
+  return {
+    iconId: normalizedIconId,
+    path: candidates.find((candidate) => fs.existsSync(candidate)) ?? null,
+  };
+}
+
+function setDockIcon(iconId = "polished") {
+  if (process.platform !== "darwin" || !app.dock) {
+    return { supported: false, iconId: "polished" };
+  }
+  const resolved = resolveDockIconPath(iconId);
+  if (!resolved.path) return { supported: true, iconId: resolved.iconId, applied: false };
   try {
-    app.dock.setIcon(appIconPath);
+    app.dock.setIcon(resolved.path);
+    return { supported: true, iconId: resolved.iconId, applied: true };
   } catch (error) {
     console.warn("Unable to set puppyone dock icon:", error);
+    return { supported: true, iconId: resolved.iconId, applied: false };
   }
 }
 
@@ -412,7 +438,7 @@ function registerIpcHandlers() {
     selectWorkspaceForNewWindow,
   });
   registerCloudIpcHandlers({ ipcMain: trustedIpcMain, cloudAuthService });
-  registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell });
+  registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell, setDockIcon });
 
   registerWorkspaceFileIpcHandlers({
     app,

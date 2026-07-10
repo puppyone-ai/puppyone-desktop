@@ -22,7 +22,7 @@
   border-radius: 4px;
   background: color-mix(in srgb, var(--po-control) 26%, transparent);
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
 }
 
 .markdown-codemirror-editor .cm-md-link-label,

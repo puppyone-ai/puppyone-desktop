@@ -2,7 +2,7 @@ import type { Workspace } from "@puppyone/shared-ui";
 import { AlertTriangle, Cloud, Folder, FolderOpen, Monitor } from "lucide-react";
 import type { DragEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import type { DarkThemePreset, LightThemePreset, ThemeMode } from "../preferences";
+import type { DarkThemePreset, DiffMarkers, LightThemePreset, TextSize, ThemeMode } from "../preferences";
 import { InlineLoading } from "./loading";
 
 export type RecentWorkspaceHomeItem = {
@@ -50,6 +50,9 @@ type MinimalOnboardingProps = {
   themeMode: ThemeMode;
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
+  textSize: TextSize;
+  pointerCursors: boolean;
+  diffMarkers: DiffMarkers;
   resolvedTheme: "light" | "dark";
 };
 
@@ -69,6 +72,9 @@ export function MinimalOnboarding({
   themeMode,
   lightThemePreset,
   darkThemePreset,
+  textSize,
+  pointerCursors,
+  diffMarkers,
   resolvedTheme,
 }: MinimalOnboardingProps) {
   const [error, setError] = useState<string | null>(initialError);
@@ -213,6 +219,9 @@ export function MinimalOnboarding({
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
+      data-text-size={textSize}
+      data-pointer-cursors={pointerCursors ? "true" : "false"}
+      data-diff-markers={diffMarkers}
       onDragEnter={() => setDragging(true)}
       onDragOver={(event) => {
         event.preventDefault();
@@ -236,6 +245,13 @@ export function MinimalOnboarding({
                 preserveAspectRatio="none"
                 aria-hidden="true"
               >
+                <defs>
+                  <linearGradient id="onboarding-cloud-project-paint" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop className="folder-drop-cloud-paint-paper" offset="0%" />
+                    <stop className="folder-drop-cloud-paint-mist" offset="48%" />
+                    <stop className="folder-drop-cloud-paint-sky" offset="100%" />
+                  </linearGradient>
+                </defs>
                 <path
                   className="folder-drop-shadow"
                   d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z"

@@ -33,6 +33,25 @@ button {
   font: inherit;
 }
 
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root) {
+  font-size: var(--po-text-size-body);
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size]
+  :where(.cm-content, .cm-gutters, .desktop-diff-line, .ai-edit-review-line code, .diff-pane pre) {
+  font-size: var(--po-code-font-size) !important;
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-pointer-cursors="false"]
+  :where(button, a[href], select, summary, [role="button"], input[type="button"], input[type="checkbox"], input[type="radio"], .desktop-settings-switch) {
+  cursor: default !important;
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-pointer-cursors="true"]
+  :where(button, a[href], select, summary, [role="button"], input[type="button"], input[type="checkbox"], input[type="radio"], .desktop-settings-switch) {
+  cursor: pointer !important;
+}
+
 button,
 input,
 textarea,
@@ -49,14 +68,14 @@ p {
 }
 
 h1 {
-  font-size: 20px;
+  font-size: calc(20px * var(--po-text-scale, 1));
   line-height: 1.2;
   font-weight: 650;
   letter-spacing: 0;
 }
 
 h2 {
-  font-size: 16px;
+  font-size: calc(16px * var(--po-text-scale, 1));
   line-height: 1.25;
   font-weight: 650;
   letter-spacing: 0;

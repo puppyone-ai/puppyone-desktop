@@ -59,7 +59,7 @@
   padding: 0 10px;
   border: 0;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 500;
   letter-spacing: 0;
   white-space: nowrap;
@@ -157,7 +157,7 @@ button.editor-save-chip {
   background: transparent;
   color: var(--po-text-muted);
   font-family: var(--po-font-sans);
-  font-size: 14px;
+  font-size: calc(14px * var(--po-text-scale, 1));
   font-weight: var(--po-text-weight-medium);
   line-height: 1.68;
   letter-spacing: 0;
@@ -168,7 +168,7 @@ button.editor-save-chip {
 
 .plain-text-editor__surface[data-technical="true"] {
   font-family: var(--po-font-mono);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   line-height: 20px;
 }
 

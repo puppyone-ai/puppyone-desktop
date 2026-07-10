@@ -12,7 +12,7 @@
 .section-kicker {
   display: block;
   color: var(--po-text-subtle);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--po-text-scale, 1));
   font-weight: 800;
   line-height: 1.4;
   text-transform: uppercase;
@@ -37,7 +37,7 @@
   height: 28px;
   padding: 0 18px 0 46px;
   color: var(--po-text-disabled);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 700;
 }
 
@@ -96,14 +96,14 @@
 }
 
 .file-name strong {
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 650;
 }
 
 .file-name small,
 .muted {
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
 }
 
 .status-pill,
@@ -114,7 +114,7 @@
   height: 20px;
   padding: 0 7px;
   border-radius: 5px;
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 700;
 }
 
@@ -203,7 +203,7 @@
 
 .file-preview-title span {
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
 }
 
 .file-preview-body {
@@ -229,7 +229,7 @@
 
 .empty-preview span {
   color: var(--po-text-subtle);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 500;
   line-height: 18px;
 }
@@ -259,7 +259,7 @@
 
 .desktop-data-workspace-wrap .desktop-explorer-list-end-create-row {
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   opacity: 0.86;
 }
 
@@ -295,7 +295,7 @@
 }
 
 .desktop-data-workspace-wrap .tree-row.root .tree-label {
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 600;
   line-height: 18px;
 }

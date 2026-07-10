@@ -78,7 +78,7 @@
   border-radius: 5px;
   background: #4599df;
   color: var(--po-text-inverse);
-  font-size: 10px;
+  font-size: calc(10px * var(--po-text-scale, 1));
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -127,7 +127,7 @@
 .workspace-switcher-copy span:first-child {
   overflow: hidden;
   color: var(--po-text);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -136,7 +136,7 @@
 .workspace-switcher-copy span:last-child {
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -182,7 +182,7 @@
   border-radius: 6px;
   background: var(--po-control);
   color: var(--po-text-muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 800;
 }
 
@@ -199,12 +199,12 @@
 }
 
 .workspace-option strong {
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
 }
 
 .workspace-option small {
   color: var(--po-text-subtle);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
 }
 
 .sidebar-collapse-button {
@@ -283,7 +283,7 @@
 
 .cloud-nav-label {
   overflow: hidden;
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -312,7 +312,7 @@
 .sidebar-stat {
   overflow: hidden;
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -369,7 +369,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 600;
 }
 
@@ -423,7 +423,7 @@
   border: 1px solid var(--po-border);
   background: var(--po-panel-raised);
   color: var(--po-text);
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
   font-weight: 600;
 }
 
@@ -446,5 +446,5 @@
 .compact {
   height: 30px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: calc(13px * var(--po-text-scale, 1));
 }

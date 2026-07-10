@@ -154,7 +154,7 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
       cursorStyle: "block",
       convertEol: true,
       fontFamily: '"SF Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-      fontSize: 13,
+      fontSize: readTerminalFontSize(containerRef.current),
       fontWeight: 450,
       fontWeightBold: 700,
       letterSpacing: 0,
@@ -322,6 +322,7 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
     const applyTheme = () => {
       if (!containerRef.current || !terminalRef.current) return;
       applyTerminalTheme(terminalRef.current, containerRef.current);
+      scheduleSettledFits();
     };
     const shell = containerRef.current?.closest(".app-shell");
     applyTheme();
@@ -330,7 +331,7 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
     const shellObserver = new MutationObserver(applyTheme);
     shellObserver.observe(shell, {
       attributes: true,
-      attributeFilter: ["class", "data-theme-mode", "data-light-theme-preset", "data-dark-theme-preset"],
+      attributeFilter: ["class", "data-theme-mode", "data-light-theme-preset", "data-dark-theme-preset", "data-text-size"],
     });
     const styleObserver = new MutationObserver(applyTheme);
     styleObserver.observe(document.head, {
@@ -343,7 +344,7 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
       shellObserver.disconnect();
       styleObserver.disconnect();
     };
-  }, [hasStarted]);
+  }, [hasStarted, scheduleSettledFits]);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -494,7 +495,14 @@ function readTerminalTheme(element: HTMLElement): ITheme {
 
 function applyTerminalTheme(terminal: Terminal, element: HTMLElement) {
   terminal.options.theme = readTerminalTheme(element);
+  terminal.options.fontSize = readTerminalFontSize(element);
   terminal.refresh(0, Math.max(0, terminal.rows - 1));
+}
+
+function readTerminalFontSize(element: HTMLElement) {
+  const value = getComputedStyle(element).getPropertyValue("--po-text-scale").trim();
+  const scale = Number.parseFloat(value);
+  return 13 * (Number.isFinite(scale) ? scale : 1);
 }
 
 function cssColor(element: HTMLElement, name: string, fallback: string) {

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
+  DIFF_MARKERS_STORAGE_KEY,
+  DOCK_ICON_STORAGE_KEY,
   EXPERIMENTAL_SETTINGS_STORAGE_KEY,
   EXTERNAL_APPS_STORAGE_KEY,
   FILES_VISIBILITY_STORAGE_KEY,
@@ -9,19 +11,24 @@ import {
   GIT_DISPLAY_MODE_STORAGE_KEY,
   DARK_THEME_PRESET_STORAGE_KEY,
   LIGHT_THEME_PRESET_STORAGE_KEY,
+  POINTER_CURSORS_STORAGE_KEY,
   RIGHT_SIDEBAR_TOOLS_STORAGE_KEY,
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
+  TEXT_SIZE_STORAGE_KEY,
   THEME_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
   getSidebarNavigationOrientation,
   getSidebarNavigationPlacement,
   type ExternalAppsSettings,
+  type DiffMarkers,
+  type DockIcon,
   type ExperimentalSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
   type ThemeMode,
+  type TextSize,
   type TitlebarActionsSettings,
 } from "../../preferences";
 import {
@@ -41,7 +48,11 @@ import {
   readInitialSidebarNavigationLayout,
   readInitialTitlebarActionsSettings,
   readInitialDarkThemePreset,
+  readInitialDiffMarkers,
+  readInitialDockIcon,
   readInitialLightThemePreset,
+  readInitialPointerCursors,
+  readInitialTextSize,
   readInitialThemeMode,
   readSystemDarkMode,
 } from "./preferences";
@@ -50,6 +61,10 @@ export function useDesktopPreferences() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readInitialThemeMode());
   const [lightThemePreset, setLightThemePreset] = useState(() => readInitialLightThemePreset());
   const [darkThemePreset, setDarkThemePreset] = useState(() => readInitialDarkThemePreset());
+  const [textSize, setTextSize] = useState<TextSize>(() => readInitialTextSize());
+  const [pointerCursors, setPointerCursors] = useState(() => readInitialPointerCursors());
+  const [dockIcon, setDockIcon] = useState<DockIcon>(() => readInitialDockIcon());
+  const [diffMarkers, setDiffMarkers] = useState<DiffMarkers>(() => readInitialDiffMarkers());
   const [fileIconTheme, setFileIconTheme] = useState<FileIconThemeId>(() => readInitialFileIconTheme());
   const [sidebarNavigationLayout, setSidebarNavigationLayout] = useState<SidebarNavigationLayout>(() => readInitialSidebarNavigationLayout());
   const [gitDisplayMode, setGitDisplayMode] = useState<GitDisplayMode>(() => readInitialGitDisplayMode());
@@ -76,6 +91,23 @@ export function useDesktopPreferences() {
   useEffect(() => {
     window.localStorage.setItem(DARK_THEME_PRESET_STORAGE_KEY, darkThemePreset);
   }, [darkThemePreset]);
+
+  useEffect(() => {
+    window.localStorage.setItem(TEXT_SIZE_STORAGE_KEY, textSize);
+  }, [textSize]);
+
+  useEffect(() => {
+    window.localStorage.setItem(POINTER_CURSORS_STORAGE_KEY, pointerCursors ? "true" : "false");
+  }, [pointerCursors]);
+
+  useEffect(() => {
+    window.localStorage.setItem(DOCK_ICON_STORAGE_KEY, dockIcon);
+    void window.puppyoneDesktop?.setDockIcon?.(dockIcon).catch(() => undefined);
+  }, [dockIcon]);
+
+  useEffect(() => {
+    window.localStorage.setItem(DIFF_MARKERS_STORAGE_KEY, diffMarkers);
+  }, [diffMarkers]);
 
   useEffect(() => {
     window.localStorage.setItem(FILE_ICON_THEME_STORAGE_KEY, fileIconTheme);
@@ -145,6 +177,8 @@ export function useDesktopPreferences() {
 
   return {
     aiEditAssistEnabled,
+    diffMarkers,
+    dockIcon,
     explorerWidth,
     externalAppsSettings,
     experimentalSettings,
@@ -165,8 +199,12 @@ export function useDesktopPreferences() {
     darkThemePreset,
     lightThemePreset,
     themeMode,
+    textSize,
+    pointerCursors,
     setAiEditAssistEnabled,
     setDarkThemePreset,
+    setDiffMarkers,
+    setDockIcon,
     setExplorerWidth,
     setExternalAppsSettings,
     setExperimentalSettings,
@@ -180,6 +218,8 @@ export function useDesktopPreferences() {
     setSidebarNavigationLayout,
     setTitlebarActionsSettings,
     setLightThemePreset,
+    setPointerCursors,
+    setTextSize,
     setThemeMode,
   };
 }

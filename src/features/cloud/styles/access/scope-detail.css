@@ -57,7 +57,7 @@
   margin: 0;
   color: var(--po-text);
   font-family: var(--po-font-sans);
-  font-size: 20px;
+  font-size: calc(20px * var(--po-text-scale, 1));
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1.25;
@@ -73,13 +73,13 @@
   gap: 8px;
   color: var(--po-text-muted);
   font-family: var(--po-font-sans);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 16px;
 }
 
 .desktop-cloud-access-web-aggregate strong {
   color: var(--po-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   font-weight: 600;
 }
 
@@ -113,7 +113,7 @@
   overflow: hidden;
   color: var(--po-text-muted);
   font-family: var(--po-font-mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--po-text-scale, 1));
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -177,7 +177,7 @@
 .desktop-cloud-access-section-label {
   color: var(--po-text-subtle);
   font-family: var(--po-font-sans);
-  font-size: 11px;
+  font-size: calc(11px * var(--po-text-scale, 1));
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 14px;
