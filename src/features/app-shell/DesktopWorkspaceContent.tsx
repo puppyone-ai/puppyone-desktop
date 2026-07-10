@@ -192,6 +192,9 @@ export function DesktopWorkspaceContent({
     );
   }, [workspace?.path]);
 
+  const externalViewerPacksEnabled = !cloudWorkspace &&
+    typeof window !== "undefined" &&
+    Boolean(window.puppyoneDesktop?.viewerPacks);
   const [viewerPackSnapshot, setViewerPackSnapshot] = useState<ViewerPackSnapshot>(EMPTY_VIEWER_PACK_SNAPSHOT);
   const refreshViewerPackSnapshot = useCallback(async () => {
     const bridge = window.puppyoneDesktop?.viewerPacks;
@@ -208,12 +211,12 @@ export function DesktopWorkspaceContent({
   }, []);
 
   useEffect(() => {
-    if (cloudWorkspace) {
+    if (!externalViewerPacksEnabled) {
       setViewerPackSnapshot(EMPTY_VIEWER_PACK_SNAPSHOT);
       return;
     }
     void refreshViewerPackSnapshot();
-  }, [cloudWorkspace, refreshViewerPackSnapshot, workspaceKey]);
+  }, [externalViewerPacksEnabled, refreshViewerPackSnapshot, workspaceKey]);
 
   const externalViewerSurface = useDesktopViewerPackSurface({
     workspaceRoot: cloudWorkspace ? null : workspace.path,
@@ -389,9 +392,9 @@ export function DesktopWorkspaceContent({
         onActivePathChange={onActiveDataPathChange}
         onActiveNodeChange={onActiveDataNodeChange}
         onOpenExternalUrl={openExternalUrl}
-        viewerPackSnapshot={cloudWorkspace ? EMPTY_VIEWER_PACK_SNAPSHOT : viewerPackSnapshot}
-        externalViewerSurface={cloudWorkspace ? null : externalViewerSurface}
-        viewerPackInstallFallback={cloudWorkspace ? null : viewerPackInstallFallback}
+        viewerPackSnapshot={externalViewerPacksEnabled ? viewerPackSnapshot : EMPTY_VIEWER_PACK_SNAPSHOT}
+        externalViewerSurface={externalViewerPacksEnabled ? externalViewerSurface : null}
+        viewerPackInstallFallback={externalViewerPacksEnabled ? viewerPackInstallFallback : null}
         documentSourceKind={cloudWorkspace ? "cloud" : "local"}
         resizableExplorer
         explorerCollapsed={false}

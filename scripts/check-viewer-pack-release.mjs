@@ -1,7 +1,22 @@
 #!/usr/bin/env node
 
+import { createRequire } from "node:module";
+import { resolveViewerPackFeatureProfile } from "../electron/main/viewer-packs/feature-profile.mjs";
 import { VIEWER_PACK_TRUSTED_SIGNERS } from "../electron/main/viewer-packs/trusted-signers.mjs";
 import { normalizeTrustedSigners } from "../electron/main/viewer-packs/package-signature.mjs";
+
+const require = createRequire(import.meta.url);
+const packageMetadata = require("../package.json");
+const profile = resolveViewerPackFeatureProfile({
+  packageMetadata,
+  environment: process.env,
+  isPackaged: false,
+});
+
+if (!profile.externalViewerPacks) {
+  console.log("Viewer Pack release trust check skipped (preset-viewers-only profile).");
+  process.exit(0);
+}
 
 const signers = normalizeTrustedSigners(VIEWER_PACK_TRUSTED_SIGNERS);
 if (signers.length === 0) {

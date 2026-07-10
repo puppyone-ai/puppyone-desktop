@@ -892,7 +892,7 @@ declare global {
       }>;
       onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
       onAgentSessionExit: (callback: (event: AgentSessionExitEvent) => void) => () => void;
-      viewerPacks: {
+      viewerPacks?: {
         getSnapshot: () => Promise<import("@puppyone/shared-ui").ViewerPackSnapshot>;
         installLocal: () => Promise<
           | { canceled: true }

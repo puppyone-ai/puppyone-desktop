@@ -4,6 +4,12 @@ import type { FileFormat } from "../core/fileFormats";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
 import type {
+  CoreViewerCapability,
+  PresetViewerContractVersion,
+  PresetViewerRuntime,
+  PresetViewerSource,
+} from "./viewerContract";
+import type {
   DocumentSourceKind,
   ViewerContribution,
   ViewerPackSnapshot,
@@ -61,7 +67,7 @@ export type ExternalViewerSurfaceRequest = {
 
 export type EditorMode = "live" | "source";
 export type EditorSaveMode = "manual" | "auto";
-export type EditorSourceRequirement = "content" | "resource" | "content-and-resource" | "none";
+export type EditorSourceRequirement = PresetViewerSource;
 export type MarkdownHtmlTrustMode = "safe" | "localTrusted";
 
 export type MarkdownWikiLinkResolvedTarget = {
@@ -149,13 +155,22 @@ export type EditorViewerContext = EditorViewerMatch & {
   externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
 };
 
-export type EditorViewer = {
+/**
+ * Versioned contract for a viewer that ships with PuppyOne. Contributions are
+ * registered in deterministic order and must not embed format-extension data.
+ */
+export type PresetViewerContribution = Readonly<{
+  contractVersion: PresetViewerContractVersion;
   id: string;
-  capability: import("./viewerPackTypes").CoreViewerCapability;
+  capability: CoreViewerCapability;
   source: EditorSourceRequirement;
+  runtime: PresetViewerRuntime;
   match: (match: EditorViewerMatch) => boolean;
   allowPreviewContent?: boolean;
   normalizeContent?: (content: string, document: EditorDocument) => string;
   isEditable?: (match: EditorViewerMatch & { content: string }) => boolean;
   render: (context: EditorViewerContext) => ReactNode;
-};
+}>;
+
+/** @deprecated Prefer the product-semantic PresetViewerContribution name. */
+export type EditorViewer = PresetViewerContribution;

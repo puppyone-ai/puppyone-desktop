@@ -45,15 +45,33 @@ export type { EditorHostProps } from "./editor/EditorHost";
 export {
   classifyEditorViewerCapability,
   coreViewerCapability,
+  createPresetViewerRegistry,
+  definePresetViewer,
   EDITOR_VIEWERS,
   ExternalViewerAdapter,
   getEditorSourceRequirement,
+  PRESET_VIEWER_REGISTRY,
+  PRESET_VIEWERS,
   resolveEditorViewer,
   resolveViewerRoute,
   resolveViewerRouteForDocument,
   shouldReadEditorContent,
 } from "./editor/viewerRegistry";
-export type { ExternalViewerAdapterProps } from "./editor/viewerRegistry";
+export type {
+  ExternalViewerAdapterProps,
+  PresetViewerRegistry,
+} from "./editor/viewerRegistry";
+export {
+  PRESET_VIEWER_CAPABILITIES,
+  PRESET_VIEWER_CONTRACT_VERSION,
+  PRESET_VIEWER_RUNTIMES,
+  PRESET_VIEWER_SOURCES,
+} from "./editor/viewerContract";
+export type {
+  PresetViewerContractVersion,
+  PresetViewerRuntime,
+  PresetViewerSource,
+} from "./editor/viewerContract";
 export { findPackCandidates } from "./editor/viewerCapability";
 export type { ResolveViewerRouteInput } from "./editor/viewerCapability";
 export { EMPTY_VIEWER_PACK_SNAPSHOT } from "./editor/viewerPackTypes";
@@ -101,6 +119,7 @@ export type {
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
   MarkdownWikiLinkResolvedTarget,
+  PresetViewerContribution,
 } from "./editor/viewerTypes";
 export { PlainTextEditor } from "./editor/PlainTextEditor";
 export type { PlainTextEditorProps } from "./editor/PlainTextEditor";
