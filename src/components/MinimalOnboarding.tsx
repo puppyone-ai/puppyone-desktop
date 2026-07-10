@@ -246,11 +246,14 @@ export function MinimalOnboarding({
                 aria-hidden="true"
               >
                 <defs>
-                  <linearGradient id="onboarding-cloud-project-paint" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <linearGradient id="onboarding-cloud-project-paint" x1="50%" y1="0%" x2="50%" y2="100%">
                     <stop className="folder-drop-cloud-paint-paper" offset="0%" />
-                    <stop className="folder-drop-cloud-paint-mist" offset="48%" />
+                    <stop className="folder-drop-cloud-paint-mist" offset="55%" />
                     <stop className="folder-drop-cloud-paint-sky" offset="100%" />
                   </linearGradient>
+                  <clipPath id="onboarding-cloud-project-clip">
+                    <path d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
+                  </clipPath>
                 </defs>
                 <path
                   className="folder-drop-shadow"
@@ -260,6 +263,42 @@ export function MinimalOnboarding({
                   className="folder-drop-fill"
                   d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z"
                 />
+                {cloudMode && (
+                  <g className="folder-drop-sky-scene" clipPath="url(#onboarding-cloud-project-clip)">
+                    <g className="folder-drop-sky-drift">
+                      <path
+                        className="folder-drop-sky-cloud folder-drop-sky-cloud-far"
+                        transform="translate(4 184)"
+                        d="M18 36C10 35 6 30 7 24C8 17 15 14 22 16C24 8 33 3 44 5C51 1 61 3 66 10C72 5 83 6 88 14C95 13 101 18 99 25C98 31 91 35 84 36C70 38 42 39 18 36Z"
+                      />
+                      <path
+                        className="folder-drop-sky-cloud folder-drop-sky-cloud-near"
+                        transform="translate(102 196)"
+                        d="M22 44C11 42 5 35 7 27C9 18 20 15 29 18C31 8 43 2 57 5C66 -1 80 2 86 11C95 5 110 8 116 18C125 17 133 24 130 33C128 40 118 45 107 45C82 47 48 48 22 44Z"
+                      />
+                      <path
+                        className="folder-drop-sky-cloud folder-drop-sky-cloud-mid"
+                        transform="translate(20 222)"
+                        d="M16 32C9 31 5 26 6 21C8 15 15 13 21 15C23 8 32 4 41 6C48 2 58 4 62 11C69 7 79 9 82 16C88 15 93 19 91 24C90 29 83 32 76 33C58 35 34 35 16 32Z"
+                      />
+                      <path
+                        className="folder-drop-sky-cloud folder-drop-sky-cloud-far"
+                        transform="translate(264 184)"
+                        d="M18 36C10 35 6 30 7 24C8 17 15 14 22 16C24 8 33 3 44 5C51 1 61 3 66 10C72 5 83 6 88 14C95 13 101 18 99 25C98 31 91 35 84 36C70 38 42 39 18 36Z"
+                      />
+                      <path
+                        className="folder-drop-sky-cloud folder-drop-sky-cloud-near"
+                        transform="translate(362 196)"
+                        d="M22 44C11 42 5 35 7 27C9 18 20 15 29 18C31 8 43 2 57 5C66 -1 80 2 86 11C95 5 110 8 116 18C125 17 133 24 130 33C128 40 118 45 107 45C82 47 48 48 22 44Z"
+                      />
+                      <path
+                        className="folder-drop-sky-cloud folder-drop-sky-cloud-mid"
+                        transform="translate(280 222)"
+                        d="M16 32C9 31 5 26 6 21C8 15 15 13 21 15C23 8 32 4 41 6C48 2 58 4 62 11C69 7 79 9 82 16C88 15 93 19 91 24C90 29 83 32 76 33C58 35 34 35 16 32Z"
+                      />
+                    </g>
+                  </g>
+                )}
                 <path
                   className="folder-drop-border"
                   d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z"

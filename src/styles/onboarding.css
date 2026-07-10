@@ -124,20 +124,20 @@
 }
 
 .folder-drop-cloud-paint-paper {
-  stop-color: var(--po-panel-raised);
+  stop-color: #8ecae6;
 }
 
 .folder-drop-cloud-paint-mist {
-  stop-color: color-mix(in oklab, var(--po-info) 5%, var(--po-panel-raised));
+  stop-color: #5baed9;
 }
 
 .folder-drop-cloud-paint-sky {
-  stop-color: color-mix(in oklab, var(--po-info) 10%, var(--po-panel-raised));
+  stop-color: #3d8fc4;
 }
 
 .folder-drop-zone.cloud-mode {
-  --onboarding-cloud-pigment: color-mix(in oklab, var(--po-info) 78%, var(--po-accent));
-  color: color-mix(in srgb, var(--onboarding-cloud-pigment) 88%, var(--po-text) 12%);
+  --onboarding-cloud-pigment: #e8f6fc;
+  color: var(--onboarding-cloud-pigment);
 }
 
 .folder-drop-zone.cloud-mode .folder-drop-fill {
@@ -145,12 +145,63 @@
 }
 
 .folder-drop-zone.cloud-mode .folder-drop-border {
-  stroke: color-mix(in srgb, var(--onboarding-cloud-pigment) 54%, var(--po-panel-raised));
+  stroke: color-mix(in srgb, #9fd4ef 70%, white 30%);
 }
 
 .folder-drop-zone.cloud-mode .folder-drop-shadow {
-  fill: var(--onboarding-cloud-pigment);
-  opacity: 0.065;
+  fill: #4a9fd4;
+  opacity: 0.22;
+}
+
+.folder-drop-sky-scene {
+  pointer-events: none;
+}
+
+.folder-drop-sky-drift {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  animation: onboarding-sky-drift 32s linear infinite;
+}
+
+.folder-drop-sky-cloud {
+  fill: rgba(255, 252, 248, 0.72);
+}
+
+.folder-drop-sky-cloud-far {
+  opacity: 0.38;
+}
+
+.folder-drop-sky-cloud-mid {
+  opacity: 0.52;
+}
+
+.folder-drop-sky-cloud-near {
+  opacity: 0.7;
+}
+
+@keyframes onboarding-sky-drift {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(-260px, 0);
+  }
+}
+
+.onboarding-shell:not(.dark) .folder-drop-cloud-paint-paper {
+  stop-color: #a8d8f0;
+}
+
+.onboarding-shell:not(.dark) .folder-drop-cloud-paint-mist {
+  stop-color: #74bde3;
+}
+
+.onboarding-shell:not(.dark) .folder-drop-cloud-paint-sky {
+  stop-color: #4fa0cc;
+}
+
+.onboarding-shell:not(.dark) .folder-drop-zone.cloud-mode {
+  --onboarding-cloud-pigment: #f7fcff;
 }
 
 .folder-drop-body {
@@ -189,16 +240,16 @@
 
 .folder-drop-zone.cloud-mode:hover,
 .folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) {
-  color: var(--onboarding-cloud-pigment);
+  color: #ffffff;
 }
 
 .folder-drop-zone.cloud-mode:hover .folder-drop-border,
 .folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) .folder-drop-border {
-  stroke: color-mix(in srgb, var(--onboarding-cloud-pigment) 72%, var(--po-border));
+  stroke: #ffffff;
 }
 
 .folder-drop-zone.cloud-mode:hover .folder-drop-shadow {
-  opacity: 0.15;
+  opacity: 0.32;
 }
 
 .folder-drop-zone.dragging,
