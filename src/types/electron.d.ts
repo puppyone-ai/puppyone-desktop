@@ -86,8 +86,61 @@ export type GitDiffLine = {
   newLine?: number;
 };
 
+export type GitRevisionMissingSide = {
+  kind: "missing";
+  identity: string;
+  size: 0;
+  mimeType: null;
+  reason: string;
+};
+
+export type GitRevisionTextSide = {
+  kind: "text";
+  identity: string;
+  size: number;
+  mimeType: string | null;
+  content: string;
+};
+
+export type GitRevisionResourceSide = {
+  kind: "resource";
+  identity: string;
+  size: number;
+  mimeType: string | null;
+  handle: string;
+};
+
+export type GitRevisionUnavailableSide = {
+  kind: "unavailable";
+  identity: string;
+  size: number | null;
+  mimeType: string | null;
+  reason: string;
+  message: string;
+};
+
+export type GitRevisionSide =
+  | GitRevisionMissingSide
+  | GitRevisionTextSide
+  | GitRevisionResourceSide
+  | GitRevisionUnavailableSide;
+
+export type GitRevisionPair = {
+  repositoryIdentity: string;
+  selectionIdentity: string;
+  sessionId: string;
+  scope: GitWorkingDiffScope;
+  path: string;
+  oldPath: string | null;
+  status: GitCommitChangeStatus | "untracked";
+  before: GitRevisionSide;
+  after: GitRevisionSide;
+};
+
 export type GitFileDiff = GitCommitChange & {
   binary: boolean;
+  mimeType?: string | null;
+  revisionPair?: GitRevisionPair;
   lines: GitDiffLine[];
   truncated?: boolean;
   omittedLines?: number;
@@ -719,7 +772,27 @@ declare global {
         rootPath: string;
         path: string;
         scope: GitWorkingDiffScope;
+        requestId?: string;
+        sessionId?: string;
       }) => Promise<GitCommitDetail>;
+      cancelGitFileDiff?: (request: {
+        requestId: string;
+        sessionId: string;
+      }) => Promise<{ ok: boolean }>;
+      readGitDiffResource: (request: {
+        handle: string;
+        sessionId: string;
+        selectionIdentity: string;
+        revisionIdentity: string;
+      }) => Promise<{
+        bytes: Uint8Array;
+        size: number;
+        selectionIdentity: string;
+        revisionIdentity: string;
+      }>;
+      releaseGitDiffResources: (request: {
+        sessionId: string;
+      }) => Promise<{ ok: boolean }>;
       stageGitPaths: (request: {
         rootPath: string;
         paths: string[];

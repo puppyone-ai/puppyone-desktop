@@ -31,6 +31,7 @@ import {
   repositoryLockKey,
   worktreeLockKey,
 } from "../git-operation-coordinator.mjs";
+import { createGitDiffResourceBroker } from "../git-diff-resource-broker.mjs";
 
 export function registerWorkspaceGitIpcHandlers({
   ipcMain,
@@ -38,11 +39,15 @@ export function registerWorkspaceGitIpcHandlers({
   dialog,
   authorizeWorkspaceRoot,
   gitOperationCoordinator = createGitOperationCoordinator(),
+  gitDiffResourceBroker = createGitDiffResourceBroker(),
 }) {
   const statusControllers = new Map();
   const cancelledStatusRequests = new Set();
   const graphControllers = new Map();
   const cancelledGraphRequests = new Set();
+  const diffControllers = new Map();
+  const cancelledDiffRequests = new Set();
+  const observedDiffSenders = new WeakSet();
 
   const withAuthorizedRoot = (handler) => async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
@@ -188,12 +193,84 @@ export function registerWorkspaceGitIpcHandlers({
     return getWorkspaceGitCommitDetail(rootPath, commitId);
   }));
 
-  ipcMain.handle("workspace:git-file-diff", withAuthorizedIdleRead((rootPath, request) => {
+  ipcMain.handle("workspace:git-file-diff", withAuthorizedRoot(async (rootPath, request, event) => {
     const filePath = request?.path;
     if (typeof filePath !== "string" || filePath.trim().length === 0) {
       throw new Error("File path is required.");
     }
-    return getWorkspaceGitFileDiff(rootPath, filePath, request?.scope);
+    const requestId = normalizeGitStatusRequestId(request?.requestId);
+    const sessionId = normalizeGitDiffSessionId(request?.sessionId)
+      ?? gitDiffResourceBroker.createSessionId();
+    const key = requestId ? `${event.sender.id}:diff:${requestId}` : null;
+    const controller = new AbortController();
+    const onDestroyed = () => controller.abort();
+
+    if (!observedDiffSenders.has(event.sender)) {
+      observedDiffSenders.add(event.sender);
+      event.sender.once?.("destroyed", () => gitDiffResourceBroker.revokeOwner(event.sender.id));
+    }
+    if (key) {
+      diffControllers.get(key)?.abort();
+      diffControllers.set(key, controller);
+      if (cancelledDiffRequests.delete(key)) controller.abort();
+    }
+    event.sender.once?.("destroyed", onDestroyed);
+
+    try {
+      const { worktreeKey, repoKey } = await resolveLockKeys(rootPath);
+      await gitOperationCoordinator.whenIdleAll([worktreeKey, repoKey], { signal: controller.signal });
+      const detail = await getWorkspaceGitFileDiff(rootPath, filePath, request?.scope, {
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) throw createGitDiffAbortError();
+      return gitDiffResourceBroker.issueDetail(detail, {
+        ownerWebContentsId: event.sender.id,
+        sessionId,
+      });
+    } finally {
+      if (key && diffControllers.get(key) === controller) diffControllers.delete(key);
+      event.sender.removeListener?.("destroyed", onDestroyed);
+    }
+  }));
+
+  ipcMain.handle("workspace:git-file-diff-cancel", async (event, request) => {
+    const requestId = normalizeGitStatusRequestId(request?.requestId);
+    const sessionId = normalizeGitDiffSessionId(request?.sessionId);
+    if (requestId) {
+      const key = `${event.sender.id}:diff:${requestId}`;
+      const controller = diffControllers.get(key);
+      if (controller) {
+        controller.abort();
+      } else {
+        cancelledDiffRequests.add(key);
+        const cleanup = setTimeout(() => cancelledDiffRequests.delete(key), 30_000);
+        cleanup.unref?.();
+      }
+    }
+    if (sessionId) {
+      gitDiffResourceBroker.revokeSession(sessionId, {
+        ownerWebContentsId: event.sender.id,
+        ignoreMissing: true,
+      });
+    }
+    return { ok: true };
+  });
+
+  ipcMain.handle("workspace:git-diff-resource-read", async (event, request) => (
+    gitDiffResourceBroker.read({
+      handle: request?.handle,
+      ownerWebContentsId: event.sender.id,
+      sessionId: request?.sessionId,
+      selectionIdentity: request?.selectionIdentity,
+      revisionIdentity: request?.revisionIdentity,
+    })
+  ));
+
+  ipcMain.handle("workspace:git-diff-resource-release", async (event, request) => ({
+    ok: gitDiffResourceBroker.revokeSession(request?.sessionId, {
+      ownerWebContentsId: event.sender.id,
+      ignoreMissing: true,
+    }),
   }));
 
   ipcMain.handle("workspace:git-stage", withAuthorizedWorktreeMutation((rootPath, request) => (
@@ -276,6 +353,19 @@ function normalizeGitStatusRequestId(value) {
   const normalized = value.trim();
   if (!/^[a-zA-Z0-9._:-]{1,160}$/.test(normalized)) return null;
   return normalized;
+}
+
+function normalizeGitDiffSessionId(value) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!/^[a-zA-Z0-9._:-]{8,256}$/.test(normalized)) return null;
+  return normalized;
+}
+
+function createGitDiffAbortError() {
+  const error = new Error("Git diff request was aborted.");
+  error.name = "AbortError";
+  return error;
 }
 
 async function runWorkspaceGitIpcOperation(electron, event, request, operation, handler) {

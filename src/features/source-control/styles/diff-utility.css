@@ -169,6 +169,227 @@
   background: var(--desktop-git-diff-code-bg, var(--po-inset));
 }
 
+.desktop-format-diff {
+  min-width: 0;
+}
+
+.desktop-binary-diff-summary,
+.desktop-docx-redline {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--po-panel) 72%, var(--po-inset));
+}
+
+.desktop-binary-diff-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--po-text-muted);
+}
+
+.desktop-binary-diff-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.desktop-binary-diff-heading strong {
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.desktop-binary-diff-heading span,
+.desktop-binary-diff-warning {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.desktop-binary-diff-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.desktop-binary-diff-side {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--po-control) 40%, transparent);
+  color: var(--po-text-subtle);
+  font-size: 11px;
+}
+
+.desktop-binary-diff-side strong {
+  overflow: hidden;
+  color: var(--po-text-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-binary-diff-side.missing {
+  border-style: dashed;
+  opacity: 0.72;
+}
+
+.desktop-binary-diff-open {
+  justify-self: start;
+}
+
+.desktop-docx-diff-state {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--po-panel) 72%, var(--po-inset));
+  color: var(--po-text-muted);
+  font-size: 12px;
+}
+
+.desktop-docx-diff-state > div {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+}
+
+.desktop-docx-diff-state span {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+}
+
+.desktop-docx-diff-state.error {
+  color: var(--po-danger);
+}
+
+.desktop-docx-redline-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.desktop-docx-redline-document-state {
+  width: fit-content;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--po-accent) 8%, transparent);
+  color: var(--po-accent);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.desktop-docx-redline-document-state.added {
+  background: color-mix(in srgb, var(--po-success) 8%, transparent);
+  color: var(--po-success);
+}
+
+.desktop-docx-redline-document-state.deleted {
+  background: color-mix(in srgb, var(--po-danger) 8%, transparent);
+  color: var(--po-danger);
+}
+
+.desktop-docx-redline-summary .added {
+  color: var(--po-success);
+}
+
+.desktop-docx-redline-summary .deleted {
+  color: var(--po-danger);
+}
+
+.desktop-docx-redline-changes {
+  display: grid;
+  gap: 7px;
+}
+
+.desktop-docx-redline-block {
+  display: grid;
+  grid-template-columns: 94px minmax(0, 1fr);
+  gap: 10px;
+  padding: 9px 10px;
+  border-left: 2px solid color-mix(in srgb, var(--po-accent) 46%, var(--po-divider));
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--po-control) 32%, transparent);
+}
+
+.desktop-docx-redline-block.added {
+  border-left-color: color-mix(in srgb, var(--po-success) 62%, var(--po-divider));
+}
+
+.desktop-docx-redline-block.deleted {
+  border-left-color: color-mix(in srgb, var(--po-danger) 62%, var(--po-divider));
+}
+
+.desktop-docx-redline-location {
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  color: var(--po-text-subtle);
+  font-size: 10px;
+}
+
+.desktop-docx-redline-location code {
+  color: var(--po-text-disabled);
+  font-family: var(--po-font-mono);
+  font-size: 10px;
+}
+
+.desktop-docx-redline-block p {
+  min-width: 0;
+  margin: 0;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.desktop-docx-redline-block p .add {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--po-success) 13%, transparent);
+  color: color-mix(in srgb, var(--po-success) 64%, var(--po-text));
+  text-decoration: none;
+}
+
+.desktop-docx-redline-block p .remove {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--po-danger) 12%, transparent);
+  color: color-mix(in srgb, var(--po-danger) 62%, var(--po-text));
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.desktop-docx-redline-fidelity,
+.desktop-docx-redline-limit {
+  padding-top: 8px;
+  border-top: 1px solid var(--po-border-subtle);
+  color: var(--po-text-disabled);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.desktop-docx-redline-limit {
+  color: var(--po-warning);
+}
+
+@media (max-width: 760px) {
+  .desktop-docx-redline-block {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
 .desktop-utility-center {
   display: flex;
   flex: 1;

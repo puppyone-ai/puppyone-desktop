@@ -142,6 +142,20 @@ the viewer, computes editability, renders). Selection/commit lifecycle
 rules for this chain live in
 [Smooth Preview Transitions](smooth-preview-transitions.md).
 
+### 4.1 Two-revision diff is a sibling capability
+
+Source Control reuses `resolveFileFormat()` but does not reuse the single-file
+`EDITOR_VIEWERS` contribution type. Its ordered, built-in Diff Registry chooses
+between `docx-redline`, `text-unified`, and `binary-summary` after main has
+derived an authorized immutable before/after pair. This separation prevents a
+viewer source requirement or plugin grant from silently becoming dual-revision
+authority. See
+[Format-Aware Diff Pipeline](../git/format-aware-diff-pipeline.md).
+
+New file-format metadata remains centralized here. New semantic comparison
+behavior belongs in the Diff Registry and must not add extension branches to
+Source Control React components.
+
 ## 5. Office document preview — current contract
 
 `OfficeViewer.tsx` dispatches on the file extension and keeps Office

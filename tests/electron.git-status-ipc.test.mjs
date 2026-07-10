@@ -87,4 +87,43 @@ describe("Git status IPC cancellation", () => {
 
     await expect(status).rejects.toMatchObject({ name: "AbortError" });
   });
+
+  it("cancels a format-aware diff request and revokes its resource session", async () => {
+    const { ipcMain, handlers } = createHarness();
+    const coordinator = createBlockingCoordinator();
+    const gitDiffResourceBroker = {
+      createSessionId: () => "git-diff-session:fallback",
+      issueDetail: vi.fn(),
+      read: vi.fn(),
+      revokeSession: vi.fn(() => true),
+      revokeOwner: vi.fn(),
+    };
+    registerWorkspaceGitIpcHandlers({
+      ipcMain,
+      BrowserWindow: { fromWebContents: () => null },
+      dialog: { showMessageBox: vi.fn() },
+      authorizeWorkspaceRoot: async () => "/repo",
+      gitOperationCoordinator: coordinator,
+      gitDiffResourceBroker,
+    });
+    const event = { sender: createSender(9) };
+    const request = {
+      rootPath: "/repo",
+      path: "report.docx",
+      scope: "unstaged",
+      requestId: "diff-request-1",
+      sessionId: "git-diff-session:test-1",
+    };
+
+    const pending = handlers.get("workspace:git-file-diff")(event, request);
+    await Promise.resolve();
+    await handlers.get("workspace:git-file-diff-cancel")(event, request);
+
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(gitDiffResourceBroker.revokeSession).toHaveBeenCalledWith(
+      "git-diff-session:test-1",
+      { ownerWebContentsId: 9, ignoreMissing: true },
+    );
+    expect(gitDiffResourceBroker.issueDetail).not.toHaveBeenCalled();
+  });
 });

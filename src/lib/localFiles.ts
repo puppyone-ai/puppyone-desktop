@@ -349,8 +349,37 @@ export async function getWorkspaceGitFileDiff(
   rootPath: string,
   path: string,
   scope: GitWorkingDiffScope,
+  options: { requestId?: string; sessionId?: string } = {},
 ): Promise<GitCommitDetail> {
-  return getDesktopBridge().getGitFileDiff({ rootPath, path, scope });
+  return getDesktopBridge().getGitFileDiff({ rootPath, path, scope, ...options });
+}
+
+export async function cancelWorkspaceGitFileDiff(requestId: string, sessionId: string): Promise<void> {
+  await getDesktopBridge().cancelGitFileDiff?.({ requestId, sessionId });
+}
+
+export async function readWorkspaceGitDiffResource(request: {
+  handle: string;
+  sessionId: string;
+  selectionIdentity: string;
+  revisionIdentity: string;
+}): Promise<ArrayBuffer> {
+  const result = await getDesktopBridge().readGitDiffResource(request);
+  if (
+    result.selectionIdentity !== request.selectionIdentity ||
+    result.revisionIdentity !== request.revisionIdentity ||
+    result.bytes.byteLength !== result.size
+  ) {
+    throw new Error("Git diff resource identity changed while loading.");
+  }
+  return result.bytes.buffer.slice(
+    result.bytes.byteOffset,
+    result.bytes.byteOffset + result.bytes.byteLength,
+  ) as ArrayBuffer;
+}
+
+export async function releaseWorkspaceGitDiffResources(sessionId: string): Promise<void> {
+  await getDesktopBridge().releaseGitDiffResources({ sessionId });
 }
 
 export async function stageWorkspaceGitPaths(rootPath: string, paths: string[]): Promise<GitStatusSnapshot> {

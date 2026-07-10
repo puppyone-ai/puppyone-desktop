@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import {
   checkoutWorkspaceGitBranch,
+  cancelWorkspaceGitFileDiff,
   commitAndCheckoutWorkspaceGitBranch,
   commitWorkspaceGit,
   discardAllWorkspaceGitChanges,
@@ -71,6 +72,7 @@ export function useDesktopGitController({
     reportGitStatusError,
   } = useGitRepositoryLifecycle({ workspace, onWorkspaceContentChanged });
   const historyRequestRef = useRef(0);
+  const workingDiffRequestRef = useRef(0);
   const branchSwitcherRef = useRef<HTMLDivElement>(null);
   const [selectedGitCommitId, setSelectedGitCommitId] = useState<string | null>(null);
   const [selectedGitWorkingFile, setSelectedGitWorkingFile] = useState<GitWorkingSelection | null>(null);
@@ -238,6 +240,9 @@ export function useDesktopGitController({
     }
 
     let cancelled = false;
+    const sequence = ++workingDiffRequestRef.current;
+    const requestId = `git-file-diff:${Date.now().toString(36)}:${sequence}`;
+    const sessionId = `git-diff-session:${Date.now().toString(36)}:${sequence}`;
     const scope = selectedGitWorkingFile.origin === "remote"
       ? "remote"
       : selectedGitWorkingFile.origin === "committed"
@@ -250,7 +255,10 @@ export function useDesktopGitController({
 
     setGitWorkingFileDiffLoading(true);
     setGitWorkingFileDiffError(null);
-    getWorkspaceGitFileDiff(workspace.path, selectedGitWorkingFile.path, scope)
+    getWorkspaceGitFileDiff(workspace.path, selectedGitWorkingFile.path, scope, {
+      requestId,
+      sessionId,
+    })
       .then((detail) => {
         if (!cancelled) setGitWorkingFileDiff(detail);
       })
@@ -266,6 +274,7 @@ export function useDesktopGitController({
 
     return () => {
       cancelled = true;
+      void cancelWorkspaceGitFileDiff(requestId, sessionId).catch(() => undefined);
     };
   }, [gitViewActive, selectedGitWorkingFile, workspace]);
 

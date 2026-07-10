@@ -118,6 +118,13 @@ describe("diffs", { timeout: 20_000 }, () => {
     expect(diff.commit_id).toBe("working-tree");
     expect(diff.files.length).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(diff.files)).toContain("const x = 2");
+    expect(diff.files[0].revisionPair).toMatchObject({
+      scope: "unstaged",
+      before: { kind: "text", content: "const x = 1\n" },
+      after: { kind: "text", content: "const x = 2\n" },
+    });
+    expect(diff.files[0].revisionPair.before.identity).toMatch(/^git:/);
+    expect(diff.files[0].revisionPair.after.identity).toMatch(/^worktree:/);
   });
 
   it("produces an untracked-file diff", async () => {
@@ -126,6 +133,68 @@ describe("diffs", { timeout: 20_000 }, () => {
     const diff = await getWorkspaceGitFileDiff(root, "new.txt", "untracked");
     expect(diff.files.length).toBe(1);
     expect(JSON.stringify(diff.files)).toContain("brand new line");
+    expect(diff.files[0].revisionPair).toMatchObject({
+      before: { kind: "missing" },
+      after: { kind: "text", content: "brand new line\n" },
+    });
+  });
+
+  it("models staged deletions and renames with immutable Git identities", async () => {
+    await initRepoWithIdentity();
+    await writeFile(path.join(root, "old.txt"), "old value\n");
+    await writeFile(path.join(root, "delete.txt"), "remove me\n");
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "base");
+
+    execFileSync("git", ["-C", root, "mv", "old.txt", "next.txt"]);
+    await rm(path.join(root, "delete.txt"));
+    await stageAllWorkspaceGitChanges(root);
+
+    const renamed = await getWorkspaceGitFileDiff(root, "next.txt", "staged");
+    expect(renamed.files[0]).toMatchObject({ status: "renamed", oldPath: "old.txt", path: "next.txt" });
+    expect(renamed.files[0].revisionPair).toMatchObject({
+      before: { kind: "text", content: "old value\n" },
+      after: { kind: "text", content: "old value\n" },
+    });
+    expect(renamed.files[0].revisionPair.before.identity).toMatch(/^git:/);
+    expect(renamed.files[0].revisionPair.after.identity).toMatch(/^git:/);
+
+    const deleted = await getWorkspaceGitFileDiff(root, "delete.txt", "staged");
+    expect(deleted.files[0].revisionPair).toMatchObject({
+      before: { kind: "text", content: "remove me\n" },
+      after: { kind: "missing" },
+    });
+  });
+
+  it("returns an honest unavailable side for over-budget binary resources and honors cancellation", async () => {
+    await initRepoWithIdentity();
+    await writeFile(path.join(root, "large.bin"), Buffer.alloc((25 * 1024 * 1024) + 1, 7));
+    const detail = await getWorkspaceGitFileDiff(root, "large.bin", "untracked");
+    expect(detail.files[0].revisionPair.after).toMatchObject({
+      kind: "unavailable",
+      reason: "size-limit",
+    });
+
+    const controller = new AbortController();
+    controller.abort();
+    await expect(getWorkspaceGitFileDiff(root, "large.bin", "untracked", {
+      signal: controller.signal,
+    })).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("materializes a small binary revision as bounded internal resource bytes", async () => {
+    await initRepoWithIdentity();
+    const bytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff, 0x01]);
+    await writeFile(path.join(root, "report.docx"), bytes);
+    const detail = await getWorkspaceGitFileDiff(root, "report.docx", "untracked");
+    expect(detail.files[0].revisionPair.before).toMatchObject({ kind: "missing" });
+    expect(detail.files[0].revisionPair.after).toMatchObject({
+      kind: "resource",
+      size: bytes.length,
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    expect(detail.files[0].revisionPair.after.identity).toMatch(/^worktree:/);
+    expect(detail.files[0].revisionPair.after.bytes).toEqual(bytes);
   });
 
   it("refuses to read an untracked symbolic link outside the workspace", async () => {
@@ -139,6 +208,56 @@ describe("diffs", { timeout: 20_000 }, () => {
         .rejects.toThrow(/symbolic links|workspace entry/i);
     } finally {
       await rm(external, { recursive: true, force: true });
+    }
+  });
+
+  it("derives committed and remote revision pairs from trusted refs", async () => {
+    await initRepoWithIdentity();
+    await writeFile(path.join(root, "shared.txt"), "base\n");
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "base");
+
+    const remoteRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-remote-"));
+    const peerRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-peer-"));
+    try {
+      execFileSync("git", ["init", "--bare", remoteRoot]);
+      execFileSync("git", ["-C", root, "remote", "add", "origin", remoteRoot]);
+      const branch = execFileSync("git", ["-C", root, "branch", "--show-current"]).toString().trim();
+      execFileSync("git", ["-C", root, "push", "-u", "origin", branch]);
+
+      execFileSync("git", ["clone", "--branch", branch, remoteRoot, peerRoot]);
+      execFileSync("git", ["-C", peerRoot, "config", "user.email", "peer@puppyone.test"]);
+      execFileSync("git", ["-C", peerRoot, "config", "user.name", "PuppyOne Peer"]);
+      await writeFile(path.join(peerRoot, "shared.txt"), "remote revision\n");
+      execFileSync("git", ["-C", peerRoot, "add", "shared.txt"]);
+      execFileSync("git", ["-C", peerRoot, "commit", "-m", "remote change"]);
+      execFileSync("git", ["-C", peerRoot, "push", "origin", branch]);
+
+      await writeFile(path.join(root, "shared.txt"), "local revision\n");
+      await stageAllWorkspaceGitChanges(root);
+      await commitWorkspaceGit(root, "local change");
+      execFileSync("git", ["-C", root, "fetch", "origin"]);
+
+      const committed = await getWorkspaceGitFileDiff(root, "shared.txt", "committed");
+      expect(committed.files[0].revisionPair).toMatchObject({
+        scope: "committed",
+        before: { kind: "text", content: "base\n" },
+        after: { kind: "text", content: "local revision\n" },
+      });
+      expect(committed.files[0].revisionPair.before.identity).toMatch(/^git:/);
+      expect(committed.files[0].revisionPair.after.identity).toMatch(/^git:/);
+
+      const remote = await getWorkspaceGitFileDiff(root, "shared.txt", "remote");
+      expect(remote.files[0].revisionPair).toMatchObject({
+        scope: "remote",
+        before: { kind: "text", content: "base\n" },
+        after: { kind: "text", content: "remote revision\n" },
+      });
+      expect(remote.files[0].revisionPair.selectionIdentity)
+        .not.toBe(committed.files[0].revisionPair.selectionIdentity);
+    } finally {
+      await rm(peerRoot, { recursive: true, force: true });
+      await rm(remoteRoot, { recursive: true, force: true });
     }
   });
 });

@@ -1,9 +1,10 @@
 import { useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { FileText, GitBranch, GripVertical, RefreshCw } from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
-import type { GitCommitDetail, GitCommitSummary, GitDiffLine, GitFileDiff, GitStatusSnapshot } from "../../types/electron";
+import type { GitCommitDetail, GitCommitSummary, GitFileDiff, GitStatusSnapshot } from "../../types/electron";
 import type { GitMainPanel, GitWorkingSelection } from "./types";
 import { displayGitBranch } from "./viewModel";
+import { FormatAwareDiff } from "./diff/FormatAwareDiff";
 
 type GitStatusViewProps = {
   workspace: Workspace;
@@ -667,6 +668,8 @@ function WorkingFileDetail({
                 <FileDiffBlock
                   file={file}
                   hideHeader={files.length === 1}
+                  canOpenFile={canOpenFile}
+                  onOpenFile={onOpenFile}
                   key={`${file.status}:${file.oldPath ?? ""}:${file.path}`}
                 />
               ))}
@@ -683,12 +686,14 @@ function WorkingFileDetail({
 function FileDiffBlock({
   file,
   hideHeader = false,
+  canOpenFile = false,
+  onOpenFile,
 }: {
   file: GitFileDiff;
   hideHeader?: boolean;
+  canOpenFile?: boolean;
+  onOpenFile?: (path: string) => void;
 }) {
-  const omittedLines = file.omittedLines ?? 0;
-
   return (
     <section className={`desktop-file-diff ${hideHeader ? "without-header" : ""}`}>
       {!hideHeader && (
@@ -708,52 +713,12 @@ function FileDiffBlock({
         </div>
       )}
 
-      {file.binary ? (
-        <div className="desktop-diff-placeholder">Binary file</div>
-      ) : file.lines.length === 0 ? (
-        <div className="desktop-diff-placeholder">
-          {file.truncated ? formatDiffTruncationMessage(omittedLines) : "No textual diff available"}
-        </div>
-      ) : (
-        <>
-          <div className="desktop-diff-lines">
-            {file.lines.map((line, index) => (
-              <DiffLineView line={line} key={index} />
-            ))}
-          </div>
-          {file.truncated && (
-            <div className="desktop-diff-placeholder">{formatDiffTruncationMessage(omittedLines)}</div>
-          )}
-        </>
-      )}
+      <FormatAwareDiff
+        file={file}
+        canOpenFile={canOpenFile}
+        onOpenFile={onOpenFile}
+      />
     </section>
-  );
-}
-
-function formatDiffTruncationMessage(omittedLines: number) {
-  if (omittedLines > 0) {
-    return `Diff truncated. ${omittedLines.toLocaleString()} more line${omittedLines === 1 ? "" : "s"} hidden.`;
-  }
-  return "Diff truncated.";
-}
-
-function DiffLineView({ line }: { line: GitDiffLine }) {
-  if (line.kind === "hunk") {
-    return <div className="desktop-diff-hunk-separator" aria-hidden="true" />;
-  }
-
-  const displayLine = line.kind === "remove" ? line.oldLine : line.newLine ?? line.oldLine;
-  const prefix = line.kind === "add" ? "+" : line.kind === "remove" ? "-" : " ";
-  return (
-    <div
-      className={`desktop-diff-line ${line.kind}`}
-      data-old-line={line.oldLine}
-      data-new-line={line.newLine}
-    >
-      <span className="line-number">{displayLine ?? ""}</span>
-      <span className="line-prefix">{prefix}</span>
-      <code>{line.text || " "}</code>
-    </div>
   );
 }
 

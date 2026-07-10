@@ -252,7 +252,21 @@ Uninstall is path-validated, user-confirmed in main, and commits disabled state
 before deleting package bytes. A renderer string can never become a recursive
 delete path.
 
-## 9. Catalog and future marketplace
+## 9. Diff capability boundary
+
+Viewer Pack v1 is explicitly not a diff plugin API. A normal activation grants
+one current document revision; it does not grant Git refs, the index, working-
+tree snapshots, or a second immutable resource. Built-in Source Control rich
+diffs use a separate main-process authority and audience-bound broker described
+in [Format-Aware Diff Pipeline](../git/format-aware-diff-pipeline.md).
+
+Opening diff capability to packs would require a separately versioned manifest
+permission, trusted before/after derivation, two-revision disclosure UX,
+independent byte/read budgets, session revocation, and marketplace review. The
+host must fail closed until that design exists; an existing single-document
+`readRange` grant cannot be reused or widened implicitly.
+
+## 10. Catalog and future marketplace
 
 Stage B does not need a marketplace backend. The desktop already owns a
 disabled catalog interface so Stage C can add a verified transport without
@@ -264,7 +278,7 @@ metadata that bypasses the same signature envelope, manifest validation,
 quarantine, or main-process activation checks. Opening a file must never cause
 an implicit network request; discovery is an explicit user action.
 
-## 10. Packaging and size budget
+## 11. Packaging and size budget
 
 Viewer payloads are excluded from Electron Builder `files` and base `dist/`.
 Only the lightweight host, `jszip`, and SemVer validator ship in the app.
@@ -275,7 +289,7 @@ them at runtime.
 `.puppyplugin` payloads. `scripts/check-viewer-pack-release.mjs` rejects a
 distributable build without a production trust root.
 
-## 11. Verification
+## 12. Verification
 
 `tests/viewer-packs/` covers:
 
@@ -294,7 +308,7 @@ fixture install, custom protocols, fixed preload, `WebContentsView`, and Range
 read. The release pipeline must additionally build an unpacked application and
 inspect `app.asar` for production runtime dependencies.
 
-## 12. Stage status
+## 13. Stage status
 
 | Stage | Intent | Status |
 | --- | --- | --- |
