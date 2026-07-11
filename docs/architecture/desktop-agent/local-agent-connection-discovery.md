@@ -142,6 +142,10 @@ user-controlled shell startup code. Use a deterministic candidate registry.
 ```
 
 The list is platform-specific, bounded and tested. It is not a recursive home-directory scan.
+Each product is registered through a validated descriptor (`id`, display name, executable
+aliases, probe and bridge-required explanation). Inventory orchestration contains no
+product-id branch. Adding a future tool such as Claude Code is a descriptor/probe addition,
+not a change to cache, cancellation or policy flow.
 
 ### Command aliases
 
@@ -188,6 +192,8 @@ Rules:
   output. Do not read or copy `~/.codex` credential files in Renderer or application code.
 - `account/read` determines account state. `model/list` determines models and their supported
   effort/input options; static hard-coded model lists are not acceptable.
+- The bounded JSONL-RPC child transport lives under `agent/transports/`; it is provider-neutral
+  and can serve explicit probes without making inventory depend on a legacy Codex runtime.
 - A successful local Codex handshake proves Codex itself is usable. It does not turn Codex into
   an inference Provider inside OpenCode. `codex app-server` owns a separate agent loop.
 - Under ADR-003, a detected/signed-in Codex installation is shown as `Detected - direct harness
@@ -264,6 +270,9 @@ PuppyOne capability gate
 Selectable Provider -> selectable Model
 ```
 
+Capability metadata is authoritative and fail-closed. Missing input/output/tool capability
+fields exclude a model; unknown is never treated as a permissive default.
+
 `/config/providers`, a CLI executable and a credential-file existence check are not Send
 authority. Remote credentials can still expire after discovery; an authoritative 401/auth
 rejection quarantines the route, clears its selected Model and requests reconnect/refresh.
@@ -329,10 +338,17 @@ Implemented source boundaries:
 electron/main/agent/connections/
   local-agent-inventory.mjs           orchestration/cache/cancellation
   local-agent-connection-policy.mjs   derived availability rules
+  tools/
+    local-agent-tool-registry.mjs     descriptor validation + duplicate guard
+    codex-tool.mjs                    Codex executable/probe descriptor
+    cursor-tool.mjs                   Cursor executable/probe descriptor
   probes/
     codex-local-probe.mjs             version + app-server account/model probe
     cursor-local-probe.mjs            version + bounded status probe
     executable-candidates.mjs         platform candidate registry
+
+electron/main/agent/transports/
+  jsonl-rpc-connection.mjs            provider-neutral bounded stdio RPC
 
 shared/agent-contract/
   types.ts                              local-agent DTO type source

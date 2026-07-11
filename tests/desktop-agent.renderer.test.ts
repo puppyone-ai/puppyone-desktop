@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentApprovalDock } from "../src/features/desktop-agent/ui/AgentApprovalDock";
 import { AgentChangesPill, summarizeAgentChanges } from "../src/features/desktop-agent/ui/AgentChangesPill";
 import { AgentComposer } from "../src/features/desktop-agent/ui/AgentComposer";
+import { AgentPickerPopover, agentPickerLimits } from "../src/features/desktop-agent/ui/AgentPickerPopover";
 import { AgentTranscript } from "../src/features/desktop-agent/ui/AgentTranscript";
 import { createAgentProjection } from "../src/features/desktop-agent/agentProjection";
 import type { AgentProviderReadiness } from "../src/features/desktop-agent/agentTypes";
@@ -122,6 +123,33 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.querySelector('button[aria-label="Agent model"]')).toBeNull();
     expect(container.textContent).not.toContain("Agent model");
     expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("keeps a large model catalog searchable while bounding mounted picker options", () => {
+    const options = Array.from({ length: 500 }, (_, index) => ({
+      id: `provider/model-${index}`,
+      label: `Model ${index}`,
+      description: `Connected model ${index}`,
+      selectable: true,
+      kind: "model" as const,
+    }));
+    const container = render(React.createElement(AgentPickerPopover, {
+      ariaLabel: "Agent model",
+      placeholder: "Choose model",
+      groups: [{ id: "models", label: "Models", options }],
+      onSelect: vi.fn(),
+    }));
+    act(() => (container.querySelector('[aria-label="Agent model"]') as HTMLButtonElement).click());
+    expect(container.querySelectorAll('[role="option"]')).toHaveLength(agentPickerLimits.maxRenderedOptions);
+    expect(container.textContent).toContain("Showing 120 of 500");
+
+    const input = container.querySelector<HTMLInputElement>('.desktop-agent-picker-search input')!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, "Model 499");
+      input.dispatchEvent(new InputEvent("input", { bubbles: true, data: "Model 499" }));
+    });
+    expect(container.querySelectorAll('[role="option"]')).toHaveLength(1);
+    expect(container.textContent).toContain("Model 499");
   });
 
   it("shows connected routes before detected local tools without making unbridged CLIs selectable", () => {

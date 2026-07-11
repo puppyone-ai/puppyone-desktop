@@ -38,6 +38,7 @@ type AgentComposerProps = {
   onAddContext?: (references: AgentFileReference[]) => void;
   onRemoveAttachment?: (path: string) => void;
   onRemoveContext?: (path: string) => void;
+  resolveFilePath?: (file: File) => string | null;
   onSubmit: (prompt: string) => Promise<boolean>;
   onStop: () => void;
 };
@@ -79,6 +80,7 @@ export function AgentComposer({
   onAddContext,
   onRemoveAttachment,
   onRemoveContext,
+  resolveFilePath,
   onSubmit,
   onStop,
 }: AgentComposerProps) {
@@ -152,9 +154,8 @@ export function AgentComposer({
     fileInputRef.current?.click();
   };
   const acceptFiles = (files: FileList | null) => {
-    const bridge = window.puppyoneDesktop;
     const references = Array.from(files ?? []).flatMap((file) => {
-      const path = bridge?.getPathForFile?.(file);
+      const path = resolveFilePath?.(file);
       return path ? [{ path, name: file.name }] : [];
     });
     if (pickMode === "context") onAddContext?.(references);

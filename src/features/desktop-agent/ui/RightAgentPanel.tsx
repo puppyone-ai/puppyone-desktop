@@ -10,6 +10,7 @@ import { AgentQuestionDock } from "./AgentQuestionDock";
 import { getAgentSessionController } from "../application/controllerRegistry";
 import { listAgentInferenceProviders, listAgentModelsForProvider } from "../domain/agent-provider-routing";
 import type { AgentSessionMetadata } from "../domain/agent-contract";
+import { getElectronAgentClient, getElectronFilePath } from "../infrastructure/electron/electronAgentClient";
 import "./desktop-agent.css";
 
 export type RightAgentPanelHandle = { newSession: () => void };
@@ -35,7 +36,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   preferredModel = null,
   onPreferredModelChange,
 }, ref) {
-  const controller = useMemo(() => getAgentSessionController(workspace.path), [workspace.path]);
+  const controller = useMemo(() => getAgentSessionController(workspace.path, getElectronAgentClient), [workspace.path]);
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
 
   useEffect(() => {
@@ -194,6 +195,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         onAddContext={(references) => controller.addContextReferences(references)}
         onRemoveAttachment={(path) => controller.removeAttachment(path)}
         onRemoveContext={(path) => controller.removeContextReference(path)}
+        resolveFilePath={getElectronFilePath}
         onSubmit={(prompt) => controller.submit(prompt)}
         onStop={() => void controller.stop()}
       />

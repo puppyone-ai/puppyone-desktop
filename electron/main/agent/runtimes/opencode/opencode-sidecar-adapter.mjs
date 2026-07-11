@@ -420,7 +420,7 @@ export function normalizeProviderCatalog(value) {
 
 function isAgentChatModel(model) {
   if (!model || typeof model !== "object" || model.status === "deprecated") return false;
-  if (!model.capabilities || typeof model.capabilities !== "object") return true;
+  if (!model.capabilities || typeof model.capabilities !== "object") return false;
   return model.capabilities.input?.text === true
     && model.capabilities.output?.text === true
     && model.capabilities.toolcall === true;
