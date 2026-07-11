@@ -12,6 +12,8 @@ import {
   execGit,
   execGitStreaming,
 } from "./git/runner.mjs";
+import { resolveGitRevisionPair } from "./git/revision-pair.mjs";
+import { deriveGitRevisionSpecs } from "./git/revision-specs.mjs";
 import { parseGitPorcelainV2Status } from "./git/porcelain-v2.mjs";
 export { getGitEnvironmentForTests } from "./git/runner.mjs";
 
@@ -1574,72 +1576,78 @@ export async function getWorkspaceGitCommitDetail(rootPath, commitId) {
   };
 }
 
-export async function getWorkspaceGitFileDiff(rootPath, relativePath, scope = "unstaged") {
+export async function getWorkspaceGitFileDiff(rootPath, relativePath, scope = "unstaged", options = {}) {
   const root = resolveWorkspacePath(rootPath, null);
   const normalizedPath = normalizeRelativePath(relativePath);
+  const signal = options.signal;
   if (!normalizedPath) throw new Error("File path is required.");
 
   if (scope === "untracked") {
-    return {
+    const detail = {
       commit_id: "working-tree",
-      files: [await buildUntrackedFileDiff(root, normalizedPath)],
+      files: [await buildUntrackedFileDiff(root, normalizedPath, { signal })],
     };
+    return attachGitRevisionPairs(root, scope, detail, { signal });
   }
 
   if (scope === "remote") {
-    const status = await getWorkspaceGitStatus(root);
+    const status = await getWorkspaceGitStatus(root, { signal });
     const target = status.sourceControl.remote.target;
     if (!target?.remote || !target.branch || target.exists !== true) {
       throw new Error("Remote branch is not available.");
     }
 
     const remoteRef = `refs/remotes/${target.remote}/${target.branch}`;
-    const diffRange = await resolveGitRemoteDiffRange(root, "incoming", remoteRef);
+    const comparison = await resolveGitRemoteDiffComparison(root, "incoming", remoteRef, signal);
+    const selectionPaths = resolveGitDiffSelectionPaths(status, scope, normalizedPath);
     const patchResult = await execGit(root, [
       "diff",
       "--find-renames",
       "--patch",
       "--unified=3",
       "--no-ext-diff",
-      diffRange,
+      comparison.range,
       "--",
-      normalizedPath,
-    ]).catch((error) => {
+      ...selectionPaths,
+    ], { signal }).catch((error) => {
       throw new Error(formatGitFileDiffError("remote", error));
     });
 
-    return {
+    const detail = {
       commit_id: target.ref ?? remoteRef,
       files: parseGitPatch(patchResult.stdout),
     };
+    return attachGitRevisionPairs(root, scope, detail, { comparison, signal });
   }
 
   if (scope === "committed") {
-    const status = await getWorkspaceGitStatus(root);
+    const status = await getWorkspaceGitStatus(root, { signal });
     const target = status.sourceControl.remote.target;
     if (!target?.remote || !target.branch || target.exists !== true) {
       throw new Error("Remote branch is not available.");
     }
 
     const remoteRef = `refs/remotes/${target.remote}/${target.branch}`;
-    const diffRange = await resolveGitRemoteDiffRange(root, "outgoing", remoteRef);
+    const comparison = await resolveGitRemoteDiffComparison(root, "outgoing", remoteRef, signal);
+    const selectionPaths = resolveGitDiffSelectionPaths(status, scope, normalizedPath);
     const patchResult = await execGit(root, [
       "diff",
       "--find-renames",
       "--patch",
       "--unified=3",
       "--no-ext-diff",
-      diffRange,
+      comparison.range,
       "--",
-      normalizedPath,
-    ]).catch((error) => {
+      ...selectionPaths,
+    ], { signal }).catch((error) => {
       throw new Error(formatGitFileDiffError("committed", error));
     });
 
-    return {
+    const detail = {
       commit_id: "local-commits",
       files: parseGitPatch(patchResult.stdout),
     };
+    return attachGitRevisionPairs(root, scope, detail, { comparison, signal });
   }
 
   const args = [
@@ -1650,16 +1658,36 @@ export async function getWorkspaceGitFileDiff(rootPath, relativePath, scope = "u
     "--no-ext-diff",
   ];
   if (scope === "staged") args.push("--cached");
-  args.push("--", normalizedPath);
+  const selectionStatus = await getWorkspaceGitStatus(root, { signal });
+  args.push("--", ...resolveGitDiffSelectionPaths(selectionStatus, scope, normalizedPath));
 
-  const patchResult = await execGit(root, args).catch((error) => {
+  const patchResult = await execGit(root, args, { signal }).catch((error) => {
     throw new Error(`Unable to read git file diff: ${error.message}`);
   });
 
-  return {
+  const detail = {
     commit_id: "working-tree",
     files: parseGitPatch(patchResult.stdout),
   };
+  return attachGitRevisionPairs(root, scope, detail, { signal });
+}
+
+function resolveGitDiffSelectionPaths(status, scope, selectedPath) {
+  let resources = [];
+  if (scope === "remote") {
+    resources = status?.sourceControl?.remote?.incomingPreview ?? [];
+  } else if (scope === "committed") {
+    resources = status?.sourceControl?.remote?.outgoingPreview ?? [];
+  } else {
+    const wantedGroups = scope === "staged" ? new Set(["index"]) : new Set(["workingTree", "merge"]);
+    resources = (status?.sourceControl?.groups ?? [])
+      .filter((group) => wantedGroups.has(group.id))
+      .flatMap((group) => group.resources ?? []);
+  }
+  const selected = resources.find((resource) => (
+    resource.path === selectedPath || resource.oldPath === selectedPath
+  ));
+  return [...new Set([selected?.oldPath, selected?.path, selectedPath].filter(Boolean))];
 }
 
 export async function stageWorkspaceGitPaths(rootPath, paths) {
@@ -3072,25 +3100,75 @@ async function readGitAheadBehindCounts(rootPath, remoteRef, options = {}) {
   };
 }
 
-async function resolveGitRemoteDiffRange(rootPath, direction, remoteRef) {
-  const hasHead = await execGit(rootPath, ["rev-parse", "--verify", "--quiet", "HEAD"])
+async function resolveGitRemoteDiffComparison(rootPath, direction, remoteRef, signal) {
+  const hasHead = await execGit(rootPath, ["rev-parse", "--verify", "--quiet", "HEAD"], { signal })
     .then((result) => Boolean(result.stdout.trim()))
-    .catch(() => false);
+    .catch(() => {
+      throwIfGitStatusAborted(signal);
+      return false;
+    });
 
   if (!hasHead) {
-    return direction === "incoming" ? `${GIT_EMPTY_TREE}..${remoteRef}` : `${remoteRef}..${GIT_EMPTY_TREE}`;
+    const beforeRef = direction === "incoming" ? GIT_EMPTY_TREE : remoteRef;
+    const afterRef = direction === "incoming" ? remoteRef : GIT_EMPTY_TREE;
+    return { beforeRef, afterRef, range: `${beforeRef}..${afterRef}` };
   }
 
-  const mergeBase = await execGit(rootPath, ["merge-base", "HEAD", remoteRef])
+  const mergeBase = await execGit(rootPath, ["merge-base", "HEAD", remoteRef], { signal })
     .then((result) => result.stdout.trim())
-    .catch(() => "");
+    .catch(() => {
+      throwIfGitStatusAborted(signal);
+      return "";
+    });
 
   if (mergeBase) {
-    return direction === "incoming" ? `${mergeBase}..${remoteRef}` : `${mergeBase}..HEAD`;
+    const afterRef = direction === "incoming" ? remoteRef : "HEAD";
+    return { beforeRef: mergeBase, afterRef, range: `${mergeBase}..${afterRef}` };
   }
 
-  return direction === "incoming" ? `HEAD..${remoteRef}` : `${remoteRef}..HEAD`;
+  const beforeRef = direction === "incoming" ? "HEAD" : remoteRef;
+  const afterRef = direction === "incoming" ? remoteRef : "HEAD";
+  return { beforeRef, afterRef, range: `${beforeRef}..${afterRef}` };
 }
+
+async function attachGitRevisionPairs(rootPath, scope, detail, { comparison = null, signal } = {}) {
+  if (!Array.isArray(detail.files) || detail.files.length === 0) return detail;
+  const hasHead = scope === "staged"
+    ? await execGit(rootPath, ["rev-parse", "--verify", "--quiet", "HEAD"], { signal })
+      .then((result) => Boolean(result.stdout.trim()))
+      .catch(() => {
+        throwIfGitStatusAborted(signal);
+        return false;
+      })
+    : true;
+
+  const files = await Promise.all(detail.files.map(async (file) => {
+    const specs = deriveGitRevisionSpecs({
+      scope,
+      file,
+      comparison,
+      hasHead,
+      getMimeType,
+    });
+    const revisionPair = await resolveGitRevisionPair({
+      rootPath,
+      scope,
+      path: file.path,
+      oldPath: file.oldPath,
+      status: file.status,
+      before: specs.before,
+      after: specs.after,
+      signal,
+    });
+    return {
+      ...file,
+      mimeType: getMimeType(file.path) ?? getMimeType(file.oldPath ?? ""),
+      revisionPair,
+    };
+  }));
+  return { ...detail, files };
+}
+
 
 function formatGitFileDiffError(scope, error) {
   const message = getGitErrorOutput(error);
@@ -3711,7 +3789,7 @@ function assertSafeCommitId(commitId) {
   }
 }
 
-async function buildUntrackedFileDiff(rootPath, relativePath) {
+async function buildUntrackedFileDiff(rootPath, relativePath, options = {}) {
   const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
   const metadata = await fs.stat(filePath).catch((error) => {
     throw new Error(`Unable to read untracked file: ${error.message}`);
@@ -3741,7 +3819,7 @@ async function buildUntrackedFileDiff(rootPath, relativePath) {
     };
   }
 
-  const bytes = await fs.readFile(filePath).catch((error) => {
+  const bytes = await fs.readFile(filePath, { signal: options.signal }).catch((error) => {
     throw new Error(`Unable to read untracked file: ${error.message}`);
   });
   if (bytes.includes(0)) {

@@ -150,6 +150,13 @@ Working-file selection maps to one of these scopes:
 The controller requests the corresponding diff only while the selection is
 active. Commit selection similarly requests commit detail by commit id.
 
+Working-file detail is format-aware. Main derives an authorized immutable
+before/after pair for the selected scope, then the renderer's ordered Diff
+Registry chooses unified text, DOCX semantic redline, or the total metadata
+fallback through canonical format resolution. The complete authority, resource
+handle, cancellation, worker, cache, and extension contracts live in
+[Format-Aware Diff Pipeline](format-aware-diff-pipeline.md).
+
 The long-term refresh architecture separates frequent working-tree status from
 history pagination. See
 [Repository Status Refresh Lifecycle](status-refresh-lifecycle.md); history must
@@ -173,7 +180,7 @@ remain in the data model but are not rendered as user-facing copy. File status,
 file-level addition/deletion totals, line numbers, and a quiet separator carry
 the useful context without exposing patch syntax.
 
-The Changes detail is a fixed unified three-column review: one relevant line
+Text Changes detail is a fixed unified three-column review: one relevant line
 number, one always-visible `+/-` marker, and the content. Removed rows show the
 old-file line number; added and context rows show the new-file line number.
 The original old/new coordinates remain attached to the row as data, but the
@@ -247,14 +254,19 @@ history lazily. See
 - `electron/preload.cjs`
   - context-isolated IPC exposure
 - `electron/main/ipc/workspace-git-ipc.mjs`
-  - authorized Git IPC handlers
+  - authorized Git IPC handlers, cancellable diff requests, and revision reads
+- `electron/main/git-diff-resource-broker.mjs`
+  - audience/session/revision-bound, bounded, revocable rich-diff resources
 - `local-api/workspace.mjs`
-  - Git execution, parsing, snapshots, diffs, history, and mutations
+  - Git execution, parsing, snapshots, trusted revision pairs, history, and mutations
+- `src/features/source-control/diff/`
+  - ordered Diff Registry plus text, DOCX, and metadata presentations
 
 ## Verification
 
 Existing real-repository tests cover repository detection, stage/commit,
-working-tree status, diffs, branches, and remote configuration in
+working-tree status, all revision-pair scopes, remote divergence, diffs,
+branches, and remote configuration in
 `tests/workspace.git.integration.test.mjs`. IPC authorization coverage lives in
 `tests/electron.workspace-authorization.test.mjs`.
 
@@ -292,6 +304,7 @@ watcher recovery, and refresh ordering belong to the lifecycle test matrix in
 - Do not expose raw unified-diff hunk coordinates in the detail UI. Preserve
   them in the model for patch semantics, but use file totals and line numbers
   for the visible reading context.
-- Git Changes always uses the unified `line / +/- / content` structure. Do not
-  restore two visible line-number gutters or let the compact-review marker
-  preference hide Git's structural symbols.
+- Text Git Changes always uses the unified `line / +/- / content` structure.
+  Rich binary formats resolve through the Diff Registry; do not restore two
+  visible line-number gutters, hide Git's structural symbols, or put extension
+  conditionals back into `GitStatusView`.

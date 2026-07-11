@@ -14,7 +14,9 @@ Explorer selection
 Format registry
         |
         v
-Viewer registry <........ reserved viewer packs
+Preset Viewer Registry
+        |
+        +........ dormant external adapter (default off)
         |
         v
 Content / resource acquisition
@@ -47,9 +49,9 @@ This subsystem owns:
 - text/content versus binary/resource acquisition;
 - loading, error, unsupported, and committed-preview states;
 - editable versus read-only capability decisions;
-- shared viewer and editor host contracts;
+- the versioned, immutable preset Viewer Contribution contract and registry;
 - format-specific preview and editing architecture;
-- the reserved external viewer-plugin boundary.
+- the dormant, capability-gated external Viewer Pack adapter boundary.
 
 It does not own Explorer loading and tree state, app-shell navigation,
 workspace binding, or native-window lifecycle. Those remain in their focused
@@ -64,8 +66,9 @@ architecture documents one level above this directory.
    - Selection, loaded content, committed preview documents, and editor mount
      lifecycle without stale content or visual flashes.
 3. [Viewer Plugin Architecture](viewer-plugin-architecture.md)
-   - The reserved boundary for future third-party or separately distributed
-     viewers; not a commitment to ship a plugin runtime now.
+   - The experimental local Host retained behind a default-off product
+     capability, its security boundary, and the reserved future distribution
+     adapter. It is not a marketplace commitment.
 4. [Markdown Editor](markdown/README.md)
    - The format-specific source-first architecture and Live Preview UX contract
      for Markdown files.
@@ -94,3 +97,18 @@ Start with the file-format pipeline, then read the preview lifecycle. Read a
 format subdirectory only for the format being changed. Consult the plugin
 document only when work affects the viewer registry boundary or distribution
 model.
+
+## Current implementation status
+
+1. The canonical File Format registry and versioned preset Viewer Registry are
+   active production paths. Existing Markdown, text/code, CSV, HTML, Office,
+   image, PDF, audio, video, and placeholder viewers are built-in preset
+   contributions; they are not downloaded packages.
+2. The external Viewer Pack Host has an experimental implementation and
+   security coverage, but the signed default product uses the
+   `preset-viewers-only` profile. That profile does not register Pack schemes,
+   create a Host, expose Pack IPC/preload APIs, or inject installation UI.
+3. A future signed build may explicitly enable the external adapter through
+   package capability metadata. Catalog, publisher, marketplace, and concrete
+   third-party Pack delivery remain uncommitted work and require a separate
+   issue.

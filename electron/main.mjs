@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, session as electronSession, shell, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import {
   getMimeType,
@@ -49,14 +50,22 @@ import {
 } from "./main/viewer-packs/index.mjs";
 import { PLUGIN_PROTOCOL_SCHEME } from "./main/viewer-packs/plugin-protocol.mjs";
 import { RESOURCE_PROTOCOL_SCHEME } from "./main/viewer-packs/resource-protocol.mjs";
+import { resolveViewerPackFeatureProfile } from "./main/viewer-packs/feature-profile.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+const packageMetadata = require("../package.json");
 const projectRoot = path.resolve(__dirname, "..");
 const preloadPath = path.join(__dirname, "preload.cjs");
 const rendererDistPath = path.join(projectRoot, "dist", "index.html");
 const appName = "puppyone";
 const devServerUrl = process.env.PUPPYONE_DESKTOP_DEV_URL;
 const rendererApplicationUrl = devServerUrl || pathToFileURL(rendererDistPath).toString();
+const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
+  packageMetadata,
+  environment: process.env,
+  isPackaged: app.isPackaged,
+});
 const workspaceStateFilename = "desktop-workspace-state.json";
 const cloudAuthProtocol = "puppyone";
 const dockIconResources = Object.freeze({
@@ -73,7 +82,7 @@ const macTitlebarOptions = process.platform === "darwin"
       titleBarStyle: "default",
     };
 
-protocol.registerSchemesAsPrivileged([
+const privilegedSchemes = [
   {
     scheme: "puppyone-local",
     privileges: {
@@ -84,7 +93,10 @@ protocol.registerSchemesAsPrivileged([
       stream: true,
     },
   },
-  {
+];
+
+if (viewerPackFeatureProfile.externalViewerPacks) {
+  privilegedSchemes.push({
     // Viewer Pack asset origin. Bytes only come from an enabled, immutable
     // version dir whose content hash matches the URL.
     scheme: PLUGIN_PROTOCOL_SCHEME,
@@ -95,8 +107,8 @@ protocol.registerSchemesAsPrivileged([
       corsEnabled: false,
       stream: true,
     },
-  },
-  {
+  });
+  privilegedSchemes.push({
     // Session-scoped, audience-bound bounded Range reads for pack documents.
     scheme: RESOURCE_PROTOCOL_SCHEME,
     privileges: {
@@ -106,8 +118,10 @@ protocol.registerSchemesAsPrivileged([
       corsEnabled: false,
       stream: true,
     },
-  },
-]);
+  });
+}
+
+protocol.registerSchemesAsPrivileged(privilegedSchemes);
 
 let updateService = null;
 let appPreviewRuntime = null;
@@ -190,6 +204,7 @@ async function createWindow(options = {}) {
       nodeIntegration: false,
       sandbox: true,
       preload: preloadPath,
+      additionalArguments: viewerPackFeatureProfile.rendererArguments,
     },
   });
   const webContentsId = window.webContents.id;
@@ -458,20 +473,22 @@ app.whenReady().then(async () => {
     readWorkspaceTextFile,
     resolveWorkspacePath: resolveLocalWorkspacePath,
   });
-  viewerPackHost = createViewerPackHost({
-    WebContentsView,
-    sessionFromPartition: (partition, options) => electronSession.fromPartition(partition, options),
-    getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
-    getMimeType,
-    userDataPath: app.getPath("userData"),
-    appVersion: app.getVersion(),
-    isPackaged: app.isPackaged,
-    allowTestKeys: !app.isPackaged && process.env.PUPPYONE_VIEWER_PACK_ALLOW_TEST_KEYS === "1",
-    getThemeSnapshot: () => ({
-      mode: nativeTheme.shouldUseDarkColors ? "dark" : "light",
-      tokens: {},
-    }),
-  });
+  if (viewerPackFeatureProfile.externalViewerPacks) {
+    viewerPackHost = createViewerPackHost({
+      WebContentsView,
+      sessionFromPartition: (partition, options) => electronSession.fromPartition(partition, options),
+      getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
+      getMimeType,
+      userDataPath: app.getPath("userData"),
+      appVersion: app.getVersion(),
+      isPackaged: app.isPackaged,
+      allowTestKeys: !app.isPackaged && process.env.PUPPYONE_VIEWER_PACK_ALLOW_TEST_KEYS === "1",
+      getThemeSnapshot: () => ({
+        mode: nativeTheme.shouldUseDarkColors ? "dark" : "light",
+        tokens: {},
+      }),
+    });
+  }
   registerIpcHandlers();
   updateService.start();
   await createWindow({

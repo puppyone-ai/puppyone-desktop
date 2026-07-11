@@ -1,4 +1,5 @@
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
+const externalViewerPacksEnabled = process.argv.includes("--puppyone-external-viewer-packs=1");
 
 contextBridge.exposeInMainWorld("puppyoneDesktop", {
   readCloudSession: () => ipcRenderer.invoke("cloud-session:read"),
@@ -138,6 +139,9 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   writePuppyoneConfig: (request) => ipcRenderer.invoke("workspace:puppyone-config-write", request),
   getGitCommitDetail: (request) => ipcRenderer.invoke("workspace:git-commit-detail", request),
   getGitFileDiff: (request) => ipcRenderer.invoke("workspace:git-file-diff", request),
+  cancelGitFileDiff: (request) => ipcRenderer.invoke("workspace:git-file-diff-cancel", request),
+  readGitDiffResource: (request) => ipcRenderer.invoke("workspace:git-diff-resource-read", request),
+  releaseGitDiffResources: (request) => ipcRenderer.invoke("workspace:git-diff-resource-release", request),
   stageGitPaths: (request) => ipcRenderer.invoke("workspace:git-stage", request),
   stageAllGitChanges: (request) => ipcRenderer.invoke("workspace:git-stage-all", request),
   unstageGitPaths: (request) => ipcRenderer.invoke("workspace:git-unstage", request),
@@ -191,21 +195,23 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     ipcRenderer.on("agent:session-exit", listener);
     return () => ipcRenderer.removeListener("agent:session-exit", listener);
   },
-  viewerPacks: {
-    getSnapshot: () => ipcRenderer.invoke("viewer-pack:get-snapshot"),
-    installLocal: () => ipcRenderer.invoke("viewer-pack:install-local"),
-    disable: (request) => ipcRenderer.invoke("viewer-pack:disable", request),
-    uninstall: (request) => ipcRenderer.invoke("viewer-pack:uninstall", request),
-    activate: (request) => ipcRenderer.invoke("viewer-pack:activate", request),
-    setBounds: (request) => ipcRenderer.invoke("viewer-pack:set-bounds", request),
-    destroySession: (request) => ipcRenderer.invoke("viewer-pack:destroy-session", request),
-    onSessionState: (callback) => {
-      if (typeof callback !== "function") return () => {};
-      const listener = (_event, payload) => callback(payload);
-      ipcRenderer.on("viewer-pack:session-state", listener);
-      return () => ipcRenderer.removeListener("viewer-pack:session-state", listener);
+  ...(externalViewerPacksEnabled ? {
+    viewerPacks: {
+      getSnapshot: () => ipcRenderer.invoke("viewer-pack:get-snapshot"),
+      installLocal: () => ipcRenderer.invoke("viewer-pack:install-local"),
+      disable: (request) => ipcRenderer.invoke("viewer-pack:disable", request),
+      uninstall: (request) => ipcRenderer.invoke("viewer-pack:uninstall", request),
+      activate: (request) => ipcRenderer.invoke("viewer-pack:activate", request),
+      setBounds: (request) => ipcRenderer.invoke("viewer-pack:set-bounds", request),
+      destroySession: (request) => ipcRenderer.invoke("viewer-pack:destroy-session", request),
+      onSessionState: (callback) => {
+        if (typeof callback !== "function") return () => {};
+        const listener = (_event, payload) => callback(payload);
+        ipcRenderer.on("viewer-pack:session-state", listener);
+        return () => ipcRenderer.removeListener("viewer-pack:session-state", listener);
+      },
     },
-  },
+  } : {}),
   createTerminal: (request) => ipcRenderer.invoke("terminal:create", request),
   writeTerminal: (request) => ipcRenderer.send("terminal:input", request),
   resizeTerminal: (request) => ipcRenderer.send("terminal:resize", request),

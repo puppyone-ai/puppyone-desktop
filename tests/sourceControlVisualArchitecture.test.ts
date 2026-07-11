@@ -6,6 +6,10 @@ const viewSource = readFileSync(
   new URL("../src/features/source-control/GitStatusView.tsx", import.meta.url),
   "utf8",
 );
+const textDiffSource = readFileSync(
+  new URL("../src/features/source-control/diff/TextUnifiedDiff.tsx", import.meta.url),
+  "utf8",
+);
 const detailCss = readFileSync(
   new URL("../src/features/source-control/styles/history-detail.css", import.meta.url),
   "utf8",
@@ -143,19 +147,16 @@ describe("source-control visual architecture", () => {
     expect(lineCode).toContain("white-space: pre-wrap;");
     expect(diffCss).not.toContain('[data-diff-markers="color"] .desktop-diff-line .line-prefix');
 
-    const hunkBranch = viewSource.slice(
-      viewSource.indexOf('if (line.kind === "hunk")'),
-      viewSource.indexOf("const prefix =", viewSource.indexOf('if (line.kind === "hunk")')),
+    const hunkBranch = textDiffSource.slice(
+      textDiffSource.indexOf('if (line.kind === "hunk")'),
+      textDiffSource.indexOf("const prefix =", textDiffSource.indexOf('if (line.kind === "hunk")')),
     );
     const hunkSeparator = compact(readCssBlock(diffCss, ".desktop-diff-hunk-separator"));
     expect(hunkBranch).toContain('className="desktop-diff-hunk-separator"');
     expect(hunkBranch).not.toContain("line.text");
     expect(hunkSeparator).toContain("height: 7px;");
 
-    const lineView = viewSource.slice(
-      viewSource.indexOf("function DiffLineView"),
-      viewSource.indexOf("function UtilityEmptyState"),
-    );
+    const lineView = textDiffSource.slice(textDiffSource.indexOf("function DiffLineView"));
     expect(lineView).toContain('line.kind === "remove" ? line.oldLine : line.newLine ?? line.oldLine');
     expect(lineView.match(/className="line-number"/g)).toHaveLength(1);
     expect(lineView).toContain('className="line-prefix"');
