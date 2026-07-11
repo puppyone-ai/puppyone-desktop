@@ -7,6 +7,9 @@ sidebar.
 Read [Desktop Agent Architecture](README.md) first for the process, IPC,
 provider-adapter, event, security, and persistence boundaries.
 
+The detailed normative contracts are [Cursor-style Chat UI behavior](chat-ui-behavior-spec.md)
+and [Local Agent and Provider connection discovery](local-agent-connection-discovery.md).
+
 The archived [Codex Implementation Brief](history/codex-vertical-slice.md)
 records the original direct-runtime slice. It is not the current product route.
 The authoritative decision is [ADR-003](ADR-003-opencode-only-chat-harness.md):
@@ -30,10 +33,13 @@ every new Chat session uses OpenCode and provider/model choice stays inside it.
 - **Implemented by capability:** history list/resume/fork/archive/delete,
   compaction, queue/steer controls, and model/mode selection. Unsupported
   controls are omitted.
-- **Migration required:** remove the legacy runtime selector and direct Codex
-  new-session route. A sidebar Chat submission must always reach OpenCode.
-- **Product gate:** provider options appear only when OpenCode reports them as
-  connected and at least one text-and-tools Agent model survives capability filtering.
+- **Legacy boundary:** the runtime selector and direct Codex new-session route
+  are absent from product composition. A sidebar Chat submission must always
+  reach OpenCode; legacy Codex records remain migration-only data.
+- **Product gate:** selectable provider options appear only when OpenCode
+  reports them as connected and at least one text-and-tools Agent model
+  survives capability filtering. Installed Codex/Cursor tools are still shown
+  in a separate Local tools group with detected/auth/bridge status.
 
 ## Product decision
 
@@ -62,11 +68,11 @@ panel components. The sidebar itself contains no Chat/Terminal selector.
 +------------------------------------------------------+
 ```
 
-This is the visual hierarchy contract. At the 420 px reference width the
-surface uses an 8 px outside gutter, 13 px full-width user prompt radius,
-document-flow assistant output, a 28 px Changes pill and a 42 px collapsed
-single-row composer. The sidebar remains resizable through 760 px and does not
-introduce horizontal scrolling for ordinary messages or controls.
+This is the visual hierarchy summary. Exact message, activity, animation,
+composer and motion rules are defined in
+[Cursor-style Chat UI behavior](chat-ui-behavior-spec.md). The sidebar remains
+resizable through 760 px and does not introduce horizontal scrolling for
+ordinary messages or controls.
 
 ## Surface hierarchy
 
@@ -121,8 +127,11 @@ become visible on keyboard focus, and expose meaningful accessible names.
 
 ## Provider, model and agent controls
 
-OpenCode is fixed and is not a composer control. The single-row composer shows
-Provider first and Model second; lower-frequency actions live in the `+` menu:
+OpenCode is fixed and is not a composer control. The composer shows Provider
+first and Model second; lower-frequency actions live in the `+` menu. Provider
+and Model use accessible PuppyOne popovers/listboxes rather than unstyled
+native `<select>` menus because rows require grouping, connection status,
+search and recovery actions:
 
 - provider selector;
 - model selector when model discovery is available;
@@ -156,17 +165,23 @@ Executable discovery and inference availability are deliberately different:
 
 | Local observation | Product meaning |
 | --- | --- |
-| Codex CLI installed | Not sufficient. OpenAI/ChatGPT appears only through an OpenCode-supported connected provider route. |
-| Claude Code installed | Not sufficient. Anthropic appears only through an authorized OpenCode provider route. |
-| Cursor CLI installed | Not a reusable inference entitlement and therefore not offered as a Provider without a documented authorized bridge. |
+| Codex CLI installed | Show `Codex CLI - Detected` with version/auth status. OpenAI/ChatGPT remains selectable only through an OpenCode-supported connected provider route. |
+| Claude Code installed | Show the local inventory state. Anthropic remains selectable only through an authorized OpenCode provider route. |
+| Cursor Agent installed | Show `Cursor Agent - Detected` with version/auth/bridge status. Do not make it selectable without a documented authorized bridge. |
 | OpenCode reports Provider in `connected` | Eligible for capability filtering and explicit selection. |
 
-This prevents PuppyOne from claiming access merely because an executable or
-stale credential file exists. API-key validity can still change remotely and
-cannot be proven by local discovery alone. When a turn receives an
-authoritative authentication rejection, PuppyOne collapses duplicate terminal
-events, quarantines that Provider for the current inspection, clears its Model,
-and requires credential repair plus Refresh before it can be selected again.
+This prevents both current failure modes: PuppyOne no longer hides a tool the
+user really installed, and it no longer claims that installation is a usable
+inference route. The picker has separate `Connected routes` and `Local tools`
+groups. Detailed candidate paths, probes, state fields, security boundary and
+acceptance fixtures are defined in
+[Local Agent and Provider connection discovery](local-agent-connection-discovery.md).
+
+API-key validity can still change remotely and cannot be proven by local
+discovery alone. When a turn receives an authoritative authentication
+rejection, PuppyOne collapses duplicate terminal events, quarantines that
+Provider for the current inspection, clears its Model, and requires credential
+repair plus Refresh before it can be selected again.
 
 Changing provider never changes the harness. It selects another inference route
 inside OpenCode and preserves one permission, tool and session authority. If a
@@ -297,8 +312,9 @@ sidebar does not fabricate an answer.
 
 The composer supports:
 
-- a 42 px single-row idle state matching the transcript's 8 px gutter;
-- multiline text;
+- a compact 64 px resting state with a text region above/alongside a stable
+  action row, growing to a maximum 184 px before internal scrolling;
+- multiline text with IME-safe Enter/Shift+Enter behavior;
 - submit with the product's established keyboard convention;
 - a single `+` menu for optional authorized attachments, workspace context and Agent mode;
 - the current connected Provider followed by a Model scoped to that Provider;

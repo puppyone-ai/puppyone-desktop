@@ -9,6 +9,15 @@ a peer runtime or fallback. Terminal remains a separate sibling surface.
 This document is intentionally made of prose and plain-text diagrams. It does
 not require a diagram renderer.
 
+Normative detail is split into two leaf specifications:
+
+- [Cursor-style Chat UI behavior](chat-ui-behavior-spec.md) defines user and
+  assistant messages, animation, Bash, read/search, write/edit, tools,
+  approvals, popovers, scrolling and visual evidence.
+- [Local Agent and Provider connection discovery](local-agent-connection-discovery.md)
+  defines how installed Codex/Cursor tools are recognized separately from
+  selectable OpenCode inference Providers.
+
 ## Product architecture
 
 ```text
@@ -42,6 +51,10 @@ PuppyOne Desktop
       |
       +-- Electron main authority
             +-- AgentService: owner/session/order/replay/journal
+            +-- Local Agent Inventory (target)
+            |     +-- Codex/Cursor executable + version discovery
+            |     +-- lazy auth/protocol compatibility probes
+            |     +-- detected-but-unbridged presentation state
             +-- OpenCode AgentRuntimePort adapter
             |     +-- pinned OpenCode sidecar (only product harness)
             |     +-- connected provider/model/session catalog
@@ -66,15 +79,21 @@ Model + variant      Provider-scoped model identity and only the options that
 Agent profile/mode   OpenCode behavior configuration such as Build or Plan;
                      not a harness.
 
+Local tool           A detected coding-agent installation such as Codex CLI
+                     or Cursor Agent. Detection is shown to the user but does
+                     not by itself make the tool a selectable Provider.
+
 Product session      PuppyOne mapping, UI projection and bounded redacted
                      cache pointing to one authoritative OpenCode session.
 ```
 
 “Codex” in the product provider/model controls means an OpenAI/ChatGPT route and
 a Codex-family model executed by OpenCode. `codex app-server`, Claude Code and
-Cursor CLI are agent products, not automatically valid model providers. A
-future authorized bridge may reuse their compute or credentials only at the
-provider layer; it must not replace or nest another loop behind OpenCode.
+Cursor CLI are agent products, not automatically valid model providers. They
+must still be detected and shown in the Local tools inventory with an exact
+status. A future authorized bridge may reuse their compute or credentials only
+at the provider layer; it must not replace or nest another loop behind
+OpenCode.
 
 The normal Chat UI never exposes harness choice. If OpenCode is unavailable,
 Chat fails closed with setup diagnostics instead of silently changing its
@@ -234,7 +253,7 @@ Right sidebar surface
 |     history / new / overflow        visible on hover or keyboard focus
 |
 +-- virtual conversation document
-|     user turn                       full-width bordered prompt surface
+|     user turn                       right-aligned quiet prompt bubble
 |     assistant turn                  unboxed readable document flow
 |     tool/plan activity              quiet text rows + progressive disclosure
 |     answer actions                  right-aligned truthful actions
@@ -244,15 +263,15 @@ Right sidebar surface
 +-- Changes pill                      real aggregate + / - counts
 |
 +-- anchored composer
-      one-row idle geometry           42 px outer height
+      compact two-zone geometry       64 px resting height
       left + menu                     attachments / context / Agent mode
-      middle input                    one line -> bounded multiline
+      middle input                    bounded multiline up to 184 px
       right controls                  provider -> model / stop or send
 ```
 
 Visible “You”, “OpenCode” or runtime badges are intentionally absent from each
 message because material and document order communicate authorship. The
-harness is not a product choice. User turns use one full-width quiet raised material;
+harness is not a product choice. User turns use a right-aligned quiet raised surface;
 assistant turns stay on canvas so long answers read like a document. Buttons
 appear only for real capabilities: the UI does not draw decorative microphone,
 rating or permission controls without an implemented action behind them.
@@ -260,19 +279,20 @@ rating or permission controls without an implemented action behind them.
 All `.desktop-agent-*` rules live in `ui/desktop-agent.css`; global
 `styles/layout.css` owns only the generic right-sidebar host. This prevents
 cascade order from changing the component when unrelated shell CSS evolves.
-The feature stylesheet uses semantic PuppyOne tokens, an 8 px horizontal
-reference gutter, 13 px user-message radius, 42 px collapsed composer and
+The feature stylesheet uses semantic PuppyOne tokens, 12-16 px responsive
+outside gutters, an 18 px user-message radius, a 64 px resting composer and
 container breakpoints at 760, 560 and 420 px. Focus and reduced-motion
-fallbacks remain explicit.
+fallbacks remain explicit. Exact target geometry and animation tokens live in
+[Cursor-style Chat UI behavior](chat-ui-behavior-spec.md).
 
 `#agent-visual-smoke` dynamically loads a deterministic conversation through
 the `visual-smoke.ts` secondary entrypoint. It is retained as a visual QA
 fixture while staying outside the normal Agent bundle and network/session
 path. Architecture tests enforce the CSS ownership boundary, responsive
-contracts, single-line growing composer, Changes aggregation and absence of a
-runtime selector. `desktop-agent.cursor-visual-contract.test.ts` locks the
-reference geometry so later feature work cannot silently reintroduce the old
-card stack or two-row composer.
+contracts, bounded growing composer, Changes aggregation and absence of a
+runtime selector. `desktop-agent.cursor-visual-contract.test.ts` must lock the
+approved reference geometry so later feature work cannot silently reintroduce
+the old card stack or native Provider menu.
 
 ## Provider routing boundary
 

@@ -83,7 +83,10 @@ stores.
 Cursor CLI and Claude Code are also agent products rather than automatically
 valid model providers. They may appear in the provider layer only after a
 supported, authorized inference bridge exists. The UI must not claim that a
-local subscription is reusable merely because its product is installed.
+local subscription is reusable merely because its product is installed. The
+installation itself must still appear in a separate Local tools inventory with
+version/auth/bridge status; hiding a detected tool and making it selectable are
+both incorrect outcomes.
 
 ## Session ownership
 
@@ -157,8 +160,10 @@ a harness and cannot bypass OpenCode's loop or PuppyOne's permission boundary.
   harness identity.
 - The composer may show Provider, Model, Variant and Agent/Mode. It does not
   show Runtime or Harness.
-- Provider availability comes from OpenCode `/provider.connected`, never from
-  `/config/providers`, an executable-presence check, or an unverified model catalog.
+- Selectable Provider availability comes from OpenCode `/provider.connected`,
+  never from `/config/providers`, an executable-presence check, or an
+  unverified model catalog. Executable discovery feeds only the Local tools
+  inventory until an authorized bridge passes its own gate.
 - Provider must be selected before Model; the Model must advertise text input,
   text output and tool calling for Agent Chat.
 - Changing provider/model follows OpenCode's advertised per-turn or
