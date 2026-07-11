@@ -121,26 +121,6 @@ export class AgentSessionController {
     }
   }
 
-  async selectRuntime(runtimeId: string) {
-    if (!runtimeId || runtimeId === this.state.selectedRuntimeId) return;
-    if (this.state.projection.runningTurnId) throw new Error("Stop the active turn before switching runtime.");
-    await this.closeActiveSession(false);
-    this.saveSessionUi();
-    this.state = {
-      ...this.state,
-      selectedRuntimeId: runtimeId,
-      session: null,
-      projection: createAgentProjection(),
-      inspection: null,
-      selectedModel: null,
-      selectedMode: null,
-      attachments: [],
-      contextReferences: [],
-    };
-    this.emit();
-    await this.initialize(true);
-  }
-
   selectModel(model: string | null) {
     this.patch({ selectedModel: model || null });
   }
@@ -386,7 +366,10 @@ export class AgentSessionController {
     const bridge = this.bridgeProvider();
     if (!bridge?.listAgentSessions) return;
     try {
-      const history = await bridge.listAgentSessions({ rootPath: this.workspaceRoot });
+      const history = await bridge.listAgentSessions({
+        rootPath: this.workspaceRoot,
+        runtimeId: this.state.selectedRuntimeId,
+      });
       this.patch({ history: history.slice(0, MAX_CACHED_SESSIONS) });
     } catch {
       // History is additive; failure must not take down an otherwise usable chat.

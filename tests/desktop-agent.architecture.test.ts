@@ -14,14 +14,21 @@ describe("Desktop Agent architecture boundaries", () => {
   it("enforces virtual, responsive, safe presentation contracts", () => {
     const timeline = source("src/features/desktop-agent/ui/AgentTranscript.tsx");
     const markdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
+    const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
     const css = source("src/features/desktop-agent/ui/desktop-agent.css");
+    const globalLayout = source("src/styles/layout.css");
     expect(timeline).toContain("MAX_MOUNTED_ROWS = 120");
     expect(markdown).not.toContain("dangerouslySetInnerHTML");
     expect(markdown).toContain('["https:", "http:", "mailto:"]');
     expect(css).toContain("container: desktop-agent / inline-size");
+    expect(css).toContain("--agent-radius-composer: 20px");
+    expect(css).toContain("max-width: 759px");
     expect(css).toContain("max-width: 559px");
     expect(css).toContain("max-width: 419px");
     expect(css).toContain("prefers-reduced-motion");
+    expect(globalLayout).not.toContain(".desktop-agent-");
+    expect(composer).toContain("useLayoutEffect");
+    expect(composer).toContain("rows={1}");
   });
 
   it("keeps sidecar transport and rendered architecture diagrams out of Renderer/docs", () => {
@@ -37,13 +44,16 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(docs).not.toContain("```mermaid");
   });
 
-  it("keeps Core provider-neutral and concrete runtimes in the composition root", () => {
+  it("keeps Core provider-neutral and OpenCode as the only production harness", () => {
     const registry = source("electron/main/agent/runtime/agent-runtime-registry.mjs");
     const bootstrap = source("electron/main/agent/bootstrap/create-agent-runtime-host.mjs");
+    const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
     const contract = source("shared/agent-contract/schema.mjs");
     expect(registry).not.toMatch(/opencode|codex|claude|cursor/i);
     expect(bootstrap).toContain("createOpenCodeRuntimeDefinition");
-    expect(bootstrap).toContain("createCodexRuntimeDefinition");
+    expect(bootstrap).not.toContain("createCodexRuntimeDefinition");
+    expect(composer).not.toMatch(/Agent runtime|onSelectRuntime|runtimes/);
+    expect(composer).toContain("Agent model");
     expect(contract).toContain("parseAgentIpcRequest");
     expect(contract).toContain("assertAgentIpcResponse");
   });

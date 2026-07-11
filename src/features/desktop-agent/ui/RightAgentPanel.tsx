@@ -140,9 +140,6 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         submitting={state.submitting}
         placeholder={unavailable ? `${runtimeLabel} unavailable` : `Plan, build, / for commands, @ for context`}
         runtimeLabel={runtimeLabel}
-        runtimes={inspection?.runtimes ?? []}
-        selectedRuntimeId={state.selectedRuntimeId}
-        onSelectRuntime={(runtimeId) => void controller.selectRuntime(runtimeId)}
         models={capabilities?.modelSelection ? inspection?.models ?? [] : []}
         selectedModel={state.selectedModel}
         onSelectModel={(model) => { controller.selectModel(model); onPreferredModelChange?.(model); }}

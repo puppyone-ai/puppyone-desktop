@@ -1,4 +1,5 @@
-import type { ComponentType } from "react";
+import { Check, Copy } from "lucide-react";
+import { useEffect, useState, type ComponentType } from "react";
 import type { AgentPart } from "../domain/agent-projection-types";
 import { AgentActivityItem } from "./AgentActivityItem";
 import { SafeMarkdown } from "./SafeMarkdown";
@@ -18,15 +19,38 @@ export function AgentPartRenderer(props: PartRendererProps) {
 }
 
 function MessagePart({ part, runtimeLabel }: PartRendererProps) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return undefined;
+    const timer = window.setTimeout(() => setCopied(false), 1_200);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
   if (part.kind !== "user" && part.kind !== "assistant") return null;
+  const copy = async () => {
+    if (!part.text || !navigator.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(part.text);
+      setCopied(true);
+    } catch {
+      // Clipboard access is optional in hardened renderer contexts.
+    }
+  };
   return (
-    <article className={`desktop-agent-message is-${part.kind}`}>
-      <div className="desktop-agent-message-role">{part.kind === "user" ? "You" : runtimeLabel}</div>
+    <article className={`desktop-agent-message is-${part.kind}`} aria-label={part.kind === "user" ? "You" : runtimeLabel}>
       {part.kind === "assistant"
         ? <SafeMarkdown text={part.text || (part.streaming ? "…" : "")} streaming={part.streaming} />
         : <div className="desktop-agent-message-text">{part.text}</div>}
-      {part.terminalState && part.terminalState !== "completed" && (
-        <div className={`desktop-agent-message-state is-${part.terminalState}`}>{part.terminalState}</div>
+      {part.kind === "assistant" && (Boolean(part.text) || part.terminalState) && (
+        <footer className="desktop-agent-message-actions">
+          {Boolean(part.text) && !part.streaming && (
+            <button type="button" aria-label={copied ? "Response copied" : "Copy response"} title={copied ? "Copied" : "Copy response"} onClick={() => void copy()}>
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+            </button>
+          )}
+          {part.terminalState && part.terminalState !== "completed" && (
+            <span className={`desktop-agent-message-state is-${part.terminalState}`}>{part.terminalState}</span>
+          )}
+        </footer>
       )}
     </article>
   );

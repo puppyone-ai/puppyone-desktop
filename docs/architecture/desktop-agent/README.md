@@ -1,9 +1,10 @@
 # Desktop Local Agent Chat architecture
 
-Status: target architecture accepted; implementation migration required behind
-the existing experimental `desktopAgentChat` gate. OpenCode is the only product
-Chat harness. The existing Codex app-server path is legacy implementation debt,
-not a peer runtime or fallback. Terminal remains a separate sibling surface.
+Status: target architecture accepted and active for the product Chat entry
+behind the existing experimental `desktopAgentChat` gate. Production
+composition now registers OpenCode only and the UI has no runtime selector.
+The existing Codex app-server implementation remains isolated legacy debt, not
+a peer runtime or fallback. Terminal remains a separate sibling surface.
 
 This document is intentionally made of prose and plain-text diagrams. It does
 not require a diagram renderer.
@@ -170,9 +171,11 @@ src/features/desktop-agent/
     AgentQuestionDock.tsx             typed blocking questions
     SafeMarkdown.tsx                  no-innerHTML Markdown surface
     AgentTranscript.tsx               <=120 mounted virtual rows
-    AgentComposer.tsx                 target: /, @, files, provider/model/mode
+    AgentComposer.tsx                 /, @, files and model/mode controls
+    AgentVisualSmokeHarness.tsx       deterministic 420/560/760 visual QA
     RightAgentPanel.tsx               view composition only
-    desktop-agent.css                 responsive PuppyOne tokens
+    desktop-agent.css                 complete responsive PuppyOne boundary
+  visual-smoke.ts                     QA-only secondary feature entrypoint
   agentTypes.ts                       migration-only type re-export
   agentProjection.ts                  migration-only projection re-export
 
@@ -214,6 +217,51 @@ OpenCode adapter, so a shared sidecar cannot leave an ownerless turn running.
 App quit also waits when inspection started the sidecar but no application
 session was created; runtime-resource state is tracked separately from session
 count so that process cannot become an orphan.
+
+## Presentation system
+
+The Chat surface follows a document-first coding-assistant hierarchy while
+remaining a PuppyOne component. It borrows interaction proportions, not brand
+assets or hard-coded colors.
+
+```text
+Right sidebar surface
+|
++-- compact session header
+|     title + live state              history / new / overflow
+|
++-- virtual conversation document
+|     user turn                       quiet, right-aligned bubble
+|     assistant turn                  unboxed readable document flow
+|     tool/plan/file activity         compact progressive disclosure
+|     answer actions                  copy and truthful available actions
+|
++-- blocking dock                     approval or structured question
+|
++-- anchored composer
+      growing input                   one line -> bounded multiline
+      left tools                      attach / context / OpenCode mode
+      right controls                  model / stop or send
+```
+
+Visible “You”, “OpenCode” or runtime badges are intentionally absent from each
+message because alignment and semantics already communicate authorship. The
+harness is not a product choice. User turns use one quiet raised material;
+assistant turns stay on canvas so long answers read like a document. Buttons
+appear only for real capabilities: the UI does not draw decorative microphone,
+rating or permission controls without an implemented action behind them.
+
+All `.desktop-agent-*` rules live in `ui/desktop-agent.css`; global
+`styles/layout.css` owns only the generic right-sidebar host. This prevents
+cascade order from changing the component when unrelated shell CSS evolves.
+The feature stylesheet uses semantic PuppyOne tokens, container breakpoints at
+760, 560 and 420 px, visible focus states and reduced-motion fallbacks.
+
+`#agent-visual-smoke` dynamically loads a deterministic conversation through
+the `visual-smoke.ts` secondary entrypoint. It is retained as a visual QA
+fixture while staying outside the normal Agent bundle and network/session
+path. Architecture tests enforce the CSS ownership boundary, responsive
+contracts, single-line growing composer and absence of a runtime selector.
 
 ## Main-process harness contract
 

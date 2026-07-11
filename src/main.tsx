@@ -9,7 +9,11 @@ import "./styles.css";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
-if (window.location.hash === "#renderer-performance-smoke") {
+if (window.location.hash === "#agent-visual-smoke") {
+  void import("./features/desktop-agent/visual-smoke").then(({ AgentVisualSmokeHarness }) => {
+    root.render(<AgentVisualSmokeHarness />);
+  });
+} else if (window.location.hash === "#renderer-performance-smoke") {
   void import("./performance/RendererPerformanceSmokeHarness").then(({ RendererPerformanceSmokeHarness }) => {
     root.render(<RendererPerformanceSmokeHarness />);
   });

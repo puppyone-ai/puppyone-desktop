@@ -120,7 +120,6 @@ const terminalService = createTerminalService({
 });
 const agentPersistence = createAgentPersistence({ app });
 const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
-  appVersion: app.getVersion(),
   appPath: app.getAppPath(),
   resourcesPath: process.resourcesPath,
   managedOpenCodeConfigDir: path.join(app.getPath("userData"), "agent-runtime", "opencode", "config"),

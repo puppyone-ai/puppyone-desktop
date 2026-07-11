@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronDown, Circle, CircleAlert, FilePenLine, TerminalSquare } from "lucide-react";
+import { Check, ChevronDown, CircleAlert, FilePenLine, LoaderCircle, TerminalSquare } from "lucide-react";
 import type { AgentActivity } from "../domain/agent-projection-types";
 import { AgentPlanItem } from "./AgentPlanItem";
 
@@ -19,7 +19,7 @@ export function AgentActivityItem({ activity, onViewChanges }: AgentActivityItem
         ? CircleAlert
         : activity.status === "completed"
           ? Check
-          : Circle;
+          : LoaderCircle;
   return (
     <div className={`desktop-agent-activity is-${activity.status}${activity.kind === "file-change" && onViewChanges ? " has-review" : ""}`}>
       <button
@@ -29,9 +29,9 @@ export function AgentActivityItem({ activity, onViewChanges }: AgentActivityItem
         aria-expanded={hasDetail ? expanded : undefined}
         onClick={() => hasDetail && setExpanded((value) => !value)}
       >
-        <Icon size={14} aria-hidden="true" />
+        <Icon size={14} aria-hidden="true" className={activity.status === "running" ? "desktop-agent-spin" : undefined} />
         <span>{activity.label}</span>
-        <small>{activity.status}</small>
+        {activity.status !== "completed" && <small>{activity.status}</small>}
         {hasDetail && <ChevronDown size={13} className={expanded ? "is-expanded" : ""} />}
       </button>
       {activity.kind === "file-change" && onViewChanges && (

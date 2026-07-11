@@ -1,6 +1,7 @@
 # ADR-003: OpenCode is the only product Chat harness
 
-Date: 2026-07-11. Status: accepted; implementation migration required.
+Date: 2026-07-11. Status: accepted; product entry implemented, legacy cleanup
+and explicit provider/variant modeling remain.
 
 This decision supersedes the product-routing parts of ADR-001 and ADR-002 that
 exposed OpenCode and Codex as peer, user-selectable Chat runtimes. It does not
@@ -192,17 +193,17 @@ bridges extend that catalog or its authorized configuration surface; they do
 not add another `AgentRuntimePort` implementation merely because they use a
 different model or credential source.
 
-Required migration work:
+Migration status:
 
-1. remove the Runtime selector from the composer and public preferences;
-2. make OpenCode the sole new-session production route;
+1. completed: remove the Runtime selector from the composer;
+2. completed: make OpenCode the sole new-session production route;
 3. represent provider, model and variant as separate session fields;
 4. route OpenAI/ChatGPT OAuth and Codex models through OpenCode;
-5. stop automatic fallback to a ready direct CLI harness;
+5. completed: stop product fallback to a ready direct CLI harness;
 6. treat persisted Codex direct sessions as legacy records;
-7. update titles, readiness copy, tests and telemetry to the vocabulary above;
-8. add an invariant test proving a sidebar submission reaches OpenCode even
-   when Codex CLI is installed and authenticated.
+7. in progress: update remaining legacy copy and telemetry to the vocabulary;
+8. completed: add a production-composition invariant proving even a persisted
+   Codex preference resolves to the sole registered OpenCode harness.
 
 ## Consequences
 

@@ -30,11 +30,11 @@ describe("Desktop Agent panel lifecycle", () => {
 
     act(() => harness.exitListener?.({ sessionId: "session-1", reason: "provider-exited" }));
 
-    expect(container.textContent).toContain("Codex stopped unexpectedly");
+    expect(container.textContent).toContain("OpenCode stopped unexpectedly");
     expect((container.querySelector("textarea") as HTMLTextAreaElement).disabled).toBe(true);
     expect(container.textContent).toContain("provider exited");
 
-    const newSessionButton = container.querySelector('button[aria-label="New Codex session"]') as HTMLButtonElement;
+    const newSessionButton = container.querySelector('button[aria-label="New OpenCode session"]') as HTMLButtonElement;
     act(() => newSessionButton.click());
     await flushEffects();
     expect(harness.bridge.closeAgentSession).toHaveBeenCalledWith({
@@ -93,25 +93,25 @@ function createBridgeHarness() {
   harness.bridge = {
     discoverAgentProviders: vi.fn(async () => ({
       runtimes: [{
-        descriptor: { id: "codex", displayName: "Codex", kind: "direct-cli" },
+        descriptor: { id: "opencode", displayName: "OpenCode", kind: "harness" },
         readiness: {
-          runtimeId: "codex",
-          provider: "codex",
+          runtimeId: "opencode",
+          provider: "opencode",
           status: "ready",
           version: "0.144.1",
           minimumVersion: "0.144.1",
-          message: "Codex is ready.",
+          message: "OpenCode is ready.",
         },
       }],
-      selectedRuntimeId: "codex",
-      runtime: { id: "codex", displayName: "Codex", kind: "direct-cli" },
+      selectedRuntimeId: "opencode",
+      runtime: { id: "opencode", displayName: "OpenCode", kind: "harness" },
       readiness: {
-        runtimeId: "codex",
-        provider: "codex",
+        runtimeId: "opencode",
+        provider: "opencode",
         status: "ready",
         version: "0.144.1",
         minimumVersion: "0.144.1",
-        message: "Codex is ready.",
+        message: "OpenCode is ready.",
       },
       account: { account: { type: "chatgpt", email: null, planType: null }, requiresOpenaiAuth: true },
       models: [{ id: "gpt-5", model: "gpt-5", displayName: "GPT-5", description: "", isDefault: true }],
@@ -142,9 +142,9 @@ function snapshot(events: AgentEvent[]): AgentSessionSnapshot {
   return {
     session: {
       id: "session-1",
-      runtimeId: "codex",
-      runtime: { id: "codex", displayName: "Codex", kind: "direct-cli" },
-      provider: "codex",
+      runtimeId: "opencode",
+      runtime: { id: "opencode", displayName: "OpenCode", kind: "harness" },
+      provider: "opencode",
       providerSessionId: "thread-1",
       workspaceRoot: "/workspace",
       title: "Session",
@@ -158,7 +158,7 @@ function snapshot(events: AgentEvent[]): AgentSessionSnapshot {
     account: { account: { type: "chatgpt", email: null, planType: null }, requiresOpenaiAuth: true },
     models: [{ id: "gpt-5", model: "gpt-5", displayName: "GPT-5", description: "", isDefault: true }],
     capabilities: capabilities(),
-    runtime: { id: "codex", displayName: "Codex", kind: "direct-cli" },
+    runtime: { id: "opencode", displayName: "OpenCode", kind: "harness" },
     events,
     partial: false,
     firstAvailableSequence: events[0]?.sequence ?? 1,
@@ -203,8 +203,8 @@ function event(
     schemaVersion: 1,
     sequence,
     sessionId: "session-1",
-    runtimeId: "codex",
-    provider: "codex",
+    runtimeId: "opencode",
+    provider: "opencode",
     providerSessionId: "thread-1",
     turnId,
     itemId,

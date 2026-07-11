@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CircleAlert, LoaderCircle } from "lucide-react";
+import { ArrowDown, CircleAlert, LoaderCircle, MessageSquareCode } from "lucide-react";
 import type { AgentPart, AgentProjection, TimelineRow } from "../domain/agent-projection-types";
 import { AgentPartRenderer } from "./AgentPartRenderer";
 
@@ -123,9 +123,9 @@ export function AgentTranscript({
         )}
         {timeline.rows.length === 0 && !loading && (
           <div className="desktop-agent-empty">
-            <div className="desktop-agent-empty-mark">P1</div>
-            <strong>Build with a local Agent</strong>
-            <p>Ask about this workspace, plan a change, run commands, or edit files. PuppyOne pauses for permission and questions.</p>
+            <div className="desktop-agent-empty-mark"><MessageSquareCode size={18} /></div>
+            <strong>What should we build?</strong>
+            <p>Ask about this workspace, plan a change, run commands, or edit files. You stay in control of approvals.</p>
           </div>
         )}
         {loading && timeline.rows.length === 0 && (
@@ -140,7 +140,7 @@ export function AgentTranscript({
               const part = timeline.parts.get(row.partId);
               if (!part) return null;
               return (
-                <MeasuredRow key={row.id} rowId={row.id} top={layout.offsets[index]} onMeasure={measure}>
+                <MeasuredRow key={row.id} rowId={row.id} kind={part.kind} top={layout.offsets[index]} onMeasure={measure}>
                   <MemoAgentPartRenderer part={part} runtimeLabel={runtimeLabel} onViewChanges={onViewChanges} />
                 </MeasuredRow>
               );
@@ -157,7 +157,7 @@ export function AgentTranscript({
           if (element) element.scrollTop = element.scrollHeight;
           pinnedRef.current = true;
           setPinned(true);
-        }}>Jump to latest</button>
+        }}><ArrowDown size={13} /> Jump to latest</button>
       )}
     </div>
   );
@@ -165,8 +165,9 @@ export function AgentTranscript({
 
 const MemoAgentPartRenderer = memo(AgentPartRenderer);
 
-function MeasuredRow({ rowId, top, onMeasure, children }: {
+function MeasuredRow({ rowId, kind, top, onMeasure, children }: {
   rowId: string;
+  kind: AgentPart["kind"];
   top: number;
   onMeasure: (rowId: string, height: number) => void;
   children: React.ReactNode;
@@ -181,7 +182,7 @@ function MeasuredRow({ rowId, top, onMeasure, children }: {
     observer?.observe(element);
     return () => observer?.disconnect();
   }, [onMeasure, rowId]);
-  return <div ref={ref} className="desktop-agent-virtual-row" style={{ transform: `translateY(${top}px)` }}>{children}</div>;
+  return <div ref={ref} className="desktop-agent-virtual-row" data-kind={kind} style={{ transform: `translateY(${top}px)` }}>{children}</div>;
 }
 
 function buildTimeline(projection: AgentProjection) {
@@ -199,7 +200,7 @@ function buildTimeline(projection: AgentProjection) {
     turnId: part.turnId,
     kind: part.kind,
     sequence: part.sequence,
-    estimatedHeight: part.kind === "assistant" ? 96 : part.kind === "user" ? 72 : 42,
+    estimatedHeight: part.kind === "assistant" ? 120 : part.kind === "user" ? 86 : 42,
   }));
   return { rows, parts: new Map(parts.map((part) => [part.id, part])) };
 }

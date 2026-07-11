@@ -1,6 +1,6 @@
-import { ArrowUp, AtSign, Paperclip, Square, X } from "lucide-react";
-import { useRef, useState, type KeyboardEvent } from "react";
-import type { AgentCommand, AgentFileReference, AgentMode, AgentModel, AgentRuntimeCatalogEntry } from "../domain/agent-contract";
+import { ArrowUp, AtSign, ChevronDown, Paperclip, Plus, Sparkles, Square, X, Zap } from "lucide-react";
+import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import type { AgentCommand, AgentFileReference, AgentMode, AgentModel } from "../domain/agent-contract";
 
 type AgentComposerProps = {
   draft: string;
@@ -11,9 +11,6 @@ type AgentComposerProps = {
   submitting: boolean;
   placeholder: string;
   runtimeLabel?: string;
-  runtimes?: AgentRuntimeCatalogEntry[];
-  selectedRuntimeId?: string | null;
-  onSelectRuntime?: (runtimeId: string) => void;
   models?: AgentModel[];
   selectedModel?: string | null;
   onSelectModel?: (model: string) => void;
@@ -35,6 +32,8 @@ type AgentComposerProps = {
   onStop: () => void;
 };
 
+const MAX_TEXTAREA_HEIGHT = 168;
+
 export function AgentComposer({
   draft,
   onDraftChange,
@@ -44,9 +43,6 @@ export function AgentComposer({
   submitting,
   placeholder,
   runtimeLabel = "Agent",
-  runtimes = [],
-  selectedRuntimeId = null,
-  onSelectRuntime,
   models = [],
   selectedModel = null,
   onSelectModel,
@@ -67,6 +63,7 @@ export function AgentComposer({
   onSubmit,
   onStop,
 }: AgentComposerProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pickMode, setPickMode] = useState<"attachment" | "context">("attachment");
   const commandQuery = /^\/([^\s]*)$/.exec(draft.trimStart())?.[1]?.toLowerCase() ?? null;
@@ -74,6 +71,19 @@ export function AgentComposer({
     .filter((command) => command.name.toLowerCase().includes(commandQuery))
     .slice(0, 8);
   const canSendWhileRunning = steerAvailable || queueAvailable;
+  const selectedModelEntry = useMemo(
+    () => models.find((model) => model.model === selectedModel) ?? models[0] ?? null,
+    [models, selectedModel],
+  );
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "0px";
+    const nextHeight = Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
+  }, [draft]);
 
   const submit = async () => {
     const prompt = draft.trim();
@@ -119,9 +129,10 @@ export function AgentComposer({
           </div>
         )}
         <textarea
+          ref={textareaRef}
           value={draft}
           disabled={disabled}
-          rows={3}
+          rows={1}
           aria-label={`Message ${runtimeLabel}`}
           placeholder={placeholder}
           onChange={(event) => onDraftChange(event.target.value)}
@@ -129,20 +140,45 @@ export function AgentComposer({
         />
         <input ref={fileInputRef} className="desktop-agent-visually-hidden" type="file" multiple tabIndex={-1} onChange={(event) => acceptFiles(event.target.files)} />
         <div className="desktop-agent-composer-footer">
-          <div className="desktop-agent-composer-selectors">
-            {runtimes.length > 1 && <label><span className="desktop-agent-visually-hidden">Agent runtime</span><select value={selectedRuntimeId ?? ""} disabled={running} onChange={(event) => onSelectRuntime?.(event.target.value)}>{runtimes.map((runtime) => <option key={runtime.descriptor.id} value={runtime.descriptor.id}>{runtime.descriptor.displayName}</option>)}</select></label>}
-            {modes.length > 0 && <label><span className="desktop-agent-visually-hidden">Agent mode</span><select value={selectedMode ?? ""} disabled={running} onChange={(event) => onSelectMode?.(event.target.value)}>{modes.map((mode) => <option key={mode.id} value={mode.id}>{mode.displayName}</option>)}</select></label>}
-            {models.length > 0 && <label><span className="desktop-agent-visually-hidden">Agent model</span><select value={selectedModel ?? ""} disabled={running} onChange={(event) => onSelectModel?.(event.target.value)}>{models.map((model) => <option key={model.id} value={model.model}>{model.displayName}</option>)}</select></label>}
+          <div className="desktop-agent-composer-leading">
+            {attachmentAvailable && <button type="button" className="desktop-agent-composer-tool" aria-label="Attach files" title="Attach files" disabled={disabled || running} onClick={() => openPicker("attachment")}><Plus size={18} /></button>}
+            {contextAvailable && <button type="button" className="desktop-agent-composer-tool" aria-label="Add workspace context" title="Add workspace context" disabled={disabled || running} onClick={() => openPicker("context")}><AtSign size={16} /></button>}
+            <div className="desktop-agent-select-pill is-mode">
+              <Sparkles size={13} aria-hidden="true" />
+              {modes.length > 0 ? (
+                <label>
+                  <span className="desktop-agent-visually-hidden">Agent mode</span>
+                  <select value={selectedMode ?? ""} disabled={running} onChange={(event) => onSelectMode?.(event.target.value)}>
+                    {modes.map((mode) => <option key={mode.id} value={mode.id}>{mode.displayName}</option>)}
+                  </select>
+                </label>
+              ) : <span>Agent</span>}
+              {modes.length > 0 && <ChevronDown size={12} aria-hidden="true" />}
+            </div>
           </div>
-          <div className="desktop-agent-composer-tools">
-            {contextAvailable && <button type="button" aria-label="Add workspace context" title="Add workspace context" disabled={disabled || running} onClick={() => openPicker("context")}><AtSign size={15} /></button>}
-            {attachmentAvailable && <button type="button" aria-label="Attach files" title="Attach files" disabled={disabled || running} onClick={() => openPicker("attachment")}><Paperclip size={15} /></button>}
-            {running && <button type="button" className="desktop-agent-composer-action is-stop" aria-label={stopping ? `Stopping ${runtimeLabel}` : `Stop ${runtimeLabel}`} disabled={stopping} onClick={onStop}><Square size={12} fill="currentColor" /></button>}
-            {(!running || canSendWhileRunning) && <button type="button" className="desktop-agent-composer-action" aria-label={running && steerAvailable ? `Steer ${runtimeLabel}` : "Send message"} disabled={disabled || submitting || !draft.trim()} onClick={() => void submit()}><ArrowUp size={16} /></button>}
+          <div className="desktop-agent-composer-trailing">
+            {models.length > 0 && (
+              <div className="desktop-agent-select-pill is-model" title={selectedModelEntry?.description || selectedModelEntry?.displayName}>
+                <Zap size={13} fill="currentColor" aria-hidden="true" />
+                <label>
+                  <span className="desktop-agent-visually-hidden">Agent model</span>
+                  <select value={selectedModel ?? ""} disabled={running} onChange={(event) => onSelectModel?.(event.target.value)}>
+                    {models.map((model) => <option key={model.id} value={model.model}>{model.displayName}</option>)}
+                  </select>
+                </label>
+                <ChevronDown size={12} aria-hidden="true" />
+              </div>
+            )}
+            {running && <button type="button" className="desktop-agent-composer-action is-stop" aria-label={stopping ? `Stopping ${runtimeLabel}` : `Stop ${runtimeLabel}`} disabled={stopping} onClick={onStop}><Square size={11} fill="currentColor" /></button>}
+            {(!running || canSendWhileRunning) && <button type="button" className="desktop-agent-composer-action" aria-label={running && steerAvailable ? `Steer ${runtimeLabel}` : "Send message"} disabled={disabled || submitting || !draft.trim()} onClick={() => void submit()}><ArrowUp size={17} strokeWidth={2.2} /></button>}
           </div>
         </div>
       </div>
-      <div className="desktop-agent-composer-hint">{stopping ? `Waiting for ${runtimeLabel} to stop…` : running && steerAvailable ? "Enter to steer the running turn" : running && queueAvailable ? "Enter to queue a follow-up" : "Enter to send · Shift+Enter for a new line"}</div>
+      {(stopping || (running && canSendWhileRunning)) && (
+        <div className="desktop-agent-composer-hint" role="status">
+          {stopping ? `Waiting for ${runtimeLabel} to stop…` : steerAvailable ? "Send to steer the running turn" : "Send to queue a follow-up"}
+        </div>
+      )}
     </div>
   );
 }

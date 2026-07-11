@@ -123,7 +123,7 @@ for (const filePath of walkSourceFiles(path.join(repoRoot, "src"))) {
   if (isInsideOrSame(filePath, rendererRoot)) continue;
   const source = readFileSync(filePath, "utf8");
   for (const specifier of collectSpecifiers(source)) {
-    if (/features\/desktop-agent\/(?!index(?:\.|$))/.test(specifier)) {
+    if (/features\/desktop-agent\/(?!index(?:\.|$)|visual-smoke(?:\.|$))/.test(specifier)) {
       errors.push(`${relative(filePath)} deep-imports ${specifier}; consume the feature public index`);
     }
   }

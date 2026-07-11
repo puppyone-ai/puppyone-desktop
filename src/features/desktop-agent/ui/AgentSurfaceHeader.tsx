@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Archive, ChevronDown, CircleAlert, CopyPlus, History, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, CircleAlert, CopyPlus, History, MoreHorizontal, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../../components/DesktopMenu";
 import type { AgentSessionListItem } from "../domain/agent-contract";
 
@@ -76,15 +76,15 @@ export function AgentSurfaceHeader({
         <span><i className={`is-${statusLabel.replace(/\s+/g, "-")}`} />{statusLabel}</span>
       </div>
       <div className="desktop-agent-session-header-actions" ref={menuRef}>
-        <button type="button" className="desktop-agent-icon-button" aria-label="Session history" title="Session history" aria-expanded={historyOpen} disabled={loading || newSessionDisabled} onClick={() => { setHistoryOpen((value) => !value); setMenuOpen(false); }}><History size={15} /></button>
+        <button type="button" className="desktop-agent-icon-button" aria-label="Session history" title="Session history" aria-expanded={historyOpen} disabled={loading} onClick={() => { setHistoryOpen((value) => !value); setMenuOpen(false); }}><History size={15} /></button>
         <button type="button" className="desktop-agent-icon-button" aria-label={`New ${runtimeLabel} session`} title={`New ${runtimeLabel} session`} disabled={loading || newSessionDisabled} onClick={onNewSession}><Plus size={15} /></button>
-        <button type="button" className="desktop-agent-icon-button" aria-label={`${runtimeLabel} session actions`} title="Session actions" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => { setMenuOpen((value) => !value); setHistoryOpen(false); }}><ChevronDown size={14} /></button>
+        <button type="button" className="desktop-agent-icon-button" aria-label={`${runtimeLabel} session actions`} title="Session actions" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => { setMenuOpen((value) => !value); setHistoryOpen(false); }}><MoreHorizontal size={16} /></button>
         {historyOpen && (
           <div className="desktop-agent-history-menu" role="menu" aria-label="Agent session history">
             <header><strong>Recent chats</strong><span>{history.length}</span></header>
             {history.length === 0 ? <p>No saved chats yet.</p> : history.map((session) => (
               <button type="button" role="menuitem" className={session.id === activeSessionId ? "is-active" : ""} key={session.id} onClick={() => { setHistoryOpen(false); onSelectSession?.(session.id); }}>
-                <strong>{session.title}</strong><span>{session.runtime?.displayName || session.runtimeId || session.provider}</span><time>{relativeTime(session.updatedAt)}</time>
+                <strong>{session.title}</strong><span>{session.selectedModel || "OpenCode"}</span><time>{relativeTime(session.updatedAt)}</time>
               </button>
             ))}
           </div>
