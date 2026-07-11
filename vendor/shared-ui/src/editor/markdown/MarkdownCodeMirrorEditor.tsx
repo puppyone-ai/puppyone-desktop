@@ -88,6 +88,7 @@ export function MarkdownCodeMirrorEditor({
   const livePreviewCoreCompartmentRef = useRef(new Compartment());
   const livePreviewContextCompartmentRef = useRef(new Compartment());
   const aiEditCompartmentRef = useRef(new Compartment());
+  const initialEditorConfigRef = useRef({ aiEditFile, readOnly, value });
   const previewActivatedRef = useRef(false);
   const livePreviewContextRef = useRef({
     htmlTrustMode,
@@ -109,6 +110,7 @@ export function MarkdownCodeMirrorEditor({
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return undefined;
+    const initialConfig = initialEditorConfigRef.current;
 
     const editorCreateStartedAt = performance.now();
     const view = new EditorView({
@@ -124,14 +126,14 @@ export function MarkdownCodeMirrorEditor({
         }
       },
       state: EditorState.create({
-        doc: value,
+        doc: initialConfig.value,
         extensions: [
-          ...markdownCodeMirrorUrgentExtensions(readOnly),
-          editableCompartmentRef.current.of(getEditableExtensions(readOnly)),
+          ...markdownCodeMirrorUrgentExtensions(initialConfig.readOnly),
+          editableCompartmentRef.current.of(getEditableExtensions(initialConfig.readOnly)),
           languageCompartmentRef.current.of([]),
           livePreviewContextCompartmentRef.current.of([]),
           livePreviewCoreCompartmentRef.current.of([]),
-          aiEditCompartmentRef.current.of(markdownAiEditExtension(aiEditFile)),
+          aiEditCompartmentRef.current.of(markdownAiEditExtension(initialConfig.aiEditFile)),
           EditorView.updateListener.of((update) => {
             if (!update.docChanged) return;
             if (update.transactions.some((transaction) => transaction.annotation(externalDocumentUpdate))) return;

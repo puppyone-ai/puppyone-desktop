@@ -59,7 +59,7 @@ export type ExplorerTreeProps = {
   onDuplicateNodes?: (nodes: DataNode[]) => void | Promise<void>;
   onImportFiles?: (files: File[], targetFolderPath: string | null) => void | Promise<void>;
   onRootContextMenu?: (event: ReactMouseEvent<HTMLDivElement>) => void;
-  onNodeContextMenu?: (node: DataNode, event: ReactMouseEvent<HTMLButtonElement>) => void;
+  onNodeContextMenu?: (node: DataNode, event: ReactMouseEvent<HTMLDivElement>) => void;
   onRootClick?: (event: ReactMouseEvent<HTMLElement>) => void;
   renderRootContent?: () => ReactNode;
   renderListEnd?: () => ReactNode;
@@ -82,7 +82,7 @@ type TreeDropTarget = {
 
 type TreeDragController = {
   enabled: boolean;
-  onNodeDragStart: (event: ReactDragEvent<HTMLButtonElement>, node: DataNode) => void;
+  onNodeDragStart: (event: ReactDragEvent<HTMLDivElement>, node: DataNode) => void;
   onNodeDragEnd: () => void;
   onRowDragOver: (
     event: ReactDragEvent<HTMLElement>,
@@ -190,7 +190,7 @@ export function ExplorerTree({
     maxMountedRows: EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS,
   });
   const scrollEdgeState = useScrollEdgeState(scrollRef, {
-    dependencies: [visibleModel.rows.length, rootError, rootLoading],
+    revision: `${visibleModel.rows.length}:${rootLoading ? "loading" : "idle"}:${rootError ?? ""}`,
   });
   const scrollable = scrollEdgeState.scrollable;
   const callbackRef = useRef({
@@ -256,7 +256,7 @@ export function ExplorerTree({
     });
   }, []);
 
-  const beginNodeDrag = useCallback((event: ReactDragEvent<HTMLButtonElement>, node: DataNode) => {
+  const beginNodeDrag = useCallback((event: ReactDragEvent<HTMLDivElement>, node: DataNode) => {
     if (!moveEnabled) {
       event.preventDefault();
       return;
@@ -619,7 +619,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
   const isFolder = node.type === "folder";
   const hoverExpandTimer = useRef<number | null>(null);
   const rowActions = renderRowActions(node);
-  const displayName = useMemo(() => getExplorerDisplayName(node), [node.name, node.type]);
+  const displayName = useMemo(() => getExplorerDisplayName(node), [node]);
   const showExtensionDisambiguator = Boolean(
     displayName.extension
       && (siblingDisplayNameCounts.get(getDisplayNameKey(displayName.primary)) ?? 0) > 1,
@@ -662,10 +662,9 @@ const TreeNodeRow = memo(function TreeNodeRow({
   }, [isFolder, node.path]);
 
   return (
-    <button
+    <div
       id={getExplorerRowDomId(row.index)}
       className={`tree-row ${isFolder ? "folder" : "file"} ${interaction.selected ? "selected" : ""} ${interaction.active ? "active" : ""} ${interaction.cut ? "clipboard-cut" : ""} ${interaction.loading ? "loading" : ""} ${interaction.dragging ? "dragging" : ""} ${interaction.dropOver ? "drop-target" : ""} ${interaction.dropParentOver ? "drop-parent-target" : ""} ${interaction.dropInvalid ? "drop-invalid" : ""} ${node.status ? `status-${node.status}` : ""}`}
-      type="button"
       role="treeitem"
       data-explorer-path={node.path}
       draggable={dragController.enabled}
@@ -706,6 +705,13 @@ const TreeNodeRow = memo(function TreeNodeRow({
         const intent = getSelectionIntent(event);
         onSelectNode(node, intent);
         if (isFolder && !intent.additive && !intent.range) toggleCurrentFolder();
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onSelectNode(node);
+        if (isFolder) toggleCurrentFolder();
       }}
       onContextMenu={hasNodeContextMenu ? (event) => {
         event.stopPropagation();
@@ -753,7 +759,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
           </span>
         )}
       </span>
-    </button>
+    </div>
   );
 }, areTreeNodeRowPropsEqual);
 

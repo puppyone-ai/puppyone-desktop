@@ -45,7 +45,7 @@ export function useActiveExternalOpenTarget({
     activeViewIsData && activeDataNode && activeDataNode.type !== "folder"
       ? getExternalAppExtension(activeDataNode.path)
       : null
-  ), [activeDataNode?.path, activeDataNode?.type, activeViewIsData]);
+  ), [activeDataNode, activeViewIsData]);
 
   const activeExternalAppOverride = useMemo(() => (
     getExternalAppOverrideForExtension(externalAppsSettings, activeExternalFileExtension)
@@ -141,11 +141,8 @@ export function useActiveExternalOpenTarget({
       cancelled = true;
     };
   }, [
-    activeDataNode?.path,
-    activeDataNode?.type,
-    activeExternalAppOverride?.appName,
-    activeExternalAppOverride?.appPath,
-    activeExternalAppOverride?.bundleId,
+    activeDataNode,
+    activeExternalAppOverride,
     activeExternalFileExtension,
     activeViewIsData,
     syncExternalAppOverrideIcon,

@@ -43,6 +43,7 @@ export function CodeMirrorCodeEditor({
   const readOnlyRef = useRef(readOnly);
   const applyingExternalChangeRef = useRef(false);
   const languageKey = useMemo(() => getCodeLanguageKey(language, nodeName), [language, nodeName]);
+  const initialEditorConfigRef = useRef({ content, languageKey, nodeName, readOnly });
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -55,9 +56,10 @@ export function CodeMirrorCodeEditor({
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return undefined;
+    const initialConfig = initialEditorConfigRef.current;
 
     const state = EditorState.create({
-      doc: content,
+      doc: initialConfig.content,
       extensions: [
         lineNumbers(),
         highlightActiveLineGutter(),
@@ -76,8 +78,8 @@ export function CodeMirrorCodeEditor({
           "&": { height: "100%" },
           ".cm-scroller": { overflow: "auto" },
         }),
-        languageCompartmentRef.current.of(getCodeLanguageExtension(languageKey, nodeName)),
-        readOnlyCompartmentRef.current.of(getReadOnlyExtension(readOnly)),
+        languageCompartmentRef.current.of(getCodeLanguageExtension(initialConfig.languageKey, initialConfig.nodeName)),
+        readOnlyCompartmentRef.current.of(getReadOnlyExtension(initialConfig.readOnly)),
       ],
     });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { EditorSaveButton, type SaveStatus } from "../EditorSaveButton";
 import { PlainTextEditor } from "../PlainTextEditor";
 import type { EditorMode, EditorSaveMode } from "../viewerTypes";
@@ -63,6 +63,7 @@ export function TextEditorFrame({
   const savingRef = useRef(false);
   const queuedAutoSaveRef = useRef(false);
   const inFlightContentRef = useRef<string | null>(null);
+  const saveCurrentSourceRef = useRef<(automatic: boolean) => Promise<void>>(async () => undefined);
   const dirty = sourceSnapshotMode ? snapshotDirty : draft !== persistedContent;
 
   useLayoutEffect(() => {
@@ -144,7 +145,7 @@ export function TextEditorFrame({
     else if (saveStatus === "dirty" || saveStatus === "error") setSaveStatus("clean");
   }, [dirty, saveStatus]);
 
-  const saveContent = async (
+  const saveContent = useCallback(async (
     contentToSave: string,
     automatic: boolean,
     sourceRevision: string | null,
@@ -185,18 +186,18 @@ export function TextEditorFrame({
       setSaveStatus("error");
       setSaveError(error instanceof Error ? error.message : String(error));
     } finally {
-      if (documentIdRef.current !== saveDocumentId) return;
-
-      savingRef.current = false;
-      inFlightContentRef.current = null;
-      if (automatic && queuedAutoSaveRef.current) {
-        queuedAutoSaveRef.current = false;
-        window.setTimeout(() => void saveCurrentSource(true), 0);
+      if (documentIdRef.current === saveDocumentId) {
+        savingRef.current = false;
+        inFlightContentRef.current = null;
+        if (automatic && queuedAutoSaveRef.current) {
+          queuedAutoSaveRef.current = false;
+          window.setTimeout(() => void saveCurrentSourceRef.current(true), 0);
+        }
       }
     }
-  };
+  }, [onSaveContent, sourceSnapshotMode]);
 
-  const saveCurrentSource = async (automatic: boolean) => {
+  const saveCurrentSource = useCallback(async (automatic: boolean) => {
     if (sourceSnapshotMode) {
       const snapshot = snapshotPortRef.current?.readSnapshot();
       if (!snapshot) return;
@@ -204,7 +205,8 @@ export function TextEditorFrame({
       return;
     }
     await saveContent(draftRef.current, automatic, null);
-  };
+  }, [saveContent, sourceSnapshotMode]);
+  saveCurrentSourceRef.current = saveCurrentSource;
 
   const handleSourceRevisionChange = (revision: EditorSourceRevision) => {
     snapshotRevisionRef.current = revision.revision;
@@ -255,7 +257,7 @@ export function TextEditorFrame({
     }, 400);
 
     return () => window.clearTimeout(timeoutId);
-  }, [dirty, onSaveContent, saveMode, snapshotRevision, draft]);
+  }, [dirty, onSaveContent, saveCurrentSource, saveMode, snapshotRevision, draft]);
 
   return (
     <section className="editor-host">

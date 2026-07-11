@@ -1,11 +1,9 @@
-import { useLayoutEffect, useState, type DependencyList, type RefObject } from "react";
+import { useLayoutEffect, useState, type RefObject } from "react";
 
 const DEFAULT_SCROLLABLE_CLASS = "is-scrollable";
 const DEFAULT_OVERFLOW_THRESHOLD = 1;
-const EMPTY_DEPENDENCIES: DependencyList = [];
-
 export type ScrollableStateOptions = {
-  dependencies?: DependencyList;
+  revision?: unknown;
   threshold?: number;
 };
 
@@ -34,7 +32,7 @@ export function useScrollableState<T extends HTMLElement>(
   elementRef: RefObject<T | null>,
   options: ScrollableStateOptions = {},
 ) {
-  const { dependencies = EMPTY_DEPENDENCIES, threshold = DEFAULT_OVERFLOW_THRESHOLD } = options;
+  const { revision, threshold = DEFAULT_OVERFLOW_THRESHOLD } = options;
   const [scrollable, setScrollable] = useState(false);
 
   useLayoutEffect(() => {
@@ -71,7 +69,7 @@ export function useScrollableState<T extends HTMLElement>(
       mutationObserver?.disconnect();
       window.removeEventListener("resize", scheduleUpdate);
     };
-  }, [elementRef, threshold, ...dependencies]);
+  }, [elementRef, revision, threshold]);
 
   return scrollable;
 }
@@ -81,8 +79,8 @@ export function useScrollEdgeState<T extends HTMLElement>(
   options: ScrollEdgeStateOptions = {},
 ) {
   const {
-    dependencies = EMPTY_DEPENDENCIES,
     fadeDistance = 24,
+    revision,
     threshold = DEFAULT_OVERFLOW_THRESHOLD,
   } = options;
   const [edgeState, setEdgeState] = useState<ScrollEdgeState>({
@@ -147,7 +145,7 @@ export function useScrollEdgeState<T extends HTMLElement>(
       element.removeEventListener("scroll", scheduleUpdate);
       window.removeEventListener("resize", scheduleUpdate);
     };
-  }, [elementRef, fadeDistance, threshold, ...dependencies]);
+  }, [elementRef, fadeDistance, revision, threshold]);
 
   return edgeState;
 }
@@ -158,7 +156,7 @@ export function useScrollableDescendantClasses<T extends HTMLElement>(
 ) {
   const {
     className = DEFAULT_SCROLLABLE_CLASS,
-    dependencies = EMPTY_DEPENDENCIES,
+    revision,
     selector,
     threshold = DEFAULT_OVERFLOW_THRESHOLD,
   } = options;
@@ -231,7 +229,7 @@ export function useScrollableDescendantClasses<T extends HTMLElement>(
         container.classList.remove(className);
       });
     };
-  }, [className, rootRef, selector, threshold, ...dependencies]);
+  }, [className, revision, rootRef, selector, threshold]);
 }
 
 function clampNumber(value: number, min: number, max: number) {

@@ -33,12 +33,17 @@ const coreBugRules = {
 export default [
   {
     ignores: [
-      "dist/**", "release/**", "node_modules/**", "vendor/**",
+      "dist/**", "release/**", "node_modules/**",
+      "vendor/claudian/**", "vendor/opencode/**",
       "src-tauri/**", "build/**", "public/**", "**/*.d.ts", "eslint.config.js",
     ],
   },
   {
-    files: ["src/**/*.{ts,tsx}", "shared/agent-contract/**/*.ts"],
+    files: [
+      "src/**/*.{ts,tsx}",
+      "shared/agent-contract/**/*.ts",
+      "vendor/shared-ui/src/**/*.{ts,tsx}",
+    ],
     languageOptions: {
       parser: tsParser,
       parserOptions: { ecmaVersion: 2023, sourceType: "module", ecmaFeatures: { jsx: true } },
@@ -49,6 +54,20 @@ export default [
       ...coreBugRules,
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn", // legacy debt — visible, non-blocking
+    },
+  },
+  {
+    files: ["tests/**/*.{ts,tsx}"],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: { ecmaVersion: 2023, sourceType: "module", ecmaFeatures: { jsx: true } },
+      globals: { ...globals.browser, ...globals.node },
+    },
+    plugins: { "react-hooks": reactHooks },
+    rules: {
+      ...coreBugRules,
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
     },
   },
   {

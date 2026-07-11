@@ -134,7 +134,7 @@ export type DataWorkspaceProps = {
   onExplorerNodeContextMenu?: (
     state: DataWorkspaceState,
     node: DataNode,
-    event: ReactMouseEvent<HTMLButtonElement>,
+    event: ReactMouseEvent<HTMLDivElement>,
   ) => void;
   explorerCutPaths?: ReadonlySet<string>;
   onCopyNodes?: (nodes: DataNode[]) => void | Promise<void>;
@@ -880,7 +880,7 @@ export function DataWorkspace({
     return () => {
       request.cancel();
     };
-  }, [dataPort, refreshKey, selectedFile?.path]);
+  }, [dataPort, refreshKey, selectedFile]);
 
   useEffect(() => {
     if (!selectedFile || !selectedFileNeedsResourceUrl || !dataPort.getFileUrl) {
@@ -925,7 +925,7 @@ export function DataWorkspace({
         activeUrl = null;
       }
     };
-  }, [dataPort, selectedFile?.path, selectedFileNeedsResourceUrl]);
+  }, [dataPort, selectedFile, selectedFileNeedsResourceUrl]);
 
   const toggleFolder = useCallback(
     (node: DataNode, expanded: boolean) => {

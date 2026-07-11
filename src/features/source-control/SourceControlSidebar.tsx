@@ -3,6 +3,7 @@ import { useScrollableDescendantClasses, type FileIconThemeId } from "@puppyone/
 import {
   Fragment,
   useCallback,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -274,8 +275,28 @@ export function GitSidebar({
     };
   }, [panelHeights]);
 
+  const scrollableContentRevision = useMemo(() => ({
+    committedExpanded,
+    loading,
+    mergeExpanded,
+    panelHeights,
+    remoteExpanded,
+    stagedExpanded,
+    status,
+    workingExpanded,
+  }), [
+    committedExpanded,
+    loading,
+    mergeExpanded,
+    panelHeights,
+    remoteExpanded,
+    stagedExpanded,
+    status,
+    workingExpanded,
+  ]);
+
   useScrollableDescendantClasses(sidebarListRef, {
-    dependencies: [status, loading, remoteExpanded, mergeExpanded, committedExpanded, stagedExpanded, workingExpanded, panelHeights],
+    revision: scrollableContentRevision,
     selector: GIT_SCROLLABLE_LIST_SELECTOR,
   });
 
