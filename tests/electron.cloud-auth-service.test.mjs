@@ -168,6 +168,47 @@ describe("main-owned Cloud Auth Broker", () => {
       .toHaveLength(1);
   });
 
+  it("does not open a blank browser when the local login page is unavailable", async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error("connection refused"));
+    const fixture = createFixture({ credential: null, fetchImpl });
+    fixture.startCallbackServer.mockResolvedValue({
+      redirectUri: "http://127.0.0.1:43123/auth/callback",
+      close: vi.fn(async () => {}),
+    });
+    fixture.requestCloudApi.mockResolvedValue({
+      state: "oauth-state-local",
+      login_url: "http://localhost:3000/login?client=desktop",
+    });
+
+    await expect(fixture.service.startOAuth({ apiBase: API }))
+      .rejects.toThrow("Local Cloud login page is unavailable at http://localhost:3000");
+    expect(fixture.openExternal).not.toHaveBeenCalled();
+  });
+
+  it("preflights the expected local Puppyone login page before opening it", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      text: vi.fn().mockResolvedValue("<h1>Sign in to Puppyone</h1>"),
+    });
+    const fixture = createFixture({ credential: null, fetchImpl });
+    fixture.startCallbackServer.mockResolvedValue({
+      redirectUri: "http://127.0.0.1:43123/auth/callback",
+      close: vi.fn(async () => {}),
+    });
+    const loginUrl = "http://localhost:3000/login?client=desktop";
+    fixture.requestCloudApi.mockResolvedValue({
+      state: "oauth-state-local",
+      login_url: loginUrl,
+    });
+
+    await expect(fixture.service.startOAuth({ apiBase: API })).resolves.toEqual({ ok: true });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      new URL(loginUrl),
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(fixture.openExternal).toHaveBeenCalledWith(loginUrl);
+  });
+
   it("always completes local logout and rejects an old-generation late result when remote revoke is unavailable", async () => {
     const fixture = createFixture({ windowCount: 2 });
     let resolveRequest;
@@ -193,7 +234,11 @@ describe("main-owned Cloud Auth Broker", () => {
   });
 });
 
-function createFixture({ credential = createCredential(), windowCount = 1 } = {}) {
+function createFixture({
+  credential = createCredential(),
+  fetchImpl = globalThis.fetch,
+  windowCount = 1,
+} = {}) {
   let storedCredential = credential;
   const credentialStore = {
     read: vi.fn(async () => storedCredential),
@@ -224,6 +269,7 @@ function createFixture({ credential = createCredential(), windowCount = 1 } = {}
     getWindows: () => windows,
     revealWindow: vi.fn(),
     credentialStore,
+    fetchImpl,
     openExternal,
     startCallbackServer,
     logger: { warn: vi.fn(), error: vi.fn() },

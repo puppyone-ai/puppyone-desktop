@@ -1,8 +1,15 @@
-import { spawn } from "node:child_process";
 import { watch, watchFile, unwatchFile } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getDefaultElectronBin } from "./electron-runtime.mjs";
+import {
+  prepareLocalCloudDevServices,
+  resolveLocalCloudDevConfig,
+} from "./local-cloud-dev.mjs";
+import {
+  spawnManagedChild,
+  terminateManagedChild,
+} from "./managed-child-process.mjs";
 import { probeViteDevServer } from "./vite-client-health.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,6 +30,7 @@ const rendererDependencyWatchPaths = [
 
 let renderer = null;
 let healthCheckInFlight = false;
+let healthCheck = null;
 let electron = null;
 let electronRestarting = false;
 let electronRestartTimer = null;
@@ -32,56 +40,122 @@ let environmentRestarting = false;
 let rendererStartedDuringEnvironmentRestart = false;
 let shuttingDown = false;
 let exitCode = 0;
+let localCloudServices = null;
+let localCloudHealthCheck = null;
+let localCloudHealthCheckInFlight = false;
+let localCloudFailureCount = 0;
 const watchers = [];
 let lastEnvironmentRestartReason = "renderer dependency changed";
 
-startRenderer();
-startRendererDependencyWatchers();
+void startDevelopmentEnvironment();
 
-const healthCheck = setInterval(async () => {
-  if (shuttingDown || !renderer || healthCheckInFlight) return;
-  healthCheckInFlight = true;
-  const probedRenderer = renderer;
-
-  let result;
+async function startDevelopmentEnvironment() {
   try {
-    result = await probeViteDevServer(devUrl, {
-      signal: AbortSignal.timeout(2_000),
-    });
-  } finally {
-    healthCheckInFlight = false;
-  }
-
-  if (renderer !== probedRenderer) return;
-
-  if (!result.ready) {
-    if (
-      result.reason === "unresolved-client-placeholders" &&
-      !environmentRestarting
-    ) {
-      const placeholders = result.placeholders.join(", ");
-      scheduleEnvironmentRestart(`stale Vite client (${placeholders})`, 0);
+    const localCloudConfig = resolveLocalCloudDevConfig({ desktopRoot });
+    if (localCloudConfig) {
+      localCloudServices = await prepareLocalCloudDevServices(localCloudConfig);
+      for (const { child, name } of localCloudServices.ownedProcesses) {
+        child.on("exit", (code, signal) => {
+          if (shuttingDown) {
+            maybeExit();
+            return;
+          }
+          console.error(
+            `[desktop-dev] Local Cloud ${name} exited unexpectedly (${signal ?? code ?? "unknown"}).`,
+          );
+          beginShutdown(typeof code === "number" && code !== 0 ? code : 1);
+        });
+      }
+      startLocalCloudHealthCheck();
     }
-    return;
-  }
 
-  if (environmentRestarting) {
-    if (!rendererStartedDuringEnvironmentRestart) return;
-    environmentRestarting = false;
-    rendererStartedDuringEnvironmentRestart = false;
-    console.info("[desktop-dev] Renderer environment is healthy again.");
+    startRenderer();
+    startRendererDependencyWatchers();
+    startRendererHealthCheck();
+  } catch (error) {
+    console.error(
+      "[desktop-dev] Unable to prepare the development environment:",
+      error instanceof Error ? error.message : String(error),
+    );
+    beginShutdown(1);
   }
+}
 
-  if (!electron) {
-    startElectron();
-    startMainWatchers();
-  }
-}, 500);
+function startRendererHealthCheck() {
+  healthCheck = setInterval(async () => {
+    if (shuttingDown || !renderer || healthCheckInFlight) return;
+    healthCheckInFlight = true;
+    const probedRenderer = renderer;
+
+    let result;
+    try {
+      result = await probeViteDevServer(devUrl, {
+        signal: AbortSignal.timeout(2_000),
+      });
+    } finally {
+      healthCheckInFlight = false;
+    }
+
+    if (renderer !== probedRenderer) return;
+
+    if (!result.ready) {
+      if (
+        result.reason === "unresolved-client-placeholders" &&
+        !environmentRestarting
+      ) {
+        const placeholders = result.placeholders.join(", ");
+        scheduleEnvironmentRestart(`stale Vite client (${placeholders})`, 0);
+      }
+      return;
+    }
+
+    if (environmentRestarting) {
+      if (!rendererStartedDuringEnvironmentRestart) return;
+      environmentRestarting = false;
+      rendererStartedDuringEnvironmentRestart = false;
+      console.info("[desktop-dev] Renderer environment is healthy again.");
+    }
+
+    if (!electron) {
+      startElectron();
+      startMainWatchers();
+    }
+  }, 500);
+}
+
+function startLocalCloudHealthCheck() {
+  localCloudHealthCheck = setInterval(async () => {
+    if (shuttingDown || !localCloudServices || localCloudHealthCheckInFlight) return;
+    localCloudHealthCheckInFlight = true;
+    try {
+      const results = await localCloudServices.probeAll();
+      const unhealthy = results.filter((result) => !result.ready);
+      if (unhealthy.length === 0) {
+        localCloudFailureCount = 0;
+        return;
+      }
+
+      localCloudFailureCount += 1;
+      const detail = unhealthy
+        .map((result) => `${result.name}: ${result.detail}`)
+        .join("; ");
+      if (localCloudFailureCount < 2) {
+        console.warn(`[desktop-dev] Local Cloud health check failed; retrying (${detail}).`);
+        return;
+      }
+
+      console.error(`[desktop-dev] Local Cloud became unhealthy (${detail}).`);
+      beginShutdown(1);
+    } finally {
+      localCloudHealthCheckInFlight = false;
+    }
+  }, 30_000);
+}
 
 function startRenderer() {
   if (shuttingDown || renderer) return;
 
-  const child = spawn("npm", ["run", "dev:renderer"], {
+  const child = spawnManagedChild("npm", ["run", "dev:renderer"], {
     cwd: desktopRoot,
     stdio: "inherit",
     env: process.env,
@@ -105,11 +179,7 @@ function startRenderer() {
       return;
     }
 
-    stopMainWatchers();
-    exitCode = code ?? 0;
-    shuttingDown = true;
-    if (electron) electron.kill("SIGTERM");
-    maybeExit();
+    beginShutdown(code ?? 0);
   });
 }
 
@@ -125,7 +195,7 @@ function startElectron() {
   if (shuttingDown || electron) return;
   const electronExecutable = getDefaultElectronBin(desktopRoot);
 
-  const child = spawn(electronExecutable, ["."], {
+  const child = spawnManagedChild(electronExecutable, ["."], {
     cwd: desktopRoot,
     stdio: "inherit",
     env: {
@@ -152,11 +222,7 @@ function startElectron() {
       return;
     }
 
-    stopMainWatchers();
-    exitCode = code ?? 0;
-    shuttingDown = true;
-    if (renderer) renderer.kill("SIGTERM");
-    maybeExit();
+    beginShutdown(code ?? 0);
   });
 }
 
@@ -170,7 +236,7 @@ function scheduleElectronRestart() {
       return;
     }
     electronRestarting = true;
-    electron.kill("SIGTERM");
+    terminateManagedChild(electron);
   }, 120);
 }
 
@@ -237,9 +303,9 @@ function restartEnvironment(reason) {
   }
 
   console.warn(`[desktop-dev] ${reason}; restarting renderer and Electron.`);
-  if (electron) electron.kill("SIGTERM");
+  if (electron) terminateManagedChild(electron);
   if (renderer) {
-    renderer.kill("SIGTERM");
+    terminateManagedChild(renderer);
   } else {
     scheduleRendererStart();
   }
@@ -251,17 +317,23 @@ function beginShutdown(code) {
   exitCode = code;
   stopMainWatchers();
   stopRendererDependencyWatchers();
-  clearInterval(healthCheck);
+  if (healthCheck) clearInterval(healthCheck);
+  if (localCloudHealthCheck) clearInterval(localCloudHealthCheck);
   if (electronRestartTimer) clearTimeout(electronRestartTimer);
   if (environmentRestartTimer) clearTimeout(environmentRestartTimer);
   if (rendererRestartTimer) clearTimeout(rendererRestartTimer);
-  if (electron) electron.kill("SIGTERM");
-  if (renderer) renderer.kill("SIGTERM");
+  if (electron) terminateManagedChild(electron);
+  if (renderer) terminateManagedChild(renderer);
+  localCloudServices?.stop();
   maybeExit();
 }
 
 function maybeExit() {
   if (!shuttingDown || electron || renderer) return;
+  const localCloudProcessRunning = localCloudServices?.ownedProcesses.some(
+    ({ child }) => child.exitCode === null && child.signalCode === null,
+  );
+  if (localCloudProcessRunning) return;
   process.exit(exitCode);
 }
 

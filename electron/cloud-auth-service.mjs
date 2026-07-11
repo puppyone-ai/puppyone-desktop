@@ -23,6 +23,7 @@ export function createCloudAuthService({
   secureStorage,
   openExternal,
   startCallbackServer = startLoopbackCallbackServer,
+  fetchImpl = globalThis.fetch,
   now = () => Date.now(),
   randomBytes = crypto.randomBytes,
   logger = console,
@@ -143,6 +144,7 @@ export function createCloudAuthService({
         });
         const state = requireNonEmptyString(start?.state, "Cloud sign-in start did not return state.");
         const loginUrl = requireHttpUrl(start?.login_url, "Cloud sign-in start did not return a browser URL.");
+        await assertLocalLoginPageReachable(loginUrl, fetchImpl);
         const timeout = setTimeout(() => {
           clearPendingOAuthState(state);
           restoreStatusAfterOAuth(previousStatus);
@@ -704,6 +706,32 @@ function requireHttpUrl(value, message) {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(message);
   return url.toString();
+}
+
+async function assertLocalLoginPageReachable(loginUrl, fetchImpl) {
+  const url = new URL(loginUrl);
+  const loopback = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname);
+  if (!loopback) return;
+  if (url.protocol !== "http:" || (url.port || "80") !== "3000") {
+    throw new Error("Local Cloud login URL must use the approved loopback web origin.");
+  }
+
+  try {
+    const response = await fetchImpl(url, {
+      cache: "no-store",
+      redirect: "follow",
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const body = await response.text();
+    if (!body.includes("Puppyone") || !body.includes("Sign in")) {
+      throw new Error("Puppyone login page marker is missing");
+    }
+    return;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Local Cloud login page is unavailable at ${url.origin}. ${detail}`);
+  }
 }
 
 function normalizeOAuthProvider(value) {
