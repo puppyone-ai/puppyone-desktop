@@ -353,9 +353,13 @@ describe("Agent IPC workspace authorization", () => {
       if (requested !== "/workspace") throw new Error("Requested workspace root does not match");
       return "/canonical/workspace";
     });
+    const localAgentInventory = {
+      discover: vi.fn(async () => ({ connections: [], scannedAt: new Date(0).toISOString(), warnings: [] })),
+    };
     registerAgentIpcHandlers({
       ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },
       agentService,
+      localAgentInventory,
       authorizeWorkspaceRoot,
     });
     const event = { sender: createSender(7) };
@@ -365,6 +369,9 @@ describe("Agent IPC workspace authorization", () => {
     expect(agentService.createSession).toHaveBeenCalledWith(event.sender, { rootPath: "/workspace" }, "/canonical/workspace");
     await handlers.get("agent:session-resume")(event, { rootPath: "/workspace" });
     expect(agentService.resumeSession).toHaveBeenCalledWith(event.sender, { rootPath: "/workspace" }, "/canonical/workspace");
+    await handlers.get("agent:local-connections-discover")(event, { rootPath: "/workspace", refresh: true, command: "unsafe" });
+    expect(localAgentInventory.discover).toHaveBeenCalledWith({ refresh: true, workspaceRoot: "/canonical/workspace" });
+    await expect(handlers.get("agent:local-connections-discover")(event, { rootPath: "/other" })).rejects.toThrow(/does not match/i);
   });
 
   it("registers the full README bridge list, including the fail-closed steer/question stubs", async () => {
@@ -391,10 +398,12 @@ describe("Agent IPC workspace authorization", () => {
     registerAgentIpcHandlers({
       ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },
       agentService,
+      localAgentInventory: { discover: vi.fn(async () => ({ connections: [], scannedAt: new Date(0).toISOString(), warnings: [] })) },
       authorizeWorkspaceRoot: vi.fn(async () => "/canonical/workspace"),
     });
     for (const channel of [
       "agent:providers-discover",
+      "agent:local-connections-discover",
       "agent:models-list",
       "agent:account-read",
       "agent:session-create",

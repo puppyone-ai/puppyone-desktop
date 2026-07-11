@@ -10,6 +10,7 @@ const mainApplicationRoot = path.join(mainRoot, "application");
 const mainConcreteRoots = [
   path.join(mainRoot, "adapters"),
   path.join(mainRoot, "runtimes"),
+  path.join(mainRoot, "connections"),
   path.join(mainRoot, "bootstrap"),
 ];
 const rendererRoot = path.join(repoRoot, "src", "features", "desktop-agent");

@@ -5,7 +5,13 @@ import { AgentActivityItem } from "./AgentActivityItem";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { AgentToolRenderer, isAgentToolPart } from "./AgentToolRendererRegistry";
 
-type PartRendererProps = { part: AgentPart; runtimeLabel: string; onViewChanges?: () => void };
+type PartRendererProps = {
+  part: AgentPart;
+  runtimeLabel: string;
+  onViewChanges?: () => void;
+  onOpenTerminal?: () => void;
+  onOpenFile?: (path: string) => void;
+};
 
 const registry = new Map<AgentPart["kind"], ComponentType<PartRendererProps>>();
 
@@ -56,10 +62,10 @@ function MessagePart({ part, runtimeLabel }: PartRendererProps) {
   );
 }
 
-function ActivityPart({ part, onViewChanges }: PartRendererProps) {
+function ActivityPart({ part, onViewChanges, onOpenTerminal, onOpenFile }: PartRendererProps) {
   if (!("label" in part) || !("status" in part) || !("detail" in part)) return null;
   if (isAgentToolPart(part)) {
-    return <AgentToolRenderer part={part} onViewChanges={onViewChanges} />;
+    return <AgentToolRenderer part={part} onViewChanges={onViewChanges} onOpenTerminal={onOpenTerminal} onOpenFile={onOpenFile} />;
   }
   return <AgentActivityItem activity={{
     id: part.id,
@@ -71,7 +77,7 @@ function ActivityPart({ part, onViewChanges }: PartRendererProps) {
     detail: part.detail,
     output: part.output,
     sequence: part.sequence,
-  }} onViewChanges={onViewChanges} />;
+  }} onViewChanges={onViewChanges} onOpenTerminal={onOpenTerminal} onOpenFile={onOpenFile} />;
 }
 
 function StatusPart({ part }: PartRendererProps) {

@@ -1,6 +1,7 @@
 # Cursor-style Agent Chat UI behavior specification
 
-Status: normative target for the experimental Desktop Agent Chat surface.
+Status: implemented normative contract for the experimental Desktop Agent Chat surface. The
+remaining production evidence gates are recorded in ISSUE-027 rather than left implicit here.
 
 This specification turns the visual direction in [Right Sidebar Agent Chat](right-sidebar.md)
 into implementable rules. The pixel reference is the MIT-licensed frontend in
@@ -8,6 +9,8 @@ into implementable rules. The pixel reference is the MIT-licensed frontend in
 especially its message, tool-call, inline-diff, input and model-selector modules. PuppyOne owns
 the React port, design-token mapping, accessibility improvements and security boundary. Claudian
 provider/runtime/session code is not adopted; OpenCode remains the only product Chat harness.
+The exact upstream-to-PuppyOne file map and MIT notice are in
+[`vendor/claudian/SOURCE_ADOPTION.md`](../../../vendor/claudian/SOURCE_ADOPTION.md).
 This file uses plain-text diagrams only.
 
 ## 1. Product contract

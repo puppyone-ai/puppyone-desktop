@@ -1,6 +1,7 @@
 import type { AgentProjection } from "../domain/agent-projection-types";
 import type {
   AgentFileReference,
+  AgentLocalConnection,
   AgentProviderInspection,
   AgentRuntimeId,
   AgentSessionListItem,
@@ -28,6 +29,10 @@ export type AgentControllerState = {
   selectedProviderId: string | null;
   selectedModel: string | null;
   selectedMode: string | null;
+  localConnections: AgentLocalConnection[];
+  localConnectionsPhase: "idle" | "loading" | "ready" | "error";
+  localConnectionsScannedAt: string | null;
+  localConnectionsError: string | null;
   draft: string;
   attachments: AgentFileReference[];
   contextReferences: AgentFileReference[];

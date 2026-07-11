@@ -1,7 +1,8 @@
 # Local Agent and Provider connection discovery
 
-Status: normative target. The local inventory UI described here is not yet the authority for
-starting new product sessions.
+Status: implemented normative boundary. Local inventory is presentation/setup evidence and is
+not authority for starting new product sessions; OpenCode's connected Provider catalog remains
+the Send authority.
 
 This document defines how PuppyOne recognizes locally installed Codex, Cursor Agent and future
 coding-agent tools without falsely claiming that every installation is a usable OpenCode model
@@ -87,7 +88,7 @@ LocalAgentConnection
   capabilities          bounded advertised feature flags
   selectable            derived, never independently assigned
   statusMessage         user-facing recovery reason
-  actions               refresh | login | reconnect | learn-more | use-route
+  actions               refresh | learn-more in the current inventory DTO
 ```
 
 Executable paths, account tokens, account identifiers, raw status output and credential-file
@@ -111,11 +112,11 @@ detected
   performance-critical paths.
 - Run a bounded inventory scan when the user first opens Provider setup, explicitly presses
   Refresh, or opens Agent settings.
-- Cache successful installation/version results for the application process. Cache auth and
-  bridge results for at most five minutes and invalidate them after login/logout, executable
-  change, sidecar restart or authoritative authentication rejection.
-- Deduplicate concurrent scans per tool. Closing the popover cancels presentation work but does
-  not leave child processes alive.
+- Cache the sanitized snapshot for at most five minutes and invalidate it on explicit Refresh,
+  executable change, sidecar restart or authoritative authentication rejection.
+- Deduplicate concurrent inventory scans. Closing the popover does not terminate an already
+  bounded scan; it may finish into the five-minute cache. Application disposal aborts active
+  probes and every timeout/output-limit path kills its child process.
 - A scan failure for one tool does not hide other detected tools.
 
 ## 5. Executable discovery
@@ -308,7 +309,7 @@ typed preload IPC
         |
         v
 Electron main
-  LocalAgentInventoryService
+  createLocalAgentInventory
     candidate registry -> realpath -> version -> optional auth/protocol probe
 
   OpenCodeProviderCatalog
@@ -322,7 +323,7 @@ Renderer never receives generic spawn, command arguments, environment variables,
 credential paths, auth tokens, sidecar URLs or passwords. Each supported tool has a specific
 probe adapter and contract fixture.
 
-Recommended source boundaries:
+Implemented source boundaries:
 
 ```text
 electron/main/agent/connections/
@@ -334,11 +335,13 @@ electron/main/agent/connections/
     executable-candidates.mjs         platform candidate registry
 
 shared/agent-contract/
-  local-agent-connection DTO + strict runtime schema
+  types.ts                              local-agent DTO type source
+  local-connection-schema.mjs          strict sanitizing response projection
 
 src/features/desktop-agent/
-  domain/agent-connection-model.ts     pure grouping/labels/actions
-  ui/AgentProviderPicker.tsx           accessible connected/local sections
+  application/LocalAgentConnectionLoader.ts  lazy Renderer-side request state
+  ui/AgentProviderPicker.tsx                 accessible connected/local sections
+  ui/AgentPickerPopover.tsx                  search + roving keyboard listbox
 ```
 
 The local inventory service must not import React or OpenCode-specific provider payloads. The
@@ -349,7 +352,7 @@ OpenCode adapter must not scan the user's PATH.
 | Failure | UI result |
 | --- | --- |
 | executable not found | omit from compact picker; show `Not installed` in Connections |
-| version probe timeout | show `Detected, version unavailable`; Retry |
+| version probe timeout | show `Detected, probe failed`; Retry |
 | unsupported version | show version and minimum/maximum tested range; Update/Learn |
 | signed out | show `Sign in required`; documented Login action |
 | status format unknown | keep Detected; auth `Unknown`; do not mark Ready |
@@ -369,7 +372,8 @@ Implementation is complete only when automated fixtures cover:
 - paths with spaces, symlinks, broken links, non-executable files and executable-swap attempts;
 - version timeout, output overflow, malformed output, unsupported version and child cleanup;
 - Codex initialize/account/model success, signed-out and additive unknown protocol fields;
-- Cursor status signed-in/signed-out/unknown and stream terminal/non-terminal failure fixtures;
+- Cursor status signed-in/signed-out/unknown fixtures; stream execution remains outside this
+  inventory boundary until an authorized bridge is approved;
 - no raw path/account/status/credential content crossing the strict IPC schema;
 - detected-but-unbridged rows visible and keyboard reachable but not selectable;
 - only connected text-and-tools OpenCode routes enabling Model and Send;

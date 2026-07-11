@@ -80,6 +80,42 @@ describe("AgentSessionController", () => {
     expect(controller.getSnapshot().inspection?.readiness).toMatchObject({ status: "installed-not-authenticated" });
     expect(controller.getSnapshot().projection.activities.filter((activity) => activity.kind === "error")).toHaveLength(1);
   });
+
+  it("discovers local tools only when the Provider surface requests them", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.discoverLocalAgentConnections = vi.fn(async () => ({
+      connections: [{
+        id: "codex",
+        displayName: "Codex CLI",
+        installation: "detected",
+        version: "0.144.1",
+        authentication: "signed-in",
+        integration: "bridge-required",
+        capabilities: { versionProbe: true, authenticationProbe: true, protocolProbe: true },
+        selectable: false,
+        statusMessage: "Direct Codex sessions are not enabled.",
+        actions: [{ id: "refresh", label: "Refresh" }],
+        source: "user-installation",
+      }],
+      scannedAt: "2026-07-12T00:00:00.000Z",
+      warnings: [],
+    }));
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+
+    await controller.initialize();
+    expect(bridge.discoverLocalAgentConnections).not.toHaveBeenCalled();
+
+    await controller.discoverLocalConnections();
+    expect(bridge.discoverLocalAgentConnections).toHaveBeenCalledWith({ rootPath: "/workspace", refresh: false });
+    expect(controller.getSnapshot()).toMatchObject({
+      localConnectionsPhase: "ready",
+      localConnectionsScannedAt: "2026-07-12T00:00:00.000Z",
+      localConnections: [expect.objectContaining({ id: "codex", selectable: false })],
+    });
+
+    await controller.discoverLocalConnections(true);
+    expect(bridge.discoverLocalAgentConnections).toHaveBeenLastCalledWith({ rootPath: "/workspace", refresh: true });
+  });
 });
 
 function bridgeFixture(onEvent: (listener: (event: AgentEvent) => void) => void) {
@@ -97,6 +133,7 @@ function bridgeFixture(onEvent: (listener: (event: AgentEvent) => void) => void)
       capabilities: capabilities(),
       warnings: [],
     })),
+    discoverLocalAgentConnections: vi.fn(async () => ({ connections: [], scannedAt: "2026-07-12T00:00:00.000Z", warnings: [] })),
     resumeAgentSession: vi.fn(async () => snapshot("session-1", [event(1, "session.resumed", { title: "Session" })])),
     createAgentSession: vi.fn(async () => snapshot("session-2", [event(1, "session.started", { title: "New" }, null, null, "session-2")])),
     replayAgentSession: vi.fn(async () => snapshot("session-1", [event(4, "assistant.completed", { text: "Working" }, "turn-1", "message-1")])),

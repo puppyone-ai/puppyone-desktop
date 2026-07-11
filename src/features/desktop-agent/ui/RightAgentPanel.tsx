@@ -18,6 +18,8 @@ type RightAgentPanelProps = {
   workspace: Workspace;
   active: boolean;
   onViewChanges?: () => void;
+  onOpenTerminal?: () => void;
+  onOpenFile?: (path: string) => void;
   onRunningChange?: (running: boolean) => void;
   preferredModel?: string | null;
   onPreferredModelChange?: (model: string) => void;
@@ -27,6 +29,8 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   workspace,
   active,
   onViewChanges,
+  onOpenTerminal,
+  onOpenFile,
   onRunningChange,
   preferredModel = null,
   onPreferredModelChange,
@@ -128,6 +132,8 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         initialPinned={viewport.pinned}
         onViewportChange={(scrollTop, measurements, pinned) => controller.rememberViewport(scrollTop, measurements, pinned)}
         onViewChanges={onViewChanges}
+        onOpenTerminal={onOpenTerminal}
+        onOpenFile={onOpenFile}
       />
 
       {state.projection.approvals[0] && (
@@ -163,6 +169,10 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         runtimeLabel={runtimeLabel}
         providers={capabilities?.modelSelection ? providers : []}
         selectedProviderId={state.selectedProviderId}
+        localConnections={state.localConnections}
+        localConnectionsPhase={state.localConnectionsPhase}
+        localConnectionsError={state.localConnectionsError}
+        onDiscoverLocalConnections={(refresh) => controller.discoverLocalConnections(refresh)}
         onSelectProvider={(providerId) => {
           const model = controller.selectProvider(providerId);
           if (model) onPreferredModelChange?.(model);

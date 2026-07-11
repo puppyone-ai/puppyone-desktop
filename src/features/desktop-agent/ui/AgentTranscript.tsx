@@ -12,6 +12,8 @@ type AgentTranscriptProps = {
   initialPinned?: boolean;
   onViewportChange?: (scrollTop: number, measurements: Record<string, number>, pinned: boolean) => void;
   onViewChanges?: () => void;
+  onOpenTerminal?: () => void;
+  onOpenFile?: (path: string) => void;
 };
 
 const OVERSCAN_ROWS = 14;
@@ -27,11 +29,16 @@ export function AgentTranscript({
   initialPinned = true,
   onViewportChange,
   onViewChanges,
+  onOpenTerminal,
+  onOpenFile,
 }: AgentTranscriptProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const measurementsRef = useRef<Record<string, number>>({ ...initialMeasurements });
   const scrollTopRef = useRef(initialScrollTop);
   const pinnedRef = useRef(initialPinned);
+  const seenPartIdsRef = useRef(new Set<string>());
+  const seededPartIdsRef = useRef(false);
+  const previousTimelineRef = useRef({ rows: 0, sequence: 0 });
   const offsetsRef = useRef<number[]>([]);
   const rowMetaRef = useRef(new Map<string, { index: number; estimatedHeight: number }>());
   const onViewportChangeRef = useRef(onViewportChange);
@@ -39,10 +46,17 @@ export function AgentTranscript({
   const [scrollTop, setScrollTop] = useState(initialScrollTop);
   const [viewportHeight, setViewportHeight] = useState(DEFAULT_VIEWPORT_HEIGHT);
   const [pinned, setPinned] = useState(initialPinned);
+  const [unreadCount, setUnreadCount] = useState(0);
   const timeline = useMemo(() => buildTimeline(projection), [projection]);
   const layout = useMemo(() => buildLayout(timeline.rows, measurementsRef.current, measurementRevision), [measurementRevision, timeline.rows]);
   const range = useMemo(() => visibleRange(layout.offsets, timeline.rows.length, scrollTop, viewportHeight), [layout.offsets, scrollTop, timeline.rows.length, viewportHeight]);
   const visibleRows = timeline.rows.slice(range.start, range.end);
+  const latestSequence = timeline.rows.at(-1)?.sequence ?? 0;
+  if (!seededPartIdsRef.current) {
+    for (const row of timeline.rows) seenPartIdsRef.current.add(row.partId);
+    seededPartIdsRef.current = true;
+    previousTimelineRef.current = { rows: timeline.rows.length, sequence: latestSequence };
+  }
   offsetsRef.current = layout.offsets;
   rowMetaRef.current = new Map(timeline.rows.map((row, index) => [row.id, { index, estimatedHeight: row.estimatedHeight }]));
   onViewportChangeRef.current = onViewportChange;
@@ -73,15 +87,27 @@ export function AgentTranscript({
     onViewportChangeRef.current?.(element.scrollTop, measurementsRef.current, true);
   }, [layout.totalHeight, pinned, projection.approvals.length, projection.questions.length]);
 
+  useEffect(() => {
+    const previous = previousTimelineRef.current;
+    if (latestSequence <= previous.sequence && timeline.rows.length <= previous.rows) return;
+    if (pinnedRef.current) setUnreadCount(0);
+    else {
+      const addedRows = Math.max(0, timeline.rows.length - previous.rows);
+      setUnreadCount((current) => Math.min(99, current + Math.max(1, addedRows)));
+    }
+    previousTimelineRef.current = { rows: timeline.rows.length, sequence: latestSequence };
+  }, [latestSequence, timeline.rows.length]);
+
   const handleScroll = () => {
     const element = scrollRef.current;
     if (!element) return;
     const nextScrollTop = element.scrollTop;
-    const nextPinned = element.scrollHeight - nextScrollTop - element.clientHeight < 40;
+    const nextPinned = element.scrollHeight - nextScrollTop - element.clientHeight < 80;
     scrollTopRef.current = nextScrollTop;
     pinnedRef.current = nextPinned;
     setScrollTop(nextScrollTop);
     setPinned(nextPinned);
+    if (nextPinned) setUnreadCount(0);
     onViewportChangeRef.current?.(nextScrollTop, measurementsRef.current, nextPinned);
   };
 
@@ -139,9 +165,11 @@ export function AgentTranscript({
               const index = range.start + relativeIndex;
               const part = timeline.parts.get(row.partId);
               if (!part) return null;
+              const animate = !seenPartIdsRef.current.has(part.id);
+              if (animate) seenPartIdsRef.current.add(part.id);
               return (
-                <MeasuredRow key={row.id} rowId={row.id} kind={part.kind} top={layout.offsets[index]} onMeasure={measure}>
-                  <MemoAgentPartRenderer part={part} runtimeLabel={runtimeLabel} onViewChanges={onViewChanges} />
+                <MeasuredRow key={row.id} rowId={row.id} kind={part.kind} top={layout.offsets[index]} animate={animate} onMeasure={measure}>
+                  <MemoAgentPartRenderer part={part} runtimeLabel={runtimeLabel} onViewChanges={onViewChanges} onOpenTerminal={onOpenTerminal} onOpenFile={onOpenFile} />
                 </MeasuredRow>
               );
             })}
@@ -157,7 +185,8 @@ export function AgentTranscript({
           if (element) element.scrollTop = element.scrollHeight;
           pinnedRef.current = true;
           setPinned(true);
-        }}><ArrowDown size={13} /> Jump to latest</button>
+          setUnreadCount(0);
+        }} aria-label={unreadCount ? `Jump to latest, ${unreadCount} unread updates` : "Jump to latest"}><ArrowDown size={13} /> Jump to latest{unreadCount > 0 ? ` · ${unreadCount}` : ""}</button>
       )}
     </div>
   );
@@ -165,10 +194,11 @@ export function AgentTranscript({
 
 const MemoAgentPartRenderer = memo(AgentPartRenderer);
 
-function MeasuredRow({ rowId, kind, top, onMeasure, children }: {
+function MeasuredRow({ rowId, kind, top, animate, onMeasure, children }: {
   rowId: string;
   kind: AgentPart["kind"];
   top: number;
+  animate: boolean;
   onMeasure: (rowId: string, height: number) => void;
   children: React.ReactNode;
 }) {
@@ -182,7 +212,7 @@ function MeasuredRow({ rowId, kind, top, onMeasure, children }: {
     observer?.observe(element);
     return () => observer?.disconnect();
   }, [onMeasure, rowId]);
-  return <div ref={ref} className="desktop-agent-virtual-row" data-kind={kind} style={{ transform: `translateY(${top}px)` }}>{children}</div>;
+  return <div ref={ref} className={`desktop-agent-virtual-row${animate ? " is-new" : ""}`} data-kind={kind} style={{ transform: `translateY(${top}px)` }}>{children}</div>;
 }
 
 function buildTimeline(projection: AgentProjection) {

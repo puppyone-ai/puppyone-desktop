@@ -13,6 +13,35 @@ const models = [
 
 const providers = [{ id: "openai", displayName: "OpenAI", source: "api", defaultModel: "openai/gpt-5.4", modelCount: 2 }];
 
+const localConnections = [
+  {
+    id: "codex",
+    displayName: "Codex CLI",
+    installation: "detected" as const,
+    version: "0.144.1",
+    authentication: "signed-in" as const,
+    integration: "bridge-required" as const,
+    capabilities: { versionProbe: true, authenticationProbe: true, protocolProbe: true },
+    selectable: false,
+    statusMessage: "Direct Codex sessions are not enabled; use OpenAI through OpenCode.",
+    actions: [{ id: "refresh" as const, label: "Refresh" }],
+    source: "user-installation" as const,
+  },
+  {
+    id: "cursor-agent",
+    displayName: "Cursor Agent",
+    installation: "detected" as const,
+    version: "2026.07.09-a3815c0",
+    authentication: "signed-in" as const,
+    integration: "bridge-required" as const,
+    capabilities: { versionProbe: true, authenticationProbe: true, protocolProbe: false },
+    selectable: false,
+    statusMessage: "Cursor Agent is installed, but an OpenCode bridge is not enabled.",
+    actions: [{ id: "refresh" as const, label: "Refresh" }],
+    source: "user-installation" as const,
+  },
+];
+
 const modes = [
   { id: "build", displayName: "Agent", description: "Plan and make changes", isDefault: true },
   { id: "plan", displayName: "Plan", description: "Read and plan only", isDefault: false },
@@ -76,7 +105,7 @@ export function AgentVisualSmokeHarness() {
         kind: "reasoning",
         label: "Worked for 2s",
         status: "completed",
-        detail: {},
+        detail: { delta: "Located the theme boundary and compared terminal token ownership." },
         output: "",
         sequence: 4,
       },
@@ -87,9 +116,36 @@ export function AgentVisualSmokeHarness() {
         kind: "tool",
         label: "Explored markdown-editor.css, 2 searches",
         status: "completed",
-        detail: {},
+        detail: { tool: "grep", query: "padding", path: "src/markdown-editor.css" },
         output: "",
         sequence: 6,
+      },
+      {
+        id: "activity:command",
+        turnId: "turn-2",
+        itemId: "tool-command",
+        kind: "command",
+        label: "Run tests",
+        status: "completed",
+        detail: { tool: "bash", input: { command: "npm test" }, metadata: { exitCode: 0, duration: 2080 } },
+        output: "25 test files passed · 251 tests passed",
+        sequence: 7,
+      },
+      {
+        id: "activity:file-change",
+        turnId: "turn-2",
+        itemId: "tool-edit",
+        kind: "file-change",
+        label: "Updated markdown-editor.css",
+        status: "completed",
+        detail: {
+          tool: "edit",
+          path: "src/markdown-editor.css",
+          changes: [{ path: "src/markdown-editor.css", additions: 2704, deletions: 585 }],
+          input: { patch: "@@ -10,2 +10,2 @@\n-padding: 12px 24px;\n+padding: 24px;" },
+        },
+        output: "",
+        sequence: 8,
       },
     ];
     value.parts = [{
@@ -101,9 +157,9 @@ export function AgentVisualSmokeHarness() {
       status: "completed",
       detail: { changes: [{ path: "src/markdown-editor.css", additions: 2704, deletions: 585 }] },
       output: "",
-      sequence: 7,
+      sequence: 8,
     }];
-    value.lastSequence = 7;
+    value.lastSequence = 8;
     value.terminalState = "completed";
     return value;
   }, []);
@@ -133,6 +189,9 @@ export function AgentVisualSmokeHarness() {
           runtimeLabel="OpenCode"
           providers={providers}
           selectedProviderId={provider}
+          localConnections={localConnections}
+          localConnectionsPhase="ready"
+          onDiscoverLocalConnections={() => undefined}
           onSelectProvider={setProvider}
           models={models}
           selectedModel={model}

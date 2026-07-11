@@ -17,6 +17,21 @@ the packaged `resources/opencode/LICENSE` file.
 The exact artifact hashes, prompt-source hashes, and source-adoption ledger are
 distributed in `vendor/opencode/`.
 
+## Claudian frontend reference
+
+PuppyOne Desktop's Agent Chat frontend selectively adapts interaction and
+presentation patterns from `YishenTu/claudian` at immutable commit
+`7d7cc84c60a77431aaccda7ff49a2f1f4ae1c2ab`. The adopted scope is limited to
+message flow, compact tool disclosures, inline diff presentation, composer and
+picker behavior. PuppyOne rewrites these patterns in React with its own design
+tokens, typed Agent contract, accessibility behavior and virtualization.
+Claudian runtime, provider, credential, session, prompt and Obsidian code is not
+included; OpenCode remains PuppyOne's sole product Chat Harness.
+
+Claudian is licensed under the MIT License. The complete license, source map and
+CycloneDX record are distributed in `vendor/claudian/LICENSE`,
+`vendor/claudian/SOURCE_ADOPTION.md` and `vendor/claudian/SBOM.cdx.json`.
+
 ## saxes
 
 PuppyOne Desktop uses saxes 6.0.0 to parse namespace-aware WordprocessingML.
