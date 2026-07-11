@@ -196,12 +196,12 @@ export function MarkdownCodeMirrorEditor({
     if (!view) return undefined;
 
     let cancelled = false;
-    let languageFrame: number | null = null;
-    let previewFrame: number | null = null;
+    let languageTask: CancellableRendererTask | null = null;
+    let previewTask: CancellableRendererTask | null = null;
     let readyFrame: number | null = null;
 
-    languageFrame = window.requestAnimationFrame(() => {
-      languageFrame = null;
+    languageTask = scheduleRendererTask(() => {
+      languageTask = null;
       if (cancelled || viewRef.current !== view) return;
       const languageStartedAt = performance.now();
       view.dispatch({
@@ -216,8 +216,8 @@ export function MarkdownCodeMirrorEditor({
       }
       if (!livePreview) return;
 
-      previewFrame = window.requestAnimationFrame(() => {
-        previewFrame = null;
+      previewTask = scheduleRendererTask(() => {
+        previewTask = null;
         if (cancelled || viewRef.current !== view) return;
         const context = livePreviewContextRef.current;
         previewActivatedRef.current = true;
@@ -259,8 +259,8 @@ export function MarkdownCodeMirrorEditor({
     return () => {
       cancelled = true;
       previewActivatedRef.current = false;
-      if (languageFrame !== null) window.cancelAnimationFrame(languageFrame);
-      if (previewFrame !== null) window.cancelAnimationFrame(previewFrame);
+      languageTask?.cancel();
+      previewTask?.cancel();
       if (readyFrame !== null) window.cancelAnimationFrame(readyFrame);
     };
   }, [livePreview]);
@@ -350,4 +350,34 @@ function getEditableExtensions(readOnly: boolean): Extension[] {
     EditorState.readOnly.of(readOnly),
     EditorView.editable.of(!readOnly),
   ];
+}
+
+type CancellableRendererTask = {
+  cancel(): void;
+};
+
+function scheduleRendererTask(callback: () => void): CancellableRendererTask {
+  const schedulerApi = (globalThis as typeof globalThis & {
+    scheduler?: {
+      postTask(
+        task: () => void,
+        options?: { priority?: "user-blocking" | "user-visible" | "background"; signal?: AbortSignal },
+      ): Promise<unknown>;
+    };
+  }).scheduler;
+  if (schedulerApi?.postTask) {
+    const controller = new AbortController();
+    void schedulerApi.postTask(callback, {
+      priority: "user-blocking",
+      signal: controller.signal,
+    }).catch((error) => {
+      if (!(error instanceof Error) || error.name !== "AbortError") {
+        console.warn("Unable to schedule Markdown activation task:", error);
+      }
+    });
+    return { cancel: () => controller.abort() };
+  }
+
+  const timeoutId = window.setTimeout(callback, 0);
+  return { cancel: () => window.clearTimeout(timeoutId) };
 }

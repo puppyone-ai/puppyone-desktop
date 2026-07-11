@@ -21,6 +21,18 @@ type InlineToken =
   | { kind: "link"; from: number; to: number; label: string; href: string }
   | { kind: "wikiLink"; from: number; to: number; token: MarkdownWikiLinkToken };
 
+// The isolated string renderer is used by table cells and atomic previews. A
+// pathological single line must never monopolize the application renderer.
+// CodeMirror still displays the complete canonical source when rich inline
+// parsing intentionally degrades to plain text.
+export const MARKDOWN_INLINE_RICH_SOURCE_MAX_CHARS = 32 * 1024;
+const MARKDOWN_INLINE_TOKEN_CANDIDATE_BUDGET = 256;
+const MARKDOWN_INLINE_RENDER_MAX_DEPTH = 12;
+
+type InlineParseBudget = {
+  remainingCandidates: number;
+};
+
 export type MarkdownInlineRenderOptions = {
   markdownLinkGraph?: MarkdownLinkGraph | null;
   /**
@@ -56,28 +68,49 @@ export function renderMarkdownInlineInto(
   source: string,
   options: MarkdownInlineRenderOptions = {},
 ) {
-  if (!source) return;
+  renderMarkdownInlineIntoAtDepth(target, source, options, 0);
+}
 
-  if (mightContainHtml(source)) {
-    appendInlineHtml(target, source, options);
+function renderMarkdownInlineIntoAtDepth(
+  target: Node,
+  source: string,
+  options: MarkdownInlineRenderOptions,
+  depth: number,
+) {
+  if (!source) return;
+  if (
+    source.length > MARKDOWN_INLINE_RICH_SOURCE_MAX_CHARS
+    || depth > MARKDOWN_INLINE_RENDER_MAX_DEPTH
+  ) {
+    appendText(target, source);
     return;
   }
 
-  appendMarkdownText(target, source, options);
+  if (mightContainHtml(source)) {
+    appendInlineHtml(target, source, options, depth);
+    return;
+  }
+
+  appendMarkdownText(target, source, options, depth);
 }
 
-function appendInlineHtml(target: Node, source: string, options: MarkdownInlineRenderOptions) {
+function appendInlineHtml(
+  target: Node,
+  source: string,
+  options: MarkdownInlineRenderOptions,
+  depth: number,
+) {
   const resolver = options.resolveAssetUrl ?? null;
   const containsImages = /<img\b/i.test(source);
   if (!containsImages || !resolver) {
-    renderSanitizedInlineHtml(target, source, options, false);
+    renderSanitizedInlineHtml(target, source, options, false, depth);
     return;
   }
 
   const targetNode = document.createElement("span");
   target.appendChild(targetNode);
   // Keep unresolved media honest while the broker evaluates every source.
-  renderSanitizedInlineHtml(targetNode, source, options, false);
+  renderSanitizedInlineHtml(targetNode, source, options, false, depth);
 
   resolveMarkdownHtmlImageSources(source, options.sourcePath ?? "", resolver)
     .then((resolvedSource) => {
@@ -87,7 +120,7 @@ function appendInlineHtml(target: Node, source: string, options: MarkdownInlineR
         ...options,
         markdownAssetUrlResolver: null,
         resolveAssetUrl: undefined,
-      }, true);
+      }, true, depth);
       options.onLayoutChange?.();
     })
     .catch(() => undefined);
@@ -98,6 +131,7 @@ function renderSanitizedInlineHtml(
   source: string,
   options: MarkdownInlineRenderOptions,
   brokeredMedia: boolean,
+  depth: number,
 ) {
   if (!isStructurallyCompleteInlineHtmlSource(source)) {
     appendText(target, source);
@@ -114,7 +148,7 @@ function renderSanitizedInlineHtml(
       // inner text through the Markdown inline path.
       const inner = planned.textContent ?? "";
       planned.textContent = "";
-      appendMarkdownText(planned, inner, options);
+      appendMarkdownText(planned, inner, options, depth + 1);
       target.appendChild(planned);
       return;
     }
@@ -126,7 +160,7 @@ function renderSanitizedInlineHtml(
   const result = appendSanitizedInlineHtml(
     fragment,
     template.content,
-    (node, text) => appendMarkdownText(node, text, options),
+    (node, text) => appendMarkdownText(node, text, options, depth + 1),
     { brokeredMedia },
   );
   if (!result.supported) {
@@ -137,11 +171,19 @@ function renderSanitizedInlineHtml(
   target.appendChild(fragment);
 }
 
-function appendMarkdownText(target: Node, source: string, options: MarkdownInlineRenderOptions) {
+function appendMarkdownText(
+  target: Node,
+  source: string,
+  options: MarkdownInlineRenderOptions,
+  depth: number,
+) {
   let cursor = 0;
+  const budget: InlineParseBudget = {
+    remainingCandidates: MARKDOWN_INLINE_TOKEN_CANDIDATE_BUDGET,
+  };
 
   while (cursor < source.length) {
-    const token = findNextToken(source, cursor);
+    const token = findNextToken(source, cursor, budget);
     if (!token) {
       appendText(target, source.slice(cursor));
       break;
@@ -151,12 +193,17 @@ function appendMarkdownText(target: Node, source: string, options: MarkdownInlin
       appendText(target, source.slice(cursor, token.from));
     }
 
-    appendToken(target, token, options);
+    appendToken(target, token, options, depth);
     cursor = token.to;
   }
 }
 
-function appendToken(target: Node, token: InlineToken, options: MarkdownInlineRenderOptions) {
+function appendToken(
+  target: Node,
+  token: InlineToken,
+  options: MarkdownInlineRenderOptions,
+  depth: number,
+) {
   if (token.kind === "code") {
     const code = document.createElement("code");
     code.className = "cm-md-inline-code";
@@ -186,14 +233,14 @@ function appendToken(target: Node, token: InlineToken, options: MarkdownInlineRe
     link.className = "cm-md-inline-link";
     link.setAttribute("data-md-href", href);
     link.rel = "noreferrer noopener";
-    renderMarkdownInlineInto(link, token.label, options);
+    renderMarkdownInlineIntoAtDepth(link, token.label, options, depth + 1);
     bindInlineHtmlDomInteractions(link, { openHref: options.openHref });
     target.appendChild(link);
     return;
   }
 
   const element = document.createElement(token.kind);
-  renderMarkdownInlineInto(element, token.text, options);
+  renderMarkdownInlineIntoAtDepth(element, token.text, options, depth + 1);
   target.appendChild(element);
 }
 
@@ -240,8 +287,15 @@ function appendText(target: Node, text: string) {
   if (text) target.appendChild(document.createTextNode(text));
 }
 
-function findNextToken(source: string, start: number): InlineToken | null {
+function findNextToken(
+  source: string,
+  start: number,
+  budget: InlineParseBudget,
+): InlineToken | null {
   for (let index = start; index < source.length; index += 1) {
+    if (!isPotentialInlineTokenStart(source[index])) continue;
+    if (budget.remainingCandidates <= 0) return null;
+    budget.remainingCandidates -= 1;
     const token =
       parseCodeToken(source, index) ??
       parseWikiLinkToken(source, index) ??
@@ -257,6 +311,15 @@ function findNextToken(source: string, start: number): InlineToken | null {
   }
 
   return null;
+}
+
+function isPotentialInlineTokenStart(character: string | undefined): boolean {
+  return character === "`"
+    || character === "["
+    || character === "!"
+    || character === "*"
+    || character === "_"
+    || character === "~";
 }
 
 function appendImage(

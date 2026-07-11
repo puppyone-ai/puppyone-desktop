@@ -2,6 +2,11 @@ import {
   isBrokerSafeResolvedAssetUrl,
   resolveWorkspaceRelativePath,
 } from "../../platform/policy/markdownAssetPolicy";
+import {
+  isEscapedInlineToken,
+  scanUnescapedDelimiterOnLine,
+  type InlineTokenClosingScan,
+} from "../../shared/inlineTokenScan";
 
 export type BrokeredMarkdownAssetUrlResolver = (
   documentPath: string,
@@ -34,69 +39,95 @@ export function findMarkdownImageTokens(source: string): MarkdownImageToken[] {
   const tokens: MarkdownImageToken[] = [];
 
   for (let index = 0; index < source.length;) {
-    const token = parseMarkdownImageTokenAt(source, index);
-    if (!token) {
+    if (!source.startsWith("![", index) || isEscapedInlineToken(source, index)) {
       index += 1;
       continue;
     }
 
-    tokens.push(token);
-    index = token.to;
+    const scan = scanMarkdownImageTokenAt(source, index);
+    if (scan.token) tokens.push(scan.token);
+    index = Math.max(index + 1, scan.nextIndex);
   }
 
   return tokens;
 }
 
 export function parseMarkdownImageTokenAt(source: string, from: number): MarkdownImageToken | null {
-  if (!source.startsWith("![", from) || isEscaped(source, from)) return null;
-  return parseObsidianImageEmbed(source, from) ?? parseStandardMarkdownImage(source, from);
+  if (!source.startsWith("![", from) || isEscapedInlineToken(source, from)) return null;
+  return scanMarkdownImageTokenAt(source, from).token;
 }
 
-function parseStandardMarkdownImage(source: string, from: number): MarkdownImageToken | null {
+type MarkdownImageTokenScan = {
+  token: MarkdownImageToken | null;
+  nextIndex: number;
+};
+
+function scanMarkdownImageTokenAt(source: string, from: number): MarkdownImageTokenScan {
+  const obsidianScan = scanObsidianImageEmbed(source, from);
+  if (obsidianScan) return obsidianScan;
+  return scanStandardMarkdownImage(source, from);
+}
+
+function scanStandardMarkdownImage(source: string, from: number): MarkdownImageTokenScan {
   const labelFrom = from + 2;
-  const labelTo = findClosingBracket(source, labelFrom);
-  if (labelTo < 0 || source[labelTo + 1] !== "(") return null;
+  const labelScan = scanUnescapedDelimiterOnLine(source, labelFrom, "]");
+  const labelTo = labelScan.closingIndex;
+  if (labelTo < 0 || source[labelTo + 1] !== "(") {
+    return { token: null, nextIndex: labelScan.nextIndex };
+  }
 
   const destinationFrom = labelTo + 2;
-  const destinationTo = findClosingParen(source, destinationFrom);
-  if (destinationTo <= destinationFrom) return null;
+  const destinationScan = findClosingParen(source, destinationFrom);
+  const destinationTo = destinationScan.closingIndex;
+  if (destinationTo <= destinationFrom) {
+    return { token: null, nextIndex: destinationScan.nextIndex };
+  }
 
   const parsed = parseMarkdownImageDestination(source.slice(destinationFrom, destinationTo));
-  if (!parsed) return null;
+  if (!parsed) return { token: null, nextIndex: destinationTo + 1 };
 
   return {
-    from,
-    to: destinationTo + 1,
-    alt: source.slice(labelFrom, labelTo),
-    href: parsed.href,
-    title: parsed.title,
+    token: {
+      from,
+      to: destinationTo + 1,
+      alt: source.slice(labelFrom, labelTo),
+      href: parsed.href,
+      title: parsed.title,
+    },
+    nextIndex: destinationTo + 1,
   };
 }
 
-function parseObsidianImageEmbed(source: string, from: number): MarkdownImageToken | null {
+function scanObsidianImageEmbed(source: string, from: number): MarkdownImageTokenScan | null {
   if (!source.startsWith("![[", from)) return null;
 
   const contentFrom = from + 3;
-  const closingFrom = source.indexOf("]]", contentFrom);
-  if (closingFrom === -1) return null;
+  const closingScan = scanUnescapedDelimiterOnLine(source, contentFrom, "]]");
+  const closingFrom = closingScan.closingIndex;
+  if (closingFrom === -1) return { token: null, nextIndex: closingScan.nextIndex };
 
   const content = source.slice(contentFrom, closingFrom);
-  if (!content.trim() || content.includes("\n")) return null;
+  if (!content.trim()) return { token: null, nextIndex: closingScan.nextIndex };
 
   const pipeOffset = findUnescapedPipe(content);
   const rawTarget = pipeOffset === -1 ? content : content.slice(0, pipeOffset);
   const href = rawTarget.trim();
-  if (!href || !isObsidianImageTarget(href)) return null;
+  if (!href || !isObsidianImageTarget(href)) {
+    return { token: null, nextIndex: closingScan.nextIndex };
+  }
 
   const rawAlias = pipeOffset === -1 ? "" : content.slice(pipeOffset + 1).trim();
   const alt = rawAlias && !isObsidianEmbedSize(rawAlias) ? rawAlias : href;
 
   return {
-    from,
-    to: closingFrom + 2,
-    alt,
-    href,
-    title: null,
+    token: {
+      from,
+      to: closingFrom + 2,
+      alt,
+      href,
+      title: null,
+    },
+    nextIndex: closingFrom + 2,
   };
 }
 
@@ -126,23 +157,22 @@ function parseMarkdownImageDestination(value: string): { href: string; title: st
   };
 }
 
-function findClosingBracket(source: string, from: number): number {
-  for (let index = from; index < source.length; index += 1) {
-    const character = source[index];
-    if (character === "\n") return -1;
-    if (character === "]" && !isEscaped(source, index)) return index;
-  }
-  return -1;
-}
-
-function findClosingParen(source: string, from: number): number {
+function findClosingParen(source: string, from: number): InlineTokenClosingScan {
   let depth = 0;
   let quote: "\"" | "'" | null = null;
+  let escaped = false;
 
   for (let index = from; index < source.length; index += 1) {
     const character = source[index];
-    if (character === "\n") return -1;
-    if (isEscaped(source, index)) continue;
+    if (character === "\n") return { closingIndex: -1, nextIndex: index + 1 };
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\") {
+      escaped = true;
+      continue;
+    }
 
     if (quote) {
       if (character === quote) quote = null;
@@ -160,12 +190,12 @@ function findClosingParen(source: string, from: number): number {
     }
 
     if (character === ")") {
-      if (depth === 0) return index;
+      if (depth === 0) return { closingIndex: index, nextIndex: index + 1 };
       depth -= 1;
     }
   }
 
-  return -1;
+  return { closingIndex: -1, nextIndex: source.length };
 }
 
 function findTrailingQuotedTitle(value: string): { href: string; title: string } | null {
@@ -173,7 +203,7 @@ function findTrailingQuotedTitle(value: string): { href: string; title: string }
   if (quote !== "\"" && quote !== "'") return null;
 
   for (let index = value.length - 2; index >= 0; index -= 1) {
-    if (value[index] !== quote || isEscaped(value, index)) continue;
+    if (value[index] !== quote || isEscapedInlineToken(value, index)) continue;
 
     const href = value.slice(0, index).trim();
     const title = value.slice(index + 1, -1);
@@ -196,17 +226,9 @@ function isObsidianEmbedSize(value: string): boolean {
 
 function findUnescapedPipe(content: string): number {
   for (let index = 0; index < content.length; index += 1) {
-    if (content[index] === "|" && !isEscaped(content, index)) return index;
+    if (content[index] === "|" && !isEscapedInlineToken(content, index)) return index;
   }
   return -1;
-}
-
-function isEscaped(source: string, index: number): boolean {
-  let slashCount = 0;
-  for (let cursor = index - 1; cursor >= 0 && source[cursor] === "\\"; cursor -= 1) {
-    slashCount += 1;
-  }
-  return slashCount % 2 === 1;
 }
 
 export function resolveMarkdownAssetPath(sourcePath: string, href: string): string | null {

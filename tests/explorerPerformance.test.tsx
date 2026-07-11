@@ -10,17 +10,22 @@ import { ExplorerTree } from "../vendor/shared-ui/src/data/ExplorerTree";
 import {
   buildExplorerVisibleModel,
 } from "../vendor/shared-ui/src/data/explorer/explorerVisibleModel";
-import { ExplorerRowStateStore } from "../vendor/shared-ui/src/data/explorer/explorerRowStateStore";
+import { createExplorerMotionPlan } from "../vendor/shared-ui/src/data/explorer/explorerMotionPlan";
 import { EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS } from "../vendor/shared-ui/src/data/explorer/useExplorerVirtualWindow";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root | null = null;
+const originalAnimate = HTMLElement.prototype.animate;
 
 afterEach(() => {
   act(() => root?.unmount());
   root = null;
   document.body.innerHTML = "";
+  Object.defineProperty(HTMLElement.prototype, "animate", {
+    configurable: true,
+    value: originalAnimate,
+  });
 });
 
 describe("Explorer bounded rendering", () => {
@@ -58,36 +63,139 @@ describe("Explorer bounded rendering", () => {
     );
   });
 
-  it("notifies only the old and new rows for an ordinary single selection", () => {
-    const store = new ExplorerRowStateStore();
-    const empty = new Set<string>();
-    store.prepare({
-      activePath: "a",
-      selectedPaths: new Set(["a"]),
-      cutPaths: empty,
-      loadingPaths: empty,
-      draggedPaths: empty,
-      dropTarget: null,
-    }, ["a", "b", "c"]);
-    store.flush();
+  it("builds bounded FLIP enter, move and exit instructions without measuring a subtree", () => {
+    const folder: DataNode = {
+      id: "folder",
+      name: "folder",
+      path: "folder",
+      type: "folder",
+      children: [
+        { id: "child-a", name: "a.md", path: "folder/a.md", type: "markdown" },
+        { id: "child-b", name: "b.md", path: "folder/b.md", type: "markdown" },
+      ],
+    };
+    const tail: DataNode = { id: "tail", name: "tail.md", path: "tail.md", type: "markdown" };
+    const collapsed = buildExplorerVisibleModel([folder, tail], { expandedPaths: new Set() });
+    const expanded = buildExplorerVisibleModel([folder, tail], { expandedPaths: new Set([folder.path]) });
+    const enterPlan = createExplorerMotionPlan({
+      previousRows: collapsed.rows,
+      nextRows: expanded.rows,
+      previousMountedRows: collapsed.rows,
+      nextMountedRows: expanded.rows,
+      rowSize: 32,
+      maxMountedRows: EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS,
+    });
 
-    const listeners = { a: vi.fn(), b: vi.fn(), c: vi.fn() };
-    const disposers = Object.entries(listeners).map(([path, listener]) => store.subscribe(path, listener));
-    store.prepare({
-      activePath: "b",
-      selectedPaths: new Set(["b"]),
-      cutPaths: empty,
-      loadingPaths: empty,
-      draggedPaths: empty,
-      dropTarget: null,
-    }, ["a", "b", "c"]);
+    expect(enterPlan.instructions.get("folder/a.md")?.kind).toBe("enter");
+    expect(enterPlan.instructions.get("tail.md")).toEqual({ kind: "move", offsetY: -64 });
+    expect(enterPlan.ghosts).toHaveLength(0);
 
-    expect([...store.getPendingNotificationPaths()].sort()).toEqual(["a", "b"]);
-    store.flush();
-    expect(listeners.a).toHaveBeenCalledTimes(1);
-    expect(listeners.b).toHaveBeenCalledTimes(1);
-    expect(listeners.c).not.toHaveBeenCalled();
-    disposers.forEach((dispose) => dispose());
+    const exitPlan = createExplorerMotionPlan({
+      previousRows: expanded.rows,
+      nextRows: collapsed.rows,
+      previousMountedRows: expanded.rows,
+      nextMountedRows: collapsed.rows,
+      rowSize: 32,
+      maxMountedRows: EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS,
+    });
+    expect(exitPlan.instructions.get("tail.md")).toEqual({ kind: "move", offsetY: 64 });
+    expect(exitPlan.ghosts.map((ghost) => ghost.row.key)).toEqual(["folder/a.md", "folder/b.md"]);
+    expect(collapsed.rows.length + exitPlan.ghosts.length).toBeLessThanOrEqual(
+      EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS,
+    );
+  });
+
+  it("animates virtualized folder expansion and collapse using transform/opacity only", () => {
+    const animate = vi.fn(() => ({ cancel: vi.fn() }));
+    Object.defineProperty(HTMLElement.prototype, "animate", {
+      configurable: true,
+      value: animate,
+    });
+    const folder: DataNode = {
+      id: "folder",
+      name: "folder",
+      path: "folder",
+      type: "folder",
+      children: makeNodes(8).map((node) => ({ ...node, path: `folder/${node.path}` })),
+    };
+    const container = document.createElement("div");
+    Object.assign(container.style, { width: "320px", height: "640px" });
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    function ControlledExplorer() {
+      const [expanded, setExpanded] = React.useState(false);
+      return (
+        <ExplorerTree
+          nodes={[folder]}
+          activePath={folder.path}
+          selectedPaths={new Set([folder.path])}
+          expandedPaths={expanded ? new Set([folder.path]) : new Set()}
+          showRoot={false}
+          onSelectNode={() => undefined}
+          onToggleFolder={(_node, nextExpanded) => setExpanded(nextExpanded)}
+        />
+      );
+    }
+
+    act(() => root?.render(<ControlledExplorer />));
+    const folderRow = container.querySelector<HTMLButtonElement>(`[data-explorer-path="${folder.path}"]`)!;
+    act(() => folderRow.click());
+    expect(container.querySelectorAll('[data-explorer-motion="enter"]').length).toBeGreaterThan(0);
+    expect(animate).toHaveBeenCalled();
+    expect(Number(container.querySelector<HTMLElement>(".explorer-tree-virtual-canvas")?.dataset.mountedRowCount))
+      .toBeLessThanOrEqual(EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS);
+
+    act(() => folderRow.click());
+    expect(container.querySelectorAll('[data-explorer-motion="exit"]').length).toBeGreaterThan(0);
+    expect(Number(container.querySelector<HTMLElement>(".explorer-tree-virtual-canvas")?.dataset.mountedRowCount))
+      .toBeLessThanOrEqual(EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS);
+  });
+
+  it("windows to an offscreen active row without mounting the intervening 1,000 rows", async () => {
+    const nodes = makeNodes(1_000);
+    const container = renderExplorer({ nodes, activePath: nodes[900]?.path ?? null });
+    await act(async () => {
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    });
+
+    expect(container.querySelector(`[data-explorer-path="${nodes[900]?.path}"]`)).not.toBeNull();
+    expect(container.querySelectorAll("[role=treeitem]").length)
+      .toBeLessThanOrEqual(EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS);
+  });
+
+  it("re-renders only the old and new mounted rows for an ordinary selection", () => {
+    const nodes = makeNodes(100);
+    const expandedPaths = new Set<string>();
+    const renderNodeActions = vi.fn(() => null);
+    const onSelectNode = vi.fn();
+    const container = document.createElement("div");
+    Object.assign(container.style, { width: "320px", height: "640px" });
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    const renderSelection = (index: number) => root?.render(
+      <ExplorerTree
+        nodes={nodes}
+        activePath={nodes[index]?.path ?? null}
+        selectedPaths={new Set([nodes[index]?.path ?? ""])}
+        expandedPaths={expandedPaths}
+        showRoot={false}
+        onSelectNode={onSelectNode}
+        renderNodeActions={renderNodeActions}
+      />,
+    );
+
+    act(() => renderSelection(0));
+    expect(renderNodeActions.mock.calls.length).toBeGreaterThan(2);
+    renderNodeActions.mockClear();
+    act(() => renderSelection(1));
+
+    expect(renderNodeActions).toHaveBeenCalledTimes(2);
+    expect(renderNodeActions.mock.calls.map(([node]) => node.path).sort()).toEqual([
+      nodes[0]?.path,
+      nodes[1]?.path,
+    ].sort());
   });
 
   it("keeps keyboard navigation and additive/range selection on the full model", () => {

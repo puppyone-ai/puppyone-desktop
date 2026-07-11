@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { PresetViewerRenderer } from "./PresetViewerRenderer";
+import { useEffect, useState } from "react";
+import { preloadPresetViewer, PresetViewerRenderer } from "./PresetViewerRenderer";
 import { resolveEditorViewer } from "./viewerRegistry";
 import {
   ExternalViewerAdapter,
@@ -73,6 +73,18 @@ export function PuppyoneEditorHost({
   viewerExtensionAdapter = null,
 }: PuppyoneEditorHostProps) {
   const { viewer, format, resolvedExtension } = resolveEditorViewer(document);
+  const preloadWhileReading = Boolean(
+    !viewerExtensionAdapter
+    && loading
+    && !document.content
+    && !document.preview,
+  );
+  useEffect(() => {
+    if (!preloadWhileReading) return;
+    // Begin route-code acquisition while the cancellable file read is in
+    // flight, rather than serializing the first viewer download after I/O.
+    void preloadPresetViewer(viewer).catch(() => undefined);
+  }, [preloadWhileReading, viewer]);
 
   // Placeholder-grade documents are the plugin-eligible surface. Route them
   // deterministically (§5.1); only a local doc with exactly one (or a chosen)

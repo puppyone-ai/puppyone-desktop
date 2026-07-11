@@ -18,6 +18,7 @@ directly:
 - [Desktop Sidebar View Stack](architecture/desktop-sidebar-view-stack.md)
 - [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)
 - [Explorer Tree Lifecycle](architecture/explorer-tree-lifecycle.md)
+- [Desktop Renderer Performance](architecture/desktop-renderer-performance.md)
 - [Desktop Multi-Window Workspaces](architecture/desktop-multi-window-workspaces.md)
 - [Desktop Session, Workspace Identity, and Cache Lifecycle](architecture/desktop-session-workspace-cache-lifecycle.md)
 - [Desktop Auto Update Lifecycle](architecture/desktop-auto-update-lifecycle.md)

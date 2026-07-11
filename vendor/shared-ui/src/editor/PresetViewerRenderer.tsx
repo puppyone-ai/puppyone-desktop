@@ -16,6 +16,17 @@ const lazyRenderers = new WeakMap<
   LazyPresetViewerContribution,
   LazyExoticComponent<ComponentType<PresetViewerRenderContext>>
 >();
+const rendererModulePromises = new WeakMap<
+  LazyPresetViewerContribution,
+  ReturnType<LazyPresetViewerContribution["load"]>
+>();
+
+/** Starts a lazy viewer download without mounting it. Module evaluation stays
+ * deduplicated and the same promise is later consumed by React.lazy. */
+export function preloadPresetViewer(viewer: PresetViewerContribution): Promise<void> {
+  if ("render" in viewer && typeof viewer.render === "function") return Promise.resolve();
+  return loadRendererModule(viewer as LazyPresetViewerContribution).then(() => undefined);
+}
 
 export function PresetViewerRenderer({
   viewer,
@@ -39,7 +50,20 @@ export function PresetViewerRenderer({
 function getLazyRenderer(viewer: LazyPresetViewerContribution) {
   const cached = lazyRenderers.get(viewer);
   if (cached) return cached;
-  const renderer = lazy(viewer.load);
+  const renderer = lazy(() => loadRendererModule(viewer));
   lazyRenderers.set(viewer, renderer);
   return renderer;
+}
+
+function loadRendererModule(viewer: LazyPresetViewerContribution) {
+  const cached = rendererModulePromises.get(viewer);
+  if (cached) return cached;
+  const modulePromise = viewer.load();
+  rendererModulePromises.set(viewer, modulePromise);
+  void modulePromise.catch(() => {
+    if (rendererModulePromises.get(viewer) === modulePromise) {
+      rendererModulePromises.delete(viewer);
+    }
+  });
+  return modulePromise;
 }

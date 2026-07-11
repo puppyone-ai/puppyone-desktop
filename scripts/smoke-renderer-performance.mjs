@@ -10,7 +10,10 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const indexPath = path.join(repoRoot, "dist", "index.html");
 const outputPath = resolveOutputPath(process.argv.slice(2));
 const tracePath = resolveOptionalPath(process.argv.slice(2), "--trace");
-const sampleTarget = tracePath ? 3 : 30;
+const coldFirstOpen = process.argv.includes("--cold");
+const linkIndex = process.argv.includes("--with-link-index");
+const visible = process.argv.includes("--visible");
+const sampleTarget = coldFirstOpen ? 1 : tracePath ? 3 : 30;
 const tempRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "puppyone-renderer-performance-"));
 app.setPath("userData", path.join(tempRoot, "user-data"));
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
@@ -31,7 +34,7 @@ async function runSmoke() {
     });
   }
   window = new BrowserWindow({
-    show: false,
+    show: visible,
     width: 1280,
     height: 800,
     webPreferences: {
@@ -42,7 +45,7 @@ async function runSmoke() {
     },
   });
   await window.loadURL(
-    `${pathToFileURL(indexPath).toString()}?rendererPerformanceSamples=${sampleTarget}#renderer-performance-smoke`,
+    `${pathToFileURL(indexPath).toString()}?rendererPerformanceSamples=${sampleTarget}&rendererPerformanceCold=${coldFirstOpen}&rendererPerformanceLinkIndex=${linkIndex}#renderer-performance-smoke`,
   );
 
   const summary = await pollForResult(window);
@@ -61,6 +64,9 @@ async function runSmoke() {
       memoryBytes: os.totalmem(),
       build: "production",
       sampleTarget,
+      coldFirstOpen,
+      linkIndex,
+      visible,
     },
     summary,
   };
@@ -109,6 +115,12 @@ function validateReport(report) {
   }
   if ((summary.stages.editor_base_ready?.p95 ?? Number.POSITIVE_INFINITY) > 50) {
     throw new Error(`Click-to-editor-base p95 exceeded 50ms: ${summary.stages.editor_base_ready.p95}ms.`);
+  }
+  if (
+    report.environment.coldFirstOpen
+    && (summary.stages.preview_ready?.p95 ?? Number.POSITIVE_INFINITY) > 150
+  ) {
+    throw new Error(`Cold click-to-preview p95 exceeded 150ms: ${summary.stages.preview_ready.p95}ms.`);
   }
   if (summary.longTasks.over50ms > 0) {
     throw new Error(`Observed ${summary.longTasks.over50ms} renderer long tasks over 50ms.`);

@@ -1,3 +1,9 @@
+import {
+  isEscapedInlineToken,
+  scanUnescapedDelimiterOnLine,
+  type InlineTokenClosingScan,
+} from "../../shared/inlineTokenScan";
+
 export type MarkdownLinkToken = {
   from: number;
   to: number;
@@ -12,20 +18,38 @@ export type MarkdownLinkToken = {
 export function findMarkdownLinkTokens(source: string): MarkdownLinkToken[] {
   const tokens: MarkdownLinkToken[] = [];
 
-  for (let index = 0; index < source.length; index += 1) {
-    if (source[index] !== "[" || source[index - 1] === "!" || isEscaped(source, index)) continue;
+  for (let index = 0; index < source.length;) {
+    if (
+      source[index] !== "["
+      || source[index - 1] === "!"
+      || isEscapedInlineToken(source, index)
+    ) {
+      index += 1;
+      continue;
+    }
 
-    const labelTo = findClosingBracket(source, index + 1);
-    if (labelTo <= index + 1 || source[labelTo + 1] !== "(") continue;
+    const labelScan = scanUnescapedDelimiterOnLine(source, index + 1, "]");
+    const labelTo = labelScan.closingIndex;
+    if (labelTo <= index + 1 || source[labelTo + 1] !== "(") {
+      index = labelScan.nextIndex;
+      continue;
+    }
 
     const hrefFrom = labelTo + 2;
-    const hrefTo = findClosingParen(source, hrefFrom);
-    if (hrefTo <= hrefFrom) continue;
+    const hrefScan = findClosingParen(source, hrefFrom);
+    const hrefTo = hrefScan.closingIndex;
+    if (hrefTo <= hrefFrom) {
+      index = hrefScan.nextIndex;
+      continue;
+    }
 
     const rawLabel = source.slice(index + 1, labelTo);
     const rawDestination = source.slice(hrefFrom, hrefTo);
     const href = parseMarkdownLinkDestination(rawDestination);
-    if (!rawLabel.trim() || !href) continue;
+    if (!rawLabel.trim() || !href) {
+      index = hrefTo + 1;
+      continue;
+    }
 
     tokens.push({
       from: index,
@@ -37,7 +61,7 @@ export function findMarkdownLinkTokens(source: string): MarkdownLinkToken[] {
       label: rawLabel,
       href,
     });
-    index = hrefTo;
+    index = hrefTo + 1;
   }
 
   return tokens;
@@ -48,22 +72,13 @@ export function isExternalMarkdownHref(href: string): boolean {
   return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(value);
 }
 
-function findClosingBracket(source: string, start: number): number {
-  for (let index = start; index < source.length; index += 1) {
-    const character = source[index];
-    if (character === "\n") return -1;
-    if (character === "]" && !isEscaped(source, index)) return index;
-  }
-  return -1;
-}
-
-function findClosingParen(source: string, start: number): number {
+function findClosingParen(source: string, start: number): InlineTokenClosingScan {
   let escaped = false;
   let quote: "\"" | "'" | null = null;
   let depth = 0;
   for (let index = start; index < source.length; index += 1) {
     const character = source[index];
-    if (character === "\n") return -1;
+    if (character === "\n") return { closingIndex: -1, nextIndex: index + 1 };
     if (escaped) {
       escaped = false;
       continue;
@@ -85,11 +100,11 @@ function findClosingParen(source: string, start: number): number {
       continue;
     }
     if (character === ")") {
-      if (depth === 0) return index;
+      if (depth === 0) return { closingIndex: index, nextIndex: index + 1 };
       depth -= 1;
     }
   }
-  return -1;
+  return { closingIndex: -1, nextIndex: source.length };
 }
 
 function parseMarkdownLinkDestination(value: string): string | null {
@@ -109,19 +124,11 @@ function findTrailingTitleStart(value: string): number | null {
   if (quote !== "\"" && quote !== "'") return null;
 
   for (let index = value.length - 2; index >= 0; index -= 1) {
-    if (value[index] !== quote || isEscaped(value, index)) continue;
+    if (value[index] !== quote || isEscapedInlineToken(value, index)) continue;
     const beforeTitle = value.slice(0, index).trimEnd();
     if (!beforeTitle || beforeTitle.length === index) return null;
     return index;
   }
 
   return null;
-}
-
-function isEscaped(source: string, index: number): boolean {
-  let slashCount = 0;
-  for (let cursor = index - 1; cursor >= 0 && source[cursor] === "\\"; cursor -= 1) {
-    slashCount += 1;
-  }
-  return slashCount % 2 === 1;
 }

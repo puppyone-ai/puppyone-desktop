@@ -22,6 +22,7 @@ export type CreateMarkdownLinkGraphOptions = {
 
 export type MarkdownLinkGraphIndexSnapshot = {
   indexedDocumentCount: number;
+  truncatedDocumentCount?: number;
   backlinks: Array<[string, MarkdownBacklink[]]>;
 };
 
@@ -39,6 +40,17 @@ type IndexedDocument = {
   content: string | null;
 };
 
+export type MarkdownLinkGraphIndexer = {
+  indexDocument(document: MarkdownLinkGraphDocument): void;
+  createSnapshot(): MarkdownLinkGraphIndexSnapshot;
+};
+
+const MAX_INDEXED_LINKS_PER_DOCUMENT = 20_000;
+const MAX_STORED_BACKLINKS = 8_000;
+const MAX_STORED_REFERENCES_PER_SOURCE_TARGET = 8;
+const MAX_STORED_BACKLINK_REFERENCES = 8_000;
+const MAX_BACKLINK_LINE_TEXT_LENGTH = 320;
+
 export function createMarkdownLinkGraph(
   documents: readonly MarkdownLinkGraphDocument[],
   options: CreateMarkdownLinkGraphOptions = {},
@@ -49,7 +61,7 @@ export function createMarkdownLinkGraph(
   const titleIndex = createTitleIndex(indexedDocuments);
   const backlinksByTargetPath = indexSnapshot
     ? new Map(indexSnapshot.backlinks)
-    : createBacklinkIndex(indexedDocuments, pathIndex, titleIndex);
+    : createBacklinkIndex(indexedDocuments);
 
   const resolveWikiLink = (sourcePath: string, target: string): MarkdownWikiLinkResolvedTarget => {
     const resolved = resolveWikiLinkTarget(indexedDocuments, pathIndex, titleIndex, sourcePath, target);
@@ -93,95 +105,180 @@ export function createMarkdownLinkGraph(
 export function createMarkdownLinkGraphIndex(
   documents: readonly MarkdownLinkGraphDocument[],
 ): MarkdownLinkGraphIndexSnapshot {
-  const indexedDocuments = documents
-    .map(toIndexedDocument)
-    .sort((left, right) => left.path.localeCompare(right.path));
-  const pathIndex = createPathIndex(indexedDocuments);
-  const titleIndex = createTitleIndex(indexedDocuments);
-  return {
-    indexedDocumentCount: indexedDocuments.filter((document) => document.content !== null).length,
-    backlinks: [...createBacklinkIndex(indexedDocuments, pathIndex, titleIndex).entries()],
-  };
+  const indexer = createMarkdownLinkGraphIndexer(documents);
+  for (const document of documents) indexer.indexDocument(document);
+  return indexer.createSnapshot();
 }
 
 function createBacklinkIndex(
   documents: readonly IndexedDocument[],
-  pathIndex: Map<string, IndexedDocument>,
-  titleIndex: Map<string, IndexedDocument[]>,
 ): Map<string, MarkdownBacklink[]> {
-  const backlinksByTargetPath = new Map<string, Map<string, MarkdownBacklink>>();
-
+  const indexer = createMarkdownLinkGraphIndexer(documents);
   for (const document of documents) {
-    if (!document.content) continue;
-    const lineStarts = createLineStarts(document.content);
-    const targetCache = new Map<string, MarkdownWikiLinkResolvedTarget>();
-    const resolveTarget = (target: string) => {
-      const cached = targetCache.get(target);
-      if (cached) return cached;
-      const resolved = resolveWikiLinkTarget(documents, pathIndex, titleIndex, document.path, target);
-      targetCache.set(target, resolved);
-      return resolved;
-    };
+    indexer.indexDocument({
+      path: document.path,
+      name: document.name,
+      content: document.content,
+    });
+  }
+  return new Map(indexer.createSnapshot().backlinks);
+}
 
-    const sourceLinks = [
-      ...findWikiLinkTokens(document.content).map((token) => ({
-        from: token.from,
-        resolvedTarget: token.target,
-        sourceTarget: token.target,
-        label: token.label,
-      })),
-      ...findMarkdownLinkTokens(document.content).flatMap((token) => {
-        const resolvedTarget = normalizeMarkdownHrefTarget(token.href);
-        return resolvedTarget
-          ? [{
-              from: token.from,
-              resolvedTarget,
-              sourceTarget: token.href,
-              label: token.label,
-            }]
-          : [];
-      }),
-    ].sort((left, right) => left.from - right.from);
+/**
+ * Incremental, bounded backlink builder used inside the indexing Worker. It
+ * retains metadata and compact backlink excerpts, never full document source.
+ * Re-indexing one source first removes that source's previous contributions.
+ */
+export function createMarkdownLinkGraphIndexer(
+  metadataDocuments: readonly MarkdownLinkGraphDocument[],
+): MarkdownLinkGraphIndexer {
+  const documents = metadataDocuments
+    .map((document) => toIndexedDocument({ ...document, content: null }))
+    .sort((left, right) => left.path.localeCompare(right.path));
+  const documentByPath = new Map(documents.map((document) => [normalizeLookupKey(document.path), document]));
+  const pathIndex = createPathIndex(documents);
+  const titleIndex = createTitleIndex(documents);
+  const backlinksByTargetPath = new Map<string, Map<string, MarkdownBacklink>>();
+  const targetPathsBySource = new Map<string, Set<string>>();
+  const indexedSourcePaths = new Set<string>();
+  const truncatedSourcePaths = new Set<string>();
+  let storedBacklinkCount = 0;
+  let storedReferenceCount = 0;
 
-    for (const sourceLink of sourceLinks) {
-      const target = resolveTarget(sourceLink.resolvedTarget);
-      if (!target.exists || !target.path) continue;
-
-      const normalizedTargetPath = normalizeDataPath(target.path);
-      const sourceMap = getOrCreateMap(backlinksByTargetPath, normalizedTargetPath);
-      const existing = sourceMap.get(document.path);
-      const reference = createBacklinkReference(
-        document.content,
-        lineStarts,
-        sourceLink.from,
-        sourceLink.sourceTarget,
-        sourceLink.label,
-      );
-
+  const removeSource = (sourcePath: string) => {
+    const normalizedSourcePath = normalizeLookupKey(sourcePath);
+    for (const targetPath of targetPathsBySource.get(normalizedSourcePath) ?? []) {
+      const sourceMap = backlinksByTargetPath.get(targetPath);
+      const existing = sourceMap?.get(sourcePath);
       if (existing) {
-        existing.count += 1;
-        existing.references.push(reference);
-        continue;
+        storedBacklinkCount -= 1;
+        storedReferenceCount -= existing.references.length;
+      }
+      sourceMap?.delete(sourcePath);
+      if (sourceMap?.size === 0) backlinksByTargetPath.delete(targetPath);
+    }
+    targetPathsBySource.delete(normalizedSourcePath);
+    indexedSourcePaths.delete(normalizedSourcePath);
+    truncatedSourcePaths.delete(normalizedSourcePath);
+  };
+
+  return {
+    indexDocument(document) {
+      removeSource(document.path);
+      if (typeof document.content !== "string") return;
+
+      const source = documentByPath.get(normalizeLookupKey(document.path))
+        ?? toIndexedDocument({ ...document, content: null });
+      const content = document.content;
+      const normalizedSourcePath = normalizeLookupKey(source.path);
+      const lineStarts = createLineStarts(content);
+      const targetCache = new Map<string, MarkdownWikiLinkResolvedTarget>();
+      const sourceTargetPaths = new Set<string>();
+      const resolveTarget = (target: string) => {
+        const cached = targetCache.get(target);
+        if (cached) return cached;
+        const resolved = resolveWikiLinkTarget(documents, pathIndex, titleIndex, source.path, target);
+        targetCache.set(target, resolved);
+        return resolved;
+      };
+      const sourceLinks = [
+        ...findWikiLinkTokens(content).map((token) => ({
+          from: token.from,
+          resolvedTarget: token.target,
+          sourceTarget: token.target,
+          label: token.label,
+        })),
+        ...findMarkdownLinkTokens(content).flatMap((token) => {
+          const resolvedTarget = normalizeMarkdownHrefTarget(token.href);
+          return resolvedTarget
+            ? [{
+                from: token.from,
+                resolvedTarget,
+                sourceTarget: token.href,
+                label: token.label,
+              }]
+            : [];
+        }),
+      ].sort((left, right) => left.from - right.from);
+
+      indexedSourcePaths.add(normalizedSourcePath);
+      if (sourceLinks.length > MAX_INDEXED_LINKS_PER_DOCUMENT) {
+        truncatedSourcePaths.add(normalizedSourcePath);
       }
 
-      sourceMap.set(document.path, {
-        sourcePath: document.path,
-        sourceName: document.name,
-        count: 1,
-        references: [reference],
-      });
-    }
-  }
+      for (const sourceLink of sourceLinks.slice(0, MAX_INDEXED_LINKS_PER_DOCUMENT)) {
+        const target = resolveTarget(sourceLink.resolvedTarget);
+        if (!target.exists || !target.path) continue;
 
-  const result = new Map<string, MarkdownBacklink[]>();
-  for (const [targetPath, sourceMap] of backlinksByTargetPath.entries()) {
-    result.set(
-      targetPath,
-      Array.from(sourceMap.values()).sort((left, right) => left.sourcePath.localeCompare(right.sourcePath)),
-    );
-  }
-
-  return result;
+        const normalizedTargetPath = normalizeDataPath(target.path);
+        const sourceMap = getOrCreateMap(backlinksByTargetPath, normalizedTargetPath);
+        const existing = sourceMap.get(source.path);
+        if (existing) {
+          existing.count += 1;
+          if (
+            existing.references.length < MAX_STORED_REFERENCES_PER_SOURCE_TARGET
+            && storedReferenceCount < MAX_STORED_BACKLINK_REFERENCES
+          ) {
+            existing.references.push(createBacklinkReference(
+              content,
+              lineStarts,
+              sourceLink.from,
+              sourceLink.sourceTarget,
+              sourceLink.label,
+            ));
+            storedReferenceCount += 1;
+          } else {
+            truncatedSourcePaths.add(normalizedSourcePath);
+          }
+        } else {
+          if (storedBacklinkCount >= MAX_STORED_BACKLINKS) {
+            truncatedSourcePaths.add(normalizedSourcePath);
+            continue;
+          }
+          const references = storedReferenceCount < MAX_STORED_BACKLINK_REFERENCES
+            ? [createBacklinkReference(
+                content,
+                lineStarts,
+                sourceLink.from,
+                sourceLink.sourceTarget,
+                sourceLink.label,
+              )]
+            : [];
+          if (references.length === 0) truncatedSourcePaths.add(normalizedSourcePath);
+          storedBacklinkCount += 1;
+          storedReferenceCount += references.length;
+          sourceMap.set(source.path, {
+            sourcePath: source.path,
+            sourceName: source.name,
+            count: 1,
+            references,
+          });
+        }
+        sourceTargetPaths.add(normalizedTargetPath);
+      }
+      targetPathsBySource.set(normalizedSourcePath, sourceTargetPaths);
+    },
+    createSnapshot() {
+      const backlinks: Array<[string, MarkdownBacklink[]]> = [];
+      for (const [targetPath, sourceMap] of backlinksByTargetPath) {
+        backlinks.push([
+          targetPath,
+          [...sourceMap.values()]
+            .map((backlink) => ({
+              ...backlink,
+              references: backlink.references.map((reference) => ({ ...reference })),
+            }))
+            .sort((left, right) => left.sourcePath.localeCompare(right.sourcePath)),
+        ]);
+      }
+      backlinks.sort(([left], [right]) => left.localeCompare(right));
+      return {
+        indexedDocumentCount: indexedSourcePaths.size,
+        truncatedDocumentCount: truncatedSourcePaths.size,
+        backlinks,
+      };
+    },
+  };
 }
 
 function normalizeMarkdownHrefTarget(href: string): string | null {
@@ -219,7 +316,16 @@ function createBacklinkReference(
   const lineStart = lineStarts[lineIndex] ?? 0;
   const nextLineStart = lineStarts[lineIndex + 1];
   const lineEnd = typeof nextLineStart === "number" ? Math.max(lineStart, nextLineStart - 1) : content.length;
-  const rawLine = content.slice(lineStart, lineEnd);
+  // Reserve room for both truncation marks so the serialized reference has a
+  // strict total bound, not merely a bounded source slice.
+  const excerptBudget = MAX_BACKLINK_LINE_TEXT_LENGTH - 2;
+  const preferredContextBefore = Math.floor(excerptBudget * 0.35);
+  let excerptStart = Math.max(lineStart, offset - preferredContextBefore);
+  let excerptEnd = Math.min(lineEnd, excerptStart + excerptBudget);
+  excerptStart = Math.max(lineStart, excerptEnd - excerptBudget);
+  const prefix = excerptStart > lineStart ? "…" : "";
+  const suffix = excerptEnd < lineEnd ? "…" : "";
+  const rawLine = `${prefix}${content.slice(excerptStart, excerptEnd).trim()}${suffix}`;
 
   return {
     lineNumber,
