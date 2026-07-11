@@ -6,14 +6,14 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveFileFormat } from "@puppyone/shared-ui";
 import type { GitFileDiff, GitRevisionPair } from "../src/types/electron";
-import type { DocxRedlinePresentation } from "../src/features/source-control/diff/docx/docxRedlineTypes";
+import type { DocxRedlinePresentation } from "../src/features/source-control/diff/contributions/docx-redline/model";
 
-vi.mock("../src/features/source-control/diff/docx/docxRedlineProvider", () => ({
+vi.mock("../src/features/source-control/diff/contributions/docx-redline/provider", () => ({
   loadDocxRedline: vi.fn(),
 }));
 
-import { DocxRedlineDiff } from "../src/features/source-control/diff/DocxRedlineDiff";
-import { loadDocxRedline } from "../src/features/source-control/diff/docx/docxRedlineProvider";
+import { docxRedlineContribution } from "../src/features/source-control/diff/contributions/docx-redline/contribution";
+import { loadDocxRedline } from "../src/features/source-control/diff/contributions/docx-redline/provider";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -77,7 +77,8 @@ function renderDiff() {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root?.render(React.createElement(DocxRedlineDiff, {
+  const Renderer = docxRedlineContribution.render;
+  act(() => root?.render(React.createElement(Renderer, {
     file: fileDiff(),
     format: resolveFileFormat({ name: "report.docx" }),
   })));
@@ -93,7 +94,7 @@ async function flushEffects() {
 function presentation(overrides: Partial<DocxRedlinePresentation>): DocxRedlinePresentation {
   return {
     kind: "docx-redline",
-    rendererVersion: "1",
+    rendererVersion: "2",
     state: "ready",
     stats: {
       blocksAdded: 0,

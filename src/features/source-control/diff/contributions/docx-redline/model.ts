@@ -1,4 +1,4 @@
-export const DOCX_REDLINE_RENDERER_VERSION = "1";
+export const DOCX_REDLINE_RENDERER_VERSION = "2";
 
 export type DocxBlockKind = "paragraph" | "heading" | "list-item" | "table-row";
 

@@ -1,32 +1,37 @@
-import { readWorkspaceGitDiffResource } from "../../../../lib/localFiles";
-import type { GitRevisionPair, GitRevisionSide } from "../../../../types/electron";
-import { buildDocxRedlineInWorker } from "./docxRedlineClient";
+import {
+  readWorkspaceGitDiffResource,
+  releaseWorkspaceGitDiffResources,
+} from "../../../../../lib/localFiles";
+import type { GitRevisionPair, GitRevisionSide } from "../../../../../types/electron";
+import { buildDocxRedlineInWorker } from "./worker/client";
 import {
   createDocxRedlineCacheKey,
   readDocxRedlineCache,
   writeDocxRedlineCache,
-} from "./docxRedlineCache";
-import { DOCX_REDLINE_RENDERER_VERSION } from "./docxRedlineTypes";
-import type { DocxRedlinePresentation } from "./docxRedlineTypes";
+} from "./cache";
+import { DOCX_REDLINE_RENDERER_VERSION, type DocxRedlinePresentation } from "./model";
 
 type DocxRedlineProviderDependencies = {
   readResource(request: {
     handle: string;
+    size: number;
     sessionId: string;
     selectionIdentity: string;
     revisionIdentity: string;
-  }): Promise<ArrayBuffer>;
+  }, signal: AbortSignal): Promise<ArrayBuffer>;
+  releaseResources(sessionId: string): Promise<void>;
   build(
     before: ArrayBuffer | null,
     after: ArrayBuffer | null,
     signal: AbortSignal,
   ): Promise<DocxRedlinePresentation>;
   readCache(key: string): DocxRedlinePresentation | undefined;
-  writeCache(key: string, model: DocxRedlinePresentation): void;
+  writeCache(key: string, model: DocxRedlinePresentation): boolean;
 };
 
 const defaultDependencies: DocxRedlineProviderDependencies = {
   readResource: readWorkspaceGitDiffResource,
+  releaseResources: releaseWorkspaceGitDiffResources,
   build: buildDocxRedlineInWorker,
   readCache: readDocxRedlineCache,
   writeCache: writeDocxRedlineCache,
@@ -39,7 +44,10 @@ export async function loadDocxRedline(
 ) {
   const cacheKey = createDocxRedlineCacheKey(pair, DOCX_REDLINE_RENDERER_VERSION);
   const cached = dependencies.readCache(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    await releaseAfterSuccess(pair.sessionId, dependencies);
+    return cached;
+  }
   throwIfAborted(signal);
 
   const [before, after] = await Promise.all([
@@ -53,6 +61,7 @@ export async function loadDocxRedline(
     throw new Error("Word diff worker returned an incompatible model version.");
   }
   dependencies.writeCache(cacheKey, model);
+  await releaseAfterSuccess(pair.sessionId, dependencies);
   return model;
 }
 
@@ -70,12 +79,20 @@ async function readRevision(
   throwIfAborted(signal);
   const bytes = await dependencies.readResource({
     handle: side.handle,
+    size: side.size,
     sessionId: pair.sessionId,
     selectionIdentity: pair.selectionIdentity,
     revisionIdentity: side.identity,
-  });
+  }, signal);
   throwIfAborted(signal);
   return bytes;
+}
+
+async function releaseAfterSuccess(
+  sessionId: string,
+  dependencies: DocxRedlineProviderDependencies,
+) {
+  await dependencies.releaseResources(sessionId).catch(() => undefined);
 }
 
 function throwIfAborted(signal: AbortSignal) {

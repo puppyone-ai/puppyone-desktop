@@ -263,6 +263,8 @@ export function registerWorkspaceGitIpcHandlers({
       sessionId: request?.sessionId,
       selectionIdentity: request?.selectionIdentity,
       revisionIdentity: request?.revisionIdentity,
+      offset: request?.offset,
+      length: request?.length,
     })
   ));
 

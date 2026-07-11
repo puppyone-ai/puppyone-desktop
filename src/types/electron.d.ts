@@ -788,9 +788,13 @@ declare global {
         sessionId: string;
         selectionIdentity: string;
         revisionIdentity: string;
+        offset: number;
+        length: number;
       }) => Promise<{
         bytes: Uint8Array;
+        offset: number;
         size: number;
+        done: boolean;
         selectionIdentity: string;
         revisionIdentity: string;
       }>;

@@ -1,5 +1,5 @@
-import type { GitDiffLine } from "../../../types/electron";
-import type { DiffRendererProps } from "./types";
+import type { GitDiffLine } from "../../../../../types/electron";
+import type { DiffRendererProps } from "../../core/types";
 
 export function TextUnifiedDiff({ file }: DiffRendererProps) {
   const omittedLines = file.omittedLines ?? 0;

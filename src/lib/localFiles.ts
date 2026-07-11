@@ -360,22 +360,61 @@ export async function cancelWorkspaceGitFileDiff(requestId: string, sessionId: s
 
 export async function readWorkspaceGitDiffResource(request: {
   handle: string;
+  size: number;
   sessionId: string;
   selectionIdentity: string;
   revisionIdentity: string;
-}): Promise<ArrayBuffer> {
-  const result = await getDesktopBridge().readGitDiffResource(request);
+}, signal?: AbortSignal): Promise<ArrayBuffer> {
+  const maxResourceBytes = 25 * 1024 * 1024;
+  const readChunkBytes = 4 * 1024 * 1024;
   if (
-    result.selectionIdentity !== request.selectionIdentity ||
-    result.revisionIdentity !== request.revisionIdentity ||
-    result.bytes.byteLength !== result.size
+    !Number.isSafeInteger(request.size)
+    || request.size < 0
+    || request.size > maxResourceBytes
   ) {
-    throw new Error("Git diff resource identity changed while loading.");
+    throw new Error("Git diff resource has an invalid or unsupported size.");
   }
-  return result.bytes.buffer.slice(
-    result.bytes.byteOffset,
-    result.bytes.byteOffset + result.bytes.byteLength,
-  ) as ArrayBuffer;
+
+  throwIfGitDiffResourceReadAborted(signal);
+  const bytes = new Uint8Array(request.size);
+  let offset = 0;
+  while (offset < request.size) {
+    throwIfGitDiffResourceReadAborted(signal);
+    const requestedLength = Math.min(readChunkBytes, request.size - offset);
+    const result = await getDesktopBridge().readGitDiffResource({
+      handle: request.handle,
+      sessionId: request.sessionId,
+      selectionIdentity: request.selectionIdentity,
+      revisionIdentity: request.revisionIdentity,
+      offset,
+      length: requestedLength,
+    });
+    throwIfGitDiffResourceReadAborted(signal);
+
+    const expectedLength = Math.min(requestedLength, request.size - offset);
+    const expectedDone = offset + expectedLength === request.size;
+    if (
+      result.selectionIdentity !== request.selectionIdentity
+      || result.revisionIdentity !== request.revisionIdentity
+      || result.offset !== offset
+      || result.size !== request.size
+      || !(result.bytes instanceof Uint8Array)
+      || result.bytes.byteLength !== expectedLength
+      || result.done !== expectedDone
+    ) {
+      throw new Error("Git diff resource identity or range changed while loading.");
+    }
+    bytes.set(result.bytes, offset);
+    offset += result.bytes.byteLength;
+  }
+  return bytes.buffer;
+}
+
+function throwIfGitDiffResourceReadAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  const error = new Error("Git diff resource read was cancelled.");
+  error.name = "AbortError";
+  throw error;
 }
 
 export async function releaseWorkspaceGitDiffResources(sessionId: string): Promise<void> {

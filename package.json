@@ -27,6 +27,7 @@
     "dist:mac:publish": "npm run check:shared-ui && npm run build && npm run check:viewer-pack-trust && npm run check:opencode-release && electron-builder --mac --publish always",
     "preview": "vite preview --host 127.0.0.1",
     "smoke:local-api": "node scripts/smoke-local-api.mjs",
+    "smoke:format-aware-diff": "electron scripts/smoke-format-aware-diff.mjs",
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
     "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
     "start": "node scripts/start-electron.mjs",
@@ -68,17 +69,18 @@
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^17.7.0",
+    "happy-dom": "^15.11.7",
     "lucide-react": "^0.562.0",
     "mermaid": "^11.16.0",
     "postcss": "^8.5.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "saxes": "^6.0.0",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.6.3",
     "vite": "^6.0.7",
     "vitest": "^2.1.8",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "happy-dom": "^15.11.7"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "build": {
     "appId": "ai.puppyone.desktop",

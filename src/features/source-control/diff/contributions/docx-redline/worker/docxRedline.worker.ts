@@ -2,7 +2,7 @@ import {
   runDocxRedlineWorkerTask,
   type DocxRedlineWorkerRequest,
   type DocxRedlineWorkerResponse,
-} from "./docxRedlineTask";
+} from "./task";
 
 type WorkerScope = {
   onmessage: ((event: MessageEvent<DocxRedlineWorkerRequest>) => void) | null;

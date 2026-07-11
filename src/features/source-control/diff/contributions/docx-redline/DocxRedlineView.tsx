@@ -1,82 +1,37 @@
-import { useEffect, useRef, useState } from "react";
 import { FileWarning, LoaderCircle, RefreshCw } from "lucide-react";
-import type { DocxRedlinePresentation } from "./docx/docxRedlineTypes";
-import type { DiffRendererProps } from "./types";
-import { isCurrentDiffLoad } from "./lifecycle";
+import type {
+  DiffErrorRendererProps,
+  DiffLoadingRendererProps,
+  DiffModelRendererProps,
+} from "../../core/types";
+import type { DocxRedlinePresentation } from "./model";
 
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "ready"; model: DocxRedlinePresentation }
-  | { kind: "error"; message: string };
-
-export function DocxRedlineDiff({ file }: DiffRendererProps) {
-  const pair = file.revisionPair;
-  const loadRef = useRef(0);
-  const selectionRef = useRef(pair?.selectionIdentity ?? "");
-  selectionRef.current = pair?.selectionIdentity ?? "";
-  const [reload, setReload] = useState(0);
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
-
-  useEffect(() => {
-    const loadId = ++loadRef.current;
-    const controller = new AbortController();
-    if (!pair) {
-      setState({ kind: "error", message: "The revision pair is unavailable for this Word document." });
-      return () => controller.abort();
-    }
-
-    setState({ kind: "loading" });
-    void import("./docx/docxRedlineProvider")
-      .then(({ loadDocxRedline }) => loadDocxRedline(pair, controller.signal))
-      .then((model) => {
-        if (isCurrentDiffLoad(
-          loadRef.current,
-          loadId,
-          controller.signal,
-          selectionRef.current,
-          pair.selectionIdentity,
-        )) {
-          setState({ kind: "ready", model });
-        }
-      })
-      .catch((error) => {
-        if (controller.signal.aborted || loadRef.current !== loadId) return;
-        setState({
-          kind: "error",
-          message: error instanceof Error ? error.message : String(error),
-        });
-      });
-
-    return () => controller.abort();
-  }, [pair, reload]);
-
-  if (state.kind === "loading") {
-    return (
-      <div className="desktop-docx-diff-state" role="status">
-        <LoaderCircle className="spin" size={16} aria-hidden="true" />
-        Building semantic Word diff…
-      </div>
-    );
-  }
-  if (state.kind === "error") {
-    return (
-      <div className="desktop-docx-diff-state error" role="alert">
-        <FileWarning size={16} aria-hidden="true" />
-        <div>
-          <strong>Word diff unavailable</strong>
-          <span>{state.message}</span>
-        </div>
-        <button type="button" className="secondary-action" onClick={() => setReload((value) => value + 1)}>
-          <RefreshCw size={13} aria-hidden="true" />
-          Retry
-        </button>
-      </div>
-    );
-  }
-  return <DocxRedlinePresentationView model={state.model} />;
+export function DocxRedlineLoading(_props: DiffLoadingRendererProps) {
+  return (
+    <div className="desktop-docx-diff-state" role="status">
+      <LoaderCircle className="spin" size={16} aria-hidden="true" />
+      Building semantic Word diff…
+    </div>
+  );
 }
 
-function DocxRedlinePresentationView({ model }: { model: DocxRedlinePresentation }) {
+export function DocxRedlineError({ message, onRetry }: DiffErrorRendererProps) {
+  return (
+    <div className="desktop-docx-diff-state error" role="alert">
+      <FileWarning size={16} aria-hidden="true" />
+      <div>
+        <strong>Word diff unavailable</strong>
+        <span>{message}</span>
+      </div>
+      <button type="button" className="secondary-action" onClick={onRetry}>
+        <RefreshCw size={13} aria-hidden="true" />
+        Retry
+      </button>
+    </div>
+  );
+}
+
+export function DocxRedlineView({ model }: DiffModelRendererProps<DocxRedlinePresentation>) {
   if (model.changes.length === 0) {
     return (
       <div className="desktop-docx-diff-state">

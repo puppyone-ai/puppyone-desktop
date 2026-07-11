@@ -1,6 +1,6 @@
 import { ExternalLink, FileWarning } from "lucide-react";
-import type { GitRevisionSide } from "../../../types/electron";
-import type { DiffRendererProps } from "./types";
+import type { GitRevisionSide } from "../../../../../types/electron";
+import type { DiffRendererProps } from "../../core/types";
 
 export function BinarySummaryDiff({ file, format, canOpenFile, onOpenFile }: DiffRendererProps) {
   const pair = file.revisionPair;

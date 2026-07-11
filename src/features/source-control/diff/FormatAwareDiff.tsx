@@ -1,5 +1,5 @@
 import type { GitFileDiff } from "../../../types/electron";
-import { resolveDiffViewer } from "./registry";
+import { resolveDiffViewer } from "./core/registry";
 
 export function FormatAwareDiff({
   file,

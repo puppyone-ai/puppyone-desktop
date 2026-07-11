@@ -1,5 +1,5 @@
-import type { DocxRedlinePresentation } from "./docxRedlineTypes";
-import type { DocxRedlineWorkerRequest, DocxRedlineWorkerResponse } from "./docxRedlineTask";
+import type { DocxRedlinePresentation } from "../model";
+import type { DocxRedlineWorkerRequest, DocxRedlineWorkerResponse } from "./task";
 
 export const DOCX_REDLINE_WORKER_TIMEOUT_MS = 20_000;
 

@@ -1,12 +1,12 @@
 import JSZip from "jszip";
 import { describe, expect, it, vi } from "vitest";
+import { alignDocxBlocks } from "../src/features/source-control/diff/contributions/docx-redline/worker/align";
+import { normalizeDocxDocumentXml } from "../src/features/source-control/diff/contributions/docx-redline/worker/normalize";
 import {
-  alignDocxBlocks,
   buildDocxRedlinePresentation,
-  normalizeDocxDocumentXml,
   runDocxRedlineWorkerTask,
-} from "../src/features/source-control/diff/docx/docxRedlineTask";
-import { buildDocxRedlineInWorker } from "../src/features/source-control/diff/docx/docxRedlineClient";
+} from "../src/features/source-control/diff/contributions/docx-redline/worker/task";
+import { buildDocxRedlineInWorker } from "../src/features/source-control/diff/contributions/docx-redline/worker/client";
 
 describe("DOCX semantic redline", () => {
   it("normalizes runs, headings, list items, and table rows into stable blocks", () => {
@@ -21,6 +21,33 @@ describe("DOCX semantic redline", () => {
       { kind: "list-item", text: "First item", sourceIndex: 1 },
       { kind: "table-row", text: "Name | Status", cells: ["Name", "Status"], sourceIndex: 2 },
     ]);
+  });
+
+  it("parses namespace-aware OOXML independently of the chosen prefix", () => {
+    const strictNamespace = "http://purl.oclc.org/ooxml/wordprocessingml/main";
+    const xml = [
+      `<doc:document xmlns:doc="${strictNamespace}"><doc:body>`,
+      '<doc:p data-note="1 > 0"><doc:pPr><doc:pStyle doc:val="Heading2"/></doc:pPr>',
+      "<!-- a > character in a comment must not confuse tokenization -->",
+      "<doc:r><doc:t>Portable prefix</doc:t></doc:r></doc:p>",
+      "</doc:body></doc:document>",
+    ].join("");
+    expect(normalizeDocxDocumentXml(xml)).toEqual([
+      { kind: "heading", text: "Portable prefix", sourceIndex: 0 },
+    ]);
+  });
+
+  it("omits tracked deletions and rejects DTDs and malformed XML", () => {
+    const xml = documentXml([
+      '<w:p><w:del><w:r><w:t>Removed text</w:t></w:r></w:del><w:r><w:t>Visible text</w:t></w:r></w:p>',
+    ]);
+    expect(normalizeDocxDocumentXml(xml)[0]?.text).toBe("Visible text");
+    expect(() => normalizeDocxDocumentXml(
+      '<!DOCTYPE w:document><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>',
+    )).toThrow(/document type/i);
+    expect(() => normalizeDocxDocumentXml(
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p>',
+    )).toThrow(/malformed/i);
   });
 
   it("builds located paragraph and word-level additions and removals from validated fixtures", async () => {
