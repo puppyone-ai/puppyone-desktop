@@ -15,9 +15,9 @@ Local binary SHA-256     0f8016e7b95534c82a46c7e03c0223a651590aa3855d0b022b57546
 Version cold time        2.52 s (first local invocation)
 Version warm times       0.87 / 0.85 / 0.84 / 0.84 s
 v1.17.18 archives        55,170,827–69,581,443 bytes by platform
-4,000-event projection   mean 5.33 ms; p99 8.93 ms (141 samples)
-steady 2,000-row delta   mean 0.94 ms; p99 1.59 ms (799 samples)
-2,000-row virtual mount  mean 6.48 ms; p99 17.93 ms (116 samples)
+4,000-event projection   mean 5.76 ms; p99 9.22 ms (131 samples)
+steady 2,000-row delta   mean 1.15 ms; p99 2.10 ms (655 samples)
+2,000-row virtual mount  mean 9.32 ms; p99 31.33 ms (81 samples)
 mounted row budget       <= 120
 ```
 
