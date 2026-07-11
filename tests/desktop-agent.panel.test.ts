@@ -84,7 +84,7 @@ describe("Desktop Agent panel lifecycle", () => {
 
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(textarea.disabled).toBe(false);
-    expect(textarea.style.height).toBe("48px");
+    expect(textarea.style.height).toBe("20px");
     expect(container.textContent).toContain("PuppyOne Agent needs repair");
     expect(container.textContent).toContain("Agent engine powered by OpenCode");
     expect(container.textContent).not.toContain("OpenCode update required");

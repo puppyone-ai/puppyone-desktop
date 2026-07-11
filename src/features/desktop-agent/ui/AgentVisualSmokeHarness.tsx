@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { AgentComposer } from "./AgentComposer";
+import { AgentChangesPill } from "./AgentChangesPill";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
 import { createAgentProjection } from "../domain/agent-projection";
 import "./desktop-agent.css";
 
 const models = [
-  { id: "anthropic/claude-sonnet-4-5", model: "anthropic/claude-sonnet-4-5", displayName: "Claude Sonnet 4.5", description: "Balanced coding model", isDefault: true, providerId: "anthropic" },
+  { id: "cursor/fable-5-extra-high", model: "cursor/fable-5-extra-high", displayName: "Fable 5 Extra High", description: "Reference-width coding model", isDefault: true, providerId: "cursor" },
   { id: "openai/gpt-5.5", model: "openai/gpt-5.5", displayName: "GPT-5.5", description: "OpenAI coding model", isDefault: false, providerId: "openai" },
 ];
 
@@ -28,7 +29,7 @@ export function AgentVisualSmokeHarness() {
         role: "user",
         turnId: "turn-1",
         itemId: null,
-        text: "这些测试文件都在代码库里面吗？",
+        text: "好，可是现在的这个 terminal 的颜色也没有按照主题风格来。terminal 的颜色也要按照这个整体的一致的颜色去做",
         streaming: false,
         terminalState: null,
         sequence: 1,
@@ -38,7 +39,7 @@ export function AgentVisualSmokeHarness() {
         role: "assistant",
         turnId: "turn-1",
         itemId: "message-1",
-        text: "是的，它们都保留在项目的 `tests` 目录里，`npm test` 会自动运行。\n\n这次新增的覆盖包括：\n\n- 文件复制与剪贴板交互\n- 工作区 IPC 安全边界\n- OpenCode session 恢复和流式事件\n\n基准测试仍然独立保留，用来持续发现首开和滚动性能回退。",
+        text: "补充两点：\n\n- 终端与正文之间保留一条柔和的视觉分隔，与 sidebar 的处理方式一致。\n- 终端前景色和 ANSI 色板继续由主题定义，底色则使用统一的正文画布色。",
         streaming: false,
         terminalState: "completed",
         sequence: 2,
@@ -48,7 +49,7 @@ export function AgentVisualSmokeHarness() {
         role: "user",
         turnId: "turn-2",
         itemId: null,
-        text: "好，那把架构和性能边界也一起固定下来。",
+        text: "好，现在我需要你这个 md editor 的上下 padding 要和左右的 padding 相同",
         streaming: false,
         terminalState: null,
         sequence: 3,
@@ -58,24 +59,48 @@ export function AgentVisualSmokeHarness() {
         role: "assistant",
         turnId: "turn-2",
         itemId: "message-2",
-        text: "已经收拢完成。Chat 始终由 OpenCode harness 驱动，Provider 和 Model 是 session 内的选择；PuppyOne 只保存映射与 UI 投影，不再维护第二套 Agent loop。",
+        text: "分支已切到 `codex-cloud`。先找到 MD 编辑器内容区上下与左右 padding 的定义处。",
         streaming: false,
         terminalState: "completed",
         sequence: 5,
       },
     ];
-    value.activities = [{
-      id: "activity:architecture",
+    value.activities = [
+      {
+        id: "activity:duration",
+        turnId: "turn-2",
+        itemId: "reasoning-1",
+        kind: "reasoning",
+        label: "Worked for 2s",
+        status: "completed",
+        detail: {},
+        output: "",
+        sequence: 4,
+      },
+      {
+        id: "activity:explored",
+        turnId: "turn-2",
+        itemId: "tool-1",
+        kind: "tool",
+        label: "Explored markdown-editor.css, 2 searches",
+        status: "completed",
+        detail: {},
+        output: "",
+        sequence: 6,
+      },
+    ];
+    value.parts = [{
+      id: "fixture:hidden-file-change-summary",
       turnId: "turn-2",
-      itemId: "tool-1",
+      itemId: "tool-2",
       kind: "file-change",
-      label: "Updated Agent architecture and UI boundaries",
+      label: "Updated files",
       status: "completed",
-      detail: { changes: [{ path: "docs/architecture/desktop-agent", additions: 86, deletions: 12 }] },
+      detail: { changes: [{ path: "src/markdown-editor.css", additions: 2704, deletions: 585 }] },
       output: "",
-      sequence: 4,
+      sequence: 7,
     }];
-    value.lastSequence = 5;
+    value.lastSequence = 7;
     value.terminalState = "completed";
     return value;
   }, []);
@@ -93,6 +118,7 @@ export function AgentVisualSmokeHarness() {
           history={[]}
         />
         <AgentTranscript projection={projection} loading={false} runtimeLabel="OpenCode" />
+        <AgentChangesPill projection={projection} onViewChanges={() => {}} />
         <AgentComposer
           draft={draft}
           onDraftChange={setDraft}
@@ -100,7 +126,7 @@ export function AgentVisualSmokeHarness() {
           running={false}
           stopping={false}
           submitting={false}
-          placeholder="Plan, build, / for commands, @ for context"
+          placeholder="Send follow-up"
           runtimeLabel="OpenCode"
           models={models}
           selectedModel={model}

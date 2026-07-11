@@ -200,7 +200,11 @@ function buildTimeline(projection: AgentProjection) {
     turnId: part.turnId,
     kind: part.kind,
     sequence: part.sequence,
-    estimatedHeight: part.kind === "assistant" ? 120 : part.kind === "user" ? 86 : 42,
+    estimatedHeight: part.kind === "assistant"
+      ? Math.min(640, 50 + Math.ceil(part.text.length / 64) * 20)
+      : part.kind === "user"
+        ? 64
+        : 34,
   }));
   return { rows, parts: new Map(parts.map((part) => [part.id, part])) };
 }

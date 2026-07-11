@@ -1,5 +1,5 @@
-import { ArrowUp, AtSign, ChevronDown, Paperclip, Plus, Sparkles, Square, X, Zap } from "lucide-react";
-import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { ArrowUp, AtSign, Check, ChevronDown, Paperclip, Plus, Sparkles, Square, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { AgentCommand, AgentFileReference, AgentMode, AgentModel } from "../domain/agent-contract";
 
 type AgentComposerProps = {
@@ -33,7 +33,8 @@ type AgentComposerProps = {
   onStop: () => void;
 };
 
-const MAX_TEXTAREA_HEIGHT = 168;
+const MIN_TEXTAREA_HEIGHT = 20;
+const MAX_TEXTAREA_HEIGHT = 132;
 
 export function AgentComposer({
   draft,
@@ -67,7 +68,9 @@ export function AgentComposer({
 }: AgentComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const toolsRef = useRef<HTMLDivElement>(null);
   const [pickMode, setPickMode] = useState<"attachment" | "context">("attachment");
+  const [toolsOpen, setToolsOpen] = useState(false);
   const commandQuery = /^\/([^\s]*)$/.exec(draft.trimStart())?.[1]?.toLowerCase() ?? null;
   const visibleCommands = commandQuery === null ? [] : commands
     .filter((command) => command.name.toLowerCase().includes(commandQuery))
@@ -77,19 +80,48 @@ export function AgentComposer({
     () => models.find((model) => model.model === selectedModel) ?? models[0] ?? null,
     [models, selectedModel],
   );
+  const toolsAvailable = attachmentAvailable || contextAvailable || modes.length > 0;
+
+  useEffect(() => {
+    if (!toolsOpen) return undefined;
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && toolsRef.current?.contains(event.target)) return;
+      setToolsOpen(false);
+    };
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setToolsOpen(false);
+    };
+    window.addEventListener("pointerdown", closeOnPointerDown, true);
+    window.addEventListener("keydown", closeOnEscape, true);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnPointerDown, true);
+      window.removeEventListener("keydown", closeOnEscape, true);
+    };
+  }, [toolsOpen]);
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    if (!draft) {
-      textarea.style.height = "48px";
-      textarea.style.overflowY = "hidden";
-      return;
-    }
-    textarea.style.height = "auto";
-    const nextHeight = Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT);
-    textarea.style.height = `${nextHeight}px`;
-    textarea.style.overflowY = textarea.scrollHeight > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
+    const resize = () => {
+      if (!draft) {
+        textarea.style.height = `${MIN_TEXTAREA_HEIGHT}px`;
+        textarea.style.overflowY = "hidden";
+        return;
+      }
+      textarea.style.height = "0px";
+      const nextHeight = Math.max(MIN_TEXTAREA_HEIGHT, Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT));
+      textarea.style.height = `${nextHeight}px`;
+      textarea.style.overflowY = textarea.scrollHeight > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
+    };
+    resize();
+    let lastWidth = textarea.parentElement?.getBoundingClientRect().width ?? 0;
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(([entry]) => {
+      if (!entry || Math.abs(entry.contentRect.width - lastWidth) < 1) return;
+      lastWidth = entry.contentRect.width;
+      resize();
+    }) : null;
+    if (textarea.parentElement) observer?.observe(textarea.parentElement);
+    return () => observer?.disconnect();
   }, [draft]);
 
   const submit = async () => {
@@ -104,6 +136,7 @@ export function AgentComposer({
   };
   const openPicker = (mode: "attachment" | "context") => {
     setPickMode(mode);
+    setToolsOpen(false);
     fileInputRef.current?.click();
   };
   const acceptFiles = (files: FileList | null) => {
@@ -119,7 +152,7 @@ export function AgentComposer({
 
   return (
     <div className="desktop-agent-composer-shell">
-      {visibleCommands.length > 0 && (
+      {visibleCommands.length > 0 && !toolsOpen && (
         <div className="desktop-agent-command-menu" role="listbox" aria-label="Agent commands">
           {visibleCommands.map((command) => (
             <button type="button" role="option" key={`${command.source}:${command.name}`} onClick={() => onDraftChange(`/${command.name} `)}>
@@ -135,38 +168,57 @@ export function AgentComposer({
             {attachments.map((reference) => <span key={`attachment:${reference.path}`}><Paperclip size={11} />{reference.name || basename(reference.path)}<button type="button" aria-label={`Remove ${reference.name || reference.path}`} onClick={() => onRemoveAttachment?.(reference.path)}><X size={10} /></button></span>)}
           </div>
         )}
-        <textarea
-          ref={textareaRef}
-          value={draft}
-          disabled={inputDisabled}
-          rows={1}
-          aria-label={`Message ${runtimeLabel}`}
-          placeholder={placeholder}
-          onChange={(event) => onDraftChange(event.target.value)}
-          onKeyDown={handleKeyDown}
-        />
-        <input ref={fileInputRef} className="desktop-agent-visually-hidden" type="file" multiple tabIndex={-1} onChange={(event) => acceptFiles(event.target.files)} />
-        <div className="desktop-agent-composer-footer">
-          <div className="desktop-agent-composer-leading">
-            {attachmentAvailable && <button type="button" className="desktop-agent-composer-tool" aria-label="Attach files" title="Attach files" disabled={disabled || running} onClick={() => openPicker("attachment")}><Plus size={18} /></button>}
-            {contextAvailable && <button type="button" className="desktop-agent-composer-tool" aria-label="Add workspace context" title="Add workspace context" disabled={disabled || running} onClick={() => openPicker("context")}><AtSign size={16} /></button>}
-            <div className="desktop-agent-select-pill is-mode">
-              <Sparkles size={13} aria-hidden="true" />
-              {modes.length > 0 ? (
-                <label>
-                  <span className="desktop-agent-visually-hidden">Agent mode</span>
-                  <select value={selectedMode ?? ""} disabled={running} onChange={(event) => onSelectMode?.(event.target.value)}>
-                    {modes.map((mode) => <option key={mode.id} value={mode.id}>{mode.displayName}</option>)}
-                  </select>
-                </label>
-              ) : <span>Agent</span>}
-              {modes.length > 0 && <ChevronDown size={12} aria-hidden="true" />}
-            </div>
+        <div className="desktop-agent-composer-row">
+          <div className="desktop-agent-composer-leading" ref={toolsRef}>
+            <button
+              type="button"
+              className="desktop-agent-composer-tool"
+              aria-label="Add context or change Agent mode"
+              title="Add context or change Agent mode"
+              aria-haspopup="menu"
+              aria-expanded={toolsOpen}
+              disabled={!toolsAvailable || disabled || running}
+              onClick={() => setToolsOpen((value) => !value)}
+            >
+              <Plus size={18} />
+            </button>
+            {toolsOpen && (
+              <div className="desktop-agent-tools-menu" role="menu" aria-label="Composer tools">
+                {attachmentAvailable && <button type="button" role="menuitem" onClick={() => openPicker("attachment")}><Paperclip size={14} /><span>Attach files</span></button>}
+                {contextAvailable && <button type="button" role="menuitem" onClick={() => openPicker("context")}><AtSign size={14} /><span>Add workspace context</span></button>}
+                {modes.length > 0 && (
+                  <div className="desktop-agent-tools-mode" role="group" aria-label="Agent mode">
+                    <div><Sparkles size={13} /><span>Agent mode</span></div>
+                    {modes.map((mode) => (
+                      <button
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={mode.id === selectedMode}
+                        key={mode.id}
+                        onClick={() => { onSelectMode?.(mode.id); setToolsOpen(false); }}
+                      >
+                        <span>{mode.displayName}</span>{mode.id === selectedMode && <Check size={13} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+          <textarea
+            ref={textareaRef}
+            value={draft}
+            disabled={inputDisabled}
+            rows={1}
+            aria-label={`Message ${runtimeLabel}`}
+            placeholder={placeholder}
+            onChange={(event) => onDraftChange(event.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+          <input ref={fileInputRef} className="desktop-agent-visually-hidden" type="file" multiple tabIndex={-1} onChange={(event) => acceptFiles(event.target.files)} />
           <div className="desktop-agent-composer-trailing">
             {models.length > 0 && (
               <div className="desktop-agent-select-pill is-model" title={selectedModelEntry?.description || selectedModelEntry?.displayName}>
-                <Zap size={13} fill="currentColor" aria-hidden="true" />
                 <label>
                   <span className="desktop-agent-visually-hidden">Agent model</span>
                   <select value={selectedModel ?? ""} disabled={running} onChange={(event) => onSelectModel?.(event.target.value)}>

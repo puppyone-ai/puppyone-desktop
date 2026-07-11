@@ -23,7 +23,7 @@ PuppyOne Desktop
 |
 +-- Local Agent Chat
       +-- Presentation (React, Cursor-style hierarchy)
-      |     +-- compact session header + history
+      |     +-- out-of-flow session actions + history
       |     +-- virtual timeline
       |     +-- part/tool renderer registry
       |     +-- permission/question docks
@@ -169,6 +169,7 @@ src/features/desktop-agent/
   ui/
     AgentPartRenderer.tsx             discriminated part registry
     AgentQuestionDock.tsx             typed blocking questions
+    AgentChangesPill.tsx              aggregate additions/deletions handoff
     SafeMarkdown.tsx                  no-innerHTML Markdown surface
     AgentTranscript.tsx               <=120 mounted virtual rows
     AgentComposer.tsx                 /, @, files and model/mode controls
@@ -227,26 +228,29 @@ assets or hard-coded colors.
 ```text
 Right sidebar surface
 |
-+-- compact session header
-|     title + live state              history / new / overflow
++-- on-demand session chrome          out of document flow
+|     history / new / overflow        visible on hover or keyboard focus
 |
 +-- virtual conversation document
-|     user turn                       quiet, right-aligned bubble
+|     user turn                       full-width bordered prompt surface
 |     assistant turn                  unboxed readable document flow
-|     tool/plan/file activity         compact progressive disclosure
-|     answer actions                  copy and truthful available actions
+|     tool/plan activity              quiet text rows + progressive disclosure
+|     answer actions                  right-aligned truthful actions
 |
 +-- blocking dock                     approval or structured question
 |
++-- Changes pill                      real aggregate + / - counts
+|
 +-- anchored composer
-      growing input                   one line -> bounded multiline
-      left tools                      attach / context / OpenCode mode
+      one-row idle geometry           42 px outer height
+      left + menu                     attachments / context / Agent mode
+      middle input                    one line -> bounded multiline
       right controls                  model / stop or send
 ```
 
 Visible “You”, “OpenCode” or runtime badges are intentionally absent from each
-message because alignment and semantics already communicate authorship. The
-harness is not a product choice. User turns use one quiet raised material;
+message because material and document order communicate authorship. The
+harness is not a product choice. User turns use one full-width quiet raised material;
 assistant turns stay on canvas so long answers read like a document. Buttons
 appear only for real capabilities: the UI does not draw decorative microphone,
 rating or permission controls without an implemented action behind them.
@@ -254,14 +258,19 @@ rating or permission controls without an implemented action behind them.
 All `.desktop-agent-*` rules live in `ui/desktop-agent.css`; global
 `styles/layout.css` owns only the generic right-sidebar host. This prevents
 cascade order from changing the component when unrelated shell CSS evolves.
-The feature stylesheet uses semantic PuppyOne tokens, container breakpoints at
-760, 560 and 420 px, visible focus states and reduced-motion fallbacks.
+The feature stylesheet uses semantic PuppyOne tokens, an 8 px horizontal
+reference gutter, 13 px user-message radius, 42 px collapsed composer and
+container breakpoints at 760, 560 and 420 px. Focus and reduced-motion
+fallbacks remain explicit.
 
 `#agent-visual-smoke` dynamically loads a deterministic conversation through
 the `visual-smoke.ts` secondary entrypoint. It is retained as a visual QA
 fixture while staying outside the normal Agent bundle and network/session
 path. Architecture tests enforce the CSS ownership boundary, responsive
-contracts, single-line growing composer and absence of a runtime selector.
+contracts, single-line growing composer, Changes aggregation and absence of a
+runtime selector. `desktop-agent.cursor-visual-contract.test.ts` locks the
+reference geometry so later feature work cannot silently reintroduce the old
+card stack or two-row composer.
 
 ## Main-process harness contract
 

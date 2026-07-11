@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useSyncExternalSto
 import { CircleAlert, LoaderCircle, RefreshCw } from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { AgentApprovalDock } from "./AgentApprovalDock";
+import { AgentChangesPill } from "./AgentChangesPill";
 import { AgentComposer } from "./AgentComposer";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
@@ -132,6 +133,8 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         />
       )}
 
+      <AgentChangesPill projection={state.projection} onViewChanges={onViewChanges} />
+
       <AgentComposer
         draft={state.draft}
         onDraftChange={(draft) => controller.setDraft(draft)}
@@ -139,7 +142,11 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         running={Boolean(state.projection.runningTurnId)}
         stopping={state.stopping}
         submitting={state.submitting}
-        placeholder={unavailable || failed ? "Draft a message while PuppyOne prepares the Agent" : "Plan, build, / for commands, @ for context"}
+        placeholder={unavailable || failed
+          ? "Draft while PuppyOne prepares the Agent"
+          : state.projection.rows.length > 0 || state.projection.messages.length > 0
+            ? "Send follow-up"
+            : "Ask anything"}
         runtimeLabel={runtimeLabel}
         models={capabilities?.modelSelection ? inspection?.models ?? [] : []}
         selectedModel={state.selectedModel}

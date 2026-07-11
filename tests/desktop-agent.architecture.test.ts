@@ -21,7 +21,7 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(markdown).not.toContain("dangerouslySetInnerHTML");
     expect(markdown).toContain('["https:", "http:", "mailto:"]');
     expect(css).toContain("container: desktop-agent / inline-size");
-    expect(css).toContain("--agent-radius-composer: 20px");
+    expect(css).toContain("--agent-radius-composer: 22px");
     expect(css).toContain("max-width: 759px");
     expect(css).toContain("max-width: 559px");
     expect(css).toContain("max-width: 419px");

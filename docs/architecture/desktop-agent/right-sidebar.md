@@ -43,47 +43,46 @@ panel components. The sidebar itself contains no Chat/Terminal selector.
 
 ```text
 +------------------------------------------------------+
-| Session title                         History  More   |
-|------------------------------------------------------|
-| User                                                 |
-| Explain the failing test and fix it.                 |
+| +--------------------------------------------------+ |
+| | Explain the failing test and fix it.             | |
+| +--------------------------------------------------+ |
 |                                                      |
-| Agent                                                |
 | I found the failure in workspaceOpening.ts.          |
 |                                                      |
-| > Plan updated                              2 / 3    |
-| > Read src/lib/workspaceOpening.ts               ✓   |
-| > Run npm test                                   ✓   |
-| > Edited 1 file                         View changes  |
+| Worked for 2s                                       |
+| Read src/lib/workspaceOpening.ts                     |
+| Ran npm test                                         |
 |                                                      |
-|------------------------------------------------------|
 | Approval required                                   |
 | npm install package-name                            |
 |                                  Deny  Allow once   |
-|------------------------------------------------------|
-| Plan, build, / commands, @ context            Stop   |
-| Provider / Model   Agent / Mode   Attach             |
+|                                                      |
+| [ Changes +86 -12 ]                                  |
+| (+)  Send follow-up       Provider / Model     Send  |
 +------------------------------------------------------+
 ```
 
-This is a conceptual hierarchy, not pixel-level visual design. The existing
-sidebar width remains 420px to 760px. Content reflows within that range and does
-not introduce horizontal scrolling for ordinary messages or controls.
+This is the visual hierarchy contract. At the 420 px reference width the
+surface uses an 8 px outside gutter, 13 px full-width user prompt radius,
+document-flow assistant output, a 28 px Changes pill and a 42 px collapsed
+single-row composer. The sidebar remains resizable through 760 px and does not
+introduce horizontal scrolling for ordinary messages or controls.
 
 ## Surface hierarchy
 
 The Chat surface has four primary regions in document order:
 
-1. **Session header** — session title and actions.
-2. **Transcript** — user messages, assistant output, and activity items.
-3. **Blocking dock** — an approval or structured question when one is pending.
-4. **Composer** — prompt, attachments, provider/model/agent-mode controls,
+1. **Transcript** — user messages, assistant output, and activity items.
+2. **Blocking dock** — an approval or structured question when one is pending.
+3. **Changes handoff** — aggregate additions/deletions linking to the existing Git surface.
+4. **Composer** — prompt, model, the `+` tools/mode menu,
    submit, and stop/queue state.
 
-Only the transcript is the primary scroll region. The header, blocking dock,
-and composer remain visible without using `position: fixed`. The layout uses
-the sidebar's existing flex boundary so it behaves correctly during animated
-resize and window resizing.
+Session history/new/overflow actions remain real controls but live in an
+out-of-flow chrome cluster revealed by hover or keyboard focus; they do not
+consume the reference transcript's top row. Only the transcript is the primary
+scroll region. The blocking dock, Changes handoff and composer remain visible
+without using `position: fixed`.
 
 ## Chat and Terminal header actions
 
@@ -116,19 +115,20 @@ The application header contains:
   enabled;
 - independent pressed/open state and accessible labels for each icon.
 
-The Chat panel has its own session header with title, New Session, diagnostics,
-reset, and close actions. Controls use native buttons and menus, preserve
-keyboard focus styles, and expose meaningful accessible names.
+The Chat panel keeps New Session, history and diagnostics as on-demand chrome
+rather than a persistent visual header. Controls use native buttons and menus,
+become visible on keyboard focus, and expose meaningful accessible names.
 
 ## Provider, model and agent controls
 
-OpenCode is fixed and is not a composer control. The compact footer contains
-only choices advertised by the OpenCode catalog:
+OpenCode is fixed and is not a composer control. The single-row composer shows
+the model choice advertised by the OpenCode catalog; lower-frequency actions
+live in the `+` menu:
 
 - provider selector;
 - model selector when model discovery is available;
 - model-scoped variant/effort selector when advertised;
-- mode selector for supported modes such as Agent, Plan, or Ask;
+- mode choices for supported modes such as Agent, Plan, or Ask, inside the `+` menu;
 - compact account/readiness status when action is required.
 
 Changing provider never changes the harness. It selects another inference route
@@ -260,9 +260,11 @@ sidebar does not fabricate an answer.
 
 The composer supports:
 
+- a 42 px single-row idle state matching the transcript's 8 px gutter;
 - multiline text;
 - submit with the product's established keyboard convention;
-- optional local file/image attachments after workspace authorization;
+- a single `+` menu for optional authorized attachments, workspace context and Agent mode;
+- the current model as the only persistent selection control;
 - a provider-aware placeholder;
 - Stop while a turn is running;
 - queue or steer only when the provider capability advertises it;

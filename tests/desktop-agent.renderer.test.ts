@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentApprovalDock } from "../src/features/desktop-agent/ui/AgentApprovalDock";
+import { AgentChangesPill, summarizeAgentChanges } from "../src/features/desktop-agent/ui/AgentChangesPill";
 import { AgentComposer } from "../src/features/desktop-agent/ui/AgentComposer";
 import { AgentTranscript } from "../src/features/desktop-agent/ui/AgentTranscript";
 import { createAgentProjection } from "../src/features/desktop-agent/agentProjection";
@@ -62,7 +63,7 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.querySelector('button[aria-label="Copy response"]')).not.toBeNull();
   });
 
-  it("keeps harness selection out of the composer while exposing model and mode", () => {
+  it("keeps a single-row composer while exposing model and mode without a harness selector", () => {
     const container = render(React.createElement(AgentComposer, {
       draft: "",
       onDraftChange: vi.fn(),
@@ -80,10 +81,43 @@ describe("Desktop Agent renderer surfaces", () => {
     }));
 
     expect(container.querySelector('select[aria-label="Agent runtime"]')).toBeNull();
-    expect(container.querySelectorAll("select")).toHaveLength(2);
+    expect(container.querySelectorAll("select")).toHaveLength(1);
     expect(container.textContent).not.toContain("OpenCode runtime");
     expect(container.querySelector("textarea")?.getAttribute("rows")).toBe("1");
-    expect((container.querySelector("textarea") as HTMLTextAreaElement).style.height).toBe("48px");
+    expect((container.querySelector("textarea") as HTMLTextAreaElement).style.height).toBe("20px");
+    expect(container.querySelector(".desktop-agent-composer-row")).not.toBeNull();
+
+    const toolsButton = container.querySelector('button[aria-label="Add context or change Agent mode"]') as HTMLButtonElement;
+    act(() => toolsButton.click());
+    expect(container.querySelector('[role="menu"][aria-label="Composer tools"]')).not.toBeNull();
+    expect(container.querySelector('[role="menuitemradio"][aria-checked="true"]')?.textContent).toContain("Agent");
+  });
+
+  it("summarizes real file changes in the compact Changes pill", () => {
+    const projection = createAgentProjection();
+    projection.activities.push({
+      id: "change-1",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      kind: "file-change",
+      label: "Edited files",
+      status: "completed",
+      output: "",
+      detail: {
+        changes: [
+          { path: "src/a.ts", additions: 86, deletions: 12 },
+          { path: "src/b.ts", additions: 4, deletions: 1 },
+        ],
+      },
+      sequence: 1,
+    });
+    expect(summarizeAgentChanges(projection)).toEqual({ additions: 90, deletions: 13, files: 2 });
+    const onViewChanges = vi.fn();
+    const container = render(React.createElement(AgentChangesPill, { projection, onViewChanges }));
+    const button = container.querySelector(".desktop-agent-changes-pill") as HTMLButtonElement;
+    expect(button.textContent).toContain("Changes+90-13");
+    act(() => button.click());
+    expect(onViewChanges).toHaveBeenCalledTimes(1);
   });
 
   it("shows Jump to latest when the transcript is not pinned to the bottom", () => {
