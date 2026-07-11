@@ -127,7 +127,7 @@
 }
 
 .desktop-cloud-overview-metric + .desktop-cloud-overview-metric,
-.desktop-cloud-overview-metric + .desktop-cloud-integrations-card {
+.desktop-cloud-overview-metric + .desktop-cloud-automation-card {
   border-top: 1px solid color-mix(in srgb, var(--po-divider) 60%, transparent);
 }
 
@@ -194,7 +194,7 @@
   color: var(--po-warning);
 }
 
-.desktop-cloud-integrations-card {
+.desktop-cloud-automation-card {
   display: grid;
   min-width: 0;
   grid-template-columns: 1fr;
@@ -206,12 +206,12 @@
   background: transparent;
 }
 
-.desktop-cloud-integrations-heading {
+.desktop-cloud-automation-heading {
   display: block;
   min-width: 0;
 }
 
-.desktop-cloud-integrations-heading span {
+.desktop-cloud-automation-heading span {
   overflow: hidden;
   color: var(--po-text-subtle);
   font-size: 12px;
@@ -221,14 +221,14 @@
   white-space: nowrap;
 }
 
-.desktop-cloud-integrations-heading strong {
+.desktop-cloud-automation-heading strong {
   color: var(--po-text);
   font-size: 14px;
   font-weight: 700;
   line-height: 1.25;
 }
 
-.desktop-cloud-integrations-icons {
+.desktop-cloud-automation-icons {
   display: inline-flex;
   min-width: 0;
   align-items: center;
@@ -237,7 +237,7 @@
   flex-wrap: wrap;
 }
 
-.desktop-cloud-integrations-value {
+.desktop-cloud-automation-value {
   display: inline-flex;
   min-width: 0;
   align-items: center;
@@ -245,14 +245,14 @@
   gap: 8px;
 }
 
-.desktop-cloud-integrations-value strong {
+.desktop-cloud-automation-value strong {
   color: var(--po-text);
   font-size: 14px;
   font-weight: 720;
   line-height: 1.25;
 }
 
-.desktop-cloud-integrations-value small {
+.desktop-cloud-automation-value small {
   min-width: 0;
   overflow: hidden;
   color: var(--po-text-muted);

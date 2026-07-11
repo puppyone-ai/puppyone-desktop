@@ -28,10 +28,12 @@ import {
   CloudServiceMainView,
   CloudServiceSidebar,
   DesktopCloudAccessView,
-  DesktopCloudIntegrationsSidebar,
-  type CloudAccessFilter,
   type CloudWorkspaceSection,
 } from "../cloud";
+import {
+  DesktopCloudAutomationSidebar,
+  DesktopCloudAutomationView,
+} from "../automation";
 import { useDesktopCloudAccessData } from "../cloud/data/useDesktopCloudAccessData";
 import { isCloudAccessNavigationResource } from "../cloud/sections/access/accessRows";
 import { getGitHostingMode } from "../source-control/viewModel";
@@ -177,15 +179,15 @@ export function DesktopWorkspaceContent({
     ? "data"
     : cloudWorkspace && (activeView === "git" || activeView === "cloud")
     ? "data"
-    : !cloudWorkspace && (activeView === "access" || activeView === "integrations") ? "data"
+    : !cloudWorkspace && (activeView === "access" || activeView === "automation") ? "data"
       : activeView === "cloud" && !cloud.enabled ? "data"
-        : (activeView === "access" || activeView === "integrations") && !cloud.enabled ? "data" : activeView;
+        : (activeView === "access" || activeView === "automation") && !cloud.enabled ? "data" : activeView;
   const gitEnabled = !cloudWorkspace;
   const gitHostingMode = getGitHostingMode(git.activeGitStatus, puppyoneConfig);
   const workspaceChangeCount = gitEnabled
     ? getDesktopWorkspaceChangeCount(git.activeGitStatus, gitHostingMode === "github")
     : 0;
-  const accessNavigationEnabled = cloud.enabled && cloudWorkspace && Boolean(cloud.projectId);
+  const cloudToolsNavigationEnabled = cloud.enabled && cloudWorkspace && Boolean(cloud.projectId);
   const cloudAccessData = useDesktopCloudAccessData({
     projectId: cloud.projectId,
     cloudSession: cloud.cloudSession,
@@ -193,11 +195,8 @@ export function DesktopWorkspaceContent({
     onCloudSessionChange: cloud.onCloudSessionChange,
   });
   const [activeCloudAccessRowId, setActiveCloudAccessRowId] = useState<string | null>(null);
-  const [activeIntegrationProvider, setActiveIntegrationProvider] = useState<string | null>(null);
+  const [activeAutomationProvider, setActiveAutomationProvider] = useState<string | null>(null);
   const [activePluginsSection, setActivePluginsSection] = useState<PluginsSection>("discover");
-  const effectiveCloudAccessFilter: CloudAccessFilter = resolvedActiveView === "integrations"
-    ? "integrations"
-    : "all";
 
   useEffect(() => {
     const accessRows = cloudAccessData.accessRows.filter(isCloudAccessNavigationResource);
@@ -205,8 +204,8 @@ export function DesktopWorkspaceContent({
     setActiveCloudAccessRowId(accessRows[0]?.id ?? null);
   }, [activeCloudAccessRowId, cloudAccessData.accessRows]);
 
-  const handleIntegrationProviderChange = useCallback((provider: string | null) => {
-    setActiveIntegrationProvider(provider);
+  const handleAutomationProviderChange = useCallback((provider: string | null) => {
+    setActiveAutomationProvider(provider);
   }, []);
   const handleOpenGitFile = useCallback((path: string) => {
     onActiveDataPathChange(path);
@@ -419,13 +418,24 @@ export function DesktopWorkspaceContent({
       projectId={cloud.projectId}
       cloudSession={cloud.cloudSession}
       accessData={cloudAccessData}
-      activeFilter={effectiveCloudAccessFilter}
+      activeFilter="all"
       activeAccessRowId={activeCloudAccessRowId}
-      activeIntegrationProvider={resolvedActiveView === "integrations" ? activeIntegrationProvider : null}
       sessionRestoring={cloud.sessionRestoring}
       onCloudSessionChange={cloud.onCloudSessionChange}
       onRefresh={() => undefined}
       onSelectAccessRow={setActiveCloudAccessRowId}
+    />
+  );
+
+  const cloudAutomationView = (
+    <DesktopCloudAutomationView
+      projectId={cloud.projectId}
+      cloudSession={cloud.cloudSession}
+      accessData={cloudAccessData}
+      activeProvider={activeAutomationProvider}
+      sessionRestoring={cloud.sessionRestoring}
+      onCloudSessionChange={cloud.onCloudSessionChange}
+      onRefresh={() => undefined}
     />
   );
 
@@ -441,11 +451,14 @@ export function DesktopWorkspaceContent({
   );
 
   if (!dataPort) {
-    if (cloudWorkspace && !cloud.cloudSession) return cloudAccessView;
+    if (cloudWorkspace && !cloud.cloudSession) {
+      return resolvedActiveView === "automation" ? cloudAutomationView : cloudAccessView;
+    }
     if (resolvedActiveView === "settings") return settingsView;
     if (resolvedActiveView === "git") return gitStatusView;
     if (resolvedActiveView === "cloud") return cloudMainView;
-    if (resolvedActiveView === "access" || resolvedActiveView === "integrations") return cloudAccessView;
+    if (resolvedActiveView === "access") return cloudAccessView;
+    if (resolvedActiveView === "automation") return cloudAutomationView;
     if (resolvedActiveView === "plugins") return pluginsView;
     return null;
   }
@@ -529,7 +542,7 @@ export function DesktopWorkspaceContent({
         explorerToolbarSlot={preferences.sidebarNavigationPlacement === "top" ? (
           <DesktopSidebarTopNavigation
             activeView={resolvedActiveView}
-            accessEnabled={accessNavigationEnabled}
+            cloudToolsEnabled={cloudToolsNavigationEnabled}
             gitEnabled={gitEnabled}
             pluginsEnabled={pluginsNavigationVisible}
             orientation={preferences.sidebarNavigationOrientation}
@@ -544,7 +557,7 @@ export function DesktopWorkspaceContent({
         explorerRailSlot={preferences.sidebarNavigationPlacement === "left" ? (
           <DesktopSidebarRailNavigation
             activeView={resolvedActiveView}
-            accessEnabled={accessNavigationEnabled}
+            cloudToolsEnabled={cloudToolsNavigationEnabled}
             gitEnabled={gitEnabled}
             pluginsEnabled={pluginsNavigationVisible}
             gitIncomingCount={git.gitIncomingCount}
@@ -587,11 +600,11 @@ export function DesktopWorkspaceContent({
                 activeAccessRowId={activeCloudAccessRowId}
                 onSelectAccessRow={setActiveCloudAccessRowId}
               />
-            ) : resolvedActiveView === "integrations" ? (
-              <DesktopCloudIntegrationsSidebar
+            ) : resolvedActiveView === "automation" ? (
+              <DesktopCloudAutomationSidebar
                 accessData={cloudAccessData}
-                activeProvider={activeIntegrationProvider}
-                onSelectProvider={handleIntegrationProviderChange}
+                activeProvider={activeAutomationProvider}
+                onSelectProvider={handleAutomationProviderChange}
               />
             ) : resolvedActiveView === "plugins" ? (
               <PluginsSidebar
@@ -650,7 +663,7 @@ export function DesktopWorkspaceContent({
           preferences.sidebarNavigationPlacement === "bottom" ? (
             <DesktopSidebarFooterNavigation
               activeView={resolvedActiveView}
-              accessEnabled={accessNavigationEnabled}
+              cloudToolsEnabled={cloudToolsNavigationEnabled}
               gitEnabled={gitEnabled}
               pluginsEnabled={pluginsNavigationVisible}
               gitIncomingCount={git.gitIncomingCount}
@@ -663,7 +676,7 @@ export function DesktopWorkspaceContent({
             />
           ) : undefined
         }
-        mainSlot={resolvedActiveView === "git" || resolvedActiveView === "plugins" || resolvedActiveView === "settings" || resolvedActiveView === "cloud" || resolvedActiveView === "access" || resolvedActiveView === "integrations" ? (
+        mainSlot={resolvedActiveView === "git" || resolvedActiveView === "plugins" || resolvedActiveView === "settings" || resolvedActiveView === "cloud" || resolvedActiveView === "access" || resolvedActiveView === "automation" ? (
           <div className="desktop-view-surface desktop-view-surface-main" data-view={resolvedActiveView}>
             {resolvedActiveView === "git"
               ? gitStatusView
@@ -671,8 +684,10 @@ export function DesktopWorkspaceContent({
                 ? pluginsView
               : resolvedActiveView === "cloud"
                 ? cloudMainView
-                : resolvedActiveView === "access" || resolvedActiveView === "integrations"
+                : resolvedActiveView === "access"
                   ? cloudAccessView
+                  : resolvedActiveView === "automation"
+                    ? cloudAutomationView
                   : settingsView}
           </div>
         ) : undefined}

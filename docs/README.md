@@ -9,6 +9,7 @@ Architecture docs record durable product and frontend decisions. Start with
 directly:
 
 - [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
+- [Automation and Plugin Domain Boundary](architecture/automation-plugin-domain-boundary.md)
 - [Git and Source Control Architecture](architecture/git/README.md)
   - Local Source Control sidebar, repository status freshness, external Git
     invalidation, and Cloud branch graph topology.

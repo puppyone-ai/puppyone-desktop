@@ -1,4 +1,5 @@
 import { Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
+import { getCloudAutomationWebPath } from "../../automation/automationDomain";
 import type { CloudWorkspaceSection } from "./cloudRouteIds";
 
 export type CloudRouteContext = "projects" | "project" | "account";
@@ -79,14 +80,14 @@ export const CLOUD_ROUTES = [
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
   },
   {
-    id: "integrations",
-    label: "Integrations",
-    title: "Integrations",
-    description: "Connected services and sync surfaces attached to this Cloud project.",
+    id: "automation",
+    label: "Automation",
+    title: "Automation",
+    description: "Cloud-managed information sources and synchronization automations for this project.",
     icon: Grid2X2,
     context: "project",
     showInSidebar: false,
-    webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/workflows`,
+    webPath: (projectId?: string) => getCloudAutomationWebPath(requireProjectId(projectId)),
   },
   {
     id: "mcp-cli",
@@ -144,8 +145,11 @@ export const CLOUD_GLOBAL_SIDEBAR_ROUTES = [
   ...CLOUD_ACCOUNT_ROUTES,
 ];
 
-export function normalizeCloudSection(section: CloudWorkspaceSection | "cloud-settings"): CloudWorkspaceSection {
+export function normalizeCloudSection(
+  section: CloudWorkspaceSection | "cloud-settings" | "integrations",
+): CloudWorkspaceSection {
   if (section === "cloud-settings") return "overview";
+  if (section === "integrations") return "automation";
   if (section === "mcp-cli" || section === "git-sync") return "access";
   return section;
 }

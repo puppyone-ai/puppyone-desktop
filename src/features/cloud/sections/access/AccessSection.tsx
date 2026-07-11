@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
@@ -11,18 +11,9 @@ import { PageLoading } from "../../../../components/loading";
 import { getCloudAccessFilterDescriptor, type CloudAccessFilter } from "../../accessFilters";
 import type { CloudWorkspaceSection } from "../../types";
 import { CloudWebEmpty } from "../../components/shared";
-import { CloudIntegrationsPage } from "./IntegrationsPage";
 import { DesktopCloudScopeAccessDetail } from "./ScopeAccessDetail";
-import {
-  buildDesktopCloudAccessRows,
-  cloudAccessRowMatchesFilter,
-  cloudAccessRowMatchesIntegrationProvider,
-  type CloudAccessSurfaceRow,
-} from "./accessRows";
-import {
-  formatProviderLabel,
-  getCloudScopeRows,
-} from "../../utils";
+import { buildDesktopCloudAccessRows } from "./accessRows";
+import { getCloudScopeRows } from "../../utils";
 import { DesktopCloudCreateAccessDialog, type DesktopCloudCreateAccessCreated } from "./CreateAccessDialog";
 
 export function CloudAccessSection({
@@ -37,13 +28,11 @@ export function CloudAccessSection({
   mcpEndpointsByScope,
   filter = "all",
   activeAccessRowId,
-  integrationProviderFilter = null,
   loading,
   onCloudSessionChange,
   onRefresh,
   onSelectAccessRow,
   onOpenProject,
-  onOpenIntegrations,
   sidebarOwnsHeader = false,
 }: {
   projectId: string;
@@ -57,17 +46,14 @@ export function CloudAccessSection({
   mcpEndpointsByScope: Map<string, DesktopCloudMcpEndpoint[]>;
   filter?: CloudAccessFilter;
   activeAccessRowId: string | null;
-  integrationProviderFilter?: string | null;
   loading: boolean;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onRefresh: () => Promise<void>;
   onSelectAccessRow?: (rowId: string | null) => void;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
-  onOpenIntegrations?: (projectId: string) => void;
   sidebarOwnsHeader?: boolean;
 }) {
   const scopeRows = getCloudScopeRows(scopes, identity);
-  const scopeKey = scopeRows.map((scope) => scope.id).join("|");
   const accessRows = buildDesktopCloudAccessRows({
     scopeRows,
     connectors,
@@ -75,35 +61,8 @@ export function CloudAccessSection({
     identity,
     apiBaseUrl,
   });
-  const accessRowKey = accessRows.map((row) => row.id).join("|");
-  const integrationRows = accessRows.filter((row) => cloudAccessRowMatchesFilter(row, "integrations"));
-  const visibleRows = accessRows.filter((row) => (
-    cloudAccessRowMatchesFilter(row, filter) &&
-    cloudAccessRowMatchesIntegrationProvider(row, integrationProviderFilter)
-  ));
-  const visibleRowKey = visibleRows.map((row) => row.id).join("|");
   const filterDescriptor = getCloudAccessFilterDescriptor(filter);
-  const pageTitle = filter === "integrations" && integrationProviderFilter
-    ? formatProviderLabel(integrationProviderFilter)
-    : filterDescriptor.title;
-  const [detailRowId, setDetailRowId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (detailRowId && !visibleRows.some((row) => row.id === detailRowId)) {
-      setDetailRowId(null);
-    }
-  }, [scopeKey, accessRowKey, visibleRowKey, detailRowId]);
-
-  useEffect(() => {
-    if (!detailRowId) return undefined;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setDetailRowId(null);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [detailRowId]);
-
-  const detailRow = visibleRows.find((row) => row.id === detailRowId) ?? null;
+  const pageTitle = filterDescriptor.title;
   const selectedAccessRow = accessRows.find((row) => row.id === activeAccessRowId) ?? accessRows[0] ?? null;
   const selectedScope = selectedAccessRow?.scope ?? scopeRows[0] ?? null;
   const selectedSurfaceId = selectedAccessRow && selectedAccessRow.scope.id === selectedScope?.id
@@ -114,29 +73,6 @@ export function CloudAccessSection({
     await onRefresh();
     onSelectAccessRow?.(created.preferredRowId);
   };
-
-  if (filter === "integrations") {
-    return (
-      <CloudIntegrationsPage
-        projectId={projectId}
-        cloudSession={cloudSession}
-        apiBaseUrl={apiBaseUrl}
-        rows={visibleRows}
-        totalCount={integrationProviderFilter ? visibleRows.length : integrationRows.length}
-        loading={loading}
-        detailRow={detailRow}
-        onOpenRow={(rowId) => setDetailRowId(rowId)}
-        onCloseDetail={() => setDetailRowId(null)}
-        onCloudSessionChange={onCloudSessionChange}
-        onRefresh={onRefresh}
-        onOpenAccess={() => onOpenProject(projectId, "access")}
-        onOpenIntegrations={() => {
-          if (onOpenIntegrations) onOpenIntegrations(projectId);
-          else onOpenProject(projectId, "integrations");
-        }}
-      />
-    );
-  }
 
   return (
     <section className="desktop-cloud-access-page desktop-cloud-access-scope-page">

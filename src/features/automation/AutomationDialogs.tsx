@@ -1,25 +1,25 @@
 import { ArrowRight, Check, ChevronRight, ExternalLink, Pause, Play, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
-  DesktopCloudCreateWorkflowRequest,
+  DesktopCloudCreateAutomationRequest,
   DesktopCloudSession,
-  DesktopCloudWorkflowConfigField,
-  DesktopCloudWorkflowProviderSpec,
-} from "../../../../lib/cloudApi";
+  DesktopCloudAutomationConfigField,
+  DesktopCloudAutomationProviderSpec,
+} from "../../lib/cloudApi";
 import {
-  createCloudWorkflow,
-  deleteCloudWorkflowConnection,
-  listCloudWorkflowProviderSpecs,
-  pauseCloudWorkflowConnection,
-  refreshCloudWorkflowConnection,
-  resumeCloudWorkflowConnection,
-} from "../../../../lib/cloudApi";
+  createCloudAutomation,
+  deleteCloudAutomationConnection,
+  listCloudAutomationProviderSpecs,
+  pauseCloudAutomationConnection,
+  refreshCloudAutomationConnection,
+  resumeCloudAutomationConnection,
+} from "../../lib/cloudApi";
 import {
   DesktopDialogCloseButton,
   DesktopDialogRoot,
   DesktopDialogSurface,
-} from "../../../../components/DesktopDialog";
-import { CloudAuthorityCell } from "../../components/shared";
+} from "../../components/DesktopDialog";
+import { CloudAuthorityCell } from "../cloud/components/shared";
 import {
   formatProviderLabel,
   formatStatusLabel,
@@ -27,8 +27,8 @@ import {
   getScopePathLabel,
   isConnectorActiveStatus,
   providerIcon,
-} from "../../utils";
-import type { CloudAccessSurfaceRow } from "./accessRows";
+} from "../cloud/utils";
+import type { CloudAutomationRow } from "./automationDomain";
 
 export function CloudNewSyncDialog({
   projectId,
@@ -36,7 +36,7 @@ export function CloudNewSyncDialog({
   apiBaseUrl,
   onCloudSessionChange,
   onRefresh,
-  onOpenIntegrations,
+  onOpenAutomation,
   onClose,
 }: {
   projectId: string;
@@ -44,10 +44,10 @@ export function CloudNewSyncDialog({
   apiBaseUrl: string | null;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onRefresh: () => Promise<void>;
-  onOpenIntegrations: () => void;
+  onOpenAutomation: () => void;
   onClose: () => void;
 }) {
-  const [providers, setProviders] = useState<DesktopCloudWorkflowProviderSpec[]>([]);
+  const [providers, setProviders] = useState<DesktopCloudAutomationProviderSpec[]>([]);
   const [providersLoading, setProvidersLoading] = useState(true);
   const [providersError, setProvidersError] = useState<string | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
@@ -61,7 +61,7 @@ export function CloudNewSyncDialog({
     let cancelled = false;
     setProvidersLoading(true);
     setProvidersError(null);
-    void listCloudWorkflowProviderSpecs(cloudSession, onCloudSessionChange, apiBaseUrl)
+    void listCloudAutomationProviderSpecs(cloudSession, onCloudSessionChange, apiBaseUrl)
       .then((items) => {
         if (cancelled) return;
         const visible = items.filter((provider) => provider.category === "datasource");
@@ -81,27 +81,27 @@ export function CloudNewSyncDialog({
   }, [apiBaseUrl, cloudSession, onCloudSessionChange]);
 
   const provider = providers.find((item) => item.provider === selectedProviderId) ?? providers[0] ?? null;
-  const fields = getCloudWorkflowUserConfigFields(provider);
+  const fields = getCloudAutomationUserConfigFields(provider);
   const requiresCloudOAuth = provider ? provider.auth === "oauth" || provider.auth === "optional_oauth" : false;
   const missingRequired = fields.some((field) => field.required && !configValues[field.key]?.trim());
-  const normalizedTargetPath = normalizeWorkflowTargetPath(targetPath || defaultWorkflowTargetPath(provider));
+  const normalizedTargetPath = normalizeAutomationTargetPath(targetPath || defaultAutomationTargetPath(provider));
   const canCreate = Boolean(provider && normalizedTargetPath && !missingRequired && !saving && !requiresCloudOAuth);
 
   useEffect(() => {
     if (!provider) return;
-    setConfigValues(defaultWorkflowConfigValues(provider));
-    setTargetPath(defaultWorkflowTargetPath(provider));
+    setConfigValues(defaultAutomationConfigValues(provider));
+    setTargetPath(defaultAutomationTargetPath(provider));
     setFeedback(null);
-  }, [provider?.provider]);
+  }, [provider]);
 
   const handleCreate = async () => {
     if (!provider || !canCreate) return;
     setSaving(true);
     setFeedback(null);
     try {
-      await createCloudWorkflow(
+      await createCloudAutomation(
         cloudSession,
-        buildDesktopCreateWorkflowRequest({
+        buildDesktopCreateAutomationRequest({
           projectId,
           provider,
           configValues,
@@ -121,8 +121,8 @@ export function CloudNewSyncDialog({
 
   return (
     <DesktopDialogRoot onClose={saving ? undefined : onClose}>
-      <DesktopDialogSurface width={step === "configure" ? 860 : 820} className="desktop-cloud-workflow-dialog">
-        <header className="desktop-dialog-header desktop-cloud-workflow-dialog-header">
+      <DesktopDialogSurface width={step === "configure" ? 860 : 820} className="desktop-cloud-automation-dialog">
+        <header className="desktop-dialog-header desktop-cloud-automation-dialog-header">
           <div className="desktop-dialog-title-row">
             <div>
               <h2>{step === "source" ? "Add sync" : `Configure ${provider?.display_name ?? "sync"}`}</h2>
@@ -135,16 +135,16 @@ export function CloudNewSyncDialog({
           </div>
           <DesktopDialogCloseButton disabled={saving} onClick={onClose} />
         </header>
-        <div className="desktop-dialog-body desktop-cloud-workflow-dialog-body">
+        <div className="desktop-dialog-body desktop-cloud-automation-dialog-body">
           {providersLoading ? (
-            <div className="desktop-cloud-workflow-state">Loading providers</div>
+            <div className="desktop-cloud-automation-state">Loading providers</div>
           ) : providersError ? (
             <div className="desktop-dialog-error">{providersError}</div>
           ) : providers.length === 0 ? (
-            <div className="desktop-cloud-workflow-state">No sync providers available.</div>
+            <div className="desktop-cloud-automation-state">No sync providers available.</div>
           ) : step === "source" ? (
             <>
-              <div className="desktop-cloud-workflow-source-grid">
+              <div className="desktop-cloud-automation-source-grid">
                 {providers.map((item) => {
                   const Icon = providerIcon(item.provider);
                   const iconUrl = item.icon_url || getCloudProviderIconUrl(item.provider);
@@ -153,31 +153,31 @@ export function CloudNewSyncDialog({
                   return (
                     <button
                       key={item.provider}
-                      className={`desktop-cloud-workflow-source-card ${selected ? "selected" : ""}`}
+                      className={`desktop-cloud-automation-source-card ${selected ? "selected" : ""}`}
                       type="button"
                       onClick={() => setSelectedProviderId(item.provider)}
                     >
-                      <span className="desktop-cloud-workflow-source-icon">
+                      <span className="desktop-cloud-automation-source-icon">
                         {iconUrl ? <img src={iconUrl} alt="" /> : <Icon size={20} />}
                       </span>
-                      <span className="desktop-cloud-workflow-source-content">
+                      <span className="desktop-cloud-automation-source-content">
                         <span>{item.display_name}</span>
                         <small>{needsOAuth ? "Authorize in Cloud" : "Authorized"}</small>
                       </span>
                       {needsOAuth && (
                         <span
-                          className="desktop-cloud-workflow-source-auth"
+                          className="desktop-cloud-automation-source-auth"
                           role="button"
                           tabIndex={0}
                           onClick={(event) => {
                             event.stopPropagation();
-                            onOpenIntegrations();
+                            onOpenAutomation();
                           }}
                           onKeyDown={(event) => {
                             if (event.key === "Enter" || event.key === " ") {
                               event.preventDefault();
                               event.stopPropagation();
-                              onOpenIntegrations();
+                              onOpenAutomation();
                             }
                           }}
                         >
@@ -188,11 +188,11 @@ export function CloudNewSyncDialog({
                   );
                 })}
               </div>
-              <div className="desktop-cloud-workflow-dialog-footer-row">
+              <div className="desktop-cloud-automation-dialog-footer-row">
                 <span className={requiresCloudOAuth ? "muted" : "ready"}>
                   {requiresCloudOAuth ? "Cloud authorization is required before creating this sync." : "Ready to configure"}
                 </span>
-                <div className="desktop-cloud-workflow-actions">
+                <div className="desktop-cloud-automation-actions">
                   <button className="desktop-dialog-button" type="button" onClick={onClose}>Cancel</button>
                   <button className="desktop-dialog-button primary" type="button" disabled={!provider} onClick={() => setStep("configure")}>
                     Continue
@@ -203,21 +203,21 @@ export function CloudNewSyncDialog({
             </>
           ) : provider ? (
             <>
-              <div className="desktop-cloud-workflow-map">
-                <section className="desktop-cloud-workflow-node">
-                  <div className="desktop-cloud-workflow-node-header">
-                    <span className="desktop-cloud-workflow-node-icon">
-                      <CloudWorkflowProviderMark provider={provider.provider} iconUrl={provider.icon_url} />
+              <div className="desktop-cloud-automation-map">
+                <section className="desktop-cloud-automation-node">
+                  <div className="desktop-cloud-automation-node-header">
+                    <span className="desktop-cloud-automation-node-icon">
+                      <CloudAutomationProviderMark provider={provider.provider} iconUrl={provider.icon_url} />
                     </span>
                     <span>{provider.display_name}</span>
                   </div>
-                  <div className="desktop-cloud-workflow-node-body">
+                  <div className="desktop-cloud-automation-node-body">
                     {fields.length === 0 ? (
-                      <div className="desktop-cloud-workflow-field-empty">No source settings required.</div>
+                      <div className="desktop-cloud-automation-field-empty">No source settings required.</div>
                     ) : fields.map((field) => (
-                      <label className="desktop-cloud-workflow-field" key={field.key}>
+                      <label className="desktop-cloud-automation-field" key={field.key}>
                         <span>{field.label}{field.required ? " *" : ""}</span>
-                        <CloudWorkflowConfigInput
+                        <CloudAutomationConfigInput
                           field={field}
                           value={configValues[field.key] ?? ""}
                           onChange={(value) => setConfigValues((current) => ({ ...current, [field.key]: value }))}
@@ -227,21 +227,21 @@ export function CloudNewSyncDialog({
                     ))}
                   </div>
                 </section>
-                <div className="desktop-cloud-workflow-connector" aria-label="Sync trigger">
+                <div className="desktop-cloud-automation-connector" aria-label="Sync trigger">
                   <span />
                   <button type="button">Manual</button>
                   <span />
                   <ArrowRight size={16} />
                 </div>
-                <section className="desktop-cloud-workflow-node">
-                  <div className="desktop-cloud-workflow-node-header">
-                    <span className="desktop-cloud-workflow-node-icon">
+                <section className="desktop-cloud-automation-node">
+                  <div className="desktop-cloud-automation-node-header">
+                    <span className="desktop-cloud-automation-node-icon">
                       <img src="/icons/folder.svg" alt="" />
                     </span>
                     <span>{normalizedTargetPath ? `/${normalizedTargetPath}` : "Project folder"}</span>
                   </div>
-                  <div className="desktop-cloud-workflow-node-body">
-                    <label className="desktop-cloud-workflow-field">
+                  <div className="desktop-cloud-automation-node-body">
+                    <label className="desktop-cloud-automation-field">
                       <span>Project path</span>
                       <input
                         value={targetPath}
@@ -253,14 +253,14 @@ export function CloudNewSyncDialog({
                 </section>
               </div>
               {feedback && <div className="desktop-dialog-error">{feedback}</div>}
-              <div className="desktop-cloud-workflow-dialog-footer-row">
+              <div className="desktop-cloud-automation-dialog-footer-row">
                 <span className={canCreate ? "ready" : "muted"}>
                   {requiresCloudOAuth ? "Authorize this provider in Cloud." : missingRequired ? "Fill required fields" : "Ready to create"}
                 </span>
-                <div className="desktop-cloud-workflow-actions">
+                <div className="desktop-cloud-automation-actions">
                   <button className="desktop-dialog-button" type="button" disabled={saving} onClick={() => setStep("source")}>Back</button>
                   {requiresCloudOAuth && (
-                    <button className="desktop-dialog-button" type="button" onClick={onOpenIntegrations}>
+                    <button className="desktop-dialog-button" type="button" onClick={onOpenAutomation}>
                       <ExternalLink size={14} />
                       Authorize
                     </button>
@@ -279,12 +279,12 @@ export function CloudNewSyncDialog({
   );
 }
 
-function CloudWorkflowConfigInput({
+function CloudAutomationConfigInput({
   field,
   value,
   onChange,
 }: {
-  field: DesktopCloudWorkflowConfigField;
+  field: DesktopCloudAutomationConfigField;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -316,7 +316,7 @@ export function CloudManageSyncDialog({
   onOpenAccess,
   onClose,
 }: {
-  row: CloudAccessSurfaceRow;
+  row: CloudAutomationRow;
   cloudSession: DesktopCloudSession;
   apiBaseUrl: string | null;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
@@ -324,11 +324,9 @@ export function CloudManageSyncDialog({
   onOpenAccess: () => void;
   onClose: () => void;
 }) {
-  const connector = row.surface.connector;
+  const connector = row.connector;
   const [busy, setBusy] = useState<"refresh" | "pause" | "resume" | "delete" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  if (!connector) return null;
-
   const providerLabel = formatProviderLabel(connector.provider);
   const targetTitle = getScopePathLabel(row.scope) === "/" ? "Project root" : getScopePathLabel(row.scope);
   const paused = connector.status === "paused";
@@ -337,20 +335,20 @@ export function CloudManageSyncDialog({
   const runAction = async (action: "refresh" | "pause" | "resume" | "delete") => {
     if (busy) return;
     if (action === "delete") {
-      const confirmed = window.confirm("Delete this integration? Existing project files stay in place.");
+      const confirmed = window.confirm("Delete this automation? Existing project files stay in place.");
       if (!confirmed) return;
     }
     setBusy(action);
     setError(null);
     try {
       if (action === "refresh") {
-        await refreshCloudWorkflowConnection(cloudSession, connector.id, onCloudSessionChange, apiBaseUrl);
+        await refreshCloudAutomationConnection(cloudSession, connector.id, onCloudSessionChange, apiBaseUrl);
       } else if (action === "pause") {
-        await pauseCloudWorkflowConnection(cloudSession, connector.id, onCloudSessionChange, apiBaseUrl);
+        await pauseCloudAutomationConnection(cloudSession, connector.id, onCloudSessionChange, apiBaseUrl);
       } else if (action === "resume") {
-        await resumeCloudWorkflowConnection(cloudSession, connector.id, onCloudSessionChange, apiBaseUrl);
+        await resumeCloudAutomationConnection(cloudSession, connector.id, onCloudSessionChange, apiBaseUrl);
       } else {
-        await deleteCloudWorkflowConnection(cloudSession, connector.id, onCloudSessionChange, apiBaseUrl);
+        await deleteCloudAutomationConnection(cloudSession, connector.id, onCloudSessionChange, apiBaseUrl);
         onClose();
       }
       await onRefresh();
@@ -363,15 +361,15 @@ export function CloudManageSyncDialog({
 
   return (
     <DesktopDialogRoot onClose={busy ? undefined : onClose}>
-      <DesktopDialogSurface width={860} className="desktop-cloud-workflow-dialog">
-        <header className="desktop-dialog-header desktop-cloud-workflow-dialog-header">
+      <DesktopDialogSurface width={860} className="desktop-cloud-automation-dialog">
+        <header className="desktop-dialog-header desktop-cloud-automation-dialog-header">
           <div className="desktop-dialog-title-row">
             <div>
               <h2>{title}</h2>
               <p>{providerLabel} syncs into {targetTitle}</p>
             </div>
           </div>
-          <div className="desktop-cloud-workflow-header-actions">
+          <div className="desktop-cloud-automation-header-actions">
             <button className="desktop-dialog-button" type="button" disabled={busy !== null} onClick={() => runAction("refresh")}>
               <Play size={14} />
               {busy === "refresh" ? "Running" : "Run now"}
@@ -389,35 +387,35 @@ export function CloudManageSyncDialog({
             <DesktopDialogCloseButton disabled={busy !== null} onClick={onClose} />
           </div>
         </header>
-        <div className="desktop-dialog-body desktop-cloud-workflow-dialog-body">
+        <div className="desktop-dialog-body desktop-cloud-automation-dialog-body">
           {error && <div className="desktop-dialog-error">{error}</div>}
-          <div className="desktop-cloud-workflow-map">
-            <section className="desktop-cloud-workflow-node">
-              <div className="desktop-cloud-workflow-node-header">
-                <span className="desktop-cloud-workflow-node-icon">
-                  <CloudWorkflowProviderMark provider={connector.provider} />
+          <div className="desktop-cloud-automation-map">
+            <section className="desktop-cloud-automation-node">
+              <div className="desktop-cloud-automation-node-header">
+                <span className="desktop-cloud-automation-node-icon">
+                  <CloudAutomationProviderMark provider={connector.provider} />
                 </span>
                 <span>{connector.name || providerLabel}</span>
               </div>
-              <div className="desktop-cloud-workflow-node-body">
+              <div className="desktop-cloud-automation-node-body">
                 <CloudAuthorityCell label="Provider" value={providerLabel} />
                 <CloudAuthorityCell label="Direction" value={connector.direction || "manual"} />
               </div>
             </section>
-            <div className="desktop-cloud-workflow-connector" aria-label="Sync trigger">
+            <div className="desktop-cloud-automation-connector" aria-label="Sync trigger">
               <span />
               <button type="button">{connector.trigger?.type ? formatStatusLabel(String(connector.trigger.type)) : "Manual"}</button>
               <span />
               <ArrowRight size={16} />
             </div>
-            <section className="desktop-cloud-workflow-node">
-              <div className="desktop-cloud-workflow-node-header">
-                <span className="desktop-cloud-workflow-node-icon">
+            <section className="desktop-cloud-automation-node">
+              <div className="desktop-cloud-automation-node-header">
+                <span className="desktop-cloud-automation-node-icon">
                   <img src="/icons/folder.svg" alt="" />
                 </span>
                 <span>{targetTitle}</span>
               </div>
-              <div className="desktop-cloud-workflow-node-body">
+              <div className="desktop-cloud-automation-node-body">
                 <CloudAuthorityCell label="Cloud path" value={getScopePathLabel(row.scope)} mono />
                 <CloudAuthorityCell
                   label="Status"
@@ -433,7 +431,7 @@ export function CloudManageSyncDialog({
   );
 }
 
-function CloudWorkflowProviderMark({
+function CloudAutomationProviderMark({
   provider,
   iconUrl,
 }: {
@@ -468,41 +466,41 @@ const CLOUD_WORKFLOW_INTERNAL_CONFIG_KEYS = new Set([
   "write_behavior",
 ]);
 
-function getCloudWorkflowUserConfigFields(
-  provider: DesktopCloudWorkflowProviderSpec | null,
-): DesktopCloudWorkflowConfigField[] {
+function getCloudAutomationUserConfigFields(
+  provider: DesktopCloudAutomationProviderSpec | null,
+): DesktopCloudAutomationConfigField[] {
   return (provider?.config_fields ?? []).filter((field) => !CLOUD_WORKFLOW_INTERNAL_CONFIG_KEYS.has(field.key));
 }
 
-function defaultWorkflowConfigValues(provider: DesktopCloudWorkflowProviderSpec): Record<string, string> {
+function defaultAutomationConfigValues(provider: DesktopCloudAutomationProviderSpec): Record<string, string> {
   const values: Record<string, string> = {};
-  for (const field of getCloudWorkflowUserConfigFields(provider)) {
+  for (const field of getCloudAutomationUserConfigFields(provider)) {
     values[field.key] = field.default === null || field.default === undefined ? "" : String(field.default);
   }
   return values;
 }
 
-function defaultWorkflowTargetPath(provider: DesktopCloudWorkflowProviderSpec | null) {
+function defaultAutomationTargetPath(provider: DesktopCloudAutomationProviderSpec | null) {
   const label = provider?.display_name || provider?.provider || "Sync";
-  return normalizeWorkflowTargetPath(label.replace(/[<>:"|?*]/g, "-"));
+  return normalizeAutomationTargetPath(label.replace(/[<>:"|?*]/g, "-"));
 }
 
-function normalizeWorkflowTargetPath(path: string) {
+function normalizeAutomationTargetPath(path: string) {
   return path.trim().replace(/^\/+|\/+$/g, "").replace(/\/+/g, "/");
 }
 
-function buildDesktopCreateWorkflowRequest({
+function buildDesktopCreateAutomationRequest({
   projectId,
   provider,
   configValues,
   targetPath,
 }: {
   projectId: string;
-  provider: DesktopCloudWorkflowProviderSpec;
+  provider: DesktopCloudAutomationProviderSpec;
   configValues: Record<string, string>;
   targetPath: string;
-}): DesktopCloudCreateWorkflowRequest {
-  const fieldsByKey = new Map(getCloudWorkflowUserConfigFields(provider).map((field) => [field.key, field]));
+}): DesktopCloudCreateAutomationRequest {
+  const fieldsByKey = new Map(getCloudAutomationUserConfigFields(provider).map((field) => [field.key, field]));
   const options: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(configValues)) {
     const trimmed = value.trim();

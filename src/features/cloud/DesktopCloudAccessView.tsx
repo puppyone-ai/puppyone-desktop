@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Filter, Search } from "lucide-react";
 import {
   openCloudApp,
-  type DesktopCloudConnector,
   type DesktopCloudSession,
 } from "../../lib/cloudApi";
-import { getCloudAccessFilterDescriptor, type CloudAccessFilter } from "./accessFilters";
+import type { CloudAccessFilter } from "./accessFilters";
 import { CloudProjectBrowserSignedOut } from "./components/ProjectBrowser";
 import { CloudWorkspaceLoadingState } from "./components/shared";
 import type { DesktopCloudAccessDataState } from "./data/useDesktopCloudAccessData";
@@ -20,13 +19,9 @@ import {
 import { isCloudAccessNavigationResource, type CloudAccessSurfaceRow } from "./sections/access/accessRows";
 import type { CloudWorkspaceSection } from "./types";
 import {
-  formatProviderLabel,
-  getCloudProviderIconUrl,
   getScopeDisplayName,
   getScopePathLabel,
-  isCloudIntegrationConnector,
   isConnectorActiveStatus,
-  providerIcon,
 } from "./utils";
 
 export function DesktopCloudAccessView({
@@ -35,7 +30,6 @@ export function DesktopCloudAccessView({
   accessData,
   activeFilter,
   activeAccessRowId,
-  activeIntegrationProvider,
   sessionRestoring,
   onCloudSessionChange,
   onRefresh,
@@ -46,7 +40,6 @@ export function DesktopCloudAccessView({
   accessData: DesktopCloudAccessDataState;
   activeFilter: CloudAccessFilter;
   activeAccessRowId: string | null;
-  activeIntegrationProvider?: string | null;
   sessionRestoring: boolean;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onRefresh: () => void | Promise<void>;
@@ -93,8 +86,8 @@ export function DesktopCloudAccessView({
   }
 
   return (
-    <div className={`desktop-cloud-main-view desktop-cloud-access-main-view ${activeFilter === "integrations" ? "desktop-cloud-integrations-main-view" : ""}`}>
-      <div className={`desktop-cloud-page-shell desktop-cloud-access-page-shell ${activeFilter === "integrations" ? "desktop-cloud-integrations-page-shell" : ""}`}>
+    <div className="desktop-cloud-main-view desktop-cloud-access-main-view">
+      <div className="desktop-cloud-page-shell desktop-cloud-access-page-shell">
         {accessData.error && <div className="desktop-cloud-main-alert">{accessData.error}</div>}
         {accessData.warning && <div className="desktop-cloud-main-alert">{accessData.warning}</div>}
         <CloudAccessSection
@@ -109,13 +102,11 @@ export function DesktopCloudAccessView({
           mcpEndpointsByScope={accessData.mcpEndpointsByScope}
           filter={activeFilter}
           activeAccessRowId={selectedAccessRowId}
-          integrationProviderFilter={activeIntegrationProvider ?? null}
           loading={accessData.loading}
           onCloudSessionChange={onCloudSessionChange}
           onRefresh={accessData.reload}
           onSelectAccessRow={onSelectAccessRow}
           onOpenProject={handleOpenProject}
-          onOpenIntegrations={handleOpenIntegrations}
           sidebarOwnsHeader={activeFilter === "all"}
         />
       </div>
@@ -219,83 +210,6 @@ export function DesktopCloudAccessSidebar({
   );
 }
 
-export function DesktopCloudIntegrationsSidebar({
-  accessData,
-  activeProvider,
-  onSelectProvider,
-}: {
-  accessData: DesktopCloudAccessDataState;
-  activeProvider: string | null;
-  onSelectProvider: (provider: string | null) => void;
-}) {
-  const integrations = getCloudAccessFilterDescriptor("integrations");
-  const IntegrationsIcon = integrations.icon;
-  const integrationConnectors = accessData.connectors.filter(isCloudIntegrationConnector);
-  const providerGroups = getIntegrationSidebarProviderGroups(integrationConnectors);
-  const providerKey = providerGroups.map((group) => group.provider).join("|");
-
-  useEffect(() => {
-    if (activeProvider && !providerKey.split("|").includes(activeProvider)) {
-      onSelectProvider(null);
-    }
-  }, [activeProvider, onSelectProvider, providerKey]);
-
-  return (
-    <section className="desktop-tool-sidebar desktop-cloud-service-sidebar desktop-cloud-integrations-type-sidebar">
-      <div className="desktop-tool-sidebar-list desktop-cloud-sidebar-list">
-        <nav className="desktop-cloud-sidebar-nav" aria-label="Cloud integrations">
-          <button
-            className={`desktop-tool-sidebar-row desktop-cloud-sidebar-nav-row ${activeProvider ? "" : "active"}`}
-            type="button"
-            aria-current={activeProvider ? undefined : "page"}
-            onClick={() => onSelectProvider(null)}
-          >
-            <span className="desktop-cloud-sidebar-nav-icon">
-              <IntegrationsIcon size={15} />
-            </span>
-            <span className="desktop-cloud-sidebar-nav-label">All Integrations</span>
-            {integrationConnectors.length > 0 && (
-              <span className="desktop-cloud-sidebar-nav-count">{integrationConnectors.length}</span>
-            )}
-          </button>
-          <div className="desktop-cloud-integrations-nav-group">
-            {providerGroups.map((group) => {
-              const Icon = providerIcon(group.provider);
-              const iconUrl = getCloudProviderIconUrl(group.provider);
-              const active = activeProvider === group.provider;
-              return (
-                <button
-                  className={`desktop-tool-sidebar-row desktop-cloud-sidebar-nav-row desktop-cloud-integrations-provider-row ${active ? "active" : ""}`}
-                  key={group.provider}
-                  type="button"
-                  aria-current={active ? "page" : undefined}
-                  title={group.label}
-                  onClick={() => onSelectProvider(group.provider)}
-                >
-                  <span className="desktop-cloud-sidebar-nav-icon">
-                    {iconUrl ? <img src={iconUrl} alt="" /> : <Icon size={14} />}
-                  </span>
-                  <span className="desktop-cloud-sidebar-nav-label">{group.label}</span>
-                  <span className="desktop-cloud-sidebar-nav-count">{group.connectors.length}</span>
-                </button>
-              );
-            })}
-            {accessData.loading && providerGroups.length === 0 && (
-              <div className="desktop-cloud-integrations-nav-empty" role="status">Loading integrations</div>
-            )}
-            {!accessData.loading && accessData.error && (
-              <div className="desktop-cloud-integrations-nav-empty" role="status">{accessData.error}</div>
-            )}
-            {!accessData.loading && !accessData.error && providerGroups.length === 0 && (
-              <div className="desktop-cloud-integrations-nav-empty">No active integrations</div>
-            )}
-          </div>
-        </nav>
-      </div>
-    </section>
-  );
-}
-
 function DesktopCloudAccessResourceRow({
   row,
   selected,
@@ -334,30 +248,6 @@ function DesktopCloudAccessResourceRow({
   );
 }
 
-function getIntegrationSidebarProviderGroups(connectors: DesktopCloudConnector[]) {
-  const groups = new Map<string, {
-    provider: string;
-    label: string;
-    connectors: DesktopCloudConnector[];
-  }>();
-
-  for (const connector of connectors) {
-    const group = groups.get(connector.provider) ?? {
-      provider: connector.provider,
-      label: formatProviderLabel(connector.provider),
-      connectors: [],
-    };
-    group.connectors.push(connector);
-    groups.set(connector.provider, group);
-  }
-
-  return [...groups.values()].sort((left, right) => left.label.localeCompare(right.label));
-}
-
 function handleOpenProject(projectId: string, section: CloudWorkspaceSection = "access") {
   openCloudApp(getCloudRouteWebPath(section, projectId));
-}
-
-function handleOpenIntegrations(projectId: string) {
-  openCloudApp(`/projects/${encodeURIComponent(projectId)}/workflows`);
 }

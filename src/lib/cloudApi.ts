@@ -243,7 +243,7 @@ export type DesktopCloudConnectorPatch = {
   status?: string;
 };
 
-export type DesktopCloudWorkflowConfigField = {
+export type DesktopCloudAutomationConfigField = {
   key: string;
   label: string;
   type: "text" | "select" | "number" | "url";
@@ -254,7 +254,7 @@ export type DesktopCloudWorkflowConfigField = {
   hint: string | null;
 };
 
-export type DesktopCloudWorkflowProviderSpec = {
+export type DesktopCloudAutomationProviderSpec = {
   provider: string;
   display_name: string;
   description: string | null;
@@ -267,11 +267,11 @@ export type DesktopCloudWorkflowProviderSpec = {
   default_sync_mode?: string;
   supported_sync_modes?: string[];
   supported_directions?: string[];
-  config_fields?: DesktopCloudWorkflowConfigField[];
+  config_fields?: DesktopCloudAutomationConfigField[];
   icon_url?: string | null;
 };
 
-export type DesktopCloudWorkflowConnection = {
+export type DesktopCloudAutomationConnection = {
   id: string;
   project_id: string;
   path: string | null;
@@ -283,7 +283,7 @@ export type DesktopCloudWorkflowConnection = {
   error_message?: string | null;
 };
 
-export type DesktopCloudCreateWorkflowRequest = {
+export type DesktopCloudCreateAutomationRequest = {
   project_id: string;
   provider: string;
   config: Record<string, unknown>;
@@ -295,8 +295,9 @@ export type DesktopCloudCreateWorkflowRequest = {
   trigger?: { type: string; schedule?: string; timezone?: string };
 };
 
-export type DesktopCloudCreateWorkflowResult = {
-  sync: DesktopCloudWorkflowConnection;
+export type DesktopCloudCreateAutomationResult = {
+  /** Legacy server response key. Product/domain code calls this Automation. */
+  sync: DesktopCloudAutomationConnection;
   execution_result?: Record<string, unknown> | null;
 };
 
@@ -679,22 +680,37 @@ export function updateCloudConnector(
   );
 }
 
-export function listCloudWorkflowProviderSpecs(
-  session: DesktopCloudSession,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudWorkflowProviderSpec[]> {
-  return cloudApiRequest<DesktopCloudWorkflowProviderSpec[]>("/integrations/connectors", session, onSessionChange, {}, apiBaseUrl);
+// Compatibility boundary only. The Cloud service has not yet migrated its
+// established `/integrations` transport routes. Product and feature code must
+// use Automation terminology and reach those routes only through this adapter.
+const CLOUD_AUTOMATION_LEGACY_WIRE_BASE = "/integrations";
+
+function cloudAutomationWirePath(suffix: string) {
+  return `${CLOUD_AUTOMATION_LEGACY_WIRE_BASE}${suffix}`;
 }
 
-export function createCloudWorkflow(
+export function listCloudAutomationProviderSpecs(
   session: DesktopCloudSession,
-  body: DesktopCloudCreateWorkflowRequest,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
-): Promise<DesktopCloudCreateWorkflowResult> {
-  return cloudApiRequest<DesktopCloudCreateWorkflowResult>(
-    "/integrations/connections",
+): Promise<DesktopCloudAutomationProviderSpec[]> {
+  return cloudApiRequest<DesktopCloudAutomationProviderSpec[]>(
+    cloudAutomationWirePath("/connectors"),
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  );
+}
+
+export function createCloudAutomation(
+  session: DesktopCloudSession,
+  body: DesktopCloudCreateAutomationRequest,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudCreateAutomationResult> {
+  return cloudApiRequest<DesktopCloudCreateAutomationResult>(
+    cloudAutomationWirePath("/connections"),
     session,
     onSessionChange,
     {
@@ -705,14 +721,14 @@ export function createCloudWorkflow(
   );
 }
 
-export function refreshCloudWorkflowConnection(
+export function refreshCloudAutomationConnection(
   session: DesktopCloudSession,
   connectionId: string,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
 ): Promise<unknown> {
   return cloudApiRequest<unknown>(
-    `/integrations/connections/${encodeURIComponent(connectionId)}/refresh`,
+    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}/refresh`),
     session,
     onSessionChange,
     { method: "POST", body: JSON.stringify({}) },
@@ -720,14 +736,14 @@ export function refreshCloudWorkflowConnection(
   );
 }
 
-export function pauseCloudWorkflowConnection(
+export function pauseCloudAutomationConnection(
   session: DesktopCloudSession,
   connectionId: string,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
 ): Promise<unknown> {
   return cloudApiRequest<unknown>(
-    `/integrations/connections/${encodeURIComponent(connectionId)}/pause`,
+    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}/pause`),
     session,
     onSessionChange,
     { method: "POST", body: JSON.stringify({}) },
@@ -735,14 +751,14 @@ export function pauseCloudWorkflowConnection(
   );
 }
 
-export function resumeCloudWorkflowConnection(
+export function resumeCloudAutomationConnection(
   session: DesktopCloudSession,
   connectionId: string,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
 ): Promise<unknown> {
   return cloudApiRequest<unknown>(
-    `/integrations/connections/${encodeURIComponent(connectionId)}/resume`,
+    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}/resume`),
     session,
     onSessionChange,
     { method: "POST", body: JSON.stringify({}) },
@@ -750,14 +766,14 @@ export function resumeCloudWorkflowConnection(
   );
 }
 
-export function deleteCloudWorkflowConnection(
+export function deleteCloudAutomationConnection(
   session: DesktopCloudSession,
   connectionId: string,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
 ): Promise<unknown> {
   return cloudApiRequest<unknown>(
-    `/integrations/connections/${encodeURIComponent(connectionId)}`,
+    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}`),
     session,
     onSessionChange,
     { method: "DELETE" },

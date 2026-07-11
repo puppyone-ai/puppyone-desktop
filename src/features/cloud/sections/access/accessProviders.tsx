@@ -15,7 +15,7 @@ export type DesktopCloudAccessMethodMeta = {
 };
 
 type AccessProviderRegistryItem = {
-  tileProvider: "cli" | "git" | "mcp" | "vm" | "integration";
+  tileProvider: "cli" | "git" | "mcp" | "vm" | "automation";
   iconSize: number;
   icon?: LucideIcon;
   meta: (surface: CloudAccessSurface) => DesktopCloudAccessMethodMeta;
@@ -115,7 +115,7 @@ function getAccessProviderRegistryItem(provider: string): AccessProviderRegistry
   if (normalized === "mcp_endpoint") return ACCESS_PROVIDER_REGISTRY.mcp;
   if (normalized === "remote_workspace" || normalized === "sandbox") return ACCESS_PROVIDER_REGISTRY.vm;
   return ACCESS_PROVIDER_REGISTRY[normalized] ?? {
-    tileProvider: "integration",
+    tileProvider: "automation",
     iconSize: 19,
     meta: (surface) => ({
       title: surface.title || formatProviderLabel(surface.provider),

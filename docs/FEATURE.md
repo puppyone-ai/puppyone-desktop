@@ -9,6 +9,10 @@ single product area can evolve without turning this file into a catch-all.
 - [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
   - Cloud environment, auth, workspace binding, project data, and route-state
     boundaries.
+- [Automation and Plugin Domain Boundary](architecture/automation-plugin-domain-boundary.md)
+  - Cloud information-source Automation and local-only file-viewer Plugins
+    have separate authority, storage, permissions, lifecycle, and source
+    ownership.
 - [Git and Source Control Architecture](architecture/git/README.md)
   - Local Source Control sidebar and status ownership, external Git refresh
     lifecycle, Git topology source of truth, and branch/ref display rules.

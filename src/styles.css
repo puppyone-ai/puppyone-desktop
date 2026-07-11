@@ -9,6 +9,8 @@
 @import "./styles/project-folder-card.css";
 @import "./styles/settings.css";
 @import "./features/cloud/cloud-service.css";
+@import "./features/automation/automation.css";
+@import "./features/automation/automation-dialog.css";
 @import "./styles/settings-controls.css";
 @import "./features/source-control/source-control.css";
 @import "./styles/settings-view.css";

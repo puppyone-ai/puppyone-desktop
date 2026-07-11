@@ -64,23 +64,6 @@ export function normalizeProviderKey(provider: string) {
   return provider.trim().toLowerCase().replace(/-/g, "_");
 }
 
-export function isCloudIntegrationConnector(connector: DesktopCloudConnector) {
-  const provider = normalizeProviderKey(connector.provider);
-  return ![
-    "",
-    "agent",
-    "cli",
-    "filesystem",
-    "git",
-    "git_remote",
-    "mcp",
-    "mcp_endpoint",
-    "sandbox",
-    "sandbox_endpoint",
-    "sync",
-  ].includes(provider);
-}
-
 export function getCloudProviderIconUrl(provider: string) {
   switch (normalizeProviderKey(provider)) {
     case "gmail":
@@ -236,8 +219,8 @@ export function countScopeAccessSurfaces(
   endpointCount: number,
 ) {
   void scope;
-  const thirdPartyCount = connectors.filter(isCloudIntegrationConnector).length;
-  return 2 + Math.max(1, endpointCount) + thirdPartyCount;
+  void connectors;
+  return 2 + Math.max(1, endpointCount);
 }
 
 export function scopeMatchesMcpEndpoint(scope: DesktopCloudScope, endpoint: DesktopCloudMcpEndpoint) {

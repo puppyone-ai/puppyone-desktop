@@ -5,7 +5,7 @@ export const CLOUD_WORKSPACE_SECTIONS = [
   "contents",
   "branches",
   "access",
-  "integrations",
+  "automation",
   "mcp-cli",
   "git-sync",
   "team",
