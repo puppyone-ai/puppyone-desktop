@@ -2,7 +2,7 @@ import type { EditorState } from "@codemirror/state";
 import { Decoration } from "@codemirror/view";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../../../viewerTypes";
 import { createMarkdownBlockFeatureWidget } from "../../features/blockFeatureRegistry";
-import { getMarkdownPlansInRange } from "../plans/markdownPlanIndex";
+import { getMarkdownPlansInRange, type IndexedMarkdownPlan } from "../plans/markdownPlanIndex";
 import type { MarkdownElementPlan } from "../plans/markdownPlanTypes";
 import { isMarkdownTableSourceLine } from "../../features/table/tableModel";
 import { getMarkdownTaskLine, type MarkdownTaskLine } from "../rendering/taskModel";
@@ -21,6 +21,12 @@ type TaskCheckboxPlan = Extract<MarkdownElementPlan, { presentation: "inlineAtom
   atom: { kind: "taskCheckbox"; checked: boolean };
 };
 
+const markdownDecorationDiagnostics = {
+  rangeBuilds: 0,
+  linesScanned: 0,
+  fullDocumentScans: 0,
+};
+
 export function addMarkdownBlockAndLineDecorations(
   state: EditorState,
   builders: MarkdownDecorationBuilders,
@@ -31,10 +37,21 @@ export function addMarkdownBlockAndLineDecorations(
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
+  from = 0,
+  to = state.doc.length,
 ) {
-  const lineCount = state.doc.lines;
+  const rangeFrom = Math.max(0, Math.min(from, to, state.doc.length));
+  const rangeTo = Math.max(rangeFrom, Math.min(Math.max(from, to), state.doc.length));
+  const firstLine = state.doc.lineAt(rangeFrom);
+  const lastLine = state.doc.lineAt(rangeTo);
+  const plans = getMarkdownPlansInRange(state, firstLine.from, lastLine.to);
+  markdownDecorationDiagnostics.rangeBuilds += 1;
+  markdownDecorationDiagnostics.linesScanned += lastLine.number - firstLine.number + 1;
+  if (firstLine.from === 0 && lastLine.to === state.doc.length) {
+    markdownDecorationDiagnostics.fullDocumentScans += 1;
+  }
 
-  for (let lineNumber = 1; lineNumber <= lineCount;) {
+  for (let lineNumber = firstLine.number; lineNumber <= lastLine.number;) {
     const line = state.doc.line(lineNumber);
     if (composingLine?.from === line.from) {
       builders.decorations.push(
@@ -46,7 +63,7 @@ export function addMarkdownBlockAndLineDecorations(
       continue;
     }
 
-    const blockPlan = findBlockAtomPlanAtLineStart(state, line.from);
+    const blockPlan = findBlockAtomPlanAtLineStart(plans, line.from);
     if (blockPlan) {
       const widget = createMarkdownBlockFeatureWidget(blockPlan, {
         htmlTrustMode,
@@ -82,16 +99,17 @@ export function addMarkdownBlockAndLineDecorations(
       markdownLinkGraph,
       documentPath,
       markdownAssetUrlResolver,
+      plans,
     );
     lineNumber += 1;
   }
 }
 
 function findBlockAtomPlanAtLineStart(
-  state: EditorState,
+  plans: readonly IndexedMarkdownPlan[],
   lineFrom: number,
 ): Extract<MarkdownElementPlan, { presentation: "blockAtom" }> | null {
-  for (const { plan } of getMarkdownPlansInRange(state, lineFrom, lineFrom + 1)) {
+  for (const { plan } of plans) {
     if (plan.presentation !== "blockAtom") continue;
     if (plan.sourceRange.from !== lineFrom) continue;
     return plan;
@@ -110,8 +128,9 @@ function decorateMarkdownLine(
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
+  plans: readonly IndexedMarkdownPlan[],
 ) {
-  const taskPlan = findTaskCheckboxPlan(state, lineFrom, lineTo);
+  const taskPlan = findTaskCheckboxPlan(plans, lineFrom, lineTo);
   const parsedTaskLine = taskPlan ? getMarkdownTaskLine({ from: lineFrom, to: lineTo, text }) : null;
   const taskLine = parsedTaskLine
     ? { ...parsedTaskLine, checked: taskPlan?.atom.checked ?? parsedTaskLine.checked }
@@ -178,16 +197,27 @@ function decorateMarkdownLine(
 }
 
 function findTaskCheckboxPlan(
-  state: EditorState,
+  plans: readonly IndexedMarkdownPlan[],
   lineFrom: number,
   lineTo: number,
 ): TaskCheckboxPlan | null {
-  for (const { element, plan } of getMarkdownPlansInRange(state, lineFrom, lineTo)) {
+  for (const { element, plan } of plans) {
+    if (plan.sourceRange.from >= lineTo || plan.sourceRange.to <= lineFrom) continue;
     if (element.kind !== "task") continue;
     if (plan.presentation !== "inlineAtom" || plan.atom.kind !== "taskCheckbox") continue;
     return plan as TaskCheckboxPlan;
   }
   return null;
+}
+
+export function resetMarkdownDecorationDiagnostics() {
+  markdownDecorationDiagnostics.rangeBuilds = 0;
+  markdownDecorationDiagnostics.linesScanned = 0;
+  markdownDecorationDiagnostics.fullDocumentScans = 0;
+}
+
+export function getMarkdownDecorationDiagnostics() {
+  return { ...markdownDecorationDiagnostics };
 }
 
 function getMarkdownLineAttributes(

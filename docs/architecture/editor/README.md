@@ -72,6 +72,10 @@ architecture documents one level above this directory.
 4. [Markdown Editor](markdown/README.md)
    - The format-specific source-first architecture and Live Preview UX contract
      for Markdown files.
+5. [Desktop Renderer Performance](../desktop-renderer-performance.md)
+   - The urgent/deferred scheduling, Explorer virtualization, Markdown
+     projection, snapshot, cancellation, worker-index, and production Electron
+     performance contracts shared by Explorer and the editor.
 
 ## Adding a format-specific editor
 

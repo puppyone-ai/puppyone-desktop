@@ -20,6 +20,16 @@ export type CreateMarkdownLinkGraphOptions = {
   onOpenExternalUrl?: (href: string) => void | Promise<void>;
 };
 
+export type MarkdownLinkGraphIndexSnapshot = {
+  indexedDocumentCount: number;
+  backlinks: Array<[string, MarkdownBacklink[]]>;
+};
+
+export const EMPTY_MARKDOWN_LINK_GRAPH_INDEX: MarkdownLinkGraphIndexSnapshot = {
+  indexedDocumentCount: 0,
+  backlinks: [],
+};
+
 type IndexedDocument = {
   path: string;
   name: string;
@@ -32,11 +42,14 @@ type IndexedDocument = {
 export function createMarkdownLinkGraph(
   documents: readonly MarkdownLinkGraphDocument[],
   options: CreateMarkdownLinkGraphOptions = {},
+  indexSnapshot?: MarkdownLinkGraphIndexSnapshot,
 ): MarkdownLinkGraph {
   const indexedDocuments = documents.map(toIndexedDocument).sort((left, right) => left.path.localeCompare(right.path));
   const pathIndex = createPathIndex(indexedDocuments);
   const titleIndex = createTitleIndex(indexedDocuments);
-  const backlinksByTargetPath = createBacklinkIndex(indexedDocuments, pathIndex, titleIndex);
+  const backlinksByTargetPath = indexSnapshot
+    ? new Map(indexSnapshot.backlinks)
+    : createBacklinkIndex(indexedDocuments, pathIndex, titleIndex);
 
   const resolveWikiLink = (sourcePath: string, target: string): MarkdownWikiLinkResolvedTarget => {
     const resolved = resolveWikiLinkTarget(indexedDocuments, pathIndex, titleIndex, sourcePath, target);
@@ -45,7 +58,8 @@ export function createMarkdownLinkGraph(
 
   return {
     documentCount: indexedDocuments.length,
-    indexedDocumentCount: indexedDocuments.filter((document) => document.content !== null).length,
+    indexedDocumentCount: indexSnapshot?.indexedDocumentCount
+      ?? indexedDocuments.filter((document) => document.content !== null).length,
     isIndexing: Boolean(options.isIndexing),
     resolveWikiLink,
     resolveMarkdownLink(sourcePath, href) {
@@ -75,6 +89,21 @@ export function createMarkdownLinkGraph(
   };
 }
 
+/** Pure-data index build. This is the worker boundary used by DataWorkspace. */
+export function createMarkdownLinkGraphIndex(
+  documents: readonly MarkdownLinkGraphDocument[],
+): MarkdownLinkGraphIndexSnapshot {
+  const indexedDocuments = documents
+    .map(toIndexedDocument)
+    .sort((left, right) => left.path.localeCompare(right.path));
+  const pathIndex = createPathIndex(indexedDocuments);
+  const titleIndex = createTitleIndex(indexedDocuments);
+  return {
+    indexedDocumentCount: indexedDocuments.filter((document) => document.content !== null).length,
+    backlinks: [...createBacklinkIndex(indexedDocuments, pathIndex, titleIndex).entries()],
+  };
+}
+
 function createBacklinkIndex(
   documents: readonly IndexedDocument[],
   pathIndex: Map<string, IndexedDocument>,
@@ -84,43 +113,50 @@ function createBacklinkIndex(
 
   for (const document of documents) {
     if (!document.content) continue;
+    const lineStarts = createLineStarts(document.content);
+    const targetCache = new Map<string, MarkdownWikiLinkResolvedTarget>();
+    const resolveTarget = (target: string) => {
+      const cached = targetCache.get(target);
+      if (cached) return cached;
+      const resolved = resolveWikiLinkTarget(documents, pathIndex, titleIndex, document.path, target);
+      targetCache.set(target, resolved);
+      return resolved;
+    };
 
-    const tokens = findWikiLinkTokens(document.content);
-    for (const token of tokens) {
-      const target = resolveWikiLinkTarget(documents, pathIndex, titleIndex, document.path, token.target);
+    const sourceLinks = [
+      ...findWikiLinkTokens(document.content).map((token) => ({
+        from: token.from,
+        resolvedTarget: token.target,
+        sourceTarget: token.target,
+        label: token.label,
+      })),
+      ...findMarkdownLinkTokens(document.content).flatMap((token) => {
+        const resolvedTarget = normalizeMarkdownHrefTarget(token.href);
+        return resolvedTarget
+          ? [{
+              from: token.from,
+              resolvedTarget,
+              sourceTarget: token.href,
+              label: token.label,
+            }]
+          : [];
+      }),
+    ].sort((left, right) => left.from - right.from);
+
+    for (const sourceLink of sourceLinks) {
+      const target = resolveTarget(sourceLink.resolvedTarget);
       if (!target.exists || !target.path) continue;
 
       const normalizedTargetPath = normalizeDataPath(target.path);
       const sourceMap = getOrCreateMap(backlinksByTargetPath, normalizedTargetPath);
       const existing = sourceMap.get(document.path);
-      const reference = createBacklinkReference(document.content, token.from, token.target, token.label);
-
-      if (existing) {
-        existing.count += 1;
-        existing.references.push(reference);
-        continue;
-      }
-
-      sourceMap.set(document.path, {
-        sourcePath: document.path,
-        sourceName: document.name,
-        count: 1,
-        references: [reference],
-      });
-    }
-
-    const markdownLinkTokens = findMarkdownLinkTokens(document.content);
-    for (const token of markdownLinkTokens) {
-      const normalizedTarget = normalizeMarkdownHrefTarget(token.href);
-      if (!normalizedTarget) continue;
-
-      const target = resolveWikiLinkTarget(documents, pathIndex, titleIndex, document.path, normalizedTarget);
-      if (!target.exists || !target.path) continue;
-
-      const normalizedTargetPath = normalizeDataPath(target.path);
-      const sourceMap = getOrCreateMap(backlinksByTargetPath, normalizedTargetPath);
-      const existing = sourceMap.get(document.path);
-      const reference = createBacklinkReference(document.content, token.from, token.href, token.label);
+      const reference = createBacklinkReference(
+        document.content,
+        lineStarts,
+        sourceLink.from,
+        sourceLink.sourceTarget,
+        sourceLink.label,
+      );
 
       if (existing) {
         existing.count += 1;
@@ -173,15 +209,17 @@ function decodeMarkdownHrefPath(value: string): string {
 
 function createBacklinkReference(
   content: string,
+  lineStarts: readonly number[],
   offset: number,
   target: string,
   label: string,
 ): MarkdownBacklinkReference {
-  const before = content.slice(0, offset);
-  const lineNumber = before.split("\n").length;
-  const lineStart = content.lastIndexOf("\n", Math.max(0, offset - 1)) + 1;
-  const lineEnd = content.indexOf("\n", offset);
-  const rawLine = content.slice(lineStart, lineEnd === -1 ? content.length : lineEnd);
+  const lineIndex = findLineIndex(lineStarts, offset);
+  const lineNumber = lineIndex + 1;
+  const lineStart = lineStarts[lineIndex] ?? 0;
+  const nextLineStart = lineStarts[lineIndex + 1];
+  const lineEnd = typeof nextLineStart === "number" ? Math.max(lineStart, nextLineStart - 1) : content.length;
+  const rawLine = content.slice(lineStart, lineEnd);
 
   return {
     lineNumber,
@@ -189,6 +227,25 @@ function createBacklinkReference(
     target,
     label,
   };
+}
+
+function createLineStarts(content: string): number[] {
+  const starts = [0];
+  for (let index = 0; index < content.length; index += 1) {
+    if (content.charCodeAt(index) === 10) starts.push(index + 1);
+  }
+  return starts;
+}
+
+function findLineIndex(lineStarts: readonly number[], offset: number): number {
+  let low = 0;
+  let high = lineStarts.length - 1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    if ((lineStarts[middle] ?? 0) <= offset) low = middle + 1;
+    else high = middle - 1;
+  }
+  return Math.max(0, high);
 }
 
 function resolveWikiLinkTarget(

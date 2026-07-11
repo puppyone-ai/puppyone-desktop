@@ -1,7 +1,7 @@
 import { StateEffect } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
-const markdownLivePreviewFocusEffect = StateEffect.define<boolean>();
+export const markdownLivePreviewFocusEffect = StateEffect.define<boolean>();
 
 export const markdownLivePreviewFocusExtension = EditorView.focusChangeEffect.of((_state, focusing) => (
   markdownLivePreviewFocusEffect.of(focusing)

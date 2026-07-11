@@ -4,6 +4,19 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { EditorSaveButton, type SaveStatus } from "../EditorSaveButton";
 import { PlainTextEditor } from "../PlainTextEditor";
 import type { EditorMode, EditorSaveMode } from "../viewerTypes";
+import type {
+  EditorSourceRevision,
+  EditorSourceSnapshot,
+  EditorSourceSnapshotPort,
+} from "../sourceSnapshot";
+
+export type TextEditorControls = {
+  canEdit: boolean;
+  onChange: (content: string) => void;
+  onSourceRevisionChange: (revision: EditorSourceRevision) => void;
+  onSnapshotPortChange: (port: EditorSourceSnapshotPort | null) => void;
+  onBeforeDestroy: (snapshot: EditorSourceSnapshot) => void;
+};
 
 export type TextEditorFrameProps = {
   documentId: string;
@@ -14,8 +27,10 @@ export type TextEditorFrameProps = {
   onSaveContent?: (content: string) => Promise<void>;
   hideSourceView: boolean;
   saveMode: EditorSaveMode;
-  renderLive: (content: string, controls: { canEdit: boolean; onChange: (content: string) => void }) => ReactNode;
-  renderSource?: (content: string, controls: { canEdit: boolean; onChange: (content: string) => void }) => ReactNode;
+  /** Keep the editor document canonical and read full source only at save boundaries. */
+  sourceSnapshotMode?: boolean;
+  renderLive: (content: string, controls: TextEditorControls) => ReactNode;
+  renderSource?: (content: string, controls: TextEditorControls) => ReactNode;
 };
 
 export function TextEditorFrame({
@@ -27,32 +42,47 @@ export function TextEditorFrame({
   onSaveContent,
   hideSourceView,
   saveMode,
+  sourceSnapshotMode = false,
   renderLive,
   renderSource,
 }: TextEditorFrameProps) {
   const [mode, setMode] = useState<EditorMode>(hideSourceView ? "live" : defaultMode);
   const [draft, setDraft] = useState(content);
+  const [editorValue, setEditorValue] = useState(content);
   const [persistedContent, setPersistedContent] = useState(content);
+  const [snapshotDirty, setSnapshotDirty] = useState(false);
+  const [snapshotRevision, setSnapshotRevision] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("clean");
   const [saveError, setSaveError] = useState<string | null>(null);
   const documentIdRef = useRef(documentId);
   const draftRef = useRef(draft);
   const persistedContentRef = useRef(persistedContent);
+  const snapshotDirtyRef = useRef(snapshotDirty);
+  const snapshotRevisionRef = useRef<string | null>(snapshotRevision);
+  const snapshotPortRef = useRef<EditorSourceSnapshotPort | null>(null);
   const savingRef = useRef(false);
-  const queuedAutoSaveRef = useRef<string | null>(null);
-  const dirty = draft !== persistedContent;
+  const queuedAutoSaveRef = useRef(false);
+  const inFlightContentRef = useRef<string | null>(null);
+  const dirty = sourceSnapshotMode ? snapshotDirty : draft !== persistedContent;
 
   useLayoutEffect(() => {
     if (documentIdRef.current === documentId) return;
 
     documentIdRef.current = documentId;
     savingRef.current = false;
-    queuedAutoSaveRef.current = null;
+    queuedAutoSaveRef.current = false;
+    inFlightContentRef.current = null;
+    snapshotPortRef.current = null;
+    snapshotDirtyRef.current = false;
+    snapshotRevisionRef.current = null;
     draftRef.current = content;
     persistedContentRef.current = content;
     setMode(hideSourceView ? "live" : defaultMode);
     setDraft(content);
+    setEditorValue(content);
     setPersistedContent(content);
+    setSnapshotDirty(false);
+    setSnapshotRevision(null);
     setSaveStatus("clean");
     setSaveError(null);
   }, [content, defaultMode, documentId, hideSourceView]);
@@ -65,13 +95,23 @@ export function TextEditorFrame({
     persistedContentRef.current = persistedContent;
   }, [persistedContent]);
 
+  useEffect(() => {
+    snapshotDirtyRef.current = snapshotDirty;
+  }, [snapshotDirty]);
+
+  useEffect(() => {
+    snapshotRevisionRef.current = snapshotRevision;
+  }, [snapshotRevision]);
+
   useLayoutEffect(() => {
     if (documentIdRef.current !== documentId) return;
 
     const previousPersistedContent = persistedContentRef.current;
-    const hasLocalDraft = saveMode === "auto" &&
-      draftRef.current !== previousPersistedContent &&
-      draftRef.current !== content;
+    const hasLocalDraft = sourceSnapshotMode
+      ? snapshotDirtyRef.current
+      : saveMode === "auto"
+        && draftRef.current !== previousPersistedContent
+        && draftRef.current !== content;
 
     setPersistedContent(content);
     persistedContentRef.current = content;
@@ -82,10 +122,18 @@ export function TextEditorFrame({
       return;
     }
 
-    setDraft(content);
-    draftRef.current = content;
+    if (sourceSnapshotMode) {
+      // A save acknowledgement already matches the canonical EditorView. Only
+      // a genuinely new external value is dispatched back into the editor.
+      if (content !== previousPersistedContent) setEditorValue(content);
+      setSnapshotDirty(false);
+      snapshotDirtyRef.current = false;
+    } else {
+      setDraft(content);
+      draftRef.current = content;
+    }
     setSaveStatus("clean");
-  }, [content, documentId, saveMode]);
+  }, [content, documentId, saveMode, sourceSnapshotMode]);
 
   useEffect(() => {
     if (hideSourceView) setMode("live");
@@ -96,16 +144,21 @@ export function TextEditorFrame({
     else if (saveStatus === "dirty" || saveStatus === "error") setSaveStatus("clean");
   }, [dirty, saveStatus]);
 
-  const saveContent = async (contentToSave: string, automatic: boolean) => {
+  const saveContent = async (
+    contentToSave: string,
+    automatic: boolean,
+    sourceRevision: string | null,
+  ) => {
     if (!onSaveContent || contentToSave === persistedContentRef.current) return;
 
     if (savingRef.current) {
-      if (automatic) queuedAutoSaveRef.current = contentToSave;
+      if (automatic) queuedAutoSaveRef.current = true;
       return;
     }
 
     const saveDocumentId = documentIdRef.current;
     savingRef.current = true;
+    inFlightContentRef.current = contentToSave;
     setSaveStatus("saving");
     setSaveError(null);
     try {
@@ -114,7 +167,15 @@ export function TextEditorFrame({
 
       persistedContentRef.current = contentToSave;
       setPersistedContent(contentToSave);
-      setSaveStatus(draftRef.current === contentToSave ? "saved" : "dirty");
+      if (sourceSnapshotMode) {
+        const currentRevision = snapshotPortRef.current?.readRevision() ?? snapshotRevisionRef.current;
+        const remainsDirty = sourceRevision !== null && currentRevision !== sourceRevision;
+        snapshotDirtyRef.current = remainsDirty;
+        setSnapshotDirty(remainsDirty);
+        setSaveStatus(remainsDirty ? "dirty" : "saved");
+      } else {
+        setSaveStatus(draftRef.current === contentToSave ? "saved" : "dirty");
+      }
       window.setTimeout(() => {
         if (documentIdRef.current !== saveDocumentId) return;
         setSaveStatus((status) => (status === "saved" ? "clean" : status));
@@ -127,37 +188,80 @@ export function TextEditorFrame({
       if (documentIdRef.current !== saveDocumentId) return;
 
       savingRef.current = false;
-      if (automatic) {
-        const queuedContent = queuedAutoSaveRef.current;
-        queuedAutoSaveRef.current = null;
-        if (queuedContent !== null && queuedContent !== persistedContentRef.current) {
-          window.setTimeout(() => {
-            void saveContent(draftRef.current, true);
-          }, 0);
-        }
+      inFlightContentRef.current = null;
+      if (automatic && queuedAutoSaveRef.current) {
+        queuedAutoSaveRef.current = false;
+        window.setTimeout(() => void saveCurrentSource(true), 0);
       }
     }
   };
 
-  const save = () => {
-    void saveContent(draftRef.current, false);
+  const saveCurrentSource = async (automatic: boolean) => {
+    if (sourceSnapshotMode) {
+      const snapshot = snapshotPortRef.current?.readSnapshot();
+      if (!snapshot) return;
+      await saveContent(snapshot.content, automatic, snapshot.revision);
+      return;
+    }
+    await saveContent(draftRef.current, automatic, null);
+  };
+
+  const handleSourceRevisionChange = (revision: EditorSourceRevision) => {
+    snapshotRevisionRef.current = revision.revision;
+    setSnapshotRevision(revision.revision);
+    if (!revision.dirty) return;
+    snapshotDirtyRef.current = true;
+    setSnapshotDirty(true);
+  };
+
+  const handleSnapshotPortChange = (port: EditorSourceSnapshotPort | null) => {
+    snapshotPortRef.current = port;
+  };
+
+  const handleBeforeDestroy = (snapshot: EditorSourceSnapshot) => {
+    snapshotPortRef.current = null;
+    if (!onSaveContent || snapshot.content === persistedContentRef.current) return;
+    if (savingRef.current && snapshot.content === inFlightContentRef.current) return;
+    // Destruction/file switch is a mandatory persistence boundary. The write
+    // is started before EditorView disposal and carries the exact revision
+    // snapshot; React state is deliberately not touched after unmount.
+    void onSaveContent(snapshot.content).catch((error) => {
+      console.error("Unable to flush editor source before disposal:", error);
+    });
+  };
+
+  const controls: TextEditorControls = {
+    canEdit,
+    onChange: setDraft,
+    onSourceRevisionChange: handleSourceRevisionChange,
+    onSnapshotPortChange: handleSnapshotPortChange,
+    onBeforeDestroy: handleBeforeDestroy,
+  };
+
+  const switchMode = (nextMode: EditorMode) => {
+    if (nextMode === mode) return;
+    if (sourceSnapshotMode) {
+      const snapshot = snapshotPortRef.current?.readSnapshot();
+      if (snapshot) setEditorValue(snapshot.content);
+    }
+    setMode(nextMode);
   };
 
   useEffect(() => {
     if (saveMode !== "auto" || !dirty || !onSaveContent) return undefined;
 
     const timeoutId = window.setTimeout(() => {
-      void saveContent(draftRef.current, true);
+      void saveCurrentSource(true);
     }, 400);
 
     return () => window.clearTimeout(timeoutId);
-  }, [dirty, draft, onSaveContent, saveMode]);
+  }, [dirty, onSaveContent, saveMode, snapshotRevision, draft]);
 
   return (
     <section className="editor-host">
       {saveMode === "manual" && (
         <div className="editor-save-overlay">
-          <EditorSaveButton status={saveStatus} onSave={save} />
+          <EditorSaveButton status={saveStatus} onSave={() => void saveCurrentSource(false)} />
         </div>
       )}
 
@@ -165,11 +269,11 @@ export function TextEditorFrame({
 
       {mode === "live" ? (
         <div className="editor-live-surface">
-          {renderLive(draft, { canEdit, onChange: setDraft })}
+          {renderLive(sourceSnapshotMode ? editorValue : draft, controls)}
         </div>
       ) : renderSource ? (
         <div className="editor-live-surface">
-          {renderSource(draft, { canEdit, onChange: setDraft })}
+          {renderSource(sourceSnapshotMode ? editorValue : draft, controls)}
         </div>
       ) : (
         <PlainTextEditor
@@ -185,7 +289,7 @@ export function TextEditorFrame({
           <button
             className={mode === "live" ? "active" : ""}
             type="button"
-            onClick={() => setMode("live")}
+            onClick={() => switchMode("live")}
             title="Live view"
             aria-label="Live view"
           >
@@ -194,7 +298,7 @@ export function TextEditorFrame({
           <button
             className={mode === "source" ? "active" : ""}
             type="button"
-            onClick={() => setMode("source")}
+            onClick={() => switchMode("source")}
             title="Source code"
             aria-label="Source code"
           >

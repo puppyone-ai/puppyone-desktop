@@ -5,12 +5,24 @@ import type {
   MouseEvent as ReactMouseEvent,
   ReactNode,
 } from "react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { DataNode } from "../core/types";
-import { getMatchedExtension } from "../core/fileFormats";
 import { FileGlyphIcon, type FileIconThemeId } from "../file/fileIcons";
 import { DotsLoader, InlineLoading } from "../primitives/LoadingIndicator";
 import { useScrollEdgeState } from "../primitives/useScrollableClass";
+import {
+  buildExplorerNodeIndex,
+  buildExplorerVisibleModel,
+  getDisplayNameKey,
+  getExplorerDisplayName,
+  type ExplorerVisibleNodeRow,
+  type ExplorerVisibleRow,
+} from "./explorer/explorerVisibleModel";
+import { ExplorerRowStateStore } from "./explorer/explorerRowStateStore";
+import {
+  EXPLORER_VIRTUAL_ROW_SIZE,
+  useExplorerVirtualWindow,
+} from "./explorer/useExplorerVirtualWindow";
 
 export type ExplorerTreeProps = {
   nodes: DataNode[];
@@ -62,8 +74,6 @@ type TreeDropTarget = {
 
 type TreeDragController = {
   enabled: boolean;
-  draggedNodes: DataNode[];
-  dropTarget: TreeDropTarget;
   onNodeDragStart: (event: ReactDragEvent<HTMLButtonElement>, node: DataNode) => void;
   onNodeDragEnd: () => void;
   onRowDragOver: (
@@ -76,22 +86,10 @@ type TreeDragController = {
   onRowDrop: (event: ReactDragEvent<HTMLElement>, targetFolderPath: string | null) => void;
 };
 
-const EXPLORER_TREE_ROW_HEIGHT = 30;
-const EXPLORER_TREE_ROW_GAP = 2;
-const EXPLORER_TREE_INDENT = 24;
-const EXPLORER_TREE_ROW_MARGIN_X = 6;
-const EXPLORER_TREE_CONTENT_INSET = 8;
-const EXPLORER_TREE_ROW_MARGIN_Y = EXPLORER_TREE_ROW_GAP / 2;
-const EXPLORER_TREE_LINE_OVERDRAW = 2;
-const EXPLORER_TREE_META_OFFSET = 14;
-const ROOT_HEADER_TOP_PADDING = 5;
-const SUBTREE_MOTION_MIN_MS = 170;
-const SUBTREE_MOTION_MAX_MS = 340;
-const SUBTREE_MOTION_PX_FACTOR = 0.28;
-const SUBTREE_MOTION_EASE = "cubic-bezier(0.25, 0.1, 0.25, 1)";
 export const EXPLORER_TREE_NODE_DRAG_TYPE = "application/x-puppyone-data-node-path";
 const FOLDER_HOVER_EXPAND_MS = 620;
 const FOLDER_PEER_DROP_ZONE_RATIO = 0.34;
+const EXPLORER_ROW_DOM_ID_PREFIX = "puppyone-explorer-row";
 
 export function ExplorerTree({
   nodes,
@@ -131,8 +129,6 @@ export function ExplorerTree({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [draggedNodes, setDraggedNodes] = useState<DataNode[]>([]);
   const [dropTarget, setDropTarget] = useState<TreeDropTarget>(null);
-  const rootDisplayNameCounts = useMemo(() => buildDisplayNameCounts(nodes), [nodes]);
-  const selectedDragNodes = useMemo(() => collectTopLevelSelectedNodes(nodes, selectedPaths), [nodes, selectedPaths]);
   const moveEnabled = Boolean(canMoveNodes && (onMoveNodes || onMoveNode));
   const importEnabled = Boolean(onImportFiles);
   const dropEnabled = moveEnabled || importEnabled;
@@ -140,10 +136,94 @@ export function ExplorerTree({
     () => loadingPaths ?? (loadingPath ? new Set([loadingPath]) : EMPTY_PATH_SET),
     [loadingPath, loadingPaths],
   );
+  const visibleModel = useMemo(() => buildExplorerVisibleModel(nodes, {
+    expandedPaths,
+    loadingPaths: resolvedLoadingPaths,
+    emptyLabel,
+    loadingLabel,
+  }), [emptyLabel, expandedPaths, loadingLabel, nodes, resolvedLoadingPaths]);
+  const nodeIndex = useMemo(() => buildExplorerNodeIndex(nodes), [nodes]);
+  const selectedDragNodes = useMemo(
+    () => collectTopLevelSelectedNodes(nodeIndex, selectedPaths),
+    [nodeIndex, selectedPaths],
+  );
+  const draggedPaths = useMemo(
+    () => new Set(draggedNodes.map((node) => node.path)),
+    [draggedNodes],
+  );
+  const activeIndex = activePath ? visibleModel.pathToIndex.get(activePath) ?? null : null;
+  const firstNavigableIndex = useMemo(
+    () => findNavigableRowIndex(visibleModel.rows, 0, 1),
+    [visibleModel.rows],
+  );
+  const virtualWindow = useExplorerVirtualWindow({
+    rowCount: visibleModel.rows.length,
+    scrollRef,
+    activeIndex,
+  });
+  const visibleRows = visibleModel.rows.slice(virtualWindow.startIndex, virtualWindow.endIndex);
+  const rowStateStoreRef = useRef<ExplorerRowStateStore>();
+  rowStateStoreRef.current ??= new ExplorerRowStateStore();
+  const rowStateStore = rowStateStoreRef.current;
+  rowStateStore.prepare({
+    activePath,
+    selectedPaths,
+    cutPaths,
+    loadingPaths: resolvedLoadingPaths,
+    draggedPaths,
+    dropTarget,
+  }, visibleModel.pathToIndex.keys());
+  useLayoutEffect(() => rowStateStore.flush(), [
+    activePath,
+    cutPaths,
+    draggedPaths,
+    dropTarget,
+    resolvedLoadingPaths,
+    rowStateStore,
+    selectedPaths,
+  ]);
   const scrollEdgeState = useScrollEdgeState(scrollRef, {
-    dependencies: [nodes, rootError, rootLoading, resolvedLoadingPaths, expandedPaths],
+    dependencies: [visibleModel.rows.length, rootError, rootLoading],
   });
   const scrollable = scrollEdgeState.scrollable;
+  const callbackRef = useRef({
+    onSelectNode,
+    onToggleFolder,
+    onNodeContextMenu,
+    renderFolderActions,
+    renderNodeActions,
+  });
+  callbackRef.current = {
+    onSelectNode,
+    onToggleFolder,
+    onNodeContextMenu,
+    renderFolderActions,
+    renderNodeActions,
+  };
+  const selectNode = useCallback<ExplorerTreeProps["onSelectNode"]>(
+    (node, intent) => callbackRef.current.onSelectNode(node, intent),
+    [],
+  );
+  const toggleFolder = useCallback<NonNullable<ExplorerTreeProps["onToggleFolder"]>>(
+    (node, expanded) => callbackRef.current.onToggleFolder?.(node, expanded),
+    [],
+  );
+  const openNodeContextMenu = useCallback<NonNullable<ExplorerTreeProps["onNodeContextMenu"]>>(
+    (node, event) => callbackRef.current.onNodeContextMenu?.(node, event),
+    [],
+  );
+  const renderNodeRowActions = useCallback((node: DataNode) => (
+    callbackRef.current.renderNodeActions?.(node)
+      ?? (node.type === "folder" ? callbackRef.current.renderFolderActions?.(node) : null)
+  ), []);
+  const selectedPathsRef = useRef(selectedPaths);
+  const selectedDragNodesRef = useRef(selectedDragNodes);
+  const draggedNodesRef = useRef(draggedNodes);
+  selectedPathsRef.current = selectedPaths;
+  selectedDragNodesRef.current = selectedDragNodes;
+  draggedNodesRef.current = draggedNodes;
+  const dragCallbacksRef = useRef({ onImportFiles, onMoveNode, onMoveNodes });
+  dragCallbacksRef.current = { onImportFiles, onMoveNode, onMoveNodes };
 
   const clearDragState = useCallback(() => {
     setDraggedNodes([]);
@@ -177,14 +257,14 @@ export function ExplorerTree({
 
     event.stopPropagation();
     event.dataTransfer.effectAllowed = "copyMove";
-    const movingNodes = selectedPaths.has(node.path) && selectedDragNodes.length > 0
-      ? selectedDragNodes
+    const movingNodes = selectedPathsRef.current.has(node.path) && selectedDragNodesRef.current.length > 0
+      ? selectedDragNodesRef.current
       : [node];
     event.dataTransfer.setData(EXPLORER_TREE_NODE_DRAG_TYPE, movingNodes.map((item) => item.path).join("\n"));
     event.dataTransfer.setData("text/plain", movingNodes.map((item) => item.path).join("\n"));
     setDraggedNodes(movingNodes);
     setDropTarget(null);
-  }, [moveEnabled, selectedDragNodes, selectedPaths]);
+  }, [moveEnabled]);
 
   const dragOverRow = useCallback((
     event: ReactDragEvent<HTMLElement>,
@@ -200,15 +280,16 @@ export function ExplorerTree({
       return true;
     }
 
-    if (!moveEnabled || draggedNodes.length === 0) return false;
+    const currentDraggedNodes = draggedNodesRef.current;
+    if (!moveEnabled || currentDraggedNodes.length === 0) return false;
 
-    const valid = isValidMoveTargetForNodes(draggedNodes, targetFolderPath);
+    const valid = isValidMoveTargetForNodes(currentDraggedNodes, targetFolderPath);
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = valid ? "move" : "none";
     setNextDropTarget(rowPath, targetFolderPath, mode, valid);
     return valid;
-  }, [draggedNodes, importEnabled, moveEnabled, setNextDropTarget]);
+  }, [importEnabled, moveEnabled, setNextDropTarget]);
 
   const dragLeaveRow = useCallback((event: ReactDragEvent<HTMLElement>, rowPath: string | null) => {
     event.stopPropagation();
@@ -220,28 +301,29 @@ export function ExplorerTree({
       event.preventDefault();
       event.stopPropagation();
       clearDragState();
-      void Promise.resolve(onImportFiles?.(importedFiles, targetFolderPath)).catch((error) => {
+      void Promise.resolve(dragCallbacksRef.current.onImportFiles?.(importedFiles, targetFolderPath)).catch((error) => {
         console.error("Unable to import dropped files:", error);
       });
       return;
     }
 
-    if (!moveEnabled || draggedNodes.length === 0) return;
+    const currentDraggedNodes = draggedNodesRef.current;
+    if (!moveEnabled || currentDraggedNodes.length === 0) return;
 
     event.preventDefault();
     event.stopPropagation();
-    const movingNodes = draggedNodes;
+    const movingNodes = currentDraggedNodes;
     const valid = isValidMoveTargetForNodes(movingNodes, targetFolderPath);
     clearDragState();
     if (!valid) return;
 
-    const moveResult = onMoveNodes
-      ? onMoveNodes(movingNodes, targetFolderPath)
-      : Promise.all(movingNodes.map((node) => onMoveNode?.(node, targetFolderPath)));
+    const moveResult = dragCallbacksRef.current.onMoveNodes
+      ? dragCallbacksRef.current.onMoveNodes(movingNodes, targetFolderPath)
+      : Promise.all(movingNodes.map((node) => dragCallbacksRef.current.onMoveNode?.(node, targetFolderPath)));
     void Promise.resolve(moveResult).catch((error) => {
       console.error("Unable to move explorer item:", error);
     });
-  }, [clearDragState, draggedNodes, importEnabled, moveEnabled, onImportFiles, onMoveNode, onMoveNodes]);
+  }, [clearDragState, importEnabled, moveEnabled]);
 
   const leaveTree = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (!dropTarget || !didLeaveElementBounds(event)) return;
@@ -250,8 +332,6 @@ export function ExplorerTree({
 
   const dragController = useMemo<TreeDragController>(() => ({
     enabled: moveEnabled,
-    draggedNodes,
-    dropTarget,
     onNodeDragStart: beginNodeDrag,
     onNodeDragEnd: clearDragState,
     onRowDragOver: dragOverRow,
@@ -262,9 +342,7 @@ export function ExplorerTree({
     clearDragState,
     dragLeaveRow,
     dragOverRow,
-    draggedNodes,
     dropOnRow,
-    dropTarget,
     moveEnabled,
   ]);
 
@@ -293,6 +371,65 @@ export function ExplorerTree({
     });
   }, [currentFolderPath, onCopyNodes, onCutNodes, onDuplicateNodes, onPasteNodes, selectedDragNodes]);
 
+  const focusRowAtIndex = useCallback((index: number) => {
+    window.requestAnimationFrame(() => {
+      document.getElementById(getExplorerRowDomId(index))?.focus();
+    });
+  }, []);
+
+  const handleTreeNavigation = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.defaultPrevented || isEditableEventTarget(event.target)) return;
+    if (!["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+
+    const targetPath = event.target instanceof HTMLElement
+      ? event.target.closest<HTMLElement>("[data-explorer-path]")?.dataset.explorerPath ?? null
+      : null;
+    const currentIndex = targetPath
+      ? visibleModel.pathToIndex.get(targetPath) ?? activeIndex ?? -1
+      : activeIndex ?? -1;
+    const currentRow = currentIndex >= 0 ? visibleModel.rows[currentIndex] : null;
+    let nextIndex: number | null = null;
+
+    if (event.key === "Home") {
+      nextIndex = findNavigableRowIndex(visibleModel.rows, 0, 1);
+    } else if (event.key === "End") {
+      nextIndex = findNavigableRowIndex(visibleModel.rows, visibleModel.rows.length - 1, -1);
+    } else if (event.key === "ArrowDown") {
+      nextIndex = findNavigableRowIndex(visibleModel.rows, Math.max(0, currentIndex + 1), 1);
+    } else if (event.key === "ArrowUp") {
+      nextIndex = findNavigableRowIndex(visibleModel.rows, Math.max(0, currentIndex - 1), -1);
+    } else if (currentRow?.kind === "node" && event.key === "ArrowRight") {
+      if (currentRow.node.type === "folder" && !expandedPaths.has(currentRow.path)) {
+        event.preventDefault();
+        toggleFolder(currentRow.node, true);
+        return;
+      }
+      nextIndex = findNavigableRowIndex(visibleModel.rows, currentIndex + 1, 1);
+    } else if (currentRow?.kind === "node" && event.key === "ArrowLeft") {
+      if (currentRow.node.type === "folder" && expandedPaths.has(currentRow.path)) {
+        event.preventDefault();
+        toggleFolder(currentRow.node, false);
+        return;
+      }
+      nextIndex = currentRow.parentPath
+        ? visibleModel.pathToIndex.get(currentRow.parentPath) ?? null
+        : null;
+    }
+
+    if (nextIndex === null || nextIndex < 0) return;
+    const nextRow = visibleModel.rows[nextIndex];
+    if (!nextRow || nextRow.kind !== "node") return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectNode(nextRow.node);
+    focusRowAtIndex(nextIndex);
+  }, [activeIndex, expandedPaths, focusRowAtIndex, selectNode, toggleFolder, visibleModel]);
+
+  const handleTreeKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    handleClipboardShortcut(event);
+    handleTreeNavigation(event);
+  }, [handleClipboardShortcut, handleTreeNavigation]);
+
   return (
     <div
       className={`explorer-tree-shell ${showRoot ? "has-root" : "no-root"} ${scrollable ? "is-scrollable" : ""} ${draggedNodes.length > 0 ? "is-dragging-node" : ""} ${dropTarget && draggedNodes.length === 0 ? "is-importing-files" : ""}`}
@@ -307,7 +444,7 @@ export function ExplorerTree({
       onDragLeave={dropEnabled ? leaveTree : undefined}
       onDrop={dropEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
       onContextMenu={onRootContextMenu}
-      onKeyDown={handleClipboardShortcut}
+      onKeyDown={handleTreeKeyDown}
     >
       {showRoot && (
         <div className="explorer-tree-root-scope">
@@ -353,7 +490,14 @@ export function ExplorerTree({
         </div>
       )}
 
-      <div ref={scrollRef} className={`explorer-tree-scroll ${scrollable ? "is-scrollable" : ""}`}>
+      <div
+        ref={scrollRef}
+        className={`explorer-tree-scroll ${scrollable ? "is-scrollable" : ""}`}
+        role="tree"
+        aria-multiselectable="true"
+        aria-activedescendant={activeIndex !== null ? getExplorerRowDomId(activeIndex) : undefined}
+        onScroll={virtualWindow.onScroll}
+      >
         <div className="explorer-tree-list">
           {rootError && nodes.length === 0 ? (
             <ExplorerTreeMetaRow depth={0}>{rootError}</ExplorerTreeMetaRow>
@@ -362,28 +506,42 @@ export function ExplorerTree({
           ) : nodes.length === 0 ? (
             <ExplorerTreeMetaRow depth={0}>{emptyLabel}</ExplorerTreeMetaRow>
           ) : (
-            nodes.map((node) => (
-              <TreeNodeRow
-                key={node.path}
-                node={node}
-                depth={0}
-                siblingDisplayNameCounts={rootDisplayNameCounts}
-                expandedPaths={expandedPaths}
-                activePath={activePath}
-                selectedPaths={selectedPaths}
-                cutPaths={cutPaths}
-                loadingPaths={resolvedLoadingPaths}
-                emptyLabel={emptyLabel}
-                loadingLabel={loadingLabel}
-                fileIconTheme={fileIconTheme}
-                onToggleFolder={onToggleFolder}
-                onSelectNode={onSelectNode}
-                dragController={dragController}
-                onNodeContextMenu={onNodeContextMenu}
-                renderFolderActions={renderFolderActions}
-                renderNodeActions={renderNodeActions}
-              />
-            ))
+            <div
+              className="explorer-tree-virtual-canvas"
+              style={{ height: `${virtualWindow.totalHeight}px` }}
+              data-visible-row-count={visibleModel.rows.length}
+              data-mounted-row-count={visibleRows.length}
+            >
+              {visibleRows.map((row) => (
+                <div
+                  key={row.key}
+                  className="explorer-tree-virtual-row"
+                  data-depth={row.depth}
+                  style={{
+                    "--depth": row.depth,
+                    transform: `translateY(${row.index * EXPLORER_VIRTUAL_ROW_SIZE}px)`,
+                  } as CSSProperties}
+                >
+                  {row.kind === "meta" ? (
+                    <ExplorerTreeMetaRow depth={row.depth} loading={row.loading}>{row.label}</ExplorerTreeMetaRow>
+                  ) : (
+                    <TreeNodeRow
+                      row={row}
+                      isExpanded={row.node.type === "folder" && expandedPaths.has(row.path)}
+                      focusable={activePath ? activePath === row.path : row.index === firstNavigableIndex}
+                      stateStore={rowStateStore}
+                      fileIconTheme={fileIconTheme}
+                      onToggleFolder={toggleFolder}
+                      onSelectNode={selectNode}
+                      dragController={dragController}
+                      hasNodeContextMenu={Boolean(onNodeContextMenu)}
+                      onNodeContextMenu={openNodeContextMenu}
+                      renderRowActions={renderNodeRowActions}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
           )}
           {renderListEnd?.()}
         </div>
@@ -392,58 +550,41 @@ export function ExplorerTree({
   );
 }
 
-function TreeNodeRow({
-  node,
-  depth,
-  siblingDisplayNameCounts,
-  expandedPaths,
-  activePath,
-  selectedPaths,
-  cutPaths,
-  loadingPaths,
-  emptyLabel,
-  loadingLabel,
+const TreeNodeRow = memo(function TreeNodeRow({
+  row,
+  isExpanded,
+  focusable,
+  stateStore,
   fileIconTheme,
   onToggleFolder,
   onSelectNode,
   dragController,
+  hasNodeContextMenu,
   onNodeContextMenu,
-  renderFolderActions,
-  renderNodeActions,
+  renderRowActions,
 }: {
-  node: DataNode;
-  depth: number;
-  siblingDisplayNameCounts: Map<string, number>;
-  expandedPaths: ReadonlySet<string>;
-  activePath: string | null;
-  selectedPaths: ReadonlySet<string>;
-  cutPaths: ReadonlySet<string>;
-  loadingPaths: ReadonlySet<string>;
-  emptyLabel: string;
-  loadingLabel: string;
+  row: ExplorerVisibleNodeRow;
+  isExpanded: boolean;
+  focusable: boolean;
+  stateStore: ExplorerRowStateStore;
   fileIconTheme: FileIconThemeId;
-  onToggleFolder?: (node: DataNode, expanded: boolean) => void;
+  onToggleFolder: (node: DataNode, expanded: boolean) => void;
   onSelectNode: ExplorerTreeProps["onSelectNode"];
   dragController: TreeDragController;
-  onNodeContextMenu?: ExplorerTreeProps["onNodeContextMenu"];
-  renderFolderActions?: (node: DataNode) => ReactNode;
-  renderNodeActions?: (node: DataNode) => ReactNode;
+  hasNodeContextMenu: boolean;
+  onNodeContextMenu: NonNullable<ExplorerTreeProps["onNodeContextMenu"]>;
+  renderRowActions: (node: DataNode) => ReactNode;
 }) {
+  const { node, depth, siblingDisplayNameCounts } = row;
   const isFolder = node.type === "folder";
-  const isExpanded = isFolder && expandedPaths.has(node.path);
   const hoverExpandTimer = useRef<number | null>(null);
-  const active = activePath === node.path;
-  const selected = selectedPaths.has(node.path);
-  const cut = isPathInClipboardCut(node.path, cutPaths);
-  const loading = loadingPaths.has(node.path);
-  const dragging = dragController.draggedNodes.some((draggedNode) => draggedNode.path === node.path);
-  const dropMatchesRow = dragController.dropTarget?.rowPath === node.path;
-  const dropOver = dropMatchesRow && dragController.dropTarget?.mode === "folder" && dragController.dropTarget.valid;
-  const dropParentOver = dropMatchesRow && dragController.dropTarget?.mode === "parent" && dragController.dropTarget.valid;
-  const dropInvalid = dropMatchesRow && !dragController.dropTarget?.valid;
-  const children = useMemo(() => node.children ?? [], [node.children]);
-  const childDisplayNameCounts = useMemo(() => buildDisplayNameCounts(children), [children]);
-  const rowActions = renderNodeActions?.(node) ?? (isFolder ? renderFolderActions?.(node) : null);
+  const subscribe = useCallback(
+    (listener: () => void) => stateStore.subscribe(node.path, listener),
+    [node.path, stateStore],
+  );
+  const getSnapshot = useCallback(() => stateStore.getSnapshot(node.path), [node.path, stateStore]);
+  const interaction = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const rowActions = renderRowActions(node);
   const displayName = useMemo(() => getExplorerDisplayName(node), [node.name, node.type]);
   const showExtensionDisambiguator = Boolean(
     displayName.extension
@@ -461,7 +602,7 @@ function TreeNodeRow({
     hoverExpandTimer.current = null;
   }, []);
 
-  useEffect(() => clearHoverExpandTimer, [clearHoverExpandTimer]);
+  useLayoutEffect(() => clearHoverExpandTimer, [clearHoverExpandTimer]);
 
   const scheduleHoverExpand = useCallback(() => {
     if (!isFolder || isExpanded || hoverExpandTimer.current !== null) return;
@@ -487,131 +628,100 @@ function TreeNodeRow({
   }, [isFolder, node.path]);
 
   return (
-    <>
-      <button
-        className={`tree-row ${isFolder ? "folder" : "file"} ${selected ? "selected" : ""} ${active ? "active" : ""} ${cut ? "clipboard-cut" : ""} ${loading ? "loading" : ""} ${dragging ? "dragging" : ""} ${dropOver ? "drop-target" : ""} ${dropParentOver ? "drop-parent-target" : ""} ${dropInvalid ? "drop-invalid" : ""} ${node.status ? `status-${node.status}` : ""}`}
-        type="button"
-        draggable={dragController.enabled}
-        aria-current={active ? "true" : undefined}
-        aria-selected={selected || undefined}
-        aria-expanded={isFolder ? isExpanded : undefined}
-        aria-busy={loading || undefined}
-        aria-grabbed={dragging ? "true" : undefined}
-        aria-label={cut ? `${node.name}, cut` : node.name}
-        title={displayName.hidden || showExtensionDisambiguator ? node.name : undefined}
-        onDragStart={(event) => dragController.onNodeDragStart(event, node)}
-        onDragEnd={dragController.onNodeDragEnd}
-        onDragEnter={(event) => {
-          const dropIntent = getDropIntent(event);
-          const validTarget = dragController.onRowDragOver(event, node.path, dropIntent.targetFolderPath, dropIntent.mode);
-          if (isFolder && dropIntent.mode === "folder" && validTarget) scheduleHoverExpand();
-        }}
-        onDragOver={(event) => {
-          const dropIntent = getDropIntent(event);
-          const validTarget = dragController.onRowDragOver(event, node.path, dropIntent.targetFolderPath, dropIntent.mode);
-          if (isFolder && dropIntent.mode === "folder" && validTarget) scheduleHoverExpand();
-        }}
-        onDragLeave={(event) => {
-          clearHoverExpandTimer();
-          dragController.onRowDragLeave(event, node.path);
-        }}
-        onDrop={(event) => {
-          clearHoverExpandTimer();
-          const dropIntent = getDropIntent(event);
-          dragController.onRowDrop(event, dropIntent.targetFolderPath);
-        }}
-        onClick={(event) => {
-          event.stopPropagation();
-          const intent = getSelectionIntent(event);
-          onSelectNode(node, intent);
-          if (isFolder) {
-            if (!intent.additive && !intent.range) toggleCurrentFolder();
-            return;
-          }
-        }}
-        onContextMenu={onNodeContextMenu ? (event) => {
-          event.stopPropagation();
-          if (!selected) onSelectNode(node);
-          onNodeContextMenu(node, event);
-        } : undefined}
-        style={{ "--depth": depth } as CSSProperties}
-      >
-        <span className="tree-row-content">
-          <span
-            className="tree-icon-slot"
-            onClick={(event) => {
-              if (!isFolder) return;
-              event.stopPropagation();
-              toggleCurrentFolder();
-            }}
-          >
-            {isFolder ? (
-              <TreeDisclosureMarker expanded={isExpanded} />
-            ) : (
-              <FileGlyphIcon name={node.name} type={node.type} size={18} theme={fileIconTheme} />
-            )}
-          </span>
-          <span className="tree-label">
-            <span className="tree-label-primary">{displayName.primary}</span>
-            {showExtensionDisambiguator && (
-              <span className="tree-label-extension" aria-hidden="true">
-                {displayName.extension}
-              </span>
-            )}
-          </span>
-          {node.status && node.status !== "clean" && (
-            <span className={`tree-status ${node.status}`}>{shortStatus(node.status)}</span>
+    <button
+      id={getExplorerRowDomId(row.index)}
+      className={`tree-row ${isFolder ? "folder" : "file"} ${interaction.selected ? "selected" : ""} ${interaction.active ? "active" : ""} ${interaction.cut ? "clipboard-cut" : ""} ${interaction.loading ? "loading" : ""} ${interaction.dragging ? "dragging" : ""} ${interaction.dropOver ? "drop-target" : ""} ${interaction.dropParentOver ? "drop-parent-target" : ""} ${interaction.dropInvalid ? "drop-invalid" : ""} ${node.status ? `status-${node.status}` : ""}`}
+      type="button"
+      role="treeitem"
+      data-explorer-path={node.path}
+      draggable={dragController.enabled}
+      tabIndex={focusable ? 0 : -1}
+      aria-level={row.depth + 1}
+      aria-posinset={row.positionInSet}
+      aria-setsize={row.setSize}
+      aria-current={interaction.active ? "true" : undefined}
+      aria-selected={interaction.selected || undefined}
+      aria-expanded={isFolder ? isExpanded : undefined}
+      aria-busy={interaction.loading || undefined}
+      aria-grabbed={interaction.dragging ? "true" : undefined}
+      aria-label={interaction.cut ? `${node.name}, cut` : node.name}
+      title={displayName.hidden || showExtensionDisambiguator ? node.name : undefined}
+      onDragStart={(event) => dragController.onNodeDragStart(event, node)}
+      onDragEnd={dragController.onNodeDragEnd}
+      onDragEnter={(event) => {
+        const dropIntent = getDropIntent(event);
+        const validTarget = dragController.onRowDragOver(event, node.path, dropIntent.targetFolderPath, dropIntent.mode);
+        if (isFolder && dropIntent.mode === "folder" && validTarget) scheduleHoverExpand();
+      }}
+      onDragOver={(event) => {
+        const dropIntent = getDropIntent(event);
+        const validTarget = dragController.onRowDragOver(event, node.path, dropIntent.targetFolderPath, dropIntent.mode);
+        if (isFolder && dropIntent.mode === "folder" && validTarget) scheduleHoverExpand();
+      }}
+      onDragLeave={(event) => {
+        clearHoverExpandTimer();
+        dragController.onRowDragLeave(event, node.path);
+      }}
+      onDrop={(event) => {
+        clearHoverExpandTimer();
+        const dropIntent = getDropIntent(event);
+        dragController.onRowDrop(event, dropIntent.targetFolderPath);
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+        const intent = getSelectionIntent(event);
+        onSelectNode(node, intent);
+        if (isFolder && !intent.additive && !intent.range) toggleCurrentFolder();
+      }}
+      onContextMenu={hasNodeContextMenu ? (event) => {
+        event.stopPropagation();
+        if (!interaction.selected) onSelectNode(node);
+        onNodeContextMenu(node, event);
+      } : undefined}
+      style={{ "--depth": depth } as CSSProperties}
+    >
+      <span className="tree-row-content">
+        <span
+          className="tree-icon-slot"
+          onClick={(event) => {
+            if (!isFolder) return;
+            event.stopPropagation();
+            toggleCurrentFolder();
+          }}
+        >
+          {isFolder ? (
+            <TreeDisclosureMarker expanded={isExpanded} />
+          ) : (
+            <FileGlyphIcon name={node.name} type={node.type} size={18} theme={fileIconTheme} />
           )}
-          {loading && (
-            <DotsLoader
-              size="sm"
-              className="tree-loading-indicator"
-              ariaHidden
-            />
-          )}
-          {rowActions && (
-            <span className="tree-row-actions" onClick={(event) => event.stopPropagation()}>
-              {rowActions}
+        </span>
+        <span className="tree-label">
+          <span className="tree-label-primary">{displayName.primary}</span>
+          {showExtensionDisambiguator && (
+            <span className="tree-label-extension" aria-hidden="true">
+              {displayName.extension}
             </span>
           )}
         </span>
-      </button>
-
-      {isFolder && (
-        <ExplorerSubtreePresence expanded={isExpanded} guideDepth={depth + 1}>
-          {loading && children.length === 0 && (
-            <ExplorerTreeMetaRow depth={depth + 1} loading>{loadingLabel}</ExplorerTreeMetaRow>
-          )}
-          {!loading && children.length === 0 && node.children && (
-            <ExplorerTreeMetaRow depth={depth + 1}>{emptyLabel}</ExplorerTreeMetaRow>
-          )}
-          {children.map((child) => (
-            <TreeNodeRow
-              key={child.path}
-              node={child}
-              depth={depth + 1}
-              siblingDisplayNameCounts={childDisplayNameCounts}
-              expandedPaths={expandedPaths}
-              activePath={activePath}
-              selectedPaths={selectedPaths}
-              cutPaths={cutPaths}
-              loadingPaths={loadingPaths}
-              emptyLabel={emptyLabel}
-              loadingLabel={loadingLabel}
-              fileIconTheme={fileIconTheme}
-              onToggleFolder={onToggleFolder}
-              onSelectNode={onSelectNode}
-              dragController={dragController}
-              onNodeContextMenu={onNodeContextMenu}
-              renderFolderActions={renderFolderActions}
-              renderNodeActions={renderNodeActions}
-            />
-          ))}
-        </ExplorerSubtreePresence>
-      )}
-    </>
+        {node.status && node.status !== "clean" && (
+          <span className={`tree-status ${node.status}`}>{shortStatus(node.status)}</span>
+        )}
+        {interaction.loading && (
+          <DotsLoader
+            size="sm"
+            className="tree-loading-indicator"
+            ariaHidden
+          />
+        )}
+        {rowActions && (
+          <span className="tree-row-actions" onClick={(event) => event.stopPropagation()}>
+            {rowActions}
+          </span>
+        )}
+      </span>
+    </button>
   );
-}
+});
 
 function TreeDisclosureMarker({
   expanded = false,
@@ -666,193 +776,6 @@ function ExplorerTreeMetaRow({
   );
 }
 
-function TreeSubtreeGuide({ depth }: { depth: number }) {
-  if (depth <= 0) return null;
-  return <span className="tree-subtree-guide" style={{ "--depth": depth } as CSSProperties} aria-hidden />;
-}
-
-function ExplorerSubtreePresence({
-  expanded,
-  guideDepth,
-  children,
-}: {
-  expanded: boolean;
-  guideDepth: number;
-  children: ReactNode;
-}) {
-  const mountedOnceRef = useRef(false);
-  const [renderSubtree, setRenderSubtree] = useState(expanded);
-
-  useLayoutEffect(() => {
-    if (expanded) setRenderSubtree(true);
-  }, [expanded]);
-
-  useEffect(() => {
-    mountedOnceRef.current = true;
-  }, []);
-
-  if (!expanded && !renderSubtree) return null;
-
-  return (
-    <ExplorerSubtreeMotion
-      visible={expanded}
-      guideDepth={guideDepth}
-      animateInitialEnter={mountedOnceRef.current}
-      onExited={() => setRenderSubtree(false)}
-    >
-      {children}
-    </ExplorerSubtreeMotion>
-  );
-}
-
-function getSubtreeMotionDurationMs(fromHeight: number, toHeight: number): number {
-  const distance = Math.abs(toHeight - fromHeight);
-  return Math.round(
-    Math.min(
-      SUBTREE_MOTION_MAX_MS,
-      Math.max(
-        SUBTREE_MOTION_MIN_MS,
-        SUBTREE_MOTION_MIN_MS + distance * SUBTREE_MOTION_PX_FACTOR,
-      ),
-    ),
-  );
-}
-
-function ExplorerSubtreeMotion({
-  visible,
-  guideDepth,
-  animateInitialEnter,
-  onExited,
-  children,
-}: {
-  visible: boolean;
-  guideDepth: number;
-  animateInitialEnter: boolean;
-  onExited: () => void;
-  children: ReactNode;
-}) {
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number | null>(null);
-  const onExitedRef = useRef(onExited);
-  const mountedRef = useRef(false);
-  const [height, setHeight] = useState<number | "auto">(() => (
-    visible && !animateInitialEnter ? "auto" : 0
-  ));
-  const [durationMs, setDurationMs] = useState(SUBTREE_MOTION_MIN_MS);
-
-  const cancelFrame = useCallback(() => {
-    if (rafRef.current === null) return;
-    window.cancelAnimationFrame(rafRef.current);
-    rafRef.current = null;
-  }, []);
-
-  useEffect(() => cancelFrame, [cancelFrame]);
-
-  useEffect(() => {
-    onExitedRef.current = onExited;
-  }, [onExited]);
-
-  useLayoutEffect(() => {
-    const wrapper = wrapperRef.current;
-    const content = contentRef.current;
-    if (!wrapper || !content) return;
-
-    cancelFrame();
-
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      if (!visible) {
-        setHeight(0);
-        return;
-      }
-      if (!animateInitialEnter) {
-        setHeight("auto");
-        return;
-      }
-      const nextHeight = content.scrollHeight;
-      setDurationMs(getSubtreeMotionDurationMs(0, nextHeight));
-      setHeight(0);
-      rafRef.current = window.requestAnimationFrame(() => {
-        setHeight(nextHeight);
-        rafRef.current = null;
-      });
-      return;
-    }
-
-    const currentHeight = wrapper.getBoundingClientRect().height;
-    const nextHeight = visible ? content.scrollHeight : 0;
-
-    if (!visible && Math.abs(currentHeight - nextHeight) < 1) {
-      setHeight(0);
-      onExitedRef.current();
-      return;
-    }
-
-    setDurationMs(getSubtreeMotionDurationMs(currentHeight, nextHeight));
-    setHeight(currentHeight);
-    rafRef.current = window.requestAnimationFrame(() => {
-      setHeight(nextHeight);
-      rafRef.current = null;
-    });
-  }, [animateInitialEnter, cancelFrame, visible]);
-
-  useEffect(() => {
-    if (!visible || height === "auto" || typeof ResizeObserver === "undefined") {
-      return undefined;
-    }
-
-    const wrapper = wrapperRef.current;
-    const content = contentRef.current;
-    if (!wrapper || !content) return undefined;
-
-    let previousHeight = content.scrollHeight;
-    const observer = new ResizeObserver(() => {
-      const nextHeight = content.scrollHeight;
-      if (Math.abs(nextHeight - previousHeight) < 1) return;
-      previousHeight = nextHeight;
-
-      cancelFrame();
-      const currentHeight = wrapper.getBoundingClientRect().height;
-      setDurationMs(getSubtreeMotionDurationMs(currentHeight, nextHeight));
-      setHeight(currentHeight);
-      rafRef.current = window.requestAnimationFrame(() => {
-        setHeight(nextHeight);
-        rafRef.current = null;
-      });
-    });
-
-    observer.observe(content);
-    return () => observer.disconnect();
-  }, [cancelFrame, height, visible]);
-
-  return (
-    <div
-      ref={wrapperRef}
-      className="tree-subtree-motion"
-      onTransitionEnd={(event) => {
-        if (event.target !== event.currentTarget) return;
-        if (event.propertyName !== "height") return;
-        if (!visible) {
-          onExitedRef.current();
-          return;
-        }
-        setHeight("auto");
-      }}
-      style={{
-        "--tree-motion-duration": `${durationMs}ms`,
-        "--tree-motion-ease": SUBTREE_MOTION_EASE,
-        height: height === "auto" ? "auto" : `${Math.max(0, height)}px`,
-      } as CSSProperties}
-    >
-      <div ref={contentRef} className="tree-subtree-content">
-        <TreeSubtreeGuide depth={guideDepth} />
-        {children}
-      </div>
-    </div>
-  );
-}
-
 function shortStatus(status: NonNullable<DataNode["status"]>) {
   if (status === "modified") return "M";
   if (status === "created") return "A";
@@ -873,21 +796,36 @@ function isValidMoveTargetForNodes(nodes: DataNode[], targetFolderPath: string |
   return nodes.every((node) => isValidMoveTarget(node, targetFolderPath));
 }
 
-function collectTopLevelSelectedNodes(nodes: DataNode[], selectedPaths: ReadonlySet<string>): DataNode[] {
+function collectTopLevelSelectedNodes(
+  nodeIndex: ReadonlyMap<string, DataNode>,
+  selectedPaths: ReadonlySet<string>,
+): DataNode[] {
   if (selectedPaths.size === 0) return [];
-  const selectedNodes = collectSelectedNodes(nodes, selectedPaths);
+  const selectedNodes = [...selectedPaths]
+    .map((path) => nodeIndex.get(path) ?? null)
+    .filter((node): node is DataNode => node !== null);
   return selectedNodes.filter((node) => !selectedNodes.some((candidate) => (
     candidate.path !== node.path && node.path.startsWith(`${candidate.path}/`)
   )));
 }
 
-function collectSelectedNodes(nodes: DataNode[], selectedPaths: ReadonlySet<string>): DataNode[] {
-  const selectedNodes: DataNode[] = [];
-  for (const node of nodes) {
-    if (selectedPaths.has(node.path)) selectedNodes.push(node);
-    if (node.children) selectedNodes.push(...collectSelectedNodes(node.children, selectedPaths));
+function findNavigableRowIndex(
+  rows: readonly ExplorerVisibleRow[],
+  startIndex: number,
+  direction: 1 | -1,
+): number | null {
+  for (
+    let index = Math.min(Math.max(0, startIndex), Math.max(0, rows.length - 1));
+    index >= 0 && index < rows.length;
+    index += direction
+  ) {
+    if (rows[index]?.kind === "node") return index;
   }
-  return selectedNodes;
+  return null;
+}
+
+function getExplorerRowDomId(index: number): string {
+  return `${EXPLORER_ROW_DOM_ID_PREFIX}-${index}`;
 }
 
 function getSelectionIntent(event: ReactMouseEvent<HTMLElement>): ExplorerSelectionIntent {
@@ -904,13 +842,6 @@ function isPrimaryModifierShortcut(event: ReactKeyboardEvent<HTMLElement>): bool
 function isEditableEventTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return target.isContentEditable || target.matches("input, textarea, select");
-}
-
-function isPathInClipboardCut(path: string, cutPaths: ReadonlySet<string>): boolean {
-  for (const cutPath of cutPaths) {
-    if (path === cutPath || path.startsWith(`${cutPath}/`)) return true;
-  }
-  return false;
 }
 
 function getParentPath(path: string): string | null {
@@ -947,56 +878,6 @@ function isPointerInFolderPeerDropZone(event: ReactDragEvent<HTMLElement>): bool
   const rect = event.currentTarget.getBoundingClientRect();
   const peerZoneTop = rect.bottom - rect.height * FOLDER_PEER_DROP_ZONE_RATIO;
   return event.clientY >= peerZoneTop;
-}
-
-function getExplorerDisplayName(node: DataNode): {
-  primary: string;
-  extension: string | null;
-  hidden: boolean;
-} {
-  if (node.type === "folder") {
-    return { primary: node.name, extension: null, hidden: false };
-  }
-
-  const extension = getDisplayExtension(node.name);
-  if (!extension) {
-    return { primary: node.name, extension: null, hidden: false };
-  }
-
-  const suffix = `.${extension}`;
-  const primary = node.name.slice(0, -suffix.length);
-  if (!primary) {
-    return { primary: node.name, extension: null, hidden: false };
-  }
-
-  return { primary, extension, hidden: true };
-}
-
-function buildDisplayNameCounts(nodes: readonly DataNode[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const node of nodes) {
-    const displayName = getExplorerDisplayName(node);
-    const key = getDisplayNameKey(displayName.primary);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return counts;
-}
-
-function getDisplayNameKey(value: string): string {
-  return value.toLocaleLowerCase();
-}
-
-function getDisplayExtension(name: string): string | null {
-  if (!name) return null;
-  if (name.startsWith(".") && name.indexOf(".", 1) === -1) return null;
-
-  const extension = getMatchedExtension(name);
-  if (!extension) return null;
-
-  const suffix = `.${extension}`;
-  if (!name.toLocaleLowerCase().endsWith(suffix.toLocaleLowerCase())) return null;
-  if (name.length <= suffix.length) return null;
-  return extension;
 }
 
 const EMPTY_PATH_SET: ReadonlySet<string> = new Set();
