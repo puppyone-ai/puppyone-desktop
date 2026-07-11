@@ -4,7 +4,7 @@
 // This is the "端" (desktop/local) side of the product: create/read/write/rename/
 // move/copy/delete/import + the path-containment security boundaries.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { chmod, mkdtemp, rm, mkdir, writeFile, readFile, stat, symlink, lstat } from "node:fs/promises";
+import { chmod, mkdtemp, rm, mkdir, writeFile, readFile, stat, symlink, lstat, realpath, rename } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -21,6 +21,7 @@ import {
   deleteWorkspaceEntry,
   importWorkspaceEntries,
   readPuppyoneWorkspaceConfig,
+  regeneratePuppyoneWorkspaceProjectId,
   writePuppyoneWorkspaceConfig,
 } from "../local-api/workspace.mjs";
 
@@ -40,7 +41,7 @@ afterEach(async () => {
 describe("workspaceFromPath", () => {
   it("returns identity for a real folder", async () => {
     const ws = await workspaceFromPath(root);
-    expect(ws.path).toBe(path.resolve(root));
+    expect(ws.path).toBe(await realpath(root));
     expect(ws.name).toBe(path.basename(root));
     expect(ws.status).toBe("protected");
     expect(ws.cloudState).toBe("local");
@@ -52,6 +53,20 @@ describe("workspaceFromPath", () => {
     const a = await workspaceFromPath(root);
     const b = await workspaceFromPath(root);
     expect(a.id).toBe(b.id);
+  });
+
+  it("does not mutate an uninitialized folder and preserves instance identity across a rename", async () => {
+    const before = await workspaceFromPath(root);
+    await expect(lstat(path.join(root, ".puppyone"))).rejects.toMatchObject({ code: "ENOENT" });
+    const moved = `${root}-moved`;
+    await rename(root, moved);
+    root = moved;
+
+    const after = await workspaceFromPath(root);
+    expect(after.workspaceInstanceId).toBe(before.workspaceInstanceId);
+    expect(after.id).toBe(before.id);
+    expect(after.projectId).toBeNull();
+    await expect(lstat(path.join(root, ".puppyone"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("rejects a file path (not a folder)", async () => {
@@ -211,9 +226,34 @@ describe("workspace config containment", () => {
       version: 1,
       cloud: { projectId: "safe-project" },
     });
+    expect(result.version).toBe(2);
+    expect(result.project.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(result.cloud.projectId).toBe("safe-project");
     expect((await lstat(path.join(root, ".puppyone", "config.json"))).isFile()).toBe(true);
     expect((await readPuppyoneWorkspaceConfig(root)).cloud.projectId).toBe("safe-project");
+  });
+
+  it("keeps project identity across clones while assigning each checkout a different instance", async () => {
+    const configured = await writePuppyoneWorkspaceConfig(root, {
+      version: 1,
+      cloud: { projectId: "cloud-project" },
+    });
+    const clone = path.join(external, "clone");
+    await mkdir(path.join(clone, ".puppyone"), { recursive: true });
+    await writeFile(
+      path.join(clone, ".puppyone", "config.json"),
+      await readFile(path.join(root, ".puppyone", "config.json")),
+    );
+
+    const sourceWorkspace = await workspaceFromPath(root, { includeGitMetadata: false });
+    const cloneWorkspace = await workspaceFromPath(clone, { includeGitMetadata: false });
+    expect(sourceWorkspace.projectId).toBe(configured.project.id);
+    expect(cloneWorkspace.projectId).toBe(configured.project.id);
+    expect(cloneWorkspace.workspaceInstanceId).not.toBe(sourceWorkspace.workspaceInstanceId);
+
+    const duplicated = await regeneratePuppyoneWorkspaceProjectId(clone);
+    expect(duplicated.project.id).not.toBe(configured.project.id);
+    expect(duplicated.cloud.projectId).toBeNull();
   });
 
   it("rejects a symlinked config directory instead of reading or writing outside", async () => {

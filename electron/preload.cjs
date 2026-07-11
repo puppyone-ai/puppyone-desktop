@@ -3,6 +3,7 @@ const externalViewerPacksEnabled = process.argv.includes("--puppyone-external-vi
 
 contextBridge.exposeInMainWorld("puppyoneDesktop", {
   readCloudSession: () => ipcRenderer.invoke("cloud-session:read"),
+  readCloudAuthState: () => ipcRenderer.invoke("cloud-auth:read-state"),
   restoreCloudSession: (request) => ipcRenderer.invoke("cloud-session:restore", request),
   startCloudOAuth: (request) => ipcRenderer.invoke("cloud-session:start-oauth", request),
   clearCloudSession: () => ipcRenderer.invoke("cloud-session:clear"),
@@ -10,6 +11,11 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     const listener = (_event, session) => callback(session);
     ipcRenderer.on("cloud-session:changed", listener);
     return () => ipcRenderer.removeListener("cloud-session:changed", listener);
+  },
+  onCloudAuthStateChanged: (callback) => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("cloud-auth:state", listener);
+    return () => ipcRenderer.removeListener("cloud-auth:state", listener);
   },
   onCloudAuthError: (callback) => {
     const listener = (_event, payload) => callback(payload);
@@ -30,6 +36,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   getInitialWorkspace: () => ipcRenderer.invoke("window:get-initial-workspace"),
   getLastWorkspace: () => ipcRenderer.invoke("workspace:get-last"),
   getRecentWorkspaces: () => ipcRenderer.invoke("workspace:get-recent"),
+  hydrateRecentWorkspaces: () => ipcRenderer.invoke("workspace:hydrate-recent"),
   forgetLastWorkspace: () => ipcRenderer.invoke("workspace:forget-last"),
   showHomepage: () => ipcRenderer.invoke("workspace:show-homepage"),
   openWorkspaceInCurrentWindow: (folderPath) => ipcRenderer.invoke("workspace:open-current", folderPath),
@@ -137,6 +144,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   configureGitCloudRemote: (request) => ipcRenderer.invoke("workspace:git-configure-cloud-remote", request),
   readPuppyoneConfig: (request) => ipcRenderer.invoke("workspace:puppyone-config-read", request),
   writePuppyoneConfig: (request) => ipcRenderer.invoke("workspace:puppyone-config-write", request),
+  regeneratePuppyoneProjectId: (request) => ipcRenderer.invoke("workspace:puppyone-project-regenerate", request),
   getGitCommitDetail: (request) => ipcRenderer.invoke("workspace:git-commit-detail", request),
   getGitFileDiff: (request) => ipcRenderer.invoke("workspace:git-file-diff", request),
   cancelGitFileDiff: (request) => ipcRenderer.invoke("workspace:git-file-diff-cancel", request),

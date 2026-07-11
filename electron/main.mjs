@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, session as electronSession, shell, WebContentsView } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, session as electronSession, shell, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
 import { createRequire } from "node:module";
@@ -7,6 +7,7 @@ import {
   getMimeType,
   readWorkspaceTextFile,
   readWorkspaceFile,
+  resolveLocalWorkspaceIdentity,
   resolveWorkspacePath as resolveLocalWorkspacePath,
   workspaceFromPath,
 } from "../local-api/workspace.mjs";
@@ -137,6 +138,7 @@ const workspaceStateStore = createWorkspaceStateStore({
   filename: workspaceStateFilename,
   canonicalizeWorkspacePath,
   workspaceFromPath,
+  resolveWorkspaceIdentity: resolveLocalWorkspaceIdentity,
 });
 const cloudAuthService = createCloudAuthService({
   app,
@@ -144,6 +146,8 @@ const cloudAuthService = createCloudAuthService({
   protocol: cloudAuthProtocol,
   requestCloudApi,
   getCloudApiErrorMessage,
+  secureStorage: safeStorage,
+  openExternal: (href) => shell.openExternal(href),
   getWindows: () => BrowserWindow.getAllWindows(),
   revealWindow: revealLastFocusedWindow,
 });
@@ -662,7 +666,7 @@ async function getInitialWorkspaceResultForWindow(sender) {
     }
 
     assignWindowWorkspace(window, workspace, canonicalPath, { cleanupPrevious: false });
-    await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath);
+    await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
     return {
       path: canonicalPath,
       workspace,
@@ -714,7 +718,7 @@ async function openWorkspaceInCurrentWindow(sender, folderPath, options = {}) {
   const existingWindow = getWorkspaceWindow(canonicalPath);
   if (existingWindow && existingWindow !== window) {
     revealWindow(existingWindow);
-      if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath);
+    if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
     return {
       status: "focused-existing",
       path: canonicalPath,
@@ -723,7 +727,7 @@ async function openWorkspaceInCurrentWindow(sender, folderPath, options = {}) {
   }
 
   assignWindowWorkspace(window, workspace, canonicalPath);
-  if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath);
+  if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
   return {
     status: "opened-current",
     path: canonicalPath,
@@ -737,7 +741,7 @@ async function openWorkspaceInNewWindow(folderPath, options = {}) {
   const existingWindow = getWorkspaceWindow(canonicalPath);
   if (existingWindow) {
     revealWindow(existingWindow);
-    if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath);
+    if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
     return {
       status: "focused-existing",
       path: canonicalPath,
@@ -749,7 +753,7 @@ async function openWorkspaceInNewWindow(folderPath, options = {}) {
     initialWorkspacePath: canonicalPath,
   });
   assignWindowWorkspace(window, workspace, canonicalPath, { cleanupPrevious: false });
-  if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath);
+  if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
   return {
     status: "opened-new-window",
     path: canonicalPath,

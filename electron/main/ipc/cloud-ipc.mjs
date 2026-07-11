@@ -16,6 +16,10 @@ export function registerCloudIpcHandlers({ ipcMain, cloudAuthService }) {
     return cloudAuthService.readSession();
   });
 
+  ipcMain.handle("cloud-auth:read-state", async () => {
+    return cloudAuthService.readState();
+  });
+
   ipcMain.handle("cloud-session:restore", async (_event, request) => {
     const apiBase = normalizeCloudApiBase(request?.apiBaseUrl);
     return cloudAuthService.restoreSession(apiBase);

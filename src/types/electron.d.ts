@@ -408,6 +408,7 @@ export type RecentWorkspacesResult = {
     path: string;
     error: string;
   }>;
+  hydrated?: boolean;
 };
 
 export type WorkspaceOpenResult = {
@@ -519,16 +520,37 @@ export type WorkspaceChooseExternalAppRequest = {
 };
 
 export type DesktopStoredCloudSession = {
-  expires_in?: number;
-  expires_at?: number;
+  expires_in: number;
+  expires_at: number;
+  user_id: string;
   user_email: string;
-  api_base_url?: string;
+  api_base_url: string;
+  session_generation: string;
+  status: DesktopCloudAuthStatus;
+};
+
+export type DesktopCloudAuthStatus =
+  | "restoring"
+  | "signing-in"
+  | "authenticated"
+  | "refreshing"
+  | "offline-authenticated"
+  | "signing-out"
+  | "expired"
+  | "signed-out";
+
+export type DesktopCloudAuthStateSnapshot = {
+  status: DesktopCloudAuthStatus;
+  session: DesktopStoredCloudSession | null;
 };
 
 export type PuppyoneBackendService = "puppyone" | "github" | "custom";
 
 export type PuppyoneWorkspaceConfig = {
-  version: 1;
+  version: 2;
+  project: {
+    id: string | null;
+  };
   sync: {
     sourceOfTruth: {
       service: PuppyoneBackendService;
@@ -556,6 +578,7 @@ declare global {
   interface Window {
     puppyoneDesktop?: {
       readCloudSession: () => Promise<DesktopStoredCloudSession | null>;
+      readCloudAuthState: () => Promise<DesktopCloudAuthStateSnapshot>;
       restoreCloudSession: (request: {
         apiBaseUrl?: string | null;
       }) => Promise<DesktopStoredCloudSession | null>;
@@ -566,6 +589,9 @@ declare global {
       clearCloudSession: () => Promise<void>;
       onCloudSessionChanged: (
         callback: (session: DesktopStoredCloudSession | null) => void,
+      ) => () => void;
+      onCloudAuthStateChanged: (
+        callback: (state: DesktopCloudAuthStateSnapshot) => void,
       ) => () => void;
       onCloudAuthError: (
         callback: (payload: { message?: string }) => void,
@@ -650,6 +676,7 @@ declare global {
       getInitialWorkspace: () => Promise<LastWorkspaceResult>;
       getLastWorkspace: () => Promise<LastWorkspaceResult>;
       getRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
+      hydrateRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
       forgetLastWorkspace: () => Promise<void>;
       showHomepage: () => Promise<{ ok: boolean }>;
       openWorkspaceInCurrentWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
@@ -767,6 +794,10 @@ declare global {
       writePuppyoneConfig: (request: {
         rootPath: string;
         config: PuppyoneWorkspaceConfig;
+      }) => Promise<PuppyoneWorkspaceConfig>;
+      regeneratePuppyoneProjectId: (request: {
+        rootPath: string;
+        preserveCloudBinding?: boolean;
       }) => Promise<PuppyoneWorkspaceConfig>;
       getGitCommitDetail: (request: {
         rootPath: string;

@@ -155,7 +155,7 @@ export function CloudServiceMainView({
     );
   }
 
-  if (cloudAuthState.status !== "signed-in") {
+  if (!effectiveCloudSession) {
     return (
       <main className="desktop-cloud-main-view">
         <div className="desktop-cloud-page-shell">
@@ -177,6 +177,11 @@ export function CloudServiceMainView({
   return (
     <main className="desktop-cloud-main-view">
       <div className="desktop-cloud-page-shell">
+        {cloudAuthState.status === "offline-authenticated" && (
+          <div className="desktop-cloud-main-alert">
+            Cloud is offline. Your local workspace remains available; Cloud data will refresh after reconnecting.
+          </div>
+        )}
         {!inCloudGlobalAccountSection && error && <div className="desktop-cloud-main-alert">{error}</div>}
         {!inCloudGlobalAccountSection && cloudData.error && <div className="desktop-cloud-main-alert">{cloudData.error}</div>}
         {!inCloudGlobalAccountSection && cloudBackupError && <div className="desktop-cloud-main-alert">{cloudBackupError}</div>}
@@ -186,7 +191,7 @@ export function CloudServiceMainView({
         <CloudRouter
           workspace={workspace}
           status={status}
-          cloudSession={cloudAuthState.session}
+          cloudSession={effectiveCloudSession}
           cloudApiBaseUrl={cloudApiBaseUrl}
           cloudRemote={cloudRemote}
           cloudData={cloudData}

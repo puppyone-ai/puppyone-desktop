@@ -15,6 +15,7 @@ export function PuppyoneWorkspaceConfigSettings({
   saving,
   error,
   onChange,
+  onRegenerateProjectId,
 }: {
   config: PuppyoneWorkspaceConfig | null;
   remotes: GitRemoteSummary[];
@@ -25,9 +26,11 @@ export function PuppyoneWorkspaceConfigSettings({
   saving: boolean;
   error: string | null;
   onChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
+  onRegenerateProjectId: () => Promise<PuppyoneWorkspaceConfig | null>;
 }) {
   const [draft, setDraft] = useState<PuppyoneWorkspaceConfig>(() => normalizePuppyoneConfigDraft(config, cloudEnabled));
   const [localError, setLocalError] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
   const branchNames = branches
     .filter((branch) => !branch.remote)
     .map((branch) => branch.name);
@@ -137,6 +140,24 @@ export function PuppyoneWorkspaceConfigSettings({
       if (saved) setDraft(normalizePuppyoneConfigDraft(saved, cloudEnabled));
     } catch (saveError) {
       setLocalError(saveError instanceof Error ? saveError.message : String(saveError));
+    }
+  };
+
+  const regenerateProjectIdentity = async () => {
+    if (!draft.project.id || regenerating || saving) return;
+    const confirmed = window.confirm(
+      "Treat this checkout as a new PuppyOne project? A new local project identity will be created and the current Cloud project binding will be cleared. Local files and Git history are not changed.",
+    );
+    if (!confirmed) return;
+    setRegenerating(true);
+    setLocalError(null);
+    try {
+      const saved = await onRegenerateProjectId();
+      if (saved) setDraft(normalizePuppyoneConfigDraft(saved, cloudEnabled));
+    } catch (regenerateError) {
+      setLocalError(regenerateError instanceof Error ? regenerateError.message : String(regenerateError));
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -309,6 +330,22 @@ export function PuppyoneWorkspaceConfigSettings({
             </label>
           )}
 
+          <div className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
+            <span className="desktop-settings-label-stack">
+              <strong>Local project identity</strong>
+              <small title={draft.project.id ?? undefined}>{draft.project.id ?? "Created when this config is first saved"}</small>
+            </span>
+            <button
+              className="desktop-settings-row-action"
+              type="button"
+              disabled={!draft.project.id || saving || regenerating}
+              onClick={() => void regenerateProjectIdentity()}
+            >
+              <RefreshCw size={13} className={regenerating ? "spin" : undefined} />
+              <span>{regenerating ? "Creating..." : "Treat as new project"}</span>
+            </button>
+          </div>
+
           <div className="desktop-puppyone-config-footer">
             <span>{error ?? localError ?? (dirty ? "Unsaved changes" : "Config is up to date")}</span>
             <div>
@@ -355,7 +392,10 @@ function normalizePuppyoneConfigDraft(config: PuppyoneWorkspaceConfig | null, cl
       ?? normalizeSettingsText(config?.backup?.branch);
 
   return {
-    version: 1,
+    version: 2,
+    project: {
+      id: config?.project?.id ?? null,
+    },
     sync: {
       sourceOfTruth: {
         service: sourceOfTruthService,
@@ -381,7 +421,8 @@ function normalizePuppyoneConfigDraft(config: PuppyoneWorkspaceConfig | null, cl
 }
 
 function samePuppyoneConfig(left: PuppyoneWorkspaceConfig, right: PuppyoneWorkspaceConfig) {
-  return left.sync.sourceOfTruth.service === right.sync.sourceOfTruth.service
+  return left.project.id === right.project.id
+    && left.sync.sourceOfTruth.service === right.sync.sourceOfTruth.service
     && left.sync.sourceOfTruth.remote === right.sync.sourceOfTruth.remote
     && left.sync.sourceOfTruth.branch === right.sync.sourceOfTruth.branch
     && left.git.primaryRemote === right.git.primaryRemote

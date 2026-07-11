@@ -63,6 +63,7 @@ export function SettingsView({
   onAiEditAssistEnabledChange,
   onCloudSessionChange,
   onPuppyoneConfigChange,
+  onRegeneratePuppyoneProjectId,
   onUnlinkWorkspace,
   onRefreshGitStatus,
   onCheckForUpdates,
@@ -144,6 +145,7 @@ export function SettingsView({
         cloudEnabled={cloudEnabled}
         onCopyRemoteUrl={copyRemoteUrl}
         onPuppyoneConfigChange={onPuppyoneConfigChange}
+        onRegeneratePuppyoneProjectId={onRegeneratePuppyoneProjectId}
         onRefresh={onRefreshGitStatus}
       />
     );
@@ -554,6 +556,17 @@ function AccountSettingsView({
   const [authError, setAuthError] = useState<string | null>(null);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const signedIn = Boolean(cloudSession);
+  const accountStatus = cloudSessionRestoring
+    ? "Restoring"
+    : cloudSession?.status === "offline-authenticated"
+      ? "Signed in — offline"
+      : cloudSession?.status === "refreshing"
+        ? "Refreshing"
+        : cloudSession?.status === "signing-out"
+          ? "Signing out"
+          : signedIn
+            ? "Signed in"
+            : "Signed out";
   const sessionMatchesService = !cloudSession || isCloudSessionForApiBase(cloudSession, resolvedApiBaseUrl);
   const desktopOAuthAvailable = supportsDesktopCloudOAuth();
   const busy = Boolean(operation) || cloudSessionRestoring;
@@ -571,7 +584,7 @@ function AccountSettingsView({
     setOperation((current) => current === "signin" ? null : current);
     setAuthError(null);
     setAuthMessage(null);
-  }, [cloudSession?.api_base_url, cloudSession?.user_email]);
+  }, [cloudSession]);
 
   const startWebSignIn = async () => {
     if (!desktopOAuthAvailable) {
@@ -620,7 +633,7 @@ function AccountSettingsView({
           <SettingsGroup title="Puppyone account">
             <SettingsLine
               label="Status"
-              value={cloudSessionRestoring ? "Restoring" : signedIn ? "Signed in" : "Signed out"}
+              value={accountStatus}
               tone={signedIn ? "success" : undefined}
               action={signedIn && !sessionMatchesService ? (
                 <span className="desktop-settings-badge warning">Different service</span>
@@ -1094,6 +1107,7 @@ function CloudHostingSettingsView({
   cloudEnabled,
   onCopyRemoteUrl,
   onPuppyoneConfigChange,
+  onRegeneratePuppyoneProjectId,
   onRefresh,
 }: {
   status: GitStatusSnapshot | null;
@@ -1108,6 +1122,7 @@ function CloudHostingSettingsView({
   cloudEnabled: boolean;
   onCopyRemoteUrl: (key: string, url: string) => Promise<void>;
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
+  onRegeneratePuppyoneProjectId: () => Promise<PuppyoneWorkspaceConfig | null>;
   onRefresh: () => void;
 }) {
   const remotes = status?.remotes ?? [];
@@ -1155,6 +1170,7 @@ function CloudHostingSettingsView({
                 saving={puppyoneConfigSaving}
                 error={puppyoneConfigError}
                 onChange={onPuppyoneConfigChange}
+                onRegenerateProjectId={onRegeneratePuppyoneProjectId}
               />
 
               {usesPuppyoneCloud && (

@@ -311,6 +311,7 @@ export function App() {
     puppyoneConfigLoading,
     puppyoneConfigSaving,
     handlePuppyoneConfigChange: savePuppyoneConfig,
+    regeneratePuppyoneProjectIdentity,
   } = usePuppyoneConfig(workspace && !workspaceIsCloud ? workspace.path : null);
   const workspaceKey = useMemo(() => workspace?.path ?? "no-workspace", [workspace?.path]);
   const desktopCloudApiBaseUrl = useMemo(() => getDesktopCloudApiBaseUrl(), []);
@@ -1031,6 +1032,7 @@ export function App() {
           onNodeActionMenu={openNodeActionMenu}
           onOpenSettings={() => navigateDesktopView("settings")}
           onPuppyoneConfigChange={handlePuppyoneConfigChange}
+          onRegeneratePuppyoneProjectId={regeneratePuppyoneProjectIdentity}
           onSelectSettingsSection={setActiveSettingsSection}
           onUnlinkWorkspace={unlinkCurrentWorkspace}
           preferences={preferences}

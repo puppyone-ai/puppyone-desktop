@@ -132,6 +132,10 @@ export async function getRecentWorkspaces(): Promise<RecentWorkspacesResult> {
   return getDesktopBridge().getRecentWorkspaces();
 }
 
+export async function hydrateRecentWorkspaces(): Promise<RecentWorkspacesResult> {
+  return getDesktopBridge().hydrateRecentWorkspaces();
+}
+
 export async function openExternalUrl(href: string): Promise<void> {
   await getDesktopBridge().openExternalUrl(href);
 }
@@ -344,6 +348,13 @@ export async function writePuppyoneWorkspaceConfig(
   config: PuppyoneWorkspaceConfig,
 ): Promise<PuppyoneWorkspaceConfig> {
   return getDesktopBridge().writePuppyoneConfig({ rootPath, config });
+}
+
+export async function regeneratePuppyoneWorkspaceProjectId(
+  rootPath: string,
+  options: { preserveCloudBinding?: boolean } = {},
+): Promise<PuppyoneWorkspaceConfig> {
+  return getDesktopBridge().regeneratePuppyoneProjectId({ rootPath, ...options });
 }
 
 export async function getWorkspaceGitCommitDetail(rootPath: string, commitId: string): Promise<GitCommitDetail> {

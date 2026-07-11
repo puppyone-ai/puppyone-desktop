@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   listCloudRoot,
   type DesktopCloudSession,
   type DesktopCloudTreeEntry,
 } from "../../../lib/cloudApi";
+import {
+  loadCloudCache,
+  readCloudCache,
+  type CloudCacheContext,
+} from "../cache/cloudCache";
 
 const CLOUD_PROJECT_PREVIEW_LIMIT = 8;
-const CLOUD_PROJECT_PREVIEW_CACHE_LIMIT = 120;
-
-const previewCache = new Map<string, DesktopCloudTreeEntry[]>();
-const previewRequests = new Map<string, Promise<DesktopCloudTreeEntry[]>>();
+const CLOUD_PROJECT_PREVIEW_TTL_MS = 30_000;
 
 type CloudProjectPreviewState = {
   entries: DesktopCloudTreeEntry[];
@@ -20,18 +22,26 @@ type CloudProjectPreviewState = {
 export function useCloudProjectPreview({
   session,
   projectId,
+  projectRevision,
   apiBaseUrl,
   onSessionChange,
 }: {
   session: DesktopCloudSession | null;
   projectId: string;
+  projectRevision?: string | null;
   apiBaseUrl: string | null;
   onSessionChange: (session: DesktopCloudSession | null) => void;
 }): CloudProjectPreviewState {
-  const cacheKey = session
-    ? [session.user_email, apiBaseUrl ?? session.api_base_url ?? "", projectId].join("\n")
-    : null;
-  const cachedEntries = cacheKey ? previewCache.get(cacheKey) : undefined;
+  const cacheContext = useMemo<CloudCacheContext | null>(() => session ? ({
+    session,
+    projectId,
+    revision: projectRevision?.trim() || "mutable-latest",
+    resource: "project-preview",
+    path: "",
+  }) : null, [projectId, projectRevision, session]);
+  const cachedEntries = cacheContext
+    ? readCloudCache<DesktopCloudTreeEntry[]>(cacheContext)
+    : undefined;
   const [state, setState] = useState<CloudProjectPreviewState>({
     entries: cachedEntries ?? [],
     loading: Boolean(session && !cachedEntries),
@@ -39,94 +49,50 @@ export function useCloudProjectPreview({
   });
 
   useEffect(() => {
-    if (!session || !projectId || !cacheKey) {
+    if (!session || !projectId || !cacheContext) {
       setState({ entries: [], loading: false, error: null });
       return undefined;
     }
 
-    const cached = previewCache.get(cacheKey);
+    const cached = readCloudCache<DesktopCloudTreeEntry[]>(cacheContext);
     if (cached) {
       setState({ entries: cached, loading: false, error: null });
       return undefined;
     }
 
     let cancelled = false;
-    setState((current) => ({
-      entries: current.entries,
-      loading: true,
-      error: null,
-    }));
-
-    const request = getPreviewRequest(cacheKey, () => (
-      listCloudRoot(
+    setState((current) => ({ ...current, loading: true, error: null }));
+    void loadCloudCache(
+      cacheContext,
+      () => listCloudRoot(
         session,
         projectId,
         (nextSession) => {
           if (nextSession) onSessionChange(nextSession);
         },
         apiBaseUrl,
-      ).then((tree) => sortPreviewEntries(tree.entries).slice(0, CLOUD_PROJECT_PREVIEW_LIMIT))
-    ));
-
-    request
+      ).then((tree) => sortPreviewEntries(tree.entries).slice(0, CLOUD_PROJECT_PREVIEW_LIMIT)),
+      { ttlMs: CLOUD_PROJECT_PREVIEW_TTL_MS },
+    )
       .then((entries) => {
-        if (cancelled) return;
-        setState({
-          entries,
-          loading: false,
-          error: null,
-        });
+        if (!cancelled) setState({ entries, loading: false, error: null });
       })
       .catch((error) => {
-        if (cancelled) return;
-        setState({
-          entries: [],
-          loading: false,
-          error: error instanceof Error ? error.message : "Unable to load project preview.",
-        });
+        if (!cancelled) {
+          setState({
+            entries: [],
+            loading: false,
+            error: error instanceof Error ? error.message : "Unable to load project preview.",
+          });
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [
-    apiBaseUrl,
-    cacheKey,
-    onSessionChange,
-    projectId,
-    session,
-  ]);
+  }, [apiBaseUrl, cacheContext, onSessionChange, projectId, session]);
 
   return state;
-}
-
-function getPreviewRequest(
-  cacheKey: string,
-  load: () => Promise<DesktopCloudTreeEntry[]>,
-) {
-  const existing = previewRequests.get(cacheKey);
-  if (existing) return existing;
-
-  const request = load()
-    .then((entries) => {
-      previewCache.set(cacheKey, entries);
-      trimPreviewCache();
-      return entries;
-    })
-    .finally(() => {
-      previewRequests.delete(cacheKey);
-    });
-
-  previewRequests.set(cacheKey, request);
-  return request;
-}
-
-function trimPreviewCache() {
-  while (previewCache.size > CLOUD_PROJECT_PREVIEW_CACHE_LIMIT) {
-    const oldestKey = previewCache.keys().next().value;
-    if (!oldestKey) return;
-    previewCache.delete(oldestKey);
-  }
 }
 
 function sortPreviewEntries(entries: DesktopCloudTreeEntry[]) {
