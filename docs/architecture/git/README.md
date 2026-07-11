@@ -29,6 +29,11 @@ described as current behavior before its implementation and verification land.
   - **Implemented**.
   - Owns Git topology, ref markers, graph continuation rows, and Cloud Branches
     rendering rules.
+- [Cloud Project History](cloud-project-history.md)
+  - **Implemented**.
+  - Owns the Cloud project History surfaces: all-branches commit tree,
+    topology/cursor data contract, VS Code Source Control Graph UX baseline,
+    and the local-vs-cloud linearity decision.
 - [Format-Aware Diff Pipeline](format-aware-diff-pipeline.md)
   - **Implemented** for text, DOCX, and metadata fallback.
   - Owns revision-pair authority, the built-in Diff Registry, resource-handle

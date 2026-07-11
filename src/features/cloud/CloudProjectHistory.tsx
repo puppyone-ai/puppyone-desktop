@@ -1,5 +1,6 @@
-import { Fragment, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import {
+  ChevronDown,
   Clock3,
   Cloud,
   ExternalLink,
@@ -27,7 +28,6 @@ const HISTORY_GRAPH_LANE_WIDTH = 14;
 const HISTORY_GRAPH_LEFT_PAD = 9;
 const HISTORY_GRAPH_RIGHT_PAD = 8;
 const HISTORY_GRAPH_ROW_HEIGHT = 42;
-const HISTORY_GRAPH_CONTINUATION_HEIGHT = 8;
 
 export type CloudProjectHistoryProps = {
   projectId: string | null;
@@ -36,21 +36,35 @@ export type CloudProjectHistoryProps = {
   rows: CloudBranchGraphRow[];
   selectedCommitId: string | null;
   loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
   error: string | null;
   onSelectCommit: (commitId: string) => void;
   onRefresh: () => void | Promise<void>;
+  onLoadMore: () => void | Promise<void>;
 };
 
 export function CloudProjectHistorySidebar({
   rows,
   selectedCommitId,
   loading,
+  loadingMore,
+  hasMore,
   error,
   onSelectCommit,
   onRefresh,
+  onLoadMore,
 }: Pick<
   CloudProjectHistoryProps,
-  "rows" | "selectedCommitId" | "loading" | "error" | "onSelectCommit" | "onRefresh"
+  | "rows"
+  | "selectedCommitId"
+  | "loading"
+  | "loadingMore"
+  | "hasMore"
+  | "error"
+  | "onSelectCommit"
+  | "onRefresh"
+  | "onLoadMore"
 >) {
   const commitRows = rows.filter((row) => row.kind === "commit");
   const graphWidth = getHistoryGraphWidth(rows);
@@ -86,33 +100,31 @@ export function CloudProjectHistorySidebar({
         ) : rows.length === 0 ? (
           <CloudHistorySidebarEmpty error={error} />
         ) : rows.map((row) => (
-          <Fragment key={row.id}>
-            <CloudHistorySidebarRow
-              row={row}
-              graphWidth={graphWidth}
-              selected={row.id === selectedCommitId}
-              onSelect={onSelectCommit}
-            />
-            {row.continuationLines.map((line, index) => (
-              <div
-                className="desktop-cloud-history-graph-continuation"
-                key={`${row.id}:continuation:${index}`}
-                aria-hidden="true"
-              >
-                <CloudHistoryGraphVisual
-                  graphWidth={graphWidth}
-                  height={HISTORY_GRAPH_CONTINUATION_HEIGHT}
-                  line={line}
-                />
-              </div>
-            ))}
-          </Fragment>
+          <CloudHistorySidebarRow
+            row={row}
+            graphWidth={graphWidth}
+            selected={row.id === selectedCommitId}
+            onSelect={onSelectCommit}
+            key={row.id}
+          />
         ))}
       </div>
 
       <footer className="desktop-cloud-history-sidebar-footer">
         <Cloud size={13} aria-hidden="true" />
         <span>Cloud repository</span>
+        {hasMore && (
+          <button
+            type="button"
+            disabled={loadingMore}
+            onClick={() => void onLoadMore()}
+          >
+            {loadingMore
+              ? <RefreshCw size={11} className="spin" aria-hidden="true" />
+              : <ChevronDown size={11} aria-hidden="true" />}
+            Load more
+          </button>
+        )}
         <small>read-only</small>
       </footer>
     </section>
@@ -230,6 +242,7 @@ function CloudHistorySidebarRow({
           graphWidth={graphWidth}
           height={HISTORY_GRAPH_ROW_HEIGHT}
           line={row}
+          continuationLines={row.continuationLines}
           refMarkers={row.refMarkers}
           node={isCommit ? {
             lane: row.nodeLane,
@@ -239,7 +252,18 @@ function CloudHistorySidebarRow({
         />
       </span>
       <span className="desktop-cloud-history-sidebar-row-copy">
-        <strong>{row.message}</strong>
+        <strong>
+          <span>{row.message}</span>
+          {isCurrentHead && <span className="desktop-cloud-history-inline-ref head">HEAD</span>}
+          {row.labels.map((label) => (
+            <span
+              className={`desktop-cloud-history-inline-ref ${label.kind}`}
+              key={`${label.kind}:${label.name}`}
+            >
+              {label.name}
+            </span>
+          ))}
+        </strong>
         <span>
           {isCommit && <code>{shortCommit(row.id)}</code>}
           <small>{meta || "Unknown commit"}</small>
@@ -428,16 +452,24 @@ function CloudHistoryGraphVisual({
   graphWidth,
   height,
   line,
+  continuationLines = [],
   refMarkers = [],
   node,
 }: {
   graphWidth: number;
   height: number;
   line: CloudBranchGraphLine;
+  continuationLines?: CloudBranchGraphLine[];
   refMarkers?: CloudBranchGraphRefMarker[];
   node?: { lane: number; color: string; current: boolean };
 }) {
   const middleY = height / 2;
+  const continuationBandHeight = continuationLines.length > 0
+    ? (height - middleY) / continuationLines.length
+    : 0;
+  const mainPositions = continuationLines.length > 0
+    ? { top: 0, middle: middleY, bottom: middleY }
+    : { top: 0, middle: middleY, bottom: height };
   return (
     <svg
       className="desktop-cloud-history-graph-svg"
@@ -450,10 +482,23 @@ function CloudHistoryGraphVisual({
         <path
           className="desktop-cloud-history-graph-segment"
           key={`${index}:${segment.fromLane}:${segment.toLane}:${segment.from}:${segment.to}`}
-          d={buildHistoryGraphSegmentPath(segment, height)}
+          d={buildHistoryGraphSegmentPath(segment, mainPositions)}
           style={{ stroke: segment.color } as CSSProperties}
         />
       ))}
+      {continuationLines.flatMap((continuationLine, lineIndex) => {
+        const top = middleY + continuationBandHeight * lineIndex;
+        const bottom = top + continuationBandHeight;
+        const positions = { top, middle: (top + bottom) / 2, bottom };
+        return continuationLine.segments.map((segment, segmentIndex) => (
+          <path
+            className="desktop-cloud-history-graph-segment"
+            key={`continuation:${lineIndex}:${segmentIndex}:${segment.fromLane}:${segment.toLane}`}
+            d={buildHistoryGraphSegmentPath(segment, positions)}
+            style={{ stroke: segment.color } as CSSProperties}
+          />
+        ));
+      })}
       {refMarkers.map((marker) => (
         <g
           className={`desktop-cloud-history-graph-ref ${marker.kind}`}
@@ -486,20 +531,14 @@ function getHistoryGraphLaneX(lane: number): number {
   return HISTORY_GRAPH_LEFT_PAD + lane * HISTORY_GRAPH_LANE_WIDTH;
 }
 
-function getHistoryGraphY(position: CloudBranchGraphLine["segments"][number]["from"], height: number): number {
-  if (position === "top") return 0;
-  if (position === "bottom") return height;
-  return height / 2;
-}
-
 function buildHistoryGraphSegmentPath(
   segment: CloudBranchGraphLine["segments"][number],
-  height: number,
+  positions: { top: number; middle: number; bottom: number },
 ): string {
   const startX = getHistoryGraphLaneX(segment.fromLane);
   const endX = getHistoryGraphLaneX(segment.toLane);
-  const startY = getHistoryGraphY(segment.from, height);
-  const endY = getHistoryGraphY(segment.to, height);
+  const startY = positions[segment.from];
+  const endY = positions[segment.to];
   if (startX === endX || startY === endY) return `M ${startX} ${startY} L ${endX} ${endY}`;
   const controlY = startY + (endY - startY) / 2;
   return `M ${startX} ${startY} C ${startX} ${controlY}, ${endX} ${controlY}, ${endX} ${endY}`;

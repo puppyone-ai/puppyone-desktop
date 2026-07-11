@@ -311,7 +311,8 @@ export function CloudProjectFolderPreview({
 
 export function getLatestCloudHistoryCommit(history: DesktopCloudHistory | null): DesktopCloudHistory["commits"][number] | null {
   const commits = history?.commits ?? [];
-  return commits.length > 0 ? commits[commits.length - 1] : null;
+  if (commits.length === 0) return null;
+  return commits.find((commit) => commit.commit_id === history?.head_commit_id) ?? commits[0];
 }
 
 function formatAccessSummary(scopeCount: number, endpointCount: number) {

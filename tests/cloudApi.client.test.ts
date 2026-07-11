@@ -4,7 +4,12 @@
 // globalThis.window (no jsdom needed — getDesktopCloudApiBaseUrl guards window
 // access in try/catch) and assert request shaping + the session/api-base guards.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cloudApiRequest, listCloudProjects, getCloudProject } from "../src/lib/cloudApi";
+import {
+  cloudApiRequest,
+  getCloudHistory,
+  getCloudProject,
+  listCloudProjects,
+} from "../src/lib/cloudApi";
 
 const API = "https://api.puppyone.ai/api/v1";
 const session = {
@@ -47,6 +52,17 @@ describe("cloud API client delegation", () => {
     await getCloudProject(session, "a/b", undefined, API);
     expect(bridge).toHaveBeenCalledWith(
       expect.objectContaining({ path: "/projects/a%2Fb", method: "GET" }),
+    );
+  });
+
+  it("getCloudHistory requests the topological contract and forwards its cursor", async () => {
+    bridge.mockResolvedValue({ project_id: "a/b", commits: [] });
+    await getCloudHistory(session, "a/b", 80, undefined, API, "a".repeat(40));
+    expect(bridge).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: `/content/a%2Fb/commits?limit=80&order=topo&cursor=${"a".repeat(40)}`,
+        method: "GET",
+      }),
     );
   });
 });
