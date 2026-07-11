@@ -1,5 +1,10 @@
 export { CloudServiceMainView } from "./CloudServiceMainView";
 export {
+  CloudProjectHistorySidebar,
+  CloudProjectHistoryView,
+  type CloudProjectHistoryProps,
+} from "./CloudProjectHistory";
+export {
   DesktopCloudAccessSidebar,
   DesktopCloudAccessView,
 } from "./DesktopCloudAccessView";

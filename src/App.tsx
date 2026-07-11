@@ -555,7 +555,7 @@ export function App() {
       return;
     }
 
-    if (workspaceIsCloud && (view === "git" || view === "cloud")) {
+    if (workspaceIsCloud && view === "cloud") {
       setActiveView("data");
       setSidebarCollapsed(false);
       setSwitcherOpen(false);
