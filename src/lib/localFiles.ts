@@ -30,7 +30,12 @@ export function createLocalDataPort(rootPath: string): DataPort {
     listChildren: (folderPath) => loadFolderChildren(rootPath, folderPath),
     // Text/content reads do not mint a browser capability URL. Resource URLs
     // have their own mounted-preview lifecycle and are revoked separately.
-    readFile: (path) => getDesktopBridge().readFile({ rootPath, path }),
+    readFile: async (path, options) => {
+      options?.signal?.throwIfAborted();
+      const result = await getDesktopBridge().readFile({ rootPath, path });
+      options?.signal?.throwIfAborted();
+      return result;
+    },
     getFileUrl: (path, options) => getDesktopBridge()
       .getFileUrl({ rootPath, path, purpose: options?.purpose ?? "file-preview" })
       .then((result) => result.url),

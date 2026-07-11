@@ -2,6 +2,7 @@ import { Link2, MoreVertical, Plus } from "lucide-react";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -15,8 +16,11 @@ import { defaultDataCapabilities } from "../core/types";
 import { getEditorSourceRequirement, shouldReadEditorContent } from "../editor/viewerRegistry";
 import {
   createMarkdownLinkGraph,
+  EMPTY_MARKDOWN_LINK_GRAPH_INDEX,
+  MarkdownLinkIndexCoordinator,
   resolveMarkdownAssetPath,
   type MarkdownLinkGraphDocument,
+  type MarkdownLinkGraphIndexSnapshot,
 } from "../editor/markdown";
 import { ExplorerTree } from "./ExplorerTree";
 import { FilePreview, type FilePreviewProps } from "./FilePreview";
@@ -32,6 +36,10 @@ import { getAiEditFileForPath } from "../editor/ai-edits/diff";
 import type { AiEditRequest } from "../editor/ai-edits/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import { usePaneResizeDrag } from "../primitives/usePaneResizeDrag";
+import { getRendererPerformanceTracker } from "../performance/rendererPerformance";
+import { FileOpenRequestCoordinator } from "./file-open/fileOpenRequestCoordinator";
+
+const rendererPerformance = getRendererPerformanceTracker();
 
 export type DataWorkspaceState = {
   tree: DataNode[];
@@ -240,9 +248,20 @@ export function DataWorkspace({
   const [fileUrlLoading, setFileUrlLoading] = useState(false);
   const [fileUrlError, setFileUrlError] = useState<string | null>(null);
   const [markdownLinkIndexing, setMarkdownLinkIndexing] = useState(false);
+  const [markdownLinkIndexBuilding, setMarkdownLinkIndexBuilding] = useState(false);
+  const [markdownLinkIndex, setMarkdownLinkIndex] = useState<MarkdownLinkGraphIndexSnapshot>(
+    EMPTY_MARKDOWN_LINK_GRAPH_INDEX,
+  );
   const [committedPreviewDocument, setCommittedPreviewDocument] = useState<CommittedPreviewDocument | null>(null);
   const lastRefreshKeyRef = useRef(refreshKey);
   const loadGenerationRef = useRef(0);
+  const fileOpenTraceRef = useRef<{ id: string; documentId: string } | null>(null);
+  const fileOpenCoordinatorRef = useRef<FileOpenRequestCoordinator | null>(null);
+  fileOpenCoordinatorRef.current ??= new FileOpenRequestCoordinator({
+    onStaleCommit: () => rendererPerformance.recordStaleCommit(),
+  });
+  const markdownLinkIndexCoordinatorRef = useRef<MarkdownLinkIndexCoordinator | null>(null);
+  markdownLinkIndexCoordinatorRef.current ??= new MarkdownLinkIndexCoordinator();
   const suppressSelectionSyncRef = useRef(false);
   const activePathHydrationAttemptRef = useRef<{ path: string; refreshKey: unknown } | null>(null);
   const [internalExplorerWidth, setInternalExplorerWidth] = useState(() => (
@@ -317,6 +336,10 @@ export function DataWorkspace({
 
   useEffect(() => {
     loadGenerationRef.current += 1;
+    if (fileOpenTraceRef.current) rendererPerformance.cancel(fileOpenTraceRef.current.id);
+    fileOpenTraceRef.current = null;
+    fileOpenCoordinatorRef.current?.cancelCurrent();
+    markdownLinkIndexCoordinatorRef.current?.cancel();
     setInternalActivePath(defaultActivePath);
     setSelectedNodePaths(defaultActivePath ? new Set([defaultActivePath]) : new Set());
     setSelectionAnchorPath(defaultActivePath);
@@ -335,6 +358,8 @@ export function DataWorkspace({
     setFileUrlError(null);
     setFileUrlLoading(false);
     setMarkdownLinkIndexing(false);
+    setMarkdownLinkIndexBuilding(false);
+    setMarkdownLinkIndex(EMPTY_MARKDOWN_LINK_GRAPH_INDEX);
     setCommittedPreviewDocument(null);
   }, [workspace.path, dataPort, defaultActivePath]);
 
@@ -426,6 +451,10 @@ export function DataWorkspace({
 
   const activeNode = useMemo(() => findDataNode(tree, resolvedActivePath), [resolvedActivePath, tree]);
   const selectedNodes = useMemo(() => findDataNodes(tree, selectedNodePaths), [selectedNodePaths, tree]);
+  const visibleDataNodes = useMemo(
+    () => collectVisibleDataNodes(tree, expandedFolderPaths),
+    [expandedFolderPaths, tree],
+  );
   const currentFolderPath = activeNode?.type === "folder" ? activeNode.path : getParentPath(resolvedActivePath);
   const selectedFile = activeNode?.type !== "folder" ? activeNode : null;
   const selectedFileSourceRequirement = selectedFile ? getEditorSourceRequirement(selectedFile) : "none";
@@ -481,6 +510,15 @@ export function DataWorkspace({
     onActiveNodeChange?.(activeNode ?? null);
   }, [activeNode, onActiveNodeChange]);
 
+  useLayoutEffect(() => {
+    if (!selectedFile) return;
+    if (fileOpenTraceRef.current?.documentId !== selectedFile.path) {
+      const id = rendererPerformance.beginFileSelection(selectedFile.path);
+      fileOpenTraceRef.current = { id, documentId: selectedFile.path };
+    }
+    rendererPerformance.mark(fileOpenTraceRef.current.id, "preview_shell_committed");
+  }, [selectedFile]);
+
   useEffect(() => {
     if (suppressSelectionSyncRef.current) {
       suppressSelectionSyncRef.current = false;
@@ -501,10 +539,17 @@ export function DataWorkspace({
   const activateNode = useCallback(
     (node: DataNode | null, intent: { additive?: boolean; range?: boolean } = {}) => {
       const nextPath = node?.path ?? null;
+      if (node && node.type !== "folder" && fileOpenTraceRef.current?.documentId !== node.path) {
+        const id = rendererPerformance.beginFileSelection(node.path);
+        fileOpenTraceRef.current = { id, documentId: node.path };
+      } else if (!node || node.type === "folder") {
+        if (fileOpenTraceRef.current) rendererPerformance.cancel(fileOpenTraceRef.current.id);
+        fileOpenTraceRef.current = null;
+      }
       setSelectedNodePaths((current) => {
         if (!nextPath) return current.size === 0 ? current : new Set();
         if (intent.range) {
-          const visiblePaths = collectVisibleDataNodes(tree, expandedFolderPaths).map((item) => item.path);
+          const visiblePaths = visibleDataNodes.map((item) => item.path);
           const anchorPath = selectionAnchorPath && visiblePaths.includes(selectionAnchorPath)
             ? selectionAnchorPath
             : resolvedActivePath && visiblePaths.includes(resolvedActivePath)
@@ -531,7 +576,7 @@ export function DataWorkspace({
         void loadFolder(null);
       }
     },
-    [activePath, expandedFolderPaths, loadFolder, onActivePathChange, resolvedActivePath, selectionAnchorPath, tree],
+    [activePath, loadFolder, onActivePathChange, resolvedActivePath, selectionAnchorPath, visibleDataNodes],
   );
   const loadLinkedPathNode = useCallback(
     async (path: string): Promise<DataNode | null> => {
@@ -634,13 +679,54 @@ export function DataWorkspace({
     },
     [activePath, loadFolder, loadLinkedPathNode, onActivePathChange, tree],
   );
-  const markdownLinkDocuments = useMemo(
-    () => buildMarkdownLinkDocuments(tree, fileContentCache),
-    [fileContentCache, tree],
+  const markdownLinkMetadataDocuments = useMemo(
+    () => buildMarkdownLinkMetadataDocuments(tree),
+    [tree],
   );
+  const markdownLinkContentDocuments = useMemo(
+    () => enableMarkdownLinkContentIndexing
+      ? buildMarkdownLinkDocuments(tree, fileContentCache)
+      : markdownLinkMetadataDocuments,
+    [enableMarkdownLinkContentIndexing, fileContentCache, markdownLinkMetadataDocuments, tree],
+  );
+  useEffect(() => {
+    const coordinator = markdownLinkIndexCoordinatorRef.current!;
+    const hasIndexedContent = enableMarkdownLinkContentIndexing
+      && markdownLinkContentDocuments.some((document) => typeof document.content === "string");
+    if (!hasIndexedContent) {
+      coordinator.cancel();
+      setMarkdownLinkIndexBuilding(false);
+      setMarkdownLinkIndex((current) => (
+        current === EMPTY_MARKDOWN_LINK_GRAPH_INDEX
+          ? current
+          : EMPTY_MARKDOWN_LINK_GRAPH_INDEX
+      ));
+      return undefined;
+    }
+
+    let cancelled = false;
+    const request = coordinator.build(markdownLinkContentDocuments);
+    setMarkdownLinkIndex(EMPTY_MARKDOWN_LINK_GRAPH_INDEX);
+    setMarkdownLinkIndexBuilding(true);
+    request.promise
+      .then((index) => {
+        if (!cancelled) setMarkdownLinkIndex(index);
+      })
+      .catch((error) => {
+        if (!cancelled) console.warn("Unable to build Markdown link index:", error);
+      })
+      .finally(() => {
+        if (!cancelled) setMarkdownLinkIndexBuilding(false);
+      });
+
+    return () => {
+      cancelled = true;
+      request.cancel();
+    };
+  }, [enableMarkdownLinkContentIndexing, markdownLinkContentDocuments]);
   const markdownLinkGraph = useMemo(
-    () => createMarkdownLinkGraph(markdownLinkDocuments, {
-      isIndexing: markdownLinkIndexing,
+    () => createMarkdownLinkGraph(markdownLinkMetadataDocuments, {
+      isIndexing: markdownLinkIndexing || markdownLinkIndexBuilding,
       onOpenPath: (path) => {
         void openMarkdownLinkCandidates([path]);
       },
@@ -650,8 +736,15 @@ export function DataWorkspace({
       onOpenExternalUrl: (href) => {
         return onOpenExternalUrl?.(href);
       },
-    }),
-    [markdownLinkDocuments, markdownLinkIndexing, onOpenExternalUrl, openMarkdownLinkCandidates],
+    }, markdownLinkIndex),
+    [
+      markdownLinkIndex,
+      markdownLinkIndexBuilding,
+      markdownLinkIndexing,
+      markdownLinkMetadataDocuments,
+      onOpenExternalUrl,
+      openMarkdownLinkCandidates,
+    ],
   );
   const markdownAssetUrlResolver = useCallback(
     async (sourcePath: string, href: string, signal?: AbortSignal) => {
@@ -716,6 +809,7 @@ export function DataWorkspace({
 
   useEffect(() => {
     if (!selectedFile) {
+      fileOpenCoordinatorRef.current?.cancelCurrent();
       setFileContent(null);
       setFileError(null);
       setFileErrorPath(null);
@@ -724,6 +818,7 @@ export function DataWorkspace({
     }
 
     if (!dataPort.readFile) {
+      fileOpenCoordinatorRef.current?.cancelCurrent();
       setFileContent(null);
       setFileError(null);
       setFileErrorPath(null);
@@ -732,6 +827,7 @@ export function DataWorkspace({
     }
 
     if (!shouldReadEditorContent(selectedFile)) {
+      fileOpenCoordinatorRef.current?.cancelCurrent();
       setFileContent(null);
       setFileError(null);
       setFileErrorPath(null);
@@ -739,34 +835,41 @@ export function DataWorkspace({
       return undefined;
     }
 
-    let cancelled = false;
+    const request = fileOpenCoordinatorRef.current!.begin(selectedFile.path);
+    const trace = fileOpenTraceRef.current?.documentId === selectedFile.path
+      ? fileOpenTraceRef.current
+      : null;
     setFileContent(null);
     setFileLoading(true);
     setFileError(null);
     setFileErrorPath(null);
-    dataPort.readFile(selectedFile.path)
+    dataPort.readFile(selectedFile.path, { signal: request.signal })
       .then((content) => {
-        if (!cancelled) {
+        request.commit(() => {
+          if (trace && fileOpenTraceRef.current?.id === trace.id) {
+            rendererPerformance.mark(trace.id, "content_ready");
+          }
           setFileContent(content);
           setFileContentCache((current) => ({
             ...current,
             [content.path]: content,
           }));
-        }
+        });
       })
       .catch((error) => {
-        if (!cancelled) {
+        if (!request.isCurrent() || request.signal.aborted) return;
+        request.commit(() => {
           setFileContent(null);
           setFileErrorPath(selectedFile.path);
           setFileError(error instanceof Error ? error.message : String(error));
-        }
+        });
       })
       .finally(() => {
-        if (!cancelled) setFileLoading(false);
+        if (request.isCurrent()) setFileLoading(false);
       });
 
     return () => {
-      cancelled = true;
+      request.cancel();
     };
   }, [dataPort, refreshKey, selectedFile?.path]);
 
@@ -1632,6 +1735,14 @@ function buildMarkdownLinkDocuments(
   }
 
   return documents;
+}
+
+function buildMarkdownLinkMetadataDocuments(nodes: DataNode[]): MarkdownLinkGraphDocument[] {
+  return collectLinkableNodes(nodes).map((node) => ({
+    path: node.path,
+    name: node.name,
+    content: null,
+  }));
 }
 
 function collectMarkdownLinkIndexCandidates(

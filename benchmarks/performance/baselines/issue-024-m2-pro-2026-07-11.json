@@ -1,0 +1,60 @@
+{
+  "schema": "puppyone-renderer-performance-evidence/v1",
+  "environment": {
+    "capturedAt": "2026-07-11",
+    "platform": "darwin-arm64",
+    "cpu": "Apple M2 Pro",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "electron": "41.7.2",
+    "chromium": "146.0.7680.216",
+    "benchmarkRunner": "vitest 2.1.9",
+    "build": "production"
+  },
+  "sameMachineBenchmarkMeansMs": {
+    "markdownEditorStateLivePreview10000": {
+      "before": 43.3560346666668,
+      "after": 2.0705330743802066
+    },
+    "markdownReactMountDispose10000": {
+      "before": 193.1740556666667,
+      "after": 16.68203650000021
+    },
+    "explorerSelection1000": {
+      "before": 147.39288900000005,
+      "after": 3.2369694999998524
+    },
+    "linkGraph250x300Lines": {
+      "before": 777.7850556666672,
+      "after": 278.9853329999999,
+      "note": "Production content indexing additionally runs in a revision-bound Worker."
+    },
+    "singleCharacterEdit10000": {
+      "top": 0.11450128937728289,
+      "middle": 0.13928454540391993,
+      "end": 0.14040285569901365
+    },
+    "focusRevealPatch10000": 0.04874873893547248,
+    "heavyMarkdownEdit3360": 0.07058338763411966,
+    "continuousABSwitchCancellation": 0.004569866470467824
+  },
+  "productionElectron30SampleSummary": {
+    "warmupSamples": 4,
+    "completedSamples": 30,
+    "staleCommitCount": 0,
+    "longTasksOver50ms": 0,
+    "stagesMs": {
+      "previewShellCommitted": { "p50": 1.2999999523162842, "p95": 1.5 },
+      "contentReady": { "p50": 4.100000023841858, "p95": 5.700000047683716 },
+      "editorBaseReady": { "p50": 3.100000023841858, "p95": 4.399999976158142 },
+      "markdownLanguageReady": { "p50": 10.800000071525574, "p95": 13.5 },
+      "previewReady": { "p50": 26.700000047683716, "p95": 32.5 },
+      "inputTransaction10000": { "p50": 0.7000000476837158, "p95": 1.1999999284744263 },
+      "markdownLinkWorkerRoundtrip": { "p50": 10.399999976158142, "p95": 10.399999976158142 }
+    }
+  },
+  "commands": {
+    "benchmark": "npm run bench:performance -- --outputJson /tmp/issue-024-final.json --compare /tmp/issue-024-before.json",
+    "smoke": "npm run build && ./node_modules/.bin/electron scripts/smoke-renderer-performance.mjs --outputJson /tmp/issue-024-renderer-smoke.json"
+  }
+}

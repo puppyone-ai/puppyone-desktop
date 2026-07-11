@@ -1,6 +1,10 @@
 import type { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
-import { getMarkdownElements, type MarkdownElement } from "../syntax/markdownElements";
+import {
+  getMarkdownElements,
+  getMarkdownElementsInRange,
+  type MarkdownElement,
+} from "../syntax/markdownElements";
 import { compileMarkdownElementPlan } from "./markdownPlanCompiler";
 import type { MarkdownElementPlan, SourceRange } from "./markdownPlanTypes";
 
@@ -11,8 +15,9 @@ export type IndexedMarkdownPlan = {
 
 type MarkdownPlanIndexCacheEntry = {
   tree: ReturnType<typeof syntaxTree>;
-  plans: readonly IndexedMarkdownPlan[];
+  plans: readonly IndexedMarkdownPlan[] | null;
   intervals: MarkdownPlanIntervalNode | null;
+  ranges: Map<string, readonly IndexedMarkdownPlan[]>;
 };
 
 type MarkdownPlanIntervalNode = {
@@ -23,6 +28,11 @@ type MarkdownPlanIntervalNode = {
 };
 
 const markdownPlanIndexCache = new WeakMap<object, MarkdownPlanIndexCacheEntry>();
+const markdownPlanIndexDiagnostics = {
+  fullBuilds: 0,
+  rangeBuilds: 0,
+  compiledElements: 0,
+};
 
 /**
  * Range-indexed compiled render plans for the current document + syntax tree.
@@ -30,20 +40,15 @@ const markdownPlanIndexCache = new WeakMap<object, MarkdownPlanIndexCacheEntry>(
  * rather than re-inferring them from element kinds.
  */
 export function getMarkdownPlanIndex(state: EditorState): readonly IndexedMarkdownPlan[] {
-  const tree = syntaxTree(state);
-  const cached = markdownPlanIndexCache.get(state.doc);
-  if (cached?.tree === tree) return cached.plans;
+  const cached = getOrCreateCacheEntry(state);
+  if (cached.plans) return cached.plans;
 
-  const plans = getMarkdownElements(state)
-    .map((element) => ({
-      element,
-      plan: compileMarkdownElementPlan(element),
-    }))
-    .sort((left, right) => (
-      left.plan.sourceRange.from - right.plan.sourceRange.from ||
-      left.plan.sourceRange.to - right.plan.sourceRange.to
-    ));
-  markdownPlanIndexCache.set(state.doc, { tree, plans, intervals: buildIntervalIndex(plans, 0, plans.length) });
+  const elements = getMarkdownElements(state);
+  const plans = compileAndSortPlans(elements);
+  cached.plans = plans;
+  cached.intervals = buildIntervalIndex(plans, 0, plans.length);
+  markdownPlanIndexDiagnostics.fullBuilds += 1;
+  markdownPlanIndexDiagnostics.compiledElements += elements.length;
   return plans;
 }
 
@@ -54,11 +59,61 @@ export function getMarkdownPlansInRange(
 ): readonly IndexedMarkdownPlan[] {
   const rangeFrom = Math.max(0, Math.min(from, to, state.doc.length));
   const rangeTo = Math.max(rangeFrom, Math.min(Math.max(from, to), state.doc.length));
-  const result: IndexedMarkdownPlan[] = [];
-  getMarkdownPlanIndex(state);
-  const cached = markdownPlanIndexCache.get(state.doc);
-  queryIntervalIndex(cached?.intervals ?? null, rangeFrom, rangeTo, result);
-  return result;
+  const cached = getOrCreateCacheEntry(state);
+  if (cached.plans) {
+    const result: IndexedMarkdownPlan[] = [];
+    queryIntervalIndex(cached.intervals, rangeFrom, rangeTo, result);
+    return result;
+  }
+
+  const cacheKey = `${rangeFrom}:${rangeTo}`;
+  const existing = cached.ranges.get(cacheKey);
+  if (existing) return existing;
+
+  const elements = getMarkdownElementsInRange(state, rangeFrom, rangeTo);
+  const plans = compileAndSortPlans(elements).filter(({ plan }) => (
+    plan.sourceRange.from < rangeTo && plan.sourceRange.to > rangeFrom
+  ));
+  cached.ranges.set(cacheKey, plans);
+  markdownPlanIndexDiagnostics.rangeBuilds += 1;
+  markdownPlanIndexDiagnostics.compiledElements += elements.length;
+  return plans;
+}
+
+export function resetMarkdownPlanIndexDiagnostics() {
+  markdownPlanIndexDiagnostics.fullBuilds = 0;
+  markdownPlanIndexDiagnostics.rangeBuilds = 0;
+  markdownPlanIndexDiagnostics.compiledElements = 0;
+}
+
+export function getMarkdownPlanIndexDiagnostics() {
+  return { ...markdownPlanIndexDiagnostics };
+}
+
+function getOrCreateCacheEntry(state: EditorState): MarkdownPlanIndexCacheEntry {
+  const tree = syntaxTree(state);
+  const existing = markdownPlanIndexCache.get(state.doc);
+  if (existing?.tree === tree) return existing;
+  const created: MarkdownPlanIndexCacheEntry = {
+    tree,
+    plans: null,
+    intervals: null,
+    ranges: new Map(),
+  };
+  markdownPlanIndexCache.set(state.doc, created);
+  return created;
+}
+
+function compileAndSortPlans(elements: readonly MarkdownElement[]): IndexedMarkdownPlan[] {
+  return elements
+    .map((element) => ({
+      element,
+      plan: compileMarkdownElementPlan(element),
+    }))
+    .sort((left, right) => (
+      left.plan.sourceRange.from - right.plan.sourceRange.from
+      || left.plan.sourceRange.to - right.plan.sourceRange.to
+    ));
 }
 
 function buildIntervalIndex(

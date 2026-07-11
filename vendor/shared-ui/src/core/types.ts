@@ -118,6 +118,10 @@ export type DataFileUrlOptions = {
   purpose?: DataFileUrlPurpose;
 };
 
+export type DataReadOptions = {
+  signal?: AbortSignal;
+};
+
 export type DataCapabilities = {
   create?: boolean;
   rename?: boolean;
@@ -134,7 +138,7 @@ export type DataCapabilities = {
 
 export type DataPort = {
   listChildren: (folderPath: string | null) => Promise<DataNode[]>;
-  readFile?: (path: string) => Promise<FileContent>;
+  readFile?: (path: string, options?: DataReadOptions) => Promise<FileContent>;
   getFileUrl?: (path: string, options?: DataFileUrlOptions) => string | Promise<string>;
   revokeFileUrl?: (url: string) => void | Promise<void>;
   openExternalFile?: (path: string) => Promise<void>;

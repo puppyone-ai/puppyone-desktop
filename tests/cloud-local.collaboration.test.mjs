@@ -28,7 +28,10 @@ import {
   fetchWorkspaceGit,
 } from "../local-api/workspace.mjs";
 
-const TIMEOUT = 60_000;
+// The full integration suite deliberately exercises several real repositories
+// in parallel. Allow enough headroom for Git/fs process contention on loaded CI
+// and reference machines; assertion failures still surface immediately.
+const TIMEOUT = 180_000;
 
 function git(cwd, ...args) {
   return execFileSync("git", ["-C", cwd, ...args]).toString().trim();

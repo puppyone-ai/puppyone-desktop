@@ -1610,9 +1610,12 @@ remain part of phases 5 and 6.
   popup, download and login denial; deterministic failure/owner cleanup.
 - Adversarial URL/asset policy fixtures (control chars, entities, `file://`,
   traversal, data size/SVG).
-- **Remaining acceptance gaps:** visual regression, full table-cell document
-  plan convergence, changed-range decoration updates with large-document
-  profiling, and fuller IME/DOM-reuse EditorView coverage in a real renderer.
+- Changed-range decoration updates, viewport projection, source snapshot
+  boundaries, and large-document production renderer profiling are implemented
+  under the [Desktop Renderer Performance](../../desktop-renderer-performance.md)
+  contract. **Remaining acceptance gaps:** visual regression, full table-cell
+  document plan convergence, and fuller IME/DOM-reuse EditorView coverage in a
+  real renderer.
 
 The shipped foundation preserves source round-trip and has semantic, policy,
 decoration, type, broker, trust, and boundary checks. Phase 6 acceptance

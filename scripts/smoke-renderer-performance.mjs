@@ -1,0 +1,140 @@
+#!/usr/bin/env electron
+
+import { app, BrowserWindow, contentTracing } from "electron";
+import fsp from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const indexPath = path.join(repoRoot, "dist", "index.html");
+const outputPath = resolveOutputPath(process.argv.slice(2));
+const tracePath = resolveOptionalPath(process.argv.slice(2), "--trace");
+const sampleTarget = tracePath ? 3 : 30;
+const tempRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "puppyone-renderer-performance-"));
+app.setPath("userData", path.join(tempRoot, "user-data"));
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+
+let window = null;
+
+async function runSmoke() {
+  await fsp.access(indexPath);
+  if (tracePath) {
+    await contentTracing.startRecording({
+      included_categories: [
+        "devtools.timeline",
+        "v8",
+        "blink.user_timing",
+        "disabled-by-default-v8.cpu_profiler",
+        "disabled-by-default-v8.cpu_profiler.hires",
+      ],
+    });
+  }
+  window = new BrowserWindow({
+    show: false,
+    width: 1280,
+    height: 800,
+    webPreferences: {
+      backgroundThrottling: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  await window.loadURL(
+    `${pathToFileURL(indexPath).toString()}?rendererPerformanceSamples=${sampleTarget}#renderer-performance-smoke`,
+  );
+
+  const summary = await pollForResult(window);
+  if (tracePath) await contentTracing.stopRecording(tracePath);
+  if (summary.error) throw new Error(summary.error);
+  const report = {
+    schema: "puppyone-renderer-performance/v1",
+    environment: {
+      capturedAt: new Date().toISOString(),
+      platform: process.platform,
+      arch: process.arch,
+      electron: process.versions.electron,
+      chromium: process.versions.chrome,
+      cpu: os.cpus()[0]?.model ?? "unknown",
+      logicalCpuCount: os.cpus().length,
+      memoryBytes: os.totalmem(),
+      build: "production",
+      sampleTarget,
+    },
+    summary,
+  };
+
+  await fsp.mkdir(path.dirname(outputPath), { recursive: true });
+  await fsp.writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  validateReport(report);
+  console.log(JSON.stringify(report, null, 2));
+  console.log(`Renderer performance report written to ${outputPath}`);
+}
+
+async function pollForResult(ownerWindow) {
+  for (let attempt = 0; attempt < 1_200; attempt += 1) {
+    const result = await ownerWindow.webContents.executeJavaScript(
+      "window.__PUPPYONE_RENDERER_PERFORMANCE_SMOKE_RESULT__ || null",
+      true,
+    );
+    if (result) return result;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("Renderer performance smoke did not publish a result within 60 seconds.");
+}
+
+function validateReport(report) {
+  const { summary } = report;
+  const requiredSamples = report.environment.sampleTarget;
+  if (summary.completedSamples < requiredSamples) {
+    throw new Error(`Expected at least ${requiredSamples} completed samples, received ${summary.completedSamples}.`);
+  }
+  for (const stage of ["preview_shell_committed", "content_ready", "editor_base_ready", "preview_ready"]) {
+    if ((summary.stages?.[stage]?.samples ?? 0) < requiredSamples) {
+      throw new Error(`Stage ${stage} did not retain ${requiredSamples} samples.`);
+    }
+  }
+  if (summary.staleCommitCount !== 0) {
+    throw new Error(`Observed ${summary.staleCommitCount} stale renderer commits.`);
+  }
+  if ((summary.inputTransactions?.samples ?? 0) < requiredSamples) {
+    throw new Error(`Expected at least ${requiredSamples} editor input transaction samples, received ${summary.inputTransactions?.samples ?? 0}.`);
+  }
+  if ((summary.inputTransactions?.p95 ?? Number.POSITIVE_INFINITY) > 16) {
+    throw new Error(`10k-line editor input transaction p95 exceeded 16ms: ${summary.inputTransactions.p95}ms.`);
+  }
+  if ((summary.stages.preview_shell_committed?.p95 ?? Number.POSITIVE_INFINITY) > 16) {
+    throw new Error(`Explorer selection p95 exceeded 16ms: ${summary.stages.preview_shell_committed.p95}ms.`);
+  }
+  if ((summary.stages.editor_base_ready?.p95 ?? Number.POSITIVE_INFINITY) > 50) {
+    throw new Error(`Click-to-editor-base p95 exceeded 50ms: ${summary.stages.editor_base_ready.p95}ms.`);
+  }
+  if (summary.longTasks.over50ms > 0) {
+    throw new Error(`Observed ${summary.longTasks.over50ms} renderer long tasks over 50ms.`);
+  }
+}
+
+function resolveOutputPath(args) {
+  const outputIndex = args.indexOf("--outputJson");
+  const requested = outputIndex >= 0 ? args[outputIndex + 1] : null;
+  return path.resolve(requested || path.join(repoRoot, "artifacts/performance/renderer-smoke-latest.json"));
+}
+
+function resolveOptionalPath(args, flag) {
+  const index = args.indexOf(flag);
+  const requested = index >= 0 ? args[index + 1] : null;
+  return requested ? path.resolve(requested) : null;
+}
+
+async function finish() {
+  window?.destroy();
+  await fsp.rm(tempRoot, { recursive: true, force: true }).catch(() => undefined);
+  app.quit();
+}
+
+app.whenReady().then(runSmoke).then(finish).catch(async (error) => {
+  console.error(error);
+  process.exitCode = 1;
+  await finish();
+});
