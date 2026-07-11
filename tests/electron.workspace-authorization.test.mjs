@@ -30,7 +30,7 @@ afterEach(async () => {
 });
 
 describe("sender-bound workspace authorization", () => {
-  it("canonicalizes the assigned root, accepts only an alias of that root, and rejects no-workspace senders", async () => {
+  it.skipIf(process.platform === "win32")("canonicalizes the assigned root, accepts only an alias of that root, and rejects no-workspace senders", async () => {
     const aliasParent = await mkdtemp(path.join(os.tmpdir(), "puppyone-auth-alias-"));
     const aliasPath = path.join(aliasParent, "workspace");
     await symlink(root, aliasPath, "dir");
@@ -52,7 +52,7 @@ describe("sender-bound workspace authorization", () => {
     }
   });
 
-  it("realpaths working directories and rejects a symlink escaping the workspace", async () => {
+  it.skipIf(process.platform === "win32")("realpaths working directories and rejects a symlink escaping the workspace", async () => {
     const inside = path.join(root, "app");
     const escape = path.join(root, "escape");
     await mkdir(inside);

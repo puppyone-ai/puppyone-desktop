@@ -1,9 +1,8 @@
-# Shared UI (vendored)
+# Desktop UI provenance
 
-This directory is the **canonical copy** of the shared UI used by puppyone
-desktop. This is a standalone repository: there is no `frontend/shared-ui`
-upstream in this tree to generate from, and no `sync-desktop-shared-ui.mjs`
-script exists. Edit files here directly.
+Despite this historical filename, this directory is not generated. It is the
+Desktop-owned UI tree and is maintained independently from PuppyOne Cloud.
+There is no cross-repository sync or drift contract. Edit files here directly.
 
 > Historical note (ISSUE-021): earlier docs instructed running
 > `node scripts/sync-desktop-shared-ui.mjs` to regenerate this directory from
@@ -12,4 +11,4 @@ script exists. Edit files here directly.
 > (e.g. an `@puppyone/shared-ui` npm package or a workspace), replace this file
 > with the real provenance and sync/verify tooling.
 
-Run `npm run check:shared-ui` to verify the desktop/shared-ui import boundaries.
+Run `npm run check:ui-boundaries` to verify Desktop import boundaries.

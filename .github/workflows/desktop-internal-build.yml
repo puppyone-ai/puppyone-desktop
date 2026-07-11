@@ -25,11 +25,15 @@ permissions:
 
 jobs:
   mac:
-    name: macOS unsigned package
+    name: Signed and notarized macOS package
     runs-on: macos-latest
     env:
-      CSC_IDENTITY_AUTO_DISCOVERY: "false"
       R2_BUCKET: puppyone-desktop
+      CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+      APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_P8 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
 
     steps:
       - name: Checkout
@@ -44,8 +48,35 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build unsigned macOS package
+      - name: Prepare notarization credentials
+        run: |
+          set -euo pipefail
+          : "${CSC_LINK:?Set MACOS_CSC_LINK}"
+          : "${CSC_KEY_PASSWORD:?Set MACOS_CSC_KEY_PASSWORD}"
+          : "${APPLE_API_KEY_CONTENT:?Set APPLE_API_KEY_P8}"
+          : "${APPLE_API_KEY_ID:?Set APPLE_API_KEY_ID}"
+          : "${APPLE_API_ISSUER:?Set APPLE_API_ISSUER}"
+          KEY_PATH="${RUNNER_TEMP}/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "${APPLE_API_KEY_CONTENT}" > "${KEY_PATH}"
+          chmod 600 "${KEY_PATH}"
+          echo "APPLE_API_KEY=${KEY_PATH}" >> "${GITHUB_ENV}"
+
+      - name: Build signed and notarized macOS package
         run: npm run dist:mac
+
+      - name: Verify signature, Gatekeeper and notarization ticket
+        run: |
+          set -euo pipefail
+          APP_PATH="$(find release -type d -name '*.app' -print -quit)"
+          : "${APP_PATH:?Packaged app was not found}"
+          codesign --verify --deep --strict --verbose=2 "${APP_PATH}"
+          spctl --assess --type execute --verbose=4 "${APP_PATH}"
+          # stapler supports app/pkg/dmg, not zip. The zipped app is covered by
+          # the strict codesign/spctl checks above before it is archived.
+          for artifact in release/*.dmg; do
+            [ -e "${artifact}" ] || continue
+            xcrun stapler validate "${artifact}"
+          done
 
       - name: Resolve release metadata
         id: release_meta
@@ -66,7 +97,7 @@ jobs:
       - name: Upload GitHub artifact
         uses: actions/upload-artifact@v4
         with:
-          name: puppyone-macos-unsigned-${{ github.run_number }}
+          name: puppyone-macos-signed-${{ github.run_number }}
           path: |
             release/*.dmg
             release/*.zip
@@ -97,13 +128,11 @@ jobs:
 
           NOTES="$(mktemp)"
           {
-            echo "Unsigned internal macOS build."
+            echo "Developer ID signed and Apple-notarized internal macOS build."
             echo
             echo "Commit: ${GITHUB_SHA}"
             echo "R2 version prefix: ${R2_PREFIX}/${RELEASE_TAG}"
             echo "R2 latest prefix: ${R2_PREFIX}/latest"
-            echo
-            echo "This build is not Developer ID signed or notarized. Use it for internal testing only."
           } > "${NOTES}"
           gh release create "${RELEASE_TAG}" "${files[@]}" \
             --target "${GITHUB_SHA}" \

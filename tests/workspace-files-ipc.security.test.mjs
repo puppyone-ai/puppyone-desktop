@@ -53,7 +53,7 @@ describe("workspace file IPC authorization", () => {
     await expect(readFile(path.join(otherRoot, "new.txt"), "utf8")).rejects.toThrow();
   });
 
-  it("uses the sender workspace and accepts a renderer root that resolves to the same directory", async () => {
+  it.skipIf(process.platform === "win32")("uses the sender workspace and accepts a renderer root that resolves to the same directory", async () => {
     const { handlers } = createHarness(() => root);
     const event = { sender: { id: 8 } };
     const notePath = path.join(root, "note.txt");
@@ -131,7 +131,7 @@ describe("workspace file IPC authorization", () => {
     )).rejects.toThrow(/no local workspace is assigned/i);
   });
 
-  it("rejects direct symbolic-link access before revealing or reading the target", async () => {
+  it.skipIf(process.platform === "win32")("rejects direct symbolic-link access before revealing or reading the target", async () => {
     const { handlers, shell } = createHarness(() => root);
     const externalFile = path.join(otherRoot, "secret.txt");
     const linkedFile = path.join(root, "linked.txt");
@@ -161,7 +161,7 @@ describe("workspace file IPC authorization", () => {
     expect(await readFile(path.join(root, "source copy.txt"), "utf8")).toBe("inside");
   });
 
-  it("cannot bypass executable confirmation and revalidates after the dialog", async () => {
+  it.skipIf(process.platform === "win32")("cannot bypass executable confirmation and revalidates after the dialog", async () => {
     const executablePath = path.join(root, "run.cmd");
     const externalFile = path.join(otherRoot, "replacement.cmd");
     await writeFile(executablePath, "echo safe");

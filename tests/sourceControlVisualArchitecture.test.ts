@@ -5,27 +5,27 @@ import { getSourceControlPrimaryActionSlot } from "../src/features/source-contro
 const viewSource = readFileSync(
   new URL("../src/features/source-control/GitStatusView.tsx", import.meta.url),
   "utf8",
-);
+).replaceAll("\r\n", "\n");
 const detailCss = readFileSync(
   new URL("../src/features/source-control/styles/history-detail.css", import.meta.url),
   "utf8",
-);
+).replaceAll("\r\n", "\n");
 const sidebarBaseCss = readFileSync(
   new URL("../src/features/source-control/styles/sidebar-base.css", import.meta.url),
   "utf8",
-);
+).replaceAll("\r\n", "\n");
 const sidebarResourcesCss = readFileSync(
   new URL("../src/features/source-control/styles/sidebar-resources.css", import.meta.url),
   "utf8",
-);
+).replaceAll("\r\n", "\n");
 const historyListCss = readFileSync(
   new URL("../src/features/source-control/styles/history-list.css", import.meta.url),
   "utf8",
-);
+).replaceAll("\r\n", "\n");
 const diffCss = readFileSync(
   new URL("../src/features/source-control/styles/diff-utility.css", import.meta.url),
   "utf8",
-);
+).replaceAll("\r\n", "\n");
 
 describe("source-control visual architecture", () => {
   it("uses a dedicated compact context header for working-file detail", () => {

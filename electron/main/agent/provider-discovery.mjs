@@ -126,7 +126,7 @@ export async function readLoginShellEnvironment({
   platform = process.platform,
 } = {}) {
   if (platform === "win32") return {};
-  const shell = typeof env.SHELL === "string" && path.isAbsolute(env.SHELL)
+  const shell = typeof env.SHELL === "string" && path.posix.isAbsolute(env.SHELL)
     ? env.SHELL
     : "/bin/zsh";
   const result = await runBounded(spawn, shell, ["-ilc", "/usr/bin/env -0"], {
@@ -161,20 +161,21 @@ export function compareVersions(left, right) {
 
 async function resolveExecutable({ fsModule, executableName, pathValue, homedir, platform }) {
   const separator = platform === "win32" ? ";" : ":";
+  const pathApi = platform === "win32" ? path.win32 : path.posix;
   const candidates = new Set(
     String(pathValue)
       .split(separator)
       .filter(Boolean)
-      .map((directory) => path.resolve(directory, executableName)),
+      .map((directory) => pathApi.resolve(directory, executableName)),
   );
   for (const directory of [
-    path.join(homedir, ".local", "bin"),
-    path.join(homedir, ".npm-global", "bin"),
+    pathApi.join(homedir, ".local", "bin"),
+    pathApi.join(homedir, ".npm-global", "bin"),
     "/opt/homebrew/bin",
     "/usr/local/bin",
     "/usr/bin",
   ]) {
-    candidates.add(path.join(directory, executableName));
+    candidates.add(pathApi.join(directory, executableName));
   }
   for (const candidate of candidates) {
     try {

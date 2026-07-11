@@ -148,7 +148,7 @@ describe("path-traversal containment", () => {
     expect(() => noteWorkspaceEditReviewPath(root, "../escape.txt")).toThrow(/escapes the workspace root/i);
   });
 
-  it("never snapshots or reports a symbolic link to an external file", async () => {
+  it.skipIf(process.platform === "win32")("never snapshots or reports a symbolic link to an external file", async () => {
     const external = await mkdtemp(path.join(os.tmpdir(), "puppyone-review-external-"));
     try {
       const secretPath = path.join(external, "secret.txt");

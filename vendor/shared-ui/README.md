@@ -1,15 +1,13 @@
 # PuppyOne Shared UI
 
-This directory is the source of truth for UI shared by PuppyOne Cloud and
-PuppyOne Desktop.
+This directory is the Desktop-owned UI implementation. PuppyOne Cloud and
+Desktop are separate products and their UI trees intentionally evolve
+independently. This directory is not generated from the Cloud repository and
+there is no cross-repository runtime or synchronization dependency.
 
-The desktop copy under `desktop/vendor/shared-ui` is generated. Do not edit the
-desktop copy directly; run:
-
-```bash
-node scripts/sync-desktop-shared-ui.mjs
-node scripts/check-desktop-shared-ui-sync.mjs
-```
+Edit this tree directly and run `npm run check:ui-boundaries`. The historical
+`check:shared-ui` command remains only as a compatibility alias for that local
+boundary check; it does not claim cross-repository parity.
 
 ## Boundaries
 
@@ -17,5 +15,5 @@ Shared UI may depend on React, browser-safe DOM APIs, and local files in this
 directory. It must not depend on Next.js routing, Supabase, SWR, Electron,
 Tauri, Node filesystem APIs, or app-specific source trees.
 
-Platform-specific shell code stays in `frontend/` and `desktop/`.
+Desktop shell code stays outside this vendored UI tree.
 

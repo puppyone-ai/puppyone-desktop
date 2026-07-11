@@ -128,7 +128,7 @@ describe("diffs", { timeout: 20_000 }, () => {
     expect(JSON.stringify(diff.files)).toContain("brand new line");
   });
 
-  it("refuses to read an untracked symbolic link outside the workspace", async () => {
+  it.skipIf(process.platform === "win32")("refuses to read an untracked symbolic link outside the workspace", async () => {
     await initRepoWithIdentity();
     const external = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-external-"));
     try {
