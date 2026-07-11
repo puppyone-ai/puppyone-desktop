@@ -3,19 +3,44 @@ import { Fragment, useState, type ReactNode } from "react";
 
 type SafeMarkdownProps = { text: string; streaming?: boolean };
 
+const MAX_INITIAL_MARKDOWN_TEXT = 24 * 1024;
+const MAX_INITIAL_MARKDOWN_BLOCKS = 240;
+
 /**
  * Deliberately renders a small Markdown surface to React nodes. Raw HTML is
  * always text, URLs use an explicit protocol policy, and no innerHTML path
  * exists at the Agent boundary.
  */
 export function SafeMarkdown({ text, streaming = false }: SafeMarkdownProps) {
-  const blocks = parseBlocks(text);
+  const [expanded, setExpanded] = useState(false);
+  const candidate = expanded ? text : initialMarkdownWindow(text);
+  const parsedBlocks = parseBlocks(candidate);
+  const initiallyTruncated = text.length > MAX_INITIAL_MARKDOWN_TEXT
+    || parsedBlocks.length > MAX_INITIAL_MARKDOWN_BLOCKS;
+  const blocks = expanded ? parsedBlocks : parsedBlocks.slice(0, MAX_INITIAL_MARKDOWN_BLOCKS);
   return (
     <div className="desktop-agent-markdown">
       {blocks.map((block, index) => renderBlock(block, index))}
       {streaming && <span className="desktop-agent-stream-caret" aria-hidden="true" />}
+      {(expanded || initiallyTruncated) && (
+        <button
+          type="button"
+          className="desktop-agent-markdown-disclosure"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? "Collapse long response" : "Show full response"}
+        </button>
+      )}
     </div>
   );
+}
+
+function initialMarkdownWindow(text: string) {
+  if (text.length <= MAX_INITIAL_MARKDOWN_TEXT) return text;
+  const headLength = Math.floor(MAX_INITIAL_MARKDOWN_TEXT * 0.75);
+  const tailLength = MAX_INITIAL_MARKDOWN_TEXT - headLength;
+  return `${text.slice(0, headLength)}\n\n… long response collapsed …\n\n${text.slice(-tailLength)}`;
 }
 
 type MarkdownBlock =
@@ -138,3 +163,8 @@ function CodeBlock({ language, value }: { language: string; value: string }) {
     </div>
   );
 }
+
+export const safeMarkdownLimits = Object.freeze({
+  maxInitialText: MAX_INITIAL_MARKDOWN_TEXT,
+  maxInitialBlocks: MAX_INITIAL_MARKDOWN_BLOCKS,
+});

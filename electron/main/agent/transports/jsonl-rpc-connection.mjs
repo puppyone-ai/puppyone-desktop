@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { spawn as nodeSpawn } from "node:child_process";
-import { redactSecretText } from "../../agent-events.mjs";
+import { redactSecretText } from "../agent-events.mjs";
 
 const DEFAULT_MAX_LINE_BYTES = 1024 * 1024;
 const DEFAULT_MAX_STDERR_BYTES = 64 * 1024;
@@ -9,9 +9,9 @@ const DEFAULT_FORCE_KILL_TIMEOUT_MS = 2_000;
 
 export class JsonlRpcRequestTimeoutError extends Error {
   constructor(method) {
-    super(`Codex request timed out: ${method}`);
+    super(`JSONL-RPC request timed out: ${method}`);
     this.name = "JsonlRpcRequestTimeoutError";
-    this.code = "CODEX_RPC_TIMEOUT";
+    this.code = "JSONL_RPC_TIMEOUT";
     this.method = method;
   }
 }
@@ -30,7 +30,7 @@ export class JsonlRpcConnection extends EventEmitter {
   }) {
     super();
     if (typeof executablePath !== "string" || executablePath.length === 0) {
-      throw new TypeError("An absolute Codex executable path is required.");
+      throw new TypeError("An absolute JSONL-RPC executable path is required.");
     }
     this.maxLineBytes = maxLineBytes;
     this.maxStderrBytes = maxStderrBytes;
@@ -62,9 +62,9 @@ export class JsonlRpcConnection extends EventEmitter {
   }
 
   request(method, params, { timeoutMs = 20_000 } = {}) {
-    if (this.closed) return Promise.reject(new Error("Codex app-server is not connected."));
+    if (this.closed) return Promise.reject(new Error("The JSONL-RPC process is not connected."));
     if (this.pending.size >= this.maxPending) {
-      return Promise.reject(new Error("Too many pending Codex requests."));
+      return Promise.reject(new Error("Too many pending JSONL-RPC requests."));
     }
     const id = this.nextRequestId++;
     return new Promise((resolve, reject) => {
@@ -105,7 +105,7 @@ export class JsonlRpcConnection extends EventEmitter {
     return redactSecretText(this.stderrBuffer.slice(-this.maxStderrBytes));
   }
 
-  dispose(reason = "Codex app-server connection closed.", { expected = true } = {}) {
+  dispose(reason = "JSONL-RPC connection closed.", { expected = true } = {}) {
     if (this.closed) return;
     this.closed = true;
     this.exitExpected = Boolean(expected);
@@ -137,11 +137,11 @@ export class JsonlRpcConnection extends EventEmitter {
 
   #write(message) {
     if (this.closed || !this.child.stdin?.writable) {
-      throw new Error("Codex app-server stdin is unavailable.");
+      throw new Error("JSONL-RPC process stdin is unavailable.");
     }
     const line = `${JSON.stringify(message)}\n`;
     if (Buffer.byteLength(line, "utf8") > this.maxLineBytes) {
-      throw new Error("Codex request exceeded the JSONL safety limit.");
+      throw new Error("JSONL-RPC request exceeded the safety limit.");
     }
     this.child.stdin.write(line, "utf8");
   }
@@ -150,7 +150,7 @@ export class JsonlRpcConnection extends EventEmitter {
     if (this.closed) return;
     this.stdoutBuffer += String(chunk);
     if (Buffer.byteLength(this.stdoutBuffer, "utf8") > this.maxLineBytes && !this.stdoutBuffer.includes("\n")) {
-      this.#protocolFailure("Codex emitted a JSONL line larger than the safety limit.");
+      this.#protocolFailure("The JSONL-RPC process emitted a line larger than the safety limit.");
       return;
     }
     let newlineIndex = this.stdoutBuffer.indexOf("\n");
@@ -158,7 +158,7 @@ export class JsonlRpcConnection extends EventEmitter {
       const line = this.stdoutBuffer.slice(0, newlineIndex).replace(/\r$/, "");
       this.stdoutBuffer = this.stdoutBuffer.slice(newlineIndex + 1);
       if (Buffer.byteLength(line, "utf8") > this.maxLineBytes) {
-        this.#protocolFailure("Codex emitted a JSONL line larger than the safety limit.");
+        this.#protocolFailure("The JSONL-RPC process emitted a line larger than the safety limit.");
         return;
       }
       if (line.trim()) this.#receiveLine(line);
@@ -171,11 +171,11 @@ export class JsonlRpcConnection extends EventEmitter {
     try {
       message = JSON.parse(line);
     } catch {
-      this.#protocolFailure("Codex emitted malformed JSONL protocol data.");
+      this.#protocolFailure("The JSONL-RPC process emitted malformed protocol data.");
       return;
     }
     if (!message || typeof message !== "object" || Array.isArray(message)) {
-      this.#protocolFailure("Codex emitted an invalid JSON-RPC message.");
+      this.#protocolFailure("The JSONL-RPC process emitted an invalid message.");
       return;
     }
     const hasId = Object.prototype.hasOwnProperty.call(message, "id");
@@ -192,18 +192,18 @@ export class JsonlRpcConnection extends EventEmitter {
       this.#receiveResponse(message);
       return;
     }
-    this.#protocolFailure("Codex emitted an unclassifiable JSON-RPC message.");
+    this.#protocolFailure("The JSONL-RPC process emitted an unclassifiable message.");
   }
 
   #receiveResponse(message) {
     const id = String(message.id);
     if (this.seenResponseIds.has(id)) {
-      this.#protocolFailure(`Codex emitted a duplicate response id: ${id}`);
+      this.#protocolFailure(`The JSONL-RPC process emitted a duplicate response id: ${id}`);
       return;
     }
     const pending = this.pending.get(id);
     if (!pending) {
-      this.#protocolFailure(`Codex emitted an unknown response id: ${id}`);
+      this.#protocolFailure(`The JSONL-RPC process emitted an unknown response id: ${id}`);
       return;
     }
     this.pending.delete(id);
@@ -254,7 +254,7 @@ export class JsonlRpcConnection extends EventEmitter {
       diagnostics: this.getDiagnostics(),
     };
     this.closed = true;
-    this.#rejectPending(new Error(error?.message || `Codex app-server exited${code === null ? "" : ` with code ${code}`}.`));
+    this.#rejectPending(new Error(error?.message || `JSONL-RPC process exited${code === null ? "" : ` with code ${code}`}.`));
     this.emit("exit", { ...this.exitInfo, expected: this.exitExpected });
   }
 

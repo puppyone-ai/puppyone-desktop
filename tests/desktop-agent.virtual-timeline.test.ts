@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentTranscript, agentTimelineLimits } from "../src/features/desktop-agent/ui/AgentTranscript";
-import { SafeMarkdown } from "../src/features/desktop-agent/ui/SafeMarkdown";
+import { SafeMarkdown, safeMarkdownLimits } from "../src/features/desktop-agent/ui/SafeMarkdown";
 import { createAgentProjection, type AgentPart } from "../src/features/desktop-agent/agentProjection";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -44,6 +44,18 @@ describe("Desktop Agent virtual transcript", () => {
     expect(container.textContent).toContain("<script>window.pwned=1</script>");
     expect(container.querySelectorAll("a")).toHaveLength(1);
     expect(container.querySelector("a")?.getAttribute("href")).toContain("https://example.com");
+  });
+
+  it("progressively discloses long Markdown without mounting an unbounded initial document", () => {
+    const text = "Paragraph\n\n".repeat(safeMarkdownLimits.maxInitialBlocks + 20);
+    const container = render(React.createElement(SafeMarkdown, { text }));
+    expect(container.querySelectorAll(".desktop-agent-markdown p").length)
+      .toBeLessThanOrEqual(safeMarkdownLimits.maxInitialBlocks);
+    const disclosure = container.querySelector<HTMLButtonElement>(".desktop-agent-markdown-disclosure");
+    expect(disclosure?.textContent).toContain("Show full response");
+    act(() => disclosure?.click());
+    expect(container.querySelectorAll(".desktop-agent-markdown p").length).toBeGreaterThan(safeMarkdownLimits.maxInitialBlocks);
+    expect(disclosure?.getAttribute("aria-expanded")).toBe("true");
   });
 
   it("animates only newly committed parts and does not replay entrance motion after rerender", () => {

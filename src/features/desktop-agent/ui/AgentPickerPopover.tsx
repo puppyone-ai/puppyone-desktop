@@ -28,6 +28,8 @@ export type AgentPickerGroup = {
   options: AgentPickerOption[];
 };
 
+const MAX_RENDERED_OPTIONS = 120;
+
 type AgentPickerPopoverProps = {
   ariaLabel: string;
   placeholder: string;
@@ -60,12 +62,20 @@ export function AgentPickerPopover({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const optionRefs = useRef(new Map<string, HTMLButtonElement>());
   const typeaheadRef = useRef({ value: "", timer: 0 as number | undefined });
+  const focusTimerRef = useRef(0 as number | undefined);
+  const restoreTimerRef = useRef(0 as number | undefined);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [inspected, setInspected] = useState<string | null>(null);
   const [activeOptionId, setActiveOptionId] = useState<string | null>(null);
-  const filteredGroups = useMemo(() => filterGroups(groups, query), [groups, query]);
+  const matchedGroups = useMemo(() => filterGroups(groups, query), [groups, query]);
+  const matchedOptionCount = useMemo(
+    () => matchedGroups.reduce((count, group) => count + group.options.length, 0),
+    [matchedGroups],
+  );
+  const filteredGroups = useMemo(() => limitGroups(matchedGroups, MAX_RENDERED_OPTIONS), [matchedGroups]);
   const flatOptions = useMemo(() => filteredGroups.flatMap((group) => group.options), [filteredGroups]);
+  const truncated = matchedOptionCount > flatOptions.length;
   const searchable = groups.reduce((count, group) => count + group.options.length, 0) > 6;
 
   useEffect(() => {
@@ -89,6 +99,8 @@ export function AgentPickerPopover({
 
   useEffect(() => () => {
     if (typeaheadRef.current.timer) window.clearTimeout(typeaheadRef.current.timer);
+    if (focusTimerRef.current) window.clearTimeout(focusTimerRef.current);
+    if (restoreTimerRef.current) window.clearTimeout(restoreTimerRef.current);
   }, []);
 
   const show = (focusDirection: "selected" | "first" | "last" = "selected") => {
@@ -99,8 +111,10 @@ export function AgentPickerPopover({
       setInspected(null);
       onOpen?.();
     }
-    window.setTimeout(() => {
-      const options = filterGroups(groups, "").flatMap((group) => group.options);
+    if (focusTimerRef.current) window.clearTimeout(focusTimerRef.current);
+    focusTimerRef.current = window.setTimeout(() => {
+      focusTimerRef.current = undefined;
+      const options = limitGroups(filterGroups(groups, ""), MAX_RENDERED_OPTIONS).flatMap((group) => group.options);
       const target = focusDirection === "last"
         ? options.at(-1)
         : focusDirection === "first"
@@ -117,7 +131,14 @@ export function AgentPickerPopover({
     setOpen(false);
     setQuery("");
     setInspected(null);
-    if (restoreFocus) window.setTimeout(() => triggerRef.current?.focus(), 0);
+    if (focusTimerRef.current) window.clearTimeout(focusTimerRef.current);
+    if (restoreTimerRef.current) window.clearTimeout(restoreTimerRef.current);
+    if (restoreFocus) {
+      restoreTimerRef.current = window.setTimeout(() => {
+        restoreTimerRef.current = undefined;
+        triggerRef.current?.focus();
+      }, 0);
+    }
   };
 
   const choose = (option: AgentPickerOption) => {
@@ -238,9 +259,13 @@ export function AgentPickerPopover({
             })}
             {flatOptions.length === 0 && <div className="desktop-agent-picker-empty">No matching options</div>}
           </div>
-          {(error || onRefresh) && (
+          {(error || onRefresh || truncated) && (
             <div className="desktop-agent-picker-footer">
-              {error && <span role="status">{error}</span>}
+              {(error || truncated) && (
+                <span role="status" data-error={error || undefined}>
+                  {error || `Showing ${flatOptions.length} of ${matchedOptionCount}. Search to narrow.`}
+                </span>
+              )}
               {onRefresh && (
                 <button type="button" disabled={loading} onClick={onRefresh}>
                   <RefreshCw size={13} className={loading ? "desktop-agent-spin" : undefined} />
@@ -268,6 +293,16 @@ function filterGroups(groups: AgentPickerGroup[], query: string) {
   });
 }
 
+function limitGroups(groups: AgentPickerGroup[], limit: number) {
+  let remaining = limit;
+  return groups.flatMap((group) => {
+    if (remaining <= 0) return [];
+    const options = group.options.slice(0, remaining);
+    remaining -= options.length;
+    return options.length ? [{ ...group, options }] : [];
+  });
+}
+
 function focusByTypeahead(
   key: string,
   options: AgentPickerOption[],
@@ -284,3 +319,5 @@ function focusByTypeahead(
 function initial(label: string) {
   return label.trim().slice(0, 1).toUpperCase();
 }
+
+export const agentPickerLimits = Object.freeze({ maxRenderedOptions: MAX_RENDERED_OPTIONS });

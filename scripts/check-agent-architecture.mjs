@@ -16,7 +16,10 @@ const mainConcreteRoots = [
 const rendererRoot = path.join(repoRoot, "src", "features", "desktop-agent");
 const rendererDomainRoot = path.join(rendererRoot, "domain");
 const rendererApplicationRoot = path.join(rendererRoot, "application");
+const rendererInfrastructureRoot = path.join(rendererRoot, "infrastructure");
 const rendererUiRoot = path.join(rendererRoot, "ui");
+const rendererCompositionRoot = path.join(rendererUiRoot, "RightAgentPanel.tsx");
+const electronAgentClient = path.join(rendererInfrastructureRoot, "electron", "electronAgentClient.ts");
 const sharedContractRoot = path.join(repoRoot, "shared", "agent-contract");
 const allowedCompositionRoot = path.join(mainRoot, "bootstrap", "create-agent-runtime-host.mjs");
 const allowedProviderNamedCoreFiles = new Set([
@@ -86,12 +89,16 @@ for (const filePath of walkSourceFiles(rendererRoot)) {
   for (const specifier of collectSpecifiers(source)) {
     const target = resolveRelativeModule(filePath, specifier);
     if (isInside(filePath, rendererDomainRoot) && target && (
-      isInsideOrSame(target, rendererApplicationRoot) || isInsideOrSame(target, rendererUiRoot)
+      isInsideOrSame(target, rendererApplicationRoot)
+      || isInsideOrSame(target, rendererInfrastructureRoot)
+      || isInsideOrSame(target, rendererUiRoot)
     )) {
       errors.push(`${relative(filePath)} imports ${relative(target)}; renderer domain is the dependency floor`);
     }
-    if (isInside(filePath, rendererApplicationRoot) && target && isInsideOrSame(target, rendererUiRoot)) {
-      errors.push(`${relative(filePath)} imports ${relative(target)}; renderer application cannot depend on UI`);
+    if (isInside(filePath, rendererApplicationRoot) && target && (
+      isInsideOrSame(target, rendererInfrastructureRoot) || isInsideOrSame(target, rendererUiRoot)
+    )) {
+      errors.push(`${relative(filePath)} imports ${relative(target)}; renderer application must depend on ports, not infrastructure/UI`);
     }
     if (isInside(filePath, rendererApplicationRoot) && (specifier === "react" || specifier.startsWith("react/"))) {
       errors.push(`${relative(filePath)} imports React; Agent application services must remain framework-independent`);
@@ -99,6 +106,23 @@ for (const filePath of walkSourceFiles(rendererRoot)) {
     if (isInside(filePath, rendererUiRoot) && target && relative(target).startsWith("electron/")) {
       errors.push(`${relative(filePath)} imports Electron main ${relative(target)}; UI must use the typed bridge`);
     }
+    if (
+      isInside(filePath, rendererUiRoot)
+      && filePath !== rendererCompositionRoot
+      && target
+      && isInsideOrSame(target, rendererInfrastructureRoot)
+    ) {
+      errors.push(`${relative(filePath)} imports infrastructure; only RightAgentPanel may compose the Electron adapter`);
+    }
+    if (isInside(filePath, rendererInfrastructureRoot) && target && isInsideOrSame(target, rendererUiRoot)) {
+      errors.push(`${relative(filePath)} imports ${relative(target)}; renderer infrastructure cannot depend on UI`);
+    }
+  }
+  if (isInsideOrSame(filePath, rendererApplicationRoot) && /\b(?:window|document|navigator)\s*\./.test(stripComments(source))) {
+    errors.push(`${relative(filePath)} accesses browser globals; application services must use explicit ports`);
+  }
+  if (filePath !== electronAgentClient && /\bpuppyoneDesktop\b/.test(stripComments(source))) {
+    errors.push(`${relative(filePath)} reads the preload bridge; use infrastructure/electron/electronAgentClient.ts`);
   }
   if (!isInside(filePath, rendererUiRoot) && /\b(?:JSX\.|ReactNode|<section\b|<div\b)/.test(stripComments(source))) {
     if (!filePath.endsWith("index.ts")) errors.push(`${relative(filePath)} contains presentation outside ui/`);
@@ -108,6 +132,32 @@ for (const filePath of walkSourceFiles(rendererRoot)) {
     && providerNamePattern.test(stripComments(source))
   ) {
     errors.push(`${relative(filePath)} names a concrete runtime; Renderer domain/application must be provider-neutral`);
+  }
+}
+
+const agentStyleRoot = path.join(rendererUiRoot, "styles");
+const agentStyleEntry = path.join(rendererUiRoot, "desktop-agent.css");
+const styleEntrySource = readFileSync(agentStyleEntry, "utf8");
+if (styleEntrySource.split("\n").length > 30 || !styleEntrySource.includes('@import "./styles/')) {
+  errors.push("src/features/desktop-agent/ui/desktop-agent.css must remain an import-only public style entry");
+}
+for (const entry of readdirSync(agentStyleRoot)) {
+  if (!entry.endsWith(".css")) continue;
+  const stylePath = path.join(agentStyleRoot, entry);
+  const lineCount = readFileSync(stylePath, "utf8").split("\n").length;
+  if (lineCount > 450) errors.push(`${relative(stylePath)} has ${lineCount} lines; split styles at a responsibility boundary`);
+}
+
+const responsibilityBudgets = [
+  [path.join(mainRoot, "agent-service.mjs"), 850],
+  [path.join(rendererApplicationRoot, "AgentSessionController.ts"), 500],
+  [path.join(rendererDomainRoot, "agent-projection.ts"), 550],
+  [path.join(rendererUiRoot, "RightAgentPanel.tsx"), 230],
+];
+for (const [filePath, maximumLines] of responsibilityBudgets) {
+  const lineCount = readFileSync(filePath, "utf8").split("\n").length;
+  if (lineCount > maximumLines) {
+    errors.push(`${relative(filePath)} has ${lineCount} lines; its orchestrator/reducer responsibility budget is ${maximumLines}`);
   }
 }
 
