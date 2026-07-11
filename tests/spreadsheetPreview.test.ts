@@ -38,7 +38,10 @@ describe("spreadsheet preview parsing", () => {
   );
 
   it("shows formulas without cached values instead of a synthetic zero", async () => {
-    const fixture = readFileSync(path.join(process.cwd(), "editor test", "puppyone-preview-sample.xlsx"));
+    const fixture = readFileSync(path.join(
+      process.cwd(),
+      "tests/fixtures/editor-rendering/puppyone-preview-sample.xlsx",
+    ));
     const result = await parseSpreadsheetPreview(toArrayBuffer(fixture), { archiveKind: "ooxml" });
     const overview = result.sheets.find((sheet) => sheet.name === "Overview");
     const totalRow = overview?.rows.find((row) => row.rowIndex === 5);

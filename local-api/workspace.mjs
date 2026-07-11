@@ -1,11 +1,22 @@
-import { constants as fsConstants, readFileSync } from "node:fs";
+import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import crypto from "node:crypto";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+import {
+  classifyLocalFile,
+  getMimeType,
+  isLocalFilePreviewable,
+  resolveCopyNameExtension,
+} from "./files/file-format-policy.mjs";
+import {
+  isSameOrInsidePath,
+  normalizeRelativePath,
+  resolveExistingWorkspacePath,
+  resolveWorkspacePath,
+} from "./files/path-policy.mjs";
 import {
   GIT_DEFAULT_TIMEOUT_MS,
   GIT_MUTATION_TIMEOUT_MS,
@@ -16,7 +27,31 @@ import {
 import { resolveGitRevisionPair } from "./git/revision-pair.mjs";
 import { deriveGitRevisionSpecs } from "./git/revision-specs.mjs";
 import { parseGitPorcelainV2Status } from "./git/porcelain-v2.mjs";
+import {
+  buildGitSourceControlSnapshot,
+  getDiscardableResources,
+  getResourceGitPaths,
+  gitStatusLabelToLetter,
+  hasStagedStatus,
+  hasUnstagedStatus,
+  uniqueGitPaths,
+} from "./git/source-control-model.mjs";
+import {
+  readPuppyoneWorkspaceConfig,
+  regeneratePuppyoneWorkspaceProjectId,
+  writePuppyoneWorkspaceConfig,
+} from "./workspace-config.mjs";
 export { getGitEnvironmentForTests } from "./git/runner.mjs";
+export { getMimeType } from "./files/file-format-policy.mjs";
+export {
+  resolveExistingWorkspacePath,
+  resolveWorkspacePath,
+} from "./files/path-policy.mjs";
+export {
+  readPuppyoneWorkspaceConfig,
+  regeneratePuppyoneWorkspaceProjectId,
+  writePuppyoneWorkspaceConfig,
+} from "./workspace-config.mjs";
 
 /** Cache totalCommits by (root, HEAD) so working-tree refreshes skip rev-list. */
 const totalCommitsByHead = new Map();
@@ -41,197 +76,7 @@ const GIT_DETAIL_MAX_TOTAL_DIFF_LINES = 4000;
 const GIT_DETAIL_MAX_FILE_DIFF_LINES = 900;
 const GIT_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
-const PUPPYONE_CONFIG_DIR = ".puppyone";
-const PUPPYONE_CONFIG_FILE = "config.json";
-const GIT_RESOURCE_GROUPS = Object.freeze([
-  { id: "merge", label: "Merge Changes" },
-  { id: "index", label: "Staged Changes" },
-  { id: "workingTree", label: "Changes" },
-  { id: "untracked", label: "Untracked Changes" },
-]);
-const DEFAULT_PUPPYONE_WORKSPACE_CONFIG = Object.freeze({
-  version: 2,
-  project: {
-    id: null,
-  },
-  sync: {
-    sourceOfTruth: {
-      service: "github",
-      remote: null,
-      branch: null,
-    },
-  },
-  git: {
-    primaryRemote: null,
-    watchedBranch: null,
-  },
-  backup: {
-    enabled: false,
-    service: "github",
-    remote: null,
-    branch: null,
-  },
-  cloud: {
-    projectId: null,
-  },
-});
 const execFileAsync = promisify(execFile);
-const localApiDir = path.dirname(fileURLToPath(import.meta.url));
-const fileFormatRegistry = loadFileFormatRegistry();
-const unknownFormat = fileFormatRegistry.unknownFormat;
-const mimeTypeByExtension = new Map(Object.entries({
-  "3g2": "video/3gpp2",
-  "3gp": "video/3gpp",
-  "3gpp": "video/3gpp",
-  "7z": "application/x-7z-compressed",
-  aac: "audio/aac",
-  aif: "audio/aiff",
-  aifc: "audio/aiff",
-  aiff: "audio/aiff",
-  apng: "image/apng",
-  avi: "video/x-msvideo",
-  avif: "image/avif",
-  azw: "application/x-mobipocket-ebook",
-  azw3: "application/x-mobipocket-ebook",
-  bmp: "image/bmp",
-  bz: "application/x-bzip2",
-  bz2: "application/x-bzip2",
-  cer: "application/pkix-cert",
-  cr2: "image/x-canon-cr2",
-  crt: "application/x-x509-ca-cert",
-  css: "text/css",
-  csv: "text/csv",
-  db: "application/vnd.sqlite3",
-  db3: "application/vnd.sqlite3",
-  der: "application/pkix-cert",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  eot: "application/vnd.ms-fontobject",
-  epub: "application/epub+zip",
-  flac: "audio/flac",
-  flv: "video/x-flv",
-  gif: "image/gif",
-  glb: "model/gltf-binary",
-  gltf: "model/gltf+json",
-  gz: "application/gzip",
-  heic: "image/heic",
-  heif: "image/heif",
-  htm: "text/html",
-  html: "text/html",
-  ico: "image/x-icon",
-  img: "application/x-iso9660-image",
-  ipynb: "application/x-ipynb+json",
-  iso: "application/x-iso9660-image",
-  jpe: "image/jpeg",
-  jpeg: "image/jpeg",
-  jfif: "image/jpeg",
-  jpg: "image/jpeg",
-  js: "application/javascript",
-  json: "application/json",
-  json5: "application/json",
-  jsonc: "application/json",
-  jsonl: "application/x-ndjson",
-  key: "application/x-pem-file",
-  lzma: "application/x-lzma",
-  m2v: "video/mpeg",
-  m4a: "audio/mp4",
-  m4b: "audio/mp4",
-  m4v: "video/mp4",
-  md: "text/markdown",
-  markdown: "text/markdown",
-  mdx: "text/markdown",
-  mid: "audio/midi",
-  midi: "audio/midi",
-  mkv: "video/x-matroska",
-  mobi: "application/x-mobipocket-ebook",
-  mov: "video/quicktime",
-  mp3: "audio/mpeg",
-  mp4: "video/mp4",
-  mpe: "video/mpeg",
-  mpeg: "video/mpeg",
-  mpg: "video/mpeg",
-  ndjson: "application/x-ndjson",
-  oga: "audio/ogg",
-  ogg: "audio/ogg",
-  ogv: "video/ogg",
-  opus: "audio/opus",
-  otf: "font/otf",
-  p12: "application/x-pkcs12",
-  pdf: "application/pdf",
-  pem: "application/x-pem-file",
-  pfx: "application/x-pkcs12",
-  pjp: "image/jpeg",
-  pjpeg: "image/jpeg",
-  png: "image/png",
-  ppt: "application/vnd.ms-powerpoint",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  puppyflow: "application/vnd.puppyone.puppyflow+json",
-  "puppyflow.json": "application/vnd.puppyone.puppyflow+json",
-  psd: "image/vnd.adobe.photoshop",
-  qt: "video/quicktime",
-  rar: "application/vnd.rar",
-  rtf: "application/rtf",
-  sqlite: "application/vnd.sqlite3",
-  sqlite3: "application/vnd.sqlite3",
-  stl: "model/stl",
-  svg: "image/svg+xml",
-  tar: "application/x-tar",
-  "tar.bz2": "application/x-bzip2",
-  "tar.gz": "application/gzip",
-  "tar.xz": "application/x-xz",
-  tbz: "application/x-bzip2",
-  tbz2: "application/x-bzip2",
-  tgz: "application/gzip",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-  tsv: "text/tab-separated-values",
-  ttc: "font/ttf",
-  ttf: "font/ttf",
-  txz: "application/x-xz",
-  wav: "audio/wav",
-  wave: "audio/wav",
-  weba: "audio/webm",
-  webm: "video/webm",
-  webp: "image/webp",
-  wma: "audio/x-ms-wma",
-  wmv: "video/x-ms-wmv",
-  woff: "font/woff",
-  woff2: "font/woff2",
-  xhtml: "text/html",
-  xls: "application/vnd.ms-excel",
-  xlsb: "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
-  xlsm: "application/vnd.ms-excel.sheet.macroEnabled.12",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  xml: "application/xml",
-  xz: "application/x-xz",
-  zip: "application/zip",
-}));
-const mimeOverrideExtensions = [...mimeTypeByExtension.keys()].sort((left, right) => right.length - left.length);
-const filenameIndex = new Map();
-const extensionIndex = new Map();
-const mimeIndex = new Map();
-const filenamePatterns = [];
-
-for (const format of fileFormatRegistry.formats) {
-  for (const filename of format.filenames ?? []) {
-    filenameIndex.set(filename.toLowerCase(), format);
-  }
-  for (const pattern of format.filenamePatterns ?? []) {
-    filenamePatterns.push({
-      regex: globPatternToRegExp(pattern.toLowerCase()),
-      format,
-    });
-  }
-  for (const extension of format.extensions ?? []) {
-    extensionIndex.set(extension.toLowerCase(), format);
-  }
-  for (const mimeType of format.mimeTypes ?? []) {
-    mimeIndex.set(mimeType.toLowerCase(), format);
-  }
-}
-
-const copyNameExtensions = [...extensionIndex.keys()].sort((left, right) => right.length - left.length);
-
 export async function resolveLocalWorkspaceIdentity(folderPath) {
   const resolvedPath = path.resolve(folderPath);
   const canonicalPath = await fs.realpath(resolvedPath).catch((error) => {
@@ -631,25 +476,6 @@ async function readFileSlice(filePath, start, end) {
   }
 }
 
-export function getMimeType(filePath) {
-  const format = resolveLocalFileFormat({ name: filePath });
-  const mimeType = getRegistryMimeTypeForName(format, filePath)
-    ?? getMimeTypeOverride(filePath)
-    ?? format.mimeTypes?.[0]
-    ?? null;
-  if (!mimeType) return null;
-  return shouldUseUtf8Mime(format, mimeType) ? `${mimeType}; charset=utf-8` : mimeType;
-}
-
-function getRegistryMimeTypeForName(format, name) {
-  const lowerName = path.basename(name).toLowerCase();
-  const extension = [...(format.extensions ?? [])]
-    .map((value) => value.toLowerCase())
-    .sort((left, right) => right.length - left.length)
-    .find((value) => lowerName.endsWith(value));
-  return extension ? format.mimeTypesByExtension?.[extension] ?? null : null;
-}
-
 export async function writeWorkspaceTextFile(rootPath, relativePath, content) {
   if (typeof content !== "string") {
     throw new Error("File content must be text.");
@@ -886,19 +712,6 @@ function parseKeepBothCopySuffix(stem) {
   const copyNumber = match[2] ? Number.parseInt(match[2], 10) : 1;
   if (!Number.isSafeInteger(copyNumber) || copyNumber < 1) return null;
   return { stem: match[1], copyNumber };
-}
-
-function resolveCopyNameExtension(name) {
-  const lowerName = name.toLowerCase();
-  const registeredExtension = copyNameExtensions.find((extension) => (
-    lowerName.endsWith(extension) && name.length > extension.length
-  ));
-  if (registeredExtension) {
-    return name.slice(-registeredExtension.length);
-  }
-
-  const lastDot = name.lastIndexOf(".");
-  return lastDot > 0 ? name.slice(lastDot) : "";
 }
 
 function isCopyTargetConflict(error) {
@@ -1508,115 +1321,6 @@ export async function configureWorkspaceCloudRemote(rootPath, remoteUrl, remoteN
   return getWorkspaceGitStatus(root);
 }
 
-export async function readPuppyoneWorkspaceConfig(rootPath) {
-  const root = await resolveExistingWorkspacePath(rootPath, null);
-  const configDir = path.join(root, PUPPYONE_CONFIG_DIR);
-  const configPath = path.join(root, PUPPYONE_CONFIG_DIR, PUPPYONE_CONFIG_FILE);
-  const configDirMetadata = await fs.lstat(configDir).catch((error) => {
-    if (error?.code === "ENOENT") return null;
-    throw new Error(`Unable to inspect PuppyOne config directory: ${error.message}`);
-  });
-  if (!configDirMetadata) return normalizePuppyoneWorkspaceConfig(null);
-  if (configDirMetadata.isSymbolicLink() || !configDirMetadata.isDirectory()) {
-    throw new Error("PuppyOne config directory must be a real directory inside the workspace.");
-  }
-  const configMetadata = await fs.lstat(configPath).catch((error) => {
-    if (error?.code === "ENOENT") return null;
-    throw new Error(`Unable to inspect PuppyOne config: ${error.message}`);
-  });
-  if (!configMetadata) return normalizePuppyoneWorkspaceConfig(null);
-  if (configMetadata.isSymbolicLink() || !configMetadata.isFile()) {
-    throw new Error("PuppyOne config must be a regular file inside the workspace.");
-  }
-  const rawConfig = await fs.readFile(configPath, "utf8").catch((error) => {
-    if (error?.code === "ENOENT") return null;
-    throw new Error(`Unable to read PuppyOne config: ${error.message}`);
-  });
-
-  if (!rawConfig) return normalizePuppyoneWorkspaceConfig(null);
-
-  try {
-    return normalizePuppyoneWorkspaceConfig(JSON.parse(rawConfig));
-  } catch (error) {
-    throw new Error(`Unable to parse PuppyOne config: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
-
-export async function writePuppyoneWorkspaceConfig(rootPath, config) {
-  const root = await resolveExistingWorkspacePath(rootPath, null);
-  const configDir = path.join(root, PUPPYONE_CONFIG_DIR);
-  const existingConfig = await readPuppyoneWorkspaceConfig(root);
-  const projectId = normalizeWorkspaceProjectId(config?.project?.id)
-    ?? existingConfig.project.id
-    ?? crypto.randomUUID();
-  const normalizedConfig = normalizePuppyoneWorkspaceConfig(config, {
-    updatedAt: new Date().toISOString(),
-    projectId,
-  });
-
-  await fs.mkdir(configDir, { recursive: false }).catch((error) => {
-    if (error?.code === "EEXIST") return;
-    throw new Error(`Unable to create PuppyOne config directory: ${error.message}`);
-  });
-  const configDirMetadata = await fs.lstat(configDir).catch((error) => {
-    throw new Error(`Unable to inspect PuppyOne config directory: ${error.message}`);
-  });
-  if (configDirMetadata.isSymbolicLink() || !configDirMetadata.isDirectory()) {
-    throw new Error("PuppyOne config directory must be a real directory inside the workspace.");
-  }
-  const canonicalConfigDir = await fs.realpath(configDir);
-  if (!isSameOrInsidePath(root, canonicalConfigDir)) {
-    throw new Error("PuppyOne config directory resolves outside the workspace.");
-  }
-
-  const configPath = path.join(canonicalConfigDir, PUPPYONE_CONFIG_FILE);
-  const existingMetadata = await fs.lstat(configPath).catch((error) => {
-    if (error?.code === "ENOENT") return null;
-    throw new Error(`Unable to inspect PuppyOne config: ${error.message}`);
-  });
-  if (existingMetadata?.isSymbolicLink() || (existingMetadata && !existingMetadata.isFile())) {
-    throw new Error("PuppyOne config must be a regular file inside the workspace.");
-  }
-
-  const temporaryPath = path.join(
-    canonicalConfigDir,
-    `.config.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`,
-  );
-  let handle = null;
-  try {
-    handle = await fs.open(temporaryPath, "wx", 0o600);
-    await handle.writeFile(`${JSON.stringify(normalizedConfig, null, 2)}\n`, "utf8");
-    await handle.sync();
-    await handle.close();
-    handle = null;
-    await fs.rename(temporaryPath, configPath);
-    await fs.chmod(configPath, 0o600).catch(() => undefined);
-    await syncDirectoryBestEffort(canonicalConfigDir);
-  } catch (error) {
-    throw new Error(`Unable to write PuppyOne config: ${error.message}`);
-  } finally {
-    if (handle) await handle.close().catch(() => undefined);
-    await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
-  }
-
-  return normalizedConfig;
-}
-
-export async function regeneratePuppyoneWorkspaceProjectId(rootPath, options = {}) {
-  const current = await readPuppyoneWorkspaceConfig(rootPath);
-  return writePuppyoneWorkspaceConfig(rootPath, {
-    ...current,
-    project: {
-      ...current.project,
-      id: crypto.randomUUID(),
-    },
-    cloud: {
-      ...current.cloud,
-      projectId: options.preserveCloudBinding === true ? current.cloud.projectId : null,
-    },
-  });
-}
-
 export async function getWorkspaceGitCommitDetail(rootPath, commitId) {
   const root = resolveWorkspacePath(rootPath, null);
   assertSafeCommitId(commitId);
@@ -2086,65 +1790,6 @@ async function nodeFromEntry(folder, entry, parentRelative) {
   };
 }
 
-export function resolveWorkspacePath(rootPath, relativePath) {
-  const root = path.resolve(rootPath);
-  const normalizedRelative = normalizeRelativePath(relativePath);
-  const resolved = normalizedRelative ? path.resolve(root, normalizedRelative) : root;
-  if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
-    throw new Error("Folder path is outside the selected workspace.");
-  }
-  return resolved;
-}
-
-export async function resolveExistingWorkspacePath(rootPath, relativePath) {
-  const resolvedRoot = path.resolve(rootPath);
-  const canonicalRoot = await fs.realpath(resolvedRoot).catch((error) => {
-    throw new Error(`Unable to resolve workspace root: ${error.message}`);
-  });
-  const candidatePath = resolveWorkspacePath(canonicalRoot, relativePath);
-  const candidateMetadata = await fs.lstat(candidatePath).catch((error) => {
-    throw new Error(`Unable to resolve workspace entry: ${error.message}`);
-  });
-
-  if (candidatePath !== canonicalRoot && candidateMetadata.isSymbolicLink()) {
-    throw new Error("Symbolic links cannot be accessed through workspace file operations.");
-  }
-
-  const canonicalCandidate = await fs.realpath(candidatePath).catch((error) => {
-    throw new Error(`Unable to resolve workspace entry: ${error.message}`);
-  });
-  if (!isSameOrInsidePath(canonicalRoot, canonicalCandidate)) {
-    throw new Error("Workspace entry resolves outside the selected workspace.");
-  }
-
-  return canonicalCandidate;
-}
-
-function isSameOrInsidePath(parentPath, candidatePath) {
-  const parent = path.resolve(parentPath);
-  const candidate = path.resolve(candidatePath);
-  if (candidate === parent) return true;
-
-  const relativePath = path.relative(parent, candidate);
-  return Boolean(relativePath && !relativePath.startsWith("..") && !path.isAbsolute(relativePath));
-}
-
-function normalizeRelativePath(value) {
-  if (value == null || value === "") return "";
-  if (typeof value !== "string") {
-    throw new Error("Folder path must be a string.");
-  }
-  if (path.isAbsolute(value)) {
-    throw new Error("Folder path is outside the selected workspace.");
-  }
-  const normalized = path.normalize(value).replaceAll("\\", "/");
-  if (normalized === "." || normalized === "") return "";
-  if (normalized.startsWith("../") || normalized === ".." || normalized.includes("/../")) {
-    throw new Error("Folder path is outside the selected workspace.");
-  }
-  return normalized;
-}
-
 function normalizeNewEntryName(value) {
   if (typeof value !== "string") {
     throw new Error("Name is required.");
@@ -2168,7 +1813,7 @@ function joinRelativePath(parent, name) {
 }
 
 function classifyFile(name) {
-  return getSemanticKindForFormat(resolveLocalFileFormat({ name }));
+  return classifyLocalFile(name);
 }
 
 async function readPreview(filePath, size) {
@@ -2194,221 +1839,7 @@ async function readPreview(filePath, size) {
 }
 
 function isPreviewable(filePath) {
-  return isTextLikeFormat(resolveLocalFileFormat({ name: filePath }));
-}
-
-function loadFileFormatRegistry() {
-  // packages/shared-ui is the canonical copy in this standalone repo (ISSUE-021).
-  // The former "../../frontend/shared-ui" fallback assumed a sibling monorepo
-  // checkout that does not exist in CI / packaged builds / other machines and
-  // resolved to nothing — it has been removed.
-  const registryPath = path.resolve(localApiDir, "../packages/shared-ui/src/core/fileFormats.json");
-  try {
-    return JSON.parse(readFileSync(registryPath, "utf8"));
-  } catch (error) {
-    throw new Error(
-      `Unable to load PuppyOne file format registry from ${registryPath}: ${error.message}`,
-    );
-  }
-}
-
-function resolveLocalFileFormat({ name, mimeType }) {
-  if (name) {
-    const base = path.basename(name).toLowerCase();
-    const byName = filenameIndex.get(base);
-    if (byName) return byName;
-
-    const byExtension = matchExtension(name);
-    if (byExtension) return byExtension;
-
-    const byPattern = matchFilenamePattern(name);
-    if (byPattern) return byPattern;
-  }
-
-  if (mimeType) {
-    const normalizedMime = mimeType.toLowerCase().split(";")[0].trim();
-    const byMime = mimeIndex.get(normalizedMime);
-    if (byMime) return byMime;
-
-    if (normalizedMime.startsWith("image/")) {
-      return {
-        ...unknownFormat,
-        id: "image-unknown",
-        label: "Image",
-        category: "image",
-        defaultViewer: "image-preview",
-      };
-    }
-
-    if (
-      normalizedMime.startsWith("text/") ||
-      normalizedMime === "application/javascript" ||
-      normalizedMime === "application/typescript"
-    ) {
-      return {
-        ...unknownFormat,
-        id: "text-unknown",
-        label: "Text",
-        category: "text",
-        defaultViewer: "plain-text",
-        monacoLanguage: "plaintext",
-      };
-    }
-  }
-
-  return unknownFormat;
-}
-
-function matchExtension(name) {
-  const lower = path.basename(name).toLowerCase();
-  const lastDot = lower.lastIndexOf(".");
-  if (lastDot < 0) return null;
-
-  const secondLastDot = lower.lastIndexOf(".", lastDot - 1);
-  if (secondLastDot >= 0) {
-    const compound = lower.slice(secondLastDot);
-    const compoundMatch = extensionIndex.get(compound);
-    if (compoundMatch) return compoundMatch;
-  }
-
-  return extensionIndex.get(lower.slice(lastDot)) ?? null;
-}
-
-function matchFilenamePattern(name) {
-  const normalized = String(name).replace(/\\/g, "/").toLowerCase();
-  const base = path.basename(normalized);
-
-  for (const { regex, format } of filenamePatterns) {
-    if (regex.test(normalized) || regex.test(base)) return format;
-  }
-
-  return null;
-}
-
-function globPatternToRegExp(pattern) {
-  let source = "^";
-
-  for (let index = 0; index < pattern.length; index += 1) {
-    const char = pattern[index];
-    const next = pattern[index + 1];
-    const afterNext = pattern[index + 2];
-
-    if (char === "*" && next === "*" && afterNext === "/") {
-      source += "(?:.*/)?";
-      index += 2;
-      continue;
-    }
-
-    if (char === "*" && next === "*") {
-      source += ".*";
-      index += 1;
-      continue;
-    }
-
-    if (char === "*") {
-      source += "[^/]*";
-      continue;
-    }
-
-    if (char === "?") {
-      source += "[^/]";
-      continue;
-    }
-
-    source += escapeRegExp(char);
-  }
-
-  return new RegExp(`${source}$`);
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
-}
-
-function getMimeTypeOverride(name) {
-  const lower = path.basename(name).toLowerCase();
-  for (const extension of mimeOverrideExtensions) {
-    if (lower.endsWith(`.${extension}`)) {
-      return mimeTypeByExtension.get(extension) ?? null;
-    }
-  }
-  return null;
-}
-
-function getSemanticKindForFormat(format) {
-  if (format.id === "puppyflow") return "workflow";
-  if (format.id === "json" || format.id === "jsonl") return "json";
-
-  switch (format.defaultViewer) {
-    case "markdown-editor":
-      return "markdown";
-    case "html-artifact":
-      return "html";
-    case "app-preview":
-      return "app";
-    case "image-preview":
-      return "image";
-    case "audio-preview":
-      return "audio";
-    case "video-preview":
-      return "video";
-    case "pdf-preview":
-      return "pdf";
-    case "csv-table":
-      return "spreadsheet";
-    default:
-      break;
-  }
-
-  switch (format.category) {
-    case "markdown":
-      return "markdown";
-    case "app":
-      return "app";
-    case "image":
-      return "image";
-    case "audio":
-      return "audio";
-    case "video":
-      return "video";
-    case "archive":
-      return "archive";
-    case "document":
-      return format.id === "xlsx" ? "spreadsheet" : "document";
-    case "binary":
-      return "binary";
-    case "text":
-      return "text";
-    case "code":
-    case "data":
-      return "code";
-    default:
-      return "file";
-  }
-}
-
-function isTextLikeFormat(format) {
-  return (
-    format.category === "markdown" ||
-    format.category === "text" ||
-    format.category === "code" ||
-    format.defaultViewer === "csv-table" ||
-    (format.category === "data" && format.defaultViewer === "monaco-code")
-  );
-}
-
-function shouldUseUtf8Mime(format, mimeType) {
-  return (
-    mimeType.startsWith("text/") ||
-    format.category === "markdown" ||
-    format.category === "text" ||
-    format.category === "code" ||
-    format.category === "data" ||
-    format.defaultViewer === "html-artifact" ||
-    format.defaultViewer === "monaco-code" ||
-    format.defaultViewer === "csv-table" ||
-    format.defaultViewer === "plain-text"
-  );
+  return isLocalFilePreviewable(filePath);
 }
 
 function formatFileSize(bytes) {
@@ -2435,18 +1866,6 @@ function createFileSystemIdentity(metadata, canonicalPath) {
 
 function createWorkspaceInstanceId(fsIdentity) {
   return `wsi_${crypto.createHash("sha256").update(fsIdentity).digest("base64url").slice(0, 24)}`;
-}
-
-async function syncDirectoryBestEffort(directory) {
-  let handle = null;
-  try {
-    handle = await fs.open(directory, "r");
-    await handle.sync();
-  } catch {
-    // Directory fsync is unavailable on some platforms and filesystems.
-  } finally {
-    if (handle) await handle.close().catch(() => undefined);
-  }
 }
 
 function getGitErrorOutput(error) {
@@ -3454,95 +2873,6 @@ async function readGitRemotes(rootPath, options = {}) {
   return [...remotes.values()];
 }
 
-function normalizePuppyoneWorkspaceConfig(value, options = {}) {
-  const source = value && typeof value === "object" ? value : {};
-  const sourceVersion = Number(source.version ?? 1);
-  if (!Number.isInteger(sourceVersion) || sourceVersion < 1 || sourceVersion > 2) {
-    throw new Error(`Unsupported PuppyOne config version: ${String(source.version)}`);
-  }
-  const project = source.project && typeof source.project === "object" ? source.project : {};
-  const sync = source.sync && typeof source.sync === "object" ? source.sync : {};
-  const sourceOfTruth = sync.sourceOfTruth && typeof sync.sourceOfTruth === "object" ? sync.sourceOfTruth : {};
-  const git = source.git && typeof source.git === "object" ? source.git : {};
-  const backup = source.backup && typeof source.backup === "object" ? source.backup : {};
-  const cloud = source.cloud && typeof source.cloud === "object" ? source.cloud : {};
-  const primaryRemote = normalizeOptionalConfigText(git.primaryRemote);
-  const watchedBranch = normalizeOptionalConfigText(git.watchedBranch);
-  const sourceOfTruthService = normalizeBackendService(sourceOfTruth.service ?? backup.service);
-  const isPuppyoneSource = sourceOfTruthService === "puppyone";
-  const sourceOfTruthRemote =
-    normalizeOptionalConfigText(sourceOfTruth.remote)
-    ?? primaryRemote
-    ?? normalizeOptionalConfigText(backup.remote);
-  const sourceOfTruthBranch = isPuppyoneSource
-    ? null
-    : normalizeOptionalConfigText(sourceOfTruth.branch)
-      ?? watchedBranch
-      ?? normalizeOptionalConfigText(backup.branch);
-  const updatedAt = typeof options.updatedAt === "string"
-    ? options.updatedAt
-    : typeof source.updatedAt === "string"
-      ? source.updatedAt
-      : undefined;
-  const projectId = options.projectId
-    ?? normalizeWorkspaceProjectId(project.id, { strict: true });
-
-  return {
-    ...source,
-    ...DEFAULT_PUPPYONE_WORKSPACE_CONFIG,
-    version: 2,
-    project: {
-      ...project,
-      id: projectId,
-    },
-    sync: {
-      ...sync,
-      sourceOfTruth: {
-        ...sourceOfTruth,
-        service: sourceOfTruthService,
-        remote: sourceOfTruthRemote,
-        branch: sourceOfTruthBranch,
-      },
-    },
-    git: {
-      ...git,
-      primaryRemote: primaryRemote ?? sourceOfTruthRemote,
-      watchedBranch: isPuppyoneSource ? null : watchedBranch ?? sourceOfTruthBranch,
-    },
-    backup: {
-      ...backup,
-      enabled: backup.enabled === true || cloud.backupEnabled === true,
-      service: normalizeBackendService(backup.service ?? sourceOfTruthService),
-      remote: normalizeOptionalConfigText(backup.remote) ?? sourceOfTruthRemote,
-      branch: normalizeOptionalConfigText(backup.branch) ?? (isPuppyoneSource ? null : sourceOfTruthBranch),
-    },
-    cloud: {
-      ...cloud,
-      projectId: normalizeOptionalConfigText(cloud.projectId),
-    },
-    ...(updatedAt ? { updatedAt } : {}),
-  };
-}
-
-function normalizeWorkspaceProjectId(value, { strict = false } = {}) {
-  if (value == null || value === "") return null;
-  const normalized = normalizeOptionalConfigText(value);
-  const valid = normalized && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalized);
-  if (valid) return normalized.toLowerCase();
-  if (strict || normalized) throw new Error("PuppyOne project.id must be a valid UUID.");
-  return null;
-}
-
-function normalizeBackendService(value) {
-  return value === "github" || value === "custom" || value === "puppyone" ? value : "github";
-}
-
-function normalizeOptionalConfigText(value) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
 async function readGitHistory(rootPath, limit, options = {}) {
   const baseArgs = [
     "log",
@@ -4044,181 +3374,4 @@ function normalizeGitRemoteUrl(remoteUrl) {
     throw new Error("Remote URL is not a PuppyOne Git endpoint.");
   }
   return normalized;
-}
-
-function buildGitSourceControlSnapshot({ entries, branchName, syncTarget, currentBranch, headCommitId }) {
-  const resourcesByGroup = new Map(GIT_RESOURCE_GROUPS.map((group) => [group.id, []]));
-
-  for (const entry of entries) {
-    for (const resource of buildGitSourceControlResourcesForEntry(entry)) {
-      resourcesByGroup.get(resource.group)?.push(resource);
-    }
-  }
-
-  const groups = GIT_RESOURCE_GROUPS
-    .map((group) => ({
-      ...group,
-      resources: resourcesByGroup.get(group.id) ?? [],
-    }))
-    .filter((group) => group.resources.length > 0 || group.id === "index" || group.id === "workingTree");
-  const stagedCount = resourcesByGroup.get("index")?.length ?? 0;
-  const workingCount = (resourcesByGroup.get("workingTree")?.length ?? 0) + (resourcesByGroup.get("untracked")?.length ?? 0);
-  const mergeCount = resourcesByGroup.get("merge")?.length ?? 0;
-
-  return {
-    input: {
-      placeholder: branchName && branchName !== "detached"
-        ? `Message (⌘↩ to commit on ${branchName})`
-        : "Message (⌘↩ to commit)",
-      defaultMessage: buildDefaultCommitMessageFromResources(resourcesByGroup.get("index") ?? []),
-    },
-    groups,
-    remote: buildGitSourceControlRemoteSummary({ branchName, syncTarget, currentBranch, headCommitId }),
-    actions: {
-      canStageAll: workingCount > 0 || mergeCount > 0,
-      canUnstageAll: stagedCount > 0,
-      canDiscardAll: workingCount > 0 || mergeCount > 0,
-      canCommit: stagedCount > 0 && mergeCount === 0,
-    },
-  };
-}
-
-function buildGitSourceControlResourcesForEntry(entry) {
-  if (entry.conflict || entry.status === "conflict" || isConflictStatus(entry.staged, entry.unstaged)) {
-    return [buildGitSourceControlResource(entry, "merge", "conflict")];
-  }
-
-  const resources = [];
-  if (entry.status === "untracked") {
-    resources.push(buildGitSourceControlResource(entry, "untracked", "untracked"));
-    return resources;
-  }
-
-  const stagedStatus = gitStatusCodeToLabel(entry.staged);
-  if (stagedStatus) {
-    resources.push(buildGitSourceControlResource(entry, "index", stagedStatus));
-  }
-
-  const unstagedStatus = gitStatusCodeToLabel(entry.unstaged);
-  if (unstagedStatus) {
-    resources.push(buildGitSourceControlResource(entry, "workingTree", unstagedStatus));
-  }
-
-  return resources;
-}
-
-function buildGitSourceControlResource(entry, group, status) {
-  return {
-    id: `${group}:${entry.oldPath ?? ""}:${entry.path}:${status}`,
-    group,
-    path: entry.path,
-    oldPath: entry.oldPath ?? null,
-    status,
-    staged: group === "index",
-    conflict: group === "merge",
-    letter: gitStatusLabelToLetter(status),
-  };
-}
-
-function buildGitSourceControlRemoteSummary({ branchName, syncTarget, currentBranch, headCommitId }) {
-  const ahead = syncTarget?.ahead ?? currentBranch?.ahead ?? 0;
-  const behind = syncTarget?.behind ?? currentBranch?.behind ?? 0;
-  const hasBranch = Boolean(branchName && branchName !== "detached");
-  const hasTarget = Boolean(syncTarget?.remote && syncTarget?.branch);
-  const remoteExists = syncTarget?.exists === true;
-  const upstream = syncTarget?.ref ?? currentBranch?.upstream ?? null;
-  const canPublish = hasBranch && hasTarget && !remoteExists && Boolean(headCommitId);
-  const canPull = remoteExists && behind > 0;
-  const canPush = remoteExists && ahead > 0;
-  const canSync = canPublish || (remoteExists && (ahead > 0 || behind > 0));
-
-  let state = "synced";
-  if (branchName == null && !headCommitId && !syncTarget) {
-    state = "no-repository";
-  } else if (!hasBranch) {
-    state = "no-branch";
-  } else if (!hasTarget) {
-    state = "no-remote";
-  } else if (!remoteExists) {
-    state = "publish";
-  } else if (ahead > 0 && behind > 0) {
-    state = "diverged";
-  } else if (behind > 0) {
-    state = "incoming";
-  } else if (ahead > 0) {
-    state = "outgoing";
-  }
-
-  return {
-    target: syncTarget,
-    currentBranch: branchName ?? null,
-    upstream,
-    ahead,
-    behind,
-    incomingPreview: syncTarget?.incomingPreview ?? [],
-    outgoingPreview: syncTarget?.outgoingPreview ?? [],
-    canPull,
-    canPush,
-    canSync,
-    canPublish,
-    state,
-  };
-}
-
-function buildDefaultCommitMessageFromResources(resources) {
-  if (resources.length === 1) {
-    return `Update ${path.basename(resources[0].path) || resources[0].path}`;
-  }
-  if (resources.length > 1) return `Update ${resources.length} files`;
-  return "Update workspace";
-}
-
-function getDiscardableResources(sourceControl) {
-  return (sourceControl?.groups ?? [])
-    .filter((group) => group.id === "workingTree" || group.id === "untracked" || group.id === "merge")
-    .flatMap((group) => group.resources);
-}
-
-function getResourceGitPaths(resource) {
-  return resource.oldPath && resource.oldPath !== resource.path
-    ? [resource.oldPath, resource.path]
-    : [resource.path];
-}
-
-function uniqueGitPaths(paths) {
-  return [...new Set(paths.map((value) => normalizeRelativePath(value)).filter(Boolean))];
-}
-
-function isConflictStatus(staged, unstaged) {
-  const code = `${staged ?? " "}${unstaged ?? " "}`;
-  return code.includes("U") || ["DD", "AA"].includes(code);
-}
-
-function gitStatusCodeToLabel(code) {
-  if (!code || code === " " || code === "." || code === "?") return null;
-  if (code === "M") return "modified";
-  if (code === "A") return "added";
-  if (code === "D") return "deleted";
-  if (code === "R") return "renamed";
-  if (code === "C") return "copied";
-  if (code === "U") return "conflict";
-  return "changed";
-}
-
-function gitStatusLabelToLetter(status) {
-  if (status === "untracked") return "U";
-  if (status === "added") return "A";
-  if (status === "deleted") return "D";
-  if (status === "renamed") return "R";
-  if (status === "copied") return "C";
-  if (status === "conflict") return "!";
-  return "M";
-}
-
-function hasStagedStatus(entry) {
-  return Boolean(entry.staged && entry.staged !== "?" && entry.staged !== ".");
-}
-
-function hasUnstagedStatus(entry) {
-  return entry.status !== "untracked" && Boolean(entry.unstaged && entry.unstaged !== "?" && entry.unstaged !== ".");
 }

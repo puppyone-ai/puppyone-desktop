@@ -27,7 +27,7 @@ describe("preflightZipCentralDirectory", () => {
   it("accepts the committed Word and Excel OOXML fixtures", () => {
     const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
     for (const filename of ["puppyone-preview-sample.docx", "puppyone-preview-sample.xlsx"]) {
-      const bytes = readFileSync(path.join(repoRoot, "editor test", filename));
+      const bytes = readFileSync(path.join(repoRoot, "tests/fixtures/editor-rendering", filename));
       const report = preflightOoxmlPackage(bytes);
       expect(report.entryCount, filename).toBeGreaterThan(2);
       expect(report.totalUncompressedBytes, filename).toBeGreaterThan(0);
