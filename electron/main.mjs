@@ -65,7 +65,6 @@ const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
   isPackaged: app.isPackaged,
 });
 const workspaceStateFilename = "desktop-workspace-state.json";
-const cloudAuthProtocol = "puppyone";
 const dockIconResources = Object.freeze({
   polished: "logo-square.png",
   light: "dock-icon-light.png",
@@ -141,12 +140,11 @@ const workspaceStateStore = createWorkspaceStateStore({
 });
 const cloudAuthService = createCloudAuthService({
   app,
-  projectRoot,
-  protocol: cloudAuthProtocol,
   requestCloudApi,
   getCloudApiErrorMessage,
   secureStorage: safeStorage,
   openExternal: (href) => shell.openExternal(href),
+  localCloudWebUrl: process.env.VITE_DESKTOP_CLOUD_WEB_URL,
   getWindows: () => BrowserWindow.getAllWindows(),
   revealWindow: revealLastFocusedWindow,
 });
@@ -393,35 +391,13 @@ function setDockMenu() {
   app.dock.setMenu(dockMenu);
 }
 
-function registerCloudAuthProtocol() {
-  cloudAuthService.registerProtocol();
-}
-
-function isCloudAuthCallbackUrl(value) {
-  return cloudAuthService.isCallbackUrl(value);
-}
-
-registerCloudAuthProtocol();
-
 app.on("second-instance", (_event, argv) => {
-  const callbackUrl = argv.find(isCloudAuthCallbackUrl);
-  if (callbackUrl) {
-    void cloudAuthService.handleCallback(callbackUrl);
-    return;
-  }
-
   const workspacePath = findWorkspacePathArg(argv);
   if (workspacePath) {
     void openWorkspaceInNewWindow(workspacePath);
     return;
   }
   createOrRevealWindow();
-});
-
-app.on("open-url", (event, callbackUrl) => {
-  if (!isCloudAuthCallbackUrl(callbackUrl)) return;
-  event.preventDefault();
-  void cloudAuthService.handleCallback(callbackUrl);
 });
 
 app.whenReady().then(async () => {

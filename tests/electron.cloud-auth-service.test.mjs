@@ -57,6 +57,7 @@ describe("main-owned Cloud Auth Broker", () => {
           refreshToken: `rotated-refresh-${refreshCount}`,
         });
       }
+      if (apiPath === "/auth/initialize") return { ok: true };
 
       if (init.headers.Authorization === `Bearer ${initialAccessToken}`) {
         initialRequests += 1;
@@ -119,8 +120,13 @@ describe("main-owned Cloud Auth Broker", () => {
   it("generates Desktop PKCE, binds the loopback redirect, exchanges the verifier once, and persists v2", async () => {
     const fixture = createFixture({ credential: null });
     let onCallback = null;
-    fixture.startCallbackServer.mockImplementation(async ({ onCallback: callback }) => {
+    let isExpectedCallback = null;
+    fixture.startCallbackServer.mockImplementation(async ({
+      onCallback: callback,
+      isExpectedCallback: expectedCallback,
+    }) => {
       onCallback = callback;
+      isExpectedCallback = expectedCallback;
       return {
         redirectUri: "http://127.0.0.1:43123/auth/callback",
         close: vi.fn(async () => {}),
@@ -151,6 +157,16 @@ describe("main-owned Cloud Auth Broker", () => {
 
     await fixture.service.startOAuth({ apiBase: API, provider: "github" });
     expect(fixture.openExternal).toHaveBeenCalledWith("https://app.puppyone.ai/login");
+    expect(isExpectedCallback(
+      "http://127.0.0.1:43123/auth/callback?state=oauth-state-1&code=exchange-code",
+    )).toBe(true);
+    expect(isExpectedCallback(
+      "http://127.0.0.1:43123/auth/callback?state=wrong&code=exchange-code",
+    )).toBe(false);
+
+    await expect(fixture.service.startOAuth({ apiBase: API, provider: "github" }))
+      .resolves.toEqual({ ok: true, pending: true });
+    expect(fixture.openExternal).toHaveBeenCalledTimes(1);
     const signedIn = await onCallback(
       "http://127.0.0.1:43123/auth/callback?state=oauth-state-1&code=exchange-code",
     );
@@ -215,6 +231,7 @@ describe("main-owned Cloud Auth Broker", () => {
     fixture.requestCloudApi.mockImplementation(async (_base, path) => {
       if (path === "/auth/refresh") return authResponse({ accessToken: jwtFor("user-123") });
       if (path === "/auth/logout") throw Object.assign(new Error("Not found"), { status: 404 });
+      if (path === "/auth/initialize") return { ok: true };
       return new Promise((resolve) => { resolveRequest = resolve; });
     });
     await fixture.service.restoreSession(API);
@@ -237,6 +254,7 @@ describe("main-owned Cloud Auth Broker", () => {
 function createFixture({
   credential = createCredential(),
   fetchImpl = globalThis.fetch,
+  localCloudWebUrl = "http://localhost:3000",
   windowCount = 1,
 } = {}) {
   let storedCredential = credential;
@@ -270,6 +288,7 @@ function createFixture({
     revealWindow: vi.fn(),
     credentialStore,
     fetchImpl,
+    localCloudWebUrl,
     openExternal,
     startCallbackServer,
     logger: { warn: vi.fn(), error: vi.fn() },

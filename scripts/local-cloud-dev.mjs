@@ -34,20 +34,20 @@ export function parseEnvText(source) {
   return values;
 }
 
-export function resolveLocalCloudDevConfig({
+export function loadDesktopDevelopmentEnvironment({
   desktopRoot,
   environment = process.env,
   readFile = readFileSync,
 } = {}) {
   if (typeof desktopRoot !== "string" || !desktopRoot.trim()) {
-    throw new TypeError("Desktop root is required to resolve local Cloud services.");
+    throw new TypeError("Desktop root is required to load development environment variables.");
   }
 
-  const fileEnvironment = {};
+  const loaded = {};
   for (const filename of VITE_DEVELOPMENT_ENV_FILES) {
     try {
       Object.assign(
-        fileEnvironment,
+        loaded,
         parseEnvText(readFile(path.join(desktopRoot, filename), "utf8")),
       );
     } catch (error) {
@@ -55,14 +55,19 @@ export function resolveLocalCloudDevConfig({
     }
   }
 
-  const effectiveEnvironment = { ...fileEnvironment };
-  for (const key of [
-    "VITE_DESKTOP_CLOUD_API_URL",
-    "VITE_CLOUD_API_URL",
-    "VITE_API_URL",
-  ]) {
-    if (typeof environment[key] === "string") effectiveEnvironment[key] = environment[key];
-  }
+  return { ...loaded, ...environment };
+}
+
+export function resolveLocalCloudDevConfig({
+  desktopRoot,
+  environment = process.env,
+  readFile = readFileSync,
+} = {}) {
+  const effectiveEnvironment = loadDesktopDevelopmentEnvironment({
+    desktopRoot,
+    environment,
+    readFile,
+  });
   const apiBaseValue = firstNonEmpty(
     effectiveEnvironment.VITE_DESKTOP_CLOUD_API_URL,
     effectiveEnvironment.VITE_CLOUD_API_URL,
@@ -70,21 +75,27 @@ export function resolveLocalCloudDevConfig({
   );
   if (!apiBaseValue) return null;
 
-  const apiBaseUrl = parseHttpUrl(apiBaseValue, "Desktop Cloud API URL");
+  const apiBaseUrl = parseConfiguredHttpUrl(apiBaseValue, "Desktop Cloud API URL");
   if (!isLoopbackHostname(apiBaseUrl.hostname)) return null;
 
-  const webUrl = parseHttpUrl(
-    firstNonEmpty(environment.PUPPYONE_LOCAL_CLOUD_WEB_URL) ?? "http://localhost:3000",
-    "Local Cloud web URL",
+  const webUrl = parseConfiguredHttpUrl(
+    effectiveEnvironment.VITE_DESKTOP_CLOUD_WEB_URL,
+    "VITE_DESKTOP_CLOUD_WEB_URL",
   );
   if (!isLoopbackHostname(webUrl.hostname)) {
     throw new Error("Local Cloud web URL must use a loopback hostname.");
   }
+  if (webUrl.pathname !== "/" || webUrl.search || webUrl.hash) {
+    throw new Error("VITE_DESKTOP_CLOUD_WEB_URL must be an origin without a path, query, or hash.");
+  }
 
-  const cloudRoot = path.resolve(
-    firstNonEmpty(environment.PUPPYONE_CLOUD_DEV_ROOT)
-      ?? path.join(desktopRoot, "..", "puppyone"),
-  );
+  const cloudRootValue = firstNonEmpty(effectiveEnvironment.PUPPYONE_CLOUD_DEV_ROOT);
+  if (!cloudRootValue) {
+    throw new Error("PUPPYONE_CLOUD_DEV_ROOT must be configured for a local Cloud API.");
+  }
+  const cloudRoot = path.isAbsolute(cloudRootValue)
+    ? path.normalize(cloudRootValue)
+    : path.resolve(desktopRoot, cloudRootValue);
   const apiOrigin = apiBaseUrl.origin;
   const webOrigin = webUrl.origin;
 
@@ -297,10 +308,13 @@ function assertServiceCanStart(service) {
   }
 }
 
-function parseHttpUrl(value, label) {
+export function parseConfiguredHttpUrl(value, label) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${label} must be configured.`);
+  }
   let url;
   try {
-    url = new URL(value);
+    url = new URL(value.trim());
   } catch {
     throw new Error(`${label} is invalid.`);
   }
@@ -315,7 +329,7 @@ function parseHttpUrl(value, label) {
   return url;
 }
 
-function isLoopbackHostname(hostname) {
+export function isLoopbackHostname(hostname) {
   return hostname === "localhost"
     || hostname === "127.0.0.1"
     || hostname === "::1"

@@ -5,16 +5,20 @@ const MAX_CALLBACK_URL_LENGTH = 8 * 1024;
 
 export async function startLoopbackCallbackServer({
   onCallback,
+  isExpectedCallback,
   host = "127.0.0.1",
   logger = console,
 } = {}) {
   if (typeof onCallback !== "function") {
     throw new TypeError("Loopback callback onCallback is required.");
   }
+  if (typeof isExpectedCallback !== "function") {
+    throw new TypeError("Loopback callback isExpectedCallback is required.");
+  }
 
-  let accepted = false;
+  let handled = false;
   let redirectUri = null;
-  const server = http.createServer((request, response) => {
+  const server = http.createServer(async (request, response) => {
     if (request.method !== "GET" || typeof request.url !== "string" || request.url.length > MAX_CALLBACK_URL_LENGTH) {
       respond(response, 404, "PuppyOne sign-in callback was not recognized.");
       return;
@@ -25,22 +29,43 @@ export async function startLoopbackCallbackServer({
     }
 
     const callbackUrl = new URL(request.url, redirectUri);
-    if (callbackUrl.pathname !== CALLBACK_PATH || accepted) {
-      respond(response, accepted ? 409 : 404, accepted
+    const serializedCallbackUrl = callbackUrl.toString();
+    if (callbackUrl.pathname !== CALLBACK_PATH || handled) {
+      respond(response, handled ? 409 : 404, handled
         ? "This PuppyOne sign-in callback has already been used."
         : "PuppyOne sign-in callback was not recognized.");
       return;
     }
+    if (!isExpectedCallback(serializedCallbackUrl)) {
+      respond(response, 400, "PuppyOne sign-in state did not match this Desktop request.");
+      return;
+    }
 
-    accepted = true;
-    respond(response, 200, "Sign-in returned to PuppyOne Desktop. You can close this browser tab.");
-    void close().finally(() => {
-      Promise.resolve(onCallback(callbackUrl.toString())).catch((error) => {
-        logger.warn?.("PuppyOne loopback callback failed.", {
-          error: error instanceof Error ? error.message : String(error),
-        });
+    handled = true;
+    // Stop accepting new callbacks immediately, but never wait for close()
+    // before exchanging the one-time code: the active browser connection is
+    // itself what close() waits for.
+    void close().catch((error) => {
+      logger.warn?.("PuppyOne loopback callback listener did not close cleanly.", {
+        error: error instanceof Error ? error.message : String(error),
       });
     });
+
+    try {
+      const session = await onCallback(serializedCallbackUrl);
+      respond(
+        response,
+        session ? 200 : 400,
+        session
+          ? "Sign-in completed in PuppyOne Desktop. You can close this browser tab."
+          : "PuppyOne Desktop could not complete sign-in. Return to the app and try again.",
+      );
+    } catch (error) {
+      logger.warn?.("PuppyOne loopback callback failed.", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      respond(response, 500, "PuppyOne Desktop could not complete sign-in. Return to the app and try again.");
+    }
   });
 
   server.on("clientError", (_error, socket) => {
@@ -66,7 +91,8 @@ export async function startLoopbackCallbackServer({
     await close();
     throw new Error("Unable to determine the OAuth loopback callback port.");
   }
-  redirectUri = `http://${host}:${address.port}${CALLBACK_PATH}`;
+  const redirectHost = host.includes(":") ? `[${host}]` : host;
+  redirectUri = `http://${redirectHost}:${address.port}${CALLBACK_PATH}`;
   server.unref?.();
 
   async function close() {

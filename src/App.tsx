@@ -89,6 +89,7 @@ export function App() {
   const assetLibraryHomeAvailable = useFeatureFlag("assetLibraryHome");
   const agentChatAvailable = useFeatureFlag("desktopAgentChat");
   const {
+    cloudAuthStatus,
     cloudSession,
     cloudSessionRestoring,
     handleCloudSessionChange: updateCloudSession,
@@ -102,12 +103,13 @@ export function App() {
       title: "Opening browser sign-in",
       detail,
     });
-    window.setTimeout(() => {
-      setHomeOperationStatus((current) => (
-        current?.title === "Opening browser sign-in" ? null : current
-      ));
-    }, 2200);
   }, []);
+  useEffect(() => {
+    if (cloudAuthStatus === "signing-in") return;
+    setHomeOperationStatus((current) => (
+      current?.title === "Opening browser sign-in" ? null : current
+    ));
+  }, [cloudAuthStatus]);
   const {
     activateWorkspace,
     clearWorkspace,
@@ -225,6 +227,10 @@ export function App() {
   }, [homeOperationStatus, workspace]);
   const startCloudBrowserSignIn = useCallback(async () => {
     if (!cloudEnabled) return;
+    if (cloudAuthStatus === "signing-in") {
+      showBrowserSignInStatus("A secure Puppyone Cloud sign-in is already open in your browser.");
+      return;
+    }
     if (cloudBrowserSignInInFlightRef.current) return;
     cloudBrowserSignInInFlightRef.current = true;
     try {
@@ -237,7 +243,7 @@ export function App() {
         cloudBrowserSignInInFlightRef.current = false;
       }, CLOUD_BROWSER_SIGN_IN_COOLDOWN_MS);
     }
-  }, [cloudEnabled]);
+  }, [cloudAuthStatus, cloudEnabled, setRestoreWorkspaceError, showBrowserSignInStatus]);
   const handleCloudDataSessionChange = useCallback((session: DesktopCloudSession | null) => {
     updateCloudSession(session);
     if (!session) {

@@ -38,7 +38,11 @@ describe("local Cloud development services", () => {
     const desktopRoot = "/workspace/puppyone desktop";
     const readFile = vi.fn((filename) => {
       if (filename.endsWith(".env.local")) {
-        return "VITE_DESKTOP_CLOUD_API_URL=http://localhost:9090/api/v1\n";
+        return [
+          "VITE_DESKTOP_CLOUD_API_URL=http://localhost:9090/api/v1",
+          "VITE_DESKTOP_CLOUD_WEB_URL=http://localhost:3000",
+          "PUPPYONE_CLOUD_DEV_ROOT=../puppyone",
+        ].join("\n");
       }
       throw missingFileError();
     });
@@ -94,6 +98,7 @@ describe("local Cloud development services", () => {
       environment: {
         PUPPYONE_CLOUD_DEV_ROOT: "/workspace/puppyone",
         VITE_DESKTOP_CLOUD_API_URL: "http://localhost:9090/api/v1",
+        VITE_DESKTOP_CLOUD_WEB_URL: "http://localhost:3000",
       },
       readFile: () => {
         throw missingFileError();

@@ -3,6 +3,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getDefaultElectronBin } from "./electron-runtime.mjs";
 import {
+  isLoopbackHostname,
+  loadDesktopDevelopmentEnvironment,
+  parseConfiguredHttpUrl,
   prepareLocalCloudDevServices,
   resolveLocalCloudDevConfig,
 } from "./local-cloud-dev.mjs";
@@ -14,7 +17,6 @@ import { probeViteDevServer } from "./vite-client-health.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const desktopRoot = path.resolve(__dirname, "..");
-const devUrl = "http://127.0.0.1:5173";
 const mainWatchPaths = [
   path.join(desktopRoot, "electron"),
   path.join(desktopRoot, "local-api"),
@@ -29,6 +31,10 @@ const rendererDependencyWatchPaths = [
 ];
 
 let renderer = null;
+let rendererHost = null;
+let rendererPort = null;
+let devUrl = null;
+let desktopCloudWebUrl = null;
 let healthCheckInFlight = false;
 let healthCheck = null;
 let electron = null;
@@ -51,7 +57,39 @@ void startDevelopmentEnvironment();
 
 async function startDevelopmentEnvironment() {
   try {
-    const localCloudConfig = resolveLocalCloudDevConfig({ desktopRoot });
+    const developmentEnvironment = loadDesktopDevelopmentEnvironment({ desktopRoot });
+    const rendererUrl = parseConfiguredHttpUrl(
+      developmentEnvironment.PUPPYONE_DESKTOP_RENDERER_URL,
+      "PUPPYONE_DESKTOP_RENDERER_URL",
+    );
+    if (
+      rendererUrl.protocol !== "http:"
+      || !isLoopbackHostname(rendererUrl.hostname)
+      || rendererUrl.pathname !== "/"
+      || rendererUrl.search
+      || rendererUrl.hash
+    ) {
+      throw new Error("PUPPYONE_DESKTOP_RENDERER_URL must use an HTTP loopback origin.");
+    }
+    parseConfiguredHttpUrl(
+      developmentEnvironment.VITE_DESKTOP_CLOUD_API_URL,
+      "VITE_DESKTOP_CLOUD_API_URL",
+    );
+    const cloudWebUrl = parseConfiguredHttpUrl(
+      developmentEnvironment.VITE_DESKTOP_CLOUD_WEB_URL,
+      "VITE_DESKTOP_CLOUD_WEB_URL",
+    );
+    rendererHost = rendererUrl.hostname === "localhost"
+      ? "127.0.0.1"
+      : rendererUrl.hostname.replace(/^\[|\]$/g, "");
+    rendererPort = rendererUrl.port ? Number(rendererUrl.port) : 80;
+    devUrl = rendererUrl.origin;
+
+    const localCloudConfig = resolveLocalCloudDevConfig({
+      desktopRoot,
+      environment: developmentEnvironment,
+    });
+    desktopCloudWebUrl = cloudWebUrl.toString().replace(/\/+$/, "");
     if (localCloudConfig) {
       localCloudServices = await prepareLocalCloudDevServices(localCloudConfig);
       for (const { child, name } of localCloudServices.ownedProcesses) {
@@ -155,7 +193,16 @@ function startLocalCloudHealthCheck() {
 function startRenderer() {
   if (shuttingDown || renderer) return;
 
-  const child = spawnManagedChild("npm", ["run", "dev:renderer"], {
+  const child = spawnManagedChild("npm", [
+    "run",
+    "dev:renderer",
+    "--",
+    "--host",
+    rendererHost,
+    "--port",
+    String(rendererPort),
+    "--strictPort",
+  ], {
     cwd: desktopRoot,
     stdio: "inherit",
     env: process.env,
@@ -201,6 +248,9 @@ function startElectron() {
     env: {
       ...process.env,
       PUPPYONE_DESKTOP_DEV_URL: devUrl,
+      ...(desktopCloudWebUrl
+        ? { VITE_DESKTOP_CLOUD_WEB_URL: desktopCloudWebUrl }
+        : {}),
     },
   });
   electron = child;

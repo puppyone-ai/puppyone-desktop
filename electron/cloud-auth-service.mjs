@@ -10,13 +10,10 @@ import { startLoopbackCallbackServer } from "./main/auth/loopback-callback-serve
 const DEFAULT_SESSION_STATE_FILENAME = "desktop-cloud-session.json";
 const SESSION_REFRESH_SKEW_MS = 60_000;
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
-const OAUTH_START_COOLDOWN_MS = 2_000;
 const LOGOUT_TIMEOUT_MS = 4_000;
 
 export function createCloudAuthService({
   app,
-  projectRoot,
-  protocol = "puppyone",
   requestCloudApi,
   getWindows,
   revealWindow,
@@ -24,6 +21,7 @@ export function createCloudAuthService({
   openExternal,
   startCallbackServer = startLoopbackCallbackServer,
   fetchImpl = globalThis.fetch,
+  localCloudWebUrl = null,
   now = () => Date.now(),
   randomBytes = crypto.randomBytes,
   logger = console,
@@ -43,9 +41,10 @@ export function createCloudAuthService({
   });
   const pendingOAuthStates = new Map();
   const pendingOAuthStarts = new Map();
-  const pendingOAuthStartCooldowns = new Set();
   const refreshPromises = new Map();
   const activeRequestControllers = new Set();
+  const initializedSessionGenerations = new Set();
+  const initializationPromises = new Map();
 
   let credentialLoaded = false;
   let credential = null;
@@ -53,31 +52,6 @@ export function createCloudAuthService({
   let authStatus = "signed-out";
   let sessionGeneration = createSessionGeneration(randomBytes);
   let disposed = false;
-
-  function registerProtocol() {
-    // Kept only as a compatibility receiver for already-open legacy browser
-    // flows. New sign-ins use an RFC 8252 loopback redirect by default.
-    try {
-      if (process.defaultApp) {
-        const appEntry = process.argv[1] ? path.resolve(process.argv[1]) : projectRoot;
-        app.setAsDefaultProtocolClient(protocol, process.execPath, [appEntry]);
-      } else {
-        app.setAsDefaultProtocolClient(protocol);
-      }
-    } catch (error) {
-      logger.warn?.("Unable to register PuppyOne legacy auth protocol:", safeErrorMessage(error));
-    }
-  }
-
-  function isCallbackUrl(value) {
-    if (typeof value !== "string") return false;
-    try {
-      const url = new URL(value);
-      return url.protocol === `${protocol}:` && url.hostname === "auth" && url.pathname === "/callback";
-    } catch {
-      return false;
-    }
-  }
 
   async function readSession() {
     await ensureCredentialLoaded();
@@ -115,8 +89,11 @@ export function createCloudAuthService({
     assertNotDisposed();
     const normalizedApiBase = normalizeCloudApiBaseUrl(apiBase);
     if (!normalizedApiBase) throw new Error("Cloud API base URL is invalid.");
+    await ensureCredentialLoaded();
     const normalizedProvider = normalizeOAuthProvider(provider);
-    const startKey = getOAuthStartKey(normalizedApiBase, normalizedProvider);
+    const startKey = getOAuthStartKey(normalizedApiBase);
+    const pendingState = findPendingOAuthState(startKey);
+    if (pendingState) return { ok: true, pending: true };
     const existing = pendingOAuthStarts.get(startKey);
     if (existing) return existing;
 
@@ -130,6 +107,7 @@ export function createCloudAuthService({
         callbackServer = await startCallbackServer({
           logger,
           onCallback: (callbackUrl) => handleCallback(callbackUrl),
+          isExpectedCallback: (callbackUrl) => isExpectedPendingCallback(callbackUrl),
         });
         const callbackUrl = requireLoopbackRedirectUri(callbackServer?.redirectUri);
         const start = await requestCloudApi(normalizedApiBase, "/auth/desktop/start", {
@@ -143,8 +121,11 @@ export function createCloudAuthService({
           }),
         });
         const state = requireNonEmptyString(start?.state, "Cloud sign-in start did not return state.");
-        const loginUrl = requireHttpUrl(start?.login_url, "Cloud sign-in start did not return a browser URL.");
-        await assertLocalLoginPageReachable(loginUrl, fetchImpl);
+        const loginUrl = requireSecureBrowserUrl(
+          start?.login_url,
+          "Cloud sign-in start did not return a secure browser URL.",
+        );
+        await assertLocalLoginPageReachable(loginUrl, fetchImpl, localCloudWebUrl);
         const timeout = setTimeout(() => {
           clearPendingOAuthState(state);
           restoreStatusAfterOAuth(previousStatus);
@@ -153,6 +134,7 @@ export function createCloudAuthService({
         timeout.unref?.();
 
         pendingOAuthStates.set(state, {
+          startKey,
           apiBase: normalizedApiBase,
           provider: normalizedProvider,
           callbackUrl,
@@ -179,12 +161,7 @@ export function createCloudAuthService({
     try {
       return await request;
     } finally {
-      const timeout = setTimeout(() => {
-        if (pendingOAuthStarts.get(startKey) === request) pendingOAuthStarts.delete(startKey);
-        pendingOAuthStartCooldowns.delete(timeout);
-      }, OAUTH_START_COOLDOWN_MS);
-      timeout.unref?.();
-      pendingOAuthStartCooldowns.add(timeout);
+      if (pendingOAuthStarts.get(startKey) === request) pendingOAuthStarts.delete(startKey);
     }
   }
 
@@ -229,8 +206,11 @@ export function createCloudAuthService({
         apiOrigin: pending.apiBase,
         now,
       });
-      await initializeUser(pending.apiBase, session.access_token);
       await adoptAuthenticatedSession(session, { rotateGeneration: true });
+      // Account initialization is idempotent application setup, not part of
+      // proving identity. Keep the securely persisted session and retry setup
+      // on later Cloud requests if this first attempt is temporarily down.
+      await initializeCurrentSessionBestEffort(pending.apiBase, session);
       revealWindow();
       return toPublicSession(runtimeSession, authStatus, sessionGeneration);
     } catch (error) {
@@ -261,6 +241,8 @@ export function createCloudAuthService({
     if (!session || !isFreshSession(session, now())) {
       session = await refreshSessionSingleflight(normalizedApiBase);
     }
+
+    await initializeCurrentSessionBestEffort(normalizedApiBase, session);
 
     const requestGeneration = sessionGeneration;
     try {
@@ -315,6 +297,8 @@ export function createCloudAuthService({
     activeRequestControllers.clear();
     runtimeSession = null;
     credential = null;
+    initializedSessionGenerations.clear();
+    initializationPromises.clear();
     credentialLoaded = true;
     setAuthStatus("signed-out", { broadcast: false });
     let clearError = null;
@@ -331,9 +315,9 @@ export function createCloudAuthService({
   function dispose() {
     disposed = true;
     for (const state of pendingOAuthStates.keys()) clearPendingOAuthState(state);
-    for (const timeout of pendingOAuthStartCooldowns) clearTimeout(timeout);
-    pendingOAuthStartCooldowns.clear();
     pendingOAuthStarts.clear();
+    initializationPromises.clear();
+    initializedSessionGenerations.clear();
     for (const controller of activeRequestControllers) controller.abort();
     activeRequestControllers.clear();
   }
@@ -468,6 +452,31 @@ export function createCloudAuthService({
     });
   }
 
+  async function initializeCurrentSessionBestEffort(apiBase, session) {
+    if (initializedSessionGenerations.has(sessionGeneration)) return;
+    const generation = sessionGeneration;
+    const existing = initializationPromises.get(generation);
+    if (existing) return existing;
+    const initialization = (async () => {
+      try {
+        await initializeUser(apiBase, session.access_token);
+        if (generation === sessionGeneration) initializedSessionGenerations.add(generation);
+      } catch (error) {
+        logger.warn?.("PuppyOne account initialization is still unavailable.", {
+          error: safeErrorMessage(error),
+        });
+      }
+    })();
+    initializationPromises.set(generation, initialization);
+    try {
+      return await initialization;
+    } finally {
+      if (initializationPromises.get(generation) === initialization) {
+        initializationPromises.delete(generation);
+      }
+    }
+  }
+
   function setAuthStatus(nextStatus, { broadcast = true } = {}) {
     const changed = authStatus !== nextStatus;
     authStatus = nextStatus;
@@ -490,8 +499,32 @@ export function createCloudAuthService({
     void pending.callbackServer?.close?.().catch(() => undefined);
   }
 
-  function getOAuthStartKey(apiBase, provider) {
-    return `${apiBase}\n${provider ?? ""}`;
+  function findPendingOAuthState(startKey) {
+    for (const pending of pendingOAuthStates.values()) {
+      if (pending.startKey === startKey && now() - pending.createdAt <= OAUTH_STATE_TTL_MS) {
+        return pending;
+      }
+    }
+    return null;
+  }
+
+  function isExpectedPendingCallback(callbackUrl) {
+    try {
+      const url = new URL(callbackUrl);
+      const state = url.searchParams.get("state");
+      const pending = state ? pendingOAuthStates.get(state) : null;
+      return Boolean(
+        pending
+        && now() - pending.createdAt <= OAUTH_STATE_TTL_MS
+        && isExactCallbackRedirect(url, pending.callbackUrl),
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  function getOAuthStartKey(apiBase) {
+    return apiBase;
   }
 
   function getSessionSource() {
@@ -526,8 +559,6 @@ export function createCloudAuthService({
   }
 
   return {
-    registerProtocol,
-    isCallbackUrl,
     handleCallback,
     readSession,
     readState,
@@ -670,11 +701,19 @@ function decodeJwtSubject(token) {
 function requireLoopbackRedirectUri(value) {
   const raw = requireHttpUrl(value, "Desktop sign-in could not start a loopback callback listener.");
   const url = new URL(raw);
-  if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" || url.pathname !== "/auth/callback" || !url.port) {
+  if (
+    url.protocol !== "http:"
+    || !["127.0.0.1", "[::1]"].includes(url.hostname)
+    || url.pathname !== "/auth/callback"
+    || !url.port
+    || Number(url.port) <= 0
+    || url.username
+    || url.password
+    || url.search
+    || url.hash
+  ) {
     throw new Error("Desktop sign-in loopback callback is invalid.");
   }
-  url.hash = "";
-  url.search = "";
   return url.toString();
 }
 
@@ -708,12 +747,39 @@ function requireHttpUrl(value, message) {
   return url.toString();
 }
 
-async function assertLocalLoginPageReachable(loginUrl, fetchImpl) {
+function requireSecureBrowserUrl(value, message) {
+  const raw = requireHttpUrl(value, message);
+  const url = new URL(raw);
+  const isLoopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  if (
+    (url.protocol !== "https:" && !(url.protocol === "http:" && isLoopback))
+    || url.username
+    || url.password
+  ) {
+    throw new Error(message);
+  }
+  return url.toString();
+}
+
+async function assertLocalLoginPageReachable(loginUrl, fetchImpl, localCloudWebUrl) {
   const url = new URL(loginUrl);
   const loopback = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname);
   if (!loopback) return;
-  if (url.protocol !== "http:" || (url.port || "80") !== "3000") {
-    throw new Error("Local Cloud login URL must use the approved loopback web origin.");
+
+  let configuredUrl;
+  try {
+    configuredUrl = new URL(localCloudWebUrl);
+  } catch {
+    throw new Error("VITE_DESKTOP_CLOUD_WEB_URL must configure the local Cloud login origin.");
+  }
+  if (
+    configuredUrl.protocol !== "http:"
+    || !["localhost", "127.0.0.1", "::1", "[::1]"].includes(configuredUrl.hostname)
+    || configuredUrl.username
+    || configuredUrl.password
+    || configuredUrl.origin !== url.origin
+  ) {
+    throw new Error("Local Cloud login URL does not match VITE_DESKTOP_CLOUD_WEB_URL.");
   }
 
   try {

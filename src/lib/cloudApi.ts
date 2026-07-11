@@ -1,9 +1,9 @@
 import {
   CLOUD_API_BASE_URL_STORAGE_KEY,
-  DEFAULT_CLOUD_API_BASE_URL,
   buildCloudApiUrl as buildCanonicalCloudApiUrl,
   cloudApiBaseUrlFromRemote,
   formatCloudApiHost as formatCanonicalCloudApiHost,
+  normalizeCloudApiBaseUrl,
   resolveCloudApiBaseUrl,
   sameCloudApiBaseUrl,
 } from "../../shared/cloudEndpoint.js";
@@ -362,11 +362,14 @@ export function getDesktopCloudApiBaseUrl(): string {
   try {
     const stored = window.localStorage.getItem(CLOUD_API_BASE_URL_STORAGE_KEY)?.trim();
     if (stored) {
-      const normalized = resolveCloudApiBaseUrl(stored);
-      if (normalized !== stored.replace(/\/+$/, "")) {
-        window.localStorage.setItem(CLOUD_API_BASE_URL_STORAGE_KEY, normalized);
+      const normalized = normalizeCloudApiBaseUrl(stored);
+      if (normalized) {
+        if (normalized !== stored.replace(/\/+$/, "")) {
+          window.localStorage.setItem(CLOUD_API_BASE_URL_STORAGE_KEY, normalized);
+        }
+        return normalized;
       }
-      return normalized;
+      window.localStorage.removeItem(CLOUD_API_BASE_URL_STORAGE_KEY);
     }
   } catch {
     // Fall through to env/default.
@@ -374,7 +377,11 @@ export function getDesktopCloudApiBaseUrl(): string {
 
   const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
   const configured = env?.VITE_DESKTOP_CLOUD_API_URL || env?.VITE_CLOUD_API_URL || env?.VITE_API_URL;
-  return resolveCloudApiBaseUrl(configured || DEFAULT_CLOUD_API_BASE_URL);
+  const normalized = normalizeCloudApiBaseUrl(configured);
+  if (!normalized) {
+    throw new Error("VITE_DESKTOP_CLOUD_API_URL must configure the Cloud API endpoint.");
+  }
+  return normalized;
 }
 
 export function desktopCloudApiUrl(path: string): string {
@@ -394,8 +401,29 @@ export function isCloudSessionForApiBase(
 }
 
 export function getDesktopCloudWebUrl(path: string): string {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `https://app.puppyone.ai${normalizedPath}`;
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+  const configured = env?.VITE_DESKTOP_CLOUD_WEB_URL?.trim();
+  if (!configured) {
+    throw new Error("VITE_DESKTOP_CLOUD_WEB_URL must configure the Cloud web endpoint.");
+  }
+
+  let baseUrl: URL;
+  try {
+    baseUrl = new URL(configured);
+  } catch {
+    throw new Error("VITE_DESKTOP_CLOUD_WEB_URL is invalid.");
+  }
+  if (
+    !["http:", "https:"].includes(baseUrl.protocol)
+    || !baseUrl.hostname
+    || baseUrl.username
+    || baseUrl.password
+  ) {
+    throw new Error("VITE_DESKTOP_CLOUD_WEB_URL is invalid.");
+  }
+
+  const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+  return new URL(normalizedPath, `${baseUrl.toString().replace(/\/+$/, "")}/`).toString();
 }
 
 export function openCloudApp(path: string): void {
