@@ -126,4 +126,44 @@ describe("Git status IPC cancellation", () => {
     );
     expect(gitDiffResourceBroker.issueDetail).not.toHaveBeenCalled();
   });
+
+  it("forwards only the calling renderer audience and bounded range to resource reads", async () => {
+    const { ipcMain, handlers } = createHarness();
+    const read = vi.fn(() => ({ bytes: new Uint8Array([2]), offset: 2, size: 4, done: false }));
+    registerWorkspaceGitIpcHandlers({
+      ipcMain,
+      BrowserWindow: { fromWebContents: () => null },
+      dialog: { showMessageBox: vi.fn() },
+      authorizeWorkspaceRoot: async () => "/repo",
+      gitOperationCoordinator: createBlockingCoordinator(),
+      gitDiffResourceBroker: {
+        createSessionId: () => "git-diff-session:fallback",
+        issueDetail: vi.fn(),
+        read,
+        revokeSession: vi.fn(() => true),
+        revokeOwner: vi.fn(),
+      },
+    });
+
+    const request = {
+      handle: "opaque-handle",
+      sessionId: "git-diff-session:test",
+      selectionIdentity: "selection:1",
+      revisionIdentity: "revision:1",
+      offset: 2,
+      length: 1,
+      ownerWebContentsId: 999,
+    };
+    handlers.get("workspace:git-diff-resource-read")({ sender: createSender(11) }, request);
+
+    expect(read).toHaveBeenCalledWith({
+      handle: "opaque-handle",
+      ownerWebContentsId: 11,
+      sessionId: "git-diff-session:test",
+      selectionIdentity: "selection:1",
+      revisionIdentity: "revision:1",
+      offset: 2,
+      length: 1,
+    });
+  });
 });

@@ -1,0 +1,71 @@
+import { AGENT_RUNTIME_CAPABILITIES } from "./constants.mjs";
+import {
+  assertArray,
+  assertRecord,
+  assertRuntimeId,
+  enumValue,
+  requiredString,
+} from "./validation.mjs";
+
+const CAPABILITY_METHODS = Object.freeze({
+  manualApprovals: "resolveApproval",
+  structuredQuestions: "resolveQuestion",
+  fork: "forkSession",
+  steer: "steerTurn",
+  compaction: "compactSession",
+});
+
+export function assertAgentInspection(value) {
+  const inspection = assertRecord(value, "Agent inspection");
+  if (inspection.runtime !== undefined) assertRuntimeDescriptor(inspection.runtime);
+  if (inspection.readiness !== undefined) assertReadiness(inspection.readiness);
+  assertArray(inspection.models ?? [], "Agent inspection.models").forEach(assertAgentModel);
+  assertArray(inspection.modes ?? [], "Agent inspection.modes").forEach((mode) => assertNamedEntry(mode, "mode"));
+  assertArray(inspection.commands ?? [], "Agent inspection.commands").forEach((command) => assertNamedEntry(command, "command", "name"));
+  normalizeCapabilitySnapshot(inspection.capabilities ?? {});
+  assertArray(inspection.warnings ?? [], "Agent inspection.warnings").forEach((warning) => requiredString(warning, "warning", 32_768));
+  return value;
+}
+
+export function assertAgentRuntimeCapabilities(adapter, capabilities, runtimeId = "unknown") {
+  const normalized = normalizeCapabilitySnapshot(capabilities);
+  for (const [capability, method] of Object.entries(CAPABILITY_METHODS)) {
+    if (normalized[capability] && typeof adapter?.[method] !== "function") {
+      throw new TypeError(`Agent runtime ${runtimeId} advertises ${capability} but is missing ${method}().`);
+    }
+  }
+  return normalized;
+}
+
+export function normalizeCapabilitySnapshot(value = {}) {
+  const source = value && typeof value === "object" ? value : {};
+  return Object.fromEntries(AGENT_RUNTIME_CAPABILITIES.map((capability) => [capability, source[capability] === true]));
+}
+
+function assertRuntimeDescriptor(value) {
+  const descriptor = assertRecord(value, "runtime descriptor");
+  assertRuntimeId(descriptor.id, "runtime descriptor.id");
+  requiredString(descriptor.displayName, "runtime descriptor.displayName", 160);
+  return value;
+}
+
+function assertReadiness(value) {
+  const readiness = assertRecord(value, "runtime readiness");
+  assertRuntimeId(readiness.runtimeId ?? readiness.provider, "runtime readiness.runtimeId");
+  enumValue(readiness.status, "runtime readiness.status", ["not-installed", "installed-not-authenticated", "unsupported-version", "ready", "error"]);
+  return value;
+}
+
+export function assertAgentModel(value) {
+  const model = assertRecord(value, "Agent model");
+  requiredString(model.id, "Agent model.id", 512);
+  requiredString(model.model, "Agent model.model", 512);
+  requiredString(model.displayName, "Agent model.displayName", 512);
+  return value;
+}
+
+function assertNamedEntry(value, label, idKey = "id") {
+  const entry = assertRecord(value, `Agent ${label}`);
+  requiredString(entry[idKey], `Agent ${label}.${idKey}`, 512);
+  return value;
+}

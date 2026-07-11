@@ -24,6 +24,7 @@ describe("Desktop Agent persistence", () => {
     await persistence.save({
       sessionId: "session-1",
       workspaceRoot: "/workspace",
+      runtimeId: "codex",
       providerSessionId: "thread-1",
       title: "Session",
       createdAt: "2026-01-01T00:00:00.000Z",
@@ -59,6 +60,32 @@ describe("Desktop Agent persistence", () => {
 
     await expect(persistence.readAll()).resolves.toEqual([]);
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/safety limit/i));
+  });
+
+  it("migrates a v1 Codex-only journal at the persistence boundary", async () => {
+    const userData = await fs.promises.mkdtemp(path.join(os.tmpdir(), "puppyone-agent-persistence-"));
+    temporaryDirectories.push(userData);
+    await fs.promises.writeFile(path.join(userData, "desktop-agent-sessions.json"), JSON.stringify({
+      version: 1,
+      sessions: [{
+        sessionId: "legacy-session",
+        workspaceRoot: "/workspace",
+        providerSessionId: "legacy-thread",
+        title: "Legacy session",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:01.000Z",
+        lastSequence: 0,
+        events: [],
+      }],
+    }));
+    const persistence = createAgentPersistence({ app: { getPath: () => userData }, logger: { warn: () => {} } });
+
+    const [record] = await persistence.readAll();
+    expect(record).toMatchObject({
+      runtimeId: "codex",
+      provider: "codex",
+      runtime: { id: "codex", displayName: "Codex CLI", kind: "direct-cli" },
+    });
   });
 
   it("lists multiple runtime-neutral sessions and supports archive/delete without deleting New Chat history", async () => {

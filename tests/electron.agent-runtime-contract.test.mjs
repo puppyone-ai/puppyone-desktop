@@ -14,7 +14,7 @@ describe("provider-neutral AgentRuntimePort contract", () => {
       createAdapter: (options) => fakeAdapter(options),
     }]);
     const persistence = { findLatest: vi.fn(async () => null), save: vi.fn(async () => {}), remove: vi.fn(async () => {}) };
-    const service = createAgentService({ appVersion: "test", runtimeRegistry: registry, persistence, logger: { warn: vi.fn() } });
+    const service = createAgentService({ runtimeRegistry: registry, persistence, logger: { warn: vi.fn() } });
     const sender = new Sender(7);
     const inspection = await service.discoverProviders(sender, { runtimeId: "fixture-harness" }, "/workspace");
     expect(inspection.selectedRuntimeId).toBe("fixture-harness");

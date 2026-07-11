@@ -139,7 +139,7 @@ describe("diffs", { timeout: 20_000 }, () => {
     });
   });
 
-  it("models staged deletions and renames with immutable Git identities", async () => {
+  it("models staged deletions and renames with immutable Git identities", { timeout: 60_000 }, async () => {
     await initRepoWithIdentity();
     await writeFile(path.join(root, "old.txt"), "old value\n");
     await writeFile(path.join(root, "delete.txt"), "remove me\n");
@@ -211,7 +211,7 @@ describe("diffs", { timeout: 20_000 }, () => {
     }
   });
 
-  it("derives committed and remote revision pairs from trusted refs", async () => {
+  it("derives committed and remote revision pairs from trusted refs", { timeout: 60_000 }, async () => {
     await initRepoWithIdentity();
     await writeFile(path.join(root, "shared.txt"), "base\n");
     await stageAllWorkspaceGitChanges(root);

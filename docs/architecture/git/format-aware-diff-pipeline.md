@@ -36,16 +36,18 @@ bounded provider model -> read-only React renderer
 ```
 
 `GitStatusView` renders `FormatAwareDiff`; it contains no extension-specific or
-binary-format decision tree. A new semantic comparator is added as a typed
-contribution under `src/features/source-control/diff/`, ahead of the total
-fallback.
+binary-format decision tree. Shared selection, lifecycle, registry, and cache
+primitives live under `diff/core/`. Each comparator is a vertical slice under
+`diff/contributions/<contribution-id>/` and owns its matcher, presentation,
+provider, model, budgets, cache, worker, and tests. A new semantic comparator is
+registered ahead of the total fallback without adding branches to the shell.
 
 ## Diff Registry contract
 
 `DIFF_VIEWERS` is deterministic and built-in only. Each contribution declares
-an id, version, source requirement, matcher, and renderer. Resolution first
-calls the shared `resolveFileFormat()` implementation and then selects the first
-matching contribution:
+an id, version, synchronous/asynchronous kind, source requirement, matcher, and
+renderer. Resolution first calls the shared `resolveFileFormat()` implementation
+and then selects the first matching contribution:
 
 | Contribution | Source | Match |
 | --- | --- | --- |
@@ -83,8 +85,11 @@ supplies separate old and new relative paths; both paths are included in the
 trusted Git pathspec so the parsed patch and revision pair agree.
 
 Git blobs use their object id as the revision identity. A successful
-working-tree read rejects symlinks/non-files and realpath escapes, checks stat
-metadata before and after the read, and uses a content-bound opaque identity.
+working-tree read rejects symlinks/non-files and realpath escapes. It opens the
+canonical path through a read-only `O_NOFOLLOW` file descriptor, matches that
+descriptor to the original path snapshot, performs a size-bounded descriptor
+read, and matches both the descriptor and path again after the read. The
+resulting opaque identity is content-bound rather than metadata-only.
 Missing and unavailable sides also receive deterministic opaque identities. No
 absolute path or ref crosses the renderer bridge.
 
@@ -95,19 +100,29 @@ and non-file sources are explicit `unavailable` states rather than empty data.
 ## Resource broker and IPC lifecycle
 
 Resource bytes remain in main until a provider asks for an issued handle.
-`git-diff-resource-broker.mjs` binds every opaque handle to:
+`git-diff-resource-broker.mjs` takes ownership of the already-bounded buffer
+without making a second full-size copy and binds every opaque handle to:
 
 - the owner `webContents` id;
 - a bounded renderer session id;
 - the selection identity;
 - the exact before/after revision identity;
-- a 25 MiB per-resource limit, two-read retry budget, and two-minute TTL.
+- a 25 MiB per-resource limit, bounded read-operation/read-byte budgets, and a
+  two-minute absolute TTL.
 
-A detail session can hold at most four handles. Reads return a defensive copy;
-identity/audience mismatches fail closed. Selection cleanup invokes the
-cancellation IPC, aborts Git reads and idle waits, and revokes the entire
-session. Window destruction revokes every handle owned by that renderer.
-Revocation zeroes broker-held bytes.
+A detail session can hold at most four handles and 50 MiB. Each renderer may
+hold four sessions and 100 MiB; the process-wide broker is capped at 256 MiB.
+Reads are defensive copies of ranges no larger than 4 MiB, so Electron never
+serializes a 25 MiB revision in one message. Every response repeats offset,
+total size, completion state, and both identities; the renderer validates all
+of them while assembling its exact-size buffer. Audience, identity, quota, or
+range mismatches fail closed.
+
+The broker schedules cleanup at the nearest expiry rather than waiting for a
+future read. A successful provider load or cache hit releases the session;
+selection cancellation aborts Git reads and revokes the session; window
+destruction revokes every handle owned by that renderer. Revocation and expiry
+zero broker-owned bytes.
 
 The controller supplies monotonically unique request/session ids. Both the
 controller and the rich renderer check request/selection identity before
@@ -116,11 +131,19 @@ models.
 
 ## DOCX semantic redline
 
-DOCX is the first resource-pair contribution. `DocxRedlineDiff` dynamically
-loads its provider; the provider reads the two authorized handles and transfers
-their buffers to a disposable module worker. The worker dynamically loads
-JSZip, runs the existing Office decompression preflight, and extracts only
+DOCX is the first asynchronous resource-pair contribution. The generic async
+contribution lifecycle owns abort, stale-identity rejection, loading, error,
+and retry behavior; the DOCX contribution supplies only its identity, provider,
+and presentation views. Its provider reads the two authorized handles and
+transfers their buffers to a disposable module worker. The worker dynamically
+loads JSZip, runs the existing Office decompression preflight, and extracts only
 `word/document.xml`.
+
+WordprocessingML is parsed with a namespace-aware streaming SAX parser. The
+normalizer recognizes both transitional and strict WordprocessingML namespace
+URIs independent of the document's chosen prefix, rejects DTDs, rejects
+malformed XML, and ignores tracked deletion/move-from content. It never uses a
+regular expression as an XML tokenizer.
 
 The normalization model contains body headings, list items, paragraphs, and
 table rows/cell text. Consecutive runs become readable text blocks. Unique
@@ -136,6 +159,7 @@ Safety budgets include:
 
 - 16 MiB per expanded entry and 64 MiB total declared expansion;
 - 250,000 XML start tags;
+- 512 XML nesting levels;
 - 12,000 normalized blocks and 2,000,000 text characters;
 - bounded block-alignment and word-diff matrices;
 - 1,200 presented changes and a 20-second worker timeout.
@@ -144,15 +168,19 @@ Malformed, encrypted, over-budget, missing-both, and unavailable inputs become
 explicit retryable errors. One-sided added/deleted documents and no-semantic-
 change documents have distinct visible states.
 
-Successful models use an eight-entry LRU keyed by repository identity, path,
-before identity, after identity, and renderer version. Aborts and failures do
-not populate the cache. Identity or renderer-version changes necessarily miss.
+Successful models use a weighted, actively expiring LRU keyed by repository
+identity, path, before identity, after identity, and renderer version. It is
+bounded by eight entries, 24 MiB of estimated presentation data, and a
+five-minute TTL. Workspace changes clear every loaded format-aware cache.
+Aborts and failures do not populate the cache. Identity or renderer-version
+changes necessarily miss.
 
 ## Extension rules
 
 Future Excel, image, and PDF comparators must:
 
-- add a typed contribution before `binary-summary`;
+- add one typed vertical slice under `diff/contributions/<id>/` and register it
+  before `binary-summary`;
 - consume only an authorized revision-pair source;
 - produce a format-specific serializable presentation model;
 - define input, CPU, expansion, output, timeout, and cache budgets;
@@ -173,10 +201,17 @@ permission, audience, and broker design.
   `tests/workspace.git.integration.test.mjs`: every scope, missing sides,
   rename/delete, real remote divergence, limits, cancellation, and path safety.
 - `tests/gitDiffResourceBroker.test.mjs` and IPC tests: audience, identity,
-  read/size/TTL budgets, release, cancellation, and workspace authorization.
+  range/read/size/cumulative/TTL budgets, active expiry, zeroing, release,
+  cancellation, and workspace authorization.
+- `tests/localFiles.git-diff-resource.test.ts`: renderer chunk assembly,
+  response validation, and cancellation boundaries.
 - `tests/docxRedline*.test.ts`: package failures, encryption, budgets,
-  normalization, word redline, cache behavior, and all renderer states.
-- `tests/diffLifecycle.test.ts`: stale-result rejection.
+  namespace-aware normalization, word redline, weighted/TTL cache behavior,
+  session release, and all renderer states.
+- `tests/diffLifecycle.test.tsx`: generic abort, stale-result rejection, error,
+  and retry behavior.
+- `npm run smoke:format-aware-diff`: real Electron preload/IPC, authorized Git
+  revision derivation, multi-chunk reads, cross-renderer denial, and release.
 
 ## Invariants
 

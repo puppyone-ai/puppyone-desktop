@@ -1,0 +1,63 @@
+import fs from "node:fs";
+import os from "node:os";
+import { spawn as nodeSpawn } from "node:child_process";
+import { redactSecretText } from "../../agent-events.mjs";
+import {
+  buildAgentEnvironment,
+  compareVersions,
+  discoverExecutable,
+  parseSemanticVersion,
+  readLoginShellEnvironment,
+} from "../../runtime/executable-discovery.mjs";
+
+// This is the oldest app-server schema exercised by the checked-in protocol
+// fixture. Versions below this floor are not advertised as compatible.
+export const MIN_SUPPORTED_CODEX_VERSION = "0.144.1";
+
+export function createCodexDiscovery(options = {}) {
+  let cached = null;
+  async function discover({ refresh = false } = {}) {
+    if (!refresh && cached) return cached;
+    cached = await discoverCodexExecutable(options);
+    return cached;
+  }
+  return { discover };
+}
+
+export async function discoverCodexExecutable({
+  fsModule = fs,
+  spawn = nodeSpawn,
+  env = process.env,
+  platform = process.platform,
+  homedir = os.homedir(),
+} = {}) {
+  const result = await discoverExecutable({
+    executableNames: [platform === "win32" ? "codex.exe" : "codex"],
+    fsModule,
+    spawn,
+    env,
+    platform,
+    homedir,
+    parseVersion: parseCodexVersion,
+    minimumVersion: MIN_SUPPORTED_CODEX_VERSION,
+    label: "Codex",
+    buildEnvironment: buildProviderEnvironment,
+  });
+  return {
+    provider: "codex",
+    runtimeId: "codex",
+    ...result,
+    message: redactSecretText(result.message),
+    ...(result.diagnostic ? { diagnostic: redactSecretText(result.diagnostic) } : {}),
+  };
+}
+
+export function parseCodexVersion(value) {
+  return parseSemanticVersion(value, "codex(?:-cli)?");
+}
+
+export { compareVersions, readLoginShellEnvironment };
+
+export function buildProviderEnvironment(baseEnv, loginEnv) {
+  return buildAgentEnvironment(baseEnv, loginEnv);
+}

@@ -7,7 +7,7 @@ sidebar.
 Read [Desktop Agent Architecture](README.md) first for the process, IPC,
 provider-adapter, event, security, and persistence boundaries.
 
-The older [Codex Implementation Brief](implementation-brief.md) records the
+The archived [Codex Implementation Brief](history/codex-vertical-slice.md) records the
 original direct-runtime slice. The current runtime architecture is in the main
 README and OpenCode ADR.
 
@@ -373,32 +373,25 @@ Main-process runtime state
 React component unmount is never the authoritative signal that a provider turn
 ended. The main process owns that lifecycle.
 
-## Proposed component map
+## Implemented component map
 
 ```text
 src/features/desktop-agent/
-  RightAgentPanel.tsx
-  AgentSurfaceHeader.tsx
-  AgentControls.tsx
-  AgentTranscript.tsx
-  AgentMessage.tsx
-  AgentActivityItem.tsx
-  AgentPlanItem.tsx
-  AgentApprovalDock.tsx
-  AgentQuestionDock.tsx
-  AgentComposer.tsx
-  AgentSessionPicker.tsx
-  agentProjection.ts
-  agentTypes.ts
+  index.ts                         public feature entrypoint
+  application/                    controller, event sync, UI-state cache
+  domain/                         contract alias, projection, rows and readers
+  ui/                             all React views and isolated CSS
+  agentProjection.ts              migration-only re-export
+  agentTypes.ts                   migration-only re-export
 ```
 
 `RightAgentPanel` composes these units but does not implement provider mappings.
 Provider-to-event mapping belongs in Electron main-process adapters, and pure
-event-to-view projection belongs in `agentProjection.ts`.
+event-to-view projection belongs in `domain/agent-projection.ts`.
 
 ## Acceptance criteria
 
-The proposed sidebar contract is satisfied when:
+The implemented sidebar contract remains satisfied when:
 
 - the independent Chat and Terminal header buttons switch panels without losing
   their active state;

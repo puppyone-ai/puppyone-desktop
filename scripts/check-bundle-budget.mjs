@@ -17,6 +17,12 @@ const heavyChunks = [
     entryLeakPattern: /\b(?:function JSZip|JSZip\.support|JSZip\.defaults)\b/,
   },
   {
+    label: "DOCX redline worker",
+    chunkPattern: /^docxRedline\.worker-.+\.js$/,
+    chunkContentPattern: /Word document XML is malformed/,
+    entryLeakPattern: /Word document XML is malformed/,
+  },
+  {
     label: "xlsx",
     chunkPattern: /^xlsx-.+\.js$/,
     entryLeakPattern: /\bSheetJS\b/,

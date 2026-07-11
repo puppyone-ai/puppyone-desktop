@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 describe("Desktop Agent architecture boundaries", () => {
   it("keeps RightAgentPanel as composition and the controller framework independent", () => {
-    const panel = source("src/features/desktop-agent/RightAgentPanel.tsx");
+    const panel = source("src/features/desktop-agent/ui/RightAgentPanel.tsx");
     const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
     expect(panel.split("\n").length).toBeLessThan(230);
     expect(panel).not.toMatch(/useState|bufferedEvents|replayInFlight|applyAgentEvent/);
@@ -12,9 +12,9 @@ describe("Desktop Agent architecture boundaries", () => {
   });
 
   it("enforces virtual, responsive, safe presentation contracts", () => {
-    const timeline = source("src/features/desktop-agent/AgentTranscript.tsx");
-    const markdown = source("src/features/desktop-agent/components/SafeMarkdown.tsx");
-    const css = source("src/features/desktop-agent/desktop-agent.css");
+    const timeline = source("src/features/desktop-agent/ui/AgentTranscript.tsx");
+    const markdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
+    const css = source("src/features/desktop-agent/ui/desktop-agent.css");
     expect(timeline).toContain("MAX_MOUNTED_ROWS = 120");
     expect(markdown).not.toContain("dangerouslySetInnerHTML");
     expect(markdown).toContain('["https:", "http:", "mailto:"]');
@@ -27,7 +27,7 @@ describe("Desktop Agent architecture boundaries", () => {
   it("keeps sidecar transport and rendered architecture diagrams out of Renderer/docs", () => {
     const preload = source("electron/preload.cjs");
     const renderer = [
-      source("src/features/desktop-agent/RightAgentPanel.tsx"),
+      source("src/features/desktop-agent/ui/RightAgentPanel.tsx"),
       source("src/features/desktop-agent/application/AgentSessionController.ts"),
       source("src/features/desktop-agent/agentTypes.ts"),
     ].join("\n");
@@ -35,6 +35,17 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(preload).not.toMatch(/spawnAgent|agentStdin|OpenCodeHttpClient|OPENCODE_SERVER_PASSWORD/);
     expect(renderer).not.toMatch(/OpenCodeHttpClient|OPENCODE_SERVER_PASSWORD|\/global\/event/);
     expect(docs).not.toContain("```mermaid");
+  });
+
+  it("keeps Core provider-neutral and concrete runtimes in the composition root", () => {
+    const registry = source("electron/main/agent/runtime/agent-runtime-registry.mjs");
+    const bootstrap = source("electron/main/agent/bootstrap/create-agent-runtime-host.mjs");
+    const contract = source("shared/agent-contract/schema.mjs");
+    expect(registry).not.toMatch(/opencode|codex|claude|cursor/i);
+    expect(bootstrap).toContain("createOpenCodeRuntimeDefinition");
+    expect(bootstrap).toContain("createCodexRuntimeDefinition");
+    expect(contract).toContain("parseAgentIpcRequest");
+    expect(contract).toContain("assertAgentIpcResponse");
   });
 });
 

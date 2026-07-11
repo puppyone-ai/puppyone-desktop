@@ -8,7 +8,7 @@
     "externalViewerPacks": false
   },
   "scripts": {
-    "check:boundaries": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-opencode-provenance.mjs",
+    "check:boundaries": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-agent-architecture.mjs && node scripts/check-opencode-provenance.mjs",
     "check:shared-ui": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs",
     "check:viewer-contract": "node scripts/check-viewer-contract.mjs",
     "check:markdown-architecture": "node scripts/check-markdown-architecture.mjs",
@@ -28,13 +28,14 @@
     "dist:mac:publish": "npm run check:shared-ui && npm run build && npm run check:viewer-pack-trust && npm run check:opencode-release && electron-builder --mac --publish always",
     "preview": "vite preview --host 127.0.0.1",
     "smoke:local-api": "node scripts/smoke-local-api.mjs",
+    "smoke:format-aware-diff": "electron scripts/smoke-format-aware-diff.mjs",
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
     "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
     "smoke:renderer-performance": "npm run build && electron scripts/smoke-renderer-performance.mjs",
     "start": "node scripts/start-electron.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bench:performance": "vitest bench --run benchmarks/performance --no-file-parallelism --maxWorkers=1 --minWorkers=1"
+    "bench:performance": "vitest bench --run benchmarks/performance --no-file-parallelism --maxWorkers=1"
   },
   "dependencies": {
     "electron-log": "^5.4.4",
@@ -76,6 +77,7 @@
     "postcss": "^8.5.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "saxes": "^6.0.0",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.6.3",
     "vite": "^8.1.4",

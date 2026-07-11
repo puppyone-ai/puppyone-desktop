@@ -1,35 +1,12 @@
-export const REQUIRED_AGENT_RUNTIME_METHODS = Object.freeze([
-  "inspect",
-  "createSession",
-  "resumeSession",
-  "startTurn",
-  "interruptTurn",
-  "dispose",
-]);
+import {
+  AGENT_RUNTIME_CAPABILITIES,
+  REQUIRED_AGENT_RUNTIME_METHODS,
+  assertAgentInspection,
+  assertAgentRuntimeCapabilities,
+  normalizeCapabilitySnapshot,
+} from "../../../../shared/agent-contract/schema.mjs";
 
-export const AGENT_RUNTIME_CAPABILITIES = Object.freeze([
-  "streamingText",
-  "structuredToolEvents",
-  "commandOutputStreaming",
-  "fileChangeEvents",
-  "manualApprovals",
-  "structuredQuestions",
-  "resume",
-  "fork",
-  "steer",
-  "queue",
-  "attachments",
-  "contextReferences",
-  "modelSelection",
-  "modeSelection",
-  "slashCommands",
-  "sessionHistory",
-  "usage",
-  "accountState",
-  "mcp",
-  "skills",
-  "compaction",
-]);
+export { AGENT_RUNTIME_CAPABILITIES, REQUIRED_AGENT_RUNTIME_METHODS, normalizeCapabilitySnapshot };
 
 export function assertAgentRuntimePort(adapter, runtimeId = "unknown") {
   if (!adapter || typeof adapter !== "object") throw new TypeError(`Agent runtime ${runtimeId} did not create an adapter.`);
@@ -39,7 +16,8 @@ export function assertAgentRuntimePort(adapter, runtimeId = "unknown") {
   return adapter;
 }
 
-export function normalizeCapabilitySnapshot(value = {}) {
-  return Object.fromEntries(AGENT_RUNTIME_CAPABILITIES.map((capability) => [capability, value[capability] === true]));
+export function assertAgentRuntimeInspection(adapter, inspection, runtimeId = "unknown") {
+  assertAgentInspection(inspection);
+  const capabilities = assertAgentRuntimeCapabilities(adapter, inspection.capabilities, runtimeId);
+  return { ...inspection, capabilities };
 }
-

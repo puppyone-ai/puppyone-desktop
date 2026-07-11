@@ -5,7 +5,7 @@ import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RightAgentPanel } from "../src/features/desktop-agent/RightAgentPanel";
+import { RightAgentPanel } from "../src/features/desktop-agent";
 import { clearAgentControllerRegistryForTests } from "../src/features/desktop-agent/application/controllerRegistry";
 import type { AgentEvent, AgentSessionSnapshot } from "../src/features/desktop-agent/agentTypes";
 
@@ -92,7 +92,21 @@ function createBridgeHarness() {
   };
   harness.bridge = {
     discoverAgentProviders: vi.fn(async () => ({
+      runtimes: [{
+        descriptor: { id: "codex", displayName: "Codex", kind: "direct-cli" },
+        readiness: {
+          runtimeId: "codex",
+          provider: "codex",
+          status: "ready",
+          version: "0.144.1",
+          minimumVersion: "0.144.1",
+          message: "Codex is ready.",
+        },
+      }],
+      selectedRuntimeId: "codex",
+      runtime: { id: "codex", displayName: "Codex", kind: "direct-cli" },
       readiness: {
+        runtimeId: "codex",
         provider: "codex",
         status: "ready",
         version: "0.144.1",
@@ -128,6 +142,8 @@ function snapshot(events: AgentEvent[]): AgentSessionSnapshot {
   return {
     session: {
       id: "session-1",
+      runtimeId: "codex",
+      runtime: { id: "codex", displayName: "Codex", kind: "direct-cli" },
       provider: "codex",
       providerSessionId: "thread-1",
       workspaceRoot: "/workspace",
@@ -142,6 +158,7 @@ function snapshot(events: AgentEvent[]): AgentSessionSnapshot {
     account: { account: { type: "chatgpt", email: null, planType: null }, requiresOpenaiAuth: true },
     models: [{ id: "gpt-5", model: "gpt-5", displayName: "GPT-5", description: "", isDefault: true }],
     capabilities: capabilities(),
+    runtime: { id: "codex", displayName: "Codex", kind: "direct-cli" },
     events,
     partial: false,
     firstAvailableSequence: events[0]?.sequence ?? 1,
@@ -186,6 +203,7 @@ function event(
     schemaVersion: 1,
     sequence,
     sessionId: "session-1",
+    runtimeId: "codex",
     provider: "codex",
     providerSessionId: "thread-1",
     turnId,

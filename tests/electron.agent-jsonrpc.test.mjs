@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { PassThrough, Writable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
-import { JsonlRpcConnection } from "../electron/main/agent/jsonl-rpc-connection.mjs";
+import { JsonlRpcConnection } from "../electron/main/agent/runtimes/codex/codex-jsonl-rpc-connection.mjs";
 
 describe("Codex JSONL JSON-RPC transport", () => {
   it("correlates responses while tolerating additive unknown fields", async () => {

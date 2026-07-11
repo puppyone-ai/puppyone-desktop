@@ -21,7 +21,7 @@ import type {
   AgentTurnInterruptRequest,
   AgentTurnStartRequest,
   AgentTurnSteerRequest,
-} from "../features/desktop-agent/agentTypes";
+} from "../../shared/agent-contract/types";
 
 export type GitStatusEntry = {
   path: string;
@@ -819,9 +819,13 @@ declare global {
         sessionId: string;
         selectionIdentity: string;
         revisionIdentity: string;
+        offset: number;
+        length: number;
       }) => Promise<{
         bytes: Uint8Array;
+        offset: number;
         size: number;
+        done: boolean;
         selectionIdentity: string;
         revisionIdentity: string;
       }>;

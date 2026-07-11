@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { countTextBytes, isAgentEventEnvelope, redactSecrets } from "./agent-events.mjs";
+import {
+  migratedRuntimeDescriptor,
+  resolvePersistedRuntimeId,
+} from "./migrations/legacy-session-format.mjs";
 
 const MAX_SESSIONS = 100;
 const MAX_EVENTS_PER_SESSION = 1_000;
@@ -178,14 +182,11 @@ function normalizeRecord(record) {
 function migrateRecord(record) {
   if (!record || typeof record !== "object") return null;
   try {
+    const runtimeId = resolvePersistedRuntimeId(record);
     return normalizeRecord({
       ...record,
-      runtimeId: record.runtimeId || record.provider || "codex",
-      runtime: record.runtime || {
-        id: record.provider || "codex",
-        displayName: defaultRuntimeName(record.provider || "codex"),
-        kind: record.provider === "opencode" ? "harness" : "direct-cli",
-      },
+      runtimeId,
+      runtime: migratedRuntimeDescriptor(record, runtimeId),
     });
   } catch {
     return null;
@@ -205,12 +206,13 @@ function normalizeRuntime(runtime, fallbackId) {
 }
 
 function normalizeRuntimeId(value) {
-  return typeof value === "string" && /^[a-z][a-z0-9-]{1,39}$/.test(value) ? value : "codex";
+  if (typeof value !== "string" || !/^[a-z][a-z0-9-]{1,39}$/.test(value)) {
+    throw new Error("Invalid Agent runtime id.");
+  }
+  return value;
 }
 
 function defaultRuntimeName(id) {
-  if (id === "opencode") return "OpenCode";
-  if (id === "codex") return "Codex CLI";
   return String(id).replace(/[-_.]+/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 

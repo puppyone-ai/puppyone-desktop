@@ -38,7 +38,7 @@ export default [
     ],
   },
   {
-    files: ["src/**/*.{ts,tsx}"],
+    files: ["src/**/*.{ts,tsx}", "shared/agent-contract/**/*.ts"],
     languageOptions: {
       parser: tsParser,
       parserOptions: { ecmaVersion: 2023, sourceType: "module", ecmaFeatures: { jsx: true } },
@@ -52,7 +52,7 @@ export default [
     },
   },
   {
-    files: ["electron/**/*.mjs", "local-api/**/*.mjs", "shared/**/*.js", "scripts/**/*.mjs", "tests/**/*.mjs"],
+    files: ["electron/**/*.mjs", "local-api/**/*.mjs", "shared/**/*.{js,mjs}", "scripts/**/*.mjs", "tests/**/*.mjs"],
     languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: { ...globals.node } },
     rules: coreBugRules,
   },

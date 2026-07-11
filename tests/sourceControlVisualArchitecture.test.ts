@@ -7,7 +7,7 @@ const viewSource = readFileSync(
   "utf8",
 );
 const textDiffSource = readFileSync(
-  new URL("../src/features/source-control/diff/TextUnifiedDiff.tsx", import.meta.url),
+  new URL("../src/features/source-control/diff/contributions/text-unified/TextUnifiedDiff.tsx", import.meta.url),
   "utf8",
 );
 const detailCss = readFileSync(

@@ -259,8 +259,10 @@ history lazily. See
   - audience/session/revision-bound, bounded, revocable rich-diff resources
 - `local-api/workspace.mjs`
   - Git execution, parsing, snapshots, trusted revision pairs, history, and mutations
-- `src/features/source-control/diff/`
-  - ordered Diff Registry plus text, DOCX, and metadata presentations
+- `src/features/source-control/diff/core/`
+  - ordered registry, generic async lifecycle, and weighted TTL cache primitive
+- `src/features/source-control/diff/contributions/`
+  - vertical text, DOCX, and metadata comparison capabilities
 
 ## Verification
 

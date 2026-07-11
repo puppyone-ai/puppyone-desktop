@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CodexAppServerAdapter,
   normalizeCodexNotification,
-} from "../electron/main/agent/adapters/codex-app-server-adapter.mjs";
+} from "../electron/main/agent/runtimes/codex/codex-app-server-adapter.mjs";
 
 describe("Codex app-server normalization", () => {
   it("keeps the tested Codex 0.144.1 generated-schema fixture compatible", () => {

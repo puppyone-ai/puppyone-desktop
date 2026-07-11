@@ -11,6 +11,7 @@ describe("normalized AgentEvent envelopes", () => {
     const event = createAgentEventEnvelope({
       sequence: 1,
       sessionId: "session-1",
+      runtimeId: "fake-runtime",
       type: "assistant.delta",
       payload: { delta: "hello" },
     });
@@ -18,11 +19,13 @@ describe("normalized AgentEvent envelopes", () => {
     expect(() => createAgentEventEnvelope({
       sequence: 2,
       sessionId: "session-1",
+      runtimeId: "fake-runtime",
       type: "codex/raw/event",
     })).toThrow(/invalid normalized/i);
     expect(() => createAgentEventEnvelope({
       sequence: 2,
       sessionId: "session-1",
+      runtimeId: "fake-runtime",
       providerSessionId: "x".repeat(257),
       type: "assistant.delta",
     })).toThrow(/invalid normalized/i);
@@ -33,6 +36,7 @@ describe("normalized AgentEvent envelopes", () => {
     const event = createAgentEventEnvelope({
       sequence: 1,
       sessionId: "session-1",
+      runtimeId: "fake-runtime",
       type: "tool.completed",
       payload,
     });

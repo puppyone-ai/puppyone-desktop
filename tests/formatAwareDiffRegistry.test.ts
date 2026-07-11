@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { GitFileDiff, GitRevisionPair } from "../src/types/electron";
-import { DIFF_VIEWERS, resolveDiffViewer } from "../src/features/source-control/diff/registry";
+import { DIFF_VIEWERS, resolveDiffViewer } from "../src/features/source-control/diff/core/registry";
 
 describe("format-aware diff registry", () => {
   it("has deterministic specialized, text, and total fallback ordering", () => {
-    expect(DIFF_VIEWERS.map((viewer) => [viewer.id, viewer.source])).toEqual([
-      ["docx-redline", "resource-pair"],
-      ["text-unified", "git-patch"],
-      ["binary-summary", "metadata"],
+    expect(DIFF_VIEWERS.map((viewer) => [viewer.id, viewer.kind, viewer.source])).toEqual([
+      ["docx-redline", "async", "resource-pair"],
+      ["text-unified", "sync", "git-patch"],
+      ["binary-summary", "sync", "metadata"],
     ]);
     expect(DIFF_VIEWERS.at(-1)?.match({
       file: fileDiff("unknown.bin", true),

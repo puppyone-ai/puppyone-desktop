@@ -7,6 +7,7 @@ describe("Agent runtime registry", () => {
       inspect: vi.fn(),
       createSession: vi.fn(),
       resumeSession: vi.fn(),
+      readHistory: vi.fn(),
       startTurn: vi.fn(),
       interruptTurn: vi.fn(),
       dispose: vi.fn(),

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execGit, execGitBuffer } from "./runner.mjs";
@@ -156,25 +157,61 @@ async function readWorktreeSide({ canonicalRoot, repositoryIdentity, scope, side
     });
   }
 
-  const bytes = await fs.readFile(canonicalCandidate, { signal });
-  const afterRead = await fs.lstat(canonicalCandidate);
-  if (
-    afterRead.dev !== metadata.dev ||
-    afterRead.ino !== metadata.ino ||
-    afterRead.size !== metadata.size ||
-    afterRead.mtimeMs !== metadata.mtimeMs
-  ) {
-    throw new Error("Working-tree revision changed while it was being read.");
+  const openFlags = fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0);
+  let handle;
+  try {
+    handle = await fs.open(canonicalCandidate, openFlags);
+    const opened = await handle.stat();
+    if (!opened.isFile() || !sameFileSnapshot(metadata, opened)) {
+      throw new Error("Working-tree revision changed before it could be read.");
+    }
+
+    const bytes = await readStableFileHandle(handle, opened.size, signal);
+    const [afterRead, afterPath] = await Promise.all([
+      handle.stat(),
+      fs.lstat(candidate),
+    ]);
+    if (!sameFileSnapshot(opened, afterRead) || !sameFileSnapshot(opened, afterPath)) {
+      throw new Error("Working-tree revision changed while it was being read.");
+    }
+    // Metadata alone is not a revision identity: a caller can preserve size and
+    // timestamps while changing content. Bind successful reads to the bytes so
+    // renderer caches can never reuse a stale same-size working-tree revision.
+    const identity = opaqueIdentity("worktree", [
+      repositoryIdentity,
+      spec.path,
+      createHash("sha256").update(bytes).digest("hex"),
+    ]);
+    return materializeSide({ identity, bytes, mimeType: spec.mimeType, preferText: spec.preferText, limits });
+  } finally {
+    await handle?.close();
   }
-  // Metadata alone is not a revision identity: a caller can preserve size and
-  // timestamps while changing content. Bind successful reads to the bytes so
-  // renderer caches can never reuse a stale same-size working-tree revision.
-  const identity = opaqueIdentity("worktree", [
-    repositoryIdentity,
-    spec.path,
-    createHash("sha256").update(bytes).digest("hex"),
-  ]);
-  return materializeSide({ identity, bytes, mimeType: spec.mimeType, preferText: spec.preferText, limits });
+}
+
+async function readStableFileHandle(handle, size, signal) {
+  const bytes = Buffer.allocUnsafe(size);
+  let offset = 0;
+  while (offset < size) {
+    throwIfAborted(signal);
+    const result = await handle.read(bytes, offset, size - offset, offset);
+    if (result.bytesRead === 0) {
+      throw new Error("Working-tree revision was truncated while it was being read.");
+    }
+    offset += result.bytesRead;
+  }
+  throwIfAborted(signal);
+  return bytes;
+}
+
+function sameFileSnapshot(left, right) {
+  return (
+    left.dev === right.dev
+    && left.ino === right.ino
+    && left.mode === right.mode
+    && left.size === right.size
+    && left.mtimeMs === right.mtimeMs
+    && left.ctimeMs === right.ctimeMs
+  );
 }
 
 async function readGitBlobSide({ canonicalRoot, objectId, spec, signal, limits }) {

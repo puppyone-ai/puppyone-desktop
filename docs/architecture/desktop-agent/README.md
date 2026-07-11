@@ -69,43 +69,59 @@ runtime; it never branches lifecycle behavior on a runtime name.
 ## Layering and one-way dependencies
 
 ```text
-components/                         React presentation
-      |
-      v
-application/                        state machine and use cases
-      |
-      v
-agentProjection.ts + agentTypes.ts  pure renderer-safe domain
-      |
-      v
-typed preload declarations          narrow transport DTOs
-      |
-      v
-Electron AgentService               authority and normalized journal
-      |
-      v
-runtime/ AgentRuntimePort            provider-neutral execution contract
-      |
-      +--> runtimes/opencode/        harness adapter and main-only sidecar
-      +--> adapters/codex-*          direct CLI adapter
+src/App.tsx
+  -> desktop-agent/index.ts                 public feature API
+  -> ui/                                    React presentation
+  -> application/                           state machine + event synchronizer
+  -> domain/                                projection + renderer-safe model
+  -> shared/agent-contract/                 process-neutral DTO/schema contract
+
+Electron IPC
+  -> AgentService / application/            ownership and use cases
+  -> domain/                                session model
+  -> runtime/ AgentRuntimePort              provider-neutral port
+
+bootstrap/create-agent-runtime-host.mjs     composition root only
+  -> runtimes/opencode/                     OpenCode implementation
+  -> runtimes/codex/                        Codex implementation
+  -> runtime/ AgentRuntimeRegistry          definitions injected here
 ```
 
-The runtime layer never imports React. Presentation never imports Electron main
-or runtime-native types. OpenCode/Codex payloads are normalized and bounded
-before they cross IPC. These rules are what “Core/Feature one-way dependency”
-means for this feature.
+The Registry and Port never import concrete runtimes. Only the composition root
+imports both Core and implementations. Main domain never imports application or
+infrastructure; Renderer domain never imports application or UI. OpenCode/Codex
+payloads are normalized and bounded before IPC. `check-agent-architecture.mjs`
+enforces these rules in every production build.
 
 ## Source layout
 
 ```text
+shared/agent-contract/
+  types.ts                           Renderer/preload DTO type source
+  constants.mjs                     channel/event/capability vocabulary
+  schema.mjs                        strict IPC request/response boundary
+  event-schema.mjs                  normalized event validation
+  runtime-schema.mjs                inspection + capability validation
+  validation.mjs                    dependency-free schema primitives
+
 electron/main/agent/
   agent-events.mjs                    versioned event envelope/redaction
   agent-persistence.mjs               v2 bounded multi-session journal
   agent-reference-authorization.mjs   realpath and file-size authority
   agent-service.mjs                   session/window/turn orchestration
+  bootstrap/
+    create-agent-runtime-host.mjs     only concrete-runtime composition root
+  application/
+    agent-input-policy.mjs            trusted use-case input policy
+    agent-runtime-catalog.mjs         discovery/inspection cache
+    agent-session-store.mjs           window ownership + retired sessions
+  domain/
+    agent-session-model.mjs           session aggregate and DTO projection
+  migrations/
+    legacy-session-format.mjs         v1 Codex journal compatibility edge
   runtime/
     agent-runtime-port.mjs            required port + capability vocabulary
-    agent-runtime-registry.mjs        registry + main-owned host
+    agent-runtime-registry.mjs        pure registry + main-owned host
     executable-discovery.mjs          bounded generic discovery
   runtimes/opencode/
     opencode-manifest.mjs             release/source/capability pin
@@ -116,23 +132,35 @@ electron/main/agent/
     opencode-security-policy.mjs      managed config + permission policy
     opencode-project-instructions.mjs canonical project instruction loader
     opencode-sidecar-adapter.mjs      AgentRuntimePort implementation
-  adapters/
+  runtimes/codex/
+    codex-discovery.mjs               local CLI discovery/version/auth
+    codex-jsonl-rpc-connection.mjs    bounded app-server transport
     codex-app-server-adapter.mjs      direct compatibility runtime
+    codex-runtime-definition.mjs      injectable Codex definition
 
 src/features/desktop-agent/
+  index.ts                            public feature entrypoint
   application/
     AgentSessionController.ts         framework-independent controller
+    AgentEventSynchronizer.ts         batching + replay/gap repair
+    SessionUiStateStore.ts            session draft/viewport measurements
+    agent-controller-state.ts         state/transition vocabulary
     controllerRegistry.ts             LRU inactive-controller lifetime
-  components/
+  domain/
+    agent-contract.ts                 feature-local shared-contract alias
+    agent-projection.ts               event -> turn/part/row reducer
+    agent-projection-types.ts         discriminated presentation model
+    agent-projection-readers.ts       bounded payload readers
+  ui/
     AgentPartRenderer.tsx             discriminated part registry
     AgentQuestionDock.tsx             typed blocking questions
     SafeMarkdown.tsx                  no-innerHTML Markdown surface
-  agentTypes.ts                       renderer DTO contract
-  agentProjection.ts                  pure event -> turn/part/row projection
-  AgentTranscript.tsx                 <=120 mounted virtual rows
-  AgentComposer.tsx                   /, @, files, runtime/model/mode
-  RightAgentPanel.tsx                 view composition only
-  desktop-agent.css                   isolated responsive PuppyOne tokens
+    AgentTranscript.tsx               <=120 mounted virtual rows
+    AgentComposer.tsx                 /, @, files, runtime/model/mode
+    RightAgentPanel.tsx               view composition only
+    desktop-agent.css                 responsive PuppyOne tokens
+  agentTypes.ts                       migration-only type re-export
+  agentProjection.ts                  migration-only projection re-export
 
 vendor/opencode/
   runtime-manifest.json               immutable release artifact hashes
@@ -359,9 +387,28 @@ bounded in main and projection layers.
 - Focus uses PuppyOne tokens; dark/light themes inherit semantic tokens;
   reduced-motion disables caret/spinner/row motion.
 
+## Extension contract
+
+Adding a runtime does not change Registry, AgentService, preload, Controller or
+UI lifecycle code. Implement `AgentRuntimePort`, return an immutable descriptor
+and capability snapshot, add a runtime definition, and register that definition
+only in the bootstrap composition root. A capability that controls an action
+must have its corresponding method or runtime construction fails.
+
+Adding an event requires one shared event vocabulary change, main normalization,
+domain projection and an optional UI registry entry. Shared constant/type drift,
+malformed IPC input, malformed responses and invalid blocking events have
+contract tests. Unknown native events remain bounded fallbacks instead of raw
+payloads.
+
+Adding a tool-specific view registers a Renderer in
+`AgentToolRendererRegistry`; it does not add provider conditions to the panel or
+controller. Cross-feature consumers import only `desktop-agent/index.ts`.
+
 ## Related records
 
 - [OpenCode sidecar ADR](ADR-001-opencode-sidecar.md)
+- [Agent contract and boundary ADR](ADR-002-agent-contract-and-boundaries.md)
 - [OpenCode adoption spike](opencode-adoption-spike.md)
 - [OpenCode update and rollback runbook](opencode-upgrade-runbook.md)
 - [Right Sidebar product contract](right-sidebar.md)

@@ -23,6 +23,6 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "vendor/shared-ui/src"],
+  "include": ["src", "shared/agent-contract/**/*.ts", "vendor/shared-ui/src"],
   "references": []
 }

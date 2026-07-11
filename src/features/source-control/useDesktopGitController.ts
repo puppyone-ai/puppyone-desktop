@@ -33,6 +33,7 @@ import {
 } from "./operationDialogs";
 import { createRepositoryRefreshReason } from "./repositoryRefreshPolicy";
 import type { GitMainPanel, GitWorkingSelection } from "./types";
+import { clearFormatAwareDiffCaches } from "./diff/core/cacheControl";
 import { useGitRepositoryLifecycle } from "./useGitRepositoryLifecycle";
 
 export type PendingBranchSwitch = {
@@ -107,6 +108,7 @@ export function useDesktopGitController({
   }, []);
 
   useEffect(() => {
+    clearFormatAwareDiffCaches();
     setSelectedGitCommitId(null);
     setSelectedGitWorkingFile(null);
     setGitCommitDetail(null);
