@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { bench, describe } from "vitest";
-import { AgentTranscript } from "../../src/features/desktop-agent/AgentTranscript";
+import { AgentTranscript } from "../../src/features/desktop-agent/ui/AgentTranscript";
 import { applyAgentEvent, applyAgentEvents, createAgentProjection } from "../../src/features/desktop-agent/agentProjection";
 import type { AgentEvent } from "../../src/features/desktop-agent/agentTypes";
 

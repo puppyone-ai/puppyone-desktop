@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CircleAlert, LoaderCircle } from "lucide-react";
-import type { AgentPart, AgentProjection, TimelineRow } from "./agentProjection";
-import { AgentPartRenderer } from "./components/AgentPartRenderer";
+import type { AgentPart, AgentProjection, TimelineRow } from "../domain/agent-projection-types";
+import { AgentPartRenderer } from "./AgentPartRenderer";
 
 type AgentTranscriptProps = {
   projection: AgentProjection;

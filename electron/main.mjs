@@ -16,7 +16,7 @@ import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
 import { createAgentPersistence } from "./main/agent/agent-persistence.mjs";
 import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
 import { createAgentService } from "./main/agent/agent-service.mjs";
-import { createDefaultAgentRuntimeHost } from "./main/agent/runtime/agent-runtime-registry.mjs";
+import { createDefaultAgentRuntimeHost } from "./main/agent/bootstrap/create-agent-runtime-host.mjs";
 import {
   getCloudApiErrorMessage,
   requestCloudApi,
@@ -126,7 +126,6 @@ const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   managedOpenCodeConfigDir: path.join(app.getPath("userData"), "agent-runtime", "opencode", "config"),
 });
 const agentService = createAgentService({
-  appVersion: app.getVersion(),
   runtimeRegistry: agentRuntimeRegistry,
   persistence: agentPersistence,
 });

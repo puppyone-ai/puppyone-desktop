@@ -21,7 +21,7 @@ import type {
   AgentTurnInterruptRequest,
   AgentTurnStartRequest,
   AgentTurnSteerRequest,
-} from "../features/desktop-agent/agentTypes";
+} from "../../shared/agent-contract/types";
 
 export type GitStatusEntry = {
   path: string;

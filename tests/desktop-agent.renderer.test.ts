@@ -5,8 +5,8 @@ import React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AgentApprovalDock } from "../src/features/desktop-agent/AgentApprovalDock";
-import { AgentTranscript } from "../src/features/desktop-agent/AgentTranscript";
+import { AgentApprovalDock } from "../src/features/desktop-agent/ui/AgentApprovalDock";
+import { AgentTranscript } from "../src/features/desktop-agent/ui/AgentTranscript";
 import { createAgentProjection } from "../src/features/desktop-agent/agentProjection";
 import type { AgentProviderReadiness } from "../src/features/desktop-agent/agentTypes";
 

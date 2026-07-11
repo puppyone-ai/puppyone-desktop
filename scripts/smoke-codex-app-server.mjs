@@ -1,5 +1,5 @@
-import { CodexAppServerAdapter } from "../electron/main/agent/adapters/codex-app-server-adapter.mjs";
-import { createCodexDiscovery } from "../electron/main/agent/provider-discovery.mjs";
+import { CodexAppServerAdapter } from "../electron/main/agent/runtimes/codex/codex-app-server-adapter.mjs";
+import { createCodexDiscovery } from "../electron/main/agent/runtimes/codex/codex-discovery.mjs";
 
 if (process.env.RUN_CODEX_AGENT_SMOKE !== "1") {
   console.log("Skipped. Set RUN_CODEX_AGENT_SMOKE=1 to initialize the installed Codex app-server without starting a turn.");

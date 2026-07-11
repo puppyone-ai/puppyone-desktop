@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
-import type { AgentPart } from "../agentProjection";
-import { AgentActivityItem } from "../AgentActivityItem";
+import type { AgentPart } from "../domain/agent-projection-types";
+import { AgentActivityItem } from "./AgentActivityItem";
 
 type AgentActivityPart = Extract<AgentPart, { label: string }>;
 export type AgentToolPart = AgentActivityPart & { kind: "tool" | "command" | "file-change" };

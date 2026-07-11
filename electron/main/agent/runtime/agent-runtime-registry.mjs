@@ -1,19 +1,4 @@
-import { CodexAppServerAdapter } from "../adapters/codex-app-server-adapter.mjs";
-import { createCodexDiscovery } from "../provider-discovery.mjs";
-import { createOpenCodeDiscovery } from "../runtimes/opencode/opencode-discovery.mjs";
-import { OpenCodeSidecarAdapter } from "../runtimes/opencode/opencode-sidecar-adapter.mjs";
-import { OpenCodeSidecarHost } from "../runtimes/opencode/opencode-sidecar-host.mjs";
-import { OPENCODE_RUNTIME_DESCRIPTOR } from "../runtimes/opencode/opencode-manifest.mjs";
 import { assertAgentRuntimePort } from "./agent-runtime-port.mjs";
-
-export const CODEX_RUNTIME_DESCRIPTOR = Object.freeze({
-  id: "codex",
-  displayName: "Codex CLI",
-  description: "Direct compatibility runtime using the user's local Codex app-server and existing Codex authentication.",
-  kind: "direct-cli",
-  iconKey: "codex",
-  priority: 50,
-});
 
 export class AgentRuntimeRegistry {
   constructor(definitions) {
@@ -101,61 +86,6 @@ export class AgentRuntimeHost {
   require(runtimeId) { return this.registry.require(runtimeId); }
   hasActiveResources() { return this.registry.hasActiveResources(); }
   dispose() { return this.registry.dispose(); }
-}
-
-export function createDefaultAgentRuntimeRegistry({
-  appVersion,
-  appPath = null,
-  resourcesPath = process.resourcesPath,
-  logger = console,
-  managedOpenCodeConfigDir = null,
-  codexDiscovery = createCodexDiscovery(),
-  openCodeDiscovery = createOpenCodeDiscovery({ appPath, resourcesPath, managedConfigDir: managedOpenCodeConfigDir }),
-  openCodeHost = new OpenCodeSidecarHost({ logger }),
-} = {}) {
-  return new AgentRuntimeRegistry([
-    {
-      descriptor: OPENCODE_RUNTIME_DESCRIPTOR,
-      discovery: openCodeDiscovery,
-      createAdapter: ({ readiness, ...options }) => new OpenCodeSidecarAdapter({
-        ...options,
-        readiness,
-        host: openCodeHost,
-      }),
-      hasActiveResources: () => openCodeHost.snapshot().state !== "idle",
-      dispose: () => openCodeHost.stop(),
-    },
-    {
-      descriptor: CODEX_RUNTIME_DESCRIPTOR,
-      discovery: codexDiscovery,
-      createAdapter: ({ readiness, ...options }) => new CodexAppServerAdapter({
-        ...options,
-        executablePath: readiness.executablePath,
-        environment: readiness.environment,
-        appVersion,
-      }),
-    },
-  ]);
-}
-
-export function createDefaultAgentRuntimeHost(options = {}) {
-  return new AgentRuntimeHost(createDefaultAgentRuntimeRegistry(options));
-}
-
-export function createLegacyCodexRuntimeRegistry({ discovery, adapterFactory, appVersion }) {
-  return new AgentRuntimeRegistry([{
-    descriptor: CODEX_RUNTIME_DESCRIPTOR,
-    discovery,
-    createAdapter: ({ readiness, ...options }) => {
-      const adapterOptions = {
-        executablePath: readiness.executablePath,
-        environment: readiness.environment,
-        appVersion,
-        ...options,
-      };
-      return adapterFactory ? adapterFactory(adapterOptions) : new CodexAppServerAdapter(adapterOptions);
-    },
-  }]);
 }
 
 export function publicRuntimeReadiness(entry) {

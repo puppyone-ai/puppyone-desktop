@@ -4,7 +4,7 @@ import {
   discoverCodexExecutable,
   MIN_SUPPORTED_CODEX_VERSION,
   parseCodexVersion,
-} from "../electron/main/agent/provider-discovery.mjs";
+} from "../electron/main/agent/runtimes/codex/codex-discovery.mjs";
 
 describe("Codex provider discovery", () => {
   it("parses and classifies semantic versions", () => {

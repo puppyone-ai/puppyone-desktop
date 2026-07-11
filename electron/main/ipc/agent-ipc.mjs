@@ -1,108 +1,88 @@
 import { authorizeAgentReferences, createAgentReferenceBudget } from "../agent/agent-reference-authorization.mjs";
+import { assertAgentIpcResponse, parseAgentIpcRequest } from "../../../shared/agent-contract/schema.mjs";
 
 export function registerAgentIpcHandlers({
   ipcMain,
   agentService,
   authorizeWorkspaceRoot,
 }) {
-  ipcMain.handle("agent:providers-discover", async (event, request) => {
-    const rootPath = typeof request?.rootPath === "string" ? request.rootPath : null;
-    const workspaceRoot = rootPath ? await authorizeWorkspaceRoot(event, rootPath) : null;
-    return agentService.discoverProviders(event.sender, request, workspaceRoot);
-  });
+  const register = (channel, handler) => {
+    ipcMain.handle(channel, async (event, rawRequest) => {
+      const request = parseAgentIpcRequest(channel, rawRequest);
+      const response = await handler(event, request);
+      return assertAgentIpcResponse(channel, response);
+    });
+  };
 
-  ipcMain.handle("agent:models-list", async (event, request) => {
-    const rootPath = typeof request?.rootPath === "string" ? request.rootPath : null;
-    const workspaceRoot = rootPath ? await authorizeWorkspaceRoot(event, rootPath) : null;
-    return agentService.listModels(event.sender, request, workspaceRoot);
-  });
+  const authorizeOptionalRoot = async (event, request) => (
+    request.rootPath ? authorizeWorkspaceRoot(event, request.rootPath) : null
+  );
+  const authorizeRequiredRoot = (event, request) => authorizeWorkspaceRoot(event, request.rootPath);
 
-  ipcMain.handle("agent:account-read", async (event, request) => {
-    const rootPath = typeof request?.rootPath === "string" ? request.rootPath : null;
-    const workspaceRoot = rootPath ? await authorizeWorkspaceRoot(event, rootPath) : null;
-    return agentService.readAccount(event.sender, request, workspaceRoot);
-  });
+  register("agent:providers-discover", async (event, request) => (
+    agentService.discoverProviders(event.sender, request, await authorizeOptionalRoot(event, request))
+  ));
+  register("agent:models-list", async (event, request) => (
+    agentService.listModels(event.sender, request, await authorizeOptionalRoot(event, request))
+  ));
+  register("agent:account-read", async (event, request) => (
+    agentService.readAccount(event.sender, request, await authorizeOptionalRoot(event, request))
+  ));
+  register("agent:session-create", async (event, request) => (
+    agentService.createSession(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
+  register("agent:session-resume", async (event, request) => (
+    agentService.resumeSession(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
+  register("agent:session-replay", async (event, request) => (
+    agentService.replay(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
+  register("agent:sessions-list", async (event, request) => (
+    agentService.listSessions(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
+  register("agent:session-fork", async (event, request) => (
+    agentService.forkSession(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
+  register("agent:session-archive", async (event, request) => (
+    agentService.archiveSession(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
+  register("agent:session-delete", async (event, request) => (
+    agentService.deleteSession(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
+  register("agent:session-close", async (event, request) => (
+    agentService.closeSession(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
+  register("agent:turn-steer", async (event, request) => (
+    agentService.steerTurn(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
+  register("agent:turn-interrupt", async (event, request) => (
+    agentService.interruptTurn(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
+  register("agent:session-compact", async (event, request) => (
+    agentService.compactSession(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
+  register("agent:approval-resolve", async (event, request) => (
+    agentService.resolveApproval(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
+  register("agent:question-resolve", async (event, request) => (
+    agentService.resolveQuestion(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
 
-  ipcMain.handle("agent:session-create", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.createSession(event.sender, request, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:session-resume", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.resumeSession(event.sender, request, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:session-replay", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.replay(event.sender, request, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:sessions-list", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.listSessions(event.sender, request, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:session-fork", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.forkSession(event.sender, request, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:session-archive", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.archiveSession(event.sender, request, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:session-delete", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.deleteSession(event.sender, request, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:session-close", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.closeSession(event.sender, request, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:turn-start", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
+  register("agent:turn-start", async (event, request) => {
+    const workspaceRoot = await authorizeRequiredRoot(event, request);
     // Attachments and @ context share one memory/count budget. Authorize them
     // sequentially so two 25 MB groups cannot be buffered at the same time.
     const referenceBudget = createAgentReferenceBudget();
     const attachments = await authorizeAgentReferences({
       workspaceRoot,
-      references: request?.attachments,
+      references: request.attachments,
       budget: referenceBudget,
     });
     const contextReferences = await authorizeAgentReferences({
       workspaceRoot,
-      references: request?.contextReferences,
+      references: request.contextReferences,
       budget: referenceBudget,
     });
     return agentService.startTurn(event.sender, { ...request, attachments, contextReferences }, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:turn-steer", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.steerTurn(event.sender, request, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:turn-interrupt", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.interruptTurn(event.sender, request, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:session-compact", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.compactSession(event.sender, request, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:approval-resolve", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.resolveApproval(event.sender, request, workspaceRoot);
-  });
-
-  ipcMain.handle("agent:question-resolve", async (event, request) => {
-    const workspaceRoot = await authorizeWorkspaceRoot(event, request?.rootPath);
-    return agentService.resolveQuestion(event.sender, request, workspaceRoot);
   });
 }

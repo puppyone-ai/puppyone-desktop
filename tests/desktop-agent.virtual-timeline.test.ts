@@ -3,8 +3,8 @@ import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { AgentTranscript, agentTimelineLimits } from "../src/features/desktop-agent/AgentTranscript";
-import { SafeMarkdown } from "../src/features/desktop-agent/components/SafeMarkdown";
+import { AgentTranscript, agentTimelineLimits } from "../src/features/desktop-agent/ui/AgentTranscript";
+import { SafeMarkdown } from "../src/features/desktop-agent/ui/SafeMarkdown";
 import { createAgentProjection, type AgentPart } from "../src/features/desktop-agent/agentProjection";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

@@ -1,7 +1,12 @@
-# Implementation Brief: Codex Agent Chat Vertical Slice
+# Historical implementation brief: Codex Agent Chat vertical slice
+
+Status: superseded. This file preserves the original Codex-only delivery
+record and must not be used as current implementation instructions. Use
+`../README.md`, `../ADR-001-opencode-sidecar.md`, and
+`../ADR-002-agent-contract-and-boundaries.md` for the implemented architecture.
 
 This is the implementation handoff for the first production-shaped slice of
-the [Desktop Agent Architecture](README.md). It is intentionally narrower than
+the [Desktop Agent Architecture](../README.md). It is intentionally narrower than
 the complete multi-provider architecture.
 
 The first slice integrates Codex only. It establishes the common contracts so
@@ -44,7 +49,7 @@ tests, run the relevant verification, and report remaining gaps accurately.
 
 Read these documents completely, in this order, before editing:
 
-1. docs/architecture/desktop-agent/implementation-brief.md
+1. docs/architecture/desktop-agent/history/codex-vertical-slice.md
 2. docs/architecture/desktop-agent/README.md
 3. docs/architecture/desktop-agent/right-sidebar.md
 4. docs/architecture/desktop-terminal-architecture.md

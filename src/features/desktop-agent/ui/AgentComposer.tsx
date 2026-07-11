@@ -1,6 +1,6 @@
 import { ArrowUp, AtSign, Paperclip, Square, X } from "lucide-react";
 import { useRef, useState, type KeyboardEvent } from "react";
-import type { AgentCommand, AgentFileReference, AgentMode, AgentModel, AgentRuntimeCatalogEntry } from "./agentTypes";
+import type { AgentCommand, AgentFileReference, AgentMode, AgentModel, AgentRuntimeCatalogEntry } from "../domain/agent-contract";
 
 type AgentComposerProps = {
   draft: string;

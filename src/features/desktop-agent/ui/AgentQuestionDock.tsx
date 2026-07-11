@@ -1,6 +1,6 @@
 import { CircleHelp, LoaderCircle } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { AgentQuestion } from "../agentProjection";
+import type { AgentQuestion } from "../domain/agent-projection-types";
 
 type AgentQuestionDockProps = {
   request: AgentQuestion;

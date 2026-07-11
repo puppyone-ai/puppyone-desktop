@@ -11,9 +11,9 @@ Runtime prompt manifest: `anomalyco/opencode@b8374b5a7c532e51aeb66b1dee9278de915
 | `electron/main/agent/runtimes/opencode/opencode-events.mjs` | `packages/app/src/context/global-sync/event-reducer.ts`, `packages/opencode/src/acp/event.ts` | React/PuppyOne event normalization rewrite with bounded DTOs. |
 | `electron/main/agent/runtimes/opencode/opencode-security-policy.mjs` | `packages/opencode/src/permission/index.ts`, `packages/opencode/src/agent/agent.ts`, `packages/opencode/src/config/config.ts` | Independent fail-closed policy. Interactive unknown/plugin/MCP tools ask, plan allows only read-oriented tools, and inherited config/permission/plugin overrides are disabled. |
 | `electron/main/agent/runtimes/opencode/opencode-project-instructions.mjs` | `packages/opencode/src/session/instruction.ts`, `packages/opencode/src/session/llm/request.ts` | Main-owned canonical replacement for automatic project instruction discovery; one bounded in-workspace file is appended through the native per-request system field. |
-| `src/features/desktop-agent/agentProjection.ts` | `packages/app/src/pages/session/timeline/projection.ts` | Behavioral port of stable part reconciliation; implementation rewritten for React and the PuppyOne event contract. |
-| `src/features/desktop-agent/AgentTranscript.tsx` | `packages/app/src/pages/session/timeline/message-timeline.tsx` | Independent fixed-budget virtual timeline using PuppyOne row and measurement contracts. |
-| `src/features/desktop-agent/components/AgentPartRenderer.tsx` | `packages/session-ui/src/components/message-part.tsx` | Registry pattern adopted; renderers and styles are PuppyOne-owned. |
+| `src/features/desktop-agent/domain/agent-projection.ts` | `packages/app/src/pages/session/timeline/projection.ts` | Behavioral port of stable part reconciliation; implementation rewritten for React and the PuppyOne event contract. |
+| `src/features/desktop-agent/ui/AgentTranscript.tsx` | `packages/app/src/pages/session/timeline/message-timeline.tsx` | Independent fixed-budget virtual timeline using PuppyOne row and measurement contracts. |
+| `src/features/desktop-agent/ui/AgentPartRenderer.tsx` | `packages/session-ui/src/components/message-part.tsx` | Registry pattern adopted; renderers and styles are PuppyOne-owned. |
 | `src/features/desktop-agent/application/AgentSessionController.ts` | OpenCode global sync/session store behavior | Independent external-store controller with PuppyOne authorization and replay semantics. |
 
 No OpenCode logo, brand skin, raw prompt body, or SolidJS component is copied.

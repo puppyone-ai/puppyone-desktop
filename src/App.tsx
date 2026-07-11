@@ -12,8 +12,7 @@ import {
 } from "./components/MinimalOnboarding";
 import { AssetLibraryHome } from "./components/AssetLibraryHome";
 import { RightTerminalPanel, type RightTerminalPanelHandle } from "./components/RightTerminalPanel";
-import { RightAgentPanel } from "./features/desktop-agent/RightAgentPanel";
-import { isDesktopAgentChatEnabled, isDesktopTerminalEnabled } from "./features/desktop-agent/featureGate";
+import { isDesktopAgentChatEnabled, isDesktopTerminalEnabled, RightAgentPanel } from "./features/desktop-agent";
 import { useDesktopUpdates } from "./components/DesktopUpdateControls";
 import {
   configureWorkspaceCloudRemote,

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, ChevronDown, Circle, CircleAlert, FilePenLine, TerminalSquare } from "lucide-react";
-import type { AgentActivity } from "./agentProjection";
+import type { AgentActivity } from "../domain/agent-projection-types";
 import { AgentPlanItem } from "./AgentPlanItem";
 
 type AgentActivityItemProps = {

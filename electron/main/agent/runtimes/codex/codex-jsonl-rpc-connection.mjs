@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { spawn as nodeSpawn } from "node:child_process";
-import { redactSecretText } from "./agent-events.mjs";
+import { redactSecretText } from "../../agent-events.mjs";
 
 const DEFAULT_MAX_LINE_BYTES = 1024 * 1024;
 const DEFAULT_MAX_STDERR_BYTES = 64 * 1024;

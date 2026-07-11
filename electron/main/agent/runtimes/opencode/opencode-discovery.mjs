@@ -37,6 +37,7 @@ export async function discoverOpenCodeExecutable({
     appPath && path.join(appPath, "vendor", "opencode", "bin", "previous", executableName),
     appPath && path.join(appPath, "vendor", "opencode", "bin", `${platform}-${arch}`, executableName),
   ].filter(Boolean).map((candidate) => path.resolve(candidate));
+  const userInstallCandidate = path.join(homedir, ".opencode", "bin", executableName);
   const packagedCandidateSet = new Set(packagedCandidates);
   const packagedFailures = [];
   const verifiedPackagedPaths = new Set();
@@ -45,7 +46,7 @@ export async function discoverOpenCodeExecutable({
     : null;
   const result = await discoverExecutable({
     executableNames: [executableName],
-    additionalCandidates: [explicitCandidate, ...packagedCandidates],
+    additionalCandidates: [explicitCandidate, ...packagedCandidates, userInstallCandidate],
     fsModule,
     spawn,
     env,

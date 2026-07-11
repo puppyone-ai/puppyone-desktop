@@ -1,80 +1,37 @@
-import { applyAgentEvent, applyAgentEvents, createAgentProjection, type AgentProjection } from "../agentProjection";
+import { applyAgentEvents, createAgentProjection } from "../domain/agent-projection";
 import type {
   AgentApprovalDecision,
-  AgentEvent,
   AgentFileReference,
   AgentProviderInspection,
   AgentQuestionResolution,
   AgentRuntimeId,
   AgentSessionListItem,
-  AgentSessionMetadata,
   AgentSessionSnapshot,
-} from "../agentTypes";
+} from "../domain/agent-contract";
+import { AgentEventSynchronizer } from "./AgentEventSynchronizer";
+import {
+  agentControllerTransitions,
+  type AgentControllerState,
+} from "./agent-controller-state";
+import { formatAgentError } from "./agent-error";
+import { SessionUiStateStore, type SessionUiState } from "./SessionUiStateStore";
 
-export type AgentControllerPhase =
-  | "idle"
-  | "discovering"
-  | "restoring"
-  | "ready"
-  | "creating"
-  | "running"
-  | "waiting"
-  | "runtime-exited"
-  | "failed";
-
-export type AgentControllerState = {
-  phase: AgentControllerPhase;
-  inspection: AgentProviderInspection | null;
-  session: AgentSessionMetadata | null;
-  history: AgentSessionListItem[];
-  projection: AgentProjection;
-  selectedRuntimeId: AgentRuntimeId | null;
-  selectedModel: string | null;
-  selectedMode: string | null;
-  draft: string;
-  attachments: AgentFileReference[];
-  contextReferences: AgentFileReference[];
-  error: string | null;
-  submitting: boolean;
-  stopping: boolean;
-  resolvingBlocker: boolean;
-  initialized: boolean;
-};
+export type { AgentControllerPhase, AgentControllerState } from "./agent-controller-state";
+export { agentControllerTransitions } from "./agent-controller-state";
+export { formatAgentError } from "./agent-error";
 
 type AgentBridge = NonNullable<Window["puppyoneDesktop"]>;
 type Listener = () => void;
 
-const STREAM_BATCH_MS = 32;
-const MAX_BUFFERED_EVENTS = 2_000;
 const MAX_CACHED_SESSIONS = 100;
-
-export const agentControllerTransitions: Readonly<Record<AgentControllerPhase, readonly AgentControllerPhase[]>> = Object.freeze({
-  idle: ["discovering", "restoring", "creating", "ready", "failed"],
-  discovering: ["restoring", "ready", "failed"],
-  restoring: ["ready", "running", "failed", "runtime-exited"],
-  ready: ["discovering", "restoring", "creating", "running", "waiting", "failed", "runtime-exited"],
-  creating: ["ready", "running", "failed", "runtime-exited"],
-  running: ["running", "waiting", "ready", "failed", "runtime-exited"],
-  waiting: ["waiting", "running", "ready", "failed", "runtime-exited"],
-  "runtime-exited": ["discovering", "restoring", "creating", "ready", "failed"],
-  failed: ["discovering", "restoring", "creating", "ready", "runtime-exited"],
-});
-
-type SessionUiState = { draft: string; scrollTop: number; measurements: Record<string, number>; pinned: boolean };
 
 export class AgentSessionController {
   readonly workspaceRoot: string;
   private state: AgentControllerState;
   private listeners = new Set<Listener>();
-  private eventCleanup: (() => void) | null = null;
-  private exitCleanup: (() => void) | null = null;
-  private connectedBridge: AgentBridge | null = null;
-  private bufferedEvents: AgentEvent[] = [];
-  private bufferedSequences = new Set<number>();
-  private flushTimer: ReturnType<typeof setTimeout> | null = null;
-  private replayPromise: Promise<void> | null = null;
+  private readonly eventSynchronizer: AgentEventSynchronizer;
   private initializePromise: Promise<void> | null = null;
-  private sessionUi = new Map<string, SessionUiState>();
+  private readonly sessionUi = new SessionUiStateStore();
   private queuedPrompts: string[] = [];
 
   constructor(workspaceRoot: string, private readonly bridgeProvider: () => AgentBridge | undefined = () => window.puppyoneDesktop) {
@@ -97,7 +54,14 @@ export class AgentSessionController {
       resolvingBlocker: false,
       initialized: false,
     };
-    this.connectEventStream();
+    this.eventSynchronizer = new AgentEventSynchronizer(
+      workspaceRoot,
+      bridgeProvider,
+      this.getSnapshot,
+      (patch) => this.patch(patch),
+      this.drainQueuedPrompt,
+    );
+    this.eventSynchronizer.connect();
   }
 
   getSnapshot = () => this.state;
@@ -113,15 +77,8 @@ export class AgentSessionController {
 
   /** Releases renderer subscriptions only; it never sends a runtime stop. */
   dispose() {
-    this.eventCleanup?.();
-    this.exitCleanup?.();
-    this.eventCleanup = null;
-    this.exitCleanup = null;
-    this.connectedBridge = null;
-    if (this.flushTimer) clearTimeout(this.flushTimer);
-    this.flushTimer = null;
-    this.bufferedEvents = [];
-    this.bufferedSequences.clear();
+    this.eventSynchronizer.dispose();
+    this.sessionUi.clear();
     this.listeners.clear();
   }
 
@@ -132,7 +89,7 @@ export class AgentSessionController {
   }
 
   private async runInitialize(refresh: boolean) {
-    this.connectEventStream();
+    this.eventSynchronizer.connect();
     const bridge = this.requireBridge("discoverAgentProviders", "resumeAgentSession");
     this.patch({ phase: "discovering", error: null });
     try {
@@ -339,7 +296,7 @@ export class AgentSessionController {
       });
     } catch (error) {
       this.patch({ error: formatAgentError(error) });
-      await this.replayFrom(this.state.projection.lastSequence);
+      await this.eventSynchronizer.repairFrom(this.state.projection.lastSequence);
     } finally {
       this.patch({ resolvingBlocker: false });
     }
@@ -361,7 +318,7 @@ export class AgentSessionController {
       });
     } catch (error) {
       this.patch({ error: formatAgentError(error) });
-      await this.replayFrom(this.state.projection.lastSequence);
+      await this.eventSynchronizer.repairFrom(this.state.projection.lastSequence);
     } finally {
       this.patch({ resolvingBlocker: false });
     }
@@ -447,7 +404,7 @@ export class AgentSessionController {
   }
 
   private applySnapshot(snapshot: AgentSessionSnapshot) {
-    this.flushBufferedEvents();
+    this.eventSynchronizer.flush();
     const inspection = this.state.inspection ? {
       ...this.state.inspection,
       runtime: snapshot.runtime ?? snapshot.session.runtime ?? this.state.inspection.runtime,
@@ -468,142 +425,11 @@ export class AgentSessionController {
     });
   }
 
-  private connectEventStream() {
-    const bridge = this.bridgeProvider();
-    if (!bridge || bridge === this.connectedBridge) return;
-    this.eventCleanup?.();
-    this.exitCleanup?.();
-    this.connectedBridge = bridge;
-    this.eventCleanup = bridge?.onAgentEvent?.((event) => this.enqueueEvent(event)) ?? null;
-    this.exitCleanup = bridge?.onAgentSessionExit?.((event) => {
-      if (event.sessionId !== this.state.session?.id || event.reason !== "provider-exited") return;
-      this.flushBufferedEvents();
-      const projection = {
-        ...this.state.projection,
-        approvals: [],
-        questions: [],
-        runningTurnId: null,
-        terminalState: this.state.projection.runningTurnId ? "failed" as const : this.state.projection.terminalState,
-      };
-      const runtimeName = this.state.session.runtime?.displayName
-        || this.state.inspection?.runtime?.displayName
-        || (this.state.selectedRuntimeId === "codex" ? "Codex" : this.state.selectedRuntimeId === "opencode" ? "OpenCode" : "Agent runtime");
-      this.patch({
-        session: { ...this.state.session, activeTurnId: null, terminalState: "provider-exited" },
-        projection,
-        phase: "runtime-exited",
-        stopping: false,
-        submitting: false,
-        resolvingBlocker: false,
-        error: `${runtimeName} stopped unexpectedly. Files already changed were not reverted. Refresh to resume the saved session.`,
-      });
-    }) ?? null;
-  }
-
-  private enqueueEvent(event: AgentEvent) {
-    if (event.sessionId !== this.state.session?.id) return;
-    if (event.sequence <= this.state.projection.lastSequence) return;
-    if (!this.bufferedSequences.has(event.sequence)) {
-      this.bufferedEvents.push(event);
-      this.bufferedSequences.add(event.sequence);
-    }
-    if (this.bufferedEvents.length > MAX_BUFFERED_EVENTS) {
-      const removed = this.bufferedEvents.splice(0, this.bufferedEvents.length - MAX_BUFFERED_EVENTS);
-      for (const entry of removed) this.bufferedSequences.delete(entry.sequence);
-    }
-    if (isUrgentEvent(event) || event.sequence > this.state.projection.lastSequence + 1) {
-      this.flushBufferedEvents();
-      return;
-    }
-    if (!this.flushTimer) this.flushTimer = setTimeout(() => this.flushBufferedEvents(), STREAM_BATCH_MS);
-  }
-
-  private flushBufferedEvents() {
-    if (this.flushTimer) clearTimeout(this.flushTimer);
-    this.flushTimer = null;
-    if (this.bufferedEvents.length === 0) return;
-    const ordered = this.bufferedEvents.sort((left, right) => left.sequence - right.sequence);
-    this.bufferedEvents = [];
-    this.bufferedSequences.clear();
-    let cursor = this.state.projection.lastSequence;
-    const applicable: AgentEvent[] = [];
-    const deferred: AgentEvent[] = [];
-    for (const event of ordered) {
-      if (event.sequence <= cursor) continue;
-      if (event.sequence > cursor + 1) {
-        deferred.push(event);
-        continue;
-      }
-      applicable.push(event);
-      cursor = event.sequence;
-    }
-    const projection = applyAgentEvents(this.state.projection, applicable);
-    this.bufferedEvents.push(...deferred);
-    for (const event of deferred) this.bufferedSequences.add(event.sequence);
-    const terminal = projection.terminalState;
-    const phase = projection.runningTurnId
-      ? projection.approvals.length || projection.questions.length ? "waiting" : "running"
-      : terminal ? "ready" : this.state.phase;
-    this.patch({
-      projection,
-      phase,
-      stopping: projection.runningTurnId ? this.state.stopping : false,
-      session: this.state.session
-        ? applicable.reduce(updateSessionFromProjectionEvent, this.state.session)
-        : null,
-    });
-    if (!projection.runningTurnId && this.queuedPrompts.length > 0) {
-      const prompt = this.queuedPrompts.shift();
-      if (prompt) queueMicrotask(() => { void this.submit(prompt); });
-    }
-    if (deferred.length > 0) void this.replayFrom(projection.lastSequence);
-  }
-
-  private replayFrom(afterSequence: number) {
-    if (this.replayPromise) return this.replayPromise;
-    const sessionId = this.state.session?.id;
-    const bridge = this.bridgeProvider();
-    if (!sessionId || !bridge?.replayAgentSession) return Promise.resolve();
-    this.replayPromise = (async () => {
-      try {
-        let cursor = afterSequence;
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          const snapshot = await bridge.replayAgentSession({ rootPath: this.workspaceRoot, sessionId, afterSequence: cursor });
-          if (this.state.session?.id !== sessionId) return;
-          let projection = applyAgentEvents(this.state.projection, snapshot.events, { partialHistory: snapshot.partial });
-          const buffered = this.bufferedEvents.sort((left, right) => left.sequence - right.sequence);
-          this.bufferedEvents = [];
-          this.bufferedSequences.clear();
-          for (const event of buffered) {
-            if (event.sequence <= projection.lastSequence + 1) projection = applyAgentEvent(projection, event);
-            else {
-              this.bufferedEvents.push(event);
-              this.bufferedSequences.add(event.sequence);
-            }
-          }
-          const phase = projection.runningTurnId
-            ? projection.approvals.length || projection.questions.length ? "waiting" : "running"
-            : projection.terminalState ? "ready" : this.state.phase;
-          this.patch({
-            projection,
-            phase,
-            session: {
-              ...snapshot.session,
-              activeTurnId: projection.runningTurnId,
-              terminalState: projection.runningTurnId ? "running" : projection.terminalState || snapshot.session.terminalState,
-              lastSequence: projection.lastSequence,
-            },
-          });
-          cursor = projection.lastSequence;
-          if (this.bufferedEvents.length === 0) return;
-        }
-        this.patch({ error: "Part of the live Agent event stream could not be repaired. Refresh to replay saved history." });
-      } catch (error) {
-        this.patch({ error: formatAgentError(error) });
-      }
-    })().finally(() => { this.replayPromise = null; });
-    return this.replayPromise;
-  }
+  private drainQueuedPrompt = () => {
+    if (this.state.projection.runningTurnId || this.queuedPrompts.length === 0) return;
+    const prompt = this.queuedPrompts.shift();
+    if (prompt) queueMicrotask(() => { void this.submit(prompt); });
+  };
 
   private async closeActiveSession(removePersistence: boolean) {
     const sessionId = this.state.session?.id;
@@ -637,12 +463,12 @@ export class AgentSessionController {
   }
 
   private readSessionUi(key: string): SessionUiState {
-    return this.sessionUi.get(key) ?? { draft: "", scrollTop: 0, measurements: {}, pinned: true };
+    return this.sessionUi.read(key);
   }
 
   private writeCurrentSessionUi(value: Partial<SessionUiState>) {
     const key = this.uiKey();
-    this.sessionUi.set(key, { ...this.readSessionUi(key), ...value });
+    this.sessionUi.patch(key, value);
   }
 
   private saveSessionUi() {
@@ -671,37 +497,4 @@ function mergeReferences(current: AgentFileReference[], incoming: AgentFileRefer
   const byPath = new Map(current.map((entry) => [entry.path, entry]));
   for (const entry of incoming) if (entry?.path) byPath.set(entry.path, entry);
   return Array.from(byPath.values()).slice(0, 32);
-}
-
-function updateSessionFromProjectionEvent(session: AgentSessionMetadata, event?: AgentEvent) {
-  if (!event) return session;
-  const terminal = event.type === "turn.completed" ? "completed"
-    : event.type === "turn.failed" ? "failed"
-      : event.type === "turn.interrupted" ? "interrupted"
-        : null;
-  return {
-    ...session,
-    title: event.type === "session.updated" && typeof event.payload.title === "string" ? event.payload.title : session.title,
-    lastSequence: Math.max(session.lastSequence, event.sequence),
-    updatedAt: event.emittedAt,
-    activeTurnId: event.type === "turn.started" ? event.turnId : terminal ? null : session.activeTurnId,
-    terminalState: event.type === "turn.started" ? "running" : terminal || session.terminalState,
-  };
-}
-
-function isUrgentEvent(event: AgentEvent) {
-  return event.type.startsWith("approval.")
-    || event.type.startsWith("question.")
-    || event.type === "turn.completed"
-    || event.type === "turn.failed"
-    || event.type === "turn.interrupted"
-    || event.type === "provider.error";
-}
-
-export function formatAgentError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  if (message.includes("No handler registered for 'agent:")) {
-    return "Desktop Agent runtime was updated. Restart PuppyOne once so the native bridge can load.";
-  }
-  return message;
 }

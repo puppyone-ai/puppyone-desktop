@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Archive, ChevronDown, CircleAlert, CopyPlus, History, Plus, RotateCcw, Trash2 } from "lucide-react";
-import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
-import type { AgentSessionListItem } from "./agentTypes";
+import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../../components/DesktopMenu";
+import type { AgentSessionListItem } from "../domain/agent-contract";
 
 type AgentSurfaceHeaderProps = {
   title: string;

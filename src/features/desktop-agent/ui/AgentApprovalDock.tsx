@@ -1,6 +1,6 @@
 import { ShieldAlert } from "lucide-react";
-import type { AgentApproval } from "./agentProjection";
-import type { AgentApprovalDecision } from "./agentTypes";
+import type { AgentApproval } from "../domain/agent-projection-types";
+import type { AgentApprovalDecision } from "../domain/agent-contract";
 
 type AgentApprovalDockProps = {
   approval: AgentApproval;

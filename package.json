@@ -8,7 +8,7 @@
     "externalViewerPacks": false
   },
   "scripts": {
-    "check:boundaries": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-opencode-provenance.mjs",
+    "check:boundaries": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-agent-architecture.mjs && node scripts/check-opencode-provenance.mjs",
     "check:shared-ui": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs",
     "check:viewer-contract": "node scripts/check-viewer-contract.mjs",
     "check:markdown-architecture": "node scripts/check-markdown-architecture.mjs",
@@ -35,7 +35,7 @@
     "start": "node scripts/start-electron.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bench:performance": "vitest bench --run benchmarks/performance --no-file-parallelism --maxWorkers=1 --minWorkers=1"
+    "bench:performance": "vitest bench --run benchmarks/performance --no-file-parallelism --maxWorkers=1"
   },
   "dependencies": {
     "electron-log": "^5.4.4",

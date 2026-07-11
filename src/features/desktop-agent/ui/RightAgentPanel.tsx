@@ -5,9 +5,9 @@ import { AgentApprovalDock } from "./AgentApprovalDock";
 import { AgentComposer } from "./AgentComposer";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
-import { AgentQuestionDock } from "./components/AgentQuestionDock";
-import { getAgentSessionController } from "./application/controllerRegistry";
-import type { AgentSessionMetadata } from "./agentTypes";
+import { AgentQuestionDock } from "./AgentQuestionDock";
+import { getAgentSessionController } from "../application/controllerRegistry";
+import type { AgentSessionMetadata } from "../domain/agent-contract";
 import "./desktop-agent.css";
 
 export type RightAgentPanelHandle = { newSession: () => void };
@@ -51,7 +51,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   const runtime = state.session?.runtime
     || inspection?.runtime
     || inspection?.runtimes?.find((entry) => entry.descriptor.id === state.selectedRuntimeId)?.descriptor;
-  const runtimeLabel = runtime?.displayName || (state.selectedRuntimeId === "codex" ? "Codex" : "Agent");
+  const runtimeLabel = runtime?.displayName || "Agent";
   const capabilities = inspection?.capabilities;
   const unavailable = Boolean(readiness && readiness.status !== "ready");
   const loading = state.phase === "discovering" || state.phase === "restoring" || state.phase === "creating";

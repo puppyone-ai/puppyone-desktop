@@ -1,6 +1,8 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import { createAgentService } from "../electron/main/agent/agent-service.mjs";
+import { createCodexRuntimeDefinition } from "../electron/main/agent/runtimes/codex/codex-runtime-definition.mjs";
+import { AgentRuntimeRegistry } from "../electron/main/agent/runtime/agent-runtime-registry.mjs";
 import { registerAgentIpcHandlers } from "../electron/main/ipc/agent-ipc.mjs";
 
 describe("Electron AgentService ownership and lifecycle", () => {
@@ -319,15 +321,15 @@ describe("Agent IPC workspace authorization", () => {
       discoverProviders: vi.fn(),
       listModels: vi.fn(),
       readAccount: vi.fn(),
-      createSession: vi.fn(),
-      resumeSession: vi.fn(),
+      createSession: vi.fn(async () => ipcSnapshot()),
+      resumeSession: vi.fn(async () => ipcSnapshot()),
       replay: vi.fn(),
       closeSession: vi.fn(),
       startTurn: vi.fn(),
-      steerTurn: vi.fn(),
+      steerTurn: vi.fn(async () => ({ sessionId: "s", turnId: "t", accepted: true })),
       interruptTurn: vi.fn(),
       resolveApproval: vi.fn(),
-      resolveQuestion: vi.fn(),
+      resolveQuestion: vi.fn(async () => ({ requestId: "r", resolved: true })),
       listSessions: vi.fn(),
       forkSession: vi.fn(),
       archiveSession: vi.fn(),
@@ -358,15 +360,15 @@ describe("Agent IPC workspace authorization", () => {
       discoverProviders: vi.fn(),
       listModels: vi.fn(),
       readAccount: vi.fn(),
-      createSession: vi.fn(),
-      resumeSession: vi.fn(),
+      createSession: vi.fn(async () => ipcSnapshot()),
+      resumeSession: vi.fn(async () => ipcSnapshot()),
       replay: vi.fn(),
       closeSession: vi.fn(),
       startTurn: vi.fn(),
-      steerTurn: vi.fn(),
+      steerTurn: vi.fn(async () => ({ sessionId: "s", turnId: "t", accepted: true })),
       interruptTurn: vi.fn(),
       resolveApproval: vi.fn(),
-      resolveQuestion: vi.fn(),
+      resolveQuestion: vi.fn(async () => ({ requestId: "r", resolved: true })),
       listSessions: vi.fn(),
       forkSession: vi.fn(),
       archiveSession: vi.fn(),
@@ -412,7 +414,7 @@ describe("Agent IPC workspace authorization", () => {
 function createServiceHarness() {
   const adapters = [];
   const persisted = new Map();
-  const service = createAgentService({
+  const runtimeRegistry = new AgentRuntimeRegistry([createCodexRuntimeDefinition({
     appVersion: "test",
     discovery: {
       discover: vi.fn(async () => ({
@@ -425,6 +427,14 @@ function createServiceHarness() {
         message: "ready",
       })),
     },
+    adapterFactory: (options) => {
+      const adapter = createFakeAdapter(options);
+      adapters.push(adapter);
+      return adapter;
+    },
+  })]);
+  const service = createAgentService({
+    runtimeRegistry,
     persistence: {
       findLatest: vi.fn(async (root) => Array.from(persisted.values()).find((entry) => entry.workspaceRoot === root) ?? null),
       findById: vi.fn(async (id, root) => {
@@ -435,11 +445,6 @@ function createServiceHarness() {
       save: vi.fn(async (entry) => persisted.set(entry.sessionId, entry)),
       archive: vi.fn(async () => undefined),
       remove: vi.fn(async (id) => persisted.delete(id)),
-    },
-    adapterFactory: (options) => {
-      const adapter = createFakeAdapter(options);
-      adapters.push(adapter);
-      return adapter;
     },
     logger: { warn: vi.fn() },
   });
@@ -469,6 +474,7 @@ function createFakeAdapter(options) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })),
+    readHistory: vi.fn(async () => []),
     startTurn: vi.fn(async () => {
       options.onEvent({ type: "turn.started", providerSessionId: "thread-1", turnId: "turn-1", payload: { status: "running" } });
       return { turnId: "turn-1" };
@@ -495,4 +501,30 @@ function sentAgentEvents(sender) {
   return sender.send.mock.calls
     .filter(([channel]) => channel === "agent:event")
     .map(([, event]) => event);
+}
+
+function ipcSnapshot() {
+  return {
+    session: {
+      id: "session-1",
+      runtimeId: "codex",
+      provider: "codex",
+      providerSessionId: "thread-1",
+      workspaceRoot: "/canonical/workspace",
+      title: "Session",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      terminalState: "idle",
+      selectedModel: null,
+      activeTurnId: null,
+      lastSequence: 0,
+    },
+    account: null,
+    models: [],
+    capabilities: null,
+    events: [],
+    partial: false,
+    firstAvailableSequence: 0,
+    lastSequence: 0,
+  };
 }

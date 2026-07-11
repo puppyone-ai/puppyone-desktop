@@ -1,14 +1,14 @@
 import fs from "node:fs";
 import os from "node:os";
 import { spawn as nodeSpawn } from "node:child_process";
-import { redactSecretText } from "./agent-events.mjs";
+import { redactSecretText } from "../../agent-events.mjs";
 import {
   buildAgentEnvironment,
   compareVersions,
   discoverExecutable,
   parseSemanticVersion,
   readLoginShellEnvironment,
-} from "./runtime/executable-discovery.mjs";
+} from "../../runtime/executable-discovery.mjs";
 
 // This is the oldest app-server schema exercised by the checked-in protocol
 // fixture. Versions below this floor are not advertised as compatible.

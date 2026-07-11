@@ -143,7 +143,6 @@ export async function resolveExecutable({
   for (const directory of [
     path.join(homedir, ".local", "bin"),
     path.join(homedir, ".npm-global", "bin"),
-    path.join(homedir, ".opencode", "bin"),
     "/opt/homebrew/bin",
     "/usr/local/bin",
     "/usr/bin",
