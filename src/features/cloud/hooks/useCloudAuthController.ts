@@ -5,7 +5,9 @@ import {
 } from "../../../lib/cloudApi";
 import {
   clearDesktopCloudSession,
+  getCachedDesktopCloudAuthState,
   onDesktopCloudAuthError,
+  onDesktopCloudAuthStateChanged,
   startDesktopCloudOAuth,
   supportsDesktopCloudOAuth,
 } from "../../../lib/cloudSession";
@@ -24,7 +26,9 @@ export function useCloudAuthController({
   onSignedOut?: () => void;
   onRefresh: () => void | Promise<void>;
 }) {
-  const [loading, setLoading] = useState<CloudLoginMethod | null>(null);
+  const [loading, setLoading] = useState<CloudLoginMethod | null>(() => (
+    getCachedDesktopCloudAuthState()?.status === "signing-in" ? "browser" : null
+  ));
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -41,7 +45,27 @@ export function useCloudAuthController({
   }, []);
 
   useEffect(() => {
+    const syncAuthState = (state: { status: DesktopCloudSession["status"] } | null) => {
+      if (!state) return;
+      if (state.status === "signing-in") {
+        setLoading("browser");
+        setError(null);
+        setMessage(null);
+        return;
+      }
+      setLoading((current) => current === "browser" ? null : current);
+    };
+    syncAuthState(getCachedDesktopCloudAuthState());
+    return onDesktopCloudAuthStateChanged(syncAuthState);
+  }, []);
+
+  useEffect(() => {
     setSignedInEmail(undefined);
+    if (accountEmail) {
+      setLoading(null);
+      setError(null);
+      setMessage(null);
+    }
   }, [accountEmail]);
 
   const startCloudLogin = async (method?: Exclude<CloudLoginMethod, "email" | "password" | "browser">) => {
@@ -53,14 +77,13 @@ export function useCloudAuthController({
     try {
       if (supportsDesktopCloudOAuth()) {
         await startDesktopCloudOAuth(method ?? cloudApiBaseUrl, method ? cloudApiBaseUrl : undefined);
-        setMessage("Finish sign-in in your browser. Desktop will connect automatically.");
       } else {
         openCloudApp(`/login${params.size > 0 ? `?${params.toString()}` : ""}`);
+        setLoading(null);
       }
     } catch (loginError) {
+      setLoading(null);
       setError(loginError instanceof Error ? loginError.message : "Unable to start Cloud sign-in");
-    } finally {
-      window.setTimeout(() => setLoading(null), 1200);
     }
   };
 

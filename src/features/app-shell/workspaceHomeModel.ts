@@ -51,10 +51,12 @@ export function getWorkspaceSwitcherItems({
 export function getHomeProjectItems({
   bindings,
   cloudProjects,
+  includeUnboundCloudProjects = true,
   recentWorkspaceItems,
 }: {
   bindings: Record<string, RecentWorkspaceCloudBinding>;
   cloudProjects: DesktopCloudProject[];
+  includeUnboundCloudProjects?: boolean;
   recentWorkspaceItems: RecentWorkspaceHomeItem[];
 }): ProjectHomeItem[] {
   const cloudProjectById = new Map(cloudProjects.map((project) => [project.id, project]));
@@ -80,16 +82,18 @@ export function getHomeProjectItems({
     });
   }
 
-  for (const project of cloudProjects.slice(0, 40)) {
-    if (consumedCloudProjectIds.has(project.id)) continue;
-    items.push({
-      id: `cloud:${project.id}`,
-      kind: "cloud",
-      label: project.name || "Untitled Project",
-      cloudProjectId: project.id,
-      description: project.description ?? null,
-      updatedAt: project.updated_at ?? null,
-    });
+  if (includeUnboundCloudProjects) {
+    for (const project of cloudProjects.slice(0, 40)) {
+      if (consumedCloudProjectIds.has(project.id)) continue;
+      items.push({
+        id: `cloud:${project.id}`,
+        kind: "cloud",
+        label: project.name || "Untitled Project",
+        cloudProjectId: project.id,
+        description: project.description ?? null,
+        updatedAt: project.updated_at ?? null,
+      });
+    }
   }
 
   return items;

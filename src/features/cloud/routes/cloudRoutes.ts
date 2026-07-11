@@ -1,4 +1,4 @@
-import { Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
+import { Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
 import { getCloudAutomationWebPath } from "../../automation/automationDomain";
 import type { CloudWorkspaceSection } from "./cloudRouteIds";
 
@@ -50,13 +50,23 @@ export const CLOUD_ROUTES = [
   },
   {
     id: "contents",
-    label: "Contents",
-    title: "Contents",
-    description: "Cloud contents are loaded from the mapped project tree.",
+    label: "Overview",
+    title: "Overview",
+    description: "Sync status and Cloud project context for this workspace.",
     icon: FileText,
     context: "project",
     showInSidebar: true,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/data`,
+  },
+  {
+    id: "history",
+    label: "History",
+    title: "History",
+    description: "Cloud commit history for the linked project.",
+    icon: Clock3,
+    context: "project",
+    showInSidebar: true,
+    webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/changes`,
   },
   {
     id: "branches",
@@ -65,19 +75,8 @@ export const CLOUD_ROUTES = [
     description: "Branches show the local and remote Git refs connected to this Cloud project.",
     icon: GitBranch,
     context: "project",
-    showInSidebar: true,
+    showInSidebar: false,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/changes`,
-  },
-  {
-    id: "access",
-    label: "Access",
-    title: "Access",
-    description: "Access surfaces, scopes, connectors, and endpoint state belong to a Cloud project.",
-    icon: ShieldCheck,
-    context: "project",
-    showInSidebar: true,
-    groupEnd: true,
-    webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
   },
   {
     id: "automation",
@@ -86,8 +85,19 @@ export const CLOUD_ROUTES = [
     description: "Cloud-managed information sources and recurring Automation runs for this project.",
     icon: Grid2X2,
     context: "project",
-    showInSidebar: false,
+    showInSidebar: true,
     webPath: (projectId?: string) => getCloudAutomationWebPath(requireProjectId(projectId)),
+  },
+  {
+    id: "access",
+    label: "Access",
+    title: "Access",
+    description: "Access surfaces, scopes, connectors, MCP, and endpoint state belong to a Cloud project.",
+    icon: ShieldCheck,
+    context: "project",
+    showInSidebar: true,
+    groupEnd: true,
+    webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
   },
   {
     id: "mcp-cli",

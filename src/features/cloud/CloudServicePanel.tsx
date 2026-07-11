@@ -126,6 +126,7 @@ export function CloudServicePanel({
 export function CloudAuthCard({
   view,
   signedInEmail,
+  signInLabel = "Sign in with browser",
   loading,
   signingOut,
   error,
@@ -137,6 +138,7 @@ export function CloudAuthCard({
 }: {
   view: CloudAuthView;
   signedInEmail: string | null;
+  signInLabel?: string;
   loading: CloudLoginMethod | null;
   signingOut: boolean;
   error: string | null;
@@ -158,7 +160,7 @@ export function CloudAuthCard({
           onClick={() => onProviderLogin()}
         >
           <LogIn size={15} />
-          <span>{loading === "browser" ? "Opening browser..." : "Sign in with browser"}</span>
+          <span>{loading === "browser" ? "Finish sign-in in browser" : signInLabel}</span>
         </button>
       ) : (
         <>
@@ -189,7 +191,7 @@ export function CloudAuthCard({
         </>
       )}
 
-      <CloudAuthFeedback error={error} message={message} />
+      <CloudAuthFeedback error={error} message={loading === "browser" ? null : message} />
 
       {view !== "signedIn" && (
         <p className="desktop-cloud-auth-terms">By continuing you agree to our Terms and Privacy Policy.</p>

@@ -228,13 +228,13 @@ body.data-sidebar-resizing * {
 .desktop-sidebar-footer-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--desktop-sidebar-nav-gap);
   min-width: 0;
 }
 
 .desktop-sidebar-footer-bar.actions-only {
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .desktop-sidebar-footer-bar.horizontal {
@@ -498,6 +498,18 @@ body.data-sidebar-resizing * {
 
 .desktop-sidebar-nav-icon-wrap > svg {
   flex: 0 0 auto;
+}
+
+.desktop-sidebar-nav-cloud-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--po-accent, var(--po-text));
+  box-shadow: 0 0 0 1.5px var(--po-panel, var(--po-bg));
+  font-style: normal;
 }
 
 .desktop-sidebar-nav-label {

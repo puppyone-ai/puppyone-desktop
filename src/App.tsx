@@ -59,6 +59,11 @@ import { usePuppyoneConfig } from "./features/app-shell/usePuppyoneConfig";
 import { useActiveExternalOpenTarget } from "./features/external-apps/useActiveExternalOpenTarget";
 import { useDesktopCloudSession } from "./features/cloud/hooks/useDesktopCloudSession";
 import { useCloudProjectHome } from "./features/cloud/hooks/useCloudProjectHome";
+import {
+  getAttachedCloudProjectId,
+  resolveCloudHubSectionAfterBindingChange,
+  useProjectCloudAttachment,
+} from "./features/cloud/attachment";
 import { useFeatureFlag } from "./features/flags";
 import {
   DesktopCreateEntryDialog,
@@ -86,8 +91,10 @@ export function App() {
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
   const cloudEnabled = useFeatureFlag("cloudWorkspace");
+  const cloudOnlyWorkspaceEnabled = useFeatureFlag("cloudOnlyWorkspace");
   const assetLibraryHomeAvailable = useFeatureFlag("assetLibraryHome");
   const agentChatAvailable = useFeatureFlag("desktopAgentChat");
+  const cloudOnlyEntryEnabled = cloudEnabled && cloudOnlyWorkspaceEnabled;
   const {
     cloudAuthStatus,
     cloudSession,
@@ -95,6 +102,7 @@ export function App() {
     handleCloudSessionChange: updateCloudSession,
   } = useDesktopCloudSession(cloudEnabled);
   const [activeCloudSection, setActiveCloudSection] = useState<CloudWorkspaceSection>("overview");
+  const [selectedCloudProjectId, setSelectedCloudProjectId] = useState<string | null>(null);
   const [cloudPanelOpen, setCloudPanelOpen] = useState(false);
   const [homeOperationStatus, setHomeOperationStatus] = useState<OnboardingOperationStatus | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -219,7 +227,7 @@ export function App() {
     setRightSidebarOpen,
     setRightSidebarSurface,
   ]);
-  const cloudProjectId = getCloudProjectIdFromWorkspace(workspace);
+  const cloudOnlyProjectId = getCloudProjectIdFromWorkspace(workspace);
   useEffect(() => {
     if (workspace && homeOperationStatus) setHomeOperationStatus(null);
   }, [homeOperationStatus, workspace]);
@@ -330,15 +338,15 @@ export function App() {
   );
   const cloudDataPort = useMemo(
     () => (
-      workspaceIsCloud && cloudProjectId && activeCloudSession
+      workspaceIsCloud && cloudOnlyProjectId && activeCloudSession
         ? createCloudDataPort({
-            projectId: cloudProjectId,
+            projectId: cloudOnlyProjectId,
             session: activeCloudSession,
             onSessionChange: handleCloudDataSessionChange,
           })
         : null
     ),
-    [activeCloudSession, cloudProjectId, handleCloudDataSessionChange, workspaceIsCloud],
+    [activeCloudSession, cloudOnlyProjectId, handleCloudDataSessionChange, workspaceIsCloud],
   );
   const dataPort = useMemo(
     () => {
@@ -435,7 +443,7 @@ export function App() {
       window.removeEventListener("pointerdown", closeOnPointerDown, true);
       window.removeEventListener("keydown", closeOnEscape, true);
     };
-  }, [branchSwitcherOpen, switcherOpen]);
+  }, [branchSwitcherOpen, branchSwitcherRef, setBranchSwitcherOpen, switcherOpen]);
 
   useEffect(() => {
     setGitOperationError(null);
@@ -445,7 +453,7 @@ export function App() {
     setActiveDataPath(null);
     setActiveDataNode(null);
     resetDataNodeActions();
-  }, [resetDataNodeActions, workspace?.path]);
+  }, [resetDataNodeActions, setBranchSwitcherOpen, setGitOperationError, setGitOperationLoading, workspace?.path]);
 
   const openWorkspaceSwitcherItem = useCallback((item: DesktopWorkspaceSwitcherItem) => {
     if (item.id === workspace?.id) {
@@ -480,7 +488,7 @@ export function App() {
       .catch((error) => {
         setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
       });
-  }, [activateWorkspace, handleWorkspaceOpenResult, workspace?.id]);
+  }, [activateWorkspace, handleWorkspaceOpenResult, setRestoreWorkspaceError, workspace?.id]);
 
   const openOrActivateCloudWorkspace = useCallback(async (project: DesktopCloudProject) => {
     if (workspace) {
@@ -514,6 +522,7 @@ export function App() {
     activeCloudSession,
     cloudEnabled,
     desktopCloudApiBaseUrl,
+    includeUnboundCloudProjects: cloudOnlyWorkspaceEnabled,
     onOpenCloudProject: openOrActivateCloudWorkspace,
     onPendingCloudProjectCreateReady: useCallback(() => {
       setCloudPanelOpen(false);
@@ -525,6 +534,33 @@ export function App() {
     startCloudBrowserSignIn,
     updateCloudSession,
   });
+
+  const projectCloudAttachment = useProjectCloudAttachment({
+    workspace,
+    workspaceIsCloud,
+    puppyoneConfig,
+    recentWorkspaceCloudBindings,
+    activeGitStatus,
+  });
+  const attachedCloudProjectId = getAttachedCloudProjectId(projectCloudAttachment);
+  const effectiveCloudProjectId = workspaceIsCloud ? cloudOnlyProjectId : attachedCloudProjectId;
+
+  const workspacePath = workspace?.path ?? null;
+  const cloudHubWorkspaceIdentity = workspace
+    ? `${workspaceIsCloud ? "cloud" : "local"}:${workspace.id}:${workspace.path}`
+    : null;
+  const previousCloudHubWorkspaceIdentityRef = useRef<string | null>(null);
+  useEffect(() => {
+    const workspaceChanged = previousCloudHubWorkspaceIdentityRef.current !== cloudHubWorkspaceIdentity;
+    previousCloudHubWorkspaceIdentityRef.current = cloudHubWorkspaceIdentity;
+    setSelectedCloudProjectId(null);
+    if (!workspacePath || workspaceIsCloud) return;
+    setActiveCloudSection((currentSection) => resolveCloudHubSectionAfterBindingChange({
+      currentSection,
+      hasBoundProject: Boolean(attachedCloudProjectId),
+      workspaceChanged,
+    }));
+  }, [attachedCloudProjectId, cloudHubWorkspaceIdentity, workspaceIsCloud, workspacePath]);
 
   const goToHomepage = useCallback(async () => {
     try {
@@ -543,7 +579,15 @@ export function App() {
     } catch (error) {
       setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
     }
-  }, [clearWorkspace, refreshHomeCloudProjects, refreshRecentWorkspaceList, resetDataNodeActions]);
+  }, [
+    clearWorkspace,
+    refreshHomeCloudProjects,
+    refreshRecentWorkspaceList,
+    resetDataNodeActions,
+    setBranchSwitcherOpen,
+    setRestoreWorkspaceError,
+    setRightSidebarOpen,
+  ]);
 
   const navigateDesktopView = useCallback((view: DesktopView) => {
     if (view === "plugins" && (workspaceIsCloud || !experimentalSettings.enableViewerPlugins)) {
@@ -588,12 +632,30 @@ export function App() {
         setSwitcherOpen(false);
         return;
       }
+      setActiveView("cloud");
+      setActiveCloudSection(
+        selectedCloudProjectId || attachedCloudProjectId
+          ? "contents"
+          : "overview",
+      );
+      setSidebarCollapsed(false);
+      setSwitcherOpen(false);
+      return;
     }
 
     setActiveView(view);
     setSidebarCollapsed(false);
     setSwitcherOpen(false);
-  }, [cloudEnabled, cloudSessionRestoring, cloudWorkspaceAvailable, experimentalSettings.enableViewerPlugins, workspaceIsCloud]);
+  }, [
+    cloudEnabled,
+    cloudSessionRestoring,
+    cloudWorkspaceAvailable,
+    experimentalSettings.enableViewerPlugins,
+    attachedCloudProjectId,
+    selectedCloudProjectId,
+    setSidebarCollapsed,
+    workspaceIsCloud,
+  ]);
 
   const handleActiveDataPathChange = useCallback((path: string | null, node: DataNode | null = null) => {
     setActiveDataPath(path);
@@ -603,7 +665,7 @@ export function App() {
   const handleFilesVisibilitySettingsChange = useCallback((nextSettings: FilesVisibilitySettings) => {
     setFilesVisibilitySettings(nextSettings);
     setWorkspaceRefreshToken((token) => token + 1);
-  }, []);
+  }, [setFilesVisibilitySettings]);
 
   const handlePuppyoneConfigChange = useCallback(async (nextConfig: PuppyoneWorkspaceConfig) => {
     const savedConfig = await savePuppyoneConfig(nextConfig);
@@ -626,7 +688,8 @@ export function App() {
     activeCloudSession,
     activeGitStatus,
     cloudEnabled,
-    cloudProjectId,
+    cloudOnlyWorkspaceEnabled,
+    cloudProjectId: cloudOnlyProjectId,
     desktopCloudApiBaseUrl,
     handlePuppyoneConfigChange,
     handleWorkspaceOpenResult,
@@ -675,7 +738,7 @@ export function App() {
       setSidebarCollapsed(false);
       setSwitcherOpen(false);
     }
-  }, [activeView, cloudEnabled, updateCloudSession, workspaceIsCloud]);
+  }, [activeView, cloudEnabled, setSidebarCollapsed, updateCloudSession, workspaceIsCloud]);
 
   const handleConfigureCloudRemote = useCallback(async (remoteUrl: string, projectId?: string | null) => {
     if (!cloudEnabled) return null;
@@ -683,33 +746,41 @@ export function App() {
     if (workspaceIsCloud) return null;
     const context = captureGitRepositoryContext(workspace.path);
     if (!context) return null;
-    await configureWorkspaceCloudRemote(context.rootPath, remoteUrl, "puppyone");
     const remoteProjectId = parsePuppyoneRemote(remoteUrl)?.projectId?.trim() || null;
     const nextProjectId = projectId?.trim() || remoteProjectId || puppyoneConfig?.cloud.projectId?.trim() || null;
-    const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
-      sync: {
-        sourceOfTruth: {
+    if (!nextProjectId) {
+      throw new Error("Cloud project identity is required before attaching this workspace.");
+    }
+    let remoteConfigured = false;
+    try {
+      await configureWorkspaceCloudRemote(context.rootPath, remoteUrl, "puppyone");
+      remoteConfigured = true;
+      const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
+        sync: {
+          sourceOfTruth: {
+            service: "puppyone",
+            remote: "puppyone",
+            branch: null,
+          },
+        },
+        backup: {
+          enabled: true,
           service: "puppyone",
           remote: "puppyone",
           branch: null,
         },
-      },
-      backup: {
-        enabled: true,
-        service: "puppyone",
-        remote: "puppyone",
-        branch: null,
-      },
-      git: {
-        primaryRemote: "puppyone",
-        watchedBranch: null,
-      },
-      cloud: {
-        projectId: nextProjectId,
-      },
-    });
-    await handlePuppyoneConfigChange(nextConfig);
-    if (nextProjectId) {
+        git: {
+          primaryRemote: "puppyone",
+          watchedBranch: null,
+        },
+        cloud: {
+          projectId: nextProjectId,
+        },
+      });
+      const savedConfig = await handlePuppyoneConfigChange(nextConfig);
+      if (!savedConfig) {
+        throw new Error("Unable to persist the Cloud project binding for this workspace.");
+      }
       setRecentWorkspaceCloudBindings((current) => ({
         ...current,
         [workspace.id]: {
@@ -718,16 +789,31 @@ export function App() {
           error: null,
         },
       }));
+      const refreshedStatus = await getWorkspaceGitStatus(context.rootPath);
+      if (applyGitStatus(
+        refreshedStatus,
+        context,
+        createRepositoryRefreshReason("configure-remote", "mutation"),
+      )) {
+        refreshWorkspaceContent();
+      }
+      return refreshedStatus;
+    } catch (error) {
+      // The Git remote mutation happens before the workspace config write. If
+      // persistence fails, publish the real repository state instead of
+      // leaving the UI on a stale pre-attach snapshot. Retrying is idempotent.
+      if (remoteConfigured) {
+        const partiallyConfiguredStatus = await getWorkspaceGitStatus(context.rootPath).catch(() => null);
+        if (partiallyConfiguredStatus && applyGitStatus(
+          partiallyConfiguredStatus,
+          context,
+          createRepositoryRefreshReason("configure-remote", "mutation"),
+        )) {
+          refreshWorkspaceContent();
+        }
+      }
+      throw error;
     }
-    const refreshedStatus = await getWorkspaceGitStatus(context.rootPath);
-    if (applyGitStatus(
-      refreshedStatus,
-      context,
-      createRepositoryRefreshReason("configure-remote", "mutation"),
-    )) {
-      refreshWorkspaceContent();
-    }
-    return refreshedStatus;
   }, [
     applyGitStatus,
     captureGitRepositoryContext,
@@ -735,6 +821,7 @@ export function App() {
     handlePuppyoneConfigChange,
     puppyoneConfig,
     refreshWorkspaceContent,
+    setRecentWorkspaceCloudBindings,
     workspace,
     workspaceIsCloud,
   ]);
@@ -772,7 +859,13 @@ export function App() {
     setRightSidebarOpen(false);
     resetDataNodeActions();
     setHomeOperationStatus(null);
-  }, [forgetActiveWorkspace, resetDataNodeActions, workspaceIsCloud]);
+  }, [
+    forgetActiveWorkspace,
+    resetDataNodeActions,
+    setBranchSwitcherOpen,
+    setRightSidebarOpen,
+    workspaceIsCloud,
+  ]);
 
   const toggleWorkspaceSwitcher = useCallback(() => {
     const nextOpen = !switcherOpen;
@@ -809,15 +902,15 @@ export function App() {
       <>
         <Homepage
           onChooseWorkspace={openFolder}
-          onCreateCloudProject={cloudEnabled ? createCloudProjectFromHomepage : undefined}
-          onOpenCloudProject={cloudEnabled ? openCloudProjectFromHomepage : undefined}
+          onCreateCloudProject={cloudOnlyEntryEnabled ? createCloudProjectFromHomepage : undefined}
+          onOpenCloudProject={cloudOnlyEntryEnabled ? openCloudProjectFromHomepage : undefined}
           onOpenWorkspacePath={openWorkspacePath}
           recentWorkspaces={recentWorkspaceItems}
-          cloudProjects={homeCloudProjects}
+          cloudProjects={cloudOnlyEntryEnabled ? homeCloudProjects : []}
           projectItems={homeProjectItems}
-          cloudSignedIn={Boolean(activeCloudSession)}
-          cloudProjectsLoading={Boolean(activeCloudSession) && (homeCloudProjectsLoading || cloudSessionRestoring)}
-          cloudProjectsError={homeCloudProjectsError}
+          cloudSignedIn={cloudOnlyEntryEnabled && Boolean(activeCloudSession)}
+          cloudProjectsLoading={cloudOnlyEntryEnabled && Boolean(activeCloudSession) && (homeCloudProjectsLoading || cloudSessionRestoring)}
+          cloudProjectsError={cloudOnlyEntryEnabled ? homeCloudProjectsError : null}
           operationStatus={homeOperationStatus}
           initialError={restoreWorkspaceError}
           themeMode={themeMode}
@@ -872,7 +965,7 @@ export function App() {
 
   const workspaceSwitcherItems = getWorkspaceSwitcherItems({
     cloudProjects: homeCloudProjects,
-    includeCloud: cloudEnabled,
+    includeCloud: cloudOnlyEntryEnabled,
     workspaces,
   });
 
@@ -892,7 +985,7 @@ export function App() {
       workspaceSwitcherOpen={switcherOpen}
       workspaceSwitcherRef={switcherRef}
       onCheckoutBranch={handleCheckoutGitBranch}
-      onCreateCloudProject={cloudEnabled ? createCloudProjectFromHomepage : undefined}
+      onCreateCloudProject={cloudOnlyEntryEnabled ? createCloudProjectFromHomepage : undefined}
       onGoHome={() => void goToHomepage()}
       onOpenFolder={openFolder}
       onOpenWorkspaceSwitcherItem={openWorkspaceSwitcherItem}
@@ -998,26 +1091,30 @@ export function App() {
           activeView={activeView}
           cloud={{
             activeSection: activeCloudSection,
+            attachment: workspaceIsCloud ? null : projectCloudAttachment,
             backupError: cloudBackupError,
             backupLoading: cloudBackupLoading,
             cloudApiBaseUrl: desktopCloudApiBaseUrl,
             cloudSession: activeCloudSession,
             storedCloudSession: cloudSession,
             enabled: cloudEnabled,
-            projectId: cloudProjectId,
+            projectId: effectiveCloudProjectId,
+            selectedProjectId: selectedCloudProjectId,
             sessionRestoring: cloudSessionRestoring,
             onCloudSessionChange: handleCloudSessionChange,
             onConfigureCloudRemote: handleConfigureCloudRemote,
             onOpenDetails: () => {
               if (!cloudEnabled) return;
-              setActiveView("cloud");
-              setActiveCloudSection("overview");
-              setSidebarCollapsed(false);
-              setSwitcherOpen(false);
+              navigateDesktopView("cloud");
             },
             onOpenGitSettings: () => {
               setActiveSettingsSection("git");
               navigateDesktopView("settings");
+            },
+            onSelectProjectId: setSelectedCloudProjectId,
+            onBackToCloudProjects: () => {
+              setSelectedCloudProjectId(null);
+              setActiveCloudSection("overview");
             },
             onSelectSection: setActiveCloudSection,
             onStartPuppyoneBackup: handleStartPuppyoneBackup,

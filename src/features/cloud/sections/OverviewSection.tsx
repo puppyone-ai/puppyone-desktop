@@ -15,7 +15,6 @@ import {
   ProjectFolderCard,
   type ProjectFolderPreviewItem,
 } from "../../../components/project-folder-card";
-import type { getPuppyoneRemote } from "../../source-control/remotes";
 import { isCloudAutomationConnector } from "../../automation/automationDomain";
 import type { CloudWorkspaceSection } from "../types";
 import {
@@ -40,8 +39,9 @@ export function CloudMappedOverview({
   connectors,
   mcpEndpoints,
   identity,
-  cloudRemote,
+  linkedToWorkspace,
   loading,
+  attachAction = null,
   onSelectSection,
   onOpenProject,
   onRefresh,
@@ -55,8 +55,13 @@ export function CloudMappedOverview({
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;
-  cloudRemote: ReturnType<typeof getPuppyoneRemote>;
+  linkedToWorkspace: boolean;
   loading: boolean;
+  attachAction?: {
+    busy: boolean;
+    disabled?: boolean;
+    onAttach: () => void;
+  } | null;
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
   onRefresh: () => Promise<void>;
@@ -79,8 +84,7 @@ export function CloudMappedOverview({
       ? "Synced"
       : "No changes";
   const hasOverviewData = Boolean(dashboard || tree || history || identity);
-  const localMapped = Boolean(cloudRemote);
-  const localMappingValue = localMapped ? workspace.path : identity?.url ?? "";
+  const localMappingValue = linkedToWorkspace ? workspace.path : identity?.url ?? "";
 
   if (loading && !hasOverviewData) {
     return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
@@ -94,7 +98,7 @@ export function CloudMappedOverview({
             <h1>{projectName}</h1>
             <span className="desktop-cloud-source-pill">
               <Cloud size={13} />
-              <span>Cloud source</span>
+              <span>{attachAction ? "Cloud preview" : "Cloud source"}</span>
             </span>
           </div>
           {project?.description || dashboard?.project.description ? (
@@ -111,6 +115,16 @@ export function CloudMappedOverview({
             <RefreshCw size={13} className={loading ? "spin" : undefined} />
             <span>Refresh</span>
           </button>
+          {attachAction && (
+            <button
+              className="desktop-cloud-row-action primary"
+              type="button"
+              disabled={attachAction.busy || attachAction.disabled}
+              onClick={attachAction.onAttach}
+            >
+              <span>{attachAction.busy ? "Linking…" : "Link folder"}</span>
+            </button>
+          )}
           {projectId && (
             <button className="desktop-cloud-row-action" type="button" onClick={() => onOpenProject(projectId, "overview")}>
               <ExternalLink size={13} />
@@ -127,7 +141,7 @@ export function CloudMappedOverview({
             entries={rootEntries}
             loading={loading}
             updatedLabel={latestChangeLabel}
-            statusConnected={localMapped}
+            statusConnected={linkedToWorkspace}
             onSelect={() => onSelectSection("contents")}
           />
         </div>
@@ -149,7 +163,7 @@ export function CloudMappedOverview({
           </div>
 
           <CloudLocalMappingPanel
-            mapped={localMapped}
+            mapped={linkedToWorkspace}
             value={localMappingValue}
           />
         </div>

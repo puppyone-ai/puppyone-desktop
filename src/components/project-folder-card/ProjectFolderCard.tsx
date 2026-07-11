@@ -104,17 +104,19 @@ export function ProjectFolderCardSkeleton() {
 export function ProjectFolderNewCard({
   label,
   loading,
+  disabled = false,
   onClick,
 }: {
   label: string;
   loading?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       className="desktop-project-folder-new-card"
       type="button"
-      disabled={loading}
+      disabled={loading || disabled}
       aria-busy={loading || undefined}
       onClick={onClick}
     >

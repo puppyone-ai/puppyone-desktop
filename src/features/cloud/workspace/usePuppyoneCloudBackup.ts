@@ -149,7 +149,7 @@ export function usePuppyoneCloudBackup({
       refreshWorkspaceContent();
       setPendingCloudBackupSetup(false);
       clearGitSelection();
-      setActiveCloudSection("overview");
+      setActiveCloudSection("contents");
       setActiveView("cloud");
       setSidebarCollapsed(false);
       setSwitcherOpen(false);

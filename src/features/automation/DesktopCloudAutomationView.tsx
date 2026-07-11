@@ -29,6 +29,7 @@ export function DesktopCloudAutomationView({
   accessData,
   activeProvider,
   sessionRestoring,
+  embedded = false,
   onCloudSessionChange,
   onRefresh,
 }: {
@@ -37,6 +38,7 @@ export function DesktopCloudAutomationView({
   accessData: DesktopCloudAccessDataState;
   activeProvider: string | null;
   sessionRestoring: boolean;
+  embedded?: boolean;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onRefresh: () => void | Promise<void>;
 }) {
@@ -139,29 +141,35 @@ export function DesktopCloudAutomationView({
     );
   }
 
+  const automationPage = (
+    <CloudAutomationPage
+      projectId={projectId}
+      cloudSession={cloudSession}
+      apiBaseUrl={cloudSession.api_base_url ?? null}
+      rows={visibleRows}
+      totalCount={activeProvider ? visibleRows.length : automationRows.length}
+      loading={accessData.loading}
+      providerSpecs={providerSpecs}
+      providerSpecsLoading={providerSpecsLoading}
+      providerSpecsError={providerSpecsError}
+      detailRow={detailRow}
+      onOpenRow={setDetailRowId}
+      onCloseDetail={() => setDetailRowId(null)}
+      onCloudSessionChange={onCloudSessionChange}
+      onRefresh={accessData.reload}
+      onOpenAccess={() => openCloudApp(`/projects/${encodeURIComponent(projectId)}/access`)}
+      onOpenAutomation={() => openCloudApp(getCloudAutomationWebPath(projectId))}
+    />
+  );
+
+  if (embedded) return automationPage;
+
   return (
     <div className="desktop-cloud-main-view desktop-cloud-automation-main-view">
       <div className="desktop-cloud-page-shell desktop-cloud-automation-page-shell">
         {accessData.error && <div className="desktop-cloud-main-alert">{accessData.error}</div>}
         {accessData.warning && <div className="desktop-cloud-main-alert">{accessData.warning}</div>}
-        <CloudAutomationPage
-          projectId={projectId}
-          cloudSession={cloudSession}
-          apiBaseUrl={cloudSession.api_base_url ?? null}
-          rows={visibleRows}
-          totalCount={activeProvider ? visibleRows.length : automationRows.length}
-          loading={accessData.loading}
-          providerSpecs={providerSpecs}
-          providerSpecsLoading={providerSpecsLoading}
-          providerSpecsError={providerSpecsError}
-          detailRow={detailRow}
-          onOpenRow={setDetailRowId}
-          onCloseDetail={() => setDetailRowId(null)}
-          onCloudSessionChange={onCloudSessionChange}
-          onRefresh={accessData.reload}
-          onOpenAccess={() => openCloudApp(`/projects/${encodeURIComponent(projectId)}/access`)}
-          onOpenAutomation={() => openCloudApp(getCloudAutomationWebPath(projectId))}
-        />
+        {automationPage}
       </div>
     </div>
   );

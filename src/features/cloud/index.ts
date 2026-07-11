@@ -1,3 +1,14 @@
+export {
+  attachmentHasBoundProject,
+  getAttachedCloudProjectId,
+  isProjectCloudLinked,
+  resolveCloudHubSectionAfterBindingChange,
+  resolveCloudProjectNavigationContext,
+  resolveCloudHubSectionForAttachment,
+  resolveProjectCloudAttachment,
+  useProjectCloudAttachment,
+  type ProjectCloudAttachment,
+} from "./attachment";
 export { CloudServiceMainView } from "./CloudServiceMainView";
 export {
   CloudProjectHistorySidebar,

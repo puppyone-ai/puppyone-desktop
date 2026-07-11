@@ -53,6 +53,7 @@ export function useWorkspaceSurfaceSwitch({
   activeCloudSession,
   activeGitStatus,
   cloudEnabled,
+  cloudOnlyWorkspaceEnabled = false,
   cloudProjectId,
   desktopCloudApiBaseUrl,
   handlePuppyoneConfigChange,
@@ -75,6 +76,7 @@ export function useWorkspaceSurfaceSwitch({
   activeCloudSession: DesktopCloudSession | null;
   activeGitStatus: GitStatusSnapshot | null;
   cloudEnabled: boolean;
+  cloudOnlyWorkspaceEnabled?: boolean;
   cloudProjectId: string | null;
   desktopCloudApiBaseUrl: string | null;
   handlePuppyoneConfigChange: (nextConfig: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
@@ -169,6 +171,27 @@ export function useWorkspaceSurfaceSwitch({
         };
       });
     };
+    const applyBindingError = (message: string) => {
+      setRecentWorkspaceCloudBindings((current) => {
+        const currentBinding = current[workspace.id];
+        const nextBinding: RecentWorkspaceCloudBinding = {
+          projectId: currentBinding?.projectId ?? null,
+          cloudLinked: true,
+          error: message,
+        };
+        if (
+          currentBinding?.projectId === nextBinding.projectId
+          && currentBinding.cloudLinked === nextBinding.cloudLinked
+          && currentBinding.error === nextBinding.error
+        ) {
+          return current;
+        }
+        return {
+          ...current,
+          [workspace.id]: nextBinding,
+        };
+      });
+    };
 
     if (configuredProjectId) {
       applyActiveBinding(configuredProjectId, null, true);
@@ -176,12 +199,18 @@ export function useWorkspaceSurfaceSwitch({
     }
 
     if (cloudRemote.info.kind === "project") {
-      applyActiveBinding(cloudRemote.info.projectId?.trim() || null);
+      const remoteProjectId = cloudRemote.info.projectId?.trim() || null;
+      applyActiveBinding(
+        remoteProjectId,
+        remoteProjectId ? null : CLOUD_PROJECT_MAPPING_ERROR,
+        true,
+      );
       return undefined;
     }
 
     if (!activeCloudSession) {
-      applyActiveBinding(null);
+      // Authentication availability must not erase a structural Cloud binding.
+      // The attachment model can remain unresolved until the account comes back.
       return undefined;
     }
 
@@ -204,7 +233,12 @@ export function useWorkspaceSurfaceSwitch({
       });
       if (cancelled) return;
 
-      applyActiveBinding(projectId);
+      if (!projectId) {
+        applyActiveBinding(null, CLOUD_PROJECT_MAPPING_ERROR, true);
+        return;
+      }
+
+      applyActiveBinding(projectId, null, true);
       if (projectId && configuredProjectId !== projectId) {
         const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
           cloud: {
@@ -215,7 +249,9 @@ export function useWorkspaceSurfaceSwitch({
       }
     })()
       .catch((error) => {
-        if (!cancelled) applyActiveBinding(null, error instanceof Error ? error.message : String(error));
+        if (!cancelled) {
+          applyBindingError(error instanceof Error ? error.message : String(error));
+        }
       })
       .finally(() => undefined);
 
@@ -322,7 +358,6 @@ export function useWorkspaceSurfaceSwitch({
     homeCloudProjects,
     openCloudProjectFromHomepage,
     puppyoneConfig,
-    puppyoneConfig?.cloud.projectId,
     setHomeCloudProjects,
     setHomeOperationStatus,
     setRecentWorkspaceCloudBindings,
@@ -393,7 +428,7 @@ export function useWorkspaceSurfaceSwitch({
 
   const workspaceSurfaceAction = useMemo<DesktopWorkspaceSurfaceAction | null>(() => {
     if (!workspace) return null;
-    if (!workspaceIsCloud && activeLocalCloudHostAvailable) {
+    if (!workspaceIsCloud && activeLocalCloudHostAvailable && cloudOnlyWorkspaceEnabled) {
       return {
         kind: "switch-to-cloud",
         disabled: workspaceSurfaceSwitching,
@@ -416,6 +451,7 @@ export function useWorkspaceSurfaceSwitch({
   }, [
     activeCloudLocalBinding,
     activeLocalCloudHostAvailable,
+    cloudOnlyWorkspaceEnabled,
     cloudProjectId,
     openCloudWorkspaceLocally,
     switchToCloudProjectSurface,

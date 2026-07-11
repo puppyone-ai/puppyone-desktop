@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -29,6 +30,7 @@ export function useCloudProjectHome({
   activeCloudSession,
   cloudEnabled,
   desktopCloudApiBaseUrl,
+  includeUnboundCloudProjects = true,
   onOpenCloudProject,
   onPendingCloudProjectCreateReady,
   recentWorkspaceItems,
@@ -41,11 +43,12 @@ export function useCloudProjectHome({
   activeCloudSession: DesktopCloudSession | null;
   cloudEnabled: boolean;
   desktopCloudApiBaseUrl: string | null;
-  onOpenCloudProject: (project: DesktopCloudProject) => Promise<void>;
+  includeUnboundCloudProjects?: boolean;
+  onOpenCloudProject: (project: DesktopCloudProject) => Promise<void> | void;
   onPendingCloudProjectCreateReady?: () => void;
   recentWorkspaceItems: RecentWorkspaceHomeItem[];
   setHomeOperationStatus: Dispatch<SetStateAction<OnboardingOperationStatus | null>>;
-  setRestoreWorkspaceError: Dispatch<SetStateAction<string | null>>;
+  setRestoreWorkspaceError: (error: string | null) => void;
   showBrowserSignInStatus: (detail: string) => void;
   startCloudBrowserSignIn: () => Promise<void>;
   updateCloudSession: (session: DesktopCloudSession | null) => void;
@@ -67,14 +70,18 @@ export function useCloudProjectHome({
     setHomeCloudProjectsLoading(true);
     setHomeCloudProjectsError(null);
     try {
-      const projects = await listCloudProjects(activeCloudSession, updateCloudSession);
+      const projects = await listCloudProjects(
+        activeCloudSession,
+        updateCloudSession,
+        desktopCloudApiBaseUrl,
+      );
       setHomeCloudProjects(projects);
     } catch (error) {
       setHomeCloudProjectsError(error instanceof Error ? error.message : String(error));
     } finally {
       setHomeCloudProjectsLoading(false);
     }
-  }, [activeCloudSession, cloudEnabled, updateCloudSession]);
+  }, [activeCloudSession, cloudEnabled, desktopCloudApiBaseUrl, updateCloudSession]);
 
   const recentWorkspaceBindingKey = useMemo(
     () => recentWorkspaceItems
@@ -87,6 +94,8 @@ export function useCloudProjectHome({
     () => homeCloudProjects.map((project) => project.id).join("\n"),
     [homeCloudProjects],
   );
+  const homeCloudProjectsRef = useRef(homeCloudProjects);
+  homeCloudProjectsRef.current = homeCloudProjects;
 
   useEffect(() => {
     const items = recentWorkspaceItems.slice(0, 20);
@@ -101,7 +110,7 @@ export function useCloudProjectHome({
         apiBaseUrl: desktopCloudApiBaseUrl,
         item,
         onSessionChange: updateCloudSession,
-        projects: homeCloudProjects,
+        projects: homeCloudProjectsRef.current,
         session: activeCloudSession,
       })),
     )
@@ -133,9 +142,10 @@ export function useCloudProjectHome({
     () => getHomeProjectItems({
       bindings: recentWorkspaceCloudBindings,
       cloudProjects: homeCloudProjects,
+      includeUnboundCloudProjects,
       recentWorkspaceItems,
     }),
-    [homeCloudProjects, recentWorkspaceCloudBindings, recentWorkspaceItems],
+    [homeCloudProjects, includeUnboundCloudProjects, recentWorkspaceCloudBindings, recentWorkspaceItems],
   );
 
   const activateCreatedCloudProject = useCallback(async (session: DesktopCloudSession) => {
@@ -143,14 +153,19 @@ export function useCloudProjectHome({
       title: "Creating cloud project",
       detail: "Preparing a new Puppyone Cloud workspace.",
     });
-    const project = await createCloudProject(session, "Untitled Project", updateCloudSession);
+    const project = await createCloudProject(
+      session,
+      "Untitled Project",
+      updateCloudSession,
+      desktopCloudApiBaseUrl,
+    );
     setHomeOperationStatus({
       title: "Opening cloud project",
       detail: "Loading the new workspace.",
     });
     setHomeCloudProjects((current) => [project, ...current.filter((item) => item.id !== project.id)]);
     await onOpenCloudProject(project);
-  }, [onOpenCloudProject, setHomeOperationStatus, updateCloudSession]);
+  }, [desktopCloudApiBaseUrl, onOpenCloudProject, setHomeOperationStatus, updateCloudSession]);
 
   const createCloudProjectFromHomepage = useCallback(async () => {
     if (!activeCloudSession) {
@@ -212,7 +227,12 @@ export function useCloudProjectHome({
     });
     try {
       const project = homeCloudProjects.find((item) => item.id === projectId)
-        ?? await getCloudProject(activeCloudSession, projectId, updateCloudSession);
+        ?? await getCloudProject(
+          activeCloudSession,
+          projectId,
+          updateCloudSession,
+          desktopCloudApiBaseUrl,
+        );
       await onOpenCloudProject(project);
     } catch (error) {
       setHomeOperationStatus(null);
@@ -220,6 +240,7 @@ export function useCloudProjectHome({
     }
   }, [
     activeCloudSession,
+    desktopCloudApiBaseUrl,
     homeCloudProjects,
     onOpenCloudProject,
     setHomeOperationStatus,

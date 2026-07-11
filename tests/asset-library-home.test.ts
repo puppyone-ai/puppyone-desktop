@@ -54,6 +54,14 @@ describe("Asset Library homepage", () => {
 
     expect(onOpenWorkspacePath).toHaveBeenCalledWith("/Users/example/Local Notes");
   });
+
+  it("hides Create in Cloud when cloud-only creation is unavailable", () => {
+    const container = renderLibrary({ onCreateCloudProject: undefined });
+
+    expect(container.textContent).toContain("New project");
+    expect(container.textContent).not.toContain("New Cloud project");
+    expect(container.textContent).not.toContain("Create in Cloud");
+  });
 });
 
 function renderLibrary(overrides: Partial<MinimalOnboardingProps> = {}) {

@@ -8,8 +8,10 @@ import type { CloudWorkspaceSection } from "../types";
 import { CloudGlobalBillingPage, CloudGlobalTeamPage } from "../components/CloudGlobalPages";
 import { CloudProjectBrowser } from "../components/ProjectBrowser";
 import { CloudWorkspaceLoadingState } from "../components/shared";
+import { CloudAutomationRouteSection } from "../sections/AutomationRouteSection";
 import { CloudBranchesSection } from "../sections/BranchesSection";
 import { CloudGitSyncSection } from "../sections/GitSyncSection";
+import { CloudHistorySection } from "../sections/HistorySection";
 import { CloudMcpCliSection } from "../sections/McpCliSection";
 import { CloudMappedOverview } from "../sections/OverviewSection";
 import { CloudAccessSection } from "../sections/access/AccessSection";
@@ -35,6 +37,7 @@ export function CloudRouter({
   cloudApiBaseUrl,
   cloudRemote,
   cloudData,
+  selectedProjectId,
   activeSection,
   accountEmail,
   accountConnected,
@@ -58,6 +61,8 @@ export function CloudRouter({
   cloudApiBaseUrl: string | null;
   cloudRemote: ReturnType<typeof getPuppyoneRemote>;
   cloudData: DesktopCloudDataState;
+  /** Explicit browse context. Never infer this from loaded project data. */
+  selectedProjectId: string | null;
   activeSection: CloudWorkspaceSection;
   accountEmail: string | null;
   accountConnected: boolean;
@@ -79,10 +84,15 @@ export function CloudRouter({
   const activeProject = cloudData.activeProject;
   const workspaceBinding = deriveCloudWorkspaceBinding({
     cloudRemote,
-    projectId: cloudData.activeProjectId,
+    projectId: cloudData.mappedProjectId,
     loading: cloudData.loading,
     error: cloudData.error,
   });
+  const browsingProjectId = selectedProjectId?.trim()
+    && selectedProjectId !== cloudData.mappedProjectId
+    ? selectedProjectId.trim()
+    : null;
+  const browsingCloudProject = Boolean(browsingProjectId);
 
   if (activeSection === "cloud-team") {
     return (
@@ -114,11 +124,11 @@ export function CloudRouter({
     return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
   }
 
-  if (activeSection === "overview" && cloudData.activeProjectId) {
+  if (activeSection === "overview" && cloudData.mappedProjectId) {
     return (
       <CloudMappedOverview
         workspace={workspace}
-        project={activeProject ?? mappedProject}
+        project={mappedProject ?? { id: cloudData.mappedProjectId, name: workspace.name }}
         dashboard={cloudData.dashboard}
         tree={cloudData.tree}
         history={cloudData.history}
@@ -126,7 +136,7 @@ export function CloudRouter({
         connectors={cloudData.connectors}
         mcpEndpoints={cloudData.mcpEndpoints}
         identity={cloudData.identity}
-        cloudRemote={cloudRemote}
+        linkedToWorkspace
         loading={loading || cloudData.loading}
         onSelectSection={onSelectSection}
         onOpenProject={onOpenProject}
@@ -144,19 +154,21 @@ export function CloudRouter({
         apiBaseUrl={cloudApiBaseUrl}
         mappedProjectId={cloudData.mappedProjectId}
         backupLoading={cloudBackupLoading}
+        cloudAction={cloudAction}
         onSessionChange={onSessionChange}
         onBackupWorkspace={onBackupWorkspace}
         onSelectProject={onSelectProject}
+        onConnectProject={onConnectProject}
         onOpenCloudProjects={() => openCloudApp(getCloudRouteWebPath("overview"))}
       />
     );
   }
 
-  if (workspaceBinding.status === "resolving") {
+  if (!browsingCloudProject && workspaceBinding.status === "resolving") {
     return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
   }
 
-  if (workspaceBinding.status === "remote-only") {
+  if (!browsingCloudProject && workspaceBinding.status === "remote-only") {
     if (!cloudRemote) {
       return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
     }
@@ -175,7 +187,7 @@ export function CloudRouter({
     );
   }
 
-  if (workspaceBinding.status === "unmapped" || workspaceBinding.status === "error") {
+  if (!browsingCloudProject && (workspaceBinding.status === "unmapped" || workspaceBinding.status === "error")) {
     return (
       <CloudUnmappedWorkspace
         workspace={workspace}
@@ -196,7 +208,22 @@ export function CloudRouter({
     );
   }
 
-  const projectId = workspaceBinding.projectId;
+  const projectId = browsingProjectId ?? (
+    workspaceBinding.status === "mapped" ? workspaceBinding.projectId : null
+  );
+  if (!projectId) {
+    return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
+  }
+  const routedProject = (
+    activeProject?.id === projectId
+      ? activeProject
+      : cloudData.projects.find((project) => project.id === projectId)
+        ?? (mappedProject?.id === projectId ? mappedProject : null)
+        ?? {
+          id: projectId,
+          name: browsingCloudProject ? "Cloud project" : workspace.name,
+        }
+  );
   const connectorsByScope = new Map<string, typeof cloudData.connectors>();
   for (const connector of cloudData.connectors) {
     const group = connectorsByScope.get(connector.scope_id) ?? [];
@@ -218,7 +245,7 @@ export function CloudRouter({
     return (
       <CloudMappedOverview
         workspace={workspace}
-        project={activeProject ?? mappedProject}
+        project={routedProject}
         dashboard={cloudData.dashboard}
         tree={cloudData.tree}
         history={cloudData.history}
@@ -226,11 +253,28 @@ export function CloudRouter({
         connectors={cloudData.connectors}
         mcpEndpoints={cloudData.mcpEndpoints}
         identity={cloudData.identity}
-        cloudRemote={cloudRemote}
+        linkedToWorkspace={!browsingCloudProject}
         loading={loading || cloudData.loading}
+        attachAction={browsingCloudProject && routedProject ? {
+          busy: cloudAction.kind === "connect" && cloudAction.projectId === routedProject.id,
+          disabled: cloudAction.kind !== null || cloudBackupLoading,
+          onAttach: () => onConnectProject(routedProject),
+        } : null}
         onSelectSection={onSelectSection}
         onOpenProject={onOpenProject}
         onRefresh={cloudData.reload}
+      />
+    );
+  }
+
+  if (activeSection === "history") {
+    return (
+      <CloudHistorySection
+        projectId={projectId}
+        projectName={routedProject?.name ?? workspace.name}
+        cloudSession={cloudSession}
+        apiBaseUrl={cloudApiBaseUrl}
+        onSessionChange={onSessionChange}
       />
     );
   }
@@ -246,6 +290,18 @@ export function CloudRouter({
         loading={loading}
         onCloudSessionChange={onSessionChange}
         onOpenProject={onOpenProject}
+      />
+    );
+  }
+
+  if (activeSection === "automation") {
+    return (
+      <CloudAutomationRouteSection
+        projectId={projectId}
+        cloudSession={cloudSession}
+        apiBaseUrl={cloudApiBaseUrl}
+        cloudData={cloudData}
+        onSessionChange={onSessionChange}
       />
     );
   }

@@ -33,10 +33,14 @@ import {
   type CloudWorkspaceSection,
 } from "../cloud";
 import {
+  resolveCloudProjectNavigationContext,
+} from "../cloud/attachment";
+import {
   DesktopCloudAutomationSidebar,
   DesktopCloudAutomationView,
 } from "../automation";
 import { useDesktopCloudAccessData } from "../cloud/data/useDesktopCloudAccessData";
+import { shouldLoadDesktopCloudAccessData } from "../cloud/data/shouldLoadDesktopCloudAccessData";
 import { useCloudBranchesData } from "../cloud/data/useCloudBranchesData";
 import { buildCloudBranchGraphRows } from "../cloud/model";
 import { isCloudAccessNavigationResource } from "../cloud/sections/access/accessRows";
@@ -94,6 +98,7 @@ type DesktopWorkspaceContentProps = {
   activeView: DesktopView;
   cloud: {
     activeSection: CloudWorkspaceSection;
+    attachment?: import("../cloud/attachment").ProjectCloudAttachment | null;
     backupError: string | null;
     backupLoading: boolean;
     cloudApiBaseUrl: string | null;
@@ -101,11 +106,14 @@ type DesktopWorkspaceContentProps = {
     storedCloudSession: DesktopCloudSession | null;
     enabled: boolean;
     projectId: string | null;
+    selectedProjectId?: string | null;
     sessionRestoring: boolean;
     onCloudSessionChange: (session: DesktopCloudSession | null) => void;
     onConfigureCloudRemote: (remoteUrl: string, projectId?: string | null) => Promise<GitStatusSnapshot | null>;
     onOpenDetails: () => void;
     onOpenGitSettings: () => void;
+    onSelectProjectId?: (projectId: string | null) => void;
+    onBackToCloudProjects?: () => void;
     onSelectSection: (section: CloudWorkspaceSection) => void;
     onStartPuppyoneBackup: () => void;
   };
@@ -192,9 +200,19 @@ export function DesktopWorkspaceContent({
   const workspaceChangeCount = gitEnabled
     ? getDesktopWorkspaceChangeCount(git.activeGitStatus, gitHostingMode === "github")
     : 0;
+  const cloudHubNavigationEnabled = cloud.enabled && !cloudWorkspace;
+  const attachment = cloud.attachment ?? { status: "local-only" as const, projectId: null };
+  const cloudNavigationContext = resolveCloudProjectNavigationContext(
+    attachment,
+    cloud.selectedProjectId ?? null,
+  );
   const cloudToolsNavigationEnabled = cloud.enabled && cloudWorkspace && Boolean(cloud.projectId);
+  const needsCloudAccessData = shouldLoadDesktopCloudAccessData({
+    workspaceKind,
+    activeView: resolvedActiveView,
+  });
   const cloudAccessData = useDesktopCloudAccessData({
-    projectId: cloud.projectId,
+    projectId: needsCloudAccessData ? cloud.projectId : null,
     cloudSession: cloud.cloudSession,
     apiBaseUrl: cloud.cloudApiBaseUrl,
     onCloudSessionChange: cloud.onCloudSessionChange,
@@ -444,16 +462,20 @@ export function DesktopWorkspaceContent({
       workspace={workspace}
       status={git.activeGitStatus}
       puppyoneConfig={puppyoneConfig}
+      cloudApiBaseUrl={cloud.cloudApiBaseUrl}
       cloudSession={cloud.storedCloudSession}
       sessionRestoring={cloud.sessionRestoring}
+      attachment={cloudWorkspace ? null : attachment}
       onCloudSessionChange={cloud.onCloudSessionChange}
       activeSection={cloud.activeSection}
+      selectedProjectId={cloud.selectedProjectId ?? null}
       loading={git.gitStatusLoading}
       error={git.gitStatusError}
       cloudBackupLoading={cloud.backupLoading}
       cloudBackupError={cloud.backupError}
       onStartPuppyoneBackup={cloud.onStartPuppyoneBackup}
       onConfigureCloudRemote={cloud.onConfigureCloudRemote}
+      onSelectProjectId={cloud.onSelectProjectId}
       onSelectSection={cloud.onSelectSection}
       onRefresh={git.refreshGitStatus}
       onOpenDetails={cloud.onOpenDetails}
@@ -592,6 +614,7 @@ export function DesktopWorkspaceContent({
           <DesktopSidebarTopNavigation
             activeView={resolvedActiveView}
             cloudHistoryEnabled={cloudWorkspace}
+            cloudHubEnabled={cloudHubNavigationEnabled}
             cloudToolsEnabled={cloudToolsNavigationEnabled}
             gitEnabled={gitEnabled}
             pluginsEnabled={pluginsNavigationVisible}
@@ -608,6 +631,7 @@ export function DesktopWorkspaceContent({
           <DesktopSidebarRailNavigation
             activeView={resolvedActiveView}
             cloudHistoryEnabled={cloudWorkspace}
+            cloudHubEnabled={cloudHubNavigationEnabled}
             cloudToolsEnabled={cloudToolsNavigationEnabled}
             gitEnabled={gitEnabled}
             pluginsEnabled={pluginsNavigationVisible}
@@ -708,8 +732,14 @@ export function DesktopWorkspaceContent({
               <CloudServiceSidebar
                 status={git.activeGitStatus}
                 cloudSession={cloud.storedCloudSession}
+                cloudApiBaseUrl={cloud.cloudApiBaseUrl}
                 activeSection={cloud.activeSection}
+                projectContext={cloudNavigationContext.projectContext}
+                projectBound={cloudNavigationContext.projectBound && !cloudWorkspace}
                 onSelectSection={cloud.onSelectSection}
+                onBackToProjects={cloud.onBackToCloudProjects ?? (() => {
+                  cloud.onSelectSection("overview");
+                })}
               />
             ) : (
               <SettingsSidebar
@@ -724,6 +754,7 @@ export function DesktopWorkspaceContent({
             <DesktopSidebarFooterNavigation
               activeView={resolvedActiveView}
               cloudHistoryEnabled={cloudWorkspace}
+              cloudHubEnabled={cloudHubNavigationEnabled}
               cloudToolsEnabled={cloudToolsNavigationEnabled}
               gitEnabled={gitEnabled}
               pluginsEnabled={pluginsNavigationVisible}

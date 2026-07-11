@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getCloudHistory,
   type DesktopCloudHistory,
@@ -31,7 +31,6 @@ export function useCloudBranchesData({
   revisionKey?: string | null;
   onSessionChange: (session: DesktopCloudSession | null) => void;
 }): CloudBranchesDataState {
-  const [reloadToken, setReloadToken] = useState(0);
   const canLoad = enabled && Boolean(session && projectId);
   const contextKey = canLoad && session && projectId
     ? [
@@ -44,62 +43,67 @@ export function useCloudBranchesData({
       ].join("\n")
     : `disabled:${projectId ?? "none"}`;
   const [state, setState] = useState<CloudBranchesDataInternalState>(() => createCloudBranchesDataState());
+  const activeRequestRef = useRef(0);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
+    const requestId = activeRequestRef.current + 1;
+    activeRequestRef.current = requestId;
+
     if (!canLoad || !session || !projectId) {
       setState(createCloudBranchesDataState({ contextKey }));
-      return undefined;
+      return;
     }
 
-    let cancelled = false;
-    const load = async () => {
-      setState((current) => ({
-        ...current,
-        loading: true,
+    setState((current) => (
+      current.contextKey === contextKey
+        ? {
+            ...current,
+            loading: true,
+            error: null,
+          }
+        : createCloudBranchesDataState({
+            loading: true,
+            contextKey,
+          })
+    ));
+
+    try {
+      const history = await getCloudHistory(session, projectId, 80, onSessionChange, apiBaseUrl);
+      if (activeRequestRef.current !== requestId) return;
+      setState({
+        history,
+        loading: false,
         error: null,
         contextKey,
-      }));
+      });
+    } catch (error) {
+      if (activeRequestRef.current !== requestId) return;
+      setState({
+        history: null,
+        loading: false,
+        error: error instanceof Error ? error.message : "Unable to load branch history.",
+        contextKey,
+      });
+    }
+  }, [apiBaseUrl, canLoad, contextKey, onSessionChange, projectId, session]);
 
-      try {
-        const history = await getCloudHistory(session, projectId, 80, onSessionChange, apiBaseUrl);
-        if (cancelled) return;
-        setState({
-          history,
-          loading: false,
-          error: null,
-          contextKey,
-        });
-      } catch (error) {
-        if (cancelled) return;
-        setState({
-          history: null,
-          loading: false,
-          error: error instanceof Error ? error.message : "Unable to load branch history.",
-          contextKey,
-        });
-      }
-    };
-
+  useEffect(() => {
     void load();
     return () => {
-      cancelled = true;
+      activeRequestRef.current += 1;
     };
-  }, [apiBaseUrl, canLoad, contextKey, onSessionChange, projectId, reloadToken, session, revisionKey]);
-
-  const reload = async () => {
-    setReloadToken((token) => token + 1);
-  };
+  }, [load, revisionKey]);
 
   if (state.contextKey !== contextKey) {
     return {
       ...toPublicCloudBranchesDataState(createCloudBranchesDataState({ loading: canLoad })),
-      reload,
+      reload: load,
     };
   }
 
   return {
     ...toPublicCloudBranchesDataState(state),
-    reload,
+    reload: load,
   };
 }
 

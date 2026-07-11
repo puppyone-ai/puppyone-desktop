@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   listCloudProjects,
   type DesktopCloudConnector,
@@ -41,186 +41,235 @@ type DesktopCloudDataInternalState = Omit<DesktopCloudDataState, "reload"> & {
   contextKey: string | null;
 };
 
-export function useDesktopCloudData(
-  session: DesktopCloudSession | null,
-  cloudEnvironment: CloudEnvironment,
-  selectedProjectId: string | null,
-  onSessionChange: (session: DesktopCloudSession | null) => void,
-  workspaceRevisionKey?: string | null,
+export function useDesktopCloudData({
+  session,
+  cloudEnvironment,
+  selectedProjectId,
+  boundProjectId = null,
+  onSessionChange,
+  workspaceRevisionKey = null,
   loadProjectDetails = true,
-): DesktopCloudDataState {
+}: {
+  session: DesktopCloudSession | null;
+  cloudEnvironment: CloudEnvironment;
+  /** A transient project opened from Cloud Projects. This never creates a local binding. */
+  selectedProjectId: string | null;
+  /** The project identity already bound to the local workspace, resolved by the app shell. */
+  boundProjectId?: string | null;
+  onSessionChange: (session: DesktopCloudSession | null) => void;
+  workspaceRevisionKey?: string | null;
+  loadProjectDetails?: boolean;
+}): DesktopCloudDataState {
   const cloudRemote = cloudEnvironment.cloudRemote;
   const cloudApiBaseUrl = cloudEnvironment.apiBaseUrl;
   const configuredProjectId = cloudEnvironment.configuredProjectId;
+  const cloudRemoteKey = createCloudRemoteKey(cloudRemote);
+  const stableCloudRemoteRef = useRef({ key: cloudRemoteKey, value: cloudRemote });
+  if (stableCloudRemoteRef.current.key !== cloudRemoteKey) {
+    stableCloudRemoteRef.current = { key: cloudRemoteKey, value: cloudRemote };
+  }
+  const stableCloudRemote = stableCloudRemoteRef.current.value;
+  const normalizedBoundProjectId = boundProjectId?.trim() || null;
   const contextKey = createCloudDataContextKey({
     session,
     cloudEnvironment,
     selectedProjectId,
-    loadProjectDetails,
+    boundProjectId: normalizedBoundProjectId,
   });
-  const [reloadToken, setReloadToken] = useState(0);
   const [state, setState] = useState<DesktopCloudDataInternalState>(() => createCloudDataState());
+  const activeRequestRef = useRef(0);
   const hasCurrentContext = state.contextKey === contextKey;
 
-  useEffect(() => {
+  const load = useCallback(async () => {
+    const requestId = activeRequestRef.current + 1;
+    activeRequestRef.current = requestId;
+
     if (!session) {
       setState(createCloudDataState({
+        mappedProjectId: normalizedBoundProjectId,
+        activeProjectId: selectedProjectId || normalizedBoundProjectId,
         initializing: false,
         loading: false,
         contextKey,
       }));
-      return undefined;
+      return;
     }
 
-    let cancelled = false;
-    const load = async () => {
-      setState((current) => ({
-        ...current,
-        initializing: current.contextKey !== contextKey,
-        loading: true,
-        error: null,
-        warning: null,
-        contextKey,
-      }));
-      try {
-        const projects = await listCloudProjects(session, onSessionChange, cloudApiBaseUrl);
-        if (cancelled) return;
-        const mappedProjectId = await resolveMappedCloudProjectId({
-          session,
-          projects,
-          cloudRemote,
-          configuredProjectId,
-          onSessionChange,
-          cloudApiBaseUrl,
-        });
-        if (cancelled) return;
-
-        const mappedProject = mappedProjectId
-          ? projects.find((project) => project.id === mappedProjectId) ?? null
-          : null;
-        const activeProjectId = selectedProjectId || mappedProjectId;
-
-        if (!activeProjectId) {
-          setState(createCloudDataState({
-            projects,
-            mappedProjectId,
-            mappedProject,
+    setState((current) => (
+      current.contextKey === contextKey
+        ? {
+            ...current,
             initializing: false,
-            loading: false,
+            loading: true,
+            error: null,
+            warning: null,
+          }
+        : createCloudDataState({
+            mappedProjectId: normalizedBoundProjectId,
+            activeProjectId: selectedProjectId || normalizedBoundProjectId,
+            initializing: true,
+            loading: true,
             contextKey,
-          }));
-          return;
-        }
+          })
+    ));
 
-        if (!loadProjectDetails) {
-          setState(createCloudDataState({
-            projects,
-            mappedProjectId,
-            mappedProject,
-            activeProjectId,
-            activeProject: projects.find((project) => project.id === activeProjectId) ?? mappedProject,
-            initializing: false,
-            loading: false,
-            contextKey,
-          }));
-          return;
-        }
+    try {
+      const projects = await listCloudProjects(session, onSessionChange, cloudApiBaseUrl);
+      if (activeRequestRef.current !== requestId) return;
 
-        const details = await loadCloudProjectDetails({
-          session,
-          projectId: activeProjectId,
+      const mappedProjectId = normalizedBoundProjectId ?? await resolveMappedCloudProjectId({
+        session,
+        projects,
+        cloudRemote: stableCloudRemote,
+        configuredProjectId,
+        onSessionChange,
+        cloudApiBaseUrl,
+      });
+      if (activeRequestRef.current !== requestId) return;
+
+      const mappedProject = mappedProjectId
+        ? projects.find((project) => project.id === mappedProjectId) ?? null
+        : null;
+      const activeProjectId = selectedProjectId || mappedProjectId;
+
+      if (!activeProjectId) {
+        setState(createCloudDataState({
           projects,
-          onSessionChange,
-          cloudApiBaseUrl,
-        });
-        if (cancelled) return;
+          mappedProjectId,
+          mappedProject,
+          initializing: false,
+          loading: false,
+          contextKey,
+        }));
+        return;
+      }
 
-        setState({
+      if (!loadProjectDetails) {
+        setState(createCloudDataState({
           projects,
           mappedProjectId,
           mappedProject,
           activeProjectId,
-          activeProject: details.activeProject,
-          dashboard: details.dashboard,
-          tree: details.tree,
-          history: details.history,
-          scopes: details.scopes,
-          connectors: details.connectors,
-          mcpEndpoints: details.mcpEndpoints,
-          identity: details.identity,
+          activeProject: projects.find((project) => project.id === activeProjectId) ?? mappedProject,
           initializing: false,
           loading: false,
-          error: null,
-          warning: details.warning,
           contextKey,
-        });
-      } catch (loadError) {
-        if (!cancelled) {
-          setState((current) => ({
-            ...current,
-            initializing: false,
-            loading: false,
-            error: loadError instanceof Error ? loadError.message : "Unable to load Cloud workspace.",
-            warning: null,
-            contextKey,
-          }));
-        }
+        }));
+        return;
       }
-    };
 
-    void load();
-    return () => {
-      cancelled = true;
-    };
+      const details = await loadCloudProjectDetails({
+        session,
+        projectId: activeProjectId,
+        projects,
+        onSessionChange,
+        cloudApiBaseUrl,
+      });
+      if (activeRequestRef.current !== requestId) return;
+
+      setState({
+        projects,
+        mappedProjectId,
+        mappedProject,
+        activeProjectId,
+        activeProject: details.activeProject,
+        dashboard: details.dashboard,
+        tree: details.tree,
+        history: details.history,
+        scopes: details.scopes,
+        connectors: details.connectors,
+        mcpEndpoints: details.mcpEndpoints,
+        identity: details.identity,
+        initializing: false,
+        loading: false,
+        error: null,
+        warning: details.warning,
+        contextKey,
+      });
+    } catch (loadError) {
+      if (activeRequestRef.current !== requestId) return;
+      setState((current) => (
+        current.contextKey === contextKey
+          ? {
+              ...current,
+              initializing: false,
+              loading: false,
+              error: loadError instanceof Error ? loadError.message : "Unable to load Cloud workspace.",
+              warning: null,
+            }
+          : createCloudDataState({
+              initializing: false,
+              loading: false,
+              error: loadError instanceof Error ? loadError.message : "Unable to load Cloud workspace.",
+              contextKey,
+            })
+      ));
+    }
   }, [
-    session,
-    onSessionChange,
-    configuredProjectId,
-    selectedProjectId,
-    cloudRemote?.rawUrl,
     cloudApiBaseUrl,
+    configuredProjectId,
     contextKey,
-    workspaceRevisionKey,
-    reloadToken,
     loadProjectDetails,
+    normalizedBoundProjectId,
+    onSessionChange,
+    selectedProjectId,
+    session,
+    stableCloudRemote,
   ]);
 
-  const reload = async () => {
-    setReloadToken((token) => token + 1);
-  };
+  useEffect(() => {
+    void load();
+    return () => {
+      activeRequestRef.current += 1;
+    };
+  }, [load, workspaceRevisionKey]);
 
   if (session && !hasCurrentContext) {
     return {
       ...toPublicCloudDataState(createCloudDataState({
+        mappedProjectId: normalizedBoundProjectId,
+        activeProjectId: selectedProjectId || normalizedBoundProjectId,
         initializing: true,
         loading: true,
       })),
-      reload,
+      reload: load,
     };
   }
 
-  return { ...toPublicCloudDataState(state), reload };
+  return { ...toPublicCloudDataState(state), reload: load };
+}
+
+function createCloudRemoteKey(cloudRemote: CloudEnvironment["cloudRemote"]): string {
+  if (!cloudRemote) return "none";
+  return [
+    cloudRemote.rawUrl,
+    cloudRemote.info.kind,
+    cloudRemote.info.projectId ?? "",
+    cloudRemote.info.accessKey ?? "",
+  ].join("\n");
 }
 
 function createCloudDataContextKey({
   session,
   cloudEnvironment,
   selectedProjectId,
-  loadProjectDetails,
+  boundProjectId,
 }: {
   session: DesktopCloudSession | null;
   cloudEnvironment: CloudEnvironment;
   selectedProjectId: string | null;
-  loadProjectDetails: boolean;
+  boundProjectId: string | null;
 }): string {
   if (!session) return "signed-out";
   return [
+    session.user_id,
     session.user_email,
+    session.session_generation,
     session.api_base_url ?? "",
     cloudEnvironment.cloudRemote?.rawUrl ?? "",
     cloudEnvironment.configuredProjectId ?? "",
+    boundProjectId ?? "",
     selectedProjectId ?? "",
-    loadProjectDetails ? "details" : "summary",
   ].join("\n");
 }
 

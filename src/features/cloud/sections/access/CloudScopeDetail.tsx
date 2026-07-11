@@ -1,5 +1,5 @@
 import { Check, ChevronRight, Copy, Eye, EyeOff, Link, RefreshCw, Settings } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   deleteCloudScope,
   regenerateCloudScopeKey,
@@ -62,7 +62,7 @@ export function CloudScopeDetail({
   const cliCommand = scope.access_key && apiBase
     ? `printf '%s' ${shellQuote(scope.access_key)} | puppyone ap login ${shellQuote(profileName)} --api-url ${shellQuote(apiBase)} --access-key-stdin`
     : "";
-  const surfaces = buildCloudAccessSurfaces({
+  const surfaces = useMemo(() => buildCloudAccessSurfaces({
     scope,
     connectors,
     mcpEndpoints,
@@ -70,8 +70,7 @@ export function CloudScopeDetail({
     gitUrl,
     cliCommand,
     profileName,
-  });
-  const surfaceKey = surfaces.map((surface) => surface.id).join("|");
+  }), [apiBase, cliCommand, connectors, gitUrl, mcpEndpoints, profileName, scope]);
   const [collapsedSurfaceIds, setCollapsedSurfaceIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
@@ -83,7 +82,7 @@ export function CloudScopeDetail({
       }
       return next;
     });
-  }, [surfaceKey]);
+  }, [surfaces]);
 
   const aggregate = getCloudAccessAggregate(surfaces);
   const modeLabel = scope.mode === "rw" ? "Read & write" : "Read only";

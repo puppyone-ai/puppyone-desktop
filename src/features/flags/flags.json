@@ -1,5 +1,6 @@
 {
   "cloudWorkspace": true,
+  "cloudOnlyWorkspace": false,
   "assetLibraryHome": true,
   "desktopAgentChat": true
 }

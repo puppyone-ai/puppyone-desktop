@@ -149,6 +149,14 @@
   font-weight: 600;
 }
 
+.desktop-cloud-sidebar-nav-row.locked,
+.desktop-cloud-sidebar-nav-row.locked:hover {
+  background: transparent;
+  color: var(--po-text-muted);
+  cursor: not-allowed;
+  opacity: 0.82;
+}
+
 .desktop-cloud-sidebar-separator {
   height: 1px;
   margin:

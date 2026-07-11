@@ -1,4 +1,4 @@
-import { Cloud, ExternalLink, Server, SquareTerminal, Users } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import type {
   DesktopCloudProject,
   DesktopCloudSession,
@@ -14,8 +14,7 @@ import { formatRelativeTime } from "../utils";
 import { CloudFilePreviewIcon } from "./shared";
 import { useCloudProjectPreview } from "../hooks/useCloudProjectPreview";
 import { useCloudAuthController } from "../hooks/useCloudAuthController";
-import { CloudAuthCard, CloudLoginFeatureRow, CloudProductMark } from "../CloudServicePanel";
-import type { CloudLoginFeature } from "../model";
+import { CloudAuthCard, CloudProductMark } from "../CloudServicePanel";
 
 const PROJECT_CARD_SKELETON_COUNT = 3;
 
@@ -26,9 +25,11 @@ export function CloudProjectBrowser({
   apiBaseUrl,
   mappedProjectId,
   backupLoading,
+  cloudAction,
   onSessionChange,
   onBackupWorkspace,
   onSelectProject,
+  onConnectProject,
   onOpenCloudProjects,
 }: {
   projects: DesktopCloudProject[];
@@ -37,9 +38,11 @@ export function CloudProjectBrowser({
   apiBaseUrl: string | null;
   mappedProjectId: string | null;
   backupLoading: boolean;
+  cloudAction: { kind: "backup" | "connect" | "copy" | null; projectId: string | null };
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onBackupWorkspace: () => void;
   onSelectProject: (project: DesktopCloudProject) => void;
+  onConnectProject: (project: DesktopCloudProject) => void;
   onOpenCloudProjects: () => void;
 }) {
   const sortedProjects = [...projects].sort((left, right) => {
@@ -50,6 +53,7 @@ export function CloudProjectBrowser({
     return rightTime - leftTime || left.name.localeCompare(right.name);
   });
   const showBackupCard = !mappedProjectId;
+  const actionInProgress = cloudAction.kind !== null || backupLoading;
 
   return (
     <section className="desktop-cloud-project-browser" aria-label="Cloud projects">
@@ -76,8 +80,11 @@ export function CloudProjectBrowser({
               session={session}
               apiBaseUrl={apiBaseUrl}
               mapped={project.id === mappedProjectId}
+              attachBusy={cloudAction.kind === "connect" && cloudAction.projectId === project.id}
+              attachDisabled={actionInProgress}
               onSessionChange={onSessionChange}
               onSelectProject={onSelectProject}
+              onConnectProject={onConnectProject}
             />
           ))
         )}
@@ -85,6 +92,7 @@ export function CloudProjectBrowser({
         {showBackupCard && (
           <CloudProjectNewCard
             loading={backupLoading}
+            disabled={actionInProgress}
             onClick={onBackupWorkspace}
           />
         )}
@@ -113,52 +121,29 @@ export function CloudProjectBrowserSignedOut({
     onSignedOut,
     onRefresh,
   });
-  const cloudFeatures: CloudLoginFeature[] = [
-    {
-      label: "Team collaboration",
-      icon: Users,
-    },
-    {
-      label: "Cloud backup",
-      icon: Cloud,
-    },
-    {
-      label: "MCP / CLI supported",
-      icon: SquareTerminal,
-    },
-    {
-      label: "24/7 online",
-      icon: Server,
-    },
-  ];
+  const signedIn = Boolean(auth.signedInEmail);
 
   return (
     <section className="desktop-cloud-project-auth-stage" aria-label="Sign in to Puppyone Cloud">
-      <section className="desktop-cloud-panel locked desktop-cloud-project-auth-panel" aria-label="Puppyone Cloud sign in">
-        <div className="desktop-cloud-panel-body">
-          <section className="desktop-cloud-login-layout">
-            <div className="desktop-cloud-login-copy">
-              <div className="desktop-cloud-login-copy-content">
-                <div className="desktop-cloud-login-identity">
-                  <div className="desktop-cloud-login-logo" aria-hidden="true">
-                    <CloudProductMark />
-                  </div>
-                  <div className="desktop-cloud-login-copy-stack">
-                    <h3>Get Puppyone Cloud</h3>
-                    <p>Back up this workspace. Keep agents, teammates, MCP, and CLI connected.</p>
-                  </div>
-                </div>
-                <div className="desktop-cloud-login-feature-list">
-                  {cloudFeatures.map((feature) => (
-                    <CloudLoginFeatureRow key={feature.label} feature={feature} />
-                  ))}
-                </div>
-              </div>
+      <div className="desktop-cloud-project-auth-body">
+        <div className="desktop-cloud-project-auth-shell">
+          <div className="desktop-cloud-project-auth-visual" aria-hidden="true">
+            <div className="desktop-cloud-login-logo">
+              <CloudProductMark />
             </div>
-            <aside className="desktop-cloud-login-card">
+          </div>
+          <div className="desktop-cloud-project-auth-content">
+            <header className="desktop-cloud-project-auth-copy">
+              <h1>Puppyone Cloud</h1>
+            </header>
+            <p className="desktop-cloud-project-auth-description">
+              Back up this workspace, collaborate with your team, and keep MCP and CLI access available around the clock.
+            </p>
+            <div className="desktop-cloud-project-auth-action">
               <CloudAuthCard
-                view={auth.signedInEmail ? "signedIn" : auth.view}
+                view={signedIn ? "signedIn" : auth.view}
                 signedInEmail={auth.signedInEmail}
+                signInLabel="Sign in"
                 loading={auth.loading}
                 signingOut={auth.signingOut}
                 error={auth.error}
@@ -168,10 +153,10 @@ export function CloudProjectBrowserSignedOut({
                 onRefresh={onRefresh}
                 onSignOut={auth.handleSignOut}
               />
-            </aside>
-          </section>
+            </div>
+          </div>
         </div>
-      </section>
+      </div>
     </section>
   );
 }
@@ -181,15 +166,21 @@ function CloudProjectCard({
   session,
   apiBaseUrl,
   mapped,
+  attachBusy,
+  attachDisabled,
   onSessionChange,
   onSelectProject,
+  onConnectProject,
 }: {
   project: DesktopCloudProject;
   session: DesktopCloudSession;
   apiBaseUrl: string | null;
   mapped: boolean;
+  attachBusy: boolean;
+  attachDisabled: boolean;
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onSelectProject: (project: DesktopCloudProject) => void;
+  onConnectProject: (project: DesktopCloudProject) => void;
 }) {
   const preview = useCloudProjectPreview({
     session,
@@ -226,6 +217,20 @@ function CloudProjectCard({
         updatedLabel: updatedLabel || "Recently updated",
         connectionCount,
       }}
+      actions={!mapped ? (
+        <button
+          type="button"
+          className="desktop-project-folder-card-action"
+          disabled={attachDisabled}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onConnectProject(project);
+          }}
+        >
+          {attachBusy ? "Linking…" : "Link folder"}
+        </button>
+      ) : null}
       onSelect={() => onSelectProject(project)}
     />
   );
@@ -233,15 +238,18 @@ function CloudProjectCard({
 
 function CloudProjectNewCard({
   loading,
+  disabled,
   onClick,
 }: {
   loading: boolean;
+  disabled: boolean;
   onClick: () => void;
 }) {
   return (
     <ProjectFolderNewCard
-      label={loading ? "Connecting..." : "Back up current folder"}
+      label={loading ? "Creating backup…" : "Back up current folder"}
       loading={loading}
+      disabled={disabled}
       onClick={onClick}
     />
   );
