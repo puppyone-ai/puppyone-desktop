@@ -4,7 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { spawn as nodeSpawn } from "node:child_process";
 import { redactSecretText } from "../../agent-events.mjs";
-import { compareVersions, discoverExecutable, parseSemanticVersion } from "../../runtime/executable-discovery.mjs";
+import { compareVersions, discoverExecutable } from "../../runtime/executable-discovery.mjs";
 import { OPENCODE_RELEASE_ARTIFACTS, OPENCODE_UPSTREAM } from "./opencode-manifest.mjs";
 import { OPEN_CODE_LOCKED_ENVIRONMENT } from "./opencode-security-policy.mjs";
 
@@ -28,6 +28,7 @@ export async function discoverOpenCodeExecutable({
   resourcesPath = process.resourcesPath,
   appPath = null,
   managedConfigDir = null,
+  allowExternal = false,
 } = {}) {
   const executableName = platform === "win32" ? "opencode.exe" : "opencode";
   const packagedCandidates = [
@@ -41,12 +42,16 @@ export async function discoverOpenCodeExecutable({
   const packagedCandidateSet = new Set(packagedCandidates);
   const packagedFailures = [];
   const verifiedPackagedPaths = new Set();
-  const explicitCandidate = typeof env.PUPPYONE_OPENCODE_BIN === "string" && env.PUPPYONE_OPENCODE_BIN.trim()
+  const explicitCandidate = allowExternal && typeof env.PUPPYONE_OPENCODE_BIN === "string" && env.PUPPYONE_OPENCODE_BIN.trim()
     ? path.resolve(env.PUPPYONE_OPENCODE_BIN.trim())
     : null;
   const result = await discoverExecutable({
-    executableNames: [executableName],
-    additionalCandidates: [explicitCandidate, ...packagedCandidates, userInstallCandidate],
+    executableNames: allowExternal ? [executableName] : [],
+    additionalCandidates: [
+      explicitCandidate,
+      ...packagedCandidates,
+      ...(allowExternal ? [userInstallCandidate] : []),
+    ],
     fsModule,
     spawn,
     env,
@@ -72,6 +77,7 @@ export async function discoverOpenCodeExecutable({
         return false;
       }
     },
+    searchPath: allowExternal,
   });
   const resolved = result.executablePath ? path.resolve(result.executablePath) : null;
   const source = resolved && verifiedPackagedPaths.has(resolved)
@@ -101,6 +107,22 @@ export async function discoverOpenCodeExecutable({
       message: `The bundled OpenCode runtime is ${readiness.version}; PuppyOne expects ${OPENCODE_UPSTREAM.sourceVersion}.`,
     };
   }
+  if (readiness.status === "not-installed" && packagedFailures.length === 0) {
+    readiness = {
+      ...readiness,
+      message: "This PuppyOne build is missing its managed Agent engine. Update or reinstall PuppyOne, then retry.",
+    };
+  } else if (source === "bundled" && readiness.status !== "ready") {
+    readiness = {
+      ...readiness,
+      message: "PuppyOne could not verify its managed Agent engine. Retry, or update PuppyOne if the problem continues.",
+    };
+  } else if (readiness.status === "unsupported-version" && source !== "bundled") {
+    readiness = {
+      ...readiness,
+      message: "The configured Agent engine is incompatible with this PuppyOne build. Use PuppyOne's managed engine, then retry.",
+    };
+  }
   return {
     provider: "opencode",
     runtimeId: "opencode",
@@ -119,7 +141,11 @@ export async function discoverOpenCodeExecutable({
 }
 
 export function parseOpenCodeVersion(value) {
-  return parseSemanticVersion(value, "opencode");
+  for (const line of String(value).split(/\r?\n/)) {
+    const match = line.trim().match(/^(?:opencode(?:\s+version)?\s+)?v?(\d+\.\d+\.\d+)$/i);
+    if (match) return match[1];
+  }
+  return null;
 }
 
 export function buildOpenCodeEnvironment(baseEnv, loginEnv, { managedConfigDir, homedir = os.homedir() } = {}) {

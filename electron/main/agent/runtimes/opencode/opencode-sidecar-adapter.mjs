@@ -62,7 +62,7 @@ export class OpenCodeSidecarAdapter {
         account: authenticated ? { type: "opencode", email: null, planType: null } : null,
         requiresOpenaiAuth: false,
         requiresRuntimeSetup: !authenticated,
-        ...(authenticated ? {} : { error: "OpenCode has no configured model provider. Run `opencode auth login` in Terminal." }),
+        ...(authenticated ? {} : { error: "No model provider is connected to PuppyOne Agent." }),
       },
       models,
       modes,

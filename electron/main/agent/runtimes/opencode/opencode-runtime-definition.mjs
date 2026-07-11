@@ -7,8 +7,9 @@ export function createOpenCodeRuntimeDefinition({
   appPath = null,
   resourcesPath = process.resourcesPath,
   managedConfigDir = null,
+  allowExternal = false,
   logger = console,
-  discovery = createOpenCodeDiscovery({ appPath, resourcesPath, managedConfigDir }),
+  discovery = createOpenCodeDiscovery({ appPath, resourcesPath, managedConfigDir, allowExternal }),
   host = new OpenCodeSidecarHost({ logger }),
 } = {}) {
   return {

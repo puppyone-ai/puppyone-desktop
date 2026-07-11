@@ -220,6 +220,13 @@
   line-height: 1.45;
 }
 
+.desktop-agent-readiness small {
+  display: block;
+  margin-top: 6px;
+  color: var(--po-text-subtle);
+  font-size: 9px;
+}
+
 .desktop-agent-readiness button {
   display: inline-flex;
   min-height: 28px;
@@ -791,6 +798,8 @@
   .desktop-agent-transcript { padding-top: 22px; }
   .desktop-agent-select-pill select { max-width: 116px; }
   .desktop-agent-history-menu { width: calc(100cqw - 12px); }
+  .desktop-agent-readiness { grid-template-columns: auto minmax(0, 1fr); }
+  .desktop-agent-readiness > button { grid-column: 2; justify-self: start; }
 }
 
 @container desktop-agent (max-width: 419px) {

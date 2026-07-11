@@ -1,3 +1,5 @@
+import { createOpencodeClient } from "@opencode-ai/sdk/v2/client";
+
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const MAX_JSON_RESPONSE_BYTES = 8 * 1024 * 1024;
 const MAX_SSE_EVENT_BYTES = 1024 * 1024;
@@ -7,6 +9,7 @@ export class OpenCodeHttpClient {
   #authorization;
   #fetch;
   #requestTimeoutMs;
+  #sdk;
 
   constructor({ baseUrl, username, password, fetchImpl = globalThis.fetch, requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS }) {
     if (typeof fetchImpl !== "function") throw new TypeError("OpenCode requires a fetch implementation.");
@@ -18,193 +21,194 @@ export class OpenCodeHttpClient {
     this.#authorization = `Basic ${Buffer.from(`${username}:${password}`, "utf8").toString("base64")}`;
     this.#fetch = fetchImpl;
     this.#requestTimeoutMs = requestTimeoutMs;
+    this.#sdk = createOpencodeClient({
+      baseUrl: this.#baseUrl,
+      headers: { authorization: this.#authorization },
+      fetch: (request) => this.#fetchSdkRequest(request),
+    });
   }
 
   health(options = {}) {
-    return this.request("GET", "/global/health", options);
+    return this.#call((sdkOptions) => this.#sdk.global.health(sdkOptions), options);
   }
 
   providers(directory, options = {}) {
-    return this.request("GET", "/config/providers", { ...options, query: { directory } });
+    return this.#call((sdkOptions) => this.#sdk.config.providers({ directory }, sdkOptions), options);
   }
 
   agents(directory, options = {}) {
-    return this.request("GET", "/agent", { ...options, query: { directory } });
+    return this.#call((sdkOptions) => this.#sdk.app.agents({ directory }, sdkOptions), options);
   }
 
   commands(directory, options = {}) {
-    return this.request("GET", "/command", { ...options, query: { directory } });
+    return this.#call((sdkOptions) => this.#sdk.command.list({ directory }, sdkOptions), options);
   }
 
   listSessions(directory, options = {}) {
-    return this.request("GET", "/session", {
-      ...options,
-      query: { directory, roots: "true", limit: options.limit ?? 100 },
-    });
+    return this.#call((sdkOptions) => this.#sdk.session.list({
+      directory,
+      roots: true,
+      limit: options.limit ?? 100,
+    }, sdkOptions), options);
   }
 
   sessionStatus(directory, options = {}) {
-    return this.request("GET", "/session/status", { ...options, query: { directory } });
+    return this.#call((sdkOptions) => this.#sdk.session.status({ directory }, sdkOptions), options);
   }
 
   permissions(directory, options = {}) {
-    return this.request("GET", "/permission", { ...options, query: { directory } });
+    return this.#call((sdkOptions) => this.#sdk.permission.list({ directory }, sdkOptions), options);
   }
 
   questions(directory, options = {}) {
-    return this.request("GET", "/question", { ...options, query: { directory } });
+    return this.#call((sdkOptions) => this.#sdk.question.list({ directory }, sdkOptions), options);
   }
 
   createSession({ directory, title, model, agent, permission, metadata }, options = {}) {
-    return this.request("POST", "/session", {
-      ...options,
-      query: { directory },
-      body: {
-        ...(title ? { title } : {}),
-        ...(agent ? { agent } : {}),
-        ...(model ? { model: { providerID: model.providerID, id: model.modelID, ...(model.variant ? { variant: model.variant } : {}) } } : {}),
-        ...(Array.isArray(permission) ? { permission } : {}),
-        ...(metadata && typeof metadata === "object" && !Array.isArray(metadata) ? { metadata } : {}),
-      },
-    });
+    return this.#call((sdkOptions) => this.#sdk.session.create({
+      directory,
+      ...(title ? { title } : {}),
+      ...(agent ? { agent } : {}),
+      ...(model ? { model: { providerID: model.providerID, id: model.modelID, ...(model.variant ? { variant: model.variant } : {}) } } : {}),
+      ...(Array.isArray(permission) ? { permission } : {}),
+      ...(metadata && typeof metadata === "object" && !Array.isArray(metadata) ? { metadata } : {}),
+    }, sdkOptions), options);
   }
 
   getSession({ directory, sessionID }, options = {}) {
-    return this.request("GET", `/session/${encodeURIComponent(sessionID)}`, { ...options, query: { directory } });
+    return this.#call((sdkOptions) => this.#sdk.session.get({ directory, sessionID }, sdkOptions), options);
   }
 
   updateSession({ directory, sessionID, title, archivedAt, permission }, options = {}) {
-    return this.request("PATCH", `/session/${encodeURIComponent(sessionID)}`, {
-      ...options,
-      query: { directory },
-      body: {
-        ...(title ? { title } : {}),
-        ...(archivedAt !== undefined ? { time: { archived: archivedAt } } : {}),
-        ...(Array.isArray(permission) ? { permission } : {}),
-      },
-    });
+    return this.#call((sdkOptions) => this.#sdk.session.update({
+      directory,
+      sessionID,
+      ...(title ? { title } : {}),
+      ...(archivedAt !== undefined ? { time: { archived: archivedAt } } : {}),
+      ...(Array.isArray(permission) ? { permission } : {}),
+    }, sdkOptions), options);
   }
 
   deleteSession({ directory, sessionID }, options = {}) {
-    return this.request("DELETE", `/session/${encodeURIComponent(sessionID)}`, { ...options, query: { directory } });
+    return this.#call((sdkOptions) => this.#sdk.session.delete({ directory, sessionID }, sdkOptions), options);
   }
 
   forkSession({ directory, sessionID, messageID }, options = {}) {
-    return this.request("POST", `/session/${encodeURIComponent(sessionID)}/fork`, {
-      ...options,
-      query: { directory },
-      body: messageID ? { messageID } : {},
-    });
+    return this.#call((sdkOptions) => this.#sdk.session.fork({
+      directory,
+      sessionID,
+      ...(messageID ? { messageID } : {}),
+    }, sdkOptions), options);
   }
 
   abortSession({ directory, sessionID }, options = {}) {
-    return this.request("POST", `/session/${encodeURIComponent(sessionID)}/abort`, { ...options, query: { directory } });
+    return this.#call((sdkOptions) => this.#sdk.session.abort({ directory, sessionID }, sdkOptions), options);
   }
 
   promptAsync({ directory, sessionID, model, agent, variant, system, parts }, options = {}) {
-    return this.request("POST", `/session/${encodeURIComponent(sessionID)}/prompt_async`, {
-      ...options,
-      query: { directory },
-      body: {
-        ...(model ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
-        ...(agent ? { agent } : {}),
-        ...(variant ? { variant } : {}),
-        ...(system ? { system } : {}),
-        parts,
-      },
-    });
+    return this.#call((sdkOptions) => this.#sdk.session.promptAsync({
+      directory,
+      sessionID,
+      ...(model ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
+      ...(agent ? { agent } : {}),
+      ...(variant ? { variant } : {}),
+      ...(system ? { system } : {}),
+      parts,
+    }, sdkOptions), options);
   }
 
   command({ directory, sessionID, command, arguments: commandArguments = "", model, agent, variant, parts }, options = {}) {
-    return this.request("POST", `/session/${encodeURIComponent(sessionID)}/command`, {
-      ...options,
-      query: { directory },
-      body: {
-        command,
-        arguments: commandArguments,
-        ...(model ? { model: `${model.providerID}/${model.modelID}` } : {}),
-        ...(agent ? { agent } : {}),
-        ...(variant ? { variant } : {}),
-        ...(Array.isArray(parts) && parts.length > 0 ? { parts } : {}),
-      },
-    });
+    return this.#call((sdkOptions) => this.#sdk.session.command({
+      directory,
+      sessionID,
+      command,
+      arguments: commandArguments,
+      ...(model ? { model: `${model.providerID}/${model.modelID}` } : {}),
+      ...(agent ? { agent } : {}),
+      ...(variant ? { variant } : {}),
+      ...(Array.isArray(parts) && parts.length > 0 ? { parts } : {}),
+    }, sdkOptions), options);
   }
 
   messages({ directory, sessionID, limit = 200, before }, options = {}) {
-    return this.request("GET", `/session/${encodeURIComponent(sessionID)}/message`, {
-      ...options,
-      query: { directory, limit, ...(before ? { before } : {}) },
-    });
+    return this.#call((sdkOptions) => this.#sdk.session.messages({
+      directory,
+      sessionID,
+      limit,
+      ...(before ? { before } : {}),
+    }, sdkOptions), options);
   }
 
   summarize({ directory, sessionID, model }, options = {}) {
-    return this.request("POST", `/session/${encodeURIComponent(sessionID)}/summarize`, {
-      ...options,
-      query: { directory },
-      body: { providerID: model.providerID, modelID: model.modelID, auto: false },
-    });
+    return this.#call((sdkOptions) => this.#sdk.session.summarize({
+      directory,
+      sessionID,
+      providerID: model.providerID,
+      modelID: model.modelID,
+      auto: false,
+    }, sdkOptions), options);
   }
 
   replyPermission({ directory, requestID, reply }, options = {}) {
-    return this.request("POST", `/permission/${encodeURIComponent(requestID)}/reply`, {
-      ...options,
-      query: { directory },
-      body: { reply },
-    });
+    return this.#call((sdkOptions) => this.#sdk.permission.reply({ directory, requestID, reply }, sdkOptions), options);
   }
 
   replyQuestion({ directory, requestID, answers }, options = {}) {
-    return this.request("POST", `/question/${encodeURIComponent(requestID)}/reply`, {
-      ...options,
-      query: { directory },
-      body: { answers },
-    });
+    return this.#call((sdkOptions) => this.#sdk.question.reply({ directory, requestID, answers }, sdkOptions), options);
   }
 
   rejectQuestion({ directory, requestID }, options = {}) {
-    return this.request("POST", `/question/${encodeURIComponent(requestID)}/reject`, {
-      ...options,
-      query: { directory },
-    });
+    return this.#call((sdkOptions) => this.#sdk.question.reject({ directory, requestID }, sdkOptions), options);
   }
 
-  async request(method, pathname, { query, body, signal, timeoutMs = this.#requestTimeoutMs } = {}) {
-    const url = new URL(pathname, this.#baseUrl);
-    for (const [key, value] of Object.entries(query ?? {})) {
-      if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
-    }
+  async #call(operation, { signal, timeoutMs = this.#requestTimeoutMs } = {}) {
     const controller = new AbortController();
     const onAbort = () => controller.abort(signal?.reason);
+    if (signal?.aborted) controller.abort(signal.reason);
     signal?.addEventListener?.("abort", onAbort, { once: true });
-    const timer = setTimeout(() => controller.abort(new Error("OpenCode request timed out.")), timeoutMs);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort(new Error("OpenCode request timed out."));
+    }, timeoutMs);
     timer.unref?.();
     try {
-      const response = await this.#fetch(url, {
-        method,
-        redirect: "error",
-        headers: {
-          authorization: this.#authorization,
-          accept: "application/json",
-          ...(body === undefined ? {} : { "content-type": "application/json" }),
-        },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        signal: controller.signal,
-      });
-      const bytes = await readBoundedResponse(response, MAX_JSON_RESPONSE_BYTES);
-      const text = new TextDecoder().decode(bytes);
-      const value = text.trim() ? safeJson(text) : null;
-      if (!response.ok) {
-        const message = readErrorMessage(value) || `OpenCode request failed with HTTP ${response.status}.`;
-        throw new OpenCodeHttpError(message, response.status);
-      }
-      return value;
+      const result = await operation({ signal: controller.signal, throwOnError: true });
+      return result?.data;
     } catch (error) {
-      if (controller.signal.aborted && !signal?.aborted) throw new Error("OpenCode request timed out.");
+      if (timedOut && !signal?.aborted) throw new Error("OpenCode request timed out.");
+      const status = Number(error?.cause?.status);
+      if (Number.isSafeInteger(status)) {
+        throw new OpenCodeHttpError(error instanceof Error ? error.message : String(error), status);
+      }
       throw error;
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener?.("abort", onAbort);
     }
+  }
+
+  async #fetchSdkRequest(request) {
+    const url = new URL(request.url);
+    if (url.origin !== this.#baseUrl || !isAllowedSdkRequest(request.method, url.pathname)) {
+      throw new Error("OpenCode SDK attempted an operation outside PuppyOne's allowlist.");
+    }
+    const headers = Object.fromEntries(request.headers.entries());
+    headers.authorization = this.#authorization;
+    const body = request.body ? await request.clone().text() : undefined;
+    const response = await this.#fetch(url, {
+      method: request.method,
+      redirect: "error",
+      headers,
+      ...(body === undefined ? {} : { body }),
+      signal: request.signal,
+    });
+    const bytes = await readBoundedResponse(response, MAX_JSON_RESPONSE_BYTES);
+    return new Response(response.status === 204 || response.status === 205 || response.status === 304 ? null : bytes, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
   }
 
   async subscribeGlobalEvents({ signal, onEvent, onOpen }) {
@@ -292,21 +296,32 @@ function isLoopbackHostname(hostname) {
   return normalized === "127.0.0.1" || normalized === "localhost" || normalized === "::1";
 }
 
+function isAllowedSdkRequest(method, pathname) {
+  const operation = `${String(method).toUpperCase()} ${pathname}`;
+  return [
+    /^GET \/global\/health$/,
+    /^GET \/config\/providers$/,
+    /^GET \/agent$/,
+    /^GET \/command$/,
+    /^GET \/session$/,
+    /^POST \/session$/,
+    /^GET \/session\/status$/,
+    /^GET \/permission$/,
+    /^GET \/question$/,
+    /^(?:GET|PATCH|DELETE) \/session\/[A-Za-z0-9:._~-]+$/,
+    /^POST \/session\/[A-Za-z0-9:._~-]+\/(?:fork|abort|prompt_async|command|summarize)$/,
+    /^GET \/session\/[A-Za-z0-9:._~-]+\/message$/,
+    /^POST \/permission\/[A-Za-z0-9:._~-]+\/reply$/,
+    /^POST \/question\/[A-Za-z0-9:._~-]+\/(?:reply|reject)$/,
+  ].some((pattern) => pattern.test(operation));
+}
+
 function safeJson(text) {
   try {
     return JSON.parse(text);
   } catch {
     throw new Error("OpenCode returned malformed JSON.");
   }
-}
-
-function readErrorMessage(value) {
-  if (!value || typeof value !== "object") return "";
-  if (typeof value.message === "string") return value.message;
-  if (typeof value.error === "string") return value.error;
-  if (value.error && typeof value.error === "object" && typeof value.error.message === "string") return value.error.message;
-  if (value.data && typeof value.data === "object" && typeof value.data.message === "string") return value.data.message;
-  return "";
 }
 
 async function readBoundedResponse(response, maximumBytes) {

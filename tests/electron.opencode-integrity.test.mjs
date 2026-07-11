@@ -3,13 +3,20 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { discoverOpenCodeExecutable, verifyBundledOpenCodeRuntime } from "../electron/main/agent/runtimes/opencode/opencode-discovery.mjs";
+import { discoverOpenCodeExecutable, parseOpenCodeVersion, verifyBundledOpenCodeRuntime } from "../electron/main/agent/runtimes/opencode/opencode-discovery.mjs";
 import { OPENCODE_RELEASE_ARTIFACTS, OPENCODE_UPSTREAM } from "../electron/main/agent/runtimes/opencode/opencode-manifest.mjs";
 
 const roots = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => fs.promises.rm(root, { recursive: true, force: true }))));
 
 describe("pinned OpenCode bundle integrity", () => {
+  it("parses only OpenCode's own version line", () => {
+    expect(parseOpenCodeVersion("1.17.18\n")).toBe("1.17.18");
+    expect(parseOpenCodeVersion("opencode version 1.17.18\n")).toBe("1.17.18");
+    expect(parseOpenCodeVersion("dependency 1.3.14\n1.17.18\n")).toBe("1.17.18");
+    expect(parseOpenCodeVersion("dependency 1.3.14 only")).toBeNull();
+  });
+
   it("accepts an exact staged executable and rejects post-stage mutation", async () => {
     const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "puppyone-opencode-integrity-"));
     roots.push(root);
@@ -69,8 +76,40 @@ describe("pinned OpenCode bundle integrity", () => {
     expect(readiness).toMatchObject({ status: "ready", source: "bundled", compatibility: "pinned", executablePath: await fs.promises.realpath(previous) });
   });
 
-  it("does not assume an older external CLI implements the pinned HTTP/SSE contract", async () => {
+  it("does not treat a user-installed CLI as a product dependency", async () => {
     const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "puppyone-opencode-old-external-"));
+    roots.push(root);
+    const executable = path.join(root, process.platform === "win32" ? "opencode.exe" : "opencode");
+    await fs.promises.writeFile(executable, "old external", { mode: 0o755 });
+    let spawnCalls = 0;
+    const spawn = (_file, args) => {
+      spawnCalls += 1;
+      return completedChild(args.includes("/usr/bin/env -0")
+        ? `PATH=${root}\0`
+        : "opencode 1.1.33\n");
+    };
+
+    const readiness = await discoverOpenCodeExecutable({
+      resourcesPath: path.join(root, "missing-resources"),
+      appPath: null,
+      spawn,
+      env: { SHELL: "/bin/zsh", PATH: root },
+      homedir: root,
+    });
+
+    expect(readiness).toMatchObject({
+      status: "not-installed",
+      version: null,
+      minimumVersion: "1.17.18",
+      source: "missing",
+      compatibility: "unavailable",
+    });
+    expect(readiness.message).toMatch(/PuppyOne build.*managed Agent engine/i);
+    expect(spawnCalls).toBe(0);
+  });
+
+  it("keeps external OpenCode behind an explicit development opt-in", async () => {
+    const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "puppyone-opencode-opt-in-"));
     roots.push(root);
     const executable = path.join(root, process.platform === "win32" ? "opencode.exe" : "opencode");
     await fs.promises.writeFile(executable, "old external", { mode: 0o755 });
@@ -84,15 +123,17 @@ describe("pinned OpenCode bundle integrity", () => {
       spawn,
       env: { SHELL: "/bin/zsh", PATH: root },
       homedir: root,
+      allowExternal: true,
     });
 
     expect(readiness).toMatchObject({
       status: "unsupported-version",
       version: "1.1.33",
-      minimumVersion: "1.17.18",
       source: "external",
       compatibility: "unavailable",
     });
+    expect(readiness.message).toMatch(/configured Agent engine is incompatible/i);
+    expect(readiness.message).not.toMatch(/update OpenCode|install OpenCode/i);
   });
 });
 

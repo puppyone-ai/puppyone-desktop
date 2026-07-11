@@ -6,6 +6,7 @@ type AgentComposerProps = {
   draft: string;
   onDraftChange: (draft: string) => void;
   disabled: boolean;
+  inputDisabled?: boolean;
   running: boolean;
   stopping: boolean;
   submitting: boolean;
@@ -38,6 +39,7 @@ export function AgentComposer({
   draft,
   onDraftChange,
   disabled,
+  inputDisabled = false,
   running,
   stopping,
   submitting,
@@ -79,7 +81,12 @@ export function AgentComposer({
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    textarea.style.height = "0px";
+    if (!draft) {
+      textarea.style.height = "48px";
+      textarea.style.overflowY = "hidden";
+      return;
+    }
+    textarea.style.height = "auto";
     const nextHeight = Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT);
     textarea.style.height = `${nextHeight}px`;
     textarea.style.overflowY = textarea.scrollHeight > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
@@ -131,7 +138,7 @@ export function AgentComposer({
         <textarea
           ref={textareaRef}
           value={draft}
-          disabled={disabled}
+          disabled={inputDisabled}
           rows={1}
           aria-label={`Message ${runtimeLabel}`}
           placeholder={placeholder}
