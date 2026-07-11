@@ -20,6 +20,7 @@
 @import "./styles/asset-library-home.css";
 @import "./features/data-workspace/browser.css";
 @import "./features/puppyflow/puppyflow.css";
+@import "./features/plugins/plugins.css";
 @import "./ai-edits/ai-edits.css";
 @import "./features/changes/changes.css";
 @import "./styles/utility-screens.css";

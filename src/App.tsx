@@ -387,12 +387,13 @@ export function App() {
   useEffect(() => {
     if (
       (!cloudEnabled && (activeView === "cloud" || activeView === "access" || activeView === "integrations")) ||
-      (!workspaceIsCloud && (activeView === "access" || activeView === "integrations"))
+      (!workspaceIsCloud && (activeView === "access" || activeView === "integrations")) ||
+      (activeView === "plugins" && (workspaceIsCloud || !experimentalSettings.enableViewerPlugins))
     ) {
       setActiveView("data");
       setActiveCloudSection("overview");
     }
-  }, [activeView, cloudEnabled, workspaceIsCloud]);
+  }, [activeView, cloudEnabled, experimentalSettings.enableViewerPlugins, workspaceIsCloud]);
 
   useEffect(() => {
     const preventFileDropNavigation = (event: DragEvent) => {
@@ -541,6 +542,13 @@ export function App() {
   }, [clearWorkspace, refreshHomeCloudProjects, refreshRecentWorkspaceList, resetDataNodeActions]);
 
   const navigateDesktopView = useCallback((view: DesktopView) => {
+    if (view === "plugins" && (workspaceIsCloud || !experimentalSettings.enableViewerPlugins)) {
+      setActiveView("data");
+      setSidebarCollapsed(false);
+      setSwitcherOpen(false);
+      return;
+    }
+
     if (workspaceIsCloud && (view === "git" || view === "cloud")) {
       setActiveView("data");
       setSidebarCollapsed(false);
@@ -581,7 +589,7 @@ export function App() {
     setActiveView(view);
     setSidebarCollapsed(false);
     setSwitcherOpen(false);
-  }, [cloudEnabled, cloudSessionRestoring, cloudWorkspaceAvailable, workspaceIsCloud]);
+  }, [cloudEnabled, cloudSessionRestoring, cloudWorkspaceAvailable, experimentalSettings.enableViewerPlugins, workspaceIsCloud]);
 
   const handleActiveDataPathChange = useCallback((path: string | null, node: DataNode | null = null) => {
     setActiveDataPath(path);

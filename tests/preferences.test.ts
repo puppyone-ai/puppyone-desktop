@@ -9,6 +9,7 @@ import {
   parseExternalAppsSettings,
   parseExperimentalSettings,
   parsePointerCursors,
+  parseSidebarNavigationVisibilitySettings,
   parseTextSize,
 } from "../src/preferences";
 
@@ -117,6 +118,7 @@ describe("experimental preferences", () => {
       enableAssetLibraryHome: false,
       enablePuppyoneAppFiles: false,
       enablePuppyFlowFiles: false,
+      enableViewerPlugins: false,
     });
     expect(parseExperimentalSettings(JSON.stringify({ enableAgentCompanion: true })).enableAgentChat).toBe(true);
   });
@@ -125,5 +127,21 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(null).enableAssetLibraryHome).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableAssetLibraryHome: false })).enableAssetLibraryHome).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableAssetLibraryHome: true })).enableAssetLibraryHome).toBe(true);
+  });
+
+  it("keeps Viewer Plugins off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableViewerPlugins).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableViewerPlugins: false })).enableViewerPlugins).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableViewerPlugins: true })).enableViewerPlugins).toBe(true);
+  });
+});
+
+describe("sidebar navigation visibility preferences", () => {
+  it("shows optional shortcuts by default and preserves an explicit hidden choice", () => {
+    expect(parseSidebarNavigationVisibilitySettings(null).enabled.plugins).toBe(true);
+    expect(parseSidebarNavigationVisibilitySettings("not-json").enabled.plugins).toBe(true);
+    expect(parseSidebarNavigationVisibilitySettings(JSON.stringify({
+      enabled: { plugins: false },
+    })).enabled.plugins).toBe(false);
   });
 });

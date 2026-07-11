@@ -1,7 +1,7 @@
 import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import type { DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, LightThemePreset, RightSidebarToolsSettings, SidebarNavigationLayout, TextSize, ThemeMode, TitlebarActionsSettings } from "../../preferences";
+import type { DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, LightThemePreset, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings } from "../../preferences";
 
 export type SettingsSection = "account" | "workspace" | "editor" | "git" | "cloud" | "appearance" | "files" | "external-apps" | "experimental";
 
@@ -20,6 +20,7 @@ export type SettingsViewProps = {
   diffMarkers: DiffMarkers;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
+  sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
   filesVisibilitySettings: FilesVisibilitySettings;
   externalAppsSettings: ExternalAppsSettings;
   experimentalSettings: ExperimentalSettings;
@@ -44,6 +45,7 @@ export type SettingsViewProps = {
   onDiffMarkersChange: (markers: DiffMarkers) => void;
   onFileIconThemeChange: (theme: FileIconThemeId) => void;
   onSidebarNavigationLayoutChange: (layout: SidebarNavigationLayout) => void;
+  onSidebarNavigationVisibilitySettingsChange: (settings: SidebarNavigationVisibilitySettings) => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
   onExternalAppsSettingsChange: (settings: ExternalAppsSettings) => void;
   onExperimentalSettingsChange: (settings: ExperimentalSettings) => void;
