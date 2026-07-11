@@ -8,6 +8,7 @@ import {
   sameCloudApiBaseUrl,
 } from "../../shared/cloudEndpoint.js";
 import { invalidateCloudCacheForMutation } from "../features/cloud/cache/cloudCache";
+import { createCloudAutomationApi } from "./cloud/automationApi";
 
 type ApiEnvelope<T> = {
   code?: number;
@@ -781,268 +782,23 @@ export function updateCloudConnector(
   );
 }
 
-// Compatibility boundary only. The Cloud service has not yet migrated its
-// established `/integrations` transport routes. Product and feature code must
-// use Automation terminology and reach those routes only through this adapter.
-const CLOUD_AUTOMATION_LEGACY_WIRE_BASE = "/integrations";
-
-// Connector provider keys are part of the desktop domain model, while the
-// OAuth router has an independently-established slug contract. Keep the
-// translation private to this transport adapter so UI code never guesses it.
-const CLOUD_AUTOMATION_OAUTH_SLUG_BY_PROVIDER: Readonly<Record<string, string>> = Object.freeze({
-  airtable: "airtable",
-  github: "github",
-  gmail: "gmail",
-  google_calendar: "google-calendar",
-  google_docs: "google-docs",
-  google_drive: "google-drive",
-  google_search_console: "google-search-console",
-  google_sheets: "google-sheets",
-  linear: "linear",
-  notion: "notion",
-});
-
-function cloudAutomationWirePath(suffix: string) {
-  return `${CLOUD_AUTOMATION_LEGACY_WIRE_BASE}${suffix}`;
-}
-
-function cloudAutomationOauthPath(provider: string, suffix: "status" | "authorize") {
-  const slug = CLOUD_AUTOMATION_OAUTH_SLUG_BY_PROVIDER[provider.trim().toLowerCase()];
-  if (!slug) throw new Error(`OAuth is not available for Automation provider ${provider}.`);
-  return `/oauth/${slug}/${suffix}`;
-}
-
-export function supportsCloudAutomationOauth(provider: string) {
-  return Boolean(CLOUD_AUTOMATION_OAUTH_SLUG_BY_PROVIDER[provider.trim().toLowerCase()]);
-}
-
-export function getCloudAutomationOauthStatus(
-  session: DesktopCloudSession,
-  provider: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudAutomationOauthStatus> {
-  return cloudApiRequest<DesktopCloudAutomationOauthStatus>(
-    cloudAutomationOauthPath(provider, "status"),
-    session,
-    onSessionChange,
-    {},
-    apiBaseUrl,
-  );
-}
-
-export async function getCloudAutomationOauthAuthorizeUrl(
-  session: DesktopCloudSession,
-  provider: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<string> {
-  const response = await cloudApiRequest<{ authorization_url: string }>(
-    cloudAutomationOauthPath(provider, "authorize"),
-    session,
-    onSessionChange,
-    {},
-    apiBaseUrl,
-  );
-  const authorizationUrl = response.authorization_url?.trim();
-  if (!authorizationUrl) throw new Error("Cloud did not return an authorization URL.");
-  return authorizationUrl;
-}
-
-export async function openCloudAutomationAuthorizationUrl(authorizationUrl: string): Promise<void> {
-  let url: URL;
-  try {
-    url = new URL(authorizationUrl);
-  } catch {
-    throw new Error("Cloud returned an invalid authorization URL.");
-  }
-  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
-    throw new Error("Cloud returned an unsafe authorization URL.");
-  }
-  if (window.puppyoneDesktop?.openExternalUrl) {
-    await window.puppyoneDesktop.openExternalUrl(url.toString());
-    return;
-  }
-  const opened = window.open(url.toString(), "_blank", "noopener,noreferrer");
-  if (!opened) throw new Error("The authorization page could not be opened.");
-}
-
-export function listCloudAutomationProviderResources(
-  session: DesktopCloudSession,
-  provider: string,
-  options: { q?: string; cursor?: string | null; resourceType?: string | null } = {},
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudAutomationProviderResources> {
-  const query = new URLSearchParams();
-  if (options.q?.trim()) query.set("q", options.q.trim());
-  if (options.cursor) query.set("cursor", options.cursor);
-  if (options.resourceType) query.set("resource_type", options.resourceType);
-  const suffix = query.size > 0 ? `?${query.toString()}` : "";
-  return cloudApiRequest<DesktopCloudAutomationProviderResources>(
-    cloudAutomationWirePath(`/providers/${encodeURIComponent(provider)}/resources${suffix}`),
-    session,
-    onSessionChange,
-    {},
-    apiBaseUrl,
-  );
-}
-
-export function listCloudAutomationProviderSpecs(
-  session: DesktopCloudSession,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudAutomationProviderSpec[]> {
-  return cloudApiRequest<DesktopCloudAutomationProviderSpec[]>(
-    cloudAutomationWirePath("/connectors"),
-    session,
-    onSessionChange,
-    {},
-    apiBaseUrl,
-  );
-}
-
-export function createCloudAutomation(
-  session: DesktopCloudSession,
-  body: DesktopCloudCreateAutomationRequest,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudCreateAutomationResult> {
-  return cloudApiRequest<DesktopCloudCreateAutomationResult>(
-    cloudAutomationWirePath("/connections"),
-    session,
-    onSessionChange,
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-    },
-    apiBaseUrl,
-  );
-}
-
-export function updateCloudAutomationConnection(
-  session: DesktopCloudSession,
-  connectionId: string,
-  body: DesktopCloudUpdateAutomationConnectionRequest,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudAutomationConnection> {
-  return cloudApiRequest<DesktopCloudAutomationConnection>(
-    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}`),
-    session,
-    onSessionChange,
-    { method: "PATCH", body: JSON.stringify(body) },
-    apiBaseUrl,
-  );
-}
-
-export function updateCloudAutomationTrigger(
-  session: DesktopCloudSession,
-  connectionId: string,
-  body: DesktopCloudUpdateAutomationTriggerRequest,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<unknown> {
-  return cloudApiRequest<unknown>(
-    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}/trigger`),
-    session,
-    onSessionChange,
-    { method: "PATCH", body: JSON.stringify(body) },
-    apiBaseUrl,
-  );
-}
-
-export function listCloudAutomationConnectionRuns(
-  session: DesktopCloudSession,
-  connectionId: string,
-  limit = 10,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudAutomationRun[]> {
-  const normalizedLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
-  return cloudApiRequest<DesktopCloudAutomationRun[]>(
-    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}/runs?limit=${normalizedLimit}`),
-    session,
-    onSessionChange,
-    {},
-    apiBaseUrl,
-  );
-}
-
-export function getCloudAutomationRun(
-  session: DesktopCloudSession,
-  runId: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudAutomationRun> {
-  return cloudApiRequest<DesktopCloudAutomationRun>(
-    cloudAutomationWirePath(`/runs/${encodeURIComponent(runId)}`),
-    session,
-    onSessionChange,
-    {},
-    apiBaseUrl,
-  );
-}
-
-export function refreshCloudAutomationConnection(
-  session: DesktopCloudSession,
-  connectionId: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<unknown> {
-  return cloudApiRequest<unknown>(
-    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}/refresh`),
-    session,
-    onSessionChange,
-    { method: "POST", body: JSON.stringify({}) },
-    apiBaseUrl,
-  );
-}
-
-export function pauseCloudAutomationConnection(
-  session: DesktopCloudSession,
-  connectionId: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<unknown> {
-  return cloudApiRequest<unknown>(
-    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}/pause`),
-    session,
-    onSessionChange,
-    { method: "POST", body: JSON.stringify({}) },
-    apiBaseUrl,
-  );
-}
-
-export function resumeCloudAutomationConnection(
-  session: DesktopCloudSession,
-  connectionId: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<unknown> {
-  return cloudApiRequest<unknown>(
-    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}/resume`),
-    session,
-    onSessionChange,
-    { method: "POST", body: JSON.stringify({}) },
-    apiBaseUrl,
-  );
-}
-
-export function deleteCloudAutomationConnection(
-  session: DesktopCloudSession,
-  connectionId: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<unknown> {
-  return cloudApiRequest<unknown>(
-    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}`),
-    session,
-    onSessionChange,
-    { method: "DELETE" },
-    apiBaseUrl,
-  );
-}
+export const {
+  supportsCloudAutomationOauth,
+  getCloudAutomationOauthStatus,
+  getCloudAutomationOauthAuthorizeUrl,
+  openCloudAutomationAuthorizationUrl,
+  listCloudAutomationProviderResources,
+  listCloudAutomationProviderSpecs,
+  createCloudAutomation,
+  updateCloudAutomationConnection,
+  updateCloudAutomationTrigger,
+  listCloudAutomationConnectionRuns,
+  getCloudAutomationRun,
+  refreshCloudAutomationConnection,
+  pauseCloudAutomationConnection,
+  resumeCloudAutomationConnection,
+  deleteCloudAutomationConnection,
+} = createCloudAutomationApi(cloudApiRequest);
 
 export function listCloudMcpEndpoints(
   session: DesktopCloudSession,

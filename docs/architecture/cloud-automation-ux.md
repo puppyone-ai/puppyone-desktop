@@ -166,9 +166,9 @@ src/features/automation/
   automationDomain.ts              row building, provider classification
 ```
 
-`src/lib/cloudApi.ts` is the single transport adapter. It owns the legacy
-`/integrations/*` HTTP base (see the domain-boundary doc); feature code never
-sees those strings.
+`src/lib/cloudApi.ts` is the stable public Cloud facade. Its focused
+`src/lib/cloud/automationApi.ts` adapter owns the legacy `/integrations/*`
+HTTP base (see the domain-boundary doc); feature code never sees those strings.
 
 ### 4.2 Server capabilities the desktop builds on
 
@@ -242,7 +242,7 @@ Rules:
 - Automation code does not import Plugin code and vice versa
   (`npm run check:boundaries` enforces this).
 - Product vocabulary is `Automation`; `/integrations` and `/workflows` remain
-  transport-compatibility strings confined to `cloudApi.ts` and
+  transport-compatibility strings confined to `cloud/automationApi.ts` and
   `getCloudAutomationWebPath()`.
 
 ## 5. Verification scenarios

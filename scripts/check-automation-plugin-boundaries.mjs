@@ -53,13 +53,14 @@ if (!/"plugins"/.test(desktopView) || !/"automation"/.test(desktopView)) {
   errors.push("Desktop navigation must expose distinct Plugin and Automation view ids.");
 }
 
-const cloudApi = read("src/lib/cloudApi.ts");
-if (!/CLOUD_AUTOMATION_LEGACY_WIRE_BASE\s*=\s*"\/integrations"/.test(cloudApi)) {
+const cloudAutomationApi = read("src/lib/cloud/automationApi.ts");
+if (!/CLOUD_AUTOMATION_LEGACY_WIRE_BASE\s*=\s*"\/integrations"/.test(cloudAutomationApi)) {
   errors.push("The legacy /integrations server route must stay isolated behind the Automation transport adapter.");
 }
 
 for (const filePath of walkSourceFiles(path.join(repoRoot, "src"))) {
   if (filePath.endsWith(path.join("src", "lib", "cloudApi.ts"))) continue;
+  if (filePath.endsWith(path.join("src", "lib", "cloud", "automationApi.ts"))) continue;
   if (filePath.endsWith(path.join("src", "features", "cloud", "routes", "cloudRoutes.ts"))) continue;
   const source = readFileSync(filePath, "utf8");
   if (/\bIntegrations\b|["']integrations["']|\/integrations(?:\/|["'`])/.test(source)) {

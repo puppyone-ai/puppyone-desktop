@@ -17,8 +17,9 @@ authority, storage, package identity, permissions, lifecycle, or delivery.
 
 `Integration` is retired as a product/domain name. The Cloud service still has
 established `/integrations/*` HTTP routes and a `/workflows` web route. Those
-strings are legacy transport compatibility only; `src/lib/cloudApi.ts` is the
-single desktop adapter allowed to know the old HTTP base, and
+strings are legacy transport compatibility only;
+`src/lib/cloud/automationApi.ts` is the adapter allowed to know the old HTTP
+base, `src/lib/cloudApi.ts` is its stable public facade, and
 `getCloudAutomationWebPath()` owns the web-path compatibility detail. New UI,
 state, types, tests, and documentation use `Automation`.
 
@@ -110,8 +111,8 @@ security review. Reusing current permissions implicitly is forbidden.
 2. The old `integrations` route id is accepted only by
    `normalizeCloudSection()` long enough to migrate existing navigation state.
 3. The existing HTTP and web paths remain compatible until the Cloud service
-   publishes new routes. A server migration changes only the two adapters, not
-   Automation UI or domain types.
+   publishes new routes. A server migration changes only the Automation
+   transport adapter and web-path adapter, not Automation UI or domain types.
 4. Plugin remains local-only even if an online catalog is added later. A
    catalog may distribute signed package bytes; it cannot become Automation or
    share Automation credentials.
