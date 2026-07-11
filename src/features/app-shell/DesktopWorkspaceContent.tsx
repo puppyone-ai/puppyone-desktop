@@ -231,7 +231,7 @@ export function DesktopWorkspaceContent({
     onSessionChange: cloud.onCloudSessionChange,
   });
   const cloudHistoryRows = useMemo(
-    () => buildCloudBranchGraphRows(null, cloudHistoryData.history),
+    () => buildCloudBranchGraphRows({ history: cloudHistoryData.history }),
     [cloudHistoryData.history],
   );
 
@@ -451,9 +451,12 @@ export function DesktopWorkspaceContent({
       rows={cloudHistoryRows}
       selectedCommitId={selectedCloudHistoryCommitId}
       loading={cloudHistoryData.loading}
+      loadingMore={cloudHistoryData.loadingMore}
+      hasMore={cloudHistoryData.hasMore}
       error={cloudHistoryData.error}
       onSelectCommit={setSelectedCloudHistoryCommitId}
       onRefresh={cloudHistoryData.reload}
+      onLoadMore={cloudHistoryData.loadMore}
     />
   );
 
@@ -692,9 +695,12 @@ export function DesktopWorkspaceContent({
                 rows={cloudHistoryRows}
                 selectedCommitId={selectedCloudHistoryCommitId}
                 loading={cloudHistoryData.loading}
+                loadingMore={cloudHistoryData.loadingMore}
+                hasMore={cloudHistoryData.hasMore}
                 error={cloudHistoryData.error}
                 onSelectCommit={setSelectedCloudHistoryCommitId}
                 onRefresh={cloudHistoryData.reload}
+                onLoadMore={cloudHistoryData.loadMore}
               />
             ) : resolvedActiveView === "git" ? (
               <GitSidebar

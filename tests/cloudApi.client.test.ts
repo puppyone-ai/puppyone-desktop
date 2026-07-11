@@ -8,6 +8,7 @@ import {
   cloudApiRequest,
   getCloudAutomationOauthAuthorizeUrl,
   getCloudAutomationOauthStatus,
+  getCloudHistory,
   getCloudProject,
   listCloudAutomationConnectionRuns,
   listCloudAutomationProviderResources,
@@ -123,6 +124,17 @@ describe("cloud API client delegation", () => {
       path: "/integrations/connections/connection%2F1/runs?limit=10",
       method: "GET",
     }));
+  });
+
+  it("getCloudHistory requests the topological contract and forwards its cursor", async () => {
+    bridge.mockResolvedValue({ project_id: "a/b", commits: [] });
+    await getCloudHistory(session, "a/b", 80, undefined, API, "a".repeat(40));
+    expect(bridge).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: `/content/a%2Fb/commits?limit=80&order=topo&cursor=${"a".repeat(40)}`,
+        method: "GET",
+      }),
+    );
   });
 });
 

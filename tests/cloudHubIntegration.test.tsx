@@ -412,6 +412,111 @@ describe("Cloud History route", () => {
     expect(container.textContent).toContain("history backend down");
     expect(container.textContent).not.toContain("No commits yet");
   });
+
+  it("renders the Cloud History route as a synchronized tree and detail pane", async () => {
+    const head = "a".repeat(40);
+    const parent = "b".repeat(40);
+    getCloudHistory.mockResolvedValue({
+      project_id: "proj-1",
+      head_commit_id: head,
+      refs: [{ ref_name: "refs/heads/main", ref_type: "branch", commit_id: head }],
+      commits: [
+        { commit_id: head, parent_ids: [parent], message: "Head commit", who: "Ada", changes: [] },
+        { commit_id: parent, parent_ids: [], message: "Parent commit", who: "Lin", changes: [] },
+      ],
+      has_more: false,
+      next_cursor: null,
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <CloudHistorySection
+          projectId="proj-1"
+          projectName="Demo"
+          cloudSession={session}
+          apiBaseUrl="https://cloud.example"
+          onSessionChange={vi.fn()}
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".desktop-cloud-history-surface")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-history-sidebar")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-project-history-view")).not.toBeNull();
+    expect(container.querySelectorAll('[role="option"]')).toHaveLength(2);
+    expect(container.querySelector("h1")?.textContent).toBe("Head commit");
+
+    const parentRow = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="option"]'))
+      .find((row) => row.textContent?.includes("Parent commit"));
+    await act(async () => parentRow?.click());
+    expect(container.querySelector("h1")?.textContent).toBe("Parent commit");
+  });
+
+  it("appends an older cursor page without replacing the selected graph", async () => {
+    const head = "c".repeat(40);
+    const parent = "d".repeat(40);
+    getCloudHistory
+      .mockResolvedValueOnce({
+        project_id: "proj-1",
+        head_commit_id: head,
+        refs: [{ ref_name: "refs/heads/main", ref_type: "branch", commit_id: head }],
+        commits: [{ commit_id: head, parent_ids: [parent], message: "Head", changes: [] }],
+        has_more: true,
+        next_cursor: head,
+      })
+      .mockResolvedValueOnce({
+        project_id: "proj-1",
+        head_commit_id: head,
+        refs: [{ ref_name: "refs/heads/main", ref_type: "branch", commit_id: head }],
+        commits: [{ commit_id: parent, parent_ids: [], message: "Parent", changes: [] }],
+        has_more: false,
+        next_cursor: null,
+      });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <CloudHistorySection
+          projectId="proj-1"
+          projectName="Demo"
+          cloudSession={session}
+          apiBaseUrl="https://cloud.example"
+          onSessionChange={vi.fn()}
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const selectedBefore = container.querySelector('[role="option"][aria-selected="true"]')?.textContent;
+    const loadMore = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("Load more"));
+
+    await act(async () => {
+      loadMore?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(getCloudHistory).toHaveBeenNthCalledWith(
+      2,
+      session,
+      "proj-1",
+      80,
+      expect.any(Function),
+      "https://cloud.example",
+      head,
+    );
+    expect(container.querySelectorAll('[role="option"]')).toHaveLength(2);
+    expect(container.querySelector('[role="option"][aria-selected="true"]')?.textContent)
+      .toBe(selectedBefore);
+  });
 });
 
 describe("CloudRouter browse context", () => {

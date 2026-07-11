@@ -169,6 +169,7 @@ export type DesktopCloudHistoryChange = {
 
 export type DesktopCloudHistoryCommit = {
   commit_id: string;
+  parent_ids?: string[];
   who?: string;
   message?: string;
   changes?: DesktopCloudHistoryChange[];
@@ -180,10 +181,20 @@ export type DesktopCloudHistoryCommit = {
   audit_detail?: Record<string, unknown> | null;
 };
 
+export type DesktopCloudHistoryRef = {
+  ref_name: string;
+  ref_type: "branch" | "tag";
+  commit_id: string;
+};
+
 export type DesktopCloudHistory = {
   project_id: string;
   commits: DesktopCloudHistoryCommit[];
   head_commit_id?: string | null;
+  refs?: DesktopCloudHistoryRef[];
+  next_cursor?: string | null;
+  has_more?: boolean;
+  total?: number;
 };
 
 export type DesktopCloudScope = {
@@ -697,8 +708,20 @@ export function getCloudHistory(
   limit = 20,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
+  cursor?: string | null,
 ): Promise<DesktopCloudHistory> {
-  return cloudApiRequest<DesktopCloudHistory>(`/content/${projectId}/commits?limit=${limit}`, session, onSessionChange, {}, apiBaseUrl);
+  const params = new URLSearchParams({
+    limit: String(limit),
+    order: "topo",
+  });
+  if (cursor) params.set("cursor", cursor);
+  return cloudApiRequest<DesktopCloudHistory>(
+    `/content/${encodeURIComponent(projectId)}/commits?${params.toString()}`,
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  );
 }
 
 export function listCloudScopes(

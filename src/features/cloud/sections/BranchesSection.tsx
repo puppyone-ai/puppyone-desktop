@@ -59,7 +59,10 @@ export function CloudBranchesSection({
     revisionKey: effectiveStatus?.headCommitId ?? null,
     onSessionChange: onCloudSessionChange,
   });
-  const graphRows = buildCloudBranchGraphRows(effectiveStatus, branchData.history);
+  const graphRows = buildCloudBranchGraphRows({
+    status: effectiveStatus,
+    history: branchData.history,
+  });
   const diagnostics = getCloudBranchGraphDiagnostics(effectiveStatus, graphRows);
   const branches = effectiveStatus?.branches ?? [];
   const branchCount = branches.length || (graphRows.length > 0 ? 1 : 0);

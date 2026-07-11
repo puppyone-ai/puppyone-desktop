@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
-import { CloudProjectHistoryView } from "../CloudProjectHistory";
+import {
+  CloudProjectHistorySidebar,
+  CloudProjectHistoryView,
+} from "../CloudProjectHistory";
 import { useCloudBranchesData } from "../data/useCloudBranchesData";
 import { buildCloudBranchGraphRows } from "../model";
 
@@ -28,7 +31,7 @@ export function CloudHistorySection({
     onSessionChange,
   });
   const rows = useMemo(
-    () => buildCloudBranchGraphRows(null, historyData.history),
+    () => buildCloudBranchGraphRows({ history: historyData.history }),
     [historyData.history],
   );
   const [selectedCommitId, setSelectedCommitId] = useState<string | null>(null);
@@ -43,17 +46,27 @@ export function CloudHistorySection({
     });
   }, [historyData.history?.head_commit_id, rows]);
 
+  const sharedProps = {
+    rows,
+    selectedCommitId,
+    loading: historyData.loading,
+    loadingMore: historyData.loadingMore,
+    hasMore: historyData.hasMore,
+    error: historyData.error,
+    onSelectCommit: setSelectedCommitId,
+    onRefresh: historyData.reload,
+    onLoadMore: historyData.loadMore,
+  };
+
   return (
-    <CloudProjectHistoryView
-      projectId={projectId}
-      projectName={projectName}
-      history={historyData.history}
-      rows={rows}
-      selectedCommitId={selectedCommitId}
-      loading={historyData.loading}
-      error={historyData.error}
-      onSelectCommit={setSelectedCommitId}
-      onRefresh={historyData.reload}
-    />
+    <section className="desktop-cloud-history-surface" aria-label="Cloud project commit history">
+      <CloudProjectHistorySidebar {...sharedProps} />
+      <CloudProjectHistoryView
+        {...sharedProps}
+        projectId={projectId}
+        projectName={projectName}
+        history={historyData.history}
+      />
+    </section>
   );
 }

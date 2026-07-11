@@ -10,6 +10,7 @@ import {
   CloudProjectHistorySidebar,
   CloudProjectHistoryView,
 } from "../src/features/cloud/CloudProjectHistory";
+import { mergeCloudHistoryPages } from "../src/features/cloud/data/useCloudBranchesData";
 import { buildCloudBranchGraphRows } from "../src/features/cloud/model";
 import type { DesktopCloudHistory } from "../src/lib/cloudApi";
 
@@ -53,12 +54,12 @@ describe("Cloud project history", () => {
 
   it("keeps the full Cloud timeline instead of truncating it to the first 20 commits", () => {
     const history = createHistory(27);
-    expect(buildCloudBranchGraphRows(null, history)).toHaveLength(27);
+    expect(buildCloudBranchGraphRows({ history })).toHaveLength(27);
   });
 
   it("selects commits from the graph and shows author, time, SHA, and changed paths", () => {
     const history = createHistory(2);
-    const rows = buildCloudBranchGraphRows(null, history);
+    const rows = buildCloudBranchGraphRows({ history });
     const container = render(<HistoryHarness history={history} />);
 
     expect(container.querySelector('[role="listbox"][aria-label="Commit history"]')).not.toBeNull();
@@ -68,6 +69,8 @@ describe("Cloud project history", () => {
     expect(container.textContent).toContain("Author 1");
     expect(container.textContent).toContain("src/file-1.ts");
     expect(container.textContent).toContain("HEAD");
+    expect(container.querySelector(".desktop-cloud-history-inline-ref")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-history-graph-continuation")).toBeNull();
 
     const olderCommit = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="option"]'))
       .find((button) => button.textContent?.includes("Commit 2"));
@@ -80,18 +83,120 @@ describe("Cloud project history", () => {
     expect(container.textContent).toContain("src/file-2.ts");
     expect(container.querySelector('.desktop-cloud-commit-file-row[data-change-kind="deleted"]')).not.toBeNull();
   });
+
+  it("maps merge parents and named refs into stable multi-lane Cloud rows", () => {
+    const history = createMergeHistory();
+    const rows = buildCloudBranchGraphRows({ history });
+    const commits = rows.filter((row) => row.kind === "commit");
+    const merge = commits.find((row) => row.id === id("d"));
+    const main = commits.find((row) => row.id === id("b"));
+    const feature = commits.find((row) => row.id === id("c"));
+
+    expect(merge?.segments.filter((segment) => segment.from === "middle" && segment.to === "bottom"))
+      .toHaveLength(2);
+    expect(commits.some((row) => row.nodeLane > 0)).toBe(true);
+    expect(feature?.nodeColor).not.toBe(main?.nodeColor);
+    expect(main?.labels).toContainEqual(expect.objectContaining({ name: "v1", kind: "tag" }));
+    expect(rows).toContainEqual(expect.objectContaining({ kind: "ref", authorName: id("e").slice(0, 8) }));
+  });
+
+  it("keeps rendered commit rows stable when an older cursor page is appended", () => {
+    const full = createMergeHistory();
+    const firstPage: DesktopCloudHistory = {
+      ...full,
+      commits: full.commits.slice(0, 3),
+      next_cursor: full.commits[2]?.commit_id,
+      has_more: true,
+    };
+    const nextPage: DesktopCloudHistory = {
+      ...full,
+      commits: full.commits.slice(3),
+      next_cursor: null,
+      has_more: false,
+    };
+    const before = buildCloudBranchGraphRows({ history: firstPage })
+      .filter((row) => row.kind === "commit");
+    const merged = mergeCloudHistoryPages(firstPage, nextPage);
+    const after = buildCloudBranchGraphRows({ history: merged })
+      .filter((row) => row.kind === "commit")
+      .slice(0, before.length);
+
+    expect(after).toEqual(before);
+    expect(merged.commits.map((commit) => commit.commit_id)).toEqual(
+      full.commits.map((commit) => commit.commit_id),
+    );
+    expect(merged.has_more).toBe(false);
+  });
+
+  it("assigns a new path color when a closed lane is reused by another branch", () => {
+    const firstHead = id("1");
+    const firstRoot = id("2");
+    const secondHead = id("3");
+    const secondRoot = id("4");
+    const history: DesktopCloudHistory = {
+      project_id: "project-1",
+      head_commit_id: firstHead,
+      refs: [
+        { ref_name: "refs/heads/main", ref_type: "branch", commit_id: firstHead },
+        { ref_name: "refs/heads/second", ref_type: "branch", commit_id: secondHead },
+      ],
+      commits: [
+        cloudCommit(firstHead, [firstRoot], "First head"),
+        cloudCommit(firstRoot, [], "First root"),
+        cloudCommit(secondHead, [secondRoot], "Second head"),
+        cloudCommit(secondRoot, [], "Second root"),
+      ],
+    };
+    const rows = buildCloudBranchGraphRows({ history });
+    const first = rows.find((row) => row.id === firstHead);
+    const second = rows.find((row) => row.id === secondHead);
+
+    expect(first?.nodeLane).toBe(0);
+    expect(second?.nodeLane).toBe(0);
+    expect(second?.nodeColor).not.toBe(first?.nodeColor);
+  });
+
+  it("offers incremental loading without adding write actions", () => {
+    const history = createHistory(2);
+    const rows = buildCloudBranchGraphRows({ history });
+    const onLoadMore = vi.fn();
+    const container = render(
+      <CloudProjectHistorySidebar
+        rows={rows}
+        selectedCommitId={history.head_commit_id ?? null}
+        loading={false}
+        loadingMore={false}
+        hasMore
+        error={null}
+        onSelectCommit={vi.fn()}
+        onRefresh={vi.fn()}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    const loadMore = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("Load more"));
+    expect(loadMore).toBeDefined();
+    act(() => loadMore?.click());
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("read-only");
+    expect(container.textContent).not.toMatch(/checkout|revert|cherry-pick/i);
+  });
 });
 
 function HistoryHarness({ history }: { history: DesktopCloudHistory }) {
-  const rows = buildCloudBranchGraphRows(null, history);
+  const rows = buildCloudBranchGraphRows({ history });
   const [selectedCommitId, setSelectedCommitId] = useState(history.head_commit_id ?? rows[0]?.id ?? null);
   const sharedProps = {
     rows,
     selectedCommitId,
     loading: false,
+    loadingMore: false,
+    hasMore: false,
     error: null,
     onSelectCommit: setSelectedCommitId,
     onRefresh: vi.fn(),
+    onLoadMore: vi.fn(),
   };
 
   return (
@@ -132,9 +237,50 @@ function createHistory(count: number): DesktopCloudHistory {
       root_hash: `root-${number}`,
     };
   });
+  const commitsWithParents = commits.map((commit, index) => ({
+    ...commit,
+    parent_ids: commits[index + 1] ? [commits[index + 1].commit_id] : [],
+  }));
   return {
     project_id: "project-1",
-    commits,
-    head_commit_id: commits[0]?.commit_id ?? null,
+    commits: commitsWithParents,
+    head_commit_id: commitsWithParents[0]?.commit_id ?? null,
+    refs: commitsWithParents[0]
+      ? [{ ref_name: "refs/heads/main", ref_type: "branch", commit_id: commitsWithParents[0].commit_id }]
+      : [],
   };
+}
+
+function createMergeHistory(): DesktopCloudHistory {
+  return {
+    project_id: "project-1",
+    head_commit_id: id("d"),
+    refs: [
+      { ref_name: "refs/heads/main", ref_type: "branch", commit_id: id("d") },
+      { ref_name: "refs/heads/feature", ref_type: "branch", commit_id: id("c") },
+      { ref_name: "refs/tags/v1", ref_type: "tag", commit_id: id("b") },
+      { ref_name: "refs/heads/archive", ref_type: "branch", commit_id: id("e") },
+    ],
+    commits: [
+      cloudCommit(id("d"), [id("b"), id("c")], "Merge feature"),
+      cloudCommit(id("c"), [id("a")], "Feature work"),
+      cloudCommit(id("b"), [id("a")], "Main work"),
+      cloudCommit(id("a"), [], "Base"),
+    ],
+  };
+}
+
+function cloudCommit(commitId: string, parentIds: string[], message: string) {
+  return {
+    commit_id: commitId,
+    parent_ids: parentIds,
+    who: "Cloud Author",
+    message,
+    created_at: "2026-07-12T10:00:00.000Z",
+    changes: [],
+  };
+}
+
+function id(character: string): string {
+  return character.repeat(40);
 }
