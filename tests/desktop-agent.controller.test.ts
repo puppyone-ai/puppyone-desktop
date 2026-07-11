@@ -9,6 +9,7 @@ describe("AgentSessionController", () => {
     const controller = new AgentSessionController("/workspace", () => bridge as never);
     await controller.initialize();
     expect(controller.getSnapshot().selectedRuntimeId).toBe("opencode");
+    expect(controller.getSnapshot().selectedProviderId).toBe("openai");
 
     eventListener?.(event(2, "turn.started", { prompt: "Fix it" }, "turn-1"));
     eventListener?.(event(3, "assistant.delta", { delta: "Working" }, "turn-1", "message-1"));
@@ -33,6 +34,52 @@ describe("AgentSessionController", () => {
     expect(bridge.closeAgentSession).toHaveBeenCalledWith({ rootPath: "/workspace", sessionId: "session-1", removePersistence: false });
     expect(controller.getSnapshot().session?.id).toBe("session-2");
   });
+
+  it("requires an explicit provider before choosing a model when multiple routes are connected", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.discoverAgentProviders.mockResolvedValueOnce({
+      runtimes: [{ descriptor: { id: "opencode", displayName: "OpenCode", priority: 100 }, readiness: readiness() }],
+      selectedRuntimeId: "opencode",
+      runtime: { id: "opencode", displayName: "OpenCode" },
+      readiness: readiness(),
+      account: { account: { type: "opencode", email: null, planType: null }, requiresOpenaiAuth: false },
+      providers: [
+        { id: "anthropic", displayName: "Anthropic", defaultModel: "anthropic/claude-sonnet", modelCount: 1 },
+        { id: "openai", displayName: "OpenAI", defaultModel: "openai/gpt-5", modelCount: 1 },
+      ],
+      models: [
+        { id: "anthropic/claude-sonnet", model: "anthropic/claude-sonnet", providerId: "anthropic", displayName: "Claude Sonnet", description: "Anthropic · Claude", isDefault: true },
+        { id: "openai/gpt-5", model: "openai/gpt-5", providerId: "openai", displayName: "GPT-5", description: "OpenAI · GPT-5", isDefault: true },
+      ],
+      modes: [],
+      commands: [],
+      capabilities: capabilities(),
+      warnings: [],
+    });
+    bridge.resumeAgentSession.mockResolvedValueOnce(null);
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+
+    await controller.initialize();
+
+    expect(controller.getSnapshot()).toMatchObject({ selectedProviderId: null, selectedModel: null });
+    expect(controller.selectProvider("openai")).toBe("openai/gpt-5");
+    expect(controller.getSnapshot()).toMatchObject({ selectedProviderId: "openai", selectedModel: "openai/gpt-5" });
+  });
+
+  it("quarantines a provider after an authoritative credential rejection", async () => {
+    let eventListener: ((event: AgentEvent) => void) | null = null;
+    const bridge = bridgeFixture((listener) => { eventListener = listener; });
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+
+    eventListener?.(event(2, "turn.started", { prompt: "Hello" }, "turn-auth"));
+    eventListener?.(event(3, "provider.error", { message: "API key not valid. Please pass a valid API key." }, "turn-auth", "assistant-auth"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(controller.getSnapshot()).toMatchObject({ selectedProviderId: null, selectedModel: null });
+    expect(controller.getSnapshot().inspection?.readiness).toMatchObject({ status: "installed-not-authenticated" });
+    expect(controller.getSnapshot().projection.activities.filter((activity) => activity.kind === "error")).toHaveLength(1);
+  });
 });
 
 function bridgeFixture(onEvent: (listener: (event: AgentEvent) => void) => void) {
@@ -43,7 +90,8 @@ function bridgeFixture(onEvent: (listener: (event: AgentEvent) => void) => void)
       runtime: { id: "opencode", displayName: "OpenCode" },
       readiness: readiness(),
       account: { account: { type: "opencode", email: null, planType: null }, requiresOpenaiAuth: false },
-      models: [{ id: "openai/gpt-5", model: "openai/gpt-5", displayName: "GPT-5", description: "", isDefault: true }],
+      providers: [{ id: "openai", displayName: "OpenAI", defaultModel: "openai/gpt-5", modelCount: 1 }],
+      models: [{ id: "openai/gpt-5", model: "openai/gpt-5", providerId: "openai", displayName: "GPT-5", description: "OpenAI · GPT-5", isDefault: true }],
       modes: [{ id: "build", displayName: "Build", description: "", isDefault: true }],
       commands: [],
       capabilities: capabilities(),
@@ -78,7 +126,8 @@ function snapshot(sessionId: string, events: AgentEvent[]): AgentSessionSnapshot
       lastSequence: events.at(-1)?.sequence ?? 0,
     },
     account: { account: { type: "opencode", email: null, planType: null }, requiresOpenaiAuth: false },
-    models: [{ id: "openai/gpt-5", model: "openai/gpt-5", displayName: "GPT-5", description: "", isDefault: true }],
+    providers: [{ id: "openai", displayName: "OpenAI", defaultModel: "openai/gpt-5", modelCount: 1 }],
+    models: [{ id: "openai/gpt-5", model: "openai/gpt-5", providerId: "openai", displayName: "GPT-5", description: "OpenAI · GPT-5", isDefault: true }],
     modes: [{ id: "build", displayName: "Build", description: "", isDefault: true }],
     commands: [],
     capabilities: capabilities(),

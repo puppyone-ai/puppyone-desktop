@@ -70,6 +70,7 @@ export class AgentEventSynchronizer {
       cursor = event.sequence;
     }
     const projection = applyAgentEvents(state.projection, applicable);
+    const providerFailure = rejectedProviderPatch(state, projection, applicable);
     this.bufferedEvents.push(...deferred);
     for (const event of deferred) this.bufferedSequences.add(event.sequence);
     this.patch({
@@ -79,6 +80,7 @@ export class AgentEventSynchronizer {
       session: state.session
         ? applicable.reduce(updateSessionFromProjectionEvent, state.session)
         : null,
+      ...providerFailure,
     });
     if (!projection.runningTurnId) this.onTurnReady();
     if (deferred.length > 0) void this.replayFrom(projection.lastSequence);
@@ -209,6 +211,41 @@ function isUrgentEvent(event: AgentEvent) {
 function humanizeRuntimeId(value: string | null | undefined) {
   if (!value) return "";
   return value.replace(/[-_]+/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function rejectedProviderPatch(state: AgentControllerState, projection: AgentControllerState["projection"], events: AgentEvent[]) {
+  if (!events.some((event) => event.type === "provider.error") || !state.selectedProviderId || !state.inspection) return {};
+  const message = [...projection.activities].reverse().find((activity) => activity.kind === "error")?.label ?? "";
+  if (!/(?:api\s*key|credential|authentication|unauthori[sz]ed|forbidden|status\s*401|http\s*401).*(?:invalid|reject|fail|expired|missing)|(?:invalid|reject|fail|expired|missing).*(?:api\s*key|credential|authentication)|api\s*key\s*not\s*valid/i.test(message)) return {};
+  const providerId = state.selectedProviderId;
+  const providers = (state.inspection.providers ?? []).filter((provider) => provider.id !== providerId);
+  const models = state.inspection.models.filter((model) => (model.providerId || modelProviderId(model.model)) !== providerId);
+  const providerName = state.inspection.providers?.find((provider) => provider.id === providerId)?.displayName || providerId;
+  const hasAlternative = providers.length > 0 && models.length > 0;
+  return {
+    selectedProviderId: null,
+    selectedModel: null,
+    inspection: {
+      ...state.inspection,
+      providers,
+      models,
+      readiness: hasAlternative
+        ? state.inspection.readiness
+        : {
+          ...state.inspection.readiness,
+          status: "installed-not-authenticated" as const,
+          message: `${providerName} rejected its credentials. Update or reconnect that provider, then refresh Agent providers.`,
+        },
+    },
+    error: hasAlternative
+      ? `${providerName} rejected its credentials. Choose another connected provider, or update it and refresh.`
+      : null,
+  } satisfies Partial<AgentControllerState>;
+}
+
+function modelProviderId(model: string) {
+  const slash = model.indexOf("/");
+  return slash > 0 ? model.slice(0, slash) : null;
 }
 
 export const agentEventSynchronizationLimits = Object.freeze({

@@ -32,8 +32,8 @@ export class OpenCodeHttpClient {
     return this.#call((sdkOptions) => this.#sdk.global.health(sdkOptions), options);
   }
 
-  providers(directory, options = {}) {
-    return this.#call((sdkOptions) => this.#sdk.config.providers({ directory }, sdkOptions), options);
+  providerCatalog(directory, options = {}) {
+    return this.#call((sdkOptions) => this.#sdk.provider.list({ directory }, sdkOptions), options);
   }
 
   agents(directory, options = {}) {
@@ -300,7 +300,7 @@ function isAllowedSdkRequest(method, pathname) {
   const operation = `${String(method).toUpperCase()} ${pathname}`;
   return [
     /^GET \/global\/health$/,
-    /^GET \/config\/providers$/,
+    /^GET \/provider$/,
     /^GET \/agent$/,
     /^GET \/command$/,
     /^GET \/session$/,

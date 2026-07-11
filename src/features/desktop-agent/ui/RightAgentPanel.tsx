@@ -8,6 +8,7 @@ import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
 import { AgentQuestionDock } from "./AgentQuestionDock";
 import { getAgentSessionController } from "../application/controllerRegistry";
+import { listAgentInferenceProviders, listAgentModelsForProvider } from "../domain/agent-provider-routing";
 import type { AgentSessionMetadata } from "../domain/agent-contract";
 import "./desktop-agent.css";
 
@@ -58,6 +59,22 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   const loading = state.phase === "discovering" || state.phase === "restoring" || state.phase === "creating";
   const failed = state.phase === "failed" || state.phase === "runtime-exited";
   const viewport = controller.readViewport();
+  const providers = listAgentInferenceProviders(inspection);
+  const providerModels = listAgentModelsForProvider(inspection, state.selectedProviderId);
+  const routingReady = Boolean(
+    state.selectedProviderId
+    && state.selectedModel
+    && providerModels.some((model) => model.model === state.selectedModel),
+  );
+  const composerPlaceholder = unavailable || failed
+    ? "Draft while PuppyOne prepares the Agent"
+    : !state.selectedProviderId
+      ? "Choose a provider to start"
+      : !state.selectedModel
+        ? "Choose a model to start"
+        : state.projection.rows.length > 0 || state.projection.messages.length > 0
+          ? "Send follow-up"
+          : "Ask anything";
 
   return (
     <section className="desktop-agent-panel" aria-label={`${runtimeLabel} Chat`} data-phase={state.phase}>
@@ -66,7 +83,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         runtimeLabel={runtimeLabel}
         statusLabel={state.session ? sessionStatusLabel(state.session.terminalState) : readinessLabel(readiness?.status)}
         loading={loading}
-        newSessionDisabled={unavailable || Boolean(state.projection.runningTurnId)}
+        newSessionDisabled={unavailable || !routingReady || Boolean(state.projection.runningTurnId)}
         onNewSession={() => void controller.newSession()}
         diagnostic={readiness?.diagnostic || (inspection?.warnings.length ? inspection.warnings.join(" ") : null)}
         closeDisabled={!state.session || Boolean(state.projection.runningTurnId)}
@@ -138,17 +155,19 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
       <AgentComposer
         draft={state.draft}
         onDraftChange={(draft) => controller.setDraft(draft)}
-        disabled={loading || unavailable || failed || state.projection.approvals.length > 0 || state.projection.questions.length > 0}
+        disabled={loading || unavailable || failed || !routingReady || state.projection.approvals.length > 0 || state.projection.questions.length > 0}
         running={Boolean(state.projection.runningTurnId)}
         stopping={state.stopping}
         submitting={state.submitting}
-        placeholder={unavailable || failed
-          ? "Draft while PuppyOne prepares the Agent"
-          : state.projection.rows.length > 0 || state.projection.messages.length > 0
-            ? "Send follow-up"
-            : "Ask anything"}
+        placeholder={composerPlaceholder}
         runtimeLabel={runtimeLabel}
-        models={capabilities?.modelSelection ? inspection?.models ?? [] : []}
+        providers={capabilities?.modelSelection ? providers : []}
+        selectedProviderId={state.selectedProviderId}
+        onSelectProvider={(providerId) => {
+          const model = controller.selectProvider(providerId);
+          if (model) onPreferredModelChange?.(model);
+        }}
+        models={capabilities?.modelSelection ? providerModels : []}
         selectedModel={state.selectedModel}
         onSelectModel={(model) => { controller.selectModel(model); onPreferredModelChange?.(model); }}
         modes={capabilities?.modeSelection ? inspection?.modes ?? [] : []}

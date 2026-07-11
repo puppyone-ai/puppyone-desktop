@@ -31,6 +31,7 @@ export function createAgentRuntimeCatalog({ runtimeRegistry }) {
         selectedRuntimeId: null,
         readiness: unavailableReadiness("No Agent runtime is registered."),
         account: null,
+        providers: [],
         models: [],
         modes: [],
         commands: [],
@@ -45,6 +46,7 @@ export function createAgentRuntimeCatalog({ runtimeRegistry }) {
         selectedRuntimeId: selected.descriptor.id,
         readiness: publicReadiness,
         account: null,
+        providers: [],
         models: [],
         modes: [],
         commands: [],
@@ -73,6 +75,7 @@ export function createAgentRuntimeCatalog({ runtimeRegistry }) {
         selectedRuntimeId: selected.descriptor.id,
         readiness: { ...publicReadiness, status: "error", message },
         account: null,
+        providers: [],
         models: [],
         modes: [],
         commands: [],
@@ -98,6 +101,7 @@ export function createAgentRuntimeCatalog({ runtimeRegistry }) {
       const inspection = assertAgentRuntimeInspection(adapter, await adapter.inspect(), runtimeId);
       const value = {
         account: inspection.account ?? null,
+        providers: Array.isArray(inspection.providers) ? inspection.providers : [],
         models: Array.isArray(inspection.models) ? inspection.models : [],
         modes: Array.isArray(inspection.modes) ? inspection.modes : [],
         commands: Array.isArray(inspection.commands) ? inspection.commands : [],

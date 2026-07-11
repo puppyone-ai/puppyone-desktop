@@ -45,6 +45,19 @@ describe("Electron AgentService ownership and lifecycle", () => {
     expect(harness.service.getSessionCount()).toBe(0);
   });
 
+  it("rejects a model that is not in the inspected connected-provider catalog", async () => {
+    const harness = createServiceHarness();
+    const owner = createSender(32);
+    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+
+    await expect(harness.service.startTurn(owner, {
+      sessionId: snapshot.session.id,
+      prompt: "Use an injected model",
+      model: "unconnected/hidden-model",
+    })).rejects.toThrow(/no longer available from a connected provider/i);
+    expect(harness.adapters[0].startTurn).not.toHaveBeenCalled();
+  });
+
   it("does not resurrect a turn that completed before turn/start returned", async () => {
     const harness = createServiceHarness();
     const owner = createSender(31);

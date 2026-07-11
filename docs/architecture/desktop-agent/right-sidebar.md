@@ -22,8 +22,8 @@ every new Chat session uses OpenCode and provider/model choice stays inside it.
   Chat and Terminal panels, preserves Terminal's lazy PTY lifecycle,
   retains the selected surface, and keeps a running Agent turn alive while
   Chat is hidden.
-- **Implemented foundation:** OpenCode Harness, readiness/account/model/mode
-  states, virtual transcript streaming, safe
+- **Implemented foundation:** OpenCode Harness, connected-provider discovery,
+  provider-first model routing, readiness/account/model/mode states, virtual transcript streaming, safe
   Markdown, part/tool registries, plan/tool/command/file activity, permission
   and structured-question docks, `/` commands, authorized `@` context and
   attachments, Stop, partial-history warning, and Jump to latest.
@@ -32,8 +32,8 @@ every new Chat session uses OpenCode and provider/model choice stays inside it.
   controls are omitted.
 - **Migration required:** remove the legacy runtime selector and direct Codex
   new-session route. A sidebar Chat submission must always reach OpenCode.
-- **Product gate:** provider options appear only when OpenCode advertises them
-  and PuppyOne permits their authentication mode.
+- **Product gate:** provider options appear only when OpenCode reports them as
+  connected and at least one text-and-tools Agent model survives capability filtering.
 
 ## Product decision
 
@@ -75,7 +75,7 @@ The Chat surface has four primary regions in document order:
 1. **Transcript** — user messages, assistant output, and activity items.
 2. **Blocking dock** — an approval or structured question when one is pending.
 3. **Changes handoff** — aggregate additions/deletions linking to the existing Git surface.
-4. **Composer** — prompt, model, the `+` tools/mode menu,
+4. **Composer** — prompt, Provider → Model routing, the `+` tools/mode menu,
    submit, and stop/queue state.
 
 Session history/new/overflow actions remain real controls but live in an
@@ -122,14 +122,51 @@ become visible on keyboard focus, and expose meaningful accessible names.
 ## Provider, model and agent controls
 
 OpenCode is fixed and is not a composer control. The single-row composer shows
-the model choice advertised by the OpenCode catalog; lower-frequency actions
-live in the `+` menu:
+Provider first and Model second; lower-frequency actions live in the `+` menu:
 
 - provider selector;
 - model selector when model discovery is available;
 - model-scoped variant/effort selector when advertised;
 - mode choices for supported modes such as Agent, Plan, or Ask, inside the `+` menu;
 - compact account/readiness status when action is required.
+
+Provider discovery follows OpenCode's own Desktop implementation boundary:
+
+```text
+OpenCode /provider
+|
++-- all                         catalog metadata only; never sufficient for Send
++-- connected                   credential/config/environment route detected by OpenCode
++-- default[provider]           default model inside that Provider
+      |
+      +-- PuppyOne capability filter
+            input.text = true
+            output.text = true
+            toolcall = true
+            status != deprecated
+```
+
+`/config/providers` is not an authentication signal and is not used for the
+composer. A non-empty configuration catalog must never enable Send. With one
+usable connected Provider PuppyOne may select it; with multiple Providers and
+no valid saved choice, PuppyOne waits for an explicit user selection. The Model
+control is then populated only from that Provider.
+
+Executable discovery and inference availability are deliberately different:
+
+| Local observation | Product meaning |
+| --- | --- |
+| Codex CLI installed | Not sufficient. OpenAI/ChatGPT appears only through an OpenCode-supported connected provider route. |
+| Claude Code installed | Not sufficient. Anthropic appears only through an authorized OpenCode provider route. |
+| Cursor CLI installed | Not a reusable inference entitlement and therefore not offered as a Provider without a documented authorized bridge. |
+| OpenCode reports Provider in `connected` | Eligible for capability filtering and explicit selection. |
+
+This prevents PuppyOne from claiming access merely because an executable or
+stale credential file exists. API-key validity can still change remotely and
+cannot be proven by local discovery alone. When a turn receives an
+authoritative authentication rejection, PuppyOne collapses duplicate terminal
+events, quarantines that Provider for the current inspection, clears its Model,
+and requires credential repair plus Refresh before it can be selected again.
 
 Changing provider never changes the harness. It selects another inference route
 inside OpenCode and preserves one permission, tool and session authority. If a
@@ -264,7 +301,7 @@ The composer supports:
 - multiline text;
 - submit with the product's established keyboard convention;
 - a single `+` menu for optional authorized attachments, workspace context and Agent mode;
-- the current model as the only persistent selection control;
+- the current connected Provider followed by a Model scoped to that Provider;
 - a provider-aware placeholder;
 - Stop while a turn is running;
 - queue or steer only when the provider capability advertises it;
@@ -406,7 +443,10 @@ The implemented sidebar contract remains satisfied when:
   their active state;
 - a hidden running agent continues safely and reports completion on return;
 - every new Chat session uses OpenCode and no runtime selector is rendered;
-- provider/model selection is catalog-driven and never replaces the harness;
+- provider/model selection is driven by OpenCode `connected`, is ordered
+  Provider → Model, and never replaces the harness;
+- image-only, audio-only, Embedding, deprecated, and non-tool Agent models are
+  absent from the Chat Model control;
 - streamed text, tools, plans, diffs, approvals, and questions preserve event
   order;
 - full diffs and files open in their existing owning surfaces;

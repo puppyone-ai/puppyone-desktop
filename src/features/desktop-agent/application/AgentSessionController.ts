@@ -1,4 +1,10 @@
 import { applyAgentEvents, createAgentProjection } from "../domain/agent-projection";
+import {
+  agentProviderIdForModel,
+  chooseAgentModel,
+  chooseAgentProvider,
+  listAgentInferenceProviders,
+} from "../domain/agent-provider-routing";
 import type {
   AgentApprovalDecision,
   AgentFileReference,
@@ -43,6 +49,7 @@ export class AgentSessionController {
       history: [],
       projection: createAgentProjection(),
       selectedRuntimeId: null,
+      selectedProviderId: null,
       selectedModel: null,
       selectedMode: null,
       draft: "",
@@ -103,9 +110,10 @@ export class AgentSessionController {
         || inspection.readiness.runtimeId
         || inspection.readiness.provider
         || null;
-      const selectedModel = chooseModel(inspection, this.state.selectedModel);
+      const selectedProviderId = chooseAgentProvider(inspection, this.state.selectedProviderId, this.state.selectedModel);
+      const selectedModel = chooseAgentModel(inspection, this.state.selectedModel, selectedProviderId);
       const selectedMode = chooseMode(inspection, this.state.selectedMode);
-      this.patch({ inspection, selectedRuntimeId: runtimeId, selectedModel, selectedMode, initialized: true });
+      this.patch({ inspection, selectedRuntimeId: runtimeId, selectedProviderId, selectedModel, selectedMode, initialized: true });
       if (inspection.readiness.status !== "ready") {
         this.patch({ phase: "ready" });
         await this.refreshHistory();
@@ -121,8 +129,26 @@ export class AgentSessionController {
     }
   }
 
+  selectProvider(providerId: string | null) {
+    if (this.state.projection.runningTurnId) return this.state.selectedModel;
+    const selectedProviderId = providerId && listAgentInferenceProviders(this.state.inspection).some((provider) => provider.id === providerId)
+      ? providerId
+      : null;
+    const selectedModel = chooseAgentModel(this.state.inspection, null, selectedProviderId);
+    this.patch({ selectedProviderId, selectedModel, error: null });
+    return selectedModel;
+  }
+
   selectModel(model: string | null) {
-    this.patch({ selectedModel: model || null });
+    if (this.state.projection.runningTurnId) return;
+    const selectedModel = model && this.state.inspection?.models.some((candidate) => candidate.model === model)
+      ? model
+      : null;
+    this.patch({
+      selectedProviderId: selectedModel ? agentProviderIdForModel(selectedModel) : this.state.selectedProviderId,
+      selectedModel,
+      error: null,
+    });
   }
 
   selectMode(mode: string | null) {
@@ -207,6 +233,10 @@ export class AgentSessionController {
     const bridge = this.requireBridge("startAgentTurn");
     const text = prompt.trim();
     if (!text || this.state.submitting) return false;
+    if (!this.state.selectedProviderId || !this.state.selectedModel) {
+      this.patch({ error: "Choose a connected model provider and model before sending a message." });
+      return false;
+    }
     const activeTurnId = this.state.projection.runningTurnId;
     if (activeTurnId && this.state.session && this.state.inspection?.capabilities?.steer && bridge.steerAgentTurn) {
       await bridge.steerAgentTurn({ rootPath: this.workspaceRoot, sessionId: this.state.session.id, turnId: activeTurnId, message: text });
@@ -392,16 +422,22 @@ export class AgentSessionController {
       ...this.state.inspection,
       runtime: snapshot.runtime ?? snapshot.session.runtime ?? this.state.inspection.runtime,
       account: snapshot.account,
+      providers: snapshot.providers ?? this.state.inspection.providers ?? [],
       models: snapshot.models,
       modes: snapshot.modes ?? this.state.inspection.modes ?? [],
       commands: snapshot.commands ?? this.state.inspection.commands ?? [],
       capabilities: snapshot.capabilities,
     } : null;
+    const selectedModel = snapshot.session.selectedModel
+      || this.state.selectedModel
+      || chooseAgentModel(inspection, null, this.state.selectedProviderId);
+    const selectedProviderId = chooseAgentProvider(inspection, this.state.selectedProviderId, selectedModel);
     this.patch({
       session: snapshot.session,
       inspection,
       selectedRuntimeId: snapshot.session.runtimeId || snapshot.session.provider || this.state.selectedRuntimeId,
-      selectedModel: snapshot.session.selectedModel || this.state.selectedModel || chooseModel(inspection, null),
+      selectedProviderId,
+      selectedModel: chooseAgentModel(inspection, selectedModel, selectedProviderId),
       selectedMode: snapshot.session.selectedMode || this.state.selectedMode || chooseMode(inspection, null),
       projection: applyAgentEvents(createAgentProjection({ partialHistory: snapshot.partial }), snapshot.events, { partialHistory: snapshot.partial }),
       stopping: false,
@@ -462,12 +498,6 @@ export class AgentSessionController {
     const ui = this.readSessionUi(this.uiKey());
     this.patch({ draft: ui.draft });
   }
-}
-
-function chooseModel(inspection: AgentProviderInspection | null, current: string | null) {
-  if (!inspection) return current;
-  if (current && inspection.models.some((model) => model.model === current)) return current;
-  return inspection.models.find((model) => model.isDefault)?.model || inspection.models[0]?.model || null;
 }
 
 function chooseMode(inspection: AgentProviderInspection | null, current: string | null) {

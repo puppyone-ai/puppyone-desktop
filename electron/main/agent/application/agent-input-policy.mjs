@@ -5,9 +5,11 @@ export function readinessWithAccountState(readiness, accountState, runtimeName =
     return {
       ...readiness,
       status: "installed-not-authenticated",
-      message: readiness.message && readiness.message !== `${runtimeName} is ready.`
-        ? readiness.message
-        : "No model provider is connected to PuppyOne Agent. Connect a provider in PuppyOne, then retry.",
+      message: accountState?.error || (
+        readiness.message && readiness.message !== `${runtimeName} is ready.`
+          ? readiness.message
+          : "No model provider is connected to PuppyOne Agent. Connect a provider in PuppyOne, then retry."
+      ),
     };
   }
   return readiness;

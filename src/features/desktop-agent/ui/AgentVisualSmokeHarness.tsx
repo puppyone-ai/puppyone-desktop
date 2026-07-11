@@ -7,9 +7,11 @@ import { createAgentProjection } from "../domain/agent-projection";
 import "./desktop-agent.css";
 
 const models = [
-  { id: "cursor/fable-5-extra-high", model: "cursor/fable-5-extra-high", displayName: "Fable 5 Extra High", description: "Reference-width coding model", isDefault: true, providerId: "cursor" },
-  { id: "openai/gpt-5.5", model: "openai/gpt-5.5", displayName: "GPT-5.5", description: "OpenAI coding model", isDefault: false, providerId: "openai" },
+  { id: "openai/gpt-5.4", model: "openai/gpt-5.4", displayName: "GPT-5.4", description: "OpenAI · coding model", isDefault: true, providerId: "openai" },
+  { id: "openai/gpt-5.4-mini", model: "openai/gpt-5.4-mini", displayName: "GPT-5.4 Mini", description: "OpenAI · fast coding model", isDefault: false, providerId: "openai" },
 ];
+
+const providers = [{ id: "openai", displayName: "OpenAI", source: "api", defaultModel: "openai/gpt-5.4", modelCount: 2 }];
 
 const modes = [
   { id: "build", displayName: "Agent", description: "Plan and make changes", isDefault: true },
@@ -18,6 +20,7 @@ const modes = [
 
 export function AgentVisualSmokeHarness() {
   const [draft, setDraft] = useState("");
+  const [provider, setProvider] = useState(providers[0].id);
   const [model, setModel] = useState(models[0].model);
   const [mode, setMode] = useState(modes[0].id);
   const projection = useMemo(() => {
@@ -128,6 +131,9 @@ export function AgentVisualSmokeHarness() {
           submitting={false}
           placeholder="Send follow-up"
           runtimeLabel="OpenCode"
+          providers={providers}
+          selectedProviderId={provider}
+          onSelectProvider={setProvider}
           models={models}
           selectedModel={model}
           onSelectModel={setModel}

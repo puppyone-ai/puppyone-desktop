@@ -46,6 +46,13 @@ describe("shared Agent contract", () => {
     })).toThrow(/workspaceRoot/i);
     expect(() => assertAgentEventEnvelope(event("approval.requested", {}))).toThrow(/requestId/i);
     expect(assertAgentEventEnvelope(event("assistant.delta", { delta: "safe" }))).toBeTruthy();
+    expect(() => assertAgentIpcResponse("agent:providers-discover", {
+      readiness: { runtimeId: "opencode", status: "ready" },
+      providers: [{ id: "openai", displayName: "OpenAI", modelCount: -1 }],
+      models: [],
+      capabilities: {},
+      warnings: [],
+    })).toThrow(/modelCount/i);
   });
 
   it("requires methods for capabilities a runtime advertises", () => {

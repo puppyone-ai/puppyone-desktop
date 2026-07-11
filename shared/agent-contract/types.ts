@@ -87,6 +87,14 @@ export type AgentModel = {
   contextWindow?: number | null;
 };
 
+export type AgentInferenceProvider = {
+  id: string;
+  displayName: string;
+  source?: "env" | "config" | "custom" | "api" | string | null;
+  defaultModel?: string | null;
+  modelCount: number;
+};
+
 export type AgentMode = {
   id: string;
   displayName: string;
@@ -218,6 +226,7 @@ export type AgentProviderInspection = {
   runtime?: AgentRuntimeDescriptor;
   readiness: AgentProviderReadiness;
   account: AgentAccountState | null;
+  providers?: AgentInferenceProvider[];
   models: AgentModel[];
   modes?: AgentMode[];
   commands?: AgentCommand[];
@@ -229,6 +238,7 @@ export type AgentSessionSnapshot = {
   session: AgentSessionMetadata;
   runtime?: AgentRuntimeDescriptor;
   account: AgentAccountState | null;
+  providers?: AgentInferenceProvider[];
   models: AgentModel[];
   modes?: AgentMode[];
   commands?: AgentCommand[];

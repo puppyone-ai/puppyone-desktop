@@ -41,6 +41,7 @@ export function createAgentSessionRecord({
     events: restoredEvents,
     replayBytes: restoredEvents.reduce((total, event) => total + countTextBytes(event), 0),
     account: null,
+    providers: [],
     models: [],
     modes: [],
     commands: [],
@@ -103,13 +104,24 @@ export function applyProviderSession(session, providerSession) {
 
 export function applyInspection(session, inspection) {
   session.account = inspection.account ?? null;
+  session.providers = Array.isArray(inspection.providers) ? inspection.providers : [];
   session.models = Array.isArray(inspection.models) ? inspection.models : [];
   session.modes = Array.isArray(inspection.modes) ? inspection.modes : [];
   session.commands = Array.isArray(inspection.commands) ? inspection.commands : [];
   session.capabilities = normalizeCapabilitySnapshot(inspection.capabilities);
   if (inspection.runtime) session.runtime = { ...session.runtime, ...inspection.runtime };
+  if (session.selectedModel && !session.models.some((model) => model.model === session.selectedModel)) {
+    session.selectedModel = null;
+  }
   if (!session.selectedModel) {
-    session.selectedModel = session.models.find((model) => model.isDefault)?.model ?? session.models[0]?.model ?? null;
+    const providerIds = new Set(session.models.map(modelProviderId).filter(Boolean));
+    if (providerIds.size <= 1) {
+      const [providerId] = providerIds;
+      const providerModels = providerId
+        ? session.models.filter((model) => modelProviderId(model) === providerId)
+        : session.models;
+      session.selectedModel = providerModels.find((model) => model.isDefault)?.model ?? providerModels[0]?.model ?? null;
+    }
   }
   if (!session.selectedMode) {
     session.selectedMode = session.modes.find((mode) => mode.isDefault)?.id ?? session.modes[0]?.id ?? null;
@@ -163,6 +175,7 @@ export function sessionSnapshot(session) {
   return {
     session: sessionMetadata(session),
     account: session.account,
+    providers: session.providers,
     models: session.models,
     modes: session.modes,
     commands: session.commands,
@@ -173,6 +186,13 @@ export function sessionSnapshot(session) {
     firstAvailableSequence: session.events[0]?.sequence ?? session.sequence + 1,
     lastSequence: session.sequence,
   };
+}
+
+function modelProviderId(model) {
+  if (typeof model?.providerId === "string" && model.providerId) return model.providerId;
+  if (typeof model?.model !== "string") return null;
+  const slash = model.model.indexOf("/");
+  return slash > 0 ? model.model.slice(0, slash) : null;
 }
 
 function normalizeSequence(value) {

@@ -789,6 +789,8 @@
 }
 .desktop-agent-select-pill > span { overflow: hidden; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .desktop-agent-select-pill svg { flex: 0 0 auto; }
+.desktop-agent-select-pill.is-provider select { max-width: 92px; }
+.desktop-agent-select-pill.is-model select { max-width: 118px; }
 .desktop-agent-composer-action {
   display: grid;
   width: 24px;
@@ -901,7 +903,8 @@
 
 @container desktop-agent (max-width: 559px) {
   .desktop-agent-transcript { padding-top: 10px; }
-  .desktop-agent-select-pill select { max-width: 132px; }
+  .desktop-agent-select-pill.is-provider select { max-width: 82px; }
+  .desktop-agent-select-pill.is-model select { max-width: 108px; }
   .desktop-agent-history-menu { width: calc(100cqw - 12px); }
   .desktop-agent-readiness { grid-template-columns: auto minmax(0, 1fr); }
   .desktop-agent-readiness > button { grid-column: 2; justify-self: start; }
@@ -915,6 +918,8 @@
   .desktop-agent-select-pill.is-model select { max-width: 118px; }
   .desktop-agent-composer { padding-left: 5px; }
   .desktop-agent-composer-row { gap: 4px; }
+  .desktop-agent-select-pill.is-provider select { max-width: 68px; }
+  .desktop-agent-select-pill.is-model select { max-width: 88px; }
   .desktop-agent-readiness { grid-template-columns: auto minmax(0, 1fr); }
   .desktop-agent-readiness > button { grid-column: 2; justify-self: start; }
 }

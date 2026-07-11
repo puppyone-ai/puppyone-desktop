@@ -28,6 +28,7 @@ describe("Desktop Agent Cursor sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-composer-action\s*\{[^}]*width:\s*24px[^}]*height:\s*24px/s);
     expect(css).toMatch(/\.desktop-agent-composer textarea\s*\{[^}]*min-height:\s*20px[^}]*max-height:\s*132px/s);
     expect(composer).toContain('className="desktop-agent-tools-menu"');
+    expect(composer.indexOf('is-provider')).toBeLessThan(composer.indexOf('is-model'));
     expect(composer).not.toContain("<Zap");
     expect(panel).toContain('"Send follow-up"');
   });

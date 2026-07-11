@@ -20,6 +20,7 @@ describe("OpenCode AgentRuntimePort adapter", () => {
       projectInstructionLoader: vi.fn(async () => ({ source: "AGENTS.md", text: "Keep tests green.", bytes: 17 })),
     });
     const inspection = await adapter.inspect();
+    expect(inspection.providers).toEqual([expect.objectContaining({ id: "openai", displayName: "OpenAI", modelCount: 1 })]);
     expect(inspection.models[0]).toMatchObject({ model: "openai/gpt-5", providerId: "openai", isDefault: true });
     expect(inspection.modes.map((mode) => mode.id)).toContain("build");
     expect(inspection.capabilities).toMatchObject({ structuredQuestions: true, mcp: true, skills: true, compaction: true });
@@ -170,7 +171,7 @@ describe("OpenCode AgentRuntimePort adapter", () => {
 
   it("reports missing model-provider setup instead of creating an unusable chat", async () => {
     const client = clientFixture();
-    client.providers.mockResolvedValue({ providers: [], default: {} });
+    client.providerCatalog.mockResolvedValue({ all: [], connected: [], default: {} });
     const host = {
       acquire: vi.fn(async () => client),
       subscribe: vi.fn(() => () => {}),
@@ -189,12 +190,52 @@ describe("OpenCode AgentRuntimePort adapter", () => {
     expect(inspection.models).toEqual([]);
     await adapter.dispose();
   });
+
+  it("offers only connected providers and text-and-tools Agent models", async () => {
+    const client = clientFixture();
+    client.providerCatalog.mockResolvedValue({
+      all: [
+        {
+          id: "google",
+          name: "Google",
+          source: "env",
+          models: {
+            "gemini-3-pro": model("gemini-3-pro", "Gemini 3 Pro"),
+            "nano-banana-pro": model("nano-banana-pro", "Nano Banana Pro", { output: { text: false, image: true }, toolcall: false }),
+            "gemini-embedding-001": model("gemini-embedding-001", "Gemini Embedding 001", { output: { text: false }, toolcall: false }),
+            "gemini-tts": model("gemini-tts", "Gemini TTS", { output: { text: false, audio: true }, toolcall: false }),
+          },
+        },
+        { id: "openai", name: "OpenAI", source: "api", models: { "gpt-5": model("gpt-5", "GPT-5") } },
+      ],
+      connected: ["google"],
+      default: { google: "gemini-3-pro", openai: "gpt-5" },
+    });
+    const host = {
+      acquire: vi.fn(async () => client),
+      subscribe: vi.fn(() => () => {}),
+      onExit: vi.fn(() => () => {}),
+      snapshot: vi.fn(() => ({ state: "ready" })),
+    };
+    const adapter = new OpenCodeSidecarAdapter({
+      readiness: { status: "ready", executablePath: "/opencode", version: "1.17.18", source: "bundled", compatibility: "pinned" },
+      workspaceRoot: "/workspace",
+      host,
+    });
+
+    const inspection = await adapter.inspect();
+
+    expect(inspection.providers.map((provider) => provider.id)).toEqual(["google"]);
+    expect(inspection.models.map((entry) => entry.model)).toEqual(["google/gemini-3-pro"]);
+    await adapter.dispose();
+  });
 });
 
 function clientFixture() {
   return {
-    providers: vi.fn(async () => ({
-      providers: [{ id: "openai", name: "OpenAI", models: { "gpt-5": { id: "gpt-5", name: "GPT-5", family: "gpt", variants: { high: {} }, limit: { context: 128_000 } } } }],
+    providerCatalog: vi.fn(async () => ({
+      all: [{ id: "openai", name: "OpenAI", source: "api", models: { "gpt-5": { id: "gpt-5", name: "GPT-5", family: "gpt", variants: { high: {} }, limit: { context: 128_000 } } } }],
+      connected: ["openai"],
       default: { openai: "gpt-5" },
     })),
     agents: vi.fn(async () => [{ name: "build", mode: "primary", description: "Build", hidden: false }]),
@@ -216,5 +257,21 @@ function clientFixture() {
     deleteSession: vi.fn(async () => true),
     listSessions: vi.fn(async () => []),
     summarize: vi.fn(async () => true),
+  };
+}
+
+function model(id, name, capabilities = {}) {
+  return {
+    id,
+    name,
+    family: "gemini",
+    status: "active",
+    limit: { context: 128_000 },
+    capabilities: {
+      input: { text: true },
+      output: { text: true },
+      toolcall: true,
+      ...capabilities,
+    },
   };
 }

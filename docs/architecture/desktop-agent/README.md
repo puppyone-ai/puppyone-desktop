@@ -44,7 +44,8 @@ PuppyOne Desktop
             +-- AgentService: owner/session/order/replay/journal
             +-- OpenCode AgentRuntimePort adapter
             |     +-- pinned OpenCode sidecar (only product harness)
-            |     +-- native provider/model/session catalog
+            |     +-- connected provider/model/session catalog
+            |     +-- text + tools model capability gate
             +-- workspace/reference authorization
             +-- process shutdown and secret redaction
 ```
@@ -163,6 +164,7 @@ src/features/desktop-agent/
     controllerRegistry.ts             LRU inactive-controller lifetime
   domain/
     agent-contract.ts                 feature-local shared-contract alias
+    agent-provider-routing.ts         pure Provider -> Model selection policy
     agent-projection.ts               event -> turn/part/row reducer
     agent-projection-types.ts         discriminated presentation model
     agent-projection-readers.ts       bounded payload readers
@@ -172,7 +174,7 @@ src/features/desktop-agent/
     AgentChangesPill.tsx              aggregate additions/deletions handoff
     SafeMarkdown.tsx                  no-innerHTML Markdown surface
     AgentTranscript.tsx               <=120 mounted virtual rows
-    AgentComposer.tsx                 /, @, files and model/mode controls
+    AgentComposer.tsx                 /, @, files and Provider/Model controls
     AgentVisualSmokeHarness.tsx       deterministic 420/560/760 visual QA
     RightAgentPanel.tsx               view composition only
     desktop-agent.css                 complete responsive PuppyOne boundary
@@ -245,7 +247,7 @@ Right sidebar surface
       one-row idle geometry           42 px outer height
       left + menu                     attachments / context / Agent mode
       middle input                    one line -> bounded multiline
-      right controls                  model / stop or send
+      right controls                  provider -> model / stop or send
 ```
 
 Visible “You”, “OpenCode” or runtime badges are intentionally absent from each
@@ -271,6 +273,47 @@ contracts, single-line growing composer, Changes aggregation and absence of a
 runtime selector. `desktop-agent.cursor-visual-contract.test.ts` locks the
 reference geometry so later feature work cannot silently reintroduce the old
 card stack or two-row composer.
+
+## Provider routing boundary
+
+Provider selection is an explicit application state, not a label parsed in the
+React component and not another runtime registry entry.
+
+```text
+pinned OpenCode sidecar
+  GET /provider
+       |
+       +-- all catalog providers
+       +-- connected provider IDs          availability authority
+       +-- per-provider default model
+              |
+              v
+  OpenCodeSidecarAdapter
+       +-- discard unconnected providers
+       +-- discard non-text / non-tool / deprecated models
+       +-- normalize bounded Provider + Model DTOs
+              |
+              v
+  shared contract + AgentSessionController
+       +-- selectedProviderId
+       +-- selectedModel belongs to selectedProviderId
+       +-- multiple providers require explicit selection
+              |
+              v
+  Composer: Provider -> Model -> Send
+```
+
+`/config/providers` describes configuration, not authenticated availability,
+and must never be used to enable a session. Electron main revalidates every
+requested Model against the inspected connected catalog so a compromised or
+stale Renderer cannot inject an arbitrary provider/model string.
+
+CLI installation is also not Provider proof. Codex, Claude Code and Cursor are
+agent products; their executables and subscriptions do not automatically grant
+OpenCode an inference route. OpenAI/ChatGPT, Anthropic or another service is
+shown only when OpenCode reports a legitimate connected Provider. A future
+Cursor or CLI credential bridge must be separately authorized and documented;
+it cannot silently reuse private credentials or introduce a nested Agent loop.
 
 ## Main-process harness contract
 

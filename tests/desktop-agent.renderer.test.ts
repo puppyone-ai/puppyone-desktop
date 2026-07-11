@@ -72,7 +72,9 @@ describe("Desktop Agent renderer surfaces", () => {
       stopping: false,
       submitting: false,
       placeholder: "Ask anything",
-      models: [{ id: "openai/gpt", model: "openai/gpt", displayName: "GPT", description: "", isDefault: true }],
+      providers: [{ id: "openai", displayName: "OpenAI", modelCount: 1 }],
+      selectedProviderId: "openai",
+      models: [{ id: "openai/gpt", model: "openai/gpt", providerId: "openai", displayName: "GPT", description: "", isDefault: true }],
       selectedModel: "openai/gpt",
       modes: [{ id: "build", displayName: "Agent", description: "", isDefault: true }],
       selectedMode: "build",
@@ -81,7 +83,13 @@ describe("Desktop Agent renderer surfaces", () => {
     }));
 
     expect(container.querySelector('select[aria-label="Agent runtime"]')).toBeNull();
-    expect(container.querySelectorAll("select")).toHaveLength(1);
+    const selects = container.querySelectorAll("select");
+    expect(selects).toHaveLength(2);
+    expect(selects[0].closest("label")?.textContent).toContain("Agent provider");
+    expect(selects[1].closest("label")?.textContent).toContain("Agent model");
+    expect((selects[0] as HTMLSelectElement).value).toBe("openai");
+    expect((selects[1] as HTMLSelectElement).value).toBe("openai/gpt");
+    expect(container.textContent).toContain("OpenAI");
     expect(container.textContent).not.toContain("OpenCode runtime");
     expect(container.querySelector("textarea")?.getAttribute("rows")).toBe("1");
     expect((container.querySelector("textarea") as HTMLTextAreaElement).style.height).toBe("20px");
@@ -91,6 +99,32 @@ describe("Desktop Agent renderer surfaces", () => {
     act(() => toolsButton.click());
     expect(container.querySelector('[role="menu"][aria-label="Composer tools"]')).not.toBeNull();
     expect(container.querySelector('[role="menuitemradio"][aria-checked="true"]')?.textContent).toContain("Agent");
+  });
+
+  it("shows Provider first and withholds Model until a connected provider is selected", () => {
+    const container = render(React.createElement(AgentComposer, {
+      draft: "Hello",
+      onDraftChange: vi.fn(),
+      disabled: true,
+      running: false,
+      stopping: false,
+      submitting: false,
+      placeholder: "Choose a provider to start",
+      providers: [
+        { id: "anthropic", displayName: "Anthropic", modelCount: 1 },
+        { id: "openai", displayName: "OpenAI", modelCount: 1 },
+      ],
+      selectedProviderId: null,
+      models: [],
+      selectedModel: null,
+      onSubmit: vi.fn(async () => false),
+      onStop: vi.fn(),
+    }));
+
+    expect(container.querySelectorAll("select")).toHaveLength(1);
+    expect(container.querySelector("select")?.closest("label")?.textContent).toContain("Agent provider");
+    expect(container.textContent).not.toContain("Agent model");
+    expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("summarizes real file changes in the compact Changes pill", () => {

@@ -25,6 +25,7 @@ export type AgentControllerState = {
   history: AgentSessionListItem[];
   projection: AgentProjection;
   selectedRuntimeId: AgentRuntimeId | null;
+  selectedProviderId: string | null;
   selectedModel: string | null;
   selectedMode: string | null;
   draft: string;

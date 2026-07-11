@@ -64,6 +64,19 @@ describe("Desktop Agent transcript projection", () => {
 
     expect(projection.activities[0].label).toBe("Invalid value: 'max'. Use 'xhigh'.");
   });
+
+  it("collapses duplicate provider terminal errors for the same turn", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Hello" }, "turn-1"),
+      event(2, "provider.error", { message: "API key not valid." }, "turn-1", "assistant-1"),
+      event(3, "turn.failed", { status: "failed", message: "API key not valid." }, "turn-1"),
+      event(4, "provider.error", { message: "API key not valid." }, "turn-1"),
+    ]);
+
+    expect(projection.activities.filter((activity) => activity.kind === "error")).toHaveLength(1);
+    expect(projection.parts.filter((part) => part.kind === "error")).toHaveLength(1);
+    expect(projection.activities.find((activity) => activity.kind === "error")?.label).toBe("API key not valid.");
+  });
 });
 
 function event(

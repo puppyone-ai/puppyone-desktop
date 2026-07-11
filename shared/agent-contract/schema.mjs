@@ -2,6 +2,7 @@ import { agentContractLimits } from "./constants.mjs";
 import { assertAgentEventEnvelope } from "./event-schema.mjs";
 import {
   assertAgentInspection,
+  assertAgentInferenceProvider,
   assertAgentModel,
 } from "./runtime-schema.mjs";
 import {
@@ -168,6 +169,8 @@ export function assertAgentIpcResponse(channel, value) {
 function assertAgentSessionSnapshot(value) {
   const snapshot = assertRecord(value, "Agent session snapshot");
   assertAgentSessionMetadata(snapshot.session);
+  assertArray(snapshot.providers ?? [], "Agent session providers").forEach(assertAgentInferenceProvider);
+  assertArray(snapshot.models ?? [], "Agent session models").forEach(assertAgentModel);
   assertArray(snapshot.events, "Agent session events").forEach(assertAgentEventEnvelope);
   if (!Number.isSafeInteger(snapshot.firstAvailableSequence) || snapshot.firstAvailableSequence < 0) throw contractError("firstAvailableSequence", "must be a non-negative integer");
   if (!Number.isSafeInteger(snapshot.lastSequence) || snapshot.lastSequence < 0) throw contractError("lastSequence", "must be a non-negative integer");

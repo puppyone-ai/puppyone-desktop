@@ -266,7 +266,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
     case "provider.warning":
     case "provider.error":
       const activity: AgentActivity = {
-        id: `${event.type}:${event.sequence}`,
+        id: providerActivityId(event),
         turnId: event.turnId,
         itemId: event.itemId,
         kind: event.type === "provider.error" ? "error" : "warning",
@@ -276,8 +276,14 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
         output: "",
         sequence: event.sequence,
       };
-      projectionIndexes(next).activities.set(activity.id, next.activities.length);
-      next.activities.push(activity);
+      const activityIndexes = projectionIndexes(next).activities;
+      const existingActivityIndex = activityIndexes.get(activity.id);
+      if (existingActivityIndex === undefined) {
+        activityIndexes.set(activity.id, next.activities.length);
+        next.activities.push(activity);
+      } else {
+        next.activities[existingActivityIndex] = activity;
+      }
       return next;
     default:
       return next;
@@ -491,7 +497,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
     return activity ? activityPart(activity) : null;
   }
   if (event.type === "provider.warning" || event.type === "provider.error") {
-    const activityIndex = projectionIndexes(projection).activities.get(`${event.type}:${event.sequence}`);
+    const activityIndex = projectionIndexes(projection).activities.get(providerActivityId(event));
     const activity = activityIndex === undefined ? null : projection.activities[activityIndex];
     return activity ? activityPart(activity) : null;
   }
@@ -518,6 +524,10 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
     label: "Unsupported agent event",
     sequence: event.sequence,
   };
+}
+
+function providerActivityId(event: AgentEvent) {
+  return `${event.type}:${event.turnId ?? event.itemId ?? "session"}`;
 }
 
 function messagePart(message: AgentTranscriptMessage): AgentPart {

@@ -83,6 +83,7 @@ export function createAgentService({
         const inspection = assertAgentRuntimeInspection(session.adapter, await session.adapter.inspect(), session.runtimeId);
         assertAuthenticated(inspection.account);
         applyInspection(session, inspection);
+        requireAvailableModel(session, session.selectedModel);
         const providerSession = await session.adapter.createSession({
           model: session.selectedModel,
           mode: session.selectedMode,
@@ -194,6 +195,7 @@ export function createAgentService({
     const prompt = normalizePrompt(request?.prompt);
     const model = normalizeOptionalString(request?.model) || session.selectedModel;
     const mode = normalizeOptionalString(request?.mode) || session.selectedMode;
+    requireAvailableModel(session, model);
     session.pendingPrompt = prompt;
     session.turnStarting = true;
     session.selectedModel = model;
@@ -838,6 +840,14 @@ export function createAgentService({
 
   function requireOwnedSession(sender, id) {
     return sessionStore.requireOwned(sender, id);
+  }
+
+  function requireAvailableModel(session, model) {
+    if (!model) throw new Error("Choose a connected model provider and model before sending a message.");
+    if (!session.models.some((candidate) => candidate.model === model)) {
+      throw new Error("The selected model is no longer available from a connected provider. Refresh Agent providers and choose again.");
+    }
+    return model;
   }
 
   return {

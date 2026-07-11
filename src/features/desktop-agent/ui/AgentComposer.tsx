@@ -1,6 +1,6 @@
 import { ArrowUp, AtSign, Check, ChevronDown, Paperclip, Plus, Sparkles, Square, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import type { AgentCommand, AgentFileReference, AgentMode, AgentModel } from "../domain/agent-contract";
+import type { AgentCommand, AgentFileReference, AgentInferenceProvider, AgentMode, AgentModel } from "../domain/agent-contract";
 
 type AgentComposerProps = {
   draft: string;
@@ -12,6 +12,9 @@ type AgentComposerProps = {
   submitting: boolean;
   placeholder: string;
   runtimeLabel?: string;
+  providers?: AgentInferenceProvider[];
+  selectedProviderId?: string | null;
+  onSelectProvider?: (providerId: string) => void;
   models?: AgentModel[];
   selectedModel?: string | null;
   onSelectModel?: (model: string) => void;
@@ -46,6 +49,9 @@ export function AgentComposer({
   submitting,
   placeholder,
   runtimeLabel = "Agent",
+  providers = [],
+  selectedProviderId = null,
+  onSelectProvider,
   models = [],
   selectedModel = null,
   onSelectModel,
@@ -217,7 +223,19 @@ export function AgentComposer({
           />
           <input ref={fileInputRef} className="desktop-agent-visually-hidden" type="file" multiple tabIndex={-1} onChange={(event) => acceptFiles(event.target.files)} />
           <div className="desktop-agent-composer-trailing">
-            {models.length > 0 && (
+            {providers.length > 0 && (
+              <div className="desktop-agent-select-pill is-provider" title="Model provider">
+                <label>
+                  <span className="desktop-agent-visually-hidden">Agent provider</span>
+                  <select value={selectedProviderId ?? ""} disabled={running} onChange={(event) => onSelectProvider?.(event.target.value)}>
+                    {!selectedProviderId && <option value="" disabled>Provider</option>}
+                    {providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.displayName}</option>)}
+                  </select>
+                </label>
+                <ChevronDown size={12} aria-hidden="true" />
+              </div>
+            )}
+            {selectedProviderId && models.length > 0 && (
               <div className="desktop-agent-select-pill is-model" title={selectedModelEntry?.description || selectedModelEntry?.displayName}>
                 <label>
                   <span className="desktop-agent-visually-hidden">Agent model</span>

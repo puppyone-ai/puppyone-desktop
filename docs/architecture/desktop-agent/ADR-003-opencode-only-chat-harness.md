@@ -157,6 +157,10 @@ a harness and cannot bypass OpenCode's loop or PuppyOne's permission boundary.
   harness identity.
 - The composer may show Provider, Model, Variant and Agent/Mode. It does not
   show Runtime or Harness.
+- Provider availability comes from OpenCode `/provider.connected`, never from
+  `/config/providers`, an executable-presence check, or an unverified model catalog.
+- Provider must be selected before Model; the Model must advertise text input,
+  text output and tool calling for Agent Chat.
 - Changing provider/model follows OpenCode's advertised per-turn or
   new-session semantics. A variant is valid only for its selected model.
 - Provider authentication failure leaves the OpenCode session intact and shows
@@ -197,7 +201,8 @@ Migration status:
 
 1. completed: remove the Runtime selector from the composer;
 2. completed: make OpenCode the sole new-session production route;
-3. represent provider, model and variant as separate session fields;
+3. completed: represent provider selection separately in application state and
+   scope every selectable model to that connected provider;
 4. route OpenAI/ChatGPT OAuth and Codex models through OpenCode;
 5. completed: stop product fallback to a ready direct CLI harness;
 6. treat persisted Codex direct sessions as legacy records;

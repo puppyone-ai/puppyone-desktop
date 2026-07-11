@@ -78,6 +78,16 @@ describe("OpenCode loopback HTTP client", () => {
     expect(JSON.parse(request.body)).toMatchObject({ command: "init", arguments: "fast", model: "openai/gpt-5", agent: "build", variant: "high" });
   });
 
+  it("uses OpenCode's connected-provider catalog instead of the configuration catalog", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ all: [], connected: [], default: {} }), { status: 200 }));
+    const client = new OpenCodeHttpClient({ baseUrl: "http://127.0.0.1:40321", username: "p", password: "x", fetchImpl });
+
+    await client.providerCatalog("/workspace");
+
+    expect(String(fetchImpl.mock.calls[0][0])).toBe("http://127.0.0.1:40321/provider?directory=%2Fworkspace");
+    expect(fetchImpl.mock.calls[0][1].method).toBe("GET");
+  });
+
   it("rejects non-loopback endpoints and parses provider/model selections", () => {
     expect(() => new OpenCodeHttpClient({ baseUrl: "https://example.com", username: "p", password: "x" })).toThrow(/loopback/i);
     expect(parseModelSelection("openai/gpt-5:high")).toEqual({ providerID: "openai", modelID: "gpt-5", variant: "high" });

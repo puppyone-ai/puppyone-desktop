@@ -19,6 +19,7 @@ export function assertAgentInspection(value) {
   const inspection = assertRecord(value, "Agent inspection");
   if (inspection.runtime !== undefined) assertRuntimeDescriptor(inspection.runtime);
   if (inspection.readiness !== undefined) assertReadiness(inspection.readiness);
+  assertArray(inspection.providers ?? [], "Agent inspection.providers").forEach(assertAgentInferenceProvider);
   assertArray(inspection.models ?? [], "Agent inspection.models").forEach(assertAgentModel);
   assertArray(inspection.modes ?? [], "Agent inspection.modes").forEach((mode) => assertNamedEntry(mode, "mode"));
   assertArray(inspection.commands ?? [], "Agent inspection.commands").forEach((command) => assertNamedEntry(command, "command", "name"));
@@ -61,6 +62,20 @@ export function assertAgentModel(value) {
   requiredString(model.id, "Agent model.id", 512);
   requiredString(model.model, "Agent model.model", 512);
   requiredString(model.displayName, "Agent model.displayName", 512);
+  if (model.providerId !== undefined) requiredString(model.providerId, "Agent model.providerId", 160);
+  if (model.modelId !== undefined) requiredString(model.modelId, "Agent model.modelId", 300);
+  return value;
+}
+
+export function assertAgentInferenceProvider(value) {
+  const provider = assertRecord(value, "Agent inference provider");
+  requiredString(provider.id, "Agent inference provider.id", 160);
+  requiredString(provider.displayName, "Agent inference provider.displayName", 160);
+  if (provider.source !== undefined && provider.source !== null) requiredString(provider.source, "Agent inference provider.source", 40);
+  if (provider.defaultModel !== undefined && provider.defaultModel !== null) requiredString(provider.defaultModel, "Agent inference provider.defaultModel", 512);
+  if (!Number.isSafeInteger(provider.modelCount) || provider.modelCount < 0 || provider.modelCount > 500) {
+    throw new TypeError("Agent inference provider.modelCount must be a bounded non-negative integer.");
+  }
   return value;
 }
 

@@ -53,9 +53,21 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(bootstrap).toContain("createOpenCodeRuntimeDefinition");
     expect(bootstrap).not.toContain("createCodexRuntimeDefinition");
     expect(composer).not.toMatch(/Agent runtime|onSelectRuntime|runtimes/);
+    expect(composer).toContain("Agent provider");
     expect(composer).toContain("Agent model");
     expect(contract).toContain("parseAgentIpcRequest");
     expect(contract).toContain("assertAgentIpcResponse");
+  });
+
+  it("keeps connected-provider authority in the OpenCode adapter and explicit selection in application state", () => {
+    const adapter = source("electron/main/agent/runtimes/opencode/opencode-sidecar-adapter.mjs");
+    const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
+    const panel = source("src/features/desktop-agent/ui/RightAgentPanel.tsx");
+    expect(adapter).toContain("client.providerCatalog");
+    expect(adapter).not.toContain("client.providers(this.workspaceRoot)");
+    expect(adapter).toContain("isAgentChatModel");
+    expect(controller).toContain("selectedProviderId");
+    expect(panel.indexOf("providers=")).toBeLessThan(panel.indexOf("models="));
   });
 });
 

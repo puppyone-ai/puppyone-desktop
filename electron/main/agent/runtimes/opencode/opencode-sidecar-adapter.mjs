@@ -48,13 +48,17 @@ export class OpenCodeSidecarAdapter {
   async inspect() {
     const client = await this.connect();
     const [providerResult, agents, commands] = await Promise.all([
-      client.providers(this.workspaceRoot),
+      client.providerCatalog(this.workspaceRoot),
       client.agents(this.workspaceRoot).catch(() => []),
       client.commands(this.workspaceRoot).catch(() => []),
     ]);
-    const models = normalizeModels(providerResult);
+    const providerCatalog = normalizeProviderCatalog(providerResult);
+    const models = providerCatalog.models;
     const modes = normalizeModes(agents);
-    const authenticated = Array.isArray(providerResult?.providers) && providerResult.providers.length > 0;
+    const authenticated = providerCatalog.providers.length > 0 && models.length > 0;
+    const setupError = providerCatalog.connectedProviderCount > 0
+      ? "Connected model providers do not expose a text-and-tools Agent model."
+      : "No model provider is connected to PuppyOne Agent.";
     const normalizedCommands = normalizeCommands(commands);
     this.commandNames = new Set(normalizedCommands.map((command) => command.name));
     return {
@@ -62,8 +66,9 @@ export class OpenCodeSidecarAdapter {
         account: authenticated ? { type: "opencode", email: null, planType: null } : null,
         requiresOpenaiAuth: false,
         requiresRuntimeSetup: !authenticated,
-        ...(authenticated ? {} : { error: "No model provider is connected to PuppyOne Agent." }),
+        ...(authenticated ? {} : { error: setupError }),
       },
+      providers: providerCatalog.providers,
       models,
       modes,
       commands: normalizedCommands,
@@ -360,35 +365,71 @@ export class OpenCodeSidecarAdapter {
   }
 }
 
-export function normalizeModels(value) {
-  const providers = Array.isArray(value?.providers) ? value.providers.slice(0, 100) : [];
+export function normalizeProviderCatalog(value) {
+  const allProviders = Array.isArray(value?.all) ? value.all.slice(0, 100) : [];
+  const connected = new Set(Array.isArray(value?.connected)
+    ? value.connected.flatMap((providerId) => {
+      const normalized = boundedString(providerId, 160);
+      return normalized ? [normalized] : [];
+    })
+    : []);
   const defaults = value?.default && typeof value.default === "object" ? value.default : {};
+  const providers = [];
   const models = [];
-  for (const provider of providers) {
+  for (const provider of allProviders) {
     const providerID = boundedString(provider?.id, 160);
+    if (!providerID || !connected.has(providerID)) continue;
+    const providerModels = [];
     for (const model of Object.values(provider?.models ?? {}).slice(0, 500 - models.length)) {
+      if (!isAgentChatModel(model)) continue;
       const modelID = boundedString(model?.id, 300);
       const selection = formatModelSelection({ providerID, modelID });
       if (!selection) continue;
-      models.push({
-      id: selection,
-      model: selection,
-      providerId: providerID,
-      modelId: modelID,
-      displayName: boundedString(model?.name, 200) || modelID,
-      description: `${boundedString(provider?.name, 160) || providerID} · ${boundedString(model?.family, 160) || modelID}`,
-      isDefault: defaults[providerID] === modelID,
-      variants: model?.variants ? Object.keys(model.variants).slice(0, 50).map((variant) => variant.slice(0, 100)) : [],
-      contextWindow: Number(model?.limit?.context) || null,
+      providerModels.push({
+        id: selection,
+        model: selection,
+        providerId: providerID,
+        modelId: modelID,
+        displayName: boundedString(model?.name, 200) || modelID,
+        description: `${boundedString(provider?.name, 160) || providerID} · ${boundedString(model?.family, 160) || modelID}`,
+        isDefault: defaults[providerID] === modelID,
+        variants: model?.variants ? Object.keys(model.variants).slice(0, 50).map((variant) => variant.slice(0, 100)) : [],
+        contextWindow: Number(model?.limit?.context) || null,
       });
-      if (models.length >= 500) break;
+      if (models.length + providerModels.length >= 500) break;
     }
+    if (providerModels.length === 0) continue;
+    models.push(...providerModels);
+    providers.push({
+      id: providerID,
+      displayName: boundedString(provider?.name, 160) || providerID,
+      source: boundedString(provider?.source, 40) || null,
+      defaultModel: providerModels.find((model) => model.isDefault)?.model ?? providerModels[0]?.model ?? null,
+      modelCount: providerModels.length,
+    });
     if (models.length >= 500) break;
   }
-  return models.sort((left, right) => (
+  models.sort((left, right) => (
     Number(right.isDefault) - Number(left.isDefault)
     || left.description.localeCompare(right.description)
   ));
+  providers.sort((left, right) => providerPriority(left.id) - providerPriority(right.id)
+    || left.displayName.localeCompare(right.displayName));
+  return { providers, models, connectedProviderCount: connected.size };
+}
+
+function isAgentChatModel(model) {
+  if (!model || typeof model !== "object" || model.status === "deprecated") return false;
+  if (!model.capabilities || typeof model.capabilities !== "object") return true;
+  return model.capabilities.input?.text === true
+    && model.capabilities.output?.text === true
+    && model.capabilities.toolcall === true;
+}
+
+function providerPriority(providerId) {
+  const order = ["opencode", "opencode-go", "anthropic", "github-copilot", "openai", "google", "openrouter", "vercel"];
+  const index = order.indexOf(providerId);
+  return index < 0 ? order.length : index;
 }
 
 function normalizeModes(value) {
