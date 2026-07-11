@@ -1,21 +1,13 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { AppPreviewController, OfficeDocumentConverter } from "../core/types";
 import type { FileFormat } from "../core/fileFormats";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
-import type {
-  CoreViewerCapability,
-  PresetViewerContractVersion,
-  PresetViewerRuntime,
-  PresetViewerSource,
-} from "./viewerContract";
-import type {
-  DocumentSourceKind,
-  ViewerContribution,
-  ViewerPackSnapshot,
-} from "./viewerPackTypes";
+import type { PresetViewerSource } from "./viewerContract";
+import type { DocumentSourceKind } from "./documentSource";
+import type { PresetViewerDefinition } from "./presetViewerManifest";
 
-export type { DocumentSourceKind } from "./viewerPackTypes";
+export type { DocumentSourceKind } from "./documentSource";
 
 export type EditorDocumentKind =
   | "folder"
@@ -49,20 +41,6 @@ export type EditorDocument = {
    * and `unknown`; only explicit `local` documents can activate a Viewer Pack.
    */
   sourceKind?: DocumentSourceKind;
-};
-
-/**
- * A host-provided callback that renders the native/sandboxed surface slot for
- * an activated plugin session. Dependency-injected by the desktop shell so
- * shared-ui never imports Electron or spawns a session itself.
- */
-export type ExternalViewerSurfaceRenderer = (
-  request: ExternalViewerSurfaceRequest,
-) => ReactNode;
-
-export type ExternalViewerSurfaceRequest = {
-  document: EditorDocument;
-  contribution: ViewerContribution;
 };
 
 export type EditorMode = "live" | "source";
@@ -128,7 +106,7 @@ export type EditorViewerMatch = {
   resolvedExtension: string | null;
 };
 
-export type EditorViewerContext = EditorViewerMatch & {
+export type PresetViewerRenderContext = EditorViewerMatch & {
   content: string;
   aiEditFile?: AiEditFile | null;
   fileUrl?: string | null;
@@ -149,28 +127,46 @@ export type EditorViewerContext = EditorViewerMatch & {
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
   onSaveContent?: (content: string) => Promise<void>;
-  /** Immutable, validated snapshot of enabled viewer-pack contributions. */
-  viewerPackSnapshot?: ViewerPackSnapshot | null;
-  /** Host-provided renderer for an activated plugin surface (DI, not Electron). */
-  externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
 };
+
+/** @deprecated Prefer PresetViewerRenderContext. */
+export type EditorViewerContext = PresetViewerRenderContext;
+
+type PresetViewerImplementationBase = Readonly<{
+  id: string;
+  match: (match: EditorViewerMatch) => boolean;
+  allowPreviewContent?: boolean;
+  normalizeContent?: (content: string, document: EditorDocument) => string;
+  isEditable?: (match: EditorViewerMatch & { content: string }) => boolean;
+}>;
+
+export type EagerPresetViewerImplementation = PresetViewerImplementationBase & Readonly<{
+  render: (context: PresetViewerRenderContext) => ReactNode;
+  load?: never;
+}>;
+
+export type LazyPresetViewerImplementation = PresetViewerImplementationBase & Readonly<{
+  load: () => Promise<{ default: ComponentType<PresetViewerRenderContext> }>;
+  render?: never;
+}>;
+
+export type PresetViewerImplementation =
+  | EagerPresetViewerImplementation
+  | LazyPresetViewerImplementation;
 
 /**
  * Versioned contract for a viewer that ships with PuppyOne. Contributions are
  * registered in deterministic order and must not embed format-extension data.
  */
-export type PresetViewerContribution = Readonly<{
-  contractVersion: PresetViewerContractVersion;
-  id: string;
-  capability: CoreViewerCapability;
-  source: EditorSourceRequirement;
-  runtime: PresetViewerRuntime;
-  match: (match: EditorViewerMatch) => boolean;
-  allowPreviewContent?: boolean;
-  normalizeContent?: (content: string, document: EditorDocument) => string;
-  isEditable?: (match: EditorViewerMatch & { content: string }) => boolean;
-  render: (context: EditorViewerContext) => ReactNode;
-}>;
+export type EagerPresetViewerContribution = PresetViewerDefinition &
+  Omit<EagerPresetViewerImplementation, "id">;
+
+export type LazyPresetViewerContribution = PresetViewerDefinition &
+  Omit<LazyPresetViewerImplementation, "id">;
+
+export type PresetViewerContribution = Readonly<
+  EagerPresetViewerContribution | LazyPresetViewerContribution
+>;
 
 /** @deprecated Prefer the product-semantic PresetViewerContribution name. */
 export type EditorViewer = PresetViewerContribution;

@@ -4,7 +4,7 @@
 Viewer Pack Host implementation is retained as a dormant external adapter. The
 signed default product uses the `preset-viewers-only` profile: no Pack schemes,
 Host, IPC/preload bridge, install CTA, catalog, or signer requirement is
-registered. A future explicitly enabled external-Pack profile remains
+registered or loaded into the startup graph. A future explicitly enabled external-Pack profile remains
 fail-closed without a reviewed production signer. Stage C (third-party
 marketplace) is not open or committed.
 
@@ -13,8 +13,9 @@ marketplace) is not open or committed.
 PuppyOne's production viewer surface is the immutable
 `PRESET_VIEWER_REGISTRY`. Markdown, text/code, CSV, HTML, Office, image, PDF,
 audio, video, and the placeholder are reviewed contributions compiled with the
-application. Adding one requires a versioned contribution plus canonical format
-data, not an App-shell or source-acquisition branch.
+application. Adding one requires one canonical manifest definition, one trusted
+implementation binding, and canonical format data only when a new format route
+is needed—not an App-shell or source-acquisition branch.
 
 Viewer Packs are a reserved adapter for potentially extending local file
 viewing without growing the base installer with every vertical runtime. They
@@ -30,12 +31,12 @@ enabled in the default product.
   Pack is part of the current product scope.
 
 ```text
-canonical resolveFileFormat()
+presetViewerManifest.json + canonical resolveFileFormat()
           |
           v
-versioned PRESET_VIEWER_REGISTRY ---> content/resource acquisition ---> render
+versioned PRESET_VIEWER_REGISTRY ---> content/resource acquisition ---> render/load
           |
-          `..... external Pack adapter (product capability OFF by default)
+          `..... ViewerExtensionHostAdapter (product capability OFF by default)
                        |
                        `--> main-owned activation + sandbox, only if enabled
 ```
@@ -65,7 +66,8 @@ trusted app IPC
         ▼
 main-process activation authority
         ├─ stat canonical local file
-        ├─ classify core capability from shared fileFormats.json
+        ├─ resolve format from shared fileFormats.json
+        ├─ classify capability from shared presetViewerManifest.json
         ├─ route against validated enabled-pack snapshot
         └─ derive version/hash/entry/permissions/revision
         ▼
@@ -84,7 +86,8 @@ Routing runs twice for good UX and one time for authority:
 
 The authoritative order is:
 
-1. Resolve the core format from the same `fileFormats.json` used by shared-ui.
+1. Resolve the core format from the same `fileFormats.json` used by shared-ui,
+   then map its `defaultViewer` through the same `presetViewerManifest.json`.
 2. If core capability is `edit` or `preview`, return core.
 3. If the source cannot be proven to be local, fail closed.
 4. Match enabled, compatible packs against observed filename suffixes and the
@@ -307,15 +310,19 @@ an implicit network request; discovery is an explicit user action.
 ## 11. Packaging and size budget
 
 Viewer payloads are excluded from Electron Builder `files` and base `dist/`.
-Only the lightweight host, `jszip`, and SemVer validator ship in the app.
-`jszip` and `semver` are production dependencies because Electron main imports
-them at runtime.
+The dormant host source, `jszip`, and SemVer validator remain packaged for the
+experimental profile, but the preset-only main startup graph dynamically stops
+before importing them. The renderer extension UI is a separate lazy chunk and
+is not loaded unless the main-issued preload bridge exists and an extension
+surface is actually requested.
 
 `scripts/check-packaged-artifact-budgets.mjs` rejects embedded
 `.puppyplugin` payloads. `scripts/check-viewer-pack-release.mjs` skips the
 default preset-only profile and rejects an explicitly enabled external-Pack
-release without a production trust root. Packaged enablement comes from signed
-`package.json` capability metadata; unpackaged development may opt in with
+release without a production trust root. Packaged enablement comes from the
+source `package.json` capability inspected by preflight; Electron Builder
+`extraMetadata` is forbidden from overriding it. Development environment flags
+never affect release preflight. Unpackaged development may opt in with
 `PUPPYONE_ENABLE_EXTERNAL_VIEWER_PACKS=1`.
 
 ## 12. Verification
@@ -332,11 +339,14 @@ release without a production trust root. Packaged enablement comes from signed
 - revision-pinned resource ranges, suffix/invalid ranges, HEAD, and revocation;
 - packaged runtime dependency classification.
 
-`tests/viewerRegistryContract.test.ts` covers the preset contract, source
-shapes, order, fallback, and strict validation.
+`tests/viewerRegistryContract.test.ts` covers manifest parity, exhaustive format
+coverage, source shapes, order, fallback, semantic combinations, and executable
+lazy boundaries. `tests/viewerHost.integration.test.ts` covers the default
+placeholder, loading/error/external-open states, and local/cloud adapter gate.
 `tests/viewerPackFeatureGate.test.mjs` proves default-off product metadata,
-packaged environment fail-closure, preload bridge omission, explicit opt-in,
-and profile-sensitive signer enforcement.
+packaged environment fail-closure, preload bridge omission, zero default runtime
+imports/schemes, release-profile integrity, explicit opt-in, and signer
+enforcement.
 
 `npm run smoke:viewer-pack` exercises a real hidden Electron window, signed
 fixture install, custom protocols, fixed preload, `WebContentsView`, and Range

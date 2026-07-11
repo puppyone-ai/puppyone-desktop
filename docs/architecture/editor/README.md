@@ -100,14 +100,17 @@ model.
 
 ## Current implementation status
 
-1. The canonical File Format registry and versioned preset Viewer Registry are
-   active production paths. Existing Markdown, text/code, CSV, HTML, Office,
-   image, PDF, audio, video, and placeholder viewers are built-in preset
-   contributions; they are not downloaded packages.
+1. The canonical File Format registry, serializable Preset Viewer manifest, and
+   versioned implementation registry are active production paths. The manifest
+   is the single source of truth for capability, source, and runtime metadata;
+   the registry binds reviewed React implementations without repeating those
+   authority fields. Existing Markdown, text/code, CSV, HTML, Office, image,
+   PDF, audio, video, and placeholder viewers are built-in contributions.
 2. The external Viewer Pack Host has an experimental implementation and
    security coverage, but the signed default product uses the
    `preset-viewers-only` profile. That profile does not register Pack schemes,
-   create a Host, expose Pack IPC/preload APIs, or inject installation UI.
+   import the main-process Pack runtime, create a Host, expose Pack IPC/preload
+   APIs, load the renderer Pack chunk, or inject installation UI.
 3. A future signed build may explicitly enable the external adapter through
    package capability metadata. Catalog, publisher, marketplace, and concrete
    third-party Pack delivery remain uncommitted work and require a separate

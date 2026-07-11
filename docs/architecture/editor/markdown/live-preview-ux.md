@@ -535,9 +535,10 @@ can still use the compartment to ship behind a temporary variant switch, but
 no switch remains for this migration.
 
 After every code change in `vendor/shared-ui`, run
-`npm run check:shared-ui`. `vendor/shared-ui/GENERATED.md` is the current
-source-of-truth note: the historical sync scripts named in
-`vendor/shared-ui/AGENTS.md` do not exist in this repository.
+`npm run check:shared-ui`. `vendor/shared-ui/GENERATED.md` and
+`vendor/shared-ui/AGENTS.md` both describe this standalone repository's
+editable canonical copy; historical monorepo sync scripts are intentionally
+not part of this repository.
 
 ## 11. To-do list
 

@@ -5,6 +5,11 @@ import { resolveViewerPackRoute } from "../../electron/main/viewer-packs/router.
 import { coreViewerCapability, resolveViewerRoute } from "../../vendor/shared-ui/src/editor/viewerCapability.ts";
 import { EMPTY_VIEWER_PACK_SNAPSHOT } from "../../vendor/shared-ui/src/editor/viewerPackTypes.ts";
 import { resolveCoreFormatPolicy } from "../../electron/main/viewer-packs/core-format-policy.mjs";
+import {
+  capabilityForCoreViewer as mainCoreViewerCapability,
+  PRESET_VIEWER_MANIFEST as MAIN_PRESET_VIEWER_MANIFEST,
+} from "../../electron/main/viewer-packs/preset-viewer-manifest.mjs";
+import { PRESET_VIEWER_MANIFEST } from "../../vendor/shared-ui/src/editor/presetViewerManifest.ts";
 
 describe("viewer pack catalog", () => {
   it("is disabled by default and never networks", async () => {
@@ -78,6 +83,16 @@ describe("viewer pack router", () => {
       .toMatchObject({ viewerId: "markdown-editor", capability: "edit" });
     expect(resolveCoreFormatPolicy({ name: "scene.glb", mimeType: "model/gltf-binary" }))
       .toMatchObject({ viewerId: "binary-placeholder", capability: "placeholder" });
+  });
+
+  it("keeps renderer and main capability policy on one canonical manifest", () => {
+    expect(MAIN_PRESET_VIEWER_MANIFEST).toEqual(PRESET_VIEWER_MANIFEST);
+    for (const definition of PRESET_VIEWER_MANIFEST.viewers) {
+      for (const viewerId of [definition.id, ...definition.formatViewerIds]) {
+        expect(mainCoreViewerCapability(viewerId)).toBe(coreViewerCapability(viewerId));
+      }
+    }
+    expect(() => mainCoreViewerCapability("undeclared-viewer")).toThrow(/not declared/i);
   });
 
   it("routes local placeholder .glb to the installed pack", () => {

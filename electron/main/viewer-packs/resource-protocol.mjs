@@ -1,8 +1,9 @@
 import { ResourceBrokerError } from "./resource-broker.mjs";
+import { RESOURCE_PROTOCOL_SCHEME } from "./protocol-schemes.mjs";
+
+export { RESOURCE_PROTOCOL_SCHEME } from "./protocol-schemes.mjs";
 
 /** Session-scoped HTTP Range facade for opaque Viewer Pack resource handles. */
-
-export const RESOURCE_PROTOCOL_SCHEME = "puppyone-resource";
 
 export function registerResourceProtocol({
   session,

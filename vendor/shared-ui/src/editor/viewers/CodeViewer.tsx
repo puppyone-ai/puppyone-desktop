@@ -1,9 +1,20 @@
 import { TextEditorFrame } from "./TextEditorFrame";
 import { CodeMirrorCodeEditor } from "../CodeMirrorCodeEditor";
 import { isTextEditable } from "./viewerUtils";
-import type { EditorViewerContext } from "../viewerTypes";
+import type { PresetViewerRenderContext } from "../viewerTypes";
 
-export function JsonViewer(context: EditorViewerContext) {
+type CodeViewerProps = Pick<
+  PresetViewerRenderContext,
+  | "document"
+  | "format"
+  | "content"
+  | "canEdit"
+  | "onSaveContent"
+  | "hideSourceView"
+  | "saveMode"
+>;
+
+export function JsonViewer(context: CodeViewerProps) {
   const language = context.format.monacoLanguage ?? "json";
   return (
     <TextEditorFrame
@@ -37,7 +48,7 @@ export function JsonViewer(context: EditorViewerContext) {
   );
 }
 
-export function TextFileViewer(context: EditorViewerContext) {
+export function TextFileViewer(context: CodeViewerProps) {
   const language = context.format.monacoLanguage ?? null;
   return (
     <TextEditorFrame
@@ -71,6 +82,6 @@ export function TextFileViewer(context: EditorViewerContext) {
   );
 }
 
-export function canEditTextFile(context: Pick<EditorViewerContext, "document" | "content">): boolean {
+export function canEditTextFile(context: Pick<PresetViewerRenderContext, "document" | "content">): boolean {
   return isTextEditable(context.document, context.content);
 }

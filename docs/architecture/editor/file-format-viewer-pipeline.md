@@ -38,18 +38,18 @@ name + mimeType
       │
       ▼
 fileFormats.json ──► resolveFileFormat() ──► FileFormat { defaultViewer, category, … }
-      │                                             │
-      │                                             ▼
-      │                    PRESET_VIEWER_REGISTRY: first contribution whose match() passes
-      │                                             │
-      │                                             ▼
-      │                    viewer.source: "content" | "resource" | "content-and-resource" | "none"
-      │                                             │
-      ▼                                             ▼
-DataWorkspace reads text content (readFile)  and/or resolves a URL (getFileUrl)
-      │
-      ▼
-FilePreview ──► EditorHost ──► PuppyoneEditorHost ──► viewer.render(context)
+                                                       │
+presetViewerManifest.json ──► capability/source/runtime│
+                  │                                    ▼
+                  └────────► PRESET_VIEWER_REGISTRY: first match() wins
+                                                       │
+                                                       ▼
+                         DataWorkspace acquires declared content/resource source
+                                                       │
+                                                       ▼
+ FilePreview ──► EditorHost ──► PuppyoneEditorHost ──► PresetViewerRenderer
+                                                       │
+                                          eager render() / lazy load()
 ```
 
 ## 2. Stage 1 — the format registry
@@ -91,13 +91,21 @@ formats; that distinction is a *viewer capability*, handled in stage 2/3.
 
 ## 3. Stage 2 — the viewer registry
 
+`vendor/shared-ui/src/editor/presetViewerManifest.json` is the serializable
+single source of truth for a preset viewer's stable id, aliases used by
+`FileFormat.defaultViewer`, core capability, source requirement, and runtime
+boundary. Both shared-ui and Electron main parse this exact file strictly.
+Unknown fields, duplicate ids/aliases, invalid capability/source combinations,
+an undeclared format viewer id, or anything other than one `placeholder` +
+`none` fallback fail at startup/test time.
+
 `vendor/shared-ui/src/editor/viewerRegistry.tsx` owns the immutable
-`PRESET_VIEWER_REGISTRY`. Each entry implements the versioned
-`PresetViewerContribution` contract: stable `id`, core `capability`, source
-requirement, runtime boundary, format-aware `match`, optional normalization /
-editability, and `render(context)`. The registry rejects unknown fields,
-unsupported authority values, duplicate ids, and any fallback that is not a
-metadata-only placeholder.
+`PRESET_VIEWER_REGISTRY`. Each implementation supplies only its canonical id,
+format-aware `match`, optional normalization/editability, and one executable
+render boundary. `definePresetViewer()` joins that implementation to the
+manifest metadata and rejects attempts to repeat or override authority fields.
+Editable viewers must provide `isEditable`; viewers without content cannot
+normalize it; `allowPreviewContent` is valid only for a combined source.
 
 `resolveEditorViewer(document)` resolves the format (stage 1), then returns the
 **first** contribution whose `match({ document, format, resolvedExtension })`
@@ -115,11 +123,14 @@ decide what to load:
 | `content-and-resource` | Needs both | html artifact |
 | `none` | Renders from metadata alone | placeholder fallback |
 
-The contract's `runtime` is `eager` or `lazy`. `lazy` means the contribution
-owns a dynamic-import or worker boundary for heavy format runtimes; it does not
-grant worker, network, filesystem, or Electron authority. Format extensions and
-MIME types never enter the contribution contract: `resolveFileFormat()` remains
-the only routing fact source, including MIME-only Office inputs.
+The manifest's `runtime` is executable rather than descriptive. An `eager`
+implementation must provide `render()` and cannot provide `load()`; a `lazy`
+implementation must provide a dynamic `load()` and cannot provide `render()`.
+`PresetViewerRenderer` owns the cached `React.lazy` + Suspense boundary. Today
+Markdown and Office use that path. Runtime metadata never grants worker,
+network, filesystem, or Electron authority. Format extensions and MIME types
+never enter the viewer implementation contract: `resolveFileFormat()` remains
+the routing source, including MIME-only Office inputs.
 
 `EDITOR_VIEWERS` remains a deprecated compatibility alias for downstream code.
 New code uses `PRESET_VIEWERS` or `PRESET_VIEWER_REGISTRY`.
@@ -148,7 +159,11 @@ file and loads only what the viewer needs:
 
 The render chain is `FilePreview` → `EditorHost` (adapts a `DataNode` +
 loaded content into an `EditorDocument`) → `PuppyoneEditorHost` (resolves
-the viewer, computes editability, renders). Selection/commit lifecycle
+the viewer and computes editability) → `PresetViewerRenderer`. Leaf Viewer
+components receive format-specific `Pick`-based prop contracts instead of
+depending on external extension authority. The optional
+`ViewerExtensionHostAdapter` exists only at the Host composition boundary.
+Selection/commit lifecycle
 rules for this chain live in
 [Smooth Preview Transitions](smooth-preview-transitions.md).
 
@@ -436,16 +451,22 @@ source-code extensions)
 
 ## 7. Invariants
 
-- `fileFormats.json` is the only place extensions and MIME types are
-  declared. No viewer, icon, or service hard-codes its own extension list
-  — the one sanctioned exception is `isOfficeDocument` in the viewer
-  registry (a MIME/name sniff for routing) and the parser dispatch inside
-  `OfficeViewer`, which is a capability statement, not format detection.
-- The two registry resolvers (shared-ui TS, local-api mjs) stay
-  behaviorally identical.
+- `fileFormats.json` is the only routing declaration for extensions and MIME
+  types. A format-specific renderer may inspect the already-resolved extension
+  to select a parser, but it must not decide whether it owns the document.
+- `presetViewerManifest.json` is the only declaration of built-in Viewer
+  capability, source, runtime, and `defaultViewer` aliases. Renderer and main
+  must parse the same manifest, and every `FileFormat.defaultViewer` must map to
+  exactly one definition.
+- The file-format resolvers (shared-ui TS, local-api mjs, and the main-process
+  activation policy) stay behaviorally identical and consume the same format
+  data.
 - `PRESET_VIEWER_REGISTRY` order is part of the contract; new contributions are
   placed deliberately, ids are unique, and the fallback remains separate and
   last by construction.
+- Preset render context never contains external Viewer Pack snapshots, session
+  creation, or surface authority. Those capabilities enter only through the
+  optional `ViewerExtensionHostAdapter` owned by `PuppyoneEditorHost`.
 - A viewer's `source` declaration is honored: `resource` viewers must
   never trigger a text read (binary files through the text path would be
   wasted I/O and a 1 MB cap they shouldn't inherit).

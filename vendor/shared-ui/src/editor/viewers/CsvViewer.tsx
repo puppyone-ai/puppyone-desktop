@@ -1,9 +1,19 @@
 import { CsvTableEditor } from "../CsvTableEditor";
-import type { EditorViewerContext } from "../viewerTypes";
+import type { PresetViewerRenderContext } from "../viewerTypes";
 import { TextEditorFrame } from "./TextEditorFrame";
 import { getDelimitedTableDelimiter, isTextEditable } from "./viewerUtils";
 
-export function CsvViewer(context: EditorViewerContext) {
+type CsvViewerProps = Pick<
+  PresetViewerRenderContext,
+  | "document"
+  | "content"
+  | "canEdit"
+  | "onSaveContent"
+  | "hideSourceView"
+  | "saveMode"
+>;
+
+export function CsvViewer(context: CsvViewerProps) {
   return (
     <TextEditorFrame
       documentId={context.document.path}
@@ -28,6 +38,6 @@ export function CsvViewer(context: EditorViewerContext) {
   );
 }
 
-export function canEditCsv(context: Pick<EditorViewerContext, "document" | "content">): boolean {
+export function canEditCsv(context: Pick<PresetViewerRenderContext, "document" | "content">): boolean {
   return isTextEditable(context.document, context.content);
 }

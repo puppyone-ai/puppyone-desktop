@@ -6,7 +6,9 @@
  * only reachable from that session.
  */
 
-export const PLUGIN_PROTOCOL_SCHEME = "puppyone-plugin";
+import { PLUGIN_PROTOCOL_SCHEME } from "./protocol-schemes.mjs";
+
+export { PLUGIN_PROTOCOL_SCHEME } from "./protocol-schemes.mjs";
 
 export function registerPluginProtocol({
   session,

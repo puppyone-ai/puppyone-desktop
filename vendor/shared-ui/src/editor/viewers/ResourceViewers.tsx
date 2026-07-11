@@ -2,9 +2,19 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { FilePreviewIcon } from "../../file/fileIcons";
-import type { EditorViewerContext } from "../viewerTypes";
+import type { PresetViewerRenderContext } from "../viewerTypes";
 
-export function ImageResourceViewer({ document, content, fileUrl, fileUrlLoading, fileUrlError }: EditorViewerContext) {
+type ResourceViewerProps = Pick<
+  PresetViewerRenderContext,
+  | "document"
+  | "content"
+  | "fileUrl"
+  | "fileUrlLoading"
+  | "fileUrlError"
+  | "fileIconTheme"
+>;
+
+export function ImageResourceViewer({ document, content, fileUrl, fileUrlLoading, fileUrlError }: ResourceViewerProps) {
   const imageSource = fileUrl || content || document.preview || null;
   return (
     <ResourcePreviewState fileUrl={imageSource} loading={fileUrlLoading} error={fileUrlError} label="image">
@@ -17,7 +27,7 @@ export function ImageResourceViewer({ document, content, fileUrl, fileUrlLoading
   );
 }
 
-export function PdfResourceViewer({ document, fileUrl, fileUrlLoading, fileUrlError }: EditorViewerContext) {
+export function PdfResourceViewer({ document, fileUrl, fileUrlLoading, fileUrlError }: ResourceViewerProps) {
   return (
     <ResourcePreviewState fileUrl={fileUrl} loading={fileUrlLoading} error={fileUrlError} label="PDF">
       {(url) => (
@@ -29,7 +39,7 @@ export function PdfResourceViewer({ document, fileUrl, fileUrlLoading, fileUrlEr
   );
 }
 
-export function AudioResourceViewer({ document, fileUrl, fileUrlLoading, fileUrlError, fileIconTheme }: EditorViewerContext) {
+export function AudioResourceViewer({ document, fileUrl, fileUrlLoading, fileUrlError, fileIconTheme }: ResourceViewerProps) {
   return (
     <ResourcePreviewState fileUrl={fileUrl} loading={fileUrlLoading} error={fileUrlError} label="audio">
       {(url) => (
@@ -48,7 +58,7 @@ export function AudioResourceViewer({ document, fileUrl, fileUrlLoading, fileUrl
   );
 }
 
-export function VideoResourceViewer({ document, fileUrl, fileUrlLoading, fileUrlError }: EditorViewerContext) {
+export function VideoResourceViewer({ document, fileUrl, fileUrlLoading, fileUrlError }: ResourceViewerProps) {
   return (
     <ResourcePreviewState fileUrl={fileUrl} loading={fileUrlLoading} error={fileUrlError} label="video">
       {(url) => (

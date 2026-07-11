@@ -12,7 +12,7 @@ export function resolveViewerPackFeatureProfile({
   environment = {},
   isPackaged = false,
 } = {}) {
-  const metadataEnabled = packageMetadata?.puppyoneCapabilities?.[EXTERNAL_VIEWER_PACKS_CAPABILITY] === true;
+  const metadataEnabled = resolvePackagedExternalViewerPacksCapability(packageMetadata);
   const developmentOverride = !isPackaged && environment?.[EXTERNAL_VIEWER_PACKS_DEV_ENV] === "1";
   const enabled = metadataEnabled || developmentOverride;
 
@@ -21,4 +21,27 @@ export function resolveViewerPackFeatureProfile({
     externalViewerPacks: enabled,
     rendererArguments: Object.freeze(enabled ? [EXTERNAL_VIEWER_PACKS_RENDERER_ARGUMENT] : []),
   });
+}
+
+/**
+ * Source package metadata is the only distributable profile authority. Builder
+ * `extraMetadata` is forbidden from silently changing the effective capability
+ * after release preflight has inspected package.json.
+ */
+export function resolvePackagedExternalViewerPacksCapability(packageMetadata = {}) {
+  const sourceValue = packageMetadata?.puppyoneCapabilities?.[EXTERNAL_VIEWER_PACKS_CAPABILITY];
+  if (sourceValue !== undefined && typeof sourceValue !== "boolean") {
+    throw new TypeError("puppyoneCapabilities.externalViewerPacks must be boolean when present.");
+  }
+  const overrideValue = packageMetadata?.build?.extraMetadata
+    ?.puppyoneCapabilities?.[EXTERNAL_VIEWER_PACKS_CAPABILITY];
+  if (overrideValue !== undefined && typeof overrideValue !== "boolean") {
+    throw new TypeError("build.extraMetadata externalViewerPacks override must be boolean when present.");
+  }
+  if (overrideValue !== undefined && overrideValue !== sourceValue) {
+    throw new Error(
+      "Electron builder extraMetadata cannot override the external Viewer Pack release capability.",
+    );
+  }
+  return sourceValue === true;
 }

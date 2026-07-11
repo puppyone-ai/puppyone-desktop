@@ -1,30 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import { PresetViewerRenderer } from "./PresetViewerRenderer";
+import { resolveEditorViewer } from "./viewerRegistry";
 import {
   ExternalViewerAdapter,
-  resolveEditorViewer,
   resolveViewerRouteForDocument,
-} from "./viewerRegistry";
+} from "./viewerPackAdapter";
 import type {
   EditorDocument,
   EditorSaveMode,
-  ExternalViewerSurfaceRenderer,
   MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
 } from "./viewerTypes";
-import type { ViewerContribution, ViewerPackSnapshot } from "./viewerPackTypes";
+import type {
+  ExternalViewerSurfaceRenderer,
+  ViewerExtensionHostAdapter,
+} from "./viewerHostAdapters";
+import type { ViewerContribution } from "./viewerPackTypes";
 import type { AppPreviewController, OfficeDocumentConverter } from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
-import type { ReactNode } from "react";
 
 export type { EditorDocument, EditorDocumentKind, EditorSaveMode, MarkdownHtmlTrustMode } from "./viewerTypes";
-
-export type ViewerPackInstallFallbackRenderer = (request: {
-  document: EditorDocument;
-}) => ReactNode;
 
 export type PuppyoneEditorHostProps = {
   document: EditorDocument;
@@ -45,14 +44,11 @@ export type PuppyoneEditorHostProps = {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
-  viewerPackSnapshot?: ViewerPackSnapshot | null;
-  externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
   /**
-   * Host-provided install CTA for placeholder-grade local documents with no
-   * matching enabled pack. Catalog is disabled by default; this is the Stage B1
-   * local-install path. Shared-ui never picks files or talks to Electron.
+   * Optional host composition port for external viewer extensions. The entire
+   * port is absent in the default preset-only product profile.
    */
-  viewerPackInstallFallback?: ViewerPackInstallFallbackRenderer | null;
+  viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
 };
 
 export function PuppyoneEditorHost({
@@ -74,9 +70,7 @@ export function PuppyoneEditorHost({
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
-  viewerPackSnapshot = null,
-  externalViewerSurface = null,
-  viewerPackInstallFallback = null,
+  viewerExtensionAdapter = null,
 }: PuppyoneEditorHostProps) {
   const { viewer, format, resolvedExtension } = resolveEditorViewer(document);
 
@@ -84,33 +78,33 @@ export function PuppyoneEditorHost({
   // deterministically (§5.1); only a local doc with exactly one (or a chosen)
   // enabled pack activates. The main process is still the sole authority — this
   // only decides which host-provided surface slot to render.
-  if (externalViewerSurface || viewerPackInstallFallback) {
-    const route = resolveViewerRouteForDocument(document, viewerPackSnapshot);
-    if (externalViewerSurface && route.kind === "plugin") {
+  if (viewerExtensionAdapter) {
+    const route = resolveViewerRouteForDocument(document, viewerExtensionAdapter.snapshot);
+    if (viewerExtensionAdapter.renderSurface && route.kind === "plugin") {
       return (
         <ExternalViewerAdapter
           document={document}
           contribution={route.contribution}
-          renderSurface={externalViewerSurface}
+          renderSurface={viewerExtensionAdapter.renderSurface}
         />
       );
     }
-    if (externalViewerSurface && route.kind === "chooser") {
+    if (viewerExtensionAdapter.renderSurface && route.kind === "chooser") {
       return (
         <ExternalViewerChooser
           document={document}
           candidates={route.candidates}
-          renderSurface={externalViewerSurface}
+          renderSurface={viewerExtensionAdapter.renderSurface}
         />
       );
     }
     if (
-      viewerPackInstallFallback &&
+      viewerExtensionAdapter.renderInstallFallback &&
       route.kind === "unsupported" &&
       route.reason === "no-match" &&
       document.sourceKind === "local"
     ) {
-      return <>{viewerPackInstallFallback({ document })}</>;
+      return <>{viewerExtensionAdapter.renderInstallFallback({ document })}</>;
     }
   }
 
@@ -136,8 +130,9 @@ export function PuppyoneEditorHost({
   }
 
   return (
-    <>
-      {viewer.render({
+    <PresetViewerRenderer
+      viewer={viewer}
+      context={{
         document,
         format,
         resolvedExtension,
@@ -161,10 +156,8 @@ export function PuppyoneEditorHost({
         openExternalFile,
         convertOfficeDocumentToDocx,
         onSaveContent,
-        viewerPackSnapshot,
-        externalViewerSurface,
-      })}
-    </>
+      }}
+    />
   );
 }
 

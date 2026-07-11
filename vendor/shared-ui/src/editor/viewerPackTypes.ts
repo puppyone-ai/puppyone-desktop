@@ -4,6 +4,7 @@
  * immutable snapshots; renderers never scan the pack store.
  */
 
+import type { DocumentSourceKind } from "./documentSource";
 import type { CoreViewerCapability } from "./viewerContract";
 
 export type { CoreViewerCapability } from "./viewerContract";
@@ -11,9 +12,8 @@ export type { CoreViewerCapability } from "./viewerContract";
 export const VIEWER_PACK_API_VERSION = 1 as const;
 export const VIEWER_PACK_SCHEMA_VERSION = 1 as const;
 
-export type ViewerDocumentSourceKind = "local" | "cloud" | "unknown";
-/** Public alias used by the editor/host surface. */
-export type DocumentSourceKind = ViewerDocumentSourceKind;
+export type ViewerDocumentSourceKind = DocumentSourceKind;
+export type { DocumentSourceKind } from "./documentSource";
 
 export type ViewerPackPermissionCurrentDocument = "metadata" | "readRange";
 
