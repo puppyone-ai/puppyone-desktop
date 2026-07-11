@@ -2,6 +2,10 @@
 
 Date: 2026-07-11. Status: accepted and implemented.
 
+ADR-003 supersedes the earlier assumption that multiple harnesses are a normal
+user-facing product extension. The contract and dependency boundaries remain
+accepted; production Chat composition is now fixed to OpenCode.
+
 ## Context
 
 The first provider-neutral slice had the correct process boundary, but the
@@ -33,9 +37,10 @@ bridge. Normalized events and runtime inspection results are validated at their
 own boundaries. Constants and TypeScript unions are checked for drift.
 
 `AgentRuntimeRegistry` and `AgentRuntimeHost` are pure Core. Only
-`bootstrap/create-agent-runtime-host.mjs` imports OpenCode and Codex runtime
-definitions. Runtime definitions own discovery, adapter construction and
-resource cleanup.
+`bootstrap/create-agent-runtime-host.mjs` imports concrete definitions. The
+current source still imports the legacy Codex vertical slice during migration;
+the target production composition registers OpenCode only for new Chat
+sessions. Definitions own discovery, adapter construction and resource cleanup.
 
 Renderer code follows:
 
@@ -65,7 +70,7 @@ Benefits:
 
 - malformed or additive privileged Renderer fields do not reach use cases;
 - response and event drift fails near the responsible boundary;
-- a new runtime is additive outside the single bootstrap registration;
+- the process seam can be replaced in tests without changing product layers;
 - UI, state synchronization and projection can evolve independently;
 - written dependency rules are executable CI policy.
 

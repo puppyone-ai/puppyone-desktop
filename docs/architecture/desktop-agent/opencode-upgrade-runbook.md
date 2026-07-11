@@ -32,9 +32,11 @@ current slot fails integrity before spawn
   -> discovery skips it
   -> previous verified slot
   -> external OpenCode at/above the exact tested protocol floor, clearly labelled
-  -> explicit Codex compatibility runtime
   -> fail closed with setup diagnostics
 ```
+
+Never fall back to Codex app-server or another harness. Provider availability
+is evaluated only after a verified OpenCode harness is running.
 
 For a behavior regression after successful spawn, roll back the PuppyOne app
 release. Old request IDs and secrets are invalid after every restart. Never

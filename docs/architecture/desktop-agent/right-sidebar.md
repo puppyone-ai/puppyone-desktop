@@ -7,9 +7,10 @@ sidebar.
 Read [Desktop Agent Architecture](README.md) first for the process, IPC,
 provider-adapter, event, security, and persistence boundaries.
 
-The archived [Codex Implementation Brief](history/codex-vertical-slice.md) records the
-original direct-runtime slice. The current runtime architecture is in the main
-README and OpenCode ADR.
+The archived [Codex Implementation Brief](history/codex-vertical-slice.md)
+records the original direct-runtime slice. It is not the current product route.
+The authoritative decision is [ADR-003](ADR-003-opencode-only-chat-harness.md):
+every new Chat session uses OpenCode and provider/model choice stays inside it.
 
 ## Status
 
@@ -21,16 +22,18 @@ README and OpenCode ADR.
   Chat and Terminal panels, preserves Terminal's lazy PTY lifecycle,
   retains the selected surface, and keeps a running Agent turn alive while
   Chat is hidden.
-- **Implemented:** OpenCode Harness and Codex direct-runtime selection,
-  readiness/account/model/mode states, virtual transcript streaming, safe
+- **Implemented foundation:** OpenCode Harness, readiness/account/model/mode
+  states, virtual transcript streaming, safe
   Markdown, part/tool registries, plan/tool/command/file activity, permission
   and structured-question docks, `/` commands, authorized `@` context and
   attachments, Stop, partial-history warning, and Jump to latest.
 - **Implemented by capability:** history list/resume/fork/archive/delete,
-  compaction, queue/steer controls, and runtime/model/mode selection. Unsupported
+  compaction, queue/steer controls, and model/mode selection. Unsupported
   controls are omitted.
-- **Product gate:** provider options appear only when their adapter and allowed
-  authentication mode are available.
+- **Migration required:** remove the legacy runtime selector and direct Codex
+  new-session route. A sidebar Chat submission must always reach OpenCode.
+- **Product gate:** provider options appear only when OpenCode advertises them
+  and PuppyOne permits their authentication mode.
 
 ## Product decision
 
@@ -59,7 +62,7 @@ panel components. The sidebar itself contains no Chat/Terminal selector.
 |                                  Deny  Allow once   |
 |------------------------------------------------------|
 | Plan, build, / commands, @ context            Stop   |
-| Harness   Mode   Provider / Model   Attach           |
+| Provider / Model   Agent / Mode   Attach             |
 +------------------------------------------------------+
 ```
 
@@ -74,7 +77,8 @@ The Chat surface has four primary regions in document order:
 1. **Session header** — session title and actions.
 2. **Transcript** — user messages, assistant output, and activity items.
 3. **Blocking dock** — an approval or structured question when one is pending.
-4. **Composer** — prompt, attachments, runtime/model/mode controls, submit, and stop/queue state.
+4. **Composer** — prompt, attachments, provider/model/agent-mode controls,
+   submit, and stop/queue state.
 
 Only the transcript is the primary scroll region. The header, blocking dock,
 and composer remain visible without using `position: fixed`. The layout uses
@@ -116,18 +120,21 @@ The Chat panel has its own session header with title, New Session, diagnostics,
 reset, and close actions. Controls use native buttons and menus, preserve
 keyboard focus styles, and expose meaningful accessible names.
 
-## Runtime and model-provider controls
+## Provider, model and agent controls
 
-The compact composer footer contains only controls the active runtime supports:
+OpenCode is fixed and is not a composer control. The compact footer contains
+only choices advertised by the OpenCode catalog:
 
 - provider selector;
 - model selector when model discovery is available;
+- model-scoped variant/effort selector when advertised;
 - mode selector for supported modes such as Agent, Plan, or Ask;
 - compact account/readiness status when action is required.
 
-Changing runtime closes the current connection without deleting its history,
-then restores or creates a session for the selected runtime. Native sessions
-are never silently migrated between runtimes and remain available in History.
+Changing provider never changes the harness. It selects another inference route
+inside OpenCode and preserves one permission, tool and session authority. If a
+provider/model change requires a new native session, the UI says so before
+creating it; it never nests or falls back to another agent product.
 
 Changing model or mode follows provider capability:
 
@@ -137,15 +144,14 @@ Changing model or mode follows provider capability:
 - if it is unsupported, the control is omitted rather than disabled without an
   explanation.
 
-Readiness states have explicit recovery actions:
+Harness and provider readiness are distinct and have explicit recovery actions:
 
 | State | Sidebar behavior |
 | --- | --- |
-| `not-installed` | Name the missing provider and offer Refresh after the user installs it externally. |
-| `installed-not-authenticated` | Offer the provider-supported login or setup action when PuppyOne is allowed to host it. |
-| `unsupported-version` | Show detected and minimum supported versions plus the provider's update command. |
-| `ready` | Enable session creation and composer submission. |
-| `error` | Show a concise reason and a provider diagnostics action without exposing secrets. |
+| OpenCode missing/invalid | State that the Chat harness is unavailable and offer the verified application repair/update path; do not fall back. |
+| OpenCode ready, provider unauthenticated | Keep the harness identity and offer that provider's supported login/setup action. |
+| Provider/model ready | Enable OpenCode session creation and composer submission. |
+| Provider error | Keep the native session intact and show a concise provider recovery action without exposing secrets. |
 
 ## Transcript
 
@@ -187,7 +193,8 @@ Expanded details are intentionally bounded:
 - file edits show paths and compact addition/deletion counts, then link to the
   existing Review or file preview surface;
 - searches and reads show query/path plus a compact result summary;
-- MCP and provider tools show a human label and redacted structured arguments;
+- MCP and OpenCode/provider-backed tools show a human label and redacted
+  structured arguments;
 - large results never render an unbounded preformatted block in the sidebar.
 
 The Git and editor subsystems remain the source of truth for full diffs and
@@ -196,39 +203,38 @@ editing behavior.
 
 ## Plans
 
-When the provider exposes plan updates, the sidebar renders one current plan
+When OpenCode exposes plan updates, the sidebar renders one current plan
 item rather than appending a new card for every update.
 
 The plan shows ordered steps and one of pending, in progress, or completed.
-Provider-specific statuses map to this small vocabulary. Unknown statuses remain
-visible as text but do not invent completion.
+OpenCode/provider-specific statuses map to this small vocabulary. Unknown
+statuses remain visible as text but do not invent completion.
 
-Plan mode and a runtime-generated plan are different:
+Plan mode and an OpenCode-generated plan are different:
 
 - **Plan mode** is an operating constraint selected before a turn.
 - **Plan item** is progress content emitted during any compatible turn.
 
-The UI must not imply that showing a plan makes a provider read-only.
+The UI must not imply that showing a plan makes the OpenCode session read-only.
 
 ## Approval dock
 
 An unresolved approval occupies a dock between the transcript and composer.
 The composer remains visible but cannot submit a conflicting new turn unless
-the provider explicitly supports steering while blocked.
+OpenCode explicitly supports steering while blocked.
 
 The dock shows:
 
 - requested tool or action;
 - command, path, domain, or other material scope;
-- provider explanation or risk context when available;
+- OpenCode/tool explanation or risk context when available;
 - Deny and Allow Once;
-- Always Allow only when the provider supplies an explainable durable rule;
+- Always Allow only when OpenCode supplies an explainable durable rule;
 - expiration, cancellation, or stale-request state.
 
-For Codex network approvals, the target host and protocol are mandatory UI;
-for file approvals, `grantRoot` is shown when present. Provider
-`serverRequest/resolved` notifications remove stale docks without waiting for a
-renderer action.
+For network approvals, the target host and protocol are mandatory UI; for file
+approvals, the authorized root is shown when present. OpenCode resolved-request
+events remove stale docks without waiting for a renderer action.
 
 The focused action defaults to the safest choice. Keyboard order follows visual
 order. Escape does not silently approve; it either leaves the request open or
@@ -284,17 +290,17 @@ Each entry contains:
 - last terminal state;
 - partial-history indication when PuppyOne cannot reconstruct all prior items.
 
-Opening history never resumes an active provider turn accidentally. Deleting a
-PuppyOne session mapping and deleting provider-native history are separate
-operations unless the provider exposes deletion and the user explicitly
+Opening history never resumes an active OpenCode turn accidentally. Deleting a
+PuppyOne session mapping and deleting OpenCode-native history are separate
+operations unless OpenCode exposes deletion and the user explicitly
 selects both.
 
 ## Empty, loading, and error states
 
 The sidebar uses distinct states:
 
-- discovering providers;
-- no supported provider installed;
+- discovering the OpenCode harness and its providers;
+- OpenCode harness unavailable;
 - provider setup required;
 - ready with no active session;
 - restoring a session;
@@ -302,16 +308,16 @@ The sidebar uses distinct states:
 - running turn;
 - waiting for approval/question;
 - interrupted turn;
-- recoverable provider disconnect;
-- provider process exited;
+- recoverable provider/model error;
+- OpenCode process exited;
 - partial history restored.
 
 Loading retains the previous committed transcript when safe. A temporary model
 or account refresh does not blank the entire sidebar.
 
-Errors state what failed and what remains valid. For example, a provider crash
-can leave file changes on disk; the sidebar must not imply that interrupting or
-retrying automatically reverted them.
+Errors state what failed and what remains valid. For example, an OpenCode or
+provider failure can leave file changes on disk; the sidebar must not imply that
+interrupting or retrying automatically reverted them.
 
 ## Resize and scroll behavior
 
@@ -353,7 +359,7 @@ Persisted presentation preference
   sidebar open
   sidebar width
   last selected surface
-  preferred provider/model/mode
+  preferred provider/model/variant/mode
 
 Workspace + session projection
   active application session id
@@ -363,8 +369,9 @@ Workspace + session projection
   independent Chat scroll position
 
 Main-process runtime state
-  provider connection/process
-  provider-native session id
+  OpenCode connection/process
+  OpenCode native session id
+  selected provider/model/variant
   active turn
   pending approval/question
   authoritative event ordering
@@ -385,9 +392,9 @@ src/features/desktop-agent/
   agentTypes.ts                   migration-only re-export
 ```
 
-`RightAgentPanel` composes these units but does not implement provider mappings.
-Provider-to-event mapping belongs in Electron main-process adapters, and pure
-event-to-view projection belongs in `domain/agent-projection.ts`.
+`RightAgentPanel` composes these units but does not implement OpenCode/provider
+mappings. OpenCode-to-event mapping belongs in Electron main-process adapters,
+and pure event-to-view projection belongs in `domain/agent-projection.ts`.
 
 ## Acceptance criteria
 
@@ -396,12 +403,13 @@ The implemented sidebar contract remains satisfied when:
 - the independent Chat and Terminal header buttons switch panels without losing
   their active state;
 - a hidden running agent continues safely and reports completion on return;
-- provider selection is capability-driven and never migrates history silently;
+- every new Chat session uses OpenCode and no runtime selector is rendered;
+- provider/model selection is catalog-driven and never replaces the harness;
 - streamed text, tools, plans, diffs, approvals, and questions preserve event
   order;
 - full diffs and files open in their existing owning surfaces;
 - no provider credential or arbitrary process API crosses into the renderer;
-- stop, reset, hide, window close, provider crash, and app quit have distinct,
-  tested outcomes;
+- stop, reset, hide, window close, OpenCode exit, provider failure, and app quit
+  have distinct, tested outcomes;
 - the entire experience is keyboard accessible from 420px through 760px;
 - Terminal behavior and its current tests remain unchanged.

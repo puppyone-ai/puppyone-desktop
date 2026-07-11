@@ -27,6 +27,7 @@ directly:
 - [Desktop Appearance Settings](architecture/desktop-appearance-settings.md)
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
 - [Desktop Agent Architecture](architecture/desktop-agent/README.md)
+  - [OpenCode-only Chat Harness Decision](architecture/desktop-agent/ADR-003-opencode-only-chat-harness.md)
 
 ## Release
 

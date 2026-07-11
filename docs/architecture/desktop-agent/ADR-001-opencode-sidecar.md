@@ -1,18 +1,20 @@
-# ADR-001: OpenCode sidecar as the primary local-agent harness
+# ADR-001: OpenCode sidecar process boundary
 
-Date: 2026-07-11. Status: accepted and implemented.
+Date: 2026-07-11. Status: accepted for the sidecar boundary. Its former peer
+Codex runtime routing is superseded by ADR-003.
 
 ## Decision
 
 Use an exact, release-verified OpenCode executable behind a main-process-only
-loopback HTTP/SSE boundary. Keep Codex app-server behind the same
-`AgentRuntimePort` as a direct-CLI compatibility runtime. Do not import the
-private, still-changing `@opencode-ai/core` V2 service graph.
+loopback HTTP/SSE boundary. OpenCode is the only product Chat harness; model
+providers are selected inside it. Do not import the private, still-changing
+`@opencode-ai/core` V2 service graph.
 
 ```text
 React -> typed IPC -> AgentService -> AgentRuntimePort
-                                      +-- OpenCode sidecar (default)
-                                      +-- Codex app-server (explicit direct)
+                                      +-- OpenCode sidecar (only product harness)
+                                                |
+                                                +-- provider/model catalog
 ```
 
 ## Why sidecar, not ACP, for the product path
@@ -36,7 +38,7 @@ Benefits:
 - provider, model, tool, MCP, skill, prompt, permission, session and compaction
   behavior stays upstream;
 - PuppyOne owns a smaller security/presentation boundary;
-- Codex direct auth remains available without pretending OpenCode is Codex;
+- OpenAI/Codex, Anthropic and other providers remain choices inside one loop;
 - runtime upgrades are explicit manifest changes.
 - an app-owned deterministic profile can keep repository config, plugins, MCP
   commands and permission overrides outside the trust boundary by default.

@@ -1,8 +1,9 @@
 # Desktop Local Agent Chat architecture
 
-Status: implemented behind the existing experimental `desktopAgentChat` gate.
-OpenCode is the primary harness; the existing Codex app-server integration is a
-direct-CLI compatibility runtime. Terminal remains a separate sibling surface.
+Status: target architecture accepted; implementation migration required behind
+the existing experimental `desktopAgentChat` gate. OpenCode is the only product
+Chat harness. The existing Codex app-server path is legacy implementation debt,
+not a peer runtime or fallback. Terminal remains a separate sibling surface.
 
 This document is intentionally made of prose and plain-text diagrams. It does
 not require a diagram renderer.
@@ -25,7 +26,7 @@ PuppyOne Desktop
       |     +-- virtual timeline
       |     +-- part/tool renderer registry
       |     +-- permission/question docks
-      |     +-- runtime/model/mode composer
+      |     +-- provider/model/variant/agent-mode composer
       |
       +-- Application (provider-neutral)
       |     +-- workspace-scoped AgentSessionController
@@ -40,31 +41,43 @@ PuppyOne Desktop
       |
       +-- Electron main authority
             +-- AgentService: owner/session/order/replay/journal
-            +-- AgentRuntimeHost
-            |     +-- AgentRuntimeRegistry
-            |     +-- OpenCodeSidecarRuntime (primary)
-            |     +-- CodexAppServerRuntime (compatibility)
+            +-- OpenCode AgentRuntimePort adapter
+            |     +-- pinned OpenCode sidecar (only product harness)
+            |     +-- native provider/model/session catalog
             +-- workspace/reference authorization
             +-- process shutdown and secret redaction
 ```
 
-## The two concepts that must not be mixed
+## Concepts that must not be mixed
 
 ```text
-Agent Runtime / Harness                    Model Provider
-------------------------------------       -----------------------------
-OpenCode sidecar                           OpenAI
-Codex app-server                           Anthropic
-future Claude/Cursor direct adapter        Google / OpenRouter / others
+Harness              OpenCode only; owns loop, tools, prompts, permissions,
+                     MCP, skills, compaction and native execution sessions.
 
-Owns loop, tools, prompt, session,          Owns inference authentication,
-permission, MCP, skills, compaction         model access and billing
+Provider route       OpenAI/ChatGPT, Anthropic, Google, OpenRouter, Modal or
+                     another authorized compatible inference endpoint; owns
+                     authentication, inference transport and billing.
+
+Model + variant      Provider-scoped model identity and only the options that
+                     model advertises.
+
+Agent profile/mode   OpenCode behavior configuration such as Build or Plan;
+                     not a harness.
+
+Product session      PuppyOne mapping, UI projection and bounded redacted
+                     cache pointing to one authoritative OpenCode session.
 ```
 
-Selecting OpenCode does not claim to reuse a user's Codex or Cursor
-subscription. Selecting Codex explicitly uses the local Codex app-server and
-its external authentication. The renderer presents capabilities returned by a
-runtime; it never branches lifecycle behavior on a runtime name.
+“Codex” in the product provider/model controls means an OpenAI/ChatGPT route and
+a Codex-family model executed by OpenCode. `codex app-server`, Claude Code and
+Cursor CLI are agent products, not automatically valid model providers. A
+future authorized bridge may reuse their compute or credentials only at the
+provider layer; it must not replace or nest another loop behind OpenCode.
+
+The normal Chat UI never exposes harness choice. If OpenCode is unavailable,
+Chat fails closed with setup diagnostics instead of silently changing its
+semantics. [ADR-003](ADR-003-opencode-only-chat-harness.md) is authoritative for
+this product decision.
 
 ## Layering and one-way dependencies
 
@@ -79,19 +92,20 @@ src/App.tsx
 Electron IPC
   -> AgentService / application/            ownership and use cases
   -> domain/                                session model
-  -> runtime/ AgentRuntimePort              provider-neutral port
+  -> runtime/ AgentRuntimePort              OpenCode process seam
 
-bootstrap/create-agent-runtime-host.mjs     composition root only
-  -> runtimes/opencode/                     OpenCode implementation
-  -> runtimes/codex/                        Codex implementation
-  -> runtime/ AgentRuntimeRegistry          definitions injected here
+bootstrap/create-agent-runtime-host.mjs     production composition root
+  -> runtimes/opencode/                     only new-session harness
+  -> runtime/ AgentRuntimeRegistry          infrastructure/test seam only
 ```
 
-The Registry and Port never import concrete runtimes. Only the composition root
-imports both Core and implementations. Main domain never imports application or
-infrastructure; Renderer domain never imports application or UI. OpenCode/Codex
-payloads are normalized and bounded before IPC. `check-agent-architecture.mjs`
-enforces these rules in every production build.
+The Registry and Port never import concrete runtimes. Product composition is
+fixed to OpenCode; a fake definition may still be injected in contract tests.
+Runtime neutrality is an internal dependency rule, not a product-level harness
+selector. Main domain never imports application or infrastructure; Renderer
+domain never imports application or UI. OpenCode payloads are normalized and
+bounded before IPC. `check-agent-architecture.mjs` enforces these rules in every
+production build.
 
 ## Source layout
 
@@ -120,8 +134,8 @@ electron/main/agent/
   migrations/
     legacy-session-format.mjs         v1 Codex journal compatibility edge
   runtime/
-    agent-runtime-port.mjs            required port + capability vocabulary
-    agent-runtime-registry.mjs        pure registry + main-owned host
+    agent-runtime-port.mjs            OpenCode process + fake-test contract
+    agent-runtime-registry.mjs        internal registry + main-owned host
     executable-discovery.mjs          bounded generic discovery
   runtimes/opencode/
     opencode-manifest.mjs             release/source/capability pin
@@ -135,8 +149,8 @@ electron/main/agent/
   runtimes/codex/
     codex-discovery.mjs               local CLI discovery/version/auth
     codex-jsonl-rpc-connection.mjs    bounded app-server transport
-    codex-app-server-adapter.mjs      direct compatibility runtime
-    codex-runtime-definition.mjs      injectable Codex definition
+    codex-app-server-adapter.mjs      legacy vertical-slice adapter
+    codex-runtime-definition.mjs      pending removal from product composition
 
 src/features/desktop-agent/
   index.ts                            public feature entrypoint
@@ -156,7 +170,7 @@ src/features/desktop-agent/
     AgentQuestionDock.tsx             typed blocking questions
     SafeMarkdown.tsx                  no-innerHTML Markdown surface
     AgentTranscript.tsx               <=120 mounted virtual rows
-    AgentComposer.tsx                 /, @, files, runtime/model/mode
+    AgentComposer.tsx                 target: /, @, files, provider/model/mode
     RightAgentPanel.tsx               view composition only
     desktop-agent.css                 responsive PuppyOne tokens
   agentTypes.ts                       migration-only type re-export
@@ -172,19 +186,26 @@ vendor/opencode/
 ## Three owners of truth
 
 ```text
-OpenCode or Codex native truth
-  model auth, agent loop, tools, provider session, native history
+OpenCode native truth
+  provider auth, agent loop, tools, messages/parts, native session,
+  compaction, fork lineage and native history
                     |
                     v
 PuppyOne main-process truth
-  runtime selection, process health, canonical workspace, window owner,
-  approval/question correlation, normalized sequence, bounded journal
+  OpenCode process health, native-session mapping, canonical workspace,
+  window owner, provider/model selection, approval/question correlation,
+  normalized sequence and bounded redacted projection cache
                     |
                     v
 Renderer presentation truth
-  turns/parts/rows, expanded cards, draft, selected controls,
+  turns/parts/rows, expanded cards, draft, provider/model/mode controls,
   scroll anchor and row measurements
 ```
+
+OpenCode is the canonical conversation and execution record. The PuppyOne
+journal is a bounded product index and replay cache, not an independent source
+of agent truth. On a partial or conflicting restore, normalized OpenCode native
+history wins.
 
 React unmount, Sidebar hide and window blur do not terminate a turn. Explicit
 Stop, a terminal runtime event, window destruction or app quit can do so. A
@@ -194,7 +215,7 @@ App quit also waits when inspection started the sidecar but no application
 session was created; runtime-resource state is tracked separately from session
 count so that process cannot become an orphan.
 
-## Main-process runtime contract
+## Main-process harness contract
 
 Every adapter provides the required `AgentRuntimePort` methods:
 
@@ -209,20 +230,18 @@ steer, queue, fork, compact, approval, question,
 attachment, context, model, mode, commands, MCP and skills
 ```
 
-The descriptor identifies the harness. Models returned by `inspect()` identify
-model providers separately. `AgentRuntimeRegistry` selects the highest-priority
-ready runtime unless the user explicitly selects one. `AgentRuntimeHost` owns
-registry shutdown. `AgentService` applies the same create/resume/turn/replay
-lifecycle to every runtime.
+The port is the Electron/OpenCode process boundary. Production new-session
+composition selects OpenCode without asking the user; the Registry exists for
+composition, lifecycle isolation and fake-harness contract tests, not for a
+product runtime picker. `AgentRuntimeHost` owns sidecar shutdown and
+`AgentService` applies create/resume/turn/replay to OpenCode-backed sessions.
 
-Model options are catalog-scoped. The Codex adapter derives a compatible
-reasoning effort from the selected model's `supportedReasoningEfforts` and
-`defaultReasoningEffort`, then explicitly supplies it at `turn/start`. A UI
-model override therefore cannot accidentally inherit an incompatible global
-Codex effort configured for another model. This mirrors OpenCode's rule that a
-variant is applied only when it exists in the selected model's `variants` map.
-Provider errors are normalized in main; the projection also unwraps bounded
-legacy JSON error strings so old journals remain readable.
+Providers, models and variants come from the OpenCode catalog. Options are
+model-scoped: a variant is applied only when it exists in the selected model's
+`variants` map. Changing an OpenAI/Codex model to an Anthropic/Claude model
+therefore changes inference routing without replacing the harness or session
+authority. Provider errors are normalized in main; the projection also unwraps
+bounded legacy JSON error strings so old journals remain readable.
 
 ## OpenCode process and trust boundary
 
@@ -382,7 +401,7 @@ bounded in main and projection layers.
 
 ## Performance and accessibility contract
 
-- OpenCode starts only when Chat first inspects a ready OpenCode runtime.
+- OpenCode starts only when Chat first needs harness inspection or a session.
 - Streaming text is batched at 32 ms; blocking and terminal events bypass the
   batch.
 - A 2,000-row fixture mounts no more than 120 rows.
@@ -398,11 +417,16 @@ bounded in main and projection layers.
 
 ## Extension contract
 
-Adding a runtime does not change Registry, AgentService, preload, Controller or
-UI lifecycle code. Implement `AgentRuntimePort`, return an immutable descriptor
-and capability snapshot, add a runtime definition, and register that definition
-only in the bootstrap composition root. A capability that controls an action
-must have its corresponding method or runtime construction fails.
+Adding a model provider, compatible endpoint or authorized credential bridge
+extends OpenCode's managed provider catalog. It must not add a peer product
+harness, runtime selector or silent fallback. Provider/model/variant identity
+stays separate in the session contract, and model-specific options must be
+validated against the selected catalog entry.
+
+`AgentRuntimePort` remains stable so Electron process management and tests do
+not depend on OpenCode internals. A fake harness can implement it in tests. A
+second production harness requires a new product ADR and migration policy; it
+is not an ordinary provider extension.
 
 Adding an event requires one shared event vocabulary change, main normalization,
 domain projection and an optional UI registry entry. Shared constant/type drift,
@@ -418,6 +442,7 @@ controller. Cross-feature consumers import only `desktop-agent/index.ts`.
 
 - [OpenCode sidecar ADR](ADR-001-opencode-sidecar.md)
 - [Agent contract and boundary ADR](ADR-002-agent-contract-and-boundaries.md)
+- [OpenCode-only product harness ADR](ADR-003-opencode-only-chat-harness.md)
 - [OpenCode adoption spike](opencode-adoption-spike.md)
 - [OpenCode update and rollback runbook](opencode-upgrade-runbook.md)
 - [Right Sidebar product contract](right-sidebar.md)
