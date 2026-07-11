@@ -159,7 +159,7 @@ Benefits:
 - zero customer CLI prerequisite and deterministic support surface;
 - application and engine versions are tested and rolled back together;
 - old global OpenCode installations cannot disable Chat;
-- SDK adoption remains possible without surrendering the trust boundary;
+- the exact-version SDK is adopted without surrendering the trust boundary;
 - billing language distinguishes a free bundled harness from paid inference.
 
 Costs:
