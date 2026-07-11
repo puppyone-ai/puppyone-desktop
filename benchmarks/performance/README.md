@@ -73,3 +73,32 @@ Reference Apple M2 Pro / 16 GB / Electron 41.7.2 result on 2026-07-11:
 The same window recorded 0 stale commits and 0 Long Tasks over 50ms. The
 machine-readable before/after and smoke summary is in
 `baselines/issue-024-m2-pro-2026-07-11.json`.
+
+## Cold first open and background-index contention
+
+The warm run does not cover lazy module evaluation or the period when the
+workspace backlink index first starts. Run the independent cold gate too:
+
+```bash
+npm run smoke:renderer-cold-performance
+```
+
+It starts a fresh visible Electron process, performs no warm-up, enables
+content indexing, records the first 10,000-line Markdown click, and observes
+the renderer for another 1.5 seconds. On the reference M2 Pro, five independent
+acceptance runs reached painted Live Preview in 80.5–94.6ms; base editor
+readiness was 32.7–44.2ms. All recorded zero Long Tasks over 50ms.
+
+The root-cause stress comparison is intentionally stronger than the ordinary
+warm smoke. The eager implementation produced four renderer Long Tasks (62ms,
+202ms, 329ms, and 486ms) while reading/indexing up to 250 files. Streaming one
+document per idle turn with Worker acknowledgement backpressure produced zero
+Long Tasks in the same observation window.
+
+A final 30-sample visible run with indexing enabled reported shell p95 1.5ms,
+base editor p95 4.3ms, painted preview p95 27.6ms, and input p95 1.3ms, with no stale
+commits or Long Tasks. The machine-readable evidence is in
+`baselines/issue-024-motion-freeze-hardening-m2-pro-2026-07-11.json`.
+
+Tracing adds profiler overhead and is diagnostic evidence only; use the
+non-traced cold command for the acceptance budget.

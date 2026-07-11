@@ -32,6 +32,7 @@
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
     "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
     "smoke:renderer-performance": "npm run build && electron scripts/smoke-renderer-performance.mjs",
+    "smoke:renderer-cold-performance": "npm run build && electron scripts/smoke-renderer-performance.mjs --cold --visible --with-link-index",
     "start": "node scripts/start-electron.mjs",
     "test": "vitest run",
     "test:watch": "vitest",

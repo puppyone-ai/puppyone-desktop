@@ -2,9 +2,16 @@ import type { EditorState } from "@codemirror/state";
 import { Decoration } from "@codemirror/view";
 import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../viewerTypes";
 import { createMarkdownImageFeatureWidget } from "../../features/inlineFeatureRegistry";
-import { findMarkdownImageTokens } from "../../features/image/markdownImageModel";
-import { findMarkdownLinkTokens, isExternalMarkdownHref } from "../links/markdownLinkModel";
-import { findWikiLinkTokens } from "../links/wikiLinkModel";
+import {
+  findMarkdownImageTokens,
+  type MarkdownImageToken,
+} from "../../features/image/markdownImageModel";
+import {
+  findMarkdownLinkTokens,
+  isExternalMarkdownHref,
+  type MarkdownLinkToken,
+} from "../links/markdownLinkModel";
+import { findWikiLinkTokens, type MarkdownWikiLinkToken } from "../links/wikiLinkModel";
 import { compileMarkdownElementPlan } from "../plans/markdownPlanCompiler";
 import type { MarkdownElementPlan } from "../plans/markdownPlanTypes";
 import { isSafeHref } from "../../platform/policy/markdownHtmlSanitizerPolicy";
@@ -42,6 +49,7 @@ export function addInlineMarkdownDecorations(
   const elements = getMarkdownElementsInRange(state, lineFrom, lineTo)
     .filter((element) => isInlineDecorationKind(element.kind))
     .sort(compareInlineDecorationPriority);
+  const tokenLookup = createInlineTokenLookup(text, elements);
 
   for (const element of elements) {
     if (element.kind === "inlineHtml") {
@@ -63,13 +71,13 @@ export function addInlineMarkdownDecorations(
 
     switch (element.kind) {
       case "image":
-        addImageElementDecoration(element, lineFrom, text, builders, expandedImageRange, documentPath, markdownAssetUrlResolver);
+        addImageElementDecoration(element, lineFrom, tokenLookup, builders, expandedImageRange, documentPath, markdownAssetUrlResolver);
         break;
       case "wikiLink":
-        addWikiLinkElementDecoration(element, lineFrom, text, builders, inlineRevealRange, markdownLinkGraph, documentPath);
+        addWikiLinkElementDecoration(element, lineFrom, tokenLookup, builders, inlineRevealRange, markdownLinkGraph, documentPath);
         break;
       case "link":
-        addLinkElementDecoration(element, lineFrom, text, builders, inlineRevealRange, markdownLinkGraph, documentPath);
+        addLinkElementDecoration(element, lineFrom, text, tokenLookup, builders, inlineRevealRange, markdownLinkGraph, documentPath);
         break;
       case "strong":
         addDelimitedInlineElementDecoration(element, builders, inlineRevealRange, "cm-md-syntax-strong");
@@ -90,6 +98,30 @@ export function addInlineMarkdownDecorations(
         break;
     }
   }
+}
+
+type InlineTokenLookup = {
+  imagesByFrom: ReadonlyMap<number, MarkdownImageToken>;
+  linksByFrom: ReadonlyMap<number, MarkdownLinkToken>;
+  wikiLinksByFrom: ReadonlyMap<number, MarkdownWikiLinkToken>;
+};
+
+function createInlineTokenLookup(
+  text: string,
+  elements: readonly MarkdownElement[],
+): InlineTokenLookup {
+  const kinds = new Set(elements.map((element) => element.kind));
+  return {
+    imagesByFrom: kinds.has("image")
+      ? new Map(findMarkdownImageTokens(text).map((token) => [token.from, token]))
+      : new Map(),
+    linksByFrom: kinds.has("link")
+      ? new Map(findMarkdownLinkTokens(text).map((token) => [token.from, token]))
+      : new Map(),
+    wikiLinksByFrom: kinds.has("wikiLink")
+      ? new Map(findWikiLinkTokens(text).map((token) => [token.from, token]))
+      : new Map(),
+  };
 }
 
 function compareInlineDecorationPriority(left: MarkdownElement, right: MarkdownElement): number {
@@ -209,7 +241,7 @@ function addEscapeElementDecoration(element: MarkdownElement, builders: Markdown
 function addImageElementDecoration(
   element: MarkdownElement,
   lineFrom: number,
-  text: string,
+  tokenLookup: InlineTokenLookup,
   builders: MarkdownDecorationBuilders,
   expandedImageRange: ExpandedImageRange | null,
   documentPath: string,
@@ -217,10 +249,8 @@ function addImageElementDecoration(
 ) {
   if (expandedImageRange?.from === element.from && expandedImageRange.to === element.to) return;
 
-  const token = findMarkdownImageTokens(text).find((candidate) => (
-    lineFrom + candidate.from === element.from &&
-    lineFrom + candidate.to === element.to
-  ));
+  const candidate = tokenLookup.imagesByFrom.get(element.from - lineFrom);
+  const token = candidate && lineFrom + candidate.to === element.to ? candidate : null;
   if (!token) return;
 
   addReplacementDecoration(
@@ -244,16 +274,14 @@ function addImageElementDecoration(
 function addWikiLinkElementDecoration(
   element: MarkdownElement,
   lineFrom: number,
-  text: string,
+  tokenLookup: InlineTokenLookup,
   builders: MarkdownDecorationBuilders,
   inlineRevealRange: InlineRevealRange | null,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
 ) {
-  const token = findWikiLinkTokens(text).find((candidate) => (
-    lineFrom + candidate.from === element.from &&
-    lineFrom + candidate.to === element.to
-  ));
+  const candidate = tokenLookup.wikiLinksByFrom.get(element.from - lineFrom);
+  const token = candidate && lineFrom + candidate.to === element.to ? candidate : null;
   if (!token || !element.contentRange || element.contentRange.from >= element.contentRange.to) return;
 
   const resolvedTarget = markdownLinkGraph?.resolveWikiLink(documentPath, token.target) ?? null;
@@ -284,6 +312,7 @@ function addLinkElementDecoration(
   element: MarkdownElement,
   lineFrom: number,
   text: string,
+  tokenLookup: InlineTokenLookup,
   builders: MarkdownDecorationBuilders,
   inlineRevealRange: InlineRevealRange | null,
   markdownLinkGraph: MarkdownLinkGraph | null,
@@ -291,10 +320,8 @@ function addLinkElementDecoration(
 ) {
   if (!element.contentRange || element.contentRange.from >= element.contentRange.to) return;
 
-  const token = findMarkdownLinkTokens(text).find((candidate) => (
-    lineFrom + candidate.from === element.from &&
-    lineFrom + candidate.to === element.to
-  ));
+  const candidate = tokenLookup.linksByFrom.get(element.from - lineFrom);
+  const token = candidate && lineFrom + candidate.to === element.to ? candidate : null;
   const href = token?.href ?? getAutolinkHref(element, lineFrom, text);
   if (!href) return;
 

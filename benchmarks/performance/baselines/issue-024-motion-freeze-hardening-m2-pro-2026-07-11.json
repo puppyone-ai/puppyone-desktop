@@ -1,0 +1,94 @@
+{
+  "schema": "puppyone-renderer-performance-evidence/v1",
+  "environment": {
+    "capturedAt": "2026-07-11",
+    "platform": "darwin-arm64",
+    "cpu": "Apple M2 Pro",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "electron": "41.10.1",
+    "chromium": "146.0.7680.216",
+    "build": "production"
+  },
+  "backgroundIndexColdObservation": {
+    "observationWindowAfterPreviewMs": 1500,
+    "fixture": "1000 Explorer rows; up to 250 indexed Markdown files; 10000 lines per source",
+    "before": {
+      "previewReadyMs": 120.70000004768372,
+      "longTasksOver50ms": 4,
+      "longTaskDurationsMs": [62, 202, 329, 486],
+      "implementation": "eager batched reads into renderer cache plus one workspace-sized worker message"
+    },
+    "after": {
+      "previewReadyMs": 99.89999997615814,
+      "longTasksOver50ms": 0,
+      "maxLongTaskMs": 0,
+      "implementation": "idle, one-document-at-a-time reads with worker acknowledgement backpressure"
+    }
+  },
+  "coldFirstOpenAcceptanceRuns": [
+    {
+      "previewShellCommittedMs": 8.700000047683716,
+      "contentReadyMs": 19,
+      "editorBaseReadyMs": 40.60000002384186,
+      "markdownLanguageReadyMs": 58,
+      "previewReadyMs": 87.10000002384186,
+      "inputTransactionMs": 3.1999999284744263,
+      "longTasksOver50ms": 0
+    },
+    {
+      "previewShellCommittedMs": 6.699999928474426,
+      "contentReadyMs": 20.600000023841858,
+      "editorBaseReadyMs": 44.199999928474426,
+      "markdownLanguageReadyMs": 60.89999997615814,
+      "previewReadyMs": 87.79999995231628,
+      "inputTransactionMs": 2.700000047683716,
+      "longTasksOver50ms": 0
+    },
+    {
+      "previewShellCommittedMs": 11.5,
+      "contentReadyMs": 22.09999990463257,
+      "editorBaseReadyMs": 43.09999990463257,
+      "markdownLanguageReadyMs": 63.39999997615814,
+      "previewReadyMs": 90.39999997615814,
+      "inputTransactionMs": 2.700000047683716,
+      "longTasksOver50ms": 0
+    },
+    {
+      "previewShellCommittedMs": 10.5,
+      "contentReadyMs": 20.600000023841858,
+      "editorBaseReadyMs": 43.700000047683716,
+      "markdownLanguageReadyMs": 65.39999997615814,
+      "previewReadyMs": 94.60000002384186,
+      "longTasksOver50ms": 0
+    },
+    {
+      "previewShellCommittedMs": 2.5999999046325684,
+      "contentReadyMs": 10.699999928474426,
+      "editorBaseReadyMs": 32.699999928474426,
+      "markdownLanguageReadyMs": 52,
+      "previewReadyMs": 80.5,
+      "inputTransactionMs": 3.4000000953674316,
+      "longTasksOver50ms": 0
+    }
+  ],
+  "streamingIndexProductionElectron30SampleSummary": {
+    "warmupSamples": 4,
+    "completedSamples": 30,
+    "staleCommitCount": 0,
+    "longTasksOver50ms": 0,
+    "stagesMs": {
+      "previewShellCommitted": { "p50": 1.3000000715255737, "p95": 1.5 },
+      "contentReady": { "p50": 13.699999928474426, "p95": 17.800000071525574 },
+      "editorBaseReady": { "p50": 3.3000000715255737, "p95": 4.299999952316284 },
+      "markdownLanguageReady": { "p50": 7.400000095367432, "p95": 9.5 },
+      "previewReady": { "p50": 19.90000009536743, "p95": 27.600000023841858 },
+      "inputTransaction10000": { "p50": 0.7000000476837158, "p95": 1.2999999523162842 }
+    }
+  },
+  "commands": {
+    "cold": "npm run smoke:renderer-cold-performance",
+    "warmWithIndex": "npm run build && ./node_modules/.bin/electron scripts/smoke-renderer-performance.mjs --visible --with-link-index --outputJson /tmp/puppyone-renderer-index-smoke.json",
+    "focusedRegression": "npx vitest run tests/explorerPerformance.test.tsx tests/markdownLinkIndex.test.ts tests/markdownTokenComplexity.test.ts"
+  }
+}

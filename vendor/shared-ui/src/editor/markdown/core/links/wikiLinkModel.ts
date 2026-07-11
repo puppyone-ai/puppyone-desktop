@@ -24,24 +24,24 @@ export function findWikiLinkTokens(source: string): MarkdownWikiLinkToken[] {
   const tokens: MarkdownWikiLinkToken[] = [];
 
   for (let index = 0; index < source.length;) {
-    if (!source.startsWith("[[", index) || isEscaped(source, index)) {
+    if (!source.startsWith("[[", index) || isEscapedInlineToken(source, index)) {
       index += 1;
       continue;
     }
 
-    const closingFrom = source.indexOf("]]", index + 2);
-    if (closingFrom === -1) break;
-
-    const contentFrom = index + 2;
-    const content = source.slice(contentFrom, closingFrom);
-    if (content.includes("\n")) {
-      index += 2;
+    const closingScan = scanUnescapedDelimiterOnLine(source, index + 2, "]]");
+    const closingFrom = closingScan.closingIndex;
+    if (closingFrom === -1) {
+      index = closingScan.nextIndex;
       continue;
     }
 
+    const contentFrom = index + 2;
+    const content = source.slice(contentFrom, closingFrom);
+
     const token = createWikiLinkToken(source, index, contentFrom, closingFrom);
     if (token) tokens.push(token);
-    index = closingFrom + 2;
+    index = closingScan.nextIndex;
   }
 
   return tokens;
@@ -112,7 +112,7 @@ function getDefaultWikiLinkLabel(parts: MarkdownWikiLinkTargetParts, target: str
 
 function findUnescapedPipe(content: string): number {
   for (let index = 0; index < content.length; index += 1) {
-    if (content[index] === "|" && !isEscaped(content, index)) return index;
+    if (content[index] === "|" && !isEscapedInlineToken(content, index)) return index;
   }
   return -1;
 }
@@ -127,10 +127,7 @@ function trimRange(source: string, from: number, to: number): { from: number; to
   return { from: start, to: end };
 }
 
-function isEscaped(source: string, index: number): boolean {
-  let slashCount = 0;
-  for (let cursor = index - 1; cursor >= 0 && source[cursor] === "\\"; cursor -= 1) {
-    slashCount += 1;
-  }
-  return slashCount % 2 === 1;
-}
+import {
+  isEscapedInlineToken,
+  scanUnescapedDelimiterOnLine,
+} from "../../shared/inlineTokenScan";

@@ -13,7 +13,9 @@ import {
 } from "@puppyone/shared-ui";
 
 const SAMPLE_COUNT = readSampleTarget();
-const WARMUP_COUNT = 4;
+const COLD_FIRST_OPEN = readBooleanParameter("rendererPerformanceCold");
+const ENABLE_LINK_INDEX = readBooleanParameter("rendererPerformanceLinkIndex");
+const WARMUP_COUNT = COLD_FIRST_OPEN ? 0 : 4;
 const FILE_A = "performance-a.md";
 const FILE_B = "performance-b.md";
 
@@ -54,12 +56,16 @@ export function RendererPerformanceSmokeHarness() {
     let stopped = false;
     let nextFile = FILE_A;
     let warmupSamples = 0;
-    let measuring = false;
+    let measuring = WARMUP_COUNT === 0;
     let timeoutId: number | null = null;
 
     const finish = () => {
       if (stopped) return;
       stopped = true;
+      window.setTimeout(runWorkerSelfCheck, ENABLE_LINK_INDEX ? 1_500 : 0);
+    };
+
+    const runWorkerSelfCheck = () => {
       const coordinator = new MarkdownLinkIndexCoordinator();
       const workerStartedAt = performance.now();
       const request = coordinator.build([
@@ -155,7 +161,7 @@ export function RendererPerformanceSmokeHarness() {
         hidePreviewSourceView
         editorSaveMode="manual"
         defaultExplorerWidth={320}
-        enableMarkdownLinkContentIndexing={false}
+        enableMarkdownLinkContentIndexing={ENABLE_LINK_INDEX}
       />
     </div>
   );
@@ -203,4 +209,8 @@ function readSampleTarget(): number {
     10,
   );
   return Number.isFinite(requested) && requested > 0 ? requested : 30;
+}
+
+function readBooleanParameter(name: string): boolean {
+  return new URLSearchParams(window.location.search).get(name) === "true";
 }

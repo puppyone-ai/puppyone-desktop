@@ -47,6 +47,9 @@ export type RendererPerformanceSummary = {
 };
 
 const MAX_RETAINED_TRACES = 240;
+const MAX_RETAINED_LONG_TASKS = 240;
+const MAX_RETAINED_METRIC_SAMPLES = 512;
+const MAX_RETAINED_OPERATION_NAMES = 64;
 const GLOBAL_TRACKER_KEY = "__PUPPYONE_RENDERER_PERFORMANCE__";
 
 export class RendererPerformanceTracker {
@@ -54,9 +57,12 @@ export class RendererPerformanceTracker {
   private activeTraceId: string | null = null;
   private readonly traces = new Map<string, RendererPerformanceTrace>();
   private readonly longTaskEntries: Array<{ startTime: number; duration: number }> = [];
-  private readonly inputTransactionDurations: number[] = [];
-  private readonly operationDurations = new Map<string, number[]>();
+  private readonly inputTransactionDurations = new BoundedNumberSamples(MAX_RETAINED_METRIC_SAMPLES);
+  private readonly operationDurations = new Map<string, BoundedNumberSamples>();
   private staleCommitCount = 0;
+  private longTaskCount = 0;
+  private longTaskOver50msCount = 0;
+  private longTaskMaxDuration = 0;
   private observer: PerformanceObserver | null = null;
   private measurementStartedAt = now();
 
@@ -133,9 +139,16 @@ export class RendererPerformanceTracker {
 
   recordOperation(name: string, duration: number) {
     if (!Number.isFinite(duration) || duration < 0) return;
-    const samples = this.operationDurations.get(name) ?? [];
+    let samples = this.operationDurations.get(name);
+    if (!samples) {
+      if (this.operationDurations.size >= MAX_RETAINED_OPERATION_NAMES) {
+        const oldestName = this.operationDurations.keys().next().value;
+        if (oldestName) this.operationDurations.delete(oldestName);
+      }
+      samples = new BoundedNumberSamples(MAX_RETAINED_METRIC_SAMPLES);
+      this.operationDurations.set(name, samples);
+    }
     samples.push(duration);
-    this.operationDurations.set(name, samples);
   }
 
   reset() {
@@ -143,13 +156,15 @@ export class RendererPerformanceTracker {
     this.activeTraceId = null;
     this.traces.clear();
     this.longTaskEntries.length = 0;
-    this.inputTransactionDurations.length = 0;
+    this.inputTransactionDurations.clear();
     this.operationDurations.clear();
     this.staleCommitCount = 0;
+    this.longTaskCount = 0;
+    this.longTaskOver50msCount = 0;
+    this.longTaskMaxDuration = 0;
     this.measurementStartedAt = now();
     if (typeof performance !== "undefined") {
-      performance.clearMarks("puppyone-renderer");
-      performance.clearMeasures("puppyone-renderer");
+      clearBrowserPerformanceEntries();
     }
   }
 
@@ -159,11 +174,11 @@ export class RendererPerformanceTracker {
       stages: { ...trace.stages },
     }));
     const completed = traces.filter((trace) => trace.status === "complete");
-    const inputTransactions = [...this.inputTransactionDurations]
+    const inputTransactions = this.inputTransactionDurations.values()
       .sort((left, right) => left - right);
     const operations: RendererPerformanceSummary["operations"] = {};
     for (const [name, durations] of this.operationDurations) {
-      const samples = [...durations].sort((left, right) => left - right);
+      const samples = durations.values().sort((left, right) => left - right);
       operations[name] = {
         samples: samples.length,
         p50: percentile(samples, 0.5),
@@ -198,9 +213,9 @@ export class RendererPerformanceTracker {
       completedSamples: completed.length,
       staleCommitCount: this.staleCommitCount,
       longTasks: {
-        count: this.longTaskEntries.length,
-        over50ms: this.longTaskEntries.filter((entry) => entry.duration > 50).length,
-        maxDuration: Math.max(0, ...this.longTaskEntries.map((entry) => entry.duration)),
+        count: this.longTaskCount,
+        over50ms: this.longTaskOver50msCount,
+        maxDuration: this.longTaskMaxDuration,
         entries: this.longTaskEntries.map((entry) => ({ ...entry })),
       },
       inputTransactions: {
@@ -228,7 +243,13 @@ export class RendererPerformanceTracker {
       this.observer = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
           if (entry.startTime >= this.measurementStartedAt) {
+            this.longTaskCount += 1;
+            if (entry.duration > 50) this.longTaskOver50msCount += 1;
+            this.longTaskMaxDuration = Math.max(this.longTaskMaxDuration, entry.duration);
             this.longTaskEntries.push({ startTime: entry.startTime, duration: entry.duration });
+            if (this.longTaskEntries.length > MAX_RETAINED_LONG_TASKS) {
+              this.longTaskEntries.splice(0, this.longTaskEntries.length - MAX_RETAINED_LONG_TASKS);
+            }
           }
         }
       });
@@ -255,6 +276,36 @@ export class RendererPerformanceTracker {
       if (!oldest) break;
       this.traces.delete(oldest);
     }
+  }
+}
+
+class BoundedNumberSamples {
+  private readonly buffer: number[];
+  private nextIndex = 0;
+  private sampleCount = 0;
+
+  constructor(private readonly capacity: number) {
+    this.buffer = new Array<number>(capacity);
+  }
+
+  push(value: number) {
+    this.buffer[this.nextIndex] = value;
+    this.nextIndex = (this.nextIndex + 1) % this.capacity;
+    this.sampleCount = Math.min(this.capacity, this.sampleCount + 1);
+  }
+
+  values(): number[] {
+    if (this.sampleCount < this.capacity) return this.buffer.slice(0, this.sampleCount);
+    return [
+      ...this.buffer.slice(this.nextIndex),
+      ...this.buffer.slice(0, this.nextIndex),
+    ];
+  }
+
+  clear() {
+    this.buffer.length = this.capacity;
+    this.nextIndex = 0;
+    this.sampleCount = 0;
   }
 }
 
@@ -294,5 +345,15 @@ function markBrowserPerformance(
     }
   } catch {
     // Performance mark support must never affect the interaction path.
+  }
+}
+
+function clearBrowserPerformanceEntries() {
+  for (const entryType of ["mark", "measure"] as const) {
+    for (const entry of performance.getEntriesByType(entryType)) {
+      if (!entry.name.startsWith("puppyone-renderer:")) continue;
+      if (entryType === "mark") performance.clearMarks(entry.name);
+      else performance.clearMeasures(entry.name);
+    }
   }
 }

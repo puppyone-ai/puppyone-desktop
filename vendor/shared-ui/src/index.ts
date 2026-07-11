@@ -25,8 +25,11 @@ export {
 } from "./core/fileFormats";
 
 export { DataWorkspace } from "./data/DataWorkspace";
-export { MarkdownLinkIndexCoordinator } from "./editor/markdown";
-export type { MarkdownLinkIndexRequest } from "./editor/markdown";
+export { MarkdownLinkIndexCoordinator } from "./editor/markdown/linkIndex";
+export type {
+  MarkdownLinkIndexDocumentReader,
+  MarkdownLinkIndexRequest,
+} from "./editor/markdown/linkIndex";
 export type {
   DataWorkspaceFolderExpansionStrategy,
   DataWorkspaceProps,

@@ -5,7 +5,7 @@ import type {
   MouseEvent as ReactMouseEvent,
   ReactNode,
 } from "react";
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DataNode } from "../core/types";
 import { FileGlyphIcon, type FileIconThemeId } from "../file/fileIcons";
 import { DotsLoader, InlineLoading } from "../primitives/LoadingIndicator";
@@ -18,8 +18,16 @@ import {
   type ExplorerVisibleNodeRow,
   type ExplorerVisibleRow,
 } from "./explorer/explorerVisibleModel";
-import { ExplorerRowStateStore } from "./explorer/explorerRowStateStore";
 import {
+  equalExplorerRowInteraction,
+  selectExplorerRowInteraction,
+  type ExplorerRowInteractionState,
+  type ExplorerRowStateSources,
+} from "./explorer/explorerRowInteraction";
+import type { ExplorerRowMotionInstruction } from "./explorer/explorerMotionPlan";
+import { useExplorerMotion } from "./explorer/useExplorerMotion";
+import {
+  EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS,
   EXPLORER_VIRTUAL_ROW_SIZE,
   useExplorerVirtualWindow,
 } from "./explorer/useExplorerVirtualWindow";
@@ -151,6 +159,14 @@ export function ExplorerTree({
     () => new Set(draggedNodes.map((node) => node.path)),
     [draggedNodes],
   );
+  const rowStateSources = useMemo<ExplorerRowStateSources>(() => ({
+    activePath,
+    selectedPaths,
+    cutPaths,
+    loadingPaths: resolvedLoadingPaths,
+    draggedPaths,
+    dropTarget,
+  }), [activePath, cutPaths, draggedPaths, dropTarget, resolvedLoadingPaths, selectedPaths]);
   const activeIndex = activePath ? visibleModel.pathToIndex.get(activePath) ?? null : null;
   const firstNavigableIndex = useMemo(
     () => findNavigableRowIndex(visibleModel.rows, 0, 1),
@@ -161,27 +177,18 @@ export function ExplorerTree({
     scrollRef,
     activeIndex,
   });
-  const visibleRows = visibleModel.rows.slice(virtualWindow.startIndex, virtualWindow.endIndex);
-  const rowStateStoreRef = useRef<ExplorerRowStateStore>();
-  rowStateStoreRef.current ??= new ExplorerRowStateStore();
-  const rowStateStore = rowStateStoreRef.current;
-  rowStateStore.prepare({
-    activePath,
-    selectedPaths,
-    cutPaths,
-    loadingPaths: resolvedLoadingPaths,
-    draggedPaths,
-    dropTarget,
-  }, visibleModel.pathToIndex.keys());
-  useLayoutEffect(() => rowStateStore.flush(), [
-    activePath,
-    cutPaths,
-    draggedPaths,
-    dropTarget,
-    resolvedLoadingPaths,
-    rowStateStore,
-    selectedPaths,
-  ]);
+  const visibleRows = useMemo(
+    () => visibleModel.rows.slice(virtualWindow.startIndex, virtualWindow.endIndex),
+    [virtualWindow.endIndex, virtualWindow.startIndex, visibleModel.rows],
+  );
+  const motionPlan = useExplorerMotion({
+    rows: visibleModel.rows,
+    mountedRows: visibleRows,
+    startIndex: virtualWindow.startIndex,
+    endIndex: virtualWindow.endIndex,
+    rowSize: EXPLORER_VIRTUAL_ROW_SIZE,
+    maxMountedRows: EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS,
+  });
   const scrollEdgeState = useScrollEdgeState(scrollRef, {
     dependencies: [visibleModel.rows.length, rootError, rootLoading],
   });
@@ -510,7 +517,8 @@ export function ExplorerTree({
               className="explorer-tree-virtual-canvas"
               style={{ height: `${virtualWindow.totalHeight}px` }}
               data-visible-row-count={visibleModel.rows.length}
-              data-mounted-row-count={visibleRows.length}
+              data-mounted-row-count={visibleRows.length + (motionPlan?.ghosts.length ?? 0)}
+              data-motion-generation={motionPlan?.generation}
             >
               {visibleRows.map((row) => (
                 <div
@@ -522,23 +530,53 @@ export function ExplorerTree({
                     transform: `translateY(${row.index * EXPLORER_VIRTUAL_ROW_SIZE}px)`,
                   } as CSSProperties}
                 >
-                  {row.kind === "meta" ? (
-                    <ExplorerTreeMetaRow depth={row.depth} loading={row.loading}>{row.label}</ExplorerTreeMetaRow>
-                  ) : (
-                    <TreeNodeRow
+                  <ExplorerVirtualMotionShell
+                    depth={row.depth}
+                    generation={motionPlan?.generation ?? 0}
+                    instruction={motionPlan?.instructions.get(row.key)}
+                  >
+                    {row.kind === "meta" ? (
+                      <ExplorerTreeMetaRow depth={row.depth} loading={row.loading}>{row.label}</ExplorerTreeMetaRow>
+                    ) : (
+                      <TreeNodeRow
+                        row={row}
+                        isExpanded={row.node.type === "folder" && expandedPaths.has(row.path)}
+                        focusable={activePath ? activePath === row.path : row.index === firstNavigableIndex}
+                        interaction={selectExplorerRowInteraction(row.path, rowStateSources)}
+                        fileIconTheme={fileIconTheme}
+                        onToggleFolder={toggleFolder}
+                        onSelectNode={selectNode}
+                        dragController={dragController}
+                        hasNodeContextMenu={Boolean(onNodeContextMenu)}
+                        onNodeContextMenu={openNodeContextMenu}
+                        renderRowActions={renderNodeRowActions}
+                      />
+                    )}
+                  </ExplorerVirtualMotionShell>
+                </div>
+              ))}
+              {motionPlan?.ghosts.map(({ row, top }) => (
+                <div
+                  key={`exit:${motionPlan.generation}:${row.key}`}
+                  className="explorer-tree-virtual-row explorer-tree-exit-ghost"
+                  data-depth={row.depth}
+                  style={{
+                    "--depth": row.depth,
+                    transform: `translateY(${top}px)`,
+                  } as CSSProperties}
+                  aria-hidden="true"
+                >
+                  <ExplorerVirtualMotionShell
+                    depth={row.depth}
+                    generation={motionPlan.generation}
+                    exit
+                  >
+                    <ExplorerExitGhostRow
                       row={row}
-                      isExpanded={row.node.type === "folder" && expandedPaths.has(row.path)}
-                      focusable={activePath ? activePath === row.path : row.index === firstNavigableIndex}
-                      stateStore={rowStateStore}
+                      expandedPaths={expandedPaths}
                       fileIconTheme={fileIconTheme}
-                      onToggleFolder={toggleFolder}
-                      onSelectNode={selectNode}
-                      dragController={dragController}
-                      hasNodeContextMenu={Boolean(onNodeContextMenu)}
-                      onNodeContextMenu={openNodeContextMenu}
-                      renderRowActions={renderNodeRowActions}
                     />
-                  )}
+                  </ExplorerVirtualMotionShell>
                 </div>
               ))}
             </div>
@@ -550,23 +588,11 @@ export function ExplorerTree({
   );
 }
 
-const TreeNodeRow = memo(function TreeNodeRow({
-  row,
-  isExpanded,
-  focusable,
-  stateStore,
-  fileIconTheme,
-  onToggleFolder,
-  onSelectNode,
-  dragController,
-  hasNodeContextMenu,
-  onNodeContextMenu,
-  renderRowActions,
-}: {
+type TreeNodeRowProps = {
   row: ExplorerVisibleNodeRow;
   isExpanded: boolean;
   focusable: boolean;
-  stateStore: ExplorerRowStateStore;
+  interaction: ExplorerRowInteractionState;
   fileIconTheme: FileIconThemeId;
   onToggleFolder: (node: DataNode, expanded: boolean) => void;
   onSelectNode: ExplorerTreeProps["onSelectNode"];
@@ -574,16 +600,24 @@ const TreeNodeRow = memo(function TreeNodeRow({
   hasNodeContextMenu: boolean;
   onNodeContextMenu: NonNullable<ExplorerTreeProps["onNodeContextMenu"]>;
   renderRowActions: (node: DataNode) => ReactNode;
-}) {
+};
+
+const TreeNodeRow = memo(function TreeNodeRow({
+  row,
+  isExpanded,
+  focusable,
+  interaction,
+  fileIconTheme,
+  onToggleFolder,
+  onSelectNode,
+  dragController,
+  hasNodeContextMenu,
+  onNodeContextMenu,
+  renderRowActions,
+}: TreeNodeRowProps) {
   const { node, depth, siblingDisplayNameCounts } = row;
   const isFolder = node.type === "folder";
   const hoverExpandTimer = useRef<number | null>(null);
-  const subscribe = useCallback(
-    (listener: () => void) => stateStore.subscribe(node.path, listener),
-    [node.path, stateStore],
-  );
-  const getSnapshot = useCallback(() => stateStore.getSnapshot(node.path), [node.path, stateStore]);
-  const interaction = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const rowActions = renderRowActions(node);
   const displayName = useMemo(() => getExplorerDisplayName(node), [node.name, node.type]);
   const showExtensionDisambiguator = Boolean(
@@ -721,7 +755,131 @@ const TreeNodeRow = memo(function TreeNodeRow({
       </span>
     </button>
   );
-});
+}, areTreeNodeRowPropsEqual);
+
+function areTreeNodeRowPropsEqual(left: TreeNodeRowProps, right: TreeNodeRowProps): boolean {
+  return left.row === right.row
+    && left.isExpanded === right.isExpanded
+    && left.focusable === right.focusable
+    && equalExplorerRowInteraction(left.interaction, right.interaction)
+    && left.fileIconTheme === right.fileIconTheme
+    && left.onToggleFolder === right.onToggleFolder
+    && left.onSelectNode === right.onSelectNode
+    && left.dragController === right.dragController
+    && left.hasNodeContextMenu === right.hasNodeContextMenu
+    && left.onNodeContextMenu === right.onNodeContextMenu
+    && left.renderRowActions === right.renderRowActions;
+}
+
+function ExplorerVirtualMotionShell({
+  depth,
+  generation,
+  instruction,
+  exit = false,
+  children,
+}: {
+  depth: number;
+  generation: number;
+  instruction?: ExplorerRowMotionInstruction;
+  exit?: boolean;
+  children: ReactNode;
+}) {
+  const elementRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const element = elementRef.current;
+    if (!element || (!instruction && !exit)) return undefined;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return undefined;
+    if (typeof element.animate !== "function") return undefined;
+
+    const rowDelta = instruction?.kind === "move"
+      ? Math.abs(instruction.offsetY) / EXPLORER_VIRTUAL_ROW_SIZE
+      : 0;
+    const duration = exit
+      ? 145
+      : instruction?.kind === "move"
+        ? Math.min(220, 150 + rowDelta * 5)
+        : 165;
+    const keyframes: Keyframe[] = exit
+      ? [
+          { opacity: 1, transform: "translateY(0) scale(1)" },
+          { opacity: 0, transform: "translateY(-5px) scale(0.985)" },
+        ]
+      : instruction?.kind === "move"
+        ? [
+            { transform: `translateY(${instruction.offsetY}px)` },
+            { transform: "translateY(0)" },
+          ]
+        : [
+            { opacity: 0, transform: "translateY(-6px) scale(0.985)" },
+            { opacity: 1, transform: "translateY(0) scale(1)" },
+          ];
+    const animation = element.animate(keyframes, {
+      duration,
+      easing: "cubic-bezier(0.2, 0.75, 0.25, 1)",
+      fill: "both",
+    });
+    return () => animation.cancel();
+  }, [exit, generation, instruction]);
+
+  return (
+    <div
+      ref={elementRef}
+      className="explorer-tree-motion-shell"
+      data-depth={depth}
+      data-explorer-motion={exit ? "exit" : instruction?.kind}
+      style={{ "--depth": depth } as CSSProperties}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ExplorerExitGhostRow({
+  row,
+  expandedPaths,
+  fileIconTheme,
+}: {
+  row: ExplorerVisibleRow;
+  expandedPaths: ReadonlySet<string>;
+  fileIconTheme: FileIconThemeId;
+}) {
+  if (row.kind === "meta") {
+    return <ExplorerTreeMetaRow depth={row.depth} loading={row.loading}>{row.label}</ExplorerTreeMetaRow>;
+  }
+
+  const displayName = getExplorerDisplayName(row.node);
+  const showExtensionDisambiguator = Boolean(
+    displayName.extension
+      && (row.siblingDisplayNameCounts.get(getDisplayNameKey(displayName.primary)) ?? 0) > 1,
+  );
+  const isFolder = row.node.type === "folder";
+  return (
+    <div
+      className={`tree-row explorer-tree-exit-ghost-row ${isFolder ? "folder" : "file"}`}
+      style={{ "--depth": row.depth } as CSSProperties}
+    >
+      <span className="tree-row-content">
+        <span className="tree-icon-slot">
+          {isFolder ? (
+            <TreeDisclosureMarker expanded={expandedPaths.has(row.path)} />
+          ) : (
+            <FileGlyphIcon name={row.node.name} type={row.node.type} size={18} theme={fileIconTheme} />
+          )}
+        </span>
+        <span className="tree-label">
+          <span className="tree-label-primary">{displayName.primary}</span>
+          {showExtensionDisambiguator && (
+            <span className="tree-label-extension" aria-hidden="true">{displayName.extension}</span>
+          )}
+        </span>
+        {row.node.status && row.node.status !== "clean" && (
+          <span className={`tree-status ${row.node.status}`}>{shortStatus(row.node.status)}</span>
+        )}
+      </span>
+    </div>
+  );
+}
 
 function TreeDisclosureMarker({
   expanded = false,

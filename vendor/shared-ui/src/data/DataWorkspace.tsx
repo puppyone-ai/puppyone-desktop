@@ -18,10 +18,10 @@ import {
   createMarkdownLinkGraph,
   EMPTY_MARKDOWN_LINK_GRAPH_INDEX,
   MarkdownLinkIndexCoordinator,
-  resolveMarkdownAssetPath,
   type MarkdownLinkGraphDocument,
   type MarkdownLinkGraphIndexSnapshot,
-} from "../editor/markdown";
+} from "../editor/markdown/linkIndex";
+import { resolveMarkdownAssetPath } from "../editor/markdown/assetResolution";
 import { ExplorerTree } from "./ExplorerTree";
 import { FilePreview, type FilePreviewProps } from "./FilePreview";
 import { ProjectsHeader } from "./ProjectsHeader";
@@ -37,6 +37,7 @@ import type { FileIconThemeId } from "../file/fileIcons";
 import { usePaneResizeDrag } from "../primitives/usePaneResizeDrag";
 import { getRendererPerformanceTracker } from "../performance/rendererPerformance";
 import { FileOpenRequestCoordinator } from "./file-open/fileOpenRequestCoordinator";
+import { putBoundedFileContent } from "./file-open/fileContentCache";
 
 const rendererPerformance = getRendererPerformanceTracker();
 
@@ -674,22 +675,17 @@ export function DataWorkspace({
     },
     [activePath, loadFolder, loadLinkedPathNode, onActivePathChange, tree],
   );
-  const markdownLinkMetadataDocuments = useMemo(
-    () => buildMarkdownLinkMetadataDocuments(tree),
-    [tree],
-  );
-  const markdownLinkContentDocuments = useMemo(
-    () => enableMarkdownLinkContentIndexing
-      ? buildMarkdownLinkDocuments(tree, fileContentCache)
-      : markdownLinkMetadataDocuments,
-    [enableMarkdownLinkContentIndexing, fileContentCache, markdownLinkMetadataDocuments, tree],
-  );
+  const markdownLinkWorkspaceIndex = useStableMarkdownLinkWorkspaceIndex(tree);
+  const markdownLinkMetadataDocuments = markdownLinkWorkspaceIndex.metadataDocuments;
   useEffect(() => {
     const coordinator = markdownLinkIndexCoordinatorRef.current!;
-    const hasIndexedContent = enableMarkdownLinkContentIndexing
-      && markdownLinkContentDocuments.some((document) => typeof document.content === "string");
-    if (!hasIndexedContent) {
+    if (
+      !enableMarkdownLinkContentIndexing
+      || !dataPort.readFile
+      || markdownLinkWorkspaceIndex.sourcePaths.length === 0
+    ) {
       coordinator.cancel();
+      setMarkdownLinkIndexing(false);
       setMarkdownLinkIndexBuilding(false);
       setMarkdownLinkIndex((current) => (
         current === EMPTY_MARKDOWN_LINK_GRAPH_INDEX
@@ -700,8 +696,21 @@ export function DataWorkspace({
     }
 
     let cancelled = false;
-    const request = coordinator.build(markdownLinkContentDocuments);
+    const request = coordinator.buildFromReader(
+      markdownLinkMetadataDocuments,
+      markdownLinkWorkspaceIndex.sourcePaths.slice(0, MARKDOWN_LINK_INDEX_MAX_FILES),
+      async (path, signal) => {
+        const content = await dataPort.readFile?.(path, { signal });
+        if (!content || typeof content.content !== "string" || !isMarkdownNodeLike(content)) return null;
+        return {
+          path: content.path,
+          name: content.name,
+          content: content.content,
+        };
+      },
+    );
     setMarkdownLinkIndex(EMPTY_MARKDOWN_LINK_GRAPH_INDEX);
+    setMarkdownLinkIndexing(true);
     setMarkdownLinkIndexBuilding(true);
     request.promise
       .then((index) => {
@@ -711,14 +720,22 @@ export function DataWorkspace({
         if (!cancelled) console.warn("Unable to build Markdown link index:", error);
       })
       .finally(() => {
-        if (!cancelled) setMarkdownLinkIndexBuilding(false);
+        if (!cancelled) {
+          setMarkdownLinkIndexing(false);
+          setMarkdownLinkIndexBuilding(false);
+        }
       });
 
     return () => {
       cancelled = true;
       request.cancel();
     };
-  }, [enableMarkdownLinkContentIndexing, markdownLinkContentDocuments]);
+  }, [
+    dataPort,
+    enableMarkdownLinkContentIndexing,
+    markdownLinkMetadataDocuments,
+    markdownLinkWorkspaceIndex.sourcePaths,
+  ]);
   const markdownLinkGraph = useMemo(
     () => createMarkdownLinkGraph(markdownLinkMetadataDocuments, {
       isIndexing: markdownLinkIndexing || markdownLinkIndexBuilding,
@@ -845,10 +862,7 @@ export function DataWorkspace({
             rendererPerformance.mark(trace.id, "content_ready");
           }
           setFileContent(content);
-          setFileContentCache((current) => ({
-            ...current,
-            [content.path]: content,
-          }));
+          setFileContentCache((current) => putBoundedFileContent(current, content));
         });
       })
       .catch((error) => {
@@ -867,45 +881,6 @@ export function DataWorkspace({
       request.cancel();
     };
   }, [dataPort, refreshKey, selectedFile?.path]);
-
-  useEffect(() => {
-    if (!enableMarkdownLinkContentIndexing || !dataPort.readFile) {
-      setMarkdownLinkIndexing(false);
-      return undefined;
-    }
-
-    const candidates = collectMarkdownLinkIndexCandidates(tree, fileContentCache)
-      .slice(0, MARKDOWN_LINK_INDEX_MAX_FILES);
-    if (candidates.length === 0) {
-      setMarkdownLinkIndexing(false);
-      return undefined;
-    }
-
-    let cancelled = false;
-    setMarkdownLinkIndexing(true);
-
-    readMarkdownLinkIndexFiles(
-      candidates,
-      (path) => dataPort.readFile?.(path) ?? Promise.reject(new Error("readFile is unavailable")),
-    )
-      .then((contents) => {
-        if (cancelled || contents.length === 0) return;
-        setFileContentCache((current) => {
-          const next = { ...current };
-          for (const content of contents) {
-            if (typeof content.content === "string") next[content.path] = content;
-          }
-          return next;
-        });
-      })
-      .finally(() => {
-        if (!cancelled) setMarkdownLinkIndexing(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [dataPort, enableMarkdownLinkContentIndexing, fileContentCache, refreshKey, tree]);
 
   useEffect(() => {
     if (!selectedFile || !selectedFileNeedsResourceUrl || !dataPort.getFileUrl) {
@@ -1005,10 +980,7 @@ export function DataWorkspace({
         ? nextContent
         : current
     ));
-    setFileContentCache((current) => ({
-      ...current,
-      [node.path]: nextContent,
-    }));
+    setFileContentCache((current) => putBoundedFileContent(current, nextContent));
     setCommittedPreviewDocument((current) => (
       current?.node.path === node.path
         ? {
@@ -1019,6 +991,15 @@ export function DataWorkspace({
         : current
     ));
     setTree((current) => updateNodeContent(current, node.path, content));
+    if (enableMarkdownLinkContentIndexing && isMarkdownNodeLike(node)) {
+      void markdownLinkIndexCoordinatorRef.current
+        ?.updateDocument({ path: node.path, name: node.name, content })
+        .then((index) => setMarkdownLinkIndex(index))
+        .catch((error) => {
+          if (error instanceof Error && error.name === "AbortError") return;
+          console.warn("Unable to update Markdown link index:", error);
+        });
+    }
   };
 
   const importFiles = useCallback(
@@ -1708,87 +1689,33 @@ function buildPreview(content: string): string | null {
   return preview || null;
 }
 
-function buildMarkdownLinkDocuments(
-  nodes: DataNode[],
-  fileContentCache: Record<string, FileContent>,
-): MarkdownLinkGraphDocument[] {
-  const documents: MarkdownLinkGraphDocument[] = [];
-
-  for (const node of collectLinkableNodes(nodes)) {
-    const cachedContent = fileContentCache[node.path];
-    const content = isMarkdownNodeLike(node)
-      ? cachedContent?.content ?? node.content ?? null
-      : null;
-
-    documents.push({
+function useStableMarkdownLinkWorkspaceIndex(nodes: DataNode[]): {
+  metadataDocuments: readonly MarkdownLinkGraphDocument[];
+  sourcePaths: readonly string[];
+} {
+  const previousRef = useRef<{
+    key: string;
+    metadataDocuments: readonly MarkdownLinkGraphDocument[];
+    sourcePaths: readonly string[];
+  } | null>(null);
+  const next = useMemo(() => {
+    const linkableNodes = collectLinkableNodes(nodes);
+    const metadataDocuments = linkableNodes.map((node) => ({
       path: node.path,
       name: node.name,
-      content,
-    });
-  }
+      content: null,
+    }));
+    const sourcePaths = linkableNodes
+      .filter(isMarkdownNodeLike)
+      .map((node) => node.path);
+    const key = metadataDocuments
+      .map((document) => `${document.path}\u0000${document.name}`)
+      .join("\u0001");
+    return { key, metadataDocuments, sourcePaths };
+  }, [nodes]);
 
-  return documents;
-}
-
-function buildMarkdownLinkMetadataDocuments(nodes: DataNode[]): MarkdownLinkGraphDocument[] {
-  return collectLinkableNodes(nodes).map((node) => ({
-    path: node.path,
-    name: node.name,
-    content: null,
-  }));
-}
-
-function collectMarkdownLinkIndexCandidates(
-  nodes: DataNode[],
-  fileContentCache: Record<string, FileContent>,
-): string[] {
-  const paths: string[] = [];
-
-  for (const node of collectMarkdownNodes(nodes)) {
-    if (typeof node.content === "string") continue;
-    if (typeof fileContentCache[node.path]?.content === "string") continue;
-    paths.push(node.path);
-  }
-
-  return paths;
-}
-
-async function readMarkdownLinkIndexFiles(
-  paths: string[],
-  readFile: NonNullable<DataPort["readFile"]>,
-): Promise<FileContent[]> {
-  const contents: FileContent[] = [];
-  const batchSize = 6;
-
-  for (let index = 0; index < paths.length; index += batchSize) {
-    const batch = paths.slice(index, index + batchSize);
-    const results = await Promise.all(
-      batch.map(async (path) => {
-        try {
-          return await readFile(path);
-        } catch {
-          return null;
-        }
-      }),
-    );
-
-    for (const result of results) {
-      if (result && isMarkdownNodeLike(result)) contents.push(result);
-    }
-  }
-
-  return contents;
-}
-
-function collectMarkdownNodes(nodes: DataNode[]): DataNode[] {
-  const markdownNodes: DataNode[] = [];
-
-  for (const node of nodes) {
-    if (isMarkdownNodeLike(node)) markdownNodes.push(node);
-    if (node.children) markdownNodes.push(...collectMarkdownNodes(node.children));
-  }
-
-  return markdownNodes;
+  if (previousRef.current?.key !== next.key) previousRef.current = next;
+  return previousRef.current;
 }
 
 function collectLinkableNodes(nodes: DataNode[]): DataNode[] {
