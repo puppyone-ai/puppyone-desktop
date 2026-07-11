@@ -17,7 +17,7 @@ type ApiEnvelope<T> = {
   error?: string;
 };
 
-type MutableSessionHandler = (session: DesktopCloudSession | null) => void | Promise<void>;
+export type MutableSessionHandler = (session: DesktopCloudSession | null) => void | Promise<void>;
 
 export type DesktopCloudSession = {
   expires_in: number;
@@ -159,42 +159,6 @@ export type DesktopCloudAccessPointSemantics = {
     mode?: string | null;
     exclude?: string[] | null;
   } | null;
-};
-
-export type DesktopCloudHistoryChange = {
-  path: string;
-  action?: "add" | "update" | "delete";
-  op?: "added" | "modified" | "deleted";
-};
-
-export type DesktopCloudHistoryCommit = {
-  commit_id: string;
-  parent_ids?: string[];
-  who?: string;
-  message?: string;
-  changes?: DesktopCloudHistoryChange[];
-  conflicts?: Array<Record<string, unknown>>;
-  root_hash?: string;
-  scope_hash?: string;
-  scope_path?: string;
-  created_at?: string | null;
-  audit_detail?: Record<string, unknown> | null;
-};
-
-export type DesktopCloudHistoryRef = {
-  ref_name: string;
-  ref_type: "branch" | "tag";
-  commit_id: string;
-};
-
-export type DesktopCloudHistory = {
-  project_id: string;
-  commits: DesktopCloudHistoryCommit[];
-  head_commit_id?: string | null;
-  refs?: DesktopCloudHistoryRef[];
-  next_cursor?: string | null;
-  has_more?: boolean;
-  total?: number;
 };
 
 export type DesktopCloudScope = {
@@ -699,28 +663,6 @@ export function getCloudAccessPointSemantics(
       headers,
     },
     desktopCloudApiBaseUrlFromRemote(remoteUrl ?? null) ?? apiBaseUrl,
-  );
-}
-
-export function getCloudHistory(
-  session: DesktopCloudSession,
-  projectId: string,
-  limit = 20,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-  cursor?: string | null,
-): Promise<DesktopCloudHistory> {
-  const params = new URLSearchParams({
-    limit: String(limit),
-    order: "topo",
-  });
-  if (cursor) params.set("cursor", cursor);
-  return cloudApiRequest<DesktopCloudHistory>(
-    `/content/${encodeURIComponent(projectId)}/commits?${params.toString()}`,
-    session,
-    onSessionChange,
-    {},
-    apiBaseUrl,
   );
 }
 

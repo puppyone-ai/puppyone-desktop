@@ -7,7 +7,8 @@ import { PageLoading } from "../../../components/loading";
 import { openCloudApp } from "../../../lib/cloudApi";
 import type { CloudWorkspaceSection } from "../types";
 import { CloudWebEmpty } from "../components/shared";
-import { useCloudBranchesData, useCloudBranchesGitStatus } from "../data";
+import { useCloudBranchesGitStatus } from "../data";
+import { useCloudHistoryData } from "../history/useCloudHistoryData";
 import {
   buildCloudBranchGraphRows,
   getCloudBranchGraphDiagnostics,
@@ -15,7 +16,7 @@ import {
   type CloudBranchGraphRefMarker,
   type CloudBranchGraphRow,
   type CloudBranchGraphStats,
-} from "../model";
+} from "../graph/model";
 import { formatRelativeTime, shortCommit } from "../utils";
 
 const GRAPH_LANE_WIDTH = 16;
@@ -51,7 +52,7 @@ export function CloudBranchesSection({
   const effectiveStatus = gitGraphStatus.status ?? status;
   const localCommits = effectiveStatus?.allCommits?.length ? effectiveStatus.allCommits : effectiveStatus?.commits ?? [];
   const hasLocalGraph = localCommits.length > 0;
-  const branchData = useCloudBranchesData({
+  const branchData = useCloudHistoryData({
     session: cloudSession,
     projectId,
     apiBaseUrl,
@@ -63,7 +64,11 @@ export function CloudBranchesSection({
     status: effectiveStatus,
     history: branchData.history,
   });
-  const diagnostics = getCloudBranchGraphDiagnostics(effectiveStatus, graphRows);
+  const diagnostics = getCloudBranchGraphDiagnostics(
+    effectiveStatus,
+    graphRows,
+    branchData.history,
+  );
   const branches = effectiveStatus?.branches ?? [];
   const branchCount = branches.length || (graphRows.length > 0 ? 1 : 0);
   const localBranchCount = branches.filter((branch) => !branch.remote).length;

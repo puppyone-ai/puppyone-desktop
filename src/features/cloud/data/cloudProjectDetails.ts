@@ -1,6 +1,5 @@
 import {
   getCloudDashboard,
-  getCloudHistory,
   getCloudRepoIdentity,
   listCloudConnectors,
   listCloudMcpEndpoints,
@@ -8,7 +7,6 @@ import {
   listCloudScopes,
   type DesktopCloudConnector,
   type DesktopCloudDashboard,
-  type DesktopCloudHistory,
   type DesktopCloudMcpEndpoint,
   type DesktopCloudProject,
   type DesktopCloudRepoIdentity,
@@ -16,6 +14,10 @@ import {
   type DesktopCloudSession,
   type DesktopCloudTree,
 } from "../../../lib/cloudApi";
+import {
+  getCloudHistory,
+  type DesktopCloudHistory,
+} from "../../../lib/cloudHistoryApi";
 import { unwrapSettled } from "../utils";
 
 export type CloudProjectDetailsData = {

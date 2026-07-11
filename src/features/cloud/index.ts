@@ -14,7 +14,7 @@ export {
   CloudProjectHistorySidebar,
   CloudProjectHistoryView,
   type CloudProjectHistoryProps,
-} from "./CloudProjectHistory";
+} from "./history";
 export {
   DesktopCloudAccessSidebar,
   DesktopCloudAccessView,

@@ -3,7 +3,6 @@ import type { Workspace } from "@puppyone/shared-ui";
 import type {
   DesktopCloudConnector,
   DesktopCloudDashboard,
-  DesktopCloudHistory,
   DesktopCloudMcpEndpoint,
   DesktopCloudProject,
   DesktopCloudRepoIdentity,
@@ -11,6 +10,7 @@ import type {
   DesktopCloudTree,
   DesktopCloudTreeEntry,
 } from "../../../lib/cloudApi";
+import type { DesktopCloudHistory } from "../../../lib/cloudHistoryApi";
 import {
   ProjectFolderCard,
   type ProjectFolderPreviewItem,
