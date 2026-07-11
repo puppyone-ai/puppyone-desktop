@@ -7,8 +7,14 @@ import packageMetadata from "../package.json";
 import {
   EXTERNAL_VIEWER_PACKS_DEV_ENV,
   EXTERNAL_VIEWER_PACKS_RENDERER_ARGUMENT,
+  resolvePackagedExternalViewerPacksCapability,
   resolveViewerPackFeatureProfile,
 } from "../electron/main/viewer-packs/feature-profile.mjs";
+import {
+  getViewerPackPrivilegedSchemes,
+  loadViewerPackRuntime,
+} from "../electron/main/viewer-packs/bootstrap.mjs";
+import { evaluateViewerPackReleaseTrust } from "../electron/main/viewer-packs/release-policy.mjs";
 
 describe("external Viewer Pack product capability", () => {
   it("keeps the signed default product on the preset-viewers-only profile", () => {
@@ -50,7 +56,7 @@ describe("external Viewer Pack product capability", () => {
     }).externalViewerPacks).toBe(true);
   });
 
-  it("omits the preload bridge by default and exposes it only with main authority", async () => {
+  it("omits the preload bridge by default and exposes it only for the main-issued profile", async () => {
     const source = await readFile(new URL("../electron/preload.cjs", import.meta.url), "utf8");
     expect(runPreload(source, []).viewerPacks).toBeUndefined();
     expect(runPreload(source, [EXTERNAL_VIEWER_PACKS_RENDERER_ARGUMENT]).viewerPacks)
@@ -61,7 +67,38 @@ describe("external Viewer Pack product capability", () => {
       });
   });
 
-  it("skips signer enforcement by default and fails closed when explicitly enabled", () => {
+  it("does not import or register the dormant runtime in the preset-only profile", async () => {
+    let imports = 0;
+    const importer = async () => {
+      imports += 1;
+      return {
+        createViewerPackHost() {},
+        registerViewerPackAppIpcHandlers() {},
+        registerViewerPackPluginIpcHandlers() {},
+      };
+    };
+    expect(getViewerPackPrivilegedSchemes(false)).toEqual([]);
+    await expect(loadViewerPackRuntime(false, importer)).resolves.toBeNull();
+    expect(imports).toBe(0);
+
+    expect(getViewerPackPrivilegedSchemes(true).map(({ scheme }) => scheme)).toEqual([
+      "puppyone-plugin",
+      "puppyone-resource",
+    ]);
+    await expect(loadViewerPackRuntime(true, importer)).resolves.toMatchObject({
+      createViewerPackHost: expect.any(Function),
+    });
+    expect(imports).toBe(1);
+  });
+
+  it("forbids builder metadata from changing the preflighted release profile", () => {
+    expect(() => resolvePackagedExternalViewerPacksCapability({
+      puppyoneCapabilities: { externalViewerPacks: false },
+      build: { extraMetadata: { puppyoneCapabilities: { externalViewerPacks: true } } },
+    })).toThrow(/cannot override/i);
+  });
+
+  it("skips signer enforcement by default and fails closed for an enabled release", () => {
     const script = fileURLToPath(new URL("../scripts/check-viewer-pack-release.mjs", import.meta.url));
     const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
     const defaultResult = spawnSync(process.execPath, [script], {
@@ -71,14 +108,14 @@ describe("external Viewer Pack product capability", () => {
     });
     expect(defaultResult.status).toBe(0);
     expect(defaultResult.stdout).toMatch(/skipped.*preset-viewers-only/i);
-
-    const enabledResult = spawnSync(process.execPath, [script], {
-      cwd: repositoryRoot,
-      encoding: "utf8",
-      env: { ...process.env, [EXTERNAL_VIEWER_PACKS_DEV_ENV]: "1" },
-    });
-    expect(enabledResult.status).toBe(1);
-    expect(enabledResult.stderr).toMatch(/failed.*production public signer/i);
+    expect(() => evaluateViewerPackReleaseTrust({
+      externalViewerPacks: true,
+      trustedSigners: [],
+    })).toThrow(/failed.*production public signer/i);
+    expect(evaluateViewerPackReleaseTrust({
+      externalViewerPacks: true,
+      trustedSigners: [{ keyId: "production" }],
+    })).toEqual({ status: "passed", signerCount: 1 });
   });
 });
 

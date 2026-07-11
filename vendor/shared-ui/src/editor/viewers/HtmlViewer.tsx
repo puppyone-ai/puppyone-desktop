@@ -4,7 +4,7 @@ import { Code2, Eye } from "lucide-react";
 import { useState } from "react";
 import { getHtmlPreviewInteractionCss } from "../htmlPreviewInteraction";
 import { PlainTextEditor } from "../PlainTextEditor";
-import type { EditorViewerContext, MarkdownHtmlTrustMode } from "../viewerTypes";
+import type { MarkdownHtmlTrustMode, PresetViewerRenderContext } from "../viewerTypes";
 
 export function HtmlViewer({
   document,
@@ -15,7 +15,17 @@ export function HtmlViewer({
   loading,
   error,
   htmlTrustMode,
-}: EditorViewerContext) {
+}: Pick<
+  PresetViewerRenderContext,
+  | "document"
+  | "content"
+  | "fileUrl"
+  | "fileUrlLoading"
+  | "fileUrlError"
+  | "loading"
+  | "error"
+  | "htmlTrustMode"
+>) {
   const [mode, setMode] = useState<"preview" | "source">("preview");
 
   if (loading && !content && !fileUrl) return <div className="editor-state">Loading HTML...</div>;

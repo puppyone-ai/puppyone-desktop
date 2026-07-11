@@ -1,38 +1,18 @@
 import type {
   CoreViewerCapability,
-  DocumentSourceKind,
   ViewerContribution,
   ViewerPackSnapshot,
   ViewerRouteResult,
 } from "./viewerPackTypes";
+import type { DocumentSourceKind } from "./documentSource";
+import { coreViewerCapability } from "./presetViewerManifest";
 
-const EDIT_VIEWER_IDS = new Set([
-  "markdown",
-  "json",
-  "csv-table",
-  "text",
-]);
-
-const PREVIEW_VIEWER_IDS = new Set([
-  "app-preview",
-  "html-artifact",
-  "image-preview",
-  "pdf-preview",
-  "office-preview",
-  "audio-preview",
-  "video-preview",
-]);
+export { coreViewerCapability } from "./presetViewerManifest";
 
 /**
  * Derive core viewer capability at the registry boundary.
  * Call sites must not scatter checks for the literal `binary-placeholder` ID.
  */
-export function coreViewerCapability(viewerId: string): CoreViewerCapability {
-  if (EDIT_VIEWER_IDS.has(viewerId)) return "edit";
-  if (PREVIEW_VIEWER_IDS.has(viewerId)) return "preview";
-  return "placeholder";
-}
-
 export function isPluginEligibleCoreCapability(capability: CoreViewerCapability): boolean {
   return capability === "placeholder";
 }

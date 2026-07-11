@@ -1,10 +1,26 @@
 "use client";
 
 import { MarkdownCodeMirrorEditor } from "../markdown";
-import type { EditorViewerContext } from "../viewerTypes";
+import type { PresetViewerRenderContext } from "../viewerTypes";
 import { TextEditorFrame } from "./TextEditorFrame";
 
-export function MarkdownViewer(context: EditorViewerContext) {
+type MarkdownViewerProps = Pick<
+  PresetViewerRenderContext,
+  | "document"
+  | "content"
+  | "canEdit"
+  | "onSaveContent"
+  | "hideSourceView"
+  | "saveMode"
+  | "aiEditFile"
+  | "htmlTrustMode"
+  | "workspaceId"
+  | "workspaceRoot"
+  | "markdownLinkGraph"
+  | "markdownAssetUrlResolver"
+>;
+
+export function MarkdownViewer(context: MarkdownViewerProps) {
   return (
     <TextEditorFrame
       documentId={context.document.path}

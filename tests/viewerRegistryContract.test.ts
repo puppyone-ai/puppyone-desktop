@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveFileFormat } from "../vendor/shared-ui/src/core/fileFormats";
+import {
+  FILE_FORMATS,
+  resolveFileFormat,
+  UNKNOWN_FORMAT,
+} from "../vendor/shared-ui/src/core/fileFormats";
 import {
   createPresetViewerRegistry,
   definePresetViewer,
@@ -8,10 +12,15 @@ import {
   resolveEditorViewer,
 } from "../vendor/shared-ui/src/editor/viewerRegistry";
 import { PRESET_VIEWER_CONTRACT_VERSION } from "../vendor/shared-ui/src/editor/viewerContract";
+import {
+  coreViewerCapability,
+  PRESET_VIEWER_MANIFEST,
+} from "../vendor/shared-ui/src/editor/presetViewerManifest";
 import type {
   EditorDocument,
   EditorViewerMatch,
   PresetViewerContribution,
+  PresetViewerImplementation,
 } from "../vendor/shared-ui/src/editor/viewerTypes";
 
 function document(name: string, type = "file", mimeType: string | null = null): EditorDocument {
@@ -27,27 +36,21 @@ function matchFor(name: string): EditorViewerMatch {
   };
 }
 
-function testContribution(
-  id: string,
+function testPreviewContribution(
   match: PresetViewerContribution["match"],
 ): PresetViewerContribution {
-  return {
-    contractVersion: PRESET_VIEWER_CONTRACT_VERSION,
-    id,
-    capability: "preview",
-    source: "content",
-    runtime: "eager",
+  return definePresetViewer({
+    id: "app-preview",
     match,
     render: () => null,
-  };
+  });
 }
 
-const fallback = testContribution("test-placeholder", () => true) as PresetViewerContribution;
-const validFallback: PresetViewerContribution = {
-  ...fallback,
-  capability: "placeholder",
-  source: "none",
-};
+const validFallback = definePresetViewer({
+  id: "document-placeholder",
+  match: () => true,
+  render: () => null,
+});
 
 describe("preset viewer contribution contract", () => {
   it("publishes one immutable, versioned registry covering every source shape", () => {
@@ -57,9 +60,14 @@ describe("preset viewer contribution contract", () => {
       new Set(["content", "resource", "content-and-resource"]),
     );
     expect(PRESET_VIEWER_REGISTRY.fallback.source).toBe("none");
+    expect(PRESET_VIEWER_REGISTRY.fallback.id).toBe(PRESET_VIEWER_MANIFEST.fallbackViewerId);
     expect(PRESET_VIEWERS.every((viewer) => (
       viewer.contractVersion === PRESET_VIEWER_CONTRACT_VERSION && Object.isFrozen(viewer)
     ))).toBe(true);
+    expect(new Set([
+      ...PRESET_VIEWERS.map(({ id }) => id),
+      PRESET_VIEWER_REGISTRY.fallback.id,
+    ])).toEqual(new Set(PRESET_VIEWER_MANIFEST.viewers.map(({ id }) => id)));
   });
 
   it.each([
@@ -78,32 +86,80 @@ describe("preset viewer contribution contract", () => {
     expect(resolveEditorViewer(input).viewer).toMatchObject({ id, source, capability });
   });
 
-  it("allows a new preset to be proven by registry contribution alone", () => {
-    const custom = testContribution("test-viewer", ({ document: input }) => input.name === "sample.test-viewer");
+  it("binds implementation to canonical metadata without repeating authority fields", () => {
+    const custom = testPreviewContribution(({ document: input }) => input.name === "sample.app");
     const registry = createPresetViewerRegistry([custom], validFallback);
 
-    expect(registry.resolve(matchFor("sample.test-viewer")).id).toBe("test-viewer");
-    expect(registry.resolve(matchFor("sample.unknown")).id).toBe("test-placeholder");
+    expect(custom).toMatchObject({
+      id: "app-preview",
+      capability: "preview",
+      source: "content",
+      runtime: "eager",
+    });
+    expect(registry.resolve(matchFor("sample.app")).id).toBe("app-preview");
+    expect(registry.resolve(matchFor("sample.unknown")).id).toBe("document-placeholder");
   });
 
-  it("rejects unknown fields and unsupported authority values at runtime", () => {
+  it("rejects unknown fields, undeclared viewers, and metadata overrides", () => {
     expect(() => definePresetViewer({
-      ...testContribution("unknown-field", () => true),
+      id: "app-preview",
+      match: () => true,
+      render: () => null,
       network: true,
-    } as unknown as PresetViewerContribution)).toThrow(/unknown field/i);
+    } as unknown as PresetViewerImplementation)).toThrow(/unknown field/i);
     expect(() => definePresetViewer({
-      ...testContribution("unknown-capability", () => true),
-      capability: "execute",
-    } as unknown as PresetViewerContribution)).toThrow(/unsupported capability/i);
+      id: "undeclared-viewer",
+      match: () => true,
+      render: () => null,
+    })).toThrow(/not declared/i);
+    const contribution = testPreviewContribution(() => true);
+    expect(() => createPresetViewerRegistry([{
+      ...contribution,
+      capability: "edit",
+    } as PresetViewerContribution], validFallback)).toThrow(/canonical capability/i);
+  });
+
+  it("enforces semantic combinations and executable lazy boundaries", () => {
     expect(() => definePresetViewer({
-      ...testContribution("unknown-runtime", () => true),
-      runtime: "worker",
-    } as unknown as PresetViewerContribution)).toThrow(/unsupported runtime/i);
+      id: "markdown",
+      match: () => true,
+      load: async () => ({ default: () => null }),
+    })).toThrow(/must define isEditable/i);
+    expect(() => definePresetViewer({
+      id: "markdown",
+      match: () => true,
+      isEditable: () => true,
+      render: () => null,
+    } as unknown as PresetViewerImplementation)).toThrow(/lazy.*load/i);
+    expect(() => definePresetViewer({
+      id: "image-preview",
+      match: () => true,
+      normalizeContent: (content) => content,
+      render: () => null,
+    })).toThrow(/cannot normalize content/i);
+    expect(PRESET_VIEWERS.find(({ id }) => id === "markdown")).toMatchObject({
+      runtime: "lazy",
+      load: expect.any(Function),
+    });
+    expect(PRESET_VIEWERS.find(({ id }) => id === "office-preview")).toMatchObject({
+      runtime: "lazy",
+      load: expect.any(Function),
+    });
+  });
+
+  it("maps every canonical format viewer through the same manifest", () => {
+    for (const format of [...FILE_FORMATS, UNKNOWN_FORMAT]) {
+      expect(() => coreViewerCapability(format.defaultViewer)).not.toThrow();
+    }
+    expect(coreViewerCapability("markdown")).toBe("edit");
+    expect(coreViewerCapability("markdown-editor")).toBe("edit");
+    expect(coreViewerCapability("binary-placeholder")).toBe("placeholder");
+    expect(() => coreViewerCapability("undeclared-viewer")).toThrow(/not declared/i);
   });
 
   it("rejects duplicate ids and a dishonest fallback", () => {
-    const duplicate = testContribution("duplicate", () => true);
+    const duplicate = testPreviewContribution(() => true);
     expect(() => createPresetViewerRegistry([duplicate, duplicate], validFallback)).toThrow(/more than once/i);
-    expect(() => createPresetViewerRegistry([], fallback)).toThrow(/placeholder.*source 'none'/i);
+    expect(() => createPresetViewerRegistry([], duplicate)).toThrow(/fallback must be document-placeholder/i);
   });
 });

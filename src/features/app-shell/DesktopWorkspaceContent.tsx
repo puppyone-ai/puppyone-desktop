@@ -1,10 +1,20 @@
-import { useCallback, useEffect, useState, type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentProps,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   DataWorkspace,
   EMPTY_VIEWER_PACK_SNAPSHOT,
   type AiEditRequest,
   type DataNode,
   type FilePreviewBodyContext,
+  type ViewerExtensionHostAdapter,
   type ViewerPackSnapshot,
   type Workspace,
 } from "@puppyone/shared-ui";
@@ -51,10 +61,13 @@ import {
   type DesktopWorkspaceSurfaceAction,
   DesktopSidebarTopNavigation,
 } from "./navigation";
-import {
-  DesktopViewerPackFallback,
-  useDesktopViewerPackSurface,
-} from "../viewer-packs";
+
+const LazyDesktopViewerPackSurface = lazy(() => import("../viewer-packs").then((module) => ({
+  default: module.DesktopViewerPackSurface,
+})));
+const LazyDesktopViewerPackFallback = lazy(() => import("../viewer-packs").then((module) => ({
+  default: module.DesktopViewerPackFallback,
+})));
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopUpdatesController = ReturnType<typeof useDesktopUpdates>;
@@ -218,25 +231,59 @@ export function DesktopWorkspaceContent({
     void refreshViewerPackSnapshot();
   }, [externalViewerPacksEnabled, refreshViewerPackSnapshot, workspaceKey]);
 
-  const externalViewerSurface = useDesktopViewerPackSurface({
-    workspaceRoot: cloudWorkspace ? null : workspace.path,
-    onInstalled: refreshViewerPackSnapshot,
-  });
-  const viewerPackInstallFallback = useCallback(
+  const externalViewerSurface = useCallback<NonNullable<ViewerExtensionHostAdapter["renderSurface"]>>(
+    ({ document, contribution }) => {
+      if (cloudWorkspace || !workspace.path) {
+        return (
+          <div className="viewer-pack-surface-status viewer-pack-surface-status--error">
+            Workspace root unavailable for Viewer Pack activation.
+          </div>
+        );
+      }
+      return (
+        <Suspense fallback={<div className="viewer-pack-surface-status">Loading viewer extension…</div>}>
+          <LazyDesktopViewerPackSurface
+            document={document}
+            contribution={contribution}
+            workspaceRoot={workspace.path}
+            onInstalled={refreshViewerPackSnapshot}
+          />
+        </Suspense>
+      );
+    },
+    [cloudWorkspace, refreshViewerPackSnapshot, workspace.path],
+  );
+  const viewerPackInstallFallback = useCallback<NonNullable<ViewerExtensionHostAdapter["renderInstallFallback"]>>(
     ({ document }: { document: { path: string; name: string; mimeType?: string | null } }) => (
-      <DesktopViewerPackFallback
-        document={{
-          path: document.path,
-          name: document.name,
-          type: "file",
-          mimeType: document.mimeType ?? null,
-          sourceKind: "local",
-        }}
-        onInstalled={refreshViewerPackSnapshot}
-      />
+      <Suspense fallback={<div className="viewer-pack-surface-status">Loading viewer options…</div>}>
+        <LazyDesktopViewerPackFallback
+          document={{
+            path: document.path,
+            name: document.name,
+            type: "file",
+            mimeType: document.mimeType ?? null,
+            sourceKind: "local",
+          }}
+          onInstalled={refreshViewerPackSnapshot}
+        />
+      </Suspense>
     ),
     [refreshViewerPackSnapshot],
   );
+  const viewerExtensionAdapter = useMemo<ViewerExtensionHostAdapter | null>(() => (
+    externalViewerPacksEnabled
+      ? {
+          snapshot: viewerPackSnapshot,
+          renderSurface: externalViewerSurface,
+          renderInstallFallback: viewerPackInstallFallback,
+        }
+      : null
+  ), [
+    externalViewerPacksEnabled,
+    externalViewerSurface,
+    viewerPackInstallFallback,
+    viewerPackSnapshot,
+  ]);
 
   const settingsView = (
     <SettingsView
@@ -392,9 +439,7 @@ export function DesktopWorkspaceContent({
         onActivePathChange={onActiveDataPathChange}
         onActiveNodeChange={onActiveDataNodeChange}
         onOpenExternalUrl={openExternalUrl}
-        viewerPackSnapshot={externalViewerPacksEnabled ? viewerPackSnapshot : EMPTY_VIEWER_PACK_SNAPSHOT}
-        externalViewerSurface={externalViewerPacksEnabled ? externalViewerSurface : null}
-        viewerPackInstallFallback={externalViewerPacksEnabled ? viewerPackInstallFallback : null}
+        viewerExtensionAdapter={viewerExtensionAdapter}
         documentSourceKind={cloudWorkspace ? "cloud" : "local"}
         resizableExplorer
         explorerCollapsed={false}

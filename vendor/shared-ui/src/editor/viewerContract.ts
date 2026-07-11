@@ -4,7 +4,7 @@
  * registry; a viewer contribution only declares host capabilities.
  */
 
-export const PRESET_VIEWER_CONTRACT_VERSION = 1 as const;
+export const PRESET_VIEWER_CONTRACT_VERSION = 2 as const;
 
 export const PRESET_VIEWER_CAPABILITIES = ["edit", "preview", "placeholder"] as const;
 export type CoreViewerCapability = (typeof PRESET_VIEWER_CAPABILITIES)[number];

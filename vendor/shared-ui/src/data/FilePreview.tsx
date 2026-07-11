@@ -1,15 +1,14 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import type { AppPreviewController, DataNode, FileContent, OfficeDocumentConverter } from "../core/types";
 import { EditorHost } from "../editor/EditorHost";
-import type { EditorSaveMode, ViewerPackInstallFallbackRenderer } from "../editor/PuppyoneEditorHost";
+import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
 import type {
   DocumentSourceKind,
-  ExternalViewerSurfaceRenderer,
   MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
 } from "../editor/viewerTypes";
-import type { ViewerPackSnapshot } from "../editor/viewerPackTypes";
+import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
 import type { AiEditFile } from "../editor/ai-edits/types";
 import { FilePreviewIcon, type FileIconThemeId } from "../file/fileIcons";
 
@@ -38,9 +37,7 @@ export type FilePreviewProps = {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
-  viewerPackSnapshot?: ViewerPackSnapshot | null;
-  externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
-  viewerPackInstallFallback?: ViewerPackInstallFallbackRenderer | null;
+  viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   documentSourceKind?: DocumentSourceKind;
 };
 
@@ -79,9 +76,7 @@ export function FilePreview({
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
-  viewerPackSnapshot = null,
-  externalViewerSurface = null,
-  viewerPackInstallFallback = null,
+  viewerExtensionAdapter = null,
   documentSourceKind = "local",
 }: FilePreviewProps) {
   if (!node) {
@@ -159,9 +154,7 @@ export function FilePreview({
               openExternalFile={openExternalFile}
               convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
               deferFallbackContent={deferFallbackContent}
-              viewerPackSnapshot={viewerPackSnapshot}
-              externalViewerSurface={externalViewerSurface}
-              viewerPackInstallFallback={viewerPackInstallFallback}
+              viewerExtensionAdapter={viewerExtensionAdapter}
               documentSourceKind={documentSourceKind}
             />
           </EditorPreviewBoundary>

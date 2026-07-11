@@ -44,23 +44,28 @@ export { EditorHost } from "./editor/EditorHost";
 export type { EditorHostProps } from "./editor/EditorHost";
 export {
   classifyEditorViewerCapability,
-  coreViewerCapability,
   createPresetViewerRegistry,
   definePresetViewer,
   EDITOR_VIEWERS,
-  ExternalViewerAdapter,
   getEditorSourceRequirement,
   PRESET_VIEWER_REGISTRY,
   PRESET_VIEWERS,
   resolveEditorViewer,
-  resolveViewerRoute,
-  resolveViewerRouteForDocument,
   shouldReadEditorContent,
 } from "./editor/viewerRegistry";
 export type {
-  ExternalViewerAdapterProps,
   PresetViewerRegistry,
 } from "./editor/viewerRegistry";
+export {
+  coreViewerCapability,
+  getPresetViewerDefinition,
+  getPresetViewerDefinitionForViewerId,
+  PRESET_VIEWER_MANIFEST,
+} from "./editor/presetViewerManifest";
+export type {
+  PresetViewerDefinition,
+  PresetViewerManifest,
+} from "./editor/presetViewerManifest";
 export {
   PRESET_VIEWER_CAPABILITIES,
   PRESET_VIEWER_CONTRACT_VERSION,
@@ -72,8 +77,13 @@ export type {
   PresetViewerRuntime,
   PresetViewerSource,
 } from "./editor/viewerContract";
-export { findPackCandidates } from "./editor/viewerCapability";
+export { findPackCandidates, resolveViewerRoute } from "./editor/viewerCapability";
 export type { ResolveViewerRouteInput } from "./editor/viewerCapability";
+export {
+  ExternalViewerAdapter,
+  resolveViewerRouteForDocument,
+} from "./editor/viewerPackAdapter";
+export type { ExternalViewerAdapterProps } from "./editor/viewerPackAdapter";
 export { EMPTY_VIEWER_PACK_SNAPSHOT } from "./editor/viewerPackTypes";
 export type {
   CoreViewerCapability,
@@ -86,7 +96,11 @@ export type {
   ViewerRoutePlaceholderReason,
   ViewerRouteResult,
 } from "./editor/viewerPackTypes";
-export type { ViewerPackInstallFallbackRenderer } from "./editor/PuppyoneEditorHost";
+export type {
+  ExternalViewerSurfaceRenderer,
+  ViewerExtensionHostAdapter,
+  ViewerExtensionInstallFallbackRenderer,
+} from "./editor/viewerHostAdapters";
 export {
   VIEWER_HOST_IPC_CHANNELS,
 } from "./editor/viewerHostApi";
@@ -112,14 +126,14 @@ export type {
   EditorViewer,
   EditorViewerContext,
   EditorViewerMatch,
-  ExternalViewerSurfaceRenderer,
-  ExternalViewerSurfaceRequest,
   MarkdownBacklink,
   MarkdownBacklinkReference,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
   MarkdownWikiLinkResolvedTarget,
   PresetViewerContribution,
+  PresetViewerImplementation,
+  PresetViewerRenderContext,
 } from "./editor/viewerTypes";
 export { PlainTextEditor } from "./editor/PlainTextEditor";
 export type { PlainTextEditorProps } from "./editor/PlainTextEditor";

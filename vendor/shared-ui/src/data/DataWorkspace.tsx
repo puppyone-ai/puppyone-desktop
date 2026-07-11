@@ -24,10 +24,9 @@ import { ProjectsHeader } from "./ProjectsHeader";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
 import type {
   DocumentSourceKind,
-  ExternalViewerSurfaceRenderer,
   MarkdownHtmlTrustMode,
 } from "../editor/viewerTypes";
-import type { ViewerPackSnapshot } from "../editor/viewerPackTypes";
+import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
 import { getAiEditFileForPath } from "../editor/ai-edits/diff";
 import type { AiEditRequest } from "../editor/ai-edits/types";
 import type { FileIconThemeId } from "../file/fileIcons";
@@ -111,9 +110,7 @@ export type DataWorkspaceProps = {
   previewActionSlot?: FilePreviewProps["actionSlot"];
   renderPreviewBody?: FilePreviewProps["renderBody"];
   previewAccessorySlot?: DataWorkspaceSlot;
-  viewerPackSnapshot?: ViewerPackSnapshot | null;
-  externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
-  viewerPackInstallFallback?: FilePreviewProps["viewerPackInstallFallback"];
+  viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   documentSourceKind?: DocumentSourceKind;
   aiEditRequest?: AiEditRequest | null;
   enableMarkdownLinkContentIndexing?: boolean;
@@ -190,9 +187,7 @@ export function DataWorkspace({
   previewActionSlot,
   renderPreviewBody,
   previewAccessorySlot,
-  viewerPackSnapshot = null,
-  externalViewerSurface = null,
-  viewerPackInstallFallback = null,
+  viewerExtensionAdapter = null,
   documentSourceKind,
   aiEditRequest = null,
   enableMarkdownLinkContentIndexing = true,
@@ -1265,9 +1260,7 @@ export function DataWorkspace({
                   appPreview={dataPort.appPreview ?? null}
                   openExternalFile={dataPort.openExternalFile}
                   convertOfficeDocumentToDocx={dataPort.convertOfficeDocumentToDocx}
-                  viewerPackSnapshot={viewerPackSnapshot}
-                  externalViewerSurface={externalViewerSurface}
-                  viewerPackInstallFallback={viewerPackInstallFallback}
+                  viewerExtensionAdapter={viewerExtensionAdapter}
                   documentSourceKind={documentSourceKind ?? resolvedDocumentSourceKind}
                   emptySlot={emptySlot}
                   actionSlot={previewActionSlot}

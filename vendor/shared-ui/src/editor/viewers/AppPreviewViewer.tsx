@@ -3,7 +3,7 @@
 import { Code2, ExternalLink, Eye, RotateCw, Square, TerminalSquare } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PlainTextEditor } from "../PlainTextEditor";
-import type { EditorViewerContext } from "../viewerTypes";
+import type { PresetViewerRenderContext } from "../viewerTypes";
 import type { AppPreviewResult } from "../../core/types";
 
 type AppPreviewMode = "preview" | "source" | "logs";
@@ -20,7 +20,10 @@ export function AppPreviewViewer({
   loading,
   error,
   appPreview,
-}: EditorViewerContext) {
+}: Pick<
+  PresetViewerRenderContext,
+  "document" | "content" | "loading" | "error" | "appPreview"
+>) {
   const [mode, setMode] = useState<AppPreviewMode>("preview");
   const [state, setState] = useState<AppPreviewState>({ status: "idle", result: null, error: null });
   const [logs, setLogs] = useState("");

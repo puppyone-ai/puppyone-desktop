@@ -13,7 +13,7 @@ import {
   preflightZipCentralDirectory,
   ZipPreflightError,
 } from "../security/zipCentralDirectoryPreflight";
-import type { EditorViewerContext } from "../viewerTypes";
+import type { PresetViewerRenderContext } from "../viewerTypes";
 import {
   fetchOfficeArrayBuffer,
   OfficeResourceLimitError,
@@ -67,6 +67,18 @@ const OPEN_DOCUMENT_DECOMPRESSION_BUDGET = {
   maxTotalUncompressedBytes: 64 * 1024 * 1024,
 } as const;
 
+type OfficeViewerProps = Pick<
+  PresetViewerRenderContext,
+  | "document"
+  | "resolvedExtension"
+  | "fileUrl"
+  | "fileUrlLoading"
+  | "fileUrlError"
+  | "openExternalFile"
+  | "convertOfficeDocumentToDocx"
+  | "markdownLinkGraph"
+>;
+
 export function OfficeViewer({
   document,
   resolvedExtension,
@@ -76,7 +88,7 @@ export function OfficeViewer({
   openExternalFile,
   convertOfficeDocumentToDocx,
   markdownLinkGraph,
-}: EditorViewerContext) {
+}: OfficeViewerProps) {
   const [state, setState] = useState<OfficeState>({ status: "idle" });
   const [activeSheet, setActiveSheet] = useState(0);
   const extension = resolvedExtension ?? getExtension(document.name);
@@ -759,7 +771,7 @@ async function loadOfficePreview({
   filename: string;
   extension: string;
   path: string;
-  convertOfficeDocumentToDocx?: EditorViewerContext["convertOfficeDocumentToDocx"];
+  convertOfficeDocumentToDocx?: OfficeViewerProps["convertOfficeDocumentToDocx"];
   signal?: AbortSignal;
 }): Promise<OfficePreviewResult> {
   if (NATIVE_DOCX_CONVERTIBLE_EXTENSIONS.has(extension)) {

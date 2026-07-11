@@ -3,17 +3,15 @@ import type { FileIconThemeId } from "../file/fileIcons";
 import {
   PuppyoneEditorHost,
   type EditorSaveMode,
-  type ViewerPackInstallFallbackRenderer,
 } from "./PuppyoneEditorHost";
 import type { AiEditFile } from "./ai-edits/types";
 import type {
   DocumentSourceKind,
-  ExternalViewerSurfaceRenderer,
   MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
 } from "./viewerTypes";
-import type { ViewerPackSnapshot } from "./viewerPackTypes";
+import type { ViewerExtensionHostAdapter } from "./viewerHostAdapters";
 
 export type EditorHostProps = {
   node: DataNode;
@@ -37,9 +35,7 @@ export type EditorHostProps = {
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
   deferFallbackContent?: boolean;
-  viewerPackSnapshot?: ViewerPackSnapshot | null;
-  externalViewerSurface?: ExternalViewerSurfaceRenderer | null;
-  viewerPackInstallFallback?: ViewerPackInstallFallbackRenderer | null;
+  viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   documentSourceKind?: DocumentSourceKind;
 };
 
@@ -65,9 +61,7 @@ export function EditorHost({
   openExternalFile,
   convertOfficeDocumentToDocx,
   deferFallbackContent = false,
-  viewerPackSnapshot = null,
-  externalViewerSurface = null,
-  viewerPackInstallFallback = null,
+  viewerExtensionAdapter = null,
   documentSourceKind = "local",
 }: EditorHostProps) {
   return (
@@ -82,9 +76,7 @@ export function EditorHost({
         url: fileContent?.url ?? fileUrl,
         sourceKind: documentSourceKind,
       }}
-      viewerPackSnapshot={viewerPackSnapshot}
-      externalViewerSurface={externalViewerSurface}
-      viewerPackInstallFallback={viewerPackInstallFallback}
+      viewerExtensionAdapter={viewerExtensionAdapter}
       loading={loading}
       error={error}
       fileUrlLoading={fileUrlLoading}
