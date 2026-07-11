@@ -55,20 +55,7 @@
   background: transparent;
 }
 
-.desktop-cloud-integrations-page .desktop-cloud-access-detail {
-  width: 100%;
-  min-height: 0;
-  overflow: auto;
-  background: transparent;
-}
-
 .desktop-cloud-access-page.list-view .desktop-cloud-access-detail-panel {
-  width: 100%;
-  margin: 0;
-  padding: 24px 24px 36px;
-}
-
-.desktop-cloud-integrations-page .desktop-cloud-access-detail-panel {
   width: 100%;
   margin: 0;
   padding: 24px 24px 36px;

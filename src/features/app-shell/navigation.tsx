@@ -3,7 +3,8 @@ import { ArrowRightLeft, Blocks, Cloud, Folder, FolderOpen, Settings } from "luc
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import type { SidebarNavigationOrientation } from "../../preferences";
 import type { GitStatusEntry, GitStatusSnapshot } from "../../types/electron";
-import { AccessChainIcon, IntegrationsGridIcon } from "../cloud/accessFilters";
+import { AutomationGridIcon } from "../automation";
+import { AccessChainIcon } from "../cloud/accessFilters";
 
 export type DesktopSidebarIconComponent = (props: { size?: number; className?: string }) => ReactNode;
 export type DesktopWorkspaceSurfaceAction = {
@@ -43,7 +44,7 @@ export function PuppyGitIcon({
 
 export function DesktopSidebarFooterNavigation({
   activeView,
-  accessEnabled = false,
+  cloudToolsEnabled = false,
   gitEnabled = true,
   pluginsEnabled = false,
   gitIncomingCount,
@@ -55,7 +56,7 @@ export function DesktopSidebarFooterNavigation({
   onOpenSettings,
 }: {
   activeView: DesktopView;
-  accessEnabled?: boolean;
+  cloudToolsEnabled?: boolean;
   gitEnabled?: boolean;
   pluginsEnabled?: boolean;
   gitIncomingCount: number;
@@ -67,7 +68,7 @@ export function DesktopSidebarFooterNavigation({
   onOpenSettings: () => void;
 }) {
   const localItems = getDesktopLocalSidebarNavItems(gitEnabled, pluginsEnabled);
-  const accessItems = getDesktopAccessSidebarNavItems(accessEnabled);
+  const cloudItems = getDesktopCloudSidebarNavItems(cloudToolsEnabled);
 
   return (
     <div
@@ -85,10 +86,10 @@ export function DesktopSidebarFooterNavigation({
           workspaceChangeCount={workspaceChangeCount}
           onNavigate={onNavigate}
         />
-        {accessItems.length > 0 && (
+        {cloudItems.length > 0 && (
           <DesktopSidebarIconNavigation
             activeView={activeView}
-            items={accessItems}
+            items={cloudItems}
             gitIncomingCount={gitIncomingCount}
             gitOperationLoading={gitOperationLoading}
             gitStatus={gitStatus}
@@ -158,7 +159,7 @@ function getDesktopWorkspaceSurfaceActionConfig(kind: DesktopWorkspaceSurfaceAct
 
 export function DesktopSidebarTopNavigation({
   activeView,
-  accessEnabled = false,
+  cloudToolsEnabled = false,
   gitEnabled = true,
   pluginsEnabled = false,
   orientation,
@@ -170,7 +171,7 @@ export function DesktopSidebarTopNavigation({
   onOpenSettings,
 }: {
   activeView: DesktopView;
-  accessEnabled?: boolean;
+  cloudToolsEnabled?: boolean;
   gitEnabled?: boolean;
   pluginsEnabled?: boolean;
   orientation: SidebarNavigationOrientation;
@@ -182,7 +183,7 @@ export function DesktopSidebarTopNavigation({
   onOpenSettings: () => void;
 }) {
   const localItems = getDesktopLocalSidebarNavItems(gitEnabled, pluginsEnabled);
-  const accessItems = getDesktopAccessSidebarNavItems(accessEnabled);
+  const cloudItems = getDesktopCloudSidebarNavItems(cloudToolsEnabled);
   return (
     <div
       className={`desktop-sidebar-top-navigation desktop-sidebar-navigation-surface ${orientation}`}
@@ -206,11 +207,11 @@ export function DesktopSidebarTopNavigation({
             onOpenSettings={onOpenSettings}
           />
         </div>
-        {accessItems.length > 0 && (
+        {cloudItems.length > 0 && (
           <div className="desktop-sidebar-top-navigation-group desktop-sidebar-top-navigation-cloud">
             <DesktopSidebarButtonNavigation
               activeView={activeView}
-              items={accessItems}
+              items={cloudItems}
               gitIncomingCount={gitIncomingCount}
               gitOperationLoading={gitOperationLoading}
               gitStatus={gitStatus}
@@ -226,7 +227,7 @@ export function DesktopSidebarTopNavigation({
 
 export function DesktopSidebarRailNavigation({
   activeView,
-  accessEnabled = false,
+  cloudToolsEnabled = false,
   gitEnabled = true,
   pluginsEnabled = false,
   gitIncomingCount,
@@ -238,7 +239,7 @@ export function DesktopSidebarRailNavigation({
   onOpenSettings,
 }: {
   activeView: DesktopView;
-  accessEnabled?: boolean;
+  cloudToolsEnabled?: boolean;
   gitEnabled?: boolean;
   pluginsEnabled?: boolean;
   gitIncomingCount: number;
@@ -250,7 +251,7 @@ export function DesktopSidebarRailNavigation({
   onOpenSettings: () => void;
 }) {
   const localItems = getDesktopLocalSidebarNavItems(gitEnabled, pluginsEnabled);
-  const accessItems = getDesktopAccessSidebarNavItems(accessEnabled);
+  const cloudItems = getDesktopCloudSidebarNavItems(cloudToolsEnabled);
   return (
     <div className="desktop-sidebar-rail-navigation" aria-label="Workspace navigation">
       <div className="desktop-sidebar-rail-actions">
@@ -264,11 +265,11 @@ export function DesktopSidebarRailNavigation({
           workspaceChangeCount={workspaceChangeCount}
           onNavigate={onNavigate}
         />
-        {accessItems.length > 0 && (
+        {cloudItems.length > 0 && (
           <DesktopSidebarIconNavigation
             activeView={activeView}
             buttonClassName="desktop-sidebar-rail-button"
-            items={accessItems}
+            items={cloudItems}
             gitIncomingCount={gitIncomingCount}
             gitOperationLoading={gitOperationLoading}
             gitStatus={gitStatus}
@@ -609,16 +610,16 @@ const DESKTOP_NAV_ITEMS = [
   { view: "git", label: "Changes", icon: PuppyGitIcon, iconSize: 15 },
   { view: "plugins", label: "Plugins", icon: Blocks },
   { view: "access", label: "Access", icon: AccessChainIcon },
-  { view: "integrations", label: "Integrations", icon: IntegrationsGridIcon },
+  { view: "automation", label: "Automation", icon: AutomationGridIcon },
 ] satisfies Array<{
-  view: Extract<DesktopView, "data" | "git" | "plugins" | "access" | "integrations">;
+  view: Extract<DesktopView, "data" | "git" | "plugins" | "access" | "automation">;
   label: string;
   icon: DesktopSidebarIconComponent;
   iconSize?: number;
 }>;
 
-const DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.view !== "access" && item.view !== "integrations");
-const DESKTOP_ACCESS_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.view === "access" || item.view === "integrations");
+const DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.view !== "access" && item.view !== "automation");
+const DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.view === "access" || item.view === "automation");
 
 function getDesktopLocalSidebarNavItems(
   gitEnabled: boolean,
@@ -630,6 +631,6 @@ function getDesktopLocalSidebarNavItems(
   ));
 }
 
-function getDesktopAccessSidebarNavItems(accessEnabled: boolean): typeof DESKTOP_ACCESS_SIDEBAR_NAV_ITEMS {
-  return accessEnabled ? DESKTOP_ACCESS_SIDEBAR_NAV_ITEMS : [];
+function getDesktopCloudSidebarNavItems(cloudToolsEnabled: boolean): typeof DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS {
+  return cloudToolsEnabled ? DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS : [];
 }

@@ -386,8 +386,8 @@ export function App() {
 
   useEffect(() => {
     if (
-      (!cloudEnabled && (activeView === "cloud" || activeView === "access" || activeView === "integrations")) ||
-      (!workspaceIsCloud && (activeView === "access" || activeView === "integrations")) ||
+      (!cloudEnabled && (activeView === "cloud" || activeView === "access" || activeView === "automation")) ||
+      (!workspaceIsCloud && (activeView === "access" || activeView === "automation")) ||
       (activeView === "plugins" && (workspaceIsCloud || !experimentalSettings.enableViewerPlugins))
     ) {
       setActiveView("data");
@@ -556,7 +556,7 @@ export function App() {
       return;
     }
 
-    if (!workspaceIsCloud && (view === "access" || view === "integrations")) {
+    if (!workspaceIsCloud && (view === "access" || view === "automation")) {
       setActiveView("data");
       setSidebarCollapsed(false);
       setSwitcherOpen(false);
@@ -570,7 +570,7 @@ export function App() {
       return;
     }
 
-    if ((view === "access" || view === "integrations") && !cloudEnabled) {
+    if ((view === "access" || view === "automation") && !cloudEnabled) {
       setActiveView("data");
       setSidebarCollapsed(false);
       setSwitcherOpen(false);

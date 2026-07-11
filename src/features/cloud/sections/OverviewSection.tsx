@@ -16,6 +16,7 @@ import {
   type ProjectFolderPreviewItem,
 } from "../../../components/project-folder-card";
 import type { getPuppyoneRemote } from "../../source-control/remotes";
+import { isCloudAutomationConnector } from "../../automation/automationDomain";
 import type { CloudWorkspaceSection } from "../types";
 import {
   CloudFilePreviewIcon,
@@ -27,7 +28,6 @@ import {
   formatProviderLabel,
   formatRelativeTime,
   getCloudProviderIconUrl,
-  isCloudIntegrationConnector,
 } from "../utils";
 
 export function CloudMappedOverview({
@@ -67,7 +67,7 @@ export function CloudMappedOverview({
   const latestCommit = getLatestCloudHistoryCommit(history);
   const accessCount = scopes.length + mcpEndpoints.length;
   const accessDetail = formatAccessSummary(scopes.length, mcpEndpoints.length);
-  const integrationConnectors = connectors.filter(isCloudIntegrationConnector);
+  const automationConnectors = connectors.filter(isCloudAutomationConnector);
   const latestChangeLabel = latestCommit?.created_at
     ? formatRelativeTime(latestCommit.created_at)
     : history?.head_commit_id
@@ -145,7 +145,7 @@ export function CloudMappedOverview({
               detail={accessDetail}
               tone={accessCount > 0 ? "ready" : undefined}
             />
-            <CloudIntegrationsCard connectors={integrationConnectors} />
+            <CloudAutomationCard connectors={automationConnectors} />
           </div>
 
           <CloudLocalMappingPanel
@@ -201,20 +201,23 @@ export function CloudOverviewMetricCard({
   );
 }
 
-export function CloudIntegrationsCard({
+export function CloudAutomationCard({
   connectors,
 }: {
   connectors: DesktopCloudConnector[];
 }) {
   return (
-    <div className="desktop-cloud-integrations-card">
-      <div className="desktop-cloud-integrations-heading">
-        <span>Integrations</span>
+    <div className="desktop-cloud-automation-card">
+      <div className="desktop-cloud-automation-heading">
+        <span>Automation</span>
       </div>
-      <div className="desktop-cloud-integrations-value">
+      <div className="desktop-cloud-automation-value">
         {connectors.length > 0 ? (
           <>
-            <span className="desktop-cloud-integrations-icons" aria-label={`${connectors.length} integrations`}>
+            <span
+              className="desktop-cloud-automation-icons"
+              aria-label={`${connectors.length} automation connection${connectors.length === 1 ? "" : "s"}`}
+            >
               {connectors.map((connector) => (
                 <CloudProviderTile key={connector.id} provider={connector.provider} />
               ))}

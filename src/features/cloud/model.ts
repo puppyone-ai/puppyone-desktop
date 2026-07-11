@@ -10,7 +10,6 @@ import type { GitBranchGraphSnapshot, GitCommitChange, GitCommitSummary } from "
 import {
   formatProviderLabel,
   getScopeDisplayName,
-  isCloudIntegrationConnector,
   isConnectorActiveStatus,
   shellQuote,
 } from "./utils";
@@ -559,7 +558,6 @@ export function buildCloudAccessSurfaces({
 }): CloudAccessSurface[] {
   const cliConnector = connectors.find((connector) => connector.provider === "cli");
   const gitConnector = connectors.find((connector) => connector.provider === "filesystem" || connector.provider === "git" || connector.provider === "git_remote");
-  const thirdPartyConnectors = connectors.filter(isCloudIntegrationConnector);
   const scopeName = getScopeDisplayName(scope);
 
   return [
@@ -607,15 +605,6 @@ export function buildCloudAccessSurfaces({
         commands: serverUrl ? [{ label: "Server URL", value: serverUrl }] : [],
       };
     }),
-    ...thirdPartyConnectors.map((connector): CloudAccessSurface => ({
-      id: `connector:${connector.id}`,
-      provider: connector.provider,
-      title: connector.name || formatProviderLabel(connector.provider),
-      subtitle: `${formatProviderLabel(connector.provider)} · ${connector.direction || "manual"}`,
-      status: connector.status,
-      statusLabel: connector.status,
-      connector,
-    })),
   ];
 }
 

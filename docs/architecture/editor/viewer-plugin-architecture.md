@@ -312,11 +312,19 @@ an implicit network request; discovery is an explicit user action.
 
 ### 10.1 Product surface and terminology
 
-`Integrations` and `Plugins` are separate product domains:
+`Automation` and `Plugins` are separate product domains. The authoritative
+cross-domain rules live in
+[Automation and Plugin Domain Boundary](../automation-plugin-domain-boundary.md):
 
-- Integrations authorize cloud services and create synchronization workflows.
+- Automation authorizes cloud information sources and creates remote
+  synchronization workflows.
 - Plugins extend local file presentation. The V1 executable package remains
   the deliberately narrow `Viewer Pack`; it is not a general desktop plugin.
+
+They do not share registries, package identities, credentials, grants,
+persistence, or lifecycle. A Viewer Pack cannot call Automation or receive a
+Cloud session, and Automation cannot activate a Viewer Pack or read its local
+store.
 
 The experimental Plugins page is off by default. A local renderer preference
 may opt into the page, and a separate Appearance preference may hide its

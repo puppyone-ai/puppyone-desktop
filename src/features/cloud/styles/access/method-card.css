@@ -97,7 +97,7 @@
 .desktop-cloud-access-method-icon.mcp,
 .desktop-cloud-access-method-icon.vm,
 .desktop-cloud-access-method-icon.remote,
-.desktop-cloud-access-method-icon.integration {
+.desktop-cloud-access-method-icon.automation {
   border-color: var(--po-border);
   background: var(--po-hover);
   color: var(--po-text-muted);

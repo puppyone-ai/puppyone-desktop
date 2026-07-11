@@ -6,10 +6,7 @@ import type {
 } from "../../../../lib/cloudApi";
 import type { CloudAccessFilter } from "../../accessFilters";
 import type { CloudAccessSurface } from "../../model";
-import {
-  isCloudIntegrationConnector,
-  normalizeProviderKey,
-} from "../../utils";
+import { normalizeProviderKey } from "../../utils";
 import {
   buildDesktopCloudAccessSurfacesForScope,
   isCliAccessSurface,
@@ -73,17 +70,5 @@ export function cloudAccessRowMatchesFilter(row: CloudAccessSurfaceRow, filter: 
   if (filter === "cli") return provider === "cli";
   if (filter === "git") return provider === "filesystem" || provider === "git" || provider === "git_remote";
   if (filter === "mcp") return provider === "mcp" || provider === "mcp_endpoint";
-  if (filter === "integrations") {
-    return !!row.surface.connector && isCloudIntegrationConnector(row.surface.connector);
-  }
   return true;
-}
-
-export function cloudAccessRowMatchesIntegrationProvider(
-  row: CloudAccessSurfaceRow,
-  providerFilter: string | null,
-): boolean {
-  if (!providerFilter) return true;
-  const rowProvider = normalizeProviderKey(row.surface.connector?.provider ?? row.surface.provider);
-  return rowProvider === normalizeProviderKey(providerFilter);
 }

@@ -143,7 +143,7 @@ so its section rows and nested scroll lists own the inline edge instead.
 
 6. Share visual contracts, not incidental shorthands.
 
-   Data, Git, Settings, Cloud, Access, Integrations, and Changes must resolve
+   Data, Git, Settings, Cloud, Access, Automation, and Changes must resolve
    to the same outer edge rhythm even though their scroll ownership differs. Use
    `--desktop-sidebar-list-padding-block` for the `8px` list edge and the
    shared row gap tokens for the `12px` inline edge. Use logical
@@ -180,7 +180,7 @@ so its section rows and nested scroll lists own the inline edge instead.
   - Settings-specific separators; list edges inherit the shared tool-sidebar
     contract
 - `src/features/cloud/styles/sidebar-shell.css`
-  - Cloud and Integrations sidebar list edges (token-override compensation)
+  - Cloud and Automation sidebar list edges (token-override compensation)
 - `src/features/cloud/styles/access/scope-sidebar.css`,
   `src/features/cloud/styles/access/service-sidebar.css`
   - Access scope list edges and service-shell scrollbar ownership
