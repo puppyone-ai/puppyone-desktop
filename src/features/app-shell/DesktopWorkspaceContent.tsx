@@ -52,6 +52,7 @@ import {
 import { PuppyFlowEditor } from "../puppyflow/PuppyFlowEditor";
 import { isPuppyFlowFile } from "../puppyflow/puppyflowModel";
 import {
+  DEFAULT_PLUGINS_SECTION,
   isPluginsNavigationVisible,
   isViewerPluginsEnabled,
   PluginsSidebar,
@@ -196,7 +197,7 @@ export function DesktopWorkspaceContent({
   });
   const [activeCloudAccessRowId, setActiveCloudAccessRowId] = useState<string | null>(null);
   const [activeAutomationProvider, setActiveAutomationProvider] = useState<string | null>(null);
-  const [activePluginsSection, setActivePluginsSection] = useState<PluginsSection>("discover");
+  const [activePluginsSection, setActivePluginsSection] = useState<PluginsSection>(DEFAULT_PLUGINS_SECTION);
 
   useEffect(() => {
     const accessRows = cloudAccessData.accessRows.filter(isCloudAccessNavigationResource);
@@ -446,6 +447,7 @@ export function DesktopWorkspaceContent({
         hostAvailable={externalViewerPacksEnabled}
         snapshot={viewerPackSnapshot}
         onRefresh={refreshViewerPackSnapshot}
+        onSelectSection={setActivePluginsSection}
       />
     </Suspense>
   );

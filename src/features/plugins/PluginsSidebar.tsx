@@ -1,6 +1,14 @@
-import { Blocks, Box, ShieldCheck } from "lucide-react";
+import { Blocks, Compass, PackageCheck } from "lucide-react";
+import { OFFICIAL_VIEWER_CATALOG } from "./pluginCatalog";
 
-export type PluginsSection = "discover" | "installed" | "built-in";
+export type PluginsSection = "installed" | "discover" | "included";
+export const DEFAULT_PLUGINS_SECTION: PluginsSection = "installed";
+
+export const PLUGINS_SIDEBAR_ITEMS = [
+  { id: "installed", label: "Installed", icon: PackageCheck },
+  { id: "discover", label: "Discover", icon: Compass },
+  { id: "included", label: "Included", icon: Blocks },
+] as const;
 
 export function PluginsSidebar({
   activeSection,
@@ -11,20 +19,19 @@ export function PluginsSidebar({
   installedCount: number;
   onSelectSection: (section: PluginsSection) => void;
 }) {
-  const items = [
-    { id: "discover", label: "Discover", icon: Blocks },
-    { id: "installed", label: "Installed", icon: Box, count: installedCount },
-    { id: "built-in", label: "Built-in", icon: ShieldCheck },
-  ] as const;
-
   return (
     <section className="desktop-tool-sidebar desktop-plugins-sidebar">
       <div className="desktop-tool-sidebar-list desktop-plugins-sidebar-list">
-        <div className="desktop-plugins-sidebar-eyebrow">Plugins</div>
+        <header className="desktop-plugins-sidebar-heading">Plugins</header>
         <nav aria-label="Plugin sections">
-          {items.map((item) => {
+          {PLUGINS_SIDEBAR_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = activeSection === item.id;
+            const count = item.id === "installed"
+              ? installedCount
+              : item.id === "included"
+                ? OFFICIAL_VIEWER_CATALOG.length
+                : 0;
             return (
               <button
                 key={item.id}
@@ -35,17 +42,11 @@ export function PluginsSidebar({
               >
                 <Icon size={15} strokeWidth={1.9} aria-hidden="true" />
                 <span>{item.label}</span>
-                {"count" in item && item.count > 0 && (
-                  <small aria-label={`${item.count} installed plugins`}>{item.count}</small>
-                )}
+                {count > 0 && <small aria-hidden="true">{count}</small>}
               </button>
             );
           })}
         </nav>
-        <div className="desktop-plugins-sidebar-note">
-          <ShieldCheck size={14} aria-hidden="true" />
-          <span>Local-only viewers</span>
-        </div>
       </div>
     </section>
   );

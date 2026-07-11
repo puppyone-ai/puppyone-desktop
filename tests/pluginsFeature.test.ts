@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_EXPERIMENTAL_SETTINGS } from "../src/preferences";
 import {
+  DEFAULT_PLUGINS_SECTION,
+  PLUGINS_SIDEBAR_ITEMS,
   isPluginsNavigationVisible,
   isViewerPluginsEnabled,
-} from "../src/features/plugins/pluginFeature";
+} from "../src/features/plugins";
 import {
   getInvalidOfficialViewerCatalogIds,
   OFFICIAL_VIEWER_CATALOG,
@@ -43,5 +45,15 @@ describe("Viewer Plugins experiment", () => {
   it("keeps every official catalog card backed by an active preset Viewer contract", () => {
     expect(OFFICIAL_VIEWER_CATALOG.length).toBeGreaterThan(0);
     expect(getInvalidOfficialViewerCatalogIds()).toEqual([]);
+    expect(OFFICIAL_VIEWER_CATALOG.every((entry) => !("description" in entry))).toBe(true);
+  });
+
+  it("starts with local state and keeps acquisition secondary", () => {
+    expect(DEFAULT_PLUGINS_SECTION).toBe("installed");
+    expect(PLUGINS_SIDEBAR_ITEMS.map((item) => item.id)).toEqual([
+      "installed",
+      "discover",
+      "included",
+    ]);
   });
 });

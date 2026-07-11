@@ -11,7 +11,6 @@ export type OfficialViewerIcon =
 export type OfficialViewerCatalogEntry = Readonly<{
   id: string;
   title: string;
-  description: string;
   icon: OfficialViewerIcon;
   viewerIds: readonly string[];
   formats: readonly string[];
@@ -21,7 +20,6 @@ export const OFFICIAL_VIEWER_CATALOG = Object.freeze([
   {
     id: "documents",
     title: "Documents",
-    description: "Safe local previews for Word, OpenDocument, and rich-text files.",
     icon: "document",
     viewerIds: ["office-preview"],
     formats: ["DOCX", "DOC", "ODT", "RTF"],
@@ -29,7 +27,6 @@ export const OFFICIAL_VIEWER_CATALOG = Object.freeze([
   {
     id: "spreadsheets",
     title: "Spreadsheets",
-    description: "Bounded workbook previews with sheet navigation and large-grid virtualization.",
     icon: "spreadsheet",
     viewerIds: ["office-preview"],
     formats: ["XLSX", "XLS", "XLSM", "ODS"],
@@ -37,7 +34,6 @@ export const OFFICIAL_VIEWER_CATALOG = Object.freeze([
   {
     id: "presentations",
     title: "Presentations",
-    description: "Local slide rendering for modern PowerPoint and OpenDocument presentations.",
     icon: "presentation",
     viewerIds: ["office-preview"],
     formats: ["PPTX", "PPSX", "ODP"],
@@ -45,7 +41,6 @@ export const OFFICIAL_VIEWER_CATALOG = Object.freeze([
   {
     id: "pdf",
     title: "PDF",
-    description: "Fast browser-isolated PDF preview with local resource authorization.",
     icon: "pdf",
     viewerIds: ["pdf-preview"],
     formats: ["PDF"],
@@ -53,7 +48,6 @@ export const OFFICIAL_VIEWER_CATALOG = Object.freeze([
   {
     id: "images",
     title: "Images",
-    description: "Responsive previews for common raster, vector, and animated image formats.",
     icon: "image",
     viewerIds: ["image-preview"],
     formats: ["PNG", "JPG", "SVG", "WEBP", "GIF"],
@@ -61,7 +55,6 @@ export const OFFICIAL_VIEWER_CATALOG = Object.freeze([
   {
     id: "media",
     title: "Audio & video",
-    description: "Native local playback with no upload or background synchronization.",
     icon: "media",
     viewerIds: ["audio-preview", "video-preview"],
     formats: ["MP3", "WAV", "MP4", "WEBM"],
