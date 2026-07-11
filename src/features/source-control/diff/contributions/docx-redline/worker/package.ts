@@ -1,5 +1,5 @@
 import type JSZip from "jszip";
-import { validateOfficePackageDecompression } from "../../../../../../../vendor/shared-ui/src/editor/security/officePackageValidationTask";
+import { validateOfficePackageDecompression } from "@puppyone/shared-ui";
 import { DOCX_REDLINE_BUDGET, createDocxLimitError } from "../budget";
 import type { DocxNormalizedBlock } from "../model";
 import { normalizeDocxDocumentXml } from "./normalize";

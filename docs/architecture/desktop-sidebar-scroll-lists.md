@@ -165,7 +165,7 @@ so its section rows and nested scroll lists own the inline edge instead.
     `--desktop-sidebar-list-padding-block`
 - `src/features/data-workspace/browser.css`
   - maps the shared sidebar edge tokens into the shared explorer tree contract
-- `vendor/shared-ui/src/styles/data-workspace.css`
+- `packages/shared-ui/src/styles/data-workspace.css`
   - files explorer scroll area (`.explorer-tree-scroll`, reserved gutter),
     list padding compensation (`.explorer-tree-list`), tree row geometry
 - `src/features/source-control/styles/sidebar-base.css`
@@ -189,7 +189,7 @@ so its section rows and nested scroll lists own the inline edge instead.
   - Access scope list edges and service-shell scrollbar ownership
 - `src/features/changes/changes.css`
   - legacy Changes review-list edge mapping
-- `vendor/shared-ui/src/primitives/useScrollableClass.ts`
+- `packages/shared-ui/src/primitives/useScrollableClass.ts`
   - scrollability detection and `is-scrollable` class assignment
 
 ## Invariants

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const checkedSrcDirs = [
-  path.join(repoRoot, "vendor", "shared-ui", "src"),
+  path.join(repoRoot, "packages", "shared-ui", "src"),
 ];
 const desktopSrcDirs = [
   path.join(repoRoot, "src"),
@@ -138,7 +138,7 @@ function findDesktopSharedTreeCssErrors(cssFiles) {
         kind: "css-selector",
         filePath,
         specifier: selector,
-        reason: "ExplorerTree component selectors belong in vendor/shared-ui/src/styles/data-workspace.css; standalone desktop should override --po-tree-* variables instead",
+        reason: "ExplorerTree component selectors belong in packages/shared-ui/src/styles/data-workspace.css; standalone desktop should override --po-tree-* variables instead",
       });
     }
   }

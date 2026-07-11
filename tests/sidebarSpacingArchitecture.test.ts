@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const tokensCss = readCss("../src/styles/tokens.css");
 const dataAdapterCss = readCss("../src/features/data-workspace/browser.css");
-const dataTreeCss = readCss("../vendor/shared-ui/src/styles/data-workspace.css");
+const dataTreeCss = readCss("../packages/shared-ui/src/styles/data-workspace.css");
 const sidebarBaseCss = readCss("../src/features/source-control/styles/sidebar-base.css");
 const gitLayoutCss = readCss("../src/features/source-control/styles/sidebar-layout.css");
 const gitHistoryCss = readCss("../src/features/source-control/styles/history-list.css");

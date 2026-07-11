@@ -6,9 +6,9 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MarkdownCodeMirrorEditor } from "../vendor/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor";
-import type { EditorSourceSnapshotPort } from "../vendor/shared-ui/src/editor/sourceSnapshot";
-import { TextEditorFrame } from "../vendor/shared-ui/src/editor/viewers/TextEditorFrame";
+import { MarkdownCodeMirrorEditor } from "../packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor";
+import type { EditorSourceSnapshotPort } from "../packages/shared-ui/src/editor/sourceSnapshot";
+import { TextEditorFrame } from "../packages/shared-ui/src/editor/viewers/TextEditorFrame";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

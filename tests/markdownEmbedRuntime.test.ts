@@ -4,22 +4,22 @@
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createEmbeddedEditSessionStore } from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/embeddedEditSession";
+import { createEmbeddedEditSessionStore } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/embeddedEditSession";
 import {
   disposeMarkdownEmbedHost,
   getMarkdownEmbedHost,
-} from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/embedHost";
-import { getMarkdownTableBlock } from "../vendor/shared-ui/src/editor/markdown/features/table/tableModel";
+} from "../packages/shared-ui/src/editor/markdown/platform/codemirror/embedHost";
+import { getMarkdownTableBlock } from "../packages/shared-ui/src/editor/markdown/features/table/tableModel";
 import {
   createTransactionBroker,
   getDocRevision,
-} from "../vendor/shared-ui/src/editor/markdown/platform/brokers/transactionBroker";
-import { CodeBlockWidget } from "../vendor/shared-ui/src/editor/markdown/features/code-block/codeBlockWidget";
-import { MermaidBlockWidget } from "../vendor/shared-ui/src/editor/markdown/features/mermaid/mermaidBlockWidget";
+} from "../packages/shared-ui/src/editor/markdown/platform/brokers/transactionBroker";
+import { CodeBlockWidget } from "../packages/shared-ui/src/editor/markdown/features/code-block/codeBlockWidget";
+import { MermaidBlockWidget } from "../packages/shared-ui/src/editor/markdown/features/mermaid/mermaidBlockWidget";
 import {
   createTableCellEditor,
   disposeTableCellEditor,
-} from "../vendor/shared-ui/src/editor/markdown/features/table/tableCellEditor";
+} from "../packages/shared-ui/src/editor/markdown/features/table/tableCellEditor";
 
 const mermaidMocks = vi.hoisted(() => ({
   render: vi.fn(async () => ({
@@ -30,7 +30,7 @@ const mermaidMocks = vi.hoisted(() => ({
   subscribe: vi.fn(() => () => undefined),
 }));
 
-vi.mock("../vendor/shared-ui/src/editor/markdown/features/mermaid/mermaidRenderer", () => ({
+vi.mock("../packages/shared-ui/src/editor/markdown/features/mermaid/mermaidRenderer", () => ({
   getMermaidThemeSnapshot: () => ({ key: "test-theme", config: {} }),
   renderMermaidDiagram: mermaidMocks.render,
   subscribeMermaidThemeChanges: mermaidMocks.subscribe,

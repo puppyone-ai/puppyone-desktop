@@ -4,15 +4,15 @@ import {
   isBrokerSafeResolvedAssetUrl,
   isPathInsideWorkspaceRoot,
   resolveWorkspaceRelativePath,
-} from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownAssetPolicy";
-import { createAssetBroker } from "../vendor/shared-ui/src/editor/markdown/platform/brokers/assetBroker";
-import { createCapabilityPrincipal } from "../vendor/shared-ui/src/editor/markdown/platform/security/capabilityPrincipal";
+} from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownAssetPolicy";
+import { createAssetBroker } from "../packages/shared-ui/src/editor/markdown/platform/brokers/assetBroker";
+import { createCapabilityPrincipal } from "../packages/shared-ui/src/editor/markdown/platform/security/capabilityPrincipal";
 import {
   allowsLocalActiveHtml,
   createDocumentTrustContext,
   evaluateAuthorizationGrant,
-} from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownTrustPolicy";
-import { createExecutionSessionStore } from "../vendor/shared-ui/src/editor/markdown/platform/sessions/executionSession";
+} from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownTrustPolicy";
+import { createExecutionSessionStore } from "../packages/shared-ui/src/editor/markdown/platform/sessions/executionSession";
 
 describe("markdownAssetPolicy", () => {
   it("denies file:// and executable schemes", () => {

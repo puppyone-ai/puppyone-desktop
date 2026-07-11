@@ -42,7 +42,7 @@ export default [
     files: [
       "src/**/*.{ts,tsx}",
       "shared/agent-contract/**/*.ts",
-      "vendor/shared-ui/src/**/*.{ts,tsx}",
+      "packages/shared-ui/src/**/*.{ts,tsx}",
     ],
     languageOptions: {
       parser: tsParser,

@@ -2,19 +2,19 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const markdownEditorCss = readFileSync(
-  new URL("../vendor/shared-ui/src/styles/editor/markdown-editor.css", import.meta.url),
+  new URL("../packages/shared-ui/src/styles/editor/markdown-editor.css", import.meta.url),
   "utf8",
 );
 const markdownTableCss = readFileSync(
-  new URL("../vendor/shared-ui/src/styles/editor/markdown-table-widget.css", import.meta.url),
+  new URL("../packages/shared-ui/src/styles/editor/markdown-table-widget.css", import.meta.url),
   "utf8",
 );
 const markdownHtmlCss = readFileSync(
-  new URL("../vendor/shared-ui/src/styles/editor/markdown-html-widget.css", import.meta.url),
+  new URL("../packages/shared-ui/src/styles/editor/markdown-html-widget.css", import.meta.url),
   "utf8",
 );
 const markdownCodeCss = readFileSync(
-  new URL("../vendor/shared-ui/src/styles/editor/markdown-code-widgets.css", import.meta.url),
+  new URL("../packages/shared-ui/src/styles/editor/markdown-code-widgets.css", import.meta.url),
   "utf8",
 );
 

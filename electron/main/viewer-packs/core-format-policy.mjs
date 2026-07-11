@@ -4,7 +4,7 @@ import { capabilityForCoreViewer } from "./preset-viewer-manifest.mjs";
 export { capabilityForCoreViewer } from "./preset-viewer-manifest.mjs";
 
 const require = createRequire(import.meta.url);
-const registryJson = require("../../../vendor/shared-ui/src/core/fileFormats.json");
+const registryJson = require("../../../packages/shared-ui/src/core/fileFormats.json");
 
 /**
  * Main-process mirror of the core file-format policy, backed by the same JSON

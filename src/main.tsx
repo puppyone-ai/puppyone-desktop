@@ -4,7 +4,7 @@ import { App } from "./App";
 import { ScrollbarActivity } from "./components/ScrollbarActivity";
 import { FeatureFlagsProvider } from "./features/flags";
 import "./cloud-globals.css";
-import "../vendor/shared-ui/src/styles/shared-ui.css";
+import "@puppyone/shared-ui/shared-ui.css";
 import "./styles.css";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);

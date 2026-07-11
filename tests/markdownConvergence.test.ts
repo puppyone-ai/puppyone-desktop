@@ -5,22 +5,22 @@ import { EditorState } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { EditorView } from "@codemirror/view";
 import { describe, expect, it, vi } from "vitest";
-import { bindInlineHtmlDomInteractions } from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlDomAdapter";
-import { renderMarkdownInlineFromSharedPolicy } from "../vendor/shared-ui/src/editor/markdown/core/preview/markdownInlinePlanAdapter";
+import { bindInlineHtmlDomInteractions } from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlDomAdapter";
+import { renderMarkdownInlineFromSharedPolicy } from "../packages/shared-ui/src/editor/markdown/core/preview/markdownInlinePlanAdapter";
 import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
-} from "../vendor/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
-import { getMarkdownPlanIndex } from "../vendor/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
-import { isTagAllowedInProfile } from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownHtmlProfiles";
-import { createSanitizedBlockHtmlFragment } from "../vendor/shared-ui/src/editor/markdown/features/html/sanitizeHtml";
-import { isSafeStyleValue } from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownHtmlSanitizerPolicy";
+} from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
+import { getMarkdownPlanIndex } from "../packages/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
+import { isTagAllowedInProfile } from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownHtmlProfiles";
+import { createSanitizedBlockHtmlFragment } from "../packages/shared-ui/src/editor/markdown/features/html/sanitizeHtml";
+import { isSafeStyleValue } from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownHtmlSanitizerPolicy";
 import {
   MERMAID_MAX_SOURCE_BYTES,
   renderMermaidDiagram,
   sanitizeMermaidSvg,
-} from "../vendor/shared-ui/src/editor/markdown/features/mermaid/mermaidRenderer";
-import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
+} from "../packages/shared-ui/src/editor/markdown/features/mermaid/mermaidRenderer";
+import { puppyMarkdownParserExtensions } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
 
 function createMarkdownState(source: string) {
   return EditorState.create({

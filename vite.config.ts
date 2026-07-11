@@ -44,8 +44,12 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: "@puppyone/shared-ui/shared-ui.css",
+        replacement: fileURLToPath(new URL("./packages/shared-ui/src/styles/shared-ui.css", import.meta.url)),
+      },
+      {
         find: "@puppyone/shared-ui",
-        replacement: fileURLToPath(new URL("./vendor/shared-ui/src/index.ts", import.meta.url)),
+        replacement: fileURLToPath(new URL("./packages/shared-ui/src/index.ts", import.meta.url)),
       },
       {
         find: "lucide-react",

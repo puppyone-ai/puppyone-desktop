@@ -176,6 +176,13 @@ export type {
   PaneResizeDragSession,
   UsePaneResizeDragOptions,
 } from "./primitives/usePaneResizeDrag";
+export { validateOfficePackageDecompression } from "./editor/security/officePackageValidationTask";
+export type {
+  OfficePackageDecompressionBudget,
+  OfficePackageValidationOptions,
+  OfficePackageValidationReport,
+  OfficePackageValidationResult,
+} from "./editor/security/officePackageValidationTask";
 export { ConflictMarkerBanner } from "./editor/ConflictMarkerBanner";
 export {
   createAiEditFile,

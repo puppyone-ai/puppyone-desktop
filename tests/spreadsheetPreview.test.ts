@@ -2,17 +2,17 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as XLSX from "xlsx";
-import { parseSpreadsheetPreview } from "../vendor/shared-ui/src/editor/viewers/spreadsheetParser";
+import { parseSpreadsheetPreview } from "../packages/shared-ui/src/editor/viewers/spreadsheetParser";
 import {
   getSpreadsheetArchiveKind,
   getSpreadsheetRenderRows,
   MAX_SPREADSHEET_MATERIALIZED_CELLS,
   MAX_SPREADSHEET_STRING_PAYLOAD_BYTES,
-} from "../vendor/shared-ui/src/editor/viewers/spreadsheetPreview";
+} from "../packages/shared-ui/src/editor/viewers/spreadsheetPreview";
 import {
   DEFAULT_SPREADSHEET_WORKER_TIMEOUT_MS,
   parseSpreadsheetInWorker,
-} from "../vendor/shared-ui/src/editor/viewers/spreadsheetPreviewClient";
+} from "../packages/shared-ui/src/editor/viewers/spreadsheetPreviewClient";
 
 const CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
 const END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50;

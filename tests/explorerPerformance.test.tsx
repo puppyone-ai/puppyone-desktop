@@ -5,13 +5,13 @@ import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { DataNode } from "../vendor/shared-ui/src/core/types";
-import { ExplorerTree } from "../vendor/shared-ui/src/data/ExplorerTree";
+import type { DataNode } from "../packages/shared-ui/src/core/types";
+import { ExplorerTree } from "../packages/shared-ui/src/data/ExplorerTree";
 import {
   buildExplorerVisibleModel,
-} from "../vendor/shared-ui/src/data/explorer/explorerVisibleModel";
-import { createExplorerMotionPlan } from "../vendor/shared-ui/src/data/explorer/explorerMotionPlan";
-import { EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS } from "../vendor/shared-ui/src/data/explorer/useExplorerVirtualWindow";
+} from "../packages/shared-ui/src/data/explorer/explorerVisibleModel";
+import { createExplorerMotionPlan } from "../packages/shared-ui/src/data/explorer/explorerMotionPlan";
+import { EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS } from "../packages/shared-ui/src/data/explorer/useExplorerVirtualWindow";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

@@ -2198,11 +2198,11 @@ function isPreviewable(filePath) {
 }
 
 function loadFileFormatRegistry() {
-  // vendor/shared-ui is the canonical copy in this standalone repo (ISSUE-021).
+  // packages/shared-ui is the canonical copy in this standalone repo (ISSUE-021).
   // The former "../../frontend/shared-ui" fallback assumed a sibling monorepo
   // checkout that does not exist in CI / packaged builds / other machines and
   // resolved to nothing — it has been removed.
-  const registryPath = path.resolve(localApiDir, "../vendor/shared-ui/src/core/fileFormats.json");
+  const registryPath = path.resolve(localApiDir, "../packages/shared-ui/src/core/fileFormats.json");
   try {
     return JSON.parse(readFileSync(registryPath, "utf8"));
   } catch (error) {

@@ -96,21 +96,21 @@ tree mount. `DataWorkspace` still owns data loading and expansion state, and
 
 ## Current Code Boundaries
 
-- `vendor/shared-ui/src/data/DataWorkspace.tsx`
+- `packages/shared-ui/src/data/DataWorkspace.tsx`
   - renders the keep-alive explorer view stack
   - owns `expandedFolderPaths`, `loadingFolderPaths`, root loaded state, and
     load generation for the file tree
   - passes controlled tree state into `ExplorerTree`
 
-- `vendor/shared-ui/src/data/ExplorerTree.tsx`
+- `packages/shared-ui/src/data/ExplorerTree.tsx`
   - must not infer fresh expansion from tab return
   - receives controlled expansion and loading props from `DataWorkspace`
 
-- `vendor/shared-ui/src/styles/data-workspace.css`
+- `packages/shared-ui/src/styles/data-workspace.css`
   - defines the keep-alive explorer frame stack
   - preserves inactive frame layout without pointer interaction
 
-These files live in `vendor/shared-ui` — the canonical copy in this standalone
+These files live in `packages/shared-ui` — the canonical copy in this standalone
 repo (ISSUE-021). Edit them in place; there is no upstream to sync from.
 
 ## Verification

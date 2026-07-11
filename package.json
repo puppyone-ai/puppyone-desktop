@@ -8,7 +8,7 @@
     "externalViewerPacks": false
   },
   "scripts": {
-    "check:boundaries": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-agent-architecture.mjs && node scripts/check-opencode-provenance.mjs && node scripts/check-agent-ui-provenance.mjs && node scripts/check-automation-plugin-boundaries.mjs",
+    "check:boundaries": "node scripts/check-repository-layout.mjs && node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-agent-architecture.mjs && node scripts/check-opencode-provenance.mjs && node scripts/check-agent-ui-provenance.mjs && node scripts/check-automation-plugin-boundaries.mjs",
     "check:shared-ui": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs",
     "check:viewer-contract": "node scripts/check-viewer-contract.mjs",
     "check:markdown-architecture": "node scripts/check-markdown-architecture.mjs",
@@ -32,6 +32,7 @@
     "smoke:format-aware-diff": "electron scripts/smoke-format-aware-diff.mjs",
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
     "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
+    "audit:viewer-gpu": "electron scripts/audit-viewer-gpu.mjs",
     "smoke:renderer-performance": "npm run build && electron scripts/smoke-renderer-performance.mjs",
     "smoke:renderer-cold-performance": "npm run build && electron scripts/smoke-renderer-performance.mjs --cold --visible --with-link-index",
     "start": "node scripts/start-electron.mjs",
@@ -104,7 +105,7 @@
       "electron/**",
       "local-api/**",
       "shared/**",
-      "vendor/shared-ui/**",
+      "packages/shared-ui/**",
       "vendor/claudian/**",
       "LICENSE",
       "NOTICE",

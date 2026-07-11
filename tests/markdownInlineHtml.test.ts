@@ -2,29 +2,29 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
-import { addInlineMarkdownDecorations } from "../vendor/shared-ui/src/editor/markdown/core/decorations/inlineDecorations";
+import { addInlineMarkdownDecorations } from "../packages/shared-ui/src/editor/markdown/core/decorations/inlineDecorations";
 import {
   markdownLivePreviewDecorations,
   requestMarkdownProjectionRange,
-} from "../vendor/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
+} from "../packages/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
 import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
-} from "../vendor/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
-import { getMarkdownHtmlBlock } from "../vendor/shared-ui/src/editor/markdown/features/html/htmlBlockModel";
-import { compileInlineHtmlRenderPlan } from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlPolicy";
-import { isAllowedStyleProperty } from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownHtmlSanitizerPolicy";
+} from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
+import { getMarkdownHtmlBlock } from "../packages/shared-ui/src/editor/markdown/features/html/htmlBlockModel";
+import { compileInlineHtmlRenderPlan } from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlPolicy";
+import { isAllowedStyleProperty } from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownHtmlSanitizerPolicy";
 import {
   getMarkdownInlineHtml,
   type MarkdownInlineHtml,
-} from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlModel";
+} from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlModel";
 import {
   parseMarkdownHtmlTagToken,
   scanMarkdownHtmlTagTokens,
-} from "../vendor/shared-ui/src/editor/markdown/features/html/htmlTagTokenizer";
-import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
-import { getInlineRevealElement } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownElements";
-import { InlineHtmlLineBreakWidget } from "../vendor/shared-ui/src/editor/markdown/core/widgets/inlineWidgets";
+} from "../packages/shared-ui/src/editor/markdown/features/html/htmlTagTokenizer";
+import { puppyMarkdownParserExtensions } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
+import { getInlineRevealElement } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownElements";
+import { InlineHtmlLineBreakWidget } from "../packages/shared-ui/src/editor/markdown/core/widgets/inlineWidgets";
 
 function createMarkdownState(source: string) {
   return EditorState.create({

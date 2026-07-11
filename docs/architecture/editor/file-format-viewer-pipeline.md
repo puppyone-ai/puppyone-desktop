@@ -54,7 +54,7 @@ presetViewerManifest.json ──► capability/source/runtime│
 
 ## 2. Stage 1 — the format registry
 
-`vendor/shared-ui/src/core/fileFormats.json` is the canonical registry.
+`packages/shared-ui/src/core/fileFormats.json` is the canonical registry.
 Each entry is a `FileFormat` (typed in `fileFormats.ts`):
 
 | Field | Meaning |
@@ -91,7 +91,7 @@ formats; that distinction is a *viewer capability*, handled in stage 2/3.
 
 ## 3. Stage 2 — the viewer registry
 
-`vendor/shared-ui/src/editor/presetViewerManifest.json` is the serializable
+`packages/shared-ui/src/editor/presetViewerManifest.json` is the serializable
 single source of truth for a preset viewer's stable id, aliases used by
 `FileFormat.defaultViewer`, core capability, source requirement, and runtime
 boundary. Both shared-ui and Electron main parse this exact file strictly.
@@ -99,7 +99,7 @@ Unknown fields, duplicate ids/aliases, invalid capability/source combinations,
 an undeclared format viewer id, or anything other than one `placeholder` +
 `none` fallback fail at startup/test time.
 
-`vendor/shared-ui/src/editor/viewerRegistry.tsx` owns the immutable
+`packages/shared-ui/src/editor/viewerRegistry.tsx` owns the immutable
 `PRESET_VIEWER_REGISTRY`. Each implementation supplies only its canonical id,
 format-aware `match`, optional normalization/editability, and one executable
 render boundary. `definePresetViewer()` joins that implementation to the

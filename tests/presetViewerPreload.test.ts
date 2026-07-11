@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { preloadPresetViewer } from "../vendor/shared-ui/src/editor/PresetViewerRenderer";
-import { getPresetViewerDefinition } from "../vendor/shared-ui/src/editor/presetViewerManifest";
-import type { LazyPresetViewerContribution } from "../vendor/shared-ui/src/editor/viewerTypes";
+import { preloadPresetViewer } from "../packages/shared-ui/src/editor/PresetViewerRenderer";
+import { getPresetViewerDefinition } from "../packages/shared-ui/src/editor/presetViewerManifest";
+import type { LazyPresetViewerContribution } from "../packages/shared-ui/src/editor/viewerTypes";
 
 describe("preset viewer preload cache", () => {
   it("deduplicates prefetch and React.lazy module acquisition", async () => {

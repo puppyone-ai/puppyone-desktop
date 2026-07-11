@@ -12,7 +12,7 @@ This document has two parts with different lifetimes:
   migration content — and remains the reference for everyone working on the
   editor after the current work is done.
 - **Part 2 — Migration plan.** The to-do list and code change map for moving
-  the implementation in `vendor/shared-ui/src/editor/markdown/` onto Part 1.
+  the implementation in `packages/shared-ui/src/editor/markdown/` onto Part 1.
   It is scoped to this one migration; delete or archive it once the new
   behavior has shipped and stabilized.
 
@@ -534,9 +534,9 @@ pipeline is the only live-preview pipeline. Future risky editor experiments
 can still use the compartment to ship behind a temporary variant switch, but
 no switch remains for this migration.
 
-After every code change in `vendor/shared-ui`, run
-`npm run check:shared-ui`. `vendor/shared-ui/GENERATED.md` and
-`vendor/shared-ui/AGENTS.md` both describe this standalone repository's
+After every code change in `packages/shared-ui`, run
+`npm run check:shared-ui`. `packages/shared-ui/GENERATED.md` and
+`packages/shared-ui/AGENTS.md` both describe this standalone repository's
 editable canonical copy; historical monorepo sync scripts are intentionally
 not part of this repository.
 

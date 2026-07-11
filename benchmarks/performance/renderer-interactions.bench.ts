@@ -5,9 +5,9 @@ import { createElement, StrictMode } from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterAll, bench, describe } from "vitest";
-import { ExplorerTree } from "../../vendor/shared-ui/src/data/ExplorerTree";
-import { FileOpenRequestCoordinator } from "../../vendor/shared-ui/src/data/file-open/fileOpenRequestCoordinator";
-import { MarkdownCodeMirrorEditor } from "../../vendor/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor";
+import { ExplorerTree } from "../../packages/shared-ui/src/data/ExplorerTree";
+import { FileOpenRequestCoordinator } from "../../packages/shared-ui/src/data/file-open/fileOpenRequestCoordinator";
+import { MarkdownCodeMirrorEditor } from "../../packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor";
 import {
   makeExplorerNodes,
   makeFeatureHeavyMarkdown,

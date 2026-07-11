@@ -4,17 +4,17 @@
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it } from "vitest";
-import { disposeWidgetSessionDom } from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/widgetSession";
-import { createWidgetSessionRegistry } from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/widgetSession";
-import { createDomFromInlineHtmlSource } from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlDomAdapter";
+import { disposeWidgetSessionDom } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/widgetSession";
+import { createWidgetSessionRegistry } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/widgetSession";
+import { createDomFromInlineHtmlSource } from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlDomAdapter";
 import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
-} from "../vendor/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
-import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/embedHost";
-import { createSanitizedBlockHtmlFragment } from "../vendor/shared-ui/src/editor/markdown/features/html/sanitizeHtml";
-import { createPrincipalFromView } from "../vendor/shared-ui/src/editor/markdown/core/editor/markdownLivePreviewContext";
-import { renderMarkdownInlineFromSharedPolicy } from "../vendor/shared-ui/src/editor/markdown/core/preview/markdownInlinePlanAdapter";
+} from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
+import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/embedHost";
+import { createSanitizedBlockHtmlFragment } from "../packages/shared-ui/src/editor/markdown/features/html/sanitizeHtml";
+import { createPrincipalFromView } from "../packages/shared-ui/src/editor/markdown/core/editor/markdownLivePreviewContext";
+import { renderMarkdownInlineFromSharedPolicy } from "../packages/shared-ui/src/editor/markdown/core/preview/markdownInlinePlanAdapter";
 
 const views: EditorView[] = [];
 

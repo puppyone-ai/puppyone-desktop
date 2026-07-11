@@ -1,26 +1,26 @@
 import { EditorState } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { describe, expect, it } from "vitest";
-import { createWidgetSessionRegistry } from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/widgetSession";
-import { createEmbeddedEditSessionStore } from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/embeddedEditSession";
-import { compileMarkdownElementPlan } from "../vendor/shared-ui/src/editor/markdown/core/plans/markdownPlanCompiler";
+import { createWidgetSessionRegistry } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/widgetSession";
+import { createEmbeddedEditSessionStore } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/embeddedEditSession";
+import { compileMarkdownElementPlan } from "../packages/shared-ui/src/editor/markdown/core/plans/markdownPlanCompiler";
 import {
   getCollapsedMarkerDeletionUnit,
   getMarkdownPlanIndex,
-} from "../vendor/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
-import { MARKDOWN_HTML_PROFILE_VERSION } from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownHtmlProfiles";
-import { createAsyncRenderBroker } from "../vendor/shared-ui/src/editor/markdown/platform/brokers/asyncRenderBroker";
-import { createLinkBroker } from "../vendor/shared-ui/src/editor/markdown/platform/brokers/linkBroker";
-import { createWebEmbedBroker } from "../vendor/shared-ui/src/editor/markdown/platform/brokers/webEmbedBroker";
-import { createCapabilityPrincipal, workspaceIdForDocument } from "../vendor/shared-ui/src/editor/markdown/platform/security/capabilityPrincipal";
-import { createExecutionSessionStore } from "../vendor/shared-ui/src/editor/markdown/platform/sessions/executionSession";
+} from "../packages/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
+import { MARKDOWN_HTML_PROFILE_VERSION } from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownHtmlProfiles";
+import { createAsyncRenderBroker } from "../packages/shared-ui/src/editor/markdown/platform/brokers/asyncRenderBroker";
+import { createLinkBroker } from "../packages/shared-ui/src/editor/markdown/platform/brokers/linkBroker";
+import { createWebEmbedBroker } from "../packages/shared-ui/src/editor/markdown/platform/brokers/webEmbedBroker";
+import { createCapabilityPrincipal, workspaceIdForDocument } from "../packages/shared-ui/src/editor/markdown/platform/security/capabilityPrincipal";
+import { createExecutionSessionStore } from "../packages/shared-ui/src/editor/markdown/platform/sessions/executionSession";
 import {
   createDocumentTrustContext,
   evaluateAuthorizationGrant,
-} from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownTrustPolicy";
-import { createTransactionBroker, getDocRevision } from "../vendor/shared-ui/src/editor/markdown/platform/brokers/transactionBroker";
-import { getMarkdownElements } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownElements";
-import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
+} from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownTrustPolicy";
+import { createTransactionBroker, getDocRevision } from "../packages/shared-ui/src/editor/markdown/platform/brokers/transactionBroker";
+import { getMarkdownElements } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownElements";
+import { puppyMarkdownParserExtensions } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
 
 function createMarkdownState(source: string) {
   return EditorState.create({

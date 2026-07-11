@@ -1385,7 +1385,7 @@ The target organization is conceptual; migration should avoid a large-bang
 rename.
 
 ```text
-vendor/shared-ui/src/editor/markdown/
+packages/shared-ui/src/editor/markdown/
   parser/
     markdownParserExtensions.ts
     markdownDialect.ts

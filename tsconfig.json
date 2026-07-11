@@ -13,7 +13,7 @@
     "moduleResolution": "Node",
     "baseUrl": ".",
     "paths": {
-      "@puppyone/shared-ui": ["vendor/shared-ui/src/index.ts"],
+      "@puppyone/shared-ui": ["packages/shared-ui/src/index.ts"],
       "lucide-react": ["node_modules/lucide-react/dist/lucide-react.d.ts"],
       "react": ["node_modules/@types/react/index.d.ts"],
       "react/jsx-runtime": ["node_modules/@types/react/jsx-runtime.d.ts"]
@@ -23,6 +23,6 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "shared/agent-contract/**/*.ts", "vendor/shared-ui/src"],
+  "include": ["src", "shared/agent-contract/**/*.ts", "packages/shared-ui/src"],
   "references": []
 }

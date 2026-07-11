@@ -5,10 +5,10 @@ import {
   canonicalizeMarkdownHref,
   getSafeMarkdownHref,
   isSafeHref,
-} from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownUrlPolicy";
-import { compileInlineHtmlRenderPlan } from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlPolicy";
-import { getMarkdownInlineHtml } from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlModel";
-import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
+} from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownUrlPolicy";
+import { compileInlineHtmlRenderPlan } from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlPolicy";
+import { getMarkdownInlineHtml } from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlModel";
+import { puppyMarkdownParserExtensions } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
 
 function createMarkdownState(source: string) {
   return EditorState.create({

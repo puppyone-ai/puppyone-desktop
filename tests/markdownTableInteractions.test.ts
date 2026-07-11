@@ -7,8 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
-} from "../vendor/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
-import { closeActiveMarkdownTableMenu } from "../vendor/shared-ui/src/editor/markdown/features/table/tableMenuState";
+} from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
+import { closeActiveMarkdownTableMenu } from "../packages/shared-ui/src/editor/markdown/features/table/tableMenuState";
 
 const TABLE_SOURCE = [
   "| A | B | C |",

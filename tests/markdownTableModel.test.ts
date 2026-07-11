@@ -6,7 +6,7 @@ import {
   isMarkdownTableLine,
   isMarkdownTableSourceLine,
   serializeMarkdownTable,
-} from "../vendor/shared-ui/src/editor/markdown/features/table/tableModel";
+} from "../packages/shared-ui/src/editor/markdown/features/table/tableModel";
 
 function createMarkdownState(source: string) {
   return EditorState.create({ doc: source });

@@ -3,25 +3,25 @@ import {
   FILE_FORMATS,
   resolveFileFormat,
   UNKNOWN_FORMAT,
-} from "../vendor/shared-ui/src/core/fileFormats";
+} from "../packages/shared-ui/src/core/fileFormats";
 import {
   createPresetViewerRegistry,
   definePresetViewer,
   PRESET_VIEWER_REGISTRY,
   PRESET_VIEWERS,
   resolveEditorViewer,
-} from "../vendor/shared-ui/src/editor/viewerRegistry";
-import { PRESET_VIEWER_CONTRACT_VERSION } from "../vendor/shared-ui/src/editor/viewerContract";
+} from "../packages/shared-ui/src/editor/viewerRegistry";
+import { PRESET_VIEWER_CONTRACT_VERSION } from "../packages/shared-ui/src/editor/viewerContract";
 import {
   coreViewerCapability,
   PRESET_VIEWER_MANIFEST,
-} from "../vendor/shared-ui/src/editor/presetViewerManifest";
+} from "../packages/shared-ui/src/editor/presetViewerManifest";
 import type {
   EditorDocument,
   EditorViewerMatch,
   PresetViewerContribution,
   PresetViewerImplementation,
-} from "../vendor/shared-ui/src/editor/viewerTypes";
+} from "../packages/shared-ui/src/editor/viewerTypes";
 
 function document(name: string, type = "file", mimeType: string | null = null): EditorDocument {
   return { path: name, name, type, mimeType };

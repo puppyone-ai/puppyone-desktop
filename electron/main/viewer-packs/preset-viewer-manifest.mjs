@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const manifestJson = require("../../../vendor/shared-ui/src/editor/presetViewerManifest.json");
+const manifestJson = require("../../../packages/shared-ui/src/editor/presetViewerManifest.json");
 
 const CONTRACT_VERSION = 2;
 const CAPABILITIES = new Set(["edit", "preview", "placeholder"]);

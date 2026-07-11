@@ -3,10 +3,10 @@ import { bench, describe } from "vitest";
 import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
-} from "../../vendor/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
-import { createMarkdownLinkGraph } from "../../vendor/shared-ui/src/editor/markdown/core/links/markdownLinkGraph";
-import { requestMarkdownProjectionRange } from "../../vendor/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
-import { markdownLivePreviewFocusEffect } from "../../vendor/shared-ui/src/editor/markdown/core/state/livePreviewFocus";
+} from "../../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
+import { createMarkdownLinkGraph } from "../../packages/shared-ui/src/editor/markdown/core/links/markdownLinkGraph";
+import { requestMarkdownProjectionRange } from "../../packages/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
+import { markdownLivePreviewFocusEffect } from "../../packages/shared-ui/src/editor/markdown/core/state/livePreviewFocus";
 import {
   makeFeatureHeavyMarkdown,
   makeLinkGraphDocuments,

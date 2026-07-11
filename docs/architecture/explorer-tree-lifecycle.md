@@ -169,43 +169,43 @@ animates. It does so without recreating recursive subtree DOM.
 
 ## Current Code Boundaries
 
-- `vendor/shared-ui/src/data/DataWorkspace.tsx`
+- `packages/shared-ui/src/data/DataWorkspace.tsx`
   - owns `expandedFolderPaths`
   - owns `loadingFolderPaths`
   - owns root loaded state and load generation
   - loads folder children before expanding unloaded folders
   - renders the keep-alive explorer view stack
 
-- `vendor/shared-ui/src/data/ExplorerTree.tsx`
+- `packages/shared-ui/src/data/ExplorerTree.tsx`
   - receives `expandedPaths` and `loadingPaths`
   - renders the controlled, virtualized tree
   - owns transient drag/drop UI state only
   - exposes root and node context-menu hooks without owning desktop menu UI
   - applies Web Animations to the bounded FLIP plan
 
-- `vendor/shared-ui/src/data/explorer/explorerVisibleModel.ts`
+- `packages/shared-ui/src/data/explorer/explorerVisibleModel.ts`
   - produces the complete stable row order and navigation maps
 
-- `vendor/shared-ui/src/data/explorer/explorerRowInteraction.ts`
+- `packages/shared-ui/src/data/explorer/explorerRowInteraction.ts`
   - derives primitive mounted-row interaction state without render-time store
     mutation; the memoized row comparator limits selection re-rendering
 
-- `vendor/shared-ui/src/data/explorer/useExplorerVirtualWindow.ts`
+- `packages/shared-ui/src/data/explorer/useExplorerVirtualWindow.ts`
   - owns overscan, scroll-to-active, and the hard 100-row mounted limit
 
-- `vendor/shared-ui/src/data/explorer/explorerMotionPlan.ts`
+- `packages/shared-ui/src/data/explorer/explorerMotionPlan.ts`
   - computes pure enter/move/exit instructions bounded to mounted rows
 
-- `vendor/shared-ui/src/data/explorer/useExplorerMotion.ts`
+- `packages/shared-ui/src/data/explorer/useExplorerMotion.ts`
   - compares committed layouts and owns plan cleanup/scroll cancellation
 
-- `vendor/shared-ui/src/styles/data-workspace.css`
+- `packages/shared-ui/src/styles/data-workspace.css`
   - defines virtual-row motion shells and aligned guide segments
   - defines the explorer WebKit scrollbar styling, the reserved scrollbar
     gutter, and the gutter-compensated list padding
   - preserves inactive frame layout through the sidebar view-stack styles
 
-These files live in `vendor/shared-ui` — the canonical copy in this standalone
+These files live in `packages/shared-ui` — the canonical copy in this standalone
 repo (ISSUE-021). Edit them in place; there is no upstream to sync from.
 
 ## Verification

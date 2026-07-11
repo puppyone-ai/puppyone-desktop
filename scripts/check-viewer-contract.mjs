@@ -8,7 +8,7 @@ import { capabilityForCoreViewer } from "../electron/main/viewer-packs/preset-vi
 
 const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const formatRegistry = require("../vendor/shared-ui/src/core/fileFormats.json");
+const formatRegistry = require("../packages/shared-ui/src/core/fileFormats.json");
 const errors = [];
 
 for (const format of [...(formatRegistry.formats ?? []), formatRegistry.unknownFormat]) {
@@ -20,9 +20,9 @@ for (const format of [...(formatRegistry.formats ?? []), formatRegistry.unknownF
 }
 
 const presetCoreFiles = [
-  path.join(repoRoot, "vendor/shared-ui/src/editor/viewerRegistry.tsx"),
-  path.join(repoRoot, "vendor/shared-ui/src/editor/viewerTypes.ts"),
-  ...walkFiles(path.join(repoRoot, "vendor/shared-ui/src/editor/viewers")),
+  path.join(repoRoot, "packages/shared-ui/src/editor/viewerRegistry.tsx"),
+  path.join(repoRoot, "packages/shared-ui/src/editor/viewerTypes.ts"),
+  ...walkFiles(path.join(repoRoot, "packages/shared-ui/src/editor/viewers")),
 ];
 for (const filePath of presetCoreFiles) {
   const source = readFileSync(filePath, "utf8");

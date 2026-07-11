@@ -5,8 +5,8 @@ import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PuppyoneEditorHost } from "../vendor/shared-ui/src/editor/PuppyoneEditorHost";
-import { EMPTY_VIEWER_PACK_SNAPSHOT } from "../vendor/shared-ui/src/editor/viewerPackTypes";
+import { PuppyoneEditorHost } from "../packages/shared-ui/src/editor/PuppyoneEditorHost";
+import { EMPTY_VIEWER_PACK_SNAPSHOT } from "../packages/shared-ui/src/editor/viewerPackTypes";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

@@ -3,22 +3,22 @@ import { describe, expect, it } from "vitest";
 import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
-} from "../vendor/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
+} from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
 import {
   getMarkdownProjectionDiagnostics,
   markdownLivePreviewDecorations,
   requestMarkdownProjectionRange,
   resetMarkdownProjectionDiagnostics,
-} from "../vendor/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
+} from "../packages/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
 import {
   getMarkdownDecorationDiagnostics,
   resetMarkdownDecorationDiagnostics,
-} from "../vendor/shared-ui/src/editor/markdown/core/decorations/blockDecorations";
+} from "../packages/shared-ui/src/editor/markdown/core/decorations/blockDecorations";
 import {
   getMarkdownPlanIndexDiagnostics,
   resetMarkdownPlanIndexDiagnostics,
-} from "../vendor/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
-import { markdownLivePreviewFocusEffect } from "../vendor/shared-ui/src/editor/markdown/core/state/livePreviewFocus";
+} from "../packages/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
+import { markdownLivePreviewFocusEffect } from "../packages/shared-ui/src/editor/markdown/core/state/livePreviewFocus";
 
 describe("Markdown incremental document projection", () => {
   it("patches a 10,000-line single-character edit without a full scan or plan rebuild", () => {

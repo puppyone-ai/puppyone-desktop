@@ -6,8 +6,8 @@ import {
   createMarkdownLinkGraph,
   createMarkdownLinkGraphIndex,
   type MarkdownLinkGraphDocument,
-} from "../vendor/shared-ui/src/editor/markdown/core/links/markdownLinkGraph";
-import { MarkdownLinkIndexCoordinator } from "../vendor/shared-ui/src/editor/markdown/platform/indexing/markdownLinkIndexCoordinator";
+} from "../packages/shared-ui/src/editor/markdown/core/links/markdownLinkGraph";
+import { MarkdownLinkIndexCoordinator } from "../packages/shared-ui/src/editor/markdown/platform/indexing/markdownLinkIndexCoordinator";
 
 afterEach(() => {
   vi.useRealTimers();
