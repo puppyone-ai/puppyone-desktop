@@ -207,6 +207,9 @@ body.data-sidebar-resizing .data-preview-accessory {
   --tree-row-indent: var(--po-tree-row-indent, 24px);
   --tree-icon-slot-size: var(--po-tree-icon-slot-size, 18px);
   --tree-row-icon-label-gap: var(--po-tree-row-icon-label-gap, 6px);
+  --tree-row-font-size: var(--po-tree-row-font-size, var(--po-text-size-sidebar, 13px));
+  --tree-row-font-weight: var(--po-tree-row-font-weight, 500);
+  --tree-row-line-height: var(--po-tree-row-line-height, 18px);
   --tree-root-top-gap: var(--po-tree-root-top-gap, 5px);
   --tree-no-root-top-gap: var(--po-tree-no-root-top-gap, 12px);
   --tree-list-bottom-gap: var(--po-tree-list-bottom-gap, 6px);
@@ -378,9 +381,9 @@ body.data-sidebar-resizing .data-preview-accessory {
   border-radius: var(--tree-row-radius);
   background: transparent;
   color: var(--po-text-muted);
-  font-size: var(--po-text-size-sidebar, 13px);
-  font-weight: 500;
-  line-height: 18px;
+  font-size: var(--tree-row-font-size);
+  font-weight: var(--tree-row-font-weight);
+  line-height: var(--tree-row-line-height);
   text-align: left;
   user-select: none;
   outline: none;

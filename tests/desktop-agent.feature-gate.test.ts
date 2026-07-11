@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   isDesktopAgentChatEnabled,
-  isDesktopTerminalEnabled,
 } from "../src/features/desktop-agent/featureGate";
+import {
+  isDesktopTerminalEnabled,
+} from "../src/features/desktop-terminal/featureGate";
 
 describe("Desktop Agent Chat experiment gate", () => {
   it("keeps the existing Terminal available when the Agent experiment is off", () => {

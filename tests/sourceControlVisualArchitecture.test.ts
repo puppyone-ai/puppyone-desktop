@@ -99,6 +99,10 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-operation-button.is-primary",
     ));
+    const stageAll = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-section-actions .desktop-tool-sidebar-icon.desktop-git-stage-all-action",
+    ));
     const select = (overrides: Partial<Parameters<typeof getSourceControlPrimaryActionSlot>[0]> = {}) => (
       getSourceControlPrimaryActionSlot({
         hasStagedAction: false,
@@ -109,9 +113,12 @@ describe("source-control visual architecture", () => {
       })
     );
 
-    expect(operation).toContain("background: transparent;");
+    expect(operation).toContain("background: var(--po-control);");
+    expect(operation).not.toContain("background: transparent;");
     expect(primary).toContain("background: var(--desktop-git-primary-bg);");
     expect(primary).toContain("color: var(--desktop-git-primary-fg);");
+    expect(stageAll).toContain("background: var(--po-control);");
+    expect(stageAll).not.toContain("var(--desktop-git-primary-bg)");
     expect(select({ hasStagedAction: true, hasSyncAction: true, hasCommittedAction: true })).toBe("staged");
     expect(select({ hasSyncAction: true, hasCommittedAction: true })).toBe("sync");
     expect(select({ hasCommittedAction: true, hasSimpleAction: true })).toBe("committed");
@@ -164,20 +171,42 @@ describe("source-control visual architecture", () => {
 
   it("keeps sidebar metadata quieter than primary working-tree content", () => {
     const sidebar = compact(readCssBlock(sidebarBaseCss, ".desktop-git-sidebar"));
-    const selectedName = compact(readCssBlock(
-      historyListCss,
-      ".desktop-git-sidebar .desktop-working-tree-row.active .desktop-working-tree-name",
-    ));
     const fileIcon = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-working-tree-icon :is(svg, img)",
     ));
+    const workingTreeMain = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-working-tree-main",
+    ));
 
-    expect(sidebar).toContain("--git-font-main: var(--po-text-size-sidebar, 13px);");
-    expect(sidebar).toContain("--git-font-small: var(--po-text-size-meta, 12px);");
-    expect(sidebar).toContain("--git-weight-regular: var(--po-text-weight-regular, 400);");
-    expect(sidebar).toContain("--git-weight-strong: var(--po-text-weight-medium, 500);");
-    expect(selectedName).toContain("font-weight: var(--git-weight-strong);");
+    expect(sidebar).toContain(
+      "--git-font-main: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));",
+    );
+    expect(sidebar).toContain(
+      "--git-font-small: var(--desktop-sidebar-font-size-meta, var(--po-text-size-meta, 12px));",
+    );
+    expect(sidebar).toContain(
+      "--git-line-height: var(--desktop-sidebar-line-height, 18px);",
+    );
+    expect(sidebar).toContain(
+      "--git-weight-regular: var(--desktop-sidebar-font-weight, var(--po-text-weight-medium, 500));",
+    );
+    expect(sidebar).toContain(
+      "--git-weight-strong: var(--desktop-sidebar-font-weight-emphasis, 650);",
+    );
+    expect(sidebar).toContain(
+      "--git-icon-label-gap: var(--desktop-sidebar-icon-label-gap, 4px);",
+    );
+    expect(historyListCss).toContain("font-size: var(--git-font-main);");
+    expect(historyListCss).toContain("font-weight: var(--git-weight-regular);");
+    expect(historyListCss).toContain("line-height: var(--git-line-height);");
+    expect(historyListCss).toContain(".desktop-working-tree-main,");
+    expect(historyListCss).toContain(".desktop-working-tree-name,");
+    expect(historyListCss).not.toContain(
+      ".desktop-git-sidebar .desktop-working-tree-row.active .desktop-working-tree-name",
+    );
+    expect(workingTreeMain).toContain("gap: var(--git-icon-label-gap);");
     expect(fileIcon).toContain("filter: grayscale(1);");
   });
 });

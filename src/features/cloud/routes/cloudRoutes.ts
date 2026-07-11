@@ -83,7 +83,7 @@ export const CLOUD_ROUTES = [
     id: "automation",
     label: "Automation",
     title: "Automation",
-    description: "Cloud-managed information sources and synchronization automations for this project.",
+    description: "Cloud-managed information sources and recurring Automation runs for this project.",
     icon: Grid2X2,
     context: "project",
     showInSidebar: false,

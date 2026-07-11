@@ -426,6 +426,7 @@ body.data-sidebar-resizing * {
 
 .desktop-sidebar-top-navigation.horizontal .desktop-sidebar-top-navigation-list {
   display: flex;
+  justify-content: flex-start;
 }
 
 .desktop-sidebar-top-navigation.vertical .desktop-sidebar-top-navigation-list {

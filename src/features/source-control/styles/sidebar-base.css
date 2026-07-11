@@ -37,10 +37,13 @@
   --git-control-radius: 8px;
   --git-inner-radius: 6px;
   --git-row-radius: var(--desktop-sidebar-row-radius);
-  --git-font-main: var(--po-text-size-sidebar, 13px);
-  --git-font-small: var(--po-text-size-meta, 12px);
-  --git-weight-regular: var(--po-text-weight-regular, 400);
-  --git-weight-strong: var(--po-text-weight-medium, 500);
+  /* Mirror Data explorer row typography via the shared desktop sidebar contract. */
+  --git-font-main: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));
+  --git-font-small: var(--desktop-sidebar-font-size-meta, var(--po-text-size-meta, 12px));
+  --git-line-height: var(--desktop-sidebar-line-height, 18px);
+  --git-weight-regular: var(--desktop-sidebar-font-weight, var(--po-text-weight-medium, 500));
+  --git-weight-strong: var(--desktop-sidebar-font-weight-emphasis, 650);
+  --git-icon-label-gap: var(--desktop-sidebar-icon-label-gap, 4px);
 }
 
 .desktop-tool-sidebar-icon {
@@ -107,9 +110,9 @@
   border-radius: var(--desktop-sidebar-row-radius);
   background: transparent;
   color: var(--po-text-muted);
-  font-size: var(--po-text-size-sidebar, 13px);
-  font-weight: 500;
-  line-height: 18px;
+  font-size: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));
+  font-weight: var(--desktop-sidebar-font-weight, var(--po-text-weight-medium, 500));
+  line-height: var(--desktop-sidebar-line-height, 18px);
   text-align: left;
 }
 

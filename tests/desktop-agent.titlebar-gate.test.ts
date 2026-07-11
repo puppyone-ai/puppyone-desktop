@@ -33,12 +33,13 @@ describe("independent Chat and Terminal titlebar buttons", () => {
     expect(readInitialRightSidebarSurface()).toBe("chat");
   });
 
-  it("keeps the normal Terminal button and menu free of Chat controls", () => {
+  it("keeps the Terminal titlebar control as a stable toggle without a dropdown menu", () => {
     const container = renderHeaderActions(false);
 
     expect(container.querySelector('button[aria-label="Hide Terminal"]')).not.toBeNull();
-    expect(container.textContent).toContain("Clear Terminal");
-    expect(container.textContent).toContain("Reset Terminal");
+    expect(container.querySelector('button[aria-label="Terminal actions"]')).toBeNull();
+    expect(container.textContent).not.toContain("Clear Terminal");
+    expect(container.textContent).not.toContain("Reset Terminal");
     expect(container.querySelector('button[aria-label="Show Agent Chat"]')).toBeNull();
   });
 
@@ -71,13 +72,7 @@ function renderHeaderActions(chatEnabled: boolean) {
     },
     terminal: {
       enabled: true,
-      menuOpen: true,
-      onClear: vi.fn(),
-      onCloseMenu: vi.fn(),
-      onReset: vi.fn(),
-      onToggleMenu: vi.fn(),
       onToggle: vi.fn(),
-      ref: createRef<HTMLDivElement>(),
       sidebarOpen: true,
     },
   };

@@ -11,8 +11,8 @@ import {
   type OnboardingOperationStatus,
 } from "./components/MinimalOnboarding";
 import { AssetLibraryHome } from "./components/AssetLibraryHome";
-import { RightTerminalPanel, type RightTerminalPanelHandle } from "./components/RightTerminalPanel";
-import { isDesktopAgentChatEnabled, isDesktopTerminalEnabled, RightAgentPanel } from "./features/desktop-agent";
+import { isDesktopAgentChatEnabled, RightAgentPanel } from "./features/desktop-agent";
+import { isDesktopTerminalEnabled, RightTerminalPanel } from "./features/desktop-terminal";
 import { useDesktopUpdates } from "./components/DesktopUpdateControls";
 import {
   configureWorkspaceCloudRemote,
@@ -184,8 +184,6 @@ export function App() {
   });
   const Homepage = assetLibraryHomeEnabled ? AssetLibraryHome : MinimalOnboarding;
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("account");
-  const [terminalSessionResetToken, setTerminalSessionResetToken] = useState(0);
-  const terminalPanelRef = useRef<RightTerminalPanelHandle | null>(null);
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
   const [activeDataPath, setActiveDataPath] = useState<string | null>(null);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
@@ -918,17 +916,9 @@ export function App() {
       terminalToolEnabled={desktopTerminalEnabled}
       agentChatEnabled={desktopAgentChatEnabled}
       agentChatSidebarOpen={rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat"}
-      onClearTerminal={() => {
-        terminalPanelRef.current?.clear();
-        setSwitcherOpen(false);
-      }}
       onOpenActiveFileExternal={() => void activeExternalOpen.openActiveFileExternal()}
       onOpenActiveFileWithApp={(appPath) => void activeExternalOpen.openActiveFileWithExternalApp(appPath)}
       onCustomizeExternalAppForActiveFile={() => void activeExternalOpen.setExternalAppDefaultForActiveFile()}
-      onResetTerminal={() => {
-        setTerminalSessionResetToken((token) => token + 1);
-        setSwitcherOpen(false);
-      }}
       onToggleTerminal={() => {
         const terminalIsOpen = rightSidebarOpen && rightSidebarSurface === "terminal";
         setRightSidebarSurface("terminal");
@@ -960,6 +950,7 @@ export function App() {
       data-diff-markers={diffMarkers}
     >
       <DesktopCloudShell
+        workspaceKind={workspaceIsCloud ? "cloud" : "local"}
         titlebarSlot={titlebarSlot}
         titlebarActions={titlebarActions}
         rightSidebarOpen={rightSidebarOpen && desktopRightSidebarEnabled}
@@ -976,8 +967,6 @@ export function App() {
                 aria-hidden={rightSidebarSurface !== "terminal"}
               >
                 <RightTerminalPanel
-                  key={`${workspace.path}:${terminalSessionResetToken}`}
-                  ref={terminalPanelRef}
                   workspace={workspace}
                   active={rightSidebarOpen && rightSidebarSurface === "terminal"}
                 />

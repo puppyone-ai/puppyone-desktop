@@ -137,9 +137,12 @@ so its section rows and nested scroll lists own the inline edge instead.
    Use `--desktop-sidebar-row-left-gap`, `--desktop-sidebar-row-right-gap`,
    `--desktop-sidebar-scroll-right-gap`,
    `--desktop-sidebar-scrollbar-width`, `--desktop-sidebar-row-height`,
-   `--desktop-sidebar-row-radius`, and content inset tokens.
-   Feature-specific aliases are acceptable, but they must not reintroduce
-   row-level scrollbar compensation.
+   `--desktop-sidebar-row-radius`, content inset tokens, and the shared
+   typography tokens (`--desktop-sidebar-font-size`,
+   `--desktop-sidebar-font-weight`, `--desktop-sidebar-line-height`,
+   `--desktop-sidebar-icon-label-gap`). Feature-specific aliases are
+   acceptable, but they must not reintroduce row-level scrollbar compensation
+   or a quieter primary-row weight than Data.
 
 6. Share visual contracts, not incidental shorthands.
 

@@ -33,6 +33,8 @@
   display: grid;
   min-height: 120px;
   place-items: center;
+  align-content: center;
+  gap: 12px;
   color: var(--po-text-muted);
   font-size: 13px;
   line-height: 18px;
@@ -41,6 +43,7 @@
 .desktop-cloud-automation-source-grid {
   display: grid;
   min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -131,19 +134,22 @@
   align-items: center;
   justify-content: center;
   padding: 0 10px;
-  border: 1px solid var(--po-border);
-  border-radius: 6px;
-  background: transparent;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 999px;
+  background: var(--po-control);
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
-  line-height: 18px;
+  line-height: 16px;
+  white-space: nowrap;
 }
 
-.desktop-cloud-automation-source-auth:hover {
-  border-color: var(--po-border-strong);
-  background: var(--po-hover);
-  color: var(--po-text);
+.desktop-cloud-automation-source-auth.ready {
+  color: var(--po-success);
+}
+
+.desktop-cloud-automation-source-auth.connection-required {
+  color: var(--po-text-subtle);
 }
 
 .desktop-cloud-automation-dialog-footer-row {
@@ -289,9 +295,12 @@
   background: var(--po-border-subtle);
 }
 
+.desktop-cloud-automation-trigger-select,
 .desktop-cloud-automation-connector button {
   display: inline-flex;
   height: 28px;
+  max-width: 84px;
+  box-sizing: border-box;
   align-items: center;
   justify-content: center;
   padding: 0 10px;
@@ -302,4 +311,31 @@
   font: inherit;
   font-size: 12px;
   font-weight: 500;
+}
+
+.desktop-cloud-automation-trigger-select {
+  outline: 0;
+  cursor: pointer;
+}
+
+.desktop-cloud-automation-trigger-select:focus {
+  border-color: var(--po-border-strong);
+}
+
+.desktop-cloud-automation-schedule-settings {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel-raised) 36%, transparent);
+}
+
+@media (max-width: 700px) {
+  .desktop-cloud-automation-source-grid,
+  .desktop-cloud-automation-schedule-settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

@@ -1,7 +1,6 @@
 import { ArrowRight, Check, ChevronRight, ExternalLink, Pause, Play, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
-  DesktopCloudCreateAutomationRequest,
   DesktopCloudSession,
   DesktopCloudAutomationConfigField,
   DesktopCloudAutomationProviderSpec,
@@ -9,7 +8,6 @@ import type {
 import {
   createCloudAutomation,
   deleteCloudAutomationConnection,
-  listCloudAutomationProviderSpecs,
   pauseCloudAutomationConnection,
   refreshCloudAutomationConnection,
   resumeCloudAutomationConnection,
@@ -29,11 +27,26 @@ import {
   providerIcon,
 } from "../cloud/utils";
 import type { CloudAutomationRow } from "./automationDomain";
+import {
+  buildDesktopCreateAutomationRequest,
+  defaultAutomationConfigValues,
+  defaultAutomationTargetPath,
+  getCloudAutomationUserConfigFields,
+  getDefaultAutomationRunMode,
+  getSupportedAutomationRunModes,
+  normalizeAutomationTargetPath,
+  type AutomationRunMode,
+} from "./automationRequest";
+import type { AutomationTemplate } from "./automationTemplates";
 
-export function CloudNewSyncDialog({
+export function CloudNewAutomationDialog({
   projectId,
   cloudSession,
   apiBaseUrl,
+  providers,
+  providersLoading,
+  providersError,
+  template,
   onCloudSessionChange,
   onRefresh,
   onOpenAutomation,
@@ -42,55 +55,56 @@ export function CloudNewSyncDialog({
   projectId: string;
   cloudSession: DesktopCloudSession;
   apiBaseUrl: string | null;
+  providers: DesktopCloudAutomationProviderSpec[];
+  providersLoading: boolean;
+  providersError: string | null;
+  template: AutomationTemplate | null;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onRefresh: () => Promise<void>;
   onOpenAutomation: () => void;
   onClose: () => void;
 }) {
-  const [providers, setProviders] = useState<DesktopCloudAutomationProviderSpec[]>([]);
-  const [providersLoading, setProvidersLoading] = useState(true);
-  const [providersError, setProvidersError] = useState<string | null>(null);
-  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
-  const [step, setStep] = useState<"source" | "configure">("source");
+  const datasourceProviders = providers.filter((provider) => provider.category === "datasource");
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(template?.provider ?? null);
+  const [step, setStep] = useState<"source" | "configure">(template ? "configure" : "source");
   const [targetPath, setTargetPath] = useState("");
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
+  const [runMode, setRunMode] = useState<AutomationRunMode>("manual");
+  const [schedule, setSchedule] = useState("0 * * * *");
+  const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    setProvidersLoading(true);
-    setProvidersError(null);
-    void listCloudAutomationProviderSpecs(cloudSession, onCloudSessionChange, apiBaseUrl)
-      .then((items) => {
-        if (cancelled) return;
-        const visible = items.filter((provider) => provider.category === "datasource");
-        setProviders(visible);
-        setSelectedProviderId((current) => current ?? visible[0]?.provider ?? null);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setProvidersError(error instanceof Error ? error.message : "Unable to load sync providers.");
-      })
-      .finally(() => {
-        if (!cancelled) setProvidersLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiBaseUrl, cloudSession, onCloudSessionChange]);
+    if (selectedProviderId || datasourceProviders.length === 0) return;
+    setSelectedProviderId(datasourceProviders[0].provider);
+  }, [datasourceProviders, selectedProviderId]);
 
-  const provider = providers.find((item) => item.provider === selectedProviderId) ?? providers[0] ?? null;
+  const provider = datasourceProviders.find((item) => item.provider === selectedProviderId) ?? null;
   const fields = getCloudAutomationUserConfigFields(provider);
-  const requiresCloudOAuth = provider ? provider.auth === "oauth" || provider.auth === "optional_oauth" : false;
+  const supportedRunModes = getSupportedAutomationRunModes(provider);
+  const requiresCloudConnection = Boolean(
+    provider
+    && provider.creation_mode === "bootstrap"
+    && provider.auth !== "none",
+  );
   const missingRequired = fields.some((field) => field.required && !configValues[field.key]?.trim());
   const normalizedTargetPath = normalizeAutomationTargetPath(targetPath || defaultAutomationTargetPath(provider));
-  const canCreate = Boolean(provider && normalizedTargetPath && !missingRequired && !saving && !requiresCloudOAuth);
+  const scheduleMissing = runMode === "scheduled" && !schedule.trim();
+  const canCreate = Boolean(
+    provider
+    && normalizedTargetPath
+    && !missingRequired
+    && !scheduleMissing
+    && !saving
+    && !requiresCloudConnection,
+  );
 
   useEffect(() => {
     if (!provider) return;
     setConfigValues(defaultAutomationConfigValues(provider));
     setTargetPath(defaultAutomationTargetPath(provider));
+    setRunMode(getDefaultAutomationRunMode(provider));
     setFeedback(null);
   }, [provider]);
 
@@ -106,6 +120,9 @@ export function CloudNewSyncDialog({
           provider,
           configValues,
           targetPath: normalizedTargetPath,
+          runMode,
+          schedule,
+          timezone,
         }),
         onCloudSessionChange,
         apiBaseUrl,
@@ -113,7 +130,7 @@ export function CloudNewSyncDialog({
       await onRefresh();
       onClose();
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Failed to create sync.");
+      setFeedback(error instanceof Error ? error.message : "Failed to create automation.");
     } finally {
       setSaving(false);
     }
@@ -125,11 +142,11 @@ export function CloudNewSyncDialog({
         <header className="desktop-dialog-header desktop-cloud-automation-dialog-header">
           <div className="desktop-dialog-title-row">
             <div>
-              <h2>{step === "source" ? "Add sync" : `Configure ${provider?.display_name ?? "sync"}`}</h2>
+              <h2>{step === "source" ? "New automation" : template?.title ?? `Configure ${provider?.display_name ?? "automation"}`}</h2>
               <p>
                 {step === "source"
-                  ? "Choose an information source and confirm its authorization status."
-                  : "Choose what to import, where it lands, and how it runs."}
+                  ? "Choose the source this Automation watches or imports from."
+                  : template?.description ?? "Choose the source data, project destination, and trigger."}
               </p>
             </div>
           </div>
@@ -137,19 +154,19 @@ export function CloudNewSyncDialog({
         </header>
         <div className="desktop-dialog-body desktop-cloud-automation-dialog-body">
           {providersLoading ? (
-            <div className="desktop-cloud-automation-state">Loading providers</div>
+            <div className="desktop-cloud-automation-state">Loading Automation sources…</div>
           ) : providersError ? (
             <div className="desktop-dialog-error">{providersError}</div>
-          ) : providers.length === 0 ? (
-            <div className="desktop-cloud-automation-state">No sync providers available.</div>
+          ) : datasourceProviders.length === 0 ? (
+            <div className="desktop-cloud-automation-state">No Automation sources are available.</div>
           ) : step === "source" ? (
             <>
               <div className="desktop-cloud-automation-source-grid">
-                {providers.map((item) => {
+                {datasourceProviders.map((item) => {
                   const Icon = providerIcon(item.provider);
                   const iconUrl = item.icon_url || getCloudProviderIconUrl(item.provider);
                   const selected = item.provider === provider?.provider;
-                  const needsOAuth = item.auth === "oauth" || item.auth === "optional_oauth";
+                  const needsConnection = item.creation_mode === "bootstrap" && item.auth !== "none";
                   return (
                     <button
                       key={item.provider}
@@ -162,36 +179,17 @@ export function CloudNewSyncDialog({
                       </span>
                       <span className="desktop-cloud-automation-source-content">
                         <span>{item.display_name}</span>
-                        <small>{needsOAuth ? "Authorize in Cloud" : "Authorized"}</small>
+                        <small>{item.description || "Use this source in an Automation."}</small>
                       </span>
-                      {needsOAuth && (
-                        <span
-                          className="desktop-cloud-automation-source-auth"
-                          role="button"
-                          tabIndex={0}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onOpenAutomation();
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              onOpenAutomation();
-                            }
-                          }}
-                        >
-                          Authorize
-                        </span>
-                      )}
+                      <span className={`desktop-cloud-automation-source-auth ${needsConnection ? "connection-required" : "ready"}`}>
+                        {needsConnection ? "Connection required" : "Ready"}
+                      </span>
                     </button>
                   );
                 })}
               </div>
               <div className="desktop-cloud-automation-dialog-footer-row">
-                <span className={requiresCloudOAuth ? "muted" : "ready"}>
-                  {requiresCloudOAuth ? "Cloud authorization is required before creating this sync." : "Ready to configure"}
-                </span>
+                <span className="muted">Select a source, then configure its destination and trigger.</span>
                 <div className="desktop-cloud-automation-actions">
                   <button className="desktop-dialog-button" type="button" onClick={onClose}>Cancel</button>
                   <button className="desktop-dialog-button primary" type="button" disabled={!provider} onClick={() => setStep("configure")}>
@@ -201,7 +199,12 @@ export function CloudNewSyncDialog({
                 </div>
               </div>
             </>
-          ) : provider ? (
+          ) : !provider ? (
+            <div className="desktop-cloud-automation-state">
+              <span>This Automation source is no longer available.</span>
+              <button className="desktop-dialog-button" type="button" onClick={() => setStep("source")}>Choose another source</button>
+            </div>
+          ) : (
             <>
               <div className="desktop-cloud-automation-map">
                 <section className="desktop-cloud-automation-node">
@@ -227,9 +230,18 @@ export function CloudNewSyncDialog({
                     ))}
                   </div>
                 </section>
-                <div className="desktop-cloud-automation-connector" aria-label="Sync trigger">
+                <div className="desktop-cloud-automation-connector" aria-label="Automation trigger">
                   <span />
-                  <button type="button">Manual</button>
+                  <select
+                    className="desktop-cloud-automation-trigger-select"
+                    aria-label="Run trigger"
+                    value={runMode}
+                    onChange={(event) => setRunMode(event.target.value as AutomationRunMode)}
+                  >
+                    {supportedRunModes.map((mode) => (
+                      <option key={mode} value={mode}>{formatAutomationRunMode(mode)}</option>
+                    ))}
+                  </select>
                   <span />
                   <ArrowRight size={16} />
                 </div>
@@ -252,27 +264,56 @@ export function CloudNewSyncDialog({
                   </div>
                 </section>
               </div>
+              {runMode === "scheduled" && (
+                <section className="desktop-cloud-automation-schedule-settings" aria-label="Schedule settings">
+                  <label className="desktop-cloud-automation-field">
+                    <span>Schedule</span>
+                    <input
+                      value={schedule}
+                      onChange={(event) => setSchedule(event.target.value)}
+                      placeholder="0 * * * *"
+                    />
+                    <small>Use a five-part cron expression.</small>
+                  </label>
+                  <label className="desktop-cloud-automation-field">
+                    <span>Timezone</span>
+                    <input
+                      value={timezone}
+                      onChange={(event) => setTimezone(event.target.value)}
+                      placeholder="UTC"
+                    />
+                  </label>
+                </section>
+              )}
               {feedback && <div className="desktop-dialog-error">{feedback}</div>}
               <div className="desktop-cloud-automation-dialog-footer-row">
                 <span className={canCreate ? "ready" : "muted"}>
-                  {requiresCloudOAuth ? "Authorize this provider in Cloud." : missingRequired ? "Fill required fields" : "Ready to create"}
+                  {requiresCloudConnection
+                    ? `Connect ${provider.display_name} before activating this Automation.`
+                    : missingRequired
+                      ? "Fill the required source fields."
+                      : scheduleMissing
+                        ? "Add a schedule before creating this Automation."
+                        : "Ready to create Automation."}
                 </span>
                 <div className="desktop-cloud-automation-actions">
-                  <button className="desktop-dialog-button" type="button" disabled={saving} onClick={() => setStep("source")}>Back</button>
-                  {requiresCloudOAuth && (
+                  {!template && (
+                    <button className="desktop-dialog-button" type="button" disabled={saving} onClick={() => setStep("source")}>Back</button>
+                  )}
+                  {requiresCloudConnection && (
                     <button className="desktop-dialog-button" type="button" onClick={onOpenAutomation}>
                       <ExternalLink size={14} />
-                      Authorize
+                      Connect source
                     </button>
                   )}
                   <button className="desktop-dialog-button primary" type="button" disabled={!canCreate} onClick={handleCreate}>
                     <Check size={14} />
-                    {saving ? "Creating" : "Create sync"}
+                    {saving ? "Creating" : "Create automation"}
                   </button>
                 </div>
               </div>
             </>
-          ) : null}
+          )}
         </div>
       </DesktopDialogSurface>
     </DesktopDialogRoot>
@@ -307,7 +348,7 @@ function CloudAutomationConfigInput({
   );
 }
 
-export function CloudManageSyncDialog({
+export function CloudManageAutomationDialog({
   row,
   cloudSession,
   apiBaseUrl,
@@ -366,7 +407,7 @@ export function CloudManageSyncDialog({
           <div className="desktop-dialog-title-row">
             <div>
               <h2>{title}</h2>
-              <p>{providerLabel} syncs into {targetTitle}</p>
+              <p>{providerLabel} Automation writes into {targetTitle}</p>
             </div>
           </div>
           <div className="desktop-cloud-automation-header-actions">
@@ -402,7 +443,7 @@ export function CloudManageSyncDialog({
                 <CloudAuthorityCell label="Direction" value={connector.direction || "manual"} />
               </div>
             </section>
-            <div className="desktop-cloud-automation-connector" aria-label="Sync trigger">
+            <div className="desktop-cloud-automation-connector" aria-label="Automation trigger">
               <span />
               <button type="button">{connector.trigger?.type ? formatStatusLabel(String(connector.trigger.type)) : "Manual"}</button>
               <span />
@@ -443,99 +484,8 @@ function CloudAutomationProviderMark({
   return resolvedIconUrl ? <img src={resolvedIconUrl} alt="" /> : <Icon size={18} />;
 }
 
-const CLOUD_WORKFLOW_INTERNAL_CONFIG_KEYS = new Set([
-  "access_key",
-  "authority",
-  "connection_id",
-  "credentials_ref",
-  "credential_ref",
-  "direction",
-  "external_resource_id",
-  "external_resource",
-  "last_sync_commit_id",
-  "name",
-  "oauth_user_id",
-  "provider",
-  "resource_id",
-  "status",
-  "sync_behavior",
-  "target_folder_path",
-  "target_output",
-  "target_path",
-  "user_id",
-  "write_behavior",
-]);
-
-function getCloudAutomationUserConfigFields(
-  provider: DesktopCloudAutomationProviderSpec | null,
-): DesktopCloudAutomationConfigField[] {
-  return (provider?.config_fields ?? []).filter((field) => !CLOUD_WORKFLOW_INTERNAL_CONFIG_KEYS.has(field.key));
-}
-
-function defaultAutomationConfigValues(provider: DesktopCloudAutomationProviderSpec): Record<string, string> {
-  const values: Record<string, string> = {};
-  for (const field of getCloudAutomationUserConfigFields(provider)) {
-    values[field.key] = field.default === null || field.default === undefined ? "" : String(field.default);
-  }
-  return values;
-}
-
-function defaultAutomationTargetPath(provider: DesktopCloudAutomationProviderSpec | null) {
-  const label = provider?.display_name || provider?.provider || "Sync";
-  return normalizeAutomationTargetPath(label.replace(/[<>:"|?*]/g, "-"));
-}
-
-function normalizeAutomationTargetPath(path: string) {
-  return path.trim().replace(/^\/+|\/+$/g, "").replace(/\/+/g, "/");
-}
-
-function buildDesktopCreateAutomationRequest({
-  projectId,
-  provider,
-  configValues,
-  targetPath,
-}: {
-  projectId: string;
-  provider: DesktopCloudAutomationProviderSpec;
-  configValues: Record<string, string>;
-  targetPath: string;
-}): DesktopCloudCreateAutomationRequest {
-  const fieldsByKey = new Map(getCloudAutomationUserConfigFields(provider).map((field) => [field.key, field]));
-  const options: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(configValues)) {
-    const trimmed = value.trim();
-    if (!trimmed || key === "resource_url") continue;
-    const field = fieldsByKey.get(key);
-    options[key] = field?.type === "number" ? Number(trimmed) : value;
-  }
-
-  const resourceUrl = (configValues.resource_url ?? "").trim();
-  const source = provider.provider === "url"
-    ? {
-        provider: provider.provider,
-        resource_type: "web_page",
-        resource_id: resourceUrl,
-        resource_name: resourceUrl,
-        resource_url: resourceUrl,
-      }
-    : {
-        provider: provider.provider,
-        resource_type: "manual",
-        resource_id: provider.provider,
-        resource_name: provider.display_name,
-      };
-
-  return {
-    project_id: projectId,
-    provider: provider.provider,
-    config: {
-      source,
-      options,
-    },
-    target_folder_path: targetPath,
-    target_path: targetPath,
-    direction: "inbound",
-    sync_mode: "manual",
-    trigger: { type: "manual" },
-  };
+function formatAutomationRunMode(mode: AutomationRunMode) {
+  if (mode === "scheduled") return "Scheduled";
+  if (mode === "realtime") return "Realtime";
+  return "Manual";
 }

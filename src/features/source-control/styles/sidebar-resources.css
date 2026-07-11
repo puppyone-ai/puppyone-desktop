@@ -440,10 +440,11 @@ body.desktop-git-sidebar-resizing {
   padding: 0 var(--git-action-padding-inline);
   border: 0;
   border-radius: var(--git-action-radius);
-  background: transparent;
+  /* Non-primary ops (Push, Stage & Commit, …) keep visible gray chrome. */
+  background: var(--po-control);
   color: var(--po-text-muted);
   font-size: var(--git-action-font-size);
-  font-weight: var(--git-weight-strong);
+  font-weight: var(--git-weight-regular);
 }
 
 .desktop-git-operation-button.is-primary {
@@ -457,7 +458,7 @@ body.desktop-git-sidebar-resizing {
 }
 
 .desktop-git-operation-button:hover:not(:disabled) {
-  background: var(--po-hover);
+  background: var(--po-control-hover);
   color: var(--po-text);
 }
 
@@ -625,13 +626,14 @@ body.desktop-git-sidebar-resizing {
   color: var(--po-text);
 }
 
-.desktop-git-section-actions .desktop-tool-sidebar-icon.primary {
-  background: transparent;
+/* Bulk Stage all is a secondary control: visible gray chrome, never accent primary. */
+.desktop-git-section-actions .desktop-tool-sidebar-icon.desktop-git-stage-all-action {
+  background: var(--po-control);
   color: var(--po-text-muted);
 }
 
-.desktop-git-section-actions .desktop-tool-sidebar-icon.primary:hover:not(:disabled) {
-  background: var(--po-hover);
+.desktop-git-section-actions .desktop-tool-sidebar-icon.desktop-git-stage-all-action:hover:not(:disabled) {
+  background: var(--po-control-hover);
   color: var(--po-text);
 }
 
@@ -724,22 +726,23 @@ body.desktop-git-sidebar-resizing {
 .desktop-git-section-title span {
   min-width: 0;
   overflow: hidden;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--git-font-small);
+  font-weight: var(--git-weight-regular);
+  line-height: var(--git-line-height);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .desktop-git-section-title small {
   color: var(--po-text-disabled);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--git-font-small);
+  font-weight: var(--git-weight-regular);
 }
 
 .desktop-git-section-title small.desktop-git-section-count-badge {
   color: var(--po-text-disabled);
   font-size: var(--git-font-small);
-  font-weight: 500;
+  font-weight: var(--git-weight-regular);
 }
 
 .desktop-git-scm-sync .desktop-git-section-title small.desktop-git-section-count-badge {
@@ -806,14 +809,15 @@ body.desktop-git-sidebar-resizing {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: var(--git-icon-label-gap);
   height: var(--desktop-sidebar-row-height);
   padding: 0 0 0 var(--git-sidebar-content-left);
   border: 0;
   background: transparent;
   color: inherit;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--git-font-main);
+  font-weight: var(--git-weight-regular);
+  line-height: var(--git-line-height);
   text-align: left;
 }
 
@@ -849,7 +853,8 @@ body.desktop-git-sidebar-resizing {
   min-width: 0;
   overflow: hidden;
   color: inherit;
-  font-weight: 500;
+  font-weight: inherit;
+  line-height: inherit;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -859,8 +864,8 @@ body.desktop-git-sidebar-resizing {
   min-width: 32px;
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: 12.5px;
-  font-weight: 500;
+  font-size: var(--git-font-small);
+  font-weight: var(--git-weight-regular);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -871,8 +876,8 @@ body.desktop-git-sidebar-resizing {
   justify-self: end;
   padding-right: var(--git-sidebar-content-right);
   color: var(--po-text-subtle);
-  font-size: 11px;
-  font-weight: 620;
+  font-size: var(--git-font-small);
+  font-weight: var(--git-weight-regular);
 }
 
 .desktop-git-remote-preview-row .desktop-working-tree-state {

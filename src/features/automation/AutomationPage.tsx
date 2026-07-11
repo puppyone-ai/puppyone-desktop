@@ -1,10 +1,10 @@
-import { ArrowRight, ChevronRight, Plus } from "lucide-react";
+import { ArrowRight, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import type {
+  DesktopCloudAutomationProviderSpec,
   DesktopCloudScope,
   DesktopCloudSession,
 } from "../../lib/cloudApi";
-import { PageLoading } from "../../components/loading";
 import {
   formatProviderLabel,
   formatRelativeTime,
@@ -14,7 +14,14 @@ import {
   providerIcon,
 } from "../cloud/utils";
 import type { CloudAutomationRow } from "./automationDomain";
-import { CloudManageSyncDialog, CloudNewSyncDialog } from "./AutomationDialogs";
+import { CloudManageAutomationDialog, CloudNewAutomationDialog } from "./AutomationDialogs";
+import {
+  AUTOMATION_CATEGORIES,
+  buildAutomationTemplates,
+  getAutomationTemplatesForCategory,
+  type AutomationCatalogCategory,
+  type AutomationTemplate,
+} from "./automationTemplates";
 
 export function CloudAutomationPage({
   projectId,
@@ -23,6 +30,9 @@ export function CloudAutomationPage({
   rows,
   totalCount,
   loading,
+  providerSpecs,
+  providerSpecsLoading,
+  providerSpecsError,
   detailRow,
   onOpenRow,
   onCloseDetail,
@@ -37,6 +47,9 @@ export function CloudAutomationPage({
   rows: CloudAutomationRow[];
   totalCount: number;
   loading: boolean;
+  providerSpecs: DesktopCloudAutomationProviderSpec[];
+  providerSpecsLoading: boolean;
+  providerSpecsError: string | null;
   detailRow: CloudAutomationRow | null;
   onOpenRow: (rowId: string) => void;
   onCloseDetail: () => void;
@@ -45,32 +58,85 @@ export function CloudAutomationPage({
   onOpenAccess: () => void;
   onOpenAutomation: () => void;
 }) {
-  const [newSyncOpen, setNewSyncOpen] = useState(false);
+  const [newAutomationOpen, setNewAutomationOpen] = useState(false);
+  const [draftTemplate, setDraftTemplate] = useState<AutomationTemplate | null>(null);
+  const [activeCategory, setActiveCategory] = useState<AutomationCatalogCategory>("popular");
+  const templates = buildAutomationTemplates(providerSpecs);
+  const visibleTemplates = getAutomationTemplatesForCategory(templates, activeCategory);
+
+  const openNewAutomation = (template: AutomationTemplate | null = null) => {
+    setDraftTemplate(template);
+    setNewAutomationOpen(true);
+  };
 
   return (
     <section className="desktop-cloud-automation-page">
-      <header className="desktop-cloud-automation-page-header">
-        <div className="desktop-cloud-automation-title-group">
-          <span className="desktop-cloud-automation-page-title">Automation</span>
-          <span className="desktop-cloud-automation-count-badge">{totalCount}</span>
-        </div>
-      </header>
       <main className="desktop-cloud-automation-canvas">
         <section className="desktop-cloud-automation-catalog">
-          {loading ? (
-            <div className="desktop-cloud-automation-blank-detail">
-              <PageLoading variant="fill" label="Loading" className="desktop-cloud-web-loading" />
+          <header className="desktop-cloud-automation-landing-header">
+            <div className="desktop-cloud-automation-landing-copy">
+              <h1>Automations</h1>
+              <p>Keep project knowledge current with always-on workflows that respond to changes.</p>
             </div>
-          ) : rows.length === 0 ? (
-            <CloudAutomationEmptyPanel onAddSync={() => setNewSyncOpen(true)} />
-          ) : (
-            <section className="desktop-cloud-automation-section">
-              <div className="desktop-cloud-automation-heading">
-                <button type="button" className="desktop-cloud-automation-add-sync" onClick={() => setNewSyncOpen(true)}>
-                  <Plus size={14} />
-                  <span>Add sync</span>
+            <button type="button" className="desktop-cloud-automation-new-button" onClick={() => openNewAutomation()}>
+              New
+            </button>
+          </header>
+
+          <nav className="desktop-cloud-automation-category-tabs" aria-label="Automation categories" role="tablist">
+            {AUTOMATION_CATEGORIES.map((category) => {
+              const active = activeCategory === category.id;
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  className={active ? "active" : undefined}
+                  onClick={() => setActiveCategory(category.id)}
+                >
+                  {category.label}
                 </button>
+              );
+            })}
+          </nav>
+
+          <section className="desktop-cloud-automation-template-grid" aria-label={`${activeCategory} automation templates`}>
+            {providerSpecsLoading ? Array.from({ length: 4 }, (_, index) => (
+              <div className="desktop-cloud-automation-template-card skeleton" aria-hidden="true" key={index}>
+                <span />
+                <span />
+                <span />
               </div>
+            )) : visibleTemplates.map((template) => (
+              <AutomationTemplateCard
+                key={template.id}
+                template={template}
+                onAdd={() => openNewAutomation(template)}
+              />
+            ))}
+          </section>
+
+          {!providerSpecsLoading && providerSpecsError && (
+            <div className="desktop-cloud-automation-catalog-error" role="alert">
+              Unable to load Automation templates. {providerSpecsError}
+            </div>
+          )}
+
+          {!providerSpecsLoading && !providerSpecsError && visibleTemplates.length === 0 && (
+            <div className="desktop-cloud-automation-catalog-empty">
+              No available sources in this category.
+            </div>
+          )}
+
+          {loading ? (
+            <div className="desktop-cloud-automation-existing-loading" role="status">Loading your automations…</div>
+          ) : rows.length > 0 ? (
+            <section className="desktop-cloud-automation-existing-section">
+              <header className="desktop-cloud-automation-existing-header">
+                <h2>Your automations</h2>
+                <span>{totalCount}</span>
+              </header>
               <div className="desktop-cloud-automation-detail">
                 <CloudAutomationAccessList
                   rows={rows}
@@ -79,22 +145,26 @@ export function CloudAutomationPage({
                 />
               </div>
             </section>
-          )}
+          ) : null}
         </section>
       </main>
-      {newSyncOpen && (
-        <CloudNewSyncDialog
+      {newAutomationOpen && (
+        <CloudNewAutomationDialog
           projectId={projectId}
           cloudSession={cloudSession}
           apiBaseUrl={apiBaseUrl}
+          providers={providerSpecs}
+          providersLoading={providerSpecsLoading}
+          providersError={providerSpecsError}
+          template={draftTemplate}
           onCloudSessionChange={onCloudSessionChange}
           onRefresh={onRefresh}
           onOpenAutomation={onOpenAutomation}
-          onClose={() => setNewSyncOpen(false)}
+          onClose={() => setNewAutomationOpen(false)}
         />
       )}
       {detailRow && (
-        <CloudManageSyncDialog
+        <CloudManageAutomationDialog
           row={detailRow}
           cloudSession={cloudSession}
           apiBaseUrl={apiBaseUrl}
@@ -108,16 +178,37 @@ export function CloudAutomationPage({
   );
 }
 
-function CloudAutomationEmptyPanel({ onAddSync }: { onAddSync: () => void }) {
+function AutomationTemplateCard({
+  template,
+  onAdd,
+}: {
+  template: AutomationTemplate;
+  onAdd: () => void;
+}) {
+  const ProviderIcon = providerIcon(template.provider);
+  const iconUrl = template.iconUrl || getCloudProviderIconUrl(template.provider);
+
   return (
-    <div className="desktop-cloud-automation-empty-catalog-panel">
-      <h2>No syncs yet</h2>
-      <p>Create a sync to bring an external resource into this project.</p>
-      <button type="button" className="desktop-cloud-automation-empty-action" onClick={onAddSync}>
-        <Plus size={14} />
-        <span>Add sync</span>
-      </button>
-    </div>
+    <article className="desktop-cloud-automation-template-card">
+      <div
+        className="desktop-cloud-automation-template-route"
+        aria-label={`${template.sourceLabel} to PuppyOne project folder`}
+      >
+        <span className="desktop-cloud-automation-template-mark source">
+          {iconUrl ? <img src={iconUrl} alt="" /> : <ProviderIcon size={17} />}
+        </span>
+        <span className="desktop-cloud-automation-template-connector" aria-hidden="true">
+          <span />
+          <ArrowRight size={12} strokeWidth={1.8} />
+        </span>
+        <span className="desktop-cloud-automation-template-mark target">
+          <img src="/icons/folder.svg" alt="" />
+        </span>
+      </div>
+      <h2>{template.title}</h2>
+      <p>{template.description}</p>
+      <button type="button" className="desktop-cloud-automation-template-add" onClick={onAdd}>Add</button>
+    </article>
   );
 }
 
@@ -183,7 +274,7 @@ function CloudAutomationAccessList({
                             {statusLabel}
                           </span>
                           <span>{connector.direction || "manual"}</span>
-                          <span>{lastRunLabel ? `Last synced ${lastRunLabel}` : "Never synced"}</span>
+                          <span>{lastRunLabel ? `Last run ${lastRunLabel}` : "Never run"}</span>
                         </span>
                         <span className="desktop-cloud-automation-manage">
                           Manage

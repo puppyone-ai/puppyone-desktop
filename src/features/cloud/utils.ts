@@ -82,6 +82,8 @@ export function getCloudProviderIconUrl(provider: string) {
       return "/icons/linear.svg";
     case "supabase":
       return "/icons/supabase-icon.png";
+    case "slack":
+      return "/icons/Slack_icon_2019.svg.png";
     default:
       return "";
   }

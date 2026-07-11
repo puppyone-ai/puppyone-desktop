@@ -23,11 +23,9 @@ type DesktopTitlebarActionsProps = {
   terminalToolEnabled: boolean;
   agentChatEnabled: boolean;
   agentChatSidebarOpen: boolean;
-  onClearTerminal: () => void;
   onOpenActiveFileExternal: () => void;
   onOpenActiveFileWithApp: (appPath: string | null) => void;
   onCustomizeExternalAppForActiveFile: () => void;
-  onResetTerminal: () => void;
   onToggleAgentChat: () => void;
   onToggleTerminal: () => void;
   onUpdateNow: () => void;
@@ -46,19 +44,15 @@ export function DesktopTitlebarActions({
   terminalToolEnabled,
   agentChatEnabled,
   agentChatSidebarOpen,
-  onClearTerminal,
   onOpenActiveFileExternal,
   onOpenActiveFileWithApp,
   onCustomizeExternalAppForActiveFile,
-  onResetTerminal,
   onToggleAgentChat,
   onToggleTerminal,
   onUpdateNow,
 }: DesktopTitlebarActionsProps) {
   const externalOpenRef = useRef<HTMLDivElement>(null);
-  const terminalRef = useRef<HTMLDivElement>(null);
   const [externalOpenMenuOpen, setExternalOpenMenuOpen] = useState(false);
-  const [terminalMenuOpen, setTerminalMenuOpen] = useState(false);
   const defaultTarget = externalOpenTargets[0] ?? null;
   const menuTargets = externalOpenTargets.length > 0 ? externalOpenTargets : [defaultTarget].filter(Boolean);
 
@@ -83,36 +77,8 @@ export function DesktopTitlebarActions({
   }, [externalOpenMenuOpen]);
 
   useEffect(() => {
-    if (!terminalMenuOpen) return undefined;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target instanceof Node ? event.target : null;
-      if (target && terminalRef.current?.contains(target)) return;
-      setTerminalMenuOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setTerminalMenuOpen(false);
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown, true);
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown, true);
-      window.removeEventListener("keydown", handleKeyDown, true);
-    };
-  }, [terminalMenuOpen]);
-
-  useEffect(() => {
     if (!canOpenActiveFileExternal) setExternalOpenMenuOpen(false);
   }, [canOpenActiveFileExternal]);
-
-  useEffect(() => {
-    if (!terminalToolEnabled) setTerminalMenuOpen(false);
-  }, [terminalToolEnabled]);
-
-  useEffect(() => {
-    if (!terminalSidebarOpen) setTerminalMenuOpen(false);
-  }, [terminalSidebarOpen]);
 
   const headerElementContext: HeaderElementRenderContext = {
     externalOpen: {
@@ -126,27 +92,12 @@ export function DesktopTitlebarActions({
       onOpen: onOpenActiveFileExternal,
       onOpenWithApp: onOpenActiveFileWithApp,
       ref: externalOpenRef,
-      setMenuOpen: (value) => {
-        setTerminalMenuOpen(false);
-        setExternalOpenMenuOpen(value);
-      },
+      setMenuOpen: setExternalOpenMenuOpen,
       title: activeFileExternalOpenTitle,
     },
     terminal: {
       enabled: terminalToolEnabled,
-      menuOpen: terminalMenuOpen,
-      onClear: onClearTerminal,
-      onCloseMenu: () => setTerminalMenuOpen(false),
-      onReset: onResetTerminal,
-      onToggle: () => {
-        setTerminalMenuOpen(false);
-        onToggleTerminal();
-      },
-      onToggleMenu: () => {
-        setExternalOpenMenuOpen(false);
-        setTerminalMenuOpen((open) => !open);
-      },
-      ref: terminalRef,
+      onToggle: onToggleTerminal,
       sidebarOpen: terminalSidebarOpen,
     },
   };

@@ -9,6 +9,10 @@ single product area can evolve without turning this file into a catch-all.
 - [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
   - Cloud environment, auth, workspace binding, project data, and route-state
     boundaries.
+- [Local and Cloud UX](architecture/local-and-cloud-ux.md)
+  - One Projects entry and one Project shell across Local Only, Local + Cloud,
+    and Cloud Only, including creation, transitions, visual semantics, Files
+    source selection, and Cloud-service eligibility.
 - [Automation and Plugin Domain Boundary](architecture/automation-plugin-domain-boundary.md)
   - Cloud information-source Automation and local-only file-viewer Plugins
     have separate authority, storage, permissions, lifecycle, and source

@@ -210,18 +210,25 @@ not shrink row hit areas or body typography.
 
 Only one available workflow action receives solid primary emphasis at a time.
 The priority is staged Commit, incoming Pull or Download, outgoing Push or
-Publish, then the simple-mode combined Stage & Commit action. Other available
-operations remain ghost controls; unavailable operations stay muted. This is a
-state-machine decision expressed by the `is-primary` class, not a label-based
-CSS exception.
+Publish, then the simple-mode combined Stage & Commit action. Non-primary
+operation buttons (including Push when Commit owns primary) use neutral gray
+control chrome (`--po-control`); only `is-primary` uses the accent fill.
+Unavailable operations stay muted. This is a state-machine decision expressed
+by the `is-primary` class, not a label-based CSS exception. The Unstaged
+Changes bulk Stage-all control is also not a workflow primary: it uses the
+same neutral gray chrome so it stays visible without competing with Commit.
 
-The sidebar uses a deliberately quiet type hierarchy: primary row content is
-`13px`, metadata is `12px`, ordinary content uses the global regular weight,
-and section or selected-row emphasis uses the global medium weight. File-type
-glyphs are neutral in the Git list; change letters retain semantic color.
-Persistent secondary and destructive detail actions remain ghost controls and
-only gain a surface on interaction. Diff add/remove fills stay low-chroma so
-large changed blocks do not compete with their text.
+The sidebar shares the desktop file-list typography contract with Data:
+primary row content is `--desktop-sidebar-font-size` (`13px` by default) at
+`--desktop-sidebar-font-weight` (`500`) and `--desktop-sidebar-line-height`
+(`18px`); metadata and section headers stay one step below at
+`--desktop-sidebar-font-size-meta` (`12px`) with the same medium weight.
+Section hierarchy comes from muted color (`--po-text-subtle`), not a heavier
+weight — do not restyle Git group titles like the Data explorer toolbar.
+File-type glyphs are neutral in the Git list; change letters retain semantic
+color. Persistent secondary and destructive detail actions remain ghost
+controls and only gain a surface on interaction. Diff add/remove fills stay
+low-chroma so large changed blocks do not compete with their text.
 
 ## Current Refresh Boundary
 
@@ -299,10 +306,18 @@ watcher recovery, and refresh ordering belong to the lifecycle test matrix in
   not reintroduce feature-local `28px` or `30px` operation controls.
 - Source Control metadata must remain one typography step below primary row
   content; do not map `--git-font-small` back to the sidebar body size.
+- Source Control primary row typography must track the shared desktop sidebar
+  contract (`--desktop-sidebar-font-*`) used by the Data explorer; do not
+  reintroduce a quieter `400` weight or a selected-row weight bump that makes
+  Git file names diverge from Data.
+- Git section headers stay at the metadata size/weight; do not borrow the Data
+  explorer toolbar's `650` emphasis for collapsible group titles.
 - File glyph color, persistent button fills, and diff fills must not all act as
   simultaneous emphasis channels; reserve semantic color for change state.
-- At most one Source Control workflow operation may carry `is-primary`; keep
-  regular Stage and Unstage actions ghosted and Discard semantically red.
+- At most one Source Control workflow operation may carry `is-primary` with the
+  accent fill; non-primary operation buttons (Push, Stage & Commit, …) and the
+  Unstaged Stage-all icon use neutral gray `--po-control` chrome. Keep Discard
+  semantically red.
 - Do not expose raw unified-diff hunk coordinates in the detail UI. Preserve
   them in the model for patch semantics, but use file totals and line numbers
   for the visible reading context.

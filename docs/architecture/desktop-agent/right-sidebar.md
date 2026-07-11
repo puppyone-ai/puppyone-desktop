@@ -103,9 +103,9 @@ resize and window resizing.
   resources through their respective main-process services.
 - “Reset Terminal” and “New Agent Session” remain separate actions.
 
-The Terminal icon and its Clear/Reset menu remain Terminal-only. The Chat icon
-does not appear unless the experiment is enabled. Chat session actions stay in
-the Chat panel header rather than being added to Terminal's menu.
+The Terminal icon remains a Terminal-only visibility toggle. Clear and Reset
+live in the Terminal surface header. The Chat icon does not appear unless the
+experiment is enabled. Chat session actions stay in the Chat panel header.
 
 ## Application header
 

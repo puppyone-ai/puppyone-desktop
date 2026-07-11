@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  listCloudAutomationProviderSpecs,
   openCloudApp,
+  type DesktopCloudAutomationProviderSpec,
   type DesktopCloudConnector,
   type DesktopCloudSession,
 } from "../../lib/cloudApi";
@@ -39,6 +41,9 @@ export function DesktopCloudAutomationView({
   onRefresh: () => void | Promise<void>;
 }) {
   const [detailRowId, setDetailRowId] = useState<string | null>(null);
+  const [providerSpecs, setProviderSpecs] = useState<DesktopCloudAutomationProviderSpec[]>([]);
+  const [providerSpecsLoading, setProviderSpecsLoading] = useState(true);
+  const [providerSpecsError, setProviderSpecsError] = useState<string | null>(null);
   const automationRows = useMemo(
     () => buildCloudAutomationRows({
       scopes: accessData.scopeRows,
@@ -51,6 +56,37 @@ export function DesktopCloudAutomationView({
     [activeProvider, automationRows],
   );
   const detailRow = visibleRows.find((row) => row.id === detailRowId) ?? null;
+
+  useEffect(() => {
+    if (!cloudSession) {
+      setProviderSpecs([]);
+      setProviderSpecsLoading(false);
+      setProviderSpecsError(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setProviderSpecsLoading(true);
+    setProviderSpecsError(null);
+    void listCloudAutomationProviderSpecs(
+      cloudSession,
+      onCloudSessionChange,
+      cloudSession.api_base_url ?? null,
+    )
+      .then((providers) => {
+        if (!cancelled) setProviderSpecs(providers);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setProviderSpecs([]);
+        setProviderSpecsError(error instanceof Error ? error.message : "Unable to load Automation sources.");
+      })
+      .finally(() => {
+        if (!cancelled) setProviderSpecsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cloudSession, onCloudSessionChange]);
 
   useEffect(() => {
     if (detailRowId && !visibleRows.some((row) => row.id === detailRowId)) {
@@ -115,6 +151,9 @@ export function DesktopCloudAutomationView({
           rows={visibleRows}
           totalCount={activeProvider ? visibleRows.length : automationRows.length}
           loading={accessData.loading}
+          providerSpecs={providerSpecs}
+          providerSpecsLoading={providerSpecsLoading}
+          providerSpecsError={providerSpecsError}
           detailRow={detailRow}
           onOpenRow={setDetailRowId}
           onCloseDetail={() => setDetailRowId(null)}
@@ -160,7 +199,7 @@ export function DesktopCloudAutomationSidebar({
             <span className="desktop-cloud-sidebar-nav-icon">
               <AutomationGridIcon size={15} />
             </span>
-            <span className="desktop-cloud-sidebar-nav-label">All Automation</span>
+            <span className="desktop-cloud-sidebar-nav-label">All automations</span>
             {automationConnectors.length > 0 && (
               <span className="desktop-cloud-sidebar-nav-count">{automationConnectors.length}</span>
             )}

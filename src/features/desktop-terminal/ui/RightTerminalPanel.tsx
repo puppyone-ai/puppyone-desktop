@@ -1,8 +1,6 @@
 import {
-  forwardRef,
   useCallback,
   useEffect,
-  useImperativeHandle,
   useRef,
   useState,
   type DragEvent as ReactDragEvent,
@@ -13,6 +11,8 @@ import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal, type IDisposable, type ITheme } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
+import { TerminalSurfaceHeader } from "./TerminalSurfaceHeader";
+import "./desktop-terminal.css";
 
 type RightTerminalPanelProps = {
   workspace: Workspace;
@@ -24,14 +24,7 @@ type TerminalSize = {
   rows: number;
 };
 
-export type RightTerminalPanelHandle = {
-  clear: () => void;
-};
-
-export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerminalPanelProps>(function RightTerminalPanel(
-  { workspace, active },
-  ref,
-) {
+export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -43,6 +36,7 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
   const fitSettleTimersRef = useRef<number[]>([]);
   const activeRef = useRef(active);
   const [hasStarted, setHasStarted] = useState(active);
+  const [sessionGeneration, setSessionGeneration] = useState(0);
 
   const handleClearTerminal = useCallback(() => {
     const terminal = terminalRef.current;
@@ -51,9 +45,9 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
     terminal.focus();
   }, []);
 
-  useImperativeHandle(ref, () => ({
-    clear: handleClearTerminal,
-  }), [handleClearTerminal]);
+  const handleResetTerminal = useCallback(() => {
+    setSessionGeneration((generation) => generation + 1);
+  }, []);
 
   const handleTerminalDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (!hasTerminalDroppablePaths(event.dataTransfer)) return;
@@ -314,7 +308,16 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
       fitAddonRef.current = null;
       sessionIdRef.current = null;
     };
-  }, [clearSettledFits, fitAndResize, hasStarted, scheduleFitAndResize, scheduleSettledFits, syncTerminalSizeToPty, workspace.path]);
+  }, [
+    clearSettledFits,
+    fitAndResize,
+    hasStarted,
+    scheduleFitAndResize,
+    scheduleSettledFits,
+    sessionGeneration,
+    syncTerminalSizeToPty,
+    workspace.path,
+  ]);
 
   useEffect(() => {
     if (!hasStarted) return undefined;
@@ -344,7 +347,7 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
       shellObserver.disconnect();
       styleObserver.disconnect();
     };
-  }, [hasStarted, scheduleSettledFits]);
+  }, [hasStarted, scheduleSettledFits, sessionGeneration]);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -360,6 +363,7 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
 
   return (
     <section className="desktop-terminal-panel" aria-label="Terminal">
+      <TerminalSurfaceHeader onClear={handleClearTerminal} onReset={handleResetTerminal} />
       <div className="desktop-terminal-body" ref={bodyRef}>
         <div
           className="desktop-terminal-xterm"
@@ -370,7 +374,7 @@ export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerm
       </div>
     </section>
   );
-});
+}
 
 type WebglRendererHandle = {
   addon: WebglAddon;

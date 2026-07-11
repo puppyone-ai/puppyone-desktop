@@ -285,7 +285,10 @@
   --po-tree-row-radius: var(--desktop-sidebar-row-radius);
   --po-tree-row-content-left: var(--desktop-sidebar-row-content-left);
   --po-tree-row-content-right: var(--desktop-sidebar-row-content-right);
-  --po-tree-row-icon-label-gap: 4px;
+  --po-tree-row-icon-label-gap: var(--desktop-sidebar-icon-label-gap);
+  --po-tree-row-font-size: var(--desktop-sidebar-font-size);
+  --po-tree-row-font-weight: var(--desktop-sidebar-font-weight);
+  --po-tree-row-line-height: var(--desktop-sidebar-line-height);
   --po-tree-root-top-gap: var(--desktop-sidebar-section-top-gap);
   --po-tree-no-root-top-gap: var(--desktop-sidebar-list-padding-block);
   --po-tree-list-bottom-gap: var(--desktop-sidebar-list-padding-block);
@@ -338,7 +341,7 @@
 }
 
 .desktop-data-workspace-wrap .tree-row.root .tree-label {
-  font-size: 13px;
+  font-size: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));
   font-weight: 600;
-  line-height: 18px;
+  line-height: var(--desktop-sidebar-line-height, 18px);
 }

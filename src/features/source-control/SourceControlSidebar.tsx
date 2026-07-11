@@ -502,7 +502,7 @@ export function GitSidebar({
                   <Undo2 size={13} />
                 </button>
                 <button
-                  className="desktop-tool-sidebar-icon primary"
+                  className="desktop-tool-sidebar-icon desktop-git-stage-all-action"
                   type="button"
                   title="Stage all"
                   aria-label="Stage all"

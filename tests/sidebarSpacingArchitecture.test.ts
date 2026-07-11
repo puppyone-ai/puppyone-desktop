@@ -24,6 +24,12 @@ describe("sidebar spacing architecture", () => {
     expect(root).toContain("--desktop-sidebar-row-content-left: 6px;");
     expect(root).toContain("--desktop-sidebar-row-content-right: 6px;");
     expect(root).toContain("--desktop-sidebar-list-padding-block: 8px;");
+    expect(root).toContain("--desktop-sidebar-font-size: var(--po-text-size-sidebar);");
+    expect(root).toContain("--desktop-sidebar-font-size-meta: var(--po-text-size-meta);");
+    expect(root).toContain("--desktop-sidebar-font-weight: var(--po-text-weight-medium);");
+    expect(root).toContain("--desktop-sidebar-font-weight-emphasis: 650;");
+    expect(root).toContain("--desktop-sidebar-line-height: 18px;");
+    expect(root).toContain("--desktop-sidebar-icon-label-gap: 4px;");
     expect(compact(root)).toContain(compact(`
       --desktop-sidebar-scroll-right-gap: calc(
         var(--desktop-sidebar-row-right-gap) - var(--desktop-sidebar-scrollbar-width)
@@ -34,11 +40,19 @@ describe("sidebar spacing architecture", () => {
   it("maps the Data tree onto the shared edge contract", () => {
     const adapter = readCssBlock(dataAdapterCss, ".desktop-data-workspace-wrap");
     const list = compact(readCssBlock(dataTreeCss, ".explorer-tree-list"));
+    const treeRow = compact(readCssBlock(dataTreeCss, ".tree-row"));
 
     expect(adapter).toContain("--po-tree-row-left-gap: var(--desktop-sidebar-row-left-gap);");
     expect(adapter).toContain("--po-tree-row-right-gap: var(--desktop-sidebar-row-right-gap);");
     expect(adapter).toContain("--po-tree-no-root-top-gap: var(--desktop-sidebar-list-padding-block);");
     expect(adapter).toContain("--po-tree-list-bottom-gap: var(--desktop-sidebar-list-padding-block);");
+    expect(adapter).toContain("--po-tree-row-icon-label-gap: var(--desktop-sidebar-icon-label-gap);");
+    expect(adapter).toContain("--po-tree-row-font-size: var(--desktop-sidebar-font-size);");
+    expect(adapter).toContain("--po-tree-row-font-weight: var(--desktop-sidebar-font-weight);");
+    expect(adapter).toContain("--po-tree-row-line-height: var(--desktop-sidebar-line-height);");
+    expect(treeRow).toContain("font-size: var(--tree-row-font-size);");
+    expect(treeRow).toContain("font-weight: var(--tree-row-font-weight);");
+    expect(treeRow).toContain("line-height: var(--tree-row-line-height);");
     expect(list).toContain("padding-block: 0 var(--tree-list-bottom-gap);");
     expect(list).toContain(compact(`
       padding-inline: var(--tree-row-left-gap)

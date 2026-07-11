@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
-import { ArrowRightLeft, Blocks, Clock3, Cloud, Folder, FolderOpen, Settings } from "lucide-react";
+import { ArrowRightLeft, Blocks, Clock3, Cloud, Folder, FolderOpen, Settings, Workflow } from "lucide-react";
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import type { SidebarNavigationOrientation } from "../../preferences";
 import type { GitStatusEntry, GitStatusSnapshot } from "../../types/electron";
-import { AutomationGridIcon } from "../automation";
-import { AccessChainIcon } from "../cloud/accessFilters";
 
 export type DesktopSidebarIconComponent = (props: { size?: number; className?: string }) => ReactNode;
 type DesktopNavigationItem = {
@@ -44,6 +42,35 @@ export function PuppyGitIcon({
       <circle cx="19" cy="18" r="3" />
       <path d="m15 9-3-3 3-3" />
       <path d="M12 6h5a2 2 0 0 1 2 2v7" />
+    </svg>
+  );
+}
+
+export function AssetsDistributionIcon({
+  size = 16,
+  className,
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      className={className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      data-icon="assets-distribution"
+    >
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.75" />
+      <path d="M9.5 14.5 20.5 3.5" />
+      <path d="M13.5 3.5h7v7" />
     </svg>
   );
 }
@@ -211,14 +238,7 @@ export function DesktopSidebarTopNavigation({
             workspaceChangeCount={workspaceChangeCount}
             onNavigate={onNavigate}
           />
-          <DesktopSidebarSettingsButton
-            activeView={activeView}
-            buttonClassName="desktop-sidebar-top-navigation-button"
-            onOpenSettings={onOpenSettings}
-          />
-        </div>
-        {cloudItems.length > 0 && (
-          <div className="desktop-sidebar-top-navigation-group desktop-sidebar-top-navigation-cloud">
+          {cloudItems.length > 0 && (
             <DesktopSidebarButtonNavigation
               activeView={activeView}
               items={cloudItems}
@@ -228,8 +248,13 @@ export function DesktopSidebarTopNavigation({
               workspaceChangeCount={workspaceChangeCount}
               onNavigate={onNavigate}
             />
-          </div>
-        )}
+          )}
+          <DesktopSidebarSettingsButton
+            activeView={activeView}
+            buttonClassName="desktop-sidebar-top-navigation-button"
+            onOpenSettings={onOpenSettings}
+          />
+        </div>
       </div>
     </div>
   );
@@ -621,8 +646,8 @@ const DESKTOP_NAV_ITEMS: readonly DesktopNavigationItem[] = [
   { view: "data", label: "Files", icon: Folder },
   { view: "git", label: "Changes", icon: PuppyGitIcon, iconSize: 15 },
   { view: "plugins", label: "Plugins", icon: Blocks },
-  { view: "access", label: "Access", icon: AccessChainIcon },
-  { view: "automation", label: "Automation", icon: AutomationGridIcon },
+  { view: "access", label: "Assets", icon: AssetsDistributionIcon },
+  { view: "automation", label: "Automation", icon: Workflow },
 ] as const;
 
 const DESKTOP_CLOUD_HISTORY_NAV_ITEM: DesktopNavigationItem = {

@@ -1,4 +1,12 @@
 .desktop-titlebar {
+  --desktop-titlebar-bg: var(--po-header);
+  --desktop-titlebar-text: var(--po-text);
+  --desktop-titlebar-text-muted: var(--po-text-muted);
+  --desktop-titlebar-text-disabled: var(--po-text-disabled);
+  --desktop-titlebar-hover: var(--po-hover);
+  --desktop-titlebar-active: var(--po-selected);
+  --desktop-titlebar-focus: var(--po-focus-ring);
+  --desktop-titlebar-divider: var(--po-header-divider);
   position: relative;
   z-index: 40;
   display: flex;
@@ -8,12 +16,22 @@
   height: var(--desktop-chrome-height);
   min-height: var(--desktop-chrome-height);
   padding: 4px 6px 4px 86px;
-  border-bottom: 1px solid var(--po-header-divider);
-  /* Header belongs to the content region: same surface as the editor
-     (unified-toolbar convention); only sidebars keep the chrome tint. */
-  background: var(--po-header);
+  border-bottom: 1px solid var(--desktop-titlebar-divider);
+  background: var(--desktop-titlebar-bg);
+  color: var(--desktop-titlebar-text);
   -webkit-app-region: drag;
   user-select: none;
+}
+
+.desktop-titlebar[data-workspace-kind="cloud"] {
+  --desktop-titlebar-bg: var(--po-cloud-titlebar-bg);
+  --desktop-titlebar-text: var(--po-cloud-titlebar-text);
+  --desktop-titlebar-text-muted: var(--po-cloud-titlebar-text-muted);
+  --desktop-titlebar-text-disabled: var(--po-cloud-titlebar-text-disabled);
+  --desktop-titlebar-hover: var(--po-cloud-titlebar-hover);
+  --desktop-titlebar-active: var(--po-cloud-titlebar-active);
+  --desktop-titlebar-focus: var(--po-cloud-titlebar-focus);
+  --desktop-titlebar-divider: var(--po-cloud-titlebar-divider);
 }
 
 .desktop-titlebar-left {
@@ -46,13 +64,13 @@
   min-width: 0;
   padding: 0 6px;
   border-radius: var(--desktop-control-radius);
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
   pointer-events: none;
 }
 
 .desktop-titlebar-context-item svg {
   flex: 0 0 auto;
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
 }
 
 .desktop-titlebar-context-mark {
@@ -100,27 +118,27 @@
   border: 0;
   border-radius: var(--desktop-control-radius);
   background: transparent;
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
   outline: 0;
   box-shadow: none;
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .desktop-titlebar-action:hover {
-  background: var(--po-hover);
-  color: var(--po-text);
+  background: var(--desktop-titlebar-hover);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-action:focus-visible {
-  background: var(--po-hover);
-  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
-  color: var(--po-text);
+  background: var(--desktop-titlebar-hover);
+  box-shadow: inset 0 0 0 1px var(--desktop-titlebar-focus);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-action.active,
 .desktop-titlebar-action[aria-pressed="true"] {
-  background: var(--po-selected);
-  color: var(--po-text);
+  background: var(--desktop-titlebar-active);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-action:disabled {
@@ -148,7 +166,7 @@
   right: 6px;
   width: 6px;
   height: 6px;
-  border: 1px solid var(--po-header);
+  border: 1px solid var(--desktop-titlebar-bg);
   border-radius: 999px;
   background: var(--po-accent);
   pointer-events: none;
@@ -177,7 +195,7 @@
   border: 0;
   border-radius: var(--desktop-control-radius);
   background: transparent;
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
   text-align: left;
   box-shadow: none;
   -webkit-app-region: no-drag;
@@ -187,20 +205,8 @@
 
 .desktop-titlebar-workspace-button:hover,
 .desktop-titlebar-workspace-button[aria-expanded="true"] {
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
-/* Keep the active execution context visible at a glance. Cloud projects use a
-   persistent sky-blue treatment; local projects retain the neutral chrome. */
-.desktop-titlebar-workspace-button.cloud {
-  --desktop-cloud-pigment: color-mix(in oklab, var(--po-info) 78%, var(--po-accent));
-  background: color-mix(in srgb, var(--desktop-cloud-pigment) 8%, transparent);
-}
-
-.desktop-titlebar-workspace-button.cloud:hover,
-.desktop-titlebar-workspace-button.cloud[aria-expanded="true"] {
-  background: color-mix(in srgb, var(--desktop-cloud-pigment) 14%, transparent);
+  background: var(--desktop-titlebar-hover);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-workspace-mark {
@@ -211,29 +217,17 @@
   height: 20px;
   flex: 0 0 auto;
   background: transparent;
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
   transition: color 0.12s ease;
 }
 
 .desktop-titlebar-workspace-button:hover .desktop-titlebar-workspace-mark,
 .desktop-titlebar-workspace-button[aria-expanded="true"] .desktop-titlebar-workspace-mark {
-  color: var(--po-text);
-}
-
-.desktop-titlebar-workspace-button.cloud .desktop-titlebar-workspace-mark,
-.desktop-titlebar-workspace-button.cloud .desktop-titlebar-workspace-name {
-  color: color-mix(in srgb, var(--desktop-cloud-pigment) 88%, var(--po-text) 12%);
-}
-
-.desktop-titlebar-workspace-button.cloud:hover .desktop-titlebar-workspace-mark,
-.desktop-titlebar-workspace-button.cloud:hover .desktop-titlebar-workspace-name,
-.desktop-titlebar-workspace-button.cloud[aria-expanded="true"] .desktop-titlebar-workspace-mark,
-.desktop-titlebar-workspace-button.cloud[aria-expanded="true"] .desktop-titlebar-workspace-name {
-  color: var(--desktop-cloud-pigment);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-workspace-button:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
+  box-shadow: inset 0 0 0 1px var(--desktop-titlebar-focus);
 }
 
 .desktop-titlebar-context-icon-button {
@@ -247,7 +241,7 @@
   border: 0;
   border-radius: var(--desktop-control-radius);
   background: transparent;
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
   outline: 0;
   -webkit-app-region: no-drag;
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
@@ -255,20 +249,21 @@
 
 .desktop-titlebar-context-icon-button:hover,
 .desktop-titlebar-context-icon-button.active {
-  color: var(--po-text);
+  background: var(--desktop-titlebar-hover);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-context-icon-button:focus-visible {
-  background: var(--po-hover);
-  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
-  color: var(--po-text);
+  background: var(--desktop-titlebar-hover);
+  box-shadow: inset 0 0 0 1px var(--desktop-titlebar-focus);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-workspace-name {
   max-width: none;
   min-width: 0;
   overflow: hidden;
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
   font-size: var(--po-font-size-chrome, 13px);
   font-weight: var(--po-font-weight-chrome, 500);
   line-height: 18px;
@@ -278,7 +273,7 @@
 
 .desktop-titlebar-workspace-button:hover .desktop-titlebar-workspace-name,
 .desktop-titlebar-workspace-button[aria-expanded="true"] .desktop-titlebar-workspace-name {
-  color: var(--po-text);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-menu {
@@ -304,7 +299,7 @@
 }
 
 .desktop-titlebar-external-open:has(.desktop-titlebar-external-open-menu-button[aria-expanded="true"]) {
-  background: var(--po-hover);
+  background: var(--desktop-titlebar-hover);
 }
 
 .desktop-titlebar-external-open-main {
@@ -320,8 +315,8 @@
 }
 
 .desktop-titlebar-external-open-menu-button[aria-expanded="true"] {
-  background: var(--po-hover);
-  color: var(--po-text);
+  background: var(--desktop-titlebar-hover);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-external-app-icon {
@@ -372,45 +367,6 @@
   text-align: left;
 }
 
-.desktop-titlebar-terminal {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  height: var(--desktop-chrome-control-size);
-  border-radius: var(--desktop-control-radius);
-}
-
-.desktop-titlebar-terminal.has-menu:has(.desktop-titlebar-terminal-menu-button[aria-expanded="true"]) {
-  background: var(--po-hover);
-}
-
-.desktop-titlebar-terminal.has-menu .desktop-titlebar-terminal-main {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.desktop-titlebar-terminal-menu-button {
-  width: 17px;
-  margin-left: -2px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-.desktop-titlebar-terminal-menu-button[aria-expanded="true"] {
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
-.desktop-titlebar-terminal-menu {
-  right: 0;
-  left: auto;
-  width: 190px;
-}
-
-.desktop-titlebar-terminal-menu-row {
-  text-align: left;
-}
-
 .desktop-titlebar-branch-wrap {
   position: relative;
   display: flex;
@@ -434,7 +390,7 @@
   border: 0;
   border-radius: var(--desktop-control-radius);
   background: transparent;
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
   text-align: left;
   outline: 0;
   -webkit-app-region: no-drag;
@@ -443,22 +399,22 @@
 
 .desktop-titlebar-branch-button:hover,
 .desktop-titlebar-branch-button[aria-expanded="true"] {
-  background: var(--po-hover);
-  color: var(--po-text);
+  background: var(--desktop-titlebar-hover);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-branch-button:disabled {
   cursor: default;
-  color: var(--po-text-disabled);
+  color: var(--desktop-titlebar-text-disabled);
 }
 
 .desktop-titlebar-branch-button:disabled:hover {
   background: transparent;
-  color: var(--po-text-disabled);
+  color: var(--desktop-titlebar-text-disabled);
 }
 
 .desktop-titlebar-branch-button:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
+  box-shadow: inset 0 0 0 1px var(--desktop-titlebar-focus);
 }
 
 .desktop-titlebar-branch-button span {

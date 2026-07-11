@@ -7,9 +7,11 @@ import {
 import { usePaneResizeDrag } from "@puppyone/shared-ui";
 
 export type DesktopView = "data" | "git" | "plugins" | "cloud" | "access" | "automation" | "settings";
+export type DesktopWorkspaceKind = "local" | "cloud";
 
 type DesktopCloudShellProps = {
   children: ReactNode;
+  workspaceKind: DesktopWorkspaceKind;
   titlebarSlot?: ReactNode;
   titlebarActions?: ReactNode;
   rightSidebar?: ReactNode;
@@ -23,6 +25,7 @@ type DesktopCloudShellProps = {
 
 export function DesktopCloudShell({
   children,
+  workspaceKind,
   titlebarSlot,
   titlebarActions,
   rightSidebar,
@@ -89,7 +92,7 @@ export function DesktopCloudShell({
 
   return (
     <div className="desktop-shell">
-      <header className="desktop-titlebar">
+      <header className="desktop-titlebar" data-workspace-kind={workspaceKind}>
         <div className="desktop-titlebar-left">
           {titlebarSlot}
         </div>
