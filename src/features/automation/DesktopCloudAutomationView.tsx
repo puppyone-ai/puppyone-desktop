@@ -96,15 +96,6 @@ export function DesktopCloudAutomationView({
     }
   }, [detailRowId, visibleRows]);
 
-  useEffect(() => {
-    if (!detailRowId) return undefined;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setDetailRowId(null);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [detailRowId]);
-
   if (sessionRestoring && !cloudSession) {
     return (
       <div className="desktop-cloud-main-view desktop-cloud-automation-main-view">
@@ -147,7 +138,8 @@ export function DesktopCloudAutomationView({
       cloudSession={cloudSession}
       apiBaseUrl={cloudSession.api_base_url ?? null}
       rows={visibleRows}
-      totalCount={activeProvider ? visibleRows.length : automationRows.length}
+      totalCount={automationRows.length}
+      hasAnyAutomation={automationRows.length > 0}
       loading={accessData.loading}
       providerSpecs={providerSpecs}
       providerSpecsLoading={providerSpecsLoading}
@@ -157,7 +149,6 @@ export function DesktopCloudAutomationView({
       onCloseDetail={() => setDetailRowId(null)}
       onCloudSessionChange={onCloudSessionChange}
       onRefresh={accessData.reload}
-      onOpenAccess={() => openCloudApp(`/projects/${encodeURIComponent(projectId)}/access`)}
       onOpenAutomation={() => openCloudApp(getCloudAutomationWebPath(projectId))}
     />
   );

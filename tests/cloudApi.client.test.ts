@@ -4,7 +4,18 @@
 // globalThis.window (no jsdom needed — getDesktopCloudApiBaseUrl guards window
 // access in try/catch) and assert request shaping + the session/api-base guards.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cloudApiRequest, listCloudProjects, getCloudProject } from "../src/lib/cloudApi";
+import {
+  cloudApiRequest,
+  getCloudAutomationOauthAuthorizeUrl,
+  getCloudAutomationOauthStatus,
+  getCloudProject,
+  listCloudAutomationConnectionRuns,
+  listCloudAutomationProviderResources,
+  listCloudProjects,
+  supportsCloudAutomationOauth,
+  updateCloudAutomationConnection,
+  updateCloudAutomationTrigger,
+} from "../src/lib/cloudApi";
 
 const API = "https://api.puppyone.ai/api/v1";
 const session = {
@@ -48,6 +59,70 @@ describe("cloud API client delegation", () => {
     expect(bridge).toHaveBeenCalledWith(
       expect.objectContaining({ path: "/projects/a%2Fb", method: "GET" }),
     );
+  });
+
+  it("keeps OAuth provider-to-slug translation inside the Automation adapter", async () => {
+    bridge
+      .mockResolvedValueOnce({ connected: false, workspace_name: null, connected_at: null, connection_id: null })
+      .mockResolvedValueOnce({ authorization_url: "https://accounts.example.test/oauth" });
+
+    await getCloudAutomationOauthStatus(session, "google_search_console", undefined, API);
+    await expect(getCloudAutomationOauthAuthorizeUrl(session, "google_docs", undefined, API))
+      .resolves.toBe("https://accounts.example.test/oauth");
+
+    expect(bridge).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      path: "/oauth/google-search-console/status",
+      method: "GET",
+    }));
+    expect(bridge).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      path: "/oauth/google-docs/authorize",
+      method: "GET",
+    }));
+    expect(supportsCloudAutomationOauth("google_docs")).toBe(true);
+    expect(supportsCloudAutomationOauth("url")).toBe(false);
+  });
+
+  it("shapes resource pagination, edits, trigger updates, and lazy run history", async () => {
+    bridge.mockResolvedValue({ resources: [], next_cursor: null });
+    await listCloudAutomationProviderResources(
+      session,
+      "google_docs",
+      { q: "product brief", cursor: "page/2", resourceType: "document" },
+      undefined,
+      API,
+    );
+    await updateCloudAutomationConnection(
+      session,
+      "connection/1",
+      { target_path: "Research/Docs", config: { source: { resource_id: "doc-1" } } },
+      undefined,
+      API,
+    );
+    await updateCloudAutomationTrigger(
+      session,
+      "connection/1",
+      { sync_mode: "scheduled", trigger: { type: "schedule", schedule: "0 9 * * *", timezone: "UTC" } },
+      undefined,
+      API,
+    );
+    await listCloudAutomationConnectionRuns(session, "connection/1", 10, undefined, API);
+
+    expect(bridge).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      path: "/integrations/providers/google_docs/resources?q=product+brief&cursor=page%2F2&resource_type=document",
+      method: "GET",
+    }));
+    expect(bridge).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      path: "/integrations/connections/connection%2F1",
+      method: "PATCH",
+    }));
+    expect(bridge).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      path: "/integrations/connections/connection%2F1/trigger",
+      method: "PATCH",
+    }));
+    expect(bridge).toHaveBeenNthCalledWith(4, expect.objectContaining({
+      path: "/integrations/connections/connection%2F1/runs?limit=10",
+      method: "GET",
+    }));
   });
 });
 

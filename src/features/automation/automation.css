@@ -176,6 +176,42 @@
   transform: translateY(-1px);
 }
 
+.desktop-cloud-automation-template-card.selected {
+  border-color: var(--po-border-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-border-strong) 54%, transparent);
+}
+
+.desktop-cloud-automation-template-card-topline {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.desktop-cloud-automation-template-status {
+  max-width: 52%;
+  overflow: hidden;
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-automation-template-status.ready {
+  color: var(--po-success);
+}
+
+.desktop-cloud-automation-template-status.required {
+  color: var(--po-warning);
+}
+
+.desktop-cloud-automation-template-status.error {
+  color: var(--po-danger);
+}
+
 .desktop-cloud-automation-template-card.skeleton {
   gap: 10px;
   pointer-events: none;
@@ -328,6 +364,119 @@
   margin-top: 38px;
   padding-top: 24px;
   border-top: 1px solid var(--po-border-subtle);
+}
+
+.desktop-cloud-automation-existing-section.primary {
+  max-width: none;
+  margin-top: 30px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.desktop-cloud-automation-existing-section.primary .desktop-cloud-automation-existing-loading {
+  margin-top: 0;
+}
+
+.desktop-cloud-automation-add-more {
+  margin-top: 42px;
+  padding-top: 28px;
+  border-top: 1px solid var(--po-border-subtle);
+}
+
+.desktop-cloud-automation-add-more-header {
+  display: grid;
+  gap: 3px;
+  padding: 0 8px;
+}
+
+.desktop-cloud-automation-add-more-header h2,
+.desktop-cloud-automation-add-more-header p {
+  margin: 0;
+}
+
+.desktop-cloud-automation-add-more-header h2 {
+  color: var(--po-text);
+  font-size: var(--po-text-size-title, 16px);
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.desktop-cloud-automation-add-more-header p {
+  color: var(--po-text-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.desktop-cloud-automation-creation-echo {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 24px;
+  padding: 12px 14px;
+  border: 1px solid var(--po-border);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--po-panel) 72%, transparent);
+}
+
+.desktop-cloud-automation-creation-echo > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.desktop-cloud-automation-creation-echo strong {
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.desktop-cloud-automation-creation-echo span {
+  overflow: hidden;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-automation-creation-echo.success {
+  border-color: color-mix(in srgb, var(--po-success) 34%, var(--po-border));
+}
+
+.desktop-cloud-automation-creation-echo.danger {
+  border-color: color-mix(in srgb, var(--po-danger) 42%, var(--po-border));
+}
+
+.desktop-cloud-automation-creation-echo-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+}
+
+.desktop-cloud-automation-creation-echo-actions > button {
+  display: inline-flex;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.desktop-cloud-automation-creation-echo-actions > button:last-child {
+  width: 28px;
+  justify-content: center;
+  padding: 0;
 }
 
 .desktop-cloud-automation-existing-header {
@@ -539,6 +688,12 @@
   border-color: var(--po-border-strong, var(--po-border));
   background: color-mix(in srgb, var(--po-panel) 62%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-border) 70%, transparent);
+}
+
+.desktop-cloud-automation-connection-card.created {
+  border-color: color-mix(in srgb, var(--po-success) 56%, var(--po-border));
+  background: color-mix(in srgb, var(--po-success) 7%, var(--po-panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-success) 22%, transparent);
 }
 
 .desktop-cloud-automation-route {

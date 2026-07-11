@@ -1,10 +1,11 @@
-import { ArrowRight, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { ArrowRight, ChevronRight, RefreshCw, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import type {
   DesktopCloudAutomationProviderSpec,
   DesktopCloudScope,
   DesktopCloudSession,
 } from "../../lib/cloudApi";
+import { getCloudAutomationRun } from "../../lib/cloudApi";
 import {
   formatProviderLabel,
   formatRelativeTime,
@@ -14,7 +15,12 @@ import {
   providerIcon,
 } from "../cloud/utils";
 import type { CloudAutomationRow } from "./automationDomain";
-import { CloudManageAutomationDialog, CloudNewAutomationDialog } from "./AutomationDialogs";
+import {
+  CloudManageAutomationDialog,
+  CloudNewAutomationDialog,
+  type CloudAutomationCreationEcho,
+} from "./AutomationDialogs";
+import { AutomationTemplateCard } from "./AutomationTemplateCard";
 import {
   AUTOMATION_CATEGORIES,
   buildAutomationTemplates,
@@ -29,6 +35,7 @@ export function CloudAutomationPage({
   apiBaseUrl,
   rows,
   totalCount,
+  hasAnyAutomation,
   loading,
   providerSpecs,
   providerSpecsLoading,
@@ -38,7 +45,6 @@ export function CloudAutomationPage({
   onCloseDetail,
   onCloudSessionChange,
   onRefresh,
-  onOpenAccess,
   onOpenAutomation,
 }: {
   projectId: string;
@@ -46,6 +52,7 @@ export function CloudAutomationPage({
   apiBaseUrl: string | null;
   rows: CloudAutomationRow[];
   totalCount: number;
+  hasAnyAutomation: boolean;
   loading: boolean;
   providerSpecs: DesktopCloudAutomationProviderSpec[];
   providerSpecsLoading: boolean;
@@ -55,97 +62,199 @@ export function CloudAutomationPage({
   onCloseDetail: () => void;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onRefresh: () => Promise<void>;
-  onOpenAccess: () => void;
   onOpenAutomation: () => void;
 }) {
   const [newAutomationOpen, setNewAutomationOpen] = useState(false);
   const [draftTemplate, setDraftTemplate] = useState<AutomationTemplate | null>(null);
   const [activeCategory, setActiveCategory] = useState<AutomationCatalogCategory>("popular");
+  const [creationEcho, setCreationEcho] = useState<CloudAutomationCreationEcho | null>(null);
+  const [highlightedConnectionId, setHighlightedConnectionId] = useState<string | null>(null);
   const templates = buildAutomationTemplates(providerSpecs);
   const visibleTemplates = getAutomationTemplatesForCategory(templates, activeCategory);
+  const activeCreationRunId = creationEcho && !isTerminalRunStatus(creationEcho.status)
+    ? creationEcho.runId
+    : null;
 
   const openNewAutomation = (template: AutomationTemplate | null = null) => {
     setDraftTemplate(template);
     setNewAutomationOpen(true);
   };
 
+  const handleCreated = (echo: CloudAutomationCreationEcho) => {
+    setCreationEcho(echo);
+    setHighlightedConnectionId(echo.connectionId);
+  };
+
+  const refreshCreationStatus = async () => {
+    const echo = creationEcho;
+    if (echo?.runId) {
+      try {
+        const run = await getCloudAutomationRun(cloudSession, echo.runId, onCloudSessionChange, apiBaseUrl);
+        setCreationEcho((current) => current?.runId === run.id ? {
+          ...current,
+          status: run.status,
+          summary: run.result_summary || formatStatusLabel(run.status),
+          error: run.error || null,
+        } : current);
+      } catch {
+        // Row refresh below still gives the user the latest connection state.
+      }
+    }
+    await onRefresh().catch(() => undefined);
+  };
+
+  useEffect(() => {
+    if (!highlightedConnectionId) return undefined;
+    const timer = window.setTimeout(() => setHighlightedConnectionId(null), 12_000);
+    return () => window.clearTimeout(timer);
+  }, [highlightedConnectionId]);
+
+  useEffect(() => {
+    const runId = activeCreationRunId;
+    if (!runId) return undefined;
+    let cancelled = false;
+    let attempts = 0;
+    let timer: number | null = null;
+    const poll = async () => {
+      attempts += 1;
+      try {
+        const run = await getCloudAutomationRun(cloudSession, runId, onCloudSessionChange, apiBaseUrl);
+        if (cancelled) return;
+        setCreationEcho((current) => current?.runId === runId ? {
+          ...current,
+          status: run.status,
+          summary: run.result_summary || (isTerminalRunStatus(run.status) ? formatStatusLabel(run.status) : current.summary),
+          error: run.error || null,
+        } : current);
+        if (isTerminalRunStatus(run.status)) {
+          await onRefresh().catch(() => undefined);
+          return;
+        }
+      } catch {
+        // The page keeps the queued response visible and offers manual refresh.
+      }
+      if (!cancelled && attempts < 5) timer = window.setTimeout(poll, 2_000);
+    };
+    timer = window.setTimeout(poll, 1_500);
+    return () => {
+      cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [activeCreationRunId, apiBaseUrl, cloudSession, onCloudSessionChange, onRefresh]);
+
+  const catalog = (
+    <>
+      {hasAnyAutomation && (
+        <header className="desktop-cloud-automation-add-more-header">
+          <h2>Add more sources</h2>
+          <p>Connect another external source to a project folder.</p>
+        </header>
+      )}
+      <nav className="desktop-cloud-automation-category-tabs" aria-label="Automation categories" role="tablist">
+        {AUTOMATION_CATEGORIES.map((category) => {
+          const active = activeCategory === category.id;
+          return (
+            <button
+              key={category.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className={active ? "active" : undefined}
+              onClick={() => setActiveCategory(category.id)}
+            >
+              {category.label}
+            </button>
+          );
+        })}
+      </nav>
+      <section className="desktop-cloud-automation-template-grid" aria-label={`${activeCategory} automation templates`}>
+        {providerSpecsLoading ? Array.from({ length: 4 }, (_, index) => (
+          <div className="desktop-cloud-automation-template-card skeleton" aria-hidden="true" key={index}>
+            <span />
+            <span />
+            <span />
+          </div>
+        )) : visibleTemplates.map((template) => (
+          <AutomationTemplateCard key={template.id} template={template} onAdd={() => openNewAutomation(template)} />
+        ))}
+      </section>
+      {!providerSpecsLoading && providerSpecsError && (
+        <div className="desktop-cloud-automation-catalog-error" role="alert">
+          Unable to load Automation templates. {providerSpecsError}
+        </div>
+      )}
+      {!providerSpecsLoading && !providerSpecsError && visibleTemplates.length === 0 && (
+        <div className="desktop-cloud-automation-catalog-empty">No available sources in this category.</div>
+      )}
+    </>
+  );
+
   return (
     <section className="desktop-cloud-automation-page">
       <main className="desktop-cloud-automation-canvas">
-        <section className="desktop-cloud-automation-catalog">
+        <section className={`desktop-cloud-automation-catalog ${hasAnyAutomation ? "has-automations" : ""}`}>
           <header className="desktop-cloud-automation-landing-header">
             <div className="desktop-cloud-automation-landing-copy">
               <h1>Automations</h1>
-              <p>Keep project knowledge current with always-on workflows that respond to changes.</p>
+              <p>Keep project knowledge current by watching external sources and importing them into project folders.</p>
             </div>
             <button type="button" className="desktop-cloud-automation-new-button" onClick={() => openNewAutomation()}>
               New
             </button>
           </header>
 
-          <nav className="desktop-cloud-automation-category-tabs" aria-label="Automation categories" role="tablist">
-            {AUTOMATION_CATEGORIES.map((category) => {
-              const active = activeCategory === category.id;
-              return (
-                <button
-                  key={category.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  className={active ? "active" : undefined}
-                  onClick={() => setActiveCategory(category.id)}
-                >
-                  {category.label}
-                </button>
-              );
-            })}
-          </nav>
-
-          <section className="desktop-cloud-automation-template-grid" aria-label={`${activeCategory} automation templates`}>
-            {providerSpecsLoading ? Array.from({ length: 4 }, (_, index) => (
-              <div className="desktop-cloud-automation-template-card skeleton" aria-hidden="true" key={index}>
-                <span />
-                <span />
-                <span />
+          {creationEcho && (
+            <section className={`desktop-cloud-automation-creation-echo ${getAutomationStatusTone(creationEcho.status)}`} role="status">
+              <div>
+                <strong>{creationEcho.summary}</strong>
+                <span>
+                  {formatProviderLabel(creationEcho.provider)} → /{creationEcho.targetPath}
+                  {creationEcho.error ? ` · ${creationEcho.error}` : ""}
+                </span>
               </div>
-            )) : visibleTemplates.map((template) => (
-              <AutomationTemplateCard
-                key={template.id}
-                template={template}
-                onAdd={() => openNewAutomation(template)}
-              />
-            ))}
-          </section>
-
-          {!providerSpecsLoading && providerSpecsError && (
-            <div className="desktop-cloud-automation-catalog-error" role="alert">
-              Unable to load Automation templates. {providerSpecsError}
-            </div>
+              <div className="desktop-cloud-automation-creation-echo-actions">
+                <button type="button" title="Refresh Automation status" onClick={() => void refreshCreationStatus()}>
+                  <RefreshCw size={14} />
+                  Refresh
+                </button>
+                <button type="button" aria-label="Dismiss creation status" title="Dismiss creation status" onClick={() => setCreationEcho(null)}>
+                  <X size={14} />
+                </button>
+              </div>
+            </section>
           )}
 
-          {!providerSpecsLoading && !providerSpecsError && visibleTemplates.length === 0 && (
-            <div className="desktop-cloud-automation-catalog-empty">
-              No available sources in this category.
-            </div>
-          )}
-
-          {loading ? (
-            <div className="desktop-cloud-automation-existing-loading" role="status">Loading your automations…</div>
-          ) : rows.length > 0 ? (
-            <section className="desktop-cloud-automation-existing-section">
+          {hasAnyAutomation && (
+            <section className="desktop-cloud-automation-existing-section primary">
               <header className="desktop-cloud-automation-existing-header">
                 <h2>Your automations</h2>
                 <span>{totalCount}</span>
               </header>
-              <div className="desktop-cloud-automation-detail">
-                <CloudAutomationAccessList
-                  rows={rows}
-                  selectedRowId={detailRow?.id ?? null}
-                  onOpenRow={onOpenRow}
-                />
-              </div>
+              {loading && rows.length === 0 ? (
+                <div className="desktop-cloud-automation-existing-loading" role="status">Loading your automations…</div>
+              ) : rows.length > 0 ? (
+                <div className="desktop-cloud-automation-detail">
+                  <CloudAutomationAccessList
+                    rows={rows}
+                    selectedRowId={detailRow?.id ?? null}
+                    highlightedConnectionId={highlightedConnectionId}
+                    creationEcho={creationEcho}
+                    onOpenRow={onOpenRow}
+                  />
+                </div>
+              ) : (
+                <div className="desktop-cloud-automation-catalog-empty">No Automations match the selected source.</div>
+              )}
             </section>
-          ) : null}
+          )}
+
+          <section className={hasAnyAutomation ? "desktop-cloud-automation-add-more" : undefined}>
+            {catalog}
+          </section>
+
+          {!hasAnyAutomation && loading && (
+            <div className="desktop-cloud-automation-existing-loading" role="status">Loading your automations…</div>
+          )}
         </section>
       </main>
       {newAutomationOpen && (
@@ -159,18 +268,21 @@ export function CloudAutomationPage({
           template={draftTemplate}
           onCloudSessionChange={onCloudSessionChange}
           onRefresh={onRefresh}
-          onOpenAutomation={onOpenAutomation}
+          onCreated={handleCreated}
           onClose={() => setNewAutomationOpen(false)}
         />
       )}
       {detailRow && (
         <CloudManageAutomationDialog
+          key={`${detailRow.id}:${providerSpecs.some((provider) => provider.provider === detailRow.connector.provider) ? "spec" : "fallback"}`}
+          projectId={projectId}
           row={detailRow}
+          providerSpec={providerSpecs.find((provider) => provider.provider === detailRow.connector.provider) ?? null}
           cloudSession={cloudSession}
           apiBaseUrl={apiBaseUrl}
           onCloudSessionChange={onCloudSessionChange}
           onRefresh={onRefresh}
-          onOpenAccess={onOpenAccess}
+          onOpenAutomation={onOpenAutomation}
           onClose={onCloseDetail}
         />
       )}
@@ -178,51 +290,20 @@ export function CloudAutomationPage({
   );
 }
 
-function AutomationTemplateCard({
-  template,
-  onAdd,
-}: {
-  template: AutomationTemplate;
-  onAdd: () => void;
-}) {
-  const ProviderIcon = providerIcon(template.provider);
-  const iconUrl = template.iconUrl || getCloudProviderIconUrl(template.provider);
-
-  return (
-    <article className="desktop-cloud-automation-template-card">
-      <div
-        className="desktop-cloud-automation-template-route"
-        aria-label={`${template.sourceLabel} to PuppyOne project folder`}
-      >
-        <span className="desktop-cloud-automation-template-mark source">
-          {iconUrl ? <img src={iconUrl} alt="" /> : <ProviderIcon size={17} />}
-        </span>
-        <span className="desktop-cloud-automation-template-connector" aria-hidden="true">
-          <span />
-          <ArrowRight size={12} strokeWidth={1.8} />
-        </span>
-        <span className="desktop-cloud-automation-template-mark target">
-          <img src="/icons/folder.svg" alt="" />
-        </span>
-      </div>
-      <h2>{template.title}</h2>
-      <p>{template.description}</p>
-      <button type="button" className="desktop-cloud-automation-template-add" onClick={onAdd}>Add</button>
-    </article>
-  );
-}
-
 function CloudAutomationAccessList({
   rows,
   selectedRowId,
+  highlightedConnectionId,
+  creationEcho,
   onOpenRow,
 }: {
   rows: CloudAutomationRow[];
   selectedRowId?: string | null;
+  highlightedConnectionId: string | null;
+  creationEcho: CloudAutomationCreationEcho | null;
   onOpenRow: (rowId: string) => void;
 }) {
   const providerGroups = getAutomationProviderGroups(rows);
-
   return (
     <section className="desktop-cloud-automation-list" aria-label="Cloud automation">
       {providerGroups.map((group) => {
@@ -243,14 +324,17 @@ function CloudAutomationAccessList({
               <div className="desktop-cloud-automation-connection-list">
                 {group.rows.map((row) => {
                   const connector = row.connector;
+                  const echo = creationEcho?.connectionId === connector.id ? creationEcho : null;
+                  const status = echo?.status || connector.status || "active";
                   const connectionTitle = connector.name || group.label;
-                  const statusLabel = formatStatusLabel(connector.status || "active");
-                  const statusTone = getAutomationStatusTone(connector.status);
+                  const statusLabel = formatStatusLabel(status);
+                  const statusTone = getAutomationStatusTone(status);
                   const lastRunLabel = formatRelativeTime(connector.last_run_at || connector.updated_at);
                   const targetPath = formatAutomationPathTrailLabel(row.scope);
+                  const highlighted = highlightedConnectionId === connector.id;
                   return (
                     <button
-                      className={`desktop-cloud-automation-connection-card ${selectedRowId === row.id ? "selected" : ""}`}
+                      className={`desktop-cloud-automation-connection-card ${selectedRowId === row.id ? "selected" : ""} ${highlighted ? "created" : ""}`.trim()}
                       key={row.id}
                       type="button"
                       title={`${connectionTitle} · ${getScopePathLabel(row.scope)}`}
@@ -273,16 +357,13 @@ function CloudAutomationAccessList({
                             <span className="desktop-cloud-automation-status-dot" aria-hidden="true" />
                             {statusLabel}
                           </span>
-                          <span>{connector.direction || "manual"}</span>
-                          <span>{lastRunLabel ? `Last run ${lastRunLabel}` : "Never run"}</span>
+                          <span>inbound</span>
+                          <span>{echo?.summary || (lastRunLabel ? `Last run ${lastRunLabel}` : "Never run")}</span>
                         </span>
-                        <span className="desktop-cloud-automation-manage">
-                          Manage
-                          <ChevronRight size={13} />
-                        </span>
+                        <span className="desktop-cloud-automation-manage">Manage<ChevronRight size={13} /></span>
                       </span>
-                      {connector.error_message && (
-                        <span className="desktop-cloud-automation-error">{connector.error_message}</span>
+                      {(echo?.error || connector.error_message) && (
+                        <span className="desktop-cloud-automation-error">{echo?.error || connector.error_message}</span>
                       )}
                     </button>
                   );
@@ -297,18 +378,10 @@ function CloudAutomationAccessList({
 }
 
 function getAutomationProviderGroups(rows: CloudAutomationRow[]) {
-  const groups = new Map<string, {
-    provider: string;
-    label: string;
-    rows: CloudAutomationRow[];
-  }>();
+  const groups = new Map<string, { provider: string; label: string; rows: CloudAutomationRow[] }>();
   for (const row of rows) {
     const provider = row.connector.provider;
-    const group = groups.get(provider) ?? {
-      provider,
-      label: formatProviderLabel(provider),
-      rows: [],
-    };
+    const group = groups.get(provider) ?? { provider, label: formatProviderLabel(provider), rows: [] };
     group.rows.push(row);
     groups.set(provider, group);
   }
@@ -317,18 +390,10 @@ function getAutomationProviderGroups(rows: CloudAutomationRow[]) {
 
 function getAutomationStatusTone(status: string | null | undefined) {
   const normalized = status?.toLowerCase() ?? "";
-  if (normalized === "active" || normalized === "ready" || normalized === "connected" || normalized === "success") {
-    return "success";
-  }
-  if (normalized === "syncing" || normalized === "processing" || normalized === "running") {
-    return "accent";
-  }
-  if (normalized === "paused" || normalized === "pending" || normalized === "warning" || normalized === "queued") {
-    return "warning";
-  }
-  if (normalized === "error" || normalized === "failed" || normalized === "blocked") {
-    return "danger";
-  }
+  if (["active", "ready", "connected", "success", "completed"].includes(normalized)) return "success";
+  if (["syncing", "processing", "running"].includes(normalized)) return "accent";
+  if (["paused", "pending", "warning", "queued"].includes(normalized)) return "warning";
+  if (["error", "failed", "blocked"].includes(normalized)) return "danger";
   return "muted";
 }
 
@@ -336,4 +401,8 @@ function formatAutomationPathTrailLabel(scope: DesktopCloudScope) {
   const path = getScopePathLabel(scope);
   if (path === "/") return "/";
   return `/ ${path.replace(/^\/+/, "").split("/").filter(Boolean).join(" / ")}`;
+}
+
+function isTerminalRunStatus(status: string) {
+  return ["success", "completed", "failed", "error", "cancelled", "canceled"].includes(status.toLowerCase());
 }

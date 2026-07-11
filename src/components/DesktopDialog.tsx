@@ -1,4 +1,13 @@
-import { useRef, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+
+const DIALOG_FOCUSABLE_SELECTOR = [
+  "button:not([disabled])",
+  "[href]",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
 
 export function DesktopDialogRoot({
   children,
@@ -12,6 +21,60 @@ export function DesktopDialogRoot({
   className?: string;
 }) {
   const pointerStartedOnBackdropRef = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const surface = root.querySelector<HTMLElement>("[role='dialog']");
+    const initialFocus = surface?.querySelector<HTMLElement>("[data-desktop-dialog-initial-focus='true'], [autofocus]")
+      ?? surface;
+    initialFocus?.focus({ preventScroll: true });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isTopmostDesktopDialog(root)) return;
+      if (event.key === "Escape") {
+        if (event.isComposing) return;
+        if (!onCloseRef.current) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !surface) return;
+      const focusable = getDialogFocusableElements(surface);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        surface.focus({ preventScroll: true });
+        return;
+      }
+      const active = document.activeElement;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!surface.contains(active)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus({ preventScroll: true });
+      } else if (active === surface) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus({ preventScroll: true });
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus({ preventScroll: true });
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, true);
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, []);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     pointerStartedOnBackdropRef.current = event.target === event.currentTarget;
@@ -27,7 +90,9 @@ export function DesktopDialogRoot({
 
   return (
     <div
+      ref={rootRef}
       className={`desktop-dialog-backdrop ${className}`.trim()}
+      data-desktop-dialog-root="true"
       role="presentation"
       onPointerDown={handlePointerDown}
       onClick={handleClick}
@@ -42,11 +107,13 @@ export function DesktopDialogSurface({
   className = "",
   width,
   style,
+  ariaLabel,
 }: {
   children: ReactNode;
   className?: string;
   width?: number | string;
   style?: CSSProperties;
+  ariaLabel?: string;
 }) {
   const surfaceStyle = {
     ...(width === undefined ? null : { "--desktop-dialog-width": typeof width === "number" ? `${width}px` : width }),
@@ -58,12 +125,24 @@ export function DesktopDialogSurface({
       className={`desktop-dialog-surface ${className}`.trim()}
       role="dialog"
       aria-modal="true"
+      aria-label={ariaLabel}
+      tabIndex={-1}
       style={surfaceStyle}
       onClick={(event) => event.stopPropagation()}
     >
       {children}
     </div>
   );
+}
+
+function getDialogFocusableElements(surface: HTMLElement) {
+  return Array.from(surface.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE_SELECTOR))
+    .filter((element) => element.tabIndex >= 0 && element.getAttribute("aria-hidden") !== "true" && !element.hidden);
+}
+
+function isTopmostDesktopDialog(root: HTMLElement) {
+  const dialogs = document.querySelectorAll<HTMLElement>("[data-desktop-dialog-root='true']");
+  return dialogs[dialogs.length - 1] === root;
 }
 
 export function DesktopDialogCloseButton({
