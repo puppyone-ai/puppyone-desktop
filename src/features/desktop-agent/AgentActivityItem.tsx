@@ -21,7 +21,7 @@ export function AgentActivityItem({ activity, onViewChanges }: AgentActivityItem
           ? Check
           : Circle;
   return (
-    <div className={`desktop-agent-activity is-${activity.status}`}>
+    <div className={`desktop-agent-activity is-${activity.status}${activity.kind === "file-change" && onViewChanges ? " has-review" : ""}`}>
       <button
         type="button"
         className="desktop-agent-activity-summary"
@@ -34,13 +34,13 @@ export function AgentActivityItem({ activity, onViewChanges }: AgentActivityItem
         <small>{activity.status}</small>
         {hasDetail && <ChevronDown size={13} className={expanded ? "is-expanded" : ""} />}
       </button>
+      {activity.kind === "file-change" && onViewChanges && (
+        <button type="button" className="desktop-agent-review-change" onClick={onViewChanges}>Review</button>
+      )}
       {expanded && (
         <div className="desktop-agent-activity-detail">
           {activity.output && <pre>{activity.output}</pre>}
           {!activity.output && <AgentActivityDetail kind={activity.kind} detail={activity.detail} />}
-          {activity.kind === "file-change" && onViewChanges && (
-            <button type="button" className="desktop-agent-view-changes" onClick={onViewChanges}>View changes</button>
-          )}
         </div>
       )}
     </div>

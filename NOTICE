@@ -37,6 +37,7 @@ third-party components include, but are not limited to:
   - Commander.js                       (MIT License)
   - Docker                             (Apache License 2.0)
   - E2B                                (Apache License 2.0)
+  - OpenCode (anomalyco/opencode)      (MIT License; see THIRD_PARTY_NOTICES.md)
 
 For the full text of each component's license, please refer to the
 upstream project. Inclusion of a component in this list does not imply

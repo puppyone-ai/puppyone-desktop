@@ -1,0 +1,72 @@
+{
+  "upstreamCommit": "9976269ab1accfc9f9dc98a4a688c516934de422",
+  "events": [
+    {
+      "directory": "/workspace",
+      "payload": {
+        "type": "message.updated",
+        "properties": {
+          "sessionID": "ses_1",
+          "info": { "id": "msg_assistant", "sessionID": "ses_1", "role": "assistant" }
+        }
+      }
+    },
+    {
+      "directory": "/workspace",
+      "payload": {
+        "type": "message.part.updated",
+        "properties": {
+          "sessionID": "ses_1",
+          "part": {
+            "id": "part_text",
+            "sessionID": "ses_1",
+            "messageID": "msg_assistant",
+            "type": "text",
+            "text": "Hello",
+            "time": { "start": 1, "end": 2 }
+          }
+        }
+      }
+    },
+    {
+      "directory": "/workspace",
+      "payload": {
+        "type": "permission.asked",
+        "properties": {
+          "id": "perm_1",
+          "sessionID": "ses_1",
+          "permission": "bash",
+          "patterns": ["npm test"],
+          "always": ["npm test"],
+          "metadata": { "command": "npm test", "cwd": "/workspace" },
+          "tool": { "messageID": "msg_assistant", "callID": "call_1" }
+        }
+      }
+    },
+    {
+      "directory": "/workspace",
+      "payload": {
+        "type": "question.asked",
+        "properties": {
+          "id": "question_1",
+          "sessionID": "ses_1",
+          "questions": [
+            {
+              "header": "Mode",
+              "question": "Which mode should be used?",
+              "options": [{ "label": "Build", "description": "Implement changes." }],
+              "custom": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "directory": "/workspace",
+      "payload": {
+        "type": "session.idle",
+        "properties": { "sessionID": "ses_1" }
+      }
+    }
+  ]
+}

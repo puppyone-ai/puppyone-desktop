@@ -1,15 +1,20 @@
 import os from "node:os";
 import { randomUUID } from "node:crypto";
-import { CodexAppServerAdapter, normalizeHistoricalThread } from "./adapters/codex-app-server-adapter.mjs";
 import { createAgentEventEnvelope, countTextBytes, isAgentEventEnvelope, redactSecretText } from "./agent-events.mjs";
+import {
+  createLegacyCodexRuntimeRegistry,
+  publicRuntimeReadiness,
+} from "./runtime/agent-runtime-registry.mjs";
+import { normalizeCapabilitySnapshot } from "./runtime/agent-runtime-port.mjs";
 
 const MAX_REPLAY_EVENTS = 1_000;
 const MAX_REPLAY_BYTES = 2 * 1024 * 1024;
-const PERSIST_DEBOUNCE_MS = 250;
+const PERSIST_DEBOUNCE_MS = 750;
 const INTERRUPT_CONFIRMATION_TIMEOUT_MS = 5_000;
 const MAX_TERMINAL_TURN_IDS = 128;
+const MAX_REFERENCE_SNAPSHOT_URL_LENGTH = Math.ceil(25 * 1024 * 1024 * 4 / 3) + 256;
 
-// Codex readiness/inspection outside a live session must never touch the
+// Runtime readiness/inspection outside a live session must never touch the
 // renderer-provided or process working directory; a fixed neutral directory
 // keeps discovery/account/model reads from depending on whatever workspace
 // happens to be active in this process.
@@ -17,92 +22,126 @@ const NEUTRAL_INSPECTION_ROOT = os.tmpdir();
 
 export function createAgentService({
   appVersion,
+  runtimeRegistry: suppliedRuntimeRegistry,
   discovery,
   persistence,
   adapterFactory,
   logger = console,
 }) {
+  const runtimeRegistry = suppliedRuntimeRegistry ?? createLegacyCodexRuntimeRegistry({
+    discovery,
+    adapterFactory,
+    appVersion,
+  });
   const sessions = new Map();
   const ownerCleanups = new Map();
   const sessionCreations = new Set();
-  let inspectionCache = null;
+  const inspectionCache = new Map();
 
-  async function discoverProviders(_sender, request = {}) {
-    const internalReadiness = await discovery.discover({ refresh: Boolean(request?.refresh) });
-    const readiness = publicReadiness(internalReadiness);
-    if (readiness.status !== "ready") {
-      inspectionCache = null;
-      return { readiness, account: null, models: [], capabilities: null, warnings: [] };
+  async function discoverProviders(_sender, request = {}, workspaceRoot = null) {
+    const catalog = await runtimeRegistry.discover({ refresh: Boolean(request?.refresh) });
+    if (request?.refresh) inspectionCache.clear();
+    const selected = selectRequestedRuntime(catalog, request?.runtimeId);
+    const runtimes = catalog.map((entry) => ({
+      descriptor: { ...entry.descriptor },
+      readiness: publicRuntimeReadiness(entry),
+    }));
+    if (!selected) {
+      return {
+        runtimes,
+        selectedRuntimeId: null,
+        readiness: unavailableReadiness("No Agent runtime is registered."),
+        account: null,
+        models: [],
+        modes: [],
+        commands: [],
+        capabilities: null,
+        warnings: [],
+      };
     }
-    const now = Date.now();
-    if (!request?.refresh && inspectionCache && now - inspectionCache.createdAt < 30_000) {
-      return inspectionCache.value;
+    const publicReadiness = publicRuntimeReadiness(selected);
+    if (publicReadiness.status !== "ready") {
+      return {
+        runtimes,
+        selectedRuntimeId: selected.descriptor.id,
+        readiness: publicReadiness,
+        account: null,
+        models: [],
+        modes: [],
+        commands: [],
+        capabilities: null,
+        runtime: { ...selected.descriptor },
+        warnings: [],
+      };
     }
-    const adapter = createAdapter({
-      internalReadiness,
-      workspaceRoot: NEUTRAL_INSPECTION_ROOT,
-      onEvent: () => {},
-      onExit: () => {},
-    });
     try {
-      const inspection = await adapter.inspect();
-      const value = { readiness: readinessWithAccountState(readiness, inspection.account), ...inspection };
-      inspectionCache = { createdAt: now, value };
-      return value;
+      const inspection = await inspectRuntime({
+        runtimeId: selected.descriptor.id,
+        readiness: selected.readiness,
+        workspaceRoot: workspaceRoot || NEUTRAL_INSPECTION_ROOT,
+        refresh: Boolean(request?.refresh),
+      });
+      return {
+        runtimes,
+        selectedRuntimeId: selected.descriptor.id,
+        readiness: readinessWithAccountState(publicReadiness, inspection.account, selected.descriptor.displayName),
+        ...inspection,
+      };
     } catch (error) {
       const message = redactSecretText(error instanceof Error ? error.message : String(error));
       return {
-        readiness: { ...readiness, status: "error", message },
+        runtimes,
+        selectedRuntimeId: selected.descriptor.id,
+        readiness: { ...publicReadiness, status: "error", message },
         account: null,
         models: [],
+        modes: [],
+        commands: [],
         capabilities: null,
+        runtime: { ...selected.descriptor },
         warnings: [message],
       };
-    } finally {
-      adapter.dispose();
     }
   }
 
-  async function listModels(_sender, request = {}, workspaceRoot = null) {
-    const internalReadiness = await discovery.discover({ refresh: false });
-    if (internalReadiness.status !== "ready") return [];
+  async function inspectRuntime({ runtimeId, readiness, workspaceRoot, refresh = false }) {
+    const key = `${runtimeId}\0${workspaceRoot}`;
     const now = Date.now();
-    if (!request?.refresh && inspectionCache && now - inspectionCache.createdAt < 30_000) {
-      return inspectionCache.value.models;
-    }
+    const cached = inspectionCache.get(key);
+    if (!refresh && cached && now - cached.createdAt < 30_000) return cached.value;
     const adapter = createAdapter({
-      internalReadiness,
-      workspaceRoot: workspaceRoot || NEUTRAL_INSPECTION_ROOT,
+      runtimeId,
+      internalReadiness: readiness,
+      workspaceRoot,
       onEvent: () => {},
       onExit: () => {},
     });
     try {
       const inspection = await adapter.inspect();
-      return inspection.models;
+      const value = {
+        account: inspection.account ?? null,
+        models: Array.isArray(inspection.models) ? inspection.models : [],
+        modes: Array.isArray(inspection.modes) ? inspection.modes : [],
+        commands: Array.isArray(inspection.commands) ? inspection.commands : [],
+        capabilities: normalizeCapabilitySnapshot(inspection.capabilities),
+        runtime: inspection.runtime ?? runtimeRegistry.require(runtimeId).descriptor,
+        warnings: Array.isArray(inspection.warnings) ? inspection.warnings : [],
+      };
+      inspectionCache.set(key, { createdAt: now, value });
+      return value;
     } finally {
-      adapter.dispose();
+      await adapter.dispose();
     }
   }
 
-  async function readAccount(_sender, request = {}, workspaceRoot = null) {
-    const internalReadiness = await discovery.discover({ refresh: false });
-    if (internalReadiness.status !== "ready") return null;
-    const now = Date.now();
-    if (!request?.refresh && inspectionCache && now - inspectionCache.createdAt < 30_000) {
-      return inspectionCache.value.account;
-    }
-    const adapter = createAdapter({
-      internalReadiness,
-      workspaceRoot: workspaceRoot || NEUTRAL_INSPECTION_ROOT,
-      onEvent: () => {},
-      onExit: () => {},
-    });
-    try {
-      const inspection = await adapter.inspect();
-      return inspection.account;
-    } finally {
-      adapter.dispose();
-    }
+  async function listModels(sender, request = {}, workspaceRoot = null) {
+    const inspection = await discoverProviders(sender, request, workspaceRoot);
+    return inspection.models;
+  }
+
+  async function readAccount(sender, request = {}, workspaceRoot = null) {
+    const inspection = await discoverProviders(sender, request, workspaceRoot);
+    return inspection.account;
   }
 
   async function createSession(sender, request, workspaceRoot) {
@@ -110,30 +149,35 @@ export function createAgentService({
     requireWorkspaceRoot(workspaceRoot);
     discardRetiredSessions(ownerId, workspaceRoot);
     if (findOwnedSession(ownerId, workspaceRoot, { connectedOnly: true })) {
-      throw new Error("This workspace already has an active Codex session.");
+      throw new Error("This workspace already has an active Agent session.");
     }
     const creationKey = `${ownerId}\0${workspaceRoot}`;
-    if (sessionCreations.has(creationKey)) throw new Error("A Codex session is already starting for this workspace.");
+    if (sessionCreations.has(creationKey)) throw new Error("An Agent session is already starting for this workspace.");
     sessionCreations.add(creationKey);
     try {
-      const internalReadiness = await discovery.discover({ refresh: false });
-      assertReady(internalReadiness);
+      const catalog = await runtimeRegistry.discover({ refresh: false });
+      const selected = selectRequestedRuntime(catalog, request?.runtimeId);
+      assertReady(selected?.readiness, selected?.descriptor?.displayName);
       const session = createSessionRecord({
         id: randomUUID(),
         sender,
         workspaceRoot,
+        runtimeId: selected.descriptor.id,
+        runtime: selected.descriptor,
         model: normalizeOptionalString(request?.model),
+        mode: normalizeOptionalString(request?.mode),
       });
       sessions.set(session.id, session);
       attachSenderCleanup(session);
       try {
-        session.adapter = createAdapterForSession(session, internalReadiness);
+        session.adapter = createAdapterForSession(session, selected.readiness);
         const inspection = await session.adapter.inspect();
         assertAuthenticated(inspection.account);
-        session.account = inspection.account;
-        session.models = inspection.models;
-        session.capabilities = inspection.capabilities;
-        const providerSession = await session.adapter.createSession({ model: session.selectedModel });
+        applyInspection(session, inspection);
+        const providerSession = await session.adapter.createSession({
+          model: session.selectedModel,
+          mode: session.selectedMode,
+        });
         applyProviderSession(session, providerSession);
         if (!session.lifecycleEventSeen) {
           emit(session, {
@@ -157,23 +201,35 @@ export function createAgentService({
     const ownerId = requireSenderId(sender);
     requireWorkspaceRoot(workspaceRoot);
     const connected = findOwnedSession(ownerId, workspaceRoot, { connectedOnly: true });
-    if (connected) return sessionSnapshot(connected);
+    const requestedSessionId = normalizeOptionalId(request?.sessionId);
+    if (connected && (!requestedSessionId || connected.id === requestedSessionId)) return sessionSnapshot(connected);
+    if (connected) await closeSessionRecord(connected, { persist: true });
     const creationKey = `${ownerId}\0${workspaceRoot}`;
-    if (sessionCreations.has(creationKey)) throw new Error("A Codex session is already starting for this workspace.");
+    if (sessionCreations.has(creationKey)) throw new Error("An Agent session is already starting for this workspace.");
     sessionCreations.add(creationKey);
     try {
-      const retired = takeRetiredSession(ownerId, workspaceRoot);
-      const persisted = retired ? persistedRecordFromSession(retired) : await persistence.findLatest(workspaceRoot);
+      const retired = takeRetiredSession(ownerId, workspaceRoot, requestedSessionId);
+      const persisted = retired
+        ? persistedRecordFromSession(retired)
+        : requestedSessionId
+          ? await persistence.findById(requestedSessionId, workspaceRoot)
+          : await persistence.findLatest(workspaceRoot, normalizeRuntimeId(request?.runtimeId));
       if (!persisted) return null;
       const existing = sessions.get(persisted.sessionId);
       if (existing) return sessionSnapshot(requireOwnedSession(sender, existing.id));
-      const internalReadiness = await discovery.discover({ refresh: false });
-      assertReady(internalReadiness);
+      const runtimeId = normalizeRuntimeId(persisted.runtimeId || persisted.provider || request?.runtimeId) || "codex";
+      const catalog = await runtimeRegistry.discover({ refresh: false });
+      const selected = runtimeRegistry.select(catalog, runtimeId);
+      if (!selected || selected.descriptor.id !== runtimeId) throw new Error(`Agent runtime ${runtimeId} is not registered.`);
+      assertReady(selected.readiness, selected.descriptor.displayName);
       const session = createSessionRecord({
         id: persisted.sessionId,
         sender,
         workspaceRoot,
+        runtimeId,
+        runtime: selected.descriptor,
         model: normalizeOptionalString(persisted.selectedModel),
+        mode: normalizeOptionalString(persisted.selectedMode),
         events: persisted.events,
         sequence: persisted.lastSequence,
         createdAt: persisted.createdAt,
@@ -184,20 +240,22 @@ export function createAgentService({
       sessions.set(session.id, session);
       attachSenderCleanup(session);
       try {
-        session.adapter = createAdapterForSession(session, internalReadiness);
+        session.adapter = createAdapterForSession(session, selected.readiness);
         const inspection = await session.adapter.inspect();
         assertAuthenticated(inspection.account);
-        session.account = inspection.account;
-        session.models = inspection.models;
-        session.capabilities = inspection.capabilities;
-        const providerSession = await session.adapter.resumeSession({
+        applyInspection(session, inspection);
+        const resumeRequest = {
           threadId: persisted.providerSessionId,
           model: session.selectedModel,
-        });
+        };
+        if (session.selectedMode) resumeRequest.mode = session.selectedMode;
+        const providerSession = await session.adapter.resumeSession(resumeRequest);
         applyProviderSession(session, providerSession);
         if (session.events.length === 0) {
-          const thread = await session.adapter.readThread();
-          for (const historicalEvent of normalizeHistoricalThread(thread)) emit(session, historicalEvent, { deliver: false });
+          const historicalEvents = typeof session.adapter.readHistory === "function"
+            ? await session.adapter.readHistory()
+            : [];
+          for (const historicalEvent of historicalEvents) emit(session, historicalEvent, { deliver: false });
         }
         if (!session.lifecycleEventSeen) {
           emit(session, {
@@ -210,26 +268,35 @@ export function createAgentService({
         return sessionSnapshot(session);
       } catch (error) {
         await closeSessionRecord(session, { persist: false });
-        throw new Error(`Unable to resume Codex session: ${redactSecretText(error instanceof Error ? error.message : String(error))}`);
+        throw new Error(`Unable to resume Agent session: ${redactSecretText(error instanceof Error ? error.message : String(error))}`);
       }
     } finally {
       sessionCreations.delete(creationKey);
     }
   }
 
-  async function startTurn(sender, request) {
+  async function startTurn(sender, request, workspaceRoot = null) {
     const session = requireOwnedSession(sender, request?.sessionId);
+    requireMatchingWorkspace(session, workspaceRoot);
     requireConnectedSession(session);
     if (session.activeTurnId || session.turnStarting || session.interruptingTurnId) {
-      throw new Error("A Codex turn is already running or stopping.");
+      throw new Error("An Agent turn is already running or stopping.");
     }
     const prompt = normalizePrompt(request?.prompt);
     const model = normalizeOptionalString(request?.model) || session.selectedModel;
+    const mode = normalizeOptionalString(request?.mode) || session.selectedMode;
     session.pendingPrompt = prompt;
     session.turnStarting = true;
     session.selectedModel = model;
+    session.selectedMode = mode;
     try {
-      const result = await session.adapter.startTurn({ prompt, model });
+      const result = await session.adapter.startTurn({
+        prompt,
+        model,
+        mode,
+        attachments: normalizeAuthorizedReferences(request?.attachments),
+        contextReferences: normalizeAuthorizedReferences(request?.contextReferences),
+      });
       const alreadyTerminal = session.terminalTurnIds.has(result.turnId);
       if (!alreadyTerminal) session.activeTurnId = result.turnId;
       if (!alreadyTerminal && session.lastStartedTurnId !== result.turnId) {
@@ -237,7 +304,7 @@ export function createAgentService({
           type: "turn.started",
           providerSessionId: session.providerSessionId,
           turnId: result.turnId,
-          payload: { status: "running", prompt, model },
+          payload: { status: "running", prompt, model, mode },
         });
       }
       session.pendingPrompt = null;
@@ -251,24 +318,26 @@ export function createAgentService({
     }
   }
 
-  async function steerTurn(sender, request) {
+  async function steerTurn(sender, request, workspaceRoot = null) {
     const session = requireOwnedSession(sender, request?.sessionId);
+    requireMatchingWorkspace(session, workspaceRoot);
     requireConnectedSession(session);
     const turnId = normalizeRequiredId(request?.turnId, "Turn id");
-    if (session.activeTurnId !== turnId) throw new Error("That Codex turn is no longer running.");
+    if (session.activeTurnId !== turnId) throw new Error("That Agent turn is no longer running.");
     if (!session.capabilities?.steer || typeof session.adapter.steerTurn !== "function") {
-      throw new Error("The active Codex session does not support steering a running turn.");
+      throw new Error("The active Agent runtime does not support steering a running turn.");
     }
     const message = normalizePrompt(request?.message);
     await session.adapter.steerTurn({ turnId, message });
     return { sessionId: session.id, turnId, steered: true };
   }
 
-  async function interruptTurn(sender, request) {
+  async function interruptTurn(sender, request, workspaceRoot = null) {
     const session = requireOwnedSession(sender, request?.sessionId);
+    requireMatchingWorkspace(session, workspaceRoot);
     requireConnectedSession(session);
     const turnId = normalizeRequiredId(request?.turnId, "Turn id");
-    if (session.activeTurnId !== turnId) throw new Error("That Codex turn is no longer running.");
+    if (session.activeTurnId !== turnId) throw new Error("That Agent turn is no longer running.");
     if (session.interruptingTurnId === turnId) {
       return { sessionId: session.id, turnId, interruptRequested: true };
     }
@@ -280,54 +349,82 @@ export function createAgentService({
       clearInterruptFallback(session);
       throw new Error(redactSecretText(error instanceof Error ? error.message : String(error)));
     }
-    // Do not discard an actionable approval until Codex has accepted the
+    // Do not discard an actionable approval until the runtime has accepted the
     // interrupt request. If the request itself fails, the live turn may still
     // be blocked on that approval and the user must retain a way to resolve it.
     failPendingApprovalsClosed(session, "turn-interrupted");
+    failPendingQuestionsClosed(session, "turn-interrupted");
     if (session.activeTurnId === turnId) scheduleInterruptFallback(session, turnId);
     return { sessionId: session.id, turnId, interruptRequested: true };
   }
 
-  function resolveQuestion(sender, request) {
-    requireOwnedSession(sender, request?.sessionId);
-    normalizeRequiredId(request?.turnId, "Turn id");
-    normalizeRequiredId(request?.requestId, "Question request id");
-    // Structured questions remain Proposed (capability-gated and unimplemented
-    // by every current adapter); every request fails closed rather than hang.
-    throw new Error("Structured questions are not supported by the active Codex session yet.");
+  async function resolveQuestion(sender, request, workspaceRoot = null) {
+    const session = requireOwnedSession(sender, request?.sessionId);
+    requireMatchingWorkspace(session, workspaceRoot);
+    const turnId = normalizeRequiredId(request?.turnId, "Turn id");
+    const requestId = normalizeRequiredId(request?.requestId, "Question request id");
+    const pending = session.pendingQuestions.get(requestId);
+    if (!pending) throw new Error("This question is stale or already resolved.");
+    if (pending.turnId !== turnId || pending.runtimeId !== session.runtimeId) {
+      throw new Error("Question correlation does not match the active request.");
+    }
+    if (!session.capabilities?.structuredQuestions || typeof session.adapter?.resolveQuestion !== "function") {
+      throw new Error("The active Agent runtime does not support structured questions.");
+    }
+    const answers = normalizeQuestionAnswers(request?.answers ?? request?.answer, pending.questions);
+    const rejected = request?.rejected === true || answers === null;
+    await session.adapter.resolveQuestion({ requestId, answers: answers ?? [], rejected, turnId });
+    if (session.pendingQuestions.has(requestId)) {
+      session.pendingQuestions.delete(requestId);
+      emit(session, {
+        type: "question.resolved",
+        providerSessionId: session.providerSessionId,
+        turnId,
+        itemId: pending.itemId,
+        payload: { requestId, resolution: rejected ? "rejected" : "answered" },
+      });
+    }
+    return { sessionId: session.id, requestId, resolution: rejected ? "rejected" : "answered" };
   }
 
-  function resolveApproval(sender, request) {
+  function resolveApproval(sender, request, workspaceRoot = null) {
     const session = requireOwnedSession(sender, request?.sessionId);
+    requireMatchingWorkspace(session, workspaceRoot);
     const requestId = normalizeRequiredId(request?.requestId, "Approval request id");
     const pending = session.pendingApprovals.get(requestId);
     if (!pending) throw new Error("This approval is stale or already resolved.");
     const turnId = normalizeRequiredId(request?.turnId, "Turn id");
-    if (pending.turnId !== turnId || pending.provider !== "codex") {
+    if (pending.turnId !== turnId || pending.runtimeId !== session.runtimeId) {
       throw new Error("Approval correlation does not match the active request.");
     }
     const decision = normalizeApprovalDecision(request?.decision);
-    session.adapter.resolveApproval({
+    const resolution = session.adapter.resolveApproval({
       requestId,
       decision,
       threadId: session.providerSessionId,
       turnId,
     });
-    if (session.pendingApprovals.has(requestId)) {
-      session.pendingApprovals.delete(requestId);
-      emit(session, {
-        type: "approval.resolved",
-        providerSessionId: session.providerSessionId,
-        turnId,
-        itemId: pending.itemId,
-        payload: { requestId, decision },
-      });
-    }
-    return { sessionId: session.id, requestId, decision };
+    const finalize = () => {
+      if (session.pendingApprovals.has(requestId)) {
+        session.pendingApprovals.delete(requestId);
+        emit(session, {
+          type: "approval.resolved",
+          providerSessionId: session.providerSessionId,
+          turnId,
+          itemId: pending.itemId,
+          payload: { requestId, decision },
+        });
+      }
+      return { sessionId: session.id, requestId, decision };
+    };
+    return resolution && typeof resolution.then === "function"
+      ? resolution.then(finalize)
+      : finalize();
   }
 
-  function replay(sender, request) {
+  function replay(sender, request, workspaceRoot = null) {
     const session = requireOwnedSession(sender, request?.sessionId);
+    requireMatchingWorkspace(session, workspaceRoot);
     const afterSequence = normalizeSequence(request?.afterSequence);
     const firstSequence = session.events[0]?.sequence ?? session.sequence + 1;
     return {
@@ -335,6 +432,9 @@ export function createAgentService({
       account: session.account,
       models: session.models,
       capabilities: session.capabilities,
+      modes: session.modes,
+      commands: session.commands,
+      runtime: session.runtime,
       events: session.events.filter((event) => event.sequence > afterSequence),
       partial: afterSequence > 0 && afterSequence < firstSequence - 1,
       firstAvailableSequence: firstSequence,
@@ -342,8 +442,123 @@ export function createAgentService({
     };
   }
 
-  async function closeSession(sender, request) {
+  async function listSessions(_sender, request, workspaceRoot) {
+    requireWorkspaceRoot(workspaceRoot);
+    const runtimeId = normalizeRuntimeId(request?.runtimeId);
+    const records = await persistence.list(workspaceRoot, { runtimeId, includeArchived: Boolean(request?.includeArchived) });
+    return records.map(publicSessionRecord);
+  }
+
+  async function forkSession(sender, request, workspaceRoot = null) {
+    const source = requireOwnedSession(sender, request?.sessionId);
+    requireMatchingWorkspace(source, workspaceRoot);
+    requireConnectedSession(source);
+    if (source.activeTurnId) throw new Error("Stop the active turn before forking this session.");
+    if (!source.capabilities?.fork || typeof source.adapter?.forkSession !== "function") {
+      throw new Error("The active Agent runtime does not support session forking.");
+    }
+    const forked = await source.adapter.forkSession({ messageId: normalizeOptionalId(request?.messageId) });
+    await persistNow(source);
+    await closeSessionRecord(source, { persist: true });
+    const catalog = await runtimeRegistry.discover({ refresh: false });
+    const selected = runtimeRegistry.select(catalog, source.runtimeId);
+    assertReady(selected?.readiness, selected?.descriptor?.displayName);
+    const session = createSessionRecord({
+      id: randomUUID(),
+      sender,
+      workspaceRoot: source.workspaceRoot,
+      runtimeId: source.runtimeId,
+      runtime: source.runtime,
+      model: source.selectedModel,
+      mode: source.selectedMode,
+      title: `${source.title} (fork)`,
+    });
+    sessions.set(session.id, session);
+    attachSenderCleanup(session);
+    try {
+      session.adapter = createAdapterForSession(session, selected.readiness);
+      const inspection = await session.adapter.inspect();
+      applyInspection(session, inspection);
+      const resumed = await session.adapter.resumeSession({
+        threadId: forked.providerSessionId,
+        model: session.selectedModel,
+        mode: session.selectedMode,
+      });
+      applyProviderSession(session, resumed);
+      const historicalEvents = typeof session.adapter.readHistory === "function" ? await session.adapter.readHistory() : [];
+      for (const historicalEvent of historicalEvents) emit(session, historicalEvent, { deliver: false });
+      emit(session, {
+        type: "session.resumed",
+        providerSessionId: session.providerSessionId,
+        payload: { ...sessionMetadata(session), forkedFrom: source.id },
+      });
+      await persistNow(session);
+      return sessionSnapshot(session);
+    } catch (error) {
+      await closeSessionRecord(session, { persist: false });
+      throw error;
+    }
+  }
+
+  async function archiveSession(sender, request, workspaceRoot) {
+    requireWorkspaceRoot(workspaceRoot);
+    const sessionId = normalizeRequiredId(request?.sessionId, "Agent session id");
+    const active = sessions.get(sessionId);
+    if (active) {
+      requireOwnedSession(sender, sessionId);
+      requireMatchingWorkspace(active, workspaceRoot);
+      if (active.activeTurnId) throw new Error("Stop the active turn before archiving this session.");
+      if (request?.archiveNative && typeof active.adapter?.archiveNativeSession === "function") {
+        await active.adapter.archiveNativeSession({ threadId: active.providerSessionId });
+      }
+      await closeSessionRecord(active, { persist: true });
+    } else {
+      await requirePersistedSessionInWorkspace(sessionId, workspaceRoot);
+    }
+    await persistence.archive(sessionId, new Date().toISOString());
+    return { sessionId, archived: true };
+  }
+
+  async function deleteSession(sender, request, workspaceRoot) {
+    requireWorkspaceRoot(workspaceRoot);
+    const sessionId = normalizeRequiredId(request?.sessionId, "Agent session id");
+    const active = sessions.get(sessionId);
+    if (active) {
+      requireOwnedSession(sender, sessionId);
+      requireMatchingWorkspace(active, workspaceRoot);
+      if (active.activeTurnId) throw new Error("Stop the active turn before deleting this session.");
+      if (request?.deleteNative && typeof active.adapter?.deleteNativeSession === "function") {
+        await active.adapter.deleteNativeSession({ threadId: active.providerSessionId });
+      }
+      await closeSessionRecord(active, { persist: false });
+    } else {
+      await requirePersistedSessionInWorkspace(sessionId, workspaceRoot);
+    }
+    await persistence.remove(sessionId);
+    return { sessionId, deleted: true, nativeDeleted: Boolean(request?.deleteNative && active) };
+  }
+
+  async function compactSession(sender, request, workspaceRoot = null) {
     const session = requireOwnedSession(sender, request?.sessionId);
+    requireMatchingWorkspace(session, workspaceRoot);
+    requireConnectedSession(session);
+    if (session.activeTurnId) throw new Error("Stop the active turn before compacting this session.");
+    if (!session.capabilities?.compaction || typeof session.adapter?.compactSession !== "function") {
+      throw new Error("The active Agent runtime does not support session compaction.");
+    }
+    await session.adapter.compactSession();
+    return { sessionId: session.id, compacted: true };
+  }
+
+  async function requirePersistedSessionInWorkspace(sessionId, workspaceRoot) {
+    const persisted = await persistence.findById(sessionId, workspaceRoot);
+    if (!persisted) throw new Error("Agent session was not found in the assigned workspace.");
+    return persisted;
+  }
+
+  async function closeSession(sender, request, workspaceRoot = null) {
+    const session = requireOwnedSession(sender, request?.sessionId);
+    requireMatchingWorkspace(session, workspaceRoot);
     const removePersistence = Boolean(request?.removePersistence);
     await closeSessionRecord(session, { persist: !removePersistence, removePersistence });
     return { sessionId: session.id, closed: true };
@@ -355,9 +570,10 @@ export function createAgentService({
       .map((session) => closeSessionRecord(session, { persist: true })));
   }
 
-  function closeAll() {
-    return Promise.all(Array.from(sessions.values())
+  async function closeAll() {
+    await Promise.all(Array.from(sessions.values())
       .map((session) => closeSessionRecord(session, { persist: true })));
+    await runtimeRegistry.dispose?.();
   }
 
   function getSessionCount() {
@@ -368,8 +584,22 @@ export function createAgentService({
     return sessions.size;
   }
 
+  function hasRuntimeResources() {
+    return runtimeRegistry.hasActiveResources?.() === true;
+  }
+
+  function selectRequestedRuntime(catalog, value) {
+    const requested = normalizeRuntimeId(value);
+    if (typeof value === "string" && value.trim() && !requested) throw new Error("Agent runtime id is invalid.");
+    if (requested && !catalog.some((entry) => entry.descriptor.id === requested)) {
+      throw new Error(`Agent runtime ${requested} is not registered.`);
+    }
+    return runtimeRegistry.select(catalog, requested);
+  }
+
   function createAdapterForSession(session, internalReadiness) {
     return createAdapter({
+      runtimeId: session.runtimeId,
       internalReadiness,
       workspaceRoot: session.workspaceRoot,
       onEvent: (event) => handleAdapterEvent(session, event),
@@ -377,16 +607,13 @@ export function createAgentService({
     });
   }
 
-  function createAdapter({ internalReadiness, workspaceRoot, onEvent, onExit }) {
-    const options = {
-      executablePath: internalReadiness.executablePath,
-      environment: internalReadiness.environment,
+  function createAdapter({ runtimeId, internalReadiness, workspaceRoot, onEvent, onExit }) {
+    return runtimeRegistry.createAdapter(runtimeId, {
+      readiness: { ...internalReadiness, workspaceRoot },
       workspaceRoot,
-      appVersion,
       onEvent,
       onExit,
-    };
-    return adapterFactory ? adapterFactory(options) : new CodexAppServerAdapter(options);
+    });
   }
 
   function handleAdapterEvent(session, adapterEvent) {
@@ -397,6 +624,9 @@ export function createAgentService({
       session.lifecycleEventSeen = true;
       if (event.providerSessionId) session.providerSessionId = event.providerSessionId;
       if (typeof event.payload?.title === "string") session.title = event.payload.title;
+    }
+    if (event.type === "session.updated" && typeof event.payload?.title === "string") {
+      session.title = event.payload.title.slice(0, 200);
     }
     if (event.type === "turn.started") {
       session.activeTurnId = event.turnId;
@@ -409,6 +639,7 @@ export function createAgentService({
     if (["turn.completed", "turn.failed", "turn.interrupted"].includes(event.type)) {
       rememberTerminalTurn(session, event.turnId);
       failPendingApprovalsForTurn(session, event.turnId, "turn-ended");
+      failPendingQuestionsForTurn(session, event.turnId, "turn-ended");
       if (session.turnStarting || !event.turnId || session.activeTurnId === event.turnId) {
         session.activeTurnId = null;
         session.interruptingTurnId = null;
@@ -419,11 +650,12 @@ export function createAgentService({
     if (event.type === "approval.requested") {
       const requestId = event.payload?.requestId;
       if (typeof requestId !== "string") return;
+      if (session.pendingApprovals.has(requestId)) return;
       session.pendingApprovals.set(requestId, {
         requestId,
         turnId: event.turnId,
         itemId: event.itemId,
-        provider: "codex",
+        runtimeId: session.runtimeId,
       });
     }
     if (event.type === "approval.resolved") {
@@ -432,14 +664,30 @@ export function createAgentService({
       // failPendingApprovalsClosed (interrupt/close) for the same request.
       if (!session.pendingApprovals.delete(requestId)) return;
     }
+    if (event.type === "question.requested") {
+      const requestId = event.payload?.requestId;
+      if (typeof requestId !== "string" || !event.turnId) return;
+      if (session.pendingQuestions.has(requestId)) return;
+      session.pendingQuestions.set(requestId, {
+        requestId,
+        turnId: event.turnId,
+        itemId: event.itemId,
+        runtimeId: session.runtimeId,
+        questions: Array.isArray(event.payload?.questions) ? event.payload.questions : [],
+      });
+    }
+    if (event.type === "question.resolved") {
+      const requestId = event.payload?.requestId;
+      if (!session.pendingQuestions.delete(requestId)) return;
+    }
     emit(session, event);
   }
 
   function handleAdapterExit(session, info) {
-    if (sessions.get(session.id) !== session || session.closing || info?.expected || !session.providerSessionId) return;
+    if (sessions.get(session.id) !== session || session.closing || session.providerExited || info?.expected || !session.providerSessionId) return;
     retireProviderSession(session, {
-      turnMessage: "Codex app-server exited before the turn completed.",
-      providerMessage: "Codex app-server exited. Files already changed on disk were not reverted.",
+      turnMessage: `${session.runtime?.displayName || "Agent runtime"} exited before the turn completed.`,
+      providerMessage: `${session.runtime?.displayName || "Agent runtime"} exited. Files already changed on disk were not reverted.`,
       diagnostic: info?.diagnostics || info?.error || "",
     });
   }
@@ -473,16 +721,51 @@ export function createAgentService({
     }
   }
 
+  function failPendingQuestionsClosed(session, reason) {
+    if (session.pendingQuestions.size === 0) return;
+    for (const pending of Array.from(session.pendingQuestions.values())) {
+      session.pendingQuestions.delete(pending.requestId);
+      emit(session, {
+        type: "question.resolved",
+        providerSessionId: session.providerSessionId,
+        turnId: pending.turnId,
+        itemId: pending.itemId,
+        payload: { requestId: pending.requestId, resolution: "rejected", reason },
+      });
+    }
+  }
+
+  function failPendingQuestionsForTurn(session, turnId, reason) {
+    if (!turnId || session.pendingQuestions.size === 0) return;
+    for (const pending of Array.from(session.pendingQuestions.values())) {
+      if (pending.turnId !== turnId) continue;
+      session.pendingQuestions.delete(pending.requestId);
+      emit(session, {
+        type: "question.resolved",
+        providerSessionId: session.providerSessionId,
+        turnId: pending.turnId,
+        itemId: pending.itemId,
+        payload: { requestId: pending.requestId, resolution: "rejected", reason },
+      });
+    }
+  }
+
   function scheduleInterruptFallback(session, turnId) {
     clearInterruptFallback(session);
     session.interruptFallbackTimer = setTimeout(() => {
       session.interruptFallbackTimer = null;
       if (sessions.get(session.id) !== session || session.closing) return;
       if (session.activeTurnId !== turnId) return;
-      session.adapter?.dispose?.("Codex did not confirm the interrupt in time.");
+      const runtimeName = session.runtime?.displayName || "Agent runtime";
+      const forcedExit = typeof session.adapter?.forceTerminate === "function"
+        ? session.adapter.forceTerminate(`${runtimeName} did not confirm the interrupt in time.`)
+        : session.adapter?.dispose?.(`${runtimeName} did not confirm the interrupt in time.`);
+      void Promise.resolve(forcedExit).catch((error) => {
+        logger.warn?.("Unable to force-stop unresponsive Agent runtime:", redactSecretText(error?.message || String(error)));
+      });
       retireProviderSession(session, {
-        turnMessage: "Codex did not confirm the interrupt, so PuppyOne stopped the provider process. Files already changed were not reverted.",
-        providerMessage: "Codex was stopped because it did not confirm the interrupt. Refresh to resume the saved session.",
+        turnMessage: `${runtimeName} did not confirm the interrupt, so PuppyOne stopped the runtime process. Files already changed were not reverted.`,
+        providerMessage: `${runtimeName} was stopped because it did not confirm the interrupt. Refresh to resume the saved session.`,
         diagnostic: "Interrupt confirmation timed out.",
       });
     }, INTERRUPT_CONFIRMATION_TIMEOUT_MS);
@@ -496,9 +779,10 @@ export function createAgentService({
   }
 
   function retireProviderSession(session, { turnMessage, providerMessage, diagnostic }) {
-    if (sessions.get(session.id) !== session || session.closing) return;
+    if (sessions.get(session.id) !== session || session.closing || session.providerExited) return;
     clearInterruptFallback(session);
     failPendingApprovalsClosed(session, "provider-exited");
+    failPendingQuestionsClosed(session, "provider-exited");
     const activeTurnId = session.activeTurnId;
     session.activeTurnId = null;
     session.interruptingTurnId = null;
@@ -525,6 +809,9 @@ export function createAgentService({
     clearTimeout(session.persistTimer);
     session.persistTimer = null;
     void persistNow(session);
+    void Promise.resolve(session.adapter?.dispose()).catch((error) => {
+      logger.warn?.("Unable to release exited Agent adapter:", redactSecretText(error?.message || String(error)));
+    });
     session.adapter = null;
     session.providerExited = true;
   }
@@ -542,6 +829,7 @@ export function createAgentService({
     const envelope = createAgentEventEnvelope({
       sequence: ++session.sequence,
       sessionId: session.id,
+      runtimeId: session.runtimeId,
       providerSessionId: adapterEvent.providerSessionId ?? session.providerSessionId,
       turnId: adapterEvent.turnId ?? null,
       itemId: adapterEvent.itemId ?? null,
@@ -576,8 +864,9 @@ export function createAgentService({
     session.persistTimer = null;
     clearInterruptFallback(session);
     failPendingApprovalsClosed(session, "session-closed");
+    failPendingQuestionsClosed(session, "session-closed");
     try {
-      session.adapter?.dispose();
+      await session.adapter?.dispose();
     } finally {
       if (sessions.get(session.id) === session) {
         session.closing = false;
@@ -610,12 +899,15 @@ export function createAgentService({
     return persistence.save({
       sessionId: session.id,
       workspaceRoot: session.workspaceRoot,
+      runtimeId: session.runtimeId,
+      runtime: session.runtime,
       providerSessionId: session.providerSessionId,
       title: session.title,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       terminalState: session.terminalState,
       selectedModel: session.selectedModel,
+      selectedMode: session.selectedMode,
       lastSequence: session.sequence,
       events: session.events,
     });
@@ -644,13 +936,14 @@ export function createAgentService({
     ownerCleanups.delete(session.ownerId);
   }
 
-  function takeRetiredSession(ownerId, workspaceRoot) {
+  function takeRetiredSession(ownerId, workspaceRoot, requestedSessionId = null) {
     const retired = Array.from(sessions.values())
       .filter((session) => (
         session.ownerId === ownerId
         && session.workspaceRoot === workspaceRoot
         && session.providerExited
         && session.providerSessionId
+        && (!requestedSessionId || session.id === requestedSessionId)
       ))
       .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)))[0] ?? null;
     if (!retired) return null;
@@ -691,7 +984,19 @@ export function createAgentService({
     return session;
   }
 
-  function createSessionRecord({ id, sender, workspaceRoot, model, events = [], sequence = 0, createdAt, title }) {
+  function createSessionRecord({
+    id,
+    sender,
+    workspaceRoot,
+    runtimeId,
+    runtime,
+    model,
+    mode,
+    events = [],
+    sequence = 0,
+    createdAt,
+    title,
+  }) {
     const restoredEvents = Array.isArray(events) ? events.filter(isAgentEventEnvelope).slice(-MAX_REPLAY_EVENTS) : [];
     const highestSequence = restoredEvents.reduce((highest, event) => Math.max(highest, event.sequence), 0);
     return {
@@ -699,6 +1004,8 @@ export function createAgentService({
       ownerId: requireSenderId(sender),
       sender,
       workspaceRoot,
+      runtimeId,
+      runtime: runtime ? { ...runtime } : { id: runtimeId, displayName: runtimeId },
       providerSessionId: null,
       adapter: null,
       activeTurnId: null,
@@ -708,14 +1015,18 @@ export function createAgentService({
       interruptingTurnId: null,
       terminalTurnIds: new Set(),
       pendingApprovals: new Map(),
+      pendingQuestions: new Map(),
       sequence: Math.max(normalizeSequence(sequence), highestSequence),
       events: restoredEvents,
       replayBytes: restoredEvents.reduce((total, event) => total + countTextBytes(event), 0),
       account: null,
       models: [],
+      modes: [],
+      commands: [],
       capabilities: null,
       selectedModel: model,
-      title: title || "Codex session",
+      selectedMode: mode,
+      title: title || `${runtime?.displayName || "Agent"} session`,
       createdAt: createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       terminalState: "idle",
@@ -739,17 +1050,23 @@ export function createAgentService({
     resolveApproval,
     resolveQuestion,
     replay,
+    listSessions,
+    forkSession,
+    archiveSession,
+    deleteSession,
+    compactSession,
     closeSession,
     closeSessionsForWindow,
     closeAll,
     getSessionCount,
     getRetainedSessionCount,
+    hasRuntimeResources,
   };
 }
 
 function requireConnectedSession(session) {
   if (session.providerExited || !session.adapter) {
-    throw new Error("Codex is disconnected. Refresh to resume the saved session.");
+    throw new Error(`${session.runtime?.displayName || "Agent runtime"} is disconnected. Refresh to resume the saved session.`);
   }
 }
 
@@ -757,13 +1074,16 @@ function persistedRecordFromSession(session) {
   return {
     sessionId: session.id,
     workspaceRoot: session.workspaceRoot,
-    provider: "codex",
+    runtimeId: session.runtimeId,
+    runtime: session.runtime,
+    provider: session.runtimeId,
     providerSessionId: session.providerSessionId,
     title: session.title,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     terminalState: session.terminalState,
     selectedModel: session.selectedModel,
+    selectedMode: session.selectedMode,
     lastSequence: session.sequence,
     events: session.events,
   };
@@ -781,14 +1101,53 @@ function applyProviderSession(session, providerSession) {
   session.providerSessionId = providerSession.providerSessionId;
   session.title = providerSession.title || session.title;
   session.selectedModel = providerSession.model || session.selectedModel;
+  session.selectedMode = providerSession.mode || session.selectedMode;
   session.createdAt = providerSession.createdAt || session.createdAt;
   session.updatedAt = providerSession.updatedAt || new Date().toISOString();
+}
+
+function applyInspection(session, inspection) {
+  session.account = inspection.account ?? null;
+  session.models = Array.isArray(inspection.models) ? inspection.models : [];
+  session.modes = Array.isArray(inspection.modes) ? inspection.modes : [];
+  session.commands = Array.isArray(inspection.commands) ? inspection.commands : [];
+  session.capabilities = normalizeCapabilitySnapshot(inspection.capabilities);
+  if (inspection.runtime) session.runtime = { ...session.runtime, ...inspection.runtime };
+  if (!session.selectedModel) {
+    session.selectedModel = session.models.find((model) => model.isDefault)?.model ?? session.models[0]?.model ?? null;
+  }
+  if (!session.selectedMode) {
+    session.selectedMode = session.modes.find((mode) => mode.isDefault)?.id ?? session.modes[0]?.id ?? null;
+  }
+}
+
+function publicSessionRecord(record) {
+  const runtimeId = record.runtimeId || record.provider || "codex";
+  return {
+    id: record.sessionId,
+    runtimeId,
+    provider: runtimeId,
+    runtime: record.runtime ?? null,
+    providerSessionId: record.providerSessionId ?? null,
+    workspaceRoot: record.workspaceRoot,
+    title: record.title || "Agent session",
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    archivedAt: record.archivedAt ?? null,
+    terminalState: record.terminalState || "idle",
+    selectedModel: record.selectedModel ?? null,
+    selectedMode: record.selectedMode ?? null,
+    lastSequence: normalizeSequence(record.lastSequence),
+    partial: Boolean(record.partial),
+  };
 }
 
 function sessionMetadata(session) {
   return {
     id: session.id,
-    provider: "codex",
+    runtimeId: session.runtimeId,
+    runtime: session.runtime,
+    provider: session.runtimeId,
     providerSessionId: session.providerSessionId,
     workspaceRoot: session.workspaceRoot,
     title: session.title,
@@ -796,6 +1155,7 @@ function sessionMetadata(session) {
     updatedAt: session.updatedAt,
     terminalState: session.terminalState,
     selectedModel: session.selectedModel,
+    selectedMode: session.selectedMode,
     activeTurnId: session.activeTurnId,
     lastSequence: session.sequence,
   };
@@ -806,7 +1166,10 @@ function sessionSnapshot(session) {
     session: sessionMetadata(session),
     account: session.account,
     models: session.models,
+    modes: session.modes,
+    commands: session.commands,
     capabilities: session.capabilities,
+    runtime: session.runtime,
     events: session.events,
     partial: Boolean(session.events[0] && session.events[0].sequence > 1),
     firstAvailableSequence: session.events[0]?.sequence ?? session.sequence + 1,
@@ -814,45 +1177,51 @@ function sessionSnapshot(session) {
   };
 }
 
-function publicReadiness(readiness) {
-  return {
-    provider: "codex",
-    status: readiness.status,
-    version: readiness.version ?? null,
-    minimumVersion: readiness.minimumVersion ?? null,
-    message: readiness.message || "",
-    ...(readiness.diagnostic ? { diagnostic: redactSecretText(readiness.diagnostic) } : {}),
-  };
-}
-
-function readinessWithAccountState(readiness, accountState) {
-  if (readiness.status === "ready" && accountState?.requiresOpenaiAuth && !accountState?.account) {
+function readinessWithAccountState(readiness, accountState, runtimeName = "Agent runtime") {
+  if (readiness.status === "ready" && requiresRuntimeSetup(accountState)) {
     return {
       ...readiness,
       status: "installed-not-authenticated",
-      message: readiness.message && readiness.message !== "Codex is ready."
+      message: readiness.message && readiness.message !== `${runtimeName} is ready.`
         ? readiness.message
-        : "Codex is installed but not signed in. Run `codex login` in a terminal, then refresh.",
+        : `${runtimeName} is installed but not signed in. Complete setup in a terminal, then refresh.`,
     };
   }
   return readiness;
 }
 
-function assertReady(readiness) {
+function assertReady(readiness, runtimeName = "Agent runtime") {
   if (readiness?.status !== "ready" || !readiness.executablePath) {
-    throw new Error(readiness?.message || "Codex is not ready.");
+    throw new Error(readiness?.message || `${runtimeName} is not ready.`);
   }
 }
 
 function assertAuthenticated(accountState) {
-  if (accountState?.requiresOpenaiAuth && !accountState?.account) {
-    throw new Error("Codex setup is required. Run `codex login` in a terminal, then refresh.");
+  if (requiresRuntimeSetup(accountState)) {
+    throw new Error("Agent runtime setup is required. Complete authentication in a terminal, then refresh.");
   }
+}
+
+function requiresRuntimeSetup(accountState) {
+  return Boolean(
+    !accountState?.account
+    && (accountState?.requiresOpenaiAuth || accountState?.requiresRuntimeSetup),
+  );
 }
 
 function requireWorkspaceRoot(value) {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error("No authorized local workspace is assigned to this Agent session.");
+  }
+}
+
+function requireMatchingWorkspace(session, workspaceRoot) {
+  // Direct service-level callers used by tests and legacy embedding may omit
+  // this proof. Trusted IPC always supplies the canonical authorized root.
+  if (workspaceRoot === null || workspaceRoot === undefined) return;
+  requireWorkspaceRoot(workspaceRoot);
+  if (session.workspaceRoot !== workspaceRoot) {
+    throw new Error("Agent session does not belong to the assigned workspace.");
   }
 }
 
@@ -862,8 +1231,8 @@ function requireSenderId(sender) {
 }
 
 function normalizePrompt(value) {
-  if (typeof value !== "string" || value.trim().length === 0) throw new Error("Enter a message for Codex.");
-  if (value.length > 128 * 1024) throw new Error("The Codex message is too large.");
+  if (typeof value !== "string" || value.trim().length === 0) throw new Error("Enter a message for the Agent.");
+  if (value.length > 128 * 1024) throw new Error("The Agent message is too large.");
   return value;
 }
 
@@ -874,6 +1243,66 @@ function normalizeRequiredId(value, label) {
 
 function normalizeOptionalString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim().slice(0, 200) : null;
+}
+
+function normalizeRuntimeId(value) {
+  return typeof value === "string" && /^[a-z][a-z0-9-]{1,39}$/.test(value) ? value : null;
+}
+
+function normalizeOptionalId(value) {
+  return typeof value === "string" && /^[A-Za-z0-9:_-]{1,160}$/.test(value) ? value : null;
+}
+
+function normalizeAuthorizedReferences(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 32).flatMap((entry) => {
+    if (!entry || typeof entry !== "object" || entry.authorized !== true) return [];
+    if (typeof entry.path !== "string" || entry.path.length === 0 || entry.path.length > 4_096) return [];
+    return [{
+      path: entry.path,
+      name: normalizeOptionalString(entry.name),
+      mime: normalizeOptionalString(entry.mime),
+      ...(isBoundedDataUrl(entry.snapshotUrl) ? { snapshotUrl: entry.snapshotUrl } : {}),
+    }];
+  });
+}
+
+function isBoundedDataUrl(value) {
+  if (typeof value !== "string" || value.length > MAX_REFERENCE_SNAPSHOT_URL_LENGTH) return false;
+  const marker = value.indexOf(";base64,");
+  return value.startsWith("data:") && marker > 5 && marker < 200 && !value.slice(0, marker).includes("\n");
+}
+
+function normalizeQuestionAnswers(value, questions) {
+  if (value === null || value === undefined) return null;
+  let rows;
+  if (typeof value === "string") rows = [[value]];
+  else if (Array.isArray(value) && value.every(Array.isArray)) rows = value;
+  else if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+    rows = Array.isArray(questions) && questions.length > 1
+      ? value.map((entry) => [entry])
+      : [value];
+  } else {
+    throw new Error("Question answers are invalid.");
+  }
+  return rows.slice(0, 8).map((row) => row
+    .filter((entry) => typeof entry === "string")
+    .map((entry) => entry.trim().slice(0, 4_000))
+    .filter(Boolean)
+    .slice(0, 20));
+}
+
+function unavailableReadiness(message) {
+  return {
+    runtimeId: "unknown",
+    provider: "unknown",
+    status: "error",
+    version: null,
+    minimumVersion: null,
+    message,
+    source: "missing",
+    compatibility: "unavailable",
+  };
 }
 
 function normalizeApprovalDecision(value) {

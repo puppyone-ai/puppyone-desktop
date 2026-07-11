@@ -60,6 +60,31 @@ describe("Desktop Agent persistence", () => {
     await expect(persistence.readAll()).resolves.toEqual([]);
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/safety limit/i));
   });
+
+  it("lists multiple runtime-neutral sessions and supports archive/delete without deleting New Chat history", async () => {
+    const userData = await fs.promises.mkdtemp(path.join(os.tmpdir(), "puppyone-agent-persistence-"));
+    temporaryDirectories.push(userData);
+    const persistence = createAgentPersistence({ app: { getPath: () => userData }, logger: { warn: () => {} } });
+    for (const [sessionId, runtimeId, second] of [["session-1", "codex", 1], ["session-2", "opencode", 2]]) {
+      await persistence.save({
+        sessionId,
+        workspaceRoot: "/workspace",
+        runtimeId,
+        providerSessionId: `native-${sessionId}`,
+        title: sessionId,
+        createdAt: `2026-01-01T00:00:0${second}.000Z`,
+        updatedAt: `2026-01-01T00:00:0${second}.000Z`,
+        lastSequence: 0,
+        events: [],
+      });
+    }
+    expect((await persistence.list("/workspace")).map((entry) => entry.sessionId)).toEqual(["session-2", "session-1"]);
+    await persistence.archive("session-2", "2026-01-01T00:00:03.000Z");
+    expect((await persistence.list("/workspace")).map((entry) => entry.sessionId)).toEqual(["session-1"]);
+    expect((await persistence.list("/workspace", { includeArchived: true })).map((entry) => entry.sessionId)).toContain("session-2");
+    await persistence.remove("session-1");
+    await expect(persistence.findById("session-1", "/workspace")).resolves.toBeNull();
+  });
 });
 
 function event(sequence, type, payload) {

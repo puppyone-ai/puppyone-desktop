@@ -15,7 +15,7 @@ import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
 import { createAgentPersistence } from "./main/agent/agent-persistence.mjs";
 import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
 import { createAgentService } from "./main/agent/agent-service.mjs";
-import { createCodexDiscovery } from "./main/agent/provider-discovery.mjs";
+import { createDefaultAgentRuntimeHost } from "./main/agent/runtime/agent-runtime-registry.mjs";
 import {
   getCloudApiErrorMessage,
   requestCloudApi,
@@ -129,9 +129,15 @@ const terminalService = createTerminalService({
   initializeWorkspaceEditReview,
 });
 const agentPersistence = createAgentPersistence({ app });
+const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
+  appVersion: app.getVersion(),
+  appPath: app.getAppPath(),
+  resourcesPath: process.resourcesPath,
+  managedOpenCodeConfigDir: path.join(app.getPath("userData"), "agent-runtime", "opencode", "config"),
+});
 const agentService = createAgentService({
   appVersion: app.getVersion(),
-  discovery: createCodexDiscovery(),
+  runtimeRegistry: agentRuntimeRegistry,
   persistence: agentPersistence,
 });
 const workspaceWatchService = createWorkspaceWatchService();

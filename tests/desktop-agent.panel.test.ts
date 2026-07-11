@@ -6,6 +6,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RightAgentPanel } from "../src/features/desktop-agent/RightAgentPanel";
+import { clearAgentControllerRegistryForTests } from "../src/features/desktop-agent/application/controllerRegistry";
 import type { AgentEvent, AgentSessionSnapshot } from "../src/features/desktop-agent/agentTypes";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -14,6 +15,7 @@ let root: Root | null = null;
 
 afterEach(() => {
   act(() => root?.unmount());
+  clearAgentControllerRegistryForTests();
   root = null;
   delete (window as Window & { puppyoneDesktop?: unknown }).puppyoneDesktop;
   document.body.innerHTML = "";
@@ -36,8 +38,9 @@ describe("Desktop Agent panel lifecycle", () => {
     act(() => newSessionButton.click());
     await flushEffects();
     expect(harness.bridge.closeAgentSession).toHaveBeenCalledWith({
+      rootPath: "/workspace",
       sessionId: "session-1",
-      removePersistence: true,
+      removePersistence: false,
     });
   });
 
@@ -59,7 +62,7 @@ describe("Desktop Agent panel lifecycle", () => {
     )));
     await flushEffects();
 
-    expect(harness.bridge.replayAgentSession).toHaveBeenCalledWith({ sessionId: "session-1", afterSequence: 1 });
+    expect(harness.bridge.replayAgentSession).toHaveBeenCalledWith({ rootPath: "/workspace", sessionId: "session-1", afterSequence: 1 });
     expect(container.textContent).toContain("Fix it");
     expect(container.textContent).toContain("Working");
   });
@@ -157,10 +160,18 @@ function capabilities() {
     resume: true,
     fork: false,
     steer: false,
+    queue: false,
     attachments: false,
+    contextReferences: false,
     modelSelection: true,
+    modeSelection: false,
+    slashCommands: false,
+    sessionHistory: true,
     usage: true,
     accountState: true,
+    mcp: false,
+    skills: false,
+    compaction: false,
   };
 }
 

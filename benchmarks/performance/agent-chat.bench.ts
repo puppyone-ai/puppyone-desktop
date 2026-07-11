@@ -1,0 +1,54 @@
+/** @vitest-environment happy-dom */
+import { createElement } from "react";
+import { flushSync } from "react-dom";
+import { createRoot } from "react-dom/client";
+import { bench, describe } from "vitest";
+import { AgentTranscript } from "../../src/features/desktop-agent/AgentTranscript";
+import { applyAgentEvent, applyAgentEvents, createAgentProjection } from "../../src/features/desktop-agent/agentProjection";
+import type { AgentEvent } from "../../src/features/desktop-agent/agentTypes";
+
+// Long enough to make this product-critical signal useful in CI while keeping
+// the complete performance suite practical on release runners.
+const OPTIONS = { iterations: 5, time: 750, warmupIterations: 2, warmupTime: 150 };
+const recordedEvents = createRecordedEvents(1_000);
+const projection = applyAgentEvents(createAgentProjection(), recordedEvents);
+
+describe("Desktop Agent long-session projection", () => {
+  bench("4,000 normalized events -> 2,000 stable message rows", () => {
+    applyAgentEvents(createAgentProjection(), recordedEvents);
+  }, OPTIONS);
+
+  bench("one steady-stream delta against a 2,000-row projection", () => {
+    applyAgentEvent(projection, event(4_001, "assistant.delta", { delta: "next" }, "turn-999", "message-999"));
+  }, OPTIONS);
+});
+
+describe("Desktop Agent virtual timeline", () => {
+  bench("mount and dispose a 2,000-row transcript with bounded DOM", () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const root = createRoot(parent);
+    flushSync(() => root.render(createElement(AgentTranscript, { projection, loading: false })));
+    if (parent.querySelectorAll(".desktop-agent-virtual-row").length > 120) throw new Error("Agent virtual-row budget regressed.");
+    flushSync(() => root.unmount());
+    parent.remove();
+  }, OPTIONS);
+});
+
+function createRecordedEvents(turns: number): AgentEvent[] {
+  const events: AgentEvent[] = [];
+  let sequence = 0;
+  for (let index = 0; index < turns; index += 1) {
+    const turnId = `turn-${index}`;
+    const itemId = `message-${index}`;
+    events.push(event(++sequence, "turn.started", { prompt: `Task ${index}` }, turnId));
+    events.push(event(++sequence, "assistant.delta", { delta: "Working on the requested change. " }, turnId, itemId));
+    events.push(event(++sequence, "assistant.completed", { text: `Completed task ${index}.` }, turnId, itemId));
+    events.push(event(++sequence, "turn.completed", { status: "completed" }, turnId));
+  }
+  return events;
+}
+
+function event(sequence: number, type: AgentEvent["type"], payload: Record<string, unknown>, turnId: string, itemId: string | null = null): AgentEvent {
+  return { schemaVersion: 1, sequence, sessionId: "benchmark", runtimeId: "fixture", provider: "fixture", providerSessionId: "native", turnId, itemId, emittedAt: new Date(sequence).toISOString(), type, payload };
+}

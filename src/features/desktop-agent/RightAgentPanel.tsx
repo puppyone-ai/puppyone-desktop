@@ -1,23 +1,16 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useSyncExternalStore } from "react";
 import { CircleAlert, LoaderCircle, RefreshCw } from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { AgentApprovalDock } from "./AgentApprovalDock";
 import { AgentComposer } from "./AgentComposer";
-import { AgentControls } from "./AgentControls";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
-import { applyAgentEvent, applyAgentEvents, createAgentProjection } from "./agentProjection";
-import type {
-  AgentApprovalDecision,
-  AgentEvent,
-  AgentProviderInspection,
-  AgentSessionMetadata,
-  AgentSessionSnapshot,
-} from "./agentTypes";
+import { AgentQuestionDock } from "./components/AgentQuestionDock";
+import { getAgentSessionController } from "./application/controllerRegistry";
+import type { AgentSessionMetadata } from "./agentTypes";
+import "./desktop-agent.css";
 
-export type RightAgentPanelHandle = {
-  newSession: () => void;
-};
+export type RightAgentPanelHandle = { newSession: () => void };
 
 type RightAgentPanelProps = {
   workspace: Workspace;
@@ -28,8 +21,6 @@ type RightAgentPanelProps = {
   onPreferredModelChange?: (model: string) => void;
 };
 
-type PanelState = "idle" | "discovering" | "restoring" | "ready" | "creating" | "failed";
-
 export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanelProps>(function RightAgentPanel({
   workspace,
   active,
@@ -38,414 +29,139 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   preferredModel = null,
   onPreferredModelChange,
 }, ref) {
-  const [hasStarted, setHasStarted] = useState(active);
-  const [panelState, setPanelState] = useState<PanelState>("idle");
-  const [inspection, setInspection] = useState<AgentProviderInspection | null>(null);
-  const [session, setSession] = useState<AgentSessionMetadata | null>(null);
-  const [projection, setProjection] = useState(() => createAgentProjection());
-  const [selectedModel, setSelectedModel] = useState<string | null>(preferredModel);
-  const [draft, setDraft] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [stopping, setStopping] = useState(false);
-  const [resolvingApproval, setResolvingApproval] = useState(false);
-  const sessionIdRef = useRef<string | null>(null);
-  const projectionRef = useRef(projection);
-  const replayInFlightRef = useRef(false);
-  const replayRequestedRef = useRef(false);
-  const bufferedEventsRef = useRef<AgentEvent[]>([]);
+  const controller = useMemo(() => getAgentSessionController(workspace.path), [workspace.path]);
+  const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
 
   useEffect(() => {
-    if (active) setHasStarted(true);
-  }, [active]);
+    if (active) void controller.initialize(false);
+  }, [active, controller]);
 
   useEffect(() => {
-    onRunningChange?.(Boolean(projection.runningTurnId));
-    if (!projection.runningTurnId) setStopping(false);
-  }, [onRunningChange, projection.runningTurnId]);
-
-  const commitProjection = useCallback((next: ReturnType<typeof createAgentProjection>) => {
-    projectionRef.current = next;
-    setProjection(next);
-  }, []);
-
-  const applySnapshot = useCallback((snapshot: AgentSessionSnapshot) => {
-    sessionIdRef.current = snapshot.session.id;
-    setSession(snapshot.session);
-    setSelectedModel((current) => (
-      snapshot.session.selectedModel
-      || current
-      || snapshot.models.find((model) => model.isDefault)?.model
-      || snapshot.models[0]?.model
-      || null
-    ));
-    setInspection((current) => ({
-      readiness: current?.readiness ?? {
-        provider: "codex",
-        status: "ready",
-        version: null,
-        minimumVersion: null,
-        message: "Codex is ready.",
-      },
-      account: snapshot.account,
-      models: snapshot.models,
-      capabilities: snapshot.capabilities,
-      warnings: current?.warnings ?? [],
-    }));
-    commitProjection(applyAgentEvents(
-      createAgentProjection({ partialHistory: snapshot.partial }),
-      snapshot.events,
-      { partialHistory: snapshot.partial },
-    ));
-  }, [commitProjection]);
-
-  const replayFrom = useCallback(async (afterSequence: number) => {
-    const bridge = window.puppyoneDesktop;
-    const sessionId = sessionIdRef.current;
-    if (!bridge?.replayAgentSession || !sessionId) return;
-    if (replayInFlightRef.current) {
-      replayRequestedRef.current = true;
-      return;
-    }
-    replayInFlightRef.current = true;
-    try {
-      let cursor = afterSequence;
-      let attempts = 0;
-      do {
-        replayRequestedRef.current = false;
-        const snapshot = await bridge.replayAgentSession({ sessionId, afterSequence: cursor });
-        if (sessionIdRef.current !== sessionId) return;
-        let next = applyAgentEvents(
-          projectionRef.current,
-          snapshot.events,
-          { partialHistory: snapshot.partial },
-        );
-        const buffered = bufferedEventsRef.current
-          .filter((event) => event.sessionId === sessionId && event.sequence > next.lastSequence)
-          .sort((left, right) => left.sequence - right.sequence);
-        bufferedEventsRef.current = [];
-        for (const event of buffered) {
-          if (event.sequence > next.lastSequence + 1 && attempts < 2) {
-            bufferedEventsRef.current.push(event);
-            replayRequestedRef.current = true;
-            continue;
-          }
-          next = applyAgentEvent(next, event);
-        }
-        commitProjection(next);
-        setSession(snapshot.session);
-        cursor = next.lastSequence;
-        attempts += 1;
-      } while (replayRequestedRef.current && attempts < 3);
-    } catch (replayError) {
-      setError(formatAgentError(replayError));
-    } finally {
-      replayInFlightRef.current = false;
-    }
-  }, [commitProjection]);
+    if (preferredModel && !state.selectedModel) controller.selectModel(preferredModel);
+  }, [controller, preferredModel, state.selectedModel]);
 
   useEffect(() => {
-    if (!hasStarted) return undefined;
-    const bridge = window.puppyoneDesktop;
-    if (!bridge?.onAgentEvent) return undefined;
-    return bridge.onAgentEvent((event: AgentEvent) => {
-      if (event.sessionId !== sessionIdRef.current) return;
-      const current = projectionRef.current;
-      if (replayInFlightRef.current || event.sequence > current.lastSequence + 1) {
-        if (!bufferedEventsRef.current.some((entry) => entry.sequence === event.sequence)) {
-          bufferedEventsRef.current.push(event);
-        }
-        replayRequestedRef.current = true;
-        void replayFrom(current.lastSequence);
-        return;
-      }
-      commitProjection(applyAgentEvent(current, event));
-      setSession((value) => value ? {
-        ...value,
-        lastSequence: event.sequence,
-        updatedAt: event.emittedAt,
-        activeTurnId: event.type === "turn.started"
-          ? event.turnId
-          : event.type === "turn.completed" || event.type === "turn.failed" || event.type === "turn.interrupted"
-            ? null
-            : value.activeTurnId,
-        terminalState: event.type === "turn.started"
-          ? "running"
-          : event.type === "turn.completed"
-            ? "completed"
-            : event.type === "turn.failed"
-              ? "failed"
-              : event.type === "turn.interrupted"
-                ? "interrupted"
-                : value.terminalState,
-      } : value);
-    });
-  }, [commitProjection, hasStarted, replayFrom]);
+    onRunningChange?.(Boolean(state.projection.runningTurnId));
+  }, [onRunningChange, state.projection.runningTurnId]);
 
-  useEffect(() => {
-    if (!hasStarted) return undefined;
-    const bridge = window.puppyoneDesktop;
-    if (!bridge?.onAgentSessionExit) return undefined;
-    return bridge.onAgentSessionExit((event) => {
-      if (event.sessionId !== sessionIdRef.current || event.reason !== "provider-exited") return;
-      sessionIdRef.current = null;
-      replayRequestedRef.current = false;
-      bufferedEventsRef.current = [];
-      setStopping(false);
-      setSubmitting(false);
-      setResolvingApproval(false);
-      setSession((value) => value ? {
-        ...value,
-        activeTurnId: null,
-        terminalState: "provider-exited",
-      } : value);
-      commitProjection({
-        ...projectionRef.current,
-        approvals: [],
-        runningTurnId: null,
-        terminalState: projectionRef.current.runningTurnId ? "failed" : projectionRef.current.terminalState,
-      });
-      setPanelState("failed");
-      setError("Codex stopped unexpectedly. Files already changed were not reverted. Refresh to resume the saved session.");
-    });
-  }, [commitProjection, hasStarted]);
+  useImperativeHandle(ref, () => ({ newSession: () => { void controller.newSession(); } }), [controller]);
 
-  const initialize = useCallback(async (refresh = false) => {
-    const bridge = window.puppyoneDesktop;
-    if (!bridge?.discoverAgentProviders || !bridge.resumeAgentSession) {
-      setPanelState("failed");
-      setError("Desktop Agent bridge unavailable. Restart PuppyOne so the native bridge can load.");
-      return;
-    }
-    setError(null);
-    setPanelState("discovering");
-    try {
-      const nextInspection = await bridge.discoverAgentProviders({ refresh });
-      setInspection(nextInspection);
-      setSelectedModel((current) => current
-        || nextInspection.models.find((model) => model.isDefault)?.model
-        || nextInspection.models[0]?.model
-        || null);
-      if (nextInspection.readiness.status !== "ready") {
-        setPanelState("ready");
-        return;
-      }
-      setPanelState("restoring");
-      const restored = await bridge.resumeAgentSession({ rootPath: workspace.path });
-      if (restored) applySnapshot(restored);
-      setPanelState("ready");
-    } catch (initializationError) {
-      setPanelState("failed");
-      setError(formatAgentError(initializationError));
-    }
-  }, [applySnapshot, workspace.path]);
-
-  useEffect(() => {
-    if (!hasStarted) return;
-    sessionIdRef.current = null;
-    replayRequestedRef.current = false;
-    bufferedEventsRef.current = [];
-    setSession(null);
-    commitProjection(createAgentProjection());
-    void initialize(false);
-  }, [commitProjection, hasStarted, initialize, workspace.path]);
-
-  const createSession = useCallback(async () => {
-    const bridge = window.puppyoneDesktop;
-    if (!bridge?.createAgentSession) throw new Error("Desktop Agent bridge unavailable.");
-    setPanelState("creating");
-    const snapshot = await bridge.createAgentSession({ rootPath: workspace.path, model: selectedModel });
-    applySnapshot(snapshot);
-    setPanelState("ready");
-    return snapshot.session;
-  }, [applySnapshot, selectedModel, workspace.path]);
-
-  const handleNewSession = useCallback(async () => {
-    const bridge = window.puppyoneDesktop;
-    setError(null);
-    try {
-      const previousSessionId = sessionIdRef.current ?? session?.id;
-      if (previousSessionId && bridge?.closeAgentSession) {
-        await bridge.closeAgentSession({ sessionId: previousSessionId, removePersistence: true });
-      }
-      sessionIdRef.current = null;
-      setSession(null);
-      commitProjection(createAgentProjection());
-      // The draft is intentionally left untouched: a fresh session should
-      // carry forward whatever the user was mid-typing.
-      await createSession();
-    } catch (newSessionError) {
-      setPanelState("failed");
-      setError(formatAgentError(newSessionError));
-    }
-  }, [commitProjection, createSession, session?.id]);
-
-  const handleResetSession = useCallback(() => {
-    void handleNewSession();
-  }, [handleNewSession]);
-
-  const handleCloseSession = useCallback(async () => {
-    const bridge = window.puppyoneDesktop;
-    const sessionToClose = sessionIdRef.current ?? session?.id;
-    if (!sessionToClose || !bridge?.closeAgentSession) return;
-    setError(null);
-    try {
-      await bridge.closeAgentSession({ sessionId: sessionToClose, removePersistence: true });
-      sessionIdRef.current = null;
-      setSession(null);
-      commitProjection(createAgentProjection());
-    } catch (closeError) {
-      setError(formatAgentError(closeError));
-    }
-  }, [commitProjection, session?.id]);
-
-  useImperativeHandle(ref, () => ({
-    newSession: () => void handleNewSession(),
-  }), [handleNewSession]);
-
-  const handleSubmit = async (prompt: string) => {
-    const bridge = window.puppyoneDesktop;
-    if (!bridge?.startAgentTurn) return false;
-    setSubmitting(true);
-    setError(null);
-    try {
-      let activeSession = session;
-      if (!activeSession) activeSession = await createSession();
-      await bridge.startAgentTurn({
-        sessionId: activeSession.id,
-        prompt,
-        model: selectedModel,
-      });
-      return true;
-    } catch (submitError) {
-      setError(formatAgentError(submitError));
-      return false;
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleStop = async () => {
-    const bridge = window.puppyoneDesktop;
-    if (!bridge?.interruptAgentTurn || !session?.id || !projection.runningTurnId) return;
-    setError(null);
-    setStopping(true);
-    try {
-      await bridge.interruptAgentTurn({ sessionId: session.id, turnId: projection.runningTurnId });
-    } catch (stopError) {
-      setStopping(false);
-      setError(formatAgentError(stopError));
-    }
-  };
-
-  const handleApproval = async (decision: AgentApprovalDecision) => {
-    const bridge = window.puppyoneDesktop;
-    const approval = projection.approvals[0];
-    if (!bridge?.resolveAgentApproval || !session || !approval) return;
-    setResolvingApproval(true);
-    setError(null);
-    try {
-      await bridge.resolveAgentApproval({
-        sessionId: session.id,
-        turnId: approval.turnId,
-        requestId: approval.requestId,
-        decision,
-      });
-    } catch (approvalError) {
-      setError(formatAgentError(approvalError));
-      void replayFrom(projection.lastSequence);
-    } finally {
-      setResolvingApproval(false);
-    }
-  };
-
-  const handleSelectModel = (model: string) => {
-    setSelectedModel(model || null);
-    if (model) onPreferredModelChange?.(model);
-  };
-
+  const inspection = state.inspection;
   const readiness = inspection?.readiness;
-  const setupRequired = readiness?.status === "installed-not-authenticated";
-  const unsupportedVersion = readiness?.status === "unsupported-version";
-  const unavailable = readiness?.status !== "ready";
-  const loading = panelState === "discovering" || panelState === "restoring" || panelState === "creating";
+  const runtime = state.session?.runtime
+    || inspection?.runtime
+    || inspection?.runtimes?.find((entry) => entry.descriptor.id === state.selectedRuntimeId)?.descriptor;
+  const runtimeLabel = runtime?.displayName || (state.selectedRuntimeId === "codex" ? "Codex" : "Agent");
+  const capabilities = inspection?.capabilities;
+  const unavailable = Boolean(readiness && readiness.status !== "ready");
+  const loading = state.phase === "discovering" || state.phase === "restoring" || state.phase === "creating";
+  const failed = state.phase === "failed" || state.phase === "runtime-exited";
+  const viewport = controller.readViewport();
 
   return (
-    <section className="desktop-agent-panel" aria-label="Codex Chat">
+    <section className="desktop-agent-panel" aria-label={`${runtimeLabel} Chat`} data-phase={state.phase}>
       <AgentSurfaceHeader
-        title={session?.title || "Codex"}
-        statusLabel={session ? sessionStatusLabel(session.terminalState) : readinessLabel(readiness?.status)}
+        title={state.session?.title || "New chat"}
+        runtimeLabel={runtimeLabel}
+        statusLabel={state.session ? sessionStatusLabel(state.session.terminalState) : readinessLabel(readiness?.status)}
         loading={loading}
-        newSessionDisabled={unavailable || Boolean(projection.runningTurnId)}
-        onNewSession={() => void handleNewSession()}
+        newSessionDisabled={unavailable || Boolean(state.projection.runningTurnId)}
+        onNewSession={() => void controller.newSession()}
         diagnostic={readiness?.diagnostic || (inspection?.warnings.length ? inspection.warnings.join(" ") : null)}
-        closeDisabled={!session}
-        onCloseSession={() => void handleCloseSession()}
-        onResetSession={handleResetSession}
+        closeDisabled={!state.session || Boolean(state.projection.runningTurnId)}
+        history={state.history}
+        activeSessionId={state.session?.id}
+        onSelectSession={(sessionId) => void controller.switchSession(sessionId)}
+        onForkSession={capabilities?.fork ? () => void controller.forkSession() : undefined}
+        onArchiveSession={state.session ? () => void controller.archiveSession() : undefined}
+        onDeleteSession={state.session ? () => void controller.deleteSession() : undefined}
+        onCompactSession={capabilities?.compaction ? () => void controller.compactSession() : undefined}
+        canFork={Boolean(capabilities?.fork)}
+        canCompact={Boolean(capabilities?.compaction)}
       />
 
-      <AgentControls
-        providerLabel="Codex"
-        models={inspection?.models ?? []}
-        selectedModel={selectedModel}
-        modelSelectionAvailable={Boolean(inspection?.capabilities?.modelSelection)}
-        disabled={Boolean(projection.runningTurnId)}
-        onSelectModel={handleSelectModel}
-      />
-
-      {(unavailable || panelState === "failed") && (
+      {(unavailable || failed) && (
         <div className="desktop-agent-readiness" role="status">
           <CircleAlert size={15} />
           <div>
-            <strong>{panelState === "failed" ? "Codex session needs attention" : readinessHeading(readiness?.status)}</strong>
-            {unsupportedVersion ? (
-              <p>
-                Detected Codex {readiness?.version || "unknown version"}; PuppyOne requires{" "}
-                {readiness?.minimumVersion || "a newer version"}. Update Codex via its install channel, then refresh.
-              </p>
-            ) : setupRequired ? (
-              <p>Codex is installed but not signed in. Run `codex login` in Terminal, then refresh.</p>
-            ) : (
-              <p>{panelState === "failed" ? error : readiness?.message || error || "Unable to inspect Codex."}</p>
-            )}
+            <strong>{failed ? `${runtimeLabel} session needs attention` : readinessHeading(readiness?.status, runtimeLabel)}</strong>
+            <p>{failed ? state.error : readiness?.message || state.error || `Unable to inspect ${runtimeLabel}.`}</p>
           </div>
-          <button type="button" aria-label="Refresh Codex readiness" onClick={() => void initialize(true)}>
-            <RefreshCw size={14} /> Refresh
-          </button>
+          <button type="button" aria-label={`Refresh ${runtimeLabel} readiness`} onClick={() => void controller.initialize(true)}><RefreshCw size={14} /> Refresh</button>
         </div>
       )}
 
       {loading && (
         <div className="desktop-agent-provider-progress" role="status">
-          <LoaderCircle size={13} className="desktop-agent-spin" /> {panelState === "restoring" ? "Restoring session" : panelState === "creating" ? "Starting session" : "Checking Codex"}
+          <LoaderCircle size={13} className="desktop-agent-spin" /> {state.phase === "restoring" ? "Restoring session" : state.phase === "creating" ? "Starting session" : `Checking ${runtimeLabel}`}
         </div>
       )}
 
-      {error && !unavailable && (
-        <div className="desktop-agent-inline-error" role="alert"><CircleAlert size={14} /> {error}</div>
+      {state.error && !unavailable && !failed && <div className="desktop-agent-inline-error" role="alert"><CircleAlert size={14} /> {state.error}</div>}
+
+      <AgentTranscript
+        key={state.session?.id || "new-agent-session"}
+        projection={state.projection}
+        loading={loading}
+        runtimeLabel={runtimeLabel}
+        initialScrollTop={viewport.scrollTop}
+        initialMeasurements={viewport.measurements}
+        initialPinned={viewport.pinned}
+        onViewportChange={(scrollTop, measurements, pinned) => controller.rememberViewport(scrollTop, measurements, pinned)}
+        onViewChanges={onViewChanges}
+      />
+
+      {state.projection.approvals[0] && (
+        <AgentApprovalDock
+          approval={state.projection.approvals[0]}
+          queueLength={state.projection.approvals.length}
+          resolving={state.resolvingBlocker}
+          runtimeLabel={runtimeLabel}
+          onResolve={(decision) => void controller.resolveApproval(decision)}
+        />
       )}
 
-      <AgentTranscript projection={projection} loading={loading} onViewChanges={onViewChanges} />
-
-      {projection.approvals[0] && (
-        <AgentApprovalDock
-          approval={projection.approvals[0]}
-          queueLength={projection.approvals.length}
-          resolving={resolvingApproval}
-          onResolve={(decision) => void handleApproval(decision)}
+      {state.projection.questions[0] && (
+        <AgentQuestionDock
+          key={state.projection.questions[0].requestId}
+          request={state.projection.questions[0]}
+          queueLength={state.projection.questions.length}
+          resolving={state.resolvingBlocker}
+          onResolve={(resolution) => void controller.resolveQuestion(resolution)}
         />
       )}
 
       <AgentComposer
-        draft={draft}
-        onDraftChange={setDraft}
-        disabled={loading || unavailable || panelState === "failed" || projection.approvals.length > 0}
-        running={Boolean(projection.runningTurnId)}
-        stopping={stopping}
-        submitting={submitting}
-        placeholder={setupRequired ? "Codex setup required" : unavailable ? "Codex unavailable" : "Message Codex…"}
-        onSubmit={handleSubmit}
-        onStop={() => void handleStop()}
+        draft={state.draft}
+        onDraftChange={(draft) => controller.setDraft(draft)}
+        disabled={loading || unavailable || failed || state.projection.approvals.length > 0 || state.projection.questions.length > 0}
+        running={Boolean(state.projection.runningTurnId)}
+        stopping={state.stopping}
+        submitting={state.submitting}
+        placeholder={unavailable ? `${runtimeLabel} unavailable` : `Plan, build, / for commands, @ for context`}
+        runtimeLabel={runtimeLabel}
+        runtimes={inspection?.runtimes ?? []}
+        selectedRuntimeId={state.selectedRuntimeId}
+        onSelectRuntime={(runtimeId) => void controller.selectRuntime(runtimeId)}
+        models={capabilities?.modelSelection ? inspection?.models ?? [] : []}
+        selectedModel={state.selectedModel}
+        onSelectModel={(model) => { controller.selectModel(model); onPreferredModelChange?.(model); }}
+        modes={capabilities?.modeSelection ? inspection?.modes ?? [] : []}
+        selectedMode={state.selectedMode}
+        onSelectMode={(mode) => controller.selectMode(mode)}
+        commands={capabilities?.slashCommands ? inspection?.commands ?? [] : []}
+        attachments={state.attachments}
+        contextReferences={state.contextReferences}
+        attachmentAvailable={Boolean(capabilities?.attachments)}
+        contextAvailable={Boolean(capabilities?.contextReferences)}
+        steerAvailable={Boolean(capabilities?.steer)}
+        queueAvailable={Boolean(capabilities?.queue)}
+        onAddAttachments={(references) => controller.addAttachments(references)}
+        onAddContext={(references) => controller.addContextReferences(references)}
+        onRemoveAttachment={(path) => controller.removeAttachment(path)}
+        onRemoveContext={(path) => controller.removeContextReference(path)}
+        onSubmit={(prompt) => controller.submit(prompt)}
+        onStop={() => void controller.stop()}
       />
     </section>
   );
@@ -456,6 +172,7 @@ function readinessLabel(status: string | undefined) {
   if (status === "installed-not-authenticated") return "setup required";
   if (status === "not-installed") return "not installed";
   if (status === "unsupported-version") return "update required";
+  if (status === "error") return "unavailable";
   return "checking";
 }
 
@@ -463,16 +180,8 @@ function sessionStatusLabel(status: AgentSessionMetadata["terminalState"]) {
   return status === "provider-exited" ? "provider exited" : status;
 }
 
-function readinessHeading(status: string | undefined) {
-  if (status === "installed-not-authenticated") return "Codex setup required";
-  if (status === "unsupported-version") return "Codex update required";
-  return "Codex unavailable";
-}
-
-function formatAgentError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  if (message.includes("No handler registered for 'agent:")) {
-    return "Desktop Agent runtime was updated. Restart PuppyOne once so the native bridge can load.";
-  }
-  return message;
+function readinessHeading(status: string | undefined, runtimeLabel: string) {
+  if (status === "installed-not-authenticated") return `${runtimeLabel} setup required`;
+  if (status === "unsupported-version") return `${runtimeLabel} update required`;
+  return `${runtimeLabel} unavailable`;
 }

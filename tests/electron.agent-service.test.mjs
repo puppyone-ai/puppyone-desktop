@@ -90,6 +90,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
     expect(events.some((event) => event.type === "approval.resolved" && event.payload.decision === "cancel")).toBe(true);
     expect(events.some((event) => event.type === "turn.failed")).toBe(true);
     expect(JSON.stringify(events)).not.toContain("secret-value");
+    expect(adapter.disposed).toBe(true);
     expect(harness.service.getSessionCount()).toBe(0);
   });
 
@@ -100,13 +101,28 @@ describe("Electron AgentService ownership and lifecycle", () => {
     harness.adapters[0].exit({ expected: false, diagnostics: "provider crashed" });
     expect(harness.service.getSessionCount()).toBe(0);
     expect(harness.service.getRetainedSessionCount()).toBe(1);
+    expect(harness.adapters[0].disposed).toBe(true);
 
-    const resumed = await harness.service.resumeSession(owner, {}, "/workspace");
+    const resumed = await harness.service.resumeSession(owner, { sessionId: created.session.id }, "/workspace");
 
     expect(resumed.session.id).toBe(created.session.id);
     expect(harness.adapters).toHaveLength(2);
     expect(harness.adapters[1].resumeSession).toHaveBeenCalledWith({ threadId: "thread-1", model: "gpt-5" });
     expect(harness.service.getSessionCount()).toBe(1);
+  });
+
+  it("does not discard a retired snapshot when a different requested session is missing", async () => {
+    const harness = createServiceHarness();
+    const owner = createSender(42);
+    await harness.service.createSession(owner, {}, "/workspace");
+    harness.adapters[0].exit({ expected: false, diagnostics: "provider crashed" });
+
+    const missing = await harness.service.resumeSession(owner, { sessionId: "missing-session" }, "/workspace");
+
+    expect(missing).toBeNull();
+    expect(harness.service.getRetainedSessionCount()).toBe(1);
+    const resumed = await harness.service.resumeSession(owner, {}, "/workspace");
+    expect(resumed).not.toBeNull();
   });
 
   it("rejects stale approvals and bounds retained replay for a slow renderer", async () => {
@@ -141,6 +157,37 @@ describe("Electron AgentService ownership and lifecycle", () => {
     const replay = harness.service.replay(owner, { sessionId: snapshot.session.id, afterSequence: 0 });
     expect(replay.events.length).toBeLessThanOrEqual(1_000);
     expect(replay.firstAvailableSequence).toBeGreaterThan(1);
+  });
+
+  it("deduplicates blocking requests replayed during runtime reconciliation", async () => {
+    const harness = createServiceHarness();
+    const owner = createSender(51);
+    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    await harness.service.startTurn(owner, { sessionId: snapshot.session.id, prompt: "Run" });
+    const adapter = harness.adapters[0];
+    const approval = {
+      type: "approval.requested",
+      providerSessionId: "thread-1",
+      turnId: "turn-1",
+      itemId: "item-approval",
+      payload: { requestId: "runtime:approval", kind: "command", availableDecisions: ["accept", "decline", "cancel"] },
+    };
+    const question = {
+      type: "question.requested",
+      providerSessionId: "thread-1",
+      turnId: "turn-1",
+      itemId: "item-question",
+      payload: { requestId: "runtime:question", questions: [{ question: "Continue?", options: [] }] },
+    };
+
+    adapter.emit(approval);
+    adapter.emit(approval);
+    adapter.emit(question);
+    adapter.emit(question);
+
+    const events = harness.service.replay(owner, { sessionId: snapshot.session.id, afterSequence: 0 }).events;
+    expect(events.filter((event) => event.type === "approval.requested")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "question.requested")).toHaveLength(1);
   });
 
   it("closes every adapter during app-level cleanup", async () => {
@@ -281,6 +328,11 @@ describe("Agent IPC workspace authorization", () => {
       interruptTurn: vi.fn(),
       resolveApproval: vi.fn(),
       resolveQuestion: vi.fn(),
+      listSessions: vi.fn(),
+      forkSession: vi.fn(),
+      archiveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      compactSession: vi.fn(),
     };
     const authorizeWorkspaceRoot = vi.fn(async (_event, requested) => {
       if (requested !== "/workspace") throw new Error("Requested workspace root does not match");
@@ -315,6 +367,11 @@ describe("Agent IPC workspace authorization", () => {
       interruptTurn: vi.fn(),
       resolveApproval: vi.fn(),
       resolveQuestion: vi.fn(),
+      listSessions: vi.fn(),
+      forkSession: vi.fn(),
+      archiveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      compactSession: vi.fn(),
     };
     registerAgentIpcHandlers({
       ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },
@@ -328,20 +385,27 @@ describe("Agent IPC workspace authorization", () => {
       "agent:session-create",
       "agent:session-resume",
       "agent:session-replay",
+      "agent:sessions-list",
+      "agent:session-fork",
+      "agent:session-archive",
+      "agent:session-delete",
       "agent:session-close",
       "agent:turn-start",
       "agent:turn-steer",
       "agent:turn-interrupt",
+      "agent:session-compact",
       "agent:approval-resolve",
       "agent:question-resolve",
     ]) {
       expect(handlers.has(channel)).toBe(true);
     }
     const event = { sender: createSender(8) };
-    await handlers.get("agent:turn-steer")(event, { sessionId: "s", turnId: "t", message: "steer" });
-    expect(agentService.steerTurn).toHaveBeenCalledWith(event.sender, { sessionId: "s", turnId: "t", message: "steer" });
-    await handlers.get("agent:question-resolve")(event, { sessionId: "s", turnId: "t", requestId: "r" });
-    expect(agentService.resolveQuestion).toHaveBeenCalledWith(event.sender, { sessionId: "s", turnId: "t", requestId: "r" });
+    const steerRequest = { rootPath: "/workspace", sessionId: "s", turnId: "t", message: "steer" };
+    await handlers.get("agent:turn-steer")(event, steerRequest);
+    expect(agentService.steerTurn).toHaveBeenCalledWith(event.sender, steerRequest, "/canonical/workspace");
+    const questionRequest = { rootPath: "/workspace", sessionId: "s", turnId: "t", requestId: "r" };
+    await handlers.get("agent:question-resolve")(event, questionRequest);
+    expect(agentService.resolveQuestion).toHaveBeenCalledWith(event.sender, questionRequest, "/canonical/workspace");
   });
 });
 
@@ -363,7 +427,13 @@ function createServiceHarness() {
     },
     persistence: {
       findLatest: vi.fn(async (root) => Array.from(persisted.values()).find((entry) => entry.workspaceRoot === root) ?? null),
+      findById: vi.fn(async (id, root) => {
+        const entry = persisted.get(id);
+        return entry?.workspaceRoot === root ? entry : null;
+      }),
+      list: vi.fn(async (root) => Array.from(persisted.values()).filter((entry) => entry.workspaceRoot === root)),
       save: vi.fn(async (entry) => persisted.set(entry.sessionId, entry)),
+      archive: vi.fn(async () => undefined),
       remove: vi.fn(async (id) => persisted.delete(id)),
     },
     adapterFactory: (options) => {

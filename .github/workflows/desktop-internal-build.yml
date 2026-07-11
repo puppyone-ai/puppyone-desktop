@@ -44,6 +44,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Stage pinned OpenCode runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLATFORM_KEY="darwin-$(node -p 'process.arch')"
+          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('vendor/opencode/runtime-manifest.json', 'utf8')).runtimeRelease.version")"
+          ARCHIVE="$(node -e "const m=require('./vendor/opencode/runtime-manifest.json'); const a=m.artifacts[process.argv[1]]; if(!a) process.exit(2); process.stdout.write(a.archive)" "${PLATFORM_KEY}")"
+          DOWNLOAD="${RUNNER_TEMP}/${ARCHIVE}"
+          curl --fail --location --retry 3 --output "${DOWNLOAD}" \
+            "https://github.com/anomalyco/opencode/releases/download/v${VERSION}/${ARCHIVE}"
+          npm run stage:opencode-runtime -- "${DOWNLOAD}"
+
       - name: Build unsigned macOS package
         run: npm run dist:mac
 

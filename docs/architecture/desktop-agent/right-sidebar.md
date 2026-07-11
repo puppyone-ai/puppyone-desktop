@@ -1,14 +1,15 @@
 # Right Sidebar Agent Chat
 
-This document defines the proposed product, layout, lifecycle, and accessibility
-contract for adding Agent Chat to PuppyOne Desktop's existing resizable right
+This document defines the implemented product, layout, lifecycle, and
+accessibility contract for Agent Chat in PuppyOne Desktop's resizable right
 sidebar.
 
 Read [Desktop Agent Architecture](README.md) first for the process, IPC,
 provider-adapter, event, security, and persistence boundaries.
 
-For the first implementation handoff, follow the
-[Codex Implementation Brief](implementation-brief.md).
+The older [Codex Implementation Brief](implementation-brief.md) records the
+original direct-runtime slice. The current runtime architecture is in the main
+README and OpenCode ADR.
 
 ## Status
 
@@ -18,14 +19,16 @@ For the first implementation handoff, follow the
   remains an independent release kill switch for Chat only.
 - **Implemented behind that gate:** the local-workspace right-side area is resizable, hosts separate
   Chat and Terminal panels, preserves Terminal's lazy PTY lifecycle,
-  retains the selected surface, and keeps a running Codex turn alive while
+  retains the selected surface, and keeps a running Agent turn alive while
   Chat is hidden.
-- **Implemented:** Codex readiness/account/model states, transcript streaming,
-  compact plan/tool/command/file activity, bounded expandable command output,
-  command/file approval dock, composer, Stop, partial-history warning, and
-  Jump to latest.
-- **Proposed:** structured-question dock, attachments, session-history picker,
-  fork/steer, and non-Codex provider selection.
+- **Implemented:** OpenCode Harness and Codex direct-runtime selection,
+  readiness/account/model/mode states, virtual transcript streaming, safe
+  Markdown, part/tool registries, plan/tool/command/file activity, permission
+  and structured-question docks, `/` commands, authorized `@` context and
+  attachments, Stop, partial-history warning, and Jump to latest.
+- **Implemented by capability:** history list/resume/fork/archive/delete,
+  compaction, queue/steer controls, and runtime/model/mode selection. Unsupported
+  controls are omitted.
 - **Product gate:** provider options appear only when their adapter and allowed
   authentication mode are available.
 
@@ -37,7 +40,7 @@ panel components. The sidebar itself contains no Chat/Terminal selector.
 
 ```text
 +------------------------------------------------------+
-| Codex session       Model: default       New  More   |
+| Session title                         History  More   |
 |------------------------------------------------------|
 | User                                                 |
 | Explain the failing test and fix it.                 |
@@ -55,7 +58,8 @@ panel components. The sidebar itself contains no Chat/Terminal selector.
 | npm install package-name                            |
 |                                  Deny  Allow once   |
 |------------------------------------------------------|
-| Message Codex...                              Stop   |
+| Plan, build, / commands, @ context            Stop   |
+| Harness   Mode   Provider / Model   Attach           |
 +------------------------------------------------------+
 ```
 
@@ -65,13 +69,12 @@ not introduce horizontal scrolling for ordinary messages or controls.
 
 ## Surface hierarchy
 
-The Chat surface has five regions in document order:
+The Chat surface has four primary regions in document order:
 
 1. **Session header** — session title and actions.
-2. **Agent controls** — provider, model, and operating mode.
-3. **Transcript** — user messages, assistant output, and activity items.
-4. **Blocking dock** — an approval or structured question when one is pending.
-5. **Composer** — prompt, attachments, submit, and stop/queue state.
+2. **Transcript** — user messages, assistant output, and activity items.
+3. **Blocking dock** — an approval or structured question when one is pending.
+4. **Composer** — prompt, attachments, runtime/model/mode controls, submit, and stop/queue state.
 
 Only the transcript is the primary scroll region. The header, blocking dock,
 and composer remain visible without using `position: fixed`. The layout uses
@@ -113,18 +116,18 @@ The Chat panel has its own session header with title, New Session, diagnostics,
 reset, and close actions. Controls use native buttons and menus, preserve
 keyboard focus styles, and expose meaningful accessible names.
 
-## Provider controls
+## Runtime and model-provider controls
 
-The second row contains only controls the active provider supports:
+The compact composer footer contains only controls the active runtime supports:
 
 - provider selector;
 - model selector when model discovery is available;
 - mode selector for supported modes such as Agent, Plan, or Ask;
 - compact account/readiness status when action is required.
 
-Changing provider starts a new application session after confirmation when the
-current session contains history. Provider-native sessions are never silently
-migrated between runtimes.
+Changing runtime closes the current connection without deleting its history,
+then restores or creates a session for the selected runtime. Native sessions
+are never silently migrated between runtimes and remain available in History.
 
 Changing model or mode follows provider capability:
 
