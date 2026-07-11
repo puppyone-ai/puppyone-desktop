@@ -9,11 +9,15 @@ import type {
   AgentProviderInspection,
   AgentQuestionResolution,
   AgentReplayRequest,
+  AgentRuntimeRequest,
   AgentSessionCloseRequest,
   AgentSessionCreateRequest,
   AgentSessionExitEvent,
+  AgentSessionListItem,
+  AgentSessionMutationRequest,
   AgentSessionResumeRequest,
   AgentSessionSnapshot,
+  AgentSessionsListRequest,
   AgentTurnInterruptRequest,
   AgentTurnStartRequest,
   AgentTurnSteerRequest,
@@ -863,12 +867,16 @@ declare global {
       onUpdateStateChanged: (
         callback: (state: DesktopUpdateState) => void,
       ) => () => void;
-      discoverAgentProviders: (request?: { refresh?: boolean }) => Promise<AgentProviderInspection>;
+      discoverAgentProviders: (request?: AgentRuntimeRequest) => Promise<AgentProviderInspection>;
       listAgentModels: (request?: AgentModelsListRequest) => Promise<AgentModel[]>;
       readAgentAccount: (request?: AgentAccountReadRequest) => Promise<AgentAccountState | null>;
       createAgentSession: (request: AgentSessionCreateRequest) => Promise<AgentSessionSnapshot>;
       resumeAgentSession: (request: AgentSessionResumeRequest) => Promise<AgentSessionSnapshot | null>;
       replayAgentSession: (request: AgentReplayRequest) => Promise<AgentSessionSnapshot>;
+      listAgentSessions: (request: AgentSessionsListRequest) => Promise<AgentSessionListItem[]>;
+      forkAgentSession: (request: AgentSessionMutationRequest) => Promise<AgentSessionSnapshot>;
+      archiveAgentSession: (request: AgentSessionMutationRequest) => Promise<{ sessionId: string; archived: boolean }>;
+      deleteAgentSession: (request: AgentSessionMutationRequest) => Promise<{ sessionId: string; deleted: boolean; nativeDeleted: boolean }>;
       closeAgentSession: (request: AgentSessionCloseRequest) => Promise<{ sessionId: string; closed: boolean }>;
       startAgentTurn: (request: AgentTurnStartRequest) => Promise<{ sessionId: string; turnId: string }>;
       steerAgentTurn: (request: AgentTurnSteerRequest) => Promise<{
@@ -881,6 +889,7 @@ declare global {
         turnId: string;
         interruptRequested: boolean;
       }>;
+      compactAgentSession: (request: { rootPath: string; sessionId: string }) => Promise<{ sessionId: string; compacted: boolean }>;
       resolveAgentApproval: (request: AgentApprovalResolution) => Promise<{
         sessionId: string;
         requestId: string;

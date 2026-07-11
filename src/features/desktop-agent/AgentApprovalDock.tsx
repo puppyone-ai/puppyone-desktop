@@ -7,12 +7,13 @@ type AgentApprovalDockProps = {
   queueLength: number;
   resolving: boolean;
   onResolve: (decision: AgentApprovalDecision) => void;
+  runtimeLabel?: string;
 };
 
-export function AgentApprovalDock({ approval, queueLength, resolving, onResolve }: AgentApprovalDockProps) {
+export function AgentApprovalDock({ approval, queueLength, resolving, onResolve, runtimeLabel = "Agent" }: AgentApprovalDockProps) {
   const canAllowForSession = approval.availableDecisions.includes("acceptForSession");
   return (
-    <section className="desktop-agent-approval" aria-label="Codex approval required" aria-live="polite">
+    <section className="desktop-agent-approval" aria-label={`${runtimeLabel} approval required`} aria-live="polite">
       <div className="desktop-agent-approval-heading">
         <ShieldAlert size={15} />
         <strong>{approval.title}</strong>
@@ -41,7 +42,7 @@ export function AgentApprovalDock({ approval, queueLength, resolving, onResolve 
       )}
       {approval.reason && <p>{approval.reason}</p>}
       {approval.policyChangeRequested && (
-        <p className="desktop-agent-approval-policy-note">Codex proposed a reusable policy change. This UI will approve only the explicit option you choose below.</p>
+        <p className="desktop-agent-approval-policy-note">{runtimeLabel} proposed a reusable policy change. This UI will approve only the explicit option you choose below.</p>
       )}
       <div className="desktop-agent-approval-actions">
         <button

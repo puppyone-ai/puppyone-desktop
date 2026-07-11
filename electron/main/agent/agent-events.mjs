@@ -1,6 +1,7 @@
 const AGENT_EVENT_TYPES = new Set([
   "session.started",
   "session.resumed",
+  "session.updated",
   "session.closed",
   "turn.started",
   "turn.completed",
@@ -18,6 +19,9 @@ const AGENT_EVENT_TYPES = new Set([
   "usage.updated",
   "approval.requested",
   "approval.resolved",
+  "question.requested",
+  "question.resolved",
+  "provider.activity",
   "provider.warning",
   "provider.error",
 ]);
@@ -58,6 +62,7 @@ const SECRET_OBJECT_KEYS = new Set([
 ]);
 
 export function isAgentEventEnvelope(value) {
+  const runtimeId = value?.runtimeId ?? value?.provider;
   return Boolean(
     value
     && typeof value === "object"
@@ -66,10 +71,12 @@ export function isAgentEventEnvelope(value) {
     && value.sequence > 0
     && typeof value.sessionId === "string"
     && value.sessionId.length > 0
-    && value.provider === "codex"
-    && (value.providerSessionId === null || typeof value.providerSessionId === "string")
-    && (value.turnId === null || typeof value.turnId === "string")
-    && (value.itemId === null || typeof value.itemId === "string")
+    && value.sessionId.length <= 256
+    && isRuntimeId(runtimeId)
+    && isRuntimeId(value.provider)
+    && isNullableBoundedId(value.providerSessionId)
+    && isNullableBoundedId(value.turnId)
+    && isNullableBoundedId(value.itemId)
     && typeof value.emittedAt === "string"
     && AGENT_EVENT_TYPES.has(value.type),
   );
@@ -78,6 +85,7 @@ export function isAgentEventEnvelope(value) {
 export function createAgentEventEnvelope({
   sequence,
   sessionId,
+  runtimeId = "codex",
   providerSessionId = null,
   turnId = null,
   itemId = null,
@@ -89,18 +97,29 @@ export function createAgentEventEnvelope({
     schemaVersion: 1,
     sequence,
     sessionId,
-    provider: "codex",
+    runtimeId,
+    // `provider` remains as a compatibility alias for persisted v1 Codex
+    // records and older renderer projections. New code should use runtimeId.
+    provider: runtimeId,
     providerSessionId,
     turnId,
     itemId,
     emittedAt,
     type,
-    payload: boundRendererValue(redactSecrets(payload)),
+    payload: redactSecrets(boundRendererValue(payload)),
   };
   if (!isAgentEventEnvelope(event)) {
     throw new TypeError(`Invalid normalized AgentEvent: ${String(type)}`);
   }
   return event;
+}
+
+function isRuntimeId(value) {
+  return typeof value === "string" && /^[a-z][a-z0-9._-]{0,63}$/i.test(value);
+}
+
+function isNullableBoundedId(value) {
+  return value === null || (typeof value === "string" && value.length > 0 && value.length <= 256);
 }
 
 export function redactSecrets(value, depth = 0) {
@@ -111,6 +130,7 @@ export function redactSecrets(value, depth = 0) {
 
   const next = {};
   for (const [key, entry] of Object.entries(value)) {
+    if (isUnsafeObjectKey(key)) continue;
     if (isSecretObjectKey(key)) {
       next[key] = "[redacted]";
     } else {
@@ -145,9 +165,14 @@ export function boundRendererValue(value, maxStringLength = 32 * 1024, depth = 0
   if (!value || typeof value !== "object") return value;
   const next = {};
   for (const [key, entry] of Object.entries(value).slice(0, 200)) {
+    if (isUnsafeObjectKey(key)) continue;
     next[key] = boundRendererValue(entry, maxStringLength, depth + 1);
   }
   return next;
+}
+
+function isUnsafeObjectKey(key) {
+  return key === "__proto__" || key === "prototype" || key === "constructor";
 }
 
 export function countTextBytes(value) {

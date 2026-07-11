@@ -1,0 +1,254 @@
+/* Desktop Agent is an isolated, container-responsive surface. All colors are
+   semantic PuppyOne tokens so the same component works in every theme. */
+.desktop-agent-panel {
+  container: desktop-agent / inline-size;
+  background: var(--po-canvas);
+  color: var(--po-text);
+  font-family: var(--po-font-sans);
+}
+
+.desktop-agent-panel * { box-sizing: border-box; }
+
+.desktop-agent-session-header {
+  min-height: 44px;
+  flex-basis: 44px;
+  padding: 0 10px 0 14px;
+  background: var(--po-canvas);
+}
+
+.desktop-agent-session-header > .desktop-agent-session-heading {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.desktop-agent-session-heading strong { font-size: var(--po-text-size-meta); }
+.desktop-agent-session-heading span { display: flex; align-items: center; gap: 5px; }
+.desktop-agent-session-heading i { width: 5px; height: 5px; border-radius: 50%; background: var(--po-text-subtle); }
+.desktop-agent-session-heading i.is-ready,
+.desktop-agent-session-heading i.is-running { background: var(--po-success); }
+.desktop-agent-session-heading i.is-failed,
+.desktop-agent-session-heading i.is-runtime-exited,
+.desktop-agent-session-heading i.is-unavailable { background: var(--po-danger); }
+
+.desktop-agent-session-header > .desktop-agent-session-header-actions {
+  display: inline-flex;
+  overflow: visible;
+  flex-direction: row;
+  gap: 1px;
+}
+
+.desktop-agent-history-menu {
+  position: absolute;
+  z-index: 42;
+  top: calc(100% + 5px);
+  right: 0;
+  display: grid;
+  width: min(330px, calc(100cqw - 18px));
+  max-height: min(440px, 65vh);
+  overflow: auto;
+  padding: 5px;
+  border: 1px solid var(--po-border);
+  border-radius: var(--po-menu-radius);
+  background: var(--po-menu-bg);
+  box-shadow: var(--po-menu-shadow);
+}
+
+.desktop-agent-history-menu > header {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 8px 6px;
+  color: var(--po-text-muted);
+  font-size: var(--po-text-size-caption);
+}
+
+.desktop-agent-history-menu > p { margin: 10px; color: var(--po-text-muted); font-size: var(--po-text-size-caption); }
+.desktop-agent-history-menu > button {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--po-menu-item-radius);
+  background: transparent;
+  color: var(--po-text);
+  text-align: left;
+  cursor: pointer;
+}
+.desktop-agent-history-menu > button:hover,
+.desktop-agent-history-menu > button.is-active { background: var(--po-hover); }
+.desktop-agent-history-menu > button strong { overflow: hidden; font-size: var(--po-text-size-caption); text-overflow: ellipsis; white-space: nowrap; }
+.desktop-agent-history-menu > button span { overflow: hidden; color: var(--po-text-muted); font-size: var(--po-text-size-micro); text-overflow: ellipsis; white-space: nowrap; }
+.desktop-agent-history-menu > button time { grid-row: 1 / span 2; grid-column: 2; align-self: center; color: var(--po-text-subtle); font-size: var(--po-text-size-micro); }
+
+.desktop-agent-transcript { padding: 18px clamp(14px, 4cqw, 28px) 28px; overflow-anchor: none; }
+.desktop-agent-virtual-canvas { position: relative; width: 100%; min-width: 0; }
+.desktop-agent-virtual-row { position: absolute; top: 0; left: 0; width: 100%; min-width: 0; padding-bottom: 9px; will-change: transform; }
+
+.desktop-agent-message { max-width: 100%; margin: 0; }
+.desktop-agent-message.is-user {
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--po-divider);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--po-inset) 45%, transparent);
+}
+.desktop-agent-message.is-assistant { padding: 5px 2px 2px; }
+.desktop-agent-message-role { margin-bottom: 6px; color: var(--po-text-subtle); letter-spacing: 0.01em; }
+.desktop-agent-message-text { font-size: var(--po-text-size-body); line-height: var(--po-line-height-relaxed); }
+
+.desktop-agent-markdown {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--po-text);
+  font-size: var(--po-text-size-body);
+  line-height: var(--po-line-height-relaxed);
+}
+.desktop-agent-markdown > :first-child { margin-top: 0; }
+.desktop-agent-markdown > :last-child { margin-bottom: 0; }
+.desktop-agent-markdown p { margin: 0.55em 0; white-space: pre-wrap; }
+.desktop-agent-markdown h1,
+.desktop-agent-markdown h2,
+.desktop-agent-markdown h3,
+.desktop-agent-markdown h4 { margin: 1em 0 0.4em; line-height: 1.3; }
+.desktop-agent-markdown h1 { font-size: 1.28em; }
+.desktop-agent-markdown h2 { font-size: 1.17em; }
+.desktop-agent-markdown h3,
+.desktop-agent-markdown h4 { font-size: 1.06em; }
+.desktop-agent-markdown ul,
+.desktop-agent-markdown ol { margin: 0.5em 0; padding-left: 1.45em; }
+.desktop-agent-markdown li { margin: 0.22em 0; }
+.desktop-agent-markdown blockquote { margin: 0.7em 0; padding-left: 10px; border-left: 2px solid var(--po-border-strong); color: var(--po-text-muted); white-space: pre-wrap; }
+.desktop-agent-markdown a { color: var(--po-accent-text); text-underline-offset: 2px; }
+.desktop-agent-markdown :not(pre) > code { padding: 0.1em 0.32em; border: 1px solid var(--po-border-subtle); border-radius: 4px; background: var(--po-inset); font-family: var(--po-font-mono); font-size: 0.92em; }
+
+.desktop-agent-code-block { margin: 9px 0; overflow: hidden; border: 1px solid var(--po-divider); border-radius: 8px; background: color-mix(in srgb, var(--po-inset) 64%, var(--po-canvas)); }
+.desktop-agent-code-block > div { display: flex; min-height: 28px; align-items: center; justify-content: space-between; padding: 0 8px; border-bottom: 1px solid var(--po-divider); color: var(--po-text-muted); font-size: var(--po-text-size-micro); }
+.desktop-agent-code-block button { display: inline-flex; align-items: center; gap: 4px; padding: 3px 5px; border: 0; border-radius: 4px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.desktop-agent-code-block button:hover { background: var(--po-hover); color: var(--po-text); }
+.desktop-agent-code-block pre { max-height: 360px; margin: 0; overflow: auto; padding: 10px; font-family: var(--po-font-mono); font-size: var(--po-text-size-caption); line-height: 1.55; tab-size: 2; }
+
+.desktop-agent-stream-caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; background: var(--po-text-muted); vertical-align: -0.13em; animation: desktop-agent-caret 0.9s step-end infinite; }
+@keyframes desktop-agent-caret { 50% { opacity: 0; } }
+
+.desktop-agent-activity { margin: 0; }
+.desktop-agent-activity.has-review { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.desktop-agent-activity.has-review .desktop-agent-activity-detail { grid-column: 1 / -1; }
+.desktop-agent-activity-summary { min-height: 30px; padding-inline: 4px; }
+.desktop-agent-activity-summary small { color: var(--po-text-subtle); }
+.desktop-agent-review-change {
+  margin-right: 4px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--po-accent);
+  font: inherit;
+  font-size: var(--po-text-size-micro);
+  cursor: pointer;
+}
+.desktop-agent-review-change:hover { background: var(--po-hover); }
+.desktop-agent-inline-part { padding: 5px 4px; color: var(--po-text-muted); font-size: var(--po-text-size-caption); }
+.desktop-agent-inline-part.is-muted { opacity: 0.75; }
+
+.desktop-agent-composer-shell { position: relative; z-index: 8; flex: 0 0 auto; padding: 0 11px 10px; background: linear-gradient(to bottom, transparent, var(--po-canvas) 10px); }
+.desktop-agent-composer-shell > .desktop-agent-composer {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--po-border-strong);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--po-panel-raised) 86%, var(--po-canvas));
+  box-shadow: 0 5px 18px color-mix(in srgb, var(--po-shadow) 12%, transparent);
+}
+.desktop-agent-composer textarea { min-height: 52px; max-height: 180px; padding: 2px 3px; font-size: var(--po-text-size-body); }
+.desktop-agent-composer-footer { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 6px; }
+.desktop-agent-composer-selectors { display: flex; min-width: 0; align-items: center; gap: 2px; overflow: hidden; }
+.desktop-agent-composer-selectors label { min-width: 0; }
+.desktop-agent-composer-selectors select {
+  max-width: 140px;
+  height: 25px;
+  overflow: hidden;
+  padding: 0 19px 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: var(--po-text-size-caption);
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.desktop-agent-composer-selectors select:hover { background: var(--po-hover); color: var(--po-text); }
+.desktop-agent-composer-tools { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; }
+.desktop-agent-composer-tools > button {
+  position: static;
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--po-text-muted);
+  cursor: pointer;
+}
+.desktop-agent-composer-tools > button:hover:not(:disabled) { background: var(--po-hover); color: var(--po-text); }
+.desktop-agent-composer-tools > button.desktop-agent-composer-action { background: var(--po-text); color: var(--po-canvas); }
+.desktop-agent-composer-tools > button.desktop-agent-composer-action.is-stop { background: var(--po-danger); color: var(--po-text-inverse); }
+.desktop-agent-composer-tools > button:disabled { cursor: default; opacity: 0.35; }
+.desktop-agent-composer-hint { position: static; margin: 4px 5px 0; color: var(--po-text-subtle); font-size: var(--po-text-size-micro); }
+
+.desktop-agent-reference-chips { display: flex; flex-wrap: wrap; gap: 4px; padding-bottom: 2px; }
+.desktop-agent-reference-chips > span { display: inline-flex; max-width: 100%; align-items: center; gap: 3px; padding: 3px 4px 3px 6px; border: 1px solid var(--po-divider); border-radius: 6px; background: var(--po-inset); color: var(--po-text-muted); font-size: var(--po-text-size-micro); }
+.desktop-agent-reference-chips span > button { display: grid; width: 16px; height: 16px; place-items: center; padding: 0; border: 0; border-radius: 3px; background: transparent; color: inherit; }
+.desktop-agent-reference-chips span > button:hover { background: var(--po-hover); color: var(--po-text); }
+
+.desktop-agent-command-menu { position: absolute; right: 11px; bottom: calc(100% + 4px); left: 11px; display: grid; max-height: 260px; overflow: auto; padding: 4px; border: 1px solid var(--po-border); border-radius: 9px; background: var(--po-menu-bg); box-shadow: var(--po-menu-shadow); }
+.desktop-agent-command-menu button { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--po-text); font: inherit; font-size: var(--po-text-size-caption); text-align: left; }
+.desktop-agent-command-menu button:hover { background: var(--po-hover); }
+.desktop-agent-command-menu button span { overflow: hidden; color: var(--po-text-muted); text-overflow: ellipsis; white-space: nowrap; }
+
+.desktop-agent-blocking-dock { flex: 0 0 auto; margin: 0 11px 9px; padding: 10px; border: 1px solid color-mix(in srgb, var(--po-warning) 45%, var(--po-divider)); border-radius: 10px; background: color-mix(in srgb, var(--po-warning) 7%, var(--po-panel)); }
+.desktop-agent-question-dock > header { display: flex; align-items: center; gap: 6px; font-size: var(--po-text-size-caption); }
+.desktop-agent-question-dock > header span { margin-left: auto; color: var(--po-text-muted); }
+.desktop-agent-question-dock fieldset { min-width: 0; margin: 9px 0 0; padding: 8px; border: 1px solid var(--po-divider); border-radius: 7px; }
+.desktop-agent-question-dock legend { padding: 0 4px; color: var(--po-text-muted); font-size: var(--po-text-size-micro); }
+.desktop-agent-question-dock p { margin: 0 0 7px; font-size: var(--po-text-size-caption); line-height: 1.4; }
+.desktop-agent-question-dock label { display: flex; align-items: flex-start; gap: 6px; margin: 5px 0; font-size: var(--po-text-size-caption); }
+.desktop-agent-question-dock label span { display: flex; flex-direction: column; }
+.desktop-agent-question-dock label small { color: var(--po-text-muted); }
+.desktop-agent-question-input { width: 100%; height: 29px; border: 1px solid var(--po-divider); border-radius: 6px; background: var(--po-inset); color: var(--po-text); }
+.desktop-agent-question-dock footer { display: flex; justify-content: flex-end; gap: 6px; margin-top: 9px; }
+.desktop-agent-question-dock footer button { display: inline-flex; min-height: 27px; align-items: center; gap: 4px; padding: 0 9px; border: 1px solid var(--po-divider); border-radius: 6px; background: var(--po-inset); color: var(--po-text); font: inherit; font-size: var(--po-text-size-caption); }
+.desktop-agent-question-dock footer button.is-primary { border-color: var(--po-accent); background: var(--po-accent); color: var(--po-text-inverse); }
+
+@container desktop-agent (max-width: 559px) {
+  .desktop-agent-transcript { padding-inline: 12px; }
+  .desktop-agent-composer-shell { padding-inline: 8px; }
+  .desktop-agent-composer-selectors select { max-width: 100px; }
+  .desktop-agent-composer-hint { display: none; }
+  .desktop-agent-history-menu { width: calc(100cqw - 12px); }
+}
+
+@container desktop-agent (max-width: 419px) {
+  .desktop-agent-session-header { padding-left: 10px; }
+  .desktop-agent-transcript { padding: 12px 9px 20px; }
+  .desktop-agent-session-header-actions .desktop-agent-icon-button { width: 26px; }
+  .desktop-agent-composer-selectors label:nth-last-child(n + 2) { display: none; }
+  .desktop-agent-composer-selectors select { max-width: 150px; }
+  .desktop-agent-readiness { grid-template-columns: auto minmax(0, 1fr); margin-inline: 8px; }
+  .desktop-agent-readiness > button { grid-column: 2; justify-self: start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-agent-stream-caret { animation: none; }
+  .desktop-agent-virtual-row { will-change: auto; }
+}

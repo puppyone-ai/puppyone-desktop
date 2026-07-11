@@ -1,602 +1,368 @@
-# Desktop Agent Architecture
+# Desktop Local Agent Chat architecture
 
-This directory is the architecture home for a structured coding-agent
-experience in PuppyOne Desktop. It defines how the right sidebar can present a
-real chat surface while delegating reasoning and tool execution to a user's
-Codex, Claude Code, Cursor, OpenCode, Hermes, or another compatible local
-agent runtime.
+Status: implemented behind the existing experimental `desktopAgentChat` gate.
+OpenCode is the primary harness; the existing Codex app-server integration is a
+direct-CLI compatibility runtime. Terminal remains a separate sibling surface.
 
-The terminal remains a first-class sibling surface. The agent experience does
-not parse terminal escape sequences or scrape a terminal UI into chat bubbles.
+This document is intentionally made of prose and plain-text diagrams. It does
+not require a diagram renderer.
 
-## Status legend
-
-- **Implemented** describes behavior present in the current codebase.
-- **Proposed** describes the accepted target contract that still requires code
-  and test changes.
-- **Product gate** describes a provider-specific legal, authentication, billing,
-  or protocol decision that must be resolved before that adapter ships.
-
-Unless a section is explicitly marked **Implemented**, this package describes
-the **Proposed** architecture.
-
-## Implementation status (July 2026)
-
-**Experimental and off by default:** Terminal remains the normal right-sidebar
-surface for local workspaces. The build-time `desktopAgentChat`
-availability flag and the user's explicit **Settings → Experimental → Agent
-Chat** opt-in add a separate Chat icon to the application header. Turning the
-experiment off removes only that Chat icon; it does not disable, rename, or
-hide Terminal.
-
-**Implemented behind that gate:** the first Codex vertical slice provides a structured
-Chat surface beside Terminal, Codex executable discovery, app-server
-initialization over stdio JSONL/JSON-RPC, existing-account and model reads,
-thread create/resume, streamed normalized events, command/file approvals,
-interrupt, bounded live replay, a retained local session journal, owner-bound
-IPC, redacted diagnostics, and symmetric window/app cleanup.
-
-The tested minimum Codex CLI/app-server version is `0.144.1`. Older versions are
-reported as unsupported rather than being treated as implicitly compatible.
-
-**Known gaps:** PuppyOne does not host Codex login yet; users authenticate with
-Codex externally and use Refresh. Experimental structured questions,
-permission approvals, MCP elicitations, dynamic tools, and attestation fail
-closed and remain Proposed. The local journal is deliberately bounded, so an
-old or very large restored transcript can be marked partial. Claude, Cursor,
-ACP, Cloud execution, fork, and steer remain Proposed or Product gated as
-described below.
-
-## Documents
-
-1. [Right Sidebar Agent Chat](right-sidebar.md)
-   - Product hierarchy, independent Chat/Terminal header actions, transcript, approval and
-     question docks, composer, resize, focus, accessibility, and state
-     ownership.
-2. [Codex Implementation Brief](implementation-brief.md)
-   - Copy-paste handoff for another agent to implement the first Codex-backed
-     vertical slice without expanding into the gated providers.
-
-## Decision summary
-
-**Implemented for Codex; Proposed for additional providers:** A structured
-Agent Chat panel and the existing Terminal panel share the resizable right-side
-area but remain separate surfaces selected by two independent header icons.
-There are no Chat/Terminal tabs inside the sidebar.
-
-The renderer consumes one normalized event model. Provider-specific protocols
-stay behind adapters in the Electron main process:
-
-```mermaid
-flowchart LR
-  UI["Header icons<br/>Chat / Terminal<br/>independent right panels"]
-  Bridge["Typed preload bridge"]
-  Service["AgentService<br/>session ownership + event normalization"]
-  Codex["Codex adapter<br/>app-server JSON-RPC"]
-  Claude["Claude adapter<br/>Agent SDK"]
-  Cursor["Cursor adapter<br/>SDK or stream-json CLI"]
-  ACP["ACP adapter<br/>JSON-RPC over stdio"]
-  CodexRuntime["User Codex runtime"]
-  ClaudeRuntime["Claude runtime"]
-  CursorRuntime["Cursor runtime"]
-  OtherRuntime["OpenCode / Hermes / other ACP agent"]
-
-  UI <-->|"agent:* IPC"| Bridge
-  Bridge <-->|"authorized requests + events"| Service
-  Service --> Codex --> CodexRuntime
-  Service --> Claude --> ClaudeRuntime
-  Service --> Cursor --> CursorRuntime
-  Service --> ACP --> OtherRuntime
-```
-
-The architecture deliberately separates three concerns:
-
-1. PuppyOne owns presentation, workspace authorization, process lifecycle,
-   and the normalized event journal.
-2. Each adapter owns one provider protocol and maps it to PuppyOne's common
-   session, turn, item, approval, and question contracts.
-3. The user's selected runtime owns model behavior, provider authentication,
-   provider-native conversation state, tools, rules, skills, and inference
-   billing.
-
-## Current baseline
-
-The following behavior is **Implemented**:
-
-- `RightTerminalPanel.tsx` mounts xterm in the right sidebar and communicates
-  through the context-isolated preload bridge.
-- `electron/main/terminal-service.mjs` owns `node-pty` sessions, confines the
-  requested working directory to the authorized workspace, and scopes every
-  terminal to its owning `WebContents`.
-- The sidebar is resizable from 420px to 760px and is available only for local
-  workspaces.
-- Window teardown and app shutdown close owned terminal sessions.
-- Workspace watchers, Git status, edit review, and file preview already react
-  to filesystem changes independently from the terminal.
-- `RightTerminalPanel` and `RightAgentPanel` remain separate components. The
-  application shell keeps them in independent right-sidebar surface slots so
-  switching header icons does not recreate the Terminal PTY or active Agent
-  projection.
-- `AgentService` and `CodexAppServerAdapter` own Codex discovery, app-server
-  protocol state, session ownership, normalized replay, approvals,
-  persistence, and cleanup in Electron main.
-- The renderer projects only normalized `AgentEvent` envelopes and never sees
-  Codex credentials, environment variables, or raw protocol unions.
-
-Those boundaries remain valid. Agent Chat is additive and does not move model
-processes, credentials, or tool execution into the renderer.
-
-## Product contract
-
-The Desktop Agent feature owns:
-
-- provider discovery and readiness state;
-- provider, model, and operating-mode selection;
-- agent session creation, restoration, and explicit reset;
-- user messages and streamed assistant output;
-- normalized tool, command, file-change, plan, usage, and error events;
-- approval and structured-question interactions;
-- interrupt, steer, and follow-up behavior when supported;
-- a provider capability model that lets the UI hide unsupported actions;
-- local event-journal metadata needed to restore the PuppyOne presentation.
-
-It does not own:
-
-- raw terminal emulation, PTY sizing, or shell history;
-- provider inference implementation or model quality;
-- provider credentials copied out of the provider's supported auth flow;
-- Git source-of-truth calculations or diff rendering outside compact chat
-  summaries;
-- Cloud workspace execution in the first implementation phase;
-- an attempt to make every provider expose identical advanced behavior.
-
-## Layer boundaries
-
-### Renderer: Agent Chat presentation
-
-**Implemented for the Codex vertical slice:** `src/features/desktop-agent/`
-
-The renderer owns view state and presentation only:
-
-- selected Chat or Terminal surface;
-- session list and active session metadata;
-- transcript projection from normalized events;
-- composer state and attachments;
-- compact plan, tool, command, and diff cards;
-- approval and question docks;
-- stop, retry, resume, and reset controls;
-- provider capability-aware labels and disabled states.
-
-The renderer must not spawn provider processes, read credential files, infer
-approval safety, or send arbitrary executable strings to a shell.
-
-See [Right Sidebar Agent Chat](right-sidebar.md) for the UI and state contract.
-
-### Preload: narrow typed bridge
-
-**Implemented for the Codex vertical slice:** `electron/preload.cjs` plus types in
-`src/types/electron.d.ts`.
-
-The bridge exposes explicit operations rather than a generic process API:
+## Product architecture
 
 ```text
-agent:providers-discover
-agent:models-list
-agent:account-read
-agent:session-create
-agent:session-resume
-agent:session-close
-agent:turn-start
-agent:turn-steer
-agent:turn-interrupt
-agent:approval-resolve
-agent:question-resolve
-agent:event
-agent:session-exit
+PuppyOne Desktop
+|
++-- File routing / workspace shell
+|     +-- Editor surface
+|     +-- Changes surface
+|     +-- Right Sidebar
+|           +-- Terminal (independent PTY surface)
+|           +-- Local Agent Chat
+|
++-- Local Agent Chat
+      +-- Presentation (React, Cursor-style hierarchy)
+      |     +-- compact session header + history
+      |     +-- virtual timeline
+      |     +-- part/tool renderer registry
+      |     +-- permission/question docks
+      |     +-- runtime/model/mode composer
+      |
+      +-- Application (provider-neutral)
+      |     +-- workspace-scoped AgentSessionController
+      |     +-- explicit phase/state machine
+      |     +-- normalized event projection
+      |     +-- sequence repair + 32 ms stream batching
+      |     +-- session draft/scroll/measurement cache
+      |
+      +-- Typed preload IPC
+      |     +-- explicit session/turn/control calls only
+      |     +-- no spawn, stdin, environment, HTTP proxy, URL or password
+      |
+      +-- Electron main authority
+            +-- AgentService: owner/session/order/replay/journal
+            +-- AgentRuntimeHost
+            |     +-- AgentRuntimeRegistry
+            |     +-- OpenCodeSidecarRuntime (primary)
+            |     +-- CodexAppServerRuntime (compatibility)
+            +-- workspace/reference authorization
+            +-- process shutdown and secret redaction
 ```
 
-Every mutation carries an application session ID. Requests that touch a
-workspace also carry its root path so the main process can apply the existing
-window-to-workspace authorization before forwarding them to `AgentService`.
+## The two concepts that must not be mixed
 
-The bridge does not expose raw `spawn`, environment variables, stdin, filesystem
-paths outside the authorized workspace, or provider tokens.
+```text
+Agent Runtime / Harness                    Model Provider
+------------------------------------       -----------------------------
+OpenCode sidecar                           OpenAI
+Codex app-server                           Anthropic
+future Claude/Cursor direct adapter        Google / OpenRouter / others
 
-### Main process: AgentService
+Owns loop, tools, prompt, session,          Owns inference authentication,
+permission, MCP, skills, compaction         model access and billing
+```
 
-**Implemented locations:**
+Selecting OpenCode does not claim to reuse a user's Codex or Cursor
+subscription. Selecting Codex explicitly uses the local Codex app-server and
+its external authentication. The renderer presents capabilities returned by a
+runtime; it never branches lifecycle behavior on a runtime name.
+
+## Layering and one-way dependencies
+
+```text
+components/                         React presentation
+      |
+      v
+application/                        state machine and use cases
+      |
+      v
+agentProjection.ts + agentTypes.ts  pure renderer-safe domain
+      |
+      v
+typed preload declarations          narrow transport DTOs
+      |
+      v
+Electron AgentService               authority and normalized journal
+      |
+      v
+runtime/ AgentRuntimePort            provider-neutral execution contract
+      |
+      +--> runtimes/opencode/        harness adapter and main-only sidecar
+      +--> adapters/codex-*          direct CLI adapter
+```
+
+The runtime layer never imports React. Presentation never imports Electron main
+or runtime-native types. OpenCode/Codex payloads are normalized and bounded
+before they cross IPC. These rules are what “Core/Feature one-way dependency”
+means for this feature.
+
+## Source layout
 
 ```text
 electron/main/agent/
-  agent-service.mjs
-  agent-events.mjs
-  agent-persistence.mjs
-  provider-discovery.mjs
-  jsonl-rpc-connection.mjs
+  agent-events.mjs                    versioned event envelope/redaction
+  agent-persistence.mjs               v2 bounded multi-session journal
+  agent-reference-authorization.mjs   realpath and file-size authority
+  agent-service.mjs                   session/window/turn orchestration
+  runtime/
+    agent-runtime-port.mjs            required port + capability vocabulary
+    agent-runtime-registry.mjs        registry + main-owned host
+    executable-discovery.mjs          bounded generic discovery
+  runtimes/opencode/
+    opencode-manifest.mjs             release/source/capability pin
+    opencode-discovery.mjs            exact bundle integrity + fallback
+    opencode-sidecar-host.mjs         lazy loopback process lifecycle
+    opencode-http-client.mjs          allowlisted HTTP/SSE client
+    opencode-events.mjs               native-to-AgentEvent mapping
+    opencode-security-policy.mjs      managed config + permission policy
+    opencode-project-instructions.mjs canonical project instruction loader
+    opencode-sidecar-adapter.mjs      AgentRuntimePort implementation
   adapters/
-    codex-app-server-adapter.mjs
-electron/main/ipc/agent-ipc.mjs
+    codex-app-server-adapter.mjs      direct compatibility runtime
+
+src/features/desktop-agent/
+  application/
+    AgentSessionController.ts         framework-independent controller
+    controllerRegistry.ts             LRU inactive-controller lifetime
+  components/
+    AgentPartRenderer.tsx             discriminated part registry
+    AgentQuestionDock.tsx             typed blocking questions
+    SafeMarkdown.tsx                  no-innerHTML Markdown surface
+  agentTypes.ts                       renderer DTO contract
+  agentProjection.ts                  pure event -> turn/part/row projection
+  AgentTranscript.tsx                 <=120 mounted virtual rows
+  AgentComposer.tsx                   /, @, files, runtime/model/mode
+  RightAgentPanel.tsx                 view composition only
+  desktop-agent.css                   isolated responsive PuppyOne tokens
+
+vendor/opencode/
+  runtime-manifest.json               immutable release artifact hashes
+  PROMPT_MANIFEST.json                source prompt hashes/order
+  SOURCE_ADOPTION.md                  exact source ledger
+  LICENSE                             upstream MIT text
 ```
 
-Claude, Cursor, and ACP adapters in the earlier proposed component map remain
-unbuilt and are not represented by placeholder runtime files.
-
-`AgentService` is the only owner of live agent sessions. Each session record
-contains at least:
+## Three owners of truth
 
 ```text
-application session id
-owning WebContents id
-canonical workspace root
-provider id and adapter instance
-provider-native session/thread id
-active turn id and state
-monotonic event sequence
-capability snapshot
-process or SDK cleanup handle
+OpenCode or Codex native truth
+  model auth, agent loop, tools, provider session, native history
+                    |
+                    v
+PuppyOne main-process truth
+  runtime selection, process health, canonical workspace, window owner,
+  approval/question correlation, normalized sequence, bounded journal
+                    |
+                    v
+Renderer presentation truth
+  turns/parts/rows, expanded cards, draft, selected controls,
+  scroll anchor and row measurements
 ```
 
-Its responsibilities are:
+React unmount, Sidebar hide and window blur do not terminate a turn. Explicit
+Stop, a terminal runtime event, window destruction or app quit can do so. A
+window/session close awaits a bounded native abort before releasing an active
+OpenCode adapter, so a shared sidecar cannot leave an ownerless turn running.
+App quit also waits when inspection started the sidecar but no application
+session was created; runtime-resource state is tracked separately from session
+count so that process cannot become an orphan.
 
-- authorize and canonicalize the workspace before adapter creation;
-- discover an executable through the user's login-shell environment, then
-  spawn the resolved absolute path without `shell: true`;
-- initialize adapters and perform protocol handshakes;
-- normalize provider events and enforce ordering;
-- correlate pending approvals/questions with the active session and turn;
-- reject responses to stale or foreign requests;
-- interrupt and dispose processes symmetrically;
-- limit line size, buffered output, journal size, and retry behavior;
-- remove credentials and sensitive values from diagnostic logs;
-- close window-owned sessions on renderer destruction and all sessions on app
-  quit.
+## Main-process runtime contract
 
-Terminal sessions and agent sessions use separate services. A provider can run
-terminal tools internally without becoming a PuppyOne PTY session.
-
-### Provider adapters
-
-Every adapter implements the smallest common interface and advertises optional
-capabilities instead of relying on provider-name checks in the UI:
-
-```ts
-type AgentAdapter = {
-  discover(): Promise<ProviderReadiness>;
-  connect(options: AdapterConnectOptions): Promise<AdapterConnection>;
-  listModels?(): Promise<AgentModel[]>;
-  readAccount?(): Promise<AgentAccountState>;
-  createSession(input: CreateSessionInput): Promise<ProviderSession>;
-  resumeSession(input: ResumeSessionInput): Promise<ProviderSession>;
-  startTurn(input: StartTurnInput): Promise<ProviderTurn>;
-  steerTurn?(input: SteerTurnInput): Promise<void>;
-  interruptTurn(input: InterruptTurnInput): Promise<void>;
-  resolveApproval?(input: ApprovalResolution): Promise<void>;
-  resolveQuestion?(input: QuestionResolution): Promise<void>;
-  closeSession(input: CloseSessionInput): Promise<void>;
-  dispose(): Promise<void>;
-};
-```
-
-Representative capabilities include:
+Every adapter provides the required `AgentRuntimePort` methods:
 
 ```text
-streamingText
-structuredToolEvents
-commandOutputStreaming
-fileChangeEvents
-manualApprovals
-structuredQuestions
-resume
-fork
-steer
-attachments
-modelSelection
-usage
-accountState
+inspect
+createSession / resumeSession / readHistory
+startTurn / interruptTurn
+dispose
+
+optional by capability:
+steer, queue, fork, compact, approval, question,
+attachment, context, model, mode, commands, MCP and skills
 ```
 
-Unknown provider fields are ignored and retained only in an optional redacted
-diagnostic payload. A new provider event must not crash the event reader.
+The descriptor identifies the harness. Models returned by `inspect()` identify
+model providers separately. `AgentRuntimeRegistry` selects the highest-priority
+ready runtime unless the user explicitly selects one. `AgentRuntimeHost` owns
+registry shutdown. `AgentService` applies the same create/resume/turn/replay
+lifecycle to every runtime.
 
-## Normalized domain model
-
-**Implemented for the Codex event vocabulary in the implementation brief.**
-Question events from the broader proposed vocabulary remain capability-gated.
-
-PuppyOne uses provider-neutral session, turn, and item concepts:
-
-- **Session** is a durable conversation bound to one provider and workspace.
-- **Turn** begins with one user submission and ends in a terminal status.
-- **Item** is a displayable or actionable unit inside a turn.
-- **Request** is a blocking approval or structured question owned by a turn.
-
-All adapter output is wrapped in a versioned envelope:
-
-```ts
-type AgentEvent = {
-  schemaVersion: 1;
-  sequence: number;
-  sessionId: string;
-  provider: "codex" | "claude" | "cursor" | "acp";
-  providerSessionId: string | null;
-  turnId: string | null;
-  itemId: string | null;
-  emittedAt: string;
-  type: AgentEventType;
-  payload: unknown;
-};
-```
-
-The first event vocabulary should cover:
+## OpenCode process and trust boundary
 
 ```text
-session.started              session.resumed
-session.metadata.updated     session.closed
-turn.started                 turn.completed
-turn.failed                  turn.interrupted
-assistant.delta              assistant.completed
-reasoning.summary.delta      plan.updated
-tool.started                 tool.progress
-tool.completed               command.output.delta
-file.change.updated          usage.updated
-approval.requested           approval.resolved
-question.requested           question.resolved
-provider.warning             provider.error
+First Chat inspection or session
+      |
+      v
+discover exact bundled binary, then external install at/above tested 1.17.18 floor
+      |
+      v
+verify release version + archive provenance + executable SHA-256
+      |
+      v
+allocate random 127.0.0.1 port and 32-byte secret
+      |
+      v
+spawn: opencode serve --hostname 127.0.0.1 --port <random>
+      |
+      +--> health polling (bounded)
+      +--> one global SSE connection (reconnecting)
+      +--> allowlisted session/provider/permission/question methods
+      |
+      v
+graceful SIGTERM on app quit; bounded wait; SIGKILL fallback
 ```
 
-Provider-native data is mapped into stable payloads. The UI must not inspect a
-Codex JSON-RPC method, a Claude SDK message class, a Cursor stream-json subtype,
-or an ACP update directly.
+Only Electron main knows the URL, Basic-auth value, executable path or process
+environment. The renderer receives normalized DTOs. The sidecar is lazy so app
+startup and the file Sidebar critical path do not pay its startup cost.
 
-## Session lifecycle
+Release CI stages the immutable `v1.17.18` artifact with
+`scripts/stage-opencode-runtime.mjs`. That command checks archive filename,
+size and SHA-256, verifies `--version`, computes the extracted binary hash and
+writes `verified-runtime.json`. Discovery recomputes the binary hash. A prior
+verified slot is retained when staging an update and is considered after a bad
+current slot. Application releases also remain the outer rollback unit.
 
-**Implemented for create, resume, turn start, approval, interrupt, replay, and
-close.** Steer and structured questions remain Proposed.
+The sidecar runs with an app-owned `OPENCODE_CONFIG_DIR`. Because that upstream
+flag is additive rather than isolating, PuppyOne also redirects the XDG
+config/cache/state roots and OpenCode's home-directory config scan to an
+app-owned profile; OpenCode's provider credential data remains owned by
+OpenCode. Automatic workspace config, workspace/external skills, Claude
+compatibility prompts, external plugins, auto-update, sharing and automatic
+LSP downloads are disabled. This
+prevents a repository checkout or inherited environment variable from
+silently starting an MCP command, loading executable plugin code or replacing
+the permission policy. Native provider authentication remains in OpenCode's
+credential store and provider environment variables remain main-only.
 
-```mermaid
-sequenceDiagram
-  participant UI as Right sidebar
-  participant IPC as Preload / IPC
-  participant AS as AgentService
-  participant PA as Provider adapter
-  participant PR as Provider runtime
+## Prompt and permission composition
 
-  UI->>IPC: create or resume session
-  IPC->>AS: authorized agent request
-  AS->>PA: connect(workspace, provider)
-  PA->>PR: initialize / handshake
-  PR-->>PA: provider session metadata
-  PA-->>AS: normalized session.started
-  AS-->>UI: agent:event
-
-  UI->>AS: turn-start(prompt, attachments)
-  AS->>PA: startTurn
-  PA->>PR: provider-native request
-  loop streamed work
-    PR-->>PA: message / tool / plan / diff event
-    PA-->>AS: normalized AgentEvent
-    AS-->>UI: ordered agent:event
-  end
-  opt approval or question
-    PR-->>PA: blocking request
-    PA-->>AS: approval.requested
-    AS-->>UI: approval dock
-    UI->>AS: approval-resolve
-    AS->>PA: provider-native resolution
-    PA->>PR: allow / deny / answer
-  end
-  PR-->>PA: terminal turn status
-  PA-->>AS: turn.completed / failed / interrupted
-  AS-->>UI: final ordered event
+```text
+OpenCode agent/mode prompt, otherwise provider-specific base prompt
+      + runtime environment and working directory
+      + main-managed global instructions (empty by default)
+      + main-managed MCP instructions (none until explicitly authorized)
+      + main-managed or built-in skills catalog
+      + PuppyOne main-authorized AGENTS.md / CLAUDE.md / CONTEXT.md
+      = native model system input
 ```
 
-Hiding the sidebar never terminates an active turn. The main process continues
-to own it, and the renderer can resubscribe from the latest known sequence when
-the Chat surface remounts. Explicit Stop enters a stopping state until Codex
-emits its authoritative terminal notification. If Codex acknowledges the
-interrupt request but never confirms the terminal state, PuppyOne terminates the
-provider and records `turn.failed`; it never fabricates `turn.interrupted`.
-Explicit Reset closes the session and starts a new one.
+Only the first recognized instruction filename at the canonical workspace root
+is used. It must resolve inside the workspace, be a regular UTF-8 text file and
+be at most 256 KB. It is sent through OpenCode's native per-request `system`
+field, so provider transforms, title, summary and compaction remain upstream.
+For a discovered native slash command, whose upstream command endpoint has no
+`system` field, the same authorized instructions are attached as a bounded
+`text/plain` file part. Unknown `/text` remains an ordinary user prompt.
 
-## Persistence and source of truth
+Every created, resumed, forked or mode-switched session receives a final
+PuppyOne ruleset. Unknown, plugin and MCP tools ask by default; ordinary
+workspace read/search/question/skill/todo operations remain available; `.env`
+reads ask; plan mode denies every non-allowlisted tool, including shell, edit,
+task, plugin and MCP tools. Permission replies still require the
+main-owned window/session/turn/request correlation.
 
-**Implemented with bounded retention:** at most 20 local application sessions,
-400 events and 512 KiB per retained session, with a bounded journal file. Raw
-streaming command-output deltas are not persisted; retained previews and
-diagnostics pass through schema-aware, best-effort credential redaction.
-Truncated journals restore with an explicit partial-history state.
+## Session and event flow
 
-Provider-native histories remain the source of truth for provider resume.
-PuppyOne stores only what it needs to restore its own presentation and mapping:
+```text
+User submit
+   |
+   v
+Controller --typed request--> preload --authorized IPC--> AgentService
+   |                                                   |
+   |                                                   v
+   |                                             runtime adapter
+   |                                                   |
+   |                                             native harness
+   |                                                   |
+   +<-- virtual rows <-- projection <-- AgentEvent <----+
 
-- application session ID;
-- canonical workspace identity;
-- provider and provider-native session ID;
-- user-facing title, timestamps, and last terminal state;
-- selected model/mode when the provider exposes them;
-- a bounded normalized event journal or compact projection checkpoint;
-- last committed event sequence.
+Native delta bursts -> main ordering/redaction -> controller 32 ms batch
+Permission/question -> immediate flush -> typed blocking dock -> correlated reply
+Sequence gap -> bounded replay -> buffered-event reconciliation -> projection
+Terminal event -> turn state + queued follow-up (only when capability permits)
+```
 
-This data belongs under Electron `userData`, not inside the user's repository.
-Conversation transcripts and tool output may still contain user-provided
-sensitive data that no heuristic can identify perfectly, so persistence has an
-explicit retention limit, file permissions, output minimization, and a
-user-facing session-delete path. Provider auth material and environment objects
-are never intentionally added to the event journal.
+The upstream SSE endpoint has no replay cursor. On a successful reconnect,
+the host therefore pauses delivery, reads native messages plus pending
+permissions/questions and session status, projects the active turn again by
+stable IDs, then releases newly buffered events. Main deduplicates blocking
+request IDs. An immediately arriving `idle` event cannot overtake this
+reconciliation barrier and hide the final answer.
 
-When provider history and the local projection disagree, provider history wins
-for model context while PuppyOne rebuilds or marks its local presentation as
-partial. The UI must not silently invent missing tool results.
+The envelope contains `runtimeId`, application `sessionId`, native session ID,
+turn/item IDs, monotonic sequence, time, type and a bounded payload. The old
+`provider` field remains as a migration alias. Journal v1 Codex records migrate
+to v2 records on read.
 
-## Provider strategy and product gates
+## Projection and timeline
 
-| Provider | Proposed integration | Capability expectation | Auth and product gate |
-| --- | --- | --- | --- |
-| Codex | `codex app-server` over stdio JSONL/JSON-RPC | Chat, tools, diffs, command/file approvals, resume, interrupt, model and account state are implemented; questions, fork, and steer remain capability-gated gaps | **Implemented as an off-by-default experiment.** Use Codex-managed ChatGPT OAuth or API-key auth. Identify PuppyOne through `clientInfo`; enterprise distribution may require OpenAI client registration. |
-| Claude Code | TypeScript Claude Agent SDK | Full structured messages, `canUseTool`, questions, session resume/fork, file checkpointing | **Product gate.** Default to customer API keys or supported enterprise/cloud providers. Do not expose Claude.ai subscription login or rate limits without Anthropic approval. |
-| Cursor | Official Cursor SDK; stream-json CLI only as a compatibility experiment | Structured text/tool events, resume, modes, interruption; manual host approval parity requires verification | **Product gate.** The official SDK uses `CURSOR_API_KEY` and token billing. Do not market reuse of a user's Cursor subscription login until Cursor's embedding terms and manual-approval behavior are confirmed. |
-| ACP | ACP client over stdio JSON-RPC | Sessions, streaming messages, tools, diffs, terminal activity, approvals, questions, cancellation; exact optional features are capability-driven | **Proposed extensibility adapter.** Enables OpenCode, Hermes, and other ACP agents while they retain their own provider setup and credentials. |
+```text
+runtime event
+   v
+Normalized AgentEvent
+   v
+AgentTurn[] + discriminated AgentPart[]
+   v
+stable TimelineRow[]
+   v
+binary-search viewport + overscan + measurement cache
+   v
+at most 120 mounted row wrappers
+```
 
-OpenCode and Hermes are optional agents, not an invisible compatibility layer
-in front of Codex, Claude Code, or Cursor. Replacing a user's selected runtime
-with another agent loop would change tool behavior, rules, skills, memory,
-approval semantics, and billing.
+Parts cover user, assistant Markdown, reasoning, plan, tool, command, file
+change, usage, warning/error, permission, question and unknown fallback.
+Repeated deltas update one stable part ID. Renderer registries choose a part or
+tool view. Unknown events show a bounded label rather than raw JSON.
 
-## Approval and question invariants
+`SafeMarkdown` creates React nodes and has no `dangerouslySetInnerHTML` path.
+Only `http`, `https` and `mailto` links become anchors. Tool and command text is
+bounded in main and projection layers.
 
-- The default posture is fail closed: an unrenderable, expired, timed-out, or
-  disconnected approval is denied.
-- PuppyOne never starts a provider with `--force`, `--yolo`, bypass-permissions,
-  or an equivalent unrestricted mode merely to avoid implementing approvals.
-- An approval resolution includes session ID, turn ID, request ID, and the
-  expected provider so stale UI cannot approve a newer action accidentally.
-- Approval UI renders the material scope supplied by Codex: command/cwd,
-  network host and protocol, file/write root, and any reusable-policy proposal.
-- “Always allow” is shown only when the provider returns a durable permission
-  update that PuppyOne can explain before it is persisted.
-- Provider suggestions can be displayed, but the main process and provider
-  remain responsible for enforcing the final rule.
-- Structured questions are not approvals. They use a distinct event and
-  response path and may allow free-form answers when the provider supports it.
-- Closing a window denies or cancels its unresolved requests before cleanup.
+## Security invariants
 
-## Executable discovery and environment
+- Every workspace comes from window state and is realpathed in main.
+- Every attachment and `@` reference must be an absolute, existing regular
+  file whose resolved path stays inside that workspace; count and bytes are
+  bounded. Main opens it without following a final symlink and passes an
+  immutable bounded data snapshot to the harness, closing the authorization/
+  read race without exposing bytes back to Renderer.
+- Session, turn, runtime, request and window ownership must all correlate.
+- Stale permission/question requests fail closed on turn end, interrupt,
+  runtime exit, reload and close.
+- No generic spawn/stdin/environment/HTTP IPC exists.
+- Runtime processes always use an absolute executable and `shell: false`.
+- No auto-approve, `--force`, `--yolo` or permission bypass is enabled.
+- Repository config cannot auto-load MCP commands, external skills or plugins;
+  the managed profile is empty until a main-authorized capability is added.
+- Inherited `OPENCODE_CONFIG*`, `OPENCODE_PERMISSION`, auth-content and server
+  credential overrides are removed before spawn.
+- URL/password/token/environment values are excluded from snapshots, renderer,
+  normal logs and persistence.
+- Persistence is `0600`, atomic, redacted and bounded by sessions, events and
+  bytes.
 
-Electron apps launched from Finder or another desktop shell may not inherit the
-same `PATH` as an interactive terminal. Provider discovery therefore cannot use
-the renderer environment or assume `codex`, `claude`, or `cursor-agent` is
-directly available.
+## Performance and accessibility contract
 
-The main process should:
+- OpenCode starts only when Chat first inspects a ready OpenCode runtime.
+- Streaming text is batched at 32 ms; blocking and terminal events bypass the
+  batch.
+- A 2,000-row fixture mounts no more than 120 rows.
+- Measurement, scroll position and pinned-to-bottom state are session-scoped
+  and survive switching; row-height changes above the viewport compensate the
+  scroll anchor instead of moving the text being read.
+- The panel uses container breakpoints at 420/560/760 widths and cannot create
+  ordinary horizontal overflow.
+- Keyboard submit is IME-safe; Shift+Enter adds a line.
+- Buttons, menus, docks and status changes have labels/roles/live regions.
+- Focus uses PuppyOne tokens; dark/light themes inherit semantic tokens;
+  reduced-motion disables caret/spinner/row motion.
 
-1. read the user's login-shell environment once with a bounded timeout;
-2. resolve approved provider executable names to absolute paths;
-3. record only path, version, and readiness diagnostics;
-4. spawn the absolute executable with an argument array and a deliberately
-   constructed environment;
-5. preserve provider-supported credential resolution without copying credential
-   files or returning secrets to the renderer;
-6. re-run discovery after an explicit Refresh action or relevant settings
-   change, not on every render.
+## Related records
 
-The UI distinguishes `not-installed`, `installed-not-authenticated`,
-`unsupported-version`, `ready`, and `error`. It does not reduce every failure to
-“provider unavailable.”
-
-## Protocol and backpressure rules
-
-- stdio JSONL readers apply a maximum line length and terminate a provider that
-  repeatedly violates framing.
-- stdout is reserved for structured protocol traffic when the protocol requires
-  it; stderr is captured separately as bounded, redacted diagnostics.
-- The service assigns a monotonic sequence after normalization, even when the
-  provider does not supply sequence numbers.
-- Text deltas may be coalesced for renderer performance without reordering
-  them across tool, approval, or terminal events.
-- Event delivery is bounded. A slow renderer cannot grow an unbounded main
-  process queue.
-- Unknown additive provider fields are ignored. Missing required terminal
-  events use process exit and adapter timeouts to produce a deterministic
-  `turn.failed` rather than leaving a permanent running state.
-- A timed-out JSON-RPC request retires the whole connection because the result
-  of a mutating request is ambiguous; PuppyOne never retries it on that
-  connection.
-- Provider reconnect is capability-specific. The service never silently
-  submits the same mutating turn twice after an ambiguous disconnect.
-
-## Cross-domain boundaries
-
-- [Right Sidebar Agent Chat](right-sidebar.md) owns the proposed sidebar
-  structure, state, accessibility, and interaction behavior.
-- [Desktop Terminal Architecture](../desktop-terminal-architecture.md) owns
-  xterm, node-pty, terminal sizing, rendering, and PTY lifecycle.
-- [Desktop Multi-Window Workspaces](../desktop-multi-window-workspaces.md) owns
-  one-workspace-per-window identity and native-window cleanup.
-- [Desktop Sidebar View Stack](../desktop-sidebar-view-stack.md) owns the
-  left-side Data, Git, Cloud, and Settings surfaces. Agent Chat is a right-side
-  panel and must not be added to that left view stack.
-- [Git and Source Control Architecture](../git/README.md) owns repository state,
-  diff source of truth, and refresh behavior after agent edits.
-- [Editor and Viewer Architecture](../editor/README.md) owns file previews and
-  editors opened from an agent tool or diff card.
-- [Cloud Workspace State Boundaries](../cloud-workspace-state.md) owns Cloud
-  authentication and workspace data. Local agent execution does not imply
-  Cloud execution support.
-
-## Proposed delivery phases
-
-### Phase 1: Common contract and inert UI
-
-- Add typed event, capability, request, and IPC contracts.
-- Add an experimental Chat header icon beside the existing Terminal icon and
-  route each icon to its independent right-sidebar panel.
-- Build the transcript, composer, tool-card, approval-dock, and error states
-  against deterministic fixtures.
-- Keep Terminal behavior unchanged.
-
-### Phase 2: Codex vertical slice
-
-- Discover and version-check `codex`.
-- Launch `codex app-server` over stdio and complete initialization.
-- Support account state, model list, thread start/resume, turn start,
-  assistant/tool/file events, manual approvals, questions, interrupt, and
-  terminal turn states.
-- Persist session mapping and restore the transcript projection.
-
-### Phase 3: Hardening
-
-- Add backpressure, line limits, redacted diagnostics, provider crash recovery,
-  resubscription, window cleanup, and app-quit cleanup.
-- Exercise agent-originated Git and file changes through existing workspace
-  invalidation and review flows.
-- Add retention and session-delete behavior.
-
-### Phase 4: ACP extensibility
-
-- Implement the generic ACP adapter.
-- Verify OpenCode and Hermes as compatibility fixtures without adopting either
-  as PuppyOne's internal agent loop.
-
-### Phase 5: Claude and Cursor product gates
-
-- Add Claude only with an approved authentication model.
-- Add Cursor through the official SDK by default.
-- Treat installed-CLI credential reuse as a separately approved compatibility
-  mode, not an implicit product promise.
-
-## Verification contract
-
-Implementation is not complete without:
-
-- adapter unit tests built from recorded, redacted provider event fixtures;
-- event ordering and unknown-field compatibility tests;
-- IPC ownership tests proving one window cannot control another window's
-  session, approval, or question;
-- workspace authorization tests for create, resume, and attachment paths;
-- lifecycle tests for hide/show, reload, reset, renderer crash, provider crash,
-  window close, and app quit;
-- bounded-output tests for long JSONL lines, stderr floods, command output, and
-  slow renderer subscribers;
-- renderer tests for streaming coalescing, approval expiry, capability-driven
-  controls, partial history, and terminal states;
-- opt-in local smoke tests for supported provider versions. CI tests must not
-  require real user credentials or consume inference quota.
-
-## Research references
-
-- Codex app-server: <https://learn.chatgpt.com/docs/app-server>
-- Codex SDK: <https://learn.chatgpt.com/docs/codex-sdk>
-- Claude Agent SDK: <https://code.claude.com/docs/en/agent-sdk/overview>
-- Claude SDK approvals: <https://code.claude.com/docs/en/agent-sdk/user-input>
-- Cursor CLI stream output: <https://docs.cursor.com/en/cli/reference/output-format>
-- Cursor SDK announcement: <https://cursor.com/changelog/sdk-release>
-- OpenCode server: <https://opencode.ai/docs/server/>
-- OpenCode ACP: <https://opencode.ai/docs/acp/>
-- Hermes programmatic integration:
-  <https://hermes-agent.nousresearch.com/docs/developer-guide/programmatic-integration>
-- Hermes ACP internals:
-  <https://hermes-agent.nousresearch.com/docs/developer-guide/acp-internals/>
-
-The research checkouts under `/Users/supersayajin/Desktop/agent-runtime-research`
-are analysis inputs only. PuppyOne must not depend on that directory at build or
-runtime.
+- [OpenCode sidecar ADR](ADR-001-opencode-sidecar.md)
+- [OpenCode adoption spike](opencode-adoption-spike.md)
+- [OpenCode update and rollback runbook](opencode-upgrade-runbook.md)
+- [Right Sidebar product contract](right-sidebar.md)
+- [OpenCode source ledger](../../../vendor/opencode/SOURCE_ADOPTION.md)

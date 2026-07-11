@@ -12,10 +12,18 @@ export const CODEX_CAPABILITIES = Object.freeze({
   resume: true,
   fork: false,
   steer: false,
+  queue: false,
   attachments: false,
+  contextReferences: false,
   modelSelection: true,
+  modeSelection: false,
+  slashCommands: false,
+  sessionHistory: true,
   usage: true,
   accountState: true,
+  mcp: false,
+  skills: false,
+  compaction: false,
 });
 
 export class CodexAppServerAdapter {
@@ -110,7 +118,19 @@ export class CodexAppServerAdapter {
     return {
       account,
       models,
+      modes: [],
+      commands: [],
       capabilities: CODEX_CAPABILITIES,
+      runtime: {
+        id: "codex",
+        displayName: "Codex CLI",
+        description: "Direct local Codex app-server compatibility runtime.",
+        kind: "direct-cli",
+        iconKey: "codex",
+        version: null,
+        source: "external",
+        compatibility: "versioned-app-server",
+      },
       warnings: [
         ...(accountResult.status === "rejected" ? [account.error] : []),
         ...(modelResult.status === "rejected" ? [redactSecretText(modelResult.reason?.message || String(modelResult.reason))] : []),
@@ -154,6 +174,10 @@ export class CodexAppServerAdapter {
       includeTurns: true,
     });
     return result?.thread ?? null;
+  }
+
+  async readHistory() {
+    return normalizeHistoricalThread(await this.readThread());
   }
 
   async startTurn({ prompt, model = null }) {

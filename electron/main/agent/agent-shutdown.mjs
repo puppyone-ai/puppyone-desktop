@@ -16,7 +16,8 @@ export function createAgentQuitCoordinator({
     const retainedSessionCount = typeof agentService.getRetainedSessionCount === "function"
       ? agentService.getRetainedSessionCount()
       : agentService.getSessionCount();
-    if (retainedSessionCount === 0) {
+    const runtimeResourcesActive = agentService.hasRuntimeResources?.() === true;
+    if (retainedSessionCount === 0 && !runtimeResourcesActive) {
       void agentService.closeAll();
       return;
     }

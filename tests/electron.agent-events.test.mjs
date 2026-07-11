@@ -20,6 +20,24 @@ describe("normalized AgentEvent envelopes", () => {
       sessionId: "session-1",
       type: "codex/raw/event",
     })).toThrow(/invalid normalized/i);
+    expect(() => createAgentEventEnvelope({
+      sequence: 2,
+      sessionId: "session-1",
+      providerSessionId: "x".repeat(257),
+      type: "assistant.delta",
+    })).toThrow(/invalid normalized/i);
+  });
+
+  it("bounds hostile object shapes before renderer delivery", () => {
+    const payload = JSON.parse('{"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}},"safe":"ok"}');
+    const event = createAgentEventEnvelope({
+      sequence: 1,
+      sessionId: "session-1",
+      type: "tool.completed",
+      payload,
+    });
+    expect(event.payload).toEqual({ safe: "ok" });
+    expect({}.polluted).toBeUndefined();
   });
 
   it("redacts common credential shapes recursively before renderer delivery", () => {
