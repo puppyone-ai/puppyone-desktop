@@ -25,6 +25,8 @@ export {
 } from "./core/fileFormats";
 
 export { DataWorkspace } from "./data/DataWorkspace";
+export { MarkdownLinkIndexCoordinator } from "./editor/markdown";
+export type { MarkdownLinkIndexRequest } from "./editor/markdown";
 export type {
   DataWorkspaceFolderExpansionStrategy,
   DataWorkspaceProps,
@@ -32,6 +34,15 @@ export type {
 } from "./data/DataWorkspace";
 export { EXPLORER_TREE_NODE_DRAG_TYPE, ExplorerTree } from "./data/ExplorerTree";
 export type { ExplorerSelectionIntent, ExplorerTreeProps } from "./data/ExplorerTree";
+export {
+  getRendererPerformanceTracker,
+  RendererPerformanceTracker,
+} from "./performance/rendererPerformance";
+export type {
+  RendererPerformanceStage,
+  RendererPerformanceSummary,
+  RendererPerformanceTrace,
+} from "./performance/rendererPerformance";
 export { FilePreview } from "./data/FilePreview";
 export type { FilePreviewBodyContext, FilePreviewProps } from "./data/FilePreview";
 export { ProjectsHeader as WorkspaceHeader } from "./data/ProjectsHeader";

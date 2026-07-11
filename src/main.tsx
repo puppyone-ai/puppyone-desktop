@@ -7,11 +7,19 @@ import "./cloud-globals.css";
 import "../vendor/shared-ui/src/styles/shared-ui.css";
 import "./styles.css";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <ScrollbarActivity />
-    <FeatureFlagsProvider>
-      <App />
-    </FeatureFlagsProvider>
-  </React.StrictMode>,
-);
+const root = ReactDOM.createRoot(document.getElementById("root")!);
+
+if (window.location.hash === "#renderer-performance-smoke") {
+  void import("./performance/RendererPerformanceSmokeHarness").then(({ RendererPerformanceSmokeHarness }) => {
+    root.render(<RendererPerformanceSmokeHarness />);
+  });
+} else {
+  root.render(
+    <React.StrictMode>
+      <ScrollbarActivity />
+      <FeatureFlagsProvider>
+        <App />
+      </FeatureFlagsProvider>
+    </React.StrictMode>,
+  );
+}

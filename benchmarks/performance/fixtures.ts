@@ -24,6 +24,29 @@ export function makeMarkdown(lineCount: number): string {
   return lines.join("\n");
 }
 
+export function makeFeatureHeavyMarkdown(sectionCount: number): string {
+  const sections: string[] = [];
+  for (let index = 0; index < sectionCount; index += 1) {
+    sections.push(
+      `## Feature section ${index}`,
+      "| Name | Value | Status |",
+      "| --- | ---: | --- |",
+      `| row ${index} | ${index} | **ready** |`,
+      "",
+      "```mermaid",
+      "flowchart LR",
+      `  A${index}[Source] --> B${index}[Projection]`,
+      "```",
+      "",
+      `<section data-index="${index}"><strong>Trusted text ${index}</strong></section>`,
+      "",
+      `Paragraph with ![asset](image-${index}.png), [[Note ${index}]], and [link](note-${index}.md).`,
+      "",
+    );
+  }
+  return sections.join("\n");
+}
+
 export function makeExplorerNodes(count: number): DataNode[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `node-${index}`,

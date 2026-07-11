@@ -2,14 +2,25 @@
 
 import { Annotation, Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
-  markdownCodeMirrorBaseExtensions,
-  markdownLivePreviewExtension,
+  markdownCodeMirrorLanguageExtension,
+  markdownCodeMirrorUrgentExtensions,
+  markdownLivePreviewCoreExtension,
 } from "./markdownCodeMirrorExtensions";
+import { markdownLivePreviewContextExtension } from "./core/editor/markdownLivePreviewContext";
 import { markdownAiEditExtension } from "./core/editor/markdownAiEditExtension";
+import { getDocRevision } from "./platform/brokers/transactionBroker";
 import type { AiEditFile } from "../ai-edits/types";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
+import type {
+  EditorSourceRevision,
+  EditorSourceSnapshot,
+  EditorSourceSnapshotPort,
+} from "../sourceSnapshot";
+import { getRendererPerformanceTracker } from "../../performance/rendererPerformance";
+
+const rendererPerformance = getRendererPerformanceTracker();
 
 export type MarkdownCodeMirrorEditorProps = {
   value: string;
@@ -22,7 +33,13 @@ export type MarkdownCodeMirrorEditorProps = {
   workspaceRoot?: string | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  /** Legacy controlled boundary. Product Markdown surfaces use snapshot ports. */
   onChange?: (value: string) => void;
+  onSourceRevisionChange?: (revision: EditorSourceRevision) => void;
+  onSnapshotPortChange?: (port: EditorSourceSnapshotPort | null) => void;
+  onBeforeDestroy?: (snapshot: EditorSourceSnapshot) => void;
+  onEditorBaseReady?: (revision: string) => void;
+  onPreviewReady?: (revision: string) => void;
 };
 
 const externalDocumentUpdate = Annotation.define<boolean>();
@@ -39,78 +56,252 @@ export function MarkdownCodeMirrorEditor({
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
   onChange,
+  onSourceRevisionChange,
+  onSnapshotPortChange,
+  onBeforeDestroy,
+  onEditorBaseReady,
+  onPreviewReady,
 }: MarkdownCodeMirrorEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
-  const onChangeRef = useRef(onChange);
+  const externalValueRef = useRef(value);
+  const documentPathRef = useRef(documentPath);
+  documentPathRef.current = documentPath;
+  const callbacksRef = useRef({
+    onChange,
+    onSourceRevisionChange,
+    onSnapshotPortChange,
+    onBeforeDestroy,
+    onEditorBaseReady,
+    onPreviewReady,
+  });
+  callbacksRef.current = {
+    onChange,
+    onSourceRevisionChange,
+    onSnapshotPortChange,
+    onBeforeDestroy,
+    onEditorBaseReady,
+    onPreviewReady,
+  };
   const editableCompartmentRef = useRef(new Compartment());
-  const livePreviewCompartmentRef = useRef(new Compartment());
+  const languageCompartmentRef = useRef(new Compartment());
+  const livePreviewCoreCompartmentRef = useRef(new Compartment());
+  const livePreviewContextCompartmentRef = useRef(new Compartment());
   const aiEditCompartmentRef = useRef(new Compartment());
+  const previewActivatedRef = useRef(false);
+  const livePreviewContextRef = useRef({
+    htmlTrustMode,
+    markdownLinkGraph,
+    documentPath,
+    markdownAssetUrlResolver,
+    workspaceId,
+    workspaceRoot,
+  });
+  livePreviewContextRef.current = {
+    htmlTrustMode,
+    markdownLinkGraph,
+    documentPath,
+    markdownAssetUrlResolver,
+    workspaceId,
+    workspaceRoot,
+  };
 
   useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
-
-  useLayoutEffect(() => {
     const host = hostRef.current;
     if (!host) return undefined;
 
+    const editorCreateStartedAt = performance.now();
     const view = new EditorView({
       parent: host,
+      dispatchTransactions: (transactions, targetView) => {
+        const startedAt = performance.now();
+        targetView.update(transactions);
+        if (transactions.some((transaction) => (
+          transaction.docChanged
+          && !transaction.annotation(externalDocumentUpdate)
+        ))) {
+          rendererPerformance.recordInputTransaction(performance.now() - startedAt);
+        }
+      },
       state: EditorState.create({
         doc: value,
         extensions: [
-          ...markdownCodeMirrorBaseExtensions(readOnly),
+          ...markdownCodeMirrorUrgentExtensions(readOnly),
           editableCompartmentRef.current.of(getEditableExtensions(readOnly)),
-          livePreviewCompartmentRef.current.of(
-            livePreview
-              ? markdownLivePreviewExtension(htmlTrustMode, markdownLinkGraph, documentPath, markdownAssetUrlResolver, workspaceId, workspaceRoot)
-              : [],
-          ),
+          languageCompartmentRef.current.of([]),
+          livePreviewContextCompartmentRef.current.of([]),
+          livePreviewCoreCompartmentRef.current.of([]),
           aiEditCompartmentRef.current.of(markdownAiEditExtension(aiEditFile)),
           EditorView.updateListener.of((update) => {
             if (!update.docChanged) return;
             if (update.transactions.some((transaction) => transaction.annotation(externalDocumentUpdate))) return;
-            onChangeRef.current?.(update.state.doc.toString());
+            const revision = getDocRevision(update.state.doc);
+            callbacksRef.current.onSourceRevisionChange?.({ revision, dirty: true });
+            // Compatibility only. The main Markdown persistence path never
+            // supplies this callback, so ordinary typing does not stringify.
+            if (callbacksRef.current.onChange) {
+              callbacksRef.current.onChange(update.state.doc.toString());
+            }
           }),
         ],
       }),
     });
+    rendererPerformance.recordOperation(
+      "editor_base_create",
+      performance.now() - editorCreateStartedAt,
+    );
 
     viewRef.current = view;
+    const snapshotPort: EditorSourceSnapshotPort = {
+      readSnapshot: () => readEditorSnapshot(view),
+      readRevision: () => getDocRevision(view.state.doc),
+    };
+    callbacksRef.current.onSnapshotPortChange?.(snapshotPort);
+    const baseRevision = getDocRevision(view.state.doc);
+    callbacksRef.current.onSourceRevisionChange?.({ revision: baseRevision, dirty: false });
+    callbacksRef.current.onEditorBaseReady?.(baseRevision);
+    if (documentPathRef.current) {
+      rendererPerformance.markActiveDocument(documentPathRef.current, "editor_base_ready");
+    }
 
     return () => {
+      const snapshotStartedAt = performance.now();
+      const snapshot = readEditorSnapshot(view);
+      rendererPerformance.recordOperation(
+        "editor_snapshot_read",
+        performance.now() - snapshotStartedAt,
+      );
+      callbacksRef.current.onBeforeDestroy?.(snapshot);
+      callbacksRef.current.onSnapshotPortChange?.(null);
+      const destroyStartedAt = performance.now();
       view.destroy();
+      rendererPerformance.recordOperation(
+        "editor_destroy",
+        performance.now() - destroyStartedAt,
+      );
       viewRef.current = null;
     };
   }, []);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-
     view.dispatch({
       effects: editableCompartmentRef.current.reconfigure(getEditableExtensions(readOnly)),
     });
   }, [readOnly]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const view = viewRef.current;
-    if (!view) return;
+    if (!view) return undefined;
 
-    view.dispatch({
-      effects: livePreviewCompartmentRef.current.reconfigure(
-        livePreview
-          ? markdownLivePreviewExtension(htmlTrustMode, markdownLinkGraph, documentPath, markdownAssetUrlResolver, workspaceId, workspaceRoot)
-          : [],
-      ),
+    let cancelled = false;
+    let languageFrame: number | null = null;
+    let previewFrame: number | null = null;
+    let readyFrame: number | null = null;
+
+    languageFrame = window.requestAnimationFrame(() => {
+      languageFrame = null;
+      if (cancelled || viewRef.current !== view) return;
+      const languageStartedAt = performance.now();
+      view.dispatch({
+        effects: languageCompartmentRef.current.reconfigure(markdownCodeMirrorLanguageExtension()),
+      });
+      rendererPerformance.recordOperation(
+        "markdown_language_activate",
+        performance.now() - languageStartedAt,
+      );
+      if (documentPathRef.current) {
+        rendererPerformance.markActiveDocument(documentPathRef.current, "markdown_language_ready");
+      }
+      if (!livePreview) return;
+
+      previewFrame = window.requestAnimationFrame(() => {
+        previewFrame = null;
+        if (cancelled || viewRef.current !== view) return;
+        const context = livePreviewContextRef.current;
+        previewActivatedRef.current = true;
+        const previewStartedAt = performance.now();
+        view.dispatch({
+          effects: [
+            livePreviewContextCompartmentRef.current.reconfigure(
+              markdownLivePreviewContextExtension(
+                context.htmlTrustMode,
+                context.markdownLinkGraph,
+                context.documentPath,
+                context.markdownAssetUrlResolver,
+                context.workspaceId,
+                context.workspaceRoot,
+              ),
+            ),
+            livePreviewCoreCompartmentRef.current.reconfigure(
+              markdownLivePreviewCoreExtension(),
+            ),
+          ],
+        });
+        rendererPerformance.recordOperation(
+          "markdown_preview_activate",
+          performance.now() - previewStartedAt,
+        );
+        const activatedRevision = getDocRevision(view.state.doc);
+        readyFrame = window.requestAnimationFrame(() => {
+          readyFrame = null;
+          if (cancelled || viewRef.current !== view) return;
+          if (getDocRevision(view.state.doc) !== activatedRevision) return;
+          callbacksRef.current.onPreviewReady?.(activatedRevision);
+          if (documentPathRef.current) {
+            rendererPerformance.markActiveDocument(documentPathRef.current, "preview_ready");
+          }
+        });
+      });
     });
-  }, [documentPath, livePreview, htmlTrustMode, markdownLinkGraph, markdownAssetUrlResolver, workspaceId, workspaceRoot]);
 
-  useLayoutEffect(() => {
+    return () => {
+      cancelled = true;
+      previewActivatedRef.current = false;
+      if (languageFrame !== null) window.cancelAnimationFrame(languageFrame);
+      if (previewFrame !== null) window.cancelAnimationFrame(previewFrame);
+      if (readyFrame !== null) window.cancelAnimationFrame(readyFrame);
+    };
+  }, [livePreview]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !livePreview || !previewActivatedRef.current) return undefined;
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      if (cancelled || viewRef.current !== view || !previewActivatedRef.current) return;
+      const context = livePreviewContextRef.current;
+      view.dispatch({
+        effects: livePreviewContextCompartmentRef.current.reconfigure(
+          markdownLivePreviewContextExtension(
+            context.htmlTrustMode,
+            context.markdownLinkGraph,
+            context.documentPath,
+            context.markdownAssetUrlResolver,
+            context.workspaceId,
+            context.workspaceRoot,
+          ),
+        ),
+      });
+    });
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [
+    documentPath,
+    htmlTrustMode,
+    livePreview,
+    markdownAssetUrlResolver,
+    markdownLinkGraph,
+    workspaceId,
+    workspaceRoot,
+  ]);
+
+  useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-
     try {
       view.dispatch({
         effects: aiEditCompartmentRef.current.reconfigure(markdownAiEditExtension(aiEditFile)),
@@ -123,16 +314,17 @@ export function MarkdownCodeMirrorEditor({
     }
   }, [aiEditFile]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const view = viewRef.current;
-    if (!view) return;
-
-    const currentValue = view.state.doc.toString();
-    if (currentValue === value) return;
-
+    if (!view || Object.is(externalValueRef.current, value)) return;
+    externalValueRef.current = value;
     view.dispatch({
-      changes: { from: 0, to: currentValue.length, insert: value },
+      changes: { from: 0, to: view.state.doc.length, insert: value },
       annotations: externalDocumentUpdate.of(true),
+    });
+    callbacksRef.current.onSourceRevisionChange?.({
+      revision: getDocRevision(view.state.doc),
+      dirty: false,
     });
   }, [value]);
 
@@ -144,6 +336,13 @@ export function MarkdownCodeMirrorEditor({
       data-readonly={readOnly ? "true" : "false"}
     />
   );
+}
+
+function readEditorSnapshot(view: EditorView): EditorSourceSnapshot {
+  return {
+    content: view.state.doc.toString(),
+    revision: getDocRevision(view.state.doc),
+  };
 }
 
 function getEditableExtensions(readOnly: boolean): Extension[] {

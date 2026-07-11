@@ -31,6 +31,7 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
       onSaveContent={context.onSaveContent}
       hideSourceView={context.hideSourceView}
       saveMode={context.saveMode}
+      sourceSnapshotMode
       renderLive={(value, controls) => (
         <MarkdownCodeMirrorEditor
           value={value}
@@ -43,7 +44,9 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
           workspaceRoot={context.workspaceRoot}
           markdownLinkGraph={context.markdownLinkGraph}
           markdownAssetUrlResolver={context.markdownAssetUrlResolver}
-          onChange={controls.canEdit ? controls.onChange : undefined}
+          onSourceRevisionChange={controls.onSourceRevisionChange}
+          onSnapshotPortChange={controls.onSnapshotPortChange}
+          onBeforeDestroy={controls.onBeforeDestroy}
         />
       )}
       renderSource={(value, controls) => (
@@ -58,7 +61,9 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
           workspaceRoot={context.workspaceRoot}
           markdownLinkGraph={context.markdownLinkGraph}
           markdownAssetUrlResolver={context.markdownAssetUrlResolver}
-          onChange={controls.canEdit ? controls.onChange : undefined}
+          onSourceRevisionChange={controls.onSourceRevisionChange}
+          onSnapshotPortChange={controls.onSnapshotPortChange}
+          onBeforeDestroy={controls.onBeforeDestroy}
         />
       )}
     />

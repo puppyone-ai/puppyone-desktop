@@ -12,7 +12,10 @@ import {
   placeholder,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { markdownLivePreviewDecorations } from "./core/decorations/livePreviewDecorations";
+import {
+  markdownLivePreviewDecorations,
+  markdownProjectionSchedulerExtension,
+} from "./core/decorations/livePreviewDecorations";
 import { markdownBlockWidgetSelectionExtension } from "./core/interaction/blockWidgetSelection";
 import { markdownEditingKeymap } from "./core/commands/markdownEditingKeymap";
 import { markdownLivePreviewContextExtension } from "./core/editor/markdownLivePreviewContext";
@@ -32,13 +35,23 @@ import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph
 
 export function markdownCodeMirrorBaseExtensions(readOnly: boolean): Extension[] {
   return [
+    ...markdownCodeMirrorUrgentExtensions(readOnly),
+    markdownCodeMirrorLanguageExtension(),
+  ];
+}
+
+/**
+ * Interaction-critical editor surface. Keep language parsing out of this set:
+ * a document must become focusable/editable before Markdown projection work is
+ * allowed onto the renderer's task queue.
+ */
+export function markdownCodeMirrorUrgentExtensions(readOnly: boolean): Extension[] {
+  return [
     highlightSpecialChars(),
     history(),
     dropCursor(),
     indentOnInput(),
     bracketMatching(),
-    markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
-    syntaxHighlighting(puppyMarkdownHighlightStyle),
     EditorView.lineWrapping,
     trailingLineWhitespaceSelectionExtension,
     EditorView.contentAttributes.of({
@@ -53,6 +66,14 @@ export function markdownCodeMirrorBaseExtensions(readOnly: boolean): Extension[]
   ];
 }
 
+/** Language parsing and source highlighting are installed after first paint. */
+export function markdownCodeMirrorLanguageExtension(): Extension {
+  return [
+    markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
+    syntaxHighlighting(puppyMarkdownHighlightStyle),
+  ];
+}
+
 export function markdownLivePreviewExtension(
   htmlTrustMode: MarkdownHtmlTrustMode = "safe",
   markdownLinkGraph: MarkdownLinkGraph | null = null,
@@ -62,7 +83,6 @@ export function markdownLivePreviewExtension(
   workspaceRoot: string | null = null,
 ): Extension {
   return [
-    keymap.of([...markdownEditingKeymap]),
     markdownLivePreviewContextExtension(
       htmlTrustMode,
       markdownLinkGraph,
@@ -71,6 +91,13 @@ export function markdownLivePreviewExtension(
       workspaceId,
       workspaceRoot,
     ),
+    markdownLivePreviewCoreExtension(),
+  ];
+}
+
+export function markdownLivePreviewCoreExtension(): Extension {
+  return [
+    keymap.of([...markdownEditingKeymap]),
     markdownHiddenMarkerSelectionNormalizer,
     markdownLivePreviewFocusExtension,
     markdownInputCompositionExtension,
@@ -79,6 +106,7 @@ export function markdownLivePreviewExtension(
     markdownTableFocusExtension,
     markdownEmbedHostLifecycle,
     markdownLivePreviewDecorations,
+    markdownProjectionSchedulerExtension,
     markdownBlockWidgetSelectionExtension,
   ];
 }

@@ -3,7 +3,10 @@ import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import { addInlineMarkdownDecorations } from "../vendor/shared-ui/src/editor/markdown/core/decorations/inlineDecorations";
-import { markdownLivePreviewDecorations } from "../vendor/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
+import {
+  markdownLivePreviewDecorations,
+  requestMarkdownProjectionRange,
+} from "../vendor/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
 import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
@@ -174,7 +177,7 @@ describe("Markdown inline HTML semantic model", () => {
     ]);
   });
 
-  it("invalidates semantic and decoration caches when background parsing advances", () => {
+  it("invalidates semantic caches and projects a newly parsed viewport", () => {
     const early = '<span style="color: red">early</span>';
     const late = '<span style="color: blue">late</span>';
     const filler = Array.from({ length: 2_500 }, (_, index) => (
@@ -199,7 +202,14 @@ describe("Markdown inline HTML semantic model", () => {
     expect(parsedState.doc).toBe(initialState.doc);
     expect(syntaxTree(parsedState).length).toBe(parsedState.doc.length);
     expect(getMarkdownInlineHtml(parsedState).some((element) => element.from === source.indexOf(late))).toBe(true);
-    expect(getInlineHtmlDecorationRanges(parsedState)).toHaveLength(2);
+    const projectedState = parsedState.update({
+      effects: requestMarkdownProjectionRange(
+        parsedState,
+        source.indexOf(late),
+        source.indexOf(late) + late.length,
+      ),
+    }).state;
+    expect(getInlineHtmlDecorationRanges(projectedState)).toHaveLength(2);
   });
 });
 

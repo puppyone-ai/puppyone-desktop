@@ -30,6 +30,7 @@
     "smoke:local-api": "node scripts/smoke-local-api.mjs",
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
     "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
+    "smoke:renderer-performance": "npm run build && electron scripts/smoke-renderer-performance.mjs",
     "start": "node scripts/start-electron.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
