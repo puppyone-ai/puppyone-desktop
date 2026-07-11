@@ -11,6 +11,9 @@ that most directly affect file-opening responsiveness:
 - 10,000-line single-character edits at the top, middle, and end; focus/reveal
   changes; and a table/HTML/Mermaid-heavy edit fixture.
 - Revision-bound continuous A/B file switching and cancellation.
+- Desktop Agent 4,000-event projection, 2,000-row virtual transcript, 128 KiB
+  Markdown progressive disclosure, expanded command/diff rendering and a
+  searchable 500-model picker.
 
 Run them serially so benchmark files do not compete for the same CPU:
 
@@ -41,6 +44,12 @@ npm run bench:performance -- --compare /tmp/puppyone-performance.json
 
 When changing the editor, tree, content cache, or link index, record the command,
 hardware, branch/commit, median/mean, and p99 for the affected cases.
+
+For Agent Chat, structural bounds are part of the result: transcript DOM must
+remain at or below 120 rows; picker DOM at or below 120 options; initial long
+Markdown at or below 24 KiB/240 blocks; command output at 64 KiB; inline diff
+at 240 lines. The reference M2 Pro results and exact scenarios are recorded in
+`baselines/issue-027-agent-chat-m2-pro-2026-07-12.json`.
 
 ## Production Electron smoke
 

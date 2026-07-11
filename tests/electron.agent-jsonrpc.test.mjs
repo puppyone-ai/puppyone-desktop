@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { PassThrough, Writable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
-import { JsonlRpcConnection } from "../electron/main/agent/runtimes/codex/codex-jsonl-rpc-connection.mjs";
+import { JsonlRpcConnection } from "../electron/main/agent/transports/jsonl-rpc-connection.mjs";
 
 describe("Codex JSONL JSON-RPC transport", () => {
   it("correlates responses while tolerating additive unknown fields", async () => {
@@ -60,7 +60,7 @@ describe("Codex JSONL JSON-RPC transport", () => {
       connection.on("exit", exit);
       const pending = connection.request("turn/start", {}, { timeoutMs: 20 });
       const rejection = expect(pending).rejects.toMatchObject({
-        code: "CODEX_RPC_TIMEOUT",
+        code: "JSONL_RPC_TIMEOUT",
         method: "turn/start",
       });
 

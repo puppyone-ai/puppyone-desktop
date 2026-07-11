@@ -15,11 +15,14 @@ describe("Desktop Agent architecture boundaries", () => {
     const timeline = source("src/features/desktop-agent/ui/AgentTranscript.tsx");
     const markdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
     const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
-    const css = source("src/features/desktop-agent/ui/desktop-agent.css");
+    const cssEntry = source("src/features/desktop-agent/ui/desktop-agent.css");
+    const css = agentStyles();
     const globalLayout = source("src/styles/layout.css");
     expect(timeline).toContain("MAX_MOUNTED_ROWS = 120");
     expect(markdown).not.toContain("dangerouslySetInnerHTML");
     expect(markdown).toContain('["https:", "http:", "mailto:"]');
+    expect(cssEntry).toContain('@import "./styles/foundation.css"');
+    expect(cssEntry.split("\n").length).toBeLessThan(30);
     expect(css).toContain("container: desktop-agent / inline-size");
     expect(css).toContain("--agent-radius-composer: 22px");
     expect(css).toContain("max-width: 759px");
@@ -30,6 +33,23 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(composer).toContain("useLayoutEffect");
     expect(composer).toContain("rows={1}");
     expect(composer).not.toContain("<select");
+  });
+
+  it("keeps product-critical Agent performance scenarios in the benchmark suite", () => {
+    const benchmark = source("benchmarks/performance/agent-chat.bench.ts");
+    expect(benchmark).toContain("128 KiB of safe Markdown");
+    expect(benchmark).toContain("64 KiB command output and 240-line diff");
+    expect(benchmark).toContain("500-model searchable picker");
+    expect(benchmark).toContain("2,000-row transcript with bounded DOM");
+  });
+
+  it("keeps application behind an explicit client port and Electron access in the composition adapter", () => {
+    const port = source("src/features/desktop-agent/application/AgentClientPort.ts");
+    const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
+    const adapter = source("src/features/desktop-agent/infrastructure/electron/electronAgentClient.ts");
+    expect(port).toContain("export interface AgentClientPort");
+    expect(controller).not.toMatch(/window\.|puppyoneDesktop|infrastructure\//);
+    expect(adapter).toContain("window.puppyoneDesktop");
   });
 
   it("keeps sidecar transport and rendered architecture diagrams out of Renderer/docs", () => {
@@ -78,14 +98,23 @@ describe("Desktop Agent architecture boundaries", () => {
     const candidates = source("electron/main/agent/connections/probes/executable-candidates.mjs");
     const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
     const picker = source("src/features/desktop-agent/ui/AgentProviderPicker.tsx");
+    const registry = source("electron/main/agent/connections/tools/local-agent-tool-registry.mjs");
     expect(inventory).not.toMatch(/from ["']react|OpenCode|providerCatalog/);
     expect(candidates).not.toMatch(/-ilc|login shell|exec\(/i);
     expect(controller.indexOf("discoverLocalConnections")).toBeGreaterThan(controller.indexOf("initialize(refresh"));
     expect(picker).toContain("Local tools on this Mac");
     expect(picker).toContain("Connected routes");
+    expect(picker).not.toMatch(/connection\.id\s*===/);
+    expect(registry).toContain("validateDescriptor");
   });
 });
 
 function source(relativePath: string) {
   return readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
+}
+
+function agentStyles() {
+  return ["foundation", "transcript", "activities", "blocking", "composer", "responsive"]
+    .map((name) => source(`src/features/desktop-agent/ui/styles/${name}.css`))
+    .join("\n");
 }

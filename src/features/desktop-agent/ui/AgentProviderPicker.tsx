@@ -41,8 +41,8 @@ export function AgentProviderPicker({
   const localOptions = visibleLocalConnections.length > 0
     ? visibleLocalConnections.map(localConnectionOption)
     : localConnectionsPhase === "loading" || localConnectionsPhase === "idle"
-      ? [statusOption("local-loading", "Checking local tools…", "Looking for Codex and Cursor Agent in known installation locations.")]
-      : [statusOption("local-empty", "No supported local tools found", "Codex and Cursor Agent were not found in known installation locations.")];
+      ? [statusOption("local-loading", "Checking local tools…", "Looking for supported local Agent tools in known installation locations.")]
+      : [statusOption("local-empty", "No supported local tools found", "No registered local Agent tools were found in known installation locations.")];
   const groups: AgentPickerGroup[] = [
     { id: "connected", label: "Connected routes", options: connectedOptions },
     { id: "local", label: "Local tools on this Mac", options: localOptions },
@@ -73,6 +73,8 @@ function localConnectionOption(connection: AgentLocalConnection): AgentPickerOpt
     detail: connection.statusMessage,
     meta: connection.version || undefined,
     keywords: `${connection.id} ${connection.authentication} ${connection.integration}`,
+    // Local inventory is explanatory only. A future bridge appears as a
+    // connected OpenCode route instead of turning this row into a Provider.
     selectable: false,
     kind: "local",
     icon: <TerminalSquare size={13} />,
@@ -90,7 +92,7 @@ function shortStatus(connection: AgentLocalConnection) {
           ? "Status unavailable"
           : "Detected";
   const integration = connection.integration === "bridge-required"
-    ? connection.id === "codex" ? "Direct mode not enabled" : "Bridge unavailable"
+    ? "OpenCode bridge required"
     : connection.integration === "incompatible"
       ? "Incompatible"
       : connection.integration === "blocked"

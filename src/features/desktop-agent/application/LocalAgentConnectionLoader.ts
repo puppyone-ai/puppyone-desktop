@@ -1,7 +1,7 @@
 import type { AgentControllerState } from "./agent-controller-state";
 import { formatAgentError } from "./agent-error";
+import type { AgentClientProvider } from "./AgentClientPort";
 
-type AgentBridge = NonNullable<Window["puppyoneDesktop"]>;
 type StatePatch = (patch: Partial<AgentControllerState>) => void;
 
 /**
@@ -14,7 +14,7 @@ export class LocalAgentConnectionLoader {
 
   constructor(
     private readonly workspaceRoot: string,
-    private readonly bridgeProvider: () => AgentBridge | undefined,
+    private readonly bridgeProvider: AgentClientProvider,
     private readonly patch: StatePatch,
   ) {}
 

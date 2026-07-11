@@ -10,8 +10,6 @@ import type {
   AgentFileReference,
   AgentProviderInspection,
   AgentQuestionResolution,
-  AgentRuntimeId,
-  AgentSessionListItem,
   AgentSessionSnapshot,
 } from "../domain/agent-contract";
 import { AgentEventSynchronizer } from "./AgentEventSynchronizer";
@@ -22,15 +20,16 @@ import {
 import { formatAgentError } from "./agent-error";
 import { SessionUiStateStore, type SessionUiState } from "./SessionUiStateStore";
 import { LocalAgentConnectionLoader } from "./LocalAgentConnectionLoader";
+import type { AgentClientPort, AgentClientProvider } from "./AgentClientPort";
+import { AgentSessionLifecycle, agentSessionLifecycleLimits } from "./AgentSessionLifecycle";
 
 export type { AgentControllerPhase, AgentControllerState } from "./agent-controller-state";
 export { agentControllerTransitions } from "./agent-controller-state";
 export { formatAgentError } from "./agent-error";
 
-type AgentBridge = NonNullable<Window["puppyoneDesktop"]>;
 type Listener = () => void;
 
-const MAX_CACHED_SESSIONS = 100;
+const MAX_QUEUED_PROMPTS = 20;
 
 export class AgentSessionController {
   readonly workspaceRoot: string;
@@ -40,9 +39,11 @@ export class AgentSessionController {
   private initializePromise: Promise<void> | null = null;
   private readonly sessionUi = new SessionUiStateStore();
   private readonly localConnectionLoader: LocalAgentConnectionLoader;
+  private readonly sessionLifecycle: AgentSessionLifecycle;
   private queuedPrompts: string[] = [];
+  private disposed = false;
 
-  constructor(workspaceRoot: string, private readonly bridgeProvider: () => AgentBridge | undefined = () => window.puppyoneDesktop) {
+  constructor(workspaceRoot: string, private readonly bridgeProvider: AgentClientProvider) {
     this.workspaceRoot = workspaceRoot;
     this.state = {
       phase: "idle",
@@ -79,6 +80,17 @@ export class AgentSessionController {
       (patch) => this.patch(patch),
       this.drainQueuedPrompt,
     );
+    this.sessionLifecycle = new AgentSessionLifecycle({
+      workspaceRoot,
+      bridgeProvider,
+      readState: this.getSnapshot,
+      patch: (patch) => this.patch(patch),
+      createSession: () => this.createSession(),
+      applySnapshot: (snapshot) => this.applySnapshot(snapshot),
+      saveSessionUi: () => this.saveSessionUi(),
+      restoreSessionUi: () => this.restoreSessionUi(),
+      deleteSessionUi: (sessionId) => this.sessionUi.delete(sessionId),
+    });
     this.eventSynchronizer.connect();
   }
 
@@ -95,9 +107,12 @@ export class AgentSessionController {
 
   /** Releases renderer subscriptions only; it never sends a runtime stop. */
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     this.eventSynchronizer.dispose();
     this.localConnectionLoader.dispose();
     this.sessionUi.clear();
+    this.queuedPrompts = [];
     this.listeners.clear();
   }
 
@@ -200,49 +215,12 @@ export class AgentSessionController {
     return this.readSessionUi(this.uiKey());
   }
 
-  async newSession() {
-    if (this.state.projection.runningTurnId) throw new Error("Stop the active turn before starting a new session.");
-    this.saveSessionUi();
-    try {
-      await this.closeActiveSession(false);
-      this.patch({
-        phase: "creating",
-        session: null,
-        projection: createAgentProjection(),
-        error: null,
-        attachments: [],
-        contextReferences: [],
-      });
-      const snapshot = await this.createSession();
-      this.applySnapshot(snapshot);
-      this.restoreSessionUi();
-      this.patch({ phase: "ready" });
-      await this.refreshHistory();
-    } catch (error) {
-      this.patch({ phase: "failed", error: formatAgentError(error) });
-    }
+  newSession() {
+    return this.sessionLifecycle.newSession();
   }
 
-  async switchSession(sessionId: string) {
-    if (!sessionId || sessionId === this.state.session?.id) return;
-    if (this.state.projection.runningTurnId) throw new Error("Stop the active turn before switching sessions.");
-    this.saveSessionUi();
-    try {
-      await this.closeActiveSession(false);
-      this.patch({ phase: "restoring", session: null, projection: createAgentProjection(), error: null });
-      const bridge = this.requireBridge("resumeAgentSession");
-      const snapshot = await bridge.resumeAgentSession({
-        rootPath: this.workspaceRoot,
-        sessionId,
-        runtimeId: this.state.selectedRuntimeId,
-      });
-      if (!snapshot) throw new Error("The saved Agent session is no longer available.");
-      this.applySnapshot(snapshot);
-      this.restoreSessionUi();
-      this.patch({ phase: snapshot.session.activeTurnId ? "running" : "ready" });
-    } catch (error) {
-      this.patch({ phase: "failed", error: formatAgentError(error) });
-    }
+  switchSession(sessionId: string) {
+    return this.sessionLifecycle.switchSession(sessionId);
   }
 
   async submit(prompt: string) {
@@ -260,8 +238,12 @@ export class AgentSessionController {
       return true;
     }
     if (activeTurnId && this.state.inspection?.capabilities?.queue) {
+      if (this.queuedPrompts.length >= MAX_QUEUED_PROMPTS) {
+        this.patch({ error: `The Agent prompt queue is full (${MAX_QUEUED_PROMPTS}). Wait for the active turn to finish.` });
+        return false;
+      }
       this.queuedPrompts.push(text);
-      this.patch({ draft: "" });
+      this.patch({ draft: "", error: null });
       return true;
     }
     if (activeTurnId) return false;
@@ -350,76 +332,24 @@ export class AgentSessionController {
     }
   }
 
-  async forkSession() {
-    const sessionId = this.state.session?.id;
-    if (!sessionId) return;
-    const bridge = this.requireBridge("forkAgentSession");
-    this.saveSessionUi();
-    this.patch({ phase: "restoring", error: null });
-    try {
-      const snapshot = await bridge.forkAgentSession({ rootPath: this.workspaceRoot, sessionId });
-      this.applySnapshot(snapshot);
-      this.restoreSessionUi();
-      this.patch({ phase: "ready" });
-      await this.refreshHistory();
-    } catch (error) {
-      this.patch({ phase: "failed", error: formatAgentError(error) });
-    }
+  forkSession() {
+    return this.sessionLifecycle.forkSession();
   }
 
-  async archiveSession(sessionId = this.state.session?.id) {
-    if (!sessionId) return;
-    try {
-      const bridge = this.requireBridge("archiveAgentSession");
-      await bridge.archiveAgentSession({ rootPath: this.workspaceRoot, sessionId, archiveNative: false });
-      if (sessionId === this.state.session?.id) {
-        this.saveSessionUi();
-        this.patch({ session: null, projection: createAgentProjection(), phase: "ready" });
-      }
-      await this.refreshHistory();
-    } catch (error) {
-      this.patch({ error: formatAgentError(error) });
-    }
+  archiveSession(sessionId = this.state.session?.id) {
+    return this.sessionLifecycle.archiveSession(sessionId);
   }
 
-  async deleteSession(sessionId = this.state.session?.id) {
-    if (!sessionId) return;
-    try {
-      const bridge = this.requireBridge("deleteAgentSession");
-      await bridge.deleteAgentSession({ rootPath: this.workspaceRoot, sessionId, deleteNative: false });
-      this.sessionUi.delete(sessionId);
-      if (sessionId === this.state.session?.id) {
-        this.patch({ session: null, projection: createAgentProjection(), phase: "ready" });
-      }
-      await this.refreshHistory();
-    } catch (error) {
-      this.patch({ error: formatAgentError(error) });
-    }
+  deleteSession(sessionId = this.state.session?.id) {
+    return this.sessionLifecycle.deleteSession(sessionId);
   }
 
-  async compactSession() {
-    const sessionId = this.state.session?.id;
-    if (!sessionId) return;
-    try {
-      const bridge = this.requireBridge("compactAgentSession");
-      await bridge.compactAgentSession({ rootPath: this.workspaceRoot, sessionId });
-    } catch (error) {
-      this.patch({ error: formatAgentError(error) });
-    }
+  compactSession() {
+    return this.sessionLifecycle.compactSession();
   }
 
-  async refreshHistory() {
-    const bridge = this.bridgeProvider();
-    if (!bridge?.listAgentSessions) return;
-    try {
-      const history = await bridge.listAgentSessions({
-        rootPath: this.workspaceRoot,
-        runtimeId: this.state.selectedRuntimeId,
-      });
-      this.patch({ history: history.slice(0, MAX_CACHED_SESSIONS) });
-    } catch {
-      // History is additive; failure must not take down an otherwise usable chat.
-    }
+  refreshHistory() {
+    return this.sessionLifecycle.refreshHistory();
   }
 
   private async createSession() {
@@ -466,14 +396,8 @@ export class AgentSessionController {
     if (prompt) queueMicrotask(() => { void this.submit(prompt); });
   };
 
-  private async closeActiveSession(removePersistence: boolean) {
-    const sessionId = this.state.session?.id;
-    const bridge = this.bridgeProvider();
-    if (!sessionId || !bridge?.closeAgentSession) return;
-    await bridge.closeAgentSession({ rootPath: this.workspaceRoot, sessionId, removePersistence });
-  }
-
   private patch(patch: Partial<AgentControllerState>) {
+    if (this.disposed) return;
     if (patch.phase && patch.phase !== this.state.phase && !agentControllerTransitions[this.state.phase].includes(patch.phase)) {
       throw new Error(`Invalid Agent controller transition: ${this.state.phase} -> ${patch.phase}`);
     }
@@ -485,7 +409,7 @@ export class AgentSessionController {
     for (const listener of this.listeners) listener();
   }
 
-  private requireBridge<K extends keyof AgentBridge>(...methods: K[]): AgentBridge {
+  private requireBridge<K extends keyof AgentClientPort>(...methods: K[]): AgentClientPort {
     const bridge = this.bridgeProvider();
     if (!bridge || methods.some((method) => typeof bridge[method] !== "function")) {
       throw new Error("Desktop Agent bridge unavailable. Restart PuppyOne so the native bridge can load.");
@@ -515,6 +439,11 @@ export class AgentSessionController {
     this.patch({ draft: ui.draft });
   }
 }
+
+export const agentSessionControllerLimits = Object.freeze({
+  maxCachedSessions: agentSessionLifecycleLimits.maxCachedSessions,
+  maxQueuedPrompts: MAX_QUEUED_PROMPTS,
+});
 
 function chooseMode(inspection: AgentProviderInspection | null, current: string | null) {
   const modes = inspection?.modes ?? [];

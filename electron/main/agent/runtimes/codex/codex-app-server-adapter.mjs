@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { JsonlRpcConnection } from "./codex-jsonl-rpc-connection.mjs";
+import { JsonlRpcConnection } from "../../transports/jsonl-rpc-connection.mjs";
 import { boundRendererValue, redactSecrets, redactSecretText } from "../../agent-events.mjs";
 
 export const CODEX_CAPABILITIES = Object.freeze({

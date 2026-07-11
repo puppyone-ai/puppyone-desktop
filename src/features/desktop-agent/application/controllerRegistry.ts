@@ -1,4 +1,5 @@
 import { AgentSessionController } from "./AgentSessionController";
+import type { AgentClientProvider } from "./AgentClientPort";
 
 const MAX_CONTROLLERS = 8;
 const controllers = new Map<string, AgentSessionController>();
@@ -7,10 +8,10 @@ const controllers = new Map<string, AgentSessionController>();
  * Workspace-scoped controllers deliberately outlive the React Sidebar. Hiding
  * or remounting presentation must never stop a main-process Agent turn.
  */
-export function getAgentSessionController(workspaceRoot: string) {
+export function getAgentSessionController(workspaceRoot: string, clientProvider: AgentClientProvider) {
   let controller = controllers.get(workspaceRoot);
   if (!controller) {
-    controller = new AgentSessionController(workspaceRoot);
+    controller = new AgentSessionController(workspaceRoot, clientProvider);
   } else {
     controllers.delete(workspaceRoot);
   }

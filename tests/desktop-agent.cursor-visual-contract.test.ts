@@ -4,7 +4,12 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const css = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/desktop-agent.css"), "utf8");
+const styleRoot = path.join(root, "src/features/desktop-agent/ui/styles");
+const css = [
+  fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/desktop-agent.css"), "utf8"),
+  ...["foundation.css", "transcript.css", "activities.css", "blocking.css", "composer.css", "responsive.css"]
+    .map((file) => fs.readFileSync(path.join(styleRoot, file), "utf8")),
+].join("\n");
 const composer = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentComposer.tsx"), "utf8");
 const panel = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/RightAgentPanel.tsx"), "utf8");
 

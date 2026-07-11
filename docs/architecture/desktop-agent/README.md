@@ -39,11 +39,16 @@ PuppyOne Desktop
       |     +-- provider/model/variant/agent-mode composer
       |
       +-- Application (provider-neutral)
+      |     +-- explicit AgentClientPort
       |     +-- workspace-scoped AgentSessionController
+      |     +-- saved-session lifecycle service
       |     +-- explicit phase/state machine
       |     +-- normalized event projection
       |     +-- sequence repair + 32 ms stream batching
       |     +-- session draft/scroll/measurement cache
+      |
+      +-- Infrastructure adapter
+      |     +-- the only feature module allowed to read window.puppyoneDesktop
       |
       +-- Typed preload IPC
       |     +-- explicit session/turn/control calls only
@@ -105,10 +110,14 @@ this product decision.
 ```text
 src/App.tsx
   -> desktop-agent/index.ts                 public feature API
-  -> ui/                                    React presentation
-  -> application/                           state machine + event synchronizer
-  -> domain/                                projection + renderer-safe model
-  -> shared/agent-contract/                 process-neutral DTO/schema contract
+  -> ui/                                    React presentation/composition
+       -> application/                      state machine + explicit client port
+            -> domain/                      projection + renderer-safe model
+                 -> shared/agent-contract/  process-neutral DTO/schema contract
+
+RightAgentPanel.tsx                         only Renderer composition root
+  -> infrastructure/electron/               preload adapter
+       -> application/AgentClientPort.ts     port implemented by the adapter
 
 Electron IPC
   -> AgentService / application/            ownership and use cases
@@ -124,9 +133,12 @@ The Registry and Port never import concrete runtimes. Product composition is
 fixed to OpenCode; a fake definition may still be injected in contract tests.
 Runtime neutrality is an internal dependency rule, not a product-level harness
 selector. Main domain never imports application or infrastructure; Renderer
-domain never imports application or UI. OpenCode payloads are normalized and
-bounded before IPC. `check-agent-architecture.mjs` enforces these rules in every
-production build.
+domain never imports application, infrastructure or UI. Renderer application
+never imports infrastructure, UI, React or browser globals. Only
+`infrastructure/electron/electronAgentClient.ts` reads the preload bridge, and
+only `RightAgentPanel.tsx` composes that adapter. OpenCode payloads are
+normalized and bounded before IPC. `check-agent-architecture.mjs` enforces
+these rules in every production build.
 
 ## Source layout
 
@@ -148,6 +160,7 @@ electron/main/agent/
   bootstrap/
     create-agent-runtime-host.mjs     only concrete-runtime composition root
   application/
+    agent-event-journal.mjs           bounded delivery + durable journal writes
     agent-input-policy.mjs            trusted use-case input policy
     agent-runtime-catalog.mjs         discovery/inspection cache
     agent-session-store.mjs           window ownership + retired sessions
@@ -158,6 +171,10 @@ electron/main/agent/
   connections/
     local-agent-inventory.mjs         lazy five-minute cache + per-tool isolation
     local-agent-connection-policy.mjs derived integration/selectability gates
+    tools/
+      local-agent-tool-registry.mjs   validated descriptor registry
+      codex-tool.mjs                  Codex inventory descriptor
+      cursor-tool.mjs                 Cursor inventory descriptor
     probes/
       executable-candidates.mjs       non-login deterministic candidate registry
       bounded-probe-command.mjs       1.5s/16KiB direct-spawn boundary
@@ -167,6 +184,8 @@ electron/main/agent/
     agent-runtime-port.mjs            OpenCode process + fake-test contract
     agent-runtime-registry.mjs        internal registry + main-owned host
     executable-discovery.mjs          bounded generic discovery
+  transports/
+    jsonl-rpc-connection.mjs          provider-neutral bounded child transport
   runtimes/opencode/
     opencode-manifest.mjs             release/source/capability pin
     opencode-discovery.mjs            exact bundle integrity + fallback
@@ -178,14 +197,15 @@ electron/main/agent/
     opencode-sidecar-adapter.mjs      AgentRuntimePort implementation
   runtimes/codex/
     codex-discovery.mjs               local CLI discovery/version/auth
-    codex-jsonl-rpc-connection.mjs    bounded app-server transport
     codex-app-server-adapter.mjs      legacy vertical-slice adapter
     codex-runtime-definition.mjs      pending removal from product composition
 
 src/features/desktop-agent/
   index.ts                            public feature entrypoint
   application/
+    AgentClientPort.ts                 explicit Renderer-side native port
     AgentSessionController.ts         framework-independent controller
+    AgentSessionLifecycle.ts          create/switch/fork/archive/delete/history
     LocalAgentConnectionLoader.ts     lazy inventory presentation loader
     AgentEventSynchronizer.ts         batching + replay/gap repair
     SessionUiStateStore.ts            session draft/viewport measurements
@@ -195,6 +215,7 @@ src/features/desktop-agent/
     agent-contract.ts                 feature-local shared-contract alias
     agent-provider-routing.ts         pure Provider -> Model selection policy
     agent-projection.ts               event -> turn/part/row reducer
+    agent-projection-indexes.ts       lazy non-serializable lookup indexes
     agent-projection-types.ts         discriminated presentation model
     agent-projection-readers.ts       bounded payload readers
     agent-activity-presentation.ts    pure Bash/read/write presentation readers
@@ -211,7 +232,16 @@ src/features/desktop-agent/
     AgentComposer.tsx                 /, @, files and Provider/Model controls
     AgentVisualSmokeHarness.tsx       deterministic 420/560/760 visual QA
     RightAgentPanel.tsx               view composition only
-    desktop-agent.css                 complete responsive PuppyOne boundary
+    desktop-agent.css                 import-only public style entry
+    styles/
+      foundation.css                  panel/session/provider boundary
+      transcript.css                  conversation + safe Markdown
+      activities.css                  tool/command/diff/changes rows
+      blocking.css                    approval/question docks
+      composer.css                    composer + provider/model popovers
+      responsive.css                  container/motion/visual-QA rules
+  infrastructure/electron/
+    electronAgentClient.ts            only preload bridge access in feature
   visual-smoke.ts                     QA-only secondary feature entrypoint
   agentTypes.ts                       migration-only type re-export
   agentProjection.ts                  migration-only projection re-export
@@ -227,6 +257,62 @@ vendor/claudian/
   SBOM.cdx.json                       CycloneDX source-reference record
   LICENSE                             upstream MIT text
 ```
+
+## Responsibility and lifecycle closeout
+
+The implementation is split at transaction and ownership boundaries rather
+than at arbitrary line counts. Known hotspots have hard growth budgets in the
+architecture checker.
+
+```text
+Renderer live-session orchestration
+  AgentSessionController                  <= 500 lines
+    +-- AgentEventSynchronizer            streaming/gap replay/disposal
+    +-- AgentSessionLifecycle             saved-session mutations/history
+    +-- LocalAgentConnectionLoader        lazy local inventory
+    +-- SessionUiStateStore               bounded ephemeral LRU
+
+Pure projection
+  agent-projection.ts                     <= 550 lines
+    +-- agent-projection-readers.ts        hostile payload normalization
+    +-- agent-projection-indexes.ts        lazy lookup indexes
+
+Main transaction coordinator
+  agent-service.mjs                       <= 850 lines
+    +-- agent-input-policy.mjs             authorization/input policy
+    +-- agent-session-store.mjs            owner/session lifecycle
+    +-- agent-event-journal.mjs            replay/persistence/delivery
+
+Presentation
+  desktop-agent.css                       import-only entry
+    +-- six responsibility stylesheets    each <= 450 lines
+```
+
+`agent-service.mjs` deliberately retains create/resume/turn/approval/question
+transaction ordering in one coordinator: splitting those correlated security
+mutations across independent services would weaken owner and blocker
+invariants. Event journaling was extracted because it has an independent
+bounded contract. The pure projection reducer remains one exhaustive event
+transition table; payload readers and indexes are separate.
+
+All growing state has an explicit bound:
+
+```text
+controller history                  100 sessions
+queued follow-ups                    20 prompts; overflow is reported
+session UI cache                    100 LRU sessions
+row measurements                  1,000 per session
+event synchronizer buffer         2,000 events
+main replay journal               1,000 events / 2 MiB
+assistant/user message text         128 KiB per message
+activity/command text                64 KiB
+initial Markdown DOM                 24 KiB / 240 blocks
+picker option DOM                   120 rows; full catalog stays searchable
+```
+
+Dispose is terminal for Renderer services. Late inventory, event replay or
+initialization results cannot mutate a released controller. Sidebar unmount
+still does not stop a main-process turn; it only releases Renderer observers.
 
 ## Three owners of truth
 
@@ -297,7 +383,8 @@ assistant turns stay on canvas so long answers read like a document. Buttons
 appear only for real capabilities: the UI does not draw decorative microphone,
 rating or permission controls without an implemented action behind them.
 
-All `.desktop-agent-*` rules live in `ui/desktop-agent.css`; global
+All `.desktop-agent-*` rules live behind the import-only
+`ui/desktop-agent.css` entry in responsibility modules under `ui/styles/`; global
 `styles/layout.css` owns only the generic right-sidebar host. This prevents
 cascade order from changing the component when unrelated shell CSS evolves.
 The feature stylesheet uses semantic PuppyOne tokens, 12-16 px responsive

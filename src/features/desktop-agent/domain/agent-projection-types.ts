@@ -11,13 +11,28 @@ export type AgentTranscriptMessage = {
   sequence: number;
 };
 
+export type AgentActivityStatus =
+  | "queued"
+  | "running"
+  | "pending"
+  | "in-progress"
+  | "waiting-for-user"
+  | "completed"
+  | "succeeded"
+  | "failed"
+  | "warning"
+  | "blocked"
+  | "cancelled"
+  | "interrupted"
+  | "unknown";
+
 export type AgentActivity = {
   id: string;
   turnId: string | null;
   itemId: string | null;
   kind: "tool" | "command" | "file-change" | "plan" | "reasoning" | "warning" | "error";
   label: string;
-  status: string;
+  status: AgentActivityStatus;
   detail: Record<string, unknown>;
   output: string;
   sequence: number;
@@ -66,7 +81,7 @@ type AgentPartBase = {
 
 export type AgentPart =
   | (AgentPartBase & { kind: "user" | "assistant"; text: string; streaming: boolean; terminalState: AgentTurnTerminalState | null })
-  | (AgentPartBase & { kind: "reasoning" | "plan" | "tool" | "command" | "file-change" | "warning" | "error"; label: string; status: string; output: string; detail: Record<string, unknown> })
+  | (AgentPartBase & { kind: "reasoning" | "plan" | "tool" | "command" | "file-change" | "warning" | "error"; label: string; status: AgentActivityStatus; output: string; detail: Record<string, unknown> })
   | (AgentPartBase & { kind: "usage"; usage: Record<string, unknown> })
   | (AgentPartBase & { kind: "permission"; requestId: string; state: "pending" | "resolved" })
   | (AgentPartBase & { kind: "question"; requestId: string; state: "pending" | "resolved" })
