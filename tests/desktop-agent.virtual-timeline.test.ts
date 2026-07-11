@@ -45,6 +45,19 @@ describe("Desktop Agent virtual transcript", () => {
     expect(container.querySelectorAll("a")).toHaveLength(1);
     expect(container.querySelector("a")?.getAttribute("href")).toContain("https://example.com");
   });
+
+  it("animates only newly committed parts and does not replay entrance motion after rerender", () => {
+    const initial = projectionWithMessages(1);
+    const container = render(React.createElement(AgentTranscript, { projection: initial, loading: false }));
+    expect(container.querySelectorAll(".desktop-agent-virtual-row.is-new")).toHaveLength(0);
+
+    const next = projectionWithMessages(2);
+    act(() => root?.render(React.createElement(AgentTranscript, { projection: next, loading: false })));
+    expect(container.querySelectorAll(".desktop-agent-virtual-row.is-new")).toHaveLength(1);
+
+    act(() => root?.render(React.createElement(AgentTranscript, { projection: next, loading: false })));
+    expect(container.querySelectorAll(".desktop-agent-virtual-row.is-new")).toHaveLength(0);
+  });
 });
 
 function render(node: React.ReactElement) {
@@ -53,4 +66,28 @@ function render(node: React.ReactElement) {
   root = createRoot(container);
   act(() => root?.render(node));
   return container;
+}
+
+function projectionWithMessages(count: number) {
+  const projection = createAgentProjection();
+  projection.parts = Array.from({ length: count }, (_, index): AgentPart => ({
+    id: `assistant:${index}`,
+    turnId: "turn:1",
+    itemId: `item:${index}`,
+    kind: "assistant",
+    text: `Message ${index}`,
+    streaming: false,
+    terminalState: null,
+    sequence: index + 1,
+  }));
+  projection.rows = projection.parts.map((part) => ({
+    id: `row:${part.id}`,
+    partId: part.id,
+    turnId: part.turnId,
+    kind: part.kind,
+    sequence: part.sequence,
+    estimatedHeight: 72,
+  }));
+  projection.lastSequence = count;
+  return projection;
 }

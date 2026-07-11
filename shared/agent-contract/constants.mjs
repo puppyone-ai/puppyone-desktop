@@ -19,7 +19,7 @@ export const REQUIRED_AGENT_RUNTIME_METHODS = Object.freeze([
 ]);
 
 export const AGENT_IPC_CHANNELS = Object.freeze([
-  "agent:providers-discover", "agent:models-list", "agent:account-read",
+  "agent:providers-discover", "agent:local-connections-discover", "agent:models-list", "agent:account-read",
   "agent:session-create", "agent:session-resume", "agent:session-replay", "agent:sessions-list",
   "agent:session-fork", "agent:session-archive", "agent:session-delete", "agent:session-close",
   "agent:turn-start", "agent:turn-steer", "agent:turn-interrupt", "agent:session-compact",

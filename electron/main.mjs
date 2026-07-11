@@ -17,6 +17,7 @@ import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
 import { createAgentPersistence } from "./main/agent/agent-persistence.mjs";
 import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
 import { createAgentService } from "./main/agent/agent-service.mjs";
+import { createLocalAgentInventory } from "./main/agent/connections/local-agent-inventory.mjs";
 import { createDefaultAgentRuntimeHost } from "./main/agent/bootstrap/create-agent-runtime-host.mjs";
 import {
   getCloudApiErrorMessage,
@@ -129,6 +130,7 @@ const agentService = createAgentService({
   runtimeRegistry: agentRuntimeRegistry,
   persistence: agentPersistence,
 });
+const localAgentInventory = createLocalAgentInventory({ appVersion: app.getVersion() });
 const workspaceWatchService = createWorkspaceWatchService();
 const gitMetadataWatchService = createGitMetadataWatchService();
 const workspaceStateStore = createWorkspaceStateStore({
@@ -476,6 +478,7 @@ app.on("before-quit", createAgentQuitCoordinator({
     viewerPackHost?.destroyAllSessions();
     appPreviewRuntime?.closeAll();
     terminalService.closeAll();
+    localAgentInventory.dispose();
     workspaceWatchService.closeAll();
     gitMetadataWatchService.closeAll();
   },
@@ -549,6 +552,7 @@ function registerIpcHandlers() {
   registerAgentIpcHandlers({
     ipcMain: trustedIpcMain,
     agentService,
+    localAgentInventory,
     authorizeWorkspaceRoot,
   });
 

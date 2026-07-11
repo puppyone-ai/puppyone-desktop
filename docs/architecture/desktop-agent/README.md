@@ -1,6 +1,6 @@
 # Desktop Local Agent Chat architecture
 
-Status: target architecture accepted and active for the product Chat entry
+Status: implemented architecture for the product Chat entry
 behind the existing experimental `desktopAgentChat` gate. Production
 composition now registers OpenCode only and the UI has no runtime selector.
 The existing Codex app-server implementation remains isolated legacy debt, not
@@ -51,7 +51,7 @@ PuppyOne Desktop
       |
       +-- Electron main authority
             +-- AgentService: owner/session/order/replay/journal
-            +-- Local Agent Inventory (target)
+            +-- Local Agent Inventory
             |     +-- Codex/Cursor executable + version discovery
             |     +-- lazy auth/protocol compatibility probes
             |     +-- detected-but-unbridged presentation state
@@ -137,6 +137,7 @@ shared/agent-contract/
   schema.mjs                        strict IPC request/response boundary
   event-schema.mjs                  normalized event validation
   runtime-schema.mjs                inspection + capability validation
+  local-connection-schema.mjs       sanitized local-tool inventory DTO
   validation.mjs                    dependency-free schema primitives
 
 electron/main/agent/
@@ -154,6 +155,14 @@ electron/main/agent/
     agent-session-model.mjs           session aggregate and DTO projection
   migrations/
     legacy-session-format.mjs         v1 Codex journal compatibility edge
+  connections/
+    local-agent-inventory.mjs         lazy five-minute cache + per-tool isolation
+    local-agent-connection-policy.mjs derived integration/selectability gates
+    probes/
+      executable-candidates.mjs       non-login deterministic candidate registry
+      bounded-probe-command.mjs       1.5s/16KiB direct-spawn boundary
+      codex-local-probe.mjs           version + bounded app-server account probe
+      cursor-local-probe.mjs          version + redacted status classification
   runtime/
     agent-runtime-port.mjs            OpenCode process + fake-test contract
     agent-runtime-registry.mjs        internal registry + main-owned host
@@ -177,6 +186,7 @@ src/features/desktop-agent/
   index.ts                            public feature entrypoint
   application/
     AgentSessionController.ts         framework-independent controller
+    LocalAgentConnectionLoader.ts     lazy inventory presentation loader
     AgentEventSynchronizer.ts         batching + replay/gap repair
     SessionUiStateStore.ts            session draft/viewport measurements
     agent-controller-state.ts         state/transition vocabulary
@@ -187,8 +197,13 @@ src/features/desktop-agent/
     agent-projection.ts               event -> turn/part/row reducer
     agent-projection-types.ts         discriminated presentation model
     agent-projection-readers.ts       bounded payload readers
+    agent-activity-presentation.ts    pure Bash/read/write presentation readers
   ui/
     AgentPartRenderer.tsx             discriminated part registry
+    AgentProviderPicker.tsx           connected routes + local tools sections
+    AgentModelPicker.tsx              provider-scoped model selection
+    AgentPickerPopover.tsx            keyboard/ARIA/search disclosure primitive
+    activity/                         Bash/read/write/plan/reasoning renderers
     AgentQuestionDock.tsx             typed blocking questions
     AgentChangesPill.tsx              aggregate additions/deletions handoff
     SafeMarkdown.tsx                  no-innerHTML Markdown surface
@@ -206,6 +221,11 @@ vendor/opencode/
   PROMPT_MANIFEST.json                source prompt hashes/order
   SOURCE_ADOPTION.md                  exact source ledger
   LICENSE                             upstream MIT text
+
+vendor/claudian/
+  SOURCE_ADOPTION.md                  exact frontend pattern/file ledger
+  SBOM.cdx.json                       CycloneDX source-reference record
+  LICENSE                             upstream MIT text
 ```
 
 ## Three owners of truth
@@ -219,7 +239,8 @@ OpenCode native truth
 PuppyOne main-process truth
   OpenCode process health, native-session mapping, canonical workspace,
   window owner, provider/model selection, approval/question correlation,
-  normalized sequence and bounded redacted projection cache
+  normalized sequence, bounded redacted projection cache and read-only local
+  Codex/Cursor installation inventory
                     |
                     v
 Renderer presentation truth
@@ -576,3 +597,4 @@ controller. Cross-feature consumers import only `desktop-agent/index.ts`.
 - [OpenCode update and rollback runbook](opencode-upgrade-runbook.md)
 - [Right Sidebar product contract](right-sidebar.md)
 - [OpenCode source ledger](../../../vendor/opencode/SOURCE_ADOPTION.md)
+- [Claudian frontend source ledger](../../../vendor/claudian/SOURCE_ADOPTION.md)

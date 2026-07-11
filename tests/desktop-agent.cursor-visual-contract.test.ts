@@ -15,7 +15,7 @@ describe("Desktop Agent Cursor sidebar visual contract", () => {
     expect(css).toMatch(/--agent-radius-message:\s*13px/);
     expect(css).toMatch(/--agent-radius-composer:\s*22px/);
     expect(css).toMatch(/\.desktop-agent-transcript\s*\{[^}]*padding:\s*10px var\(--agent-page-gutter\) 28px/s);
-    expect(css).toMatch(/\.desktop-agent-message\.is-user\s*\{[^}]*width:\s*100%[^}]*max-width:\s*100%[^}]*padding:\s*10px 12px 11px/s);
+    expect(css).toMatch(/\.desktop-agent-message\.is-user\s*\{[^}]*width:\s*fit-content[^}]*max-width:\s*min\(86%, 720px\)[^}]*padding:\s*12px 14px/s);
     expect(css).toMatch(/\.desktop-agent-message\.is-assistant\s*\{\s*padding:\s*0 10px/);
   });
 

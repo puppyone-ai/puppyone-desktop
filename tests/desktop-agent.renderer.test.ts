@@ -63,7 +63,7 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.querySelector('button[aria-label="Copy response"]')).not.toBeNull();
   });
 
-  it("keeps a single-row composer while exposing model and mode without a harness selector", () => {
+  it("keeps a single-row composer with accessible custom Provider and Model pickers", () => {
     const container = render(React.createElement(AgentComposer, {
       draft: "",
       onDraftChange: vi.fn(),
@@ -82,13 +82,9 @@ describe("Desktop Agent renderer surfaces", () => {
       onStop: vi.fn(),
     }));
 
-    expect(container.querySelector('select[aria-label="Agent runtime"]')).toBeNull();
-    const selects = container.querySelectorAll("select");
-    expect(selects).toHaveLength(2);
-    expect(selects[0].closest("label")?.textContent).toContain("Agent provider");
-    expect(selects[1].closest("label")?.textContent).toContain("Agent model");
-    expect((selects[0] as HTMLSelectElement).value).toBe("openai");
-    expect((selects[1] as HTMLSelectElement).value).toBe("openai/gpt");
+    expect(container.querySelector("select")).toBeNull();
+    expect(container.querySelector('button[aria-label="Agent provider"]')?.textContent).toContain("OpenAI");
+    expect(container.querySelector('button[aria-label="Agent model"]')?.textContent).toContain("GPT");
     expect(container.textContent).toContain("OpenAI");
     expect(container.textContent).not.toContain("OpenCode runtime");
     expect(container.querySelector("textarea")?.getAttribute("rows")).toBe("1");
@@ -121,10 +117,97 @@ describe("Desktop Agent renderer surfaces", () => {
       onStop: vi.fn(),
     }));
 
-    expect(container.querySelectorAll("select")).toHaveLength(1);
-    expect(container.querySelector("select")?.closest("label")?.textContent).toContain("Agent provider");
+    expect(container.querySelector("select")).toBeNull();
+    expect(container.querySelector('button[aria-label="Agent provider"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="Agent model"]')).toBeNull();
     expect(container.textContent).not.toContain("Agent model");
     expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("shows connected routes before detected local tools without making unbridged CLIs selectable", () => {
+    const onSelectProvider = vi.fn();
+    const onDiscoverLocalConnections = vi.fn(async () => undefined);
+    const container = render(React.createElement(AgentComposer, {
+      draft: "",
+      onDraftChange: vi.fn(),
+      disabled: true,
+      running: false,
+      stopping: false,
+      submitting: false,
+      placeholder: "Choose a provider",
+      providers: [{ id: "openai", displayName: "OpenAI", modelCount: 1 }],
+      selectedProviderId: null,
+      models: [],
+      selectedModel: null,
+      localConnections: [{
+        id: "codex",
+        displayName: "Codex CLI",
+        installation: "detected",
+        version: "0.144.1",
+        authentication: "signed-in",
+        integration: "bridge-required",
+        capabilities: { versionProbe: true, authenticationProbe: true, protocolProbe: true },
+        selectable: false,
+        statusMessage: "Direct Codex sessions are not enabled.",
+        actions: [{ id: "refresh", label: "Refresh" }],
+      }],
+      localConnectionsPhase: "ready",
+      onDiscoverLocalConnections,
+      onSelectProvider,
+      onSubmit: vi.fn(async () => false),
+      onStop: vi.fn(),
+    }));
+
+    const trigger = container.querySelector('button[aria-label="Agent provider"]') as HTMLButtonElement;
+    act(() => trigger.click());
+    const popup = container.querySelector('[role="listbox"][aria-label="Agent provider options"]') as HTMLElement;
+    expect(popup).not.toBeNull();
+    expect(onDiscoverLocalConnections).toHaveBeenCalledWith(false);
+    expect(popup.textContent?.indexOf("Connected routes")).toBeLessThan(popup.textContent?.indexOf("Local tools on this Mac") ?? 0);
+    const codex = Array.from(popup.querySelectorAll('[role="option"]')).find((option) => option.textContent?.includes("Codex CLI")) as HTMLButtonElement;
+    expect(codex.getAttribute("aria-disabled")).toBe("true");
+    act(() => codex.click());
+    expect(onSelectProvider).not.toHaveBeenCalled();
+    expect(popup.textContent).toContain("Direct Codex sessions are not enabled.");
+  });
+
+  it("supports Arrow, Enter and Escape with focus return in the custom Provider picker", async () => {
+    const onSelectProvider = vi.fn();
+    const container = render(React.createElement(AgentComposer, {
+      draft: "",
+      onDraftChange: vi.fn(),
+      disabled: true,
+      running: false,
+      stopping: false,
+      submitting: false,
+      placeholder: "Choose a provider",
+      providers: [
+        { id: "openai", displayName: "OpenAI", modelCount: 2 },
+        { id: "anthropic", displayName: "Anthropic", modelCount: 1 },
+      ],
+      selectedProviderId: null,
+      localConnections: [],
+      localConnectionsPhase: "ready",
+      onSelectProvider,
+      onSubmit: vi.fn(async () => false),
+      onStop: vi.fn(),
+    }));
+    const trigger = container.querySelector('button[aria-label="Agent provider"]') as HTMLButtonElement;
+    act(() => trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect((document.activeElement as HTMLElement).textContent).toContain("OpenAI");
+    act(() => document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
+    expect((document.activeElement as HTMLElement).textContent).toContain("Anthropic");
+    act(() => document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(onSelectProvider).toHaveBeenCalledWith("anthropic");
+    expect(document.activeElement).toBe(trigger);
+
+    act(() => trigger.click());
+    act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(container.querySelector('[role="listbox"][aria-label="Agent provider options"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
   });
 
   it("summarizes real file changes in the compact Changes pill", () => {
@@ -152,6 +235,115 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(button.textContent).toContain("Changes+90-13");
     act(() => button.click());
     expect(onViewChanges).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders Bash activity as a compact Claudian-style row with a bounded expandable transcript", () => {
+    const projection = createAgentProjection();
+    projection.activities.push({
+      id: "command-1",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      kind: "command",
+      label: "Run tests",
+      status: "completed",
+      output: "25 files passed",
+      detail: {
+        tool: "bash",
+        input: { command: "npm test" },
+        metadata: { exitCode: 0, duration: 842 },
+      },
+      sequence: 1,
+    });
+    const onOpenTerminal = vi.fn();
+    const container = render(React.createElement(AgentTranscript, { projection, loading: false, onOpenTerminal }));
+    const row = container.querySelector(".desktop-agent-tool-row") as HTMLButtonElement;
+    expect(row.textContent).toContain("Bash");
+    expect(row.textContent).toContain("npm test");
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    act(() => row.click());
+    expect(row.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector(".desktop-agent-command-line")?.textContent).toContain("$npm test");
+    expect(container.querySelector(".desktop-agent-command-output")?.textContent).toContain("25 files passed");
+    expect(container.querySelector(".desktop-agent-command-meta")?.textContent).toContain("Exit 0");
+    const openTerminal = container.querySelector('button[aria-label="Open command in terminal"]') as HTMLButtonElement;
+    act(() => openTerminal.click());
+    expect(onOpenTerminal).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders Write/Edit activity with file stats, inline diff lines and Review handoff", () => {
+    const projection = createAgentProjection();
+    projection.activities.push({
+      id: "edit-1",
+      turnId: "turn-1",
+      itemId: "tool-2",
+      kind: "file-change",
+      label: "Updated app.ts",
+      status: "completed",
+      output: "",
+      detail: {
+        tool: "edit",
+        path: "src/app.ts",
+        changes: [{ path: "src/app.ts", additions: 2, deletions: 1 }],
+        input: { patch: "@@ -1,2 +1,3 @@\n-old\n+new\n context" },
+      },
+      sequence: 1,
+    });
+    const onViewChanges = vi.fn();
+    const onOpenFile = vi.fn();
+    const container = render(React.createElement(AgentTranscript, { projection, loading: false, onViewChanges, onOpenFile }));
+    const row = container.querySelector(".desktop-agent-tool-row") as HTMLButtonElement;
+    expect(row.textContent).toContain("Edit");
+    expect(row.textContent).toContain("src/app.ts");
+    act(() => row.click());
+    expect(container.querySelectorAll(".desktop-agent-diff-line.is-addition")).toHaveLength(1);
+    expect(container.querySelectorAll(".desktop-agent-diff-line.is-deletion")).toHaveLength(1);
+    expect(container.textContent).toContain("+2");
+    const review = container.querySelector('button[aria-label="Review file changes"]') as HTMLButtonElement;
+    act(() => review.click());
+    expect(onViewChanges).toHaveBeenCalledTimes(1);
+    act(() => (container.querySelector('button[aria-label="Open src/app.ts"]') as HTMLButtonElement).click());
+    expect(onOpenFile).toHaveBeenCalledWith("src/app.ts");
+  });
+
+  it("keeps Read activity compact and hands workspace paths back to the Editor surface", () => {
+    const projection = createAgentProjection();
+    projection.activities.push({
+      id: "read-1",
+      turnId: "turn-1",
+      itemId: "tool-read",
+      kind: "tool",
+      label: "Read composer",
+      status: "completed",
+      output: "export function AgentComposer() {}",
+      detail: { tool: "read", input: { path: "src/features/desktop-agent/ui/AgentComposer.tsx" } },
+      sequence: 1,
+    });
+    const onOpenFile = vi.fn();
+    const container = render(React.createElement(AgentTranscript, { projection, loading: false, onOpenFile }));
+    expect(container.querySelector(".desktop-agent-tool-row")?.textContent).toContain("Read");
+    const open = container.querySelector('button[aria-label="Open src/features/desktop-agent/ui/AgentComposer.tsx"]') as HTMLButtonElement;
+    act(() => open.click());
+    expect(onOpenFile).toHaveBeenCalledWith("src/features/desktop-agent/ui/AgentComposer.tsx");
+  });
+
+  it("renders reasoning as a quiet disclosure branch instead of a message bubble", () => {
+    const projection = createAgentProjection();
+    projection.activities.push({
+      id: "reasoning-1",
+      turnId: "turn-1",
+      itemId: "reasoning",
+      kind: "reasoning",
+      label: "Reasoning summary",
+      status: "completed",
+      output: "",
+      detail: { delta: "Compared the provider boundaries." },
+      sequence: 1,
+    });
+    const container = render(React.createElement(AgentTranscript, { projection, loading: false }));
+    expect(container.querySelector(".desktop-agent-reasoning")).not.toBeNull();
+    expect(container.querySelector(".desktop-agent-message")).toBeNull();
+    act(() => (container.querySelector(".desktop-agent-tool-row") as HTMLButtonElement).click());
+    expect(container.textContent).toContain("Compared the provider boundaries.");
   });
 
   it("shows Jump to latest when the transcript is not pinned to the bottom", () => {

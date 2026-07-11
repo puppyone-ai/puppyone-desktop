@@ -234,6 +234,40 @@ export type AgentProviderInspection = {
   warnings: string[];
 };
 
+export type AgentLocalInstallationState = "not-found" | "detected" | "unsupported" | "broken";
+export type AgentLocalAuthenticationState = "unknown" | "signed-out" | "signed-in" | "expired" | "error";
+export type AgentLocalIntegrationState = "inventory-only" | "bridge-required" | "ready" | "incompatible" | "blocked";
+export type AgentLocalConnectionSource =
+  | "configured"
+  | "user-installation"
+  | "system-installation"
+  | "path-installation"
+  | "application-bundle";
+
+export type AgentLocalConnection = {
+  id: string;
+  displayName: string;
+  installation: AgentLocalInstallationState;
+  version: string | null;
+  authentication: AgentLocalAuthenticationState;
+  integration: AgentLocalIntegrationState;
+  capabilities: {
+    versionProbe: boolean;
+    authenticationProbe: boolean;
+    protocolProbe: boolean;
+  };
+  selectable: boolean;
+  statusMessage: string;
+  actions: Array<{ id: "refresh" | "learn-more"; label: string }>;
+  source?: AgentLocalConnectionSource;
+};
+
+export type AgentLocalConnectionsSnapshot = {
+  connections: AgentLocalConnection[];
+  scannedAt: string;
+  warnings: string[];
+};
+
 export type AgentSessionSnapshot = {
   session: AgentSessionMetadata;
   runtime?: AgentRuntimeDescriptor;
@@ -254,6 +288,8 @@ export type AgentRuntimeRequest = {
   runtimeId?: AgentRuntimeId | null;
   refresh?: boolean;
 };
+
+export type AgentLocalConnectionsRequest = Pick<AgentRuntimeRequest, "rootPath" | "refresh">;
 
 export type AgentModelsListRequest = AgentRuntimeRequest;
 export type AgentAccountReadRequest = AgentRuntimeRequest;
@@ -352,6 +388,7 @@ export type AgentSessionExitEvent = {
 
 export type AgentIpcChannel =
   | "agent:providers-discover"
+  | "agent:local-connections-discover"
   | "agent:models-list"
   | "agent:account-read"
   | "agent:session-create"

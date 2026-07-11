@@ -29,6 +29,7 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(globalLayout).not.toContain(".desktop-agent-");
     expect(composer).toContain("useLayoutEffect");
     expect(composer).toContain("rows={1}");
+    expect(composer).not.toContain("<select");
   });
 
   it("keeps sidecar transport and rendered architecture diagrams out of Renderer/docs", () => {
@@ -48,13 +49,15 @@ describe("Desktop Agent architecture boundaries", () => {
     const registry = source("electron/main/agent/runtime/agent-runtime-registry.mjs");
     const bootstrap = source("electron/main/agent/bootstrap/create-agent-runtime-host.mjs");
     const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
+    const providerPicker = source("src/features/desktop-agent/ui/AgentProviderPicker.tsx");
+    const modelPicker = source("src/features/desktop-agent/ui/AgentModelPicker.tsx");
     const contract = source("shared/agent-contract/schema.mjs");
     expect(registry).not.toMatch(/opencode|codex|claude|cursor/i);
     expect(bootstrap).toContain("createOpenCodeRuntimeDefinition");
     expect(bootstrap).not.toContain("createCodexRuntimeDefinition");
     expect(composer).not.toMatch(/Agent runtime|onSelectRuntime|runtimes/);
-    expect(composer).toContain("Agent provider");
-    expect(composer).toContain("Agent model");
+    expect(providerPicker).toContain('ariaLabel="Agent provider"');
+    expect(modelPicker).toContain('ariaLabel="Agent model"');
     expect(contract).toContain("parseAgentIpcRequest");
     expect(contract).toContain("assertAgentIpcResponse");
   });
@@ -68,6 +71,18 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(adapter).toContain("isAgentChatModel");
     expect(controller).toContain("selectedProviderId");
     expect(panel.indexOf("providers=")).toBeLessThan(panel.indexOf("models="));
+  });
+
+  it("keeps local executable inventory main-owned, lazy and separate from OpenCode provider authority", () => {
+    const inventory = source("electron/main/agent/connections/local-agent-inventory.mjs");
+    const candidates = source("electron/main/agent/connections/probes/executable-candidates.mjs");
+    const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
+    const picker = source("src/features/desktop-agent/ui/AgentProviderPicker.tsx");
+    expect(inventory).not.toMatch(/from ["']react|OpenCode|providerCatalog/);
+    expect(candidates).not.toMatch(/-ilc|login shell|exec\(/i);
+    expect(controller.indexOf("discoverLocalConnections")).toBeGreaterThan(controller.indexOf("initialize(refresh"));
+    expect(picker).toContain("Local tools on this Mac");
+    expect(picker).toContain("Connected routes");
   });
 });
 

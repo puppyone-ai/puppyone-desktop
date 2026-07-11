@@ -4,6 +4,8 @@ import type {
   AgentAccountState,
   AgentApprovalResolution,
   AgentEvent,
+  AgentLocalConnectionsRequest,
+  AgentLocalConnectionsSnapshot,
   AgentModel,
   AgentModelsListRequest,
   AgentProviderInspection,
@@ -903,6 +905,7 @@ declare global {
         callback: (state: DesktopUpdateState) => void,
       ) => () => void;
       discoverAgentProviders: (request?: AgentRuntimeRequest) => Promise<AgentProviderInspection>;
+      discoverLocalAgentConnections: (request?: AgentLocalConnectionsRequest) => Promise<AgentLocalConnectionsSnapshot>;
       listAgentModels: (request?: AgentModelsListRequest) => Promise<AgentModel[]>;
       readAgentAccount: (request?: AgentAccountReadRequest) => Promise<AgentAccountState | null>;
       createAgentSession: (request: AgentSessionCreateRequest) => Promise<AgentSessionSnapshot>;

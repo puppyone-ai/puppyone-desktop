@@ -19,6 +19,11 @@ describe("shared Agent contract", () => {
   });
 
   it("parses and strips IPC input before workspace authorization", () => {
+    expect(parseAgentIpcRequest("agent:local-connections-discover", {
+      rootPath: "/workspace",
+      refresh: true,
+      executablePath: "/private/should-not-cross",
+    })).toEqual({ rootPath: "/workspace", refresh: true });
     expect(parseAgentIpcRequest("agent:turn-start", {
       rootPath: "/workspace",
       sessionId: "session-1",
@@ -41,6 +46,47 @@ describe("shared Agent contract", () => {
   });
 
   it("rejects malformed main-to-renderer responses and blocking events", () => {
+    expect(assertAgentIpcResponse("agent:local-connections-discover", {
+      connections: [{
+        id: "codex",
+        displayName: "Codex CLI",
+        installation: "detected",
+        version: "0.144.1",
+        authentication: "signed-in",
+        integration: "bridge-required",
+        capabilities: { versionProbe: true, authenticationProbe: true, protocolProbe: true },
+        selectable: false,
+        statusMessage: "Detected; direct harness not enabled.",
+        actions: [{ id: "refresh", label: "Refresh" }],
+        source: "user-installation",
+        executablePath: "/Users/private/.local/bin/codex",
+        rawStatus: "private@example.test",
+      }],
+      scannedAt: "2026-07-12T00:00:00.000Z",
+      warnings: [],
+      environment: { OPENAI_API_KEY: "secret" },
+    })).toEqual({
+      connections: [{
+        id: "codex",
+        displayName: "Codex CLI",
+        installation: "detected",
+        version: "0.144.1",
+        authentication: "signed-in",
+        integration: "bridge-required",
+        capabilities: { versionProbe: true, authenticationProbe: true, protocolProbe: true },
+        selectable: false,
+        statusMessage: "Detected; direct harness not enabled.",
+        actions: [{ id: "refresh", label: "Refresh" }],
+        source: "user-installation",
+      }],
+      scannedAt: "2026-07-12T00:00:00.000Z",
+      warnings: [],
+    });
+    expect(() => assertAgentIpcResponse("agent:local-connections-discover", {
+      connections: [{ id: "codex", displayName: "Codex CLI", installation: "ready" }],
+      scannedAt: "not-a-date",
+      warnings: [],
+    })).toThrow(/installation|contract/i);
     expect(() => assertAgentIpcResponse("agent:session-create", {
       session: { id: "s", runtimeId: "codex", provider: "codex", title: "Session" },
     })).toThrow(/workspaceRoot/i);

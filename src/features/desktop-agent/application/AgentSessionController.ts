@@ -21,6 +21,7 @@ import {
 } from "./agent-controller-state";
 import { formatAgentError } from "./agent-error";
 import { SessionUiStateStore, type SessionUiState } from "./SessionUiStateStore";
+import { LocalAgentConnectionLoader } from "./LocalAgentConnectionLoader";
 
 export type { AgentControllerPhase, AgentControllerState } from "./agent-controller-state";
 export { agentControllerTransitions } from "./agent-controller-state";
@@ -38,6 +39,7 @@ export class AgentSessionController {
   private readonly eventSynchronizer: AgentEventSynchronizer;
   private initializePromise: Promise<void> | null = null;
   private readonly sessionUi = new SessionUiStateStore();
+  private readonly localConnectionLoader: LocalAgentConnectionLoader;
   private queuedPrompts: string[] = [];
 
   constructor(workspaceRoot: string, private readonly bridgeProvider: () => AgentBridge | undefined = () => window.puppyoneDesktop) {
@@ -52,6 +54,10 @@ export class AgentSessionController {
       selectedProviderId: null,
       selectedModel: null,
       selectedMode: null,
+      localConnections: [],
+      localConnectionsPhase: "idle",
+      localConnectionsScannedAt: null,
+      localConnectionsError: null,
       draft: "",
       attachments: [],
       contextReferences: [],
@@ -61,6 +67,11 @@ export class AgentSessionController {
       resolvingBlocker: false,
       initialized: false,
     };
+    this.localConnectionLoader = new LocalAgentConnectionLoader(
+      workspaceRoot,
+      bridgeProvider,
+      (patch) => this.patch(patch),
+    );
     this.eventSynchronizer = new AgentEventSynchronizer(
       workspaceRoot,
       bridgeProvider,
@@ -85,6 +96,7 @@ export class AgentSessionController {
   /** Releases renderer subscriptions only; it never sends a runtime stop. */
   dispose() {
     this.eventSynchronizer.dispose();
+    this.localConnectionLoader.dispose();
     this.sessionUi.clear();
     this.listeners.clear();
   }
@@ -93,6 +105,10 @@ export class AgentSessionController {
     if (this.initializePromise && !refresh) return this.initializePromise;
     this.initializePromise = this.runInitialize(refresh).finally(() => { this.initializePromise = null; });
     return this.initializePromise;
+  }
+
+  async discoverLocalConnections(refresh = false) {
+    return this.localConnectionLoader.discover(refresh);
   }
 
   private async runInitialize(refresh: boolean) {

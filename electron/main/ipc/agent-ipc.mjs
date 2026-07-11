@@ -4,6 +4,7 @@ import { assertAgentIpcResponse, parseAgentIpcRequest } from "../../../shared/ag
 export function registerAgentIpcHandlers({
   ipcMain,
   agentService,
+  localAgentInventory,
   authorizeWorkspaceRoot,
 }) {
   const register = (channel, handler) => {
@@ -21,6 +22,12 @@ export function registerAgentIpcHandlers({
 
   register("agent:providers-discover", async (event, request) => (
     agentService.discoverProviders(event.sender, request, await authorizeOptionalRoot(event, request))
+  ));
+  register("agent:local-connections-discover", async (event, request) => (
+    localAgentInventory.discover({
+      refresh: request.refresh === true,
+      workspaceRoot: await authorizeOptionalRoot(event, request),
+    })
   ));
   register("agent:models-list", async (event, request) => (
     agentService.listModels(event.sender, request, await authorizeOptionalRoot(event, request))
