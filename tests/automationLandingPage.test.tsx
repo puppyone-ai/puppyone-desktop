@@ -9,6 +9,7 @@ import type {
   DesktopCloudAutomationProviderSpec,
   DesktopCloudSession,
 } from "../src/lib/cloudApi";
+import type { CloudAutomationRow } from "../src/features/automation/automationDomain";
 import type { AutomationTemplate } from "../src/features/automation/automationTemplates";
 
 vi.mock("../src/features/automation/AutomationDialogs", () => ({
@@ -39,7 +40,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function renderAutomationPage() {
+function renderAutomationPage(rows: CloudAutomationRow[] = []) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -48,8 +49,9 @@ function renderAutomationPage() {
       projectId="project-1"
       cloudSession={{} as DesktopCloudSession}
       apiBaseUrl={null}
-      rows={[]}
-      totalCount={0}
+      rows={rows}
+      totalCount={rows.length}
+      hasAnyAutomation={rows.length > 0}
       loading={false}
       providerSpecs={PROVIDERS}
       providerSpecsLoading={false}
@@ -59,7 +61,6 @@ function renderAutomationPage() {
       onCloseDetail={vi.fn()}
       onCloudSessionChange={vi.fn()}
       onRefresh={vi.fn(async () => undefined)}
-      onOpenAccess={vi.fn()}
       onOpenAutomation={vi.fn()}
     />,
   ));
@@ -97,7 +98,42 @@ describe("Automation landing page", () => {
     act(() => firstAdd?.click());
     expect(container.querySelector('[data-testid="new-automation-provider"]')?.textContent).toBe("google_docs");
   });
+
+  it("promotes owned Automations above the secondary source catalog", () => {
+    const container = renderAutomationPage([automationRow()]);
+    const owned = container.querySelector(".desktop-cloud-automation-existing-section");
+    const addMore = container.querySelector(".desktop-cloud-automation-add-more");
+
+    expect(owned?.querySelector("h2")?.textContent).toBe("Your automations");
+    expect(addMore?.querySelector("h2")?.textContent).toBe("Add more sources");
+    expect(((owned?.compareDocumentPosition(addMore as Node) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true);
+  });
 });
+
+function automationRow(): CloudAutomationRow {
+  return {
+    id: "automation:scope-1:connection-1",
+    scope: {
+      id: "scope-1",
+      project_id: "project-1",
+      name: "Docs",
+      path: "Research/Docs",
+      exclude: [],
+      mode: "rw",
+      is_root: false,
+    },
+    connector: {
+      id: "connection-1",
+      project_id: "project-1",
+      scope_id: "scope-1",
+      provider: "google_docs",
+      name: "Product brief",
+      direction: "inbound",
+      status: "active",
+      config: {},
+    },
+  };
+}
 
 function provider(
   providerId: string,

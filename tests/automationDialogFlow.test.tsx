@@ -37,20 +37,36 @@ describe("CloudNewAutomationDialog", () => {
     });
 
     expect(container.querySelector("h2")?.textContent).toBe("Collect Google Docs");
-    expect(container.querySelector(".desktop-cloud-automation-source-grid")).toBeNull();
-    expect(container.querySelector(".desktop-cloud-automation-map")).not.toBeNull();
-    expect(container.querySelector<HTMLSelectElement>('[aria-label="Run trigger"]')?.value).toBe("scheduled");
+    expect(container.querySelector(".desktop-cloud-automation-chooser-grid")).toBeNull();
+    expect(container.querySelector(".desktop-cloud-automation-builder")).not.toBeNull();
+    expect(container.querySelector<HTMLElement>("[role='dialog']")?.style.getPropertyValue("--desktop-dialog-width")).toBe("920px");
+    expect(container.querySelector<HTMLSelectElement>('[aria-label="Run trigger"]')?.value).toBe("daily");
     expect(
       Array.from(container.querySelectorAll("button"), (button) => button.textContent?.trim()),
-    ).toContain("Create automation");
+    ).toContain("Create Automation");
+    expect(
+      Array.from(container.querySelectorAll("button"), (button) => button.textContent?.trim()),
+    ).toContain("Back");
+
+    act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "Back")?.click());
+    const chooseButtons = container.querySelectorAll<HTMLButtonElement>(".desktop-cloud-automation-template-add");
+    act(() => chooseButtons[1]?.click());
+    act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "Continue")?.click());
+    expect(container.querySelector("h2")?.textContent).toBe("Configure Web Page");
   });
 
   it("uses source selection only for the generic New action", () => {
     const container = renderDialog({ template: null });
 
-    expect(container.querySelector("h2")?.textContent).toBe("New automation");
-    expect(container.querySelectorAll(".desktop-cloud-automation-source-card")).toHaveLength(2);
-    expect(container.querySelector(".desktop-cloud-automation-map")).toBeNull();
+    expect(container.querySelector("h2")?.textContent).toBe("Choose an Automation source");
+    expect(container.querySelectorAll(".desktop-cloud-automation-chooser-grid .desktop-cloud-automation-template-card")).toHaveLength(2);
+    expect(container.querySelector(".desktop-cloud-automation-builder")).toBeNull();
+    expect(
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "Continue")?.disabled,
+    ).toBe(true);
   });
 });
 
@@ -72,7 +88,7 @@ function renderDialog({ template }: { template: AutomationTemplate | null }) {
       template={template}
       onCloudSessionChange={vi.fn()}
       onRefresh={vi.fn(async () => undefined)}
-      onOpenAutomation={vi.fn()}
+      onCreated={vi.fn()}
       onClose={vi.fn()}
     />,
   ));
