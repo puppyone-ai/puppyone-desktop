@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import {
   Box,
-  Check,
   FileArchive,
   FileText,
   Film,
   Image,
+  MoreHorizontal,
   PackagePlus,
   Presentation,
-  ShieldCheck,
+  Search,
   Table2,
   Trash2,
   type LucideIcon,
@@ -28,14 +28,17 @@ export function PluginsView({
   hostAvailable,
   snapshot,
   onRefresh,
+  onSelectSection,
 }: {
   activeSection: PluginsSection;
   hostAvailable: boolean;
   snapshot: ViewerPackSnapshot;
   onRefresh: () => void | Promise<void>;
+  onSelectSection: (section: PluginsSection) => void;
 }) {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; message: string } | null>(null);
+  const [query, setQuery] = useState("");
   const installed = useMemo(
     () => [...snapshot.contributions].sort((a, b) => a.label.localeCompare(b.label)),
     [snapshot.contributions],
@@ -50,15 +53,9 @@ export function PluginsView({
       const result = await bridge.installLocal();
       if (result.canceled) return;
       await onRefresh();
-      setFeedback({
-        tone: "success",
-        message: `${result.pluginId} ${result.version} is installed and ready for matching local files.`,
-      });
+      setFeedback({ tone: "success", message: `${result.pluginId} ${result.version} installed.` });
     } catch (error) {
-      setFeedback({
-        tone: "danger",
-        message: error instanceof Error ? error.message : String(error),
-      });
+      setFeedback({ tone: "danger", message: error instanceof Error ? error.message : String(error) });
     } finally {
       setBusyAction(null);
     }
@@ -74,37 +71,39 @@ export function PluginsView({
       if (!result.ok && !result.canceled) throw new Error("Plugin could not be removed.");
       if (result.canceled) return;
       await onRefresh();
-      setFeedback({ tone: "success", message: `${plugin.label} was removed from this device.` });
+      setFeedback({ tone: "success", message: `${plugin.label} removed.` });
     } catch (error) {
-      setFeedback({
-        tone: "danger",
-        message: error instanceof Error ? error.message : String(error),
-      });
+      setFeedback({ tone: "danger", message: error instanceof Error ? error.message : String(error) });
     } finally {
       setBusyAction(null);
     }
   };
+
+  const sectionTitle = activeSection === "installed"
+    ? "Installed"
+    : activeSection === "discover"
+      ? "Discover"
+      : "Included";
 
   return (
     <section className="desktop-plugins-view">
       <div className="desktop-plugins-scroll">
         <div className="desktop-plugins-page">
           <header className="desktop-plugins-header">
-            <div>
-              <span className="desktop-plugins-kicker">Experimental · Local only</span>
-              <h1>Plugins</h1>
-              <p>Add focused viewers without turning the editor into a heavyweight application.</p>
+            <div className="desktop-plugins-title-row">
+              <h1>{sectionTitle}</h1>
             </div>
-            <button
-              className="desktop-plugins-install-action"
-              type="button"
-              disabled={!hostAvailable || busyAction !== null}
-              title={hostAvailable ? "Install a signed local Viewer Pack" : "Local Viewer Pack installation is unavailable in this build"}
-              onClick={() => void installLocal()}
-            >
-              <PackagePlus size={15} aria-hidden="true" />
-              <span>{busyAction === "install" ? "Installing…" : "Install from file"}</span>
-            </button>
+            {activeSection === "installed" && hostAvailable && installed.length > 0 && (
+              <button
+                className="desktop-plugins-install-action"
+                type="button"
+                disabled={busyAction !== null}
+                onClick={() => void installLocal()}
+              >
+                <PackagePlus size={14} aria-hidden="true" />
+                <span>{busyAction === "install" ? "Installing…" : "Install from file"}</span>
+              </button>
+            )}
           </header>
 
           {feedback && (
@@ -113,147 +112,147 @@ export function PluginsView({
             </div>
           )}
 
-          {activeSection === "discover" && (
-            <>
-              <PluginPrinciples />
-              <OfficialViewersSection entries={OFFICIAL_VIEWER_CATALOG.slice(0, 3)} compact />
-              <InstalledPluginsSection
-                hostAvailable={hostAvailable}
-                installed={installed}
-                busyAction={busyAction}
-                onInstall={installLocal}
-                onUninstall={uninstall}
-                previewLimit={2}
-              />
-            </>
-          )}
-
-          {activeSection === "built-in" && (
-            <OfficialViewersSection entries={OFFICIAL_VIEWER_CATALOG} />
-          )}
-
           {activeSection === "installed" && (
-            <InstalledPluginsSection
+            <InstalledPlugins
               hostAvailable={hostAvailable}
               installed={installed}
               busyAction={busyAction}
+              onBrowse={() => onSelectSection("discover")}
               onInstall={installLocal}
               onUninstall={uninstall}
             />
           )}
+
+          {activeSection === "discover" && (
+            <DiscoverPlugins query={query} onQueryChange={setQuery} />
+          )}
+
+          {activeSection === "included" && (
+            <OfficialPluginList entries={OFFICIAL_VIEWER_CATALOG} showStatus={false} />
+          )}
         </div>
       </div>
     </section>
   );
 }
 
-function PluginPrinciples() {
+function DiscoverPlugins({
+  query,
+  onQueryChange,
+}: {
+  query: string;
+  onQueryChange: (query: string) => void;
+}) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const entries = normalizedQuery
+    ? OFFICIAL_VIEWER_CATALOG.filter((entry) => (
+        `${entry.title} ${entry.formats.join(" ")}`.toLowerCase().includes(normalizedQuery)
+      ))
+    : OFFICIAL_VIEWER_CATALOG;
+
   return (
-    <div className="desktop-plugins-principles" aria-label="Plugin safety model">
-      <span><ShieldCheck size={15} aria-hidden="true" /> Sandboxed</span>
-      <span><FileArchive size={15} aria-hidden="true" /> Current file only</span>
-      <span><Check size={15} aria-hidden="true" /> Signed packages</span>
+    <>
+      <label className="desktop-plugins-search">
+        <Search size={16} aria-hidden="true" />
+        <input
+          type="search"
+          value={query}
+          placeholder="Search plugins"
+          aria-label="Search plugins"
+          onChange={(event) => onQueryChange(event.target.value)}
+        />
+      </label>
+      <div className="desktop-plugins-list-heading">
+        <span>Official</span>
+      </div>
+      {entries.length > 0 ? (
+        <OfficialPluginList entries={entries} showStatus />
+      ) : (
+        <div className="desktop-plugins-no-results">No matching plugins</div>
+      )}
+    </>
+  );
+}
+
+function OfficialPluginList({
+  entries,
+  showStatus = false,
+}: {
+  entries: readonly OfficialViewerCatalogEntry[];
+  showStatus?: boolean;
+}) {
+  return (
+    <div className="desktop-official-plugins-list">
+      {entries.map((entry) => (
+        <OfficialPluginRow key={entry.id} entry={entry} showStatus={showStatus} />
+      ))}
     </div>
   );
 }
 
-function OfficialViewersSection({
-  entries,
-  compact = false,
+function OfficialPluginRow({
+  entry,
+  showStatus,
 }: {
-  entries: readonly OfficialViewerCatalogEntry[];
-  compact?: boolean;
+  entry: OfficialViewerCatalogEntry;
+  showStatus: boolean;
 }) {
-  return (
-    <section className="desktop-plugins-section">
-      <div className="desktop-plugins-section-heading">
-        <div>
-          <h2>Official viewers</h2>
-          <p>Included with PuppyOne and activated only when a matching file is opened.</p>
-        </div>
-        <span>{compact ? "Featured" : `${entries.length} included`}</span>
-      </div>
-      <div className="desktop-plugins-grid">
-        {entries.map((entry) => (
-          <OfficialViewerCard key={entry.id} entry={entry} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function OfficialViewerCard({ entry }: { entry: OfficialViewerCatalogEntry }) {
   const Icon = OFFICIAL_VIEWER_ICONS[entry.icon];
   return (
-    <article className="desktop-plugin-card">
-      <div className="desktop-plugin-card-topline">
-        <span className="desktop-plugin-mark"><Icon size={17} strokeWidth={1.8} aria-hidden="true" /></span>
-        <span className="desktop-plugin-status included"><Check size={11} aria-hidden="true" /> Included</span>
+    <article className="desktop-official-plugin-row">
+      <span className="desktop-plugin-mark"><Icon size={19} strokeWidth={1.75} aria-hidden="true" /></span>
+      <div>
+        <strong>{entry.title}</strong>
+        <span>{entry.formats.join(" · ")}</span>
       </div>
-      <div className="desktop-plugin-card-copy">
-        <h3>{entry.title}</h3>
-        <p>{entry.description}</p>
-      </div>
-      <div className="desktop-plugin-formats" aria-label={`${entry.title} formats`}>
-        {entry.formats.map((format) => <span key={format}>{format}</span>)}
-      </div>
+      {showStatus && <small>Included</small>}
     </article>
   );
 }
 
-function InstalledPluginsSection({
+function InstalledPlugins({
   hostAvailable,
   installed,
   busyAction,
+  onBrowse,
   onInstall,
   onUninstall,
-  previewLimit,
 }: {
   hostAvailable: boolean;
   installed: readonly ViewerContribution[];
   busyAction: string | null;
+  onBrowse: () => void;
   onInstall: () => Promise<void>;
   onUninstall: (plugin: ViewerContribution) => Promise<void>;
-  previewLimit?: number;
 }) {
-  const visible = typeof previewLimit === "number" ? installed.slice(0, previewLimit) : installed;
-  return (
-    <section className="desktop-plugins-section">
-      <div className="desktop-plugins-section-heading">
-        <div>
-          <h2>Installed locally</h2>
-          <p>Optional Viewer Packs stay on this device and receive no network permission.</p>
-        </div>
-        <span>{installed.length}</span>
+  if (installed.length === 0) {
+    return (
+      <div className="desktop-plugins-empty">
+        <span className="desktop-plugin-mark"><Box size={19} strokeWidth={1.75} aria-hidden="true" /></span>
+        <strong>No plugins installed</strong>
+        <button
+          className="desktop-plugins-empty-action"
+          type="button"
+          disabled={busyAction !== null}
+          onClick={() => hostAvailable ? void onInstall() : onBrowse()}
+        >
+          {hostAvailable ? (busyAction === "install" ? "Installing…" : "Install from file") : "Browse plugins"}
+        </button>
       </div>
-      {visible.length > 0 ? (
-        <div className="desktop-installed-plugins-list">
-          {visible.map((plugin) => (
-            <InstalledPluginRow
-              key={`${plugin.pluginId}:${plugin.contentHash}`}
-              plugin={plugin}
-              busy={busyAction === `remove:${plugin.pluginId}`}
-              onUninstall={onUninstall}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="desktop-plugins-empty">
-          <span className="desktop-plugin-mark"><Box size={17} strokeWidth={1.8} aria-hidden="true" /></span>
-          <div>
-            <strong>No optional plugins installed</strong>
-            <p>
-              {hostAvailable
-                ? "Install a signed Viewer Pack for a local format that does not already have a built-in preview."
-                : "Signed local Viewer Packs will appear here when installation is available."}
-            </p>
-          </div>
-          <button type="button" disabled={!hostAvailable || busyAction !== null} onClick={() => void onInstall()}>
-            Install from file
-          </button>
-        </div>
-      )}
-    </section>
+    );
+  }
+
+  return (
+    <div className="desktop-installed-plugins-list">
+      {installed.map((plugin) => (
+        <InstalledPluginRow
+          key={`${plugin.pluginId}:${plugin.contentHash}`}
+          plugin={plugin}
+          busy={busyAction === `remove:${plugin.pluginId}`}
+          onUninstall={onUninstall}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -269,28 +268,25 @@ function InstalledPluginRow({
   const formats = plugin.formats.flatMap((format) => format.extensions).slice(0, 6);
   return (
     <article className="desktop-installed-plugin-row">
-      <span className="desktop-plugin-mark"><Box size={17} strokeWidth={1.8} aria-hidden="true" /></span>
+      <span className="desktop-plugin-mark"><Box size={19} strokeWidth={1.75} aria-hidden="true" /></span>
       <div className="desktop-installed-plugin-copy">
-        <div>
-          <h3>{plugin.label}</h3>
-          <span>{plugin.version}</span>
-        </div>
-        <p>{plugin.publisher} · Current file access only</p>
+        <strong>{plugin.label}</strong>
+        <span>{plugin.publisher} · {plugin.version}</span>
         {formats.length > 0 && (
-          <div className="desktop-plugin-formats">
-            {formats.map((format) => <span key={format}>{format.replace(/^\./, "").toUpperCase()}</span>)}
-          </div>
+          <small>{formats.map((format) => format.replace(/^\./, "").toUpperCase()).join(" · ")}</small>
         )}
       </div>
-      <button
-        className="desktop-plugin-remove-action"
-        type="button"
-        disabled={busy}
-        onClick={() => void onUninstall(plugin)}
-      >
-        <Trash2 size={13} aria-hidden="true" />
-        <span>{busy ? "Removing…" : "Remove"}</span>
-      </button>
+      <details className="desktop-plugin-menu">
+        <summary aria-label={`Manage ${plugin.label}`} title={`Manage ${plugin.label}`}>
+          <MoreHorizontal size={16} aria-hidden="true" />
+        </summary>
+        <div>
+          <button type="button" disabled={busy} onClick={() => void onUninstall(plugin)}>
+            <Trash2 size={13} aria-hidden="true" />
+            <span>{busy ? "Removing…" : "Remove"}</span>
+          </button>
+        </div>
+      </details>
     </article>
   );
 }
