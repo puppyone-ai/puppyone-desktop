@@ -31,6 +31,7 @@ export function SettingsView({
   diffMarkers,
   fileIconTheme,
   sidebarNavigationLayout,
+  sidebarNavigationVisibilitySettings,
   filesVisibilitySettings,
   externalAppsSettings,
   experimentalSettings,
@@ -55,6 +56,7 @@ export function SettingsView({
   onDiffMarkersChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
+  onSidebarNavigationVisibilitySettingsChange,
   onFilesVisibilitySettingsChange,
   onExternalAppsSettingsChange,
   onExperimentalSettingsChange,
@@ -327,6 +329,28 @@ export function SettingsView({
                   })}
                 </div>
               </div>
+              {experimentalSettings.enableViewerPlugins && (
+                <div className="desktop-settings-row desktop-settings-row-control">
+                  <span className="desktop-settings-label-stack">
+                    <strong>Plugins shortcut</strong>
+                    <small>Show the local Plugins entry in workspace navigation.</small>
+                  </span>
+                  <label className="desktop-settings-switch">
+                    <input
+                      type="checkbox"
+                      checked={sidebarNavigationVisibilitySettings.enabled.plugins}
+                      onChange={(event) => onSidebarNavigationVisibilitySettingsChange({
+                        ...sidebarNavigationVisibilitySettings,
+                        enabled: {
+                          ...sidebarNavigationVisibilitySettings.enabled,
+                          plugins: event.target.checked,
+                        },
+                      })}
+                    />
+                    <span aria-hidden="true" />
+                  </label>
+                </div>
+              )}
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-tools-row">
                 <span>Header elements</span>
                 <div className="desktop-settings-tool-list">
@@ -762,6 +786,23 @@ function ExperimentalSettingsView({
             detail="Opt in to early desktop experiences. Every experiment is off by default."
           />
           <div className="desktop-settings-list">
+            <div className="desktop-settings-row desktop-settings-row-control">
+              <span className="desktop-settings-label-stack">
+                <strong>Viewer plugins</strong>
+                <small>Enable the experimental local-only Plugins page and its optional navigation shortcut.</small>
+              </span>
+              <label className="desktop-settings-switch">
+                <input
+                  type="checkbox"
+                  checked={settings.enableViewerPlugins}
+                  onChange={(event) => onChange({
+                    ...settings,
+                    enableViewerPlugins: event.target.checked,
+                  })}
+                />
+                <span aria-hidden="true" />
+              </label>
+            </div>
             {assetLibraryHomeAvailable && (
               <div className="desktop-settings-row desktop-settings-row-control">
                 <span className="desktop-settings-label-stack">

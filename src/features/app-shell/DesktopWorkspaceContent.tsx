@@ -49,6 +49,12 @@ import {
 } from "../data-workspace/nodeActions";
 import { PuppyFlowEditor } from "../puppyflow/PuppyFlowEditor";
 import { isPuppyFlowFile } from "../puppyflow/puppyflowModel";
+import {
+  isPluginsNavigationVisible,
+  isViewerPluginsEnabled,
+  PluginsSidebar,
+  type PluginsSection,
+} from "../plugins";
 import type { DesktopPreferencesController } from "./useDesktopPreferences";
 import {
   COLLAPSED_EXPLORER_WIDTH,
@@ -67,6 +73,9 @@ const LazyDesktopViewerPackSurface = lazy(() => import("../viewer-packs").then((
 })));
 const LazyDesktopViewerPackFallback = lazy(() => import("../viewer-packs").then((module) => ({
   default: module.DesktopViewerPackFallback,
+})));
+const LazyPluginsView = lazy(() => import("../plugins/PluginsView").then((module) => ({
+  default: module.PluginsView,
 })));
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
@@ -154,7 +163,17 @@ export function DesktopWorkspaceContent({
   workspaceRefreshToken,
 }: DesktopWorkspaceContentProps) {
   const cloudWorkspace = workspaceKind === "cloud";
-  const resolvedActiveView = cloudWorkspace && (activeView === "git" || activeView === "cloud")
+  const viewerPluginsEnabled = isViewerPluginsEnabled({
+    settings: preferences.experimentalSettings,
+    workspaceIsCloud: cloudWorkspace,
+  });
+  const pluginsNavigationVisible = isPluginsNavigationVisible({
+    featureEnabled: viewerPluginsEnabled,
+    visibility: preferences.sidebarNavigationVisibilitySettings,
+  });
+  const resolvedActiveView = activeView === "plugins" && !viewerPluginsEnabled
+    ? "data"
+    : cloudWorkspace && (activeView === "git" || activeView === "cloud")
     ? "data"
     : !cloudWorkspace && (activeView === "access" || activeView === "integrations") ? "data"
       : activeView === "cloud" && !cloud.enabled ? "data"
@@ -173,6 +192,7 @@ export function DesktopWorkspaceContent({
   });
   const [activeCloudAccessRowId, setActiveCloudAccessRowId] = useState<string | null>(null);
   const [activeIntegrationProvider, setActiveIntegrationProvider] = useState<string | null>(null);
+  const [activePluginsSection, setActivePluginsSection] = useState<PluginsSection>("discover");
   const effectiveCloudAccessFilter: CloudAccessFilter = resolvedActiveView === "integrations"
     ? "integrations"
     : "all";
@@ -205,7 +225,7 @@ export function DesktopWorkspaceContent({
     );
   }, [workspace?.path]);
 
-  const externalViewerPacksEnabled = !cloudWorkspace &&
+  const externalViewerPacksEnabled = viewerPluginsEnabled &&
     typeof window !== "undefined" &&
     Boolean(window.puppyoneDesktop?.viewerPacks);
   const [viewerPackSnapshot, setViewerPackSnapshot] = useState<ViewerPackSnapshot>(EMPTY_VIEWER_PACK_SNAPSHOT);
@@ -301,6 +321,7 @@ export function DesktopWorkspaceContent({
       diffMarkers={preferences.diffMarkers}
       fileIconTheme={preferences.fileIconTheme}
       sidebarNavigationLayout={preferences.sidebarNavigationLayout}
+      sidebarNavigationVisibilitySettings={preferences.sidebarNavigationVisibilitySettings}
       filesVisibilitySettings={preferences.filesVisibilitySettings}
       externalAppsSettings={preferences.externalAppsSettings}
       experimentalSettings={preferences.experimentalSettings}
@@ -325,6 +346,7 @@ export function DesktopWorkspaceContent({
       onDiffMarkersChange={preferences.setDiffMarkers}
       onFileIconThemeChange={preferences.setFileIconTheme}
       onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
+      onSidebarNavigationVisibilitySettingsChange={preferences.setSidebarNavigationVisibilitySettings}
       onFilesVisibilitySettingsChange={onFilesVisibilitySettingsChange}
       onExternalAppsSettingsChange={preferences.setExternalAppsSettings}
       onExperimentalSettingsChange={preferences.setExperimentalSettings}
@@ -404,12 +426,24 @@ export function DesktopWorkspaceContent({
     />
   );
 
+  const pluginsView = (
+    <Suspense fallback={<div className="desktop-plugins-loading">Loading plugins…</div>}>
+      <LazyPluginsView
+        activeSection={activePluginsSection}
+        hostAvailable={externalViewerPacksEnabled}
+        snapshot={viewerPackSnapshot}
+        onRefresh={refreshViewerPackSnapshot}
+      />
+    </Suspense>
+  );
+
   if (!dataPort) {
     if (cloudWorkspace && !cloud.cloudSession) return cloudAccessView;
     if (resolvedActiveView === "settings") return settingsView;
     if (resolvedActiveView === "git") return gitStatusView;
     if (resolvedActiveView === "cloud") return cloudMainView;
     if (resolvedActiveView === "access" || resolvedActiveView === "integrations") return cloudAccessView;
+    if (resolvedActiveView === "plugins") return pluginsView;
     return null;
   }
 
@@ -494,6 +528,7 @@ export function DesktopWorkspaceContent({
             activeView={resolvedActiveView}
             accessEnabled={accessNavigationEnabled}
             gitEnabled={gitEnabled}
+            pluginsEnabled={pluginsNavigationVisible}
             orientation={preferences.sidebarNavigationOrientation}
             gitIncomingCount={git.gitIncomingCount}
             gitOperationLoading={git.gitOperationLoading}
@@ -508,6 +543,7 @@ export function DesktopWorkspaceContent({
             activeView={resolvedActiveView}
             accessEnabled={accessNavigationEnabled}
             gitEnabled={gitEnabled}
+            pluginsEnabled={pluginsNavigationVisible}
             gitIncomingCount={git.gitIncomingCount}
             gitOperationLoading={git.gitOperationLoading}
             gitStatus={git.activeGitStatus}
@@ -553,6 +589,12 @@ export function DesktopWorkspaceContent({
                 accessData={cloudAccessData}
                 activeProvider={activeIntegrationProvider}
                 onSelectProvider={handleIntegrationProviderChange}
+              />
+            ) : resolvedActiveView === "plugins" ? (
+              <PluginsSidebar
+                activeSection={activePluginsSection}
+                installedCount={viewerPackSnapshot.contributions.length}
+                onSelectSection={setActivePluginsSection}
               />
             ) : resolvedActiveView === "git" ? (
               <GitSidebar
@@ -607,6 +649,7 @@ export function DesktopWorkspaceContent({
               activeView={resolvedActiveView}
               accessEnabled={accessNavigationEnabled}
               gitEnabled={gitEnabled}
+              pluginsEnabled={pluginsNavigationVisible}
               gitIncomingCount={git.gitIncomingCount}
               gitOperationLoading={git.gitOperationLoading}
               gitStatus={git.activeGitStatus}
@@ -617,10 +660,12 @@ export function DesktopWorkspaceContent({
             />
           ) : undefined
         }
-        mainSlot={resolvedActiveView === "git" || resolvedActiveView === "settings" || resolvedActiveView === "cloud" || resolvedActiveView === "access" || resolvedActiveView === "integrations" ? (
+        mainSlot={resolvedActiveView === "git" || resolvedActiveView === "plugins" || resolvedActiveView === "settings" || resolvedActiveView === "cloud" || resolvedActiveView === "access" || resolvedActiveView === "integrations" ? (
           <div className="desktop-view-surface desktop-view-surface-main" data-view={resolvedActiveView}>
             {resolvedActiveView === "git"
               ? gitStatusView
+              : resolvedActiveView === "plugins"
+                ? pluginsView
               : resolvedActiveView === "cloud"
                 ? cloudMainView
                 : resolvedActiveView === "access" || resolvedActiveView === "integrations"

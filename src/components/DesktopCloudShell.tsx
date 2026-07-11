@@ -6,7 +6,7 @@ import {
 } from "react";
 import { usePaneResizeDrag } from "@puppyone/shared-ui";
 
-export type DesktopView = "data" | "git" | "cloud" | "access" | "integrations" | "settings";
+export type DesktopView = "data" | "git" | "plugins" | "cloud" | "access" | "integrations" | "settings";
 
 type DesktopCloudShellProps = {
   children: ReactNode;

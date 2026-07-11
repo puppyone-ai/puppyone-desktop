@@ -13,6 +13,11 @@ export type SidebarNavigationLayout =
 
 export type SidebarNavigationPlacement = "top" | "left" | "bottom";
 export type SidebarNavigationOrientation = "horizontal" | "vertical";
+export const OPTIONAL_SIDEBAR_NAVIGATION_ITEM_IDS = ["plugins"] as const;
+export type OptionalSidebarNavigationItemId = typeof OPTIONAL_SIDEBAR_NAVIGATION_ITEM_IDS[number];
+export type SidebarNavigationVisibilitySettings = {
+  enabled: Record<OptionalSidebarNavigationItemId, boolean>;
+};
 export type FilesVisibilitySettings = {
   showHiddenFiles: boolean;
   excludePatterns: string[];
@@ -46,6 +51,7 @@ export type ExperimentalSettings = {
   enableAssetLibraryHome: boolean;
   enablePuppyoneAppFiles: boolean;
   enablePuppyFlowFiles: boolean;
+  enableViewerPlugins: boolean;
 };
 
 export const THEME_STORAGE_KEY = "puppyone.desktop.theme";
@@ -58,6 +64,7 @@ export const DOCK_ICON_STORAGE_KEY = "puppyone.desktop.dockIcon";
 export const DIFF_MARKERS_STORAGE_KEY = "puppyone.desktop.diffMarkers";
 export const FILE_ICON_THEME_STORAGE_KEY = "puppyone.desktop.fileIconTheme";
 export const SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY = "puppyone.desktop.sidebarNavigationLayout";
+export const SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY = "puppyone.desktop.sidebarNavigationVisibility";
 export const FILES_VISIBILITY_STORAGE_KEY = "puppyone.desktop.filesVisibility";
 export const EXTERNAL_APPS_STORAGE_KEY = "puppyone.desktop.externalApps";
 export const RIGHT_SIDEBAR_TOOLS_STORAGE_KEY = "puppyone.desktop.rightSidebarTools";
@@ -75,6 +82,11 @@ export const DEFAULT_DOCK_ICON: DockIcon = "polished";
 export const DEFAULT_DIFF_MARKERS: DiffMarkers = "color";
 export const DEFAULT_GIT_DISPLAY_MODE: GitDisplayMode = "simple";
 export const DEFAULT_SIDEBAR_NAVIGATION_LAYOUT: SidebarNavigationLayout = "bottom-horizontal";
+export const DEFAULT_SIDEBAR_NAVIGATION_VISIBILITY_SETTINGS: SidebarNavigationVisibilitySettings = {
+  enabled: {
+    plugins: true,
+  },
+};
 export const DEFAULT_EXPLORER_EXCLUDE_PATTERNS = [
   "**/.git",
   "**/.puppyone",
@@ -110,6 +122,7 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableAssetLibraryHome: false,
   enablePuppyoneAppFiles: false,
   enablePuppyFlowFiles: false,
+  enableViewerPlugins: false,
 };
 
 export const SIDEBAR_NAVIGATION_LAYOUT_OPTIONS = [
@@ -357,6 +370,26 @@ export function getSidebarNavigationOrientation(layout: SidebarNavigationLayout)
   return SIDEBAR_NAVIGATION_LAYOUT_OPTIONS.find((option) => option.value === layout)?.orientation ?? "horizontal";
 }
 
+export function parseSidebarNavigationVisibilitySettings(
+  value: string | null | undefined,
+): SidebarNavigationVisibilitySettings {
+  if (!value) return DEFAULT_SIDEBAR_NAVIGATION_VISIBILITY_SETTINGS;
+
+  try {
+    const parsed = JSON.parse(value) as { enabled?: Partial<Record<OptionalSidebarNavigationItemId, unknown>> } | null;
+    if (!parsed || typeof parsed !== "object" || !parsed.enabled || typeof parsed.enabled !== "object") {
+      return DEFAULT_SIDEBAR_NAVIGATION_VISIBILITY_SETTINGS;
+    }
+    return {
+      enabled: {
+        plugins: parsed.enabled.plugins !== false,
+      },
+    };
+  } catch {
+    return DEFAULT_SIDEBAR_NAVIGATION_VISIBILITY_SETTINGS;
+  }
+}
+
 export function parseFilesVisibilitySettings(value: string | null | undefined): FilesVisibilitySettings {
   if (!value) return DEFAULT_FILES_VISIBILITY_SETTINGS;
 
@@ -448,6 +481,7 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
       enableAssetLibraryHome: parsed.enableAssetLibraryHome === true,
       enablePuppyoneAppFiles: parsed.enablePuppyoneAppFiles === true,
       enablePuppyFlowFiles: parsed.enablePuppyFlowFiles === true,
+      enableViewerPlugins: parsed.enableViewerPlugins === true,
     };
   } catch {
     return DEFAULT_EXPERIMENTAL_SETTINGS;

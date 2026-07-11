@@ -14,6 +14,7 @@ import {
   POINTER_CURSORS_STORAGE_KEY,
   RIGHT_SIDEBAR_TOOLS_STORAGE_KEY,
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
+  SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY,
   TEXT_SIZE_STORAGE_KEY,
   THEME_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
@@ -27,6 +28,7 @@ import {
   type GitDisplayMode,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
+  type SidebarNavigationVisibilitySettings,
   type ThemeMode,
   type TextSize,
   type TitlebarActionsSettings,
@@ -50,6 +52,7 @@ import {
   readInitialRightSidebarSurface,
   readInitialSidebarCollapsed,
   readInitialSidebarNavigationLayout,
+  readInitialSidebarNavigationVisibilitySettings,
   readInitialTitlebarActionsSettings,
   readInitialDarkThemePreset,
   readInitialDiffMarkers,
@@ -71,6 +74,9 @@ export function useDesktopPreferences() {
   const [diffMarkers, setDiffMarkers] = useState<DiffMarkers>(() => readInitialDiffMarkers());
   const [fileIconTheme, setFileIconTheme] = useState<FileIconThemeId>(() => readInitialFileIconTheme());
   const [sidebarNavigationLayout, setSidebarNavigationLayout] = useState<SidebarNavigationLayout>(() => readInitialSidebarNavigationLayout());
+  const [sidebarNavigationVisibilitySettings, setSidebarNavigationVisibilitySettings] = useState<SidebarNavigationVisibilitySettings>(
+    () => readInitialSidebarNavigationVisibilitySettings(),
+  );
   const [gitDisplayMode, setGitDisplayMode] = useState<GitDisplayMode>(() => readInitialGitDisplayMode());
   const [filesVisibilitySettings, setFilesVisibilitySettings] = useState<FilesVisibilitySettings>(() => readInitialFilesVisibilitySettings());
   const [externalAppsSettings, setExternalAppsSettings] = useState<ExternalAppsSettings>(() => readInitialExternalAppsSettings());
@@ -122,6 +128,13 @@ export function useDesktopPreferences() {
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY, sidebarNavigationLayout);
   }, [sidebarNavigationLayout]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY,
+      JSON.stringify(sidebarNavigationVisibilitySettings),
+    );
+  }, [sidebarNavigationVisibilitySettings]);
 
   useEffect(() => {
     window.localStorage.setItem(GIT_DISPLAY_MODE_STORAGE_KEY, gitDisplayMode);
@@ -205,6 +218,7 @@ export function useDesktopPreferences() {
     sidebarNavigationLayout,
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
+    sidebarNavigationVisibilitySettings,
     terminalToolEnabled,
     titlebarActionsSettings,
     darkThemePreset,
@@ -229,6 +243,7 @@ export function useDesktopPreferences() {
     setAgentPreferredModel,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
+    setSidebarNavigationVisibilitySettings,
     setTitlebarActionsSettings,
     setLightThemePreset,
     setPointerCursors,

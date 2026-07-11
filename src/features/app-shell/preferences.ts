@@ -17,6 +17,7 @@ import {
   POINTER_CURSORS_STORAGE_KEY,
   RIGHT_SIDEBAR_TOOLS_STORAGE_KEY,
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
+  SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY,
   TEXT_SIZE_STORAGE_KEY,
   THEME_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
@@ -32,6 +33,7 @@ import {
   parsePointerCursors,
   parseRightSidebarToolsSettings,
   parseSidebarNavigationLayout,
+  parseSidebarNavigationVisibilitySettings,
   parseThemeMode,
   parseTextSize,
   parseTitlebarActionsSettings,
@@ -45,6 +47,7 @@ import {
   type LightThemePreset,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
+  type SidebarNavigationVisibilitySettings,
   type ThemeMode,
   type TextSize,
   type TitlebarActionsSettings,
@@ -111,6 +114,13 @@ export function readInitialFileIconTheme(): FileIconThemeId {
 export function readInitialSidebarNavigationLayout(): SidebarNavigationLayout {
   if (typeof window === "undefined") return DEFAULT_SIDEBAR_NAVIGATION_LAYOUT;
   return parseSidebarNavigationLayout(window.localStorage.getItem(SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY));
+}
+
+export function readInitialSidebarNavigationVisibilitySettings(): SidebarNavigationVisibilitySettings {
+  if (typeof window === "undefined") return parseSidebarNavigationVisibilitySettings(null);
+  return parseSidebarNavigationVisibilitySettings(
+    window.localStorage.getItem(SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY),
+  );
 }
 
 export function readInitialGitDisplayMode(): GitDisplayMode {

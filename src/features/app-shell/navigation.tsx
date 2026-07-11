@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
-import { ArrowRightLeft, Cloud, Folder, FolderOpen, Settings } from "lucide-react";
+import { ArrowRightLeft, Blocks, Cloud, Folder, FolderOpen, Settings } from "lucide-react";
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import type { SidebarNavigationOrientation } from "../../preferences";
 import type { GitStatusEntry, GitStatusSnapshot } from "../../types/electron";
@@ -45,6 +45,7 @@ export function DesktopSidebarFooterNavigation({
   activeView,
   accessEnabled = false,
   gitEnabled = true,
+  pluginsEnabled = false,
   gitIncomingCount,
   gitOperationLoading,
   gitStatus,
@@ -56,6 +57,7 @@ export function DesktopSidebarFooterNavigation({
   activeView: DesktopView;
   accessEnabled?: boolean;
   gitEnabled?: boolean;
+  pluginsEnabled?: boolean;
   gitIncomingCount: number;
   gitOperationLoading: string | null;
   gitStatus: GitStatusSnapshot | null;
@@ -64,7 +66,7 @@ export function DesktopSidebarFooterNavigation({
   onNavigate: (view: DesktopView) => void;
   onOpenSettings: () => void;
 }) {
-  const localItems = getDesktopLocalSidebarNavItems(gitEnabled);
+  const localItems = getDesktopLocalSidebarNavItems(gitEnabled, pluginsEnabled);
   const accessItems = getDesktopAccessSidebarNavItems(accessEnabled);
 
   return (
@@ -158,6 +160,7 @@ export function DesktopSidebarTopNavigation({
   activeView,
   accessEnabled = false,
   gitEnabled = true,
+  pluginsEnabled = false,
   orientation,
   gitIncomingCount,
   gitOperationLoading,
@@ -169,6 +172,7 @@ export function DesktopSidebarTopNavigation({
   activeView: DesktopView;
   accessEnabled?: boolean;
   gitEnabled?: boolean;
+  pluginsEnabled?: boolean;
   orientation: SidebarNavigationOrientation;
   gitIncomingCount: number;
   gitOperationLoading: string | null;
@@ -177,7 +181,7 @@ export function DesktopSidebarTopNavigation({
   onNavigate: (view: DesktopView) => void;
   onOpenSettings: () => void;
 }) {
-  const localItems = getDesktopLocalSidebarNavItems(gitEnabled);
+  const localItems = getDesktopLocalSidebarNavItems(gitEnabled, pluginsEnabled);
   const accessItems = getDesktopAccessSidebarNavItems(accessEnabled);
   return (
     <div
@@ -224,6 +228,7 @@ export function DesktopSidebarRailNavigation({
   activeView,
   accessEnabled = false,
   gitEnabled = true,
+  pluginsEnabled = false,
   gitIncomingCount,
   gitOperationLoading,
   gitStatus,
@@ -235,6 +240,7 @@ export function DesktopSidebarRailNavigation({
   activeView: DesktopView;
   accessEnabled?: boolean;
   gitEnabled?: boolean;
+  pluginsEnabled?: boolean;
   gitIncomingCount: number;
   gitOperationLoading: string | null;
   gitStatus: GitStatusSnapshot | null;
@@ -243,7 +249,7 @@ export function DesktopSidebarRailNavigation({
   onNavigate: (view: DesktopView) => void;
   onOpenSettings: () => void;
 }) {
-  const localItems = getDesktopLocalSidebarNavItems(gitEnabled);
+  const localItems = getDesktopLocalSidebarNavItems(gitEnabled, pluginsEnabled);
   const accessItems = getDesktopAccessSidebarNavItems(accessEnabled);
   return (
     <div className="desktop-sidebar-rail-navigation" aria-label="Workspace navigation">
@@ -601,10 +607,11 @@ function getDesktopNavigationLabel(
 const DESKTOP_NAV_ITEMS = [
   { view: "data", label: "Files", icon: Folder },
   { view: "git", label: "Changes", icon: PuppyGitIcon, iconSize: 15 },
+  { view: "plugins", label: "Plugins", icon: Blocks },
   { view: "access", label: "Access", icon: AccessChainIcon },
   { view: "integrations", label: "Integrations", icon: IntegrationsGridIcon },
 ] satisfies Array<{
-  view: Extract<DesktopView, "data" | "git" | "access" | "integrations">;
+  view: Extract<DesktopView, "data" | "git" | "plugins" | "access" | "integrations">;
   label: string;
   icon: DesktopSidebarIconComponent;
   iconSize?: number;
@@ -613,10 +620,14 @@ const DESKTOP_NAV_ITEMS = [
 const DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.view !== "access" && item.view !== "integrations");
 const DESKTOP_ACCESS_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.view === "access" || item.view === "integrations");
 
-function getDesktopLocalSidebarNavItems(gitEnabled: boolean): typeof DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS {
-  return gitEnabled
-    ? DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS
-    : DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS.filter((item) => item.view !== "git");
+function getDesktopLocalSidebarNavItems(
+  gitEnabled: boolean,
+  pluginsEnabled: boolean,
+): typeof DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS {
+  return DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS.filter((item) => (
+    (gitEnabled || item.view !== "git") &&
+    (pluginsEnabled || item.view !== "plugins")
+  ));
 }
 
 function getDesktopAccessSidebarNavItems(accessEnabled: boolean): typeof DESKTOP_ACCESS_SIDEBAR_NAV_ITEMS {

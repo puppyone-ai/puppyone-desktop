@@ -3,8 +3,11 @@
 **Status:** The versioned preset Viewer Contract is active. A Stage B0/B1 local
 Viewer Pack Host implementation is retained as a dormant external adapter. The
 signed default product uses the `preset-viewers-only` profile: no Pack schemes,
-Host, IPC/preload bridge, install CTA, catalog, or signer requirement is
-registered or loaded into the startup graph. A future explicitly enabled external-Pack profile remains
+Host, IPC/preload bridge, active install path, catalog, or signer requirement is
+registered or loaded into the startup graph. An opt-in experimental Plugins
+surface may list compiled official viewers in that profile, but its local Pack
+installation control remains unavailable unless main explicitly supplies the
+capability bridge. A future explicitly enabled external-Pack profile remains
 fail-closed without a reviewed production signer. Stage C (third-party
 marketplace) is not open or committed.
 
@@ -307,14 +310,44 @@ metadata that bypasses the same signature envelope, manifest validation,
 quarantine, or main-process activation checks. Opening a file must never cause
 an implicit network request; discovery is an explicit user action.
 
+### 10.1 Product surface and terminology
+
+`Integrations` and `Plugins` are separate product domains:
+
+- Integrations authorize cloud services and create synchronization workflows.
+- Plugins extend local file presentation. The V1 executable package remains
+  the deliberately narrow `Viewer Pack`; it is not a general desktop plugin.
+
+The experimental Plugins page is off by default. A local renderer preference
+may opt into the page, and a separate Appearance preference may hide its
+workspace-navigation shortcut. Those preferences are presentation gates only:
+they cannot register privileged schemes, expose preload APIs, select trusted
+signers, or turn on the main-process Host. Turning the experiment off also
+removes the external Viewer adapter from the editor pipeline.
+
+The page presents two different sources without conflating their authority:
+
+1. `Built-in` official viewers are derived from the active preset Viewer
+   Contract, compiled with the signed app, immutable, and shown as Included.
+2. `Installed` Viewer Packs come only from the main-issued, verified registry
+   snapshot. The renderer never scans the package store or interprets package
+   manifests directly.
+
+The default product therefore provides an honest Plugins preview without
+pretending a marketplace exists. Local install becomes actionable only in an
+explicit external-Pack build profile with a reviewed signer root. Online
+catalog distribution remains a separate delivery stage.
+
 ## 11. Packaging and size budget
 
 Viewer payloads are excluded from Electron Builder `files` and base `dist/`.
 The dormant host source, `jszip`, and SemVer validator remain packaged for the
 experimental profile, but the preset-only main startup graph dynamically stops
-before importing them. The renderer extension UI is a separate lazy chunk and
-is not loaded unless the main-issued preload bridge exists and an extension
-surface is actually requested.
+before importing them. The Plugins catalog/management page is a separate lazy
+chunk loaded only after the user opens that experimental view. The executable
+renderer extension surface is an independent lazy chunk and is not loaded
+unless the main-issued preload bridge exists and an extension surface is
+actually requested.
 
 `scripts/check-packaged-artifact-budgets.mjs` rejects embedded
 `.puppyplugin` payloads. `scripts/check-viewer-pack-release.mjs` skips the
