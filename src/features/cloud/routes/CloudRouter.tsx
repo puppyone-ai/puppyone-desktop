@@ -4,6 +4,11 @@ import type { GitStatusSnapshot } from "../../../types/electron";
 import type { Workspace } from "@puppyone/shared-ui";
 import type { getPuppyoneRemote } from "../../source-control/remotes";
 import type { DesktopCloudDataState } from "../data";
+import type { ProjectCloudAttachment } from "../attachment";
+import {
+  getAttachedCloudProjectId,
+  isCloudAttachmentRecovery,
+} from "../attachment";
 import type { CloudWorkspaceSection } from "../types";
 import { CloudGlobalBillingPage, CloudGlobalTeamPage } from "../components/CloudGlobalPages";
 import { CloudProjectBrowser } from "../components/ProjectBrowser";
@@ -16,8 +21,8 @@ import { CloudMcpCliSection } from "../sections/McpCliSection";
 import { CloudMappedOverview } from "../sections/OverviewSection";
 import { CloudAccessSection } from "../sections/access/AccessSection";
 import {
+  CloudProjectRecoveryState,
   CloudProjectWebSection,
-  CloudRemoteConnectedWorkspace,
   CloudUnmappedWorkspace,
 } from "../states";
 import { deriveCloudWorkspaceBinding } from "../workspace";
@@ -37,6 +42,7 @@ export function CloudRouter({
   cloudApiBaseUrl,
   cloudRemote,
   cloudData,
+  attachment = null,
   selectedProjectId,
   activeSection,
   accountEmail,
@@ -54,6 +60,8 @@ export function CloudRouter({
   onOpenGitSettings,
   onSelectProject,
   onSelectSection,
+  onRetryBinding,
+  onUseAnotherAccount,
 }: {
   workspace: Workspace;
   status: GitStatusSnapshot | null;
@@ -61,6 +69,7 @@ export function CloudRouter({
   cloudApiBaseUrl: string | null;
   cloudRemote: ReturnType<typeof getPuppyoneRemote>;
   cloudData: DesktopCloudDataState;
+  attachment?: ProjectCloudAttachment | null;
   /** Explicit browse context. Never infer this from loaded project data. */
   selectedProjectId: string | null;
   activeSection: CloudWorkspaceSection;
@@ -79,21 +88,30 @@ export function CloudRouter({
   onOpenGitSettings: () => void;
   onSelectProject: (project: DesktopCloudProject) => void;
   onSelectSection: (section: CloudWorkspaceSection) => void;
+  onRetryBinding?: () => void;
+  onUseAnotherAccount?: () => void;
 }) {
+  const mappedProjectId = getAttachedCloudProjectId(attachment ?? { status: "local-only", projectId: null })
+    ?? cloudData.mappedProjectId;
   const mappedProject = cloudData.mappedProject;
   const activeProject = cloudData.activeProject;
   const workspaceBinding = deriveCloudWorkspaceBinding({
     cloudRemote,
-    projectId: cloudData.mappedProjectId,
-    loading: cloudData.loading,
-    error: cloudData.error,
+    projectId: mappedProjectId,
+    loading: cloudData.loading || attachment?.status === "resolving",
+    error: attachment && isCloudAttachmentRecovery(attachment)
+      ? attachment.message
+      : cloudData.error,
   });
   const browsingProjectId = selectedProjectId?.trim()
-    && selectedProjectId !== cloudData.mappedProjectId
+    && selectedProjectId !== mappedProjectId
+    && (!attachment || attachment.status === "local-only")
     ? selectedProjectId.trim()
     : null;
   const browsingCloudProject = Boolean(browsingProjectId);
+  const hasPuppyoneRemote = Boolean(cloudRemote);
 
+  // 1) Account routes first
   if (activeSection === "cloud-team") {
     return (
       <CloudGlobalTeamPage
@@ -120,39 +138,86 @@ export function CloudRouter({
     );
   }
 
-  if (cloudData.initializing) {
-    return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
+  // 2) Workspace binding before project sections / browser
+  if (attachment?.status === "resolving" || (hasPuppyoneRemote && cloudData.initializing && !mappedProjectId)) {
+    return <CloudWorkspaceLoadingState label="Matching Cloud project" />;
   }
 
-  if (activeSection === "overview" && cloudData.mappedProjectId) {
+  if (attachment && isCloudAttachmentRecovery(attachment) && hasPuppyoneRemote && !browsingCloudProject) {
     return (
-      <CloudMappedOverview
-        workspace={workspace}
-        project={mappedProject ?? { id: cloudData.mappedProjectId, name: workspace.name }}
-        dashboard={cloudData.dashboard}
-        tree={cloudData.tree}
-        history={cloudData.history}
-        scopes={cloudData.scopes}
-        connectors={cloudData.connectors}
-        mcpEndpoints={cloudData.mcpEndpoints}
-        identity={cloudData.identity}
-        linkedToWorkspace
-        loading={loading || cloudData.loading}
-        onSelectSection={onSelectSection}
-        onOpenProject={onOpenProject}
-        onRefresh={cloudData.reload}
+      <CloudProjectRecoveryState
+        message={attachment.message}
+        remoteLabel={cloudRemote?.info.displayId ?? null}
+        loading={cloudData.loading}
+        onRetry={() => {
+          if (onRetryBinding) onRetryBinding();
+          else void cloudData.reload();
+        }}
+        onUseAnotherAccount={() => {
+          if (onUseAnotherAccount) onUseAnotherAccount();
+          else onSessionChange(null);
+        }}
+        onOpenGitDetails={onOpenGitSettings}
       />
     );
   }
 
-  if (activeSection === "overview") {
+  if (cloudData.initializing && !mappedProjectId && !browsingCloudProject) {
+    return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
+  }
+
+  // Mapped local workspace: always enter project overview / contents — never ProjectBrowser.
+  if (mappedProjectId && !browsingCloudProject) {
+    return renderBoundProjectSection({
+      activeSection,
+      workspace,
+      status,
+      cloudSession,
+      cloudApiBaseUrl,
+      cloudRemote,
+      cloudData,
+      projectId: mappedProjectId,
+      project: mappedProject ?? activeProject ?? { id: mappedProjectId, name: workspace.name },
+      linkedToWorkspace: true,
+      loading,
+      accountConnected,
+      onSessionChange,
+      onSelectSection,
+      onOpenProject,
+      onOpenGitSettings,
+      onRefresh: cloudData.reload,
+    });
+  }
+
+  // Explicit Cloud-only / browse path may still use the project browser when local-only.
+  if (activeSection === "overview" && !hasPuppyoneRemote && !browsingCloudProject) {
+    if (attachment?.status === "local-only") {
+      return (
+        <CloudUnmappedWorkspace
+          workspace={workspace}
+          activeSection={activeSection}
+          accountEmail={accountEmail}
+          branchName={branchName}
+          localChangeCount={localChangeCount}
+          projects={cloudData.projects}
+          loading={cloudData.loading}
+          backupLoading={cloudBackupLoading}
+          cloudRemote={null}
+          action={cloudAction}
+          onBackupWorkspace={onBackupWorkspace}
+          onConnectProject={onConnectProject}
+          onCopyCloneCommand={onCopyCloneCommand}
+          onOpenProject={onOpenProject}
+        />
+      );
+    }
     return (
       <CloudProjectBrowser
         projects={cloudData.projects}
         loading={cloudData.loading}
         session={cloudSession}
         apiBaseUrl={cloudApiBaseUrl}
-        mappedProjectId={cloudData.mappedProjectId}
+        mappedProjectId={mappedProjectId}
         backupLoading={cloudBackupLoading}
         cloudAction={cloudAction}
         onSessionChange={onSessionChange}
@@ -165,29 +230,10 @@ export function CloudRouter({
   }
 
   if (!browsingCloudProject && workspaceBinding.status === "resolving") {
-    return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
+    return <CloudWorkspaceLoadingState label="Matching Cloud project" />;
   }
 
-  if (!browsingCloudProject && workspaceBinding.status === "remote-only") {
-    if (!cloudRemote) {
-      return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
-    }
-    return (
-      <CloudRemoteConnectedWorkspace
-        workspace={workspace}
-        activeSection={activeSection}
-        branchName={branchName}
-        localChangeCount={localChangeCount}
-        cloudRemote={cloudRemote}
-        loading={cloudData.loading}
-        userEmail={cloudSession.user_email || accountEmail}
-        onRefresh={cloudData.reload}
-        onOpenGitSettings={onOpenGitSettings}
-      />
-    );
-  }
-
-  if (!browsingCloudProject && (workspaceBinding.status === "unmapped" || workspaceBinding.status === "error")) {
+  if (!browsingCloudProject && (workspaceBinding.status === "unmapped" || workspaceBinding.status === "error") && !hasPuppyoneRemote) {
     return (
       <CloudUnmappedWorkspace
         workspace={workspace}
@@ -208,12 +254,34 @@ export function CloudRouter({
     );
   }
 
+  if (hasPuppyoneRemote && !mappedProjectId && !browsingCloudProject) {
+    return (
+      <CloudProjectRecoveryState
+        message={workspaceBinding.status === "error" && "message" in workspaceBinding
+          ? workspaceBinding.message
+          : "We found a PuppyOne Cloud remote, but couldn’t identify its project."}
+        remoteLabel={cloudRemote?.info.displayId ?? null}
+        loading={cloudData.loading}
+        onRetry={() => {
+          if (onRetryBinding) onRetryBinding();
+          else void cloudData.reload();
+        }}
+        onUseAnotherAccount={() => {
+          if (onUseAnotherAccount) onUseAnotherAccount();
+          else onSessionChange(null);
+        }}
+        onOpenGitDetails={onOpenGitSettings}
+      />
+    );
+  }
+
   const projectId = browsingProjectId ?? (
     workspaceBinding.status === "mapped" ? workspaceBinding.projectId : null
   );
   if (!projectId) {
     return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
   }
+
   const routedProject = (
     activeProject?.id === projectId
       ? activeProject
@@ -224,6 +292,76 @@ export function CloudRouter({
           name: browsingCloudProject ? "Cloud project" : workspace.name,
         }
   );
+
+  return renderBoundProjectSection({
+    activeSection,
+    workspace,
+    status,
+    cloudSession,
+    cloudApiBaseUrl,
+    cloudRemote,
+    cloudData,
+    projectId,
+    project: routedProject,
+    linkedToWorkspace: !browsingCloudProject,
+    loading,
+    accountConnected,
+    onSessionChange,
+    onSelectSection,
+    onOpenProject,
+    onOpenGitSettings,
+    onRefresh: cloudData.reload,
+    attachAction: browsingCloudProject
+      ? {
+          busy: cloudAction.kind === "connect" && cloudAction.projectId === projectId,
+          onAttach: () => {
+            const project = cloudData.projects.find((entry) => entry.id === projectId) ?? routedProject;
+            onConnectProject(project);
+          },
+        }
+      : null,
+  });
+}
+
+function renderBoundProjectSection({
+  activeSection,
+  workspace,
+  status,
+  cloudSession,
+  cloudApiBaseUrl,
+  cloudRemote,
+  cloudData,
+  projectId,
+  project,
+  linkedToWorkspace,
+  loading,
+  accountConnected,
+  onSessionChange,
+  onSelectSection,
+  onOpenProject,
+  onOpenGitSettings,
+  onRefresh,
+  attachAction = null,
+}: {
+  activeSection: CloudWorkspaceSection;
+  workspace: Workspace;
+  status: GitStatusSnapshot | null;
+  cloudSession: DesktopCloudSession;
+  cloudApiBaseUrl: string | null;
+  cloudRemote: ReturnType<typeof getPuppyoneRemote>;
+  cloudData: DesktopCloudDataState;
+  projectId: string;
+  project: DesktopCloudProject;
+  linkedToWorkspace: boolean;
+  loading: boolean;
+  accountConnected: boolean;
+  onSessionChange: (session: DesktopCloudSession | null) => void;
+  onSelectSection: (section: CloudWorkspaceSection) => void;
+  onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
+  onOpenGitSettings: () => void;
+  onRefresh: () => Promise<void>;
+  attachAction?: { busy: boolean; onAttach: () => void } | null;
+}) {
   const connectorsByScope = new Map<string, typeof cloudData.connectors>();
   for (const connector of cloudData.connectors) {
     const group = connectorsByScope.get(connector.scope_id) ?? [];
@@ -241,11 +379,11 @@ export function CloudRouter({
     );
   }
 
-  if (activeSection === "contents") {
+  if (activeSection === "overview" || activeSection === "contents") {
     return (
       <CloudMappedOverview
         workspace={workspace}
-        project={routedProject}
+        project={project}
         dashboard={cloudData.dashboard}
         tree={cloudData.tree}
         history={cloudData.history}
@@ -253,16 +391,12 @@ export function CloudRouter({
         connectors={cloudData.connectors}
         mcpEndpoints={cloudData.mcpEndpoints}
         identity={cloudData.identity}
-        linkedToWorkspace={!browsingCloudProject}
+        linkedToWorkspace={linkedToWorkspace}
         loading={loading || cloudData.loading}
-        attachAction={browsingCloudProject && routedProject ? {
-          busy: cloudAction.kind === "connect" && cloudAction.projectId === routedProject.id,
-          disabled: cloudAction.kind !== null || cloudBackupLoading,
-          onAttach: () => onConnectProject(routedProject),
-        } : null}
+        attachAction={attachAction}
         onSelectSection={onSelectSection}
         onOpenProject={onOpenProject}
-        onRefresh={cloudData.reload}
+        onRefresh={onRefresh}
       />
     );
   }
@@ -271,7 +405,7 @@ export function CloudRouter({
     return (
       <CloudHistorySection
         projectId={projectId}
-        projectName={routedProject?.name ?? workspace.name}
+        projectName={project.name ?? workspace.name}
         cloudSession={cloudSession}
         apiBaseUrl={cloudApiBaseUrl}
         onSessionChange={onSessionChange}
@@ -306,7 +440,32 @@ export function CloudRouter({
     );
   }
 
-  if (activeSection === "access") {
+  if (activeSection === "access" || activeSection === "mcp-cli" || activeSection === "git-sync") {
+    if (activeSection === "mcp-cli") {
+      return (
+        <CloudMcpCliSection
+          projectId={projectId}
+          identity={cloudData.identity}
+          scopes={cloudData.scopes}
+          mcpEndpoints={cloudData.mcpEndpoints}
+          loading={cloudData.loading}
+          onOpenProject={onOpenProject}
+        />
+      );
+    }
+    if (activeSection === "git-sync") {
+      return (
+        <CloudGitSyncSection
+          workspace={workspace}
+          status={status}
+          identity={cloudData.identity}
+          cloudRemote={cloudRemote}
+          accountConnected={accountConnected}
+          onOpenGitSettings={onOpenGitSettings}
+          onRefresh={onOpenGitSettings}
+        />
+      );
+    }
     return (
       <CloudAccessSection
         projectId={projectId}
@@ -321,35 +480,8 @@ export function CloudRouter({
         activeAccessRowId={null}
         loading={cloudData.loading}
         onCloudSessionChange={onSessionChange}
-        onRefresh={cloudData.reload}
+        onRefresh={onRefresh}
         onOpenProject={onOpenProject}
-      />
-    );
-  }
-
-  if (activeSection === "mcp-cli") {
-    return (
-      <CloudMcpCliSection
-        projectId={projectId}
-        identity={cloudData.identity}
-        scopes={cloudData.scopes}
-        mcpEndpoints={cloudData.mcpEndpoints}
-        loading={cloudData.loading}
-        onOpenProject={onOpenProject}
-      />
-    );
-  }
-
-  if (activeSection === "git-sync") {
-    return (
-      <CloudGitSyncSection
-        workspace={workspace}
-        status={status}
-        identity={cloudData.identity}
-        cloudRemote={cloudRemote}
-        accountConnected={accountConnected}
-        onOpenGitSettings={onOpenGitSettings}
-        onRefresh={onOpenGitSettings}
       />
     );
   }

@@ -211,9 +211,10 @@ describe("ProjectCloudAttachment binding-only semantics", () => {
       projectContext: true,
       projectBound: true,
     });
+    // Formal binding wins — stale browse selection must not demote projectBound.
     expect(resolveCloudProjectNavigationContext(degradedBinding, "proj-preview")).toEqual({
       projectContext: true,
-      projectBound: false,
+      projectBound: true,
     });
   });
 
@@ -259,11 +260,13 @@ describe("CloudServiceSidebar project context", () => {
       "Automation",
       "Access",
       "Settings",
+      "Team",
+      "Billing",
     ]);
     expect(rows.every((row) => !row.classList.contains("active"))).toBe(true);
 
     const lockedRows = rows;
-    expect(lockedRows).toHaveLength(5);
+    expect(lockedRows).toHaveLength(7);
     expect(lockedRows.every((row) => row.getAttribute("aria-disabled") === "true")).toBe(true);
     expect(container.querySelector(".desktop-cloud-sidebar-nav-lock")).toBeNull();
 
@@ -311,6 +314,10 @@ describe("CloudServiceSidebar project context", () => {
     expect(container.querySelector('[aria-label="Cloud project sections"]')).not.toBeNull();
     expect(container.textContent).toContain("History");
     expect(container.textContent).toContain("Automation");
+    expect(container.textContent).toContain("Access");
+    expect(container.textContent).toContain("Team");
+    expect(container.textContent).toContain("Billing");
+    expect(container.querySelector(".desktop-cloud-sidebar-context-back")).toBeNull();
   });
 
   it("back to Cloud Projects clears browse context via onBackToProjects", () => {
@@ -914,3 +921,134 @@ async function flushPromises() {
   await Promise.resolve();
   await Promise.resolve();
 }
+
+describe("Local repo Cloud binding integration", () => {
+  it("enters contents after a verified binding and keeps Team/Billing in the bound sidebar", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const onSelectSection = vi.fn();
+
+    await act(async () => {
+      root?.render(
+        <>
+          <CloudServiceSidebar
+            status={null}
+            cloudSession={session}
+            activeSection="contents"
+            projectContext
+            projectBound
+            onSelectSection={onSelectSection}
+          />
+          <CloudRouter
+            workspace={{ id: "local-1", name: "Local Notes", path: "/tmp/local-notes" }}
+            status={{
+              remotes: [{
+                name: "puppyone",
+                fetchUrl: "https://cloud.example/git/proj-1.git",
+                pushUrl: "https://cloud.example/git/proj-1.git",
+                branches: [],
+              }],
+            } as GitStatusSnapshot}
+            cloudSession={session}
+            cloudApiBaseUrl="https://cloud.example"
+            cloudRemote={{
+              remote: { name: "puppyone", fetchUrl: "", pushUrl: "", branches: [] },
+              rawUrl: "https://cloud.example/git/proj-1.git",
+              info: { kind: "project", host: "cloud.example", displayId: "proj-1", projectId: "proj-1" },
+            }}
+            cloudData={createAggregateCloudData(vi.fn(async () => undefined))}
+            attachment={{ status: "linked", projectId: "proj-1" }}
+            selectedProjectId={null}
+            activeSection="contents"
+            accountEmail={session.user_email}
+            accountConnected
+            branchName="main"
+            localChangeCount={0}
+            loading={false}
+            cloudBackupLoading={false}
+            cloudAction={{ kind: null, projectId: null, message: null, error: null }}
+            onSessionChange={vi.fn()}
+            onBackupWorkspace={vi.fn()}
+            onConnectProject={vi.fn()}
+            onCopyCloneCommand={vi.fn()}
+            onOpenProject={vi.fn()}
+            onOpenGitSettings={vi.fn()}
+            onSelectProject={vi.fn()}
+            onSelectSection={onSelectSection}
+          />
+        </>,
+      );
+      await flushPromises();
+    });
+
+    expect(container.textContent).toContain("History");
+    expect(container.textContent).toContain("Automation");
+    expect(container.textContent).toContain("Access");
+    expect(container.textContent).toContain("Team");
+    expect(container.textContent).toContain("Billing");
+    expect(container.textContent).not.toContain("Cloud Projects");
+    expect(container.textContent).not.toContain("Back up");
+    expect(container.textContent).not.toContain("root scope");
+    expect(container.querySelector(".desktop-cloud-sidebar-context-back")).toBeNull();
+  });
+
+  it("shows a recovery page when a remote exists but the account is not authorized", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <CloudRouter
+          workspace={{ id: "local-1", name: "Local Notes", path: "/tmp/local-notes" }}
+          status={null}
+          cloudSession={session}
+          cloudApiBaseUrl="https://cloud.example"
+          cloudRemote={{
+            remote: { name: "puppyone", fetchUrl: "", pushUrl: "", branches: [] },
+            rawUrl: "https://cloud.example/git/proj-secret.git",
+            info: { kind: "project", host: "cloud.example", displayId: "proj-secret", projectId: "proj-secret" },
+          }}
+          cloudData={createAggregateCloudData(vi.fn(async () => undefined), {
+            mappedProjectId: null,
+            mappedProject: null,
+            activeProjectId: null,
+            activeProject: null,
+          })}
+          attachment={{
+            status: "not-authorized",
+            projectId: "proj-secret",
+            message: "You don’t have access to the Cloud project linked to this folder.",
+          }}
+          selectedProjectId={null}
+          activeSection="overview"
+          accountEmail={session.user_email}
+          accountConnected
+          branchName="main"
+          localChangeCount={0}
+          loading={false}
+          cloudBackupLoading={false}
+          cloudAction={{ kind: null, projectId: null, message: null, error: null }}
+          onSessionChange={vi.fn()}
+          onBackupWorkspace={vi.fn()}
+          onConnectProject={vi.fn()}
+          onCopyCloneCommand={vi.fn()}
+          onOpenProject={vi.fn()}
+          onOpenGitSettings={vi.fn()}
+          onSelectProject={vi.fn()}
+          onSelectSection={vi.fn()}
+        />,
+      );
+      await flushPromises();
+    });
+
+    expect(container.textContent).toContain("Cloud project unavailable");
+    expect(container.textContent).toContain("You don’t have access");
+    expect(container.textContent).toContain("Retry");
+    expect(container.textContent).toContain("Use another account");
+    expect(container.textContent).toContain("Git sync details");
+    expect(container.textContent).not.toContain("Back up current folder");
+    expect(container.textContent).not.toContain("root scope");
+  });
+});

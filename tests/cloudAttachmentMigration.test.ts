@@ -195,6 +195,36 @@ describe("ProjectCloudAttachment", () => {
     expect(resolveCloudHubSectionForAttachment(linked)).toBe("contents");
     expect(resolveCloudHubSectionForAttachment({ status: "local-only", projectId: null })).toBe("overview");
   });
+
+  it("separates not-authorized and unresolvable recovery attachments", () => {
+    expect(resolveProjectCloudAttachment({
+      configuredProjectId: null,
+      bindingProjectId: null,
+      remoteProjectId: "proj-secret",
+      bindingError: "You don’t have access to the Cloud project linked to this folder.",
+      bindingReason: "not-authorized",
+      bindingCloudLinked: true,
+      resolving: false,
+    })).toEqual({
+      status: "not-authorized",
+      projectId: "proj-secret",
+      message: "You don’t have access to the Cloud project linked to this folder.",
+    });
+
+    expect(resolveProjectCloudAttachment({
+      configuredProjectId: null,
+      bindingProjectId: null,
+      remoteProjectId: null,
+      bindingError: "We found a PuppyOne Cloud remote, but couldn’t identify its project.",
+      bindingReason: "unresolvable",
+      bindingCloudLinked: true,
+      resolving: false,
+    })).toEqual({
+      status: "unresolvable",
+      projectId: null,
+      message: "We found a PuppyOne Cloud remote, but couldn’t identify its project.",
+    });
+  });
 });
 
 describe("selected vs mapped Cloud project binding", () => {

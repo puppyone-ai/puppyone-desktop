@@ -1,6 +1,8 @@
 export {
   attachmentHasBoundProject,
   getAttachedCloudProjectId,
+  getCloudAttachmentWarning,
+  isCloudAttachmentRecovery,
   isProjectCloudLinked,
   resolveCloudHubSectionAfterBindingChange,
   resolveCloudProjectNavigationContext,

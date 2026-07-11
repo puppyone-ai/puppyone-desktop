@@ -53,7 +53,14 @@ while still allowing each menu to own its placement, size, and content.
    padding, font size, font weight, icon slot, or icon-label gap values that
    make menu rows drift from the shared menu rhythm.
 
-4. Keep React abstraction proportional.
+4. Keep interactive trailing actions outside the row button.
+
+   A menu row that needs a secondary control (for example Copy path on a
+   project switcher item) must not nest a button inside `DesktopMenuItem`.
+   Use a feature row wrapper with a primary `menuitem` button plus a sibling
+   action button, and keep the row visuals on the shared menu item tokens.
+
+5. Keep React abstraction proportional.
 
    `DesktopMenuSurface` and `DesktopMenuItem` intentionally do not own opening,
    closing, focus trapping, or collision placement. Those behaviors still belong
@@ -89,6 +96,8 @@ while still allowing each menu to own its placement, size, and content.
   when the shared item tokens can express the layout.
 - Do not hand-roll menu row button markup when `DesktopMenuItem` can express
   the row.
+- Do not nest interactive controls inside `DesktopMenuItem`; secondary actions
+  such as Copy path belong in a sibling control on a feature row wrapper.
 - Use `DesktopMenuSurface` for new menu containers.
 - Keep shared surface and row visuals in `menus.css`; keep menu-specific
   geometry in the feature stylesheet.

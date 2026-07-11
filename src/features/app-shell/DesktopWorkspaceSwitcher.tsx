@@ -1,7 +1,8 @@
-import type { RefObject } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type RefObject } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
-import { ArrowLeft, Cloud, Folder, FolderOpen } from "lucide-react";
+import { ArrowLeft, Check, Cloud, Copy, Folder, FolderOpen } from "lucide-react";
 import { DesktopMenuItem, DesktopMenuSection, DesktopMenuSurface } from "../../components/DesktopMenu";
+import { writeClipboardText } from "../settings/utils";
 
 export type DesktopWorkspaceSwitcherItem = {
   id: string;
@@ -42,16 +43,12 @@ export function DesktopWorkspaceSwitcher({
   const cloudItems = items.filter((item) => item.kind === "cloud");
   const localItems = items.filter((item) => item.kind === "local");
 
-  const renderProjectRows = (items: DesktopWorkspaceSwitcherItem[]) => items.map((item) => (
-    <DesktopMenuItem
+  const renderProjectRows = (projectItems: DesktopWorkspaceSwitcherItem[]) => projectItems.map((item) => (
+    <DesktopProjectMenuRow
       key={item.id}
-      className="desktop-project-option"
-      title={item.title}
+      item={item}
       selected={item.id === workspace.id}
-      icon={<ProjectTypeMark kind={item.kind} className="desktop-project-mark" />}
-      label={item.label}
-      detail={item.detail}
-      onClick={() => onOpenItem(item)}
+      onOpen={() => onOpenItem(item)}
     />
   ));
 
@@ -110,6 +107,87 @@ export function DesktopWorkspaceSwitcher({
       )}
     </div>
   );
+}
+
+function DesktopProjectMenuRow({
+  item,
+  selected,
+  onOpen,
+}: {
+  item: DesktopWorkspaceSwitcherItem;
+  selected: boolean;
+  onOpen: () => void;
+}) {
+  const path = getProjectCopyPath(item);
+  const [copied, setCopied] = useState(false);
+  const copiedResetRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (copiedResetRef.current !== null) window.clearTimeout(copiedResetRef.current);
+  }, []);
+
+  const handleCopyPath = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!path) return;
+
+    try {
+      await writeClipboardText(path);
+      setCopied(true);
+      if (copiedResetRef.current !== null) window.clearTimeout(copiedResetRef.current);
+      copiedResetRef.current = window.setTimeout(() => {
+        setCopied(false);
+        copiedResetRef.current = null;
+      }, 1400);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className={`desktop-project-option-row ${selected ? "selected" : ""}`}>
+      <button
+        className={`desktop-menu-item desktop-project-option ${selected ? "selected" : ""}`}
+        type="button"
+        role="menuitem"
+        title={item.title}
+        onClick={onOpen}
+      >
+        <span className="desktop-menu-item-icon">
+          <ProjectTypeMark kind={item.kind} className="desktop-project-mark" />
+        </span>
+        <span className="desktop-menu-item-body">
+          <span className="desktop-menu-item-label">{item.label}</span>
+          <span className="desktop-menu-item-detail">{item.detail}</span>
+        </span>
+      </button>
+      {path ? (
+        <button
+          className={`desktop-project-copy-path ${copied ? "is-copied" : ""}`}
+          type="button"
+          aria-label={copied ? "Path copied" : `Copy path for ${item.label}`}
+          title={copied ? "Copied" : "Copy path"}
+          onClick={(event) => void handleCopyPath(event)}
+        >
+          {copied ? <Check size={13} strokeWidth={2.2} /> : <Copy size={13} strokeWidth={1.9} />}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+export function getProjectCopyPath(item: DesktopWorkspaceSwitcherItem): string | null {
+  const path = item.workspace.path?.trim();
+  if (!path) return null;
+  // Cloud status labels are not filesystem paths; only copy real workspace roots.
+  if (item.kind === "cloud" && (path === item.detail || !looksLikeFilesystemPath(path))) {
+    return null;
+  }
+  return path;
+}
+
+function looksLikeFilesystemPath(path: string): boolean {
+  return path.includes("/") || path.includes("\\") || /^[A-Za-z]:/.test(path);
 }
 
 function ProjectTypeMark({

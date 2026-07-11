@@ -9,16 +9,35 @@ import type {
 } from "../../../lib/cloudApi";
 import type { GitStatusSnapshot } from "../../../types/electron";
 import { getPuppyoneRemote } from "../../source-control/remotes";
-import { resolveMappedCloudProjectId } from "./resolveMappedCloudProjectId";
+import {
+  extractRemoteProjectCandidateId,
+  isProjectAccessible,
+  resolveMappedCloudProjectId,
+} from "./resolveMappedCloudProjectId";
 import type { RecentWorkspaceHomeItem } from "../../../components/MinimalOnboarding";
 
 export type RecentWorkspaceCloudBinding = {
   projectId: string | null;
   cloudLinked: boolean;
   error: string | null;
+  /** Optional machine-readable reason for UI routing. */
+  reason?: "not-authorized" | "unresolvable" | "network" | null;
 };
 
-export const CLOUD_PROJECT_MAPPING_ERROR = "This workspace has a Puppyone Cloud Git remote, but Desktop could not match it to a Cloud project root scope.";
+export const CLOUD_PROJECT_NOT_AUTHORIZED_MESSAGE =
+  "You don’t have access to the Cloud project linked to this folder.";
+
+export const CLOUD_PROJECT_UNRESOLVABLE_MESSAGE =
+  "We found a PuppyOne Cloud remote, but couldn’t identify its project.";
+
+/** @deprecated Prefer CLOUD_PROJECT_UNRESOLVABLE_MESSAGE — kept for older call sites. */
+export const CLOUD_PROJECT_MAPPING_ERROR = CLOUD_PROJECT_UNRESOLVABLE_MESSAGE;
+
+export type WorkspaceCloudProjectResolution =
+  | { status: "mapped"; projectId: string }
+  | { status: "not-authorized"; candidateProjectId: string | null; message: string }
+  | { status: "unresolvable"; message: string }
+  | { status: "unmapped" };
 
 function normalizeCloudProjectCandidate(value: string | null | undefined) {
   return (value ?? "")
@@ -80,7 +99,11 @@ function filterCandidateCloudProjects({
   ));
 }
 
-export async function resolveWorkspaceCloudProjectId({
+/**
+ * Single workspace → Cloud project binding resolver for Local repos.
+ * Accessible-project membership is mandatory before any id is returned as mapped.
+ */
+export async function resolveWorkspaceCloudProjectBinding({
   activeGitStatus,
   apiBaseUrl,
   configuredProjectId,
@@ -96,9 +119,25 @@ export async function resolveWorkspaceCloudProjectId({
   projects: DesktopCloudProject[];
   session: DesktopCloudSession;
   workspace: Workspace | null;
-}) {
+}): Promise<WorkspaceCloudProjectResolution> {
   const cloudRemote = getPuppyoneRemote(activeGitStatus);
-  if (!cloudRemote) return configuredProjectId;
+  if (!cloudRemote) {
+    const configured = configuredProjectId?.trim() || null;
+    if (configured && isProjectAccessible(projects, configured)) {
+      return { status: "mapped", projectId: configured };
+    }
+    return { status: "unmapped" };
+  }
+
+  const remoteCandidateId = extractRemoteProjectCandidateId(cloudRemote);
+  const configuredAccessible = isProjectAccessible(projects, configuredProjectId)
+    ? configuredProjectId!.trim()
+    : null;
+
+  // Prefer configured id when still accessible for this account/host.
+  if (configuredAccessible) {
+    return { status: "mapped", projectId: configuredAccessible };
+  }
 
   const candidateProjects = filterCandidateCloudProjects({
     projects,
@@ -106,6 +145,7 @@ export async function resolveWorkspaceCloudProjectId({
     workspace,
   });
   const preferredProjects = candidateProjects.length > 0 ? candidateProjects : projects;
+
   let projectId = await resolveMappedCloudProjectId({
     session,
     projects: preferredProjects,
@@ -113,22 +153,53 @@ export async function resolveWorkspaceCloudProjectId({
     configuredProjectId,
     onSessionChange,
     cloudApiBaseUrl: apiBaseUrl,
-    requireRootScope: true,
     maxProjectScan: preferredProjects.length,
   });
-  if (projectId || candidateProjects.length === 0) return projectId;
 
-  projectId = await resolveMappedCloudProjectId({
-    session,
-    projects,
-    cloudRemote,
-    configuredProjectId,
-    onSessionChange,
-    cloudApiBaseUrl: apiBaseUrl,
-    requireRootScope: true,
-    maxProjectScan: projects.length,
-  });
-  return projectId;
+  if (!projectId && candidateProjects.length > 0) {
+    projectId = await resolveMappedCloudProjectId({
+      session,
+      projects,
+      cloudRemote,
+      configuredProjectId,
+      onSessionChange,
+      cloudApiBaseUrl: apiBaseUrl,
+      maxProjectScan: projects.length,
+    });
+  }
+
+  if (projectId) {
+    return { status: "mapped", projectId };
+  }
+
+  if (remoteCandidateId && !isProjectAccessible(projects, remoteCandidateId)) {
+    return {
+      status: "not-authorized",
+      candidateProjectId: remoteCandidateId,
+      message: CLOUD_PROJECT_NOT_AUTHORIZED_MESSAGE,
+    };
+  }
+
+  if (configuredProjectId?.trim() && !isProjectAccessible(projects, configuredProjectId)) {
+    return {
+      status: "not-authorized",
+      candidateProjectId: configuredProjectId.trim(),
+      message: CLOUD_PROJECT_NOT_AUTHORIZED_MESSAGE,
+    };
+  }
+
+  return {
+    status: "unresolvable",
+    message: CLOUD_PROJECT_UNRESOLVABLE_MESSAGE,
+  };
+}
+
+/** @deprecated Use resolveWorkspaceCloudProjectBinding and read `.projectId` when mapped. */
+export async function resolveWorkspaceCloudProjectId(
+  args: Parameters<typeof resolveWorkspaceCloudProjectBinding>[0],
+): Promise<string | null> {
+  const resolution = await resolveWorkspaceCloudProjectBinding(args);
+  return resolution.status === "mapped" ? resolution.projectId : null;
 }
 
 export async function resolveRecentWorkspaceCloudBinding({
@@ -154,11 +225,13 @@ export async function resolveRecentWorkspaceCloudBinding({
     configError = error instanceof Error ? error.message : String(error);
   }
 
-  if (configuredProjectId) {
+  // Homepage cache hint only — do not treat configured id as verified authorization.
+  if (configuredProjectId && !session) {
     return [item.workspace.id, {
       projectId: configuredProjectId,
       cloudLinked: true,
       error: configError,
+      reason: null,
     }];
   }
 
@@ -170,12 +243,13 @@ export async function resolveRecentWorkspaceCloudBinding({
       projectId: null,
       cloudLinked: false,
       error: configError,
+      reason: null,
     }];
   }
 
   if (session) {
     try {
-      const projectId = await resolveWorkspaceCloudProjectId({
+      const resolution = await resolveWorkspaceCloudProjectBinding({
         activeGitStatus: gitStatusResult,
         apiBaseUrl,
         configuredProjectId,
@@ -184,32 +258,56 @@ export async function resolveRecentWorkspaceCloudBinding({
         session,
         workspace: item.workspace,
       });
+      if (resolution.status === "mapped") {
+        return [item.workspace.id, {
+          projectId: resolution.projectId,
+          cloudLinked: true,
+          error: null,
+          reason: null,
+        }];
+      }
+      if (resolution.status === "not-authorized") {
+        return [item.workspace.id, {
+          projectId: null,
+          cloudLinked: true,
+          error: resolution.message,
+          reason: "not-authorized",
+        }];
+      }
+      if (resolution.status === "unresolvable") {
+        return [item.workspace.id, {
+          projectId: null,
+          cloudLinked: true,
+          error: resolution.message,
+          reason: "unresolvable",
+        }];
+      }
       return [item.workspace.id, {
-        projectId,
-        cloudLinked: Boolean(projectId),
+        projectId: null,
+        cloudLinked: false,
         error: null,
+        reason: null,
       }];
     } catch (error) {
       return [item.workspace.id, {
         projectId: configuredProjectId,
         cloudLinked: Boolean(configuredProjectId),
         error: error instanceof Error ? error.message : String(error),
+        reason: "network",
       }];
     }
   }
 
-  const remoteProjectId = cloudRemote.info.kind === "project"
-    ? cloudRemote.info.projectId?.trim() || null
-    : null;
+  const remoteProjectId = extractRemoteProjectCandidateId(cloudRemote);
   return [item.workspace.id, {
     projectId: remoteProjectId ?? configuredProjectId,
     cloudLinked: Boolean(remoteProjectId ?? configuredProjectId),
     error: null,
+    reason: null,
   }];
 }
 
 export function getPuppyoneRemoteProjectId(status: GitStatusSnapshot | null): string | null {
   const cloudRemote = getPuppyoneRemote(status);
-  if (cloudRemote?.info.kind !== "project") return null;
-  return cloudRemote.info.projectId?.trim() || null;
+  return extractRemoteProjectCandidateId(cloudRemote);
 }

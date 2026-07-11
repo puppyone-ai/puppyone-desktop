@@ -216,11 +216,6 @@ export function CloudServiceMainView({
             Cloud is offline. Your local workspace remains available; Cloud data will refresh after reconnecting.
           </div>
         )}
-        {attachment?.status === "error" && (
-          <div className="desktop-cloud-main-alert" role="alert">
-            {attachment.message}
-          </div>
-        )}
         {attachment?.status === "linked" && attachment.warning && (
           <div className="desktop-cloud-main-alert" role="alert">
             {attachment.warning}
@@ -228,7 +223,7 @@ export function CloudServiceMainView({
         )}
         {attachment?.status === "resolving" && (
           <div className="desktop-cloud-main-alert">
-            Resolving Cloud project binding…
+            Matching this folder to its Cloud project…
           </div>
         )}
         {!inCloudGlobalAccountSection && error && <div className="desktop-cloud-main-alert">{error}</div>}
@@ -245,6 +240,7 @@ export function CloudServiceMainView({
           cloudApiBaseUrl={cloudApiBaseUrl}
           cloudRemote={cloudRemote}
           cloudData={cloudData}
+          attachment={attachment}
           selectedProjectId={selectedProjectId}
           activeSection={activeSection}
           accountEmail={accountEmail}
@@ -265,6 +261,11 @@ export function CloudServiceMainView({
             onSelectSection("contents");
           }}
           onSelectSection={onSelectSection}
+          onRetryBinding={() => {
+            void cloudData.reload();
+            onRefresh();
+          }}
+          onUseAnotherAccount={() => onCloudSessionChange(null)}
         />
       </div>
     </main>

@@ -82,6 +82,7 @@ import { createRepositoryRefreshReason } from "./features/source-control/reposit
 import { getPuppyoneRemote, parsePuppyoneRemote } from "./features/source-control/remotes";
 import { CloudProjectResolveDialog } from "./features/cloud/workspace/CloudProjectResolveDialog";
 import { useWorkspaceSurfaceSwitch } from "./features/cloud/workspace/useWorkspaceSurfaceSwitch";
+import { useCloudWorkspaceBinding } from "./features/cloud/workspace/useCloudWorkspaceBinding";
 import { usePuppyoneCloudBackup } from "./features/cloud/workspace/usePuppyoneCloudBackup";
 
 const CLOUD_BROWSER_SIGN_IN_COOLDOWN_MS = 1500;
@@ -675,6 +676,21 @@ export function App() {
     }
     return savedConfig;
   }, [refreshGitStatus, savePuppyoneConfig]);
+
+  useCloudWorkspaceBinding({
+    activeCloudSession,
+    activeGitStatus,
+    cloudEnabled,
+    desktopCloudApiBaseUrl,
+    handlePuppyoneConfigChange,
+    homeCloudProjects,
+    puppyoneConfig,
+    setHomeCloudProjects,
+    setRecentWorkspaceCloudBindings,
+    updateCloudSession,
+    workspace,
+    workspaceIsCloud,
+  });
 
   const {
     setWorkspaceSurfaceDialogOpen,

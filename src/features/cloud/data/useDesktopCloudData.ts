@@ -12,7 +12,6 @@ import {
   type DesktopCloudTree,
 } from "../../../lib/cloudApi";
 import type { CloudEnvironment } from "../environment";
-import { resolveMappedCloudProjectId } from "../workspace";
 import { loadCloudProjectDetails } from "./cloudProjectDetails";
 
 export { resolveMappedCloudProjectId } from "../workspace";
@@ -60,15 +59,7 @@ export function useDesktopCloudData({
   workspaceRevisionKey?: string | null;
   loadProjectDetails?: boolean;
 }): DesktopCloudDataState {
-  const cloudRemote = cloudEnvironment.cloudRemote;
   const cloudApiBaseUrl = cloudEnvironment.apiBaseUrl;
-  const configuredProjectId = cloudEnvironment.configuredProjectId;
-  const cloudRemoteKey = createCloudRemoteKey(cloudRemote);
-  const stableCloudRemoteRef = useRef({ key: cloudRemoteKey, value: cloudRemote });
-  if (stableCloudRemoteRef.current.key !== cloudRemoteKey) {
-    stableCloudRemoteRef.current = { key: cloudRemoteKey, value: cloudRemote };
-  }
-  const stableCloudRemote = stableCloudRemoteRef.current.value;
   const normalizedBoundProjectId = boundProjectId?.trim() || null;
   const contextKey = createCloudDataContextKey({
     session,
@@ -117,16 +108,9 @@ export function useDesktopCloudData({
       const projects = await listCloudProjects(session, onSessionChange, cloudApiBaseUrl);
       if (activeRequestRef.current !== requestId) return;
 
-      const mappedProjectId = normalizedBoundProjectId ?? await resolveMappedCloudProjectId({
-        session,
-        projects,
-        cloudRemote: stableCloudRemote,
-        configuredProjectId,
-        onSessionChange,
-        cloudApiBaseUrl,
-      });
-      if (activeRequestRef.current !== requestId) return;
-
+      // Mapping is owned by useCloudWorkspaceBinding. This hook only loads data
+      // for an already-verified bound project or an explicit browse selection.
+      const mappedProjectId = normalizedBoundProjectId;
       const mappedProject = mappedProjectId
         ? projects.find((project) => project.id === mappedProjectId) ?? null
         : null;
@@ -207,14 +191,12 @@ export function useDesktopCloudData({
     }
   }, [
     cloudApiBaseUrl,
-    configuredProjectId,
     contextKey,
     loadProjectDetails,
     normalizedBoundProjectId,
     onSessionChange,
     selectedProjectId,
     session,
-    stableCloudRemote,
   ]);
 
   useEffect(() => {
@@ -237,16 +219,6 @@ export function useDesktopCloudData({
   }
 
   return { ...toPublicCloudDataState(state), reload: load };
-}
-
-function createCloudRemoteKey(cloudRemote: CloudEnvironment["cloudRemote"]): string {
-  if (!cloudRemote) return "none";
-  return [
-    cloudRemote.rawUrl,
-    cloudRemote.info.kind,
-    cloudRemote.info.projectId ?? "",
-    cloudRemote.info.accessKey ?? "",
-  ].join("\n");
 }
 
 function createCloudDataContextKey({

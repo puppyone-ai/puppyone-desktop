@@ -4,6 +4,8 @@ export type ProjectCloudAttachment =
   | { status: "local-only"; projectId: null }
   | { status: "resolving"; projectId: null }
   | { status: "linked"; projectId: string; warning?: string }
+  | { status: "not-authorized"; projectId: string | null; message: string }
+  | { status: "unresolvable"; projectId: null; message: string }
   | { status: "error"; projectId: null; message: string };
 
 /** Binding identity only — auth/offline/expired live on CloudAuthState. */
@@ -20,11 +22,28 @@ export function attachmentHasBoundProject(attachment: ProjectCloudAttachment): b
   return Boolean(getAttachedCloudProjectId(attachment));
 }
 
+export function isCloudAttachmentRecovery(
+  attachment: ProjectCloudAttachment,
+): attachment is Extract<ProjectCloudAttachment, { status: "not-authorized" | "unresolvable" | "error" }> {
+  return attachment.status === "not-authorized"
+    || attachment.status === "unresolvable"
+    || attachment.status === "error";
+}
+
+export function getCloudAttachmentWarning(attachment: ProjectCloudAttachment): string | null {
+  if (attachment.status === "linked") return attachment.warning ?? null;
+  if (attachment.status === "not-authorized" || attachment.status === "unresolvable" || attachment.status === "error") {
+    return attachment.message;
+  }
+  return null;
+}
+
 export function resolveProjectCloudAttachment({
   configuredProjectId,
   bindingProjectId,
   remoteProjectId,
   bindingError,
+  bindingReason = null,
   bindingCloudLinked,
   resolving,
 }: {
@@ -32,16 +51,16 @@ export function resolveProjectCloudAttachment({
   bindingProjectId: string | null;
   remoteProjectId: string | null;
   bindingError: string | null;
+  bindingReason?: "not-authorized" | "unresolvable" | "network" | null;
   bindingCloudLinked: boolean;
   resolving: boolean;
 }): ProjectCloudAttachment {
   const projectId = configuredProjectId?.trim()
     || bindingProjectId?.trim()
-    || remoteProjectId?.trim()
     || null;
 
-  // A resolver/network failure is diagnostic once local identity is known; it
-  // must not demote a durable binding into an unbound navigation state.
+  // A known durable binding stays linked on network/resolver warnings.
+  // Remote-only candidate ids are NOT treated as verified bindings.
   if (projectId) {
     return bindingError
       ? { status: "linked", projectId, warning: bindingError }
@@ -49,6 +68,20 @@ export function resolveProjectCloudAttachment({
   }
 
   if (bindingError) {
+    if (bindingReason === "not-authorized") {
+      return {
+        status: "not-authorized",
+        projectId: remoteProjectId?.trim() || null,
+        message: bindingError,
+      };
+    }
+    if (bindingReason === "unresolvable" || bindingCloudLinked) {
+      return {
+        status: "unresolvable",
+        projectId: null,
+        message: bindingError,
+      };
+    }
     return {
       status: "error",
       projectId: null,
@@ -62,9 +95,9 @@ export function resolveProjectCloudAttachment({
 
   if (bindingCloudLinked) {
     return {
-      status: "error",
+      status: "unresolvable",
       projectId: null,
-      message: "Cloud project link could not be resolved.",
+      message: "We found a PuppyOne Cloud remote, but couldn’t identify its project.",
     };
   }
 
@@ -82,10 +115,13 @@ export function resolveCloudProjectNavigationContext(
   selectedProjectId: string | null,
 ): { projectContext: boolean; projectBound: boolean } {
   const attachmentBound = attachmentHasBoundProject(attachment);
-  const browsingProject = Boolean(selectedProjectId?.trim());
+  // Stale browse selection must never override a formal local binding, and must
+  // not invent project context when a recovery/local-only state is active.
+  const browsingProject = Boolean(selectedProjectId?.trim()) && !attachmentBound
+    && attachment.status === "local-only";
   return {
     projectContext: attachmentBound || browsingProject,
-    projectBound: attachmentBound && !browsingProject,
+    projectBound: attachmentBound,
   };
 }
 

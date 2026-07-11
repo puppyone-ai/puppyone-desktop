@@ -26,6 +26,8 @@ import { CloudAccessPointAccessSection } from "./sections/access/AccessPointSect
 import { CloudGitSyncSection } from "./sections/GitSyncSection";
 import { CloudMcpCliSection } from "./sections/McpCliSection";
 
+export { CloudProjectRecoveryState } from "./states/CloudProjectRecoveryState";
+
 export function CloudSignedOutState({
   workspace,
   onOpenDetails,

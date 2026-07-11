@@ -28,8 +28,8 @@ import {
 import type { DesktopWorkspaceSurfaceAction } from "../../app-shell/navigation";
 import {
   getPuppyoneRemoteProjectId,
-  CLOUD_PROJECT_MAPPING_ERROR,
-  resolveWorkspaceCloudProjectId,
+  CLOUD_PROJECT_UNRESOLVABLE_MESSAGE,
+  resolveWorkspaceCloudProjectBinding,
   type RecentWorkspaceCloudBinding,
 } from "./cloudProjectResolution";
 import { getPuppyoneRemote } from "../../source-control/remotes";
@@ -139,140 +139,7 @@ export function useWorkspaceSurfaceSwitch({
     setWorkspaceSurfaceDialogOpen(false);
   }, [workspace?.path]);
 
-  useEffect(() => {
-    if (!workspace || workspaceIsCloud || !cloudEnabled || !activeGitStatus) return undefined;
-
-    const cloudRemote = getPuppyoneRemote(activeGitStatus);
-    if (!cloudRemote) return undefined;
-
-    const configuredProjectId = puppyoneConfig?.cloud.projectId?.trim() || null;
-    const applyActiveBinding = (
-      projectId: string | null,
-      error: string | null = null,
-      cloudLinked = Boolean(projectId),
-    ) => {
-      setRecentWorkspaceCloudBindings((current) => {
-        const nextBinding: RecentWorkspaceCloudBinding = {
-          projectId,
-          cloudLinked,
-          error,
-        };
-        const currentBinding = current[workspace.id];
-        if (
-          currentBinding?.projectId === nextBinding.projectId &&
-          currentBinding.cloudLinked === nextBinding.cloudLinked &&
-          currentBinding.error === nextBinding.error
-        ) {
-          return current;
-        }
-        return {
-          ...current,
-          [workspace.id]: nextBinding,
-        };
-      });
-    };
-    const applyBindingError = (message: string) => {
-      setRecentWorkspaceCloudBindings((current) => {
-        const currentBinding = current[workspace.id];
-        const nextBinding: RecentWorkspaceCloudBinding = {
-          projectId: currentBinding?.projectId ?? null,
-          cloudLinked: true,
-          error: message,
-        };
-        if (
-          currentBinding?.projectId === nextBinding.projectId
-          && currentBinding.cloudLinked === nextBinding.cloudLinked
-          && currentBinding.error === nextBinding.error
-        ) {
-          return current;
-        }
-        return {
-          ...current,
-          [workspace.id]: nextBinding,
-        };
-      });
-    };
-
-    if (configuredProjectId) {
-      applyActiveBinding(configuredProjectId, null, true);
-      return undefined;
-    }
-
-    if (cloudRemote.info.kind === "project") {
-      const remoteProjectId = cloudRemote.info.projectId?.trim() || null;
-      applyActiveBinding(
-        remoteProjectId,
-        remoteProjectId ? null : CLOUD_PROJECT_MAPPING_ERROR,
-        true,
-      );
-      return undefined;
-    }
-
-    if (!activeCloudSession) {
-      // Authentication availability must not erase a structural Cloud binding.
-      // The attachment model can remain unresolved until the account comes back.
-      return undefined;
-    }
-
-    let cancelled = false;
-    void (async () => {
-      const projects = homeCloudProjects.length > 0
-        ? homeCloudProjects
-        : await listCloudProjects(activeCloudSession, updateCloudSession, desktopCloudApiBaseUrl);
-      if (cancelled) return;
-      if (homeCloudProjects.length === 0) setHomeCloudProjects(projects);
-
-      const projectId = await resolveWorkspaceCloudProjectId({
-        activeGitStatus,
-        apiBaseUrl: desktopCloudApiBaseUrl,
-        configuredProjectId,
-        onSessionChange: updateCloudSession,
-        projects,
-        session: activeCloudSession,
-        workspace,
-      });
-      if (cancelled) return;
-
-      if (!projectId) {
-        applyActiveBinding(null, CLOUD_PROJECT_MAPPING_ERROR, true);
-        return;
-      }
-
-      applyActiveBinding(projectId, null, true);
-      if (projectId && configuredProjectId !== projectId) {
-        const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
-          cloud: {
-            projectId,
-          },
-        });
-        await handlePuppyoneConfigChange(nextConfig);
-      }
-    })()
-      .catch((error) => {
-        if (!cancelled) {
-          applyBindingError(error instanceof Error ? error.message : String(error));
-        }
-      })
-      .finally(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeCloudSession,
-    activeGitStatus,
-    cloudEnabled,
-    desktopCloudApiBaseUrl,
-    handlePuppyoneConfigChange,
-    homeCloudProjects,
-    puppyoneConfig,
-    puppyoneConfig?.cloud.projectId,
-    setHomeCloudProjects,
-    setRecentWorkspaceCloudBindings,
-    updateCloudSession,
-    workspace,
-    workspaceIsCloud,
-  ]);
+  // Local workspace Cloud project binding is owned by useCloudWorkspaceBinding.
 
   const switchToCloudProjectSurface = useCallback(() => {
     if (workspaceSurfaceSwitching) return;
@@ -294,13 +161,13 @@ export function useWorkspaceSurfaceSwitch({
         }
 
         if (cloudRemote) {
-          projectId = await withTimeout(
+          const resolution = await withTimeout(
             (async () => {
               const projects = homeCloudProjects.length === 0
                 ? await listCloudProjects(activeCloudSession, updateCloudSession, desktopCloudApiBaseUrl)
                 : homeCloudProjects;
               if (homeCloudProjects.length === 0) setHomeCloudProjects(projects);
-              return resolveWorkspaceCloudProjectId({
+              return resolveWorkspaceCloudProjectBinding({
                 activeGitStatus,
                 apiBaseUrl: desktopCloudApiBaseUrl,
                 configuredProjectId,
@@ -311,8 +178,13 @@ export function useWorkspaceSurfaceSwitch({
               });
             })(),
             CLOUD_PROJECT_SWITCH_RESOLVE_TIMEOUT_MS,
-            CLOUD_PROJECT_MAPPING_ERROR,
+            CLOUD_PROJECT_UNRESOLVABLE_MESSAGE,
           );
+          if (resolution.status === "mapped") {
+            projectId = resolution.projectId;
+          } else if (resolution.status === "not-authorized" || resolution.status === "unresolvable") {
+            throw new Error(resolution.message);
+          }
         }
       }
 
@@ -324,6 +196,7 @@ export function useWorkspaceSurfaceSwitch({
               projectId,
               cloudLinked: true,
               error: null,
+              reason: null,
             },
           }));
 
@@ -342,7 +215,7 @@ export function useWorkspaceSurfaceSwitch({
         return;
       }
 
-      throw new Error(CLOUD_PROJECT_MAPPING_ERROR);
+      throw new Error(CLOUD_PROJECT_UNRESOLVABLE_MESSAGE);
     })().catch((error) => {
       setHomeOperationStatus(null);
       setWorkspaceSurfaceError(error instanceof Error ? error.message : String(error));

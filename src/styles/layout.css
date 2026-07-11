@@ -285,13 +285,77 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
 }
 
 .desktop-project-option:hover .desktop-project-mark,
-.desktop-project-option.selected .desktop-project-mark {
+.desktop-project-option.selected .desktop-project-mark,
+.desktop-project-option-row.selected .desktop-project-mark,
+.desktop-project-option-row:hover .desktop-project-mark,
+.desktop-project-option-row:focus-within .desktop-project-mark {
   color: var(--po-text);
 }
 
 .desktop-project-option:hover .desktop-project-mark.linked,
-.desktop-project-option.selected .desktop-project-mark.linked {
+.desktop-project-option.selected .desktop-project-mark.linked,
+.desktop-project-option-row.selected .desktop-project-mark.linked,
+.desktop-project-option-row:hover .desktop-project-mark.linked,
+.desktop-project-option-row:focus-within .desktop-project-mark.linked {
   color: color-mix(in oklab, var(--po-info) 78%, var(--po-accent));
+}
+
+.desktop-project-option-row {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.desktop-project-option-row > .desktop-project-option {
+  width: 100%;
+  padding-right: calc(var(--po-menu-item-padding-inline) + 26px);
+}
+
+.desktop-project-option-row:hover > .desktop-project-option:not(:disabled),
+.desktop-project-option-row:focus-within > .desktop-project-option:not(:disabled),
+.desktop-project-option-row.selected > .desktop-project-option {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-project-copy-path {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  z-index: 1;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--po-text-disabled);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 0.12s ease, background 0.1s ease, color 0.1s ease;
+}
+
+.desktop-project-option-row:hover .desktop-project-copy-path,
+.desktop-project-option-row:focus-within .desktop-project-copy-path,
+.desktop-project-copy-path.is-copied {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.desktop-project-copy-path:hover,
+.desktop-project-copy-path:focus-visible {
+  background: var(--po-control);
+  color: var(--po-text);
+  outline: none;
+}
+
+.desktop-project-copy-path.is-copied,
+.desktop-project-copy-path.is-copied:hover {
+  background: color-mix(in srgb, var(--po-success) 14%, var(--po-control));
+  color: var(--po-success);
 }
 
 .desktop-project-actions {

@@ -3,6 +3,7 @@ import type { CloudServiceSidebarProps, CloudWorkspaceSection } from "./types";
 import { getCloudAuthSession, resolveCloudAuthState } from "./auth";
 import { resolveCloudEnvironment } from "./environment";
 import {
+  CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES,
   CLOUD_GLOBAL_SIDEBAR_ROUTES,
   CLOUD_PROJECT_SIDEBAR_ROUTES,
   normalizeCloudSection,
@@ -19,7 +20,7 @@ type CloudSidebarNavEntry = {
 };
 
 const SIGNED_OUT_CLOUD_SIDEBAR_ROUTES: CloudSidebarNavEntry[] = [
-  ...CLOUD_PROJECT_SIDEBAR_ROUTES.map((route) => ({
+  ...CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES.map((route) => ({
     ...route,
     locked: true,
     lockReason: `Sign in to use ${route.label}`,
@@ -49,9 +50,11 @@ export function CloudServiceSidebar({
   const inProjectContext = signedIn && projectContext;
   const navItems: CloudSidebarNavEntry[] = !signedIn
     ? SIGNED_OUT_CLOUD_SIDEBAR_ROUTES
-    : inProjectContext
-      ? CLOUD_PROJECT_SIDEBAR_ROUTES
-      : CLOUD_GLOBAL_SIDEBAR_ROUTES;
+    : inProjectContext && projectBound
+      ? CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES
+      : inProjectContext
+        ? CLOUD_PROJECT_SIDEBAR_ROUTES
+        : CLOUD_GLOBAL_SIDEBAR_ROUTES;
 
   return (
     <section className="desktop-tool-sidebar desktop-cloud-service-sidebar">
