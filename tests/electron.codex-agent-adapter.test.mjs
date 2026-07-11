@@ -60,6 +60,61 @@ describe("Codex app-server normalization", () => {
       type: "provider.warning",
       payload: { message: "Invalid config Unknown key (/workspace/.codex/config.toml)" },
     });
+
+    expect(normalizeCodexNotification({
+      method: "error",
+      params: {
+        error: {
+          message: JSON.stringify({
+            type: "error",
+            error: { message: "Invalid value: 'max'. Use 'xhigh'.", param: "reasoning.effort" },
+            status: 400,
+          }),
+        },
+        willRetry: false,
+      },
+    })[0]).toMatchObject({
+      type: "provider.error",
+      payload: { message: "Invalid value: 'max'. Use 'xhigh'." },
+    });
+  });
+
+  it("overrides global reasoning config with the selected model's catalog default", async () => {
+    const connection = new FakeConnection();
+    connection.results.set("account/read", { account: { type: "chatgpt" }, requiresOpenaiAuth: false });
+    connection.results.set("model/list", {
+      data: [{
+        id: "gpt-5.5",
+        model: "gpt-5.5",
+        displayName: "GPT-5.5",
+        defaultReasoningEffort: "medium",
+        supportedReasoningEfforts: ["low", "medium", "high", "xhigh"].map((reasoningEffort) => ({
+          reasoningEffort,
+          description: reasoningEffort,
+        })),
+      }],
+    });
+    connection.results.set("turn/start", { turn: { id: "turn-1" } });
+    const adapter = new CodexAppServerAdapter({
+      executablePath: "/usr/local/bin/codex",
+      environment: {},
+      workspaceRoot: "/workspace",
+      appVersion: "test",
+      connectionFactory: () => connection,
+    });
+
+    const inspection = await adapter.inspect();
+    expect(inspection.models[0]).toMatchObject({
+      model: "gpt-5.5",
+      variants: ["low", "medium", "high", "xhigh"],
+      defaultVariant: "medium",
+    });
+    adapter.threadId = "thread-1";
+    await adapter.startTurn({ prompt: "hello", model: "gpt-5.5" });
+    expect(connection.requests.find((request) => request.method === "turn/start")).toMatchObject({
+      params: { threadId: "thread-1", model: "gpt-5.5", effort: "medium" },
+    });
+    adapter.dispose();
   });
 
   it("offers only explicit durable decisions and fails unsupported requests closed", async () => {
@@ -226,11 +281,13 @@ class FakeConnection extends EventEmitter {
     this.closed = false;
     this.responses = [];
     this.errors = [];
+    this.requests = [];
     this.results = new Map([["initialize", { userAgent: "codex" }]]);
     this.failures = new Map();
   }
 
-  request(method) {
+  request(method, params) {
+    this.requests.push({ method, params });
     if (this.failures.has(method)) return Promise.reject(this.failures.get(method));
     return Promise.resolve(this.results.get(method) ?? {});
   }

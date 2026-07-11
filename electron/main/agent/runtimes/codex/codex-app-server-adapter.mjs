@@ -49,6 +49,7 @@ export class CodexAppServerAdapter {
     this.threadId = null;
     this.activeTurnId = null;
     this.pendingApprovals = new Map();
+    this.modelProfiles = new Map();
     this.sessionLifecycleType = null;
     this.disposed = false;
   }
@@ -115,6 +116,7 @@ export class CodexAppServerAdapter {
     const models = modelResult.status === "fulfilled"
       ? normalizeModels(modelResult.value)
       : [];
+    this.modelProfiles = new Map(models.map((model) => [model.model, model]));
     return {
       account,
       models,
@@ -183,6 +185,7 @@ export class CodexAppServerAdapter {
   async startTurn({ prompt, model = null }) {
     if (!this.threadId) throw new Error("No Codex thread is active.");
     const clientUserMessageId = randomUUID();
+    const effort = compatibleReasoningEffort(this.modelProfiles.get(model));
     const result = await this.connection.request("turn/start", {
       threadId: this.threadId,
       clientUserMessageId,
@@ -190,6 +193,7 @@ export class CodexAppServerAdapter {
       cwd: this.workspaceRoot,
       approvalPolicy: "on-request",
       ...(model ? { model } : {}),
+      ...(effort ? { effort } : {}),
     });
     this.activeTurnId = requireString(result?.turn?.id, "Codex turn/start did not return a turn id.");
     return { turnId: this.activeTurnId, clientUserMessageId };
@@ -406,7 +410,7 @@ export function normalizeCodexNotification(message) {
         turnId,
         payload: {
           status: normalizeTurnStatus(status),
-          ...(params.turn?.error?.message ? { message: redactSecretText(params.turn.error.message) } : {}),
+          ...(params.turn?.error?.message ? { message: formatCodexErrorMessage(params.turn.error.message) } : {}),
         },
       }];
     }
@@ -437,7 +441,7 @@ export function normalizeCodexNotification(message) {
         type: params.willRetry ? "provider.warning" : "provider.error",
         providerSessionId: threadId,
         turnId,
-        payload: { message: redactSecretText(params.error?.message || "Codex reported an error."), recoverable: Boolean(params.willRetry) },
+        payload: { message: formatCodexErrorMessage(params.error, "Codex reported an error."), recoverable: Boolean(params.willRetry) },
       }];
     case "warning":
     case "configWarning":
@@ -597,13 +601,61 @@ function normalizeAccount(result) {
 
 function normalizeModels(result) {
   if (!Array.isArray(result?.data)) return [];
-  return result.data.filter((model) => !model?.hidden).slice(0, 100).map((model) => ({
-    id: String(model.id ?? model.model ?? ""),
-    model: String(model.model ?? model.id ?? ""),
-    displayName: String(model.displayName ?? model.model ?? model.id ?? "Codex"),
-    description: String(model.description ?? ""),
-    isDefault: Boolean(model.isDefault),
-  })).filter((model) => model.id);
+  return result.data.filter((model) => !model?.hidden).slice(0, 100).map((model) => {
+    const variants = Array.isArray(model?.supportedReasoningEfforts)
+      ? model.supportedReasoningEfforts
+        .map((entry) => typeof entry?.reasoningEffort === "string" ? entry.reasoningEffort.trim() : "")
+        .filter(Boolean)
+        .slice(0, 20)
+      : [];
+    const advertisedDefault = typeof model?.defaultReasoningEffort === "string"
+      ? model.defaultReasoningEffort.trim()
+      : "";
+    return {
+      id: String(model.id ?? model.model ?? ""),
+      model: String(model.model ?? model.id ?? ""),
+      displayName: String(model.displayName ?? model.model ?? model.id ?? "Codex"),
+      description: String(model.description ?? ""),
+      isDefault: Boolean(model.isDefault),
+      variants,
+      defaultVariant: variants.includes(advertisedDefault)
+        ? advertisedDefault
+        : variants.includes("medium")
+          ? "medium"
+          : variants[0] ?? null,
+    };
+  }).filter((model) => model.id);
+}
+
+function compatibleReasoningEffort(model) {
+  if (!model || !Array.isArray(model.variants) || model.variants.length === 0) return null;
+  if (model.defaultVariant && model.variants.includes(model.defaultVariant)) return model.defaultVariant;
+  return model.variants.includes("medium") ? "medium" : model.variants[0] ?? null;
+}
+
+function formatCodexErrorMessage(value, fallback = "Codex reported an error.") {
+  return redactSecretText(extractCodexErrorText(value) || fallback);
+}
+
+function extractCodexErrorText(value, depth = 0) {
+  if (depth > 4 || value === null || value === undefined) return "";
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!text) return "";
+    if ((text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"))) {
+      try {
+        const nested = extractCodexErrorText(JSON.parse(text), depth + 1);
+        if (nested) return nested;
+      } catch {
+        // Keep the bounded provider text when it only resembles JSON.
+      }
+    }
+    return text.slice(0, 32_768);
+  }
+  if (typeof value !== "object" || Array.isArray(value)) return "";
+  return extractCodexErrorText(value.error?.message, depth + 1)
+    || extractCodexErrorText(value.message, depth + 1)
+    || extractCodexErrorText(value.error, depth + 1);
 }
 
 function isApprovalDecision(value) {

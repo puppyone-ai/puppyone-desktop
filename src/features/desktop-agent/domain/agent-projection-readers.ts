@@ -50,6 +50,29 @@ export function readString(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+/** Makes already-persisted provider errors readable without trusting raw HTML or object shapes. */
+export function readProviderMessage(value: unknown, depth = 0): string {
+  if (depth > 4 || value === null || value === undefined) return "";
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!text) return "";
+    if ((text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"))) {
+      try {
+        const nested = readProviderMessage(JSON.parse(text), depth + 1);
+        if (nested) return nested;
+      } catch {
+        // Preserve non-JSON provider text below.
+      }
+    }
+    return text.slice(0, 32_768);
+  }
+  if (typeof value !== "object" || Array.isArray(value)) return "";
+  const record = value as Record<string, unknown>;
+  return readProviderMessage((record.error as Record<string, unknown> | undefined)?.message, depth + 1)
+    || readProviderMessage(record.message, depth + 1)
+    || readProviderMessage(record.error, depth + 1);
+}
+
 export function nullableString(value: unknown) {
   const text = readString(value);
   return text || null;

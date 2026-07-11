@@ -215,6 +215,15 @@ ready runtime unless the user explicitly selects one. `AgentRuntimeHost` owns
 registry shutdown. `AgentService` applies the same create/resume/turn/replay
 lifecycle to every runtime.
 
+Model options are catalog-scoped. The Codex adapter derives a compatible
+reasoning effort from the selected model's `supportedReasoningEfforts` and
+`defaultReasoningEffort`, then explicitly supplies it at `turn/start`. A UI
+model override therefore cannot accidentally inherit an incompatible global
+Codex effort configured for another model. This mirrors OpenCode's rule that a
+variant is applied only when it exists in the selected model's `variants` map.
+Provider errors are normalized in main; the projection also unwraps bounded
+legacy JSON error strings so old journals remain readable.
+
 ## OpenCode process and trust boundary
 
 ```text

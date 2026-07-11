@@ -83,6 +83,7 @@ export type AgentModel = {
   providerId?: string;
   modelId?: string;
   variants?: string[];
+  defaultVariant?: string | null;
   contextWindow?: number | null;
 };
 

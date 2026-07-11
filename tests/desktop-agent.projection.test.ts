@@ -52,6 +52,18 @@ describe("Desktop Agent transcript projection", () => {
     expect(projection.activities[0].output.length).toBe(64 * 1024);
     expect(projection.approvals).toEqual([]);
   });
+
+  it("renders legacy nested provider errors as readable text", () => {
+    const projection = applyAgentEvent(createAgentProjection(), event(1, "provider.error", {
+      message: JSON.stringify({
+        type: "error",
+        error: { message: "Invalid value: 'max'. Use 'xhigh'.", param: "reasoning.effort" },
+        status: 400,
+      }),
+    }, "turn-1"));
+
+    expect(projection.activities[0].label).toBe("Invalid value: 'max'. Use 'xhigh'.");
+  });
 });
 
 function event(
