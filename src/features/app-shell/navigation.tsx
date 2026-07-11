@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
-import { ArrowRightLeft, Blocks, Cloud, Folder, FolderOpen, Settings } from "lucide-react";
+import { ArrowRightLeft, Blocks, Clock3, Cloud, Folder, FolderOpen, Settings } from "lucide-react";
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import type { SidebarNavigationOrientation } from "../../preferences";
 import type { GitStatusEntry, GitStatusSnapshot } from "../../types/electron";
@@ -7,6 +7,12 @@ import { AutomationGridIcon } from "../automation";
 import { AccessChainIcon } from "../cloud/accessFilters";
 
 export type DesktopSidebarIconComponent = (props: { size?: number; className?: string }) => ReactNode;
+type DesktopNavigationItem = {
+  view: Extract<DesktopView, "data" | "git" | "plugins" | "access" | "automation">;
+  label: string;
+  icon: DesktopSidebarIconComponent;
+  iconSize?: number;
+};
 export type DesktopWorkspaceSurfaceAction = {
   kind: "switch-to-cloud" | "switch-to-local" | "open-locally";
   disabled?: boolean;
@@ -44,6 +50,7 @@ export function PuppyGitIcon({
 
 export function DesktopSidebarFooterNavigation({
   activeView,
+  cloudHistoryEnabled = false,
   cloudToolsEnabled = false,
   gitEnabled = true,
   pluginsEnabled = false,
@@ -56,6 +63,7 @@ export function DesktopSidebarFooterNavigation({
   onOpenSettings,
 }: {
   activeView: DesktopView;
+  cloudHistoryEnabled?: boolean;
   cloudToolsEnabled?: boolean;
   gitEnabled?: boolean;
   pluginsEnabled?: boolean;
@@ -67,7 +75,7 @@ export function DesktopSidebarFooterNavigation({
   onNavigate: (view: DesktopView) => void;
   onOpenSettings: () => void;
 }) {
-  const localItems = getDesktopLocalSidebarNavItems(gitEnabled, pluginsEnabled);
+  const localItems = getDesktopLocalSidebarNavItems(gitEnabled, pluginsEnabled, cloudHistoryEnabled);
   const cloudItems = getDesktopCloudSidebarNavItems(cloudToolsEnabled);
 
   return (
@@ -159,6 +167,7 @@ function getDesktopWorkspaceSurfaceActionConfig(kind: DesktopWorkspaceSurfaceAct
 
 export function DesktopSidebarTopNavigation({
   activeView,
+  cloudHistoryEnabled = false,
   cloudToolsEnabled = false,
   gitEnabled = true,
   pluginsEnabled = false,
@@ -171,6 +180,7 @@ export function DesktopSidebarTopNavigation({
   onOpenSettings,
 }: {
   activeView: DesktopView;
+  cloudHistoryEnabled?: boolean;
   cloudToolsEnabled?: boolean;
   gitEnabled?: boolean;
   pluginsEnabled?: boolean;
@@ -182,7 +192,7 @@ export function DesktopSidebarTopNavigation({
   onNavigate: (view: DesktopView) => void;
   onOpenSettings: () => void;
 }) {
-  const localItems = getDesktopLocalSidebarNavItems(gitEnabled, pluginsEnabled);
+  const localItems = getDesktopLocalSidebarNavItems(gitEnabled, pluginsEnabled, cloudHistoryEnabled);
   const cloudItems = getDesktopCloudSidebarNavItems(cloudToolsEnabled);
   return (
     <div
@@ -227,6 +237,7 @@ export function DesktopSidebarTopNavigation({
 
 export function DesktopSidebarRailNavigation({
   activeView,
+  cloudHistoryEnabled = false,
   cloudToolsEnabled = false,
   gitEnabled = true,
   pluginsEnabled = false,
@@ -239,6 +250,7 @@ export function DesktopSidebarRailNavigation({
   onOpenSettings,
 }: {
   activeView: DesktopView;
+  cloudHistoryEnabled?: boolean;
   cloudToolsEnabled?: boolean;
   gitEnabled?: boolean;
   pluginsEnabled?: boolean;
@@ -250,7 +262,7 @@ export function DesktopSidebarRailNavigation({
   onNavigate: (view: DesktopView) => void;
   onOpenSettings: () => void;
 }) {
-  const localItems = getDesktopLocalSidebarNavItems(gitEnabled, pluginsEnabled);
+  const localItems = getDesktopLocalSidebarNavItems(gitEnabled, pluginsEnabled, cloudHistoryEnabled);
   const cloudItems = getDesktopCloudSidebarNavItems(cloudToolsEnabled);
   return (
     <div className="desktop-sidebar-rail-navigation" aria-label="Workspace navigation">
@@ -323,7 +335,7 @@ function DesktopSidebarButtonNavigation({
   onNavigate,
 }: {
   activeView: DesktopView;
-  items: typeof DESKTOP_NAV_ITEMS;
+  items: readonly DesktopNavigationItem[];
   gitIncomingCount: number;
   gitOperationLoading: string | null;
   gitStatus: GitStatusSnapshot | null;
@@ -373,7 +385,7 @@ function DesktopSidebarIconNavigation({
 }: {
   activeView: DesktopView;
   buttonClassName?: string;
-  items: typeof DESKTOP_NAV_ITEMS;
+  items: readonly DesktopNavigationItem[];
   gitIncomingCount: number;
   gitOperationLoading: string | null;
   gitStatus: GitStatusSnapshot | null;
@@ -605,18 +617,19 @@ function getDesktopNavigationLabel(
   return `${label}, ${badge.count} remote change${badge.count === 1 ? "" : "s"} to pull`;
 }
 
-const DESKTOP_NAV_ITEMS = [
+const DESKTOP_NAV_ITEMS: readonly DesktopNavigationItem[] = [
   { view: "data", label: "Files", icon: Folder },
   { view: "git", label: "Changes", icon: PuppyGitIcon, iconSize: 15 },
   { view: "plugins", label: "Plugins", icon: Blocks },
   { view: "access", label: "Access", icon: AccessChainIcon },
   { view: "automation", label: "Automation", icon: AutomationGridIcon },
-] satisfies Array<{
-  view: Extract<DesktopView, "data" | "git" | "plugins" | "access" | "automation">;
-  label: string;
-  icon: DesktopSidebarIconComponent;
-  iconSize?: number;
-}>;
+] as const;
+
+const DESKTOP_CLOUD_HISTORY_NAV_ITEM: DesktopNavigationItem = {
+  view: "git",
+  label: "History",
+  icon: Clock3,
+};
 
 const DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.view !== "access" && item.view !== "automation");
 const DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.view === "access" || item.view === "automation");
@@ -624,13 +637,16 @@ const DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS = DESKTOP_NAV_ITEMS.filter((item) => item.
 function getDesktopLocalSidebarNavItems(
   gitEnabled: boolean,
   pluginsEnabled: boolean,
-): typeof DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS {
+  cloudHistoryEnabled = false,
+): DesktopNavigationItem[] {
   return DESKTOP_LOCAL_SIDEBAR_NAV_ITEMS.filter((item) => (
-    (gitEnabled || item.view !== "git") &&
+    (gitEnabled || cloudHistoryEnabled || item.view !== "git") &&
     (pluginsEnabled || item.view !== "plugins")
+  )).map((item) => (
+    cloudHistoryEnabled && item.view === "git" ? DESKTOP_CLOUD_HISTORY_NAV_ITEM : item
   ));
 }
 
-function getDesktopCloudSidebarNavItems(cloudToolsEnabled: boolean): typeof DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS {
+function getDesktopCloudSidebarNavItems(cloudToolsEnabled: boolean): DesktopNavigationItem[] {
   return cloudToolsEnabled ? DESKTOP_CLOUD_SIDEBAR_NAV_ITEMS : [];
 }

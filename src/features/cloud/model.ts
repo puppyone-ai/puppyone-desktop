@@ -176,14 +176,16 @@ export function buildCloudBranchGraphRows(
     ];
   }
 
-  return (history?.commits ?? []).slice(0, 20).map((commit, index, commits) => ({
+  return (history?.commits ?? []).map((commit, index, commits) => ({
     id: commit.commit_id,
     kind: "commit" as const,
     message: commit.message || "Update workspace",
     createdAt: commit.created_at ?? null,
     stats: buildCloudCommitStats(commit.changes ?? []),
     authorName: commit.who || "Cloud",
-    labels: index === 0 ? [{ name: "Cloud history", kind: "cloud", current: false }] : [],
+    labels: commit.commit_id === history?.head_commit_id || (!history?.head_commit_id && index === 0)
+      ? [{ name: "Cloud history", kind: "cloud", current: true }]
+      : [],
     prefix: "*",
     laneCount: 1,
     nodeLane: 0,

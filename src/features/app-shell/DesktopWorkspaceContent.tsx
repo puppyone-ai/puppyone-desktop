@@ -24,6 +24,8 @@ import { GitSidebar, GitStatusView } from "../source-control";
 import type { DesktopGitController } from "../source-control/useDesktopGitController";
 import { SettingsSidebar, SettingsView, type SettingsSection } from "../settings";
 import {
+  CloudProjectHistorySidebar,
+  CloudProjectHistoryView,
   DesktopCloudAccessSidebar,
   CloudServiceMainView,
   CloudServiceSidebar,
@@ -35,6 +37,8 @@ import {
   DesktopCloudAutomationView,
 } from "../automation";
 import { useDesktopCloudAccessData } from "../cloud/data/useDesktopCloudAccessData";
+import { useCloudBranchesData } from "../cloud/data/useCloudBranchesData";
+import { buildCloudBranchGraphRows } from "../cloud/model";
 import { isCloudAccessNavigationResource } from "../cloud/sections/access/accessRows";
 import { getGitHostingMode } from "../source-control/viewModel";
 import type { DesktopView } from "../../components/DesktopCloudShell";
@@ -178,7 +182,7 @@ export function DesktopWorkspaceContent({
   });
   const resolvedActiveView = activeView === "plugins" && !viewerPluginsEnabled
     ? "data"
-    : cloudWorkspace && (activeView === "git" || activeView === "cloud")
+    : cloudWorkspace && activeView === "cloud"
     ? "data"
     : !cloudWorkspace && (activeView === "access" || activeView === "automation") ? "data"
       : activeView === "cloud" && !cloud.enabled ? "data"
@@ -198,6 +202,35 @@ export function DesktopWorkspaceContent({
   const [activeCloudAccessRowId, setActiveCloudAccessRowId] = useState<string | null>(null);
   const [activeAutomationProvider, setActiveAutomationProvider] = useState<string | null>(null);
   const [activePluginsSection, setActivePluginsSection] = useState<PluginsSection>(DEFAULT_PLUGINS_SECTION);
+  const [selectedCloudHistoryCommitId, setSelectedCloudHistoryCommitId] = useState<string | null>(null);
+  const cloudHistoryActive = cloudWorkspace && resolvedActiveView === "git";
+  const cloudHistoryData = useCloudBranchesData({
+    session: cloud.cloudSession,
+    projectId: cloud.projectId,
+    apiBaseUrl: cloud.cloudApiBaseUrl,
+    enabled: cloudHistoryActive,
+    revisionKey: String(workspaceRefreshToken),
+    onSessionChange: cloud.onCloudSessionChange,
+  });
+  const cloudHistoryRows = useMemo(
+    () => buildCloudBranchGraphRows(null, cloudHistoryData.history),
+    [cloudHistoryData.history],
+  );
+
+  useEffect(() => {
+    if (!cloudHistoryActive) {
+      setSelectedCloudHistoryCommitId(null);
+      return;
+    }
+
+    const commitRows = cloudHistoryRows.filter((row) => row.kind === "commit");
+    const headCommitId = cloudHistoryData.history?.head_commit_id ?? null;
+    setSelectedCloudHistoryCommitId((current) => {
+      if (current && commitRows.some((row) => row.id === current)) return current;
+      if (headCommitId && commitRows.some((row) => row.id === headCommitId)) return headCommitId;
+      return commitRows[0]?.id ?? null;
+    });
+  }, [cloudHistoryActive, cloudHistoryData.history?.head_commit_id, cloudHistoryRows]);
 
   useEffect(() => {
     const accessRows = cloudAccessData.accessRows.filter(isCloudAccessNavigationResource);
@@ -392,6 +425,20 @@ export function DesktopWorkspaceContent({
     />
   );
 
+  const cloudProjectHistoryView = (
+    <CloudProjectHistoryView
+      projectId={cloud.projectId}
+      projectName={workspace.name}
+      history={cloudHistoryData.history}
+      rows={cloudHistoryRows}
+      selectedCommitId={selectedCloudHistoryCommitId}
+      loading={cloudHistoryData.loading}
+      error={cloudHistoryData.error}
+      onSelectCommit={setSelectedCloudHistoryCommitId}
+      onRefresh={cloudHistoryData.reload}
+    />
+  );
+
   const cloudMainView = (
     <CloudServiceMainView
       workspace={workspace}
@@ -457,7 +504,7 @@ export function DesktopWorkspaceContent({
       return resolvedActiveView === "automation" ? cloudAutomationView : cloudAccessView;
     }
     if (resolvedActiveView === "settings") return settingsView;
-    if (resolvedActiveView === "git") return gitStatusView;
+    if (resolvedActiveView === "git") return cloudWorkspace ? cloudProjectHistoryView : gitStatusView;
     if (resolvedActiveView === "cloud") return cloudMainView;
     if (resolvedActiveView === "access") return cloudAccessView;
     if (resolvedActiveView === "automation") return cloudAutomationView;
@@ -544,6 +591,7 @@ export function DesktopWorkspaceContent({
         explorerToolbarSlot={preferences.sidebarNavigationPlacement === "top" ? (
           <DesktopSidebarTopNavigation
             activeView={resolvedActiveView}
+            cloudHistoryEnabled={cloudWorkspace}
             cloudToolsEnabled={cloudToolsNavigationEnabled}
             gitEnabled={gitEnabled}
             pluginsEnabled={pluginsNavigationVisible}
@@ -559,6 +607,7 @@ export function DesktopWorkspaceContent({
         explorerRailSlot={preferences.sidebarNavigationPlacement === "left" ? (
           <DesktopSidebarRailNavigation
             activeView={resolvedActiveView}
+            cloudHistoryEnabled={cloudWorkspace}
             cloudToolsEnabled={cloudToolsNavigationEnabled}
             gitEnabled={gitEnabled}
             pluginsEnabled={pluginsNavigationVisible}
@@ -614,6 +663,15 @@ export function DesktopWorkspaceContent({
                 installedCount={viewerPackSnapshot.contributions.length}
                 onSelectSection={setActivePluginsSection}
               />
+            ) : resolvedActiveView === "git" && cloudWorkspace ? (
+              <CloudProjectHistorySidebar
+                rows={cloudHistoryRows}
+                selectedCommitId={selectedCloudHistoryCommitId}
+                loading={cloudHistoryData.loading}
+                error={cloudHistoryData.error}
+                onSelectCommit={setSelectedCloudHistoryCommitId}
+                onRefresh={cloudHistoryData.reload}
+              />
             ) : resolvedActiveView === "git" ? (
               <GitSidebar
                 status={git.activeGitStatus}
@@ -665,6 +723,7 @@ export function DesktopWorkspaceContent({
           preferences.sidebarNavigationPlacement === "bottom" ? (
             <DesktopSidebarFooterNavigation
               activeView={resolvedActiveView}
+              cloudHistoryEnabled={cloudWorkspace}
               cloudToolsEnabled={cloudToolsNavigationEnabled}
               gitEnabled={gitEnabled}
               pluginsEnabled={pluginsNavigationVisible}
@@ -681,7 +740,7 @@ export function DesktopWorkspaceContent({
         mainSlot={resolvedActiveView === "git" || resolvedActiveView === "plugins" || resolvedActiveView === "settings" || resolvedActiveView === "cloud" || resolvedActiveView === "access" || resolvedActiveView === "automation" ? (
           <div className="desktop-view-surface desktop-view-surface-main" data-view={resolvedActiveView}>
             {resolvedActiveView === "git"
-              ? gitStatusView
+              ? cloudWorkspace ? cloudProjectHistoryView : gitStatusView
               : resolvedActiveView === "plugins"
                 ? pluginsView
               : resolvedActiveView === "cloud"

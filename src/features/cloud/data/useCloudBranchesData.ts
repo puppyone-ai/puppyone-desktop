@@ -24,15 +24,16 @@ export function useCloudBranchesData({
   revisionKey,
   onSessionChange,
 }: {
-  session: DesktopCloudSession;
-  projectId: string;
+  session: DesktopCloudSession | null;
+  projectId: string | null;
   apiBaseUrl: string | null;
   enabled?: boolean;
   revisionKey?: string | null;
   onSessionChange: (session: DesktopCloudSession | null) => void;
 }): CloudBranchesDataState {
   const [reloadToken, setReloadToken] = useState(0);
-  const contextKey = enabled
+  const canLoad = enabled && Boolean(session && projectId);
+  const contextKey = canLoad && session && projectId
     ? [
         session.user_id,
         session.session_generation,
@@ -41,11 +42,11 @@ export function useCloudBranchesData({
         projectId,
         revisionKey ?? "mutable-latest",
       ].join("\n")
-    : `disabled:${projectId}`;
+    : `disabled:${projectId ?? "none"}`;
   const [state, setState] = useState<CloudBranchesDataInternalState>(() => createCloudBranchesDataState());
 
   useEffect(() => {
-    if (!enabled) {
+    if (!canLoad || !session || !projectId) {
       setState(createCloudBranchesDataState({ contextKey }));
       return undefined;
     }
@@ -83,7 +84,7 @@ export function useCloudBranchesData({
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, contextKey, enabled, onSessionChange, projectId, reloadToken, session, revisionKey]);
+  }, [apiBaseUrl, canLoad, contextKey, onSessionChange, projectId, reloadToken, session, revisionKey]);
 
   const reload = async () => {
     setReloadToken((token) => token + 1);
@@ -91,7 +92,7 @@ export function useCloudBranchesData({
 
   if (state.contextKey !== contextKey) {
     return {
-      ...toPublicCloudBranchesDataState(createCloudBranchesDataState({ loading: enabled })),
+      ...toPublicCloudBranchesDataState(createCloudBranchesDataState({ loading: canLoad })),
       reload,
     };
   }
