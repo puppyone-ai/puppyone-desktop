@@ -35,8 +35,11 @@ export async function probeCursorLocal({
     if (versionResult.code !== 0 || !version) return brokenCursor(candidate.source);
     let authentication = "unknown";
     try {
+      const statusExecutablePath = runCommand === runBoundedProbeCommand
+        ? await assertExecutableIdentity(candidate)
+        : executablePath;
       const statusResult = await runCommand(
-        executablePath,
+        statusExecutablePath,
         [...(candidate.argsPrefix || []), "status"],
         { env: probeEnvironment, signal },
       );

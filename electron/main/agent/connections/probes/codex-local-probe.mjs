@@ -37,8 +37,11 @@ export async function probeCodexLocal({
     }
     let protocol;
     try {
+      const protocolExecutablePath = runCommand === runBoundedProbeCommand
+        ? await assertExecutableIdentity(candidate)
+        : executablePath;
       protocol = await inspectProtocol({
-        candidate: { ...candidate, executablePath },
+        candidate: { ...candidate, executablePath: protocolExecutablePath },
         appVersion,
         workspaceRoot,
         env: createProbeEnvironment(env),
@@ -65,9 +68,11 @@ export async function inspectCodexProtocol({
   appVersion,
   workspaceRoot,
   env,
+  signal,
   spawn,
   connectionFactory = (options) => new JsonlRpcConnection(options),
 } = {}) {
+  if (signal?.aborted) throw new Error("Codex inventory probe was cancelled.");
   const connection = connectionFactory({
     executablePath: candidate.executablePath,
     args: [...(candidate.argsPrefix || []), "app-server", "--listen", "stdio://"],
@@ -84,7 +89,13 @@ export async function inspectCodexProtocol({
       connection.respondError?.(message.id, -32601, "Inventory probes do not accept server requests.");
     }
   });
+  const abort = () => connection.dispose?.("Codex inventory probe cancelled.");
+  signal?.addEventListener?.("abort", abort, { once: true });
   try {
+    if (signal?.aborted) {
+      abort();
+      throw new Error("Codex inventory probe was cancelled.");
+    }
     await connection.request("initialize", {
       clientInfo: {
         name: "puppyone_desktop_inventory",
@@ -106,6 +117,7 @@ export async function inspectCodexProtocol({
       hasModels: models.status === "fulfilled" && Array.isArray(models.value?.data) && models.value.data.length > 0,
     };
   } finally {
+    signal?.removeEventListener?.("abort", abort);
     connection.dispose?.("Codex inventory probe complete.");
   }
 }

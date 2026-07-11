@@ -13,6 +13,7 @@ import {
   runBoundedProbeCommand,
 } from "../electron/main/agent/connections/probes/bounded-probe-command.mjs";
 import {
+  inspectCodexProtocol,
   parseCodexLocalVersion,
   probeCodexLocal,
 } from "../electron/main/agent/connections/probes/codex-local-probe.mjs";
@@ -182,6 +183,33 @@ describe("Desktop Agent local-tool inventory", () => {
       authentication: "signed-in",
     });
     expect(JSON.stringify(cursor)).not.toContain("private@example.test");
+  });
+
+  it("disposes an in-flight Codex protocol probe when application inventory is cancelled", async () => {
+    const controller = new AbortController();
+    let rejectRequest;
+    const connection = {
+      on: vi.fn(),
+      notify: vi.fn(),
+      request: vi.fn(() => new Promise((_resolve, reject) => { rejectRequest = reject; })),
+      dispose: vi.fn(() => rejectRequest?.(new Error("connection closed"))),
+    };
+    const pending = inspectCodexProtocol({
+      candidate: fixedCandidate("/tools/codex", "codex"),
+      appVersion: "0.1.2",
+      workspaceRoot: "/workspace",
+      env: {},
+      signal: controller.signal,
+      connectionFactory: () => connection,
+    });
+    await vi.waitFor(() => expect(connection.request).toHaveBeenCalledWith(
+      "initialize",
+      expect.any(Object),
+      { timeoutMs: 1_500 },
+    ));
+    controller.abort();
+    await expect(pending).rejects.toThrow(/connection closed/i);
+    expect(connection.dispose).toHaveBeenCalledWith("Codex inventory probe cancelled.");
   });
 
   it("keeps unsupported Codex and signed-out Cursor visible without running an integration route", async () => {
