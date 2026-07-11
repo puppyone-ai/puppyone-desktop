@@ -142,7 +142,7 @@ electron/main/agent/
     opencode-manifest.mjs             release/source/capability pin
     opencode-discovery.mjs            exact bundle integrity + fallback
     opencode-sidecar-host.mjs         lazy loopback process lifecycle
-    opencode-http-client.mjs          allowlisted HTTP/SSE client
+    opencode-http-client.mjs          pinned SDK + allowlisted HTTP/SSE gateway
     opencode-events.mjs               native-to-AgentEvent mapping
     opencode-security-policy.mjs      managed config + permission policy
     opencode-project-instructions.mjs canonical project instruction loader
@@ -297,7 +297,7 @@ bounded legacy JSON error strings so old journals remain readable.
 First Chat inspection or session
       |
       v
-discover exact bundled binary, then external install at/above tested 1.17.18 floor
+discover verified PuppyOne-managed current or previous runtime only
       |
       v
 verify release version + archive provenance + executable SHA-256
@@ -326,6 +326,14 @@ size and SHA-256, verifies `--version`, computes the extracted binary hash and
 writes `verified-runtime.json`. Discovery recomputes the binary hash. A prior
 verified slot is retained when staging an update and is considered after a bad
 current slot. Application releases also remain the outer rollback unit.
+
+Customers never install or update OpenCode for PuppyOne. Production discovery
+does not scan PATH, Homebrew or `~/.opencode/bin`; an external runtime exists
+only behind an explicit development opt-in. Local `npm run dev` prepares the
+same pinned artifact through `scripts/prepare-opencode-dev-runtime.mjs`.
+Missing or incompatible engine state is presented as a PuppyOne repair/update,
+while the Composer remains draftable. ADR-004 defines distribution, SDK and
+pricing ownership.
 
 The sidecar runs with an app-owned `OPENCODE_CONFIG_DIR`. Because that upstream
 flag is additive rather than isolating, PuppyOne also redirects the XDG
@@ -491,6 +499,7 @@ controller. Cross-feature consumers import only `desktop-agent/index.ts`.
 - [OpenCode sidecar ADR](ADR-001-opencode-sidecar.md)
 - [Agent contract and boundary ADR](ADR-002-agent-contract-and-boundaries.md)
 - [OpenCode-only product harness ADR](ADR-003-opencode-only-chat-harness.md)
+- [Managed Agent engine distribution ADR](ADR-004-managed-agent-engine-distribution.md)
 - [OpenCode adoption spike](opencode-adoption-spike.md)
 - [OpenCode update and rollback runbook](opencode-upgrade-runbook.md)
 - [Right Sidebar product contract](right-sidebar.md)

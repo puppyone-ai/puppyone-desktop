@@ -45,13 +45,16 @@ export async function discoverExecutable({
   label,
   buildEnvironment = buildAgentEnvironment,
   validateCandidate,
+  searchPath = true,
 }) {
   let loginEnv = {};
   let environmentWarning = null;
-  try {
-    loginEnv = await readLoginShellEnvironment({ spawn, env, platform });
-  } catch (error) {
-    environmentWarning = error instanceof Error ? error.message : String(error);
+  if (searchPath) {
+    try {
+      loginEnv = await readLoginShellEnvironment({ spawn, env, platform });
+    } catch (error) {
+      environmentWarning = error instanceof Error ? error.message : String(error);
+    }
   }
   const environment = buildEnvironment(env, loginEnv);
   const executablePath = await resolveExecutable({
@@ -62,6 +65,7 @@ export async function discoverExecutable({
     homedir,
     platform,
     validateCandidate,
+    searchPath,
   });
   if (!executablePath) {
     return {
@@ -133,21 +137,24 @@ export async function resolveExecutable({
   homedir,
   platform,
   validateCandidate,
+  searchPath = true,
 }) {
   const separator = platform === "win32" ? ";" : ":";
   const names = Array.isArray(executableNames) ? executableNames : [executableNames];
   const candidates = new Set(additionalCandidates.filter(Boolean).map((candidate) => path.resolve(candidate)));
-  for (const directory of String(pathValue).split(separator).filter(Boolean)) {
-    for (const name of names) candidates.add(path.resolve(directory, name));
-  }
-  for (const directory of [
-    path.join(homedir, ".local", "bin"),
-    path.join(homedir, ".npm-global", "bin"),
-    "/opt/homebrew/bin",
-    "/usr/local/bin",
-    "/usr/bin",
-  ]) {
-    for (const name of names) candidates.add(path.join(directory, name));
+  if (searchPath) {
+    for (const directory of String(pathValue).split(separator).filter(Boolean)) {
+      for (const name of names) candidates.add(path.resolve(directory, name));
+    }
+    for (const directory of [
+      path.join(homedir, ".local", "bin"),
+      path.join(homedir, ".npm-global", "bin"),
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+      "/usr/bin",
+    ]) {
+      for (const name of names) candidates.add(path.join(directory, name));
+    }
   }
   for (const candidate of candidates) {
     try {

@@ -7,11 +7,18 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const runtime = readJson("vendor/opencode/runtime-manifest.json");
 const prompts = readJson("vendor/opencode/PROMPT_MANIFEST.json");
 const sbom = readJson("vendor/opencode/SBOM.cdx.json");
+const packageManifest = readJson("package.json");
+const packageLock = readJson("package-lock.json");
 const notice = await fs.promises.readFile(path.join(root, "THIRD_PARTY_NOTICES.md"), "utf8");
 const license = await fs.promises.readFile(path.join(root, "vendor/opencode/LICENSE"), "utf8");
 const runtimeSource = await fs.promises.readFile(path.join(root, "electron/main/agent/runtimes/opencode/opencode-manifest.mjs"), "utf8");
+const gatewaySource = await fs.promises.readFile(path.join(root, "electron/main/agent/runtimes/opencode/opencode-http-client.mjs"), "utf8");
 
 assert(runtime.runtimeRelease.version === "1.17.18", "OpenCode runtime version drifted.");
+assert(packageManifest.dependencies?.["@opencode-ai/sdk"] === runtime.runtimeRelease.version, "OpenCode SDK must exactly match the bundled runtime.");
+assert(packageLock.packages?.["node_modules/@opencode-ai/sdk"]?.version === runtime.runtimeRelease.version, "OpenCode SDK lockfile version drifted.");
+assert(gatewaySource.includes('from "@opencode-ai/sdk/v2/client"'), "OpenCode gateway must use the client-only SDK entrypoint.");
+assert(!gatewaySource.includes("@opencode-ai/sdk/server"), "OpenCode PATH-spawning SDK server helper is forbidden.");
 assert(runtime.protocolFloor === runtime.runtimeRelease.version, "Unverified older OpenCode protocol floor is not allowed.");
 assert(/^[a-f0-9]{40}$/.test(runtime.runtimeRelease.releaseCommit), "OpenCode release commit is invalid.");
 assert(Object.keys(runtime.artifacts).length === 6, "OpenCode release artifact matrix is incomplete.");
@@ -32,6 +39,7 @@ for (const [filename, digest] of Object.entries(prompts.files)) {
 assert(notice.includes(runtime.sourceAudit.commit) && notice.includes("MIT License"), "OpenCode third-party notice is incomplete.");
 assert(license.includes("Copyright (c) 2025 opencode"), "OpenCode MIT license is incomplete.");
 assert(sbom.bomFormat === "CycloneDX" && sbom.components?.[0]?.version === runtime.runtimeRelease.version, "OpenCode SBOM is missing or drifted.");
+assert(sbom.components?.some((component) => component.purl === `pkg:npm/%40opencode-ai/sdk@${runtime.runtimeRelease.version}`), "OpenCode SDK is missing from the SBOM.");
 
 const upstreamRoot = process.argv[2] || process.env.PUPPYONE_OPENCODE_SOURCE;
 if (upstreamRoot) {

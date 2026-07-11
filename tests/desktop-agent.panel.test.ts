@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 describe("Desktop Agent panel lifecycle", () => {
-  it("disables the composer and offers recovery after the provider exits", async () => {
+  it("keeps the draft editable and offers recovery after the provider exits", async () => {
     const harness = createBridgeHarness();
     const container = renderPanel(harness.bridge);
     await flushEffects();
@@ -31,7 +31,8 @@ describe("Desktop Agent panel lifecycle", () => {
     act(() => harness.exitListener?.({ sessionId: "session-1", reason: "provider-exited" }));
 
     expect(container.textContent).toContain("OpenCode stopped unexpectedly");
-    expect((container.querySelector("textarea") as HTMLTextAreaElement).disabled).toBe(true);
+    expect((container.querySelector("textarea") as HTMLTextAreaElement).disabled).toBe(false);
+    expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
     expect(container.textContent).toContain("provider exited");
 
     const newSessionButton = container.querySelector('button[aria-label="New OpenCode session"]') as HTMLButtonElement;
@@ -42,6 +43,52 @@ describe("Desktop Agent panel lifecycle", () => {
       sessionId: "session-1",
       removePersistence: false,
     });
+  });
+
+  it("owns incompatible-engine recovery instead of asking users to update OpenCode", async () => {
+    const harness = createBridgeHarness();
+    harness.bridge.discoverAgentProviders = vi.fn(async () => ({
+      runtimes: [{
+        descriptor: { id: "opencode", displayName: "OpenCode", kind: "harness" },
+        readiness: {
+          runtimeId: "opencode",
+          provider: "opencode",
+          status: "unsupported-version",
+          version: "1.1.33",
+          minimumVersion: "1.17.18",
+          source: "external",
+          compatibility: "unavailable",
+          message: "The configured Agent engine is incompatible with this PuppyOne build. Use PuppyOne's managed engine, then retry.",
+        },
+      }],
+      selectedRuntimeId: "opencode",
+      runtime: { id: "opencode", displayName: "OpenCode", kind: "harness" },
+      readiness: {
+        runtimeId: "opencode",
+        provider: "opencode",
+        status: "unsupported-version",
+        version: "1.1.33",
+        minimumVersion: "1.17.18",
+        source: "external",
+        compatibility: "unavailable",
+        message: "The configured Agent engine is incompatible with this PuppyOne build. Use PuppyOne's managed engine, then retry.",
+      },
+      account: null,
+      models: [],
+      capabilities: null,
+      warnings: [],
+    }));
+
+    const container = renderPanel(harness.bridge);
+    await flushEffects();
+
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(textarea.disabled).toBe(false);
+    expect(textarea.style.height).toBe("48px");
+    expect(container.textContent).toContain("PuppyOne Agent needs repair");
+    expect(container.textContent).toContain("Agent engine powered by OpenCode");
+    expect(container.textContent).not.toContain("OpenCode update required");
+    expect(container.querySelector('button[aria-label="Retry Agent engine"]')).not.toBeNull();
   });
 
   it("buffers live events while replay fills a sequence gap", async () => {

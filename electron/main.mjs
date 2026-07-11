@@ -123,6 +123,7 @@ const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   appPath: app.getAppPath(),
   resourcesPath: process.resourcesPath,
   managedOpenCodeConfigDir: path.join(app.getPath("userData"), "agent-runtime", "opencode", "config"),
+  allowExternalOpenCode: !app.isPackaged && process.env.PUPPYONE_ALLOW_EXTERNAL_OPENCODE === "1",
 });
 const agentService = createAgentService({
   runtimeRegistry: agentRuntimeRegistry,

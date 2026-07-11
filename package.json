@@ -14,7 +14,7 @@
     "check:markdown-architecture": "node scripts/check-markdown-architecture.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "dev": "node scripts/dev-electron.mjs",
+    "dev": "node scripts/prepare-opencode-dev-runtime.mjs --optional && node scripts/dev-electron.mjs",
     "dev:renderer": "vite",
     "dev:browser": "vite --host 127.0.0.1",
     "postinstall": "node scripts/fix-node-pty-permissions.mjs",
@@ -23,6 +23,7 @@
     "check:artifact-budgets": "node scripts/check-packaged-artifact-budgets.mjs",
     "check:viewer-pack-trust": "node scripts/check-viewer-pack-release.mjs",
     "stage:opencode-runtime": "node scripts/stage-opencode-runtime.mjs",
+    "prepare:opencode-runtime": "node scripts/prepare-opencode-dev-runtime.mjs",
     "check:opencode-release": "node scripts/check-opencode-release.mjs",
     "dist:mac": "npm run check:shared-ui && npm run build && npm run check:viewer-pack-trust && npm run check:opencode-release && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
     "dist:mac:publish": "npm run check:shared-ui && npm run build && npm run check:viewer-pack-trust && npm run check:opencode-release && electron-builder --mac --publish always",
@@ -39,6 +40,7 @@
     "bench:performance": "vitest bench --run benchmarks/performance --no-file-parallelism --maxWorkers=1"
   },
   "dependencies": {
+    "@opencode-ai/sdk": "1.17.18",
     "electron-log": "^5.4.4",
     "electron-updater": "^6.8.9",
     "jszip": "^3.10.1",

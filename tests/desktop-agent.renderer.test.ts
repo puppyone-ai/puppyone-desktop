@@ -83,6 +83,7 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.querySelectorAll("select")).toHaveLength(2);
     expect(container.textContent).not.toContain("OpenCode runtime");
     expect(container.querySelector("textarea")?.getAttribute("rows")).toBe("1");
+    expect((container.querySelector("textarea") as HTMLTextAreaElement).style.height).toBe("48px");
   });
 
   it("shows Jump to latest when the transcript is not pinned to the bottom", () => {
@@ -170,27 +171,27 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.textContent).toContain("reusable policy change");
   });
 
-  it("renders unsupported-version readiness copy with detected and minimum versions", () => {
+  it("keeps incompatible runtime recovery product-owned", () => {
     const readiness: AgentProviderReadiness = {
       runtimeId: "opencode",
       provider: "opencode",
       status: "unsupported-version",
       version: "0.100.0",
       minimumVersion: "0.144.1",
-      message: "OpenCode is too old.",
+      message: "The managed Agent engine is incompatible with this PuppyOne build.",
     };
     const container = render(React.createElement("div", {
       className: "desktop-agent-readiness",
       role: "status",
       children: [
-        React.createElement("strong", { key: "h" }, "OpenCode update required"),
+        React.createElement("strong", { key: "h" }, "PuppyOne Agent needs repair"),
         React.createElement("p", { key: "p" },
-          `Detected OpenCode ${readiness.version}; PuppyOne requires ${readiness.minimumVersion}. Update OpenCode via its install channel, then refresh.`,
+          `${readiness.message} Update or reinstall PuppyOne, then retry.`,
         ),
       ],
     }));
-    expect(container.textContent).toContain("0.100.0");
-    expect(container.textContent).toContain("0.144.1");
-    expect(container.textContent).toContain("Update OpenCode");
+    expect(container.textContent).toContain("PuppyOne Agent needs repair");
+    expect(container.textContent).toContain("Update or reinstall PuppyOne");
+    expect(container.textContent).not.toContain("Update OpenCode");
   });
 });

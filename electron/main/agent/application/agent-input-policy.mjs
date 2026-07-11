@@ -7,7 +7,7 @@ export function readinessWithAccountState(readiness, accountState, runtimeName =
       status: "installed-not-authenticated",
       message: readiness.message && readiness.message !== `${runtimeName} is ready.`
         ? readiness.message
-        : `${runtimeName} is installed but not signed in. Complete setup in a terminal, then refresh.`,
+        : "No model provider is connected to PuppyOne Agent. Connect a provider in PuppyOne, then retry.",
     };
   }
   return readiness;
@@ -21,7 +21,7 @@ export function assertReady(readiness, runtimeName = "Agent runtime") {
 
 export function assertAuthenticated(accountState) {
   if (requiresRuntimeSetup(accountState)) {
-    throw new Error("Agent runtime setup is required. Complete authentication in a terminal, then refresh.");
+    throw new Error("No model provider is connected to PuppyOne Agent.");
   }
 }
 

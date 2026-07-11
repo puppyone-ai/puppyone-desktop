@@ -7,6 +7,7 @@ export function createDefaultAgentRuntimeHost({
   resourcesPath = process.resourcesPath,
   logger = console,
   managedOpenCodeConfigDir = null,
+  allowExternalOpenCode = false,
   openCode = {},
 } = {}) {
   const definitions = [
@@ -14,6 +15,7 @@ export function createDefaultAgentRuntimeHost({
       appPath,
       resourcesPath,
       managedConfigDir: managedOpenCodeConfigDir,
+      allowExternal: allowExternalOpenCode,
       logger,
       ...openCode,
     }),

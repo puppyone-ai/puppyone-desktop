@@ -58,6 +58,10 @@ implementation additionally redirects XDG config/cache/state and the
 home-level `.opencode` scan into the app-owned profile while leaving provider
 credential data under OpenCode's native ownership.
 
+Runtime distribution and customer recovery are governed by ADR-004. The
+sidecar is a bundled PuppyOne component; a global OpenCode CLI is not a product
+dependency.
+
 ## Kill criteria
 
 Revisit only if release evidence shows one of these cannot be corrected at the

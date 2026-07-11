@@ -84,10 +84,11 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         <div className="desktop-agent-readiness" role="status">
           <CircleAlert size={15} />
           <div>
-            <strong>{failed ? `${runtimeLabel} session needs attention` : readinessHeading(readiness?.status, runtimeLabel)}</strong>
+            <strong>{failed ? "Agent session needs attention" : readinessHeading(readiness?.status)}</strong>
             <p>{failed ? state.error : readiness?.message || state.error || `Unable to inspect ${runtimeLabel}.`}</p>
+            {!failed && <small>Agent engine powered by OpenCode</small>}
           </div>
-          <button type="button" aria-label={`Refresh ${runtimeLabel} readiness`} onClick={() => void controller.initialize(true)}><RefreshCw size={14} /> Refresh</button>
+          <button type="button" aria-label="Retry Agent engine" onClick={() => void controller.initialize(true)}><RefreshCw size={14} /> Retry</button>
         </div>
       )}
 
@@ -138,7 +139,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         running={Boolean(state.projection.runningTurnId)}
         stopping={state.stopping}
         submitting={state.submitting}
-        placeholder={unavailable ? `${runtimeLabel} unavailable` : `Plan, build, / for commands, @ for context`}
+        placeholder={unavailable || failed ? "Draft a message while PuppyOne prepares the Agent" : "Plan, build, / for commands, @ for context"}
         runtimeLabel={runtimeLabel}
         models={capabilities?.modelSelection ? inspection?.models ?? [] : []}
         selectedModel={state.selectedModel}
@@ -166,10 +167,8 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
 
 function readinessLabel(status: string | undefined) {
   if (status === "ready") return "ready";
-  if (status === "installed-not-authenticated") return "setup required";
-  if (status === "not-installed") return "not installed";
-  if (status === "unsupported-version") return "update required";
-  if (status === "error") return "unavailable";
+  if (status === "installed-not-authenticated") return "provider setup required";
+  if (status === "not-installed" || status === "unsupported-version" || status === "error") return "needs repair";
   return "checking";
 }
 
@@ -177,8 +176,7 @@ function sessionStatusLabel(status: AgentSessionMetadata["terminalState"]) {
   return status === "provider-exited" ? "provider exited" : status;
 }
 
-function readinessHeading(status: string | undefined, runtimeLabel: string) {
-  if (status === "installed-not-authenticated") return `${runtimeLabel} setup required`;
-  if (status === "unsupported-version") return `${runtimeLabel} update required`;
-  return `${runtimeLabel} unavailable`;
+function readinessHeading(status: string | undefined) {
+  if (status === "installed-not-authenticated") return "Connect a model provider";
+  return "PuppyOne Agent needs repair";
 }
