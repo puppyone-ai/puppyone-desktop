@@ -2,13 +2,21 @@ import type { DesktopCloudSession } from "../../../lib/cloudApi";
 
 export type CloudAuthState =
   | { status: "restoring"; apiBaseUrl: string | null }
+  | { status: "signing-in"; apiBaseUrl: string | null; session: DesktopCloudSession | null }
   | { status: "signed-out"; apiBaseUrl: string | null }
   | { status: "signed-in"; apiBaseUrl: string | null; session: DesktopCloudSession }
+  | { status: "refreshing"; apiBaseUrl: string | null; session: DesktopCloudSession }
+  | { status: "offline-authenticated"; apiBaseUrl: string | null; session: DesktopCloudSession }
+  | { status: "signing-out"; apiBaseUrl: string | null; session: DesktopCloudSession }
   | { status: "wrong-host"; apiBaseUrl: string; session: DesktopCloudSession }
   | { status: "expired"; apiBaseUrl: string | null };
 
 export function getCloudAuthSession(authState: CloudAuthState): DesktopCloudSession | null {
-  return authState.status === "signed-in" ? authState.session : null;
+  return authState.status === "signed-in"
+    || authState.status === "refreshing"
+    || authState.status === "offline-authenticated"
+    ? authState.session
+    : null;
 }
 
 export function isCloudAuthBlocking(authState: CloudAuthState): boolean {
@@ -16,6 +24,10 @@ export function isCloudAuthBlocking(authState: CloudAuthState): boolean {
 }
 
 export function getCloudAuthEmail(authState: CloudAuthState): string | null {
-  if (authState.status !== "signed-in" && authState.status !== "wrong-host") return null;
+  if (authState.status !== "signed-in"
+    && authState.status !== "refreshing"
+    && authState.status !== "offline-authenticated"
+    && authState.status !== "signing-out"
+    && authState.status !== "wrong-host") return null;
   return authState.session.user_email || null;
 }

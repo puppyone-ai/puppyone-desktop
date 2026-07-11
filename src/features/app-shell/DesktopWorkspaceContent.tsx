@@ -114,6 +114,7 @@ type DesktopWorkspaceContentProps = {
   onNodeActionMenu: (node: DataNode, anchorRect: DOMRect, selectedNodes?: readonly DataNode[]) => void;
   onOpenSettings: () => void;
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
+  onRegeneratePuppyoneProjectId: () => Promise<PuppyoneWorkspaceConfig | null>;
   onSelectSettingsSection: (section: SettingsSection) => void;
   onUnlinkWorkspace: () => Promise<void>;
   preferences: DesktopPreferencesController;
@@ -147,6 +148,7 @@ export function DesktopWorkspaceContent({
   onNodeActionMenu,
   onOpenSettings,
   onPuppyoneConfigChange,
+  onRegeneratePuppyoneProjectId,
   onSelectSettingsSection,
   onUnlinkWorkspace,
   preferences,
@@ -355,6 +357,7 @@ export function DesktopWorkspaceContent({
       onAiEditAssistEnabledChange={preferences.setAiEditAssistEnabled}
       onCloudSessionChange={cloud.onCloudSessionChange}
       onPuppyoneConfigChange={onPuppyoneConfigChange}
+      onRegeneratePuppyoneProjectId={onRegeneratePuppyoneProjectId}
       onUnlinkWorkspace={onUnlinkWorkspace}
       onRefreshGitStatus={git.refreshGitStatus}
       onCheckForUpdates={() => void desktopUpdates.checkForUpdates()}

@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
+import crypto from "node:crypto";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import {
@@ -49,7 +50,10 @@ const GIT_RESOURCE_GROUPS = Object.freeze([
   { id: "untracked", label: "Untracked Changes" },
 ]);
 const DEFAULT_PUPPYONE_WORKSPACE_CONFIG = Object.freeze({
-  version: 1,
+  version: 2,
+  project: {
+    id: null,
+  },
   sync: {
     sourceOfTruth: {
       service: "github",
@@ -228,9 +232,12 @@ for (const format of fileFormatRegistry.formats) {
 
 const copyNameExtensions = [...extensionIndex.keys()].sort((left, right) => right.length - left.length);
 
-export async function workspaceFromPath(folderPath) {
+export async function resolveLocalWorkspaceIdentity(folderPath) {
   const resolvedPath = path.resolve(folderPath);
-  const metadata = await fs.stat(resolvedPath).catch((error) => {
+  const canonicalPath = await fs.realpath(resolvedPath).catch((error) => {
+    throw new Error(`Unable to open folder: ${error.message}`);
+  });
+  const metadata = await fs.stat(canonicalPath).catch((error) => {
     throw new Error(`Unable to open folder: ${error.message}`);
   });
 
@@ -238,13 +245,45 @@ export async function workspaceFromPath(folderPath) {
     throw new Error("Selected path is not a folder.");
   }
 
+  const fsIdentity = createFileSystemIdentity(metadata, canonicalPath);
+  let projectId = null;
+  let configError = null;
+  try {
+    const config = await readPuppyoneWorkspaceConfig(canonicalPath);
+    projectId = config.project.id;
+  } catch (error) {
+    // Invalid project metadata must not prevent a local-first folder from
+    // opening. The config surface reports the recoverable error separately.
+    configError = error instanceof Error ? error.message : String(error);
+  }
+
+  const workspaceInstanceId = createWorkspaceInstanceId(fsIdentity);
   return {
-    id: stableWorkspaceId(resolvedPath),
-    name: path.basename(resolvedPath) || resolvedPath,
-    path: resolvedPath,
+    canonicalPath,
+    fsIdentity,
+    projectId,
+    workspaceInstanceId,
+    configError,
+  };
+}
+
+export async function workspaceFromPath(folderPath, options = {}) {
+  const identity = await resolveLocalWorkspaceIdentity(folderPath);
+  const includeGitMetadata = options.includeGitMetadata !== false;
+
+  return {
+    id: `local:${identity.workspaceInstanceId}`,
+    name: path.basename(identity.canonicalPath) || identity.canonicalPath,
+    path: identity.canonicalPath,
     status: "protected",
-    commitCount: await getWorkspaceCommitCount(resolvedPath),
+    ...(includeGitMetadata
+      ? { commitCount: await getWorkspaceCommitCount(identity.canonicalPath), hydrationState: "ready" }
+      : { hydrationState: "metadata" }),
     cloudState: "local",
+    projectId: identity.projectId,
+    workspaceInstanceId: identity.workspaceInstanceId,
+    fsIdentity: identity.fsIdentity,
+    ...(identity.configError ? { configError: identity.configError } : {}),
   };
 }
 
@@ -1506,8 +1545,13 @@ export async function readPuppyoneWorkspaceConfig(rootPath) {
 export async function writePuppyoneWorkspaceConfig(rootPath, config) {
   const root = await resolveExistingWorkspacePath(rootPath, null);
   const configDir = path.join(root, PUPPYONE_CONFIG_DIR);
+  const existingConfig = await readPuppyoneWorkspaceConfig(root);
+  const projectId = normalizeWorkspaceProjectId(config?.project?.id)
+    ?? existingConfig.project.id
+    ?? crypto.randomUUID();
   const normalizedConfig = normalizePuppyoneWorkspaceConfig(config, {
     updatedAt: new Date().toISOString(),
+    projectId,
   });
 
   await fs.mkdir(configDir, { recursive: false }).catch((error) => {
@@ -1538,20 +1582,39 @@ export async function writePuppyoneWorkspaceConfig(rootPath, config) {
     canonicalConfigDir,
     `.config.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`,
   );
+  let handle = null;
   try {
-    await fs.writeFile(
-      temporaryPath,
-      `${JSON.stringify(normalizedConfig, null, 2)}\n`,
-      { encoding: "utf8", flag: "wx", mode: 0o600 },
-    );
+    handle = await fs.open(temporaryPath, "wx", 0o600);
+    await handle.writeFile(`${JSON.stringify(normalizedConfig, null, 2)}\n`, "utf8");
+    await handle.sync();
+    await handle.close();
+    handle = null;
     await fs.rename(temporaryPath, configPath);
+    await fs.chmod(configPath, 0o600).catch(() => undefined);
+    await syncDirectoryBestEffort(canonicalConfigDir);
   } catch (error) {
     throw new Error(`Unable to write PuppyOne config: ${error.message}`);
   } finally {
+    if (handle) await handle.close().catch(() => undefined);
     await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
   }
 
   return normalizedConfig;
+}
+
+export async function regeneratePuppyoneWorkspaceProjectId(rootPath, options = {}) {
+  const current = await readPuppyoneWorkspaceConfig(rootPath);
+  return writePuppyoneWorkspaceConfig(rootPath, {
+    ...current,
+    project: {
+      ...current.project,
+      id: crypto.randomUUID(),
+    },
+    cloud: {
+      ...current.cloud,
+      projectId: options.preserveCloudBinding === true ? current.cloud.projectId : null,
+    },
+  });
 }
 
 export async function getWorkspaceGitCommitDetail(rootPath, commitId) {
@@ -2359,8 +2422,31 @@ function formatFileSize(bytes) {
   return `${bytes} B`;
 }
 
-function stableWorkspaceId(folderPath) {
-  return `local:${Buffer.from(folderPath).toString("base64url")}`;
+function createFileSystemIdentity(metadata, canonicalPath) {
+  const device = Number(metadata.dev);
+  const inode = Number(metadata.ino);
+  if (Number.isFinite(device) && Number.isFinite(inode) && inode > 0) {
+    return `fs:${device}:${inode}`;
+  }
+  // Some virtual/network filesystems do not expose a stable inode. Keep the
+  // fallback explicit so the registry can later reconcile it with project.id.
+  return `path:${canonicalPath}`;
+}
+
+function createWorkspaceInstanceId(fsIdentity) {
+  return `wsi_${crypto.createHash("sha256").update(fsIdentity).digest("base64url").slice(0, 24)}`;
+}
+
+async function syncDirectoryBestEffort(directory) {
+  let handle = null;
+  try {
+    handle = await fs.open(directory, "r");
+    await handle.sync();
+  } catch {
+    // Directory fsync is unavailable on some platforms and filesystems.
+  } finally {
+    if (handle) await handle.close().catch(() => undefined);
+  }
 }
 
 function getGitErrorOutput(error) {
@@ -3370,6 +3456,11 @@ async function readGitRemotes(rootPath, options = {}) {
 
 function normalizePuppyoneWorkspaceConfig(value, options = {}) {
   const source = value && typeof value === "object" ? value : {};
+  const sourceVersion = Number(source.version ?? 1);
+  if (!Number.isInteger(sourceVersion) || sourceVersion < 1 || sourceVersion > 2) {
+    throw new Error(`Unsupported PuppyOne config version: ${String(source.version)}`);
+  }
+  const project = source.project && typeof source.project === "object" ? source.project : {};
   const sync = source.sync && typeof source.sync === "object" ? source.sync : {};
   const sourceOfTruth = sync.sourceOfTruth && typeof sync.sourceOfTruth === "object" ? sync.sourceOfTruth : {};
   const git = source.git && typeof source.git === "object" ? source.git : {};
@@ -3393,32 +3484,53 @@ function normalizePuppyoneWorkspaceConfig(value, options = {}) {
     : typeof source.updatedAt === "string"
       ? source.updatedAt
       : undefined;
+  const projectId = options.projectId
+    ?? normalizeWorkspaceProjectId(project.id, { strict: true });
 
   return {
+    ...source,
     ...DEFAULT_PUPPYONE_WORKSPACE_CONFIG,
-    version: 1,
+    version: 2,
+    project: {
+      ...project,
+      id: projectId,
+    },
     sync: {
+      ...sync,
       sourceOfTruth: {
+        ...sourceOfTruth,
         service: sourceOfTruthService,
         remote: sourceOfTruthRemote,
         branch: sourceOfTruthBranch,
       },
     },
     git: {
+      ...git,
       primaryRemote: primaryRemote ?? sourceOfTruthRemote,
       watchedBranch: isPuppyoneSource ? null : watchedBranch ?? sourceOfTruthBranch,
     },
     backup: {
+      ...backup,
       enabled: backup.enabled === true || cloud.backupEnabled === true,
       service: normalizeBackendService(backup.service ?? sourceOfTruthService),
       remote: normalizeOptionalConfigText(backup.remote) ?? sourceOfTruthRemote,
       branch: normalizeOptionalConfigText(backup.branch) ?? (isPuppyoneSource ? null : sourceOfTruthBranch),
     },
     cloud: {
+      ...cloud,
       projectId: normalizeOptionalConfigText(cloud.projectId),
     },
     ...(updatedAt ? { updatedAt } : {}),
   };
+}
+
+function normalizeWorkspaceProjectId(value, { strict = false } = {}) {
+  if (value == null || value === "") return null;
+  const normalized = normalizeOptionalConfigText(value);
+  const valid = normalized && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalized);
+  if (valid) return normalized.toLowerCase();
+  if (strict || normalized) throw new Error("PuppyOne project.id must be a valid UUID.");
+  return null;
 }
 
 function normalizeBackendService(value) {

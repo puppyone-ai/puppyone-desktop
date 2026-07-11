@@ -10,8 +10,11 @@ const API = "https://api.puppyone.ai/api/v1";
 const session = {
   expires_in: 3600,
   expires_at: 0,
+  user_id: "user-123",
   user_email: "user@example.com",
   api_base_url: API,
+  session_generation: "generation-1",
+  status: "authenticated" as const,
 };
 
 let bridge: ReturnType<typeof vi.fn>;

@@ -34,6 +34,11 @@ export type Workspace = {
   status: "protected" | "recording" | "paused";
   commitCount?: number;
   cloudState?: "local" | "syncing" | "synced";
+  projectId?: string | null;
+  workspaceInstanceId?: string;
+  fsIdentity?: string;
+  hydrationState?: "metadata" | "loading" | "ready" | "error";
+  configError?: string;
 };
 
 export type DataNode = {

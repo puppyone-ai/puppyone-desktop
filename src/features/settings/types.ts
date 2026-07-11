@@ -54,6 +54,7 @@ export type SettingsViewProps = {
   onAiEditAssistEnabledChange: (enabled: boolean) => void;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
+  onRegeneratePuppyoneProjectId: () => Promise<PuppyoneWorkspaceConfig | null>;
   onUnlinkWorkspace: () => Promise<void>;
   onRefreshGitStatus: () => void;
   onCheckForUpdates: () => void;

@@ -17,6 +17,7 @@ import {
   publishWorkspaceGitBranch,
   pushWorkspaceGit,
   readPuppyoneWorkspaceConfig,
+  regeneratePuppyoneWorkspaceProjectId,
   resolveGitRepositoryIdentity,
   stageAllWorkspaceGitChanges,
   stageWorkspaceGitPaths,
@@ -183,6 +184,12 @@ export function registerWorkspaceGitIpcHandlers({
 
   ipcMain.handle("workspace:puppyone-config-write", withAuthorizedWorktreeMutation((rootPath, request) => (
     writePuppyoneWorkspaceConfig(rootPath, request?.config)
+  )));
+
+  ipcMain.handle("workspace:puppyone-project-regenerate", withAuthorizedWorktreeMutation((rootPath, request) => (
+    regeneratePuppyoneWorkspaceProjectId(rootPath, {
+      preserveCloudBinding: request?.preserveCloudBinding === true,
+    })
   )));
 
   ipcMain.handle("workspace:git-commit-detail", withAuthorizedIdleRead((rootPath, request) => {

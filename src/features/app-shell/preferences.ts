@@ -191,7 +191,10 @@ export function mergePuppyoneWorkspaceConfig(
   }
 
   return {
-    version: 1,
+    version: 2,
+    project: {
+      id: current?.project?.id ?? null,
+    },
     sync: {
       sourceOfTruth,
     },

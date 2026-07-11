@@ -33,7 +33,14 @@ export function useCloudBranchesData({
 }): CloudBranchesDataState {
   const [reloadToken, setReloadToken] = useState(0);
   const contextKey = enabled
-    ? [session.user_email, session.api_base_url ?? "", apiBaseUrl ?? "", projectId, revisionKey ?? ""].join("\n")
+    ? [
+        session.user_id,
+        session.session_generation,
+        session.api_base_url,
+        apiBaseUrl ?? "",
+        projectId,
+        revisionKey ?? "mutable-latest",
+      ].join("\n")
     : `disabled:${projectId}`;
   const [state, setState] = useState<CloudBranchesDataInternalState>(() => createCloudBranchesDataState());
 

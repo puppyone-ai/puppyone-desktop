@@ -13,11 +13,11 @@ import type { RecentWorkspaceCloudBinding } from "../cloud/workspace/cloudProjec
 import type { getRecentWorkspaces } from "../../lib/localFiles";
 
 export function mergeWorkspaceLists(current: Workspace[], incoming: Workspace[]) {
-  const byId = new Map<string, Workspace>();
+  const byLocation = new Map<string, Workspace>();
   for (const workspace of [...current, ...incoming]) {
-    byId.set(workspace.id, workspace);
+    byLocation.set(workspace.path, workspace);
   }
-  return Array.from(byId.values());
+  return Array.from(byLocation.values());
 }
 
 export function getRecentWorkspaceItems(result: Awaited<ReturnType<typeof getRecentWorkspaces>>): RecentWorkspaceHomeItem[] {

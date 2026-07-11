@@ -194,6 +194,7 @@ function CloudProjectCard({
   const preview = useCloudProjectPreview({
     session,
     projectId: project.id,
+    projectRevision: project.updated_at,
     apiBaseUrl,
     onSessionChange,
   });

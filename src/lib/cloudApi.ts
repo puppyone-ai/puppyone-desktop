@@ -7,6 +7,7 @@ import {
   resolveCloudApiBaseUrl,
   sameCloudApiBaseUrl,
 } from "../../shared/cloudEndpoint.js";
+import { invalidateCloudCacheForMutation } from "../features/cloud/cache/cloudCache";
 
 type ApiEnvelope<T> = {
   code?: number;
@@ -21,8 +22,19 @@ type MutableSessionHandler = (session: DesktopCloudSession | null) => void | Pro
 export type DesktopCloudSession = {
   expires_in: number;
   expires_at: number;
+  user_id: string;
   user_email: string;
-  api_base_url?: string;
+  api_base_url: string;
+  session_generation: string;
+  status:
+    | "restoring"
+    | "signing-in"
+    | "authenticated"
+    | "refreshing"
+    | "offline-authenticated"
+    | "signing-out"
+    | "expired"
+    | "signed-out";
 };
 
 export type DesktopCloudProject = {
@@ -407,26 +419,31 @@ export async function cloudApiRequest<T>(
   if (window.puppyoneDesktop?.requestCloudSessionApi) {
     const body = typeof init.body === "string" ? init.body : undefined;
     try {
-      return await window.puppyoneDesktop.requestCloudSessionApi({
+      const result = await window.puppyoneDesktop.requestCloudSessionApi({
         apiBaseUrl: requestedApiBase,
         path: path.startsWith("/") ? path : `/${path}`,
         method: init.method ?? "GET",
         headers: normalizeRequestHeaders(init.headers),
         ...(body === undefined ? {} : { body }),
       }) as T;
+      if (isMutationMethod(init.method)) {
+        invalidateCloudCacheForMutation({ session, apiPath: path });
+      }
+      return result;
     } catch (error) {
       const normalized = normalizeCloudBridgeError(error);
-      if (isAuthFailure(normalized) && shouldClearCloudSessionForApiBase(apiBaseUrl)) {
-        await onSessionChange?.(null);
-      }
       throw normalized;
     }
   }
 
   const error = new Error("Desktop secure Cloud session service is unavailable.");
   (error as Error & { status?: number }).status = 401;
-  if (shouldClearCloudSessionForApiBase(apiBaseUrl)) await onSessionChange?.(null);
   throw error;
+}
+
+function isMutationMethod(method: string | undefined) {
+  const normalized = (method ?? "GET").toUpperCase();
+  return normalized !== "GET" && normalized !== "HEAD" && normalized !== "OPTIONS";
 }
 
 export function listCloudProjects(
@@ -886,11 +903,6 @@ function normalizeRequestHeaders(headers: HeadersInit | undefined): Record<strin
   return Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, String(value)]));
 }
 
-function shouldClearCloudSessionForApiBase(apiBaseUrl?: string | null) {
-  if (!apiBaseUrl) return true;
-  return sameCloudApiBaseUrl(apiBaseUrl, getDesktopCloudApiBaseUrl());
-}
-
 async function requestRaw<T = unknown>(path: string, init: RequestInit, apiBaseUrl?: string | null): Promise<T> {
   const normalizedApiBaseUrl = resolveCloudApiBaseUrl(apiBaseUrl || getDesktopCloudApiBaseUrl());
   if (window.puppyoneDesktop?.requestCloudApi) {
@@ -932,12 +944,6 @@ function getCloudApiErrorMessage(payload: ApiEnvelope<unknown> | null, fallback:
   if (isRecord(detail) && typeof detail.message === "string" && detail.message) return detail.message;
   if (typeof payload?.error === "string" && payload.error) return payload.error;
   return fallback;
-}
-
-function isAuthFailure(error: unknown): boolean {
-  if (isRecord(error) && error.status === 401) return true;
-  const message = error instanceof Error ? error.message : String(error);
-  return /invalid or expired token|invalid refresh token|refresh token not found|already used|sign in again|sign in to/i.test(message);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

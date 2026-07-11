@@ -4,6 +4,7 @@ import {
   forgetLastWorkspace,
   getInitialWorkspace,
   getRecentWorkspaces,
+  hydrateRecentWorkspaces,
 } from "../../lib/localFiles";
 import {
   openWorkspaceTarget,
@@ -53,6 +54,17 @@ export function useWorkspaceLifecycle({
     if (result.errors.length > 0) {
       console.warn("Some recent puppyone workspaces could not be loaded:", result.errors);
     }
+    void hydrateRecentWorkspaces()
+      .then((hydrated) => {
+        setRecentWorkspaceItems(getRecentWorkspaceItems(hydrated));
+        setWorkspaces((current) => mergeWorkspaceLists(current, hydrated.workspaces));
+        if (hydrated.errors.length > 0) {
+          console.warn("Some recent puppyone workspaces could not be hydrated:", hydrated.errors);
+        }
+      })
+      .catch((error) => {
+        console.warn("Unable to hydrate recent puppyone workspaces:", error);
+      });
   }, []);
 
   const handleWorkspaceOpenResult = useCallback((result: WorkspaceOpenResult | null) => {
@@ -120,6 +132,18 @@ export function useWorkspaceLifecycle({
         } else if (initialWorkspace.error) {
           setRestoreWorkspaceError(initialWorkspace.error);
         }
+        void hydrateRecentWorkspaces()
+          .then((hydrated) => {
+            if (cancelled) return;
+            setRecentWorkspaceItems(getRecentWorkspaceItems(hydrated));
+            setWorkspaces((current) => mergeWorkspaceLists(current, hydrated.workspaces));
+            if (hydrated.errors.length > 0) {
+              console.warn("Some recent puppyone workspaces could not be hydrated:", hydrated.errors);
+            }
+          })
+          .catch((error) => {
+            if (!cancelled) console.warn("Unable to hydrate recent puppyone workspaces:", error);
+          });
       })
       .catch((error) => {
         if (!cancelled) {
