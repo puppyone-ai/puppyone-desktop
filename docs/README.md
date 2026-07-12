@@ -13,6 +13,9 @@ directly:
   - One Projects entry, one Project shell, and the Local Only, Local + Cloud,
     and Cloud Only capability states.
 - [Automation and Plugin Domain Boundary](architecture/automation-plugin-domain-boundary.md)
+- [Cloud Automation UX and Architecture](architecture/cloud-automation-ux.md)
+  - Automation product definition, UX contract for creation and management,
+    and the desktop/server architecture behind it.
 - [Git and Source Control Architecture](architecture/git/README.md)
   - Local Source Control sidebar, repository status freshness, external Git
     invalidation, and Cloud branch graph topology.
@@ -33,6 +36,8 @@ directly:
   - [Multi-Native Agent Backend Decision](architecture/desktop-agent/ADR-005-multi-native-agent-backends.md)
   - One shared PuppyOne UI and control plane over PuppyOne Agent, Codex,
     Claude Code, user OpenCode and capability-gated future native Agents.
+    PuppyOne caches the last Agent selection and sanitized local detection,
+    while conversation history remains entirely provider-owned.
 
 ## Release
 

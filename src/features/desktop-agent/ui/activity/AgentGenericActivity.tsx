@@ -2,6 +2,7 @@ import { FileSearch, FolderSearch, Globe2, Search, Wrench } from "lucide-react";
 import {
   agentActivitySummary,
   agentActivityToolName,
+  isContextCompactionActivity,
   outputForActivity,
   pathForActivity,
   structuredInputForActivity,
@@ -10,6 +11,15 @@ import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
 
 export function AgentGenericActivity({ activity, onOpenFile }: { activity: AgentActivity; onOpenFile?: (path: string) => void }) {
+  if (isContextCompactionActivity(activity)) {
+    return (
+      <div className="desktop-agent-context-divider" role="status" aria-label="Context compacted">
+        <span aria-hidden="true" />
+        <small>Compacted context</small>
+        <span aria-hidden="true" />
+      </div>
+    );
+  }
   const tool = agentActivityToolName(activity);
   const path = pathForActivity(activity);
   const output = outputForActivity(activity);

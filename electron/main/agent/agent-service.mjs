@@ -37,11 +37,16 @@ const INTERRUPT_CONFIRMATION_TIMEOUT_MS = 5_000;
 
 export function createAgentService({
   runtimeRegistry,
-  persistence,
+  sessionCache = null,
+  persistence: legacyPersistence = null,
   logger = console,
 }) {
   if (!runtimeRegistry || typeof runtimeRegistry.createAdapter !== "function") {
     throw new TypeError("AgentService requires a provider-neutral runtime registry.");
+  }
+  const persistence = sessionCache ?? legacyPersistence;
+  if (!persistence || typeof persistence.save !== "function") {
+    throw new TypeError("AgentService requires an ephemeral session cache.");
   }
   const sessionStore = new AgentSessionStore({ onOwnerDestroyed: closeSessionsForWindow });
   const sessionCreations = new Set();

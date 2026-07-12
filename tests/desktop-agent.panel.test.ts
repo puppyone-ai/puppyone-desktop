@@ -41,7 +41,7 @@ describe("Desktop Agent panel lifecycle", () => {
     expect(harness.bridge.closeAgentSession).toHaveBeenCalledWith({
       rootPath: "/workspace",
       sessionId: "session-1",
-      removePersistence: false,
+      removePersistence: true,
     });
   });
 
@@ -85,8 +85,8 @@ describe("Desktop Agent panel lifecycle", () => {
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(textarea.disabled).toBe(false);
     expect(textarea.style.height).toBe("20px");
-    expect(container.textContent).toContain("PuppyOne Agent needs repair");
-    expect(container.textContent).toContain("Agent engine powered by OpenCode");
+    expect(container.textContent).toContain("OpenCode needs attention");
+    expect(container.textContent).toContain("OpenCode readiness");
     expect(container.textContent).not.toContain("OpenCode update required");
     expect(container.querySelector('button[aria-label="Retry Agent engine"]')).not.toBeNull();
   });

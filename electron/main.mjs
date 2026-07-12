@@ -1,3 +1,4 @@
+import { installBrokenStdioGuards } from "./main/stdio-guard.mjs";
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, session as electronSession, shell, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
@@ -14,7 +15,7 @@ import {
 import { initializeWorkspaceEditReview } from "../local-api/edit-review.mjs";
 import { createUpdateService } from "./update-service.mjs";
 import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
-import { createAgentPersistence } from "./main/agent/agent-persistence.mjs";
+import { createEphemeralAgentSessionCache } from "./main/agent/agent-persistence.mjs";
 import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
 import { createAgentService } from "./main/agent/agent-service.mjs";
 import { createLocalAgentInventory } from "./main/agent/connections/local-agent-inventory.mjs";
@@ -50,6 +51,11 @@ import {
   loadViewerPackRuntime,
 } from "./main/viewer-packs/bootstrap.mjs";
 import { resolveViewerPackFeatureProfile } from "./main/viewer-packs/feature-profile.mjs";
+
+// Must run before any console.* / IPC replyWithError logging: broken inherited
+// stdout/stderr (Dock launch, detached child, closed terminal) otherwise throws
+// uncaught `write EIO` / `write EPIPE` and Electron shows a fatal dialog.
+installBrokenStdioGuards();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -119,7 +125,7 @@ const terminalService = createTerminalService({
   appVersion: app.getVersion(),
   initializeWorkspaceEditReview,
 });
-const agentPersistence = createAgentPersistence({ app });
+const agentSessionCache = createEphemeralAgentSessionCache({ app });
 const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   appVersion: app.getVersion(),
   appPath: app.getAppPath(),
@@ -129,9 +135,12 @@ const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
 });
 const agentService = createAgentService({
   runtimeRegistry: agentRuntimeRegistry,
-  persistence: agentPersistence,
+  sessionCache: agentSessionCache,
 });
-const localAgentInventory = createLocalAgentInventory({ appVersion: app.getVersion() });
+const localAgentInventory = createLocalAgentInventory({
+  appVersion: app.getVersion(),
+  cacheFilePath: path.join(app.getPath("userData"), "agent-runtime-inventory.json"),
+});
 const workspaceWatchService = createWorkspaceWatchService();
 const gitMetadataWatchService = createGitMetadataWatchService();
 const workspaceStateStore = createWorkspaceStateStore({

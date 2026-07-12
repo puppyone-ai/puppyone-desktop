@@ -175,6 +175,7 @@ export function App() {
     rightSidebarToolsSettings,
     rightSidebarWidth,
     rightSidebarSurface,
+    agentPreferredRuntime,
     agentPreferredModel,
     sidebarCollapsed,
     sidebarNavigationLayout,
@@ -197,6 +198,7 @@ export function App() {
     setRightSidebarToolsSettings,
     setRightSidebarWidth,
     setRightSidebarSurface,
+    setAgentPreferredRuntime,
     setAgentPreferredModel,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
@@ -1232,6 +1234,8 @@ export function App() {
                 <RightAgentPanel
                   workspace={workspace}
                   active={rightSidebarOpen && rightSidebarSurface === "chat"}
+                  preferredRuntimeId={agentPreferredRuntime}
+                  onPreferredRuntimeChange={setAgentPreferredRuntime}
                   preferredModel={agentPreferredModel}
                   onPreferredModelChange={setAgentPreferredModel}
                   onViewChanges={() => {

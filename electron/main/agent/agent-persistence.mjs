@@ -1,56 +1,43 @@
 import fs from "node:fs";
 import path from "node:path";
 import { countTextBytes, isAgentEventEnvelope, redactSecrets } from "./agent-events.mjs";
-import {
-  migratedRuntimeDescriptor,
-  resolvePersistedRuntimeId,
-} from "./migrations/legacy-session-format.mjs";
+import { canonicalRuntimeId } from "./migrations/legacy-session-format.mjs";
 
-const MAX_SESSIONS = 100;
+const MAX_SESSIONS = 8;
 const MAX_EVENTS_PER_SESSION = 1_000;
-const MAX_SESSION_BYTES = 1024 * 1024;
-const MAX_JOURNAL_BYTES = 24 * 1024 * 1024;
-const JOURNAL_VERSION = 3;
+const MAX_SESSION_BYTES = 2 * 1024 * 1024;
+const LEGACY_JOURNAL_FILENAME = "desktop-agent-sessions.json";
 
-export function createAgentPersistence({ app, filename = "desktop-agent-sessions.json", fsModule = fs, logger = console }) {
-  const filePath = path.join(app.getPath("userData"), filename);
-  let writeChain = Promise.resolve();
-  let cachedSessions = null;
-  let loadPromise = null;
+/**
+ * Process-local recovery cache for currently active Agent connections.
+ *
+ * PuppyOne does not own Chat History. This cache never writes transcripts or
+ * native session ids to disk and disappears with the Electron main process.
+ * The legacy durable journal is removed once during startup.
+ */
+export function createEphemeralAgentSessionCache({
+  app,
+  fsModule = fs,
+  logger = console,
+  legacyFilename = LEGACY_JOURNAL_FILENAME,
+} = {}) {
+  const legacyPath = app?.getPath
+    ? path.join(app.getPath("userData"), legacyFilename)
+    : null;
+  let records = [];
+  const legacyCleanup = legacyPath
+    ? fsModule.promises.rm(legacyPath, { force: true }).catch((error) => {
+      logger.warn?.("Unable to remove the legacy Desktop Agent chat journal:", error);
+    })
+    : Promise.resolve();
 
   async function readAll() {
-    if (cachedSessions) return cachedSessions;
-    if (!loadPromise) {
-      loadPromise = loadJournal().then((sessions) => {
-        cachedSessions = sessions;
-        return sessions;
-      }).finally(() => { loadPromise = null; });
-    }
-    return loadPromise;
-  }
-
-  async function loadJournal() {
-    try {
-      const metadata = await fsModule.promises.stat(filePath);
-      if (metadata.size > MAX_JOURNAL_BYTES) {
-        logger.warn?.("Desktop Agent session journal exceeded its safety limit; ignoring it.");
-        return [];
-      }
-      const parsed = JSON.parse(await fsModule.promises.readFile(filePath, "utf8"));
-      if (!Array.isArray(parsed?.sessions)) return [];
-      return parsed.sessions
-        .map(migrateRecord)
-        .filter(Boolean)
-        .slice(0, MAX_SESSIONS);
-    } catch (error) {
-      if (error?.code !== "ENOENT") logger.warn?.("Unable to read Desktop Agent session metadata:", error);
-      return [];
-    }
+    await legacyCleanup;
+    return records;
   }
 
   async function findLatest(workspaceRoot, runtimeId = null) {
-    const sessions = await readAll();
-    return sessions
+    return (await readAll())
       .filter((entry) => (
         entry.workspaceRoot === workspaceRoot
         && entry.providerSessionId
@@ -61,87 +48,54 @@ export function createAgentPersistence({ app, filename = "desktop-agent-sessions
   }
 
   async function findById(sessionId, workspaceRoot = null) {
-    const sessions = await readAll();
-    return sessions.find((entry) => (
+    return (await readAll()).find((entry) => (
       entry.sessionId === sessionId
       && (!workspaceRoot || entry.workspaceRoot === workspaceRoot)
     )) ?? null;
   }
 
   async function list(workspaceRoot, { runtimeId = null, includeArchived = false } = {}) {
-    const sessions = await readAll();
-    return sessions
-      .filter((entry) => (
-        entry.workspaceRoot === workspaceRoot
-        && (!runtimeId || entry.runtimeId === runtimeId)
-        && (includeArchived || !entry.archivedAt)
-      ))
-      .sort(byUpdatedDescending);
+    // Compatibility surface only. PuppyOne deliberately exposes no Chat History.
+    void workspaceRoot;
+    void runtimeId;
+    void includeArchived;
+    await legacyCleanup;
+    return [];
   }
 
-  function save(record) {
+  async function save(record) {
+    await legacyCleanup;
     const safeRecord = normalizeRecord(record);
-    return enqueue(async () => {
-      const sessions = await readAll();
-      const next = [safeRecord, ...sessions.filter((entry) => entry.sessionId !== safeRecord.sessionId)]
-        .sort(byUpdatedDescending)
-        .slice(0, MAX_SESSIONS);
-      await writeJournal(next);
-    }, "persist Desktop Agent session metadata");
+    records = [safeRecord, ...records.filter((entry) => entry.workspaceRoot !== safeRecord.workspaceRoot)]
+      .sort(byUpdatedDescending)
+      .slice(0, MAX_SESSIONS);
   }
 
-  function archive(sessionId, archivedAt = new Date().toISOString()) {
-    return enqueue(async () => {
-      const sessions = await readAll();
-      await writeJournal(sessions.map((entry) => entry.sessionId === sessionId
-        ? { ...entry, archivedAt, updatedAt: archivedAt }
-        : entry));
-    }, "archive Desktop Agent session metadata");
+  async function archive(sessionId, archivedAt = new Date().toISOString()) {
+    await legacyCleanup;
+    records = records.map((entry) => entry.sessionId === sessionId
+      ? { ...entry, archivedAt, updatedAt: archivedAt }
+      : entry);
   }
 
-  function remove(sessionId) {
-    return enqueue(async () => {
-      const sessions = await readAll();
-      await writeJournal(sessions.filter((entry) => entry.sessionId !== sessionId));
-    }, "remove Desktop Agent session metadata");
+  async function remove(sessionId) {
+    await legacyCleanup;
+    records = records.filter((entry) => entry.sessionId !== sessionId);
   }
 
-  function enqueue(operation, label) {
-    writeChain = writeChain.then(operation).catch((error) => {
-      logger.warn?.(`Unable to ${label}:`, error);
-    });
-    return writeChain;
+  function clear() {
+    records = [];
   }
 
-  async function writeJournal(sessions) {
-    await fsModule.promises.mkdir(path.dirname(filePath), { recursive: true });
-    const temporaryPath = `${filePath}.${process.pid}.tmp`;
-    const retainedSessions = fitJournal(sessions);
-    const payload = JSON.stringify({ version: JOURNAL_VERSION, sessions: retainedSessions });
-    await fsModule.promises.writeFile(temporaryPath, payload, { encoding: "utf8", mode: 0o600 });
-    await fsModule.promises.chmod?.(temporaryPath, 0o600);
-    await fsModule.promises.rename(temporaryPath, filePath);
-    cachedSessions = retainedSessions;
-  }
-
-  return { findLatest, findById, list, save, archive, remove, readAll };
+  return { findLatest, findById, list, save, archive, remove, readAll, clear };
 }
 
-function fitJournal(sessions) {
-  const retained = [];
-  let bytes = Buffer.byteLength(JSON.stringify({ version: JOURNAL_VERSION, sessions: [] }), "utf8");
-  for (const session of sessions.slice(0, MAX_SESSIONS)) {
-    const nextBytes = countTextBytes(session) + (retained.length > 0 ? 1 : 0);
-    if (bytes + nextBytes > MAX_JOURNAL_BYTES) break;
-    retained.push(session);
-    bytes += nextBytes;
-  }
-  return retained;
-}
+/** @deprecated Compatibility alias. No durable persistence occurs. */
+export const createAgentPersistence = createEphemeralAgentSessionCache;
 
 function normalizeRecord(record) {
-  const runtimeId = resolvePersistedRuntimeId(record);
-  const sourceEvents = Array.isArray(record.events)
+  const runtimeId = normalizeRuntimeId(record?.runtimeId ?? record?.provider);
+  const sourceEvents = Array.isArray(record?.events)
     ? record.events.filter((event) => isAgentEventEnvelope(event) && event.type !== "command.output.delta")
     : [];
   const candidateEvents = sourceEvents.slice(-MAX_EVENTS_PER_SESSION).map((event) => redactSecrets({
@@ -149,27 +103,25 @@ function normalizeRecord(record) {
     runtimeId,
     provider: runtimeId,
   }));
-  let partial = candidateEvents.length < sourceEvents.length || Boolean(record.partial);
   const safe = redactSecrets({
-    sessionId: normalizeId(record.sessionId),
-    workspaceRoot: normalizePath(record.workspaceRoot),
+    sessionId: normalizeId(record?.sessionId),
+    workspaceRoot: normalizePath(record?.workspaceRoot),
     runtimeId,
     provider: runtimeId,
-    runtime: normalizeRuntime(record.runtime, runtimeId),
-    providerSessionId: normalizeOptionalId(record.providerSessionId),
-    title: normalizeText(record.title, 200) || "Agent session",
-    createdAt: normalizeDate(record.createdAt),
-    updatedAt: normalizeDate(record.updatedAt),
-    archivedAt: record.archivedAt ? normalizeDate(record.archivedAt) : null,
-    terminalState: normalizeText(record.terminalState, 40) || "idle",
-    selectedModel: normalizeText(record.selectedModel, 300) || null,
-    selectedMode: normalizeText(record.selectedMode, 160) || null,
-    lastSequence: normalizeSequence(record.lastSequence),
-    partial,
+    runtime: normalizeRuntime(record?.runtime, runtimeId),
+    providerSessionId: normalizeOptionalId(record?.providerSessionId),
+    title: normalizeText(record?.title, 200) || "Agent session",
+    createdAt: normalizeDate(record?.createdAt),
+    updatedAt: normalizeDate(record?.updatedAt),
+    archivedAt: record?.archivedAt ? normalizeDate(record.archivedAt) : null,
+    terminalState: normalizeText(record?.terminalState, 40) || "idle",
+    selectedModel: normalizeText(record?.selectedModel, 300) || null,
+    selectedMode: normalizeText(record?.selectedMode, 160) || null,
+    lastSequence: normalizeSequence(record?.lastSequence),
+    partial: candidateEvents.length < sourceEvents.length || Boolean(record?.partial),
     events: [],
   });
   let retainedBytes = countTextBytes(safe);
-  const retained = [];
   for (let index = candidateEvents.length - 1; index >= 0; index -= 1) {
     const event = candidateEvents[index];
     const eventBytes = countTextBytes(event) + 1;
@@ -177,50 +129,30 @@ function normalizeRecord(record) {
       safe.partial = true;
       break;
     }
-    retained.unshift(event);
+    safe.events.unshift(event);
     retainedBytes += eventBytes;
   }
-  safe.events = retained;
   return safe;
 }
 
-function migrateRecord(record) {
-  if (!record || typeof record !== "object") return null;
-  try {
-    const runtimeId = resolvePersistedRuntimeId(record);
-    return normalizeRecord({
-      ...record,
-      runtimeId,
-      runtime: migratedRuntimeDescriptor(record, runtimeId),
-    });
-  } catch {
-    return null;
-  }
-}
-
 function normalizeRuntime(runtime, fallbackId) {
-  // The product-session runtime id is authoritative. Descriptor snapshots may
-  // carry a historical alias, but can never change backend ownership.
-  const id = normalizeRuntimeId(fallbackId);
   return {
-    id,
-    displayName: normalizeText(runtime?.displayName, 100) || defaultRuntimeName(id),
-    kind: normalizeText(runtime?.kind, 40) || "direct-cli",
+    id: fallbackId,
+    displayName: normalizeText(runtime?.displayName, 100) || defaultRuntimeName(fallbackId),
+    kind: normalizeText(runtime?.kind, 40) || "native-cli",
     version: normalizeText(runtime?.version, 80) || null,
     source: normalizeText(runtime?.source, 40) || null,
     compatibility: normalizeText(runtime?.compatibility, 80) || null,
   };
 }
 
-function normalizeRuntimeId(value) {
-  if (typeof value !== "string" || !/^[a-z][a-z0-9-]{1,39}$/.test(value)) {
-    throw new Error("Invalid Agent runtime id.");
-  }
-  return value;
-}
-
 function defaultRuntimeName(id) {
   return String(id).replace(/[-_.]+/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function normalizeRuntimeId(value) {
+  if (typeof value !== "string" || !/^[a-z][a-z0-9-]{1,39}$/.test(value)) throw new Error("Invalid Agent runtime id.");
+  return canonicalRuntimeId(value);
 }
 
 function normalizeId(value) {
@@ -256,9 +188,9 @@ function byUpdatedDescending(left, right) {
 }
 
 export const agentPersistenceLimits = Object.freeze({
+  durable: false,
   maxSessions: MAX_SESSIONS,
   maxEventsPerSession: MAX_EVENTS_PER_SESSION,
   maxSessionBytes: MAX_SESSION_BYTES,
-  maxJournalBytes: MAX_JOURNAL_BYTES,
-  journalVersion: JOURNAL_VERSION,
+  legacyJournalFilename: LEGACY_JOURNAL_FILENAME,
 });

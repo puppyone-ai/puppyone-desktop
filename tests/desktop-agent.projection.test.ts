@@ -108,6 +108,18 @@ describe("Desktop Agent transcript projection", () => {
     expect(projection.activities[0].label).toBe("Invalid value: 'max'. Use 'xhigh'.");
   });
 
+  it("drops legacy lifecycle-only system-error notices and keeps the actionable diagnostic", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "provider.error", { message: "Codex thread entered a system error state." }, "turn-1"),
+      event(2, "provider.error", { message: "Invalid value: 'max'. Supported value is 'xhigh'." }, "turn-1"),
+    ]);
+
+    expect(projection.activities.map((activity) => activity.label)).toEqual([
+      "Invalid value: 'max'. Supported value is 'xhigh'.",
+    ]);
+    expect(projection.parts.filter((part) => part.kind === "error")).toHaveLength(1);
+  });
+
   it("normalizes unrecognized provider activity status to a neutral unknown state", () => {
     const projection = applyAgentEvent(createAgentProjection(), event(1, "provider.activity", {
       label: "Future provider activity",

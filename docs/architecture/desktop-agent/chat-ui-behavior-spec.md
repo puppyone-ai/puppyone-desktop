@@ -1,8 +1,8 @@
 # Cursor-style Agent Chat UI behavior specification
 
-Status: implemented transcript/activity foundation plus target Agent-first
-selection contract. Multi-native backend selection from ADR-005 remains
-migration work and requires new visual and interaction evidence.
+Status: implemented Cursor-style conversation document, compact work evidence
+and Agent-first selection contract. Multi-native backend capability differences
+remain incremental work and require backend-specific interaction evidence.
 
 This specification turns the visual direction in [Right Sidebar Agent Chat](right-sidebar.md)
 into implementable rules. The pixel reference is the MIT-licensed frontend in
@@ -31,6 +31,9 @@ The following invariants are mandatory:
 
 - user and assistant messages remain the primary visual hierarchy;
 - tool activity is compact by default and expands in place;
+- assistant Markdown never receives a generic card surface, border or shadow;
+- read/search/reasoning/tool rows never share a decorative Research timeline
+  rail; only semantically related command output forms one bounded card;
 - repeated updates mutate one stable row instead of appending duplicates;
 - proposed work, approved work and completed work are visibly different states;
 - raw provider JSON, ANSI control sequences and hidden reasoning are never rendered directly;
@@ -42,8 +45,8 @@ The following invariants are mandatory:
 
 ```text
 +------------------------------------------------------+
-| New chat                                  history  ...|
-|------------------------------------------------------|
+| Codex v                                       +  ... |
+|       scroll-aware surface fade, no divider          |
 |                                                      |
 |                   +-------------------------------+  |
 |                   | User prompt                   |  |
@@ -59,13 +62,51 @@ The following invariants are mandatory:
 | [Changes +42 -11]                                    |
 | +--------------------------------------------------+ |
 | | Send follow-up                                   | |
-| | +   Codex    GPT-5.x                  mic/send   | |
+| | GPT-5.x                                mic/send  | |
 | +--------------------------------------------------+ |
 +------------------------------------------------------+
 ```
 
 Only the transcript scrolls. The decision dock, Changes handoff and composer stay anchored
 at the bottom in normal document layout. They must not be fixed over transcript content.
+
+The top sub-header owns the selected coding-Agent identity. It uses the same 46 px toolbar
+geometry, text scale and flat icon-button treatment as the left sidebar. Like the Data sidebar,
+its toolbar edge is transparent at rest. Once the transcript scrolls underneath, the transcript
+owns an 18 px same-surface fade whose opacity ramps over the first 24 px of scrolling. A visible
+bottom border, drop shadow, underline and enclosing action pill are not allowed. Provider identity
+is therefore visually persistent while Model remains a lower-level composer choice.
+
+### 2.1 Shared typography contract
+
+Agent Chat and the left sidebar share one Appearance-controlled type scale:
+
+```text
+Appearance: Small / Default / Large
+                  |
+                  v
+        --po-text-size-sidebar     12 / 13 / 14 px
+                  |
+                  v
+     --desktop-sidebar-font-size
+             /             \
+            v               v
+   left sidebar rows   --agent-font-size
+                         /   |    \
+                        v    v     v
+                 messages  input  tool rows/pickers
+```
+
+- Primary Chat text must use `--agent-font-size`, which aliases the same
+  `--desktop-sidebar-font-size` consumed by left-sidebar rows. Default is 13 px;
+  Small and Large are 12 px and 14 px. A Chat component must not hard-code its own
+  13/14 px body size.
+- Secondary timestamps, statuses and metadata use the shared meta scale. Headings keep
+  semantic hierarchy through the responsive title tokens, and command/code surfaces keep
+  the Appearance-controlled monospace code size.
+- The app shell and the shared overlay root both redeclare the sidebar aliases at their
+  theme boundary. This prevents portalled pickers from freezing at the default size and
+  guarantees that an Appearance change updates the left and right sidebars together.
 
 ## 3. Shared row state model
 
@@ -135,11 +176,22 @@ sidebar gets another frame, so wheel and pointer input wait behind it.
 ```
 
 - Markdown occupies the available transcript width with a readable measure. Body text uses
-  the product body size and a 1.55-1.7 line height.
+  the shared sidebar/Agent size and a 1.55-1.7 line height.
+- The assistant container is transparent and borderless. Theme tokens control text, inline
+  code, links and code blocks; a generic raised-surface token must not wrap the whole answer.
+- User bubbles, assistant text, work evidence, context dividers and errors are five separate
+  semantic treatments. Do not reuse one card component for all five.
 - The first visible assistant content may fade in over 120 ms. Subsequent tokens do not use a
   per-character typewriter animation.
 - Text deltas are coalesced into at most one visual commit per 24-50 ms; permission, question,
   tool-boundary and terminal events bypass the text batch so ordering stays correct.
+- Submission is optimistic at the presentation boundary: the local prompt appears before
+  native session/thread creation finishes. Until the first native reasoning, tool or text
+  part arrives, one quiet `Thinking` row with a compact spinner occupies the live tail. It is
+  presentation-only, is never journaled, and never invents reasoning text.
+- A native reasoning-summary section boundary may replace the generic `Thinking` row before
+  summary text arrives. Raw reasoning deltas are not rendered. After a completed tool, the
+  generic working pulse may reappear while the same native turn remains active.
 - A streaming caret is optional and may only appear at the final text edge while a text part
   is active. It disappears immediately on tool transition, Stop, failure or completion.
 - Headings, lists, links, tables, inline code and fenced code use PuppyOne Markdown policies.
@@ -317,45 +369,49 @@ Known tools use a renderer registry. Unknown tools use a safe fallback instead o
 
 ## 12. Agent and backend-scoped pickers
 
-Native operating-system `<select>` menus are not the target interaction. Use an accessible,
-anchored listbox/popover so status, grouping, search and secondary text remain consistent.
+Native operating-system `<select>` menus are not the target interaction. Use one accessible,
+anchored listbox/popover. The compact surface is deliberately flat: readiness is a row state,
+not a second navigation hierarchy.
 
 ```text
-+ Agent ---------------------------------------------------+
-| Search Agents...                                        |
-|                                                          |
-| Ready                                                     |
-|  * PuppyOne Agent               Managed                 |
-|    Codex                         Native login            |
-|    Claude Code                   API / cloud credential  |
-|                                                          |
-| Detected                                                  |
-|    Cursor Agent                  Protocol unavailable    |
-|    OpenCode                      Sign in required        |
-|                                                          |
-|  Refresh                              Agent settings      |
-+----------------------------------------------------------+
++ Agent ----------------------------------+
+|  PuppyOne Agent                  check  |
+|  Codex                           0.144  |
+|  Claude Code                     warning|
+|  OpenCode                        warning|
+|  Cursor Agent                    warning|
++-----------------------------------------+
 ```
 
-- Agent is chosen before Model or Provider. Backend-scoped triggers stay
-  hidden or disabled with explanatory text until a selectable Agent exists.
-- Ready Agents are selectable. Detected native products remain visible but are
-  selectable only after every rule in
-  [Native Agent backend and model discovery](local-agent-connection-discovery.md) passes.
+- Agent is chosen in the top-left session sub-header before Model or inference Provider.
+  Backend-scoped triggers stay
+  hidden or disabled with explanatory text until a registered Agent is selected.
+- Every registered Agent row can be selected so the trigger changes immediately. A
+  non-ready row shows exactly one right-aligned warning icon; selecting it exposes that
+  backend's scoped readiness state but keeps Send disabled. Selection never implies that
+  execution gates passed.
 - The popover supports arrow navigation, type-ahead/search, Home/End, Enter and Escape; focus
   returns to the trigger on close.
-- Agent rows include name, source and readiness. They never expose executable,
-  credential or native-session paths.
+- Agent rows include only the official local product mark, name, compact version/source and
+  optional warning. They never expose executable, credential or native-session paths. The
+  compact menu has no `Coding Agents`, `Detected`, `Refresh` or descriptive footer chrome.
 - Model results are scoped to the selected Agent and, when applicable, its
   selected Provider. Required text/tool filters are backend capability policy;
   image, embedding and TTS-only models never appear in coding-Agent catalogs.
+- With no still-valid explicit model selection, the first model in the native backend's
+  advertised order is selected. PuppyOne does not reorder that catalog around an `isDefault`
+  flag. The user may then choose another advertised model for the current live configuration.
 - Missing or unrecognized capability metadata fails closed; it is never interpreted as text +
   tools support. The searchable catalog remains complete in memory while at most 120 option
   rows are mounted. A 500-model catalog therefore stays searchable without a 500-row popover.
-- A selected Agent/model is rendered compactly in the composer. Long names ellipsize without
-  shrinking Send or covering the textarea.
+- The selected Agent trigger is a borderless sub-header control with its official mark, name and
+  chevron. Model/backend-scoped triggers remain transparent outlined controls in the composer.
+  Long names ellipsize at the responsive maximum without shrinking Send or covering the
+  textarea; open/selected state must not become a solid fill.
 - An existing session pins its Agent. Choosing another Agent creates a new
-  session after an explicit boundary; it never rewrites the active native session.
+  session after an explicit boundary; it never rewrites the active native session. The trigger
+  exposes the accessible description `Switching provider starts a new chat`, and the switch
+  clears the current PuppyOne live projection before inspecting the new backend.
 
 ## 13. Composer behavior
 
@@ -363,7 +419,7 @@ anchored listbox/popover so status, grouping, search and secondary text remain c
 +------------------------------------------------------+
 | Send follow-up                                       |
 |                                                      |
-| +  Codex   GPT-5.x  Agent                 mic/send   |
+| GPT-5.x                                    mic/send   |
 +------------------------------------------------------+
 ```
 
@@ -372,10 +428,14 @@ anchored listbox/popover so status, grouping, search and secondary text remain c
 - Horizontal outside margin is 12 px at 420 px and 16 px at 560/760 px. Inner horizontal
   padding is 12-14 px; radius is 20 px.
 - Enter submits, Shift+Enter inserts a newline and IME composition never submits early.
+- Submit clears the controlled draft synchronously, renders the optimistic user prompt and
+  changes Send to a busy indicator before any IPC/session setup await. A rejected start
+  restores the prompt only when the user has not already begun another draft.
 - The draft remains editable while Agent setup or runtime repair is required. Send alone is
   disabled and the placeholder explains the next action.
-- `+` owns attachment, `@` context and lower-frequency mode actions. Agent and
-  the most relevant backend-scoped Model/Provider control remain visible.
+- Attachment, `@` context and lower-frequency mode actions remain capability-driven. The most
+  relevant backend-scoped Model/Provider control remains visible; the session-level Agent
+  selector must not be duplicated in the composer.
 - During a turn, Send becomes Stop unless the capability explicitly supports steer or queue.
   Stop remains a stable target and never moves because a model name changes width.
 - The Changes pill sits above the composer, not inside it. Blocking docks sit above both.
@@ -413,6 +473,12 @@ zero except an optional non-essential spinner replacement.
   above 50 ms during steady streaming.
 - Provider discovery, executable probing, Markdown parser initialization and large output
   formatting never run synchronously on the sidebar input path.
+- Draft updates do not clone the transcript measurement map, recreate the textarea width
+  observer or render the virtual transcript. Growing streamed Markdown uses React's deferred
+  rendering path so an external-store delta cannot take priority over typing or scrolling.
+- The benchmark suite includes repeated draft-cache writes with 1,000 measurements and
+  controlled composer commits beside a 2,000-row transcript; these product-critical files
+  remain in source control.
 
 The serial happy-dom benchmark is a synchronous regression signal, not a substitute for the
 production Electron gate. Reference M2 Pro results captured 2026-07-12:

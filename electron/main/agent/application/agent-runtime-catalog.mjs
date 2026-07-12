@@ -11,7 +11,7 @@ import {
   normalizeCapabilitySnapshot,
 } from "../runtime/agent-runtime-port.mjs";
 
-const INSPECTION_CACHE_MS = 30_000;
+const INSPECTION_CACHE_MS = 5 * 60_000;
 // Discovery/account/model inspection must never depend on process.cwd().
 const NEUTRAL_INSPECTION_ROOT = os.tmpdir();
 
@@ -135,11 +135,16 @@ export function createAgentRuntimeCatalog({ runtimeRegistry }) {
   };
 }
 
+export const agentRuntimeCatalogPolicy = Object.freeze({
+  inspectionCacheTtlMs: INSPECTION_CACHE_MS,
+});
+
 function selectRequestedRuntime(runtimeRegistry, catalog, value) {
   if (value !== undefined && value !== null && !/^[a-z][a-z0-9-]{1,39}$/.test(value)) {
     throw new Error("Agent runtime selection is invalid.");
   }
   const selected = runtimeRegistry.select(catalog, value || null);
-  if (value && selected?.descriptor?.id !== value) throw new Error(`Agent runtime ${value} is not registered.`);
-  return selected;
+  return value && selected?.descriptor?.id !== value
+    ? runtimeRegistry.select(catalog, null)
+    : selected;
 }

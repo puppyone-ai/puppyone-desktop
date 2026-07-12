@@ -3,8 +3,8 @@
 Status: backend architecture implemented from
 [ADR-005](ADR-005-multi-native-agent-backends.md). The production composition
 registers PuppyOne Agent, native Codex, native Claude Code, user OpenCode and
-capability-gated Cursor. The shared contract, Registry, Service, persistence
-and session model are backend-neutral. Agent-first Renderer integration is a
+capability-gated Cursor. The shared contract, Registry, Service, live-session
+model and cache boundaries are backend-neutral. Agent-first Renderer integration is a
 separate presentation migration. Terminal remains a separate sibling surface.
 
 This document is intentionally made of prose and plain-text diagrams. It does
@@ -33,7 +33,7 @@ PuppyOne Desktop
 |
 +-- Local Agent Chat
       +-- Presentation (React, Cursor-style hierarchy)
-      |     +-- out-of-flow session actions + history
+      |     +-- compact new-session + diagnostics actions
       |     +-- virtual timeline
       |     +-- part/tool renderer registry
       |     +-- permission/question docks
@@ -42,11 +42,11 @@ PuppyOne Desktop
       +-- Application (provider-neutral)
       |     +-- explicit AgentClientPort
       |     +-- workspace-scoped AgentSessionController
-      |     +-- saved-session lifecycle service
+      |     +-- current live-session lifecycle service
       |     +-- explicit phase/state machine
       |     +-- normalized event projection
       |     +-- sequence repair + 32 ms stream batching
-      |     +-- session draft/scroll/measurement cache
+      |     +-- process-local draft/scroll/measurement cache
       |
       +-- Infrastructure adapter
       |     +-- the only feature module allowed to read window.puppyoneDesktop
@@ -56,7 +56,7 @@ PuppyOne Desktop
       |     +-- no spawn, stdin, environment, HTTP proxy, URL or password
       |
       +-- Electron main authority
-            +-- AgentService: owner/session/order/replay/journal
+            +-- AgentService: owner/session/order/live replay ring
             +-- AgentRuntimeRegistry
             |     +-- PuppyOne Agent adapter
             |     |     +-- pinned managed OpenCode kernel
@@ -96,11 +96,13 @@ Model + variant      Provider-scoped model identity and only the options that
 Agent profile/mode   Backend-scoped behavior configuration; not a backend or
                      harness.
 
-Local tool           A detected native Agent installation. It becomes a
-                     selectable backend only after every readiness gate passes.
+Local tool           A detected native Agent installation. Its row may be
+                     selected for inspection; execution is enabled only after
+                     every readiness gate passes.
 
-Product session      PuppyOne mapping, UI projection and bounded redacted
-                     cache pointing to one backend-native session.
+Bridge session       Process-local PuppyOne correlation and UI projection for
+                     one currently connected backend-native session. It is not
+                     Chat History and is never persisted by PuppyOne.
 ```
 
 The first product choice is Agent backend. If the user selects Codex, the
@@ -112,6 +114,47 @@ inside another and no backend failure triggers a silent fallback.
 Backend selection is visible for a blank composer and immutable after session
 creation. Backend-scoped Provider, Model, Variant and Mode controls follow it.
 ADR-005 is authoritative for this product decision.
+
+## Persistence and cache ownership
+
+PuppyOne deliberately persists product preferences and discovery metadata, not
+conversations. This boundary is architectural, not merely a current UI choice.
+
+```text
+PuppyOne durable state
+|
++-- Renderer localStorage
+|     +-- puppyone.desktop.agentPreferredRuntime
+|           validated Agent/backend id only
+|           stale or unregistered id -> registered default
+|     +-- existing backend-scoped preferred model
+|           applied only when advertised by the selected backend
+|
++-- Electron userData/agent-runtime-inventory.json
+      +-- versioned Renderer-safe LocalAgentConnection snapshot
+      +-- scan timestamp; maximum age 24 hours
+      +-- atomic replace; file mode 0600; maximum 64 KiB
+      +-- explicit Refresh bypasses memory and disk caches
+      +-- expiry / clock rollback / corruption / schema mismatch -> rescan
+
+PuppyOne process-local state
+|
++-- current bridge session + native correlation id
++-- bounded redacted live-event replay ring
++-- current draft / scroll / row measurements
+      all cleared by connection replacement or application shutdown
+
+Provider-owned state
+|
++-- conversation history, native thread/session retention
++-- native resume, fork, compaction, archive and deletion policy
+```
+
+The persisted inventory is presentation evidence only. It never authorizes an
+executable or a turn. Before native execution, Electron main resolves and
+validates the selected runtime again through its adapter readiness gates. No
+prompt, response, tool output, title or native session ID enters either durable
+PuppyOne cache.
 
 ## Layering and one-way dependencies
 
@@ -157,7 +200,7 @@ shared/agent-contract/
 
 electron/main/agent/
   domain/                            backend-neutral session aggregate
-  application/                       backend-neutral use cases and journals
+  application/                       backend-neutral live-session use cases
   runtime/                           AgentRuntimePort / Registry / Host only
   connections/                       bounded executable/readiness primitives
   transports/                        bounded reusable process transports
@@ -174,7 +217,7 @@ electron/main/agent/
       discovery + Agent SDK adapter + events + definition
     opencode-native/
       user-profile discovery + native adapter + events + definition
-    cursor/                           discovery + non-selectable protocol gate
+    cursor/                           discovery + execution protocol gate
 
 src/features/desktop-agent/
   domain/                             projections + Agent-scoped routing
@@ -207,24 +250,24 @@ shared/agent-contract/
 
 electron/main/agent/
   agent-events.mjs                    versioned event envelope/redaction
-  agent-persistence.mjs               v3 bounded multi-session journal
+  agent-persistence.mjs               ephemeral current-process recovery cache
   agent-reference-authorization.mjs   realpath and file-size authority
   agent-service.mjs                   session/window/turn orchestration
   bootstrap/
     create-agent-runtime-host.mjs     only concrete-runtime composition root
   application/
-    agent-event-journal.mjs           bounded delivery + durable journal writes
+    agent-event-journal.mjs           bounded live delivery + in-memory replay
     agent-input-policy.mjs            trusted use-case input policy
     agent-runtime-catalog.mjs         discovery/inspection cache
     agent-session-store.mjs           window ownership + retired sessions
   domain/
     agent-session-model.mjs           session aggregate and DTO projection
   migrations/
-    legacy-session-format.mjs         v1 Codex + managed opencode ID migration
+    legacy-session-format.mjs         compatibility parser; no new durable writes
   security/
     authorized-project-instructions.mjs bounded canonical instruction snapshot
   connections/
-    local-agent-inventory.mjs         lazy five-minute cache + per-tool isolation
+    local-agent-inventory.mjs         5m memory + 24h sanitized disk cache
     local-agent-connection-policy.mjs derived integration/selectability gates
     tools/
       local-agent-tool-registry.mjs   validated descriptor registry
@@ -267,14 +310,14 @@ electron/main/agent/
     opencode-native-runtime-definition.mjs independent host and profile
   runtimes/cursor/
     cursor-discovery.mjs              bounded inventory/protocol gate
-    cursor-runtime-definition.mjs     visible but non-selectable definition
+    cursor-runtime-definition.mjs     visible, selectable, execution-gated definition
 
 src/features/desktop-agent/
   index.ts                            public feature entrypoint
   application/
     AgentClientPort.ts                 explicit Renderer-side native port
     AgentSessionController.ts         framework-independent controller
-    AgentSessionLifecycle.ts          create/switch/fork/archive/delete/history
+    AgentSessionLifecycle.ts          current live connection create/close
     LocalAgentConnectionLoader.ts     lazy inventory presentation loader
     AgentEventSynchronizer.ts         batching + replay/gap repair
     SessionUiStateStore.ts            session draft/viewport measurements
@@ -291,6 +334,7 @@ src/features/desktop-agent/
     agent-activity-presentation.ts    pure Bash/read/write presentation readers
   ui/
     AgentPartRenderer.tsx             discriminated part registry
+    AgentMessagePart.tsx              user bubble + borderless Agent document
     AgentBackendPicker.tsx            target: native Agent selection
     AgentProviderPicker.tsx           backend-scoped inference routes
     AgentModelPicker.tsx              backend/provider-scoped model selection
@@ -339,7 +383,7 @@ architecture checker.
 Renderer live-session orchestration
   AgentSessionController                  <= 500 lines
     +-- AgentEventSynchronizer            streaming/gap replay/disposal
-    +-- AgentSessionLifecycle             saved-session mutations/history
+    +-- AgentSessionLifecycle             current live connection lifecycle
     +-- LocalAgentConnectionLoader        lazy local inventory
     +-- SessionUiStateStore               bounded ephemeral LRU
 
@@ -352,7 +396,7 @@ Main transaction coordinator
   agent-service.mjs                       <= 850 lines
     +-- agent-input-policy.mjs             authorization/input policy
     +-- agent-session-store.mjs            owner/session lifecycle
-    +-- agent-event-journal.mjs            replay/persistence/delivery
+    +-- agent-event-journal.mjs            bounded live replay/delivery
 
 Presentation
   desktop-agent.css                       import-only entry
@@ -362,19 +406,18 @@ Presentation
 `agent-service.mjs` deliberately retains create/resume/turn/approval/question
 transaction ordering in one coordinator: splitting those correlated security
 mutations across independent services would weaken owner and blocker
-invariants. Event journaling was extracted because it has an independent
-bounded contract. The pure projection reducer remains one exhaustive event
+invariants. Live-event replay was extracted because it has an independent
+bounded in-memory contract. The pure projection reducer remains one exhaustive event
 transition table; payload readers and indexes are separate.
 
 All growing state has an explicit bound:
 
 ```text
-controller history                  100 sessions
 queued follow-ups                    20 prompts; overflow is reported
-session UI cache                    100 LRU sessions
+current-process UI cache              bounded LRU; cleared on connection change
 row measurements                  1,000 per session
 event synchronizer buffer         2,000 events
-main replay journal               1,000 events / 2 MiB
+main live replay ring             1,000 events / 2 MiB
 assistant/user message text         128 KiB per message
 activity/command text                64 KiB
 initial Markdown DOM                 24 KiB / 240 blocks
@@ -393,8 +436,8 @@ Backend-native truth
   compaction, fork lineage and native history where supported
                     |
                     v
-PuppyOne main-process truth
-  backend readiness, native-session mapping, canonical workspace, window
+PuppyOne current-process truth
+  backend readiness, live native-session mapping, canonical workspace, window
   owner, backend-scoped selection, approval/question correlation, normalized
   sequence and bounded redacted projection cache
                     |
@@ -405,9 +448,10 @@ Renderer presentation truth
 ```
 
 The selected backend's native session is the canonical conversation and
-execution record. The PuppyOne journal is a bounded product index and replay
-cache, not an independent source of Agent truth. On a partial or conflicting
-restore, normalized native history wins.
+execution record. PuppyOne keeps only a bounded live replay ring for the
+currently running application process. It is not a product index and disappears
+on app shutdown; PuppyOne never writes a transcript or native-session mapping
+to disk.
 
 React unmount, Sidebar hide and window blur do not terminate a turn. Explicit
 Stop, a terminal runtime event, window destruction or app quit can do so. A
@@ -425,8 +469,8 @@ assets or hard-coded colors.
 ```text
 Right sidebar surface
 |
-+-- on-demand session chrome          out of document flow
-|     history / new / overflow        visible on hover or keyboard focus
++-- compact session chrome            out of document flow
+|     new / diagnostics / overflow    no PuppyOne History control
 |
 +-- virtual conversation document
 |     user turn                       right-aligned quiet prompt bubble
@@ -493,6 +537,15 @@ AgentSessionController
 Composer: Agent -> backend-scoped controls -> Send
 ```
 
+The Agent control is one flat menu. Registered but non-ready backends remain
+selectable as an inspection scope and carry one compact warning; Send remains
+gated by main-process readiness. Agent and Model triggers are transparent,
+outlined and content-sized. Model selection only changes the next-turn
+configuration: it never restarts or resumes a native session. For Codex, one
+app-server connection is initialized once, and one native thread is started or
+resumed only for the current live connection and is not stored by PuppyOne as
+durable history.
+
 Electron main revalidates Backend, Provider, Model and Mode against the latest
 inspection so a stale or compromised Renderer cannot inject arbitrary routing.
 Executable presence alone is not readiness: version, protocol, authentication,
@@ -515,15 +568,18 @@ steer, queue, fork, compact, approval, question,
 attachment, context, model, mode, commands, MCP and skills
 ```
 
-The port is the Electron/native-process boundary. Production composition
+The port is the Electron/native-process boundary. `resumeSession` and
+`readHistory` are adapter primitives for a provider-owned native session and
+current-process gap repair; they do not create a PuppyOne history database or
+history UI. Production composition
 registers every backend that has passed its product gate. `AgentRuntimeHost`
 owns process shutdown and `AgentService` applies create/resume/turn/replay
 without backend-name lifecycle branches.
 
 Providers, models, variants and modes come from the selected backend's
 inspection. Options stay backend-scoped. Provider errors are normalized in
-main; the projection also unwraps bounded legacy JSON error strings so old
-journals remain readable.
+main; the projection also unwraps bounded legacy JSON error strings received
+from a live adapter.
 
 ## PuppyOne Agent OpenCode process and trust boundary
 
@@ -610,7 +666,7 @@ For a discovered native slash command, whose upstream command endpoint has no
 `system` field, the same authorized instructions are attached as a bounded
 `text/plain` file part. Unknown `/text` remains an ordinary user prompt.
 
-Every created, resumed, forked or mode-switched session receives a final
+Every created or current-process resumed session receives a final
 PuppyOne ruleset. Unknown, plugin and MCP tools ask by default; ordinary
 workspace read/search/question/skill/todo operations remain available; `.env`
 reads ask; plan mode denies every non-allowlisted tool, including shell, edit,
@@ -622,6 +678,9 @@ main-owned window/session/turn/request correlation.
 ```text
 User submit
    |
+   +--> optimistic prompt + presentation-only Thinking pulse
+   |       (visible before native session/thread setup completes)
+   |
    v
 Controller --typed request--> preload --authorized IPC--> AgentService
    |                                                   |
@@ -632,7 +691,9 @@ Controller --typed request--> preload --authorized IPC--> AgentService
    |                                                   |
    +<-- virtual rows <-- projection <-- AgentEvent <----+
 
+Native turn/start -> immediate flush -> remove optimistic tail duplication
 Native delta bursts -> main ordering/redaction -> controller 32 ms batch
+First reasoning/tool/text part -> replace generic Thinking with native evidence
 Permission/question -> immediate flush -> typed blocking dock -> correlated reply
 Sequence gap -> bounded replay -> buffered-event reconciliation -> projection
 Terminal event -> turn state + queued follow-up (only when capability permits)
@@ -644,13 +705,13 @@ plus pending permissions/questions and session status, projects the active
 turn again by stable IDs, then releases newly buffered events. Main
 deduplicates blocking request IDs. An immediately arriving `idle` event cannot
 overtake this reconciliation barrier and hide the final answer. Other backends
-implement equivalent gap repair using their native history and event contract;
+implement equivalent live gap repair using their native event/history contract;
 they do not emulate OpenCode SSE.
 
 The envelope contains `runtimeId`, application `sessionId`, native session ID,
 turn/item IDs, monotonic sequence, time, type and a bounded payload. The old
-`provider` field remains as a migration alias. Journal v1 Codex records migrate
-to v2 records on read.
+`provider` field remains as a live compatibility alias. Envelopes are bounded
+in memory and are not written as Chat History.
 
 ## Projection and timeline
 
@@ -673,6 +734,15 @@ change, usage, warning/error, permission, question and unknown fallback.
 Repeated deltas update one stable part ID. Renderer registries choose a part or
 tool view. Unknown events show a bounded label rather than raw JSON.
 
+The Composer and transcript have separate render costs. A controlled draft
+update preserves the transcript projection and initial viewport references;
+the memoized transcript therefore does not rebuild its row/offset maps. The
+textarea installs one width observer for its lifetime, while draft-only
+`SessionUiStateStore` patches retain the existing measurement object instead
+of cloning up to 1,000 row heights per keystroke. Streamed Markdown is deferred
+inside its bounded 24 KiB/240-block presentation window so input remains the
+higher-priority interaction.
+
 `SafeMarkdown` creates React nodes and has no `dangerouslySetInnerHTML` path.
 Only `http`, `https` and `mailto` links become anchors. Tool and command text is
 bounded in main and projection layers.
@@ -692,9 +762,10 @@ bounded in main and projection layers.
 - Runtime processes always use an absolute executable and `shell: false`.
 - No auto-approve, `--force`, `--yolo` or permission bypass is enabled.
 - URL/password/token/environment values are excluded from snapshots, renderer,
-  normal logs and persistence.
-- Persistence is `0600`, atomic, redacted and bounded by sessions, events and
-  bytes.
+  normal logs and every cache.
+- The only durable Agent cache is sanitized local discovery metadata. It is
+  schema-versioned, atomic, mode `0600`, size-bounded and contains no transcript,
+  native session ID, executable path, environment or credential material.
 
 PuppyOne Agent adds these managed-kernel invariants:
 
@@ -713,8 +784,8 @@ the managed PuppyOne Agent profile.
 - Streaming text is batched at 32 ms; blocking and terminal events bypass the
   batch.
 - A 2,000-row fixture mounts no more than 120 rows.
-- Measurement, scroll position and pinned-to-bottom state are session-scoped
-  and survive switching; row-height changes above the viewport compensate the
+- Measurement, scroll position and pinned-to-bottom state are current-process
+  presentation state; row-height changes above the viewport compensate the
   scroll anchor instead of moving the text being read.
 - The panel uses container breakpoints at 420/560/760 widths and cannot create
   ordinary horizontal overflow.

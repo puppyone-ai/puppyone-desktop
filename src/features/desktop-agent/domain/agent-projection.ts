@@ -28,7 +28,10 @@ import {
   cloneAgentProjection,
   projectionIndexes,
 } from "./agent-projection-indexes";
-import { providerActivityIdentity } from "./agent-provider-notice-policy";
+import {
+  isNonDiagnosticProviderStatusMessage,
+  providerActivityIdentity,
+} from "./agent-provider-notice-policy";
 
 export type * from "./agent-projection-types";
 
@@ -270,6 +273,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
     case "provider.error": {
       const kind = event.type === "provider.error" ? "error" : "warning";
       const label = readProviderMessage(payload.message) || (kind === "error" ? "Provider error" : "Provider warning");
+      if (isNonDiagnosticProviderStatusMessage(label)) return next;
       const identity = providerActivityIdentity(next, event, label);
       const activityIndexes = projectionIndexes(next).activities;
       const existingActivityIndex = activityIndexes.get(identity.id);
@@ -494,6 +498,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
   if (event.type === "provider.warning" || event.type === "provider.error") {
     const label = readProviderMessage(event.payload.message)
       || (event.type === "provider.error" ? "Provider error" : "Provider warning");
+    if (isNonDiagnosticProviderStatusMessage(label)) return null;
     const activityIndex = projectionIndexes(projection).activities.get(providerActivityIdentity(projection, event, label).id);
     const activity = activityIndex === undefined ? null : projection.activities[activityIndex];
     return activity ? activityPart(activity) : null;

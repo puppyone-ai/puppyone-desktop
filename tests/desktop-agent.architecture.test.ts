@@ -4,9 +4,15 @@ import { describe, expect, it } from "vitest";
 describe("Desktop Agent architecture boundaries", () => {
   it("keeps RightAgentPanel as composition and the controller framework independent", () => {
     const panel = source("src/features/desktop-agent/ui/RightAgentPanel.tsx");
+    const layout = source("src/features/desktop-agent/ui/AgentPanelLayout.tsx");
     const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
     expect(panel.split("\n").length).toBeLessThan(230);
     expect(panel).not.toMatch(/useState|bufferedEvents|replayInFlight|applyAgentEvent/);
+    expect(panel).toContain("<AgentPanelLayout");
+    expect(layout).toContain('className="desktop-agent-boundary"');
+    expect(layout).toContain('className="desktop-agent-panel"');
+    expect(layout).toContain('className="desktop-agent-conversation-region"');
+    expect(layout).toContain('className="desktop-agent-dock-region"');
     expect(controller).not.toMatch(/from ["']react["']|JSX\.|<section/);
     expect(controller).toContain("agentControllerTransitions");
   });
@@ -15,16 +21,21 @@ describe("Desktop Agent architecture boundaries", () => {
     const timeline = source("src/features/desktop-agent/ui/AgentTranscript.tsx");
     const markdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
     const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
+    const picker = source("src/features/desktop-agent/ui/AgentPickerPopover.tsx");
     const cssEntry = source("src/features/desktop-agent/ui/desktop-agent.css");
+    const foundation = source("src/features/desktop-agent/ui/styles/foundation.css");
     const css = agentStyles();
     const globalLayout = source("src/styles/layout.css");
     expect(timeline).toContain("MAX_MOUNTED_ROWS = 120");
     expect(markdown).not.toContain("dangerouslySetInnerHTML");
     expect(markdown).toContain('["https:", "http:", "mailto:"]');
     expect(cssEntry).toContain('@import "./styles/foundation.css"');
+    expect(cssEntry).toContain('@import "./styles/pickers.css"');
     expect(cssEntry.split("\n").length).toBeLessThan(30);
-    expect(css).toContain("container: desktop-agent / inline-size");
-    expect(css).toContain("--agent-radius-composer: 22px");
+    expect(foundation).toMatch(/\.desktop-agent-boundary\s*\{[^}]*container:\s*desktop-agent \/ inline-size/s);
+    expect(foundation).not.toMatch(/\.desktop-agent-panel\s*\{[^}]*container:/s);
+    expect(foundation).toMatch(/\.desktop-agent-panel\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\) auto/s);
+    expect(foundation).toContain("--agent-radius-composer: 8px");
     expect(css).toContain("max-width: 759px");
     expect(css).toContain("max-width: 559px");
     expect(css).toContain("max-width: 419px");
@@ -33,6 +44,8 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(composer).toContain("useLayoutEffect");
     expect(composer).toContain("rows={1}");
     expect(composer).not.toContain("<select");
+    expect(picker).toContain("DesktopOverlayLayer");
+    expect(picker).toContain("useAnchoredOverlayPosition");
   });
 
   it("keeps product-critical Agent performance scenarios in the benchmark suite", () => {
@@ -50,6 +63,23 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(port).toContain("export interface AgentClientPort");
     expect(controller).not.toMatch(/window\.|puppyoneDesktop|infrastructure\//);
     expect(adapter).toContain("window.puppyoneDesktop");
+  });
+
+  it("persists only Agent selection and discovery metadata, never PuppyOne Chat History", () => {
+    const main = source("electron/main.mjs");
+    const sessionCache = source("electron/main/agent/agent-persistence.mjs");
+    const inventory = source("electron/main/agent/connections/local-agent-inventory.mjs");
+    const preferences = source("src/features/app-shell/preferences.ts");
+    const header = source("src/features/desktop-agent/ui/AgentSurfaceHeader.tsx");
+    const controllerState = source("src/features/desktop-agent/application/agent-controller-state.ts");
+    expect(main).toContain("createEphemeralAgentSessionCache");
+    expect(sessionCache).toContain("PuppyOne does not own Chat History");
+    expect(sessionCache).not.toMatch(/promises\.writeFile|desktop-agent-sessions\.json.*write/);
+    expect(main).toContain("agent-runtime-inventory.json");
+    expect(inventory).toContain("PERSISTED_CACHE_TTL_MS");
+    expect(preferences).toContain("AGENT_PREFERRED_RUNTIME_STORAGE_KEY");
+    expect(header).not.toMatch(/Session history|Recent chats|Archive chat|Delete local chat|Fork chat/);
+    expect(controllerState).not.toContain("history:");
   });
 
   it("keeps sidecar transport and rendered architecture diagrams out of Renderer/docs", () => {
@@ -88,21 +118,25 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(adapter).not.toContain("client.providers(this.workspaceRoot)");
     expect(adapter).toContain("isAgentChatModel");
     expect(controller).toContain("selectedProviderId");
-    expect(panel.indexOf("providers=")).toBeLessThan(panel.indexOf("models="));
+    expect(panel.indexOf("agentProviders=")).toBeLessThan(panel.indexOf("models="));
+    expect(panel).toContain("agentSelector={<AgentProviderPicker");
+    expect(source("src/features/desktop-agent/ui/AgentComposer.tsx")).not.toContain("AgentProviderPicker");
   });
 
   it("keeps local executable inventory main-owned, lazy and separate from OpenCode provider authority", () => {
     const inventory = source("electron/main/agent/connections/local-agent-inventory.mjs");
     const candidates = source("electron/main/agent/connections/probes/executable-candidates.mjs");
     const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
-    const picker = source("src/features/desktop-agent/ui/AgentProviderPicker.tsx");
+    const providerPicker = source("src/features/desktop-agent/ui/AgentProviderPicker.tsx");
+    const backendRouting = source("src/features/desktop-agent/domain/agent-backend-routing.ts");
     const registry = source("electron/main/agent/connections/tools/local-agent-tool-registry.mjs");
     expect(inventory).not.toMatch(/from ["']react|OpenCode|providerCatalog/);
     expect(candidates).not.toMatch(/-ilc|login shell|exec\(/i);
     expect(controller.indexOf("discoverLocalConnections")).toBeGreaterThan(controller.indexOf("initialize(refresh"));
-    expect(picker).toContain("Local tools on this Mac");
-    expect(picker).toContain("Connected routes");
-    expect(picker).not.toMatch(/connection\.id\s*===/);
+    expect(providerPicker).not.toMatch(/Local tools|AgentLocalConnection|connection\.id/);
+    expect(providerPicker).not.toMatch(/Coding Agents|Detected|Refresh/);
+    expect(providerPicker).toContain("Selection is a presentation concern");
+    expect(backendRouting).not.toMatch(/puppyone-agent|codex|claude|cursor|opencode/i);
     expect(registry).toContain("validateDescriptor");
   });
 });
@@ -112,7 +146,7 @@ function source(relativePath: string) {
 }
 
 function agentStyles() {
-  return ["foundation", "transcript", "activities", "blocking", "composer", "responsive"]
+  return ["foundation", "transcript", "activities", "blocking", "composer", "pickers", "responsive"]
     .map((name) => source(`src/features/desktop-agent/ui/styles/${name}.css`))
     .join("\n");
 }

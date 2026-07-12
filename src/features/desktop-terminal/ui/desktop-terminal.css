@@ -51,7 +51,7 @@
   border-radius: 7px;
   background: transparent;
   color: var(--po-text-muted);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-terminal-icon-button:hover {

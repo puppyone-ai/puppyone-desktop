@@ -28,7 +28,7 @@ export function AgentActivityShell({
   const [expanded, setExpanded] = useState(defaultExpanded);
   const hasDetail = children !== undefined && children !== null && children !== false && children !== "";
   return (
-    <div className={`desktop-agent-tool-call is-${status} ${className}`.trim()}>
+    <div className={`desktop-agent-tool-call is-${status}${hasDetail ? " has-detail" : ""}${expanded ? " is-expanded" : ""} ${className}`.trim()}>
       <div className="desktop-agent-tool-header">
         <button
           type="button"

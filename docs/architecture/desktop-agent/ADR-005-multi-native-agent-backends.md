@@ -39,10 +39,10 @@ PuppyOne owns shared product concerns and normalization, not the harness loop.
 PuppyOne right-sidebar Chat
 |
 +-- shared product UI
-|     session history, transcript, composer, approval/question docks
+|     current transcript, composer, approval/question docks
 |
 +-- PuppyOne application control plane
-|     workspace authority, lifecycle, safe DTOs, event journal, projection
+|     workspace authority, live lifecycle, safe DTOs, replay ring, projection
 |
 +-- AgentRuntimeRegistry                         SESSION-SCOPED CHOICE
       |
@@ -107,9 +107,9 @@ Native session
   The backend-owned thread/session that is authoritative for execution,
   history, tool state, compaction and continuation.
 
-Product session
-  PuppyOne's workspace-bound index and presentation record pointing to one
-  native session and one immutable backend identity.
+Bridge session
+  A process-local PuppyOne correlation record for one current native
+  connection. It is not a durable product session or Chat History entry.
 ```
 
 ## Ownership boundary
@@ -118,10 +118,10 @@ Product session
 | --- | --- |
 | Agent selection and readiness presentation | Agent loop and reasoning cycle |
 | canonical workspace authorization | native tool scheduling and execution semantics |
-| window/session/turn/request correlation | provider-specific prompts and context policy |
+| window/live-session/turn/request correlation | provider-specific prompts and context policy |
 | normalized `AgentEvent` vocabulary | native streaming protocol and event source |
-| bounded redacted event cache | canonical native session and full native history |
-| product session index, archive state and title | compaction, fork and resume semantics |
+| bounded process-local event replay ring | canonical native session and full native history |
+| selected Agent preference + sanitized discovery cache | compaction, fork, archive, retention and resume semantics |
 | shared transcript, composer and blocking docks | native model catalog and model options |
 | capability-driven UI | native login, credentials and subscription entitlement |
 | process lifetime, timeout and crash containment | provider retry and usage semantics |
@@ -138,7 +138,7 @@ and implements the required `AgentRuntimePort` surface.
 `Agent backend` is the product concept. `AgentRuntimeDefinition`,
 `AgentRuntimeRegistry` and `AgentRuntimePort` remain the internal implementation
 names. One registered production runtime definition represents exactly one
-selectable backend; keeping the established internal names avoids a cosmetic
+user-selectable backend row; keeping the established internal names avoids a cosmetic
 rename across shared contracts without weakening the product vocabulary.
 
 ```text
@@ -186,8 +186,8 @@ credential code remains under `electron/main/agent/runtimes/<backend>/`.
 | `opencode-native` | OpenCode | user OpenCode ACP/server protocol | user OpenCode profile | OpenCode session | user-installed CLI | separate adapter/profile required |
 | `pi` | Pi | `pi --mode rpc` | Pi/provider config | Pi session | user-installed CLI | optional future adapter |
 
-An executable-presence check is never enough to enable a backend. A selectable
-backend must pass installation, version, protocol, authentication, model/tool
+An executable-presence check is never enough to enable execution. An
+execution-ready backend must pass installation, version, protocol, authentication, model/tool
 capability, workspace and product-policy gates. Cursor remains visible as a
 detected local tool while its execution protocol is unavailable.
 
@@ -200,7 +200,7 @@ Agent
   PuppyOne Agent
   Codex
   Claude Code
-  Cursor Agent          disabled with an explanation until supported
+  Cursor Agent          selectable row; execution gated until supported
   OpenCode
 
 Backend-scoped controls
@@ -212,25 +212,50 @@ Backend-scoped controls
 
 Choosing a different Agent for a blank composer changes the backend used by the
 next new session. A created session pins `runtimeId` and `nativeSessionId`.
-Changing Agent during an existing session creates a new session; it never
-silently migrates or nests native state. Cross-backend fork, rewind or history
-conversion is unsupported unless a future explicit export/import contract is
-defined.
+Changing Agent during an existing live connection closes that PuppyOne bridge
+connection and creates another; it never silently migrates or nests native
+state. PuppyOne exposes no cross-backend fork, rewind or Chat History
+conversion.
+
+The compact selector separates selection from readiness. Every registered
+backend row may become the selected inspection scope; a non-ready backend shows
+one warning and cannot Send. The menu remains a single flat list without
+Ready/Detected headings, descriptions or a Refresh footer. This keeps the
+composer predictable while main-process validation remains authoritative.
 
 ```text
-PuppyOne product session
+PuppyOne bridge session                 PROCESS LOCAL ONLY
   sessionId
   workspaceRoot
   runtimeId                      immutable after creation
   nativeSessionId
   runtime version/provenance
   selected provider/model/variant/mode where supported
-  title, archive state and timestamps
-  bounded redacted AgentEvent journal
+  bounded redacted live AgentEvent ring
           |
           v
 backend-native session           authoritative execution record
 ```
+
+The bridge record and event ring disappear on application shutdown. PuppyOne
+does not persist or expose conversation titles, transcripts, native session IDs,
+archive state, fork lineage or a history list.
+
+The only durable Agent-related state is intentionally narrow:
+
+```text
+presentation selection preferences
+  -> validated Agent/backend id; stale id falls back to the registered default
+  -> optional model preference applies only when the selected backend advertises it
+
+sanitized local-Agent detection snapshot
+  -> versioned public DTO, timestamped, bounded, atomic and mode 0600
+  -> no executable path, environment, credentials, raw probe output or chat data
+  -> explicit Refresh / expiry / corruption / schema mismatch causes a rescan
+```
+
+Cached detection is presentation data, never execution authority. Electron
+main revalidates the selected runtime before starting native work.
 
 ## Discovery and authentication
 
@@ -260,7 +285,8 @@ product explicitly permits third-party clients.
 
 PuppyOne Agent uses its managed profile and OpenCode-supported provider
 authentication. A user's installed OpenCode backend uses a separate user-owned
-profile. Those profiles, histories and credentials never merge implicitly.
+profile. Those profiles, histories and credentials never merge implicitly. Any
+history they retain remains provider-owned and is not copied into PuppyOne.
 
 ## Security and process isolation
 
@@ -280,7 +306,7 @@ React
   passwords, tokens or raw native protocol payloads.
 - Main canonicalizes the workspace and validates attachments and context
   references before the adapter sees them.
-- Every blocking reply correlates window, product session, backend, native
+- Every blocking reply correlates window, live bridge session, backend, native
   session, turn and request identity.
 - Runtime processes use absolute validated executables, `shell: false`, bounded
   protocol frames, timeouts, redaction and graceful-to-forced shutdown.
@@ -298,10 +324,10 @@ security overlays, upgrade qualification and product support. OpenCode owns the
 native harness loop.
 
 The implementation may use `puppyone-agent` as the new product runtime ID while
-retaining a migration alias for persisted `opencode` product sessions. It must
-not rewrite user-owned `opencode-native` session IDs into PuppyOne Agent
-sessions. OpenCode licensing and source provenance remain visible outside the
-normal conversation chrome.
+retaining a runtime-ID compatibility alias for legacy inputs. It must not copy
+or rewrite user-owned `opencode-native` history into PuppyOne Agent. OpenCode
+licensing and source provenance remain visible outside the normal conversation
+chrome.
 
 ADR-004's bundling, integrity, rollback and repair rules apply only to
 `puppyone-agent`. A corrupt or missing managed OpenCode component disables
@@ -309,7 +335,7 @@ PuppyOne Agent, not Codex, Claude Code or another healthy native backend.
 
 ## Migration from OpenCode-only composition
 
-The migration is incremental and preserves existing sessions.
+The migration is incremental and preserves native-provider ownership.
 
 ```text
 Phase 0  Decision and vocabulary
@@ -322,15 +348,15 @@ Phase 1  Multi-backend composition                         IMPLEMENTED
 
 Phase 2  PuppyOne Agent identity                           IMPLEMENTED
   rename the current managed product route to puppyone-agent
-  migrate persisted opencode product mappings without changing native sessions
+  retain the opencode runtime-ID compatibility alias without new durable writes
   keep managed OpenCode provenance in diagnostics and licenses
 
 Phase 3  Native Codex                                      IMPLEMENTED
   promote the existing app-server adapter from legacy compatibility
-  complete readiness, auth, capability, history and security acceptance tests
+  complete readiness, auth, capability, live recovery and security tests
 
 Phase 4  Native Claude Code                                IMPLEMENTED
-  add CLI resolution, Agent SDK adapter, event normalization, native history,
+  add CLI resolution, Agent SDK adapter, event normalization, native recovery,
   permissions and capability tests
 
 Phase 5  Agent-first UI                                    IN PROGRESS
@@ -339,17 +365,16 @@ Phase 5  Agent-first UI                                    IN PROGRESS
 
 Phase 6  Optional backends                                 PARTIAL
   user OpenCode profile and Pi adapters
-  Cursor only after a supported protocol and approval contract exist
+  Cursor row may be registered now; enable execution only after a supported
+  protocol and approval contract exist
 
 Phase 7  Legacy closeout
-  remove OpenCode-only branches, copy, tests and migration aliases after the
-  supported session-retention window
+  remove OpenCode-only branches, copy, tests and legacy aliases
 ```
 
-During migration, current `opencode` sessions continue to resume through the
-managed adapter. They must not be reclassified as user-owned OpenCode sessions.
-Current direct Codex records remain readable and become native Codex sessions
-only after the adapter passes the new production gates.
+Legacy PuppyOne transcript journals are deleted and never recreated. Native
+Codex, Claude Code and OpenCode history remains untouched because PuppyOne does
+not own or migrate it.
 
 ## Architecture fitness rules
 
@@ -365,12 +390,14 @@ legacy policy.
 - `AgentService`, shared domain, application and UI code do not name concrete
   backends for lifecycle behavior.
 - Each backend has discovery, protocol, event-normalization, capability,
-  security, history and cleanup contract tests.
+  security, live-recovery and cleanup contract tests.
 - A session cannot change `runtimeId` after creation.
 - An unavailable backend stays visible with a bounded diagnostic but cannot be
   selected or silently replaced.
 - Backend-scoped models cannot be selected under another backend.
 - The Agent selector precedes backend-scoped Provider and Model controls.
+- Only validated presentation selections and a sanitized local discovery DTO
+  may be durable PuppyOne Agent state; transcript/session persistence is banned.
 - A PuppyOne Agent engine failure does not prevent discovery or use of another
   healthy native backend.
 - No test or production helper treats an inference provider, model, CLI and
@@ -381,7 +408,7 @@ legacy policy.
 Benefits:
 
 - users can reuse supported native Agent products, permitted credentials and
-  session behavior without credential scraping;
+  native session behavior without credential or history scraping;
 - PuppyOne maintains one product control plane and UI rather than an Agent
   loop;
 - PuppyOne Agent remains a coherent first-party default without becoming a
@@ -393,10 +420,10 @@ Benefits:
 Costs:
 
 - each native protocol requires its own adapter, compatibility baseline,
-  history mapping and security review;
+  live event/recovery mapping and security review;
 - behavior cannot be perfectly identical across backends, so capability-driven
   UX and testing are mandatory;
-- session migration and support diagnostics become backend-aware;
+- live-session support diagnostics become backend-aware;
 - user-installed backends introduce version and login-state support surfaces.
 
 ## Rejected alternatives

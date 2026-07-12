@@ -1,11 +1,15 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useScrollEdgeState } from "@puppyone/shared-ui";
 import { ArrowDown, CircleAlert, LoaderCircle, MessageSquareCode } from "lucide-react";
 import type { AgentPart, AgentProjection, TimelineRow } from "../domain/agent-projection-types";
+import { AgentMessagePart } from "./AgentMessagePart";
 import { AgentPartRenderer } from "./AgentPartRenderer";
 
 type AgentTranscriptProps = {
   projection: AgentProjection;
   loading: boolean;
+  pendingPrompt?: string | null;
+  working?: boolean;
   runtimeLabel?: string;
   initialScrollTop?: number;
   initialMeasurements?: Record<string, number>;
@@ -20,9 +24,11 @@ const OVERSCAN_ROWS = 14;
 const MAX_MOUNTED_ROWS = 120;
 const DEFAULT_VIEWPORT_HEIGHT = 640;
 
-export function AgentTranscript({
+function AgentTranscriptView({
   projection,
   loading,
+  pendingPrompt = null,
+  working = false,
   runtimeLabel = "Agent",
   initialScrollTop = 0,
   initialMeasurements = {},
@@ -52,6 +58,11 @@ export function AgentTranscript({
   const range = useMemo(() => visibleRange(layout.offsets, timeline.rows.length, scrollTop, viewportHeight), [layout.offsets, scrollTop, timeline.rows.length, viewportHeight]);
   const visibleRows = timeline.rows.slice(range.start, range.end);
   const latestSequence = timeline.rows.at(-1)?.sequence ?? 0;
+  const showThinking = shouldShowAgentThinking(projection, working, pendingPrompt);
+  const hasLiveTail = Boolean(pendingPrompt) || showThinking;
+  const scrollEdgeState = useScrollEdgeState(scrollRef, {
+    revision: `${timeline.rows.length}:${layout.totalHeight}:${hasLiveTail ? "live" : "settled"}`,
+  });
   if (!seededPartIdsRef.current) {
     for (const row of timeline.rows) seenPartIdsRef.current.add(row.partId);
     seededPartIdsRef.current = true;
@@ -85,7 +96,7 @@ export function AgentTranscript({
     pinnedRef.current = true;
     setScrollTop(element.scrollTop);
     onViewportChangeRef.current?.(element.scrollTop, measurementsRef.current, true);
-  }, [layout.totalHeight, pinned, projection.approvals.length, projection.questions.length]);
+  }, [layout.totalHeight, pendingPrompt, pinned, projection.approvals.length, projection.questions.length, showThinking]);
 
   useEffect(() => {
     const previous = previousTimelineRef.current;
@@ -134,7 +145,13 @@ export function AgentTranscript({
   }, []);
 
   return (
-    <div className="desktop-agent-transcript-wrap">
+    <div
+      className="desktop-agent-transcript-wrap"
+      data-scroll-at-top={scrollEdgeState.atTop ? "true" : "false"}
+      style={{
+        "--agent-edge-fade-top": scrollEdgeState.topFade.toFixed(3),
+      } as CSSProperties}
+    >
       <div
         className="desktop-agent-transcript"
         ref={scrollRef}
@@ -144,19 +161,19 @@ export function AgentTranscript({
       >
         {projection.partialHistory && (
           <div className="desktop-agent-history-warning" role="status">
-            <CircleAlert size={14} /> Part of this session history is unavailable.
+            <CircleAlert size={14} /> Earlier live events are no longer available.
           </div>
         )}
-        {timeline.rows.length === 0 && !loading && (
+        {timeline.rows.length === 0 && !loading && !hasLiveTail && (
           <div className="desktop-agent-empty">
             <div className="desktop-agent-empty-mark"><MessageSquareCode size={18} /></div>
             <strong>What should we build?</strong>
             <p>Ask about this workspace, plan a change, run commands, or edit files. You stay in control of approvals.</p>
           </div>
         )}
-        {loading && timeline.rows.length === 0 && (
+        {loading && timeline.rows.length === 0 && !hasLiveTail && (
           <div className="desktop-agent-loading" role="status">
-            <LoaderCircle size={15} className="desktop-agent-spin" /> Restoring session…
+            <LoaderCircle size={15} className="desktop-agent-spin" /> Preparing Agent…
           </div>
         )}
         {timeline.rows.length > 0 && (
@@ -173,6 +190,26 @@ export function AgentTranscript({
                 </MeasuredRow>
               );
             })}
+          </div>
+        )}
+        {hasLiveTail && (
+          <div className="desktop-agent-live-tail">
+            {pendingPrompt && <AgentMessagePart part={{
+              id: "optimistic:user",
+              kind: "user",
+              turnId: null,
+              itemId: null,
+              text: pendingPrompt,
+              streaming: false,
+              terminalState: null,
+              sequence: Number.MAX_SAFE_INTEGER,
+            }} runtimeLabel={runtimeLabel} />}
+            {showThinking && (
+              <div className="desktop-agent-thinking-indicator" role="status" aria-label={`${runtimeLabel} is thinking`}>
+                <LoaderCircle size={13} className="desktop-agent-spin" aria-hidden="true" />
+                <span>Thinking</span>
+              </div>
+            )}
           </div>
         )}
         <div className="desktop-agent-announcer" aria-live="polite" aria-atomic="true">
@@ -192,6 +229,9 @@ export function AgentTranscript({
   );
 }
 
+export const AgentTranscript = memo(AgentTranscriptView);
+AgentTranscript.displayName = "AgentTranscript";
+
 const MemoAgentPartRenderer = memo(AgentPartRenderer);
 
 function MeasuredRow({ rowId, kind, top, animate, onMeasure, children }: {
@@ -203,6 +243,8 @@ function MeasuredRow({ rowId, kind, top, animate, onMeasure, children }: {
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [entering, setEntering] = useState(animate);
+  useEffect(() => setEntering(animate), [animate, rowId]);
   useEffect(() => {
     const element = ref.current;
     if (!element) return undefined;
@@ -212,7 +254,13 @@ function MeasuredRow({ rowId, kind, top, animate, onMeasure, children }: {
     observer?.observe(element);
     return () => observer?.disconnect();
   }, [onMeasure, rowId]);
-  return <div ref={ref} className={`desktop-agent-virtual-row${animate ? " is-new" : ""}`} data-kind={kind} style={{ transform: `translateY(${top}px)` }}>{children}</div>;
+  return <div
+    ref={ref}
+    className={`desktop-agent-virtual-row${entering ? " is-new" : ""}`}
+    data-kind={kind}
+    style={{ transform: `translateY(${top}px)` }}
+    onAnimationEnd={() => setEntering(false)}
+  >{children}</div>;
 }
 
 function buildTimeline(projection: AgentProjection) {
@@ -263,6 +311,37 @@ function lowerBound(values: number[], target: number) {
     else high = middle;
   }
   return low;
+}
+
+/** Presentation-only working state; never fabricates or persists model text. */
+export function shouldShowAgentThinking(
+  projection: AgentProjection,
+  working: boolean,
+  pendingPrompt: string | null = null,
+) {
+  if ((!working && !pendingPrompt) || projection.approvals.length > 0 || projection.questions.length > 0) return false;
+  if (pendingPrompt && !projection.runningTurnId) return true;
+  const turnId = projection.runningTurnId;
+  if (!turnId) return Boolean(pendingPrompt);
+  const typedParts = projection.parts.length > 0
+    ? projection.parts
+    : [
+      ...projection.messages.map((message): AgentPart => ({ ...message, kind: message.role })),
+      ...projection.activities.map((activity): AgentPart => ({ ...activity })),
+    ];
+  const visible = typedParts
+    .filter((part) => part.turnId === turnId && !["user", "usage", "permission", "question"].includes(part.kind))
+    .sort((left, right) => left.sequence - right.sequence);
+  const latest = visible.at(-1);
+  if (!latest) return true;
+  if (latest.kind === "assistant") return false;
+  if (latest.kind === "error" || latest.kind === "warning") return false;
+  if ("status" in latest && ["running", "pending", "in-progress", "waiting-for-user", "blocked"].includes(latest.status)) {
+    return false;
+  }
+  // A completed tool/reasoning item while the turn is still active means the
+  // native harness has resumed work and needs a fresh, non-persistent pulse.
+  return true;
 }
 
 export const agentTimelineLimits = Object.freeze({ maxMountedRows: MAX_MOUNTED_ROWS, streamBatchMs: 32 });

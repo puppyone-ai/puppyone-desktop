@@ -150,7 +150,7 @@
   font-size: 12px;
   font-weight: 650;
   letter-spacing: 0;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .office-warning-note button:hover,
@@ -268,7 +268,7 @@
   letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .office-spreadsheet-tabs button:hover {

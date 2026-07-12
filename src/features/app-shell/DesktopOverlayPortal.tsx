@@ -29,32 +29,41 @@ export function DesktopOverlayPortal({
   pointerCursors?: boolean;
   diffMarkers?: DiffMarkers;
 }) {
-  const [root, setRoot] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const overlayRoot = getDesktopOverlayRoot();
-    if (theme) {
-      applyDesktopOverlayTheme(
-        overlayRoot,
-        theme,
-        lightThemePreset,
-        darkThemePreset,
-        textSize,
-        typography,
-        pointerCursors,
-        diffMarkers,
-      );
-    }
-    setRoot(overlayRoot);
-  }, [theme, lightThemePreset, darkThemePreset, textSize, typography, pointerCursors, diffMarkers]);
+  const root = useDesktopOverlayRoot();
 
   useLayoutEffect(() => {
     if (!root || !theme) return;
-    applyDesktopOverlayTheme(root, theme, lightThemePreset, darkThemePreset, textSize, typography, pointerCursors, diffMarkers);
+    applyDesktopOverlayTheme(
+      root,
+      theme,
+      lightThemePreset,
+      darkThemePreset,
+      textSize,
+      typography,
+      pointerCursors,
+      diffMarkers,
+    );
   }, [root, theme, lightThemePreset, darkThemePreset, textSize, typography, pointerCursors, diffMarkers]);
 
   if (!root) return null;
   return createPortal(children, root);
+}
+
+/** Portals feature-owned menus into the shared, themed desktop overlay root. */
+export function DesktopOverlayLayer({ children }: { children: ReactNode }) {
+  const root = useDesktopOverlayRoot();
+  if (!root) return null;
+  return createPortal(children, root);
+}
+
+function useDesktopOverlayRoot() {
+  const [root, setRoot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setRoot(getDesktopOverlayRoot());
+  }, []);
+
+  return root;
 }
 
 function getDesktopOverlayRoot() {

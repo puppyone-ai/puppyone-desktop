@@ -45,6 +45,19 @@ export function agentActivitySummary(activity: AgentActivity) {
   );
 }
 
+export function isContextCompactionActivity(activity: AgentActivity) {
+  const input = record(activity.detail.input);
+  const values = [
+    activity.detail.tool,
+    activity.detail.kind,
+    activity.detail.description,
+    input.action,
+    activity.label,
+  ].map(text).filter(Boolean);
+  return values.some((value) => /^(?:compaction|context-compaction)$/u.test(value.toLowerCase())
+    || /(?:compact(?:ed|ing|ion)?\s+(?:the\s+)?context|context\s+compact)/iu.test(value));
+}
+
 export function commandForActivity(activity: AgentActivity) {
   const input = record(activity.detail.input);
   const metadata = record(activity.detail.metadata);

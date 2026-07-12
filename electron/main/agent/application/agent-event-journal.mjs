@@ -4,7 +4,7 @@ const MAX_REPLAY_EVENTS = 1_000;
 const MAX_REPLAY_BYTES = 2 * 1024 * 1024;
 const PERSIST_DEBOUNCE_MS = 750;
 
-/** Owns bounded event delivery and durable journal writes for live session records. */
+/** Owns bounded live-event delivery and process-local recovery snapshots. */
 export function createAgentEventJournal({ persistence, logger = console }) {
   function sendSessionExit(session, reason) {
     if (session.sender?.isDestroyed?.()) return;

@@ -1,8 +1,7 @@
-import { ArrowUp, AtSign, Check, Paperclip, Plus, Sparkles, Square, X } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import type { AgentCommand, AgentFileReference, AgentInferenceProvider, AgentLocalConnection, AgentMode, AgentModel } from "../domain/agent-contract";
+import { ArrowUp, AtSign, LoaderCircle, Paperclip, Square, X } from "lucide-react";
+import { useCallback, useLayoutEffect, useRef, type KeyboardEvent } from "react";
+import type { AgentCommand, AgentFileReference, AgentModel } from "../domain/agent-contract";
 import { AgentModelPicker } from "./AgentModelPicker";
-import { AgentProviderPicker } from "./AgentProviderPicker";
 
 type AgentComposerProps = {
   draft: string;
@@ -14,37 +13,24 @@ type AgentComposerProps = {
   submitting: boolean;
   placeholder: string;
   runtimeLabel?: string;
-  providers?: AgentInferenceProvider[];
-  selectedProviderId?: string | null;
-  onSelectProvider?: (providerId: string) => void;
-  localConnections?: AgentLocalConnection[];
-  localConnectionsPhase?: "idle" | "loading" | "ready" | "error";
-  localConnectionsError?: string | null;
-  onDiscoverLocalConnections?: (refresh: boolean) => void | Promise<void>;
+  configurationDisabled?: boolean;
   models?: AgentModel[];
   selectedModel?: string | null;
   onSelectModel?: (model: string) => void;
-  modes?: AgentMode[];
-  selectedMode?: string | null;
-  onSelectMode?: (mode: string) => void;
   commands?: AgentCommand[];
   attachments?: AgentFileReference[];
   contextReferences?: AgentFileReference[];
-  attachmentAvailable?: boolean;
-  contextAvailable?: boolean;
   steerAvailable?: boolean;
   queueAvailable?: boolean;
-  onAddAttachments?: (references: AgentFileReference[]) => void;
-  onAddContext?: (references: AgentFileReference[]) => void;
   onRemoveAttachment?: (path: string) => void;
   onRemoveContext?: (path: string) => void;
-  resolveFilePath?: (file: File) => string | null;
   onSubmit: (prompt: string) => Promise<boolean>;
   onStop: () => void;
 };
 
 const MIN_TEXTAREA_HEIGHT = 20;
 const MAX_TEXTAREA_HEIGHT = 132;
+const ignoreSelection = () => {};
 
 export function AgentComposer({
   draft,
@@ -56,116 +42,71 @@ export function AgentComposer({
   submitting,
   placeholder,
   runtimeLabel = "Agent",
-  providers = [],
-  selectedProviderId = null,
-  onSelectProvider,
-  localConnections = [],
-  localConnectionsPhase = "idle",
-  localConnectionsError = null,
-  onDiscoverLocalConnections = () => undefined,
+  configurationDisabled = false,
   models = [],
   selectedModel = null,
   onSelectModel,
-  modes = [],
-  selectedMode = null,
-  onSelectMode,
   commands = [],
   attachments = [],
   contextReferences = [],
-  attachmentAvailable = false,
-  contextAvailable = false,
   steerAvailable = false,
   queueAvailable = false,
-  onAddAttachments,
-  onAddContext,
   onRemoveAttachment,
   onRemoveContext,
-  resolveFilePath,
   onSubmit,
   onStop,
 }: AgentComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const toolsRef = useRef<HTMLDivElement>(null);
-  const [pickMode, setPickMode] = useState<"attachment" | "context">("attachment");
-  const [toolsOpen, setToolsOpen] = useState(false);
   const commandQuery = /^\/([^\s]*)$/.exec(draft.trimStart())?.[1]?.toLowerCase() ?? null;
   const visibleCommands = commandQuery === null ? [] : commands
     .filter((command) => command.name.toLowerCase().includes(commandQuery))
     .slice(0, 8);
   const canSendWhileRunning = steerAvailable || queueAvailable;
-  const toolsAvailable = attachmentAvailable || contextAvailable || modes.length > 0;
+  const resizeTextarea = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    if (!textarea.value) {
+      textarea.style.height = `${MIN_TEXTAREA_HEIGHT}px`;
+      textarea.style.overflowY = "hidden";
+      return;
+    }
+    textarea.style.height = "0px";
+    const scrollHeight = textarea.scrollHeight;
+    const nextHeight = Math.max(MIN_TEXTAREA_HEIGHT, Math.min(scrollHeight, MAX_TEXTAREA_HEIGHT));
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = scrollHeight > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
+  }, []);
 
-  useEffect(() => {
-    if (!toolsOpen) return undefined;
-    const closeOnPointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && toolsRef.current?.contains(event.target)) return;
-      setToolsOpen(false);
-    };
-    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") setToolsOpen(false);
-    };
-    window.addEventListener("pointerdown", closeOnPointerDown, true);
-    window.addEventListener("keydown", closeOnEscape, true);
-    return () => {
-      window.removeEventListener("pointerdown", closeOnPointerDown, true);
-      window.removeEventListener("keydown", closeOnEscape, true);
-    };
-  }, [toolsOpen]);
+  useLayoutEffect(() => {
+    resizeTextarea();
+  }, [draft, resizeTextarea]);
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const resize = () => {
-      if (!draft) {
-        textarea.style.height = `${MIN_TEXTAREA_HEIGHT}px`;
-        textarea.style.overflowY = "hidden";
-        return;
-      }
-      textarea.style.height = "0px";
-      const nextHeight = Math.max(MIN_TEXTAREA_HEIGHT, Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT));
-      textarea.style.height = `${nextHeight}px`;
-      textarea.style.overflowY = textarea.scrollHeight > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
-    };
-    resize();
     let lastWidth = textarea.parentElement?.getBoundingClientRect().width ?? 0;
     const observer = typeof ResizeObserver === "function" ? new ResizeObserver(([entry]) => {
       if (!entry || Math.abs(entry.contentRect.width - lastWidth) < 1) return;
       lastWidth = entry.contentRect.width;
-      resize();
+      resizeTextarea();
     }) : null;
     if (textarea.parentElement) observer?.observe(textarea.parentElement);
     return () => observer?.disconnect();
-  }, [draft]);
+  }, [resizeTextarea]);
 
   const submit = async () => {
     const prompt = draft.trim();
     if (!prompt || disabled || (running && !canSendWhileRunning) || submitting) return;
-    if (await onSubmit(prompt)) onDraftChange("");
+    await onSubmit(prompt);
   };
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
     void submit();
   };
-  const openPicker = (mode: "attachment" | "context") => {
-    setPickMode(mode);
-    setToolsOpen(false);
-    fileInputRef.current?.click();
-  };
-  const acceptFiles = (files: FileList | null) => {
-    const references = Array.from(files ?? []).flatMap((file) => {
-      const path = resolveFilePath?.(file);
-      return path ? [{ path, name: file.name }] : [];
-    });
-    if (pickMode === "context") onAddContext?.(references);
-    else onAddAttachments?.(references);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
   return (
     <div className="desktop-agent-composer-shell">
-      {visibleCommands.length > 0 && !toolsOpen && (
+      {visibleCommands.length > 0 && (
         <div className="desktop-agent-command-menu" role="listbox" aria-label="Agent commands">
           {visibleCommands.map((command) => (
             <button type="button" role="option" key={`${command.source}:${command.name}`} onClick={() => onDraftChange(`/${command.name} `)}>
@@ -182,42 +123,6 @@ export function AgentComposer({
           </div>
         )}
         <div className="desktop-agent-composer-row">
-          <div className="desktop-agent-composer-leading" ref={toolsRef}>
-            <button
-              type="button"
-              className="desktop-agent-composer-tool"
-              aria-label="Add context or change Agent mode"
-              title="Add context or change Agent mode"
-              aria-haspopup="menu"
-              aria-expanded={toolsOpen}
-              disabled={!toolsAvailable || inputDisabled || running}
-              onClick={() => setToolsOpen((value) => !value)}
-            >
-              <Plus size={18} />
-            </button>
-            {toolsOpen && (
-              <div className="desktop-agent-tools-menu" role="menu" aria-label="Composer tools">
-                {attachmentAvailable && <button type="button" role="menuitem" onClick={() => openPicker("attachment")}><Paperclip size={14} /><span>Attach files</span></button>}
-                {contextAvailable && <button type="button" role="menuitem" onClick={() => openPicker("context")}><AtSign size={14} /><span>Add workspace context</span></button>}
-                {modes.length > 0 && (
-                  <div className="desktop-agent-tools-mode" role="group" aria-label="Agent mode">
-                    <div><Sparkles size={13} /><span>Agent mode</span></div>
-                    {modes.map((mode) => (
-                      <button
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={mode.id === selectedMode}
-                        key={mode.id}
-                        onClick={() => { onSelectMode?.(mode.id); setToolsOpen(false); }}
-                      >
-                        <span>{mode.displayName}</span>{mode.id === selectedMode && <Check size={13} />}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
           <textarea
             ref={textareaRef}
             value={draft}
@@ -228,32 +133,19 @@ export function AgentComposer({
             onChange={(event) => onDraftChange(event.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <input ref={fileInputRef} className="desktop-agent-visually-hidden" type="file" multiple tabIndex={-1} onChange={(event) => acceptFiles(event.target.files)} />
           <div className="desktop-agent-composer-trailing">
-            <div className="desktop-agent-composer-picker is-provider">
-              <AgentProviderPicker
-                providers={providers}
-                localConnections={localConnections}
-                localConnectionsPhase={localConnectionsPhase}
-                localConnectionsError={localConnectionsError}
-                selectedProviderId={selectedProviderId}
-                disabled={running}
-                onSelectProvider={(providerId) => onSelectProvider?.(providerId)}
-                onDiscoverLocalConnections={onDiscoverLocalConnections}
-              />
-            </div>
-            {selectedProviderId && models.length > 0 && (
+            {models.length > 0 && (
               <div className="desktop-agent-composer-picker is-model">
                 <AgentModelPicker
                   models={models}
                   selectedModel={selectedModel}
-                  disabled={running}
-                  onSelectModel={(model) => onSelectModel?.(model)}
+                  disabled={running || configurationDisabled}
+                  onSelectModel={onSelectModel ?? ignoreSelection}
                 />
               </div>
             )}
             {running && <button type="button" className="desktop-agent-composer-action is-stop" aria-label={stopping ? `Stopping ${runtimeLabel}` : `Stop ${runtimeLabel}`} disabled={stopping} onClick={onStop}><Square size={11} fill="currentColor" /></button>}
-            {(!running || canSendWhileRunning) && <button type="button" className="desktop-agent-composer-action" aria-label={running && steerAvailable ? `Steer ${runtimeLabel}` : "Send message"} disabled={disabled || submitting || !draft.trim()} onClick={() => void submit()}><ArrowUp size={17} strokeWidth={2.2} /></button>}
+            {(!running || canSendWhileRunning) && <button type="button" className="desktop-agent-composer-action" aria-label={running && steerAvailable ? `Steer ${runtimeLabel}` : "Send message"} aria-busy={submitting || undefined} disabled={disabled || submitting || !draft.trim()} onClick={() => void submit()}>{submitting ? <LoaderCircle size={15} className="desktop-agent-spin" /> : <ArrowUp size={17} strokeWidth={2.2} />}</button>}
           </div>
         </div>
       </div>

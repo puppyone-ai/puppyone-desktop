@@ -659,7 +659,7 @@ function AccountSettingsView({
     <section className="desktop-utility-view desktop-settings-view">
       <div className="desktop-utility-body desktop-settings-body">
         <div className="desktop-settings-section desktop-account-settings-section">
-          <SettingsSectionHeader title="Account" detail="Desktop account and Cloud service settings." />
+          <SettingsSectionHeader title="Account" detail="PuppyOne Cloud account and desktop sign-in session." />
 
           <SettingsGroup title="Puppyone account">
             <SettingsLine
@@ -1373,44 +1373,88 @@ function GitSettingsView({
   );
 }
 
+type SettingsSidebarItem = {
+  id: SettingsSection;
+  label: string;
+  icon: typeof Settings;
+  disabled: boolean;
+};
+
+type SettingsSidebarGroup = {
+  id: string;
+  label: string | null;
+  items: readonly SettingsSidebarItem[];
+};
+
+const SETTINGS_SIDEBAR_GROUPS = [
+  {
+    id: "desktop-app",
+    label: "Desktop App",
+    items: [
+      { id: "workspace", label: "General", icon: Settings, disabled: false },
+      { id: "appearance", label: "Appearance", icon: Monitor, disabled: false },
+      { id: "external-apps", label: "Default Apps", icon: ExternalLink, disabled: false },
+      { id: "editor", label: "Editor", icon: Pencil, disabled: false },
+      { id: "experimental", label: "Experimental", icon: FlaskConical, disabled: false },
+    ],
+  },
+  {
+    id: "workspace",
+    label: "Workspace",
+    items: [
+      { id: "git", label: "Git", icon: GitBranch, disabled: false },
+      { id: "files", label: "Git Ignore", icon: FileText, disabled: false },
+    ],
+  },
+  {
+    id: "cloud",
+    label: "Cloud",
+    items: [
+      { id: "account", label: "Account", icon: UserRound, disabled: false },
+      { id: "cloud", label: "Cloud Hosting", icon: Cloud, disabled: false },
+    ],
+  },
+] satisfies readonly SettingsSidebarGroup[];
+
 export function SettingsSidebar({ activeSection, onSelectSection }: SettingsSidebarProps) {
-  const settingsSections = [
-    { id: "account", label: "Account", icon: UserRound, disabled: false },
-    { id: "workspace", label: "General", icon: Settings, disabled: false },
-    { id: "appearance", label: "Appearance", icon: Monitor, disabled: false },
-    { id: "external-apps", label: "Default Apps", icon: ExternalLink, disabled: false },
-    { id: "git", label: "Git", icon: GitBranch, disabled: false },
-    { id: "files", label: "Git Ignore", icon: FileText, disabled: false },
-    { id: "editor", label: "Editor", icon: Pencil, disabled: false },
-    { id: "experimental", label: "Experimental", icon: FlaskConical, disabled: false },
-    { id: "cloud", label: "Cloud Hosting", icon: Cloud, disabled: false },
-  ] satisfies Array<{
-    id: SettingsSection;
-    label: string;
-    icon: typeof Settings;
-    disabled: boolean;
-  }>;
 
   return (
     <section className="desktop-tool-sidebar desktop-settings-sidebar">
       <div className="desktop-tool-sidebar-list">
-        {settingsSections.map((section) => {
-          const Icon = section.icon;
+        {SETTINGS_SIDEBAR_GROUPS.map((group) => {
+          const labelId = group.label ? `desktop-settings-sidebar-group-${group.id}` : undefined;
           return (
-            <div key={section.id}>
-              <button
-                className={`desktop-tool-sidebar-row ${section.id === activeSection ? "active" : ""}`}
-                type="button"
-                disabled={section.disabled}
-                aria-disabled={section.disabled}
-                title={section.disabled ? `${section.label} is not available yet` : section.label}
-                onClick={() => onSelectSection(section.id)}
-              >
-                <Icon size={15} />
-                <span>{section.label}</span>
-              </button>
-              {section.id === "account" && <div className="desktop-settings-sidebar-divider" aria-hidden="true" />}
-              {section.id === "experimental" && <div className="desktop-settings-sidebar-divider cloud" aria-hidden="true" />}
+            <div
+              className="desktop-settings-sidebar-group"
+              role="group"
+              aria-label={group.label ? undefined : "Account"}
+              aria-labelledby={labelId}
+              key={group.id}
+            >
+              {group.label && (
+                <div className="desktop-settings-sidebar-group-header">
+                  <div className="desktop-settings-sidebar-group-title" id={labelId}>
+                    {group.label}
+                  </div>
+                </div>
+              )}
+              {group.items.map((section) => {
+                const Icon = section.icon;
+                return (
+                  <button
+                    className={`desktop-tool-sidebar-row ${section.id === activeSection ? "active" : ""}`}
+                    type="button"
+                    disabled={section.disabled}
+                    aria-disabled={section.disabled}
+                    title={section.disabled ? `${section.label} is not available yet` : section.label}
+                    onClick={() => onSelectSection(section.id)}
+                    key={section.id}
+                  >
+                    <Icon size={15} />
+                    <span>{section.label}</span>
+                  </button>
+                );
+              })}
             </div>
           );
         })}

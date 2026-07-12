@@ -1,57 +1,35 @@
 import { useMemo, useState } from "react";
+import { DesktopOverlayPortal } from "../../app-shell/DesktopOverlayPortal";
 import { AgentComposer } from "./AgentComposer";
 import { AgentChangesPill } from "./AgentChangesPill";
+import { AgentPanelLayout } from "./AgentPanelLayout";
+import { AgentProviderPicker } from "./AgentProviderPicker";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
 import { createAgentProjection } from "../domain/agent-projection";
+import type { AgentModel, AgentRuntimeCatalogEntry } from "../domain/agent-contract";
 import "./desktop-agent.css";
 
-const models = [
-  { id: "openai/gpt-5.4", model: "openai/gpt-5.4", displayName: "GPT-5.4", description: "OpenAI · coding model", isDefault: true, providerId: "openai" },
-  { id: "openai/gpt-5.4-mini", model: "openai/gpt-5.4-mini", displayName: "GPT-5.4 Mini", description: "OpenAI · fast coding model", isDefault: false, providerId: "openai" },
+const agentProviders: AgentRuntimeCatalogEntry[] = [
+  provider("codex", "Codex", "codex"),
+  provider("claude", "Claude Code", "claude"),
+  provider("opencode-native", "OpenCode", "opencode"),
+  detectedProvider("cursor", "Cursor Agent", "cursor"),
 ];
 
-const providers = [{ id: "openai", displayName: "OpenAI", source: "api", defaultModel: "openai/gpt-5.4", modelCount: 2 }];
-
-const localConnections = [
-  {
-    id: "codex",
-    displayName: "Codex CLI",
-    installation: "detected" as const,
-    version: "0.144.1",
-    authentication: "signed-in" as const,
-    integration: "bridge-required" as const,
-    capabilities: { versionProbe: true, authenticationProbe: true, protocolProbe: true },
-    selectable: false,
-    statusMessage: "Direct Codex sessions are not enabled; use OpenAI through OpenCode.",
-    actions: [{ id: "refresh" as const, label: "Refresh" }],
-    source: "user-installation" as const,
-  },
-  {
-    id: "cursor-agent",
-    displayName: "Cursor Agent",
-    installation: "detected" as const,
-    version: "2026.07.09-a3815c0",
-    authentication: "signed-in" as const,
-    integration: "bridge-required" as const,
-    capabilities: { versionProbe: true, authenticationProbe: true, protocolProbe: false },
-    selectable: false,
-    statusMessage: "Cursor Agent is installed, but an OpenCode bridge is not enabled.",
-    actions: [{ id: "refresh" as const, label: "Refresh" }],
-    source: "user-installation" as const,
-  },
-];
-
-const modes = [
-  { id: "build", displayName: "Agent", description: "Plan and make changes", isDefault: true },
-  { id: "plan", displayName: "Plan", description: "Read and plan only", isDefault: false },
-];
+const modelsByProvider: Record<string, AgentModel[]> = {
+  codex: [model("gpt-5.4", "GPT-5.4", true), model("gpt-5.4-mini", "GPT-5.4 Mini")],
+  claude: [model("claude-sonnet-4.5", "Claude Sonnet 4.5", true), model("claude-opus-4.1", "Claude Opus 4.1")],
+  "opencode-native": [model("google/gemini-3-pro", "Gemini 3 Pro", true), model("openai/gpt-5.4", "GPT-5.4")],
+  cursor: [model("auto", "Auto", true), model("composer-1", "Composer 1")],
+};
 
 export function AgentVisualSmokeHarness() {
   const [draft, setDraft] = useState("");
-  const [provider, setProvider] = useState(providers[0].id);
-  const [model, setModel] = useState(models[0].model);
-  const [mode, setMode] = useState(modes[0].id);
+  const [providerId, setProviderId] = useState(agentProviders[0].descriptor.id);
+  const [selectedModel, setSelectedModel] = useState(modelsByProvider[providerId][0].model);
+  const selectedProvider = agentProviders.find((entry) => entry.descriptor.id === providerId) ?? agentProviders[0];
+  const models = modelsByProvider[providerId];
   const projection = useMemo(() => {
     const value = createAgentProjection();
     value.sessionState = "active";
@@ -94,7 +72,7 @@ export function AgentVisualSmokeHarness() {
         text: "分支已切到 `codex-cloud`。先找到 MD 编辑器内容区上下与左右 padding 的定义处。",
         streaming: false,
         terminalState: "completed",
-        sequence: 5,
+        sequence: 6,
       },
     ];
     value.activities = [
@@ -110,6 +88,17 @@ export function AgentVisualSmokeHarness() {
         sequence: 4,
       },
       {
+        id: "activity:compaction",
+        turnId: "turn-2",
+        itemId: "compact-1",
+        kind: "tool",
+        label: "Compacted context",
+        status: "completed",
+        detail: { tool: "compaction" },
+        output: "",
+        sequence: 5,
+      },
+      {
         id: "activity:explored",
         turnId: "turn-2",
         itemId: "tool-1",
@@ -118,7 +107,7 @@ export function AgentVisualSmokeHarness() {
         status: "completed",
         detail: { tool: "grep", query: "padding", path: "src/markdown-editor.css" },
         output: "",
-        sequence: 6,
+        sequence: 7,
       },
       {
         id: "activity:command",
@@ -129,7 +118,7 @@ export function AgentVisualSmokeHarness() {
         status: "completed",
         detail: { tool: "bash", input: { command: "npm test" }, metadata: { exitCode: 0, duration: 2080 } },
         output: "25 test files passed · 251 tests passed",
-        sequence: 7,
+        sequence: 8,
       },
       {
         id: "activity:file-change",
@@ -145,7 +134,7 @@ export function AgentVisualSmokeHarness() {
           input: { patch: "@@ -10,2 +10,2 @@\n-padding: 12px 24px;\n+padding: 24px;" },
         },
         output: "",
-        sequence: 8,
+        sequence: 9,
       },
     ];
     value.parts = [{
@@ -157,55 +146,83 @@ export function AgentVisualSmokeHarness() {
       status: "completed",
       detail: { changes: [{ path: "src/markdown-editor.css", additions: 2704, deletions: 585 }] },
       output: "",
-      sequence: 8,
+      sequence: 9,
     }];
-    value.lastSequence = 8;
+    value.lastSequence = 9;
     value.terminalState = "completed";
     return value;
   }, []);
 
   return (
-    <main className="desktop-agent-visual-smoke dark">
-      <section className="desktop-agent-panel" aria-label="Agent visual smoke">
-        <AgentSurfaceHeader
-          title="Agent architecture"
-          runtimeLabel="OpenCode"
-          statusLabel="ready"
-          loading={false}
-          newSessionDisabled={false}
-          onNewSession={() => {}}
-          history={[]}
+    <>
+      <main className="desktop-agent-visual-smoke dark">
+        <AgentPanelLayout
+          ariaLabel="Agent visual smoke"
+          header={<AgentSurfaceHeader
+            title="Agent architecture"
+            runtimeLabel={selectedProvider.descriptor.displayName}
+            statusLabel="ready"
+            loading={false}
+            newSessionDisabled={false}
+            onNewSession={() => {}}
+            agentSelector={<AgentProviderPicker
+              agentProviders={agentProviders}
+              selectedAgentProviderId={providerId}
+              onSelectAgentProvider={(nextProviderId) => {
+                setProviderId(nextProviderId);
+                setSelectedModel(modelsByProvider[nextProviderId][0].model);
+              }}
+            />}
+          />}
+          conversation={<AgentTranscript projection={projection} loading={false} runtimeLabel={selectedProvider.descriptor.displayName} />}
+          dock={<>
+            <AgentChangesPill projection={projection} onViewChanges={() => {}} />
+            <AgentComposer
+              draft={draft}
+              onDraftChange={setDraft}
+              disabled={false}
+              running={false}
+              stopping={false}
+              submitting={false}
+              placeholder="Send follow-up"
+              runtimeLabel={selectedProvider.descriptor.displayName}
+              models={models}
+              selectedModel={selectedModel}
+              onSelectModel={setSelectedModel}
+              commands={[]}
+              onSubmit={async () => { setDraft(""); return true; }}
+              onStop={() => {}}
+            />
+          </>}
         />
-        <AgentTranscript projection={projection} loading={false} runtimeLabel="OpenCode" />
-        <AgentChangesPill projection={projection} onViewChanges={() => {}} />
-        <AgentComposer
-          draft={draft}
-          onDraftChange={setDraft}
-          disabled={false}
-          running={false}
-          stopping={false}
-          submitting={false}
-          placeholder="Send follow-up"
-          runtimeLabel="OpenCode"
-          providers={providers}
-          selectedProviderId={provider}
-          localConnections={localConnections}
-          localConnectionsPhase="ready"
-          onDiscoverLocalConnections={() => undefined}
-          onSelectProvider={setProvider}
-          models={models}
-          selectedModel={model}
-          onSelectModel={setModel}
-          modes={modes}
-          selectedMode={mode}
-          onSelectMode={setMode}
-          commands={[]}
-          attachmentAvailable
-          contextAvailable
-          onSubmit={async () => true}
-          onStop={() => {}}
-        />
-      </section>
-    </main>
+      </main>
+      <DesktopOverlayPortal theme="dark"><></></DesktopOverlayPortal>
+    </>
   );
+}
+
+function provider(id: string, displayName: string, iconKey: string): AgentRuntimeCatalogEntry {
+  return {
+    descriptor: { id, displayName, iconKey, distribution: "user-installed" },
+    readiness: { runtimeId: id, provider: id, status: "ready", version: "1.0.0", minimumVersion: null, message: "Ready", selectable: true },
+  };
+}
+
+function detectedProvider(id: string, displayName: string, iconKey: string): AgentRuntimeCatalogEntry {
+  return {
+    descriptor: { id, displayName, iconKey, distribution: "user-installed" },
+    readiness: {
+      runtimeId: id,
+      provider: id,
+      status: "protocol-unavailable",
+      version: "2026.07.09-a3815c0",
+      minimumVersion: null,
+      message: "Cursor Agent is installed, but its native protocol is not available.",
+      selectable: false,
+    },
+  };
+}
+
+function model(id: string, displayName: string, isDefault = false): AgentModel {
+  return { id, model: id, displayName, description: "Native coding Agent model", isDefault };
 }

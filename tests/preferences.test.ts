@@ -58,6 +58,10 @@ describe("appearance preferences", () => {
         expect(block).toContain(`${tokenNames[role as keyof typeof tokenNames]}: ${size}px;`);
       }
     }
+
+    expect(css).toMatch(
+      /:root,\s*:where\(\.app-shell, \.onboarding-shell, \.desktop-overlay-root, \.desktop-theme-preview-surface, \.dark\)\s*\{[^}]*--desktop-sidebar-font-size:\s*var\(--po-text-size-sidebar\);[^}]*--desktop-sidebar-font-size-meta:\s*var\(--po-text-size-meta\);/s,
+    );
   });
 
   it("accepts only curated appearance values", () => {
