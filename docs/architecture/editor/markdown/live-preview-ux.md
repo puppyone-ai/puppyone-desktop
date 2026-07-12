@@ -127,6 +127,13 @@ and patches these edges instead.
    source. Range selections (mouse drags, shift-selects) act on rendered
    text without expanding anything — this kills drag flicker by
    construction.
+7. **Live Preview commits atomically.** A newly selected document may build
+   its canonical EditorView and derived projection in separate scheduled
+   tasks, but raw source is not an intermediate presentation state. The
+   measurable editor stays hidden and non-interactive until the current
+   document revision is confirmed for paint. Source appears immediately only
+   when the user intentionally chooses Source Mode or when Preview fails with
+   an explicit fallback notice.
 
 ## 4. Element lifecycle
 

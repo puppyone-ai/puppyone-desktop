@@ -13,7 +13,12 @@ import {
 } from "react";
 import type { DataCapabilities, DataNode, DataPort, FileContent, Workspace } from "../core/types";
 import { defaultDataCapabilities } from "../core/types";
-import { getEditorSourceRequirement, shouldReadEditorContent } from "../editor/viewerRegistry";
+import { preloadPresetViewer } from "../editor/PresetViewerRenderer";
+import {
+  getEditorSourceRequirement,
+  resolveEditorViewer,
+  shouldReadEditorContent,
+} from "../editor/viewerRegistry";
 import {
   createMarkdownLinkGraph,
   EMPTY_MARKDOWN_LINK_GRAPH_INDEX,
@@ -453,6 +458,17 @@ export function DataWorkspace({
   );
   const currentFolderPath = activeNode?.type === "folder" ? activeNode.path : getParentPath(resolvedActivePath);
   const selectedFile = activeNode?.type !== "folder" ? activeNode : null;
+  const selectedFileViewer = useMemo(() => selectedFile
+    ? resolveEditorViewer({
+        path: selectedFile.path,
+        name: selectedFile.name,
+        type: selectedFile.type,
+        content: selectedFile.content,
+        preview: selectedFile.preview,
+        mimeType: selectedFile.mimeType,
+        sourceKind: documentSourceKind ?? resolvedDocumentSourceKind,
+      }).viewer
+    : null, [documentSourceKind, resolvedDocumentSourceKind, selectedFile]);
   const selectedFileSourceRequirement = selectedFile ? getEditorSourceRequirement(selectedFile) : "none";
   const selectedFileNeedsFullContent = Boolean(selectedFile && dataPort.readFile && shouldReadEditorContent(selectedFile));
   const selectedFileNeedsResourceUrl = Boolean(
@@ -501,6 +517,15 @@ export function DataWorkspace({
   const loadingPath = getFirstSetValue(loadingFolderPaths);
   const rootLoading = loadingFolderPaths.has(ROOT_FOLDER_KEY);
   const filesExplorerActive = !explorerSlot;
+
+  useEffect(() => {
+    if (!selectedFileViewer) return;
+    // Selection owns route preloading. The currently committed preview may
+    // intentionally remain on screen while a different format is read, so a
+    // preload initiated by the rendered document can target the old viewer.
+    // The loader cache deduplicates this with PuppyoneEditorHost and React.lazy.
+    void preloadPresetViewer(selectedFileViewer).catch(() => undefined);
+  }, [selectedFileViewer]);
 
   useEffect(() => {
     onActiveNodeChange?.(activeNode ?? null);

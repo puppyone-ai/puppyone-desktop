@@ -1,9 +1,22 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { preloadPresetViewer } from "../packages/shared-ui/src/editor/PresetViewerRenderer";
 import { getPresetViewerDefinition } from "../packages/shared-ui/src/editor/presetViewerManifest";
 import type { LazyPresetViewerContribution } from "../packages/shared-ui/src/editor/viewerTypes";
 
 describe("preset viewer preload cache", () => {
+  it("starts route acquisition from the selected document rather than the retained preview", () => {
+    const workspaceSource = readFileSync(
+      new URL("../packages/shared-ui/src/data/DataWorkspace.tsx", import.meta.url),
+      "utf8",
+    );
+    const selectionPreload = workspaceSource.indexOf("preloadPresetViewer(selectedFileViewer)");
+    const contentRead = workspaceSource.indexOf("dataPort.readFile(selectedFile.path");
+
+    expect(selectionPreload).toBeGreaterThan(-1);
+    expect(contentRead).toBeGreaterThan(selectionPreload);
+  });
+
   it("deduplicates prefetch and React.lazy module acquisition", async () => {
     const load = vi.fn(async () => ({ default: () => null }));
     const viewer = createLazyViewer(load);

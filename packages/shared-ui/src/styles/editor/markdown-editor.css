@@ -28,6 +28,65 @@
   letter-spacing: 0;
 }
 
+/* Live Preview is a presentation commit, not a progressive source-to-rich
+   animation. The base EditorView stays measurable while its derived Markdown
+   projection activates, but canonical source must never become an interim
+   user-visible frame. */
+.markdown-codemirror-editor[data-live-preview="true"][data-preview-state="pending"] {
+  cursor: default;
+}
+
+.markdown-codemirror-editor[data-live-preview="true"][data-preview-state="pending"] .cm-editor {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.markdown-codemirror-editor[data-preview-state="pending"][data-preview-message]::after {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--po-editor-bg);
+  color: var(--po-text-subtle);
+  content: attr(data-preview-message);
+  cursor: default;
+  font-family: var(--po-font-ui, var(--po-font-sans));
+  font-size: var(--po-text-size-meta, 12px);
+  font-weight: var(--po-text-weight-medium, 500);
+}
+
+.markdown-codemirror-editor[data-preview-state="error"][data-preview-message]::after {
+  position: absolute;
+  z-index: 4;
+  top: 14px;
+  left: 50%;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--po-danger) 20%, var(--po-border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--po-panel-raised) 96%, transparent);
+  box-shadow: var(--po-shadow-sm);
+  color: var(--po-danger);
+  content: attr(data-preview-message);
+  font-family: var(--po-font-ui, var(--po-font-sans));
+  font-size: var(--po-text-size-caption, 11px);
+  font-weight: var(--po-text-weight-medium, 500);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.markdown-preview-announcer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  margin: -1px;
+  white-space: nowrap;
+}
+
 .markdown-codemirror-editor .cm-scroller {
   overflow: auto;
   cursor: text;

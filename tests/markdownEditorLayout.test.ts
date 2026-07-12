@@ -19,6 +19,18 @@ const markdownCodeCss = readFileSync(
 );
 
 describe("Markdown editor layout", () => {
+  it("keeps canonical Markdown source invisible until Live Preview commits", () => {
+    const pendingRule = readCssRule(
+      markdownEditorCss,
+      '.markdown-codemirror-editor[data-live-preview="true"][data-preview-state="pending"] .cm-editor',
+    );
+
+    expect(pendingRule).toContain("visibility: hidden;");
+    expect(pendingRule).toContain("pointer-events: none;");
+    expect(markdownEditorCss).not.toMatch(/data-preview-state="pending"[^}]*opacity\s*:/s);
+    expect(markdownEditorCss).not.toMatch(/data-preview-state="pending"[^}]*display\s*:\s*none/s);
+  });
+
   it("keeps vertical document padding fixed while the inline gutter responds to width", () => {
     const editorRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor");
     const contentRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor .cm-content");

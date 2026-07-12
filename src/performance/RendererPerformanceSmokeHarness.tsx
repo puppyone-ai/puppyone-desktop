@@ -102,34 +102,77 @@ export function RendererPerformanceSmokeHarness() {
       button.click();
     };
 
+    const failPresentationContract = (message: string) => {
+      if (stopped) return;
+      stopped = true;
+      window.__PUPPYONE_RENDERER_PERFORMANCE_SMOKE_RESULT__ = { error: message };
+    };
+
+    const verifyPendingPresentation = () => {
+      const host = document.querySelector<HTMLElement>(".markdown-codemirror-editor");
+      const editor = host?.querySelector<HTMLElement>(".cm-editor") ?? null;
+      if (!host || !editor) {
+        failPresentationContract("Markdown base readiness did not expose an EditorView for presentation verification.");
+        return false;
+      }
+      if (host.dataset.livePreview !== "true" || host.dataset.previewState !== "pending") {
+        failPresentationContract(`Markdown source exposure gate was not pending at base readiness (${host.dataset.previewState ?? "missing"}).`);
+        return false;
+      }
+      if (getComputedStyle(editor).visibility !== "hidden") {
+        failPresentationContract("Markdown canonical source was visible before Live Preview committed.");
+        return false;
+      }
+      return true;
+    };
+
+    const verifyReadyPresentation = () => {
+      const host = document.querySelector<HTMLElement>(".markdown-codemirror-editor");
+      const editor = host?.querySelector<HTMLElement>(".cm-editor") ?? null;
+      if (!host || !editor) {
+        failPresentationContract("Markdown preview readiness did not retain an EditorView.");
+        return false;
+      }
+      if (host.dataset.previewState !== "ready") {
+        failPresentationContract(`Markdown preview did not atomically commit (${host.dataset.previewState ?? "missing"}).`);
+        return false;
+      }
+      if (getComputedStyle(editor).visibility === "hidden") {
+        failPresentationContract("Markdown Live Preview remained hidden after readiness committed.");
+        return false;
+      }
+      return true;
+    };
+
     const onPerformance = (event: Event) => {
       const detail = (event as CustomEvent<{ stage?: string }>).detail;
+      if (detail?.stage === "editor_base_ready" && !verifyPendingPresentation()) return;
       if (detail?.stage !== "preview_ready") return;
-      if (!measuring) {
-        warmupSamples += 1;
-        if (warmupSamples >= WARMUP_COUNT) {
-          tracker.reset();
-          measuring = true;
+      window.requestAnimationFrame(() => {
+        if (stopped || !verifyReadyPresentation()) return;
+        if (!measuring) {
+          warmupSamples += 1;
+          if (warmupSamples >= WARMUP_COUNT) {
+            tracker.reset();
+            measuring = true;
+          }
+          window.requestAnimationFrame(selectNextFile);
+          return;
+        }
+        const editorElement = document.querySelector<HTMLElement>(".markdown-codemirror-editor");
+        const editorView = editorElement ? EditorView.findFromDOM(editorElement) : null;
+        if (!editorView) {
+          failPresentationContract("Unable to resolve the CodeMirror view for input transaction sampling.");
+          return;
+        }
+        editorView.dispatch({ changes: { from: 0, insert: "x" } });
+        const summary = tracker.getSummary();
+        if (summary.completedSamples >= SAMPLE_COUNT) {
+          finish();
+          return;
         }
         window.requestAnimationFrame(selectNextFile);
-        return;
-      }
-      const editorElement = document.querySelector<HTMLElement>(".markdown-codemirror-editor");
-      const editorView = editorElement ? EditorView.findFromDOM(editorElement) : null;
-      if (!editorView) {
-        window.__PUPPYONE_RENDERER_PERFORMANCE_SMOKE_RESULT__ = {
-          error: "Unable to resolve the CodeMirror view for input transaction sampling.",
-        };
-        stopped = true;
-        return;
-      }
-      editorView.dispatch({ changes: { from: 0, insert: "x" } });
-      const summary = tracker.getSummary();
-      if (summary.completedSamples >= SAMPLE_COUNT) {
-        finish();
-        return;
-      }
-      window.requestAnimationFrame(selectNextFile);
+      });
     };
 
     window.addEventListener("puppyone:renderer-performance", onPerformance);

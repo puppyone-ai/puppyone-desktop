@@ -68,14 +68,22 @@ rendering.
 ## Markdown projection contract
 
 The base EditorView is committed from an effect with source, editing, history,
-and layout extensions. While content is still being acquired, a lazy viewer
-module is prefetched through the preset-viewer loader cache so download and I/O
-overlap. Markdown language support and Live Preview activation then run as two
-separate cancellable `scheduler.postTask({priority: "user-blocking"})` tasks
-(zero-delay tasks on hosts without the Scheduler API). This preserves a yield
-between parsing and projection without forcing two extra frame delays. A final
-animation frame confirms the activated revision actually painted. Every task
-and frame is canceled on file switch or unmount.
+and layout extensions. The selected document route owns lazy-viewer preloading,
+so module acquisition overlaps content I/O even while the previously committed
+document remains visible. The loader cache deduplicates that request with the
+host fallback and React.lazy.
+
+Markdown language support and Live Preview activation then run as two separate
+cancellable `scheduler.postTask({priority: "user-blocking"})` tasks (zero-delay
+tasks on hosts without the Scheduler API). This preserves a yield between
+parsing and projection without forcing two extra frame delays. During those
+tasks the base EditorView remains in layout for measurement but its canonical
+source is `visibility: hidden` and non-interactive. A final animation frame
+confirms the same document revision and atomically commits the rendered
+presentation. Revision changes re-arm confirmation; file/mode supersession
+cancels the generation. Source Mode bypasses the gate, and an activation error
+falls back to visible source with an explicit notice. Every task and frame is
+canceled on file switch or unmount.
 
 `MarkdownDocumentProjection` is EditorView-scoped:
 
@@ -186,6 +194,8 @@ interactions, changed-range Markdown projection, source snapshot/flush
 behavior, A/B request cancellation, streaming worker equivalence,
 cancellation and incremental updates, pathological inline-token complexity,
 Markdown round-trip and IME, table interactions, widget/session cleanup, and
-trust/policy/asset/web-embed security. The final gate is `npm test`,
+trust/policy/asset/web-embed security. Production smoke must also prove that
+the base EditorView is visually hidden before `preview_ready` and visible only
+after the matching revision commits. The final gate is `npm test`,
 `npm run lint`, `npm run check:shared-ui`, both production renderer smokes, and
 `npm run build`.

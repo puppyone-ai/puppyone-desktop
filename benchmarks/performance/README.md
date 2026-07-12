@@ -83,6 +83,12 @@ The same window recorded 0 stale commits and 0 Long Tasks over 50ms. The
 machine-readable before/after and smoke summary is in
 `baselines/issue-024-m2-pro-2026-07-11.json`.
 
+The atomic Live Preview readiness follow-up additionally verifies computed
+visibility: canonical Markdown source is hidden at `editor_base_ready`, and
+the editor becomes visible only after the matching revision commits. Its warm
+30-sample and cold-first-open evidence is recorded in
+`baselines/markdown-preview-readiness-m2-pro-2026-07-13.json`.
+
 ## Cold first open and background-index contention
 
 The warm run does not cover lazy module evaluation or the period when the
