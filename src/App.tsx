@@ -18,12 +18,15 @@ import {
   configureWorkspaceCloudRemote,
   createLocalDataPort,
   getWorkspaceGitStatus,
+  removeWorkspaceGitRemote,
   showHomepage,
 } from "./lib/localFiles";
 import { openWorkspaceTarget } from "./lib/workspaceOpening";
 import {
   getDesktopCloudApiBaseUrl,
+  getCloudProject,
   isCloudSessionForApiBase,
+  revokeCloudWorkspaceBinding,
   type DesktopCloudProject,
   type DesktopCloudSession,
 } from "./lib/cloudApi";
@@ -79,11 +82,15 @@ import {
 } from "./features/source-control/operationDialogs";
 import { useDesktopGitController } from "./features/source-control/useDesktopGitController";
 import { createRepositoryRefreshReason } from "./features/source-control/repositoryRefreshPolicy";
-import { getPuppyoneRemote, parsePuppyoneRemote } from "./features/source-control/remotes";
 import { CloudProjectResolveDialog } from "./features/cloud/workspace/CloudProjectResolveDialog";
 import { useWorkspaceSurfaceSwitch } from "./features/cloud/workspace/useWorkspaceSurfaceSwitch";
 import { useCloudWorkspaceBinding } from "./features/cloud/workspace/useCloudWorkspaceBinding";
 import { usePuppyoneCloudBackup } from "./features/cloud/workspace/usePuppyoneCloudBackup";
+import {
+  cloudOriginFromApiBase,
+  createExplicitWorkspaceBinding,
+} from "./features/cloud/workspace/explicitWorkspaceBinding";
+import type { CloudWorkspaceAttachOptions } from "./features/cloud/types";
 
 const CLOUD_BROWSER_SIGN_IN_COOLDOWN_MS = 1500;
 
@@ -756,22 +763,55 @@ export function App() {
     }
   }, [activeView, cloudEnabled, setSidebarCollapsed, updateCloudSession, workspaceIsCloud]);
 
-  const handleConfigureCloudRemote = useCallback(async (remoteUrl: string, projectId?: string | null) => {
+  const handleConfigureCloudRemote = useCallback(async (
+    remoteUrl: string,
+    projectId?: string | null,
+    options: CloudWorkspaceAttachOptions = {},
+  ) => {
     if (!cloudEnabled) return null;
     if (!workspace) return null;
     if (workspaceIsCloud) return null;
     const context = captureGitRepositoryContext(workspace.path);
     if (!context) return null;
-    const remoteProjectId = parsePuppyoneRemote(remoteUrl)?.projectId?.trim() || null;
-    const nextProjectId = projectId?.trim() || remoteProjectId || puppyoneConfig?.cloud.projectId?.trim() || null;
+    const nextProjectId = projectId?.trim() || null;
     if (!nextProjectId) {
       throw new Error("Cloud project identity is required before attaching this workspace.");
     }
+    if (!activeCloudSession) {
+      throw new Error("Sign in before attaching this workspace to Cloud.");
+    }
     let remoteConfigured = false;
+    let createdBindingId: string | null = null;
     try {
-      await configureWorkspaceCloudRemote(context.rootPath, remoteUrl, "puppyone");
+      const project = homeCloudProjects.find((entry) => entry.id === nextProjectId)
+        ?? await getCloudProject(
+          activeCloudSession,
+          nextProjectId,
+          updateCloudSession,
+          desktopCloudApiBaseUrl,
+        );
+      const attached = await createExplicitWorkspaceBinding({
+        session: activeCloudSession,
+        apiBaseUrl: desktopCloudApiBaseUrl,
+        project,
+        projectId: nextProjectId,
+        workspace,
+        remoteUrl,
+        bindingKind: options.bindingKind ?? "full",
+        scopeId: options.scopeId ?? null,
+        onSessionChange: updateCloudSession,
+      });
+      if (puppyoneConfig?.cloud.bindingId !== attached.binding.id) {
+        createdBindingId = attached.binding.id;
+      }
+      await configureWorkspaceCloudRemote(
+        context.rootPath, attached.credentialRemoteUrl, "puppyone",
+      );
       remoteConfigured = true;
       const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
+        project: {
+          workspaceInstanceId: workspace.workspaceInstanceId ?? null,
+        },
         sync: {
           sourceOfTruth: {
             service: "puppyone",
@@ -791,6 +831,10 @@ export function App() {
         },
         cloud: {
           projectId: nextProjectId,
+          origin: cloudOriginFromApiBase(
+            desktopCloudApiBaseUrl ?? activeCloudSession.api_base_url,
+          ),
+          bindingId: attached.binding.id,
         },
       });
       const savedConfig = await handlePuppyoneConfigChange(nextConfig);
@@ -801,8 +845,12 @@ export function App() {
         ...current,
         [workspace.id]: {
           projectId: nextProjectId,
+          bindingId: attached.binding.id,
+          bindingKind: attached.binding.binding_kind,
+          scopePath: attached.binding.scope_path ?? null,
           cloudLinked: true,
           error: null,
+          reason: null,
         },
       }));
       const refreshedStatus = await getWorkspaceGitStatus(context.rootPath);
@@ -815,6 +863,14 @@ export function App() {
       }
       return refreshedStatus;
     } catch (error) {
+      if (createdBindingId) {
+        await revokeCloudWorkspaceBinding(
+          activeCloudSession,
+          createdBindingId,
+          updateCloudSession,
+          desktopCloudApiBaseUrl,
+        ).catch(() => undefined);
+      }
       // The Git remote mutation happens before the workspace config write. If
       // persistence fails, publish the real repository state instead of
       // leaving the UI on a stale pre-attach snapshot. Retrying is idempotent.
@@ -832,12 +888,88 @@ export function App() {
     }
   }, [
     applyGitStatus,
+    activeCloudSession,
     captureGitRepositoryContext,
     cloudEnabled,
+    desktopCloudApiBaseUrl,
+    handlePuppyoneConfigChange,
+    homeCloudProjects,
+    puppyoneConfig,
+    refreshWorkspaceContent,
+    setRecentWorkspaceCloudBindings,
+    updateCloudSession,
+    workspace,
+    workspaceIsCloud,
+  ]);
+
+  const handleDetachCloudProject = useCallback(async () => {
+    if (!workspace || workspaceIsCloud) return;
+    const bindingId = puppyoneConfig?.cloud.bindingId?.trim() || null;
+    if (bindingId) {
+      if (!activeCloudSession) {
+        throw new Error("Sign in before detaching this Cloud project.");
+      }
+      await revokeCloudWorkspaceBinding(
+        activeCloudSession,
+        bindingId,
+        updateCloudSession,
+        desktopCloudApiBaseUrl,
+      ).catch((error: unknown) => {
+        const status = error && typeof error === "object" && "status" in error
+          ? Number((error as { status?: unknown }).status)
+          : null;
+        if (status !== 404) throw error;
+      });
+    }
+
+    const refreshedStatus = await removeWorkspaceGitRemote(workspace.path, "puppyone");
+    const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
+      sync: {
+        sourceOfTruth: { service: "puppyone", remote: null, branch: null },
+      },
+      backup: {
+        enabled: false,
+        service: "puppyone",
+        remote: null,
+        branch: null,
+      },
+      git: {
+        primaryRemote: null,
+        watchedBranch: null,
+      },
+      cloud: {
+        projectId: null,
+        origin: null,
+        bindingId: null,
+      },
+    });
+    const savedConfig = await handlePuppyoneConfigChange(nextConfig);
+    if (!savedConfig) {
+      throw new Error("Cloud access was revoked, but Desktop could not clear the local binding manifest.");
+    }
+    setRecentWorkspaceCloudBindings((current) => ({
+      ...current,
+      [workspace.id]: { projectId: null, cloudLinked: false, error: null, reason: null },
+    }));
+    const context = captureGitRepositoryContext(workspace.path);
+    if (context && applyGitStatus(
+      refreshedStatus,
+      context,
+      createRepositoryRefreshReason("configure-remote", "mutation"),
+    )) {
+      refreshWorkspaceContent();
+    }
+    setActiveCloudSection("overview");
+  }, [
+    activeCloudSession,
+    applyGitStatus,
+    captureGitRepositoryContext,
+    desktopCloudApiBaseUrl,
     handlePuppyoneConfigChange,
     puppyoneConfig,
     refreshWorkspaceContent,
     setRecentWorkspaceCloudBindings,
+    updateCloudSession,
     workspace,
     workspaceIsCloud,
   ]);
@@ -854,9 +986,8 @@ export function App() {
     clearGitSelection,
     cloudEnabled,
     handleCloudSessionChange,
-    handlePuppyoneConfigChange,
+    onConfigureCloudRemote: handleConfigureCloudRemote,
     isGitRepositoryContextCurrent,
-    puppyoneConfig,
     refreshWorkspaceContent,
     setActiveCloudSection,
     setActiveView,
@@ -1116,9 +1247,13 @@ export function App() {
             enabled: cloudEnabled,
             projectId: effectiveCloudProjectId,
             selectedProjectId: selectedCloudProjectId,
+            selectedProjectCapabilities: homeCloudProjects.find(
+              (project) => project.id === selectedCloudProjectId,
+            )?.capabilities ?? [],
             sessionRestoring: cloudSessionRestoring,
             onCloudSessionChange: handleCloudSessionChange,
             onConfigureCloudRemote: handleConfigureCloudRemote,
+            onDetachCloudProject: handleDetachCloudProject,
             onOpenDetails: () => {
               if (!cloudEnabled) return;
               navigateDesktopView("cloud");

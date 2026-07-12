@@ -17,6 +17,7 @@ import {
   publishWorkspaceGitBranch,
   pushWorkspaceGit,
   readPuppyoneWorkspaceConfig,
+  removeWorkspaceGitRemote,
   regeneratePuppyoneWorkspaceProjectId,
   resolveGitRepositoryIdentity,
   stageAllWorkspaceGitChanges,
@@ -177,6 +178,10 @@ export function registerWorkspaceGitIpcHandlers({
     }
     return configureWorkspaceCloudRemote(rootPath, remoteUrl, remoteName);
   }));
+
+  ipcMain.handle("workspace:git-remove-remote", withAuthorizedRepositoryMutation((rootPath, request) => (
+    removeWorkspaceGitRemote(rootPath, request?.remoteName ?? "puppyone")
+  )));
 
   ipcMain.handle("workspace:puppyone-config-read", withAuthorizedRoot((rootPath) => (
     readPuppyoneWorkspaceConfig(rootPath)

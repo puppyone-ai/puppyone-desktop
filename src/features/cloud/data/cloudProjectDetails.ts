@@ -1,6 +1,7 @@
 import {
   getCloudDashboard,
   getCloudHistory,
+  getCloudProjectReadiness,
   getCloudRepoIdentity,
   listCloudConnectors,
   listCloudMcpEndpoints,
@@ -11,6 +12,7 @@ import {
   type DesktopCloudHistory,
   type DesktopCloudMcpEndpoint,
   type DesktopCloudProject,
+  type DesktopCloudProjectReadiness,
   type DesktopCloudRepoIdentity,
   type DesktopCloudScope,
   type DesktopCloudSession,
@@ -27,6 +29,7 @@ export type CloudProjectDetailsData = {
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;
+  readiness: DesktopCloudProjectReadiness | null;
   warning: string | null;
 };
 
@@ -51,6 +54,7 @@ export async function loadCloudProjectDetails({
     connectorsResult,
     mcpResult,
     identityResult,
+    readinessResult,
   ] = await Promise.allSettled([
     getCloudDashboard(session, projectId, onSessionChange, cloudApiBaseUrl),
     listCloudRoot(session, projectId, onSessionChange, cloudApiBaseUrl),
@@ -59,6 +63,7 @@ export async function loadCloudProjectDetails({
     listCloudConnectors(session, projectId, onSessionChange, cloudApiBaseUrl),
     listCloudMcpEndpoints(session, projectId, onSessionChange, cloudApiBaseUrl),
     getCloudRepoIdentity(session, projectId, onSessionChange, cloudApiBaseUrl),
+    getCloudProjectReadiness(session, projectId, onSessionChange, cloudApiBaseUrl),
   ]);
 
   const dashboard = unwrapSettled(dashboardResult);
@@ -75,6 +80,7 @@ export async function loadCloudProjectDetails({
     connectorsResult,
     mcpResult,
     identityResult,
+    readinessResult,
   ].filter((result) => result.status === "rejected");
 
   return {
@@ -86,6 +92,7 @@ export async function loadCloudProjectDetails({
     connectors: unwrapSettled(connectorsResult) ?? [],
     mcpEndpoints: unwrapSettled(mcpResult) ?? [],
     identity: unwrapSettled(identityResult),
+    readiness: unwrapSettled(readinessResult),
     warning: sectionErrors.length > 0
       ? "Some Cloud project details could not be loaded. Refresh after checking the backend connection."
       : null,

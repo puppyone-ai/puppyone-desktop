@@ -339,6 +339,13 @@ export async function configureWorkspaceCloudRemote(
   return getDesktopBridge().configureGitCloudRemote({ rootPath, remoteUrl, remoteName });
 }
 
+export async function removeWorkspaceGitRemote(
+  rootPath: string,
+  remoteName = "puppyone",
+): Promise<GitStatusSnapshot> {
+  return getDesktopBridge().removeGitRemote({ rootPath, remoteName });
+}
+
 export async function readPuppyoneWorkspaceConfig(rootPath: string): Promise<PuppyoneWorkspaceConfig> {
   return getDesktopBridge().readPuppyoneConfig({ rootPath });
 }

@@ -14,4 +14,3 @@ export {
   loadCloudProjectDetails,
   type CloudProjectDetailsData,
 } from "./cloudProjectDetails";
-export { resolveMappedCloudProjectId } from "../workspace";

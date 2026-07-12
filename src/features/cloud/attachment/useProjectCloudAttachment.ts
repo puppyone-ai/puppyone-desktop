@@ -1,10 +1,7 @@
 import { useMemo } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../../types/electron";
-import {
-  getPuppyoneRemoteProjectId,
-  type RecentWorkspaceCloudBinding,
-} from "../workspace/cloudProjectResolution";
+import type { RecentWorkspaceCloudBinding } from "../workspace/cloudProjectResolution";
 import { getPuppyoneRemote } from "../../source-control/remotes";
 import {
   resolveProjectCloudAttachment,
@@ -36,25 +33,30 @@ export function useProjectCloudAttachment({
     }
 
     const binding = recentWorkspaceCloudBindings[workspace.id];
-    const configuredProjectId = puppyoneConfig?.cloud.projectId?.trim() || null;
-    // Runtime authorization fact: only configured (persisted after verify) or
-    // currently resolving binding project ids. Never promote a raw remote path
-    // id into a linked attachment without accessible-project verification.
+    // A config Project id is only an identity hint. The verified binding
+    // controller is the sole source allowed to promote it into a linked state.
+    const configuredProjectId = null;
+    const hasFormalConfigHint = Boolean(
+      puppyoneConfig?.cloud.projectId
+      && puppyoneConfig.cloud.bindingId
+      && puppyoneConfig.cloud.origin,
+    );
     const bindingProjectId = binding?.projectId?.trim() || null;
-    const remoteProjectId = getPuppyoneRemoteProjectId(activeGitStatus);
+    const remoteProjectId = binding?.candidateProjectId?.trim() || null;
     const hasCloudRemote = Boolean(getPuppyoneRemote(activeGitStatus));
     const hasCandidateSource = Boolean(
       configuredProjectId
       || bindingProjectId
       || remoteProjectId
       || hasCloudRemote
-      || binding?.cloudLinked,
+      || binding?.cloudLinked
+      || hasFormalConfigHint,
     );
     const resolving = hasCandidateSource
       && !configuredProjectId
       && !bindingProjectId
       && !binding?.error
-      && hasCloudRemote;
+      && (hasCloudRemote || hasFormalConfigHint);
 
     return resolveProjectCloudAttachment({
       configuredProjectId,
@@ -64,9 +66,17 @@ export function useProjectCloudAttachment({
       bindingReason: binding?.reason ?? null,
       bindingCloudLinked: Boolean(binding?.cloudLinked || hasCloudRemote),
       resolving,
+      bindingId: binding?.bindingId ?? null,
+      bindingKind: binding?.bindingKind ?? null,
+      scopePath: binding?.scopePath ?? null,
+      readiness: binding?.readiness ?? null,
+      capabilities: binding?.capabilities ?? [],
+      scopeId: binding?.candidateScopeId ?? null,
     });
   }, [
     activeGitStatus,
+    puppyoneConfig?.cloud.bindingId,
+    puppyoneConfig?.cloud.origin,
     puppyoneConfig?.cloud.projectId,
     recentWorkspaceCloudBindings,
     workspace,

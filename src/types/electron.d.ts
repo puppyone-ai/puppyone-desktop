@@ -550,6 +550,7 @@ export type PuppyoneWorkspaceConfig = {
   version: 2;
   project: {
     id: string | null;
+    workspaceInstanceId: string | null;
   };
   sync: {
     sourceOfTruth: {
@@ -570,6 +571,8 @@ export type PuppyoneWorkspaceConfig = {
   };
   cloud: {
     projectId: string | null;
+    origin: string | null;
+    bindingId: string | null;
   };
   updatedAt?: string;
 };
@@ -786,6 +789,10 @@ declare global {
       configureGitCloudRemote: (request: {
         rootPath: string;
         remoteUrl: string;
+        remoteName?: string;
+      }) => Promise<GitStatusSnapshot>;
+      removeGitRemote: (request: {
+        rootPath: string;
         remoteName?: string;
       }) => Promise<GitStatusSnapshot>;
       readPuppyoneConfig: (request: {
