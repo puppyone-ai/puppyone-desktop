@@ -158,6 +158,38 @@ describe("Cloud History data lifecycle", () => {
     expect(state?.error).toBeNull();
   });
 
+  it("refreshes after the server reports an unavailable signed snapshot", async () => {
+    const firstHead = "1".repeat(40);
+    const refreshedHead = "2".repeat(40);
+    const conflict = Object.assign(new Error("refresh the history snapshot"), { status: 409 });
+    getCloudHistory
+      .mockResolvedValueOnce(historyPage({
+        commits: [historyCommit(firstHead, [])],
+        head_commit_id: firstHead,
+        has_more: true,
+        next_cursor: "h1.expired",
+        total: 2,
+      }))
+      .mockRejectedValueOnce(conflict)
+      .mockResolvedValueOnce(historyPage({
+        snapshot_id: "3".repeat(64),
+        commits: [historyCommit(refreshedHead, [])],
+        head_commit_id: refreshedHead,
+        total: 1,
+      }));
+    let state: CloudHistoryDataState | null = null;
+    render(<Probe onState={(value) => { state = value; }} />);
+    await flush();
+
+    await act(async () => {
+      await state?.loadMore();
+    });
+
+    expect(getCloudHistory).toHaveBeenCalledTimes(3);
+    expect(state?.history?.head_commit_id).toBe(refreshedHead);
+    expect(state?.error).toBeNull();
+  });
+
   it("does not reload when a parent passes an unstable session callback", async () => {
     getCloudHistory.mockResolvedValue(historyPage());
     render(<UnstableCallbackProbe />);
