@@ -339,12 +339,16 @@ body.data-sidebar-resizing .data-preview-accessory {
   bottom: 0;
   left: calc(
     var(--tree-row-content-left)
-    + var(--depth, 0) * var(--tree-row-indent)
-    - var(--tree-row-indent)
     + var(--tree-icon-slot-size) / 2
   );
-  width: 1px;
-  background: var(--po-tree-guide);
+  width: calc(var(--depth, 0) * var(--tree-row-indent));
+  background-image: linear-gradient(
+    to right,
+    var(--po-tree-guide) 0 1px,
+    transparent 1px
+  );
+  background-repeat: repeat-x;
+  background-size: var(--tree-row-indent) 100%;
   content: "";
   pointer-events: none;
 }

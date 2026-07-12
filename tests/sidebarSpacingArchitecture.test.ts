@@ -60,6 +60,33 @@ describe("sidebar spacing architecture", () => {
     `));
   });
 
+  it("draws every ancestor guide column with one depth-bounded layer", () => {
+    const guide = compact(readCssBlock(
+      dataTreeCss,
+      '.explorer-tree-motion-shell:not([data-depth="0"])::before',
+    ));
+
+    expect(guide).toContain(compact(`
+      left: calc(
+        var(--tree-row-content-left)
+        + var(--tree-icon-slot-size) / 2
+      );
+    `));
+    expect(guide).toContain(
+      "width: calc(var(--depth, 0) * var(--tree-row-indent));",
+    );
+    expect(guide).toContain(compact(`
+      background-image: linear-gradient(
+        to right,
+        var(--po-tree-guide) 0 1px,
+        transparent 1px
+      );
+    `));
+    expect(guide).toContain("background-repeat: repeat-x;");
+    expect(guide).toContain("background-size: var(--tree-row-indent) 100%;");
+    expect(guide).not.toContain("- var(--tree-row-indent)");
+  });
+
   it("keeps Settings on the shared scroll-list padding", () => {
     const list = compact(readCssBlock(sidebarBaseCss, ".desktop-tool-sidebar-list"));
 

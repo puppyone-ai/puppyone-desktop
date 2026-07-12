@@ -128,9 +128,12 @@ animates. It does so without recreating recursive subtree DOM.
 7. Keep guide geometry inside the motion shell.
 
    A virtual list has no mounted subtree wrapper. Each mounted row therefore
-   draws the guide segments implied by its depth. The segment pseudo-elements
-   belong to the inner motion shell so they translate with the row instead of
-   lagging behind it. Adjacent fixed-height segments form the continuous guide.
+   draws every ancestor guide column implied by its depth. One depth-bounded,
+   horizontally repeating background layer belongs to the inner motion shell;
+   it renders all columns without adding one DOM node per ancestor and
+   translates with the row instead of lagging behind it. Adjacent fixed-height
+   segments form continuous guides, including the outer columns of deeply
+   nested rows.
 
 8. Keep tab-return behavior delegated to the sidebar view stack.
 
@@ -261,7 +264,8 @@ These invariants should remain true after future changes:
 - Motion work and DOM presence are bounded by the virtual window; current rows
   plus exit ghosts never exceed 100.
 - Expansion uses transform/opacity only and never measures a full subtree.
-- Guide segments live inside the row motion shell and move with it.
+- Every ancestor guide column lives in one depth-bounded layer inside the row
+  motion shell and moves with it; nested depth must not increase DOM count.
 - Explorer rows keep the same geometry in short and long lists. The scroll
   container reserves the scrollbar gutter; rows never compensate for scrollbar
   width in their own spacing.
