@@ -150,6 +150,14 @@ Working-file selection maps to one of these scopes:
 The controller requests the corresponding diff only while the selection is
 active. Commit selection similarly requests commit detail by commit id.
 
+Incoming and committed/outgoing resource lists represent a **net comparison**,
+not a concatenation of per-commit path events. Trusted local Git code resolves
+the remote comparison once and uses `git diff --name-status` over the same
+merge-base range used by the opened patch. `git log --name-status` is not a
+valid source for these lists: a file added in one local commit and modified in a
+later commit is still `Added` relative to the upstream base, while a temporary
+file added and deleted within the range has no net change and must not appear.
+
 Working-file detail is format-aware. Main derives an authorized immutable
 before/after pair for the selected scope, then the renderer's ordered Diff
 Registry chooses unified text, DOCX semantic redline, or the total metadata
@@ -165,20 +173,27 @@ not be reloaded in full after every filesystem event.
 ### Working-file presentation contract
 
 The Changes detail is a developer-tool surface, not a dashboard or marketing
-card. The selected path is compact context text rather than a page headline;
-file actions use low-emphasis toolbar controls, with destructive color becoming
-prominent on interaction instead of through a persistent tinted button.
+card. File actions use low-emphasis toolbar controls, with destructive color
+becoming prominent on interaction instead of through a persistent tinted
+button.
 
-For a single selected file, the detail header owns path, status, statistics,
-and actions. The diff block omits its duplicate file header. Multi-file commit
-and history diffs retain per-file headers because those labels disambiguate the
-blocks. The code surface stays one tonal step above the deepest inset so it
-does not become a black slab. Diff rows use soft full-line backgrounds and
-gently tinted muted foregrounds; color is a change signal, not the primary
-reading color. Raw unified-diff hunk coordinates such as `@@ -67,12 +68,11 @@`
-remain in the data model but are not rendered as user-facing copy. File status,
-file-level addition/deletion totals, line numbers, and a quiet separator carry
-the useful context without exposing patch syntax.
+Changes and History render every file through the same canonical
+`GitFileDiffSurface`. That surface owns the file path, net change kind,
+addition/deletion statistics, file boundary, and format-aware renderer. A
+focused Changes view adds a compact comparison-context bar above it; the bar
+owns scope (`OUTGOING`, `INCOMING`, `STAGED`, `WORKING TREE`, or `UNTRACKED`),
+baseline explanation, and file actions. It does not reproduce the path or file
+statistics. This keeps a file visually identical to its History counterpart
+without conflating two different comparisons: History is one commit relative
+to its parent, while outgoing/incoming is the net merge-base range.
+
+The code surface stays one tonal step above the deepest inset so it does not
+become a black slab. Diff rows use soft full-line backgrounds and gently tinted
+muted foregrounds; color is a change signal, not the primary reading color.
+Raw unified-diff hunk coordinates such as `@@ -67,12 +68,11 @@` remain in the
+data model but are not rendered as user-facing copy. File status, file-level
+addition/deletion totals, line numbers, and a quiet separator carry the useful
+context without exposing patch syntax.
 
 Text Changes detail is a fixed unified three-column review: one relevant line
 number, one always-visible `+/-` marker, and the content. Removed rows show the
@@ -190,8 +205,9 @@ two narrow editors wrap more aggressively than a single unified stream.
 
 Keep these responsibilities separate:
 
-- the detail header owns selection context and file-level actions;
-- the diff container owns file boundaries and hunk structure;
+- the comparison-context bar owns scope/baseline copy and file-level actions;
+- the canonical file surface owns path, net change kind, statistics, file
+  boundaries, and the format-aware renderer;
 - diff rows own line-level add/remove signals;
 - the Source Control sidebar owns bulk and section-level operations.
 
@@ -253,7 +269,13 @@ history lazily. See
 - `src/features/source-control/SourceControlSidebar.tsx`
   - composes the sidebar surface
 - `src/features/source-control/GitStatusView.tsx`
-  - renders overview, history, commit detail, and working-file detail
+  - composes overview, history, and commit detail without owning file-diff chrome
+- `src/features/source-control/WorkingFileDetail.tsx`
+  - composes focused comparison context, file actions, and canonical file surfaces
+- `src/features/source-control/diff/GitFileDiffSurface.tsx`
+  - owns the shared History/Changes file header and format-aware renderer boundary
+- `src/features/source-control/diff/presentation.ts`
+  - derives comparison-scope copy without mixing it into file change status
 - `src/features/app-shell/navigation.tsx`
   - derives Git navigation badges from the active snapshot
 - `src/lib/localFiles.ts`
@@ -266,6 +288,8 @@ history lazily. See
   - audience/session/revision-bound, bounded, revocable rich-diff resources
 - `local-api/workspace.mjs`
   - Git execution, parsing, snapshots, trusted revision pairs, history, and mutations
+- `local-api/git/diff-comparison.mjs`
+  - resolves trusted incoming/outgoing ranges and reads bounded net-change previews
 - `src/features/source-control/diff/core/`
   - ordered registry, generic async lifecycle, and weighted TTL cache primitive
 - `src/features/source-control/diff/contributions/`
@@ -292,15 +316,17 @@ watcher recovery, and refresh ordering belong to the lifecycle test matrix in
   authority.
 - Application-initiated mutations reconcile status as part of operation
   completion.
+- Incoming/outgoing sidebar resources and their opened patches use the same net
+  comparison strategy; commit-log path events must not label aggregate diffs.
 - Selection is cleared when its file or commit no longer exists in the active
   snapshot.
 - Shared sidebar lifecycle and layout rules are not duplicated in this feature
   document.
 - Working-file actions remain compact, low-emphasis controls; the view must not
   promote every file operation into a persistent CTA.
-- A single-file Changes detail does not repeat the same path and status in a
-  second diff header.
-- Working-file header actions place navigation first and destructive mutation
+- Changes and History use one canonical file-diff surface; the focused context
+  bar must not fork or hide that file header.
+- Working-file context actions place navigation first and destructive mutation
   last; `Discard` must remain to the right of `Stage`.
 - Source Control operation buttons share the `24px` action-size contract; do
   not reintroduce feature-local `28px` or `30px` operation controls.

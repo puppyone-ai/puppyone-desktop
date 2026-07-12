@@ -25,6 +25,10 @@ import {
   execGitStreaming,
 } from "./git/runner.mjs";
 import { createWorkspaceCloudRemoteActions } from "./git/cloud-remote.mjs";
+import {
+  readGitComparisonPreview,
+  resolveGitRemoteDiffComparisons,
+} from "./git/diff-comparison.mjs";
 import { resolveGitRevisionPair } from "./git/revision-pair.mjs";
 import { deriveGitRevisionSpecs } from "./git/revision-specs.mjs";
 import { parseGitPorcelainV2Status } from "./git/porcelain-v2.mjs";
@@ -75,7 +79,6 @@ export const GIT_STATUS_ENTRY_LIMIT = 10_000;
 const GIT_STATUS_RECORD_LIMIT = (GIT_STATUS_ENTRY_LIMIT * 2) + 32;
 const GIT_DETAIL_MAX_TOTAL_DIFF_LINES = 4000;
 const GIT_DETAIL_MAX_FILE_DIFF_LINES = 900;
-const GIT_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
 const execFileAsync = promisify(execFile);
 const {
@@ -1383,7 +1386,9 @@ export async function getWorkspaceGitFileDiff(rootPath, relativePath, scope = "u
     }
 
     const remoteRef = `refs/remotes/${target.remote}/${target.branch}`;
-    const comparison = await resolveGitRemoteDiffComparison(root, "incoming", remoteRef, signal);
+    const comparison = (
+      await resolveGitRemoteDiffComparisons(root, remoteRef, { signal })
+    ).incoming;
     const selectionPaths = resolveGitDiffSelectionPaths(status, scope, normalizedPath);
     const patchResult = await execGit(root, [
       "diff",
@@ -1413,7 +1418,9 @@ export async function getWorkspaceGitFileDiff(rootPath, relativePath, scope = "u
     }
 
     const remoteRef = `refs/remotes/${target.remote}/${target.branch}`;
-    const comparison = await resolveGitRemoteDiffComparison(root, "outgoing", remoteRef, signal);
+    const comparison = (
+      await resolveGitRemoteDiffComparisons(root, remoteRef, { signal })
+    ).outgoing;
     const selectionPaths = resolveGitDiffSelectionPaths(status, scope, normalizedPath);
     const patchResult = await execGit(root, [
       "diff",
@@ -2142,12 +2149,26 @@ async function readGitSyncTarget(
   const counts = headCommitId
     ? await readGitAheadBehindCounts(rootPath, remoteRef, { signal })
     : { ahead: 0, behind: 0 };
-  const incomingPreview = counts.behind > 0
-    ? await readGitRemoteChangePreview(rootPath, `HEAD..${remoteRef}`, { signal })
-    : [];
-  const outgoingPreview = counts.ahead > 0
-    ? await readGitOutgoingChangePreview(rootPath, `${remoteRef}..HEAD`, { signal })
-    : [];
+  const comparisons = counts.ahead > 0 || counts.behind > 0
+    ? await resolveGitRemoteDiffComparisons(rootPath, remoteRef, {
+      signal,
+      hasHead: Boolean(headCommitId),
+    })
+    : null;
+  const [incomingPreview, outgoingPreview] = await Promise.all([
+    counts.behind > 0
+      ? readGitComparisonPreview(rootPath, comparisons.incoming, "remote", {
+        signal,
+        limit: GIT_REMOTE_PREVIEW_LIMIT,
+      })
+      : [],
+    counts.ahead > 0
+      ? readGitComparisonPreview(rootPath, comparisons.outgoing, "committed", {
+        signal,
+        limit: GIT_REMOTE_PREVIEW_LIMIT,
+      })
+      : [],
+  ]);
 
   return {
     remote: remoteName,
@@ -2623,37 +2644,6 @@ async function readGitAheadBehindCounts(rootPath, remoteRef, options = {}) {
   };
 }
 
-async function resolveGitRemoteDiffComparison(rootPath, direction, remoteRef, signal) {
-  const hasHead = await execGit(rootPath, ["rev-parse", "--verify", "--quiet", "HEAD"], { signal })
-    .then((result) => Boolean(result.stdout.trim()))
-    .catch(() => {
-      throwIfGitStatusAborted(signal);
-      return false;
-    });
-
-  if (!hasHead) {
-    const beforeRef = direction === "incoming" ? GIT_EMPTY_TREE : remoteRef;
-    const afterRef = direction === "incoming" ? remoteRef : GIT_EMPTY_TREE;
-    return { beforeRef, afterRef, range: `${beforeRef}..${afterRef}` };
-  }
-
-  const mergeBase = await execGit(rootPath, ["merge-base", "HEAD", remoteRef], { signal })
-    .then((result) => result.stdout.trim())
-    .catch(() => {
-      throwIfGitStatusAborted(signal);
-      return "";
-    });
-
-  if (mergeBase) {
-    const afterRef = direction === "incoming" ? remoteRef : "HEAD";
-    return { beforeRef: mergeBase, afterRef, range: `${mergeBase}..${afterRef}` };
-  }
-
-  const beforeRef = direction === "incoming" ? "HEAD" : remoteRef;
-  const afterRef = direction === "incoming" ? remoteRef : "HEAD";
-  return { beforeRef, afterRef, range: `${beforeRef}..${afterRef}` };
-}
-
 async function attachGitRevisionPairs(rootPath, scope, detail, { comparison = null, signal } = {}) {
   if (!Array.isArray(detail.files) || detail.files.length === 0) return detail;
   const hasHead = scope === "staged"
@@ -2706,121 +2696,6 @@ function formatGitFileDiffError(scope, error) {
   return scope === "remote"
     ? `Unable to preview remote change: ${message}`
     : `Unable to preview committed change: ${message}`;
-}
-
-async function readGitRemoteChangePreview(rootPath, range, options = {}) {
-  const signal = options.signal;
-  const result = await execGit(rootPath, [
-    "log",
-    "--name-status",
-    "--format=",
-    "-z",
-    "--find-renames",
-    range,
-  ], { optionalLocks: false, signal }).catch(() => {
-    throwIfGitStatusAborted(signal);
-    return { stdout: "" };
-  });
-
-  return uniqueGitPreviewResources(
-    parseGitNameStatusPreview(result.stdout, "remote", GIT_REMOTE_PREVIEW_LIMIT * 4),
-    GIT_REMOTE_PREVIEW_LIMIT,
-  );
-}
-
-async function readGitOutgoingChangePreview(rootPath, range, options = {}) {
-  const signal = options.signal;
-  const result = await execGit(rootPath, [
-    "log",
-    "--name-status",
-    "--format=",
-    "-z",
-    "--find-renames",
-    range,
-  ], { optionalLocks: false, signal }).catch(() => {
-    throwIfGitStatusAborted(signal);
-    return { stdout: "" };
-  });
-
-  return uniqueGitPreviewResources(
-    parseGitNameStatusPreview(result.stdout, "committed", GIT_REMOTE_PREVIEW_LIMIT * 4),
-    GIT_REMOTE_PREVIEW_LIMIT,
-  );
-}
-
-function uniqueGitPreviewResources(resources, limit) {
-  const seen = new Set();
-  const unique = [];
-
-  for (const resource of resources) {
-    const key = `${resource.oldPath ?? ""}\0${resource.path}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(resource);
-    if (unique.length >= limit) break;
-  }
-
-  return unique;
-}
-
-function parseGitNameStatusPreview(output, group, limit) {
-  const tokens = output.split("\0").filter(Boolean);
-  const resources = [];
-
-  for (let index = 0; index < tokens.length && resources.length < limit; index += 1) {
-    const code = tokens[index] ?? "";
-    const statusCode = code[0] ?? "";
-    if (!statusCode) continue;
-
-    if (statusCode === "R" || statusCode === "C") {
-      const oldPath = tokens[index + 1] ?? null;
-      const nextPath = tokens[index + 2] ?? oldPath;
-      index += 2;
-      if (nextPath) {
-        resources.push(buildGitPreviewResource({
-          path: nextPath,
-          oldPath,
-          status: statusCode === "R" ? "renamed" : "copied",
-          group,
-        }));
-      }
-      continue;
-    }
-
-    const filePath = tokens[index + 1] ?? null;
-    index += 1;
-    if (!filePath) continue;
-    resources.push(buildGitPreviewResource({
-      path: filePath,
-      oldPath: null,
-      status: gitNameStatusCodeToLabel(statusCode),
-      group,
-    }));
-  }
-
-  return resources;
-}
-
-function buildGitPreviewResource({ path: filePath, oldPath, status, group }) {
-  return {
-    id: `${group}:${oldPath ?? ""}:${filePath}:${status}`,
-    group: "workingTree",
-    path: filePath,
-    oldPath: oldPath ?? null,
-    status,
-    staged: false,
-    conflict: false,
-    letter: gitStatusLabelToLetter(status),
-  };
-}
-
-function gitNameStatusCodeToLabel(statusCode) {
-  if (statusCode === "A") return "added";
-  if (statusCode === "D") return "deleted";
-  if (statusCode === "R") return "renamed";
-  if (statusCode === "C") return "copied";
-  if (statusCode === "M") return "modified";
-  return "changed";
 }
 
 function parseGitBranchLine(line) {

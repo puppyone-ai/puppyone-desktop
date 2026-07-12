@@ -35,12 +35,14 @@ DIFF_VIEWERS (first match wins)
 bounded provider model -> read-only React renderer
 ```
 
-`GitStatusView` renders `FormatAwareDiff`; it contains no extension-specific or
-binary-format decision tree. Shared selection, lifecycle, registry, and cache
-primitives live under `diff/core/`. Each comparator is a vertical slice under
-`diff/contributions/<contribution-id>/` and owns its matcher, presentation,
-provider, model, budgets, cache, worker, and tests. A new semantic comparator is
-registered ahead of the total fallback without adding branches to the shell.
+`GitFileDiffSurface` renders `FormatAwareDiff` and is reused by focused Changes
+and embedded History files; neither it nor `GitStatusView` contains an
+extension-specific or binary-format decision tree. Shared selection, lifecycle,
+registry, and cache primitives live under `diff/core/`. Each comparator is a
+vertical slice under `diff/contributions/<contribution-id>/` and owns its
+matcher, presentation, provider, model, budgets, cache, worker, and tests. A new
+semantic comparator is registered ahead of the total fallback without adding
+branches to the shell.
 
 ## Diff Registry contract
 

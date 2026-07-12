@@ -29,6 +29,11 @@
   color: var(--po-text-muted);
 }
 
+.desktop-file-diff-header > svg {
+  flex: 0 0 auto;
+  color: var(--po-text-subtle);
+}
+
 .desktop-file-diff-path {
   min-width: 0;
   flex: 1;

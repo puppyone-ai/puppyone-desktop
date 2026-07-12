@@ -1,8 +1,8 @@
-import type { GitSourceControlResource } from "../../types/electron";
+import type { GitSourceControlResource, GitSourceControlResourceStatus } from "../../types/electron";
 
 export type GitWorkingSelection = {
   path: string;
-  status: string;
+  status: GitSourceControlResourceStatus;
   staged: boolean;
   origin?: "local" | "remote" | "committed";
 };

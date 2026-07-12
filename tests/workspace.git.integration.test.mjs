@@ -260,6 +260,80 @@ describe("diffs", { timeout: 20_000 }, () => {
       await rm(remoteRoot, { recursive: true, force: true });
     }
   });
+
+  it("keeps incoming and outgoing sidebar status aligned with aggregate opened diffs", { timeout: 60_000 }, async () => {
+    await initRepoWithIdentity();
+    await writeFile(path.join(root, "base.txt"), "base\n");
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "base");
+
+    const remoteRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-remote-"));
+    const peerRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-peer-"));
+    try {
+      execFileSync("git", ["init", "--bare", remoteRoot]);
+      execFileSync("git", ["-C", root, "remote", "add", "origin", remoteRoot]);
+      const branch = execFileSync("git", ["-C", root, "branch", "--show-current"]).toString().trim();
+      execFileSync("git", ["-C", root, "push", "-u", "origin", branch]);
+      execFileSync("git", ["clone", "--branch", branch, remoteRoot, peerRoot]);
+      execFileSync("git", ["-C", peerRoot, "config", "user.email", "peer@puppyone.test"]);
+      execFileSync("git", ["-C", peerRoot, "config", "user.name", "PuppyOne Peer"]);
+
+      await writeFile(path.join(root, "multi-commit.md"), "first\n");
+      await stageAllWorkspaceGitChanges(root);
+      await commitWorkspaceGit(root, "add aggregate file");
+      await writeFile(path.join(root, "multi-commit.md"), "first\nsecond\n");
+      await stageAllWorkspaceGitChanges(root);
+      await commitWorkspaceGit(root, "edit aggregate file");
+
+      await writeFile(path.join(root, "cancelled.txt"), "temporary\n");
+      await stageAllWorkspaceGitChanges(root);
+      await commitWorkspaceGit(root, "add temporary file");
+      await rm(path.join(root, "cancelled.txt"));
+      await stageAllWorkspaceGitChanges(root);
+      await commitWorkspaceGit(root, "remove temporary file");
+
+      await writeFile(path.join(peerRoot, "remote-multi.md"), "remote first\n");
+      execFileSync("git", ["-C", peerRoot, "add", "remote-multi.md"]);
+      execFileSync("git", ["-C", peerRoot, "commit", "-m", "add remote aggregate file"]);
+      await writeFile(path.join(peerRoot, "remote-multi.md"), "remote first\nremote second\n");
+      execFileSync("git", ["-C", peerRoot, "add", "remote-multi.md"]);
+      execFileSync("git", ["-C", peerRoot, "commit", "-m", "edit remote aggregate file"]);
+      execFileSync("git", ["-C", peerRoot, "push", "origin", branch]);
+      execFileSync("git", ["-C", root, "fetch", "origin"]);
+
+      const status = await getWorkspaceGitStatus(root);
+      const outgoingPreview = status.sourceControl.remote.outgoingPreview;
+      expect(outgoingPreview).toContainEqual(expect.objectContaining({
+        path: "multi-commit.md",
+        status: "added",
+        letter: "A",
+      }));
+      expect(outgoingPreview.some((file) => file.path === "cancelled.txt")).toBe(false);
+      expect(status.sourceControl.remote.incomingPreview).toContainEqual(expect.objectContaining({
+        path: "remote-multi.md",
+        status: "added",
+        letter: "A",
+      }));
+
+      const detail = await getWorkspaceGitFileDiff(root, "multi-commit.md", "committed");
+      expect(detail.files).toContainEqual(expect.objectContaining({
+        path: "multi-commit.md",
+        status: "added",
+        additions: 2,
+        deletions: 0,
+      }));
+      const incomingDetail = await getWorkspaceGitFileDiff(root, "remote-multi.md", "remote");
+      expect(incomingDetail.files).toContainEqual(expect.objectContaining({
+        path: "remote-multi.md",
+        status: "added",
+        additions: 2,
+        deletions: 0,
+      }));
+    } finally {
+      await rm(peerRoot, { recursive: true, force: true });
+      await rm(remoteRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("branches", { timeout: 20_000 }, () => {

@@ -6,6 +6,14 @@ const viewSource = readFileSync(
   new URL("../src/features/source-control/GitStatusView.tsx", import.meta.url),
   "utf8",
 );
+const workingFileDetailSource = readFileSync(
+  new URL("../src/features/source-control/WorkingFileDetail.tsx", import.meta.url),
+  "utf8",
+);
+const fileDiffSurfaceSource = readFileSync(
+  new URL("../src/features/source-control/diff/GitFileDiffSurface.tsx", import.meta.url),
+  "utf8",
+);
 const textDiffSource = readFileSync(
   new URL("../src/features/source-control/diff/contributions/text-unified/TextUnifiedDiff.tsx", import.meta.url),
   "utf8",
@@ -32,18 +40,21 @@ const diffCss = readFileSync(
 );
 
 describe("source-control visual architecture", () => {
-  it("uses a dedicated compact context header for working-file detail", () => {
-    expect(viewSource).toContain("desktop-working-file-detail-view");
-    expect(viewSource).toContain("desktop-working-file-status");
-    expect(viewSource).toContain("hideHeader={files.length === 1}");
-    expect(viewSource).not.toContain('<span className="desktop-head-badge">{remote ?');
+  it("uses one canonical file diff surface in Changes and History", () => {
+    expect(viewSource).toContain("<GitFileDiffSurface");
+    expect(workingFileDetailSource).toContain("<GitFileDiffSurface");
+    expect(fileDiffSurfaceSource).toContain('className="desktop-file-diff-header"');
+    expect(fileDiffSurfaceSource).toContain("<FormatAwareDiff");
+    expect(viewSource).not.toContain("hideHeader");
+    expect(workingFileDetailSource).not.toContain("hideHeader");
+    expect(fileDiffSurfaceSource).not.toContain("without-header");
 
-    const title = compact(readCssBlock(
+    const context = compact(readCssBlock(
       detailCss,
-      ".desktop-working-file-detail-view .desktop-commit-id-row strong",
+      ".desktop-working-diff-context",
     ));
-    expect(title).toContain("font-size: var(--po-text-size-title, 16px);");
-    expect(title).toContain("font-weight: var(--po-text-weight-semibold, 600);");
+    expect(context).toContain("border-bottom: 1px solid var(--po-border-subtle);");
+    expect(workingFileDetailSource).toContain("getGitDiffContextPresentation");
   });
 
   it("keeps file actions at toolbar emphasis", () => {
@@ -57,12 +68,8 @@ describe("source-control visual architecture", () => {
     expect(actions).toContain("font-size: var(--git-action-font-size);");
     expect(actions).toContain("font-weight: 500;");
 
-    const workingFileDetail = viewSource.slice(
-      viewSource.indexOf("function WorkingFileDetail"),
-      viewSource.indexOf("function FileDiffBlock"),
-    );
-    const actionsSource = workingFileDetail.slice(
-      workingFileDetail.indexOf('className="desktop-working-file-actions"'),
+    const actionsSource = workingFileDetailSource.slice(
+      workingFileDetailSource.indexOf('className="desktop-working-file-actions"'),
     );
     const openFileIndex = actionsSource.indexOf("onOpenFile(selection.path)");
     const stageIndex = actionsSource.indexOf("onStagePaths([selection.path])");
