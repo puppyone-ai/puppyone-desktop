@@ -178,14 +178,23 @@ becoming prominent on interaction instead of through a persistent tinted
 button.
 
 Changes and History render every file through the same canonical
-`GitFileDiffSurface`. That surface owns the file path, net change kind,
-addition/deletion statistics, file boundary, and format-aware renderer. A
-focused Changes view adds a compact comparison-context bar above it; the bar
-owns scope (`OUTGOING`, `INCOMING`, `STAGED`, `WORKING TREE`, or `UNTRACKED`),
-baseline explanation, and file actions. It does not reproduce the path or file
-statistics. This keeps a file visually identical to its History counterpart
-without conflating two different comparisons: History is one commit relative
-to its parent, while outgoing/incoming is the net merge-base range.
+`GitFileDiffSurface`. Its header has one stable information hierarchy. The left
+fact cluster contains the canonical file format, net change kind, and
+addition/deletion totals, in that order. The right identity cluster contains
+the filename and then its quieter directory. Both clusters derive from the same
+resolved Diff Registry result used by the renderer; the header must not grow a
+second extension switch.
+
+Focused Changes does not add a persistent `OUTGOING`, `INCOMING`, or baseline
+explanation banner above a selected file. The sidebar section and selection
+already establish that scope, while the data contract guarantees that the
+preview status and opened patch use the same comparison. Repeating scope copy
+would displace the file facts users need to review. Mutable local selections
+may add a separate low-emphasis action toolbar; committed and remote selections
+render the canonical file surface directly. This keeps a file visually
+identical to its History counterpart while preserving the underlying semantic
+difference: History is one commit relative to its parent, while
+outgoing/incoming is the net merge-base range.
 
 The code surface stays one tonal step above the deepest inset so it does not
 become a black slab. Diff rows use soft full-line backgrounds and gently tinted
@@ -205,9 +214,12 @@ two narrow editors wrap more aggressively than a single unified stream.
 
 Keep these responsibilities separate:
 
-- the comparison-context bar owns scope/baseline copy and file-level actions;
-- the canonical file surface owns path, net change kind, statistics, file
-  boundaries, and the format-aware renderer;
+- the sidebar selection establishes comparison scope, without repeating a
+  visible scope banner in file detail;
+- the canonical file surface owns canonical format, net change kind,
+  statistics, path identity, file boundaries, and the format-aware renderer;
+- the focused-detail toolbar owns only local file actions and is absent for
+  read-only comparisons;
 - diff rows own line-level add/remove signals;
 - the Source Control sidebar owns bulk and section-level operations.
 
@@ -271,11 +283,10 @@ history lazily. See
 - `src/features/source-control/GitStatusView.tsx`
   - composes overview, history, and commit detail without owning file-diff chrome
 - `src/features/source-control/WorkingFileDetail.tsx`
-  - composes focused comparison context, file actions, and canonical file surfaces
+  - composes local file actions and canonical file surfaces
 - `src/features/source-control/diff/GitFileDiffSurface.tsx`
-  - owns the shared History/Changes file header and format-aware renderer boundary
-- `src/features/source-control/diff/presentation.ts`
-  - derives comparison-scope copy without mixing it into file change status
+  - owns the shared History/Changes fact-first file header and reuses the Diff
+    Registry result at the format-aware renderer boundary
 - `src/features/app-shell/navigation.tsx`
   - derives Git navigation badges from the active snapshot
 - `src/lib/localFiles.ts`
@@ -324,8 +335,9 @@ watcher recovery, and refresh ordering belong to the lifecycle test matrix in
   document.
 - Working-file actions remain compact, low-emphasis controls; the view must not
   promote every file operation into a persistent CTA.
-- Changes and History use one canonical file-diff surface; the focused context
-  bar must not fork or hide that file header.
+- Changes and History use one canonical file-diff surface; a focused detail
+  must not fork or hide its fact-first file header or prepend redundant scope
+  copy.
 - Working-file context actions place navigation first and destructive mutation
   last; `Discard` must remain to the right of `Stage`.
 - Source Control operation buttons share the `24px` action-size contract; do

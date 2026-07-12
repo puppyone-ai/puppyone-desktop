@@ -123,7 +123,6 @@ export function GitStatusView({
     return (
       <WorkingFileDetail
         selection={selectedWorkingFile}
-        status={status}
         detail={workingFileDiff}
         loading={workingFileDiffLoading}
         error={workingFileDiffError}

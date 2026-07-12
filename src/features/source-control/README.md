@@ -20,8 +20,7 @@ contracts here.
   keep UI selection and user operations above that lifecycle boundary.
 - `components.tsx` contains reusable Git list primitives such as section headers, preview rows, and working-tree rows.
 - `SourceControlSidebar.tsx` composes the sidebar flow and wires user actions to the view model.
-- `WorkingFileDetail.tsx` composes comparison context and file actions for the focused diff route.
-- `diff/GitFileDiffSurface.tsx` is the single file-level visual contract used by focused Changes and embedded History.
-- `diff/presentation.ts` derives scope/baseline copy separately from the file's net change kind.
+- `WorkingFileDetail.tsx` composes local file actions and canonical file surfaces for the focused diff route.
+- `diff/GitFileDiffSurface.tsx` is the single fact-first file-level visual contract used by focused Changes and embedded History. Its type label and renderer share one Diff Registry resolution.
 
 Keep Git command execution in the local API layer. Keep feature state derivation in `viewModel.ts`. Keep components mostly presentational so simple/professional mode, GitHub/Puppyone remote behavior, and future sync actions can evolve without rewriting the whole sidebar.

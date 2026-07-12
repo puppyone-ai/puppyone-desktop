@@ -1,12 +1,10 @@
 import { FileText } from "lucide-react";
-import type { GitCommitDetail, GitStatusSnapshot } from "../../types/electron";
+import type { GitCommitDetail } from "../../types/electron";
 import type { GitWorkingSelection } from "./types";
 import { GitFileDiffSurface } from "./diff/GitFileDiffSurface";
-import { getGitDiffContextPresentation } from "./diff/presentation";
 
 export type WorkingFileDetailProps = {
   selection: GitWorkingSelection;
-  status: GitStatusSnapshot | null;
   detail: GitCommitDetail | null;
   loading: boolean;
   error: string | null;
@@ -20,7 +18,6 @@ export type WorkingFileDetailProps = {
 
 export function WorkingFileDetail({
   selection,
-  status,
   detail,
   loading,
   error,
@@ -35,19 +32,13 @@ export function WorkingFileDetail({
   const disabled = Boolean(operationLoading);
   const readOnly = selection.origin === "remote" || selection.origin === "committed";
   const canOpenFile = !readOnly && selection.status !== "deleted";
-  const context = getGitDiffContextPresentation(selection, status);
 
   return (
     <section className="desktop-utility-view desktop-history-detail-view desktop-working-file-detail-view">
       <div className="desktop-history-detail-scroll">
         <div className="desktop-commit-detail">
-          <div className="desktop-working-diff-context" data-tone={context.tone}>
-            <div className="desktop-working-diff-context-copy">
-              <span className="desktop-working-diff-context-label">{context.label}</span>
-              <span className="desktop-working-diff-context-detail">{context.detail}</span>
-            </div>
-
-            {!readOnly && (
+          {!readOnly && (
+            <div className="desktop-working-file-toolbar">
               <div className="desktop-working-file-actions">
                 {canOpenFile && (
                   <button
@@ -75,8 +66,8 @@ export function WorkingFileDetail({
                   </>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {operationError && <div className="desktop-utility-empty danger">{operationError}</div>}
           {loading ? (

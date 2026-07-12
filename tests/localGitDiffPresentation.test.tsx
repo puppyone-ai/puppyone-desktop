@@ -5,9 +5,8 @@ import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GitFileDiff, GitStatusSnapshot } from "../src/types/electron";
+import type { GitFileDiff } from "../src/types/electron";
 import { GitFileDiffSurface } from "../src/features/source-control/diff/GitFileDiffSurface";
-import { getGitDiffContextPresentation } from "../src/features/source-control/diff/presentation";
 import { WorkingFileDetail } from "../src/features/source-control/WorkingFileDetail";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -25,7 +24,6 @@ describe("local Git diff presentation", () => {
     const focused = render(
       <WorkingFileDetail
         selection={{ path: file.path, status: "added", staged: false, origin: "committed" }}
-        status={statusWithRemote({ ahead: 11, behind: 0 })}
         detail={{ commit_id: "local-commits", files: [file] }}
         loading={false}
         error={null}
@@ -41,30 +39,66 @@ describe("local Git diff presentation", () => {
 
     expect(focused.querySelector(".desktop-file-diff")?.outerHTML)
       .toBe(embedded.querySelector(".desktop-file-diff")?.outerHTML);
-    expect(focused.querySelector(".desktop-working-diff-context-label")?.textContent).toBe("OUTGOING");
+    expect(focused.querySelector(".desktop-working-file-toolbar")).toBeNull();
+    expect(focused.querySelector(".desktop-working-diff-context")).toBeNull();
+    expect(focused.querySelector(".desktop-file-format-label")?.textContent).toBe("Markdown");
     expect(focused.querySelector(".desktop-change-badge")?.textContent).toBe("Added");
-    expect(focused.textContent).toContain("11 local commits");
-    expect(focused.textContent).toContain("origin/main");
+    expect(focused.querySelector(".desktop-file-diff-stat")?.textContent).toBe("+2-0");
+    expect(focused.querySelector(".desktop-file-diff-name")?.textContent).toBe("ISSUE-030.md");
+    expect(focused.querySelector(".desktop-file-diff-directory")?.textContent).toBe("dev issues/3-done");
+    expect(focused.textContent).not.toContain("OUTGOING");
+    expect(focused.textContent).not.toContain("Net changes");
     expect(focused.querySelector(".without-header")).toBeNull();
   });
 
-  it("keeps comparison scope separate from the file change kind", () => {
-    expect(getGitDiffContextPresentation(
-      { path: "notes.md", status: "modified", staged: false, origin: "remote" },
-      statusWithRemote({ ahead: 0, behind: 2 }),
-    )).toEqual({
-      label: "INCOMING",
-      detail: "Net changes in 2 remote commits from origin/main.",
-      tone: "incoming",
-    });
-    expect(getGitDiffContextPresentation(
-      { path: "notes.md", status: "modified", staged: true, origin: "local" },
-      null,
-    ).detail).toBe("HEAD → index");
-    expect(getGitDiffContextPresentation(
-      { path: "new.md", status: "untracked", staged: false, origin: "local" },
-      null,
-    ).detail).toBe("Not present → working tree");
+  it("orders canonical format, status and totals before the path identity", () => {
+    const file: GitFileDiff = {
+      ...textFile(),
+      path: "src/current/new.ts",
+      oldPath: "src/legacy/old.ts",
+      status: "renamed",
+      additions: 7,
+      deletions: 3,
+    };
+    const surface = render(<GitFileDiffSurface file={file} />);
+    const header = surface.querySelector(".desktop-file-diff-header");
+    const facts = header?.children.item(0);
+    const identity = header?.children.item(1);
+
+    expect(header?.getAttribute("data-file-format")).toBe("typescript");
+    expect(Array.from(facts?.children ?? []).map((element) => element.className)).toEqual([
+      "desktop-file-format-label",
+      "desktop-change-badge renamed",
+      "desktop-file-diff-stat",
+    ]);
+    expect(facts?.textContent).toBe("TypeScriptRenamed+7-3");
+    expect(identity?.className).toBe("desktop-file-diff-identity");
+    expect(identity?.textContent).toBe("old.ts → new.tssrc/legacy → src/current");
+    expect(identity?.getAttribute("title")).toBe("src/legacy/old.ts → src/current/new.ts");
+    expect(identity?.getAttribute("aria-label")).toBe("src/legacy/old.ts → src/current/new.ts");
+  });
+
+  it("keeps local mutations in a separate low-emphasis toolbar without restoring scope copy", () => {
+    const file = textFile();
+    const surface = render(
+      <WorkingFileDetail
+        selection={{ path: file.path, status: "added", staged: false, origin: "local" }}
+        detail={{ commit_id: "working-tree", files: [file] }}
+        loading={false}
+        error={null}
+        operationLoading={null}
+        operationError={null}
+        onStagePaths={async () => true}
+        onUnstagePaths={async () => true}
+        onDiscardPaths={async () => true}
+        onOpenFile={vi.fn()}
+      />,
+    );
+
+    expect(Array.from(surface.querySelectorAll(".desktop-working-file-toolbar button"))
+      .map((button) => button.textContent)).toEqual(["Open file", "Stage", "Discard"]);
+    expect(surface.querySelector(".desktop-working-diff-context")).toBeNull();
+    expect(surface.querySelector(".desktop-file-diff-facts")?.textContent).toBe("MarkdownAdded+2-0");
   });
 });
 
@@ -91,17 +125,4 @@ function textFile(): GitFileDiff {
       { kind: "add", text: "Done", newLine: 2 },
     ],
   };
-}
-
-function statusWithRemote({ ahead, behind }: { ahead: number; behind: number }) {
-  return {
-    sourceControl: {
-      remote: {
-        ahead,
-        behind,
-        upstream: "origin/main",
-        target: { ref: "origin/main" },
-      },
-    },
-  } as GitStatusSnapshot;
 }

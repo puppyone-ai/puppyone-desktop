@@ -1,16 +1,18 @@
 import type { GitFileDiff } from "../../../types/electron";
-import { resolveDiffViewer } from "./core/registry";
+import type { ResolvedDiffViewer } from "./core/types";
 
 export function FormatAwareDiff({
   file,
   canOpenFile,
   onOpenFile,
+  resolvedViewer,
 }: {
   file: GitFileDiff;
   canOpenFile?: boolean;
   onOpenFile?: (path: string) => void;
+  resolvedViewer: ResolvedDiffViewer;
 }) {
-  const resolved = resolveDiffViewer(file);
+  const resolved = resolvedViewer;
   const Renderer = resolved.contribution.render;
   return (
     <div

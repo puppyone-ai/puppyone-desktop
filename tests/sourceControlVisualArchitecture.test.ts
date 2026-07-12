@@ -49,12 +49,31 @@ describe("source-control visual architecture", () => {
     expect(workingFileDetailSource).not.toContain("hideHeader");
     expect(fileDiffSurfaceSource).not.toContain("without-header");
 
-    const context = compact(readCssBlock(
-      detailCss,
-      ".desktop-working-diff-context",
-    ));
-    expect(context).toContain("border-bottom: 1px solid var(--po-border-subtle);");
-    expect(workingFileDetailSource).toContain("getGitDiffContextPresentation");
+    const header = compact(readCssBlock(diffCss, ".desktop-file-diff-header"));
+    const format = compact(readCssBlock(diffCss, ".desktop-file-format-label"));
+    const stats = compact(readCssBlock(diffCss, ".desktop-file-diff-stat"));
+    expect(header).toContain("grid-template-columns: max-content minmax(0, 1fr);");
+    expect(format).toContain("color: var(--po-text);");
+    expect(format).toContain("font-weight: 650;");
+    expect(format).not.toContain("border-radius:");
+    expect(format).not.toContain("background:");
+    expect(stats).toContain("font-variant-numeric: tabular-nums;");
+    expect(stats).toContain("font-weight: 650;");
+
+    const factsIndex = fileDiffSurfaceSource.indexOf('className="desktop-file-diff-facts"');
+    const formatIndex = fileDiffSurfaceSource.indexOf('className="desktop-file-format-label"');
+    const statusIndex = fileDiffSurfaceSource.indexOf("desktop-change-badge");
+    const statsIndex = fileDiffSurfaceSource.indexOf('className="desktop-file-diff-stat"');
+    const identityIndex = fileDiffSurfaceSource.indexOf('className="desktop-file-diff-identity"');
+    expect(factsIndex).toBeGreaterThan(-1);
+    expect(formatIndex).toBeGreaterThan(factsIndex);
+    expect(statusIndex).toBeGreaterThan(formatIndex);
+    expect(statsIndex).toBeGreaterThan(statusIndex);
+    expect(identityIndex).toBeGreaterThan(statsIndex);
+    expect(fileDiffSurfaceSource).toContain("resolveDiffViewer(file)");
+    expect(fileDiffSurfaceSource).toContain("resolvedViewer={resolvedViewer}");
+    expect(workingFileDetailSource).not.toContain("desktop-working-diff-context");
+    expect(workingFileDetailSource).not.toContain("getGitDiffContextPresentation");
   });
 
   it("keeps file actions at toolbar emphasis", () => {
