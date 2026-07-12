@@ -33,8 +33,9 @@ Build output is written to `release/`.
 puppyone desktop is local-first. It opens local project folders, edits files
 through the shared data workspace, and keeps Git operations local.
 
-Cloud features are opt-in and disabled by default. Users can enable Cloud from
-Settings when they want the Cloud sidebar and Cloud backup actions.
+Cloud features are available by default, but remain opt-in at the account and
+workspace level: users must sign in before Cloud projects, the Cloud sidebar,
+or Cloud backup actions can access any cloud data.
 
 GitHub is the default sync/backup service for new workspace config. puppyone
 Cloud can still be selected after Cloud is enabled.

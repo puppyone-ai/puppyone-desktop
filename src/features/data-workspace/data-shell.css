@@ -1,6 +1,4 @@
-.data-workspace,
-.changes-workspace,
-.utility-workspace {
+.data-workspace {
   display: flex;
   flex: 1;
   width: 100%;

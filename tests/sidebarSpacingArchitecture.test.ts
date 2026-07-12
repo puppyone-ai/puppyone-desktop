@@ -13,7 +13,6 @@ const accessScopeCss = readCss("../src/features/cloud/styles/access/scope-sideba
 const accessServiceCss = readCss("../src/features/cloud/styles/access/service-sidebar.css");
 const accessLegacyCss = readCss("../src/features/cloud/styles/access/legacy-detail.css");
 const changesCss = readCss("../src/features/changes/changes.css");
-const legacyCloudSidebarCss = readCss("../src/features/cloud/legacy-sidebar.css");
 
 describe("sidebar spacing architecture", () => {
   it("defines one visual edge contract", () => {
@@ -79,7 +78,6 @@ describe("sidebar spacing architecture", () => {
     );
     expectBlockPadding(accessLegacyCss, ".desktop-cloud-access-scope-list", "8px");
     expectBlockPadding(changesCss, ".review-list", "0");
-    expectBlockPadding(legacyCloudSidebarCss, ".cloud-nav", "6px");
   });
 });
 

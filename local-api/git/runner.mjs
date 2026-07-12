@@ -16,9 +16,6 @@ export const GIT_MUTATION_TIMEOUT_MS = 120_000;
 /** Network-bound operations (fetch/push/pull/publish). */
 export const GIT_NETWORK_TIMEOUT_MS = 60_000;
 
-/** @deprecated Prefer GIT_READ_TIMEOUT_MS; kept for existing call sites. */
-export const GIT_DEFAULT_TIMEOUT_MS = GIT_READ_TIMEOUT_MS;
-
 export function execGit(rootPath, args, options = {}) {
   const timeout = options.timeout ?? GIT_READ_TIMEOUT_MS;
   return execFileAsync("git", ["-C", rootPath, "-c", "core.quotePath=false", ...args], {

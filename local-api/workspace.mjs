@@ -6,7 +6,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import {
-  GIT_DEFAULT_TIMEOUT_MS,
+  GIT_READ_TIMEOUT_MS,
   GIT_MUTATION_TIMEOUT_MS,
   GIT_NETWORK_TIMEOUT_MS,
   execGit,
@@ -2342,7 +2342,7 @@ function getGitErrorOutput(error) {
   if (isGitTimeoutError(error)) {
     const timeoutSeconds = Number.isFinite(error?.gitTimeoutMs)
       ? Math.round(error.gitTimeoutMs / 1000)
-      : Math.round(GIT_DEFAULT_TIMEOUT_MS / 1000);
+      : Math.round(GIT_READ_TIMEOUT_MS / 1000);
     const timeoutMessage = `Git command timed out after ${timeoutSeconds}s. The operation may be waiting for credentials, network access, or a remote server response.`;
     return [stderr, stdout, timeoutMessage].filter(Boolean).join("\n");
   }

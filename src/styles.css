@@ -12,7 +12,6 @@
 @import "./styles/settings-controls.css";
 @import "./features/source-control/source-control.css";
 @import "./styles/settings-view.css";
-@import "./features/cloud/legacy-sidebar.css";
 @import "./styles/file-actions.css";
 @import "./styles/menus.css";
 @import "./features/data-workspace/data-shell.css";
