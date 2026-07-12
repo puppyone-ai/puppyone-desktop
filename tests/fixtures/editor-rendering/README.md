@@ -5,6 +5,7 @@ This folder contains small English sample files for checking preview, metadata, 
 Suggested checks:
 
 - Text preview and line wrapping
+- Log preview and timestamp readability
 - Markdown headings, lists, and code blocks
 - Table rendering for CSV and spreadsheet files
 - Audio playback controls and duration metadata
