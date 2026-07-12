@@ -50,6 +50,59 @@ export const OPEN_CODE_LOCKED_ENVIRONMENT = Object.freeze({
   OPENCODE_PURE: "1",
 });
 
+/**
+ * Inline config for the bundled PuppyOne Agent runtime.
+ *
+ * OpenCode remains the harness and system-prompt owner. PuppyOne adds only
+ * named permission modes so ACP can surface every consequential action through
+ * the shared approval contract without loading workspace-provided plugins or
+ * replacing OpenCode's native loop.
+ */
+export function managedOpenCodeAcpConfig() {
+  return {
+    default_agent: "puppyone",
+    agent: {
+      puppyone: {
+        mode: "primary",
+        permission: {
+          "*": "ask",
+          read: {
+            "*": "allow",
+            "*.env": "ask",
+            "*.env.*": "ask",
+            "*.env.example": "allow",
+          },
+          glob: "allow",
+          grep: "allow",
+          question: "allow",
+          skill: "allow",
+          todowrite: "allow",
+          plan_enter: "allow",
+          plan_exit: "allow",
+        },
+      },
+      "puppyone-plan": {
+        mode: "primary",
+        permission: {
+          "*": "deny",
+          read: {
+            "*": "allow",
+            "*.env": "ask",
+            "*.env.*": "ask",
+            "*.env.example": "allow",
+          },
+          glob: "allow",
+          grep: "allow",
+          question: "allow",
+          skill: "allow",
+          todowrite: "allow",
+          plan_exit: "allow",
+        },
+      },
+    },
+  };
+}
+
 function normalizeMode(mode) {
   return typeof mode === "string" ? mode.trim().toLowerCase() : "";
 }

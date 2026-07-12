@@ -27,12 +27,13 @@ export function createDefaultAgentRuntimeHost({
       resourcesPath,
       managedConfigDir: managedOpenCodeConfigDir,
       allowExternal: allowExternalOpenCode,
+      appVersion,
       logger,
       ...openCode,
     }),
     createCodexRuntimeDefinition({ appVersion, ...codex }),
     createClaudeRuntimeDefinition({ appVersion, logger, ...claude }),
-    createOpenCodeNativeRuntimeDefinition({ logger, ...openCodeNative }),
+    createOpenCodeNativeRuntimeDefinition({ appVersion, logger, ...openCodeNative }),
     createCursorRuntimeDefinition(cursor),
   ];
   return new AgentRuntimeHost(new AgentRuntimeRegistry(definitions, {

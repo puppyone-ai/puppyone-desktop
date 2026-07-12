@@ -71,9 +71,9 @@ describe("native Agent backend discovery", () => {
 
   it("isolates Claude version probing from the user's real profile", async () => {
     const removed = [];
-    const spawn = vi.fn((_file, _args, options) => fakeChild({
-      stdout: `${CLAUDE_CODE_TESTED_BASELINE} (Claude Code)\n`,
-    }, options));
+    const spawn = vi.fn((_file, args, options) => fakeChild(args[0] === "--version"
+      ? { stdout: "2.1.159 (Claude Code)\n" }
+      : { stdout: secureClaudeHelp() }, options));
     const readiness = await discoverClaudeRuntime({
       fsModule: {
         constants: { X_OK: 1 },
@@ -94,16 +94,17 @@ describe("native Agent backend discovery", () => {
 
     expect(readiness).toMatchObject({
       status: "ready",
-      version: CLAUDE_CODE_TESTED_BASELINE,
+      version: "2.1.159",
       environment: { CLAUDE_CONFIG_DIR: "/home/test/.claude-custom" },
     });
     const probeEnvironment = spawn.mock.calls[0][2].env;
     expect(probeEnvironment.CLAUDE_CONFIG_DIR).toMatch(/^\/tmp\/puppyone-claude-version-probe-/u);
     expect(probeEnvironment.CLAUDE_CONFIG_DIR).not.toBe(readiness.environment.CLAUDE_CONFIG_DIR);
-    expect(removed).toEqual([[probeEnvironment.CLAUDE_CONFIG_DIR, { recursive: true, force: true }]]);
+    expect(removed).toHaveLength(2);
+    expect(removed[0]).toEqual([probeEnvironment.CLAUDE_CONFIG_DIR, { recursive: true, force: true }]);
   });
 
-  it("reports an installed but outdated Claude CLI without treating it as missing", async () => {
+  it("reports an installed Claude CLI with missing secure SDK controls without treating it as missing", async () => {
     const readiness = await discoverClaudeRuntime({
       fsModule: {
         constants: { X_OK: 1 },
@@ -114,7 +115,9 @@ describe("native Agent backend discovery", () => {
           rm: vi.fn(async () => {}),
         },
       },
-      spawn: vi.fn((_file, _args, options) => fakeChild({ stdout: "1.0.73 (Claude Code)\n" }, options)),
+      spawn: vi.fn((_file, args, options) => fakeChild(args[0] === "--version"
+        ? { stdout: "1.0.73 (Claude Code)\n" }
+        : { stdout: "--input-format --output-format --permission-mode" }, options)),
       env: { PATH: "/tools", HOME: "/home/test" },
       platform: "darwin",
       homedir: "/home/test",
@@ -123,14 +126,19 @@ describe("native Agent backend discovery", () => {
     });
 
     expect(readiness).toMatchObject({
-      status: "unsupported-version",
+      status: "protocol-unavailable",
       version: "1.0.73",
       minimumVersion: CLAUDE_CODE_TESTED_BASELINE,
       source: "user-installed",
       compatibility: "unavailable",
     });
+    expect(readiness.message).toMatch(/secure streaming controls/i);
   });
 });
+
+function secureClaudeHelp() {
+  return "--input-format --output-format --setting-sources --permission-mode";
+}
 
 function fakeChild(result, options) {
   expect(options.shell).toBe(false);

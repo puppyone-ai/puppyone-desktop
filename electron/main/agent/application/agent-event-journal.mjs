@@ -4,8 +4,8 @@ const MAX_REPLAY_EVENTS = 1_000;
 const MAX_REPLAY_BYTES = 2 * 1024 * 1024;
 const PERSIST_DEBOUNCE_MS = 750;
 
-/** Owns bounded event delivery and durable journal writes for live session records. */
-export function createAgentEventJournal({ persistence, logger = console }) {
+/** Owns bounded live-event delivery and process-local recovery snapshots. */
+export function createAgentEventJournal({ sessionCache, logger = console }) {
   function sendSessionExit(session, reason) {
     if (session.sender?.isDestroyed?.()) return;
     try {
@@ -58,7 +58,7 @@ export function createAgentEventJournal({ persistence, logger = console }) {
 
   function persistNow(session) {
     if (!session.providerSessionId) return Promise.resolve();
-    return persistence.save({
+    return sessionCache.save({
       sessionId: session.id,
       workspaceRoot: session.workspaceRoot,
       runtimeId: session.runtimeId,

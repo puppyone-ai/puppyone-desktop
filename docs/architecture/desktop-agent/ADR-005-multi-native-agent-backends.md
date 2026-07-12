@@ -10,6 +10,8 @@ This decision fully supersedes the product-routing decision in
 [ADR-004](ADR-004-managed-agent-engine-distribution.md) to the managed
 `puppyone-agent` backend. It reaffirms the multi-runtime contract and process
 boundaries in [ADR-002](ADR-002-agent-contract-and-boundaries.md).
+[ADR-006](ADR-006-native-harness-adapters-and-acp.md) is the authoritative
+transport, persistence and source-layout refinement of this product decision.
 
 ## Context
 
@@ -39,7 +41,7 @@ PuppyOne owns shared product concerns and normalization, not the harness loop.
 PuppyOne right-sidebar Chat
 |
 +-- shared product UI
-|     session history, transcript, composer, approval/question docks
+|     live transcript, composer, approval/question docks
 |
 +-- PuppyOne application control plane
 |     workspace authority, lifecycle, safe DTOs, event journal, projection
@@ -108,8 +110,8 @@ Native session
   history, tool state, compaction and continuation.
 
 Product session
-  PuppyOne's workspace-bound index and presentation record pointing to one
-  native session and one immutable backend identity.
+  A process-local, workspace-bound correlation pointing to one native session
+  and one immutable backend identity. It is not durable Chat history.
 ```
 
 ## Ownership boundary
@@ -120,8 +122,8 @@ Product session
 | canonical workspace authorization | native tool scheduling and execution semantics |
 | window/session/turn/request correlation | provider-specific prompts and context policy |
 | normalized `AgentEvent` vocabulary | native streaming protocol and event source |
-| bounded redacted event cache | canonical native session and full native history |
-| product session index, archive state and title | compaction, fork and resume semantics |
+| bounded process-local event projection | canonical native session and full native history |
+| live product/native session correlation | compaction, fork and resume semantics |
 | shared transcript, composer and blocking docks | native model catalog and model options |
 | capability-driven UI | native login, credentials and subscription entitlement |
 | process lifetime, timeout and crash containment | provider retry and usage semantics |
@@ -179,11 +181,11 @@ credential code remains under `electron/main/agent/runtimes/<backend>/`.
 
 | Backend ID | User-facing name | Native transport | Authentication owner | Native session | Distribution | Target status |
 | --- | --- | --- | --- | --- | --- | --- |
-| `puppyone-agent` | PuppyOne Agent | managed OpenCode loopback HTTP/SSE | managed OpenCode profile and supported provider flows | OpenCode session | bundled, pinned and verified by PuppyOne | migrate current `opencode` product path |
-| `codex` | Codex | `codex app-server` stdio JSON-RPC | Codex CLI | Codex thread | user-installed CLI | existing adapter; harden and register |
+| `puppyone-agent` | PuppyOne Agent | ACP JSON-RPC 2.0 over stdio | managed OpenCode profile and supported provider flows | OpenCode session | bundled, pinned and verified by PuppyOne | implemented |
+| `codex` | Codex | `codex app-server` stdio JSON-RPC | Codex CLI | Codex thread | user-installed CLI | implemented |
 | `claude` | Claude Code | Claude Agent SDK plus user's Claude Code process | Anthropic API key or supported cloud provider | Claude session | SDK control layer bundled; user CLI required | implemented |
 | `cursor` | Cursor Agent | supported native protocol, not shell scraping | Cursor | Cursor session | user-installed product | inventory-only until protocol gate passes |
-| `opencode-native` | OpenCode | user OpenCode ACP/server protocol | user OpenCode profile | OpenCode session | user-installed CLI | separate adapter/profile required |
+| `opencode-native` | OpenCode | ACP JSON-RPC 2.0 over stdio | user OpenCode profile | OpenCode session | user-installed CLI | implemented |
 | `pi` | Pi | `pi --mode rpc` | Pi/provider config | Pi session | user-installed CLI | optional future adapter |
 
 An executable-presence check is never enough to enable a backend. A selectable
@@ -225,8 +227,7 @@ PuppyOne product session
   nativeSessionId
   runtime version/provenance
   selected provider/model/variant/mode where supported
-  title, archive state and timestamps
-  bounded redacted AgentEvent journal
+  bounded process-local AgentEvent projection
           |
           v
 backend-native session           authoritative execution record
@@ -276,7 +277,7 @@ React
   -> native harness
 ```
 
-- Renderer never receives executable paths, environment dumps, sidecar URLs,
+- Renderer never receives executable paths, environment dumps, internal URLs,
   passwords, tokens or raw native protocol payloads.
 - Main canonicalizes the workspace and validates attachments and context
   references before the adapter sees them.
@@ -293,15 +294,14 @@ React
 
 `PuppyOne Agent` is the user-facing product name for the managed backend. Its
 implementation remains an exact, verified OpenCode release behind the existing
-main-only sidecar gateway. PuppyOne owns distribution, profile isolation,
+main-only ACP adapter. PuppyOne owns distribution, profile isolation,
 security overlays, upgrade qualification and product support. OpenCode owns the
 native harness loop.
 
-The implementation may use `puppyone-agent` as the new product runtime ID while
-retaining a migration alias for persisted `opencode` product sessions. It must
-not rewrite user-owned `opencode-native` session IDs into PuppyOne Agent
-sessions. OpenCode licensing and source provenance remain visible outside the
-normal conversation chrome.
+The implementation uses `puppyone-agent` as the product runtime ID. It must not
+rewrite user-owned `opencode-native` session IDs into PuppyOne Agent sessions.
+OpenCode licensing and source provenance remain visible outside the normal
+conversation chrome.
 
 ADR-004's bundling, integrity, rollback and repair rules apply only to
 `puppyone-agent`. A corrupt or missing managed OpenCode component disables
@@ -322,15 +322,15 @@ Phase 1  Multi-backend composition                         IMPLEMENTED
 
 Phase 2  PuppyOne Agent identity                           IMPLEMENTED
   rename the current managed product route to puppyone-agent
-  migrate persisted opencode product mappings without changing native sessions
+  remove the legacy PuppyOne-owned transcript cache
   keep managed OpenCode provenance in diagnostics and licenses
 
 Phase 3  Native Codex                                      IMPLEMENTED
   promote the existing app-server adapter from legacy compatibility
-  complete readiness, auth, capability, history and security acceptance tests
+  complete readiness, auth, capability, native-session and security tests
 
 Phase 4  Native Claude Code                                IMPLEMENTED
-  add CLI resolution, Agent SDK adapter, event normalization, native history,
+  add CLI resolution, Agent SDK adapter, event normalization,
   permissions and capability tests
 
 Phase 5  Agent-first UI                                    IN PROGRESS
@@ -338,7 +338,7 @@ Phase 5  Agent-first UI                                    IN PROGRESS
   pin Agent identity per session and make switching create a new session
 
 Phase 6  Optional backends                                 PARTIAL
-  user OpenCode profile and Pi adapters
+  user OpenCode profile implemented; Pi remains optional
   Cursor only after a supported protocol and approval contract exist
 
 Phase 7  Legacy closeout
@@ -346,10 +346,9 @@ Phase 7  Legacy closeout
   supported session-retention window
 ```
 
-During migration, current `opencode` sessions continue to resume through the
-managed adapter. They must not be reclassified as user-owned OpenCode sessions.
-Current direct Codex records remain readable and become native Codex sessions
-only after the adapter passes the new production gates.
+Legacy PuppyOne transcript/session cache data is removed. Native provider
+history is not copied or reclassified; a live session continues only through
+its selected harness and the current application process.
 
 ## Architecture fitness rules
 
@@ -365,7 +364,7 @@ legacy policy.
 - `AgentService`, shared domain, application and UI code do not name concrete
   backends for lifecycle behavior.
 - Each backend has discovery, protocol, event-normalization, capability,
-  security, history and cleanup contract tests.
+  security and cleanup contract tests.
 - A session cannot change `runtimeId` after creation.
 - An unavailable backend stays visible with a bounded diagnostic but cannot be
   selected or silently replaced.
@@ -392,8 +391,8 @@ Benefits:
 
 Costs:
 
-- each native protocol requires its own adapter, compatibility baseline,
-  history mapping and security review;
+- each native protocol requires its own adapter, capability baseline and
+  security review;
 - behavior cannot be perfectly identical across backends, so capability-driven
   UX and testing are mandatory;
 - session migration and support diagnostics become backend-aware;
@@ -426,6 +425,7 @@ Silent fallback between backends
 ## Implementation specifications
 
 - [Desktop Agent architecture and target source layout](README.md)
+- [Native harness adapters and ACP](ADR-006-native-harness-adapters-and-acp.md)
 - [Native Agent backend and model discovery](local-agent-connection-discovery.md)
 - [Right Sidebar Agent Chat](right-sidebar.md)
 - [Cursor-style Agent Chat UI behavior](chat-ui-behavior-spec.md)

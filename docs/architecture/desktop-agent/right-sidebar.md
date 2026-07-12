@@ -2,8 +2,8 @@
 
 This document defines the target product, layout, lifecycle, and accessibility
 contract for Agent Chat in PuppyOne Desktop's resizable right sidebar. The
-current implementation is migrating from an OpenCode-only composer to the
-Agent-first backend architecture below.
+backend uses the Agent-first native-harness architecture below; presentation
+can evolve independently through the shared contract.
 
 Read [Desktop Agent Architecture](README.md) first for the process, IPC,
 backend-adapter, event, security, and persistence boundaries.
@@ -13,7 +13,8 @@ and [Native Agent backend and model discovery](local-agent-connection-discovery.
 
 The archived [Codex Implementation Brief](history/codex-vertical-slice.md)
 records the original direct-runtime slice. The authoritative target decision is
-[ADR-005](ADR-005-multi-native-agent-backends.md): PuppyOne presents one Chat
+[ADR-005](ADR-005-multi-native-agent-backends.md) and
+[ADR-006](ADR-006-native-harness-adapters-and-acp.md): PuppyOne presents one Chat
 surface over multiple session-scoped native Agent backends. PuppyOne Agent uses
 the managed OpenCode kernel; Codex, Claude Code and other supported products use
 their own harness and native session.
@@ -28,18 +29,17 @@ their own harness and native session.
   Chat and Terminal panels, preserves Terminal's lazy PTY lifecycle,
   retains the selected surface, and keeps a running Agent turn alive while
   Chat is hidden.
-- **Implemented foundation:** managed OpenCode/PuppyOne Agent path,
+- **Implemented foundation:** PuppyOne Agent, Codex, Claude Code and user
+  OpenCode native routes,
   connected-provider discovery, readiness/account/model/mode states, virtual transcript streaming, safe
   Markdown, part/tool registries, plan/tool/command/file activity, permission
   and structured-question docks, `/` commands, authorized `@` context and
-  attachments, Stop, partial-history warning, and Jump to latest.
-- **Implemented by capability:** history list/resume/fork/archive/delete,
-  compaction, queue/steer controls, and model/mode selection. Unsupported
-  controls are omitted.
-- **Migration target:** restore a deliberate Agent selector, rename the current
-  managed route to PuppyOne Agent, promote the native Codex adapter after its
-  production gates, add Claude Code, and keep Cursor disabled until a supported
-  protocol exists.
+  attachments, Stop, and Jump to latest.
+- **Implemented by capability:** native interruption, approvals/questions,
+  queue/steer controls, and model/mode selection. Unsupported controls are
+  omitted. PuppyOne does not persist Chat history.
+- **Current boundary:** keep Cursor disabled until a supported protocol and
+  approval contract exist.
 - **Product gate:** an Agent becomes selectable only after installation,
   version, authentication, protocol, model/tool, workspace and product-policy
   gates pass. Provider/Model controls are then scoped to that Agent.
@@ -87,9 +87,8 @@ The Chat surface has four primary regions in document order:
 4. **Composer** — prompt, Agent → backend-scoped routing, the `+` tools/mode
    menu, submit, and stop/queue state.
 
-Session history/new/overflow actions remain real controls but live in an
-out-of-flow chrome cluster revealed by hover or keyboard focus; they do not
-consume the reference transcript's top row. Only the transcript is the primary
+New-session and overflow actions live in compact header chrome; PuppyOne does
+not expose a PuppyOne-owned history browser. Only the transcript is the primary
 scroll region. The blocking dock, Changes handoff and composer remain visible
 without using `position: fixed`.
 
@@ -124,7 +123,7 @@ The application header contains:
   enabled;
 - independent pressed/open state and accessible labels for each icon.
 
-The Chat panel keeps New Session, history and diagnostics as on-demand chrome
+The Chat panel keeps New Session and diagnostics as on-demand chrome
 rather than a persistent visual header. Controls use native buttons and menus,
 become visible on keyboard focus, and expose meaningful accessible names.
 
@@ -315,24 +314,13 @@ Attachment paths are resolved in the main process. Drag-and-drop data from the
 renderer is treated as untrusted input and must pass the same workspace and file
 capability checks as existing file operations.
 
-## Session history
+## History boundary
 
-Session history is accessed from the header overflow menu or a compact picker,
-not as a permanently visible third column inside the right sidebar.
-
-Each entry contains:
-
-- title;
-- Agent backend and optional backend-scoped model;
-- workspace identity;
-- last activity time;
-- last terminal state;
-- partial-history indication when PuppyOne cannot reconstruct all prior items.
-
-Opening history never resumes an active native turn accidentally. Deleting a
-PuppyOne session mapping and deleting backend-native history are separate
-operations unless that backend exposes deletion and the user explicitly
-selects both.
+PuppyOne does not persist a Chat transcript, session index or duplicate native
+history. The current window may keep a bounded live projection while the app is
+running. A native Agent remains free to own history inside its own product, but
+surfacing that history later requires an explicit provider-owned capability and
+must not create a PuppyOne copy.
 
 ## Empty, loading, and error states
 
@@ -343,14 +331,14 @@ The sidebar uses distinct states:
 - selected Agent setup required;
 - PuppyOne Agent repair required while other Agents remain available;
 - ready with no active session;
-- restoring a session;
+- reconnecting the current live session;
 - active idle session;
 - running turn;
 - waiting for approval/question;
 - interrupted turn;
 - recoverable backend/provider/model error;
 - native Agent process exited;
-- partial history restored.
+- live projection gap with a bounded recovery notice.
 
 Loading retains the previous committed transcript when safe. A temporary model
 or account refresh does not blank the entire sidebar.
@@ -368,7 +356,7 @@ switching Agent or retrying automatically reverted them.
 - Transcript rows use breakable paths and commands with expandable full text.
 - The composer grows vertically to a bounded maximum, then scrolls internally.
 - Opening or closing a dock preserves the user's transcript position when they
-  are reading history.
+  are reading earlier messages in the current live transcript.
 - When pinned to the bottom, new deltas keep the transcript pinned.
 - When scrolled away from the bottom, new deltas do not steal position; a
   “Jump to latest” action appears.

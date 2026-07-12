@@ -1,16 +1,49 @@
 import { EventEmitter } from "node:events";
 import { PassThrough, Writable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
-import { JsonlRpcConnection } from "../electron/main/agent/transports/jsonl-rpc-connection.mjs";
+import {
+  JsonlRpcConnection,
+  JsonlRpcErrorResponse,
+} from "../electron/main/agent/transports/jsonl-rpc-connection.mjs";
 
 describe("Codex JSONL JSON-RPC transport", () => {
+  it("rejects non-canonical process launch inputs before spawning", () => {
+    const spawn = vi.fn();
+    expect(() => new JsonlRpcConnection({
+      executablePath: "codex",
+      args: [],
+      cwd: "/workspace",
+      env: {},
+      spawn,
+    })).toThrow("absolute JSONL-RPC executable");
+    expect(() => new JsonlRpcConnection({
+      executablePath: "/usr/local/bin/codex",
+      args: ["app-server\n--unsafe"],
+      cwd: "/workspace",
+      env: {},
+      spawn,
+    })).toThrow("arguments are invalid");
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it("correlates responses while tolerating additive unknown fields", async () => {
     const child = createChild();
     const connection = createConnection(child);
     const request = connection.request("account/read", { refreshToken: false });
-    expect(JSON.parse(child.writes[0])).toMatchObject({ id: 1, method: "account/read" });
+    expect(JSON.parse(child.writes[0])).toMatchObject({ jsonrpc: "2.0", id: 1, method: "account/read" });
     child.stdout.write(`${JSON.stringify({ id: 1, result: { account: null }, future: "ignored" })}\n`);
     await expect(request).resolves.toEqual({ account: null });
+    connection.dispose();
+  });
+
+  it("preserves JSON-RPC error codes for protocol fallback decisions", async () => {
+    const child = createChild();
+    const connection = createConnection(child);
+    const request = connection.request("session/new", {});
+    child.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32601, message: "Method not found" } })}\n`);
+
+    await expect(request).rejects.toBeInstanceOf(JsonlRpcErrorResponse);
+    await expect(request).rejects.toMatchObject({ method: "session/new", code: -32601 });
     connection.dispose();
   });
 

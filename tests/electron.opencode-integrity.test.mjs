@@ -73,7 +73,12 @@ describe("pinned OpenCode bundle integrity", () => {
       env: { SHELL: "/bin/zsh", PATH: "" },
       homedir: path.join(resourcesPath, "home"),
     });
-    expect(readiness).toMatchObject({ status: "ready", source: "bundled", compatibility: "pinned", executablePath: await fs.promises.realpath(previous) });
+    expect(readiness).toMatchObject({
+      status: "ready",
+      source: "bundled",
+      compatibility: "pinned-acp-v1",
+      executablePath: await fs.promises.realpath(previous),
+    });
   });
 
   it("does not treat a user-installed CLI as a product dependency", async () => {

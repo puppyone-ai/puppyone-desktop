@@ -1,6 +1,6 @@
 import path from "node:path";
-import { randomUUID } from "node:crypto";
-import { redactSecretText } from "../../agent-events.mjs";
+import { createHash, randomUUID } from "node:crypto";
+import { boundRendererValue, redactSecrets, redactSecretText } from "../../agent-events.mjs";
 import {
   formatAuthorizedProjectInstructions,
   loadAuthorizedProjectInstructions,
@@ -11,6 +11,8 @@ import {
   normalizeClaudeMessage,
 } from "./claude-events.mjs";
 import { CLAUDE_RUNTIME_DESCRIPTOR } from "./claude-identity.mjs";
+import { ClaudeMessageChannel, createClaudeUserMessage } from "./claude-message-channel.mjs";
+import { createClaudeSpawn } from "./claude-spawn.mjs";
 
 const INSPECTION_TIMEOUT_MS = 30_000;
 const CLAUDE_PROJECT_INSTRUCTION_NAMES = Object.freeze(["CLAUDE.md", "AGENTS.md", "CONTEXT.md"]);
@@ -50,6 +52,7 @@ export class ClaudeAgentSdkAdapter {
     projectInstructionLoader = (root) => loadAuthorizedProjectInstructions(root, {
       instructionNames: CLAUDE_PROJECT_INSTRUCTION_NAMES,
     }),
+    spawnClaudeCodeProcess = null,
     logger = console,
   }) {
     this.readiness = readiness ?? {};
@@ -59,6 +62,12 @@ export class ClaudeAgentSdkAdapter {
     this.onEvent = onEvent;
     this.onExit = onExit;
     this.projectInstructionLoader = projectInstructionLoader;
+    this.spawnClaudeCodeProcess = spawnClaudeCodeProcess ?? createClaudeSpawn({
+      onStderr: (data) => {
+        const diagnostic = redactSecretText(String(data)).trim().slice(-4_000);
+        if (diagnostic) logger.warn?.(`Claude Code runtime: ${diagnostic}`);
+      },
+    });
     this.logger = logger;
     this.sdk = null;
     this.sessionId = null;
@@ -67,6 +76,9 @@ export class ClaudeAgentSdkAdapter {
     this.activeQuery = null;
     this.activeController = null;
     this.activeState = null;
+    this.messageChannel = null;
+    this.queryConfigurationKey = null;
+    this.queryConsumer = null;
     this.interruptRequested = false;
     this.pendingApprovals = new Map();
     this.pendingQuestions = new Map();
@@ -114,6 +126,7 @@ export class ClaudeAgentSdkAdapter {
 
   async createSession({ model = null, mode = "agent" } = {}) {
     this.#assertIdle();
+    await this.#closePersistentQuery("Starting a new Claude Code session.");
     this.sessionId = null;
     this.resuming = false;
     const now = new Date().toISOString();
@@ -129,6 +142,7 @@ export class ClaudeAgentSdkAdapter {
 
   async resumeSession({ threadId, model = null, mode = "agent" } = {}) {
     this.#assertIdle();
+    await this.#closePersistentQuery("Resuming a Claude Code session.");
     const sdk = await this.#loadSdk();
     const info = await sdk.getSessionInfo(threadId, { dir: this.workspaceRoot });
     if (!info?.sessionId) throw new Error("Claude Code session was not found in this workspace.");
@@ -164,23 +178,15 @@ export class ClaudeAgentSdkAdapter {
     const turnId = `claude:${randomUUID()}`;
     const controller = new AbortController();
     const state = createClaudeEventState({ turnId, resumed: this.resuming || Boolean(this.sessionId) });
-    const query = sdk.query({
-      prompt: formatPrompt(prompt, references),
-      options: this.#queryOptions({
-        abortController: controller,
-        model,
-        mode,
-        resume: this.sessionId,
-        projectInstructions,
-        references,
-      }),
-    });
+    await this.#ensurePersistentQuery({ sdk, controller, model, mode, projectInstructions });
     this.activeTurnId = turnId;
-    this.activeController = controller;
-    this.activeQuery = query;
     this.activeState = state;
     this.interruptRequested = false;
-    void this.#consume(query, state);
+    this.messageChannel.setSessionId(this.sessionId ?? "");
+    this.messageChannel.enqueue(createClaudeUserMessage(
+      formatPrompt(prompt, references, this.workspaceRoot),
+      this.sessionId ?? "",
+    ));
     return { turnId };
   }
 
@@ -191,7 +197,9 @@ export class ClaudeAgentSdkAdapter {
     if (interrupt && typeof interrupt.then === "function") {
       await Promise.race([interrupt.catch(() => {}), delay(1_000)]);
     }
-    this.activeController?.abort();
+    // Keep the long-lived query connected. `interrupt()` stops only the active
+    // native turn; AgentService force-terminates the process if it never
+    // confirms the interruption.
   }
 
   resolveApproval({ requestId, decision, turnId }) {
@@ -241,25 +249,28 @@ export class ClaudeAgentSdkAdapter {
       dir: this.workspaceRoot,
       ...(messageId ? { upToMessageId: messageId } : {}),
     });
+    await this.#closePersistentQuery("Forking the Claude Code session.");
     return { providerSessionId: forked.sessionId };
   }
 
-  dispose(reason = "Claude Code adapter closed.") {
+  async dispose(reason = "Claude Code adapter closed.") {
     if (this.disposed) return;
     this.disposed = true;
     this.interruptRequested = true;
     this.#resolvePending(reason);
-    this.activeController?.abort();
-    this.activeQuery?.close?.();
+    await this.#closePersistentQuery(reason);
     this.#clearActive();
   }
 
-  async #consume(query, state) {
-    let endedNormally = false;
+  async #consumePersistent(query, channel) {
+    let emittedTerminal = false;
     try {
       for await (const message of query) {
-        if (this.disposed || this.activeState !== state) return;
+        if (this.disposed || this.activeQuery !== query) return;
         if (typeof message?.session_id === "string" && message.session_id) this.sessionId = message.session_id;
+        channel.setSessionId(this.sessionId ?? "");
+        const state = this.activeState;
+        if (!state) continue;
         const normalized = normalizeClaudeMessage(message, state);
         for (const event of normalized) {
           const output = this.interruptRequested && ["turn.completed", "turn.failed"].includes(event.type)
@@ -267,10 +278,14 @@ export class ClaudeAgentSdkAdapter {
             : event;
           this.onEvent(output);
         }
+        if (state.terminal && this.activeState === state) {
+          channel.onTurnComplete();
+          this.#clearActive();
+        }
       }
-      endedNormally = true;
     } catch (error) {
-      if (!this.disposed && this.activeState === state && !state.terminal) {
+      const state = this.activeState;
+      if (!this.disposed && this.activeQuery === query && state && !state.terminal) {
         const interrupted = this.interruptRequested || this.activeController?.signal.aborted;
         if (!interrupted) {
           this.onEvent({
@@ -288,22 +303,86 @@ export class ClaudeAgentSdkAdapter {
           itemId: null,
           payload: { status: interrupted ? "interrupted" : "failed" },
         });
+        emittedTerminal = true;
       }
     } finally {
-      if (!this.disposed && this.activeState === state && endedNormally && !state.terminal) {
-        this.onEvent({
-          type: this.interruptRequested ? "turn.interrupted" : "turn.completed",
-          providerSessionId: this.sessionId,
-          turnId: state.turnId,
-          itemId: null,
-          payload: { status: this.interruptRequested ? "interrupted" : "completed" },
-        });
-      }
-      if (this.activeState === state) {
-        this.#resolvePending("Claude Code turn ended before the request was resolved.");
+      if (this.activeQuery === query) {
+        const state = this.activeState;
+        if (!this.disposed && state && !state.terminal && !emittedTerminal) {
+          this.onEvent({
+            type: this.interruptRequested ? "turn.interrupted" : "turn.failed",
+            providerSessionId: this.sessionId,
+            turnId: state.turnId,
+            itemId: null,
+            payload: { status: this.interruptRequested ? "interrupted" : "failed" },
+          });
+        }
+        this.#resolvePending("Claude Code query closed before the request was resolved.");
+        channel.close();
+        this.activeQuery = null;
+        this.activeController = null;
+        this.messageChannel = null;
+        this.queryConfigurationKey = null;
+        this.queryConsumer = null;
         this.#clearActive();
       }
     }
+  }
+
+  async #ensurePersistentQuery({ sdk, controller, model, mode, projectInstructions }) {
+    const configurationKey = JSON.stringify({
+      model: model ?? null,
+      mode,
+      instructions: projectInstructionIdentity(projectInstructions),
+    });
+    if (this.activeQuery && this.queryConfigurationKey === configurationKey) {
+      await this.activeQuery.setModel?.(model || undefined);
+      await this.activeQuery.setPermissionMode?.(mode === "plan" ? "plan" : "default");
+      return;
+    }
+    await this.#closePersistentQuery("Claude Code query configuration changed.");
+    const channel = new ClaudeMessageChannel({
+      onWarning: (message) => this.logger.warn?.(message),
+    });
+    channel.setSessionId(this.sessionId ?? "");
+    const query = sdk.query({
+      prompt: channel,
+      options: this.#queryOptions({
+        abortController: controller,
+        model,
+        mode,
+        resume: this.sessionId,
+        projectInstructions,
+      }),
+    });
+    this.activeController = controller;
+    this.activeQuery = query;
+    this.messageChannel = channel;
+    this.queryConfigurationKey = configurationKey;
+    this.queryConsumer = this.#consumePersistent(query, channel);
+    try {
+      await withTimeout(query.initializationResult(), INSPECTION_TIMEOUT_MS, "Claude Code startup timed out.");
+    } catch (error) {
+      await this.#closePersistentQuery("Claude Code startup failed.");
+      throw error;
+    }
+  }
+
+  async #closePersistentQuery(reason) {
+    const query = this.activeQuery;
+    const controller = this.activeController;
+    this.activeQuery = null;
+    this.activeController = null;
+    this.queryConfigurationKey = null;
+    this.messageChannel?.close();
+    this.messageChannel = null;
+    controller?.abort();
+    query?.close?.();
+    if (this.queryConsumer) {
+      await Promise.race([Promise.resolve(this.queryConsumer).catch(() => {}), delay(1_000)]);
+    }
+    this.queryConsumer = null;
+    if (reason && this.pendingApprovals.size + this.pendingQuestions.size > 0) this.#resolvePending(reason);
   }
 
   #queryOptions({
@@ -312,26 +391,26 @@ export class ClaudeAgentSdkAdapter {
     mode = "agent",
     resume = null,
     projectInstructions = [],
-    references = [],
   } = {}) {
     const append = formatAuthorizedProjectInstructions(projectInstructions);
-    const additionalDirectories = Array.from(new Set(references
-      .map((entry) => path.dirname(path.resolve(entry.path)))
-      .filter((directory) => directory !== this.workspaceRoot)));
     return {
       abortController,
       cwd: this.workspaceRoot,
       env: cleanEnvironment({
-        ...(this.readiness.environment ?? process.env),
+        ...(this.readiness.environment ?? {}),
         CLAUDE_AGENT_SDK_CLIENT_APP: `puppyone-desktop/${this.appVersion}`,
         PUPPYONE_AGENT_BACKEND: "claude",
       }),
       ...(this.readiness.executablePath ? { pathToClaudeCodeExecutable: this.readiness.executablePath } : {}),
       ...(model ? { model } : {}),
       ...(resume ? { resume } : {}),
-      ...(additionalDirectories.length ? { additionalDirectories } : {}),
       permissionMode: mode === "plan" ? "plan" : "default",
       canUseTool: (toolName, input, options) => this.#requestPermission(toolName, input, options),
+      spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
+      stderr: (data) => {
+        const diagnostic = redactSecretText(String(data)).trim().slice(-4_000);
+        if (diagnostic) this.logger.warn?.(`Claude Code runtime: ${diagnostic}`);
+      },
       includePartialMessages: true,
       settingSources: ["user"],
       systemPrompt: {
@@ -373,7 +452,7 @@ export class ClaudeAgentSdkAdapter {
           displayName: bounded(options.displayName, 160) || humanize(toolName),
           kind: permissionKind(toolName),
           toolName: bounded(toolName, 160),
-          input,
+          input: boundRendererValue(redactSecrets(input)),
           availableDecisions: ["accept", "acceptForSession", "decline", "cancel"],
         },
       });
@@ -436,8 +515,6 @@ export class ClaudeAgentSdkAdapter {
 
   #clearActive() {
     this.activeTurnId = null;
-    this.activeQuery = null;
-    this.activeController = null;
     this.activeState = null;
     this.interruptRequested = false;
   }
@@ -514,11 +591,27 @@ function questionAnswerMap(questions, answers) {
   }));
 }
 
-function formatPrompt(prompt, references) {
-  const paths = Array.from(new Set(references.map((entry) => entry.path).filter(Boolean)));
+function formatPrompt(prompt, references, workspaceRoot) {
+  const paths = Array.from(new Set(references
+    .map((entry) => typeof entry?.path === "string" ? path.resolve(entry.path) : null)
+    .filter((filename) => filename && isInsideWorkspace(workspaceRoot, filename))));
   return paths.length
     ? `${prompt}\n\nAuthorized context files for this turn:\n${paths.map((filename) => `- ${filename}`).join("\n")}`
     : prompt;
+}
+
+function projectInstructionIdentity(value) {
+  if (!value || typeof value !== "object") return null;
+  return createHash("sha256")
+    .update(String(value.source ?? ""))
+    .update("\0")
+    .update(String(value.text ?? ""))
+    .digest("hex");
+}
+
+function isInsideWorkspace(workspaceRoot, filename) {
+  const relative = path.relative(workspaceRoot, filename);
+  return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
 async function* idleInput(signal) {

@@ -1,5 +1,4 @@
-import { OpenCodeSidecarAdapter } from "../opencode-protocol/opencode-sidecar-adapter.mjs";
-import { OpenCodeSidecarHost } from "../opencode-protocol/opencode-sidecar-host.mjs";
+import { OpenCodeAcpAdapter } from "../opencode-protocol/opencode-acp-adapter.mjs";
 import { createUserOpenCodeDiscovery } from "./opencode-native-discovery.mjs";
 
 export const OPENCODE_NATIVE_RUNTIME_DESCRIPTOR = Object.freeze({
@@ -15,19 +14,32 @@ export const OPENCODE_NATIVE_RUNTIME_DESCRIPTOR = Object.freeze({
 export function createOpenCodeNativeRuntimeDefinition({
   discovery = createUserOpenCodeDiscovery(),
   logger = console,
-  host = new OpenCodeSidecarHost({ logger }),
+  appVersion = "0.0.0",
+  adapterFactory = (options) => new OpenCodeAcpAdapter(options),
 } = {}) {
+  const adapters = new Set();
   return {
     descriptor: OPENCODE_NATIVE_RUNTIME_DESCRIPTOR,
     discovery,
-    createAdapter: ({ readiness, ...options }) => new OpenCodeSidecarAdapter({
-      ...options,
-      readiness,
-      host,
-      runtimeDescriptor: OPENCODE_NATIVE_RUNTIME_DESCRIPTOR,
-      managed: false,
-    }),
-    hasActiveResources: () => host.snapshot().state !== "idle",
-    dispose: () => host.stop(),
+    createAdapter: ({ readiness, ...options }) => {
+      let adapter;
+      adapter = adapterFactory({
+        ...options,
+        readiness,
+        appVersion,
+        logger,
+        runtimeDescriptor: OPENCODE_NATIVE_RUNTIME_DESCRIPTOR,
+        managed: false,
+        onDispose: () => adapters.delete(adapter),
+      });
+      adapters.add(adapter);
+      return adapter;
+    },
+    hasActiveResources: () => Array.from(adapters).some((adapter) => adapter.hasActiveProcess?.() === true),
+    dispose: async () => {
+      const active = Array.from(adapters);
+      adapters.clear();
+      await Promise.allSettled(active.map((adapter) => adapter.dispose?.()));
+    },
   };
 }

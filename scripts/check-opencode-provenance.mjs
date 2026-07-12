@@ -12,13 +12,15 @@ const packageLock = readJson("package-lock.json");
 const notice = await fs.promises.readFile(path.join(root, "THIRD_PARTY_NOTICES.md"), "utf8");
 const license = await fs.promises.readFile(path.join(root, "vendor/opencode/LICENSE"), "utf8");
 const runtimeSource = await fs.promises.readFile(path.join(root, "electron/main/agent/runtimes/opencode-protocol/opencode-manifest.mjs"), "utf8");
-const gatewaySource = await fs.promises.readFile(path.join(root, "electron/main/agent/runtimes/opencode-protocol/opencode-http-client.mjs"), "utf8");
+const adapterSource = await fs.promises.readFile(path.join(root, "electron/main/agent/runtimes/opencode-protocol/opencode-acp-adapter.mjs"), "utf8");
+const acpClientSource = await fs.promises.readFile(path.join(root, "electron/main/agent/protocols/acp/acp-client.mjs"), "utf8");
 
 assert(runtime.runtimeRelease.version === "1.17.18", "OpenCode runtime version drifted.");
-assert(packageManifest.dependencies?.["@opencode-ai/sdk"] === runtime.runtimeRelease.version, "OpenCode SDK must exactly match the bundled runtime.");
-assert(packageLock.packages?.["node_modules/@opencode-ai/sdk"]?.version === runtime.runtimeRelease.version, "OpenCode SDK lockfile version drifted.");
-assert(gatewaySource.includes('from "@opencode-ai/sdk/v2/client"'), "OpenCode gateway must use the client-only SDK entrypoint.");
-assert(!gatewaySource.includes("@opencode-ai/sdk/server"), "OpenCode PATH-spawning SDK server helper is forbidden.");
+assert(!packageManifest.dependencies?.["@opencode-ai/sdk"], "The retired OpenCode HTTP SDK gateway must not remain in production dependencies.");
+assert(!packageLock.packages?.["node_modules/@opencode-ai/sdk"], "The retired OpenCode HTTP SDK gateway must not remain in the lockfile.");
+assert(adapterSource.includes('"acp"') && adapterSource.includes("AcpClient"), "OpenCode must use the provider-neutral ACP adapter.");
+assert(adapterSource.includes('"--hostname=127.0.0.1"') && adapterSource.includes('"--pure"'), "Managed OpenCode ACP must remain loopback-only and plugin-isolated.");
+assert(acpClientSource.includes("timeoutMs: 0"), "ACP prompt turns must not use an unsafe arbitrary request timeout.");
 assert(runtime.protocolFloor === runtime.runtimeRelease.version, "Unverified older OpenCode protocol floor is not allowed.");
 assert(/^[a-f0-9]{40}$/.test(runtime.runtimeRelease.releaseCommit), "OpenCode release commit is invalid.");
 assert(Object.keys(runtime.artifacts).length === 6, "OpenCode release artifact matrix is incomplete.");
@@ -39,7 +41,8 @@ for (const [filename, digest] of Object.entries(prompts.files)) {
 assert(notice.includes(runtime.sourceAudit.commit) && notice.includes("MIT License"), "OpenCode third-party notice is incomplete.");
 assert(license.includes("Copyright (c) 2025 opencode"), "OpenCode MIT license is incomplete.");
 assert(sbom.bomFormat === "CycloneDX" && sbom.components?.[0]?.version === runtime.runtimeRelease.version, "OpenCode SBOM is missing or drifted.");
-assert(sbom.components?.some((component) => component.purl === `pkg:npm/%40opencode-ai/sdk@${runtime.runtimeRelease.version}`), "OpenCode SDK is missing from the SBOM.");
+assert(!sbom.components?.some((component) => component.purl?.includes("%40opencode-ai/sdk")), "Retired OpenCode SDK must not remain in the SBOM.");
+assert(sbom.metadata?.component?.name === "puppyone-desktop-managed-agent-kernel", "OpenCode SBOM component identity drifted.");
 
 const upstreamRoot = process.argv[2] || process.env.PUPPYONE_OPENCODE_SOURCE;
 if (upstreamRoot) {

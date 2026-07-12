@@ -1,8 +1,8 @@
 # Cursor-style Agent Chat UI behavior specification
 
-Status: implemented transcript/activity foundation plus target Agent-first
-selection contract. Multi-native backend selection from ADR-005 remains
-migration work and requires new visual and interaction evidence.
+Status: implemented transcript/activity foundation and Agent-first backend
+contract. Visual refinement remains iterative and must preserve the native
+harness boundaries in ADR-005 and ADR-006.
 
 This specification turns the visual direction in [Right Sidebar Agent Chat](right-sidebar.md)
 into implementable rules. The pixel reference is the MIT-licensed frontend in
@@ -35,14 +35,14 @@ The following invariants are mandatory:
 - proposed work, approved work and completed work are visibly different states;
 - raw provider JSON, ANSI control sequences and hidden reasoning are never rendered directly;
 - animation communicates state change but never delays input, approval or Stop;
-- replaying or restoring a session does not replay entrance animations;
+- remounting the current live session does not replay entrance animations;
 - reduced-motion mode preserves every state without translation, shimmer or pulse.
 
 ## 2. Surface anatomy
 
 ```text
 +------------------------------------------------------+
-| New chat                                  history  ...|
+| Agent                                      +      ...|
 |------------------------------------------------------|
 |                                                      |
 |                   +-------------------------------+  |

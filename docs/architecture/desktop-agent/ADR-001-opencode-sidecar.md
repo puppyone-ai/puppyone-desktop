@@ -1,12 +1,13 @@
 # ADR-001: OpenCode sidecar process boundary
 
-Date: 2026-07-11. Status: accepted for the managed `puppyone-agent` sidecar
-boundary only. Its OpenCode-only product routing is superseded by ADR-005.
+Date: 2026-07-11. Status: superseded by
+[ADR-006](ADR-006-native-harness-adapters-and-acp.md) on 2026-07-13.
 
 [ADR-005](ADR-005-multi-native-agent-backends.md) makes PuppyOne Agent one
-selectable backend among native Agent integrations. The process, integrity and
-security decisions below remain authoritative for PuppyOne Agent; they do not
-apply to Codex, Claude Code or user-owned OpenCode processes.
+selectable backend among native Agent integrations. This file is the historical
+record for the former HTTP/SSE transport choice. Process isolation, integrity
+and fail-closed security remain requirements, but ADR-006's ACP stdio boundary
+is now authoritative.
 
 ## Decision
 

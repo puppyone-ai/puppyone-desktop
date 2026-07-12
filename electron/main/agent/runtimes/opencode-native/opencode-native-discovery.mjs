@@ -6,10 +6,8 @@ import { redactSecretText } from "../../agent-events.mjs";
 import {
   buildAgentEnvironment,
   discoverExecutable,
+  runBounded,
 } from "../../runtime/executable-discovery.mjs";
-import {
-  OPENCODE_UPSTREAM,
-} from "../opencode-protocol/opencode-manifest.mjs";
 import {
   parseOpenCodeVersion,
 } from "../opencode-protocol/opencode-version.mjs";
@@ -46,18 +44,44 @@ export async function discoverUserOpenCodeExecutable({
     platform,
     homedir,
     parseVersion: parseOpenCodeVersion,
-    minimumVersion: OPENCODE_UPSTREAM.protocolFloor,
+    minimumVersion: null,
     label: "OpenCode",
     buildEnvironment: buildUserOpenCodeEnvironment,
   });
+  let readiness = result;
+  if (result.status === "ready" && result.executablePath) {
+    try {
+      const probe = await runBounded(spawn, result.executablePath, ["acp", "--help"], {
+        env: result.environment,
+        timeoutMs: 4_000,
+        maxBytes: 64 * 1024,
+        label: "OpenCode ACP",
+      });
+      if (probe.code !== 0) {
+        readiness = {
+          ...result,
+          status: "protocol-unavailable",
+          message: "This OpenCode installation does not expose a usable Agent Client Protocol endpoint.",
+          diagnostic: `${probe.stdout}\n${probe.stderr}`.trim().slice(0, 4_000),
+        };
+      }
+    } catch (error) {
+      readiness = {
+        ...result,
+        status: "protocol-unavailable",
+        message: "This OpenCode installation could not start its Agent Client Protocol endpoint.",
+        diagnostic: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
   return {
     provider: "opencode-native",
     runtimeId: "opencode-native",
     source: result.executablePath ? "user-installed" : "missing",
-    compatibility: result.status === "ready" ? "native-supported" : "unavailable",
-    ...result,
-    message: redactSecretText(result.message),
-    ...(result.diagnostic ? { diagnostic: redactSecretText(result.diagnostic) } : {}),
+    compatibility: readiness.status === "ready" ? "acp-v1" : "unavailable",
+    ...readiness,
+    message: redactSecretText(readiness.message),
+    ...(readiness.diagnostic ? { diagnostic: redactSecretText(readiness.diagnostic) } : {}),
   };
 }
 

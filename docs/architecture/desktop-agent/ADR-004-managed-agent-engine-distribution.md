@@ -16,11 +16,10 @@ different distribution models. The latter leaks an internal implementation
 choice into onboarding, creates version skew and makes PuppyOne support depend
 on arbitrary PATH state.
 
-The official `@opencode-ai/sdk@1.17.18` contains a generated client and a
-`createOpencodeServer()` helper. The helper still executes `opencode` from
-PATH. Therefore installing the SDK alone does not distribute the harness and
-would reproduce the same customer-owned dependency if used as lifecycle
-authority.
+An npm control package alone does not distribute the native OpenCode harness.
+Relying on a helper that resolves `opencode` from `PATH` would reproduce the
+same customer-owned dependency. The product must package and verify the native
+runtime independently of its protocol client.
 
 ## Decision
 
@@ -35,10 +34,10 @@ PuppyOne application release
 |     executable SHA-256 + exact version
 |     current slot + verified previous slot
 +-- app-owned OpenCode profile
-+-- main-only loopback gateway
-      +-- allowlisted operations
-      +-- bounded JSON/SSE
-      +-- timeout, redaction and owner correlation
++-- main-only ACP adapter over child stdio
+      +-- JSON-RPC 2.0 framing and method allowlist
+      +-- bounded startup/metadata transport
+      +-- workspace callbacks, redaction and owner correlation
 ```
 
 Production discovery considers only the verified bundled current/previous
@@ -58,25 +57,29 @@ SHA-256, then stages the same layout used by packaging. `npm run dev` invokes
 this preparation opportunistically; an offline failure does not prevent the
 rest of PuppyOne from starting.
 
-## SDK boundary
+## ACP boundary
 
-The official SDK is useful, but it has two different roles:
+PuppyOne uses OpenCode's supported Agent Client Protocol command over the
+verified child process's stdin/stdout. The provider-neutral ACP client lives in
+Electron main and owns JSON-RPC 2.0 framing, method negotiation, capabilities,
+permission/file callbacks and normalized events. No OpenCode SDK or HTTP/SSE
+client is shipped in Renderer or required as a production dependency.
 
 ```text
-SDK generated client/types          adopted at exact runtime version
-SDK createOpencodeServer helper     rejected as lifecycle authority
-                                    because it spawns `opencode` from PATH
-OpenCode private core package       not a stable embedded ABI
+verified OpenCode executable
+  opencode acp --cwd=<canonical workspace> --hostname=127.0.0.1 --port=0 --pure
+        ^
+        | JSON-RPC 2.0 over stdio
+        v
+main-only ACP client
+  initialize / session / prompt / cancel / permission / workspace files
 ```
 
-PuppyOne uses `@opencode-ai/sdk/v2/client` at the same exact version as the
-bundled runtime for generated REST paths and payloads. The SDK is wrapped by a
-main-process gateway that preserves the product invariants: loopback only,
-Basic auth kept in main, no redirects, response/SSE byte limits, request
-timeouts, redaction and an explicit endpoint allowlist. The bounded SSE parser
-remains at the gateway because it coordinates reconnect repair before releasing
-new events. The SDK server helper and SDK client are never exposed through
-preload or Renderer.
+The upstream ACP command may create an internal loopback server as its own
+implementation detail; PuppyOne neither exposes nor authenticates to that
+server. The child receives an isolated profile and locked safety environment.
+Prompt requests are not given an arbitrary wall-clock timeout or automatic
+retry, because a timed-out mutating turn could otherwise duplicate effects.
 
 ## User experience
 
@@ -147,7 +150,7 @@ permissions/questions, cancellation, MCP/skills, model routing, compaction,
 streaming, persistence, package sandboxing and provenance.
 
 ```text
-Managed OpenCode sidecar
+Managed OpenCode ACP process
   larger platform artifact
   mature complete harness remains upstream
   strong process fault/security boundary
@@ -172,7 +175,7 @@ Benefits:
 - zero customer CLI prerequisite for PuppyOne Agent and a deterministic support surface;
 - application and engine versions are tested and rolled back together;
 - old global OpenCode installations cannot disable PuppyOne Agent or another backend;
-- the exact-version SDK is adopted without surrendering the trust boundary;
+- the supported ACP contract is adopted without surrendering the trust boundary;
 - billing language distinguishes a free bundled harness from paid inference.
 
 Costs:
@@ -183,7 +186,7 @@ Costs:
 
 ## Upstream references
 
-- OpenCode SDK source:
-  `anomalyco/opencode@9976269:packages/sdk/js/src/server.ts`
+- OpenCode ACP source:
+  `anomalyco/opencode@9976269:packages/opencode/src/acp/agent.ts`
 - [Pi official monorepo and packages](https://github.com/badlogic/pi-mono)
 - [Pi coding-agent SDK documentation](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/sdk.md)

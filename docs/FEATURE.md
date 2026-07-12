@@ -58,7 +58,9 @@ single product area can evolve without turning this file into a catch-all.
     native Agent backends. PuppyOne Agent uses a managed OpenCode kernel;
     Codex, Claude Code, user OpenCode and future supported products keep their
     own harness, provider-permitted credentials and native session. See the
-    [multi-native backend decision](architecture/desktop-agent/ADR-005-multi-native-agent-backends.md).
+    [multi-native backend decision](architecture/desktop-agent/ADR-005-multi-native-agent-backends.md)
+    and the
+    [native harness/ACP decision](architecture/desktop-agent/ADR-006-native-harness-adapters-and-acp.md).
 
 ## Document Boundary
 

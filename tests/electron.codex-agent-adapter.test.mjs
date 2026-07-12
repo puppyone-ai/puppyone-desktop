@@ -36,9 +36,30 @@ describe("Codex app-server normalization", () => {
     })]);
 
     expect(normalizeCodexNotification({
+      method: "item/reasoning/summaryPartAdded",
+      params: { threadId: "thread-1", turnId: "turn-1", itemId: "reasoning-1", summaryIndex: 1 },
+    })).toEqual([expect.objectContaining({
+      type: "reasoning.summary.delta",
+      payload: { delta: "", summaryIndex: 1, boundary: true },
+    })]);
+
+    expect(normalizeCodexNotification({
       method: "turn/completed",
       params: { threadId: "thread-1", turn: { id: "turn-1", status: "interrupted" } },
     })[0]).toMatchObject({ type: "turn.interrupted", payload: { status: "interrupted" } });
+
+    expect(normalizeCodexNotification({
+      method: "thread/status/changed",
+      params: { threadId: "thread-1", status: { type: "systemError" } },
+    })).toEqual([]);
+
+    expect(normalizeCodexNotification({
+      method: "turn/completed",
+      params: { threadId: "thread-1", turn: { id: "turn-1", status: "failed", error: { message: "Actionable failure" } } },
+    })).toEqual([
+      expect.objectContaining({ type: "turn.failed", payload: expect.objectContaining({ message: "Actionable failure" }) }),
+      expect.objectContaining({ type: "provider.error", payload: { message: "Actionable failure", recoverable: true } }),
+    ]);
 
     expect(normalizeCodexNotification({
       method: "item/fileChange/patchUpdated",
@@ -79,7 +100,7 @@ describe("Codex app-server normalization", () => {
     });
   });
 
-  it("overrides global reasoning config with the selected model's catalog default", async () => {
+  it("normalizes legacy reasoning effort and reuses one thread across follow-up turns", async () => {
     const connection = new FakeConnection();
     connection.results.set("account/read", { account: { type: "chatgpt" }, requiresOpenaiAuth: false });
     connection.results.set("model/list", {
@@ -87,13 +108,14 @@ describe("Codex app-server normalization", () => {
         id: "gpt-5.5",
         model: "gpt-5.5",
         displayName: "GPT-5.5",
-        defaultReasoningEffort: "medium",
-        supportedReasoningEfforts: ["low", "medium", "high", "xhigh"].map((reasoningEffort) => ({
+        defaultReasoningEffort: "max",
+        supportedReasoningEfforts: ["low", "max", "unsupported", "xhigh"].map((reasoningEffort) => ({
           reasoningEffort,
           description: reasoningEffort,
         })),
       }],
     });
+    connection.results.set("thread/start", { thread: { id: "thread-1", preview: "Session", createdAt: 1, updatedAt: 1 } });
     connection.results.set("turn/start", { turn: { id: "turn-1" } });
     const adapter = new CodexAppServerAdapter({
       executablePath: "/usr/local/bin/codex",
@@ -106,14 +128,20 @@ describe("Codex app-server normalization", () => {
     const inspection = await adapter.inspect();
     expect(inspection.models[0]).toMatchObject({
       model: "gpt-5.5",
-      variants: ["low", "medium", "high", "xhigh"],
-      defaultVariant: "medium",
+      variants: ["low", "xhigh"],
+      defaultVariant: "xhigh",
     });
-    adapter.threadId = "thread-1";
+    await adapter.createSession({ model: "gpt-5.5" });
     await adapter.startTurn({ prompt: "hello", model: "gpt-5.5" });
+    await adapter.startTurn({ prompt: "follow up", model: "gpt-5.5" });
     expect(connection.requests.find((request) => request.method === "turn/start")).toMatchObject({
-      params: { threadId: "thread-1", model: "gpt-5.5", effort: "medium" },
+      params: { threadId: "thread-1", model: "gpt-5.5", effort: "xhigh" },
     });
+    expect(connection.requests.filter((request) => request.method === "initialize")).toHaveLength(1);
+    expect(connection.requests.filter((request) => request.method === "thread/start")).toHaveLength(1);
+    expect(connection.requests.filter((request) => request.method === "thread/resume")).toHaveLength(0);
+    expect(connection.requests.filter((request) => request.method === "turn/start")).toHaveLength(2);
+    expect(JSON.stringify(connection.requests)).not.toContain('"effort":"max"');
     adapter.dispose();
   });
 

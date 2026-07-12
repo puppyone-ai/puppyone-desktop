@@ -1,153 +1,91 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { AcpEventNormalizer } from "../electron/main/agent/protocols/acp/acp-event-normalizer.mjs";
 import {
-  createOpenCodeEventState,
-  normalizeOpenCodeActiveTurnHistory,
-  normalizeOpenCodeEvent,
-  normalizeOpenCodeHistory,
-} from "../electron/main/agent/runtimes/opencode-protocol/opencode-events.mjs";
+  resolveAcpEfforts,
+  resolveAcpModels,
+  resolveAcpModes,
+  resolveRequestedAcpMode,
+} from "../electron/main/agent/protocols/acp/acp-session-config.mjs";
 
-describe("OpenCode event normalization", () => {
-  it("normalizes the pinned source fixture without leaking the runtime protocol", () => {
-    const fixture = JSON.parse(readFileSync(new URL("./fixtures/opencode/v1-events.json", import.meta.url), "utf8"));
-    const state = createOpenCodeEventState();
-    state.activeTurnId = "turn_1";
-    const events = fixture.events.flatMap((event) => normalizeOpenCodeEvent(event, state));
-    expect(events.map((event) => event.type)).toEqual([
-      "assistant.completed",
-      "approval.requested",
-      "question.requested",
-      "turn.completed",
+describe("OpenCode ACP normalization", () => {
+  it("streams assistant text, working state, tools, diffs, plans and usage", () => {
+    const normalizer = new AcpEventNormalizer({ turnId: "opencode:turn-1" });
+    const assistant = normalizer.normalize(notification({
+      sessionUpdate: "agent_message_chunk",
+      messageId: "message-1",
+      content: { type: "text", text: "Hello " },
+    }));
+    const thought = normalizer.normalize(notification({
+      sessionUpdate: "agent_thought_chunk",
+      messageId: "thought-1",
+      content: { type: "text", text: "Checking files" },
+    }));
+    const started = normalizer.normalize(notification({
+      sessionUpdate: "tool_call",
+      toolCallId: "tool-1",
+      kind: "execute",
+      title: "Run tests",
+      status: "in_progress",
+      rawInput: { command: "npm test", token: "secret" },
+    }));
+    const completed = normalizer.normalize(notification({
+      sessionUpdate: "tool_call_update",
+      toolCallId: "tool-1",
+      kind: "execute",
+      status: "completed",
+      content: [
+        { type: "content", content: { type: "text", text: "passed" } },
+        { type: "diff", path: "src/app.ts" },
+      ],
+    }));
+    const plan = normalizer.normalize(notification({
+      sessionUpdate: "plan",
+      entries: [{ content: "Run tests", status: "completed", priority: "high" }],
+    }));
+    const usage = normalizer.normalize(notification({ sessionUpdate: "usage_update", size: 128_000, used: 4_096 }));
+    normalizer.normalize(notification({
+      sessionUpdate: "agent_message_chunk",
+      messageId: "message-1",
+      content: { type: "text", text: "world" },
+    }));
+
+    expect(assistant).toEqual([expect.objectContaining({ type: "assistant.delta", payload: { delta: "Hello " } })]);
+    expect(thought).toEqual([expect.objectContaining({
+      type: "reasoning.summary.delta",
+      payload: { delta: "", boundary: true, status: "working" },
+    })]);
+    expect(JSON.stringify(thought)).not.toContain("Checking files");
+    expect(started).toEqual([expect.objectContaining({ type: "tool.started", payload: expect.objectContaining({ kind: "command", command: "npm test" }) })]);
+    expect(JSON.stringify(started)).not.toContain("secret");
+    expect(completed.map((event) => event.type)).toEqual(["command.output.delta", "file.change.updated", "tool.completed"]);
+    expect(plan[0]).toMatchObject({ type: "plan.updated", payload: { steps: [{ step: "Run tests", status: "completed", priority: "high" }] } });
+    expect(usage[0]).toMatchObject({ type: "usage.updated", payload: { contextWindow: { size: 128_000, used: 4_096 } } });
+    expect(normalizer.completeAssistant("session-1")).toEqual([
+      expect.objectContaining({ type: "assistant.completed", payload: { text: "Hello world" } }),
     ]);
-    expect(events[1]).toMatchObject({
-      providerSessionId: "ses_1",
-      turnId: "turn_1",
-      payload: { requestId: "perm_1", availableDecisions: ["accept", "acceptForSession", "decline", "cancel"] },
-    });
   });
 
-  it("rebuilds a provider-neutral transcript from OpenCode native history", () => {
-    const events = normalizeOpenCodeHistory([
-      {
-        info: { id: "user_1", sessionID: "ses_1", role: "user", model: { providerID: "openai", modelID: "gpt-5" } },
-        parts: [{ id: "text_1", type: "text", text: "Fix tests" }],
-      },
-      {
-        info: { id: "assistant_1", parentID: "user_1", sessionID: "ses_1", role: "assistant", tokens: { input: 4, output: 2 }, cost: 0.1 },
-        parts: [
-          { id: "text_2", type: "text", text: "Done" },
-          { id: "tool_1", callID: "call_1", type: "tool", tool: "bash", state: { status: "completed", title: "Tests", input: {}, output: "ok" } },
-        ],
-      },
-    ]);
-    expect(events.map((event) => event.type)).toEqual([
-      "turn.started",
-      "assistant.completed",
-      "tool.completed",
-      "usage.updated",
-      "turn.completed",
-    ]);
-  });
+  it("derives model, mode and effort selection from ACP config options", () => {
+    const configOptions = [
+      select("model", "model", "openai/gpt-5", [
+        { value: "openai/gpt-5", name: "GPT-5" },
+        { value: "anthropic/claude", name: "Claude" },
+      ]),
+      select("mode", "mode", "build", [{ value: "build", name: "Build" }, { value: "plan", name: "Plan" }]),
+      select("thought", "thought_level", "high", [{ value: "low" }, { value: "high" }]),
+    ];
 
-  it("emits one terminal boundary for a multi-step assistant loop", () => {
-    const events = normalizeOpenCodeHistory([
-      {
-        info: { id: "user_1", sessionID: "ses_1", role: "user" },
-        parts: [{ id: "prompt_1", type: "text", text: "Run tests" }],
-      },
-      {
-        info: { id: "assistant_1", parentID: "user_1", sessionID: "ses_1", role: "assistant" },
-        parts: [{ id: "tool_1", callID: "call_1", type: "tool", tool: "bash", state: { status: "completed", output: "ok" } }],
-      },
-      {
-        info: { id: "assistant_2", parentID: "user_1", sessionID: "ses_1", role: "assistant" },
-        parts: [{ id: "answer_1", type: "text", text: "All tests pass" }],
-      },
-    ]);
-
-    expect(events.map((event) => event.type)).toEqual([
-      "turn.started",
-      "tool.completed",
-      "assistant.completed",
-      "turn.completed",
-    ]);
-    expect(events.filter((event) => event.type === "turn.completed")).toHaveLength(1);
-  });
-
-  it("reconciles only the active native turn without synthesizing a terminal event", () => {
-    const events = normalizeOpenCodeActiveTurnHistory([
-      {
-        info: { id: "user_old", sessionID: "ses_1", role: "user" },
-        parts: [{ id: "old_prompt", type: "text", text: "Old turn" }],
-      },
-      {
-        info: { id: "assistant_old", parentID: "user_old", sessionID: "ses_1", role: "assistant" },
-        parts: [{ id: "old_answer", type: "text", text: "Old answer" }],
-      },
-      {
-        info: { id: "user_current", sessionID: "ses_1", role: "user" },
-        parts: [{ id: "current_prompt", type: "text", text: "Current turn" }],
-      },
-      {
-        info: {
-          id: "assistant_current",
-          parentID: "user_current",
-          sessionID: "ses_1",
-          role: "assistant",
-          tokens: { input: 4, output: 3 },
-        },
-        parts: [
-          { id: "current_answer", type: "text", text: "Recovered answer" },
-          {
-            id: "current_tool",
-            callID: "call_current",
-            type: "tool",
-            tool: "bash",
-            state: { status: "completed", title: "Tests", output: "ok" },
-          },
-        ],
-      },
-    ], "app_turn_1");
-
-    expect(events.map((event) => event.type)).toEqual([
-      "assistant.completed",
-      "tool.completed",
-      "usage.updated",
-    ]);
-    expect(events.every((event) => event.turnId === "app_turn_1")).toBe(true);
-    expect(JSON.stringify(events)).not.toContain("Old answer");
-  });
-
-  it("does not misclassify an out-of-order user text part as assistant output", () => {
-    const state = createOpenCodeEventState();
-    state.activeTurnId = "turn_1";
-    expect(normalizeOpenCodeEvent({
-      type: "message.part.updated",
-      properties: { part: { id: "part_1", messageID: "message_1", sessionID: "ses_1", type: "text", text: "user text" } },
-    }, state)).toEqual([]);
-    expect(normalizeOpenCodeEvent({
-      type: "message.part.delta",
-      properties: { partID: "part_1", messageID: "message_1", sessionID: "ses_1", field: "text", delta: "user delta" },
-    }, state)).toEqual([]);
-  });
-
-  it("keeps empty session diffs explicit for projection clearing but drops invalid file rows", () => {
-    const state = createOpenCodeEventState();
-    state.activeTurnId = "turn_1";
-    const [empty] = normalizeOpenCodeEvent({
-      type: "session.diff",
-      properties: { sessionID: "ses_1", diff: [{ additions: 2, deletions: 1 }] },
-    }, state);
-    expect(empty).toMatchObject({
-      type: "file.change.updated",
-      itemId: "session-diff",
-      payload: { changes: [] },
-    });
-
-    const [changed] = normalizeOpenCodeEvent({
-      type: "session.diff",
-      properties: { sessionID: "ses_1", diff: [{ file: "src/app.ts", additions: 2, deletions: 1 }] },
-    }, state);
-    expect(changed.payload.changes).toEqual([{ path: "src/app.ts", additions: 2, deletions: 1, status: "" }]);
+    expect(resolveAcpModels({ configOptions })).toMatchObject({ configId: "model", currentId: "openai/gpt-5" });
+    expect(resolveAcpModes({ configOptions })).toMatchObject({ configId: "mode", currentId: "build" });
+    expect(resolveAcpEfforts({ configOptions })).toMatchObject({ configId: "thought", currentId: "high" });
+    expect(resolveRequestedAcpMode("plan", resolveAcpModes({ configOptions }))).toBe("plan");
   });
 });
+
+function notification(update) {
+  return { sessionId: "session-1", update };
+}
+
+function select(id, category, currentValue, options) {
+  return { id, category, type: "select", currentValue, options };
+}

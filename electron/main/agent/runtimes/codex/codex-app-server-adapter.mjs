@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { JsonlRpcConnection } from "../../transports/jsonl-rpc-connection.mjs";
 import { boundRendererValue, redactSecrets, redactSecretText } from "../../agent-events.mjs";
 
+const CODEX_REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
+
 export const CODEX_CAPABILITIES = Object.freeze({
   streamingText: true,
   structuredToolEvents: true,
@@ -396,23 +398,32 @@ export function normalizeCodexNotification(message) {
       }];
     }
     case "thread/status/changed":
-      return params.status?.type === "systemError"
-        ? [{ type: "provider.error", providerSessionId: threadId, payload: { message: "Codex thread entered a system error state.", recoverable: true } }]
-        : [];
+      // Runtime status is lifecycle state, not a diagnostic. The accompanying
+      // failed-turn payload carries the actionable message exactly once.
+      return [];
     case "turn/started":
       return [{ type: "turn.started", providerSessionId: threadId, turnId, payload: { status: "running" } }];
     case "turn/completed": {
       const status = params.turn?.status;
       const type = status === "interrupted" ? "turn.interrupted" : status === "failed" ? "turn.failed" : "turn.completed";
-      return [{
+      const message = params.turn?.error?.message ? formatCodexErrorMessage(params.turn.error.message) : "";
+      const terminalEvent = {
         type,
         providerSessionId: threadId,
         turnId,
         payload: {
           status: normalizeTurnStatus(status),
-          ...(params.turn?.error?.message ? { message: formatCodexErrorMessage(params.turn.error.message) } : {}),
+          ...(message ? { message } : {}),
         },
-      }];
+      };
+      return status === "failed" && message
+        ? [terminalEvent, {
+          type: "provider.error",
+          providerSessionId: threadId,
+          turnId,
+          payload: { message, recoverable: true },
+        }]
+        : [terminalEvent];
     }
     case "item/started":
       return normalizeItemLifecycle(item, "started", threadId, turnId);
@@ -422,6 +433,8 @@ export function normalizeCodexNotification(message) {
       return [{ type: "assistant.delta", providerSessionId: threadId, turnId, itemId, payload: { delta: String(params.delta ?? "") } }];
     case "item/reasoning/summaryTextDelta":
       return [{ type: "reasoning.summary.delta", providerSessionId: threadId, turnId, itemId, payload: { delta: String(params.delta ?? ""), summaryIndex: params.summaryIndex ?? 0 } }];
+    case "item/reasoning/summaryPartAdded":
+      return [{ type: "reasoning.summary.delta", providerSessionId: threadId, turnId, itemId, payload: { delta: "", summaryIndex: params.summaryIndex ?? 0, boundary: true } }];
     case "turn/plan/updated":
       return [{ type: "plan.updated", providerSessionId: threadId, turnId, payload: { explanation: stringOrNull(params.explanation), steps: normalizePlan(params.plan) } }];
     case "item/plan/delta":
@@ -604,13 +617,12 @@ function normalizeModels(result) {
   return result.data.filter((model) => !model?.hidden).slice(0, 100).map((model) => {
     const variants = Array.isArray(model?.supportedReasoningEfforts)
       ? model.supportedReasoningEfforts
-        .map((entry) => typeof entry?.reasoningEffort === "string" ? entry.reasoningEffort.trim() : "")
+        .map((entry) => normalizeCodexReasoningEffort(entry?.reasoningEffort))
         .filter(Boolean)
+        .filter((value, index, values) => values.indexOf(value) === index)
         .slice(0, 20)
       : [];
-    const advertisedDefault = typeof model?.defaultReasoningEffort === "string"
-      ? model.defaultReasoningEffort.trim()
-      : "";
+    const advertisedDefault = normalizeCodexReasoningEffort(model?.defaultReasoningEffort);
     return {
       id: String(model.id ?? model.model ?? ""),
       model: String(model.model ?? model.id ?? ""),
@@ -625,6 +637,13 @@ function normalizeModels(result) {
           : variants[0] ?? null,
     };
   }).filter((model) => model.id);
+}
+
+function normalizeCodexReasoningEffort(value) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  const compatible = normalized === "max" ? "xhigh" : normalized;
+  return CODEX_REASONING_EFFORTS.has(compatible) ? compatible : null;
 }
 
 function compatibleReasoningEffort(model) {

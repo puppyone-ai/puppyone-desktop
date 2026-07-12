@@ -7,7 +7,8 @@ This file remains the historical record for the OpenCode-only phase. Its
 single-harness product routing, hidden runtime selector and global OpenCode
 availability rules are no longer the target architecture. Its OpenCode process
 isolation, safe DTO, permission and provenance decisions continue under the
-PuppyOne Agent backend through ADR-001 and ADR-004.
+PuppyOne Agent backend through ADR-004 and
+[ADR-006](ADR-006-native-harness-adapters-and-acp.md).
 
 This decision supersedes the product-routing parts of ADR-001 and ADR-002 that
 exposed OpenCode and Codex as peer, user-selectable Chat runtimes. It does not

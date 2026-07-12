@@ -37,16 +37,21 @@ const INTERRUPT_CONFIRMATION_TIMEOUT_MS = 5_000;
 
 export function createAgentService({
   runtimeRegistry,
-  persistence,
+  sessionCache = null,
+  persistence: legacyPersistence = null,
   logger = console,
 }) {
   if (!runtimeRegistry || typeof runtimeRegistry.createAdapter !== "function") {
     throw new TypeError("AgentService requires a provider-neutral runtime registry.");
   }
+  const cache = sessionCache ?? legacyPersistence;
+  if (!cache || typeof cache.save !== "function") {
+    throw new TypeError("AgentService requires an ephemeral session cache.");
+  }
   const sessionStore = new AgentSessionStore({ onOwnerDestroyed: closeSessionsForWindow });
   const sessionCreations = new Set();
   const runtimeCatalog = createAgentRuntimeCatalog({ runtimeRegistry });
-  const { emit, persistNow, persistSoon, sendSessionExit } = createAgentEventJournal({ persistence, logger });
+  const { emit, persistNow, persistSoon, sendSessionExit } = createAgentEventJournal({ sessionCache: cache, logger });
 
   const discoverProviders = (_sender, request = {}, workspaceRoot = null) => runtimeCatalog.discover(request, workspaceRoot);
   const listModels = (_sender, request = {}, workspaceRoot = null) => runtimeCatalog.listModels(request, workspaceRoot);
@@ -121,8 +126,8 @@ export function createAgentService({
       const persisted = retired
         ? persistedRecordFromSession(retired)
         : requestedSessionId
-          ? await persistence.findById(requestedSessionId, workspaceRoot)
-          : await persistence.findLatest(workspaceRoot, normalizeRuntimeId(request?.runtimeId));
+          ? await cache.findById(requestedSessionId, workspaceRoot)
+          : await cache.findLatest(workspaceRoot, normalizeRuntimeId(request?.runtimeId));
       if (!persisted) return null;
       const existing = sessionStore.get(persisted.sessionId);
       if (existing) return sessionSnapshot(requireOwnedSession(sender, existing.id));
@@ -355,7 +360,7 @@ export function createAgentService({
   async function listSessions(_sender, request, workspaceRoot) {
     requireWorkspaceRoot(workspaceRoot);
     const runtimeId = normalizeRuntimeId(request?.runtimeId);
-    const records = await persistence.list(workspaceRoot, { runtimeId, includeArchived: Boolean(request?.includeArchived) });
+    const records = await cache.list(workspaceRoot, { runtimeId, includeArchived: Boolean(request?.includeArchived) });
     return records.map((record) => publicSessionRecord({
       ...record,
       runtimeId: resolvePersistedRuntimeId(record, runtimeId),
@@ -428,7 +433,7 @@ export function createAgentService({
     } else {
       await requirePersistedSessionInWorkspace(sessionId, workspaceRoot);
     }
-    await persistence.archive(sessionId, new Date().toISOString());
+    await cache.archive(sessionId, new Date().toISOString());
     return { sessionId, archived: true };
   }
 
@@ -447,7 +452,7 @@ export function createAgentService({
     } else {
       await requirePersistedSessionInWorkspace(sessionId, workspaceRoot);
     }
-    await persistence.remove(sessionId);
+    await cache.remove(sessionId);
     return { sessionId, deleted: true, nativeDeleted: Boolean(request?.deleteNative && active) };
   }
 
@@ -464,7 +469,7 @@ export function createAgentService({
   }
 
   async function requirePersistedSessionInWorkspace(sessionId, workspaceRoot) {
-    const persisted = await persistence.findById(sessionId, workspaceRoot);
+    const persisted = await cache.findById(sessionId, workspaceRoot);
     if (!persisted) throw new Error("Agent session was not found in the assigned workspace.");
     return persisted;
   }
@@ -751,7 +756,7 @@ export function createAgentService({
         sessionStore.remove(session);
       }
       sendSessionExit(session, "closed");
-      if (removePersistence) await persistence.remove(session.id);
+      if (removePersistence) await cache.remove(session.id);
       else if (persist) await persistNow(session);
     }
   }

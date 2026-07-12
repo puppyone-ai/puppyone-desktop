@@ -1,10 +1,13 @@
 # OpenCode harness adoption spike
 
-> Scope: this spike records why the managed OpenCode sidecar was selected as
+> Scope: this spike records why a managed OpenCode process was selected as
 > the internal harness kernel for `PuppyOne Agent`. It is not evidence for
 > routing Codex, Claude Code, Cursor or user-managed OpenCode sessions through
 > that kernel. See
-> [ADR-005](ADR-005-multi-native-agent-backends.md) for product-wide routing.
+> [ADR-005](ADR-005-multi-native-agent-backends.md) for product-wide routing and
+> [ADR-006](ADR-006-native-harness-adapters-and-acp.md) for the accepted ACP
+> transport. The HTTP/SSE comparison below is retained as historical spike
+> evidence, not the current implementation.
 
 ## Pins and local evidence
 
@@ -102,5 +105,6 @@ offline start and corrupted-current -> previous-slot fallback
 signed/notarized launch on every supported platform
 ```
 
-Static/source results select sidecar; these remaining numbers can trigger the
-ADR kill criteria but cannot silently change the architecture.
+The current source and contract suite select ACP. These remaining measurements
+are release gates for the managed process and cannot silently change the
+architecture.
