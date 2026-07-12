@@ -31,6 +31,11 @@ export function projectionIndexes(projection: AgentProjection): ProjectionIndexe
   return indexes;
 }
 
+export function invalidateProjectionIndexes(projection: AgentProjection) {
+  const holder = projection as AgentProjection & { [PROJECTION_INDEXES]?: ProjectionIndexes };
+  Reflect.deleteProperty(holder, PROJECTION_INDEXES);
+}
+
 export function cloneAgentProjection(value: AgentProjection): AgentProjection {
   return {
     ...value,

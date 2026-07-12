@@ -1,23 +1,30 @@
 # ADR-001: OpenCode sidecar process boundary
 
-Date: 2026-07-11. Status: accepted for the sidecar boundary. Its former peer
-Codex runtime routing is superseded by ADR-003.
+Date: 2026-07-11. Status: accepted for the managed `puppyone-agent` sidecar
+boundary only. Its OpenCode-only product routing is superseded by ADR-005.
+
+[ADR-005](ADR-005-multi-native-agent-backends.md) makes PuppyOne Agent one
+selectable backend among native Agent integrations. The process, integrity and
+security decisions below remain authoritative for PuppyOne Agent; they do not
+apply to Codex, Claude Code or user-owned OpenCode processes.
 
 ## Decision
 
 Use an exact, release-verified OpenCode executable behind a main-process-only
-loopback HTTP/SSE boundary. OpenCode is the only product Chat harness; model
-providers are selected inside it. Do not import the private, still-changing
+loopback HTTP/SSE boundary for the PuppyOne Agent backend. Model providers are
+selected inside that backend. Do not import the private, still-changing
 `@opencode-ai/core` V2 service graph.
 
 ```text
 React -> typed IPC -> AgentService -> AgentRuntimePort
-                                      +-- OpenCode sidecar (only product harness)
+                                      +-- PuppyOne Agent adapter
+                                                |
+                                                +-- managed OpenCode sidecar
                                                 |
                                                 +-- provider/model catalog
 ```
 
-## Why sidecar, not ACP, for the product path
+## Why sidecar, not ACP, for the PuppyOne Agent path
 
 OpenCode's server surface exposes the complete current harness event set,
 including permission and structured questions. The source-audited ACP bridge
@@ -48,7 +55,7 @@ Costs:
 - 55–70 MB compressed platform artifact plus runtime RSS;
 - platform packaging/signing and release provenance;
 - health, restart and migration compatibility tests;
-- process startup on first OpenCode Chat use.
+- process startup on first PuppyOne Agent inspection or session use.
 - global OpenCode plugins/config and repository-local OpenCode config are not
   imported implicitly; future MCP/skill configuration must use a main-owned
   authorization surface.

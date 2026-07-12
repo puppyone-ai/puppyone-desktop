@@ -58,6 +58,29 @@ describe("Desktop Agent transcript projection", () => {
     expect(projection.approvals).toEqual([]);
   });
 
+  it("does not project empty file-change placeholders and removes a cleared session diff", () => {
+    let projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Inspect" }, "turn-file"),
+      event(2, "file.change.updated", { status: "completed", changes: [] }, "turn-file", "session-diff"),
+    ]);
+    expect(projection.activities.filter((activity) => activity.kind === "file-change")).toHaveLength(0);
+    expect(projection.parts.filter((part) => part.kind === "file-change")).toHaveLength(0);
+
+    projection = applyAgentEvent(projection, event(3, "file.change.updated", {
+      status: "completed",
+      changes: [{ path: "src/app.ts", additions: 2, deletions: 1 }],
+    }, "turn-file", "session-diff"));
+    expect(projection.activities.filter((activity) => activity.kind === "file-change")).toHaveLength(1);
+
+    projection = applyAgentEvent(projection, event(4, "file.change.updated", {
+      status: "completed",
+      changes: [],
+    }, "turn-file", "session-diff"));
+    expect(projection.activities.filter((activity) => activity.kind === "file-change")).toHaveLength(0);
+    expect(projection.parts.filter((part) => part.kind === "file-change")).toHaveLength(0);
+    expect(projection.rows.some((row) => row.partId === "activity:session-diff")).toBe(false);
+  });
+
   it("bounds streamed messages and reasoning before they reach renderer state", () => {
     const oversized = "x".repeat(agentProjectionLimits.maxMessageText * 2);
     const projection = applyAgentEvents(createAgentProjection(), [
@@ -98,14 +121,30 @@ describe("Desktop Agent transcript projection", () => {
   it("collapses duplicate provider terminal errors for the same turn", () => {
     const projection = applyAgentEvents(createAgentProjection(), [
       event(1, "turn.started", { prompt: "Hello" }, "turn-1"),
-      event(2, "provider.error", { message: "API key not valid." }, "turn-1", "assistant-1"),
-      event(3, "turn.failed", { status: "failed", message: "API key not valid." }, "turn-1"),
-      event(4, "provider.error", { message: "API key not valid." }, "turn-1"),
+      event(2, "provider.warning", { message: "API key not valid. Please pass a valid API key." }, "turn-1", "retry-1"),
+      event(3, "provider.error", { message: "API key not valid. Please pass a valid API key." }, "turn-1", "assistant-1"),
+      event(4, "turn.failed", { status: "failed", message: "API key not valid." }, "turn-1"),
+      event(5, "provider.error", { message: "API key not valid. Please pass a valid API key." }, null, "assistant-2"),
     ]);
 
     expect(projection.activities.filter((activity) => activity.kind === "error")).toHaveLength(1);
+    expect(projection.activities.filter((activity) => activity.kind === "warning")).toHaveLength(0);
     expect(projection.parts.filter((part) => part.kind === "error")).toHaveLength(1);
-    expect(projection.activities.find((activity) => activity.kind === "error")?.label).toBe("API key not valid.");
+    expect(projection.activities.find((activity) => activity.kind === "error")?.label)
+      .toBe("API key not valid. Please pass a valid API key.");
+  });
+
+  it("does not merge the same provider failure across separate turns", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "First" }, "turn-1"),
+      event(2, "provider.error", { message: "API key not valid." }, "turn-1", "assistant-1"),
+      event(3, "turn.failed", { status: "failed" }, "turn-1"),
+      event(4, "turn.started", { prompt: "Second" }, "turn-2"),
+      event(5, "provider.error", { message: "API key not valid." }, "turn-2", "assistant-2"),
+    ]);
+
+    expect(projection.activities.filter((activity) => activity.kind === "error")).toHaveLength(2);
+    expect(new Set(projection.activities.map((activity) => activity.turnId))).toEqual(new Set(["turn-1", "turn-2"]));
   });
 });
 

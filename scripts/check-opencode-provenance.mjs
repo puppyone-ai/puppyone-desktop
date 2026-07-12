@@ -11,8 +11,8 @@ const packageManifest = readJson("package.json");
 const packageLock = readJson("package-lock.json");
 const notice = await fs.promises.readFile(path.join(root, "THIRD_PARTY_NOTICES.md"), "utf8");
 const license = await fs.promises.readFile(path.join(root, "vendor/opencode/LICENSE"), "utf8");
-const runtimeSource = await fs.promises.readFile(path.join(root, "electron/main/agent/runtimes/opencode/opencode-manifest.mjs"), "utf8");
-const gatewaySource = await fs.promises.readFile(path.join(root, "electron/main/agent/runtimes/opencode/opencode-http-client.mjs"), "utf8");
+const runtimeSource = await fs.promises.readFile(path.join(root, "electron/main/agent/runtimes/opencode-protocol/opencode-manifest.mjs"), "utf8");
+const gatewaySource = await fs.promises.readFile(path.join(root, "electron/main/agent/runtimes/opencode-protocol/opencode-http-client.mjs"), "utf8");
 
 assert(runtime.runtimeRelease.version === "1.17.18", "OpenCode runtime version drifted.");
 assert(packageManifest.dependencies?.["@opencode-ai/sdk"] === runtime.runtimeRelease.version, "OpenCode SDK must exactly match the bundled runtime.");

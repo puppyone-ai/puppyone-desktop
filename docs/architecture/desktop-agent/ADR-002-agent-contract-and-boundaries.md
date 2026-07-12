@@ -2,9 +2,10 @@
 
 Date: 2026-07-11. Status: accepted and implemented.
 
-ADR-003 supersedes the earlier assumption that multiple harnesses are a normal
-user-facing product extension. The contract and dependency boundaries remain
-accepted; production Chat composition is now fixed to OpenCode.
+ADR-005 supersedes ADR-003 and reaffirms the original multi-runtime purpose of
+this contract. The dependency boundaries remain accepted. Production Chat may
+register multiple native Agent backends, while shared Core, application and UI
+code stay backend-neutral.
 
 ## Context
 
@@ -38,9 +39,9 @@ own boundaries. Constants and TypeScript unions are checked for drift.
 
 `AgentRuntimeRegistry` and `AgentRuntimeHost` are pure Core. Only
 `bootstrap/create-agent-runtime-host.mjs` imports concrete definitions. The
-current source still imports the legacy Codex vertical slice during migration;
-the target production composition registers OpenCode only for new Chat
-sessions. Definitions own discovery, adapter construction and resource cleanup.
+production root registers PuppyOne Agent, Codex, Claude Code, user OpenCode
+and capability-gated Cursor as independent definitions. Definitions own
+discovery, adapter construction and resource cleanup.
 
 Renderer code follows:
 

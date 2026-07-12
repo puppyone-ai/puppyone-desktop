@@ -15,17 +15,24 @@ export function AgentFileChangeActivity({ activity, onViewChanges, onOpenFile }:
   const deletions = changes.reduce((sum, change) => sum + change.deletions, 0);
   const path = pathForActivity(activity);
   const stats = additions || deletions ? `+${additions} −${deletions}` : null;
+  const reviewable = changes.length > 0 || diffLines.length > 0 || Boolean(path);
+  if (!reviewable) return null;
+  const defaultTitle = agentActivityToolName(activity);
+  const title = defaultTitle === "File Change"
+    ? changes.length > 1 ? "File changes" : "Edited"
+    : defaultTitle;
+  const summary = changes.length > 1 ? `${changes.length} files` : path || activity.label;
   return (
     <AgentActivityShell
-      title={agentActivityToolName(activity)}
-      summary={path || activity.label}
+      title={title}
+      summary={summary}
       meta={stats}
       status={activity.status}
       icon={<FilePenLine size={13} />}
       className="desktop-agent-file-change"
       actions={<>
         {onOpenFile && path && <button type="button" className="desktop-agent-tool-action" aria-label={`Open ${path}`} onClick={() => onOpenFile(path)}>Open file</button>}
-        {onViewChanges && <button type="button" className="desktop-agent-tool-action" aria-label="Review file changes" onClick={onViewChanges}>Review</button>}
+        {onViewChanges && reviewable && <button type="button" className="desktop-agent-tool-action" aria-label="Review file changes" onClick={onViewChanges}>Review</button>}
       </>}
     >
       {(changes.length > 0 || diffLines.length > 0) && <div className="desktop-agent-file-change-detail">

@@ -1,5 +1,11 @@
 # OpenCode harness adoption spike
 
+> Scope: this spike records why the managed OpenCode sidecar was selected as
+> the internal harness kernel for `PuppyOne Agent`. It is not evidence for
+> routing Codex, Claude Code, Cursor or user-managed OpenCode sessions through
+> that kernel. See
+> [ADR-005](ADR-005-multi-native-agent-backends.md) for product-wide routing.
+
 ## Pins and local evidence
 
 ```text
@@ -34,8 +40,11 @@ platform/architecture pairs are machine checked in
 `vendor/opencode/runtime-manifest.json`.
 
 The local 1.1.33 executable was useful only for binary/startup measurements.
-It was not treated as protocol-compatible: the application accepts external
-OpenCode only at or above the exact 1.17.18 contract fixture used here.
+It was not treated as protocol-compatible with the managed `PuppyOne Agent`
+backend: that backend accepts a runtime only at or above the exact 1.17.18
+contract fixture used here. A separately selected user-OpenCode backend owns
+its own compatibility and readiness result; it is never a silent fallback for
+PuppyOne Agent.
 
 The broader architecture audit used the later `dev` commit shown above. Prompt
 hashes were separately recomputed from the exact runtime release commit; all 18
@@ -63,7 +72,8 @@ The sidecar requires a loopback server, auth secret and a global SSE stream.
 PuppyOne moves all three into Electron main, unlike the upstream Desktop
 renderer connection. ACP is attractive as a standard boundary, but source at
 the audited commit forwards permission/message updates and lacks complete
-structured-question parity. Sidecar is therefore the default.
+structured-question parity. Sidecar is therefore the selected transport inside
+PuppyOne Agent, not a product-wide default backend.
 
 The source spike also found that the normal OpenCode profile can discover
 repository config, external skills, plugins and MCP commands before PuppyOne

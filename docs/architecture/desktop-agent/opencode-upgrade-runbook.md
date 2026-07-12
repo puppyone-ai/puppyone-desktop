@@ -1,5 +1,11 @@
 # OpenCode update and rollback runbook
 
+> Scope: this runbook governs the managed OpenCode kernel embedded behind the
+> `PuppyOne Agent` backend. It does not govern Codex, Claude Code, Cursor,
+> user-managed OpenCode or any other native Agent backend. Product-wide routing
+> and backend isolation are defined by
+> [ADR-005](ADR-005-multi-native-agent-backends.md).
+
 1. Choose an immutable OpenCode release tag and its exact release commit.
 2. Check out the proposed source and run the source capability audit.
 3. Check out the exact release commit separately from any later architecture
@@ -28,15 +34,19 @@ to reject a filename, size, digest or executable-version mismatch.
 Rollback order:
 
 ```text
-current slot fails integrity before spawn
+PuppyOne Agent current slot fails integrity before spawn
   -> discovery skips it
   -> previous verified slot
-  -> external OpenCode at/above the exact tested protocol floor, clearly labelled
-  -> fail closed with setup diagnostics
+  -> disable PuppyOne Agent with scoped diagnostics
+
+Other ready native Agent backends remain selectable throughout this flow.
 ```
 
-Never fall back to Codex app-server or another harness. Provider availability
-is evaluated only after a verified OpenCode harness is running.
+Never reinterpret a PuppyOne Agent session as a Codex, Claude Code, Cursor or
+user-OpenCode session. A session is pinned to one backend, so failover is only
+between verified managed OpenCode slots inside PuppyOne Agent. Provider and
+model availability for that backend is evaluated only after its verified kernel
+is running; readiness for other backends is evaluated independently.
 
 For a behavior regression after successful spawn, roll back the PuppyOne app
 release. Old request IDs and secrets are invalid after every restart. Never

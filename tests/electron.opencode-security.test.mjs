@@ -2,12 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildOpenCodeEnvironment } from "../electron/main/agent/runtimes/opencode/opencode-discovery.mjs";
+import { buildOpenCodeEnvironment } from "../electron/main/agent/runtimes/puppyone-agent/managed-opencode-discovery.mjs";
 import {
   formatAuthorizedProjectInstructions,
   loadAuthorizedProjectInstructions,
-} from "../electron/main/agent/runtimes/opencode/opencode-project-instructions.mjs";
-import { createOpenCodeSessionPermissions } from "../electron/main/agent/runtimes/opencode/opencode-security-policy.mjs";
+} from "../electron/main/agent/security/authorized-project-instructions.mjs";
+import { createOpenCodeSessionPermissions } from "../electron/main/agent/runtimes/opencode-protocol/opencode-security-policy.mjs";
 
 const roots = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => fs.promises.rm(root, { recursive: true, force: true }))));

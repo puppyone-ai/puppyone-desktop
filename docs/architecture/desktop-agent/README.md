@@ -1,10 +1,11 @@
 # Desktop Local Agent Chat architecture
 
-Status: implemented architecture for the product Chat entry
-behind the existing experimental `desktopAgentChat` gate. Production
-composition now registers OpenCode only and the UI has no runtime selector.
-The existing Codex app-server implementation remains isolated legacy debt, not
-a peer runtime or fallback. Terminal remains a separate sibling surface.
+Status: backend architecture implemented from
+[ADR-005](ADR-005-multi-native-agent-backends.md). The production composition
+registers PuppyOne Agent, native Codex, native Claude Code, user OpenCode and
+capability-gated Cursor. The shared contract, Registry, Service, persistence
+and session model are backend-neutral. Agent-first Renderer integration is a
+separate presentation migration. Terminal remains a separate sibling surface.
 
 This document is intentionally made of prose and plain-text diagrams. It does
 not require a diagram renderer.
@@ -14,9 +15,9 @@ Normative detail is split into two leaf specifications:
 - [Cursor-style Chat UI behavior](chat-ui-behavior-spec.md) defines user and
   assistant messages, animation, Bash, read/search, write/edit, tools,
   approvals, popovers, scrolling and visual evidence.
-- [Local Agent and Provider connection discovery](local-agent-connection-discovery.md)
-  defines how installed Codex/Cursor tools are recognized separately from
-  selectable OpenCode inference Providers.
+- [Native Agent backend and model discovery](local-agent-connection-discovery.md)
+  defines how native Agent backends are discovered and gated separately from
+  backend-scoped Provider and Model catalogs.
 
 ## Product architecture
 
@@ -36,7 +37,7 @@ PuppyOne Desktop
       |     +-- virtual timeline
       |     +-- part/tool renderer registry
       |     +-- permission/question docks
-      |     +-- provider/model/variant/agent-mode composer
+      |     +-- Agent-first, backend-scoped composer controls
       |
       +-- Application (provider-neutral)
       |     +-- explicit AgentClientPort
@@ -56,14 +57,20 @@ PuppyOne Desktop
       |
       +-- Electron main authority
             +-- AgentService: owner/session/order/replay/journal
-            +-- Local Agent Inventory
-            |     +-- Codex/Cursor executable + version discovery
-            |     +-- lazy auth/protocol compatibility probes
-            |     +-- detected-but-unbridged presentation state
-            +-- OpenCode AgentRuntimePort adapter
-            |     +-- pinned OpenCode sidecar (only product harness)
-            |     +-- connected provider/model/session catalog
-            |     +-- text + tools model capability gate
+            +-- AgentRuntimeRegistry
+            |     +-- PuppyOne Agent adapter
+            |     |     +-- pinned managed OpenCode kernel
+            |     +-- Codex native adapter
+            |     |     +-- codex app-server
+            |     +-- Claude native adapter
+            |     |     +-- Claude Agent SDK + Claude Code
+            |     +-- user OpenCode native adapter
+            |     |     +-- user opencode server/profile
+            |     +-- capability-gated native adapters
+            |           +-- Cursor / Pi / future
+            +-- Backend discovery and readiness
+            |     +-- executable + version + auth + protocol gates
+            |     +-- backend-scoped provider/model/mode catalog
             +-- workspace/reference authorization
             +-- process shutdown and secret redaction
 ```
@@ -71,39 +78,40 @@ PuppyOne Desktop
 ## Concepts that must not be mixed
 
 ```text
-Harness              OpenCode only; owns loop, tools, prompts, permissions,
-                     MCP, skills, compaction and native execution sessions.
+Agent backend        User-selectable native Agent integration. Examples are
+                     PuppyOne Agent, Codex, Claude Code and user OpenCode.
 
-Provider route       OpenAI/ChatGPT, Anthropic, Google, OpenRouter, Modal or
-                     another authorized compatible inference endpoint; owns
-                     authentication, inference transport and billing.
+Harness              The selected backend's native loop. Owns reasoning, tool
+                     dispatch, context and native execution sessions.
+
+PuppyOne Agent       First-party backend whose internal kernel is a managed,
+                     pinned OpenCode harness.
+
+Provider route       Backend-scoped inference transport and billing identity.
+                     Some native backends expose no separate Provider control.
 
 Model + variant      Provider-scoped model identity and only the options that
                      model advertises.
 
-Agent profile/mode   OpenCode behavior configuration such as Build or Plan;
-                     not a harness.
+Agent profile/mode   Backend-scoped behavior configuration; not a backend or
+                     harness.
 
-Local tool           A detected coding-agent installation such as Codex CLI
-                     or Cursor Agent. Detection is shown to the user but does
-                     not by itself make the tool a selectable Provider.
+Local tool           A detected native Agent installation. It becomes a
+                     selectable backend only after every readiness gate passes.
 
 Product session      PuppyOne mapping, UI projection and bounded redacted
-                     cache pointing to one authoritative OpenCode session.
+                     cache pointing to one backend-native session.
 ```
 
-“Codex” in the product provider/model controls means an OpenAI/ChatGPT route and
-a Codex-family model executed by OpenCode. `codex app-server`, Claude Code and
-Cursor CLI are agent products, not automatically valid model providers. They
-must still be detected and shown in the Local tools inventory with an exact
-status. A future authorized bridge may reuse their compute or credentials only
-at the provider layer; it must not replace or nest another loop behind
-OpenCode.
+The first product choice is Agent backend. If the user selects Codex, the
+session uses Codex app-server and its native login and thread. If the user
+selects Claude Code, it uses Claude's native harness. If the user selects
+PuppyOne Agent, it uses the managed OpenCode kernel. No backend is nested
+inside another and no backend failure triggers a silent fallback.
 
-The normal Chat UI never exposes harness choice. If OpenCode is unavailable,
-Chat fails closed with setup diagnostics instead of silently changing its
-semantics. [ADR-003](ADR-003-opencode-only-chat-harness.md) is authoritative for
-this product decision.
+Backend selection is visible for a blank composer and immutable after session
+creation. Backend-scoped Provider, Model, Variant and Mode controls follow it.
+ADR-005 is authoritative for this product decision.
 
 ## Layering and one-way dependencies
 
@@ -122,25 +130,70 @@ RightAgentPanel.tsx                         only Renderer composition root
 Electron IPC
   -> AgentService / application/            ownership and use cases
   -> domain/                                session model
-  -> runtime/ AgentRuntimePort              OpenCode process seam
+  -> runtime/ AgentRuntimePort              native backend process seam
 
 bootstrap/create-agent-runtime-host.mjs     production composition root
-  -> runtimes/opencode/                     only new-session harness
-  -> runtime/ AgentRuntimeRegistry          infrastructure/test seam only
+  -> runtimes/<backend>/                    native backend adapters
+  -> runtime/ AgentRuntimeRegistry          production composition seam
 ```
 
-The Registry and Port never import concrete runtimes. Product composition is
-fixed to OpenCode; a fake definition may still be injected in contract tests.
-Runtime neutrality is an internal dependency rule, not a product-level harness
-selector. Main domain never imports application or infrastructure; Renderer
+The Registry and Port never import concrete runtimes. The Composition Root may
+register multiple production-ready definitions; tests may inject fake
+backends. Main domain never imports application or infrastructure; Renderer
 domain never imports application, infrastructure or UI. Renderer application
 never imports infrastructure, UI, React or browser globals. Only
 `infrastructure/electron/electronAgentClient.ts` reads the preload bridge, and
-only `RightAgentPanel.tsx` composes that adapter. OpenCode payloads are
+only `RightAgentPanel.tsx` composes that adapter. Every native payload is
 normalized and bounded before IPC. `check-agent-architecture.mjs` enforces
 these rules in every production build.
 
 ## Source layout
+
+The steady-state ownership is:
+
+```text
+shared/agent-contract/
+  backend-readiness + capability + event + IPC DTO contracts
+
+electron/main/agent/
+  domain/                            backend-neutral session aggregate
+  application/                       backend-neutral use cases and journals
+  runtime/                           AgentRuntimePort / Registry / Host only
+  connections/                       bounded executable/readiness primitives
+  transports/                        bounded reusable process transports
+  runtimes/                          one native adapter package per backend
+    opencode-protocol/                shared protocol only; no product identity
+      host + allowlisted client + events + policy + adapter
+    puppyone-agent/
+      puppyone-agent-identity.mjs
+      puppyone-agent-runtime-definition.mjs
+      managed-opencode-discovery.mjs  pinned bundle/profile authority
+    codex/
+      discovery + app-server adapter + events + definition
+    claude/
+      discovery + Agent SDK adapter + events + definition
+    opencode-native/
+      user-profile discovery + native adapter + events + definition
+    cursor/                           discovery + non-selectable protocol gate
+
+src/features/desktop-agent/
+  domain/                             projections + Agent-scoped routing
+  application/                        backend-neutral session controller
+  infrastructure/electron/            only preload bridge implementation
+  ui/                                 capability-driven transcript/composer
+    AgentBackendPicker.tsx
+    AgentProviderPicker.tsx            optional and backend-scoped
+    AgentModelPicker.tsx               backend-scoped
+```
+
+`runtime/` never imports `runtimes/`. The single bootstrap composition root
+injects definitions into the Registry. Each concrete backend package owns its
+discovery, protocol, event mapping, native history, capability translation and
+cleanup. There is no shared `harness/` package because PuppyOne does not own a
+universal loop.
+
+The detailed map below records current backend ownership. Renderer lines
+marked `target` remain presentation migration work and are not backend claims.
 
 ```text
 shared/agent-contract/
@@ -154,7 +207,7 @@ shared/agent-contract/
 
 electron/main/agent/
   agent-events.mjs                    versioned event envelope/redaction
-  agent-persistence.mjs               v2 bounded multi-session journal
+  agent-persistence.mjs               v3 bounded multi-session journal
   agent-reference-authorization.mjs   realpath and file-size authority
   agent-service.mjs                   session/window/turn orchestration
   bootstrap/
@@ -167,7 +220,9 @@ electron/main/agent/
   domain/
     agent-session-model.mjs           session aggregate and DTO projection
   migrations/
-    legacy-session-format.mjs         v1 Codex journal compatibility edge
+    legacy-session-format.mjs         v1 Codex + managed opencode ID migration
+  security/
+    authorized-project-instructions.mjs bounded canonical instruction snapshot
   connections/
     local-agent-inventory.mjs         lazy five-minute cache + per-tool isolation
     local-agent-connection-policy.mjs derived integration/selectability gates
@@ -181,24 +236,38 @@ electron/main/agent/
       codex-local-probe.mjs           version + bounded app-server account probe
       cursor-local-probe.mjs          version + redacted status classification
   runtime/
-    agent-runtime-port.mjs            OpenCode process + fake-test contract
-    agent-runtime-registry.mjs        internal registry + main-owned host
+    agent-runtime-port.mjs            native backend + fake-test contract
+    agent-runtime-registry.mjs        production registry + main-owned host
     executable-discovery.mjs          bounded generic discovery
   transports/
     jsonl-rpc-connection.mjs          provider-neutral bounded child transport
-  runtimes/opencode/
+  runtimes/opencode-protocol/
     opencode-manifest.mjs             release/source/capability pin
-    opencode-discovery.mjs            exact bundle integrity + fallback
     opencode-sidecar-host.mjs         lazy loopback process lifecycle
     opencode-http-client.mjs          pinned SDK + allowlisted HTTP/SSE gateway
     opencode-events.mjs               native-to-AgentEvent mapping
-    opencode-security-policy.mjs      managed config + permission policy
-    opencode-project-instructions.mjs canonical project instruction loader
-    opencode-sidecar-adapter.mjs      AgentRuntimePort implementation
+    opencode-security-policy.mjs      fail-closed permission overlay
+    opencode-sidecar-adapter.mjs      parameterized AgentRuntimePort adapter
+  runtimes/puppyone-agent/
+    puppyone-agent-identity.mjs       product ID/descriptor and provenance
+    managed-opencode-discovery.mjs    exact bundle integrity + isolated profile
+    puppyone-agent-runtime-definition.mjs managed composition
   runtimes/codex/
     codex-discovery.mjs               local CLI discovery/version/auth
-    codex-app-server-adapter.mjs      legacy vertical-slice adapter
-    codex-runtime-definition.mjs      pending removal from product composition
+    codex-app-server-adapter.mjs      native Codex protocol adapter
+    codex-runtime-definition.mjs      production definition
+  runtimes/claude/
+    claude-identity.mjs               product ID/descriptor
+    claude-discovery.mjs              SDK + required user CLI readiness
+    claude-agent-sdk-adapter.mjs      native Claude SDK protocol adapter
+    claude-events.mjs                 native-to-AgentEvent mapping
+    claude-runtime-definition.mjs     production definition
+  runtimes/opencode-native/
+    opencode-native-discovery.mjs     user executable/profile readiness
+    opencode-native-runtime-definition.mjs independent host and profile
+  runtimes/cursor/
+    cursor-discovery.mjs              bounded inventory/protocol gate
+    cursor-runtime-definition.mjs     visible but non-selectable definition
 
 src/features/desktop-agent/
   index.ts                            public feature entrypoint
@@ -213,7 +282,8 @@ src/features/desktop-agent/
     controllerRegistry.ts             LRU inactive-controller lifetime
   domain/
     agent-contract.ts                 feature-local shared-contract alias
-    agent-provider-routing.ts         pure Provider -> Model selection policy
+    agent-provider-routing.ts         current Provider -> Model policy
+    agent-backend-routing.ts          target: Agent -> scoped control policy
     agent-projection.ts               event -> turn/part/row reducer
     agent-projection-indexes.ts       lazy non-serializable lookup indexes
     agent-projection-types.ts         discriminated presentation model
@@ -221,15 +291,16 @@ src/features/desktop-agent/
     agent-activity-presentation.ts    pure Bash/read/write presentation readers
   ui/
     AgentPartRenderer.tsx             discriminated part registry
-    AgentProviderPicker.tsx           connected routes + local tools sections
-    AgentModelPicker.tsx              provider-scoped model selection
+    AgentBackendPicker.tsx            target: native Agent selection
+    AgentProviderPicker.tsx           backend-scoped inference routes
+    AgentModelPicker.tsx              backend/provider-scoped model selection
     AgentPickerPopover.tsx            keyboard/ARIA/search disclosure primitive
     activity/                         Bash/read/write/plan/reasoning renderers
     AgentQuestionDock.tsx             typed blocking questions
     AgentChangesPill.tsx              aggregate additions/deletions handoff
     SafeMarkdown.tsx                  no-innerHTML Markdown surface
     AgentTranscript.tsx               <=120 mounted virtual rows
-    AgentComposer.tsx                 /, @, files and Provider/Model controls
+    AgentComposer.tsx                 /, @, files and Agent-scoped controls
     AgentVisualSmokeHarness.tsx       deterministic 420/560/760 visual QA
     RightAgentPanel.tsx               view composition only
     desktop-agent.css                 import-only public style entry
@@ -317,35 +388,33 @@ still does not stop a main-process turn; it only releases Renderer observers.
 ## Three owners of truth
 
 ```text
-OpenCode native truth
-  provider auth, agent loop, tools, messages/parts, native session,
-  compaction, fork lineage and native history
+Backend-native truth
+  native auth, agent loop, tools, messages/parts, native session,
+  compaction, fork lineage and native history where supported
                     |
                     v
 PuppyOne main-process truth
-  OpenCode process health, native-session mapping, canonical workspace,
-  window owner, provider/model selection, approval/question correlation,
-  normalized sequence, bounded redacted projection cache and read-only local
-  Codex/Cursor installation inventory
+  backend readiness, native-session mapping, canonical workspace, window
+  owner, backend-scoped selection, approval/question correlation, normalized
+  sequence and bounded redacted projection cache
                     |
                     v
 Renderer presentation truth
-  turns/parts/rows, expanded cards, draft, provider/model/mode controls,
+  turns/parts/rows, expanded cards, draft, Agent/backend-scoped controls,
   scroll anchor and row measurements
 ```
 
-OpenCode is the canonical conversation and execution record. The PuppyOne
-journal is a bounded product index and replay cache, not an independent source
-of agent truth. On a partial or conflicting restore, normalized OpenCode native
-history wins.
+The selected backend's native session is the canonical conversation and
+execution record. The PuppyOne journal is a bounded product index and replay
+cache, not an independent source of Agent truth. On a partial or conflicting
+restore, normalized native history wins.
 
 React unmount, Sidebar hide and window blur do not terminate a turn. Explicit
 Stop, a terminal runtime event, window destruction or app quit can do so. A
 window/session close awaits a bounded native abort before releasing an active
-OpenCode adapter, so a shared sidecar cannot leave an ownerless turn running.
-App quit also waits when inspection started the sidecar but no application
-session was created; runtime-resource state is tracked separately from session
-count so that process cannot become an orphan.
+adapter, so a native process cannot leave an ownerless turn running. App quit
+also waits for backend resources created by inspection even when no product
+session exists; resource state is tracked separately from session count.
 
 ## Presentation system
 
@@ -373,13 +442,14 @@ Right sidebar surface
       compact two-zone geometry       64 px resting height
       left + menu                     attachments / context / Agent mode
       middle input                    bounded multiline up to 184 px
-      right controls                  provider -> model / stop or send
+      right controls                  Agent -> backend-scoped controls / send
 ```
 
-Visible “You”, “OpenCode” or runtime badges are intentionally absent from each
-message because material and document order communicate authorship. The
-harness is not a product choice. User turns use a right-aligned quiet raised surface;
-assistant turns stay on canvas so long answers read like a document. Buttons
+Visible role badges remain absent from each message because material and
+document order communicate authorship. The selected Agent is shown in session
+chrome and the composer rather than repeated on every message. User turns use
+a right-aligned quiet raised surface; assistant turns stay on canvas so long
+answers read like a document. Buttons
 appear only for real capabilities: the UI does not draw decorative microphone,
 rating or permission controls without an implemented action behind them.
 
@@ -397,53 +467,40 @@ fallbacks remain explicit. Exact target geometry and animation tokens live in
 the `visual-smoke.ts` secondary entrypoint. It is retained as a visual QA
 fixture while staying outside the normal Agent bundle and network/session
 path. Architecture tests enforce the CSS ownership boundary, responsive
-contracts, bounded growing composer, Changes aggregation and absence of a
-runtime selector. `desktop-agent.cursor-visual-contract.test.ts` must lock the
-approved reference geometry so later feature work cannot silently reintroduce
-the old card stack or native Provider menu.
+contracts, bounded growing composer and Changes aggregation. The target visual
+contract adds an Agent selector without reintroducing the old card stack or an
+unbounded native menu. `desktop-agent.cursor-visual-contract.test.ts` must lock
+the approved reference geometry.
 
-## Provider routing boundary
+## Agent and backend-scoped routing boundary
 
-Provider selection is an explicit application state, not a label parsed in the
-React component and not another runtime registry entry.
+Agent backend selection and backend-scoped model selection are explicit
+application state. Neither is inferred from labels in React.
 
 ```text
-pinned OpenCode sidecar
-  GET /provider
-       |
-       +-- all catalog providers
-       +-- connected provider IDs          availability authority
-       +-- per-provider default model
-              |
-              v
-  OpenCodeSidecarAdapter
-       +-- discard unconnected providers
-       +-- discard non-text / non-tool / deprecated models
-       +-- normalize bounded Provider + Model DTOs
-              |
-              v
-  shared contract + AgentSessionController
-       +-- selectedProviderId
-       +-- selectedModel belongs to selectedProviderId
-       +-- multiple providers require explicit selection
-              |
-              v
-  Composer: Provider -> Model -> Send
+AgentRuntimeRegistry
+  +-- discovered backend descriptors and readiness
+  +-- capability snapshot
+  +-- backend-scoped Provider / Model / Mode catalog
+             |
+             v
+AgentSessionController
+  +-- selectedRuntimeId for a blank/new session
+  +-- selected Provider/Model valid only inside that backend
+  +-- created session pins runtimeId
+             |
+             v
+Composer: Agent -> backend-scoped controls -> Send
 ```
 
-`/config/providers` describes configuration, not authenticated availability,
-and must never be used to enable a session. Electron main revalidates every
-requested Model against the inspected connected catalog so a compromised or
-stale Renderer cannot inject an arbitrary provider/model string.
+Electron main revalidates Backend, Provider, Model and Mode against the latest
+inspection so a stale or compromised Renderer cannot inject arbitrary routing.
+Executable presence alone is not readiness: version, protocol, authentication,
+model/tool capability, workspace and product-policy gates must pass. The
+PuppyOne Agent adapter additionally trusts only OpenCode's connected Provider
+catalog, never its configuration catalog.
 
-CLI installation is also not Provider proof. Codex, Claude Code and Cursor are
-agent products; their executables and subscriptions do not automatically grant
-OpenCode an inference route. OpenAI/ChatGPT, Anthropic or another service is
-shown only when OpenCode reports a legitimate connected Provider. A future
-Cursor or CLI credential bridge must be separately authorized and documented;
-it cannot silently reuse private credentials or introduce a nested Agent loop.
-
-## Main-process harness contract
+## Main-process Agent backend contract
 
 Every adapter provides the required `AgentRuntimePort` methods:
 
@@ -458,20 +515,21 @@ steer, queue, fork, compact, approval, question,
 attachment, context, model, mode, commands, MCP and skills
 ```
 
-The port is the Electron/OpenCode process boundary. Production new-session
-composition selects OpenCode without asking the user; the Registry exists for
-composition, lifecycle isolation and fake-harness contract tests, not for a
-product runtime picker. `AgentRuntimeHost` owns sidecar shutdown and
-`AgentService` applies create/resume/turn/replay to OpenCode-backed sessions.
+The port is the Electron/native-process boundary. Production composition
+registers every backend that has passed its product gate. `AgentRuntimeHost`
+owns process shutdown and `AgentService` applies create/resume/turn/replay
+without backend-name lifecycle branches.
 
-Providers, models and variants come from the OpenCode catalog. Options are
-model-scoped: a variant is applied only when it exists in the selected model's
-`variants` map. Changing an OpenAI/Codex model to an Anthropic/Claude model
-therefore changes inference routing without replacing the harness or session
-authority. Provider errors are normalized in main; the projection also unwraps
-bounded legacy JSON error strings so old journals remain readable.
+Providers, models, variants and modes come from the selected backend's
+inspection. Options stay backend-scoped. Provider errors are normalized in
+main; the projection also unwraps bounded legacy JSON error strings so old
+journals remain readable.
 
-## OpenCode process and trust boundary
+## PuppyOne Agent OpenCode process and trust boundary
+
+This section applies only when `runtimeId` is `puppyone-agent`. Native Codex,
+Claude Code, user OpenCode and future backends define equivalent protocol and
+security records in their own adapter documentation.
 
 ```text
 First Chat inspection or session
@@ -527,7 +585,12 @@ silently starting an MCP command, loading executable plugin code or replacing
 the permission policy. Native provider authentication remains in OpenCode's
 credential store and provider environment variables remain main-only.
 
-## Prompt and permission composition
+## PuppyOne Agent prompt and permission composition
+
+This section is part of the `puppyone-agent` boundary above. Native Codex,
+Claude Code and other backends preserve their own prompt and permission
+composition, then expose normalized capability and blocking-request events at
+the adapter boundary.
 
 ```text
 OpenCode agent/mode prompt, otherwise provider-specific base prompt
@@ -554,7 +617,7 @@ reads ask; plan mode denies every non-allowlisted tool, including shell, edit,
 task, plugin and MCP tools. Permission replies still require the
 main-owned window/session/turn/request correlation.
 
-## Session and event flow
+## Shared session and event flow
 
 ```text
 User submit
@@ -575,12 +638,14 @@ Sequence gap -> bounded replay -> buffered-event reconciliation -> projection
 Terminal event -> turn state + queued follow-up (only when capability permits)
 ```
 
-The upstream SSE endpoint has no replay cursor. On a successful reconnect,
-the host therefore pauses delivery, reads native messages plus pending
-permissions/questions and session status, projects the active turn again by
-stable IDs, then releases newly buffered events. Main deduplicates blocking
-request IDs. An immediately arriving `idle` event cannot overtake this
-reconciliation barrier and hide the final answer.
+For PuppyOne Agent, the upstream SSE endpoint has no replay cursor. Its adapter
+therefore pauses delivery after a successful reconnect, reads native messages
+plus pending permissions/questions and session status, projects the active
+turn again by stable IDs, then releases newly buffered events. Main
+deduplicates blocking request IDs. An immediately arriving `idle` event cannot
+overtake this reconciliation barrier and hide the final answer. Other backends
+implement equivalent gap repair using their native history and event contract;
+they do not emulate OpenCode SSE.
 
 The envelope contains `runtimeId`, application `sessionId`, native session ID,
 turn/item IDs, monotonic sequence, time, type and a bounded payload. The old
@@ -626,18 +691,25 @@ bounded in main and projection layers.
 - No generic spawn/stdin/environment/HTTP IPC exists.
 - Runtime processes always use an absolute executable and `shell: false`.
 - No auto-approve, `--force`, `--yolo` or permission bypass is enabled.
-- Repository config cannot auto-load MCP commands, external skills or plugins;
-  the managed profile is empty until a main-authorized capability is added.
-- Inherited `OPENCODE_CONFIG*`, `OPENCODE_PERMISSION`, auth-content and server
-  credential overrides are removed before spawn.
 - URL/password/token/environment values are excluded from snapshots, renderer,
   normal logs and persistence.
 - Persistence is `0600`, atomic, redacted and bounded by sessions, events and
   bytes.
 
+PuppyOne Agent adds these managed-kernel invariants:
+
+- Repository config cannot auto-load MCP commands, external skills or plugins;
+  the managed profile is empty until a main-authorized capability is added.
+- Inherited `OPENCODE_CONFIG*`, `OPENCODE_PERMISSION`, auth-content and server
+  credential overrides are removed before spawn.
+
+Native backends may use their documented user-owned configuration only through
+their own adapter policy. PuppyOne does not silently replace that profile with
+the managed PuppyOne Agent profile.
+
 ## Performance and accessibility contract
 
-- OpenCode starts only when Chat first needs harness inspection or a session.
+- A backend starts only when its inspection or a session requires it.
 - Streaming text is batched at 32 ms; blocking and terminal events bypass the
   batch.
 - A 2,000-row fixture mounts no more than 120 rows.
@@ -653,16 +725,15 @@ bounded in main and projection layers.
 
 ## Extension contract
 
-Adding a model provider, compatible endpoint or authorized credential bridge
-extends OpenCode's managed provider catalog. It must not add a peer product
-harness, runtime selector or silent fallback. Provider/model/variant identity
-stays separate in the session contract, and model-specific options must be
-validated against the selected catalog entry.
+Adding a native Agent backend registers a new definition, adapter, discovery,
+capability map and native-session policy. Adding a model provider inside
+PuppyOne Agent instead extends the managed OpenCode catalog. These are distinct
+extension paths. Neither may introduce silent fallback or cross-backend model
+selection.
 
 `AgentRuntimePort` remains stable so Electron process management and tests do
-not depend on OpenCode internals. A fake harness can implement it in tests. A
-second production harness requires a new product ADR and migration policy; it
-is not an ordinary provider extension.
+not depend on native harness internals. A fake backend can implement it in
+tests. Product UI consumes capabilities and catalogs rather than concrete IDs.
 
 Adding an event requires one shared event vocabulary change, main normalization,
 domain projection and an optional UI registry entry. Shared constant/type drift,
@@ -678,7 +749,8 @@ controller. Cross-feature consumers import only `desktop-agent/index.ts`.
 
 - [OpenCode sidecar ADR](ADR-001-opencode-sidecar.md)
 - [Agent contract and boundary ADR](ADR-002-agent-contract-and-boundaries.md)
-- [OpenCode-only product harness ADR](ADR-003-opencode-only-chat-harness.md)
+- [Multi-native Agent backend ADR](ADR-005-multi-native-agent-backends.md)
+- [Superseded OpenCode-only product harness ADR](ADR-003-opencode-only-chat-harness.md)
 - [Managed Agent engine distribution ADR](ADR-004-managed-agent-engine-distribution.md)
 - [OpenCode adoption spike](opencode-adoption-spike.md)
 - [OpenCode update and rollback runbook](opencode-upgrade-runbook.md)

@@ -14,7 +14,7 @@ export function createLocalAgentToolRegistry(descriptors = DEFAULT_LOCAL_AGENT_T
       displayName: descriptor.displayName,
       executableNames: Object.freeze([...descriptor.executableNames]),
       probe: descriptor.probe,
-      bridgeRequiredMessage: descriptor.bridgeRequiredMessage,
+      unavailableMessage: descriptor.unavailableMessage,
     });
   }));
 }
@@ -32,8 +32,8 @@ function validateDescriptor(descriptor) {
   if (typeof descriptor.probe !== "function") {
     throw new TypeError(`Local Agent tool ${descriptor.id} requires a probe.`);
   }
-  if (typeof descriptor.bridgeRequiredMessage !== "string" || !descriptor.bridgeRequiredMessage.trim()) {
-    throw new TypeError(`Local Agent tool ${descriptor.id} requires a bridge message.`);
+  if (typeof descriptor.unavailableMessage !== "string" || !descriptor.unavailableMessage.trim()) {
+    throw new TypeError(`Local Agent tool ${descriptor.id} requires an unavailable-state message.`);
   }
 }
 

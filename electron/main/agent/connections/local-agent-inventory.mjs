@@ -61,7 +61,7 @@ export function createLocalAgentInventory({
         });
         return {
           tool,
-          result: { ...result, bridgeRequiredMessage: tool.bridgeRequiredMessage },
+          result: { ...result, unavailableMessage: tool.unavailableMessage },
           failed: false,
         };
       } catch {

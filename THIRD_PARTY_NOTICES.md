@@ -17,6 +17,24 @@ the packaged `resources/opencode/LICENSE` file.
 The exact artifact hashes, prompt-source hashes, and source-adoption ledger are
 distributed in `vendor/opencode/`.
 
+## Claude Agent SDK
+
+PuppyOne Desktop uses the exact-version
+`@anthropic-ai/claude-agent-sdk@0.3.159` as the control layer for the native
+Claude Code backend. PuppyOne does not redistribute the SDK's optional
+platform executable; the backend uses the user's canonical Claude Code
+installation. The SDK is © Anthropic PBC, all rights reserved, and its use is
+subject to Anthropic's applicable legal agreements. The package license notice is retained at
+`vendor/claude-agent-sdk/LICENSE.md`; current terms are linked from
+https://code.claude.com/docs/en/legal-and-compliance.
+
+Anthropic's published authentication policy does not permit third-party
+products to route traffic through users' Free, Pro or Max Claude subscription
+credentials. PuppyOne therefore requires an Anthropic API key or a supported
+cloud-provider credential for this backend and does not copy Claude credential
+files. Claude Agent SDK usage may be subject to Anthropic's documented data
+collection, usage and retention policies.
+
 ## Claudian frontend reference
 
 PuppyOne Desktop's Agent Chat frontend selectively adapts interaction and
@@ -26,7 +44,8 @@ message flow, compact tool disclosures, inline diff presentation, composer and
 picker behavior. PuppyOne rewrites these patterns in React with its own design
 tokens, typed Agent contract, accessibility behavior and virtualization.
 Claudian runtime, provider, credential, session, prompt and Obsidian code is not
-included; OpenCode remains PuppyOne's sole product Chat Harness.
+included. PuppyOne's native backend implementations are independently owned
+and audited under the shared `AgentRuntimePort` contract.
 
 Claudian is licensed under the MIT License. The complete license, source map and
 CycloneDX record are distributed in `vendor/claudian/LICENSE`,

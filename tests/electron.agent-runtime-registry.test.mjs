@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentRuntimeRegistry } from "../electron/main/agent/runtime/agent-runtime-registry.mjs";
 
 describe("Agent runtime registry", () => {
-  it("selects the highest-priority ready runtime and keeps provider names out of lifecycle dispatch", async () => {
+  it("selects the configured default without readiness fallback and keeps lifecycle dispatch neutral", async () => {
     const adapter = {
       inspect: vi.fn(),
       createSession: vi.fn(),
@@ -16,12 +16,30 @@ describe("Agent runtime registry", () => {
       definition("direct", 10, "ready", adapter),
       definition("harness", 100, "ready", adapter),
       definition("offline", 200, "not-installed", adapter),
-    ]);
+    ], { defaultRuntimeId: "harness" });
     const catalog = await registry.discover();
     expect(registry.select(catalog).descriptor.id).toBe("harness");
+    expect(registry.select(catalog, "offline")?.descriptor.id).toBe("offline");
+    expect(registry.select(catalog, "missing")).toBeNull();
     expect(registry.createAdapter("direct", { workspaceRoot: "/workspace" })).toBe(adapter);
     expect(registry.descriptors().map((entry) => entry.id)).toEqual(["offline", "harness", "direct"]);
     expect(registry.hasActiveResources()).toBe(false);
+  });
+
+  it("attempts cleanup for every backend even when one cleanup fails", async () => {
+    const firstDispose = vi.fn(async () => { throw new Error("first failed"); });
+    const secondDispose = vi.fn(async () => undefined);
+    const adapter = {
+      inspect() {}, createSession() {}, resumeSession() {}, readHistory() {},
+      startTurn() {}, interruptTurn() {}, dispose() {},
+    };
+    const first = { ...definition("first", 2, "ready", adapter), dispose: firstDispose };
+    const second = { ...definition("second", 1, "ready", adapter), dispose: secondDispose };
+    const registry = new AgentRuntimeRegistry([first, second]);
+
+    await expect(registry.dispose()).rejects.toThrow(/failed to dispose cleanly/i);
+    expect(firstDispose).toHaveBeenCalledTimes(1);
+    expect(secondDispose).toHaveBeenCalledTimes(1);
   });
 });
 

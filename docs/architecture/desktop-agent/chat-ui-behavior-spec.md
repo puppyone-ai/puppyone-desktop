@@ -1,14 +1,16 @@
 # Cursor-style Agent Chat UI behavior specification
 
-Status: implemented normative contract for the experimental Desktop Agent Chat surface. The
-remaining production evidence gates are recorded in ISSUE-027 rather than left implicit here.
+Status: implemented transcript/activity foundation plus target Agent-first
+selection contract. Multi-native backend selection from ADR-005 remains
+migration work and requires new visual and interaction evidence.
 
 This specification turns the visual direction in [Right Sidebar Agent Chat](right-sidebar.md)
 into implementable rules. The pixel reference is the MIT-licensed frontend in
 [`YishenTu/claudian@7d7cc84c`](https://github.com/YishenTu/claudian/tree/7d7cc84c60a77431aaccda7ff49a2f1f4ae1c2ab),
 especially its message, tool-call, inline-diff, input and model-selector modules. PuppyOne owns
 the React port, design-token mapping, accessibility improvements and security boundary. Claudian
-provider/runtime/session code is not adopted; OpenCode remains the only product Chat harness.
+provider/runtime/session code is not copied, but its native-backend separation is an architectural
+reference for [ADR-005](ADR-005-multi-native-agent-backends.md).
 The exact upstream-to-PuppyOne file map and MIT notice are in
 [`vendor/claudian/SOURCE_ADOPTION.md`](../../../vendor/claudian/SOURCE_ADOPTION.md).
 This file uses plain-text diagrams only.
@@ -22,7 +24,7 @@ viewer or a stack of unrelated cards.
 Conversation layer       user prompts + assistant Markdown
 Work layer               plan/read/search/bash/write/tool activity
 Decision layer           permission/question/review actions
-Control layer            context + Provider -> Model + send/stop
+Control layer            context + Agent -> backend-scoped controls + send/stop
 ```
 
 The following invariants are mandatory:
@@ -57,7 +59,7 @@ The following invariants are mandatory:
 | [Changes +42 -11]                                    |
 | +--------------------------------------------------+ |
 | | Send follow-up                                   | |
-| | +   OpenAI   GPT-5.x                  mic/send   | |
+| | +   Codex    GPT-5.x                  mic/send   | |
 | +--------------------------------------------------+ |
 +------------------------------------------------------+
 ```
@@ -160,7 +162,7 @@ Plans are one mutable block per turn, not one card per update.
 ```text
 Plan
   [done] Inspect provider discovery
-  [work] Add Provider -> Model routing
+  [work] Add Agent -> Provider -> Model routing
   [next] Verify renderer and main-process guards
 ```
 
@@ -292,7 +294,7 @@ Known tools use a renderer registry. Unknown tools use a safe fallback instead o
 ? Tool event: future-tool-type                    details
 ```
 
-- The collapsed row shows a human provider/tool name and a one-line redacted input summary.
+- The collapsed row shows a human backend/tool name and a one-line redacted input summary.
 - Expanded arguments/results use typed renderers when registered; otherwise show bounded,
   syntax-highlighted, recursively redacted data.
 - Secret fields, binary payloads, data URLs, headers and access tokens are never expandable.
@@ -306,49 +308,54 @@ Known tools use a renderer registry. Unknown tools use a safe fallback instead o
   redacted `Technical details` disclosure, never as the main assistant response.
 - Updates referring to the same failed turn/item upsert one error row. Provider error plus
   terminal session error must not produce duplicates.
-- Authentication rejection identifies the Provider, clears the invalid selection and presents
-  `Reconnect`/`Choose another Provider`; it does not blame the user with an unbounded API body.
+- Authentication rejection identifies the Agent or backend-scoped Provider,
+  clears only incompatible selections and presents its native recovery action.
+  It never silently switches Agent or blames the user with an unbounded API body.
 - A failed tool preserves prior assistant text, applied file changes and command output.
 - Retry is offered only for idempotent inspection/provider operations. Retrying a write or Bash
   command requires a new explicit turn or approval.
 
-## 12. Provider and Model picker
+## 12. Agent and backend-scoped pickers
 
 Native operating-system `<select>` menus are not the target interaction. Use an accessible,
 anchored listbox/popover so status, grouping, search and secondary text remain consistent.
 
 ```text
-+ Provider ------------------------------------------------+
-| Search providers...                                     |
++ Agent ---------------------------------------------------+
+| Search Agents...                                        |
 |                                                          |
-| Connected routes                                         |
-|  * OpenAI / ChatGPT             Connected               |
-|    Anthropic                     Connected               |
+| Ready                                                     |
+|  * PuppyOne Agent               Managed                 |
+|    Codex                         Native login            |
+|    Claude Code                   API / cloud credential  |
 |                                                          |
-| Local tools detected                                     |
-|    Codex CLI 0.144.1             Detected - connect      |
-|    Cursor Agent 2026.07.09       Detected - no bridge    |
+| Detected                                                  |
+|    Cursor Agent                  Protocol unavailable    |
+|    OpenCode                      Sign in required        |
 |                                                          |
-|  + Connect another provider                              |
+|  Refresh                              Agent settings      |
 +----------------------------------------------------------+
 ```
 
-- Provider is chosen before Model. The Model trigger is hidden or disabled with explanatory
-  text until a selectable Provider route exists.
-- Connected routes are selectable. Detected local tools are always visible but are selectable
-  only when their connection has passed the rules in
-  [Local Agent and Provider Discovery](local-agent-connection-discovery.md).
+- Agent is chosen before Model or Provider. Backend-scoped triggers stay
+  hidden or disabled with explanatory text until a selectable Agent exists.
+- Ready Agents are selectable. Detected native products remain visible but are
+  selectable only after every rule in
+  [Native Agent backend and model discovery](local-agent-connection-discovery.md) passes.
 - The popover supports arrow navigation, type-ahead/search, Home/End, Enter and Escape; focus
   returns to the trigger on close.
-- Provider rows include name, connection source and status. They never expose credential
-  values or local credential paths.
-- Model results are scoped to the selected Provider and limited to text-input, text-output,
-  tool-capable, non-deprecated models. Image, embedding and TTS-only models are excluded.
+- Agent rows include name, source and readiness. They never expose executable,
+  credential or native-session paths.
+- Model results are scoped to the selected Agent and, when applicable, its
+  selected Provider. Required text/tool filters are backend capability policy;
+  image, embedding and TTS-only models never appear in coding-Agent catalogs.
 - Missing or unrecognized capability metadata fails closed; it is never interpreted as text +
   tools support. The searchable catalog remains complete in memory while at most 120 option
   rows are mounted. A 500-model catalog therefore stays searchable without a 500-row popover.
-- A selected route is rendered compactly in the composer. Long names ellipsize without
+- A selected Agent/model is rendered compactly in the composer. Long names ellipsize without
   shrinking Send or covering the textarea.
+- An existing session pins its Agent. Choosing another Agent creates a new
+  session after an explicit boundary; it never rewrites the active native session.
 
 ## 13. Composer behavior
 
@@ -356,7 +363,7 @@ anchored listbox/popover so status, grouping, search and secondary text remain c
 +------------------------------------------------------+
 | Send follow-up                                       |
 |                                                      |
-| +  OpenAI  GPT-5.x  Agent                 mic/send   |
+| +  Codex   GPT-5.x  Agent                 mic/send   |
 +------------------------------------------------------+
 ```
 
@@ -365,10 +372,10 @@ anchored listbox/popover so status, grouping, search and secondary text remain c
 - Horizontal outside margin is 12 px at 420 px and 16 px at 560/760 px. Inner horizontal
   padding is 12-14 px; radius is 20 px.
 - Enter submits, Shift+Enter inserts a newline and IME composition never submits early.
-- The draft remains editable while Provider setup or runtime repair is required. Send alone is
+- The draft remains editable while Agent setup or runtime repair is required. Send alone is
   disabled and the placeholder explains the next action.
-- `+` owns attachment, `@` context and lower-frequency Agent/mode actions. Provider and Model
-  remain visible routing controls.
+- `+` owns attachment, `@` context and lower-frequency mode actions. Agent and
+  the most relevant backend-scoped Model/Provider control remain visible.
 - During a turn, Send becomes Stop unless the capability explicitly supports steer or queue.
   Stop remains a stable target and never moves because a model name changes width.
 - The Changes pill sits above the composer, not inside it. Blocking docks sit above both.
@@ -446,10 +453,13 @@ Machine-readable evidence lives in
 The UI is not accepted from a static screenshot alone. Evidence must include:
 
 - recorded fixtures for every row type and every terminal state;
-- update-in-place tests proving no duplicated plan, activity or provider error rows;
+- update-in-place tests proving no duplicated plan, activity or backend/provider error rows;
 - 420/560/760 px dark/light screenshots for empty, streaming, tool-heavy, approval, error and
   long-session states;
-- keyboard-only Provider -> Model selection, composer submission, disclosure and approval;
+- keyboard-only Agent -> backend-scoped Model selection, composer submission,
+  disclosure and approval;
+- evidence that switching Agent creates a new session and one backend failure
+  leaves other ready Agents unchanged;
 - reduced-motion and screen-reader walkthroughs;
 - production Electron trace for streaming, scroll anchoring, input latency and mounted-row
   budget;

@@ -135,7 +135,7 @@ function normalizeAuthentication(value) {
 function baseCodex(source) {
   return {
     id: "codex",
-    displayName: "Codex CLI",
+    displayName: "Codex",
     authentication: "unknown",
     protocolCompatible: false,
     hasModels: false,
