@@ -130,4 +130,24 @@ describe("OpenCode event normalization", () => {
       properties: { partID: "part_1", messageID: "message_1", sessionID: "ses_1", field: "text", delta: "user delta" },
     }, state)).toEqual([]);
   });
+
+  it("keeps empty session diffs explicit for projection clearing but drops invalid file rows", () => {
+    const state = createOpenCodeEventState();
+    state.activeTurnId = "turn_1";
+    const [empty] = normalizeOpenCodeEvent({
+      type: "session.diff",
+      properties: { sessionID: "ses_1", diff: [{ additions: 2, deletions: 1 }] },
+    }, state);
+    expect(empty).toMatchObject({
+      type: "file.change.updated",
+      itemId: "session-diff",
+      payload: { changes: [] },
+    });
+
+    const [changed] = normalizeOpenCodeEvent({
+      type: "session.diff",
+      properties: { sessionID: "ses_1", diff: [{ file: "src/app.ts", additions: 2, deletions: 1 }] },
+    }, state);
+    expect(changed.payload.changes).toEqual([{ path: "src/app.ts", additions: 2, deletions: 1, status: "" }]);
+  });
 });

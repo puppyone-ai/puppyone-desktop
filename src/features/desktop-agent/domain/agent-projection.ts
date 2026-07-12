@@ -8,6 +8,7 @@ import type {
   AgentTurn,
   TimelineRow,
 } from "./agent-projection-types";
+import { clearProjectedFileChange, hasRenderableFileChange } from "./agent-file-change-projection";
 import {
   activityId,
   defaultToolLabel,
@@ -23,7 +24,11 @@ import {
   readRecordArray,
   readString,
 } from "./agent-projection-readers";
-import { cloneAgentProjection, projectionIndexes } from "./agent-projection-indexes";
+import {
+  cloneAgentProjection,
+  projectionIndexes,
+} from "./agent-projection-indexes";
+import { providerActivityIdentity } from "./agent-provider-notice-policy";
 
 export type * from "./agent-projection-types";
 
@@ -193,6 +198,10 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
       return next;
     }
     case "file.change.updated":
+      if (!hasRenderableFileChange(payload)) {
+        clearProjectedFileChange(next, event);
+        return next;
+      }
       return upsertActivity(next, event, {
         kind: "file-change",
         label: fileChangeLabel(payload),
@@ -258,20 +267,25 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
         detail: pickSafeActivityDetail(payload),
       });
     case "provider.warning":
-    case "provider.error":
+    case "provider.error": {
+      const kind = event.type === "provider.error" ? "error" : "warning";
+      const label = readProviderMessage(payload.message) || (kind === "error" ? "Provider error" : "Provider warning");
+      const identity = providerActivityIdentity(next, event, label);
+      const activityIndexes = projectionIndexes(next).activities;
+      const existingActivityIndex = activityIndexes.get(identity.id);
+      const existingActivity = existingActivityIndex === undefined ? null : next.activities[existingActivityIndex];
+      if (existingActivity?.kind === "error" && kind === "warning") return next;
       const activity: AgentActivity = {
-        id: providerActivityId(event),
-        turnId: event.turnId,
-        itemId: event.itemId,
-        kind: event.type === "provider.error" ? "error" : "warning",
-        label: readProviderMessage(payload.message) || (event.type === "provider.error" ? "Provider error" : "Provider warning"),
-        status: event.type === "provider.error" ? "failed" : "warning",
+        id: identity.id,
+        turnId: identity.turnId,
+        itemId: event.itemId ?? existingActivity?.itemId ?? null,
+        kind,
+        label,
+        status: kind === "error" ? "failed" : "warning",
         detail: pickSafeActivityDetail(payload),
         output: "",
         sequence: event.sequence,
       };
-      const activityIndexes = projectionIndexes(next).activities;
-      const existingActivityIndex = activityIndexes.get(activity.id);
       if (existingActivityIndex === undefined) {
         activityIndexes.set(activity.id, next.activities.length);
         next.activities.push(activity);
@@ -279,6 +293,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
         next.activities[existingActivityIndex] = activity;
       }
       return next;
+    }
     default:
       return next;
   }
@@ -477,7 +492,9 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
     return activity ? activityPart(activity) : null;
   }
   if (event.type === "provider.warning" || event.type === "provider.error") {
-    const activityIndex = projectionIndexes(projection).activities.get(providerActivityId(event));
+    const label = readProviderMessage(event.payload.message)
+      || (event.type === "provider.error" ? "Provider error" : "Provider warning");
+    const activityIndex = projectionIndexes(projection).activities.get(providerActivityIdentity(projection, event, label).id);
     const activity = activityIndex === undefined ? null : projection.activities[activityIndex];
     return activity ? activityPart(activity) : null;
   }
@@ -504,10 +521,6 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
     label: "Unsupported agent event",
     sequence: event.sequence,
   };
-}
-
-function providerActivityId(event: AgentEvent) {
-  return `${event.type}:${event.turnId ?? event.itemId ?? "session"}`;
 }
 
 function messagePart(message: AgentTranscriptMessage): AgentPart {

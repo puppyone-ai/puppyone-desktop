@@ -333,6 +333,28 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(onOpenFile).toHaveBeenCalledWith("src/app.ts");
   });
 
+  it("does not render a generic File Change row or Review action without a real change", () => {
+    const projection = createAgentProjection();
+    projection.activities.push({
+      id: "empty-change",
+      turnId: "turn-1",
+      itemId: "session-diff",
+      kind: "file-change",
+      label: "File changes",
+      status: "completed",
+      output: "",
+      detail: { changes: [] },
+      sequence: 1,
+    });
+    const container = render(React.createElement(AgentTranscript, {
+      projection,
+      loading: false,
+      onViewChanges: vi.fn(),
+    }));
+    expect(container.textContent).not.toContain("File Change");
+    expect(container.querySelector('button[aria-label="Review file changes"]')).toBeNull();
+  });
+
   it("keeps Read activity compact and hands workspace paths back to the Editor surface", () => {
     const projection = createAgentProjection();
     projection.activities.push({
