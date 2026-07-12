@@ -18,34 +18,75 @@
 }
 
 .desktop-file-diff-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
   min-width: 0;
-  gap: 6px;
-  min-height: 34px;
+  gap: 10px;
+  min-height: 36px;
   padding: 0 10px;
   border-bottom: 1px solid var(--po-border-subtle);
   background: color-mix(in srgb, var(--po-canvas) 94%, var(--po-text) 2%);
   color: var(--po-text-muted);
 }
 
-.desktop-file-diff-path {
+.desktop-file-diff-facts {
+  display: inline-flex;
   min-width: 0;
-  flex: 1;
+  align-items: center;
+  gap: 7px;
+}
+
+.desktop-file-format-label {
+  display: block;
+  max-width: 112px;
   overflow: hidden;
   color: var(--po-text);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.desktop-file-diff-identity {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+  overflow: hidden;
+  text-align: right;
+}
+
+.desktop-file-diff-name,
+.desktop-file-diff-directory {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-file-diff-name {
+  flex: 0 1 auto;
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-file-diff-directory {
+  flex: 0 2 auto;
+  color: var(--po-text-subtle);
+  font-size: 10px;
+  font-weight: 500;
 }
 
 .desktop-file-diff-stat {
   display: inline-flex;
   flex: 0 0 auto;
   gap: 6px;
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
-  font-weight: 520;
+  font-weight: 650;
 }
 
 .desktop-change-badge {
@@ -384,6 +425,17 @@
 }
 
 @media (max-width: 760px) {
+  .desktop-file-diff-header {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    padding-block: 7px;
+  }
+
+  .desktop-file-diff-identity {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
   .desktop-docx-redline-block {
     grid-template-columns: 1fr;
     gap: 4px;

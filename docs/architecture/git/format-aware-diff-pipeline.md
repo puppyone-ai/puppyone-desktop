@@ -35,9 +35,14 @@ DIFF_VIEWERS (first match wins)
 bounded provider model -> read-only React renderer
 ```
 
-`GitStatusView` renders `FormatAwareDiff`; it contains no extension-specific or
-binary-format decision tree. Shared selection, lifecycle, registry, and cache
-primitives live under `diff/core/`. Each comparator is a vertical slice under
+`GitFileDiffSurface` resolves the Diff Registry once, uses the returned
+canonical format label in its fact-first header, and passes that exact resolved
+viewer to `FormatAwareDiff`. It is reused by focused Changes and embedded
+History files; neither it nor `GitStatusView` contains an extension-specific or
+binary-format decision tree. This single-resolution rule prevents the visible
+file type and selected renderer from drifting apart. Shared selection,
+lifecycle, registry, and cache primitives live under `diff/core/`. Each
+comparator is a vertical slice under
 `diff/contributions/<contribution-id>/` and owns its matcher, presentation,
 provider, model, budgets, cache, worker, and tests. A new semantic comparator is
 registered ahead of the total fallback without adding branches to the shell.
@@ -218,6 +223,8 @@ permission, audience, and broker design.
 - Renderer input never creates Git refs, object ids, absolute paths, or grants.
 - Contribution code is read-only and cannot mutate Git or the workspace.
 - Unknown formats always resolve to an honest metadata presentation.
+- The header's visible file type and the renderer use the same resolved Diff
+  Registry result; neither introduces extension-specific branching.
 - A successful model is committed only for the exact active selection and
   revision identities.
 - Heavy document parsing never enters the startup bundle or Renderer main

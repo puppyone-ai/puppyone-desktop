@@ -1,4 +1,13 @@
 export * from "./core/types";
+export {
+  TYPOGRAPHY_CHANGE_EVENT,
+  dispatchTypographyChange,
+  subscribeTypographyChanges,
+} from "./core/typography";
+export type {
+  TypographyChangeDetail,
+  TypographyChangePhase,
+} from "./core/typography";
 export type {
   FileCategory,
   FileFormat,

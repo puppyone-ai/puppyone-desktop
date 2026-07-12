@@ -191,7 +191,7 @@ export class MermaidBlockWidget extends WidgetType {
 
     const runRender = (source: string) => {
       disposeActiveRender();
-      const theme = getMermaidThemeSnapshot();
+      const theme = getMermaidThemeSnapshot(view.dom);
       const generation = ++renderGeneration;
       let abortKey = "";
       const executionSession = host.executionSessions.create({

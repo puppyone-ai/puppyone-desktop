@@ -19,6 +19,7 @@ import type {
   EditorSourceSnapshotPort,
 } from "../sourceSnapshot";
 import { getRendererPerformanceTracker } from "../../performance/rendererPerformance";
+import { subscribeTypographyChanges } from "../../core/typography";
 
 const rendererPerformance = getRendererPerformanceTracker();
 
@@ -154,6 +155,9 @@ export function MarkdownCodeMirrorEditor({
     );
 
     viewRef.current = view;
+    const unsubscribeTypography = subscribeTypographyChanges(host.ownerDocument, () => {
+      view.requestMeasure();
+    });
     const snapshotPort: EditorSourceSnapshotPort = {
       readSnapshot: () => readEditorSnapshot(view),
       readRevision: () => getDocRevision(view.state.doc),
@@ -167,6 +171,7 @@ export function MarkdownCodeMirrorEditor({
     }
 
     return () => {
+      unsubscribeTypography();
       const snapshotStartedAt = performance.now();
       const snapshot = readEditorSnapshot(view);
       rendererPerformance.recordOperation(

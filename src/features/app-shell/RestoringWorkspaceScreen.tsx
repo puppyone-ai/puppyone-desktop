@@ -1,4 +1,8 @@
 import type { DarkThemePreset, DiffMarkers, LightThemePreset, TextSize, ThemeMode } from "../../preferences";
+import {
+  createTypographyRootProps,
+  type ResolvedTypography,
+} from "../typography";
 
 const puppyoneLogoUrl = new URL("../../../public/puppyone-logo.svg", import.meta.url).href;
 
@@ -7,6 +11,7 @@ type RestoringWorkspaceScreenProps = {
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
   textSize: TextSize;
+  typography: ResolvedTypography;
   pointerCursors: boolean;
   diffMarkers: DiffMarkers;
   resolvedTheme: "light" | "dark";
@@ -17,6 +22,7 @@ export function RestoringWorkspaceScreen({
   lightThemePreset,
   darkThemePreset,
   textSize,
+  typography,
   pointerCursors,
   diffMarkers,
   resolvedTheme,
@@ -30,6 +36,7 @@ export function RestoringWorkspaceScreen({
       data-text-size={textSize}
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
+      {...createTypographyRootProps(typography)}
     >
       <div className="onboarding-titlebar" aria-hidden="true" />
       <section className="restoring-workspace-status" aria-label="Opening last project">

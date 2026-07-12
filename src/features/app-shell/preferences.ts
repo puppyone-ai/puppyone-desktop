@@ -19,6 +19,7 @@ import {
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
   SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY,
   TEXT_SIZE_STORAGE_KEY,
+  TYPOGRAPHY_STORAGE_KEY,
   THEME_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
   parseAiEditAssistEnabled,
@@ -36,6 +37,7 @@ import {
   parseSidebarNavigationVisibilitySettings,
   parseThemeMode,
   parseTextSize,
+  parseTypography,
   parseTitlebarActionsSettings,
   type DarkThemePreset,
   type DiffMarkers,
@@ -50,6 +52,7 @@ import {
   type SidebarNavigationVisibilitySettings,
   type ThemeMode,
   type TextSize,
+  type TypographyPreferences,
   type TitlebarActionsSettings,
 } from "../../preferences";
 
@@ -88,6 +91,11 @@ export function readInitialDarkThemePreset(): DarkThemePreset {
 export function readInitialTextSize(): TextSize {
   if (typeof window === "undefined") return parseTextSize(null);
   return parseTextSize(window.localStorage.getItem(TEXT_SIZE_STORAGE_KEY));
+}
+
+export function readInitialTypographyPreferences(): TypographyPreferences {
+  if (typeof window === "undefined") return parseTypography(null);
+  return parseTypography(window.localStorage.getItem(TYPOGRAPHY_STORAGE_KEY));
 }
 
 export function readInitialPointerCursors(): boolean {

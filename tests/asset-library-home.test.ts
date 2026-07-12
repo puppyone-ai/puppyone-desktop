@@ -7,6 +7,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AssetLibraryHome } from "../src/components/AssetLibraryHome";
 import type { MinimalOnboardingProps, ProjectHomeItem } from "../src/components/MinimalOnboarding";
+import {
+  DEFAULT_TYPOGRAPHY_PREFERENCES,
+  resolveTypography,
+} from "../src/features/typography";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -79,6 +83,7 @@ function renderLibrary(overrides: Partial<MinimalOnboardingProps> = {}) {
     lightThemePreset: "neutral",
     darkThemePreset: "default",
     textSize: "default",
+    typography: resolveTypography(DEFAULT_TYPOGRAPHY_PREFERENCES),
     pointerCursors: false,
     diffMarkers: "color",
     resolvedTheme: "dark",

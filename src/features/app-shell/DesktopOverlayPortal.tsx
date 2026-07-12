@@ -1,6 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { DarkThemePreset, DiffMarkers, LightThemePreset, TextSize } from "../../preferences";
+import {
+  applyTypographyToElement,
+  type ResolvedTypography,
+} from "../typography";
 
 const DESKTOP_OVERLAY_ROOT_ID = "desktop-overlay-root";
 
@@ -12,6 +16,7 @@ export function DesktopOverlayPortal({
   lightThemePreset,
   darkThemePreset,
   textSize,
+  typography,
   pointerCursors,
   diffMarkers,
 }: {
@@ -20,6 +25,7 @@ export function DesktopOverlayPortal({
   lightThemePreset?: LightThemePreset;
   darkThemePreset?: DarkThemePreset;
   textSize?: TextSize;
+  typography?: ResolvedTypography;
   pointerCursors?: boolean;
   diffMarkers?: DiffMarkers;
 }) {
@@ -27,14 +33,25 @@ export function DesktopOverlayPortal({
 
   useEffect(() => {
     const overlayRoot = getDesktopOverlayRoot();
-    if (theme) applyDesktopOverlayTheme(overlayRoot, theme, lightThemePreset, darkThemePreset, textSize, pointerCursors, diffMarkers);
+    if (theme) {
+      applyDesktopOverlayTheme(
+        overlayRoot,
+        theme,
+        lightThemePreset,
+        darkThemePreset,
+        textSize,
+        typography,
+        pointerCursors,
+        diffMarkers,
+      );
+    }
     setRoot(overlayRoot);
-  }, [theme, lightThemePreset, darkThemePreset, textSize, pointerCursors, diffMarkers]);
+  }, [theme, lightThemePreset, darkThemePreset, textSize, typography, pointerCursors, diffMarkers]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!root || !theme) return;
-    applyDesktopOverlayTheme(root, theme, lightThemePreset, darkThemePreset, textSize, pointerCursors, diffMarkers);
-  }, [root, theme, lightThemePreset, darkThemePreset, textSize, pointerCursors, diffMarkers]);
+    applyDesktopOverlayTheme(root, theme, lightThemePreset, darkThemePreset, textSize, typography, pointerCursors, diffMarkers);
+  }, [root, theme, lightThemePreset, darkThemePreset, textSize, typography, pointerCursors, diffMarkers]);
 
   if (!root) return null;
   return createPortal(children, root);
@@ -61,6 +78,7 @@ function applyDesktopOverlayTheme(
   lightThemePreset?: LightThemePreset,
   darkThemePreset?: DarkThemePreset,
   textSize?: TextSize,
+  typography?: ResolvedTypography,
   pointerCursors?: boolean,
   diffMarkers?: DiffMarkers,
 ) {
@@ -69,6 +87,7 @@ function applyDesktopOverlayTheme(
   if (lightThemePreset) root.dataset.lightThemePreset = lightThemePreset;
   if (darkThemePreset) root.dataset.darkThemePreset = darkThemePreset;
   if (textSize) root.dataset.textSize = textSize;
+  if (typography) applyTypographyToElement(root, typography);
   if (pointerCursors !== undefined) root.dataset.pointerCursors = pointerCursors ? "true" : "false";
   if (diffMarkers) root.dataset.diffMarkers = diffMarkers;
 }

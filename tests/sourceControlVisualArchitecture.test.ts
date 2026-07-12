@@ -6,6 +6,14 @@ const viewSource = readFileSync(
   new URL("../src/features/source-control/GitStatusView.tsx", import.meta.url),
   "utf8",
 );
+const workingFileDetailSource = readFileSync(
+  new URL("../src/features/source-control/WorkingFileDetail.tsx", import.meta.url),
+  "utf8",
+);
+const fileDiffSurfaceSource = readFileSync(
+  new URL("../src/features/source-control/diff/GitFileDiffSurface.tsx", import.meta.url),
+  "utf8",
+);
 const textDiffSource = readFileSync(
   new URL("../src/features/source-control/diff/contributions/text-unified/TextUnifiedDiff.tsx", import.meta.url),
   "utf8",
@@ -32,18 +40,40 @@ const diffCss = readFileSync(
 );
 
 describe("source-control visual architecture", () => {
-  it("uses a dedicated compact context header for working-file detail", () => {
-    expect(viewSource).toContain("desktop-working-file-detail-view");
-    expect(viewSource).toContain("desktop-working-file-status");
-    expect(viewSource).toContain("hideHeader={files.length === 1}");
-    expect(viewSource).not.toContain('<span className="desktop-head-badge">{remote ?');
+  it("uses one canonical file diff surface in Changes and History", () => {
+    expect(viewSource).toContain("<GitFileDiffSurface");
+    expect(workingFileDetailSource).toContain("<GitFileDiffSurface");
+    expect(fileDiffSurfaceSource).toContain('className="desktop-file-diff-header"');
+    expect(fileDiffSurfaceSource).toContain("<FormatAwareDiff");
+    expect(viewSource).not.toContain("hideHeader");
+    expect(workingFileDetailSource).not.toContain("hideHeader");
+    expect(fileDiffSurfaceSource).not.toContain("without-header");
 
-    const title = compact(readCssBlock(
-      detailCss,
-      ".desktop-working-file-detail-view .desktop-commit-id-row strong",
-    ));
-    expect(title).toContain("font-size: var(--po-text-size-title, 16px);");
-    expect(title).toContain("font-weight: var(--po-text-weight-semibold, 600);");
+    const header = compact(readCssBlock(diffCss, ".desktop-file-diff-header"));
+    const format = compact(readCssBlock(diffCss, ".desktop-file-format-label"));
+    const stats = compact(readCssBlock(diffCss, ".desktop-file-diff-stat"));
+    expect(header).toContain("grid-template-columns: max-content minmax(0, 1fr);");
+    expect(format).toContain("color: var(--po-text);");
+    expect(format).toContain("font-weight: 650;");
+    expect(format).not.toContain("border-radius:");
+    expect(format).not.toContain("background:");
+    expect(stats).toContain("font-variant-numeric: tabular-nums;");
+    expect(stats).toContain("font-weight: 650;");
+
+    const factsIndex = fileDiffSurfaceSource.indexOf('className="desktop-file-diff-facts"');
+    const formatIndex = fileDiffSurfaceSource.indexOf('className="desktop-file-format-label"');
+    const statusIndex = fileDiffSurfaceSource.indexOf("desktop-change-badge");
+    const statsIndex = fileDiffSurfaceSource.indexOf('className="desktop-file-diff-stat"');
+    const identityIndex = fileDiffSurfaceSource.indexOf('className="desktop-file-diff-identity"');
+    expect(factsIndex).toBeGreaterThan(-1);
+    expect(formatIndex).toBeGreaterThan(factsIndex);
+    expect(statusIndex).toBeGreaterThan(formatIndex);
+    expect(statsIndex).toBeGreaterThan(statusIndex);
+    expect(identityIndex).toBeGreaterThan(statsIndex);
+    expect(fileDiffSurfaceSource).toContain("resolveDiffViewer(file)");
+    expect(fileDiffSurfaceSource).toContain("resolvedViewer={resolvedViewer}");
+    expect(workingFileDetailSource).not.toContain("desktop-working-diff-context");
+    expect(workingFileDetailSource).not.toContain("getGitDiffContextPresentation");
   });
 
   it("keeps file actions at toolbar emphasis", () => {
@@ -57,12 +87,8 @@ describe("source-control visual architecture", () => {
     expect(actions).toContain("font-size: var(--git-action-font-size);");
     expect(actions).toContain("font-weight: 500;");
 
-    const workingFileDetail = viewSource.slice(
-      viewSource.indexOf("function WorkingFileDetail"),
-      viewSource.indexOf("function FileDiffBlock"),
-    );
-    const actionsSource = workingFileDetail.slice(
-      workingFileDetail.indexOf('className="desktop-working-file-actions"'),
+    const actionsSource = workingFileDetailSource.slice(
+      workingFileDetailSource.indexOf('className="desktop-working-file-actions"'),
     );
     const openFileIndex = actionsSource.indexOf("onOpenFile(selection.path)");
     const stageIndex = actionsSource.indexOf("onStagePaths([selection.path])");

@@ -83,7 +83,7 @@
   overflow: clip;
   width: 100%;
   color: color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted));
-  font-family: var(--po-font-sans);
+  font-family: var(--po-font-content, var(--po-font-sans));
   font-size: 14px;
   line-height: 1.6;
 }

@@ -72,6 +72,8 @@ described as current behavior before its implementation and verification land.
   - audience/session/revision-bound immutable bytes for rich diff providers
 - `local-api/workspace.mjs`
   - workspace-facing Git status, history, parsing, and mutations
+- `local-api/git/diff-comparison.mjs`
+  - trusted merge-base comparisons and bounded incoming/outgoing net-file previews
 - `local-api/git/revision-specs.mjs` and `local-api/git/revision-pair.mjs`
   - trusted scope/status derivation and bounded before/after revision reads
 - `local-api/git/runner.mjs`
@@ -89,7 +91,8 @@ described as current behavior before its implementation and verification land.
 - `tests/electron.git-metadata-watch.integration.test.mjs`
   - real-repository metadata watcher and external Git freshness coverage
 - `tests/workspace.git.integration.test.mjs`
-  - real-repository integration coverage for the local Git engine
+  - real-repository integration coverage for the local Git engine, including
+    sidebar/detail aggregate-diff consistency
 
 ## Cross-Domain Boundaries
 

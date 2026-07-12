@@ -12,6 +12,7 @@ import { ExternalAppIcon } from "../external-apps/ExternalAppIcon";
 import { useFeatureFlag } from "../flags";
 import { getPuppyoneRemote, maskRemoteUrl, parsePuppyoneRemote } from "../source-control/remotes";
 import { SettingsGroup, SettingsLine, SettingsSectionHeader } from "./components";
+import { ContentFontSetting } from "./ContentFontSetting";
 import { PuppyoneWorkspaceConfigSettings } from "./PuppyoneWorkspaceConfigSettings";
 import type { SettingsSidebarProps, SettingsViewProps, SettingsSection } from "./types";
 import { remoteKindLabel, shortCommit, writeClipboardText } from "./utils";
@@ -26,6 +27,7 @@ export function SettingsView({
   lightThemePreset,
   darkThemePreset,
   textSize,
+  typographyPreferences,
   pointerCursors,
   dockIcon,
   diffMarkers,
@@ -51,6 +53,7 @@ export function SettingsView({
   onLightThemePresetChange,
   onDarkThemePresetChange,
   onTextSizeChange,
+  onTypographyPreferencesChange,
   onPointerCursorsChange,
   onDockIconChange,
   onDiffMarkersChange,
@@ -292,6 +295,10 @@ export function SettingsView({
                   ))}
                 </div>
               </div>
+              <ContentFontSetting
+                preferences={typographyPreferences}
+                onChange={onTypographyPreferencesChange}
+              />
               <div className="desktop-settings-row desktop-settings-row-control">
                 <span>File icons</span>
                 <div className="desktop-theme-segment desktop-file-icon-theme-segment" aria-label="File icon theme">
