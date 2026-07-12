@@ -9,10 +9,10 @@ import { DesktopSidebarRailNavigation } from "../src/features/app-shell/navigati
 import {
   CloudProjectHistorySidebar,
   CloudProjectHistoryView,
-} from "../src/features/cloud/CloudProjectHistory";
-import { mergeCloudHistoryPages } from "../src/features/cloud/data/useCloudBranchesData";
-import { buildCloudBranchGraphRows } from "../src/features/cloud/model";
-import type { DesktopCloudHistory } from "../src/lib/cloudApi";
+} from "../src/features/cloud/history";
+import { mergeCloudHistoryPages } from "../src/features/cloud/history/pagination";
+import { buildCloudBranchGraphRows } from "../src/features/cloud/graph/model";
+import type { DesktopCloudHistory } from "../src/lib/cloudHistoryApi";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -62,8 +62,8 @@ describe("Cloud project history", () => {
     const rows = buildCloudBranchGraphRows({ history });
     const container = render(<HistoryHarness history={history} />);
 
-    expect(container.querySelector('[role="listbox"][aria-label="Commit history"]')).not.toBeNull();
-    expect(container.querySelectorAll('[role="option"]')).toHaveLength(2);
+    expect(container.querySelector('ol[aria-label="Commit history"]')).not.toBeNull();
+    expect(container.querySelectorAll('button[data-commit-id]')).toHaveLength(2);
     expect(container.querySelector(".desktop-cloud-history-graph-svg")).not.toBeNull();
     expect(container.querySelector("h1")?.textContent).toBe("Commit 1");
     expect(container.textContent).toContain("Author 1");
@@ -72,7 +72,7 @@ describe("Cloud project history", () => {
     expect(container.querySelector(".desktop-cloud-history-inline-ref")).not.toBeNull();
     expect(container.querySelector(".desktop-cloud-history-graph-continuation")).toBeNull();
 
-    const olderCommit = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="option"]'))
+    const olderCommit = Array.from(container.querySelectorAll<HTMLButtonElement>('button[data-commit-id]'))
       .find((button) => button.textContent?.includes("Commit 2"));
     if (!olderCommit) throw new Error("Older commit row is missing.");
 
@@ -134,6 +134,7 @@ describe("Cloud project history", () => {
     const secondHead = id("3");
     const secondRoot = id("4");
     const history: DesktopCloudHistory = {
+      ...historyEnvelope("lane-reuse", 4),
       project_id: "project-1",
       head_commit_id: firstHead,
       refs: [
@@ -168,6 +169,7 @@ describe("Cloud project history", () => {
         loadingMore={false}
         hasMore
         error={null}
+        warning={null}
         onSelectCommit={vi.fn()}
         onRefresh={vi.fn()}
         onLoadMore={onLoadMore}
@@ -182,6 +184,31 @@ describe("Cloud project history", () => {
     expect(container.textContent).toContain("read-only");
     expect(container.textContent).not.toMatch(/checkout|revert|cherry-pick/i);
   });
+
+  it("uses native button-list semantics and keeps ref-only rows non-interactive", () => {
+    const history = createMergeHistory();
+    const rows = buildCloudBranchGraphRows({ history });
+    const container = render(
+      <CloudProjectHistorySidebar
+        rows={rows}
+        selectedCommitId={history.head_commit_id}
+        loading={false}
+        loadingMore={false}
+        hasMore={false}
+        error={null}
+        warning={null}
+        onSelectCommit={vi.fn()}
+        onRefresh={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector('ol[aria-label="Commit history"]')).not.toBeNull();
+    expect(container.querySelectorAll('button[data-commit-id]')).toHaveLength(4);
+    const refOnlyItem = container.querySelector('[data-history-row-kind="ref"]');
+    expect(refOnlyItem).not.toBeNull();
+    expect(refOnlyItem?.querySelector("button")).toBeNull();
+  });
 });
 
 function HistoryHarness({ history }: { history: DesktopCloudHistory }) {
@@ -194,6 +221,7 @@ function HistoryHarness({ history }: { history: DesktopCloudHistory }) {
     loadingMore: false,
     hasMore: false,
     error: null,
+    warning: null,
     onSelectCommit: setSelectedCommitId,
     onRefresh: vi.fn(),
     onLoadMore: vi.fn(),
@@ -234,7 +262,11 @@ function createHistory(count: number): DesktopCloudHistory {
         action: deleted ? "delete" as const : "update" as const,
         op: deleted ? "deleted" as const : "modified" as const,
       }],
+      conflicts: [],
       root_hash: `root-${number}`,
+      scope_hash: "",
+      scope_path: "",
+      audit_detail: null,
     };
   });
   const commitsWithParents = commits.map((commit, index) => ({
@@ -243,6 +275,7 @@ function createHistory(count: number): DesktopCloudHistory {
   }));
   return {
     project_id: "project-1",
+    ...historyEnvelope("linear-history", commitsWithParents.length),
     commits: commitsWithParents,
     head_commit_id: commitsWithParents[0]?.commit_id ?? null,
     refs: commitsWithParents[0]
@@ -253,6 +286,7 @@ function createHistory(count: number): DesktopCloudHistory {
 
 function createMergeHistory(): DesktopCloudHistory {
   return {
+    ...historyEnvelope("merge-history", 4),
     project_id: "project-1",
     head_commit_id: id("d"),
     refs: [
@@ -278,6 +312,24 @@ function cloudCommit(commitId: string, parentIds: string[], message: string) {
     message,
     created_at: "2026-07-12T10:00:00.000Z",
     changes: [],
+    conflicts: [],
+    root_hash: "",
+    scope_hash: "",
+    scope_path: "",
+    audit_detail: null,
+  };
+}
+
+function historyEnvelope(snapshotSeed: string, total: number) {
+  return {
+    topology_available: true,
+    refs_included: true,
+    snapshot_id: snapshotSeed.padEnd(64, "0").slice(0, 64),
+    next_cursor: null,
+    has_more: false,
+    total,
+    graph_health: "complete" as const,
+    unreadable_commit_ids: [],
   };
 }
 

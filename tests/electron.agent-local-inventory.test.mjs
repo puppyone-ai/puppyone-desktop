@@ -278,7 +278,7 @@ describe("Desktop Agent local-tool inventory", () => {
     const cursorProbe = vi.fn(async () => { throw new Error("private cursor output /Users/example"); });
     const inventory = createLocalAgentInventory({
       now,
-      resolveCandidate: vi.fn(async (tool) => fixedCandidate(`/tools/${tool.id}`, tool.names[0])),
+      resolveCandidate: vi.fn(async (tool) => fixedCandidate(`/tools/${tool.id}`, tool.executableNames[0])),
       probes: { codex: codexProbe, "cursor-agent": cursorProbe },
     });
 
@@ -299,6 +299,41 @@ describe("Desktop Agent local-tool inventory", () => {
     expect(codexProbe).toHaveBeenCalledTimes(1);
     await inventory.discover({ refresh: true });
     expect(codexProbe).toHaveBeenCalledTimes(2);
+  });
+
+  it("adds a new inventory tool through one validated descriptor without changing inventory orchestration", async () => {
+    const inventory = createLocalAgentInventory({
+      toolDescriptors: [{
+        id: "claude-code",
+        displayName: "Claude Code",
+        executableNames: ["claude"],
+        bridgeRequiredMessage: "A Claude-to-OpenCode provider bridge is not enabled.",
+        probe: vi.fn(async () => ({
+          id: "claude-code",
+          displayName: "Claude Code",
+          installation: "detected",
+          version: "2.1.0",
+          authentication: "signed-in",
+          protocolCompatible: true,
+          hasModels: true,
+          source: "user-installation",
+        })),
+      }],
+      resolveCandidate: vi.fn(async () => fixedCandidate("/tools/claude", "claude")),
+    });
+
+    const snapshot = await inventory.discover({ refresh: true });
+
+    expect(snapshot.connections).toEqual([
+      expect.objectContaining({
+        id: "claude-code",
+        displayName: "Claude Code",
+        integration: "bridge-required",
+        selectable: false,
+        statusMessage: expect.stringContaining("Claude-to-OpenCode provider bridge"),
+      }),
+    ]);
+    inventory.dispose();
   });
 });
 

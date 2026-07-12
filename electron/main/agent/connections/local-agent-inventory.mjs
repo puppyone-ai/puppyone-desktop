@@ -1,13 +1,8 @@
 import { deriveLocalConnection } from "./local-agent-connection-policy.mjs";
 import { resolveFirstExecutable } from "./probes/executable-candidates.mjs";
-import { probeCodexLocal } from "./probes/codex-local-probe.mjs";
-import { probeCursorLocal } from "./probes/cursor-local-probe.mjs";
+import { createLocalAgentToolRegistry } from "./tools/local-agent-tool-registry.mjs";
 
 const CACHE_TTL_MS = 5 * 60 * 1_000;
-const TOOL_DEFINITIONS = Object.freeze([
-  Object.freeze({ id: "codex", displayName: "Codex CLI", names: Object.freeze(["codex"]) }),
-  Object.freeze({ id: "cursor-agent", displayName: "Cursor Agent", names: Object.freeze(["cursor-agent", "agent", "cursor agent"]) }),
-]);
 
 export function createLocalAgentInventory({
   appVersion = "0.0.0",
@@ -16,14 +11,16 @@ export function createLocalAgentInventory({
   platform = process.platform,
   now = Date.now,
   cacheTtlMs = CACHE_TTL_MS,
+  toolDescriptors = createLocalAgentToolRegistry(),
   resolveCandidate = (tool) => resolveFirstExecutable({
-    names: tool.names,
+    names: tool.executableNames,
     env,
     ...(homedir ? { homedir } : {}),
     platform,
   }),
-  probes = { codex: probeCodexLocal, "cursor-agent": probeCursorLocal },
+  probes = {},
 } = {}) {
+  const tools = createLocalAgentToolRegistry(toolDescriptors);
   let cached = null;
   let inFlight = null;
   let activeController = null;
@@ -50,10 +47,10 @@ export function createLocalAgentInventory({
   }
 
   async function scan({ workspaceRoot, startedAt, signal }) {
-    const outcomes = await Promise.all(TOOL_DEFINITIONS.map(async (tool) => {
+    const outcomes = await Promise.all(tools.map(async (tool) => {
       try {
         const candidate = await resolveCandidate(tool);
-        const probe = probes[tool.id];
+        const probe = probes[tool.id] ?? tool.probe;
         if (typeof probe !== "function") throw new Error("Missing local tool probe.");
         const result = await probe({
           candidate,
@@ -62,7 +59,11 @@ export function createLocalAgentInventory({
           env,
           signal,
         });
-        return { tool, result, failed: false };
+        return {
+          tool,
+          result: { ...result, bridgeRequiredMessage: tool.bridgeRequiredMessage },
+          failed: false,
+        };
       } catch {
         return {
           tool,
@@ -100,5 +101,5 @@ export function createLocalAgentInventory({
 
 export const localAgentInventoryPolicy = Object.freeze({
   cacheTtlMs: CACHE_TTL_MS,
-  tools: TOOL_DEFINITIONS,
+  tools: createLocalAgentToolRegistry(),
 });

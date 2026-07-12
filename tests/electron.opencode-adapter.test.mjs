@@ -204,6 +204,7 @@ describe("OpenCode AgentRuntimePort adapter", () => {
             "nano-banana-pro": model("nano-banana-pro", "Nano Banana Pro", { output: { text: false, image: true }, toolcall: false }),
             "gemini-embedding-001": model("gemini-embedding-001", "Gemini Embedding 001", { output: { text: false }, toolcall: false }),
             "gemini-tts": model("gemini-tts", "Gemini TTS", { output: { text: false, audio: true }, toolcall: false }),
+            "unknown-capabilities": { id: "unknown-capabilities", name: "Unknown Capabilities", status: "active" },
           },
         },
         { id: "openai", name: "OpenAI", source: "api", models: { "gpt-5": model("gpt-5", "GPT-5") } },
@@ -234,7 +235,7 @@ describe("OpenCode AgentRuntimePort adapter", () => {
 function clientFixture() {
   return {
     providerCatalog: vi.fn(async () => ({
-      all: [{ id: "openai", name: "OpenAI", source: "api", models: { "gpt-5": { id: "gpt-5", name: "GPT-5", family: "gpt", variants: { high: {} }, limit: { context: 128_000 } } } }],
+      all: [{ id: "openai", name: "OpenAI", source: "api", models: { "gpt-5": { ...model("gpt-5", "GPT-5"), family: "gpt", variants: { high: {} } } } }],
       connected: ["openai"],
       default: { openai: "gpt-5" },
     })),

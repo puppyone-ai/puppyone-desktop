@@ -37,18 +37,18 @@ export function deriveLocalConnection(probe, gates = {}) {
     },
     selectable: integration === "ready",
     statusMessage: statusMessage({
-      id: probe?.id,
       displayName: probe?.displayName,
       installation,
       authentication,
       version,
+      bridgeRequiredMessage: probe?.bridgeRequiredMessage,
     }),
     actions: actionsFor(installation),
     ...(SAFE_SOURCES.has(probe?.source) ? { source: probe.source } : {}),
   };
 }
 
-function statusMessage({ id, displayName, installation, authentication, version }) {
+function statusMessage({ displayName, installation, authentication, version, bridgeRequiredMessage }) {
   const label = safeText(displayName, "Local Agent", 80);
   const suffix = version ? ` ${version}` : "";
   if (installation === "not-found") return `${label} was not found in known installation locations.`;
@@ -57,9 +57,12 @@ function statusMessage({ id, displayName, installation, authentication, version 
   if (authentication === "signed-out") return `${label}${suffix} is detected but requires sign-in. Refresh after signing in with its documented CLI flow.`;
   if (authentication === "expired") return `${label}${suffix} is detected, but its local session has expired.`;
   if (authentication === "error") return `${label}${suffix} is detected, but its authentication state could not be read.`;
-  if (id === "codex") return `${label}${suffix} is detected${authentication === "signed-in" ? " and signed in" : ""}. Direct Codex sessions are not enabled; use an OpenAI route connected through OpenCode.`;
-  if (id === "cursor-agent") return `${label}${suffix} is detected${authentication === "signed-in" ? " and signed in" : ""}. A Cursor-to-OpenCode bridge is not enabled.`;
-  return `${label}${suffix} is detected, but no authorized OpenCode bridge is available.`;
+  const bridgeMessage = safeText(
+    bridgeRequiredMessage,
+    "No authorized OpenCode provider bridge is available.",
+    256,
+  );
+  return `${label}${suffix} is detected${authentication === "signed-in" ? " and signed in" : ""}. ${bridgeMessage}`;
 }
 
 function actionsFor(installation) {

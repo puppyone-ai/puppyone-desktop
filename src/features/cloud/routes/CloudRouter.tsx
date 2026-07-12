@@ -17,6 +17,7 @@ import { CloudAutomationRouteSection } from "../sections/AutomationRouteSection"
 import { CloudBranchesSection } from "../sections/BranchesSection";
 import { CloudGitSyncSection } from "../sections/GitSyncSection";
 import { CloudHistorySection } from "../sections/HistorySection";
+import { CloudClaudeSection } from "../sections/ClaudeSection";
 import { CloudMcpCliSection } from "../sections/McpCliSection";
 import { CloudMappedOverview } from "../sections/OverviewSection";
 import { CloudAccessSection } from "../sections/access/AccessSection";
@@ -62,6 +63,8 @@ export function CloudRouter({
   onSelectSection,
   onRetryBinding,
   onUseAnotherAccount,
+  onConfirmLegacyBinding,
+  onDetachCloudProject,
 }: {
   workspace: Workspace;
   status: GitStatusSnapshot | null;
@@ -90,6 +93,12 @@ export function CloudRouter({
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onRetryBinding?: () => void;
   onUseAnotherAccount?: () => void;
+  onConfirmLegacyBinding?: (input: {
+    projectId: string;
+    scopeId: string | null;
+    bindingKind: "full" | "scoped";
+  }) => void;
+  onDetachCloudProject?: () => void;
 }) {
   const mappedProjectId = getAttachedCloudProjectId(attachment ?? { status: "local-only", projectId: null })
     ?? cloudData.mappedProjectId;
@@ -158,6 +167,16 @@ export function CloudRouter({
           else onSessionChange(null);
         }}
         onOpenGitDetails={onOpenGitSettings}
+        confirmLabel={attachment.status === "legacy-confirmation-required" ? "Confirm project" : undefined}
+        onConfirm={attachment.status === "legacy-confirmation-required"
+          && attachment.projectId
+          && attachment.bindingKind
+          ? () => onConfirmLegacyBinding?.({
+              projectId: attachment.projectId as string,
+              scopeId: attachment.scopeId,
+              bindingKind: attachment.bindingKind as "full" | "scoped",
+            })
+          : undefined}
       />
     );
   }
@@ -186,6 +205,12 @@ export function CloudRouter({
       onOpenProject,
       onOpenGitSettings,
       onRefresh: cloudData.reload,
+      bindingKind: attachment?.status === "linked" ? attachment.bindingKind ?? null : null,
+      scopePath: attachment?.status === "linked" ? attachment.scopePath ?? null : null,
+      readiness: attachment?.status === "linked"
+        ? attachment.readiness ?? cloudData.readiness
+        : cloudData.readiness,
+      onDetachCloudProject,
     });
   }
 
@@ -229,11 +254,11 @@ export function CloudRouter({
     );
   }
 
-  if (!browsingCloudProject && workspaceBinding.status === "resolving") {
+  if (!browsingCloudProject && workspaceBinding.status === "binding-resolving") {
     return <CloudWorkspaceLoadingState label="Matching Cloud project" />;
   }
 
-  if (!browsingCloudProject && (workspaceBinding.status === "unmapped" || workspaceBinding.status === "error") && !hasPuppyoneRemote) {
+  if (!browsingCloudProject && (workspaceBinding.status === "local-only" || workspaceBinding.status === "error") && !hasPuppyoneRemote) {
     return (
       <CloudUnmappedWorkspace
         workspace={workspace}
@@ -257,7 +282,7 @@ export function CloudRouter({
   if (hasPuppyoneRemote && !mappedProjectId && !browsingCloudProject) {
     return (
       <CloudProjectRecoveryState
-        message={workspaceBinding.status === "error" && "message" in workspaceBinding
+        message={workspaceBinding.status === "error"
           ? workspaceBinding.message
           : "We found a PuppyOne Cloud remote, but couldn’t identify its project."}
         remoteLabel={cloudRemote?.info.displayId ?? null}
@@ -276,7 +301,7 @@ export function CloudRouter({
   }
 
   const projectId = browsingProjectId ?? (
-    workspaceBinding.status === "mapped" ? workspaceBinding.projectId : null
+    "projectId" in workspaceBinding ? workspaceBinding.projectId : null
   );
   if (!projectId) {
     return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
@@ -311,6 +336,10 @@ export function CloudRouter({
     onOpenProject,
     onOpenGitSettings,
     onRefresh: cloudData.reload,
+    bindingKind: null,
+    scopePath: null,
+    readiness: cloudData.readiness,
+    onDetachCloudProject: undefined,
     attachAction: browsingCloudProject
       ? {
           busy: cloudAction.kind === "connect" && cloudAction.projectId === projectId,
@@ -341,6 +370,10 @@ function renderBoundProjectSection({
   onOpenProject,
   onOpenGitSettings,
   onRefresh,
+  bindingKind,
+  scopePath,
+  readiness,
+  onDetachCloudProject,
   attachAction = null,
 }: {
   activeSection: CloudWorkspaceSection;
@@ -360,6 +393,10 @@ function renderBoundProjectSection({
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
   onOpenGitSettings: () => void;
   onRefresh: () => Promise<void>;
+  bindingKind: "full" | "scoped" | null;
+  scopePath: string | null;
+  readiness: import("../../../lib/cloudApi").DesktopCloudProjectReadiness | null;
+  onDetachCloudProject?: () => void;
   attachAction?: { busy: boolean; onAttach: () => void } | null;
 }) {
   const connectorsByScope = new Map<string, typeof cloudData.connectors>();
@@ -397,6 +434,9 @@ function renderBoundProjectSection({
         onSelectSection={onSelectSection}
         onOpenProject={onOpenProject}
         onRefresh={onRefresh}
+        detachAction={linkedToWorkspace && onDetachCloudProject
+          ? { onDetach: onDetachCloudProject }
+          : null}
       />
     );
   }
@@ -409,6 +449,21 @@ function renderBoundProjectSection({
         cloudSession={cloudSession}
         apiBaseUrl={cloudApiBaseUrl}
         onSessionChange={onSessionChange}
+      />
+    );
+  }
+
+  if (activeSection === "claude") {
+    return (
+      <CloudClaudeSection
+        readiness={readiness}
+        identity={cloudData.identity}
+        bindingKind={bindingKind}
+        scopePath={scopePath}
+        loading={cloudData.loading}
+        onCreateGit={() => onSelectSection("access")}
+        onOpenGitSync={onOpenGitSettings}
+        onOpenClaude={() => onOpenProject(projectId, "claude")}
       />
     );
   }
@@ -482,6 +537,7 @@ function renderBoundProjectSection({
         onCloudSessionChange={onSessionChange}
         onRefresh={onRefresh}
         onOpenProject={onOpenProject}
+        canManage={project.capabilities?.includes("access_surface.manage") === true}
       />
     );
   }

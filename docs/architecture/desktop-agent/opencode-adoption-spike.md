@@ -21,6 +21,14 @@ steady 2,000-row delta   mean 1.15 ms; p99 2.10 ms (655 samples)
 mounted row budget       <= 120
 ```
 
+The figures above are the original adoption-spike capture. The 2026-07-12
+architecture-closeout rerun on the same M2 Pro measured projection mean/p99
+`2.17/2.77 ms`, steady delta `0.45/0.83 ms`, and virtual mount/dispose
+`4.45/9.59 ms`. It also added bounded 128 KiB Markdown, 64 KiB command plus
+240-line diff, and 500-model picker scenarios. The machine-readable current
+evidence is
+`benchmarks/performance/baselines/issue-027-agent-chat-m2-pro-2026-07-12.json`.
+
 The archive filenames, byte sizes and SHA-256 values for six supported
 platform/architecture pairs are machine checked in
 `vendor/opencode/runtime-manifest.json`.

@@ -1,4 +1,4 @@
-import { Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
+import { Bot, Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
 import { getCloudAutomationWebPath } from "../../automation/automationDomain";
 import type { CloudWorkspaceSection } from "./cloudRouteIds";
 
@@ -13,6 +13,7 @@ export type CloudRouteDescriptor = {
   context: CloudRouteContext;
   showInSidebar: boolean;
   groupEnd?: boolean;
+  requiredCapability?: string;
   webPath: (projectId?: string) => string;
 };
 
@@ -67,6 +68,17 @@ export const CLOUD_ROUTES = [
     context: "project",
     showInSidebar: true,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/changes`,
+  },
+  {
+    id: "claude",
+    label: "Claude",
+    title: "Claude",
+    description: "Project Agent work starts after the root Git remote has accepted its first commit.",
+    icon: Bot,
+    context: "project",
+    showInSidebar: true,
+    requiredCapability: "agent.read",
+    webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/agent`,
   },
   {
     id: "branches",
@@ -129,6 +141,7 @@ export const CLOUD_ROUTES = [
     context: "project",
     showInSidebar: false,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/settings`,
+    requiredCapability: "project.settings.manage",
   },
   {
     id: "settings",
@@ -138,6 +151,7 @@ export const CLOUD_ROUTES = [
     icon: Settings,
     context: "project",
     showInSidebar: true,
+    requiredCapability: "project.settings.manage",
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/settings`,
   },
 ] as const satisfies readonly CloudRouteDescriptor[];

@@ -77,4 +77,39 @@ describe("workspace config normalization", () => {
       backup: { enabled: true, service: "github", remote: "origin", branch: "main" },
     });
   });
+
+  it("normalizes explicit Cloud binding identity without weakening checkout isolation", () => {
+    expect(normalizePuppyoneWorkspaceConfig({
+      version: 2,
+      project: {
+        id: "01234567-89ab-4def-8123-456789abcdef",
+        workspaceInstanceId: "workspace-instance-1234",
+      },
+      cloud: {
+        projectId: "cloud-project-123",
+        origin: "https://API.PUPPYONE.AI",
+        bindingId: "binding-123",
+      },
+    })).toMatchObject({
+      project: {
+        id: "01234567-89ab-4def-8123-456789abcdef",
+        workspaceInstanceId: "workspace-instance-1234",
+      },
+      cloud: {
+        projectId: "cloud-project-123",
+        origin: "https://api.puppyone.ai",
+        bindingId: "binding-123",
+      },
+    });
+  });
+
+  it("rejects malformed checkout identities and non-origin Cloud endpoints", () => {
+    expect(() => normalizePuppyoneWorkspaceConfig({
+      project: { workspaceInstanceId: "too short" },
+    })).toThrow(/workspaceInstanceId is invalid/i);
+
+    expect(() => normalizePuppyoneWorkspaceConfig({
+      cloud: { origin: "https://user:secret@api.puppyone.ai/v1" },
+    })).toThrow(/cloud\.origin must be an HTTP\(S\) origin/i);
+  });
 });

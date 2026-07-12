@@ -46,6 +46,7 @@ export function DesktopCloudAccessMethodCard({
   onToggle,
   onCreateMcpEndpoint,
   onUpdatePermissions,
+  canManage = false,
 }: {
   scope: DesktopCloudScope;
   surface: CloudAccessSurface;
@@ -57,6 +58,7 @@ export function DesktopCloudAccessMethodCard({
   onToggle: () => void;
   onCreateMcpEndpoint: () => void;
   onUpdatePermissions: (nextAllowedKeys: ReadonlySet<string>) => Promise<void>;
+  canManage?: boolean;
 }) {
   const meta = getDesktopCloudAccessMethodMeta(surface);
   const live = isConnectorActiveStatus(surface.status);
@@ -66,7 +68,7 @@ export function DesktopCloudAccessMethodCard({
   const vmPlaceholder = isDesktopVmPlaceholderSurface(surface);
 
   if (vmPlaceholder) {
-    return <DesktopCloudRemoteWorkspaceCard surface={surface} />;
+    return <DesktopCloudRemoteWorkspaceCard surface={surface} canManage={canManage} />;
   }
 
   if (mcpPlaceholder) {
@@ -88,14 +90,14 @@ export function DesktopCloudAccessMethodCard({
             <p title={mcpError ?? meta.description}>{mcpError ?? meta.description}</p>
           </div>
         </div>
-        <button
+        {canManage && <button
           className="desktop-cloud-access-method-remote-button"
           type="button"
           disabled={creatingMcp}
           onClick={onCreateMcpEndpoint}
         >
           <span>{creatingMcp ? "Creating endpoint" : mcpError ? "Retry" : "Create endpoint"}</span>
-        </button>
+        </button>}
       </article>
     );
   }
@@ -141,13 +143,20 @@ export function DesktopCloudAccessMethodCard({
           pending={configPending}
           error={configError}
           onUpdatePermissions={onUpdatePermissions}
+          canManage={canManage}
         />
       )}
     </article>
   );
 }
 
-export function DesktopCloudRemoteWorkspaceCard({ surface }: { surface?: CloudAccessSurface }) {
+export function DesktopCloudRemoteWorkspaceCard({
+  surface,
+  canManage = false,
+}: {
+  surface?: CloudAccessSurface;
+  canManage?: boolean;
+}) {
   return (
     <article className="desktop-cloud-access-method-card remote">
       <div className="desktop-cloud-access-method-info">
@@ -166,10 +175,10 @@ export function DesktopCloudRemoteWorkspaceCard({ surface }: { surface?: CloudAc
           <p>{surface?.prompt ?? "Add your SSH public key, then open this scope in Cursor or VS Code over Remote-SSH."}</p>
         </div>
       </div>
-      <button className="desktop-cloud-access-method-remote-button" type="button">
+      {canManage && <button className="desktop-cloud-access-method-remote-button" type="button">
         <span>Add SSH key</span>
         <ChevronRight size={13} />
-      </button>
+      </button>}
     </article>
   );
 }
@@ -180,12 +189,14 @@ function DesktopCloudAccessMethodExpandedDetail({
   pending,
   error,
   onUpdatePermissions,
+  canManage,
 }: {
   surface: CloudAccessSurface;
   scope: DesktopCloudScope;
   pending: boolean;
   error: string | null;
   onUpdatePermissions: (nextAllowedKeys: ReadonlySet<string>) => Promise<void>;
+  canManage: boolean;
 }) {
   if (isCliAccessSurface(surface.provider)) {
     return (
@@ -196,7 +207,7 @@ function DesktopCloudAccessMethodExpandedDetail({
           allowedKeys={parseCliCommandPermissions(surface.connector?.config)}
           pending={pending}
           error={error}
-          canUpdate={!!surface.connector}
+          canUpdate={canManage && !!surface.connector}
           unavailableLabel="CLI connector is not available yet."
           onUpdate={onUpdatePermissions}
         />
@@ -213,7 +224,7 @@ function DesktopCloudAccessMethodExpandedDetail({
           allowedKeys={parseMcpToolPermissions(surface.endpoint?.tools_config)}
           pending={pending}
           error={error}
-          canUpdate={!!surface.endpoint}
+          canUpdate={canManage && !!surface.endpoint}
           unavailableLabel="MCP endpoint is not available yet."
           footer="The server applies this policy to both tools/list and tools/call. Client JSON only contains the URL and key."
           onUpdate={onUpdatePermissions}

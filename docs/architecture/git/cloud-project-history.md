@@ -47,17 +47,22 @@ long blue lane"); this document extends the same rule to Cloud History.
 CloudHistorySection / DesktopWorkspaceContent
         |
         v
-useCloudBranchesData  ->  getCloudHistory(session, projectId, cursor)
-        |                     GET /content/{projectId}/commits
+useCloudHistoryController
+        |-- useCloudHistoryData
+        |-- graph/model.ts
+        |-- selected commit state (shared by both surfaces)
+        v
+cloudHistoryApi.ts  ->  GET /content/{projectId}/commits
         |                         ?order=topo&limit=80&cursor=...
         v
-Backend history graph read model
-        |-- roots: refs/heads/main + version_refs branches/tags
+Backend HistoryGraphService
+        |-- atomic DB snapshot: canonical main + version_refs
         |-- facts: immutable Git commit parent_ids
         |-- order: deterministic child-before-parent topo order
-        |-- page: next_cursor + has_more (legacy since_commit_id unchanged)
+        |-- page: HMAC snapshot cursor + has_more
+        |-- cache: app-scoped TTL/LRU + single-flight + node budget
         v
-buildCloudBranchGraphRows({ history })          (src/features/cloud/model.ts)
+buildCloudBranchGraphRows({ history })          (src/features/cloud/graph/model.ts)
         |
         +-- parent_ids + refs -> stable lanes, path colors, ref-only rows
         +-- local Git snapshot -> equivalent git graph-prefix layout
@@ -70,14 +75,14 @@ CloudHistorySection
 
 ### Delivered invariants (Implemented)
 
-1. The graph response carries `parent_ids`, branch/tag `refs`,
-   `next_cursor`, and `has_more`. Commits reachable only from a named ref are
+1. The graph response carries `parent_ids`, branch/tag `refs`, `snapshot_id`,
+   `next_cursor`, `has_more`, and graph health. Commits reachable only from a named ref are
    decoded from the canonical Git object store and remain visible even when
    no transaction-history row exists for them.
 2. `order=topo` is an explicit graph-read mode. The legacy linear
    `since_commit_id` catch-up contract remains unchanged for WebSocket and
    existing web clients.
-3. Lane assignment lives in `src/features/cloud/model.ts`; JSX only draws
+3. Lane assignment lives in `src/features/cloud/graph/model.ts`; JSX only draws
    segments. Active ancestry survives page boundaries, so appending an older
    page cannot reorder or recolor already-rendered commit rows.
 4. Cloud → History is a two-pane surface with HEAD selected by default,
@@ -86,6 +91,33 @@ CloudHistorySection
 5. History commit rows are uniformly 42px. Git continuation prefixes are
    folded into the owning row's SVG, rails remain continuous through hover
    and selection, and lane reuse receives a new path color.
+6. The first page resolves main and named refs in one PostgreSQL MVCC snapshot.
+   Continuation cursors are signed, project-bound, and carry the immutable
+   ordered root set, so ref movement cannot reorder, duplicate, or omit pages.
+   Continuation responses omit repeated refs (`refs_included=false`); clients
+   retain the first page's labels for that `snapshot_id`.
+7. Legacy linear catch-up never depends on `version_refs`. A named-ref control
+   plane outage fails the all-branch graph closed without taking down existing
+   linear consumers.
+8. Missing/corrupt Git objects preserve healthy history and surface
+   `graph_health=degraded`; they are not indistinguishable from ordinary
+   pagination overflow.
+
+### Module ownership (Implemented)
+
+- Backend `read/history_graph.py` owns graph orchestration and traversal;
+  `history_cursor.py`, `history_cache.py`, and `history_models.py` own their
+  narrow policies. `read/admin.py` remains the legacy history/content/diff
+  facade, and the HTTP router contains no ref-merging logic.
+- Desktop `features/cloud/history/` owns data lifecycle, controller, pagination
+  invariants, sidebar, detail, SVG, and styles. `pagination.ts` is pure policy;
+  the React hook only owns request lifecycle. `features/cloud/graph/model.ts` is its small public
+  adapter; `cloudTopology.ts`, `gitTopology.ts`, and `shared.ts` isolate the
+  Cloud DAG, local Git-prefix, and ref-presentation policies shared by History
+  and Branches. `lib/cloudHistoryApi.ts` validates and normalizes untrusted API
+  responses before feature code sees them, retaining an explicit
+  `topology_available` compatibility bit instead of conflating missing ancestry
+  with a root commit.
 
 ### Backend facts this contract builds on (Implemented)
 
@@ -123,7 +155,7 @@ The same three-layer rule from `cloud-branch-graph-layout.md` applies:
 1. **Topology source** — the server owns commit ancestry and refs. The
    renderer must not infer topology from commit messages, timestamps, or
    React state.
-2. **View model** — `src/features/cloud/model.ts` converts ancestry + refs
+2. **View model** — `src/features/cloud/graph/model.ts` converts ancestry + refs
    into lanes, segments, ref markers, and labels. Lane assignment for
    Cloud history derives from `parent_ids` server data (or a
    server-provided graph prefix); it never guesses.
@@ -179,6 +211,19 @@ argument.
 - Local Source Control sidebar history keeps its linear current-branch
   presentation.
 
+## Evolution seams
+
+- If server build telemetry shows the bounded on-demand traversal no longer
+  meets the History latency objective, a materialized commit-graph index can be
+  introduced behind `HistoryGraphService`; the HTTP schema, signed snapshot
+  cursor, and Desktop data layer do not change.
+- If users routinely retain thousands of loaded rows, windowing belongs inside
+  `CloudProjectHistorySidebar`. Stable row IDs and the pure graph model let that
+  renderer change without moving selection, paging, or topology into JSX.
+- Author/message search is a separate server read-model query. It must return
+  ancestry/ref context for its result window rather than filtering the loaded
+  client page and pretending the resulting gaps are a complete graph.
+
 ## Invariants
 
 - Cloud History topology comes from server-provided ancestry and refs (or,
@@ -191,3 +236,8 @@ argument.
 - Commit rows are the only interactive rows.
 - The commit list and the detail pane always agree on the selected commit.
 - Pagination never re-orders previously rendered rows.
+- Every continuation page has the same `snapshot_id`; a client MUST discard and
+  refresh a mismatched page rather than merge snapshots.
+- Graph cache memory is bounded by retained node-container weight and TTL, not
+  only by a count of repository keys. Concurrent misses for one snapshot share
+  one build.

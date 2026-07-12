@@ -1,0 +1,55 @@
+@container desktop-agent (max-width: 759px) {
+  .desktop-agent-picker.is-model .desktop-agent-picker-trigger { max-width: 142px; }
+}
+
+@container desktop-agent (max-width: 559px) {
+  .desktop-agent-transcript { padding-top: 10px; }
+  .desktop-agent-picker.is-provider .desktop-agent-picker-trigger { max-width: 82px; }
+  .desktop-agent-picker.is-model .desktop-agent-picker-trigger { max-width: 108px; }
+  .desktop-agent-history-menu { width: calc(100cqw - 12px); }
+  .desktop-agent-readiness { grid-template-columns: auto minmax(0, 1fr); }
+  .desktop-agent-readiness > button { grid-column: 2; justify-self: start; }
+}
+
+@container desktop-agent (max-width: 419px) {
+  .desktop-agent-panel { --agent-page-gutter: 7px; --agent-composer-gutter: 7px; --agent-radius-composer: 21px; }
+  .desktop-agent-session-header { top: 7px; right: 7px; }
+  .desktop-agent-transcript { padding-top: 8px; padding-bottom: 24px; }
+  .desktop-agent-message.is-assistant { padding-inline: 9px; }
+  .desktop-agent-picker-popover { right: -32px; width: calc(100cqw - 14px); }
+  .desktop-agent-composer { padding-left: 5px; }
+  .desktop-agent-composer-row { gap: 4px; }
+  .desktop-agent-picker.is-provider .desktop-agent-picker-trigger { max-width: 68px; }
+  .desktop-agent-picker.is-model .desktop-agent-picker-trigger { max-width: 88px; }
+  .desktop-agent-readiness { grid-template-columns: auto minmax(0, 1fr); }
+  .desktop-agent-readiness > button { grid-column: 2; justify-self: start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-agent-stream-caret,
+  .desktop-agent-spin,
+  .desktop-agent-virtual-row.is-new > *,
+  .desktop-agent-tool-branch { animation: none; }
+  .desktop-agent-virtual-row { will-change: auto; }
+  .desktop-agent-activity-summary svg:last-child,
+  .desktop-agent-message-actions,
+  .desktop-agent-composer,
+  .desktop-agent-composer-action,
+  .desktop-agent-picker-trigger svg { transition: none; }
+  .desktop-agent-tool-chevron { transition: none; }
+  .desktop-agent-picker-popover { animation: none; }
+}
+
+/* Deterministic local QA route; dynamically imported and absent from app flow. */
+.desktop-agent-visual-smoke {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  align-items: stretch;
+  justify-content: center;
+  background: var(--po-canvas);
+}
+
+.desktop-agent-visual-smoke > .desktop-agent-panel { width: min(100%, 760px); }

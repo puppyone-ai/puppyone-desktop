@@ -1,17 +1,31 @@
 /** @vitest-environment happy-dom */
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { bench, describe } from "vitest";
 import { AgentTranscript } from "../../src/features/desktop-agent/ui/AgentTranscript";
+import { SafeMarkdown } from "../../src/features/desktop-agent/ui/SafeMarkdown";
+import {
+  AgentPickerPopover,
+  agentPickerLimits,
+  type AgentPickerGroup,
+} from "../../src/features/desktop-agent/ui/AgentPickerPopover";
+import { AgentCommandActivity } from "../../src/features/desktop-agent/ui/activity/AgentCommandActivity";
+import { AgentFileChangeActivity } from "../../src/features/desktop-agent/ui/activity/AgentFileChangeActivity";
 import { applyAgentEvent, applyAgentEvents, createAgentProjection } from "../../src/features/desktop-agent/agentProjection";
 import type { AgentEvent } from "../../src/features/desktop-agent/agentTypes";
+import type { AgentActivity } from "../../src/features/desktop-agent/domain/agent-projection-types";
 
 // Long enough to make this product-critical signal useful in CI while keeping
 // the complete performance suite practical on release runners.
 const OPTIONS = { iterations: 5, time: 750, warmupIterations: 2, warmupTime: 150 };
+const HEAVY_UI_OPTIONS = { iterations: 3, time: 500, warmupIterations: 1, warmupTime: 100 };
 const recordedEvents = createRecordedEvents(1_000);
 const projection = applyAgentEvents(createAgentProjection(), recordedEvents);
+const largeMarkdown = createLargeMarkdown(128 * 1024);
+const pickerGroups = createPickerGroups(500);
+const commandActivity = createCommandActivity();
+const fileChangeActivity = createFileChangeActivity();
 
 describe("Desktop Agent long-session projection", () => {
   bench("4,000 normalized events -> 2,000 stable message rows", () => {
@@ -34,6 +48,108 @@ describe("Desktop Agent virtual timeline", () => {
     parent.remove();
   }, OPTIONS);
 });
+
+describe("Desktop Agent bounded heavy content", () => {
+  bench("mount and dispose 128 KiB of safe Markdown", () => {
+    withMounted(createElement(SafeMarkdown, { text: largeMarkdown }), (parent) => {
+      if (!parent.querySelector(".desktop-agent-markdown")) throw new Error("Markdown surface did not mount.");
+    });
+  }, HEAVY_UI_OPTIONS);
+
+  bench("expand a bounded 64 KiB command output and 240-line diff", () => {
+    withMounted(createElement("div", null,
+      createElement(AgentCommandActivity, { activity: commandActivity }),
+      createElement(AgentFileChangeActivity, { activity: fileChangeActivity }),
+    ), (parent) => {
+      const rows = parent.querySelectorAll<HTMLButtonElement>(".desktop-agent-tool-row");
+      flushSync(() => rows.forEach((row) => row.click()));
+      if (!parent.querySelector(".desktop-agent-command-output")) throw new Error("Command output did not expand.");
+      if (parent.querySelectorAll(".desktop-agent-diff-line").length !== 240) throw new Error("Diff rendering bound regressed.");
+    });
+  }, HEAVY_UI_OPTIONS);
+
+  bench("open a 500-model searchable picker with bounded mounted options", () => {
+    withMounted(createElement(AgentPickerPopover, {
+      ariaLabel: "Agent model",
+      placeholder: "Choose model",
+      groups: pickerGroups,
+      onSelect: () => {},
+    }), (parent) => {
+      const trigger = parent.querySelector<HTMLButtonElement>('[aria-label="Agent model"]');
+      if (!trigger) throw new Error("Model picker trigger did not mount.");
+      flushSync(() => trigger.click());
+      const optionCount = parent.querySelectorAll('[role="option"]').length;
+      if (optionCount > agentPickerLimits.maxRenderedOptions) throw new Error("Model picker DOM budget regressed.");
+    });
+  }, HEAVY_UI_OPTIONS);
+});
+
+function withMounted(node: ReactNode, inspect: (parent: HTMLElement) => void) {
+  const parent = document.createElement("div");
+  document.body.appendChild(parent);
+  const root = createRoot(parent);
+  try {
+    flushSync(() => root.render(node));
+    inspect(parent);
+  } finally {
+    flushSync(() => root.unmount());
+    parent.remove();
+  }
+}
+
+function createLargeMarkdown(size: number) {
+  const paragraph = "## Architecture boundary\n\n- **Safe** rendering with `bounded` content and [documentation](https://example.com).\n\n";
+  return paragraph.repeat(Math.ceil(size / paragraph.length)).slice(0, size);
+}
+
+function createPickerGroups(count: number): AgentPickerGroup[] {
+  return [{
+    id: "models",
+    label: "Connected models",
+    options: Array.from({ length: count }, (_, index) => ({
+      id: `provider/model-${index}`,
+      label: `Model ${index}`,
+      description: `Connected provider model ${index}`,
+      keywords: `model ${index}`,
+      selectable: true,
+      kind: "model" as const,
+    })),
+  }];
+}
+
+function createCommandActivity(): AgentActivity {
+  return {
+    id: "command-benchmark",
+    turnId: "turn-benchmark",
+    itemId: "command",
+    kind: "command",
+    label: "Run benchmark",
+    status: "completed",
+    detail: { tool: "bash", command: "npm test", metadata: { exitCode: 0, duration: 900 } },
+    output: "command output line\n".repeat(4_000).slice(0, 64 * 1024),
+    sequence: 1,
+  };
+}
+
+function createFileChangeActivity(): AgentActivity {
+  const diff = Array.from({ length: 240 }, (_, index) => `${index % 2 ? "+" : "-"}line ${index}`).join("\n");
+  return {
+    id: "file-change-benchmark",
+    turnId: "turn-benchmark",
+    itemId: "edit",
+    kind: "file-change",
+    label: "Edit benchmark.ts",
+    status: "completed",
+    detail: {
+      tool: "edit",
+      path: "src/benchmark.ts",
+      changes: [{ path: "src/benchmark.ts", additions: 120, deletions: 120 }],
+      diff,
+    },
+    output: "",
+    sequence: 2,
+  };
+}
 
 function createRecordedEvents(turns: number): AgentEvent[] {
   const events: AgentEvent[] = [];

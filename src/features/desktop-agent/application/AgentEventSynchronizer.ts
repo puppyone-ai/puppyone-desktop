@@ -3,8 +3,8 @@ import type { AgentEvent, AgentSessionMetadata } from "../domain/agent-contract"
 import type { AgentControllerState } from "./agent-controller-state";
 import { phaseForProjection } from "./agent-controller-state";
 import { formatAgentError } from "./agent-error";
+import type { AgentClientPort, AgentClientProvider } from "./AgentClientPort";
 
-type AgentBridge = NonNullable<Window["puppyoneDesktop"]>;
 type StatePatch = (patch: Partial<AgentControllerState>) => void;
 
 const STREAM_BATCH_MS = 32;
@@ -13,21 +13,23 @@ const MAX_BUFFERED_EVENTS = 2_000;
 export class AgentEventSynchronizer {
   private eventCleanup: (() => void) | null = null;
   private exitCleanup: (() => void) | null = null;
-  private connectedBridge: AgentBridge | null = null;
+  private connectedBridge: AgentClientPort | null = null;
   private bufferedEvents: AgentEvent[] = [];
   private bufferedSequences = new Set<number>();
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private replayPromise: Promise<void> | null = null;
+  private disposed = false;
 
   constructor(
     private readonly workspaceRoot: string,
-    private readonly bridgeProvider: () => AgentBridge | undefined,
+    private readonly bridgeProvider: AgentClientProvider,
     private readonly readState: () => AgentControllerState,
     private readonly patch: StatePatch,
     private readonly onTurnReady: () => void,
   ) {}
 
   connect() {
+    if (this.disposed) return;
     const bridge = this.bridgeProvider();
     if (!bridge || bridge === this.connectedBridge) return;
     this.eventCleanup?.();
@@ -38,6 +40,8 @@ export class AgentEventSynchronizer {
   }
 
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     this.eventCleanup?.();
     this.exitCleanup?.();
     this.eventCleanup = null;
@@ -50,6 +54,7 @@ export class AgentEventSynchronizer {
   }
 
   flush() {
+    if (this.disposed) return;
     if (this.flushTimer) clearTimeout(this.flushTimer);
     this.flushTimer = null;
     if (this.bufferedEvents.length === 0) return;
@@ -87,10 +92,12 @@ export class AgentEventSynchronizer {
   }
 
   repairFrom(afterSequence: number) {
+    if (this.disposed) return Promise.resolve();
     return this.replayFrom(afterSequence);
   }
 
   private enqueue(event: AgentEvent) {
+    if (this.disposed) return;
     const state = this.readState();
     if (event.sessionId !== state.session?.id) return;
     if (event.sequence <= state.projection.lastSequence) return;
@@ -110,6 +117,7 @@ export class AgentEventSynchronizer {
   }
 
   private handleSessionExit(event: { sessionId: string; reason: string }) {
+    if (this.disposed) return;
     const state = this.readState();
     if (event.sessionId !== state.session?.id || event.reason !== "provider-exited") return;
     this.flush();
@@ -139,6 +147,7 @@ export class AgentEventSynchronizer {
   }
 
   private replayFrom(afterSequence: number) {
+    if (this.disposed) return Promise.resolve();
     if (this.replayPromise) return this.replayPromise;
     const sessionId = this.readState().session?.id;
     const bridge = this.bridgeProvider();
@@ -148,6 +157,7 @@ export class AgentEventSynchronizer {
         let cursor = afterSequence;
         for (let attempt = 0; attempt < 3; attempt += 1) {
           const snapshot = await bridge.replayAgentSession({ rootPath: this.workspaceRoot, sessionId, afterSequence: cursor });
+          if (this.disposed) return;
           const state = this.readState();
           if (state.session?.id !== sessionId) return;
           let projection = applyAgentEvents(state.projection, snapshot.events, { partialHistory: snapshot.partial });
@@ -176,7 +186,7 @@ export class AgentEventSynchronizer {
         }
         this.patch({ error: "Part of the live Agent event stream could not be repaired. Refresh to replay saved history." });
       } catch (error) {
-        this.patch({ error: formatAgentError(error) });
+        if (!this.disposed) this.patch({ error: formatAgentError(error) });
       }
     })().finally(() => { this.replayPromise = null; });
     return this.replayPromise;

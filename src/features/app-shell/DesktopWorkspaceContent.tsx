@@ -37,8 +37,7 @@ import {
 } from "../cloud/attachment";
 import { useDesktopCloudAccessData } from "../cloud/data/useDesktopCloudAccessData";
 import { shouldLoadDesktopCloudAccessData } from "../cloud/data/shouldLoadDesktopCloudAccessData";
-import { useCloudBranchesData } from "../cloud/data/useCloudBranchesData";
-import { buildCloudBranchGraphRows } from "../cloud/model";
+import { useCloudHistoryController } from "../cloud/history/useCloudHistoryController";
 import { isCloudAccessNavigationResource } from "../cloud/sections/access/accessRows";
 import { getGitHostingMode } from "../source-control/viewModel";
 import type { DesktopView } from "../../components/DesktopCloudShell";
@@ -109,9 +108,11 @@ type DesktopWorkspaceContentProps = {
     enabled: boolean;
     projectId: string | null;
     selectedProjectId?: string | null;
+    selectedProjectCapabilities?: readonly string[];
     sessionRestoring: boolean;
     onCloudSessionChange: (session: DesktopCloudSession | null) => void;
-    onConfigureCloudRemote: (remoteUrl: string, projectId?: string | null) => Promise<GitStatusSnapshot | null>;
+    onConfigureCloudRemote: import("../cloud/types").CloudServiceMainViewProps["onConfigureCloudRemote"];
+    onDetachCloudProject?: () => Promise<void>;
     onOpenDetails: () => void;
     onOpenGitSettings: () => void;
     onSelectProjectId?: (projectId: string | null) => void;
@@ -222,9 +223,8 @@ export function DesktopWorkspaceContent({
   const [activeCloudAccessRowId, setActiveCloudAccessRowId] = useState<string | null>(null);
   const [activeAutomationProvider, setActiveAutomationProvider] = useState<string | null>(null);
   const [activePluginsSection, setActivePluginsSection] = useState<PluginsSection>(DEFAULT_PLUGINS_SECTION);
-  const [selectedCloudHistoryCommitId, setSelectedCloudHistoryCommitId] = useState<string | null>(null);
   const cloudHistoryActive = cloudWorkspace && resolvedActiveView === "git";
-  const cloudHistoryData = useCloudBranchesData({
+  const cloudHistory = useCloudHistoryController({
     session: cloud.cloudSession,
     projectId: cloud.projectId,
     apiBaseUrl: cloud.cloudApiBaseUrl,
@@ -232,25 +232,6 @@ export function DesktopWorkspaceContent({
     revisionKey: String(workspaceRefreshToken),
     onSessionChange: cloud.onCloudSessionChange,
   });
-  const cloudHistoryRows = useMemo(
-    () => buildCloudBranchGraphRows({ history: cloudHistoryData.history }),
-    [cloudHistoryData.history],
-  );
-
-  useEffect(() => {
-    if (!cloudHistoryActive) {
-      setSelectedCloudHistoryCommitId(null);
-      return;
-    }
-
-    const commitRows = cloudHistoryRows.filter((row) => row.kind === "commit");
-    const headCommitId = cloudHistoryData.history?.head_commit_id ?? null;
-    setSelectedCloudHistoryCommitId((current) => {
-      if (current && commitRows.some((row) => row.id === current)) return current;
-      if (headCommitId && commitRows.some((row) => row.id === headCommitId)) return headCommitId;
-      return commitRows[0]?.id ?? null;
-    });
-  }, [cloudHistoryActive, cloudHistoryData.history?.head_commit_id, cloudHistoryRows]);
 
   useEffect(() => {
     const accessRows = cloudAccessData.accessRows.filter(isCloudAccessNavigationResource);
@@ -449,16 +430,17 @@ export function DesktopWorkspaceContent({
     <CloudProjectHistoryView
       projectId={cloud.projectId}
       projectName={workspace.name}
-      history={cloudHistoryData.history}
-      rows={cloudHistoryRows}
-      selectedCommitId={selectedCloudHistoryCommitId}
-      loading={cloudHistoryData.loading}
-      loadingMore={cloudHistoryData.loadingMore}
-      hasMore={cloudHistoryData.hasMore}
-      error={cloudHistoryData.error}
-      onSelectCommit={setSelectedCloudHistoryCommitId}
-      onRefresh={cloudHistoryData.reload}
-      onLoadMore={cloudHistoryData.loadMore}
+      history={cloudHistory.history}
+      rows={cloudHistory.rows}
+      selectedCommitId={cloudHistory.selectedCommitId}
+      loading={cloudHistory.loading}
+      loadingMore={cloudHistory.loadingMore}
+      hasMore={cloudHistory.hasMore}
+      error={cloudHistory.error}
+      warning={cloudHistory.warning}
+      onSelectCommit={cloudHistory.selectCommit}
+      onRefresh={cloudHistory.reload}
+      onLoadMore={cloudHistory.loadMore}
     />
   );
 
@@ -480,6 +462,7 @@ export function DesktopWorkspaceContent({
       cloudBackupError={cloud.backupError}
       onStartPuppyoneBackup={cloud.onStartPuppyoneBackup}
       onConfigureCloudRemote={cloud.onConfigureCloudRemote}
+      onDetachCloudProject={cloud.onDetachCloudProject}
       onSelectProjectId={cloud.onSelectProjectId}
       onSelectSection={cloud.onSelectSection}
       onRefresh={git.refreshGitStatus}
@@ -698,15 +681,16 @@ export function DesktopWorkspaceContent({
               />
             ) : resolvedActiveView === "git" && cloudWorkspace ? (
               <CloudProjectHistorySidebar
-                rows={cloudHistoryRows}
-                selectedCommitId={selectedCloudHistoryCommitId}
-                loading={cloudHistoryData.loading}
-                loadingMore={cloudHistoryData.loadingMore}
-                hasMore={cloudHistoryData.hasMore}
-                error={cloudHistoryData.error}
-                onSelectCommit={setSelectedCloudHistoryCommitId}
-                onRefresh={cloudHistoryData.reload}
-                onLoadMore={cloudHistoryData.loadMore}
+                rows={cloudHistory.rows}
+                selectedCommitId={cloudHistory.selectedCommitId}
+                loading={cloudHistory.loading}
+                loadingMore={cloudHistory.loadingMore}
+                hasMore={cloudHistory.hasMore}
+                error={cloudHistory.error}
+                warning={cloudHistory.warning}
+                onSelectCommit={cloudHistory.selectCommit}
+                onRefresh={cloudHistory.reload}
+                onLoadMore={cloudHistory.loadMore}
               />
             ) : resolvedActiveView === "git" ? (
               <GitSidebar
@@ -748,6 +732,11 @@ export function DesktopWorkspaceContent({
                 activeSection={cloud.activeSection}
                 projectContext={cloudNavigationContext.projectContext}
                 projectBound={cloudNavigationContext.projectBound && !cloudWorkspace}
+                projectCapabilities={
+                  attachment.status === "linked"
+                    ? attachment.capabilities ?? []
+                    : cloud.selectedProjectCapabilities ?? []
+                }
                 onSelectSection={cloud.onSelectSection}
                 onBackToProjects={cloud.onBackToCloudProjects ?? (() => {
                   cloud.onSelectSection("overview");

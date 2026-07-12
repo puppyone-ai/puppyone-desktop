@@ -6,6 +6,11 @@ import type { CloudWorkspaceSection } from "./routes/cloudRouteIds";
 
 export type { CloudWorkspaceSection } from "./routes/cloudRouteIds";
 
+export type CloudWorkspaceAttachOptions = {
+  bindingKind?: "full" | "scoped";
+  scopeId?: string | null;
+};
+
 export type CloudServiceSidebarProps = {
   status: GitStatusSnapshot | null;
   cloudSession: DesktopCloudSession | null;
@@ -15,6 +20,7 @@ export type CloudServiceSidebarProps = {
   projectContext?: boolean;
   /** True only when this project is structurally bound to the local workspace. */
   projectBound?: boolean;
+  projectCapabilities?: readonly string[];
   onSelectSection: (section: CloudWorkspaceSection) => void;
   /** Clear browsing selection and return to the Cloud Projects list. */
   onBackToProjects?: () => void;
@@ -50,7 +56,12 @@ export type CloudServiceMainViewProps = {
   cloudBackupLoading: boolean;
   cloudBackupError: string | null;
   onStartPuppyoneBackup: () => void;
-  onConfigureCloudRemote: (remoteUrl: string, projectId?: string | null) => Promise<GitStatusSnapshot | null>;
+  onConfigureCloudRemote: (
+    remoteUrl: string,
+    projectId?: string | null,
+    options?: CloudWorkspaceAttachOptions,
+  ) => Promise<GitStatusSnapshot | null>;
+  onDetachCloudProject?: () => Promise<void>;
   onSelectProjectId?: (projectId: string | null) => void;
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onRefresh: () => void;

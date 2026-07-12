@@ -29,6 +29,10 @@ import {
 import { useDesktopCloudAccessData } from "../src/features/cloud/data/useDesktopCloudAccessData";
 import { resolveCloudEnvironment, type CloudEnvironment } from "../src/features/cloud/environment";
 import type { DesktopCloudScope, DesktopCloudSession } from "../src/lib/cloudApi";
+import type {
+  DesktopCloudHistory,
+  DesktopCloudHistoryCommit,
+} from "../src/lib/cloudHistoryApi";
 import type { GitStatusSnapshot } from "../src/types/electron";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -39,24 +43,72 @@ const listCloudScopes = vi.fn();
 const listCloudConnectors = vi.fn();
 const listCloudMcpEndpoints = vi.fn();
 const getCloudRepoIdentity = vi.fn();
+const getCloudProjectReadiness = vi.fn().mockResolvedValue({
+  project_id: "proj-1",
+  git: { root_scope_id: null, root_surface_exists: false, root_head_exists: false, root_git_push_accepted: false, default_branch: "main", state: "git_not_created" },
+  claude: { ready: false, blockers: ["root_git_surface_missing", "root_head_missing", "root_git_push_not_accepted"] },
+});
 const getCloudDashboard = vi.fn();
 const listCloudRoot = vi.fn();
 const listCloudProjects = vi.fn();
+
+function historyPage(overrides: Partial<DesktopCloudHistory> = {}): DesktopCloudHistory {
+  return {
+    project_id: "proj-1",
+    commits: [],
+    topology_available: true,
+    head_commit_id: null,
+    refs: [],
+    refs_included: true,
+    snapshot_id: "history-snapshot".padEnd(64, "0"),
+    next_cursor: null,
+    has_more: false,
+    total: 0,
+    graph_health: "complete",
+    unreadable_commit_ids: [],
+    ...overrides,
+  };
+}
+
+function historyCommit(
+  overrides: Pick<DesktopCloudHistoryCommit, "commit_id" | "parent_ids"> & Partial<DesktopCloudHistoryCommit>,
+): DesktopCloudHistoryCommit {
+  return {
+    who: "Cloud Author",
+    message: "Update workspace",
+    changes: [],
+    conflicts: [],
+    root_hash: "",
+    scope_hash: "",
+    scope_path: "",
+    created_at: null,
+    audit_detail: null,
+    ...overrides,
+  };
+}
 
 vi.mock("../src/lib/cloudApi", async () => {
   const actual = await vi.importActual<typeof import("../src/lib/cloudApi")>("../src/lib/cloudApi");
   return {
     ...actual,
-    getCloudHistory: (...args: unknown[]) => getCloudHistory(...args),
     listCloudAutomationProviderSpecs: (...args: unknown[]) => listCloudAutomationProviderSpecs(...args),
     listCloudScopes: (...args: unknown[]) => listCloudScopes(...args),
     listCloudConnectors: (...args: unknown[]) => listCloudConnectors(...args),
     listCloudMcpEndpoints: (...args: unknown[]) => listCloudMcpEndpoints(...args),
     getCloudRepoIdentity: (...args: unknown[]) => getCloudRepoIdentity(...args),
+    getCloudProjectReadiness: (...args: unknown[]) => getCloudProjectReadiness(...args),
     getCloudDashboard: (...args: unknown[]) => getCloudDashboard(...args),
     listCloudRoot: (...args: unknown[]) => listCloudRoot(...args),
     listCloudProjects: (...args: unknown[]) => listCloudProjects(...args),
     openCloudApp: vi.fn(),
+  };
+});
+
+vi.mock("../src/lib/cloudHistoryApi", async () => {
+  const actual = await vi.importActual<typeof import("../src/lib/cloudHistoryApi")>("../src/lib/cloudHistoryApi");
+  return {
+    ...actual,
+    getCloudHistory: (...args: unknown[]) => getCloudHistory(...args),
   };
 });
 
@@ -257,6 +309,7 @@ describe("CloudServiceSidebar project context", () => {
     expect(rows.map((row) => row.textContent)).toEqual([
       "Overview",
       "History",
+      "Claude",
       "Automation",
       "Access",
       "Settings",
@@ -266,7 +319,7 @@ describe("CloudServiceSidebar project context", () => {
     expect(rows.every((row) => !row.classList.contains("active"))).toBe(true);
 
     const lockedRows = rows;
-    expect(lockedRows).toHaveLength(7);
+    expect(lockedRows).toHaveLength(8);
     expect(lockedRows.every((row) => row.getAttribute("aria-disabled") === "true")).toBe(true);
     expect(container.querySelector(".desktop-cloud-sidebar-nav-lock")).toBeNull();
 
@@ -318,6 +371,39 @@ describe("CloudServiceSidebar project context", () => {
     expect(container.textContent).toContain("Team");
     expect(container.textContent).toContain("Billing");
     expect(container.querySelector(".desktop-cloud-sidebar-context-back")).toBeNull();
+  });
+
+  it("renders project-management navigation from server capabilities", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(
+      <CloudServiceSidebar
+        status={null}
+        cloudSession={session}
+        activeSection="contents"
+        projectContext
+        projectBound
+        projectCapabilities={["project.read", "agent.read"]}
+        onSelectSection={vi.fn()}
+      />,
+    ));
+    expect(container.textContent).toContain("Claude");
+    expect(container.textContent).not.toContain("Settings");
+
+    act(() => root?.render(
+      <CloudServiceSidebar
+        status={null}
+        cloudSession={session}
+        activeSection="contents"
+        projectContext
+        projectBound
+        projectCapabilities={["project.read", "agent.read", "project.settings.manage"]}
+        onSelectSection={vi.fn()}
+      />,
+    ));
+    expect(container.textContent).toContain("Settings");
   });
 
   it("back to Cloud Projects clears browse context via onBackToProjects", () => {
@@ -416,17 +502,16 @@ describe("Cloud History route", () => {
   it("renders the Cloud History route as a synchronized tree and detail pane", async () => {
     const head = "a".repeat(40);
     const parent = "b".repeat(40);
-    getCloudHistory.mockResolvedValue({
+    getCloudHistory.mockResolvedValue(historyPage({
       project_id: "proj-1",
       head_commit_id: head,
       refs: [{ ref_name: "refs/heads/main", ref_type: "branch", commit_id: head }],
       commits: [
-        { commit_id: head, parent_ids: [parent], message: "Head commit", who: "Ada", changes: [] },
-        { commit_id: parent, parent_ids: [], message: "Parent commit", who: "Lin", changes: [] },
+        historyCommit({ commit_id: head, parent_ids: [parent], message: "Head commit", who: "Ada" }),
+        historyCommit({ commit_id: parent, parent_ids: [], message: "Parent commit", who: "Lin" }),
       ],
-      has_more: false,
-      next_cursor: null,
-    });
+      total: 2,
+    }));
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -448,10 +533,10 @@ describe("Cloud History route", () => {
     expect(container.querySelector(".desktop-cloud-history-surface")).not.toBeNull();
     expect(container.querySelector(".desktop-cloud-history-sidebar")).not.toBeNull();
     expect(container.querySelector(".desktop-cloud-project-history-view")).not.toBeNull();
-    expect(container.querySelectorAll('[role="option"]')).toHaveLength(2);
+    expect(container.querySelectorAll('button[data-commit-id]')).toHaveLength(2);
     expect(container.querySelector("h1")?.textContent).toBe("Head commit");
 
-    const parentRow = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="option"]'))
+    const parentRow = Array.from(container.querySelectorAll<HTMLButtonElement>('button[data-commit-id]'))
       .find((row) => row.textContent?.includes("Parent commit"));
     await act(async () => parentRow?.click());
     expect(container.querySelector("h1")?.textContent).toBe("Parent commit");
@@ -461,22 +546,25 @@ describe("Cloud History route", () => {
     const head = "c".repeat(40);
     const parent = "d".repeat(40);
     getCloudHistory
-      .mockResolvedValueOnce({
+      .mockResolvedValueOnce(historyPage({
         project_id: "proj-1",
         head_commit_id: head,
         refs: [{ ref_name: "refs/heads/main", ref_type: "branch", commit_id: head }],
-        commits: [{ commit_id: head, parent_ids: [parent], message: "Head", changes: [] }],
+        commits: [historyCommit({ commit_id: head, parent_ids: [parent], message: "Head" })],
         has_more: true,
         next_cursor: head,
-      })
-      .mockResolvedValueOnce({
+        total: 2,
+      }))
+      .mockResolvedValueOnce(historyPage({
         project_id: "proj-1",
         head_commit_id: head,
-        refs: [{ ref_name: "refs/heads/main", ref_type: "branch", commit_id: head }],
-        commits: [{ commit_id: parent, parent_ids: [], message: "Parent", changes: [] }],
+        refs: [],
+        refs_included: false,
+        commits: [historyCommit({ commit_id: parent, parent_ids: [], message: "Parent" })],
         has_more: false,
         next_cursor: null,
-      });
+        total: 2,
+      }));
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -494,7 +582,7 @@ describe("Cloud History route", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    const selectedBefore = container.querySelector('[role="option"][aria-selected="true"]')?.textContent;
+    const selectedBefore = container.querySelector('button[data-commit-id][aria-current="true"]')?.textContent;
     const loadMore = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.includes("Load more"));
 
@@ -513,8 +601,8 @@ describe("Cloud History route", () => {
       "https://cloud.example",
       head,
     );
-    expect(container.querySelectorAll('[role="option"]')).toHaveLength(2);
-    expect(container.querySelector('[role="option"][aria-selected="true"]')?.textContent)
+    expect(container.querySelectorAll('button[data-commit-id]')).toHaveLength(2);
+    expect(container.querySelector('button[data-commit-id][aria-current="true"]')?.textContent)
       .toBe(selectedBefore);
   });
 });
@@ -522,7 +610,7 @@ describe("Cloud History route", () => {
 describe("CloudRouter browse context", () => {
   it("routes History for an explicitly browsed project without promoting it to a local binding", async () => {
     getCloudHistory.mockReset();
-    getCloudHistory.mockResolvedValue({ head_commit_id: null, commits: [] });
+    getCloudHistory.mockResolvedValue(historyPage({ project_id: "proj-browse" }));
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -765,7 +853,7 @@ describe("useDesktopCloudData request lifecycle", () => {
       project: { id: projectId, name: projectId === "proj-a" ? "Project A" : "Project B" },
     }));
     listCloudRoot.mockResolvedValue({ entries: [] });
-    getCloudHistory.mockResolvedValue({ head_commit_id: null, commits: [] });
+    getCloudHistory.mockResolvedValue(historyPage());
     listCloudScopes.mockResolvedValue([]);
     listCloudConnectors.mockResolvedValue([]);
     listCloudMcpEndpoints.mockResolvedValue([]);

@@ -144,6 +144,10 @@ sidebar gets another frame, so wheel and pointer input wait behind it.
   Links use the safe external-navigation path and raw HTML is not executed.
 - Code blocks have a language label and Copy action. Long blocks use internal overflow and a
   height cap; they do not widen the sidebar.
+- Projection bounds every user/assistant message to 128 KiB. Initial Markdown mounts at most
+  24 KiB and 240 blocks; a truthful `Show full response` disclosure retains access to the full
+  bounded response. The initial window preserves both the beginning and latest tail so long
+  streaming output cannot create a main-thread Long Task merely by becoming visible.
 - Message actions appear after the message settles: Copy is required; feedback actions are
   optional product features and must not shift the text when they appear.
 - Raw chain-of-thought is never shown. A provider-supplied reasoning summary is a separately
@@ -340,6 +344,9 @@ anchored listbox/popover so status, grouping, search and secondary text remain c
   values or local credential paths.
 - Model results are scoped to the selected Provider and limited to text-input, text-output,
   tool-capable, non-deprecated models. Image, embedding and TTS-only models are excluded.
+- Missing or unrecognized capability metadata fails closed; it is never interpreted as text +
+  tools support. The searchable catalog remains complete in memory while at most 120 option
+  rows are mounted. A 500-model catalog therefore stays searchable without a 500-row popover.
 - A selected route is rendered compactly in the composer. Long names ellipsize without
   shrinking Send or covering the textarea.
 
@@ -391,10 +398,29 @@ zero except an optional non-essential spinner replacement.
 - Use flattened stable rows, measurement cache and windowing. A 2,000-row transcript mounts at
   most 120 transcript rows.
 - Expanding a large command/tool card does not disable transcript virtualization.
+- Command output is capped at 64 KiB, inline diff presentation at 240 lines, message text at
+  128 KiB, and initial Markdown at 24 KiB/240 blocks. Session UI state uses a 100-session LRU
+  with 1,000 measurements per session. The follow-up queue accepts at most 20 prompts and
+  reports backpressure instead of silently dropping work.
 - Target production Electron scroll/input p95 is at most 16 ms with no interaction Long Task
   above 50 ms during steady streaming.
 - Provider discovery, executable probing, Markdown parser initialization and large output
   formatting never run synchronously on the sidebar input path.
+
+The serial happy-dom benchmark is a synchronous regression signal, not a substitute for the
+production Electron gate. Reference M2 Pro results captured 2026-07-12:
+
+| Scenario | mean | p99 | Structural bound |
+| --- | ---: | ---: | --- |
+| 4,000 events -> 2,000 rows | 2.17 ms | 2.77 ms | deterministic reducer |
+| steady delta at 2,000 rows | 0.45 ms | 0.83 ms | indexed update |
+| mount/dispose 2,000-row transcript | 4.45 ms | 9.59 ms | <=120 mounted rows |
+| initial 128 KiB Markdown response | 12.57 ms | 15.04 ms | 24 KiB/240 initial blocks |
+| expanded command + diff | 6.46 ms | 8.95 ms | 64 KiB + 240 lines |
+| open searchable 500-model picker | 16.44 ms | 33.08 ms | <=120 mounted options |
+
+Machine-readable evidence lives in
+`benchmarks/performance/baselines/issue-027-agent-chat-m2-pro-2026-07-12.json`.
 
 ## 16. Responsive and accessibility contract
 
@@ -408,7 +434,8 @@ zero except an optional non-essential spinner replacement.
 - Transcript uses normal document semantics; live announcements are throttled and do not read
   every streaming token.
 - Running/completed/failed state is conveyed through text or accessible description, not color
-  alone.
+  alone. Provider status strings normalize into a closed union; an unknown value renders a
+  neutral `Unknown status`, never a success checkmark.
 - Listboxes, dialogs and blocking docks follow expected focus order. Popovers are not focus
   traps; credential/setup dialogs are.
 - Screen readers receive the completed assistant chunk and blocking request, not command-output

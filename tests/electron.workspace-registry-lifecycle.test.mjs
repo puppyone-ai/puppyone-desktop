@@ -98,25 +98,41 @@ describe("workspace registry lifecycle", () => {
   });
 
   it("persists and clears the main-owned Cloud binding hint without granting renderer authority", async () => {
-    let cloudProjectId = "cloud-project-1";
+    let bindingEnabled = true;
     const store = createStore({
       resolveWorkspaceIdentity: async (folderPath) => ({
         canonicalPath: folderPath,
         workspaceInstanceId: "instance-cloud",
         fsIdentity: "fs:1:100",
         projectId: "project-identity",
-        cloudProjectId,
+        cloudProjectId: bindingEnabled ? "cloud-project-1" : null,
+        cloudBindingId: bindingEnabled ? "binding-1" : null,
+        cloudBindingOrigin: bindingEnabled ? "https://api.puppyone.ai" : null,
+        cloudBindingWorkspaceInstanceId: bindingEnabled ? "instance-cloud" : null,
+        hasPuppyoneCloudRemote: bindingEnabled,
       }),
     });
     const folder = path.join(root, "cloud-linked");
     await fs.promises.mkdir(folder);
 
     await store.rememberRecentWorkspacePath(folder);
-    expect((await store.getRecentWorkspacesResult()).items[0].workspace.cloudProjectId).toBe("cloud-project-1");
+    expect((await store.getRecentWorkspacesResult()).items[0].workspace).toMatchObject({
+      cloudProjectId: "cloud-project-1",
+      cloudBindingId: "binding-1",
+      cloudBindingOrigin: "https://api.puppyone.ai",
+      cloudBindingWorkspaceInstanceId: "instance-cloud",
+      hasPuppyoneCloudRemote: true,
+    });
 
-    cloudProjectId = null;
+    bindingEnabled = false;
     await store.rememberRecentWorkspacePath(folder);
-    expect((await store.getRecentWorkspacesResult()).items[0].workspace.cloudProjectId).toBeNull();
+    expect((await store.getRecentWorkspacesResult()).items[0].workspace).toMatchObject({
+      cloudProjectId: null,
+      cloudBindingId: null,
+      cloudBindingOrigin: null,
+      cloudBindingWorkspaceInstanceId: null,
+      hasPuppyoneCloudRemote: false,
+    });
   });
 
   it("quarantines corrupt JSON and reports a recoverable registry error", async () => {

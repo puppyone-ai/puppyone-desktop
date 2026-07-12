@@ -18,24 +18,18 @@ import {
   readApprovalDecisions,
   readNetworkApprovalContext,
   readProviderMessage,
+  normalizeAgentActivityStatus,
   readQuestions,
   readRecordArray,
   readString,
 } from "./agent-projection-readers";
+import { cloneAgentProjection, projectionIndexes } from "./agent-projection-indexes";
 
 export type * from "./agent-projection-types";
 
 const MAX_COMMAND_OUTPUT = 64 * 1024;
-const PROJECTION_INDEXES = Symbol("agentProjectionIndexes");
-
-type ProjectionIndexes = {
-  messages: Map<string, number>;
-  messagesByTurn: Map<string, number[]>;
-  activities: Map<string, number>;
-  turns: Map<string, number>;
-  parts: Map<string, number>;
-  rows: Map<string, number>;
-};
+const MAX_MESSAGE_TEXT = 128 * 1024;
+const MAX_ACTIVITY_TEXT = 64 * 1024;
 
 export function createAgentProjection(options: { partialHistory?: boolean } = {}): AgentProjection {
   return {
@@ -65,7 +59,7 @@ export function applyAgentEvents(
     .filter((event) => event.sequence > initial.lastSequence)
     .sort((left, right) => left.sequence - right.sequence);
   if (relevant.length === 0 && !options.partialHistory) return initial;
-  const next = cloneProjection(initial);
+  const next = cloneAgentProjection(initial);
   if (options.partialHistory) next.partialHistory = true;
   for (const event of relevant) {
     if (event.sequence <= next.lastSequence) continue;
@@ -77,7 +71,7 @@ export function applyAgentEvents(
 
 export function applyAgentEvent(previous: AgentProjection, event: AgentEvent): AgentProjection {
   if (event.sequence <= previous.lastSequence) return previous;
-  const next = cloneProjection(previous);
+  const next = cloneAgentProjection(previous);
   applyLegacyAgentEvent(next, event);
   projectTypedPart(next, event);
   return next;
@@ -108,7 +102,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
       next.sessionState = "active";
       next.runningTurnId = event.turnId;
       next.terminalState = null;
-      const prompt = readString(payload.prompt);
+      const prompt = readString(payload.prompt).slice(0, MAX_MESSAGE_TEXT);
       const indexes = projectionIndexes(next);
       const turnMessages = event.turnId ? indexes.messagesByTurn.get(event.turnId) ?? [] : [];
       if (prompt && !turnMessages.some((index) => next.messages[index]?.role === "user")) {
@@ -166,7 +160,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
       return upsertActivity(next, event, {
         kind,
         label: readString(payload.label) || defaultToolLabel(kind),
-        status: readString(payload.status) || (event.type === "tool.completed" ? "completed" : "running"),
+        status: normalizeAgentActivityStatus(payload.status, event.type === "tool.completed" ? "completed" : "running"),
         detail: payload,
       });
     }
@@ -202,11 +196,11 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
       return upsertActivity(next, event, {
         kind: "file-change",
         label: fileChangeLabel(payload),
-        status: readString(payload.status) || "running",
+        status: normalizeAgentActivityStatus(payload.status, "running"),
         detail: payload,
       });
     case "usage.updated":
-      next.usage = payload;
+      next.usage = pickUsage(payload);
       return next;
     case "approval.requested": {
       const requestId = readString(payload.requestId);
@@ -260,7 +254,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
       return upsertActivity(next, event, {
         kind: "tool",
         label: readString(payload.label) || "Agent activity",
-        status: readString(payload.status) || "running",
+        status: normalizeAgentActivityStatus(payload.status, "running"),
         detail: pickSafeActivityDetail(payload),
       });
     case "provider.warning":
@@ -272,7 +266,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
         kind: event.type === "provider.error" ? "error" : "warning",
         label: readProviderMessage(payload.message) || (event.type === "provider.error" ? "Provider error" : "Provider warning"),
         status: event.type === "provider.error" ? "failed" : "warning",
-        detail: payload,
+        detail: pickSafeActivityDetail(payload),
         output: "",
         sequence: event.sequence,
       };
@@ -304,7 +298,9 @@ function upsertAssistant(
     const existing = projection.messages[existingIndex];
     projection.messages[existingIndex] = {
       ...existing,
-      text: authoritative ? text : `${existing.text}${text}`,
+      text: authoritative
+        ? text.slice(0, MAX_MESSAGE_TEXT)
+        : appendBounded(existing.text, text, MAX_MESSAGE_TEXT),
       streaming,
       sequence: event.sequence,
     };
@@ -315,7 +311,7 @@ function upsertAssistant(
       role: "assistant",
       turnId: event.turnId,
       itemId: event.itemId,
-      text,
+      text: text.slice(0, MAX_MESSAGE_TEXT),
       streaming,
       terminalState: null,
       sequence: event.sequence,
@@ -337,6 +333,7 @@ function upsertActivity(
   const id = activityId(event);
   const indexes = projectionIndexes(projection);
   const existingIndex = indexes.activities.get(id);
+  const safeDetail = pickSafeActivityDetail(value.detail);
   if (existingIndex !== undefined) {
     const existing = projection.activities[existingIndex];
     let detail;
@@ -344,11 +341,15 @@ function upsertActivity(
       const field = options.appendDetailField;
       detail = {
         ...existing.detail,
-        ...value.detail,
-        [field]: `${readString(existing.detail[field])}${readString(value.detail[field])}`,
+        ...safeDetail,
+        [field]: appendBounded(
+          readString(existing.detail[field]),
+          readString(safeDetail[field]),
+          MAX_ACTIVITY_TEXT,
+        ),
       };
     } else {
-      detail = { ...existing.detail, ...value.detail };
+      detail = { ...existing.detail, ...safeDetail };
     }
     projection.activities[existingIndex] = {
       ...existing,
@@ -364,6 +365,7 @@ function upsertActivity(
       turnId: event.turnId,
       itemId: event.itemId,
       ...value,
+      detail: safeDetail,
       output: "",
       sequence: event.sequence,
     });
@@ -371,38 +373,16 @@ function upsertActivity(
   return projection;
 }
 
-function cloneProjection(value: AgentProjection): AgentProjection {
-  return {
-    ...value,
-    missingRanges: [...value.missingRanges],
-    messages: [...value.messages],
-    activities: [...value.activities],
-    approvals: [...value.approvals],
-    questions: [...value.questions],
-    turns: [...value.turns],
-    parts: [...value.parts],
-    rows: [...value.rows],
-  };
+function appendBounded(current: string, incoming: string, limit: number) {
+  const remaining = limit - current.length;
+  return remaining > 0 ? `${current}${incoming.slice(0, remaining)}` : current.slice(0, limit);
 }
 
-function projectionIndexes(projection: AgentProjection): ProjectionIndexes {
-  const holder = projection as AgentProjection & { [PROJECTION_INDEXES]?: ProjectionIndexes };
-  if (holder[PROJECTION_INDEXES]) return holder[PROJECTION_INDEXES];
-  const messagesByTurn = new Map<string, number[]>();
-  projection.messages.forEach((message, index) => {
-    if (message.turnId) messagesByTurn.set(message.turnId, [...(messagesByTurn.get(message.turnId) ?? []), index]);
-  });
-  const indexes: ProjectionIndexes = {
-    messages: new Map(projection.messages.map((message, index) => [message.id, index])),
-    messagesByTurn,
-    activities: new Map(projection.activities.map((activity, index) => [activity.id, index])),
-    turns: new Map(projection.turns.map((turn, index) => [turn.id, index])),
-    parts: new Map(projection.parts.map((part, index) => [part.id, index])),
-    rows: new Map(projection.rows.map((row, index) => [row.id, index])),
-  };
-  Object.defineProperty(holder, PROJECTION_INDEXES, { value: indexes, configurable: true });
-  return indexes;
-}
+export const agentProjectionLimits = Object.freeze({
+  maxMessageText: MAX_MESSAGE_TEXT,
+  maxCommandOutput: MAX_COMMAND_OUTPUT,
+  maxActivityText: MAX_ACTIVITY_TEXT,
+});
 
 function projectTypedPart(projection: AgentProjection, event: AgentEvent) {
   const turn = updateTurn(projection, event);

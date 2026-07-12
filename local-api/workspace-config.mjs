@@ -13,6 +13,7 @@ const DEFAULT_PUPPYONE_WORKSPACE_CONFIG = Object.freeze({
   version: 2,
   project: {
     id: null,
+    workspaceInstanceId: null,
   },
   sync: {
     sourceOfTruth: {
@@ -33,6 +34,8 @@ const DEFAULT_PUPPYONE_WORKSPACE_CONFIG = Object.freeze({
   },
   cloud: {
     projectId: null,
+    origin: null,
+    bindingId: null,
   },
 });
 
@@ -141,6 +144,8 @@ export async function regeneratePuppyoneWorkspaceProjectId(rootPath, options = {
     cloud: {
       ...current.cloud,
       projectId: options.preserveCloudBinding === true ? current.cloud.projectId : null,
+      origin: options.preserveCloudBinding === true ? current.cloud.origin : null,
+      bindingId: options.preserveCloudBinding === true ? current.cloud.bindingId : null,
     },
   });
 }
@@ -185,6 +190,7 @@ export function normalizePuppyoneWorkspaceConfig(value, options = {}) {
     project: {
       ...project,
       id: projectId,
+      workspaceInstanceId: normalizeWorkspaceInstanceId(project.workspaceInstanceId),
     },
     sync: {
       ...sync,
@@ -210,6 +216,8 @@ export function normalizePuppyoneWorkspaceConfig(value, options = {}) {
     cloud: {
       ...cloud,
       projectId: normalizeOptionalConfigText(cloud.projectId),
+      origin: normalizeCloudBindingOrigin(cloud.origin),
+      bindingId: normalizeOptionalConfigText(cloud.bindingId),
     },
     ...(updatedAt ? { updatedAt } : {}),
   };
@@ -222,6 +230,37 @@ function normalizeWorkspaceProjectId(value, { strict = false } = {}) {
   if (valid) return normalized.toLowerCase();
   if (strict || normalized) throw new Error("PuppyOne project.id must be a valid UUID.");
   return null;
+}
+
+function normalizeWorkspaceInstanceId(value) {
+  const normalized = normalizeOptionalConfigText(value);
+  if (!normalized) return null;
+  if (normalized.length < 16 || normalized.length > 200 || /\s/.test(normalized)) {
+    throw new Error("PuppyOne project.workspaceInstanceId is invalid.");
+  }
+  return normalized;
+}
+
+function normalizeCloudBindingOrigin(value) {
+  const normalized = normalizeOptionalConfigText(value);
+  if (!normalized) return null;
+  let parsed;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new Error("PuppyOne cloud.origin must be an HTTP(S) origin.");
+  }
+  if (
+    !["http:", "https:"].includes(parsed.protocol)
+    || parsed.username
+    || parsed.password
+    || parsed.pathname !== "/"
+    || parsed.search
+    || parsed.hash
+  ) {
+    throw new Error("PuppyOne cloud.origin must be an HTTP(S) origin.");
+  }
+  return parsed.origin.toLowerCase();
 }
 
 function normalizeBackendService(value) {

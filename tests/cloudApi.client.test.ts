@@ -8,7 +8,6 @@ import {
   cloudApiRequest,
   getCloudAutomationOauthAuthorizeUrl,
   getCloudAutomationOauthStatus,
-  getCloudHistory,
   getCloudProject,
   listCloudAutomationConnectionRuns,
   listCloudAutomationProviderResources,
@@ -17,6 +16,7 @@ import {
   updateCloudAutomationConnection,
   updateCloudAutomationTrigger,
 } from "../src/lib/cloudApi";
+import { getCloudHistory, normalizeCloudHistory } from "../src/lib/cloudHistoryApi";
 
 const API = "https://api.puppyone.ai/api/v1";
 const session = {
@@ -127,7 +127,19 @@ describe("cloud API client delegation", () => {
   });
 
   it("getCloudHistory requests the topological contract and forwards its cursor", async () => {
-    bridge.mockResolvedValue({ project_id: "a/b", commits: [] });
+    bridge.mockResolvedValue({
+      project_id: "a/b",
+      commits: [],
+      head_commit_id: null,
+      refs: [],
+      refs_included: false,
+      snapshot_id: "1".repeat(64),
+      next_cursor: null,
+      has_more: false,
+      total: 0,
+      graph_health: "complete",
+      unreadable_commit_ids: [],
+    });
     await getCloudHistory(session, "a/b", 80, undefined, API, "a".repeat(40));
     expect(bridge).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -135,6 +147,57 @@ describe("cloud API client delegation", () => {
         method: "GET",
       }),
     );
+  });
+
+  it("normalizes legacy optional fields at the API boundary and rejects malformed ancestry", () => {
+    const commitId = "b".repeat(40);
+    expect(normalizeCloudHistory({
+      project_id: "p1",
+      commits: [{ commit_id: commitId }],
+      head_commit_id: commitId,
+    })).toEqual(expect.objectContaining({
+      project_id: "p1",
+      topology_available: false,
+      refs: [],
+      has_more: false,
+      graph_health: "complete",
+      commits: [expect.objectContaining({ parent_ids: [], changes: [] })],
+    }));
+    expect(() => normalizeCloudHistory({
+      commits: [{ commit_id: commitId, parent_ids: ["not-a-commit"] }],
+    })).toThrow(/parent id is invalid/i);
+  });
+
+  it("fails closed on cross-project, topology-less, or inconsistent History pages", async () => {
+    const valid = {
+      project_id: "p1",
+      commits: [],
+      head_commit_id: null,
+      refs: [],
+      refs_included: true,
+      snapshot_id: "1".repeat(64),
+      next_cursor: null,
+      has_more: false,
+      total: 0,
+      graph_health: "complete",
+      unreadable_commit_ids: [],
+    };
+
+    bridge.mockResolvedValueOnce({ ...valid, project_id: "p2" });
+    await expect(getCloudHistory(session, "p1", 80, undefined, API))
+      .rejects.toThrow(/another project/i);
+
+    bridge.mockResolvedValueOnce({
+      ...valid,
+      commits: [{ commit_id: "a".repeat(40) }],
+      total: 1,
+    });
+    await expect(getCloudHistory(session, "p1", 80, undefined, API))
+      .rejects.toThrow(/does not include commit topology/i);
+
+    bridge.mockResolvedValueOnce({ ...valid, has_more: true });
+    await expect(getCloudHistory(session, "p1", 80, undefined, API))
+      .rejects.toThrow(/pagination state is inconsistent/i);
   });
 });
 

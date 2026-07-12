@@ -1,5 +1,5 @@
 import os from "node:os";
-import { JsonlRpcConnection } from "../../runtimes/codex/codex-jsonl-rpc-connection.mjs";
+import { JsonlRpcConnection } from "../../transports/jsonl-rpc-connection.mjs";
 import { assertExecutableIdentity } from "./executable-candidates.mjs";
 import { createProbeEnvironment, runBoundedProbeCommand } from "./bounded-probe-command.mjs";
 

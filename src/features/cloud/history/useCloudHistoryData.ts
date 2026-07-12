@@ -2,26 +2,31 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getCloudHistory,
   type DesktopCloudHistory,
-  type DesktopCloudSession,
-} from "../../../lib/cloudApi";
+} from "../../../lib/cloudHistoryApi";
+import type { DesktopCloudSession } from "../../../lib/cloudApi";
+import {
+  isHistorySnapshotRestartError,
+  mergeCloudHistoryPages,
+} from "./pagination";
 
-export type CloudBranchesDataState = {
+export type CloudHistoryDataState = {
   history: DesktopCloudHistory | null;
   loading: boolean;
   loadingMore: boolean;
   hasMore: boolean;
   error: string | null;
+  warning: string | null;
   reload: () => Promise<void>;
   loadMore: () => Promise<void>;
 };
 
-type CloudBranchesDataInternalState = Omit<CloudBranchesDataState, "reload" | "loadMore" | "hasMore"> & {
+type CloudHistoryDataInternalState = Omit<CloudHistoryDataState, "reload" | "loadMore" | "hasMore"> & {
   contextKey: string | null;
 };
 
 const CLOUD_HISTORY_PAGE_SIZE = 80;
 
-export function useCloudBranchesData({
+export function useCloudHistoryData({
   session,
   projectId,
   apiBaseUrl,
@@ -35,7 +40,7 @@ export function useCloudBranchesData({
   enabled?: boolean;
   revisionKey?: string | null;
   onSessionChange: (session: DesktopCloudSession | null) => void;
-}): CloudBranchesDataState {
+}): CloudHistoryDataState {
   const canLoad = enabled && Boolean(session && projectId);
   const contextKey = canLoad && session && projectId
     ? [
@@ -47,15 +52,22 @@ export function useCloudBranchesData({
         revisionKey ?? "mutable-latest",
       ].join("\n")
     : `disabled:${projectId ?? "none"}`;
-  const [state, setState] = useState<CloudBranchesDataInternalState>(() => createCloudBranchesDataState());
+  const [state, setState] = useState<CloudHistoryDataInternalState>(() => createCloudHistoryDataState());
   const activeRequestRef = useRef(0);
+  const loadMoreCursorRef = useRef<string | null>(null);
+  const sessionRef = useRef(session);
+  const onSessionChangeRef = useRef(onSessionChange);
+  sessionRef.current = session;
+  onSessionChangeRef.current = onSessionChange;
 
   const load = useCallback(async () => {
     const requestId = activeRequestRef.current + 1;
     activeRequestRef.current = requestId;
+    loadMoreCursorRef.current = null;
 
-    if (!canLoad || !session || !projectId) {
-      setState(createCloudBranchesDataState({ contextKey }));
+    const activeSession = sessionRef.current;
+    if (!canLoad || !activeSession || !projectId) {
+      setState(createCloudHistoryDataState({ contextKey }));
       return;
     }
 
@@ -66,8 +78,9 @@ export function useCloudBranchesData({
             loading: true,
             loadingMore: false,
             error: null,
+            warning: current.warning,
           }
-        : createCloudBranchesDataState({
+        : createCloudHistoryDataState({
             loading: true,
             contextKey,
           })
@@ -75,10 +88,10 @@ export function useCloudBranchesData({
 
     try {
       const history = await getCloudHistory(
-        session,
+        activeSession,
         projectId,
         CLOUD_HISTORY_PAGE_SIZE,
-        onSessionChange,
+        onSessionChangeRef.current,
         apiBaseUrl,
       );
       if (activeRequestRef.current !== requestId) return;
@@ -87,6 +100,7 @@ export function useCloudBranchesData({
         loading: false,
         loadingMore: false,
         error: null,
+        warning: getHistoryHealthWarning(history),
         contextKey,
       });
     } catch (error) {
@@ -96,24 +110,28 @@ export function useCloudBranchesData({
         loading: false,
         loadingMore: false,
         error: error instanceof Error ? error.message : "Unable to load branch history.",
+        warning: null,
         contextKey,
       }));
     }
-  }, [apiBaseUrl, canLoad, contextKey, onSessionChange, projectId, session]);
+  }, [apiBaseUrl, canLoad, contextKey, projectId]);
 
   const loadMore = useCallback(async () => {
     const currentHistory = state.contextKey === contextKey ? state.history : null;
     const cursor = currentHistory?.next_cursor ?? null;
+    const activeSession = sessionRef.current;
     if (
       !canLoad
-      || !session
+      || !activeSession
       || !projectId
       || state.loading
       || state.loadingMore
+      || loadMoreCursorRef.current
       || !currentHistory?.has_more
       || !cursor
     ) return;
 
+    loadMoreCursorRef.current = cursor;
     const requestId = activeRequestRef.current + 1;
     activeRequestRef.current = requestId;
     setState((current) => (
@@ -124,25 +142,32 @@ export function useCloudBranchesData({
 
     try {
       const nextPage = await getCloudHistory(
-        session,
+        activeSession,
         projectId,
         CLOUD_HISTORY_PAGE_SIZE,
-        onSessionChange,
+        onSessionChangeRef.current,
         apiBaseUrl,
         cursor,
       );
       if (activeRequestRef.current !== requestId) return;
+      const mergedHistory = mergeCloudHistoryPages(currentHistory, nextPage);
       setState((current) => {
         if (current.contextKey !== contextKey || !current.history) return current;
+        if (current.history.snapshot_id !== currentHistory.snapshot_id) return current;
         return {
           ...current,
-          history: mergeCloudHistoryPages(current.history, nextPage),
+          history: mergedHistory,
           loadingMore: false,
           error: null,
+          warning: getHistoryHealthWarning(mergedHistory),
         };
       });
     } catch (error) {
       if (activeRequestRef.current !== requestId) return;
+      if (isHistorySnapshotRestartError(error)) {
+        await load();
+        return;
+      }
       setState((current) => (
         current.contextKey === contextKey
           ? {
@@ -152,59 +177,62 @@ export function useCloudBranchesData({
             }
           : current
       ));
+    } finally {
+      if (loadMoreCursorRef.current === cursor) loadMoreCursorRef.current = null;
     }
   }, [
     apiBaseUrl,
     canLoad,
     contextKey,
-    onSessionChange,
     projectId,
-    session,
     state.contextKey,
     state.history,
     state.loading,
     state.loadingMore,
+    load,
   ]);
 
   useEffect(() => {
     void load();
     return () => {
       activeRequestRef.current += 1;
+      loadMoreCursorRef.current = null;
     };
-  }, [load, revisionKey]);
+  }, [load]);
 
   if (state.contextKey !== contextKey) {
     return {
-      ...toPublicCloudBranchesDataState(createCloudBranchesDataState({ loading: canLoad })),
+      ...toPublicCloudHistoryDataState(createCloudHistoryDataState({ loading: canLoad })),
       reload: load,
       loadMore,
     };
   }
 
   return {
-    ...toPublicCloudBranchesDataState(state),
+    ...toPublicCloudHistoryDataState(state),
     reload: load,
     loadMore,
   };
 }
 
-function createCloudBranchesDataState(
-  overrides: Partial<CloudBranchesDataInternalState> = {},
-): CloudBranchesDataInternalState {
+function createCloudHistoryDataState(
+  overrides: Partial<CloudHistoryDataInternalState> = {},
+): CloudHistoryDataInternalState {
   return {
     history: null,
     loading: false,
     loadingMore: false,
     error: null,
+    warning: null,
     contextKey: null,
     ...overrides,
   };
 }
 
-function toPublicCloudBranchesDataState({
+function toPublicCloudHistoryDataState({
   contextKey,
   ...publicState
-}: CloudBranchesDataInternalState): Omit<CloudBranchesDataState, "reload" | "loadMore"> {
+}: CloudHistoryDataInternalState): Omit<CloudHistoryDataState, "reload" | "loadMore"> {
   void contextKey;
   return {
     ...publicState,
@@ -212,24 +240,10 @@ function toPublicCloudBranchesDataState({
   };
 }
 
-export function mergeCloudHistoryPages(
-  current: DesktopCloudHistory,
-  nextPage: DesktopCloudHistory,
-): DesktopCloudHistory {
-  const commitsById = new Map(current.commits.map((commit) => [commit.commit_id, commit]));
-  for (const commit of nextPage.commits) {
-    if (!commitsById.has(commit.commit_id)) commitsById.set(commit.commit_id, commit);
-  }
-  const commits = [...commitsById.values()];
-  const madeProgress = commits.length > current.commits.length;
-  return {
-    ...nextPage,
-    project_id: current.project_id || nextPage.project_id,
-    commits,
-    head_commit_id: current.head_commit_id ?? nextPage.head_commit_id,
-    refs: current.refs ?? nextPage.refs,
-    total: current.total ?? nextPage.total,
-    next_cursor: madeProgress ? nextPage.next_cursor : null,
-    has_more: madeProgress && Boolean(nextPage.has_more),
-  };
+function getHistoryHealthWarning(history: DesktopCloudHistory): string | null {
+  if (history.graph_health !== "degraded") return null;
+  const count = history.unreadable_commit_ids.length;
+  return count > 0
+    ? `History is incomplete because ${count} commit object${count === 1 ? " is" : "s are"} unavailable.`
+    : "History is incomplete because part of the commit graph is unavailable.";
 }

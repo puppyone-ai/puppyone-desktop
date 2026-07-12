@@ -24,6 +24,7 @@ import {
   execGit,
   execGitStreaming,
 } from "./git/runner.mjs";
+import { createWorkspaceCloudRemoteActions } from "./git/cloud-remote.mjs";
 import { resolveGitRevisionPair } from "./git/revision-pair.mjs";
 import { deriveGitRevisionSpecs } from "./git/revision-specs.mjs";
 import { parseGitPorcelainV2Status } from "./git/porcelain-v2.mjs";
@@ -77,6 +78,20 @@ const GIT_DETAIL_MAX_FILE_DIFF_LINES = 900;
 const GIT_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
 const execFileAsync = promisify(execFile);
+const {
+  configureWorkspaceCloudRemote,
+  removeWorkspaceGitRemote,
+} = createWorkspaceCloudRemoteActions({
+  execGit,
+  getGitErrorOutput,
+  getWorkspaceGitStatus,
+  mutationTimeoutMs: GIT_MUTATION_TIMEOUT_MS,
+  normalizeGitRemoteName,
+  normalizeGitRemoteUrl,
+  resolveWorkspacePath,
+});
+export { configureWorkspaceCloudRemote, removeWorkspaceGitRemote };
+
 export async function resolveLocalWorkspaceIdentity(folderPath) {
   const resolvedPath = path.resolve(folderPath);
   const canonicalPath = await fs.realpath(resolvedPath).catch((error) => {
@@ -93,11 +108,17 @@ export async function resolveLocalWorkspaceIdentity(folderPath) {
   const fsIdentity = createFileSystemIdentity(metadata, canonicalPath);
   let projectId = null;
   let cloudProjectId = null;
+  let cloudBindingId = null;
+  let cloudBindingOrigin = null;
+  let cloudBindingWorkspaceInstanceId = null;
   let configError = null;
   try {
     const config = await readPuppyoneWorkspaceConfig(canonicalPath);
     projectId = config.project.id;
     cloudProjectId = config.cloud.projectId;
+    cloudBindingId = config.cloud.bindingId;
+    cloudBindingOrigin = config.cloud.origin;
+    cloudBindingWorkspaceInstanceId = config.project.workspaceInstanceId;
   } catch (error) {
     // Invalid project metadata must not prevent a local-first folder from
     // opening. The config surface reports the recoverable error separately.
@@ -107,6 +128,9 @@ export async function resolveLocalWorkspaceIdentity(folderPath) {
   const workspaceInstanceId = createWorkspaceInstanceId(fsIdentity);
   return {
     canonicalPath,
+    cloudBindingId,
+    cloudBindingOrigin,
+    cloudBindingWorkspaceInstanceId,
     cloudProjectId,
     fsIdentity,
     projectId,
@@ -118,22 +142,40 @@ export async function resolveLocalWorkspaceIdentity(folderPath) {
 export async function workspaceFromPath(folderPath, options = {}) {
   const identity = await resolveLocalWorkspaceIdentity(folderPath);
   const includeGitMetadata = options.includeGitMetadata !== false;
+  const gitMetadata = includeGitMetadata
+    ? await Promise.all([
+      getWorkspaceCommitCount(identity.canonicalPath),
+      hasWorkspacePuppyoneCloudRemote(identity.canonicalPath),
+    ])
+    : null;
 
   return {
     id: `local:${identity.workspaceInstanceId}`,
     name: path.basename(identity.canonicalPath) || identity.canonicalPath,
     path: identity.canonicalPath,
     status: "protected",
-    ...(includeGitMetadata
-      ? { commitCount: await getWorkspaceCommitCount(identity.canonicalPath), hydrationState: "ready" }
+    ...(gitMetadata
+      ? {
+        commitCount: gitMetadata[0],
+        hasPuppyoneCloudRemote: gitMetadata[1],
+        hydrationState: "ready",
+      }
       : { hydrationState: "metadata" }),
     cloudState: "local",
+    cloudBindingId: identity.cloudBindingId,
+    cloudBindingOrigin: identity.cloudBindingOrigin,
+    cloudBindingWorkspaceInstanceId: identity.cloudBindingWorkspaceInstanceId,
     cloudProjectId: identity.cloudProjectId,
     projectId: identity.projectId,
     workspaceInstanceId: identity.workspaceInstanceId,
     fsIdentity: identity.fsIdentity,
     ...(identity.configError ? { configError: identity.configError } : {}),
   };
+}
+
+async function hasWorkspacePuppyoneCloudRemote(rootPath) {
+  const remotes = await readGitRemotes(rootPath).catch(() => []);
+  return remotes.some((remote) => isPuppyoneRemote(remote));
 }
 
 export async function listFolderChildren(rootPath, folderPath) {
@@ -1293,34 +1335,6 @@ export async function initializeWorkspaceGitRepository(rootPath) {
       throw new Error(`Unable to initialize repository: ${getGitErrorOutput(error)}`);
     });
   }
-
-  return getWorkspaceGitStatus(root);
-}
-
-export async function configureWorkspaceCloudRemote(rootPath, remoteUrl, remoteName = "puppyone") {
-  const root = resolveWorkspacePath(rootPath, null);
-  const normalizedRemoteName = normalizeGitRemoteName(remoteName);
-  const normalizedRemoteUrl = normalizeGitRemoteUrl(remoteUrl);
-  const isRepo = await execGit(root, ["rev-parse", "--is-inside-work-tree"])
-    .then((result) => result.stdout.trim() === "true")
-    .catch(() => false);
-
-  if (!isRepo) {
-    await execGit(root, ["init"], { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
-      throw new Error(`Unable to initialize repository: ${getGitErrorOutput(error)}`);
-    });
-  }
-
-  const remoteExists = await execGit(root, ["remote", "get-url", normalizedRemoteName])
-    .then(() => true)
-    .catch(() => false);
-  const args = remoteExists
-    ? ["remote", "set-url", normalizedRemoteName, normalizedRemoteUrl]
-    : ["remote", "add", normalizedRemoteName, normalizedRemoteUrl];
-
-  await execGit(root, args, { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
-    throw new Error(`Unable to configure Cloud remote: ${getGitErrorOutput(error)}`);
-  });
 
   return getWorkspaceGitStatus(root);
 }

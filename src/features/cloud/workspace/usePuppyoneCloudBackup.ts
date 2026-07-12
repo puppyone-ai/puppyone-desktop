@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import {
   commitWorkspaceGit,
-  configureWorkspaceCloudRemote,
   getWorkspaceGitStatus,
   initializeWorkspaceGitRepository,
   pushWorkspaceGit,
@@ -15,10 +14,7 @@ import {
 } from "../../../lib/cloudApi";
 import type { DesktopView } from "../../../components/DesktopCloudShell";
 import type { CloudWorkspaceSection } from "../types";
-import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../../types/electron";
-import {
-  mergePuppyoneWorkspaceConfig,
-} from "../../app-shell/preferences";
+import type { GitStatusSnapshot } from "../../../types/electron";
 import {
   createGitOperationErrorState,
   type GitOperationErrorState,
@@ -34,9 +30,8 @@ export function usePuppyoneCloudBackup({
   clearGitSelection,
   cloudEnabled,
   handleCloudSessionChange,
-  handlePuppyoneConfigChange,
+  onConfigureCloudRemote,
   isGitRepositoryContextCurrent,
-  puppyoneConfig,
   refreshWorkspaceContent,
   setActiveCloudSection,
   setActiveView,
@@ -58,9 +53,8 @@ export function usePuppyoneCloudBackup({
   clearGitSelection: () => void;
   cloudEnabled: boolean;
   handleCloudSessionChange: (session: DesktopCloudSession | null) => void;
-  handlePuppyoneConfigChange: (nextConfig: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
+  onConfigureCloudRemote: (remoteUrl: string, projectId: string) => Promise<GitStatusSnapshot | null>;
   isGitRepositoryContextCurrent: (context: GitRepositoryContext) => boolean;
-  puppyoneConfig: PuppyoneWorkspaceConfig | null;
   refreshWorkspaceContent: () => void;
   setActiveCloudSection: (section: CloudWorkspaceSection) => void;
   setActiveView: (view: DesktopView) => void;
@@ -111,31 +105,8 @@ export function usePuppyoneCloudBackup({
 
       const project = await createCloudProject(session, workspace.name, handleCloudSessionChange);
       const identity = await getCloudRepoIdentity(session, project.id, handleCloudSessionChange);
-      await configureWorkspaceCloudRemote(context.rootPath, identity.url, "puppyone");
-      const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
-        sync: {
-          sourceOfTruth: {
-            service: "puppyone",
-            remote: "puppyone",
-            branch: null,
-          },
-        },
-        backup: {
-          enabled: true,
-          service: "puppyone",
-          remote: "puppyone",
-          branch: null,
-        },
-        git: {
-          primaryRemote: "puppyone",
-          watchedBranch: null,
-        },
-        cloud: {
-          projectId: project.id,
-        },
-      });
-      await handlePuppyoneConfigChange(nextConfig);
-      nextStatus = await getWorkspaceGitStatus(context.rootPath);
+      nextStatus = await onConfigureCloudRemote(identity.url, project.id)
+        ?? await getWorkspaceGitStatus(context.rootPath);
 
       if (nextStatus.headCommitId) {
         nextStatus = await pushWorkspaceGit(context.rootPath);
@@ -175,9 +146,8 @@ export function usePuppyoneCloudBackup({
     clearGitSelection,
     cloudEnabled,
     handleCloudSessionChange,
-    handlePuppyoneConfigChange,
+    onConfigureCloudRemote,
     isGitRepositoryContextCurrent,
-    puppyoneConfig,
     refreshWorkspaceContent,
     setActiveCloudSection,
     setActiveView,

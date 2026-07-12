@@ -27,6 +27,10 @@ const requiredBoundaries = [
     exports: ["buildGitSourceControlSnapshot", "gitStatusLabelToLetter", "uniqueGitPaths"],
   },
   {
+    path: "local-api/git/cloud-remote.mjs",
+    exports: ["createWorkspaceCloudRemoteActions"],
+  },
+  {
     path: "local-api/workspace-config.mjs",
     exports: ["readPuppyoneWorkspaceConfig", "regeneratePuppyoneWorkspaceProjectId", "writePuppyoneWorkspaceConfig"],
   },
@@ -50,6 +54,8 @@ const retiredFacadeImplementations = [
   "function resolveWorkspacePath",
   "function loadFileFormatRegistry",
   "function buildGitSourceControlSnapshot",
+  "async function configureWorkspaceCloudRemote",
+  "async function removeWorkspaceGitRemote",
   "function normalizePuppyoneWorkspaceConfig",
   "const mimeTypeByExtension",
   "const GIT_RESOURCE_GROUPS",
@@ -65,6 +71,7 @@ for (const requiredImport of [
   'from "./files/file-format-policy.mjs"',
   'from "./files/path-policy.mjs"',
   'from "./git/source-control-model.mjs"',
+  'from "./git/cloud-remote.mjs"',
   'from "./workspace-config.mjs"',
 ]) {
   if (!workspaceFacade.includes(requiredImport)) {

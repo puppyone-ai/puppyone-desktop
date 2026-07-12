@@ -20,6 +20,10 @@ These states must stay separate. A user who is signed in must not be asked to
 sign in again unless the active workspace truly requires a different Cloud API
 host or the saved session is expired.
 
+Workspace-to-Project mapping is an explicit server binding. Git remote URLs
+and access credentials are runtime transport facts and must not be used as the
+normal Project identity or human authorization source.
+
 ## Problem
 
 The desktop Cloud page can regress if one component treats every missing value
@@ -103,7 +107,17 @@ desktop/src/features/cloud/
     useCloudProjects.ts
     useCloudProjectOverview.ts
     useCloudAccessData.ts
-    useCloudBranchesData.ts
+
+  history/
+    useCloudHistoryData.ts
+    useCloudHistoryController.ts
+    pagination.ts
+
+  graph/
+    model.ts
+    cloudTopology.ts
+    gitTopology.ts
+    shared.ts
 
   routes/
     cloudRoutes.ts
@@ -210,7 +224,10 @@ escalate to global banners.
     signed-out states into a generic missing-session check.
 
 - `desktop/src/features/cloud/workspace/`
-  - owns workspace-to-project mapping resolution and binding state derivation.
+  - owns explicit binding resolution keyed by stable workspace instance,
+    binding ID, Cloud origin, and current account.
+  - permits remote inspection only for one-time legacy candidate discovery;
+    candidate confirmation creates a formal binding.
   - route components should branch on `CloudWorkspaceBindingState` instead of
     manually combining `remote`, `projectId`, `loading`, and `error`.
 
