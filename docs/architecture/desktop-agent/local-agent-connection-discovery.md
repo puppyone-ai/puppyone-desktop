@@ -1,134 +1,157 @@
-# Local Agent and Provider connection discovery
+# Native Agent backend and model discovery
 
-Status: implemented normative boundary. Local inventory is presentation/setup evidence and is
-not authority for starting new product sessions; OpenCode's connected Provider catalog remains
-the Send authority.
+Status: target normative boundary accepted by
+[ADR-005](ADR-005-multi-native-agent-backends.md). Codex and Cursor inventory,
+bounded probes and the PuppyOne Agent OpenCode catalog are implemented. Claude
+Code discovery, native-backend readiness composition and Agent-first selection
+are migration work.
 
-This document defines how PuppyOne recognizes locally installed Codex, Cursor Agent and future
-coding-agent tools without falsely claiming that every installation is a usable OpenCode model
-Provider. It complements [ADR-003](ADR-003-opencode-only-chat-harness.md): OpenCode remains the
-product Chat harness unless a later architecture decision explicitly changes that rule.
+This document defines how PuppyOne discovers native Agent products without
+confusing an executable, harness, inference provider or model. It also defines
+when an installed product becomes a selectable Agent backend.
 
-## 1. Why there are two discovery systems
+## 1. Two discovery layers
 
-The current OpenCode `/provider` catalog answers one question:
-
-```text
-Which inference Provider routes can this OpenCode harness use now?
-```
-
-It does not answer:
+PuppyOne needs two catalogs because they answer different questions.
 
 ```text
-Which coding-agent products are installed on this computer?
-```
+Agent backend inventory
+  Which native Agent products can PuppyOne safely run on this machine?
 
-PuppyOne therefore needs two independent catalogs that meet only in presentation and explicit
-integration policy.
+Backend-scoped catalog
+  Which providers, models, variants, modes and commands can the selected
+  native Agent use?
+```
 
 ```text
-Local Agent Inventory                         OpenCode Provider Catalog
----------------------                         -------------------------
-Codex CLI installed                           OpenAI / ChatGPT connected
-Cursor Agent installed                        Anthropic connected
-Claude Code installed                         OpenRouter connected
-version / auth / protocol                      model capabilities
-          |                                             |
-          +-------------------+-------------------------+
-                              v
-                    Connection Policy
-                       |          |
-                       |          +-- selectable Provider route
-                       +------------- detected local tool, not yet selectable
-                              |
-                              v
-                    Provider picker presentation
+Agent backend inventory
+-----------------------
+PuppyOne Agent engine verified
+Codex CLI installed and signed in
+Claude Code installed and signed in
+Cursor Agent installed, protocol unavailable
+user OpenCode installed and signed in
+          |
+          | installation / version / auth / protocol / policy gates
+          v
+Selectable Agent backends
+          |
+          +-- PuppyOne Agent -> OpenCode connected Provider/Model catalog
+          +-- Codex          -> Codex model/list and native capabilities
+          +-- Claude Code    -> Claude SDK/native model and mode metadata
+          +-- OpenCode       -> user OpenCode Provider/Model catalog
+          +-- Cursor         -> no catalog until protocol gate passes
 ```
 
-An installed CLI must be recognized and shown. It must not become a selectable inference route
-until authentication, protocol compatibility and an authorized bridge are all established.
+One catalog never substitutes for the other. A Codex executable is not an
+OpenCode inference Provider. An OpenAI Provider route inside PuppyOne Agent is
+not proof that Codex CLI is installed. A model ID is never used as a backend
+ID.
 
 ## 2. Vocabulary
 
 ```text
-Local tool          An executable/application found on the machine, such as codex or
-                    cursor-agent.
+Local installation
+  A canonical executable or application bundle found on the machine.
 
-Agent harness       Owns loop, tool execution, approvals, context and session semantics.
-                    Codex app-server, Cursor Agent and OpenCode are separate harnesses.
+Agent backend
+  A user-selectable native Agent integration that owns one harness and native
+  session. Examples: PuppyOne Agent, Codex, Claude Code and user OpenCode.
 
-Credential source  A supported account/API-key/OAuth mechanism. Presence does not prove that
-                    a different product may copy or reuse the credential.
+Harness
+  The selected backend's native reasoning/tool/context loop.
 
-Provider route      The inference route selected inside the active harness. In the accepted
-                    product path this comes from OpenCode /provider.connected.
+Inference provider
+  A backend-scoped model transport and billing identity when exposed by that
+  backend.
 
-Authorized bridge   A versioned, documented adapter allowed to translate one supported public
-                    protocol/credential route without scraping private files.
+Native protocol
+  The supported interface used by an adapter: Codex app-server, Claude Agent
+  SDK, OpenCode server/ACP, Pi RPC or a future Cursor contract.
 
-Selectable          The route has passed install, version, authentication, bridge and model
-                    capability checks for the current product path.
+Selectable
+  Every installation, version, authentication, protocol, capability,
+  workspace and product-policy gate has passed.
 ```
 
-Do not use `Provider`, `CLI`, `model` and `harness` as interchangeable UI labels.
+Do not use `Provider`, `Agent`, `CLI`, `model` and `harness` as interchangeable
+labels in code, UI, telemetry or documentation.
 
 ## 3. Discovery result model
 
-Installation, authentication and integration are orthogonal fields. A single boolean such as
-`available` loses the reason an item cannot be used.
+Installation, authentication, protocol compatibility and integration are
+orthogonal. A single `available` boolean loses the recovery reason.
 
 ```text
-LocalAgentConnection
-  id                    codex | cursor-agent | claude-code | future stable id
-  displayName           safe product label
-  installation          not-found | detected | unsupported | broken
+AgentBackendReadiness
+  id                    puppyone-agent | codex | claude | cursor |
+                        opencode-native | future stable id
+  displayName           bounded user-facing label
+  installation          not-found | detected | unsupported | broken | managed
   version               bounded normalized version or null
-  authentication        unknown | signed-out | signed-in | expired | error
-  integration           inventory-only | bridge-required | ready | incompatible | blocked
-  capabilities          bounded advertised feature flags
-  selectable            derived, never independently assigned
-  statusMessage         user-facing recovery reason
-  actions               refresh | learn-more in the current inventory DTO
+  authentication        unknown | signed-out | signed-in | expired | error |
+                        managed
+  protocol              unsupported | compatible | incompatible | error
+  capabilities          bounded native capability snapshot
+  catalogState          idle | loading | ready | empty | error
+  selectable            derived, never assigned independently
+  statusMessage         exact bounded recovery reason
+  actions               refresh | sign-in | repair | update | learn-more
+  source                managed | configured | user | system | application
 ```
 
-Executable paths, account tokens, account identifiers, raw status output and credential-file
-locations remain main-process data and do not cross IPC. Renderer receives a bounded label such
-as `User installation` or `Application bundle` when source context is useful.
+The currently implemented `LocalAgentConnection` DTO is an interim inventory
+projection. Migration should either evolve it into the readiness contract above
+or add a separate `AgentBackendReadiness` DTO while retaining a small Local
+tools diagnostics view.
 
-`selectable` is true only when all applicable gates pass:
+Executable paths, account identifiers, tokens, raw status output, credential
+locations, sidecar URLs and process environment remain main-process data.
+Renderer receives sanitized descriptors, status and action IDs only.
+
+`selectable` is true only when every applicable gate passes:
 
 ```text
-detected
-  AND supported version
-  AND authenticated by a public supported mechanism
-  AND authorized bridge compatible with the fixed OpenCode harness
-  AND at least one text + tools model
-  AND workspace/security policy allows the route
+installation recognized
+  AND tested version
+  AND native protocol compatible
+  AND native authentication ready
+  AND required text/tool capabilities advertised
+  AND canonical workspace accepted
+  AND backend-specific product policy accepted
 ```
 
-## 4. When discovery runs
+PuppyOne Agent uses `managed` installation/auth states and still requires a
+verified engine plus at least one usable connected Provider/Model route.
 
-- Do not scan local CLIs on application startup, file open or Sidebar layout. Those are
-  performance-critical paths.
-- Run a bounded inventory scan when the user first opens Provider setup, explicitly presses
-  Refresh, or opens Agent settings.
-- Cache the sanitized snapshot for at most five minutes and invalidate it on explicit Refresh,
-  executable change, sidecar restart or authoritative authentication rejection.
-- Deduplicate concurrent inventory scans. Closing the popover does not terminate an already
-  bounded scan; it may finish into the five-minute cache. Application disposal aborts active
-  probes and every timeout/output-limit path kills its child process.
-- A scan failure for one tool does not hide other detected tools.
+## 4. Discovery lifecycle
+
+- Do not scan user CLIs on application startup, file open or the left Sidebar
+  critical path.
+- Start a bounded scan when Chat first opens, the Agent picker opens, Agent
+  settings open or the user presses Refresh.
+- Managed PuppyOne Agent integrity may be checked independently and lazily when
+  its row or an existing PuppyOne Agent session needs it.
+- Cache sanitized readiness for at most five minutes. Invalidate on explicit
+  Refresh, executable identity change, native process restart, login/logout or
+  authoritative authentication rejection.
+- Deduplicate concurrent scans. Application disposal aborts active probes and
+  every timeout/output-limit path kills its child process.
+- One backend failure never hides, disables or selects another backend.
+- Restoring a saved session inspects its pinned backend. It does not choose the
+  highest-priority healthy backend as a fallback.
 
 ## 5. Executable discovery
 
-Packaged GUI applications often receive a different `PATH` from interactive shells. Searching
-only `process.env.PATH` is insufficient, while launching a login shell is slow and executes
-user-controlled shell startup code. Use a deterministic candidate registry.
+Packaged GUI applications often receive a smaller `PATH` than interactive
+shells. Searching only `process.env.PATH` is insufficient, while starting a
+login shell is slow and executes user-controlled startup code. Use a bounded,
+deterministic candidate registry.
 
 ### Candidate sources
 
 ```text
-1. Already configured absolute executable path, if any
+1. Explicit per-device configured absolute path
 2. Current non-login process PATH
 3. Product-specific user locations
      ~/.local/bin
@@ -138,264 +161,283 @@ user-controlled shell startup code. Use a deterministic candidate registry.
 4. Platform package-manager locations
      /opt/homebrew/bin
      /usr/local/bin
-5. Signed application bundle helper path, when publicly documented
+5. Documented application bundle helpers
+6. Provider-specific locations with explicit fixtures
+     Claude local/npm/NVM/Volta/asdf entrypoints
+     Codex.app resource locations
 ```
 
-The list is platform-specific, bounded and tested. It is not a recursive home-directory scan.
-Each product is registered through a validated descriptor (`id`, display name, executable
-aliases, probe and bridge-required explanation). Inventory orchestration contains no
-product-id branch. Adding a future tool such as Claude Code is a descriptor/probe addition,
-not a change to cache, cancellation or policy flow.
+The list is platform-specific, bounded and tested. It is not a recursive home
+scan. Each product is a validated descriptor with an ID, display name,
+candidate aliases, probe and recovery copy. Inventory orchestration contains no
+product-ID branches.
 
-### Command aliases
+### Canonical candidates
 
-| Product | Canonical candidates | Notes |
+| Backend | Candidates | Notes |
 | --- | --- | --- |
-| Codex | `codex` | Require a successful bounded `codex --version` probe. |
-| Cursor Agent | `cursor-agent`, `agent`, `cursor agent` | Prefer `cursor-agent`; `cursor` alone may be an IDE launcher or shim and must be classified before use. |
-| Claude Code | `claude` | Inventory only until its independent integration contract is approved. |
+| Codex | `codex` and documented Codex.app helpers | Require bounded version and app-server probes. |
+| Claude Code | `claude`, native binary and documented Node package entrypoints | Resolve Node only when the entrypoint requires it. |
+| Cursor Agent | `cursor-agent`, `agent`, documented Cursor helper | `cursor` alone may be an IDE launcher; classify before use. |
+| user OpenCode | `opencode` | Keep user profile and data roots separate from PuppyOne Agent. |
+| Pi | `pi` | Enable only with an approved RPC adapter. |
 
 ### File and process safety
 
-- Resolve the candidate with `realpath`, require a regular executable file and record the
-  canonical identity so aliases do not create duplicate rows.
-- Spawn directly with an argument array. Never use `shell: true` and never interpolate a path
-  into a shell command.
-- Version probes have a 1.5 second timeout, a 16 KiB combined-output cap and an explicit child
-  kill path.
-- Reject directories, devices, relative executables, newline-containing paths and candidates
+- Resolve with `realpath`, require a regular executable file and retain a
+  canonical identity/fingerprint through launch.
+- Spawn directly with an argument array, an allowlisted environment and
+  `shell: false`.
+- Version and status probes have explicit time, output, line and pending-RPC
+  limits plus graceful-to-forced cleanup.
+- Reject directories, devices, relative paths, newline/NUL paths and candidates
   that change identity between validation and spawn.
-- A user-owned symlink to a canonical executable is allowed after `realpath` validation.
-- Diagnostic logs contain tool id, safe source class, duration and outcome; they do not contain
-  home paths, account output or environment values.
+- Diagnostic logs contain backend ID, safe source class, duration and outcome;
+  never home paths, account output or environment values.
 
-## 6. Codex discovery and compatibility
+## 6. Codex readiness
 
-OpenAI documents Codex app-server as the embedding interface for custom rich clients. It uses a
-version-specific JSON-RPC protocol and exposes account, model, thread, turn, approval, item and
-streaming event APIs. The protocol can generate a schema matching the installed CLI version.
-
-Discovery levels:
+Codex uses its public app-server interface. The existing PuppyOne bounded
+JSONL-RPC transport and adapter are the foundation for the native backend.
 
 ```text
-Level 1  codex executable + version
-Level 2  app-server initialize handshake
+Level 1  canonical Codex executable + supported version
+Level 2  app-server initialize / initialized handshake
 Level 3  account/read authentication state
-Level 4  model/list + required capability check
-Level 5  approved product integration route
+Level 4  model/list and required capability check
+Level 5  production security/history/approval contract accepted
+Level 6  selectable Codex backend
 ```
 
 Rules:
 
-- Level 1 is enough to show `Codex CLI - Detected` in Local tools.
-- Levels 2-4 are lazy and use direct stdio JSON-RPC with strict schemas, timeouts and bounded
-  output. Do not read or copy `~/.codex` credential files in Renderer or application code.
-- `account/read` determines account state. `model/list` determines models and their supported
-  effort/input options; static hard-coded model lists are not acceptable.
-- The bounded JSONL-RPC child transport lives under `agent/transports/`; it is provider-neutral
-  and can serve explicit probes without making inventory depend on a legacy Codex runtime.
-- A successful local Codex handshake proves Codex itself is usable. It does not turn Codex into
-  an inference Provider inside OpenCode. `codex app-server` owns a separate agent loop.
-- Under ADR-003, a detected/signed-in Codex installation is shown as `Detected - direct harness
-  not enabled`. The selectable Codex-family route remains OpenAI/ChatGPT connected through
-  OpenCode.
-- If product strategy later enables direct Codex mode, that is a visible session-level harness
-  choice with separate session ownership, approval and migration rules. It cannot be a silent
-  fallback or be mislabeled as a Provider.
+- Level 1 is enough to show `Codex - Detected`.
+- Levels 2-4 run lazily over stdio JSON-RPC with strict schemas and bounded
+  output. Do not read or copy `~/.codex` credential files.
+- `account/read` determines native authentication. `model/list` determines
+  native model metadata; static production model lists are not authoritative.
+- The backend uses `thread/start`, `thread/resume`, `turn/start`, native
+  notifications and native approval/question requests.
+- A Codex session stores its Codex thread ID. It never creates an OpenCode
+  session or imports Codex credentials into PuppyOne Agent.
+- The current adapter becomes production-selectable only after its capability,
+  history, crash, cancellation and security suites pass ADR-005 acceptance.
 
-Official reference: [Codex App Server](https://learn.chatgpt.com/docs/app-server).
+Reference: [official Codex App Server documentation](https://learn.chatgpt.com/docs/app-server),
+including the stable stdio JSONL transport and native thread, turn, account,
+model, approval and event surfaces. Experimental WebSocket transport is not
+part of the PuppyOne production adapter contract.
 
-## 7. Cursor Agent discovery and compatibility
+## 7. Claude Code readiness
 
-Cursor publicly documents three relevant surfaces:
-
-- `cursor-agent status` for CLI authentication state;
-- `--print --output-format stream-json` for NDJSON system, assistant, tool and terminal result
-  events;
-- `@cursor/sdk` for programmatic local/cloud agents using an explicit Cursor API key and its
-  own billing/runtime contract.
-
-Discovery levels:
+Claude Code uses the native Claude Agent SDK plus the user's supported Claude
+Code executable and login.
 
 ```text
-Level 1  cursor-agent/agent executable + version
-Level 2  cursor-agent status, bounded and redacted
-Level 3  documented stream-json or SDK compatibility version
-Level 4  explicit credential/billing route approved for PuppyOne
-Level 5  approved product integration route
+Level 1  canonical Claude executable/entrypoint + supported version
+Level 2  required Node runtime available when the entrypoint needs Node
+Level 3  Claude Agent SDK initialization/native session handshake
+Level 4  native authentication and model/capability inspection
+Level 5  production permission/history/recovery contract accepted
+Level 6  selectable Claude Code backend
+```
+
+Resolver requirements should borrow the proven Claudian search categories
+without copying its weaker trust assumptions:
+
+- explicit per-device path;
+- `~/.claude/local`, `~/.local/bin`, Homebrew and system locations;
+- Volta, asdf and NVM default bins;
+- documented `@anthropic-ai/claude-code` Node entrypoints;
+- configured provider environment PATH.
+
+PuppyOne passes the resolved executable to the SDK. Claude Code remains the
+owner of its loop, tools, permission semantics and native session. PuppyOne
+normalizes SDK events and blocking requests but never polls or copies private
+credential files.
+
+## 8. Cursor Agent readiness
+
+Cursor remains capability-gated. Installation and authentication inventory may
+be shown before execution support exists.
+
+```text
+Level 1  canonical Cursor Agent executable + version
+Level 2  bounded native status/auth observation
+Level 3  stable documented streaming/session/approval protocol
+Level 4  explicit credential and billing contract
+Level 5  production security/history/recovery adapter accepted
+Level 6  selectable Cursor backend
 ```
 
 Rules:
 
-- Level 1 is enough to show `Cursor Agent - Detected` even when no OpenCode bridge exists.
-- Treat `cursor`, `cursor-agent` and `agent` aliases that resolve to the same canonical binary as
-  one installation.
-- Status output is parsed in main, reduced to signed-in/signed-out/unknown and never forwarded
-  verbatim because it may contain account or endpoint information.
-- Stream consumers ignore additive unknown fields, correlate tool calls by id, require a
-  terminal result when the process succeeds, and handle non-zero exit without assuming valid
-  terminal JSON.
-- PuppyOne never uses `--force`. Command/file actions retain explicit permission semantics.
-- The SDK/API-key path and a locally signed-in CLI are different credential and billing
-  contracts unless Cursor explicitly documents reuse. Do not infer that SDK calls may use a
-  private CLI login cache.
-- Cursor Agent is a separate harness. Under ADR-003 it is shown as `Detected - bridge not
-  available` and is not selectable inside the OpenCode Provider list.
+- Alias candidates resolving to the same canonical binary produce one row.
+- Raw status output is reduced in main to a bounded auth state.
+- Local CLI login and an SDK/API-key product are different entitlement
+  contracts unless Cursor explicitly guarantees reuse.
+- `--force`, unbounded shell output and simulated tool/approval semantics are
+  prohibited.
+- Until Levels 3-5 pass, Cursor is visible as `Detected - protocol not yet
+  supported` and is not selectable.
 
-Official references:
+## 9. PuppyOne Agent and user OpenCode
 
-- [Cursor CLI authentication](https://docs.cursor.com/en/cli/reference/authentication)
-- [Cursor CLI parameters](https://docs.cursor.com/en/cli/reference/parameters)
-- [Cursor stream JSON output](https://docs.cursor.com/en/cli/reference/output-format)
-- [Cursor SDK announcement](https://cursor.com/changelog/sdk-release)
-
-## 8. OpenCode Provider discovery
-
-OpenCode remains the selectable inference authority for the accepted product path.
+These are separate backends even though both use OpenCode technology.
 
 ```text
-GET /provider
-  all[]                       catalog/display metadata
-  connected[]                 configured credential route detected by OpenCode
-  default[providerId]         default model id
-        |
-        v
-PuppyOne capability gate
-  input.text == true
-  output.text == true
-  toolcall == true
-  status != deprecated
-        |
-        v
-Selectable Provider -> selectable Model
+PuppyOne Agent
+  runtimeId             puppyone-agent
+  executable            pinned and verified PuppyOne component
+  profile               PuppyOne-owned isolated profile
+  provider catalog      managed OpenCode connected routes
+  native sessions       managed OpenCode sessions
+  repair                PuppyOne application repair/update
+
+OpenCode
+  runtimeId             opencode-native
+  executable            user installation
+  profile               user-owned OpenCode profile
+  provider catalog      user OpenCode connected routes
+  native sessions       user OpenCode sessions
+  repair                native installation/login guidance
 ```
 
-Capability metadata is authoritative and fail-closed. Missing input/output/tool capability
-fields exclude a model; unknown is never treated as a permissive default.
+The two adapters never share implicit config roots, native session IDs or
+credential stores. Existing product `opencode` mappings migrate to
+`puppyone-agent`; they are not reclassified as user OpenCode.
 
-`/config/providers`, a CLI executable and a credential-file existence check are not Send
-authority. Remote credentials can still expire after discovery; an authoritative 401/auth
-rejection quarantines the route, clears its selected Model and requests reconnect/refresh.
+For either OpenCode-backed backend, configuration catalog entries are not Send
+authority. Only connected Providers with compatible text input, text output and
+tool calling models survive capability filtering. An authoritative auth
+rejection quarantines the affected route for that backend's current snapshot.
 
-## 9. Provider picker presentation
+## 10. Agent picker presentation
 
-The picker joins both catalogs without erasing their difference.
+The compact picker presents Agent backends, not a merged list of unrelated
+Providers and local tools.
 
 ```text
-+ Provider ------------------------------------------------+
-| Connected routes                                         |
-|  * OpenAI / ChatGPT     OAuth          Ready             |
-|    Anthropic            API key        Ready             |
-|                                                          |
-| Local tools on this Mac                                  |
-|    Codex CLI 0.x        Signed in      Direct not enabled|
-|    Cursor Agent 20xx.x  Signed in      Bridge unavailable|
-|                                                          |
-| [Refresh]                         [Connect provider...]   |
-+----------------------------------------------------------+
++ Agent ---------------------------------------------------+
+| Ready                                                     |
+|  * PuppyOne Agent        Managed             Ready        |
+|    Codex                 Native login        Ready        |
+|    Claude Code           Native login        Ready        |
+|                                                           |
+| Detected                                                  |
+|    Cursor Agent          Protocol unavailable Learn why  |
+|    OpenCode              Sign in required       Sign in   |
+|                                                           |
+| [Refresh]                              [Agent settings]   |
++-----------------------------------------------------------+
 ```
 
-- A detected local tool is never omitted merely because it is not selectable.
-- A non-selectable row is not a dead disabled option. It remains focusable, explains the exact
-  missing gate and offers a valid action or `Learn why`.
-- Connected Provider routes appear before local inventory because they can send the current
-  OpenCode session.
-- `Not installed` products are hidden from the compact picker but may appear in the full
-  Connections settings page with an Install/Learn action.
-- A signed-out detected tool offers its documented login action only if PuppyOne can observe
-  completion safely. Otherwise it gives exact instructions and Refresh.
-- Provider and Model stay separate controls. Choosing a local inventory row cannot populate
-  models until `selectable` is true.
+- Ready backends appear before detected/non-ready entries.
+- Non-ready rows remain focusable and explain the exact missing gate.
+- Not-installed backends may be omitted from the compact picker but remain in
+  the Connections/Agent settings page.
+- Selecting a ready Agent on a blank composer loads only that backend's model,
+  provider, variant and mode controls.
+- An existing session shows its pinned Agent. Selecting a different Agent
+  starts a new session after an explicit boundary confirmation.
+- PuppyOne Agent may show Provider then Model. Native Codex or Claude Code may
+  show Model directly when their native protocol has no separate Provider
+  control.
 
-## 10. Main/Renderer boundary
+## 11. Main/Renderer boundary
 
 ```text
 Renderer
-  open provider picker / refresh / select public route id
+  open Agent picker / refresh / select public backend ID
         |
         v
 typed preload IPC
         |
         v
 Electron main
-  createLocalAgentInventory
-    candidate registry -> realpath -> version -> optional auth/protocol probe
+  AgentRuntimeRegistry
+    definition discovery -> readiness -> capability/catalog inspection
 
-  OpenCodeProviderCatalog
-    /provider.connected -> capability filtering
+  Local executable inventory
+    candidate registry -> realpath -> version -> auth/protocol probe
 
-  AgentConnectionPolicy
-    merge presentation DTOs -> derive selectable routes
+  AgentService
+    validate backend/model/session/workspace -> create native adapter
 ```
 
-Renderer never receives generic spawn, command arguments, environment variables, raw stdout,
-credential paths, auth tokens, sidecar URLs or passwords. Each supported tool has a specific
-probe adapter and contract fixture.
+Renderer never receives generic spawn, command arguments, raw stdout,
+environment variables, executable/credential paths, auth tokens, sidecar URLs
+or passwords. Each backend has a specific discovery and protocol adapter plus
+contract fixtures.
 
-Implemented source boundaries:
+Target source boundaries:
 
 ```text
-electron/main/agent/connections/
-  local-agent-inventory.mjs           orchestration/cache/cancellation
-  local-agent-connection-policy.mjs   derived availability rules
-  tools/
-    local-agent-tool-registry.mjs     descriptor validation + duplicate guard
-    codex-tool.mjs                    Codex executable/probe descriptor
-    cursor-tool.mjs                   Cursor executable/probe descriptor
-  probes/
-    codex-local-probe.mjs             version + app-server account/model probe
-    cursor-local-probe.mjs            version + bounded status probe
-    executable-candidates.mjs         platform candidate registry
+electron/main/agent/runtime/
+  AgentRuntimePort / Registry             provider-neutral contracts
 
-electron/main/agent/transports/
-  jsonl-rpc-connection.mjs            provider-neutral bounded stdio RPC
+electron/main/agent/runtimes/<backend>/
+  discovery, native protocol, normalization, history and security mapping
+
+electron/main/agent/connections/
+  bounded local executable inventory and reusable candidate/probe safety
 
 shared/agent-contract/
-  types.ts                              local-agent DTO type source
-  local-connection-schema.mjs          strict sanitizing response projection
+  backend readiness, capabilities, catalogs and strict sanitized DTOs
 
 src/features/desktop-agent/
-  application/LocalAgentConnectionLoader.ts  lazy Renderer-side request state
-  ui/AgentProviderPicker.tsx                 accessible connected/local sections
-  ui/AgentPickerPopover.tsx                  search + roving keyboard listbox
+  application/                            backend-neutral controller
+  domain/                                 Agent -> scoped routing policy
+  ui/AgentBackendPicker.tsx               accessible Agent selector
+  ui/AgentProviderPicker.tsx              optional backend-scoped Provider
+  ui/AgentModelPicker.tsx                 backend-scoped Model
 ```
 
-The local inventory service must not import React or OpenCode-specific provider payloads. The
-OpenCode adapter must not scan the user's PATH.
+The inventory layer must not import React or native runtime payloads. Runtime
+adapters may reuse executable safety primitives but own protocol and session
+semantics.
 
-## 11. Refresh and failure behavior
+## 12. Refresh and failure behavior
 
 | Failure | UI result |
 | --- | --- |
-| executable not found | omit from compact picker; show `Not installed` in Connections |
-| version probe timeout | show `Detected, probe failed`; Retry |
-| unsupported version | show version and minimum/maximum tested range; Update/Learn |
-| signed out | show `Sign in required`; documented Login action |
-| status format unknown | keep Detected; auth `Unknown`; do not mark Ready |
-| bridge unavailable | keep Detected; explain current OpenCode-only limitation |
-| Provider credential rejected | remove from selectable routes for this snapshot; Reconnect |
-| scan cancelled | retain last verified snapshot and stop child process |
+| executable not found | omit from compact picker or show Not installed in Agent settings |
+| probe timeout/broken binary | show scoped probe failure and Retry |
+| unsupported version | show version range and Update/Learn action |
+| signed out/expired | show native Sign in guidance and Refresh |
+| protocol incompatible | keep Detected, disable selection and explain compatibility |
+| model/tool catalog empty | keep backend non-selectable with exact capability reason |
+| PuppyOne Agent engine corrupt | disable PuppyOne Agent only; application repair action |
+| backend/provider auth rejected during turn | retain native session, quarantine affected route and reconnect |
+| scan cancelled | retain last verified snapshot and terminate probe child |
 
-One probe failure never changes OpenCode harness health. One Provider authentication failure
-never erases the local installation row.
+One backend failure never changes another backend's readiness. No failure
+causes automatic fallback or moves an existing session to another harness.
 
-## 12. Acceptance tests
+## 13. Acceptance tests
 
 Implementation is complete only when automated fixtures cover:
 
-- packaged GUI `PATH` missing both CLIs while known user locations contain them;
-- `codex`, `cursor-agent`, `agent` and `cursor agent` alias deduplication by canonical identity;
-- paths with spaces, symlinks, broken links, non-executable files and executable-swap attempts;
-- version timeout, output overflow, malformed output, unsupported version and child cleanup;
-- Codex initialize/account/model success, signed-out and additive unknown protocol fields;
-- Cursor status signed-in/signed-out/unknown fixtures; stream execution remains outside this
-  inventory boundary until an authorized bridge is approved;
-- no raw path/account/status/credential content crossing the strict IPC schema;
-- detected-but-unbridged rows visible and keyboard reachable but not selectable;
-- only connected text-and-tools OpenCode routes enabling Model and Send;
-- refresh invalidation after login/logout, binary replacement and authoritative auth rejection;
-- discovery off the app/sidebar/file-open critical path, with no interaction Long Task above
-  50 ms.
+- packaged GUI PATH missing user CLIs while known deterministic locations
+  contain them;
+- aliases, spaces, symlinks, broken links, non-executable files and executable
+  identity-swap attempts;
+- timeout, output overflow, malformed protocol, unsupported version and child
+  cleanup for every backend probe;
+- Codex initialize/account/model and native session success/failure fixtures;
+- Claude executable/Node/SDK/auth/session and permission fixtures;
+- Cursor detected-but-unsupported behavior until its protocol contract passes;
+- strict isolation between PuppyOne Agent and user OpenCode profiles/sessions;
+- no raw path/account/status/credential content crossing IPC;
+- Agent-first picker keyboard behavior and backend-scoped Model validation;
+- immutable `runtimeId` after product-session creation;
+- one backend failure leaving other ready Agents selectable;
+- refresh invalidation after login/logout, binary replacement, engine repair and
+  authoritative authentication rejection;
+- discovery staying off application/file/Sidebar critical paths with no
+  interaction Long Task above 50 ms.
 
-Manual evidence must show a machine with both Codex and Cursor installed: both appear under
-Local tools, their real status is explained, and only legitimately ready routes can send.
+Manual evidence must include at least two ready native backends plus one
+detected-but-unavailable backend. Each ready backend starts its own native
+session, reports its own capabilities and can fail without changing the other
+rows or silently switching the active session.
