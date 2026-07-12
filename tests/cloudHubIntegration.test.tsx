@@ -621,6 +621,7 @@ describe("Cloud project attachment actions", () => {
 describe("Cloud Automation route dedupe", () => {
   it("reuses aggregate Cloud data and does not call useDesktopCloudAccessData", async () => {
     listCloudAutomationProviderSpecs.mockResolvedValue([]);
+    await import("../src/features/automation/DesktopCloudAutomationView");
     const reload = vi.fn(async () => undefined);
     const cloudData = createAggregateCloudData(reload);
     const container = document.createElement("div");
@@ -644,7 +645,11 @@ describe("Cloud Automation route dedupe", () => {
     expect(listCloudConnectors).not.toHaveBeenCalled();
     expect(listCloudMcpEndpoints).not.toHaveBeenCalled();
     expect(container.querySelector(".desktop-cloud-main-view")).toBeNull();
-    expect(container.querySelectorAll(".desktop-cloud-automation-page")).toHaveLength(1);
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(container.querySelectorAll(".desktop-cloud-automation-page")).toHaveLength(1);
+      });
+    });
     expect(adaptCloudAggregateToAccessData({
       apiBaseUrl: "https://cloud.example",
       scopes: cloudData.scopes,

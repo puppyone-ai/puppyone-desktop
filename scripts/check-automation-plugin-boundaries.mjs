@@ -53,6 +53,18 @@ if (!/"plugins"/.test(desktopView) || !/"automation"/.test(desktopView)) {
   errors.push("Desktop navigation must expose distinct Plugin and Automation view ids.");
 }
 
+const workspaceContent = read("src/features/app-shell/DesktopWorkspaceContent.tsx");
+if (!/lazy\(\(\) => import\("\.\.\/automation\/DesktopCloudAutomationView"\)/.test(workspaceContent)) {
+  errors.push("Cloud Automation routes must remain lazy so their provider SDK and dialogs stay outside the local-first startup chunk.");
+}
+if (/from\s+["']\.\.\/automation["']/.test(workspaceContent)) {
+  errors.push("The app shell must not statically import the Cloud Automation feature barrel.");
+}
+const cloudAutomationRoute = read("src/features/cloud/sections/AutomationRouteSection.tsx");
+if (!/lazy\(\(\) => import\("\.\.\/\.\.\/automation\/DesktopCloudAutomationView"\)/.test(cloudAutomationRoute)) {
+  errors.push("The Cloud router must preserve the same lazy Automation route boundary as the desktop app shell.");
+}
+
 const cloudAutomationApi = read("src/lib/cloud/automationApi.ts");
 if (!/CLOUD_AUTOMATION_LEGACY_WIRE_BASE\s*=\s*"\/integrations"/.test(cloudAutomationApi)) {
   errors.push("The legacy /integrations server route must stay isolated behind the Automation transport adapter.");

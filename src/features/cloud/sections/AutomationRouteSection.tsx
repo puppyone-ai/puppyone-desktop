@@ -1,7 +1,11 @@
+import { lazy, Suspense } from "react";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
-import { DesktopCloudAutomationView } from "../../automation/DesktopCloudAutomationView";
 import { adaptCloudAggregateToAccessData } from "../data/adaptCloudAggregateToAccessData";
 import type { DesktopCloudDataState } from "../data/useDesktopCloudData";
+
+const LazyDesktopCloudAutomationView = lazy(() => import("../../automation/DesktopCloudAutomationView").then((module) => ({
+  default: module.DesktopCloudAutomationView,
+})));
 
 /** Automation reuses aggregate Cloud data — no second Access fetch. */
 export function CloudAutomationRouteSection({
@@ -32,15 +36,17 @@ export function CloudAutomationRouteSection({
   });
 
   return (
-    <DesktopCloudAutomationView
-      projectId={projectId}
-      cloudSession={cloudSession}
-      accessData={accessData}
-      activeProvider={null}
-      sessionRestoring={sessionRestoring}
-      embedded
-      onCloudSessionChange={onSessionChange}
-      onRefresh={cloudData.reload}
-    />
+    <Suspense fallback={<div className="desktop-view-route-loading" role="status">Loading automation…</div>}>
+      <LazyDesktopCloudAutomationView
+        projectId={projectId}
+        cloudSession={cloudSession}
+        accessData={accessData}
+        activeProvider={null}
+        sessionRestoring={sessionRestoring}
+        embedded
+        onCloudSessionChange={onSessionChange}
+        onRefresh={cloudData.reload}
+      />
+    </Suspense>
   );
 }

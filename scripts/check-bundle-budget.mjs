@@ -4,8 +4,13 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const assetsDir = path.join(repoRoot, "dist", "assets");
-const entryChunkBudgetBytes = 2_100_000;
+const entryChunkBudgetBytes = 1_950_000;
 const heavyChunks = [
+  {
+    label: "Cloud Automation route",
+    chunkPattern: /^DesktopCloudAutomationView-.+\.js$/,
+    entryLeakPattern: /Unable to load Automation sources/,
+  },
   {
     label: "docx-preview",
     chunkPattern: /^docx-preview-.+\.js$/,

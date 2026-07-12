@@ -35,10 +35,6 @@ import {
 import {
   resolveCloudProjectNavigationContext,
 } from "../cloud/attachment";
-import {
-  DesktopCloudAutomationSidebar,
-  DesktopCloudAutomationView,
-} from "../automation";
 import { useDesktopCloudAccessData } from "../cloud/data/useDesktopCloudAccessData";
 import { shouldLoadDesktopCloudAccessData } from "../cloud/data/shouldLoadDesktopCloudAccessData";
 import { useCloudBranchesData } from "../cloud/data/useCloudBranchesData";
@@ -87,6 +83,12 @@ const LazyDesktopViewerPackFallback = lazy(() => import("../viewer-packs").then(
 })));
 const LazyPluginsView = lazy(() => import("../plugins/PluginsView").then((module) => ({
   default: module.PluginsView,
+})));
+const LazyDesktopCloudAutomationSidebar = lazy(() => import("../automation/DesktopCloudAutomationView").then((module) => ({
+  default: module.DesktopCloudAutomationSidebar,
+})));
+const LazyDesktopCloudAutomationView = lazy(() => import("../automation/DesktopCloudAutomationView").then((module) => ({
+  default: module.DesktopCloudAutomationView,
 })));
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
@@ -501,15 +503,17 @@ export function DesktopWorkspaceContent({
   );
 
   const cloudAutomationView = (
-    <DesktopCloudAutomationView
-      projectId={cloud.projectId}
-      cloudSession={cloud.cloudSession}
-      accessData={cloudAccessData}
-      activeProvider={activeAutomationProvider}
-      sessionRestoring={cloud.sessionRestoring}
-      onCloudSessionChange={cloud.onCloudSessionChange}
-      onRefresh={() => undefined}
-    />
+    <Suspense fallback={<DesktopRouteLoading label="Loading automation…" />}>
+      <LazyDesktopCloudAutomationView
+        projectId={cloud.projectId}
+        cloudSession={cloud.cloudSession}
+        accessData={cloudAccessData}
+        activeProvider={activeAutomationProvider}
+        sessionRestoring={cloud.sessionRestoring}
+        onCloudSessionChange={cloud.onCloudSessionChange}
+        onRefresh={() => undefined}
+      />
+    </Suspense>
   );
 
   const pluginsView = (
@@ -679,11 +683,13 @@ export function DesktopWorkspaceContent({
                 onSelectAccessRow={setActiveCloudAccessRowId}
               />
             ) : resolvedActiveView === "automation" ? (
-              <DesktopCloudAutomationSidebar
-                accessData={cloudAccessData}
-                activeProvider={activeAutomationProvider}
-                onSelectProvider={handleAutomationProviderChange}
-              />
+              <Suspense fallback={<DesktopRouteLoading label="Loading automation navigation…" />}>
+                <LazyDesktopCloudAutomationSidebar
+                  accessData={cloudAccessData}
+                  activeProvider={activeAutomationProvider}
+                  onSelectProvider={handleAutomationProviderChange}
+                />
+              </Suspense>
             ) : resolvedActiveView === "plugins" ? (
               <PluginsSidebar
                 activeSection={activePluginsSection}
@@ -812,6 +818,14 @@ export function DesktopWorkspaceContent({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function DesktopRouteLoading({ label }: { label: string }) {
+  return (
+    <div className="desktop-view-route-loading" role="status" aria-live="polite">
+      {label}
     </div>
   );
 }
