@@ -1,6 +1,8 @@
-import { ArrowUp, AtSign, Check, ChevronDown, Paperclip, Plus, Sparkles, Square, X } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import type { AgentCommand, AgentFileReference, AgentInferenceProvider, AgentMode, AgentModel } from "../domain/agent-contract";
+import { ArrowUp, AtSign, Check, Paperclip, Plus, Sparkles, Square, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import type { AgentCommand, AgentFileReference, AgentInferenceProvider, AgentLocalConnection, AgentMode, AgentModel } from "../domain/agent-contract";
+import { AgentModelPicker } from "./AgentModelPicker";
+import { AgentProviderPicker } from "./AgentProviderPicker";
 
 type AgentComposerProps = {
   draft: string;
@@ -15,6 +17,10 @@ type AgentComposerProps = {
   providers?: AgentInferenceProvider[];
   selectedProviderId?: string | null;
   onSelectProvider?: (providerId: string) => void;
+  localConnections?: AgentLocalConnection[];
+  localConnectionsPhase?: "idle" | "loading" | "ready" | "error";
+  localConnectionsError?: string | null;
+  onDiscoverLocalConnections?: (refresh: boolean) => void | Promise<void>;
   models?: AgentModel[];
   selectedModel?: string | null;
   onSelectModel?: (model: string) => void;
@@ -32,6 +38,7 @@ type AgentComposerProps = {
   onAddContext?: (references: AgentFileReference[]) => void;
   onRemoveAttachment?: (path: string) => void;
   onRemoveContext?: (path: string) => void;
+  resolveFilePath?: (file: File) => string | null;
   onSubmit: (prompt: string) => Promise<boolean>;
   onStop: () => void;
 };
@@ -52,6 +59,10 @@ export function AgentComposer({
   providers = [],
   selectedProviderId = null,
   onSelectProvider,
+  localConnections = [],
+  localConnectionsPhase = "idle",
+  localConnectionsError = null,
+  onDiscoverLocalConnections = () => undefined,
   models = [],
   selectedModel = null,
   onSelectModel,
@@ -69,6 +80,7 @@ export function AgentComposer({
   onAddContext,
   onRemoveAttachment,
   onRemoveContext,
+  resolveFilePath,
   onSubmit,
   onStop,
 }: AgentComposerProps) {
@@ -82,10 +94,6 @@ export function AgentComposer({
     .filter((command) => command.name.toLowerCase().includes(commandQuery))
     .slice(0, 8);
   const canSendWhileRunning = steerAvailable || queueAvailable;
-  const selectedModelEntry = useMemo(
-    () => models.find((model) => model.model === selectedModel) ?? models[0] ?? null,
-    [models, selectedModel],
-  );
   const toolsAvailable = attachmentAvailable || contextAvailable || modes.length > 0;
 
   useEffect(() => {
@@ -146,9 +154,8 @@ export function AgentComposer({
     fileInputRef.current?.click();
   };
   const acceptFiles = (files: FileList | null) => {
-    const bridge = window.puppyoneDesktop;
     const references = Array.from(files ?? []).flatMap((file) => {
-      const path = bridge?.getPathForFile?.(file);
+      const path = resolveFilePath?.(file);
       return path ? [{ path, name: file.name }] : [];
     });
     if (pickMode === "context") onAddContext?.(references);
@@ -183,7 +190,7 @@ export function AgentComposer({
               title="Add context or change Agent mode"
               aria-haspopup="menu"
               aria-expanded={toolsOpen}
-              disabled={!toolsAvailable || disabled || running}
+              disabled={!toolsAvailable || inputDisabled || running}
               onClick={() => setToolsOpen((value) => !value)}
             >
               <Plus size={18} />
@@ -223,27 +230,26 @@ export function AgentComposer({
           />
           <input ref={fileInputRef} className="desktop-agent-visually-hidden" type="file" multiple tabIndex={-1} onChange={(event) => acceptFiles(event.target.files)} />
           <div className="desktop-agent-composer-trailing">
-            {providers.length > 0 && (
-              <div className="desktop-agent-select-pill is-provider" title="Model provider">
-                <label>
-                  <span className="desktop-agent-visually-hidden">Agent provider</span>
-                  <select value={selectedProviderId ?? ""} disabled={running} onChange={(event) => onSelectProvider?.(event.target.value)}>
-                    {!selectedProviderId && <option value="" disabled>Provider</option>}
-                    {providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.displayName}</option>)}
-                  </select>
-                </label>
-                <ChevronDown size={12} aria-hidden="true" />
-              </div>
-            )}
+            <div className="desktop-agent-composer-picker is-provider">
+              <AgentProviderPicker
+                providers={providers}
+                localConnections={localConnections}
+                localConnectionsPhase={localConnectionsPhase}
+                localConnectionsError={localConnectionsError}
+                selectedProviderId={selectedProviderId}
+                disabled={running}
+                onSelectProvider={(providerId) => onSelectProvider?.(providerId)}
+                onDiscoverLocalConnections={onDiscoverLocalConnections}
+              />
+            </div>
             {selectedProviderId && models.length > 0 && (
-              <div className="desktop-agent-select-pill is-model" title={selectedModelEntry?.description || selectedModelEntry?.displayName}>
-                <label>
-                  <span className="desktop-agent-visually-hidden">Agent model</span>
-                  <select value={selectedModel ?? ""} disabled={running} onChange={(event) => onSelectModel?.(event.target.value)}>
-                    {models.map((model) => <option key={model.id} value={model.model}>{model.displayName}</option>)}
-                  </select>
-                </label>
-                <ChevronDown size={12} aria-hidden="true" />
+              <div className="desktop-agent-composer-picker is-model">
+                <AgentModelPicker
+                  models={models}
+                  selectedModel={selectedModel}
+                  disabled={running}
+                  onSelectModel={(model) => onSelectModel?.(model)}
+                />
               </div>
             )}
             {running && <button type="button" className="desktop-agent-composer-action is-stop" aria-label={stopping ? `Stopping ${runtimeLabel}` : `Stop ${runtimeLabel}`} disabled={stopping} onClick={onStop}><Square size={11} fill="currentColor" /></button>}

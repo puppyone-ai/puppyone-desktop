@@ -178,6 +178,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     return () => ipcRenderer.removeListener("updates:state", listener);
   },
   discoverAgentProviders: (request) => ipcRenderer.invoke("agent:providers-discover", request),
+  discoverLocalAgentConnections: (request) => ipcRenderer.invoke("agent:local-connections-discover", request),
   listAgentModels: (request) => ipcRenderer.invoke("agent:models-list", request),
   readAgentAccount: (request) => ipcRenderer.invoke("agent:account-read", request),
   createAgentSession: (request) => ipcRenderer.invoke("agent:session-create", request),

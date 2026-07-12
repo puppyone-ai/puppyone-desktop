@@ -1,0 +1,24 @@
+import { ListTodo } from "lucide-react";
+import type { AgentActivity } from "../../domain/agent-projection-types";
+import { AgentPlanItem } from "../AgentPlanItem";
+import { AgentActivityShell } from "./AgentActivityShell";
+
+export function AgentPlanActivity({ activity }: { activity: AgentActivity }) {
+  const steps = Array.isArray(activity.detail.steps) ? activity.detail.steps.slice(0, 100).map((step) => {
+    const value = step && typeof step === "object" ? step as Record<string, unknown> : {};
+    return { step: String(value.step ?? "").slice(0, 2_000), status: String(value.status ?? "pending") };
+  }).filter((step) => step.step) : [];
+  const completed = steps.filter((step) => step.status === "completed").length;
+  return (
+    <AgentActivityShell
+      title="Plan"
+      summary={steps.length ? `${completed} of ${steps.length} steps complete` : activity.label}
+      status={activity.status}
+      icon={<ListTodo size={13} />}
+      className="desktop-agent-plan"
+      defaultExpanded={activity.status === "running"}
+    >
+      {steps.length > 0 && <AgentPlanItem steps={steps} />}
+    </AgentActivityShell>
+  );
+}

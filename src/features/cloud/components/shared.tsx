@@ -3,11 +3,11 @@ import { FilePreviewIcon, type Workspace } from "@puppyone/shared-ui";
 import { useState, type ReactNode } from "react";
 import type {
   DesktopCloudDashboard,
-  DesktopCloudHistory,
   DesktopCloudMcpEndpoint,
   DesktopCloudProject,
   DesktopCloudTreeEntry,
 } from "../../../lib/cloudApi";
+import type { DesktopCloudHistory } from "../../../lib/cloudHistoryApi";
 import type { CloudAccessIconComponent } from "../accessFilters";
 import type { CloudWorkspaceSection } from "../types";
 import { PageLoading } from "../../../components/loading";

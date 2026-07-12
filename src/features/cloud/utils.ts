@@ -1,12 +1,12 @@
 import { Bot, Cloud, Database, GitBranch, Link, Server, SquareTerminal } from "lucide-react";
 import type {
   DesktopCloudConnector,
-  DesktopCloudHistory,
   DesktopCloudMcpEndpoint,
   DesktopCloudRepoIdentity,
   DesktopCloudScope,
   DesktopCloudTreeEntry,
 } from "../../lib/cloudApi";
+import type { DesktopCloudHistory } from "../../lib/cloudHistoryApi";
 import type { GitCommitSummary } from "../../types/electron";
 import type { getPuppyoneRemote } from "../source-control/remotes";
 

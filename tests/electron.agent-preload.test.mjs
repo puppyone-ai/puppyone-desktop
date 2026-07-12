@@ -6,6 +6,7 @@ describe("Desktop Agent preload boundary", () => {
     const source = await readFile(new URL("../electron/preload.cjs", import.meta.url), "utf8");
     for (const name of [
       "discoverAgentProviders",
+      "discoverLocalAgentConnections",
       "listAgentModels",
       "readAgentAccount",
       "createAgentSession",
@@ -29,6 +30,7 @@ describe("Desktop Agent preload boundary", () => {
     }
     for (const channel of [
       "agent:providers-discover",
+      "agent:local-connections-discover",
       "agent:models-list",
       "agent:account-read",
       "agent:session-create",

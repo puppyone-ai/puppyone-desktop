@@ -1,5 +1,6 @@
 import { agentContractLimits } from "./constants.mjs";
 import { assertAgentEventEnvelope } from "./event-schema.mjs";
+import { sanitizeAgentLocalConnectionsSnapshot } from "./local-connection-schema.mjs";
 import {
   assertAgentInspection,
   assertAgentInferenceProvider,
@@ -24,6 +25,7 @@ import {
 
 export * from "./constants.mjs";
 export * from "./event-schema.mjs";
+export * from "./local-connection-schema.mjs";
 export * from "./runtime-schema.mjs";
 
 const {
@@ -36,6 +38,7 @@ export function parseAgentIpcRequest(channel, value) {
   const input = optionalRecord(value, channel);
   switch (channel) {
     case "agent:providers-discover":
+    case "agent:local-connections-discover":
     case "agent:models-list":
     case "agent:account-read":
       return compact({
@@ -135,6 +138,8 @@ export function assertAgentIpcResponse(channel, value) {
   switch (channel) {
     case "agent:providers-discover":
       return assertAgentInspection(value);
+    case "agent:local-connections-discover":
+      return sanitizeAgentLocalConnectionsSnapshot(value);
     case "agent:models-list":
       assertArray(value, "models").forEach(assertAgentModel);
       return value;

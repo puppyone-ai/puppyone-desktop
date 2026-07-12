@@ -1226,6 +1226,14 @@ export function App() {
                     setActiveView("git");
                     setSidebarCollapsed(false);
                   }}
+                  onOpenTerminal={desktopTerminalEnabled ? () => {
+                    setRightSidebarSurface("terminal");
+                    setRightSidebarOpen(true);
+                  } : undefined}
+                  onOpenFile={(path) => {
+                    handleActiveDataPathChange(path);
+                    navigateDesktopView("data");
+                  }}
                 />
               </div>
             )}

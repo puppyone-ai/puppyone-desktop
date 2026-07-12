@@ -1,6 +1,6 @@
 # Desktop Local Agent Chat architecture
 
-Status: target architecture accepted and active for the product Chat entry
+Status: implemented architecture for the product Chat entry
 behind the existing experimental `desktopAgentChat` gate. Production
 composition now registers OpenCode only and the UI has no runtime selector.
 The existing Codex app-server implementation remains isolated legacy debt, not
@@ -8,6 +8,15 @@ a peer runtime or fallback. Terminal remains a separate sibling surface.
 
 This document is intentionally made of prose and plain-text diagrams. It does
 not require a diagram renderer.
+
+Normative detail is split into two leaf specifications:
+
+- [Cursor-style Chat UI behavior](chat-ui-behavior-spec.md) defines user and
+  assistant messages, animation, Bash, read/search, write/edit, tools,
+  approvals, popovers, scrolling and visual evidence.
+- [Local Agent and Provider connection discovery](local-agent-connection-discovery.md)
+  defines how installed Codex/Cursor tools are recognized separately from
+  selectable OpenCode inference Providers.
 
 ## Product architecture
 
@@ -30,11 +39,16 @@ PuppyOne Desktop
       |     +-- provider/model/variant/agent-mode composer
       |
       +-- Application (provider-neutral)
+      |     +-- explicit AgentClientPort
       |     +-- workspace-scoped AgentSessionController
+      |     +-- saved-session lifecycle service
       |     +-- explicit phase/state machine
       |     +-- normalized event projection
       |     +-- sequence repair + 32 ms stream batching
       |     +-- session draft/scroll/measurement cache
+      |
+      +-- Infrastructure adapter
+      |     +-- the only feature module allowed to read window.puppyoneDesktop
       |
       +-- Typed preload IPC
       |     +-- explicit session/turn/control calls only
@@ -42,6 +56,10 @@ PuppyOne Desktop
       |
       +-- Electron main authority
             +-- AgentService: owner/session/order/replay/journal
+            +-- Local Agent Inventory
+            |     +-- Codex/Cursor executable + version discovery
+            |     +-- lazy auth/protocol compatibility probes
+            |     +-- detected-but-unbridged presentation state
             +-- OpenCode AgentRuntimePort adapter
             |     +-- pinned OpenCode sidecar (only product harness)
             |     +-- connected provider/model/session catalog
@@ -66,15 +84,21 @@ Model + variant      Provider-scoped model identity and only the options that
 Agent profile/mode   OpenCode behavior configuration such as Build or Plan;
                      not a harness.
 
+Local tool           A detected coding-agent installation such as Codex CLI
+                     or Cursor Agent. Detection is shown to the user but does
+                     not by itself make the tool a selectable Provider.
+
 Product session      PuppyOne mapping, UI projection and bounded redacted
                      cache pointing to one authoritative OpenCode session.
 ```
 
 “Codex” in the product provider/model controls means an OpenAI/ChatGPT route and
 a Codex-family model executed by OpenCode. `codex app-server`, Claude Code and
-Cursor CLI are agent products, not automatically valid model providers. A
-future authorized bridge may reuse their compute or credentials only at the
-provider layer; it must not replace or nest another loop behind OpenCode.
+Cursor CLI are agent products, not automatically valid model providers. They
+must still be detected and shown in the Local tools inventory with an exact
+status. A future authorized bridge may reuse their compute or credentials only
+at the provider layer; it must not replace or nest another loop behind
+OpenCode.
 
 The normal Chat UI never exposes harness choice. If OpenCode is unavailable,
 Chat fails closed with setup diagnostics instead of silently changing its
@@ -86,10 +110,14 @@ this product decision.
 ```text
 src/App.tsx
   -> desktop-agent/index.ts                 public feature API
-  -> ui/                                    React presentation
-  -> application/                           state machine + event synchronizer
-  -> domain/                                projection + renderer-safe model
-  -> shared/agent-contract/                 process-neutral DTO/schema contract
+  -> ui/                                    React presentation/composition
+       -> application/                      state machine + explicit client port
+            -> domain/                      projection + renderer-safe model
+                 -> shared/agent-contract/  process-neutral DTO/schema contract
+
+RightAgentPanel.tsx                         only Renderer composition root
+  -> infrastructure/electron/               preload adapter
+       -> application/AgentClientPort.ts     port implemented by the adapter
 
 Electron IPC
   -> AgentService / application/            ownership and use cases
@@ -105,9 +133,12 @@ The Registry and Port never import concrete runtimes. Product composition is
 fixed to OpenCode; a fake definition may still be injected in contract tests.
 Runtime neutrality is an internal dependency rule, not a product-level harness
 selector. Main domain never imports application or infrastructure; Renderer
-domain never imports application or UI. OpenCode payloads are normalized and
-bounded before IPC. `check-agent-architecture.mjs` enforces these rules in every
-production build.
+domain never imports application, infrastructure or UI. Renderer application
+never imports infrastructure, UI, React or browser globals. Only
+`infrastructure/electron/electronAgentClient.ts` reads the preload bridge, and
+only `RightAgentPanel.tsx` composes that adapter. OpenCode payloads are
+normalized and bounded before IPC. `check-agent-architecture.mjs` enforces
+these rules in every production build.
 
 ## Source layout
 
@@ -118,6 +149,7 @@ shared/agent-contract/
   schema.mjs                        strict IPC request/response boundary
   event-schema.mjs                  normalized event validation
   runtime-schema.mjs                inspection + capability validation
+  local-connection-schema.mjs       sanitized local-tool inventory DTO
   validation.mjs                    dependency-free schema primitives
 
 electron/main/agent/
@@ -128,6 +160,7 @@ electron/main/agent/
   bootstrap/
     create-agent-runtime-host.mjs     only concrete-runtime composition root
   application/
+    agent-event-journal.mjs           bounded delivery + durable journal writes
     agent-input-policy.mjs            trusted use-case input policy
     agent-runtime-catalog.mjs         discovery/inspection cache
     agent-session-store.mjs           window ownership + retired sessions
@@ -135,10 +168,24 @@ electron/main/agent/
     agent-session-model.mjs           session aggregate and DTO projection
   migrations/
     legacy-session-format.mjs         v1 Codex journal compatibility edge
+  connections/
+    local-agent-inventory.mjs         lazy five-minute cache + per-tool isolation
+    local-agent-connection-policy.mjs derived integration/selectability gates
+    tools/
+      local-agent-tool-registry.mjs   validated descriptor registry
+      codex-tool.mjs                  Codex inventory descriptor
+      cursor-tool.mjs                 Cursor inventory descriptor
+    probes/
+      executable-candidates.mjs       non-login deterministic candidate registry
+      bounded-probe-command.mjs       1.5s/16KiB direct-spawn boundary
+      codex-local-probe.mjs           version + bounded app-server account probe
+      cursor-local-probe.mjs          version + redacted status classification
   runtime/
     agent-runtime-port.mjs            OpenCode process + fake-test contract
     agent-runtime-registry.mjs        internal registry + main-owned host
     executable-discovery.mjs          bounded generic discovery
+  transports/
+    jsonl-rpc-connection.mjs          provider-neutral bounded child transport
   runtimes/opencode/
     opencode-manifest.mjs             release/source/capability pin
     opencode-discovery.mjs            exact bundle integrity + fallback
@@ -150,14 +197,16 @@ electron/main/agent/
     opencode-sidecar-adapter.mjs      AgentRuntimePort implementation
   runtimes/codex/
     codex-discovery.mjs               local CLI discovery/version/auth
-    codex-jsonl-rpc-connection.mjs    bounded app-server transport
     codex-app-server-adapter.mjs      legacy vertical-slice adapter
     codex-runtime-definition.mjs      pending removal from product composition
 
 src/features/desktop-agent/
   index.ts                            public feature entrypoint
   application/
+    AgentClientPort.ts                 explicit Renderer-side native port
     AgentSessionController.ts         framework-independent controller
+    AgentSessionLifecycle.ts          create/switch/fork/archive/delete/history
+    LocalAgentConnectionLoader.ts     lazy inventory presentation loader
     AgentEventSynchronizer.ts         batching + replay/gap repair
     SessionUiStateStore.ts            session draft/viewport measurements
     agent-controller-state.ts         state/transition vocabulary
@@ -166,10 +215,16 @@ src/features/desktop-agent/
     agent-contract.ts                 feature-local shared-contract alias
     agent-provider-routing.ts         pure Provider -> Model selection policy
     agent-projection.ts               event -> turn/part/row reducer
+    agent-projection-indexes.ts       lazy non-serializable lookup indexes
     agent-projection-types.ts         discriminated presentation model
     agent-projection-readers.ts       bounded payload readers
+    agent-activity-presentation.ts    pure Bash/read/write presentation readers
   ui/
     AgentPartRenderer.tsx             discriminated part registry
+    AgentProviderPicker.tsx           connected routes + local tools sections
+    AgentModelPicker.tsx              provider-scoped model selection
+    AgentPickerPopover.tsx            keyboard/ARIA/search disclosure primitive
+    activity/                         Bash/read/write/plan/reasoning renderers
     AgentQuestionDock.tsx             typed blocking questions
     AgentChangesPill.tsx              aggregate additions/deletions handoff
     SafeMarkdown.tsx                  no-innerHTML Markdown surface
@@ -177,7 +232,16 @@ src/features/desktop-agent/
     AgentComposer.tsx                 /, @, files and Provider/Model controls
     AgentVisualSmokeHarness.tsx       deterministic 420/560/760 visual QA
     RightAgentPanel.tsx               view composition only
-    desktop-agent.css                 complete responsive PuppyOne boundary
+    desktop-agent.css                 import-only public style entry
+    styles/
+      foundation.css                  panel/session/provider boundary
+      transcript.css                  conversation + safe Markdown
+      activities.css                  tool/command/diff/changes rows
+      blocking.css                    approval/question docks
+      composer.css                    composer + provider/model popovers
+      responsive.css                  container/motion/visual-QA rules
+  infrastructure/electron/
+    electronAgentClient.ts            only preload bridge access in feature
   visual-smoke.ts                     QA-only secondary feature entrypoint
   agentTypes.ts                       migration-only type re-export
   agentProjection.ts                  migration-only projection re-export
@@ -187,7 +251,68 @@ vendor/opencode/
   PROMPT_MANIFEST.json                source prompt hashes/order
   SOURCE_ADOPTION.md                  exact source ledger
   LICENSE                             upstream MIT text
+
+vendor/claudian/
+  SOURCE_ADOPTION.md                  exact frontend pattern/file ledger
+  SBOM.cdx.json                       CycloneDX source-reference record
+  LICENSE                             upstream MIT text
 ```
+
+## Responsibility and lifecycle closeout
+
+The implementation is split at transaction and ownership boundaries rather
+than at arbitrary line counts. Known hotspots have hard growth budgets in the
+architecture checker.
+
+```text
+Renderer live-session orchestration
+  AgentSessionController                  <= 500 lines
+    +-- AgentEventSynchronizer            streaming/gap replay/disposal
+    +-- AgentSessionLifecycle             saved-session mutations/history
+    +-- LocalAgentConnectionLoader        lazy local inventory
+    +-- SessionUiStateStore               bounded ephemeral LRU
+
+Pure projection
+  agent-projection.ts                     <= 550 lines
+    +-- agent-projection-readers.ts        hostile payload normalization
+    +-- agent-projection-indexes.ts        lazy lookup indexes
+
+Main transaction coordinator
+  agent-service.mjs                       <= 850 lines
+    +-- agent-input-policy.mjs             authorization/input policy
+    +-- agent-session-store.mjs            owner/session lifecycle
+    +-- agent-event-journal.mjs            replay/persistence/delivery
+
+Presentation
+  desktop-agent.css                       import-only entry
+    +-- six responsibility stylesheets    each <= 450 lines
+```
+
+`agent-service.mjs` deliberately retains create/resume/turn/approval/question
+transaction ordering in one coordinator: splitting those correlated security
+mutations across independent services would weaken owner and blocker
+invariants. Event journaling was extracted because it has an independent
+bounded contract. The pure projection reducer remains one exhaustive event
+transition table; payload readers and indexes are separate.
+
+All growing state has an explicit bound:
+
+```text
+controller history                  100 sessions
+queued follow-ups                    20 prompts; overflow is reported
+session UI cache                    100 LRU sessions
+row measurements                  1,000 per session
+event synchronizer buffer         2,000 events
+main replay journal               1,000 events / 2 MiB
+assistant/user message text         128 KiB per message
+activity/command text                64 KiB
+initial Markdown DOM                 24 KiB / 240 blocks
+picker option DOM                   120 rows; full catalog stays searchable
+```
+
+Dispose is terminal for Renderer services. Late inventory, event replay or
+initialization results cannot mutate a released controller. Sidebar unmount
+still does not stop a main-process turn; it only releases Renderer observers.
 
 ## Three owners of truth
 
@@ -200,7 +325,8 @@ OpenCode native truth
 PuppyOne main-process truth
   OpenCode process health, native-session mapping, canonical workspace,
   window owner, provider/model selection, approval/question correlation,
-  normalized sequence and bounded redacted projection cache
+  normalized sequence, bounded redacted projection cache and read-only local
+  Codex/Cursor installation inventory
                     |
                     v
 Renderer presentation truth
@@ -234,7 +360,7 @@ Right sidebar surface
 |     history / new / overflow        visible on hover or keyboard focus
 |
 +-- virtual conversation document
-|     user turn                       full-width bordered prompt surface
+|     user turn                       right-aligned quiet prompt bubble
 |     assistant turn                  unboxed readable document flow
 |     tool/plan activity              quiet text rows + progressive disclosure
 |     answer actions                  right-aligned truthful actions
@@ -244,35 +370,37 @@ Right sidebar surface
 +-- Changes pill                      real aggregate + / - counts
 |
 +-- anchored composer
-      one-row idle geometry           42 px outer height
+      compact two-zone geometry       64 px resting height
       left + menu                     attachments / context / Agent mode
-      middle input                    one line -> bounded multiline
+      middle input                    bounded multiline up to 184 px
       right controls                  provider -> model / stop or send
 ```
 
 Visible “You”, “OpenCode” or runtime badges are intentionally absent from each
 message because material and document order communicate authorship. The
-harness is not a product choice. User turns use one full-width quiet raised material;
+harness is not a product choice. User turns use a right-aligned quiet raised surface;
 assistant turns stay on canvas so long answers read like a document. Buttons
 appear only for real capabilities: the UI does not draw decorative microphone,
 rating or permission controls without an implemented action behind them.
 
-All `.desktop-agent-*` rules live in `ui/desktop-agent.css`; global
+All `.desktop-agent-*` rules live behind the import-only
+`ui/desktop-agent.css` entry in responsibility modules under `ui/styles/`; global
 `styles/layout.css` owns only the generic right-sidebar host. This prevents
 cascade order from changing the component when unrelated shell CSS evolves.
-The feature stylesheet uses semantic PuppyOne tokens, an 8 px horizontal
-reference gutter, 13 px user-message radius, 42 px collapsed composer and
+The feature stylesheet uses semantic PuppyOne tokens, 12-16 px responsive
+outside gutters, an 18 px user-message radius, a 64 px resting composer and
 container breakpoints at 760, 560 and 420 px. Focus and reduced-motion
-fallbacks remain explicit.
+fallbacks remain explicit. Exact target geometry and animation tokens live in
+[Cursor-style Chat UI behavior](chat-ui-behavior-spec.md).
 
 `#agent-visual-smoke` dynamically loads a deterministic conversation through
 the `visual-smoke.ts` secondary entrypoint. It is retained as a visual QA
 fixture while staying outside the normal Agent bundle and network/session
 path. Architecture tests enforce the CSS ownership boundary, responsive
-contracts, single-line growing composer, Changes aggregation and absence of a
-runtime selector. `desktop-agent.cursor-visual-contract.test.ts` locks the
-reference geometry so later feature work cannot silently reintroduce the old
-card stack or two-row composer.
+contracts, bounded growing composer, Changes aggregation and absence of a
+runtime selector. `desktop-agent.cursor-visual-contract.test.ts` must lock the
+approved reference geometry so later feature work cannot silently reintroduce
+the old card stack or native Provider menu.
 
 ## Provider routing boundary
 
@@ -556,3 +684,4 @@ controller. Cross-feature consumers import only `desktop-agent/index.ts`.
 - [OpenCode update and rollback runbook](opencode-upgrade-runbook.md)
 - [Right Sidebar product contract](right-sidebar.md)
 - [OpenCode source ledger](../../../vendor/opencode/SOURCE_ADOPTION.md)
+- [Claudian frontend source ledger](../../../vendor/claudian/SOURCE_ADOPTION.md)

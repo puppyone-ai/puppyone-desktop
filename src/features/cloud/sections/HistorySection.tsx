@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
-import { CloudProjectHistoryView } from "../CloudProjectHistory";
-import { useCloudBranchesData } from "../data/useCloudBranchesData";
-import { buildCloudBranchGraphRows } from "../model";
+import {
+  CloudProjectHistorySidebar,
+  CloudProjectHistoryView,
+} from "../history";
+import { useCloudHistoryController } from "../history/useCloudHistoryController";
 
 export function CloudHistorySection({
   projectId,
@@ -19,7 +20,7 @@ export function CloudHistorySection({
   onSessionChange: (session: DesktopCloudSession | null) => void;
   revisionKey?: string | null;
 }) {
-  const historyData = useCloudBranchesData({
+  const history = useCloudHistoryController({
     session: cloudSession,
     projectId,
     apiBaseUrl,
@@ -27,33 +28,28 @@ export function CloudHistorySection({
     revisionKey,
     onSessionChange,
   });
-  const rows = useMemo(
-    () => buildCloudBranchGraphRows(null, historyData.history),
-    [historyData.history],
-  );
-  const [selectedCommitId, setSelectedCommitId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const commitRows = rows.filter((row) => row.kind === "commit");
-    const headCommitId = historyData.history?.head_commit_id ?? null;
-    setSelectedCommitId((current) => {
-      if (current && commitRows.some((row) => row.id === current)) return current;
-      if (headCommitId && commitRows.some((row) => row.id === headCommitId)) return headCommitId;
-      return commitRows[0]?.id ?? null;
-    });
-  }, [historyData.history?.head_commit_id, rows]);
+  const sharedProps = {
+    rows: history.rows,
+    selectedCommitId: history.selectedCommitId,
+    loading: history.loading,
+    loadingMore: history.loadingMore,
+    hasMore: history.hasMore,
+    error: history.error,
+    warning: history.warning,
+    onSelectCommit: history.selectCommit,
+    onRefresh: history.reload,
+    onLoadMore: history.loadMore,
+  };
 
   return (
-    <CloudProjectHistoryView
-      projectId={projectId}
-      projectName={projectName}
-      history={historyData.history}
-      rows={rows}
-      selectedCommitId={selectedCommitId}
-      loading={historyData.loading}
-      error={historyData.error}
-      onSelectCommit={setSelectedCommitId}
-      onRefresh={historyData.reload}
-    />
+    <section className="desktop-cloud-history-surface" aria-label="Cloud project commit history">
+      <CloudProjectHistorySidebar {...sharedProps} />
+      <CloudProjectHistoryView
+        {...sharedProps}
+        projectId={projectId}
+        projectName={projectName}
+        history={history.history}
+      />
+    </section>
   );
 }

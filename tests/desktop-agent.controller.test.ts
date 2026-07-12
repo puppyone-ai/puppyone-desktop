@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { AgentSessionController } from "../src/features/desktop-agent/application/AgentSessionController";
+import {
+  AgentSessionController,
+  agentSessionControllerLimits,
+} from "../src/features/desktop-agent/application/AgentSessionController";
 import type { AgentEvent, AgentSessionSnapshot } from "../src/features/desktop-agent/agentTypes";
 
 describe("AgentSessionController", () => {
@@ -80,9 +83,81 @@ describe("AgentSessionController", () => {
     expect(controller.getSnapshot().inspection?.readiness).toMatchObject({ status: "installed-not-authenticated" });
     expect(controller.getSnapshot().projection.activities.filter((activity) => activity.kind === "error")).toHaveLength(1);
   });
+
+  it("discovers local tools only when the Provider surface requests them", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.discoverLocalAgentConnections = vi.fn(async () => ({
+      connections: [{
+        id: "codex",
+        displayName: "Codex CLI",
+        installation: "detected",
+        version: "0.144.1",
+        authentication: "signed-in",
+        integration: "bridge-required",
+        capabilities: { versionProbe: true, authenticationProbe: true, protocolProbe: true },
+        selectable: false,
+        statusMessage: "Direct Codex sessions are not enabled.",
+        actions: [{ id: "refresh", label: "Refresh" }],
+        source: "user-installation",
+      }],
+      scannedAt: "2026-07-12T00:00:00.000Z",
+      warnings: [],
+    }));
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+
+    await controller.initialize();
+    expect(bridge.discoverLocalAgentConnections).not.toHaveBeenCalled();
+
+    await controller.discoverLocalConnections();
+    expect(bridge.discoverLocalAgentConnections).toHaveBeenCalledWith({ rootPath: "/workspace", refresh: false });
+    expect(controller.getSnapshot()).toMatchObject({
+      localConnectionsPhase: "ready",
+      localConnectionsScannedAt: "2026-07-12T00:00:00.000Z",
+      localConnections: [expect.objectContaining({ id: "codex", selectable: false })],
+    });
+
+    await controller.discoverLocalConnections(true);
+    expect(bridge.discoverLocalAgentConnections).toHaveBeenLastCalledWith({ rootPath: "/workspace", refresh: true });
+  });
+
+  it("bounds queued prompts and reports backpressure instead of silently dropping work", async () => {
+    let eventListener: ((event: AgentEvent) => void) | null = null;
+    const bridge = bridgeFixture((listener) => { eventListener = listener; }, { queue: true });
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+    eventListener?.(event(2, "turn.started", { prompt: "Long task" }, "turn-queue"));
+    await new Promise((resolve) => setTimeout(resolve, 45));
+
+    for (let index = 0; index < agentSessionControllerLimits.maxQueuedPrompts; index += 1) {
+      await expect(controller.submit(`Follow-up ${index}`)).resolves.toBe(true);
+    }
+    await expect(controller.submit("Overflow")).resolves.toBe(false);
+    expect(controller.getSnapshot().error).toMatch(/queue is full/i);
+  });
+
+  it("does not publish late asynchronous state after renderer disposal", async () => {
+    const bridge = bridgeFixture(() => {});
+    const inspection = await bridge.discoverAgentProviders();
+    let resolveDiscovery: ((value: typeof inspection) => void) | null = null;
+    bridge.discoverAgentProviders.mockImplementationOnce(() => new Promise((resolve) => { resolveDiscovery = resolve; }));
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    const listener = vi.fn();
+    controller.subscribe(listener);
+
+    const initialize = controller.initialize();
+    expect(listener).toHaveBeenCalledTimes(1);
+    controller.dispose();
+    resolveDiscovery?.(inspection);
+    await initialize;
+
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
 });
 
-function bridgeFixture(onEvent: (listener: (event: AgentEvent) => void) => void) {
+function bridgeFixture(
+  onEvent: (listener: (event: AgentEvent) => void) => void,
+  capabilityOverrides: Partial<ReturnType<typeof capabilities>> = {},
+) {
   return {
     discoverAgentProviders: vi.fn(async () => ({
       runtimes: [{ descriptor: { id: "opencode", displayName: "OpenCode", priority: 100 }, readiness: readiness() }],
@@ -94,12 +169,14 @@ function bridgeFixture(onEvent: (listener: (event: AgentEvent) => void) => void)
       models: [{ id: "openai/gpt-5", model: "openai/gpt-5", providerId: "openai", displayName: "GPT-5", description: "OpenAI · GPT-5", isDefault: true }],
       modes: [{ id: "build", displayName: "Build", description: "", isDefault: true }],
       commands: [],
-      capabilities: capabilities(),
+      capabilities: capabilities(capabilityOverrides),
       warnings: [],
     })),
-    resumeAgentSession: vi.fn(async () => snapshot("session-1", [event(1, "session.resumed", { title: "Session" })])),
-    createAgentSession: vi.fn(async () => snapshot("session-2", [event(1, "session.started", { title: "New" }, null, null, "session-2")])),
-    replayAgentSession: vi.fn(async () => snapshot("session-1", [event(4, "assistant.completed", { text: "Working" }, "turn-1", "message-1")])),
+    discoverLocalAgentConnections: vi.fn(async () => ({ connections: [], scannedAt: "2026-07-12T00:00:00.000Z", warnings: [] })),
+    resumeAgentSession: vi.fn(async () => snapshot("session-1", [event(1, "session.resumed", { title: "Session" })], capabilityOverrides)),
+    createAgentSession: vi.fn(async () => snapshot("session-2", [event(1, "session.started", { title: "New" }, null, null, "session-2")], capabilityOverrides)),
+    startAgentTurn: vi.fn(async () => ({ turnId: "turn-next" })),
+    replayAgentSession: vi.fn(async () => snapshot("session-1", [event(4, "assistant.completed", { text: "Working" }, "turn-1", "message-1")], capabilityOverrides)),
     closeAgentSession: vi.fn(async () => ({ sessionId: "session-1", closed: true })),
     listAgentSessions: vi.fn(async () => []),
     onAgentEvent: vi.fn((listener: (event: AgentEvent) => void) => { onEvent(listener); return () => {}; }),
@@ -107,7 +184,11 @@ function bridgeFixture(onEvent: (listener: (event: AgentEvent) => void) => void)
   };
 }
 
-function snapshot(sessionId: string, events: AgentEvent[]): AgentSessionSnapshot {
+function snapshot(
+  sessionId: string,
+  events: AgentEvent[],
+  capabilityOverrides: Partial<ReturnType<typeof capabilities>> = {},
+): AgentSessionSnapshot {
   return {
     session: {
       id: sessionId,
@@ -130,7 +211,7 @@ function snapshot(sessionId: string, events: AgentEvent[]): AgentSessionSnapshot
     models: [{ id: "openai/gpt-5", model: "openai/gpt-5", providerId: "openai", displayName: "GPT-5", description: "OpenAI · GPT-5", isDefault: true }],
     modes: [{ id: "build", displayName: "Build", description: "", isDefault: true }],
     commands: [],
-    capabilities: capabilities(),
+    capabilities: capabilities(capabilityOverrides),
     events,
     partial: false,
     firstAvailableSequence: events[0]?.sequence ?? 1,
@@ -142,8 +223,8 @@ function readiness() {
   return { runtimeId: "opencode", provider: "opencode", status: "ready" as const, version: "1.17.18", minimumVersion: "1.17.18", message: "ready" };
 }
 
-function capabilities() {
-  return { streamingText: true, structuredToolEvents: true, commandOutputStreaming: true, fileChangeEvents: true, manualApprovals: true, structuredQuestions: true, resume: true, fork: true, steer: false, queue: false, attachments: true, contextReferences: true, modelSelection: true, modeSelection: true, slashCommands: true, sessionHistory: true, usage: true, accountState: true, mcp: true, skills: true, compaction: true };
+function capabilities(overrides: Partial<Record<string, boolean>> = {}) {
+  return { streamingText: true, structuredToolEvents: true, commandOutputStreaming: true, fileChangeEvents: true, manualApprovals: true, structuredQuestions: true, resume: true, fork: true, steer: false, queue: false, attachments: true, contextReferences: true, modelSelection: true, modeSelection: true, slashCommands: true, sessionHistory: true, usage: true, accountState: true, mcp: true, skills: true, compaction: true, ...overrides };
 }
 
 function event(sequence: number, type: AgentEvent["type"], payload: Record<string, unknown>, turnId: string | null = null, itemId: string | null = null, sessionId = "session-1"): AgentEvent {

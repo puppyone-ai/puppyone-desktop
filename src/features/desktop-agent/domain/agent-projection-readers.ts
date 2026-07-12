@@ -1,5 +1,40 @@
 import type { AgentEvent } from "./agent-contract";
-import type { AgentActivity, AgentApproval, AgentQuestionPrompt } from "./agent-projection-types";
+import type {
+  AgentActivity,
+  AgentActivityStatus,
+  AgentApproval,
+  AgentQuestionPrompt,
+} from "./agent-projection-types";
+
+const ACTIVITY_STATUS_ALIASES: Readonly<Record<string, AgentActivityStatus>> = Object.freeze({
+  queued: "queued",
+  running: "running",
+  pending: "pending",
+  "in-progress": "in-progress",
+  in_progress: "in-progress",
+  working: "running",
+  "waiting-for-user": "waiting-for-user",
+  waiting_for_user: "waiting-for-user",
+  completed: "completed",
+  complete: "completed",
+  done: "completed",
+  success: "succeeded",
+  succeeded: "succeeded",
+  failed: "failed",
+  failure: "failed",
+  error: "failed",
+  warning: "warning",
+  blocked: "blocked",
+  cancelled: "cancelled",
+  canceled: "cancelled",
+  interrupted: "interrupted",
+});
+
+export function normalizeAgentActivityStatus(value: unknown, fallback: AgentActivityStatus = "unknown") {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (!normalized) return fallback;
+  return ACTIVITY_STATUS_ALIASES[normalized] ?? "unknown";
+}
 
 export function readQuestions(value: unknown): AgentQuestionPrompt[] {
   if (!Array.isArray(value)) return [];
@@ -35,7 +70,7 @@ export function pickUsage(payload: Record<string, unknown>) {
 
 export function pickSafeActivityDetail(payload: Record<string, unknown>) {
   const detail: Record<string, unknown> = {};
-  for (const key of ["command", "cwd", "delta", "status", "kind", "tool", "description", "path", "changes", "steps", "title", "message", "input", "outputPreview", "error", "content", "detail", "outputPaths"]) {
+  for (const key of ["command", "cwd", "delta", "status", "kind", "tool", "description", "path", "query", "changes", "steps", "title", "message", "input", "outputPreview", "error", "content", "detail", "metadata", "exitCode", "duration", "diff", "patch", "outputPaths"]) {
     if (!(key in payload)) continue;
     detail[key] = boundProjectionValue(payload[key]);
   }

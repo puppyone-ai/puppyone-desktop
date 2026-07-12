@@ -17,7 +17,7 @@ type ApiEnvelope<T> = {
   error?: string;
 };
 
-type MutableSessionHandler = (session: DesktopCloudSession | null) => void | Promise<void>;
+export type MutableSessionHandler = (session: DesktopCloudSession | null) => void | Promise<void>;
 
 export type DesktopCloudSession = {
   expires_in: number;
@@ -222,31 +222,6 @@ export type DesktopCloudAccessPointSemantics = {
   } | null;
 };
 
-export type DesktopCloudHistoryChange = {
-  path: string;
-  action?: "add" | "update" | "delete";
-  op?: "added" | "modified" | "deleted";
-};
-
-export type DesktopCloudHistoryCommit = {
-  commit_id: string;
-  who?: string;
-  message?: string;
-  changes?: DesktopCloudHistoryChange[];
-  conflicts?: Array<Record<string, unknown>>;
-  root_hash?: string;
-  scope_hash?: string;
-  scope_path?: string;
-  created_at?: string | null;
-  audit_detail?: Record<string, unknown> | null;
-};
-
-export type DesktopCloudHistory = {
-  project_id: string;
-  commits: DesktopCloudHistoryCommit[];
-  head_commit_id?: string | null;
-};
-
 export type DesktopCloudScope = {
   id: string;
   project_id: string;
@@ -360,6 +335,56 @@ export type DesktopCloudCreateAutomationResult = {
   /** Legacy server response key. Product/domain code calls this Automation. */
   sync: DesktopCloudAutomationConnection;
   execution_result?: Record<string, unknown> | null;
+};
+
+export type DesktopCloudAutomationOauthStatus = {
+  connected: boolean;
+  workspace_name: string | null;
+  connected_at: string | null;
+  connection_id: number | null;
+};
+
+export type DesktopCloudAutomationProviderResource = {
+  id: string;
+  type: string;
+  name: string;
+  url: string | null;
+  subtitle: string | null;
+  icon: string | null;
+  authorized: boolean;
+  metadata: Record<string, unknown>;
+};
+
+export type DesktopCloudAutomationProviderResources = {
+  resources: DesktopCloudAutomationProviderResource[];
+  next_cursor: string | null;
+};
+
+export type DesktopCloudUpdateAutomationConnectionRequest = {
+  config?: Record<string, unknown>;
+  target_path?: string;
+  direction?: string;
+  conflict_strategy?: string;
+};
+
+export type DesktopCloudUpdateAutomationTriggerRequest = {
+  sync_mode: "manual" | "scheduled" | "realtime";
+  trigger?: { type: string; schedule?: string; timezone?: string } | null;
+};
+
+export type DesktopCloudAutomationRun = {
+  id: string;
+  access_point_id: string;
+  status: string;
+  worker_job_id?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  duration_ms?: number | null;
+  exit_code?: number | null;
+  stdout?: string | null;
+  error?: string | null;
+  trigger_type?: string | null;
+  result_summary?: string | null;
 };
 
 export type DesktopCloudMcpEndpoint = {
@@ -816,16 +841,6 @@ export function getCloudAccessPointSemantics(
   );
 }
 
-export function getCloudHistory(
-  session: DesktopCloudSession,
-  projectId: string,
-  limit = 20,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudHistory> {
-  return cloudApiRequest<DesktopCloudHistory>(`/content/${projectId}/commits?limit=${limit}`, session, onSessionChange, {}, apiBaseUrl);
-}
-
 export function listCloudScopes(
   session: DesktopCloudSession,
   projectId: string,
@@ -888,8 +903,106 @@ export function updateCloudConnector(
 // use Automation terminology and reach those routes only through this adapter.
 const CLOUD_AUTOMATION_LEGACY_WIRE_BASE = "/integrations";
 
+// Connector provider keys are part of the desktop domain model, while the
+// OAuth router has an independently-established slug contract. Keep the
+// translation private to this transport adapter so UI code never guesses it.
+const CLOUD_AUTOMATION_OAUTH_SLUG_BY_PROVIDER: Readonly<Record<string, string>> = Object.freeze({
+  airtable: "airtable",
+  github: "github",
+  gmail: "gmail",
+  google_calendar: "google-calendar",
+  google_docs: "google-docs",
+  google_drive: "google-drive",
+  google_search_console: "google-search-console",
+  google_sheets: "google-sheets",
+  linear: "linear",
+  notion: "notion",
+});
+
 function cloudAutomationWirePath(suffix: string) {
   return `${CLOUD_AUTOMATION_LEGACY_WIRE_BASE}${suffix}`;
+}
+
+function cloudAutomationOauthPath(provider: string, suffix: "status" | "authorize") {
+  const slug = CLOUD_AUTOMATION_OAUTH_SLUG_BY_PROVIDER[provider.trim().toLowerCase()];
+  if (!slug) throw new Error(`OAuth is not available for Automation provider ${provider}.`);
+  return `/oauth/${slug}/${suffix}`;
+}
+
+export function supportsCloudAutomationOauth(provider: string) {
+  return Boolean(CLOUD_AUTOMATION_OAUTH_SLUG_BY_PROVIDER[provider.trim().toLowerCase()]);
+}
+
+export function getCloudAutomationOauthStatus(
+  session: DesktopCloudSession,
+  provider: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudAutomationOauthStatus> {
+  return cloudApiRequest<DesktopCloudAutomationOauthStatus>(
+    cloudAutomationOauthPath(provider, "status"),
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  );
+}
+
+export async function getCloudAutomationOauthAuthorizeUrl(
+  session: DesktopCloudSession,
+  provider: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<string> {
+  const response = await cloudApiRequest<{ authorization_url: string }>(
+    cloudAutomationOauthPath(provider, "authorize"),
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  );
+  const authorizationUrl = response.authorization_url?.trim();
+  if (!authorizationUrl) throw new Error("Cloud did not return an authorization URL.");
+  return authorizationUrl;
+}
+
+export async function openCloudAutomationAuthorizationUrl(authorizationUrl: string): Promise<void> {
+  let url: URL;
+  try {
+    url = new URL(authorizationUrl);
+  } catch {
+    throw new Error("Cloud returned an invalid authorization URL.");
+  }
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+    throw new Error("Cloud returned an unsafe authorization URL.");
+  }
+  if (window.puppyoneDesktop?.openExternalUrl) {
+    await window.puppyoneDesktop.openExternalUrl(url.toString());
+    return;
+  }
+  const opened = window.open(url.toString(), "_blank", "noopener,noreferrer");
+  if (!opened) throw new Error("The authorization page could not be opened.");
+}
+
+export function listCloudAutomationProviderResources(
+  session: DesktopCloudSession,
+  provider: string,
+  options: { q?: string; cursor?: string | null; resourceType?: string | null } = {},
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudAutomationProviderResources> {
+  const query = new URLSearchParams();
+  if (options.q?.trim()) query.set("q", options.q.trim());
+  if (options.cursor) query.set("cursor", options.cursor);
+  if (options.resourceType) query.set("resource_type", options.resourceType);
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return cloudApiRequest<DesktopCloudAutomationProviderResources>(
+    cloudAutomationWirePath(`/providers/${encodeURIComponent(provider)}/resources${suffix}`),
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  );
 }
 
 export function listCloudAutomationProviderSpecs(
@@ -920,6 +1033,70 @@ export function createCloudAutomation(
       method: "POST",
       body: JSON.stringify(body),
     },
+    apiBaseUrl,
+  );
+}
+
+export function updateCloudAutomationConnection(
+  session: DesktopCloudSession,
+  connectionId: string,
+  body: DesktopCloudUpdateAutomationConnectionRequest,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudAutomationConnection> {
+  return cloudApiRequest<DesktopCloudAutomationConnection>(
+    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}`),
+    session,
+    onSessionChange,
+    { method: "PATCH", body: JSON.stringify(body) },
+    apiBaseUrl,
+  );
+}
+
+export function updateCloudAutomationTrigger(
+  session: DesktopCloudSession,
+  connectionId: string,
+  body: DesktopCloudUpdateAutomationTriggerRequest,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<unknown> {
+  return cloudApiRequest<unknown>(
+    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}/trigger`),
+    session,
+    onSessionChange,
+    { method: "PATCH", body: JSON.stringify(body) },
+    apiBaseUrl,
+  );
+}
+
+export function listCloudAutomationConnectionRuns(
+  session: DesktopCloudSession,
+  connectionId: string,
+  limit = 10,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudAutomationRun[]> {
+  const normalizedLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
+  return cloudApiRequest<DesktopCloudAutomationRun[]>(
+    cloudAutomationWirePath(`/connections/${encodeURIComponent(connectionId)}/runs?limit=${normalizedLimit}`),
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  );
+}
+
+export function getCloudAutomationRun(
+  session: DesktopCloudSession,
+  runId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudAutomationRun> {
+  return cloudApiRequest<DesktopCloudAutomationRun>(
+    cloudAutomationWirePath(`/runs/${encodeURIComponent(runId)}`),
+    session,
+    onSessionChange,
+    {},
     apiBaseUrl,
   );
 }
@@ -1176,6 +1353,10 @@ function normalizeCloudBridgeError(error: unknown): Error {
     .replace(/^Error:\s*/i, "")
     .trim();
   const normalized = new Error(message || "Cloud request failed.");
+  const sourceStatus = isRecord(error) && typeof error.status === "number" ? error.status : undefined;
+  const statusFromMessage = message.match(/(?:request failed|status)\s*\(?([1-5]\d\d)\)?/i)?.[1];
+  const status = sourceStatus ?? (statusFromMessage ? Number(statusFromMessage) : undefined);
+  if (status) (normalized as Error & { status?: number }).status = status;
   if (/invalid or expired token|sign in again/i.test(message)) {
     (normalized as Error & { status?: number }).status = 401;
   }

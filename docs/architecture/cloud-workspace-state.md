@@ -107,7 +107,17 @@ desktop/src/features/cloud/
     useCloudProjects.ts
     useCloudProjectOverview.ts
     useCloudAccessData.ts
-    useCloudBranchesData.ts
+
+  history/
+    useCloudHistoryData.ts
+    useCloudHistoryController.ts
+    pagination.ts
+
+  graph/
+    model.ts
+    cloudTopology.ts
+    gitTopology.ts
+    shared.ts
 
   routes/
     cloudRoutes.ts

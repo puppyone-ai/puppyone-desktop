@@ -3,7 +3,6 @@ import {
   listCloudProjects,
   type DesktopCloudConnector,
   type DesktopCloudDashboard,
-  type DesktopCloudHistory,
   type DesktopCloudMcpEndpoint,
   type DesktopCloudProject,
   type DesktopCloudProjectReadiness,
@@ -12,6 +11,7 @@ import {
   type DesktopCloudSession,
   type DesktopCloudTree,
 } from "../../../lib/cloudApi";
+import type { DesktopCloudHistory } from "../../../lib/cloudHistoryApi";
 import type { CloudEnvironment } from "../environment";
 import { loadCloudProjectDetails } from "./cloudProjectDetails";
 

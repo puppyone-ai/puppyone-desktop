@@ -112,7 +112,8 @@ Model inference
 
 Local coding-product subscriptions
   Codex CLI, Claude Code or Cursor installation does not imply reusable model
-  entitlement. Only a documented authorized provider bridge may reuse it.
+  entitlement. PuppyOne may detect and show the installation in Local tools;
+  only a documented authorized provider bridge may make it selectable.
 ```
 
 This keeps the first product version economically simple: PuppyOne absorbs

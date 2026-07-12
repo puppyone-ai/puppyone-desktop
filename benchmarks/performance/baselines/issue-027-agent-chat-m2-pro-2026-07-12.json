@@ -1,0 +1,47 @@
+{
+  "schema": "puppyone-agent-chat-performance-evidence/v1",
+  "environment": {
+    "capturedAt": "2026-07-12",
+    "platform": "darwin-arm64",
+    "cpu": "Apple M2 Pro",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "node": "22.22.3",
+    "benchmarkRunner": "vitest 4.1.10",
+    "dom": "happy-dom",
+    "note": "Synchronous DOM regression signal; production Electron visual/Long Task evidence remains a separate release gate."
+  },
+  "scenarios": {
+    "projection4000EventsTo2000Rows": {
+      "meanMs": 2.1669,
+      "p99Ms": 2.7667
+    },
+    "steadyDeltaAt2000Rows": {
+      "meanMs": 0.4543,
+      "p99Ms": 0.8339
+    },
+    "virtualTranscriptMount2000Rows": {
+      "meanMs": 4.452,
+      "p99Ms": 9.5875,
+      "maxMountedRows": 120
+    },
+    "safeMarkdownInitial128KiB": {
+      "meanMs": 12.5749,
+      "p99Ms": 15.043,
+      "maxInitialTextBytes": 24576,
+      "maxInitialBlocks": 240
+    },
+    "expandedCommand64KiBAndDiff240Lines": {
+      "meanMs": 6.4576,
+      "p99Ms": 8.954,
+      "maxCommandBytes": 65536,
+      "maxDiffLines": 240
+    },
+    "searchablePicker500Models": {
+      "meanMs": 16.4445,
+      "p99Ms": 33.0768,
+      "maxMountedOptions": 120
+    }
+  },
+  "command": "npx vitest bench --run benchmarks/performance/agent-chat.bench.ts --no-file-parallelism --maxWorkers=1"
+}
