@@ -5,8 +5,10 @@ import crypto from "node:crypto";
 import { spawn as nodeSpawn } from "node:child_process";
 import { redactSecretText } from "../../agent-events.mjs";
 import { compareVersions, discoverExecutable } from "../../runtime/executable-discovery.mjs";
-import { OPENCODE_RELEASE_ARTIFACTS, OPENCODE_UPSTREAM } from "./opencode-manifest.mjs";
-import { OPEN_CODE_LOCKED_ENVIRONMENT } from "./opencode-security-policy.mjs";
+import { PUPPYONE_AGENT_RUNTIME_ID } from "./puppyone-agent-identity.mjs";
+import { OPENCODE_RELEASE_ARTIFACTS, OPENCODE_UPSTREAM } from "../opencode-protocol/opencode-manifest.mjs";
+import { OPEN_CODE_LOCKED_ENVIRONMENT } from "../opencode-protocol/opencode-security-policy.mjs";
+import { parseOpenCodeVersion } from "../opencode-protocol/opencode-version.mjs";
 
 export function createOpenCodeDiscovery(options = {}) {
   let cached = null;
@@ -124,8 +126,8 @@ export async function discoverOpenCodeExecutable({
     };
   }
   return {
-    provider: "opencode",
-    runtimeId: "opencode",
+    provider: PUPPYONE_AGENT_RUNTIME_ID,
+    runtimeId: PUPPYONE_AGENT_RUNTIME_ID,
     source,
     pinnedVersion: OPENCODE_UPSTREAM.sourceVersion,
     upstreamCommit: OPENCODE_UPSTREAM.commit,
@@ -140,13 +142,7 @@ export async function discoverOpenCodeExecutable({
   };
 }
 
-export function parseOpenCodeVersion(value) {
-  for (const line of String(value).split(/\r?\n/)) {
-    const match = line.trim().match(/^(?:opencode(?:\s+version)?\s+)?v?(\d+\.\d+\.\d+)$/i);
-    if (match) return match[1];
-  }
-  return null;
-}
+export { parseOpenCodeVersion } from "../opencode-protocol/opencode-version.mjs";
 
 export function buildOpenCodeEnvironment(baseEnv, loginEnv, { managedConfigDir, homedir = os.homedir() } = {}) {
   const merged = { ...baseEnv, ...loginEnv };

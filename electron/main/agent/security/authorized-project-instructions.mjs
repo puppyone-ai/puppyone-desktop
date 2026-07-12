@@ -1,17 +1,21 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const PROJECT_INSTRUCTION_NAMES = Object.freeze(["AGENTS.md", "CLAUDE.md", "CONTEXT.md"]);
+const DEFAULT_PROJECT_INSTRUCTION_NAMES = Object.freeze(["AGENTS.md", "CONTEXT.md"]);
 const MAX_PROJECT_INSTRUCTION_BYTES = 256 * 1024;
 
 /**
- * OpenCode's automatic project-config walk is disabled. This is the narrow,
- * main-owned replacement for project instructions: one known filename, one
- * canonical workspace, no external symlink target, and a strict byte limit.
+ * Native backends' automatic project-config walks are disabled at their
+ * adapters. This is the narrow main-owned replacement: one known filename,
+ * one canonical workspace, no external symlink target, and a strict byte
+ * limit. The backend's own system prompt remains authoritative.
  */
-export async function loadAuthorizedProjectInstructions(workspaceRoot, { fsModule = fs } = {}) {
+export async function loadAuthorizedProjectInstructions(workspaceRoot, {
+  fsModule = fs,
+  instructionNames = DEFAULT_PROJECT_INSTRUCTION_NAMES,
+} = {}) {
   const canonicalRoot = await fsModule.promises.realpath(path.resolve(workspaceRoot));
-  for (const name of PROJECT_INSTRUCTION_NAMES) {
+  for (const name of normalizeInstructionNames(instructionNames)) {
     const requestedPath = path.join(canonicalRoot, name);
     let canonicalPath;
     try {
@@ -62,7 +66,17 @@ function isSameOrInsidePath(rootPath, candidatePath) {
   return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
 }
 
-export const openCodeProjectInstructionPolicy = Object.freeze({
-  filenames: PROJECT_INSTRUCTION_NAMES,
+export const authorizedProjectInstructionPolicy = Object.freeze({
+  defaultFilenames: DEFAULT_PROJECT_INSTRUCTION_NAMES,
   maxBytes: MAX_PROJECT_INSTRUCTION_BYTES,
 });
+
+function normalizeInstructionNames(value) {
+  if (!Array.isArray(value)) throw new TypeError("Project instruction names must be an array.");
+  return value.slice(0, 8).map((name) => {
+    if (typeof name !== "string" || !/^[A-Za-z0-9._-]{1,120}$/.test(name)) {
+      throw new TypeError("Project instruction filename is invalid.");
+    }
+    return name;
+  });
+}

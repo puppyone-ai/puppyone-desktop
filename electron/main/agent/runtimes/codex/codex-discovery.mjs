@@ -58,6 +58,6 @@ export function parseCodexVersion(value) {
 
 export { compareVersions, readLoginShellEnvironment };
 
-export function buildProviderEnvironment(baseEnv, loginEnv) {
-  return buildAgentEnvironment(baseEnv, loginEnv);
+export function buildProviderEnvironment(baseEnv, loginEnv, options) {
+  return buildAgentEnvironment(baseEnv, loginEnv, options);
 }

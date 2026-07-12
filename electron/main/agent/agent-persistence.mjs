@@ -10,7 +10,7 @@ const MAX_SESSIONS = 100;
 const MAX_EVENTS_PER_SESSION = 1_000;
 const MAX_SESSION_BYTES = 1024 * 1024;
 const MAX_JOURNAL_BYTES = 24 * 1024 * 1024;
-const JOURNAL_VERSION = 2;
+const JOURNAL_VERSION = 3;
 
 export function createAgentPersistence({ app, filename = "desktop-agent-sessions.json", fsModule = fs, logger = console }) {
   const filePath = path.join(app.getPath("userData"), filename);
@@ -140,17 +140,22 @@ function fitJournal(sessions) {
 }
 
 function normalizeRecord(record) {
+  const runtimeId = resolvePersistedRuntimeId(record);
   const sourceEvents = Array.isArray(record.events)
     ? record.events.filter((event) => isAgentEventEnvelope(event) && event.type !== "command.output.delta")
     : [];
-  const candidateEvents = sourceEvents.slice(-MAX_EVENTS_PER_SESSION).map((event) => redactSecrets(event));
+  const candidateEvents = sourceEvents.slice(-MAX_EVENTS_PER_SESSION).map((event) => redactSecrets({
+    ...event,
+    runtimeId,
+    provider: runtimeId,
+  }));
   let partial = candidateEvents.length < sourceEvents.length || Boolean(record.partial);
   const safe = redactSecrets({
     sessionId: normalizeId(record.sessionId),
     workspaceRoot: normalizePath(record.workspaceRoot),
-    runtimeId: normalizeRuntimeId(record.runtimeId || record.provider),
-    provider: normalizeRuntimeId(record.runtimeId || record.provider),
-    runtime: normalizeRuntime(record.runtime, record.runtimeId || record.provider),
+    runtimeId,
+    provider: runtimeId,
+    runtime: normalizeRuntime(record.runtime, runtimeId),
     providerSessionId: normalizeOptionalId(record.providerSessionId),
     title: normalizeText(record.title, 200) || "Agent session",
     createdAt: normalizeDate(record.createdAt),
@@ -194,7 +199,9 @@ function migrateRecord(record) {
 }
 
 function normalizeRuntime(runtime, fallbackId) {
-  const id = normalizeRuntimeId(runtime?.id || fallbackId);
+  // The product-session runtime id is authoritative. Descriptor snapshots may
+  // carry a historical alias, but can never change backend ownership.
+  const id = normalizeRuntimeId(fallbackId);
   return {
     id,
     displayName: normalizeText(runtime?.displayName, 100) || defaultRuntimeName(id),

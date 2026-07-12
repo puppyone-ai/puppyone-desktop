@@ -3,8 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { discoverOpenCodeExecutable, parseOpenCodeVersion, verifyBundledOpenCodeRuntime } from "../electron/main/agent/runtimes/opencode/opencode-discovery.mjs";
-import { OPENCODE_RELEASE_ARTIFACTS, OPENCODE_UPSTREAM } from "../electron/main/agent/runtimes/opencode/opencode-manifest.mjs";
+import { discoverOpenCodeExecutable, parseOpenCodeVersion, verifyBundledOpenCodeRuntime } from "../electron/main/agent/runtimes/puppyone-agent/managed-opencode-discovery.mjs";
+import { OPENCODE_RELEASE_ARTIFACTS, OPENCODE_UPSTREAM } from "../electron/main/agent/runtimes/opencode-protocol/opencode-manifest.mjs";
 
 const roots = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => fs.promises.rm(root, { recursive: true, force: true }))));

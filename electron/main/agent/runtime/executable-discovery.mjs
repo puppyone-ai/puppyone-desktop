@@ -44,19 +44,21 @@ export async function discoverExecutable({
   minimumVersion,
   label,
   buildEnvironment = buildAgentEnvironment,
+  buildProbeEnvironment = (runtimeEnvironment) => runtimeEnvironment,
   validateCandidate,
   searchPath = true,
+  loadLoginShellEnvironment = false,
 }) {
   let loginEnv = {};
   let environmentWarning = null;
-  if (searchPath) {
+  if (searchPath && loadLoginShellEnvironment) {
     try {
       loginEnv = await readLoginShellEnvironment({ spawn, env, platform });
     } catch (error) {
       environmentWarning = error instanceof Error ? error.message : String(error);
     }
   }
-  const environment = buildEnvironment(env, loginEnv);
+  const environment = buildEnvironment(env, loginEnv, { homedir, platform });
   const executablePath = await resolveExecutable({
     fsModule,
     executableNames,
@@ -79,8 +81,13 @@ export async function discoverExecutable({
     };
   }
   try {
+    const probeEnvironment = await buildProbeEnvironment(environment, {
+      executablePath,
+      homedir,
+      platform,
+    });
     const result = await runBounded(spawn, executablePath, ["--version"], {
-      env: environment,
+      env: probeEnvironment,
       timeoutMs: VERSION_TIMEOUT_MS,
       maxBytes: MAX_DISCOVERY_OUTPUT,
       label,
@@ -220,13 +227,32 @@ export function runBounded(spawn, file, args, {
   });
 }
 
-export function buildAgentEnvironment(baseEnv, loginEnv) {
+export function buildAgentEnvironment(baseEnv, loginEnv, {
+  homedir = os.homedir(),
+  platform = process.platform,
+} = {}) {
+  const merged = { ...baseEnv, ...loginEnv };
   return {
-    ...baseEnv,
-    ...loginEnv,
+    ...merged,
+    PATH: deterministicAgentPath(merged.PATH, { homedir, platform }),
     TERM: "dumb",
     PUPPYONE_AGENT: "1",
   };
+}
+
+function deterministicAgentPath(value, { homedir, platform }) {
+  const separator = platform === "win32" ? ";" : ":";
+  if (platform === "win32") return String(value || "");
+  const directories = [
+    ...String(value || "").split(separator),
+    path.join(homedir, ".local", "bin"),
+    path.join(homedir, ".npm-global", "bin"),
+    path.join(homedir, ".bun", "bin"),
+    path.join(homedir, ".cargo", "bin"),
+    path.join(homedir, ".volta", "bin"),
+    "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin",
+  ];
+  return Array.from(new Set(directories.filter((entry) => path.isAbsolute(entry)))).slice(0, 64).join(separator);
 }
 
 export function parseSemanticVersion(value, prefixPattern = "") {
@@ -249,4 +275,5 @@ export const executableDiscoveryLimits = Object.freeze({
   loginEnvironmentTimeoutMs: LOGIN_ENV_TIMEOUT_MS,
   versionTimeoutMs: VERSION_TIMEOUT_MS,
   maxDiscoveryOutput: MAX_DISCOVERY_OUTPUT,
+  loadsLoginShellByDefault: false,
 });

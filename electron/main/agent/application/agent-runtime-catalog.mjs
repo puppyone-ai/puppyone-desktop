@@ -5,6 +5,7 @@ import {
   unavailableReadiness,
 } from "./agent-input-policy.mjs";
 import { publicRuntimeReadiness } from "../runtime/agent-runtime-registry.mjs";
+import { sanitizeAgentRuntimeDescriptor } from "../../../../shared/agent-contract/runtime-schema.mjs";
 import {
   assertAgentRuntimeInspection,
   normalizeCapabilitySnapshot,
@@ -22,7 +23,7 @@ export function createAgentRuntimeCatalog({ runtimeRegistry }) {
     if (request.refresh) inspectionCache.clear();
     const selected = selectRequestedRuntime(runtimeRegistry, catalog, request.runtimeId);
     const runtimes = catalog.map((entry) => ({
-      descriptor: { ...entry.descriptor },
+      descriptor: sanitizeAgentRuntimeDescriptor(entry.descriptor),
       readiness: publicRuntimeReadiness(entry),
     }));
     if (!selected) {
@@ -62,18 +63,28 @@ export function createAgentRuntimeCatalog({ runtimeRegistry }) {
         workspaceRoot: workspaceRoot || NEUTRAL_INSPECTION_ROOT,
         refresh: Boolean(request.refresh),
       });
+      const effectiveReadiness = readinessWithAccountState(
+        publicReadiness,
+        inspection.account,
+        selected.descriptor.displayName,
+      );
+      const selectedEntry = runtimes.find((entry) => entry.descriptor.id === selected.descriptor.id);
+      if (selectedEntry) selectedEntry.readiness = effectiveReadiness;
       return {
         runtimes,
         selectedRuntimeId: selected.descriptor.id,
-        readiness: readinessWithAccountState(publicReadiness, inspection.account, selected.descriptor.displayName),
+        readiness: effectiveReadiness,
         ...inspection,
       };
     } catch (error) {
       const message = redactSecretText(error instanceof Error ? error.message : String(error));
+      const failedReadiness = { ...publicReadiness, status: "error", selectable: false, message };
+      const selectedEntry = runtimes.find((entry) => entry.descriptor.id === selected.descriptor.id);
+      if (selectedEntry) selectedEntry.readiness = failedReadiness;
       return {
         runtimes,
         selectedRuntimeId: selected.descriptor.id,
-        readiness: { ...publicReadiness, status: "error", message },
+        readiness: failedReadiness,
         account: null,
         providers: [],
         models: [],
@@ -106,7 +117,7 @@ export function createAgentRuntimeCatalog({ runtimeRegistry }) {
         modes: Array.isArray(inspection.modes) ? inspection.modes : [],
         commands: Array.isArray(inspection.commands) ? inspection.commands : [],
         capabilities: normalizeCapabilitySnapshot(inspection.capabilities),
-        runtime: inspection.runtime ?? runtimeRegistry.require(runtimeId).descriptor,
+        runtime: sanitizeAgentRuntimeDescriptor(inspection.runtime ?? runtimeRegistry.require(runtimeId).descriptor),
         warnings: Array.isArray(inspection.warnings) ? inspection.warnings : [],
       };
       inspectionCache.set(key, { createdAt: now, value });

@@ -5,7 +5,7 @@ import {
   normalizeOpenCodeActiveTurnHistory,
   normalizeOpenCodeEvent,
   normalizeOpenCodeHistory,
-} from "../electron/main/agent/runtimes/opencode/opencode-events.mjs";
+} from "../electron/main/agent/runtimes/opencode-protocol/opencode-events.mjs";
 
 describe("OpenCode event normalization", () => {
   it("normalizes the pinned source fixture without leaking the runtime protocol", () => {

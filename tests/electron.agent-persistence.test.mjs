@@ -84,8 +84,33 @@ describe("Desktop Agent persistence", () => {
     expect(record).toMatchObject({
       runtimeId: "codex",
       provider: "codex",
-      runtime: { id: "codex", displayName: "Codex CLI", kind: "direct-cli" },
+      runtime: { id: "codex", displayName: "Codex", kind: "native-cli" },
     });
+  });
+
+  it("migrates managed OpenCode identity without reclassifying user-owned OpenCode", async () => {
+    const userData = await fs.promises.mkdtemp(path.join(os.tmpdir(), "puppyone-agent-persistence-"));
+    temporaryDirectories.push(userData);
+    await fs.promises.writeFile(path.join(userData, "desktop-agent-sessions.json"), JSON.stringify({
+      version: 2,
+      sessions: [
+        persisted("managed", "opencode", event(1, "turn.completed", { status: "completed" }, "opencode")),
+        persisted("native", "opencode-native", event(1, "turn.completed", { status: "completed" }, "opencode-native")),
+      ],
+    }));
+    const persistence = createAgentPersistence({ app: { getPath: () => userData }, logger: { warn: () => {} } });
+
+    const records = await persistence.readAll();
+    const managed = records.find((record) => record.sessionId === "managed");
+    const native = records.find((record) => record.sessionId === "native");
+    expect(managed).toMatchObject({
+      runtimeId: "puppyone-agent",
+      provider: "puppyone-agent",
+      runtime: { id: "puppyone-agent", displayName: "PuppyOne Agent", kind: "managed-harness" },
+    });
+    expect(managed.events[0]).toMatchObject({ runtimeId: "puppyone-agent", provider: "puppyone-agent" });
+    expect(native).toMatchObject({ runtimeId: "opencode-native", provider: "opencode-native" });
+    expect(native.events[0]).toMatchObject({ runtimeId: "opencode-native", provider: "opencode-native" });
   });
 
   it("lists multiple runtime-neutral sessions and supports archive/delete without deleting New Chat history", async () => {
@@ -114,17 +139,33 @@ describe("Desktop Agent persistence", () => {
   });
 });
 
-function event(sequence, type, payload) {
+function event(sequence, type, payload, runtimeId = "codex") {
   return {
     schemaVersion: 1,
     sequence,
     sessionId: "session-1",
-    provider: "codex",
+    runtimeId,
+    provider: runtimeId,
     providerSessionId: "thread-1",
     turnId: "turn-1",
     itemId: null,
     emittedAt: new Date(sequence * 1000).toISOString(),
     type,
     payload,
+  };
+}
+
+function persisted(sessionId, runtimeId, entry) {
+  return {
+    sessionId,
+    workspaceRoot: "/workspace",
+    runtimeId,
+    runtime: { id: runtimeId, displayName: runtimeId === "opencode" ? "OpenCode" : "OpenCode", kind: "harness" },
+    providerSessionId: `native-${sessionId}`,
+    title: sessionId,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:01.000Z",
+    lastSequence: 1,
+    events: [{ ...entry, sessionId }],
   };
 }

@@ -1,5 +1,11 @@
 const LEGACY_RUNTIME_ID = "codex";
 const RUNTIME_ID_PATTERN = /^[a-z][a-z0-9-]{1,39}$/;
+const RUNTIME_ID_ALIASES = Object.freeze({
+  // Before ADR-005, `opencode` meant PuppyOne's managed product runtime.
+  // User-owned OpenCode sessions have the distinct `opencode-native` id and
+  // must never pass through this alias.
+  opencode: "puppyone-agent",
+});
 
 /**
  * Session journal v1 predated runtime selection and therefore omitted a
@@ -8,20 +14,29 @@ const RUNTIME_ID_PATTERN = /^[a-z][a-z0-9-]{1,39}$/;
  */
 export function resolvePersistedRuntimeId(record, requestedRuntimeId = null) {
   for (const value of [record?.runtimeId, record?.provider, requestedRuntimeId]) {
-    if (typeof value === "string" && RUNTIME_ID_PATTERN.test(value)) return value;
+    if (typeof value === "string" && RUNTIME_ID_PATTERN.test(value)) return canonicalRuntimeId(value);
   }
   return LEGACY_RUNTIME_ID;
 }
 
 export function migratedRuntimeDescriptor(record, runtimeId) {
-  if (record?.runtime && typeof record.runtime === "object") return record.runtime;
-  if (runtimeId === "opencode") {
-    return { id: runtimeId, displayName: "OpenCode", kind: "harness" };
+  const previous = record?.runtime && typeof record.runtime === "object" ? record.runtime : {};
+  if (runtimeId === "puppyone-agent") {
+    return { ...previous, id: runtimeId, displayName: "PuppyOne Agent", kind: "managed-harness" };
   }
   if (runtimeId === LEGACY_RUNTIME_ID) {
-    return { id: runtimeId, displayName: "Codex CLI", kind: "direct-cli" };
+    return { ...previous, id: runtimeId, displayName: previous.displayName || "Codex", kind: previous.kind || "native-cli" };
   }
-  return { id: runtimeId, displayName: humanizeRuntimeId(runtimeId), kind: "direct-cli" };
+  return {
+    ...previous,
+    id: runtimeId,
+    displayName: previous.displayName || humanizeRuntimeId(runtimeId),
+    kind: previous.kind || "native-cli",
+  };
+}
+
+export function canonicalRuntimeId(value) {
+  return RUNTIME_ID_ALIASES[value] ?? value;
 }
 
 function humanizeRuntimeId(value) {

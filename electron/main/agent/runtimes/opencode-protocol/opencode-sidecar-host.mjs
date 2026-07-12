@@ -16,6 +16,7 @@ export class OpenCodeSidecarHost {
     allocatePort = allocateLoopbackPort,
     clientFactory = (options) => new OpenCodeHttpClient(options),
     logger = console,
+    runtimeLabel = "OpenCode",
     startTimeoutMs = START_TIMEOUT_MS,
     stopTimeoutMs = STOP_TIMEOUT_MS,
   } = {}) {
@@ -24,6 +25,9 @@ export class OpenCodeSidecarHost {
     this.allocatePort = allocatePort;
     this.clientFactory = clientFactory;
     this.logger = logger;
+    this.runtimeLabel = typeof runtimeLabel === "string" && runtimeLabel.trim()
+      ? runtimeLabel.trim().slice(0, 120)
+      : "OpenCode";
     this.startTimeoutMs = startTimeoutMs;
     this.stopTimeoutMs = stopTimeoutMs;
     this.eventListeners = new Set();
@@ -43,7 +47,7 @@ export class OpenCodeSidecarHost {
 
   async acquire(readiness) {
     if (!readiness?.executablePath || readiness.status !== "ready") {
-      throw new Error(readiness?.message || "OpenCode is not ready.");
+      throw new Error(readiness?.message || `${this.runtimeLabel} is not ready.`);
     }
     if (this.stopping) await this.stopping;
     const identity = `${readiness.executablePath}\0${readiness.version ?? "unknown"}`;
@@ -58,19 +62,19 @@ export class OpenCodeSidecarHost {
   }
 
   subscribe(listener) {
-    if (typeof listener !== "function") throw new TypeError("OpenCode event listener must be a function.");
+    if (typeof listener !== "function") throw new TypeError(`${this.runtimeLabel} event listener must be a function.`);
     this.eventListeners.add(listener);
     return () => this.eventListeners.delete(listener);
   }
 
   onExit(listener) {
-    if (typeof listener !== "function") throw new TypeError("OpenCode exit listener must be a function.");
+    if (typeof listener !== "function") throw new TypeError(`${this.runtimeLabel} exit listener must be a function.`);
     this.exitListeners.add(listener);
     return () => this.exitListeners.delete(listener);
   }
 
   onReconnect(listener) {
-    if (typeof listener !== "function") throw new TypeError("OpenCode reconnect listener must be a function.");
+    if (typeof listener !== "function") throw new TypeError(`${this.runtimeLabel} reconnect listener must be a function.`);
     this.reconnectListeners.add(listener);
     return () => this.reconnectListeners.delete(listener);
   }
@@ -85,7 +89,7 @@ export class OpenCodeSidecarHost {
 
   async #start(readiness, identity) {
     const port = await this.allocatePort();
-    if (this.stopRequested) throw new Error("OpenCode sidecar startup was cancelled during application shutdown.");
+    if (this.stopRequested) throw new Error(`${this.runtimeLabel} startup was cancelled during application shutdown.`);
     const username = "puppyone";
     const password = this.randomBytes(32).toString("base64url");
     const encodedAuthorization = Buffer.from(`${username}:${password}`, "utf8").toString("base64");
@@ -143,13 +147,13 @@ export class OpenCodeSidecarHost {
         try {
           listener({ expected, code, signal, diagnostics: this.diagnostics });
         } catch (error) {
-          this.logger.warn?.("OpenCode exit listener failed:", error);
+          this.logger.warn?.(`${this.runtimeLabel} exit listener failed:`, error);
         }
       }
     });
     try {
       await this.#waitUntilHealthy(client, child);
-      if (this.child !== child) throw new Error("OpenCode exited before becoming ready.");
+      if (this.child !== child) throw new Error(`${this.runtimeLabel} exited before becoming ready.`);
       this.client = client;
       this.#startEventStream(client, child);
       return client;
@@ -161,7 +165,7 @@ export class OpenCodeSidecarHost {
         this.client = null;
         this.identity = null;
       }
-      throw new Error(`OpenCode sidecar failed to start: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`${this.runtimeLabel} failed to start: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -178,8 +182,8 @@ export class OpenCodeSidecarHost {
       }
       await delay(HEALTH_POLL_MS);
     }
-    if (this.stopRequested) throw new Error("OpenCode sidecar startup was cancelled.");
-    throw lastError ?? new Error(`OpenCode did not become ready within ${this.startTimeoutMs}ms.`);
+    if (this.stopRequested) throw new Error(`${this.runtimeLabel} startup was cancelled.`);
+    throw lastError ?? new Error(`${this.runtimeLabel} did not become ready within ${this.startTimeoutMs}ms.`);
   }
 
   #startEventStream(client, child) {
@@ -201,7 +205,7 @@ export class OpenCodeSidecarHost {
                 try {
                   await listener(event);
                 } catch (error) {
-                  this.logger.warn?.("OpenCode event listener failed:", error);
+                  this.logger.warn?.(`${this.runtimeLabel} event listener failed:`, error);
                 }
               }
             },
@@ -221,7 +225,7 @@ export class OpenCodeSidecarHost {
       try {
         await listener();
       } catch (error) {
-        this.logger.warn?.("OpenCode reconnect reconciliation failed:", error);
+        this.logger.warn?.(`${this.runtimeLabel} reconnect reconciliation failed:`, error);
       }
     }));
   }

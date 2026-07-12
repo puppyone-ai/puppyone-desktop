@@ -9,10 +9,9 @@ export function deriveLocalConnection(probe, gates = {}) {
   const ready = installation === "detected"
     && authentication === "signed-in"
     && probe?.protocolCompatible === true
-    && gates.bridgeAuthorized === true
-    && gates.bridgeCompatible === true
-    && gates.hasTextAndToolsModel === true
-    && gates.workspaceAllowed === true;
+    && probe?.hasModels === true
+    && gates.backendRegistered !== false
+    && gates.workspaceAllowed !== false;
   const integration = ready
     ? "ready"
     : installation === "unsupported"
@@ -20,7 +19,9 @@ export function deriveLocalConnection(probe, gates = {}) {
       : installation === "broken"
         ? "blocked"
         : installation === "detected"
-          ? "bridge-required"
+          ? probe?.protocolCompatible !== true
+            ? "protocol-unavailable"
+            : "setup-required"
           : "inventory-only";
 
   return {
@@ -41,28 +42,29 @@ export function deriveLocalConnection(probe, gates = {}) {
       installation,
       authentication,
       version,
-      bridgeRequiredMessage: probe?.bridgeRequiredMessage,
+      unavailableMessage: probe?.unavailableMessage,
+      protocolCompatible: probe?.protocolCompatible === true,
+      hasModels: probe?.hasModels === true,
+      ready,
     }),
     actions: actionsFor(installation),
     ...(SAFE_SOURCES.has(probe?.source) ? { source: probe.source } : {}),
   };
 }
 
-function statusMessage({ displayName, installation, authentication, version, bridgeRequiredMessage }) {
+function statusMessage({ displayName, installation, authentication, version, unavailableMessage, protocolCompatible, hasModels, ready }) {
   const label = safeText(displayName, "Local Agent", 80);
   const suffix = version ? ` ${version}` : "";
   if (installation === "not-found") return `${label} was not found in known installation locations.`;
   if (installation === "unsupported") return `${label}${suffix} is older than the tested compatibility baseline.`;
   if (installation === "broken") return `${label} was detected, but its version or status probe could not be completed safely.`;
+  if (!protocolCompatible) return `${label}${suffix} is detected. ${safeText(unavailableMessage, "This PuppyOne build does not support its native Agent protocol.", 256)}`;
   if (authentication === "signed-out") return `${label}${suffix} is detected but requires sign-in. Refresh after signing in with its documented CLI flow.`;
   if (authentication === "expired") return `${label}${suffix} is detected, but its local session has expired.`;
   if (authentication === "error") return `${label}${suffix} is detected, but its authentication state could not be read.`;
-  const bridgeMessage = safeText(
-    bridgeRequiredMessage,
-    "No authorized OpenCode provider bridge is available.",
-    256,
-  );
-  return `${label}${suffix} is detected${authentication === "signed-in" ? " and signed in" : ""}. ${bridgeMessage}`;
+  if (!hasModels) return `${label}${suffix} is detected, but no compatible text-and-tools model is available.`;
+  if (ready) return `${label}${suffix} is ready for native Agent sessions.`;
+  return `${label}${suffix} is detected but is not enabled for this workspace.`;
 }
 
 function actionsFor(installation) {

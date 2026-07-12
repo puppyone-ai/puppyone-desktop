@@ -1,7 +1,8 @@
 const TERMINAL_PART_STATUSES = new Set(["completed", "error"]);
 
-export function createOpenCodeEventState() {
+export function createOpenCodeEventState({ runtimeName = "OpenCode" } = {}) {
   return {
+    runtimeName,
     activeTurnId: null,
     interruptRequested: false,
     messageRoles: new Map(),
@@ -33,7 +34,7 @@ export function normalizeOpenCodeEvent(envelope, state = createOpenCodeEventStat
       }
       if (info.error) {
         output.push(agentEvent("provider.error", sessionID, turnId, messageID, {
-          message: readErrorMessage(info.error) || "OpenCode assistant turn failed.",
+          message: readErrorMessage(info.error) || `${state.runtimeName} assistant turn failed.`,
           errorName: readString(info.error?.name),
         }));
       }
@@ -45,7 +46,7 @@ export function normalizeOpenCodeEvent(envelope, state = createOpenCodeEventStat
       const messageID = readString(part.messageID);
       if (partID && part.type) state.partTypes.set(partID, readString(part.type));
       const role = state.messageRoles.get(messageID);
-      return normalizeUpdatedPart(part, { sessionID, turnId, role });
+      return normalizeUpdatedPart(part, { sessionID, turnId, role, runtimeName: state.runtimeName });
     }
     case "message.part.delta": {
       const partID = readString(properties.partID);
@@ -158,7 +159,7 @@ export function normalizeOpenCodeEvent(envelope, state = createOpenCodeEventStat
       const status = asRecord(properties.status);
       if (status.type === "retry") {
         return [agentEvent("provider.warning", sessionID, turnId, null, {
-          message: readString(status.message) || "OpenCode is retrying the provider request.",
+          message: readString(status.message) || `${state.runtimeName} is retrying the provider request.`,
           attempt: numberOrZero(status.attempt),
           next: status.next,
         })];
@@ -171,7 +172,7 @@ export function normalizeOpenCodeEvent(envelope, state = createOpenCodeEventStat
     case "session.error": {
       const failedTurn = state.activeTurnId;
       state.activeTurnId = null;
-      const message = readErrorMessage(properties.error) || "OpenCode session failed.";
+      const message = readErrorMessage(properties.error) || `${state.runtimeName} session failed.`;
       return [
         ...(failedTurn ? [agentEvent("turn.failed", sessionID, failedTurn, null, { status: "failed", message })] : []),
         agentEvent("provider.error", sessionID, failedTurn, null, { message }),
@@ -201,7 +202,7 @@ export function normalizeOpenCodeEvent(envelope, state = createOpenCodeEventStat
   }
 }
 
-export function normalizeOpenCodeHistory(messages) {
+export function normalizeOpenCodeHistory(messages, { runtimeName = "OpenCode" } = {}) {
   const entries = Array.isArray(messages) ? messages : [];
   const output = [];
   let pendingTerminal = null;
@@ -211,7 +212,7 @@ export function normalizeOpenCodeHistory(messages) {
     const failed = Boolean(info.error);
     output.push(agentEvent(failed ? "turn.failed" : "turn.completed", sessionID, turnId, null, {
       status: failed ? "failed" : "completed",
-      ...(failed ? { message: readErrorMessage(info.error) || "OpenCode turn failed." } : {}),
+      ...(failed ? { message: readErrorMessage(info.error) || `${runtimeName} turn failed.` } : {}),
     }));
     pendingTerminal = null;
   };
@@ -230,7 +231,7 @@ export function normalizeOpenCodeHistory(messages) {
     const turnId = readString(info.parentID) || messageID;
     if (pendingTerminal && pendingTerminal.turnId !== turnId) flushTerminal();
     for (const part of parts) {
-      output.push(...normalizeHistoricalPart(asRecord(part), { sessionID, turnId }));
+      output.push(...normalizeHistoricalPart(asRecord(part), { sessionID, turnId, runtimeName }));
     }
     if (info.tokens && typeof info.tokens === "object") {
       output.push(agentEvent("usage.updated", sessionID, turnId, messageID, {
@@ -246,7 +247,7 @@ export function normalizeOpenCodeHistory(messages) {
   return output;
 }
 
-export function normalizeOpenCodeActiveTurnHistory(messages, turnId) {
+export function normalizeOpenCodeActiveTurnHistory(messages, turnId, { runtimeName = "OpenCode" } = {}) {
   if (!turnId || !Array.isArray(messages)) return [];
   const lastUserIndex = messages.findLastIndex((entry) => entry?.info?.role === "user");
   if (lastUserIndex < 0) return [];
@@ -259,6 +260,7 @@ export function normalizeOpenCodeActiveTurnHistory(messages, turnId) {
       output.push(...normalizeHistoricalPart(asRecord(part), {
         sessionID: readString(info.sessionID),
         turnId,
+        runtimeName,
       }));
     }
     if (info.tokens && typeof info.tokens === "object") {
@@ -273,7 +275,7 @@ export function normalizeOpenCodeActiveTurnHistory(messages, turnId) {
   return output;
 }
 
-function normalizeUpdatedPart(part, { sessionID, turnId, role }) {
+function normalizeUpdatedPart(part, { sessionID, turnId, role, runtimeName = "OpenCode" }) {
   const partID = readString(part.id);
   if (part.type === "text") {
     if (role !== "assistant" || part.ignored) return [];
@@ -318,7 +320,7 @@ function normalizeUpdatedPart(part, { sessionID, turnId, role }) {
   }
   if (part.type === "retry") {
     return [agentEvent("provider.warning", sessionID, turnId, partID, {
-      message: readErrorMessage(part.error) || "OpenCode is retrying.",
+      message: readErrorMessage(part.error) || `${runtimeName} is retrying.`,
       attempt: numberOrZero(part.attempt),
     })];
   }

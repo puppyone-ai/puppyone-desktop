@@ -5,10 +5,11 @@ export function readinessWithAccountState(readiness, accountState, runtimeName =
     return {
       ...readiness,
       status: "installed-not-authenticated",
+      selectable: false,
       message: accountState?.error || (
         readiness.message && readiness.message !== `${runtimeName} is ready.`
           ? readiness.message
-          : "No model provider is connected to PuppyOne Agent. Connect a provider in PuppyOne, then retry."
+          : `${runtimeName} requires authentication or model setup.`
       ),
     };
   }
@@ -16,14 +17,14 @@ export function readinessWithAccountState(readiness, accountState, runtimeName =
 }
 
 export function assertReady(readiness, runtimeName = "Agent runtime") {
-  if (readiness?.status !== "ready" || !readiness.executablePath) {
+  if (readiness?.status !== "ready") {
     throw new Error(readiness?.message || `${runtimeName} is not ready.`);
   }
 }
 
-export function assertAuthenticated(accountState) {
+export function assertAuthenticated(accountState, runtimeName = "Agent runtime") {
   if (requiresRuntimeSetup(accountState)) {
-    throw new Error("No model provider is connected to PuppyOne Agent.");
+    throw new Error(accountState?.error || `${runtimeName} requires authentication or model setup.`);
   }
 }
 
@@ -121,6 +122,7 @@ export function unavailableReadiness(message) {
     message,
     source: "missing",
     compatibility: "unavailable",
+    selectable: false,
   };
 }
 

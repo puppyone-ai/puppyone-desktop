@@ -327,7 +327,7 @@ anchored listbox/popover so status, grouping, search and secondary text remain c
 | Ready                                                     |
 |  * PuppyOne Agent               Managed                 |
 |    Codex                         Native login            |
-|    Claude Code                   Native login            |
+|    Claude Code                   API / cloud credential  |
 |                                                          |
 | Detected                                                  |
 |    Cursor Agent                  Protocol unavailable    |

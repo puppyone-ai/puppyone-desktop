@@ -65,25 +65,23 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(docs).not.toContain("```mermaid");
   });
 
-  it("keeps Core provider-neutral and OpenCode as the only production harness", () => {
+  it("keeps Core backend-neutral and concrete backends in the single production composition root", () => {
     const registry = source("electron/main/agent/runtime/agent-runtime-registry.mjs");
     const bootstrap = source("electron/main/agent/bootstrap/create-agent-runtime-host.mjs");
-    const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
-    const providerPicker = source("src/features/desktop-agent/ui/AgentProviderPicker.tsx");
-    const modelPicker = source("src/features/desktop-agent/ui/AgentModelPicker.tsx");
     const contract = source("shared/agent-contract/schema.mjs");
     expect(registry).not.toMatch(/opencode|codex|claude|cursor/i);
-    expect(bootstrap).toContain("createOpenCodeRuntimeDefinition");
-    expect(bootstrap).not.toContain("createCodexRuntimeDefinition");
-    expect(composer).not.toMatch(/Agent runtime|onSelectRuntime|runtimes/);
-    expect(providerPicker).toContain('ariaLabel="Agent provider"');
-    expect(modelPicker).toContain('ariaLabel="Agent model"');
+    expect(bootstrap).toContain("createPuppyOneAgentRuntimeDefinition");
+    expect(bootstrap).toContain("createCodexRuntimeDefinition");
+    expect(bootstrap).toContain("createClaudeRuntimeDefinition");
+    expect(bootstrap).toContain("createOpenCodeNativeRuntimeDefinition");
+    expect(bootstrap).toContain("createCursorRuntimeDefinition");
+    expect(bootstrap).toContain('DEFAULT_AGENT_RUNTIME_ID = "puppyone-agent"');
     expect(contract).toContain("parseAgentIpcRequest");
     expect(contract).toContain("assertAgentIpcResponse");
   });
 
   it("keeps connected-provider authority in the OpenCode adapter and explicit selection in application state", () => {
-    const adapter = source("electron/main/agent/runtimes/opencode/opencode-sidecar-adapter.mjs");
+    const adapter = source("electron/main/agent/runtimes/opencode-protocol/opencode-sidecar-adapter.mjs");
     const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
     const panel = source("src/features/desktop-agent/ui/RightAgentPanel.tsx");
     expect(adapter).toContain("client.providerCatalog");

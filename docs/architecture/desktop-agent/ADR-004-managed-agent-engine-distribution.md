@@ -121,6 +121,10 @@ Native Agent product subscriptions
   harness. A backend becomes selectable only through its supported native
   protocol and product gate; PuppyOne never copies its private credentials into
   PuppyOne Agent.
+
+  Provider policy can be stricter than technical discovery. In particular,
+  PuppyOne's Claude Agent SDK backend requires an API key or supported cloud
+  provider and does not route through Claude subscription OAuth.
 ```
 
 PuppyOne absorbs PuppyOne Agent engine distribution and update cost. A native

@@ -3,15 +3,16 @@ import { createCodexDiscovery } from "./codex-discovery.mjs";
 
 export const CODEX_RUNTIME_DESCRIPTOR = Object.freeze({
   id: "codex",
-  displayName: "Codex CLI",
-  description: "Direct compatibility runtime using the user's local Codex app-server and existing Codex authentication.",
-  kind: "direct-cli",
+  displayName: "Codex",
+  description: "Codex's native app-server, login, models, tools, approvals and sessions.",
+  kind: "native-cli",
   iconKey: "codex",
   priority: 50,
+  distribution: "user-installed",
 });
 
 export function createCodexRuntimeDefinition({
-  appVersion,
+  appVersion = "0.0.0",
   discovery = createCodexDiscovery(),
   adapterFactory = (options) => new CodexAppServerAdapter(options),
 } = {}) {

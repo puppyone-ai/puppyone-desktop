@@ -125,9 +125,9 @@ export class CodexAppServerAdapter {
       capabilities: CODEX_CAPABILITIES,
       runtime: {
         id: "codex",
-        displayName: "Codex CLI",
-        description: "Direct local Codex app-server compatibility runtime.",
-        kind: "direct-cli",
+        displayName: "Codex",
+        description: "Codex's native app-server runtime.",
+        kind: "native-cli",
         iconKey: "codex",
         version: null,
         source: "external",

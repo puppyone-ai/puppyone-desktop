@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { OpenCodeSidecarHost } from "../electron/main/agent/runtimes/opencode/opencode-sidecar-host.mjs";
+import { OpenCodeSidecarHost } from "../electron/main/agent/runtimes/opencode-protocol/opencode-sidecar-host.mjs";
 
 describe("OpenCode sidecar host", () => {
   it("starts lazily with loopback auth and stops with bounded lifecycle", async () => {

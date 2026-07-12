@@ -1,7 +1,8 @@
 # ADR-005: PuppyOne unifies native Agent backends
 
-Date: 2026-07-12. Status: accepted; migration planned and partially enabled by
-the existing runtime-neutral contracts.
+Date: 2026-07-12. Status: accepted. Backend phases 1-4 and the backend portion
+of phase 6 are implemented; Agent-first Renderer integration and optional
+future backends remain incremental work.
 
 This decision fully supersedes the product-routing decision in
 [ADR-003](ADR-003-opencode-only-chat-harness.md). It narrows
@@ -54,7 +55,7 @@ PuppyOne right-sidebar Chat
       |     codex app-server over stdio JSON-RPC
       |
       +-- claude
-      |     user's Claude Code login
+      |     API-key or supported cloud-provider credentials
       |     Claude Agent SDK plus Claude Code executable
       |
       +-- cursor                                  CAPABILITY-GATED
@@ -180,7 +181,7 @@ credential code remains under `electron/main/agent/runtimes/<backend>/`.
 | --- | --- | --- | --- | --- | --- | --- |
 | `puppyone-agent` | PuppyOne Agent | managed OpenCode loopback HTTP/SSE | managed OpenCode profile and supported provider flows | OpenCode session | bundled, pinned and verified by PuppyOne | migrate current `opencode` product path |
 | `codex` | Codex | `codex app-server` stdio JSON-RPC | Codex CLI | Codex thread | user-installed CLI | existing adapter; harden and register |
-| `claude` | Claude Code | Claude Agent SDK plus Claude Code process | Claude Code | Claude session | SDK bundled; user CLI/login | new adapter required |
+| `claude` | Claude Code | Claude Agent SDK plus user's Claude Code process | Anthropic API key or supported cloud provider | Claude session | SDK control layer bundled; user CLI required | implemented |
 | `cursor` | Cursor Agent | supported native protocol, not shell scraping | Cursor | Cursor session | user-installed product | inventory-only until protocol gate passes |
 | `opencode-native` | OpenCode | user OpenCode ACP/server protocol | user OpenCode profile | OpenCode session | user-installed CLI | separate adapter/profile required |
 | `pi` | Pi | `pi --mode rpc` | Pi/provider config | Pi session | user-installed CLI | optional future adapter |
@@ -250,6 +251,13 @@ must not scrape, copy or translate private CLI credential stores. Discovery and
 runtime processes stay in Electron main; Renderer receives bounded status and
 action DTOs only.
 
+Provider policy remains an additional gate. Anthropic's published policy does
+not permit third-party products to route Agent SDK traffic through Free, Pro or
+Max subscription OAuth credentials, so the Claude backend accepts an
+Anthropic API key or supported cloud-provider credential and rejects
+subscription-only OAuth. Native credentials are reused only where the native
+product explicitly permits third-party clients.
+
 PuppyOne Agent uses its managed profile and OpenCode-supported provider
 authentication. A user's installed OpenCode backend uses a separate user-owned
 profile. Those profiles, histories and credentials never merge implicitly.
@@ -307,29 +315,29 @@ The migration is incremental and preserves existing sessions.
 Phase 0  Decision and vocabulary
   accept ADR-005; mark ADR-003 superseded; update product documentation
 
-Phase 1  Multi-backend composition
+Phase 1  Multi-backend composition                         IMPLEMENTED
   keep AgentRuntimePort/Registry/Service
   register all production-ready definitions
   remove automatic selection of one global harness
 
-Phase 2  PuppyOne Agent identity
+Phase 2  PuppyOne Agent identity                           IMPLEMENTED
   rename the current managed product route to puppyone-agent
   migrate persisted opencode product mappings without changing native sessions
   keep managed OpenCode provenance in diagnostics and licenses
 
-Phase 3  Native Codex
+Phase 3  Native Codex                                      IMPLEMENTED
   promote the existing app-server adapter from legacy compatibility
   complete readiness, auth, capability, history and security acceptance tests
 
-Phase 4  Native Claude Code
+Phase 4  Native Claude Code                                IMPLEMENTED
   add CLI resolution, Agent SDK adapter, event normalization, native history,
   permissions and capability tests
 
-Phase 5  Agent-first UI
+Phase 5  Agent-first UI                                    IN PROGRESS
   Agent selector before backend-scoped Model controls
   pin Agent identity per session and make switching create a new session
 
-Phase 6  Optional backends
+Phase 6  Optional backends                                 PARTIAL
   user OpenCode profile and Pi adapters
   Cursor only after a supported protocol and approval contract exist
 
@@ -372,8 +380,8 @@ legacy policy.
 
 Benefits:
 
-- users can reuse supported native Agent products, logins, subscriptions and
-  session behavior;
+- users can reuse supported native Agent products, permitted credentials and
+  session behavior without credential scraping;
 - PuppyOne maintains one product control plane and UI rather than an Agent
   loop;
 - PuppyOne Agent remains a coherent first-party default without becoming a

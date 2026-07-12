@@ -3,20 +3,30 @@ import { pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 import { normalizeOpenCodeActiveTurnHistory, normalizeOpenCodeEvent, normalizeOpenCodeHistory, createOpenCodeEventState } from "./opencode-events.mjs";
 import { formatModelSelection, parseModelSelection } from "./opencode-http-client.mjs";
-import { OPENCODE_CAPABILITIES, OPENCODE_PROMPT_PROFILE, OPENCODE_RUNTIME_DESCRIPTOR, OPENCODE_UPSTREAM } from "./opencode-manifest.mjs";
-import { formatAuthorizedProjectInstructions, loadAuthorizedProjectInstructions } from "./opencode-project-instructions.mjs";
+import { OPENCODE_CAPABILITIES, OPENCODE_PROMPT_PROFILE, OPENCODE_UPSTREAM } from "./opencode-manifest.mjs";
+import { formatAuthorizedProjectInstructions, loadAuthorizedProjectInstructions } from "../../security/authorized-project-instructions.mjs";
 import { createOpenCodeSessionPermissions, openCodePolicyKey } from "./opencode-security-policy.mjs";
+
+const OPEN_CODE_PROJECT_INSTRUCTION_NAMES = Object.freeze(["AGENTS.md", "CLAUDE.md", "CONTEXT.md"]);
 
 export class OpenCodeSidecarAdapter {
   constructor({
     readiness,
     workspaceRoot,
     host,
+    runtimeDescriptor,
+    managed = false,
     onEvent = () => {},
     onExit = () => {},
-    projectInstructionLoader = loadAuthorizedProjectInstructions,
+    projectInstructionLoader = (root) => loadAuthorizedProjectInstructions(root, {
+      instructionNames: OPEN_CODE_PROJECT_INSTRUCTION_NAMES,
+    }),
   }) {
+    if (!runtimeDescriptor?.id) throw new TypeError("OpenCode adapter requires an Agent runtime descriptor.");
     this.readiness = { ...readiness, workspaceRoot };
+    this.runtimeDescriptor = { ...runtimeDescriptor };
+    this.runtimeName = this.runtimeDescriptor.displayName || "OpenCode";
+    this.managed = managed === true;
     this.workspaceRoot = path.resolve(workspaceRoot);
     this.host = host;
     this.onEvent = onEvent;
@@ -25,7 +35,7 @@ export class OpenCodeSidecarAdapter {
     this.sessionId = null;
     this.selectedModel = null;
     this.selectedMode = null;
-    this.eventState = createOpenCodeEventState();
+    this.eventState = createOpenCodeEventState({ runtimeName: this.runtimeName });
     this.projectInstructionLoader = projectInstructionLoader;
     this.appliedPolicyKey = null;
     this.commandNames = new Set();
@@ -40,7 +50,7 @@ export class OpenCodeSidecarAdapter {
   }
 
   async connect() {
-    if (this.disposed) throw new Error("OpenCode adapter is closed.");
+    if (this.disposed) throw new Error(`${this.runtimeName} adapter is closed.`);
     if (!this.client) this.client = await this.host.acquire(this.readiness);
     return this.client;
   }
@@ -58,7 +68,7 @@ export class OpenCodeSidecarAdapter {
     const authenticated = providerCatalog.providers.length > 0 && models.length > 0;
     const setupError = providerCatalog.connectedProviderCount > 0
       ? "Connected model providers do not expose a text-and-tools Agent model."
-      : "No model provider is connected to PuppyOne Agent.";
+      : `No model provider is connected to ${this.runtimeDescriptor.displayName}.`;
     const normalizedCommands = normalizeCommands(commands);
     this.commandNames = new Set(normalizedCommands.map((command) => command.name));
     return {
@@ -73,11 +83,11 @@ export class OpenCodeSidecarAdapter {
       modes,
       commands: normalizedCommands,
       capabilities: { ...OPENCODE_CAPABILITIES },
-      warnings: this.readiness.compatibility === "pinned"
-        ? []
-        : [`Using compatible external OpenCode ${this.readiness.version ?? "unknown"}; packaged builds pin ${OPENCODE_UPSTREAM.sourceVersion}.`],
+      warnings: this.managed && this.readiness.compatibility !== "pinned"
+        ? [`Using compatible external OpenCode ${this.readiness.version ?? "unknown"}; packaged builds pin ${OPENCODE_UPSTREAM.sourceVersion}.`]
+        : [],
       runtime: {
-        ...OPENCODE_RUNTIME_DESCRIPTOR,
+        ...this.runtimeDescriptor,
         version: this.readiness.version ?? null,
         source: this.readiness.source ?? "external",
         compatibility: this.readiness.compatibility ?? "compatible-external",
@@ -96,7 +106,7 @@ export class OpenCodeSidecarAdapter {
       agent: normalizeOptionalString(mode),
       permission: createOpenCodeSessionPermissions(mode),
       metadata: {
-        "puppyone.runtime": "opencode",
+        "puppyone.runtime": this.runtimeDescriptor.id,
         "puppyone.runtimeVersion": this.readiness.version ?? OPENCODE_UPSTREAM.sourceVersion,
         "puppyone.runtimeCommit": pinnedRuntime ? OPENCODE_UPSTREAM.releaseCommit : "external-unverified",
         "puppyone.promptProfile": pinnedRuntime ? OPENCODE_PROMPT_PROFILE.id : "external-unverified",
@@ -106,7 +116,7 @@ export class OpenCodeSidecarAdapter {
     });
     this.#attachSession(created?.id, { model, mode });
     this.appliedPolicyKey = openCodePolicyKey(mode);
-    return normalizeSession(created, { model, mode });
+    return normalizeSession(created, { model, mode, runtimeName: this.runtimeName });
   }
 
   async resumeSession({ threadId, model, mode } = {}) {
@@ -126,19 +136,19 @@ export class OpenCodeSidecarAdapter {
         resumedInFlight: true,
       }));
     }
-    return normalizeSession(info, { model, mode });
+    return normalizeSession(info, { model, mode, runtimeName: this.runtimeName });
   }
 
   async readHistory() {
     if (!this.sessionId) return [];
     const client = await this.connect();
     const messages = await client.messages({ directory: this.workspaceRoot, sessionID: this.sessionId });
-    return normalizeOpenCodeHistory(messages);
+    return normalizeOpenCodeHistory(messages, { runtimeName: this.runtimeName });
   }
 
   async startTurn({ prompt, model, mode, attachments = [], contextReferences = [] }) {
-    if (!this.sessionId) throw new Error("OpenCode session has not started.");
-    if (this.eventState.activeTurnId) throw new Error("An OpenCode turn is already running.");
+    if (!this.sessionId) throw new Error(`${this.runtimeName} session has not started.`);
+    if (this.eventState.activeTurnId) throw new Error(`A ${this.runtimeName} turn is already running.`);
     const client = await this.connect();
     const effectiveMode = mode || this.selectedMode;
     await this.#applySecurityPolicy(client, effectiveMode);
@@ -193,7 +203,7 @@ export class OpenCodeSidecarAdapter {
 
   async interruptTurn({ turnId }) {
     if (!this.sessionId || this.eventState.activeTurnId !== turnId) {
-      throw new Error("That OpenCode turn is no longer running.");
+      throw new Error(`That ${this.runtimeName} turn is no longer running.`);
     }
     const client = await this.connect();
     await client.abortSession({ directory: this.workspaceRoot, sessionID: this.sessionId });
@@ -219,16 +229,16 @@ export class OpenCodeSidecarAdapter {
   }
 
   async forkSession() {
-    if (!this.sessionId) throw new Error("OpenCode session has not started.");
+    if (!this.sessionId) throw new Error(`${this.runtimeName} session has not started.`);
     const client = await this.connect();
     const forked = await client.forkSession({ directory: this.workspaceRoot, sessionID: this.sessionId });
-    return normalizeSession(forked, { model: this.selectedModel, mode: this.selectedMode });
+    return normalizeSession(forked, { model: this.selectedModel, mode: this.selectedMode, runtimeName: this.runtimeName });
   }
 
   async listNativeSessions() {
     const client = await this.connect();
     const sessions = await client.listSessions(this.workspaceRoot);
-    return Array.isArray(sessions) ? sessions.map((session) => normalizeSession(session)) : [];
+    return Array.isArray(sessions) ? sessions.map((session) => normalizeSession(session, { runtimeName: this.runtimeName })) : [];
   }
 
   async archiveNativeSession({ threadId }) {
@@ -246,9 +256,9 @@ export class OpenCodeSidecarAdapter {
   }
 
   async compactSession() {
-    if (!this.sessionId) throw new Error("OpenCode session has not started.");
+    if (!this.sessionId) throw new Error(`${this.runtimeName} session has not started.`);
     const model = parseModelSelection(this.selectedModel);
-    if (!model) throw new Error("Select an OpenCode model before compacting the session.");
+    if (!model) throw new Error(`Select a ${this.runtimeName} model before compacting the session.`);
     const client = await this.connect();
     return client.summarize({ directory: this.workspaceRoot, sessionID: this.sessionId, model });
   }
@@ -282,12 +292,12 @@ export class OpenCodeSidecarAdapter {
 
   #attachSession(sessionId, { model, mode }) {
     if (typeof sessionId !== "string" || !/^[A-Za-z0-9:_-]{1,240}$/.test(sessionId)) {
-      throw new Error("OpenCode did not return a valid session id.");
+      throw new Error(`${this.runtimeName} did not return a valid session id.`);
     }
     this.sessionId = sessionId;
     this.selectedModel = model || this.selectedModel;
     this.selectedMode = mode || this.selectedMode;
-    this.eventState = createOpenCodeEventState();
+    this.eventState = createOpenCodeEventState({ runtimeName: this.runtimeName });
   }
 
   async #applySecurityPolicy(client, mode, { force = false } = {}) {
@@ -334,7 +344,7 @@ export class OpenCodeSidecarAdapter {
         client.sessionStatus(this.workspaceRoot).catch(() => ({})),
       ]);
       if (this.disposed || this.sessionId !== sessionId || this.eventState.activeTurnId !== turnId) return;
-      for (const event of normalizeOpenCodeActiveTurnHistory(messages, turnId)) this.onEvent(event);
+      for (const event of normalizeOpenCodeActiveTurnHistory(messages, turnId, { runtimeName: this.runtimeName })) this.onEvent(event);
       for (const request of asArray(permissions).filter((entry) => entry?.sessionID === sessionId)) {
         for (const event of normalizeOpenCodeEvent({ type: "permission.asked", properties: request }, this.eventState)) this.onEvent(event);
       }
@@ -347,7 +357,7 @@ export class OpenCodeSidecarAdapter {
     })().catch((error) => {
       if (this.disposed) return;
       this.onEvent(agentLifecycleEvent("provider.warning", sessionId, turnId, {
-        message: `OpenCode reconnected, but history reconciliation failed: ${error instanceof Error ? error.message : String(error)}`,
+        message: `${this.runtimeName} reconnected, but history reconciliation failed: ${error instanceof Error ? error.message : String(error)}`,
       }));
     }).finally(() => { this.reconcilePromise = null; });
     return this.reconcilePromise;
@@ -461,7 +471,7 @@ function normalizeSession(value, fallback = {}) {
   const updated = normalizeTime(info.time?.updated) || created;
   return {
     providerSessionId: typeof info.id === "string" && /^[A-Za-z0-9:_-]{1,240}$/.test(info.id) ? info.id : null,
-    title: boundedString(info.title, 200) || "OpenCode session",
+    title: boundedString(info.title, 200) || `${fallback.runtimeName || "OpenCode"} session`,
     model: fallback.model ?? null,
     mode: fallback.mode ?? null,
     createdAt: created,
