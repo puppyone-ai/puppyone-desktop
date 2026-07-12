@@ -406,12 +406,15 @@ function normalizeTodos(value) {
 
 function normalizeDiff(value) {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 200).map((diff) => ({
-    path: readString(diff?.file) || readString(diff?.path) || "Unknown file",
-    additions: numberOrZero(diff?.additions),
-    deletions: numberOrZero(diff?.deletions),
-    status: readString(diff?.status),
-  }));
+  return value.slice(0, 200).flatMap((diff) => {
+    const path = readString(diff?.file) || readString(diff?.path);
+    return path ? [{
+      path,
+      additions: numberOrZero(diff?.additions),
+      deletions: numberOrZero(diff?.deletions),
+      status: readString(diff?.status),
+    }] : [];
+  });
 }
 
 function normalizePermissionReply(reply) {
