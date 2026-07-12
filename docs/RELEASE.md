@@ -73,7 +73,7 @@ desktop/internal/mac/latest
 The stable production updater feed is configured in `package.json` as:
 
 ```text
-https://updates.puppyone.ai/desktop/stable/mac
+https://updates.puppyone.ai/desktop/stable/mac/latest
 ```
 
 The stable release script enforces that this path receives only signed and notarized builds.

@@ -50,7 +50,7 @@ The update path has five layers:
 The production stable macOS feed is:
 
 ```text
-https://updates.puppyone.ai/desktop/stable/mac
+https://updates.puppyone.ai/desktop/stable/mac/latest
 ```
 
 Cloudflare R2/CDN should use platform-scoped channel directories:

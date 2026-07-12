@@ -73,18 +73,20 @@ describe("macOS stable release policy", () => {
   });
 
   it("uses immutable version and mutable latest R2 prefixes", () => {
-    expect(getStableReleaseCoordinates({
+    const coordinates = getStableReleaseCoordinates({
       packageMetadata,
       env: {
         CLOUDFLARE_ACCOUNT_ID: "account",
         PUPPYONE_RELEASE_TAG: `v${packageMetadata.version}`,
       },
-    })).toEqual({
+    });
+    expect(coordinates).toEqual({
       bucket: "puppyone-desktop",
       endpoint: "https://account.r2.cloudflarestorage.com",
       latestPrefix: "desktop/stable/mac/latest",
       tag: `v${packageMetadata.version}`,
       versionPrefix: `desktop/stable/mac/v${packageMetadata.version}`,
     });
+    expect(new URL(packageMetadata.build.publish[0].url).pathname).toBe(`/${coordinates.latestPrefix}`);
   });
 });

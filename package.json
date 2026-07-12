@@ -138,7 +138,7 @@
     "publish": [
       {
         "provider": "generic",
-        "url": "https://updates.puppyone.ai/desktop/stable/mac",
+        "url": "https://updates.puppyone.ai/desktop/stable/mac/latest",
         "channel": "stable"
       }
     ],

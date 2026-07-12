@@ -1,4 +1,4 @@
-const STABLE_UPDATE_URL = "https://updates.puppyone.ai/desktop/stable/mac";
+const STABLE_UPDATE_URL = "https://updates.puppyone.ai/desktop/stable/mac/latest";
 
 export function inspectMacReleaseReadiness({
   packageMetadata,
