@@ -37,6 +37,15 @@ A Project can have one of three user-visible availability states:
 These are capability states of one Project, not three incompatible Project
 types. A Project can move between them without becoming a duplicate entry.
 
+### Current rollout decision
+
+The Cloud-only implementation remains architecturally supported, but its
+standalone creation/open entry is hidden during the Local-first rollout. The
+primary path is Open Folder -> explicit Share/Attach to Cloud. Hiding the entry
+is a feature-release decision, not permission to delete Cloud data ports,
+Cloud-only workspace state, or the ability to expose that entry later for
+enterprise hosted Projects.
+
 ```text
                           one Project
                                |
@@ -348,6 +357,31 @@ Four user states must remain separate:
 Purchasing Cloud does not automatically perform the remaining three steps.
 Connecting a Project does not automatically expose all content through MCP.
 
+### Explicit binding contract
+
+Normal Desktop open never derives Project identity or human permission by
+scanning Projects, scopes, or access keys. A Local + Cloud workspace stores a
+stable `workspaceInstanceId`, Cloud origin, Project ID, and binding ID. It
+resolves that one binding with the current account, then obtains current server
+capabilities.
+
+```text
+local workspace instance
+  -> explicit binding id             identity only
+  -> current JWT ProjectGrant        human permission
+  -> binding-specific credential     Git/CLI runtime only
+```
+
+The manifest never stores the binding credential, role, capability snapshot,
+or absolute-path-derived identity. A legacy PuppyOne remote is only a one-time
+candidate-discovery input and requires user confirmation; a non-root remote can
+create only a visibly scoped binding.
+
+Role/account/host/binding failures leave local Files, Changes, Terminal, and
+local Agent work usable. The Cloud area shows Request Access, Switch Account,
+Switch Host, Reattach, or the relevant recovery action without deleting or
+silently rebinding local content.
+
 ### MCP rule
 
 A personal MCP server may run locally while Desktop is running. A stable,
@@ -380,6 +414,21 @@ The longer-term domain object is a Change whose lifecycle may include local
 work, draft publication, Review, merge, and recorded decision. Git remains the
 version mechanism underneath; users must not be forced to jump between an
 editor product and a separate GitHub-like product to complete that lifecycle.
+
+## Claude readiness
+
+Claude Project runtime is not unlocked by Cloud metadata, an empty Project, a
+non-root checkout, or a Web/API-created root head. Cloud must report all three
+durable facts:
+
+1. an active Git surface on the canonical root scope;
+2. a valid canonical root head;
+3. a committed root `access_git` Version Engine transaction proving the first
+   Git push was accepted.
+
+Until then the Project shell shows `Create Git` or `Push your first commit` and
+does not request or create Claude runtime. A scoped checkout always explains
+that the full root checkout is required.
 
 ## Visual Semantics
 
@@ -549,6 +598,9 @@ applicable scenarios:
 11. Deploy Hosted MCP only from Cloud-resolvable resources.
 12. Switch provider/model in Agent Chat; verify Project Local/Cloud state does
     not change.
+13. Create a root head through Product/API without a Git push; verify Claude
+    remains at `Push your first commit`.
+14. Accept the first root Git push; verify Claude becomes ready.
 
 ## Invariants
 

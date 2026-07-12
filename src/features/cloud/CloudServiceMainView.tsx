@@ -32,6 +32,7 @@ export function CloudServiceMainView({
   cloudBackupError,
   onStartPuppyoneBackup,
   onConfigureCloudRemote,
+  onDetachCloudProject,
   onSelectProjectId,
   onSelectSection,
   onRefresh,
@@ -173,6 +174,76 @@ export function CloudServiceMainView({
     }
   };
 
+  const handleConfirmLegacyBinding = async ({
+    projectId,
+    scopeId,
+    bindingKind,
+  }: {
+    projectId: string;
+    scopeId: string | null;
+    bindingKind: "full" | "scoped";
+  }) => {
+    if (!cloudRemote || actionRequestRef.current || cloudBackupLoading) return;
+    const request = Symbol("confirm-legacy-cloud-binding");
+    const requestContext = actionContextKey;
+    actionRequestRef.current = request;
+    setCloudAction({ kind: "connect", projectId, message: null, error: null });
+    try {
+      const configuredStatus = await onConfigureCloudRemote(cloudRemote.rawUrl, projectId, {
+        bindingKind,
+        scopeId,
+      });
+      if (actionContextRef.current !== requestContext) return;
+      if (!configuredStatus) throw new Error("This workspace is no longer available for Cloud attachment.");
+      setCloudAction({
+        kind: null,
+        projectId,
+        message: bindingKind === "scoped"
+          ? "Scoped Cloud binding confirmed. Only the selected Cloud path is synchronized."
+          : "Cloud project binding confirmed.",
+        error: null,
+      });
+      onSelectSection("contents");
+    } catch (actionError) {
+      if (actionContextRef.current !== requestContext) return;
+      setCloudAction({
+        kind: null,
+        projectId,
+        message: null,
+        error: actionError instanceof Error ? actionError.message : "Unable to confirm this Cloud binding.",
+      });
+    } finally {
+      if (actionRequestRef.current === request) actionRequestRef.current = null;
+    }
+  };
+
+  const handleDetachCloudProject = async () => {
+    if (!onDetachCloudProject || actionRequestRef.current) return;
+    const request = Symbol("detach-cloud-project");
+    actionRequestRef.current = request;
+    setCloudAction({ kind: "connect", projectId: boundProjectId, message: null, error: null });
+    try {
+      await onDetachCloudProject();
+      setCloudAction({
+        kind: null,
+        projectId: null,
+        message: "Cloud detached. Local files and Git history remain on this device.",
+        error: null,
+      });
+      onSelectProjectId?.(null);
+      onSelectSection("overview");
+    } catch (actionError) {
+      setCloudAction({
+        kind: null,
+        projectId: boundProjectId,
+        message: null,
+        error: actionError instanceof Error ? actionError.message : "Unable to detach this Cloud project.",
+      });
+    } finally {
+      if (actionRequestRef.current === request) actionRequestRef.current = null;
+    }
+  };
+
   if (isCloudAuthBlocking(cloudAuthState)) {
     return (
       <main className="desktop-cloud-main-view desktop-cloud-auth-main-view">
@@ -266,6 +337,8 @@ export function CloudServiceMainView({
             onRefresh();
           }}
           onUseAnotherAccount={() => onCloudSessionChange(null)}
+          onConfirmLegacyBinding={(input) => void handleConfirmLegacyBinding(input)}
+          onDetachCloudProject={onDetachCloudProject ? () => void handleDetachCloudProject() : undefined}
         />
       </div>
     </main>
@@ -276,6 +349,7 @@ function shouldLoadAggregateProjectDetails(section: CloudWorkspaceSection): bool
   // History uses a dedicated route-scoped history hook; skip aggregate details reload there.
   return section === "overview"
     || section === "contents"
+    || section === "claude"
     || section === "access"
     || section === "automation"
     || section === "mcp-cli"

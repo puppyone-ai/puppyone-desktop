@@ -395,6 +395,7 @@ function normalizePuppyoneConfigDraft(config: PuppyoneWorkspaceConfig | null, cl
     version: 2,
     project: {
       id: config?.project?.id ?? null,
+      workspaceInstanceId: config?.project?.workspaceInstanceId ?? null,
     },
     sync: {
       sourceOfTruth: {
@@ -415,6 +416,8 @@ function normalizePuppyoneConfigDraft(config: PuppyoneWorkspaceConfig | null, cl
     },
     cloud: {
       projectId: normalizeSettingsText(config?.cloud?.projectId),
+      origin: normalizeSettingsText(config?.cloud?.origin),
+      bindingId: normalizeSettingsText(config?.cloud?.bindingId),
     },
     ...(config?.updatedAt ? { updatedAt: config.updatedAt } : {}),
   };
@@ -422,6 +425,7 @@ function normalizePuppyoneConfigDraft(config: PuppyoneWorkspaceConfig | null, cl
 
 function samePuppyoneConfig(left: PuppyoneWorkspaceConfig, right: PuppyoneWorkspaceConfig) {
   return left.project.id === right.project.id
+    && left.project.workspaceInstanceId === right.project.workspaceInstanceId
     && left.sync.sourceOfTruth.service === right.sync.sourceOfTruth.service
     && left.sync.sourceOfTruth.remote === right.sync.sourceOfTruth.remote
     && left.sync.sourceOfTruth.branch === right.sync.sourceOfTruth.branch
@@ -431,7 +435,9 @@ function samePuppyoneConfig(left: PuppyoneWorkspaceConfig, right: PuppyoneWorksp
     && left.backup.service === right.backup.service
     && left.backup.remote === right.backup.remote
     && left.backup.branch === right.backup.branch
-    && left.cloud.projectId === right.cloud.projectId;
+    && left.cloud.projectId === right.cloud.projectId
+    && left.cloud.origin === right.cloud.origin
+    && left.cloud.bindingId === right.cloud.bindingId;
 }
 
 function normalizeBackendServiceDraft(value: string | null | undefined, cloudEnabled = true): PuppyoneBackendService {

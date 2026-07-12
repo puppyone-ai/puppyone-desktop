@@ -1,4 +1,4 @@
-import { AlertTriangle, GitBranch, RefreshCw, UserRound } from "lucide-react";
+import { AlertTriangle, Check, GitBranch, RefreshCw, UserRound } from "lucide-react";
 import { CloudMainSection } from "../components/shared";
 
 export function CloudProjectRecoveryState({
@@ -9,6 +9,8 @@ export function CloudProjectRecoveryState({
   onRetry,
   onUseAnotherAccount,
   onOpenGitDetails,
+  confirmLabel,
+  onConfirm,
 }: {
   title?: string;
   message: string;
@@ -17,6 +19,8 @@ export function CloudProjectRecoveryState({
   onRetry: () => void;
   onUseAnotherAccount: () => void;
   onOpenGitDetails: () => void;
+  confirmLabel?: string;
+  onConfirm?: () => void;
 }) {
   return (
     <CloudMainSection
@@ -24,6 +28,12 @@ export function CloudProjectRecoveryState({
       count={loading ? "Retrying" : "Action needed"}
       action={(
         <>
+          {onConfirm && (
+            <button className="desktop-cloud-row-action primary" type="button" disabled={loading} onClick={onConfirm}>
+              <Check size={13} />
+              <span>{confirmLabel ?? "Confirm"}</span>
+            </button>
+          )}
           <button className="desktop-cloud-row-action" type="button" disabled={loading} onClick={onRetry}>
             <RefreshCw size={13} className={loading ? "spin" : undefined} />
             <span>Retry</span>

@@ -45,6 +45,7 @@ export function DesktopCloudScopeAccessDetail({
   connectors,
   mcpEndpoints,
   onRefresh,
+  canManage = false,
 }: {
   projectId: string;
   cloudSession: DesktopCloudSession;
@@ -56,6 +57,7 @@ export function DesktopCloudScopeAccessDetail({
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   onRefresh: () => Promise<void>;
+  canManage?: boolean;
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [expandedSurfaceId, setExpandedSurfaceId] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export function DesktopCloudScopeAccessDetail({
   const accessKeyLabel = scope.access_key ? maskDesktopScopeAccessKey(scope.access_key) : "Preparing";
 
   const handleCreateMcpEndpoint = async () => {
-    if (creatingMcp) return;
+    if (creatingMcp || !canManage) return;
     setCreatingMcp(true);
     setMcpError(null);
     const body: DesktopCloudCreateMcpEndpointRequest = {
@@ -125,7 +127,7 @@ export function DesktopCloudScopeAccessDetail({
   };
 
   const handleUpdateSurfacePermissions = async (surface: CloudAccessSurface, allowedKeys: ReadonlySet<string>) => {
-    if (surfaceConfigBusyId) return;
+    if (surfaceConfigBusyId || !canManage) return;
     const provider = normalizeProviderKey(surface.provider);
     setSurfaceConfigBusyId(surface.id);
     setSurfaceConfigError(null);
@@ -200,7 +202,7 @@ export function DesktopCloudScopeAccessDetail({
               </button>
             </div>
           </div>
-          <button
+          {canManage && <button
             className={`desktop-cloud-access-settings-button ${settingsOpen ? "active" : ""}`}
             type="button"
             aria-pressed={settingsOpen}
@@ -209,10 +211,10 @@ export function DesktopCloudScopeAccessDetail({
             onClick={() => setSettingsOpen((open) => !open)}
           >
             <Settings size={13} />
-          </button>
+          </button>}
         </header>
 
-        {settingsOpen && (
+        {canManage && settingsOpen && (
           <section className="desktop-cloud-access-web-settings">
             <span className="desktop-cloud-access-section-label">Settings</span>
             <div className="desktop-cloud-access-web-settings-body">
@@ -242,6 +244,7 @@ export function DesktopCloudScopeAccessDetail({
               onToggle={() => setExpandedSurfaceId((current) => (current === surface.id ? null : surface.id))}
               onCreateMcpEndpoint={handleCreateMcpEndpoint}
               onUpdatePermissions={(nextAllowedKeys) => handleUpdateSurfacePermissions(surface, nextAllowedKeys)}
+              canManage={canManage}
             />
           ))}
         </section>

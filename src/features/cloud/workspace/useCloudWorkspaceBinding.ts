@@ -1,33 +1,55 @@
-import {
-  useEffect,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
+import { useEffect, type Dispatch, type SetStateAction } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import {
-  listCloudProjects,
+  getCloudProject,
+  getCloudProjectReadiness,
+  getCloudWorkspaceBinding,
+  resolveLegacyCloudWorkspaceRemote,
   type DesktopCloudProject,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../../types/electron";
-import { mergePuppyoneWorkspaceConfig } from "../../app-shell/preferences";
 import { getPuppyoneRemote } from "../../source-control/remotes";
-import {
-  resolveWorkspaceCloudProjectBinding,
-  type RecentWorkspaceCloudBinding,
-} from "./cloudProjectResolution";
+import type { RecentWorkspaceCloudBinding } from "./cloudProjectResolution";
+import { bindingMatchesWorkspace, sameCloudOrigin } from "./explicitWorkspaceBinding";
+
+const LEGACY_CONFIRMATION_MESSAGE =
+  "Confirm this Cloud project before converting the legacy Git remote into a workspace binding.";
+const FORBIDDEN_MESSAGE =
+  "This folder is linked to a Cloud project that the current account cannot access.";
+
+type BindingHint = RecentWorkspaceCloudBinding;
+
+function errorStatus(error: unknown): number | null {
+  return error && typeof error === "object" && "status" in error
+    ? Number((error as { status?: unknown }).status) || null
+    : null;
+}
+
+function upsertProject(
+  projects: DesktopCloudProject[],
+  project: DesktopCloudProject,
+): DesktopCloudProject[] {
+  const index = projects.findIndex((entry) => entry.id === project.id);
+  if (index < 0) return [...projects, project];
+  if (projects[index] === project) return projects;
+  const next = [...projects];
+  next[index] = project;
+  return next;
+}
 
 /**
- * Single runtime owner for Local workspace → Cloud project binding.
- * Homepage `recentWorkspaceCloudBindings` is updated as a cache hint only.
+ * The single Local workspace -> Cloud Project binding controller.
+ *
+ * Normal opens resolve one binding id. Git remotes are only a one-time legacy
+ * discovery input and never become authorization or identity facts.
  */
 export function useCloudWorkspaceBinding({
   activeCloudSession,
   activeGitStatus,
   cloudEnabled,
   desktopCloudApiBaseUrl,
-  handlePuppyoneConfigChange,
-  homeCloudProjects,
+  homeCloudProjects: _homeCloudProjects,
   puppyoneConfig,
   setHomeCloudProjects,
   setRecentWorkspaceCloudBindings,
@@ -49,157 +71,197 @@ export function useCloudWorkspaceBinding({
   workspaceIsCloud: boolean;
 }) {
   useEffect(() => {
-    if (!workspace || workspaceIsCloud || !cloudEnabled || !activeGitStatus) return undefined;
+    if (!workspace || workspaceIsCloud || !cloudEnabled) return undefined;
 
+    const configProjectId = puppyoneConfig?.cloud.projectId?.trim() || null;
+    const configBindingId = puppyoneConfig?.cloud.bindingId?.trim() || null;
+    const configOrigin = puppyoneConfig?.cloud.origin?.trim() || null;
+    const configWorkspaceInstanceId = puppyoneConfig?.project.workspaceInstanceId?.trim() || null;
+    const workspaceInstanceId = workspace.workspaceInstanceId?.trim() || null;
     const cloudRemote = getPuppyoneRemote(activeGitStatus);
-    if (!cloudRemote) {
-      // No PuppyOne remote — clear stale linked cache for this workspace when
-      // config also has no project id.
-      const configuredProjectId = puppyoneConfig?.cloud.projectId?.trim() || null;
-      if (!configuredProjectId) {
-        setRecentWorkspaceCloudBindings((current) => {
-          if (!current[workspace.id]) return current;
-          const next = { ...current };
-          delete next[workspace.id];
-          return next;
-        });
-      }
-      return undefined;
-    }
 
-    const configuredProjectId = puppyoneConfig?.cloud.projectId?.trim() || null;
-    const sessionKey = [
-      activeCloudSession?.user_email ?? "",
-      activeCloudSession?.api_base_url ?? desktopCloudApiBaseUrl ?? "",
-      cloudRemote.rawUrl,
-      configuredProjectId ?? "",
-    ].join("\n");
-
-    const applyActiveBinding = (nextBinding: RecentWorkspaceCloudBinding) => {
-      setRecentWorkspaceCloudBindings((current) => {
-        const currentBinding = current[workspace.id];
-        if (
-          currentBinding?.projectId === nextBinding.projectId
-          && currentBinding.cloudLinked === nextBinding.cloudLinked
-          && currentBinding.error === nextBinding.error
-          && (currentBinding.reason ?? null) === (nextBinding.reason ?? null)
-        ) {
-          return current;
-        }
-        return {
-          ...current,
-          [workspace.id]: nextBinding,
-        };
-      });
+    const apply = (next: BindingHint) => {
+      setRecentWorkspaceCloudBindings((current) => ({
+        ...current,
+        [workspace.id]: next,
+      }));
     };
 
-    if (!activeCloudSession) {
-      // Keep structural remote presence; do not auto-unbind on missing session.
-      if (configuredProjectId) {
-        applyActiveBinding({
-          projectId: configuredProjectId,
-          cloudLinked: true,
-          error: null,
-          reason: null,
-        });
-      } else {
-        applyActiveBinding({
+    if (!configBindingId || !configProjectId) {
+      if (!cloudRemote) {
+        apply({ projectId: null, cloudLinked: false, error: null, reason: null });
+        return undefined;
+      }
+      if (!activeCloudSession) {
+        apply({
           projectId: null,
           cloudLinked: true,
-          error: null,
-          reason: null,
+          error: "Sign in to identify this legacy Cloud remote.",
+          reason: "wrong-account",
         });
+        return undefined;
       }
+
+      let cancelled = false;
+      void resolveLegacyCloudWorkspaceRemote(
+        activeCloudSession,
+        cloudRemote.rawUrl,
+        updateCloudSession,
+        desktopCloudApiBaseUrl,
+      ).then((candidate) => {
+        if (cancelled) return;
+        apply({
+          projectId: null,
+          candidateProjectId: candidate.project_id,
+          candidateScopeId: candidate.scope_id,
+          bindingId: null,
+          bindingKind: candidate.binding_kind,
+          scopePath: null,
+          cloudLinked: true,
+          error: LEGACY_CONFIRMATION_MESSAGE,
+          reason: "legacy-confirmation-required",
+        });
+      }).catch((error) => {
+        if (cancelled) return;
+        apply({
+          projectId: null,
+          cloudLinked: true,
+          error: error instanceof Error ? error.message : String(error),
+          reason: errorStatus(error) === 401 ? "wrong-account" : "unresolvable",
+        });
+      });
+      return () => { cancelled = true; };
+    }
+
+    if (!configOrigin || !sameCloudOrigin(configOrigin, desktopCloudApiBaseUrl ?? activeCloudSession?.api_base_url)) {
+      apply({
+        projectId: null,
+        candidateProjectId: configProjectId,
+        bindingId: configBindingId,
+        cloudLinked: true,
+        error: `Switch to the Cloud host used by this binding (${configOrigin ?? "unknown"}).`,
+        reason: "wrong-host",
+      });
+      return undefined;
+    }
+    if (
+      !configWorkspaceInstanceId
+      || !workspaceInstanceId
+      || configWorkspaceInstanceId !== workspaceInstanceId
+    ) {
+      apply({
+        projectId: null,
+        candidateProjectId: configProjectId,
+        bindingId: configBindingId,
+        cloudLinked: true,
+        error: "This binding belongs to a different local checkout. Attach this checkout explicitly.",
+        reason: "binding-revoked",
+      });
+      return undefined;
+    }
+    if (!activeCloudSession) {
+      apply({
+        projectId: configProjectId,
+        bindingId: configBindingId,
+        cloudLinked: true,
+        error: null,
+        reason: null,
+      });
       return undefined;
     }
 
     let cancelled = false;
     void (async () => {
-      const projects = homeCloudProjects.length > 0
-        ? homeCloudProjects
-        : await listCloudProjects(activeCloudSession, updateCloudSession, desktopCloudApiBaseUrl);
-      if (cancelled) return;
-      if (homeCloudProjects.length === 0) setHomeCloudProjects(projects);
+      try {
+        const binding = await getCloudWorkspaceBinding(
+          activeCloudSession,
+          configBindingId,
+          updateCloudSession,
+          desktopCloudApiBaseUrl,
+        );
+        if (cancelled) return;
+        if (
+          binding.id !== configBindingId
+          || !bindingMatchesWorkspace({
+            binding,
+            workspace,
+            configuredProjectId: configProjectId,
+            configuredOrigin: configOrigin,
+          })
+        ) {
+          apply({
+            projectId: null,
+            candidateProjectId: configProjectId,
+            bindingId: configBindingId,
+            cloudLinked: true,
+            error: "Cloud returned a binding that does not match this local workspace.",
+            reason: "binding-revoked",
+          });
+          return;
+        }
+        if (!binding.usable) {
+          const reason = binding.unusable_reason === "wrong_account"
+            ? "wrong-account"
+            : binding.unusable_reason === "role_downgraded"
+              ? "role-downgraded"
+              : "binding-revoked";
+          apply({
+            projectId: null,
+            candidateProjectId: configProjectId,
+            bindingId: binding.id,
+            bindingKind: binding.binding_kind,
+            scopePath: binding.scope_path ?? null,
+            cloudLinked: true,
+            error: reason === "wrong-account" ? "Switch to the account that attached this folder." : FORBIDDEN_MESSAGE,
+            reason,
+          });
+          return;
+        }
 
-      const resolution = await resolveWorkspaceCloudProjectBinding({
-        activeGitStatus,
-        apiBaseUrl: desktopCloudApiBaseUrl,
-        configuredProjectId,
-        onSessionChange: updateCloudSession,
-        projects,
-        session: activeCloudSession,
-        workspace,
-      });
-      if (cancelled) return;
-
-      if (resolution.status === "mapped") {
-        applyActiveBinding({
-          projectId: resolution.projectId,
+        const [project, readiness] = await Promise.all([
+          getCloudProject(activeCloudSession, configProjectId, updateCloudSession, desktopCloudApiBaseUrl),
+          getCloudProjectReadiness(activeCloudSession, configProjectId, updateCloudSession, desktopCloudApiBaseUrl),
+        ]);
+        if (cancelled) return;
+        setHomeCloudProjects((projects) => upsertProject(projects, project));
+        apply({
+          projectId: configProjectId,
+          bindingId: binding.id,
+          bindingKind: binding.binding_kind,
+          scopePath: binding.scope_path ?? null,
+          readiness,
+          capabilities: project.capabilities ?? [],
           cloudLinked: true,
           error: null,
           reason: null,
         });
-        if (configuredProjectId !== resolution.projectId) {
-          const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
-            cloud: {
-              projectId: resolution.projectId,
-            },
-          });
-          await handlePuppyoneConfigChange(nextConfig);
-        }
-        return;
-      }
-
-      if (resolution.status === "not-authorized") {
-        applyActiveBinding({
-          projectId: null,
-          cloudLinked: true,
-          error: resolution.message,
-          reason: "not-authorized",
-        });
-        // Do not persist unauthorized candidate ids into workspace config.
-        return;
-      }
-
-      if (resolution.status === "unresolvable") {
-        applyActiveBinding({
-          projectId: null,
-          cloudLinked: true,
-          error: resolution.message,
-          reason: "unresolvable",
-        });
-        return;
-      }
-
-      applyActiveBinding({
-        projectId: null,
-        cloudLinked: false,
-        error: null,
-        reason: null,
-      });
-    })()
-      .catch((error) => {
+      } catch (error) {
         if (cancelled) return;
-        // Network failures must not erase a previously verified binding.
-        applyActiveBinding({
-          projectId: configuredProjectId,
+        const status = errorStatus(error);
+        apply({
+          projectId: status == null ? configProjectId : null,
+          candidateProjectId: configProjectId,
+          bindingId: configBindingId,
           cloudLinked: true,
-          error: error instanceof Error ? error.message : String(error),
-          reason: configuredProjectId ? "network" : "unresolvable",
+          error: status === 401
+            ? "Switch accounts to use this Cloud binding."
+            : status === 403 || status === 404
+              ? FORBIDDEN_MESSAGE
+              : error instanceof Error ? error.message : String(error),
+          reason: status === 401
+            ? "wrong-account"
+            : status === 403 || status === 404
+              ? "not-authorized"
+              : "network",
         });
-      });
-
-    return () => {
-      cancelled = true;
-      void sessionKey;
-    };
+      }
+    })();
+    return () => { cancelled = true; };
   }, [
     activeCloudSession,
     activeGitStatus,
     cloudEnabled,
     desktopCloudApiBaseUrl,
-    handlePuppyoneConfigChange,
-    homeCloudProjects,
     puppyoneConfig,
     setHomeCloudProjects,
     setRecentWorkspaceCloudBindings,

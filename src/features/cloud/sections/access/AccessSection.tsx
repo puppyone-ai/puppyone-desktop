@@ -34,6 +34,7 @@ export function CloudAccessSection({
   onSelectAccessRow,
   onOpenProject,
   sidebarOwnsHeader = false,
+  canManage = false,
 }: {
   projectId: string;
   cloudSession: DesktopCloudSession;
@@ -52,6 +53,7 @@ export function CloudAccessSection({
   onSelectAccessRow?: (rowId: string | null) => void;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
   sidebarOwnsHeader?: boolean;
+  canManage?: boolean;
 }) {
   const scopeRows = getCloudScopeRows(scopes, identity);
   const accessRows = buildDesktopCloudAccessRows({
@@ -83,10 +85,12 @@ export function CloudAccessSection({
             <span className="desktop-cloud-access-count-badge">{loading ? 0 : scopeRows.length}</span>
           </div>
         )}
-        <button className="desktop-cloud-access-header-action" type="button" onClick={() => setCreateAccessOpen(true)}>
-          <Plus size={14} />
-          <span>New access</span>
-        </button>
+        {canManage && (
+          <button className="desktop-cloud-access-header-action" type="button" onClick={() => setCreateAccessOpen(true)}>
+            <Plus size={14} />
+            <span>New access</span>
+          </button>
+        )}
       </header>
       {loading ? (
         <PageLoading variant="fill" label="Loading" className="desktop-cloud-web-loading" />
@@ -109,12 +113,13 @@ export function CloudAccessSection({
             connectors={connectorsByScope.get(selectedScope.id) ?? []}
             mcpEndpoints={mcpEndpointsByScope.get(selectedScope.id) ?? []}
             onRefresh={onRefresh}
+            canManage={canManage}
           />
         </div>
       ) : (
         <div className="desktop-cloud-access-detail" />
       )}
-      {createAccessOpen && (
+      {canManage && createAccessOpen && (
         <DesktopCloudCreateAccessDialog
           projectId={projectId}
           cloudSession={cloudSession}

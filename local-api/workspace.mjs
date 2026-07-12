@@ -53,6 +53,7 @@ const DEFAULT_PUPPYONE_WORKSPACE_CONFIG = Object.freeze({
   version: 2,
   project: {
     id: null,
+    workspaceInstanceId: null,
   },
   sync: {
     sourceOfTruth: {
@@ -73,6 +74,8 @@ const DEFAULT_PUPPYONE_WORKSPACE_CONFIG = Object.freeze({
   },
   cloud: {
     projectId: null,
+    origin: null,
+    bindingId: null,
   },
 });
 const execFileAsync = promisify(execFile);
@@ -1508,6 +1511,23 @@ export async function configureWorkspaceCloudRemote(rootPath, remoteUrl, remoteN
   return getWorkspaceGitStatus(root);
 }
 
+export async function removeWorkspaceGitRemote(rootPath, remoteName = "puppyone") {
+  const root = resolveWorkspacePath(rootPath, null);
+  const normalizedRemoteName = normalizeGitRemoteName(remoteName);
+  const remoteExists = await execGit(root, ["remote", "get-url", normalizedRemoteName])
+    .then(() => true)
+    .catch(() => false);
+
+  if (remoteExists) {
+    await execGit(root, ["remote", "remove", normalizedRemoteName], {
+      timeout: GIT_MUTATION_TIMEOUT_MS,
+    }).catch((error) => {
+      throw new Error(`Unable to remove Cloud remote: ${getGitErrorOutput(error)}`);
+    });
+  }
+  return getWorkspaceGitStatus(root);
+}
+
 export async function readPuppyoneWorkspaceConfig(rootPath) {
   const root = await resolveExistingWorkspacePath(rootPath, null);
   const configDir = path.join(root, PUPPYONE_CONFIG_DIR);
@@ -1613,6 +1633,8 @@ export async function regeneratePuppyoneWorkspaceProjectId(rootPath, options = {
     cloud: {
       ...current.cloud,
       projectId: options.preserveCloudBinding === true ? current.cloud.projectId : null,
+      origin: options.preserveCloudBinding === true ? current.cloud.origin : null,
+      bindingId: options.preserveCloudBinding === true ? current.cloud.bindingId : null,
     },
   });
 }
@@ -3494,6 +3516,7 @@ function normalizePuppyoneWorkspaceConfig(value, options = {}) {
     project: {
       ...project,
       id: projectId,
+      workspaceInstanceId: normalizeWorkspaceInstanceId(project.workspaceInstanceId),
     },
     sync: {
       ...sync,
@@ -3519,6 +3542,8 @@ function normalizePuppyoneWorkspaceConfig(value, options = {}) {
     cloud: {
       ...cloud,
       projectId: normalizeOptionalConfigText(cloud.projectId),
+      origin: normalizeCloudBindingOrigin(cloud.origin),
+      bindingId: normalizeOptionalConfigText(cloud.bindingId),
     },
     ...(updatedAt ? { updatedAt } : {}),
   };
@@ -3531,6 +3556,37 @@ function normalizeWorkspaceProjectId(value, { strict = false } = {}) {
   if (valid) return normalized.toLowerCase();
   if (strict || normalized) throw new Error("PuppyOne project.id must be a valid UUID.");
   return null;
+}
+
+function normalizeWorkspaceInstanceId(value) {
+  const normalized = normalizeOptionalConfigText(value);
+  if (!normalized) return null;
+  if (normalized.length < 16 || normalized.length > 200 || /\s/.test(normalized)) {
+    throw new Error("PuppyOne project.workspaceInstanceId is invalid.");
+  }
+  return normalized;
+}
+
+function normalizeCloudBindingOrigin(value) {
+  const normalized = normalizeOptionalConfigText(value);
+  if (!normalized) return null;
+  let parsed;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new Error("PuppyOne cloud.origin must be an HTTP(S) origin.");
+  }
+  if (
+    !["http:", "https:"].includes(parsed.protocol)
+    || parsed.username
+    || parsed.password
+    || parsed.pathname !== "/"
+    || parsed.search
+    || parsed.hash
+  ) {
+    throw new Error("PuppyOne cloud.origin must be an HTTP(S) origin.");
+  }
+  return parsed.origin.toLowerCase();
 }
 
 function normalizeBackendService(value) {

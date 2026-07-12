@@ -1,10 +1,31 @@
 import type { CloudWorkspaceSection } from "../routes/cloudRouteIds";
+import type { DesktopCloudProjectReadiness } from "../../../lib/cloudApi";
 
 export type ProjectCloudAttachment =
   | { status: "local-only"; projectId: null }
   | { status: "resolving"; projectId: null }
-  | { status: "linked"; projectId: string; warning?: string }
+  | {
+      status: "linked";
+      projectId: string;
+      bindingId?: string | null;
+      bindingKind?: "full" | "scoped" | null;
+      scopePath?: string | null;
+      readiness?: DesktopCloudProjectReadiness | null;
+      capabilities?: string[];
+      warning?: string;
+    }
   | { status: "not-authorized"; projectId: string | null; message: string }
+  | { status: "wrong-account"; projectId: string | null; message: string }
+  | { status: "wrong-host"; projectId: string | null; message: string }
+  | { status: "binding-revoked"; projectId: string | null; message: string }
+  | { status: "role-downgraded"; projectId: string | null; message: string }
+  | {
+      status: "legacy-confirmation-required";
+      projectId: string | null;
+      scopeId: string | null;
+      bindingKind: "full" | "scoped" | null;
+      message: string;
+    }
   | { status: "unresolvable"; projectId: null; message: string }
   | { status: "error"; projectId: null; message: string };
 
@@ -24,15 +45,30 @@ export function attachmentHasBoundProject(attachment: ProjectCloudAttachment): b
 
 export function isCloudAttachmentRecovery(
   attachment: ProjectCloudAttachment,
-): attachment is Extract<ProjectCloudAttachment, { status: "not-authorized" | "unresolvable" | "error" }> {
+): attachment is Extract<ProjectCloudAttachment, {
+  status:
+    | "not-authorized"
+    | "wrong-account"
+    | "wrong-host"
+    | "binding-revoked"
+    | "role-downgraded"
+    | "legacy-confirmation-required"
+    | "unresolvable"
+    | "error";
+}> {
   return attachment.status === "not-authorized"
+    || attachment.status === "wrong-account"
+    || attachment.status === "wrong-host"
+    || attachment.status === "binding-revoked"
+    || attachment.status === "role-downgraded"
+    || attachment.status === "legacy-confirmation-required"
     || attachment.status === "unresolvable"
     || attachment.status === "error";
 }
 
 export function getCloudAttachmentWarning(attachment: ProjectCloudAttachment): string | null {
   if (attachment.status === "linked") return attachment.warning ?? null;
-  if (attachment.status === "not-authorized" || attachment.status === "unresolvable" || attachment.status === "error") {
+  if (isCloudAttachmentRecovery(attachment)) {
     return attachment.message;
   }
   return null;
@@ -46,31 +82,79 @@ export function resolveProjectCloudAttachment({
   bindingReason = null,
   bindingCloudLinked,
   resolving,
+  bindingId = null,
+  bindingKind = null,
+  scopePath = null,
+  readiness = null,
+  capabilities = [],
+  scopeId = null,
 }: {
   configuredProjectId: string | null;
   bindingProjectId: string | null;
   remoteProjectId: string | null;
   bindingError: string | null;
-  bindingReason?: "not-authorized" | "unresolvable" | "network" | null;
+  bindingReason?:
+    | "not-authorized"
+    | "unresolvable"
+    | "network"
+    | "binding-revoked"
+    | "wrong-account"
+    | "wrong-host"
+    | "role-downgraded"
+    | "legacy-confirmation-required"
+    | null;
   bindingCloudLinked: boolean;
   resolving: boolean;
+  bindingId?: string | null;
+  bindingKind?: "full" | "scoped" | null;
+  scopePath?: string | null;
+  readiness?: DesktopCloudProjectReadiness | null;
+  capabilities?: string[];
+  scopeId?: string | null;
 }): ProjectCloudAttachment {
-  const projectId = configuredProjectId?.trim()
-    || bindingProjectId?.trim()
-    || null;
+  const projectId = bindingProjectId?.trim() || configuredProjectId?.trim() || null;
 
   // A known durable binding stays linked on network/resolver warnings.
   // Remote-only candidate ids are NOT treated as verified bindings.
   if (projectId) {
+    const bindingDetails = {
+      ...(bindingId ? { bindingId } : {}),
+      ...(bindingKind ? { bindingKind } : {}),
+      ...(scopePath ? { scopePath } : {}),
+      ...(readiness ? { readiness } : {}),
+      ...(capabilities.length > 0 ? { capabilities } : {}),
+    };
     return bindingError
-      ? { status: "linked", projectId, warning: bindingError }
-      : { status: "linked", projectId };
+      ? { status: "linked", projectId, ...bindingDetails, warning: bindingError }
+      : { status: "linked", projectId, ...bindingDetails };
   }
 
   if (bindingError) {
     if (bindingReason === "not-authorized") {
       return {
         status: "not-authorized",
+        projectId: remoteProjectId?.trim() || null,
+        message: bindingError,
+      };
+    }
+    if (
+      bindingReason === "wrong-account"
+      || bindingReason === "wrong-host"
+      || bindingReason === "binding-revoked"
+      || bindingReason === "role-downgraded"
+      || bindingReason === "legacy-confirmation-required"
+    ) {
+      if (bindingReason === "legacy-confirmation-required") {
+        return {
+          status: bindingReason,
+          projectId: remoteProjectId?.trim() || null,
+          scopeId,
+          bindingKind,
+          message: bindingError,
+        };
+      }
+      return {
+        status: bindingReason,
         projectId: remoteProjectId?.trim() || null,
         message: bindingError,
       };

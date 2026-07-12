@@ -46,6 +46,67 @@ export type DesktopCloudProject = {
   bound_git_branch?: string | null;
   updated_at?: string | null;
   access_point_count?: number | null;
+  effective_role?: "admin" | "editor" | "viewer";
+  grant_source?: "org_owner" | "project_member" | "org_visibility";
+  capabilities?: string[];
+};
+
+export type DesktopCloudProjectReadiness = {
+  project_id: string;
+  git: {
+    root_scope_id: string | null;
+    root_surface_exists: boolean;
+    root_head_exists: boolean;
+    root_git_push_accepted: boolean;
+    default_branch: string;
+    state: "git_not_created" | "awaiting_first_push" | "ready";
+  };
+  claude: {
+    ready: boolean;
+    blockers: Array<
+      | "root_git_surface_missing"
+      | "root_head_missing"
+      | "root_git_push_not_accepted"
+      | string
+    >;
+  };
+};
+
+export type DesktopCloudWorkspaceBinding = {
+  id: string;
+  org_id: string;
+  project_id: string;
+  scope_id: string;
+  scope_path?: string | null;
+  workspace_instance_id: string;
+  bound_user_id: string;
+  cloud_origin: string;
+  binding_kind: "full" | "scoped";
+  mode: "r" | "rw";
+  status: "active" | "revoked";
+  usable: boolean;
+  unusable_reason?: "binding_revoked" | "wrong_account" | "role_downgraded" | string | null;
+  created_at: string;
+  updated_at: string;
+  last_seen_at: string;
+  revoked_at?: string | null;
+  /** Returned exactly once by create; never persist this field locally. */
+  credential?: string | null;
+};
+
+export type DesktopCloudWorkspaceBindingCreate = {
+  workspace_instance_id: string;
+  cloud_origin: string;
+  binding_kind: "full" | "scoped";
+  scope_id?: string | null;
+  mode: "r" | "rw";
+};
+
+export type DesktopCloudLegacyBindingCandidate = {
+  project_id: string;
+  scope_id: string;
+  binding_kind: "full" | "scoped";
+  requires_confirmation: true;
 };
 
 export type DesktopCloudOrganization = {
@@ -521,6 +582,120 @@ export function getCloudProject(
     {},
     apiBaseUrl,
   );
+}
+
+export function getCloudProjectReadiness(
+  session: DesktopCloudSession,
+  projectId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudProjectReadiness> {
+  return cloudApiRequest<DesktopCloudProjectReadiness>(
+    `/projects/${encodeURIComponent(projectId)}/readiness`,
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  );
+}
+
+export function createCloudWorkspaceBinding(
+  session: DesktopCloudSession,
+  projectId: string,
+  payload: DesktopCloudWorkspaceBindingCreate,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudWorkspaceBinding> {
+  return cloudApiRequest<DesktopCloudWorkspaceBinding>(
+    `/projects/${encodeURIComponent(projectId)}/workspace-bindings`,
+    session,
+    onSessionChange,
+    { method: "POST", body: JSON.stringify(payload) },
+    apiBaseUrl,
+  );
+}
+
+export function getCloudWorkspaceBinding(
+  session: DesktopCloudSession,
+  bindingId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudWorkspaceBinding> {
+  return cloudApiRequest<DesktopCloudWorkspaceBinding>(
+    `/workspace-bindings/${encodeURIComponent(bindingId)}`,
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  );
+}
+
+export function heartbeatCloudWorkspaceBinding(
+  session: DesktopCloudSession,
+  bindingId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudWorkspaceBinding> {
+  return cloudApiRequest<DesktopCloudWorkspaceBinding>(
+    `/workspace-bindings/${encodeURIComponent(bindingId)}/heartbeat`,
+    session,
+    onSessionChange,
+    { method: "POST" },
+    apiBaseUrl,
+  );
+}
+
+export function revokeCloudWorkspaceBinding(
+  session: DesktopCloudSession,
+  bindingId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<void> {
+  return cloudApiRequest<void>(
+    `/workspace-bindings/${encodeURIComponent(bindingId)}`,
+    session,
+    onSessionChange,
+    { method: "DELETE" },
+    apiBaseUrl,
+  );
+}
+
+export async function rotateCloudWorkspaceBindingCredential(
+  session: DesktopCloudSession,
+  bindingId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<string> {
+  const result = await cloudApiRequest<{ binding_id: string; credential: string }>(
+    `/workspace-bindings/${encodeURIComponent(bindingId)}/credential/rotate`,
+    session,
+    onSessionChange,
+    { method: "POST" },
+    apiBaseUrl,
+  );
+  return result.credential;
+}
+
+export function resolveLegacyCloudWorkspaceRemote(
+  session: DesktopCloudSession,
+  remoteUrl: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudLegacyBindingCandidate> {
+  return cloudApiRequest<DesktopCloudLegacyBindingCandidate>(
+    "/desktop/project-bindings/resolve-legacy-remote",
+    session,
+    onSessionChange,
+    { method: "POST", body: JSON.stringify({ remote_url: remoteUrl }) },
+    apiBaseUrl,
+  );
+}
+
+export function projectAllows(
+  project: DesktopCloudProject | null | undefined,
+  capability: string,
+): boolean {
+  return project?.capabilities?.includes(capability) === true;
 }
 
 export function listCloudOrganizations(

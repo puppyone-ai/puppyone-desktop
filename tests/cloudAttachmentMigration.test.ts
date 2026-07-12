@@ -241,7 +241,7 @@ describe("selected vs mapped Cloud project binding", () => {
     });
 
     expect(selectedProjectId).toBe("browse-proj");
-    expect(binding).toEqual({ status: "unmapped" });
+    expect(binding).toEqual({ status: "local-only" });
     expect(isProjectCloudLinked({ status: "local-only", projectId: null })).toBe(false);
   });
 
@@ -254,7 +254,7 @@ describe("selected vs mapped Cloud project binding", () => {
       loading: false,
       error: null,
     });
-    expect(beforeAttach).toEqual({ status: "unmapped" });
+    expect(beforeAttach).toEqual({ status: "local-only" });
 
     const afterAttach = deriveCloudWorkspaceBinding({
       cloudRemote: {
@@ -266,7 +266,7 @@ describe("selected vs mapped Cloud project binding", () => {
       loading: false,
       error: null,
     });
-    expect(afterAttach).toEqual({ status: "mapped", projectId: "proj-1" });
+    expect(afterAttach).toEqual({ status: "bound-full", projectId: "proj-1", readiness: null });
     expect(isProjectCloudLinked({ status: "linked", projectId: "proj-1" })).toBe(true);
   });
 });

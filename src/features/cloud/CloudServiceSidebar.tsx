@@ -15,6 +15,7 @@ type CloudSidebarNavEntry = {
   label: string;
   icon: typeof Cloud;
   groupEnd?: boolean;
+  requiredCapability?: string;
   locked?: boolean;
   lockReason?: string;
 };
@@ -34,6 +35,7 @@ export function CloudServiceSidebar({
   activeSection,
   projectContext = false,
   projectBound = false,
+  projectCapabilities = [],
   onSelectSection,
   onBackToProjects,
 }: CloudServiceSidebarProps) {
@@ -48,13 +50,19 @@ export function CloudServiceSidebar({
   const signedIn = Boolean(effectiveCloudSession);
   // Project context comes from binding / explicit selection — never from route alone.
   const inProjectContext = signedIn && projectContext;
-  const navItems: CloudSidebarNavEntry[] = !signedIn
+  const baseNavItems: CloudSidebarNavEntry[] = !signedIn
     ? SIGNED_OUT_CLOUD_SIDEBAR_ROUTES
     : inProjectContext && projectBound
       ? CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES
       : inProjectContext
         ? CLOUD_PROJECT_SIDEBAR_ROUTES
         : CLOUD_GLOBAL_SIDEBAR_ROUTES;
+  const navItems = baseNavItems.filter((item) => (
+    !signedIn
+    || !("requiredCapability" in item)
+    || !item.requiredCapability
+    || projectCapabilities.includes(item.requiredCapability)
+  ));
 
   return (
     <section className="desktop-tool-sidebar desktop-cloud-service-sidebar">

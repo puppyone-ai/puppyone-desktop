@@ -43,6 +43,11 @@ const listCloudScopes = vi.fn();
 const listCloudConnectors = vi.fn();
 const listCloudMcpEndpoints = vi.fn();
 const getCloudRepoIdentity = vi.fn();
+const getCloudProjectReadiness = vi.fn().mockResolvedValue({
+  project_id: "proj-1",
+  git: { root_scope_id: null, root_surface_exists: false, root_head_exists: false, root_git_push_accepted: false, default_branch: "main", state: "git_not_created" },
+  claude: { ready: false, blockers: ["root_git_surface_missing", "root_head_missing", "root_git_push_not_accepted"] },
+});
 const getCloudDashboard = vi.fn();
 const listCloudRoot = vi.fn();
 const listCloudProjects = vi.fn();
@@ -91,6 +96,7 @@ vi.mock("../src/lib/cloudApi", async () => {
     listCloudConnectors: (...args: unknown[]) => listCloudConnectors(...args),
     listCloudMcpEndpoints: (...args: unknown[]) => listCloudMcpEndpoints(...args),
     getCloudRepoIdentity: (...args: unknown[]) => getCloudRepoIdentity(...args),
+    getCloudProjectReadiness: (...args: unknown[]) => getCloudProjectReadiness(...args),
     getCloudDashboard: (...args: unknown[]) => getCloudDashboard(...args),
     listCloudRoot: (...args: unknown[]) => listCloudRoot(...args),
     listCloudProjects: (...args: unknown[]) => listCloudProjects(...args),
@@ -303,6 +309,7 @@ describe("CloudServiceSidebar project context", () => {
     expect(rows.map((row) => row.textContent)).toEqual([
       "Overview",
       "History",
+      "Claude",
       "Automation",
       "Access",
       "Settings",
@@ -312,7 +319,7 @@ describe("CloudServiceSidebar project context", () => {
     expect(rows.every((row) => !row.classList.contains("active"))).toBe(true);
 
     const lockedRows = rows;
-    expect(lockedRows).toHaveLength(7);
+    expect(lockedRows).toHaveLength(8);
     expect(lockedRows.every((row) => row.getAttribute("aria-disabled") === "true")).toBe(true);
     expect(container.querySelector(".desktop-cloud-sidebar-nav-lock")).toBeNull();
 
@@ -364,6 +371,39 @@ describe("CloudServiceSidebar project context", () => {
     expect(container.textContent).toContain("Team");
     expect(container.textContent).toContain("Billing");
     expect(container.querySelector(".desktop-cloud-sidebar-context-back")).toBeNull();
+  });
+
+  it("renders project-management navigation from server capabilities", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(
+      <CloudServiceSidebar
+        status={null}
+        cloudSession={session}
+        activeSection="contents"
+        projectContext
+        projectBound
+        projectCapabilities={["project.read", "agent.read"]}
+        onSelectSection={vi.fn()}
+      />,
+    ));
+    expect(container.textContent).toContain("Claude");
+    expect(container.textContent).not.toContain("Settings");
+
+    act(() => root?.render(
+      <CloudServiceSidebar
+        status={null}
+        cloudSession={session}
+        activeSection="contents"
+        projectContext
+        projectBound
+        projectCapabilities={["project.read", "agent.read", "project.settings.manage"]}
+        onSelectSection={vi.fn()}
+      />,
+    ));
+    expect(container.textContent).toContain("Settings");
   });
 
   it("back to Cloud Projects clears browse context via onBackToProjects", () => {

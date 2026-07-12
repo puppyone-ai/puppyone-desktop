@@ -151,6 +151,7 @@ export function readInitialTitlebarActionsSettings(): TitlebarActionsSettings {
 export function mergePuppyoneWorkspaceConfig(
   current: PuppyoneWorkspaceConfig | null,
   patch: Partial<{
+    project: Partial<PuppyoneWorkspaceConfig["project"]>;
     sync: {
       sourceOfTruth: Partial<PuppyoneWorkspaceConfig["sync"]["sourceOfTruth"]>;
     };
@@ -194,6 +195,8 @@ export function mergePuppyoneWorkspaceConfig(
     version: 2,
     project: {
       id: current?.project?.id ?? null,
+      workspaceInstanceId: current?.project?.workspaceInstanceId ?? null,
+      ...patch.project,
     },
     sync: {
       sourceOfTruth,
@@ -202,6 +205,8 @@ export function mergePuppyoneWorkspaceConfig(
     backup,
     cloud: {
       projectId: current?.cloud?.projectId ?? null,
+      origin: current?.cloud?.origin ?? null,
+      bindingId: current?.cloud?.bindingId ?? null,
       ...patch.cloud,
     },
     ...(current?.updatedAt ? { updatedAt: current.updatedAt } : {}),

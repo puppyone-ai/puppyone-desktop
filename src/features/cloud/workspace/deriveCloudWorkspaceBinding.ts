@@ -13,16 +13,20 @@ export function deriveCloudWorkspaceBinding({
   error: string | null;
 }): CloudWorkspaceBindingState {
   if (projectId) {
-    return { status: "mapped", projectId };
+    return { status: "bound-full", projectId, readiness: null };
   }
   if (cloudRemote && loading) {
-    return { status: "resolving", remoteUrl: cloudRemote.rawUrl };
+    return { status: "binding-resolving", bindingId: null };
   }
   if (cloudRemote) {
-    return { status: "remote-only", remoteUrl: cloudRemote.rawUrl };
+    return {
+      status: "error",
+      projectId: null,
+      message: "This legacy Cloud remote needs an explicit Project binding.",
+    };
   }
   if (error) {
-    return { status: "error", message: error };
+    return { status: "error", projectId: null, message: error };
   }
-  return { status: "unmapped" };
+  return { status: "local-only" };
 }

@@ -40,7 +40,6 @@ export {
 } from "./routes/cloudRoutes";
 export {
   deriveCloudWorkspaceBinding,
-  resolveMappedCloudProjectId,
 } from "./workspace";
 export { CLOUD_WORKSPACE_SECTIONS } from "./routes/cloudRouteIds";
 export type { CloudAuthState } from "./auth";

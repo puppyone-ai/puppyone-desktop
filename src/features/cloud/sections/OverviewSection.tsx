@@ -1,4 +1,5 @@
-import { Cloud, ExternalLink, RefreshCw } from "lucide-react";
+import { Cloud, ExternalLink, RefreshCw, Unlink } from "lucide-react";
+import { useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import type {
   DesktopCloudConnector,
@@ -42,6 +43,7 @@ export function CloudMappedOverview({
   linkedToWorkspace,
   loading,
   attachAction = null,
+  detachAction = null,
   onSelectSection,
   onOpenProject,
   onRefresh,
@@ -61,6 +63,10 @@ export function CloudMappedOverview({
     busy: boolean;
     disabled?: boolean;
     onAttach: () => void;
+  } | null;
+  detachAction?: {
+    busy?: boolean;
+    onDetach: () => void;
   } | null;
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
@@ -85,6 +91,7 @@ export function CloudMappedOverview({
       : "No changes";
   const hasOverviewData = Boolean(dashboard || tree || history || identity);
   const localMappingValue = linkedToWorkspace ? workspace.path : identity?.url ?? "";
+  const [confirmDetach, setConfirmDetach] = useState(false);
 
   if (loading && !hasOverviewData) {
     return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
@@ -123,6 +130,25 @@ export function CloudMappedOverview({
               onClick={attachAction.onAttach}
             >
               <span>{attachAction.busy ? "Linking…" : "Link folder"}</span>
+            </button>
+          )}
+          {detachAction && (
+            <button
+              className="desktop-cloud-row-action"
+              type="button"
+              disabled={detachAction.busy}
+              onBlur={() => setConfirmDetach(false)}
+              onClick={() => {
+                if (!confirmDetach) {
+                  setConfirmDetach(true);
+                  return;
+                }
+                setConfirmDetach(false);
+                detachAction.onDetach();
+              }}
+            >
+              <Unlink size={13} />
+              <span>{detachAction.busy ? "Detaching…" : confirmDetach ? "Confirm detach" : "Detach"}</span>
             </button>
           )}
           {projectId && (

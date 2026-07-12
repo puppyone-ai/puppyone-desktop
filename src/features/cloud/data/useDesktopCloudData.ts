@@ -5,6 +5,7 @@ import {
   type DesktopCloudDashboard,
   type DesktopCloudMcpEndpoint,
   type DesktopCloudProject,
+  type DesktopCloudProjectReadiness,
   type DesktopCloudRepoIdentity,
   type DesktopCloudScope,
   type DesktopCloudSession,
@@ -14,7 +15,6 @@ import type { DesktopCloudHistory } from "../../../lib/cloudHistoryApi";
 import type { CloudEnvironment } from "../environment";
 import { loadCloudProjectDetails } from "./cloudProjectDetails";
 
-export { resolveMappedCloudProjectId } from "../workspace";
 
 export type DesktopCloudDataState = {
   projects: DesktopCloudProject[];
@@ -29,6 +29,7 @@ export type DesktopCloudDataState = {
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;
+  readiness: DesktopCloudProjectReadiness | null;
   initializing: boolean;
   loading: boolean;
   error: string | null;
@@ -164,6 +165,7 @@ export function useDesktopCloudData({
         connectors: details.connectors,
         mcpEndpoints: details.mcpEndpoints,
         identity: details.identity,
+        readiness: details.readiness,
         initializing: false,
         loading: false,
         error: null,
@@ -261,6 +263,7 @@ function createCloudDataState(
     connectors: [],
     mcpEndpoints: [],
     identity: null,
+    readiness: null,
     initializing: false,
     loading: false,
     error: null,
