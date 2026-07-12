@@ -41,7 +41,7 @@ deliberate ownership of knowledge content:
 | Item | Shape |
 | --- | --- |
 | Text size | One three-tier control (Small / Default / Large). `Default` is an exact identity state that preserves every hand-tuned component font size, line height, and spacing value. Small/Large may scale semantic typography tokens; never bulk-rewrite existing component CSS or introduce two free px inputs. |
-| Content font | One catalog-backed selector. Built-in entries are Geist, System, and Serif. Preferences store an opaque font ID rather than a CSS family or file path, so a future local imported-font catalog can extend the same surface without changing the preference schema. UI, code, and terminal fonts remain fixed until separately designed. |
+| Content font | One catalog-backed selector with an inline live content sample. Built-in entries are Geist, System, and Serif. Preferences store an opaque font ID rather than a CSS family or file path, so a future local imported-font catalog can extend the same surface without changing the preference schema. UI, code, and terminal fonts remain fixed until separately designed. |
 | Dock icon | Curated set of 2-3 official icons only, presented in the shared content-sized segmented control. No custom image upload. macOS only. |
 | Pointer cursors | Single toggle. Default off (macOS-native arrow cursor). |
 | Third dark preset | A warm dark preset pairing with the light `warm` preset, giving 3 light + 3 dark. |

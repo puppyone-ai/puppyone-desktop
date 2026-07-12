@@ -111,5 +111,8 @@ protocol. That transport choice is deliberately below the catalog boundary.
 - A font-loading failure leaves the product usable with the role fallback.
 - Overlay roots receive the same resolved role variables as the owning app
   surface.
+- The Appearance selector renders an immediate content-font sample; the
+  surrounding Settings chrome remains on the interface role so the scope of a
+  change is visible without destabilizing application metrics.
 - Multi-window preference changes propagate through the browser storage event;
   imported catalog synchronization will be owned by its future host adapter.

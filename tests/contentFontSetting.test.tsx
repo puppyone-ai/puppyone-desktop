@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import React, { act } from "react";
+import React, { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ContentFontSetting } from "../src/features/settings/ContentFontSetting";
@@ -22,6 +22,39 @@ afterEach(() => {
 });
 
 describe("ContentFontSetting", () => {
+  it("previews the selected content font immediately without changing UI typography", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    function ControlledSetting() {
+      const [preferences, setPreferences] = useState(DEFAULT_TYPOGRAPHY_PREFERENCES);
+      return <ContentFontSetting preferences={preferences} onChange={setPreferences} />;
+    }
+
+    act(() => root?.render(
+      <TypographyCatalogProvider>
+        <ControlledSetting />
+      </TypographyCatalogProvider>,
+    ));
+
+    const serifButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Use Serif for content"]',
+    );
+    const preview = container.querySelector<HTMLOutputElement>(".desktop-content-font-preview");
+    expect(serifButton).not.toBeNull();
+    expect(preview?.dataset.fontId).toBe("builtin:geist-sans");
+    expect(preview?.style.fontFamily).toContain("Geist Sans");
+
+    act(() => serifButton?.click());
+
+    expect(serifButton?.getAttribute("aria-pressed")).toBe("true");
+    expect(preview?.dataset.fontId).toBe("builtin:system-serif");
+    expect(preview?.style.fontFamily).toContain("ui-serif");
+    expect(preview?.getAttribute("aria-label")).toBe("Serif content font preview");
+    expect(container.querySelector(".desktop-content-font-preview-text")?.textContent).toContain("知识");
+  });
+
   it("renders future imported catalog entries without changing its preference contract", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);

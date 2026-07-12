@@ -63,6 +63,70 @@
   min-height: 42px;
 }
 
+.desktop-content-font-row {
+  min-height: 58px;
+  padding-block: 7px;
+}
+
+.desktop-content-font-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 3px;
+}
+
+.desktop-settings-row .desktop-content-font-label {
+  color: var(--po-text-subtle);
+}
+
+.desktop-content-font-preview {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+  overflow: hidden;
+  color: var(--po-text-muted);
+  font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.desktop-settings-row .desktop-content-font-preview-glyph {
+  flex: 0 0 auto;
+  color: var(--po-text);
+  font-size: 17px;
+  line-height: 20px;
+}
+
+.desktop-settings-row .desktop-content-font-preview-text {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+}
+
+.desktop-content-font-segment {
+  max-width: 50%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 760px) {
+  .desktop-content-font-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .desktop-content-font-segment {
+    max-width: 100%;
+    align-self: flex-start;
+    justify-content: flex-start;
+  }
+}
+
 .desktop-settings-tools-row {
   align-items: flex-start;
   min-height: 38px;
