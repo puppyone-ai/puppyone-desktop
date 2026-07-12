@@ -2,9 +2,14 @@
 
 ## Current State
 
-The repository can build unsigned macOS packages for internal testing.
-Production macOS auto-update should wait until the app is Developer ID signed
-and notarized.
+macOS release commands fail closed unless Developer ID signing and Apple
+notarization credentials are present. Electron Builder enables the hardened
+runtime and notarization, while the macOS workflow verifies `codesign`,
+Gatekeeper, and the stapled notarization ticket before publishing artifacts.
+
+The remaining operational step is to provision the repository secrets and run
+one real macOS release. Until that external verification succeeds, do not
+publish any artifact to the stable auto-update feed.
 
 ## Release Source Of Truth
 
@@ -20,8 +25,8 @@ Recommended link policy:
 
 - GitHub README/release notes can link to GitHub Release assets.
 - The product website should link to Cloudflare download URLs.
-- The app auto-updater should use a Cloudflare-backed generic update feed after
-  signing and notarization are enabled.
+- The app auto-updater uses the Cloudflare-backed generic update feed only for
+  artifacts that passed signing and notarization verification.
 
 Cloudflare should keep both versioned history and a fixed latest path:
 
@@ -54,7 +59,7 @@ The default R2 bucket is:
 puppyone-desktop
 ```
 
-The internal unsigned build workflow uses this base R2 prefix:
+The signed prerelease workflow uses this base R2 prefix:
 
 ```text
 desktop/internal/mac
@@ -75,7 +80,7 @@ https://updates.puppyone.ai/desktop/stable/mac
 
 Use the stable path only for signed and notarized builds.
 
-## Internal Unsigned macOS Build
+## Signed macOS Prerelease Build
 
 Run the `Desktop Internal Build` workflow manually from GitHub Actions.
 
@@ -101,20 +106,24 @@ v0.1.1-internal.<run number>
 You can override it with the workflow `release_tag` input when rerunning or
 creating a named internal build.
 
-Unsigned builds are useful for team testing but are not suitable for public
-macOS auto-update.
+The workflow fails before packaging if signing or notarization credentials are
+missing. Its prerelease artifacts are suitable for internal validation only;
+promoting an artifact to the stable auto-update feed still requires the
+production release approval process.
 
 ## Production macOS Signing
 
-Before enabling stable releases, add Apple signing and notarization secrets:
+Before running a signed macOS prerelease or enabling stable releases, add these
+repository secrets (the workflow maps them to Electron Builder's variables):
 
 ```text
-CSC_LINK
-CSC_KEY_PASSWORD
-APPLE_ID
-APPLE_APP_SPECIFIC_PASSWORD
-APPLE_TEAM_ID
+MACOS_CSC_LINK
+MACOS_CSC_KEY_PASSWORD
+APPLE_API_KEY_P8
+APPLE_API_KEY_ID
+APPLE_API_ISSUER
 ```
 
-Then update the Electron Builder macOS config to sign and notarize production
-builds instead of using the current unsigned internal settings.
+Do not replace these with plaintext files in the repository. The existing
+Electron Builder configuration already enables hardened runtime, signing, and
+notarization; the release workflow also performs post-build verification.

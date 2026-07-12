@@ -10,10 +10,23 @@ const electronSourceBundleDefaults = {
   CFBundleIconFile: "electron.icns",
 };
 
-export function getDefaultElectronBin(desktopRoot) {
-  return process.platform === "win32"
-    ? path.join(desktopRoot, "node_modules", ".bin", "electron.cmd")
+export function getDefaultElectronBin(desktopRoot, platform = process.platform) {
+  // Spawn the native executable directly on Windows.  The npm-generated
+  // electron.cmd shim cannot be used with child_process.spawn without a shell
+  // and made both `npm run dev` and `npm run start` fail before Electron ran.
+  return platform === "win32"
+    ? path.join(desktopRoot, "node_modules", "electron", "dist", "electron.exe")
     : path.join(desktopRoot, "node_modules", ".bin", "electron");
+}
+
+/**
+ * Electron uses this variable to deliberately run its binary as plain Node.
+ * A parent test runner or shell can leave it set, so never inherit it when
+ * launching the desktop application itself.
+ */
+export function getElectronRuntimeEnv(env = process.env) {
+  const { ELECTRON_RUN_AS_NODE: _runAsNode, ...electronEnv } = env;
+  return electronEnv;
 }
 
 export function prepareElectronAppRuntime({

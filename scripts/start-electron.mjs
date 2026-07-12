@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getDefaultElectronBin } from "./electron-runtime.mjs";
+import { getDefaultElectronBin, getElectronRuntimeEnv } from "./electron-runtime.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const desktopRoot = path.resolve(__dirname, "..");
@@ -11,7 +11,7 @@ const electronArgs = [".", ...process.argv.slice(2)];
 const electron = spawn(electronExecutable, electronArgs, {
   cwd: desktopRoot,
   stdio: "inherit",
-  env: process.env,
+  env: getElectronRuntimeEnv(),
 });
 
 for (const signal of ["SIGINT", "SIGTERM"]) {

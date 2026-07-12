@@ -2,7 +2,8 @@ import { spawn } from "node:child_process";
 import { watch } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getDefaultElectronBin } from "./electron-runtime.mjs";
+import { getDefaultElectronBin, getElectronRuntimeEnv } from "./electron-runtime.mjs";
+import { getNpmExecutable, getNpmSpawnOptions } from "./node-package-manager.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const desktopRoot = path.resolve(__dirname, "..");
@@ -14,10 +15,11 @@ const mainWatchPaths = [
   path.join(desktopRoot, "build", "icon.icns"),
 ];
 
-const renderer = spawn("npm", ["run", "dev:renderer"], {
+const renderer = spawn(getNpmExecutable(), ["run", "dev:renderer"], {
   cwd: desktopRoot,
   stdio: "inherit",
   env: process.env,
+  ...getNpmSpawnOptions(),
 });
 
 let electronStarted = false;
@@ -54,7 +56,7 @@ function startElectron() {
     cwd: desktopRoot,
     stdio: "inherit",
     env: {
-      ...process.env,
+      ...getElectronRuntimeEnv(),
       PUPPYONE_DESKTOP_DEV_URL: devUrl,
     },
   });
