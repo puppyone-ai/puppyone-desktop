@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { OpenCodeHttpClient, parseModelSelection } from "../electron/main/agent/runtimes/opencode/opencode-http-client.mjs";
+import { OpenCodeHttpClient, parseModelSelection } from "../electron/main/agent/runtimes/opencode-protocol/opencode-http-client.mjs";
 
 describe("OpenCode loopback HTTP client", () => {
   it("keeps authentication internal and uses the versioned session endpoints", async () => {

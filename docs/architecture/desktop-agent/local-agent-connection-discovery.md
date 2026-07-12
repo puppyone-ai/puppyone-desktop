@@ -1,10 +1,10 @@
 # Native Agent backend and model discovery
 
-Status: target normative boundary accepted by
-[ADR-005](ADR-005-multi-native-agent-backends.md). Codex and Cursor inventory,
-bounded probes and the PuppyOne Agent OpenCode catalog are implemented. Claude
-Code discovery, native-backend readiness composition and Agent-first selection
-are migration work.
+Status: backend boundary implemented from
+[ADR-005](ADR-005-multi-native-agent-backends.md). PuppyOne Agent, Codex,
+Claude Code, user OpenCode and capability-gated Cursor are registered in the
+production runtime catalog. Agent-first presentation remains a separate UI
+migration.
 
 This document defines how PuppyOne discovers native Agent products without
 confusing an executable, harness, inference provider or model. It also defines
@@ -220,8 +220,9 @@ Rules:
   notifications and native approval/question requests.
 - A Codex session stores its Codex thread ID. It never creates an OpenCode
   session or imports Codex credentials into PuppyOne Agent.
-- The current adapter becomes production-selectable only after its capability,
-  history, crash, cancellation and security suites pass ADR-005 acceptance.
+- The production adapter is selectable only after version, app-server,
+  authentication and model inspection pass; capability, history, crash,
+  cancellation and security behavior are covered by backend contract tests.
 
 Reference: [official Codex App Server documentation](https://learn.chatgpt.com/docs/app-server),
 including the stable stdio JSONL transport and native thread, turn, account,
@@ -230,20 +231,24 @@ part of the PuppyOne production adapter contract.
 
 ## 7. Claude Code readiness
 
-Claude Code uses the native Claude Agent SDK plus the user's supported Claude
-Code executable and login.
+Claude Code uses the official Claude Agent SDK and the user's native Claude
+Code installation. PuppyOne bundles the pinned SDK control layer but excludes
+its 200+ MB optional platform executable from the base application; the native
+backend passes the user's canonical Claude Code executable to the SDK. SDK
+`0.3.159` is validated against Claude Code `2.1.159`; older local CLIs stay
+visible as installed but are not selectable until they meet that tested
+protocol baseline.
 
 ```text
-Level 1  canonical Claude executable/entrypoint + supported version
-Level 2  required Node runtime available when the entrypoint needs Node
-Level 3  Claude Agent SDK initialization/native session handshake
+Level 1  pinned Claude Agent SDK control layer available
+Level 2  canonical user Claude executable + version
+Level 3  SDK initialization/native session handshake
 Level 4  native authentication and model/capability inspection
-Level 5  production permission/history/recovery contract accepted
+Level 5  permission/history/recovery contract accepted
 Level 6  selectable Claude Code backend
 ```
 
-Resolver requirements should borrow the proven Claudian search categories
-without copying its weaker trust assumptions:
+Optional user-CLI resolution uses bounded deterministic categories:
 
 - explicit per-device path;
 - `~/.claude/local`, `~/.local/bin`, Homebrew and system locations;
@@ -251,10 +256,22 @@ without copying its weaker trust assumptions:
 - documented `@anthropic-ai/claude-code` Node entrypoints;
 - configured provider environment PATH.
 
-PuppyOne passes the resolved executable to the SDK. Claude Code remains the
+The version probe runs with an OS-created temporary `CLAUDE_CONFIG_DIR`, then
+deletes it. This prevents a read-only `--version` check from reading, migrating
+or writing the user's real Claude profile. The resulting session environment
+still uses the user's configured profile; probe isolation is never persisted
+into runtime readiness.
+
+PuppyOne passes the resolved user executable to the SDK. Claude Code remains the
 owner of its loop, tools, permission semantics and native session. PuppyOne
 normalizes SDK events and blocking requests but never polls or copies private
 credential files.
+
+The adapter loads user settings only. Repository project/local settings are
+not executed implicitly; main instead loads one canonical, bounded project
+instruction snapshot. The native `claude_code` system-prompt preset remains
+authoritative, permission bypass is never enabled, and “allow for session”
+filters permission updates to the SDK's in-memory `session` destination.
 
 ## 8. Cursor Agent readiness
 
@@ -322,7 +339,7 @@ Providers and local tools.
 | Ready                                                     |
 |  * PuppyOne Agent        Managed             Ready        |
 |    Codex                 Native login        Ready        |
-|    Claude Code           Native login        Ready        |
+|    Claude Code           API/cloud auth      Ready        |
 |                                                           |
 | Detected                                                  |
 |    Cursor Agent          Protocol unavailable Learn why  |

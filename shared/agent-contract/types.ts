@@ -7,6 +7,7 @@ export type AgentReadinessStatus =
   | "not-installed"
   | "installed-not-authenticated"
   | "unsupported-version"
+  | "protocol-unavailable"
   | "ready"
   | "error";
 
@@ -20,6 +21,7 @@ export type AgentRuntimeDescriptor = {
   version?: string | null;
   source?: string | null;
   compatibility?: string | null;
+  distribution?: "bundled" | "sdk-bundled" | "user-installed" | string;
 };
 
 export type AgentProviderReadiness = {
@@ -32,7 +34,11 @@ export type AgentProviderReadiness = {
   source?: string;
   compatibility?: string;
   diagnostic?: string;
+  selectable?: boolean;
 };
+
+/** Preferred product vocabulary; the provider-named type remains for compatibility. */
+export type AgentBackendReadiness = AgentProviderReadiness;
 
 export type AgentRuntimeCatalogEntry = {
   descriptor: AgentRuntimeDescriptor;
@@ -236,7 +242,15 @@ export type AgentProviderInspection = {
 
 export type AgentLocalInstallationState = "not-found" | "detected" | "unsupported" | "broken";
 export type AgentLocalAuthenticationState = "unknown" | "signed-out" | "signed-in" | "expired" | "error";
-export type AgentLocalIntegrationState = "inventory-only" | "bridge-required" | "ready" | "incompatible" | "blocked";
+export type AgentLocalIntegrationState =
+  | "inventory-only"
+  | "setup-required"
+  | "protocol-unavailable"
+  | "ready"
+  | "incompatible"
+  | "blocked"
+  /** @deprecated Read-only compatibility for older snapshots. */
+  | "bridge-required";
 export type AgentLocalConnectionSource =
   | "configured"
   | "user-installation"

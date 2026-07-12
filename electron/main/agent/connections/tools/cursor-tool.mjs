@@ -5,5 +5,5 @@ export const CURSOR_LOCAL_TOOL = Object.freeze({
   displayName: "Cursor Agent",
   executableNames: Object.freeze(["cursor-agent", "agent", "cursor agent"]),
   probe: probeCursorLocal,
-  bridgeRequiredMessage: "A Cursor-to-OpenCode provider bridge is not enabled.",
+  unavailableMessage: "PuppyOne will enable Cursor only after a stable supported Agent protocol is available.",
 });

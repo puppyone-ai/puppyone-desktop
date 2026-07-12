@@ -10,7 +10,16 @@ import {
 
 const INSTALLATION_STATES = Object.freeze(["not-found", "detected", "unsupported", "broken"]);
 const AUTHENTICATION_STATES = Object.freeze(["unknown", "signed-out", "signed-in", "expired", "error"]);
-const INTEGRATION_STATES = Object.freeze(["inventory-only", "bridge-required", "ready", "incompatible", "blocked"]);
+const INTEGRATION_STATES = Object.freeze([
+  "inventory-only",
+  "setup-required",
+  "protocol-unavailable",
+  "ready",
+  "incompatible",
+  "blocked",
+  // Read-only compatibility for older journal/UI fixtures.
+  "bridge-required",
+]);
 const SOURCES = Object.freeze(["configured", "user-installation", "system-installation", "path-installation", "application-bundle"]);
 const ACTIONS = Object.freeze(["refresh", "learn-more"]);
 

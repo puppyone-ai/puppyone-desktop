@@ -1,5 +1,5 @@
 import { countTextBytes, isAgentEventEnvelope } from "../agent-events.mjs";
-import { normalizeCapabilitySnapshot } from "../../../../shared/agent-contract/schema.mjs";
+import { normalizeCapabilitySnapshot, sanitizeAgentRuntimeDescriptor } from "../../../../shared/agent-contract/schema.mjs";
 
 const MAX_REPLAY_EVENTS = 1_000;
 const MAX_TERMINAL_TURN_IDS = 128;
@@ -109,7 +109,7 @@ export function applyInspection(session, inspection) {
   session.modes = Array.isArray(inspection.modes) ? inspection.modes : [];
   session.commands = Array.isArray(inspection.commands) ? inspection.commands : [];
   session.capabilities = normalizeCapabilitySnapshot(inspection.capabilities);
-  if (inspection.runtime) session.runtime = { ...session.runtime, ...inspection.runtime };
+  if (inspection.runtime) session.runtime = { ...session.runtime, ...sanitizeAgentRuntimeDescriptor(inspection.runtime) };
   if (session.selectedModel && !session.models.some((model) => model.model === session.selectedModel)) {
     session.selectedModel = null;
   }

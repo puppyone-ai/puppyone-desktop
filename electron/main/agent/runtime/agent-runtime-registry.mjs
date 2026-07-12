@@ -1,7 +1,8 @@
 import { assertAgentRuntimePort } from "./agent-runtime-port.mjs";
+import { sanitizeAgentRuntimeDescriptor } from "../../../../shared/agent-contract/runtime-schema.mjs";
 
 export class AgentRuntimeRegistry {
-  constructor(definitions) {
+  constructor(definitions, { defaultRuntimeId = null } = {}) {
     this.definitions = new Map();
     for (const definition of definitions) {
       validateDefinition(definition);
@@ -11,11 +12,14 @@ export class AgentRuntimeRegistry {
       this.definitions.set(definition.descriptor.id, definition);
     }
     if (this.definitions.size === 0) throw new Error("At least one Agent runtime must be registered.");
+    const defaultId = defaultRuntimeId ?? this.descriptors()[0]?.id ?? null;
+    if (!this.definitions.has(defaultId)) throw new Error(`Default Agent runtime is not registered: ${defaultId}`);
+    this.defaultRuntimeId = defaultId;
   }
 
   descriptors() {
     return Array.from(this.definitions.values())
-      .map((definition) => ({ ...definition.descriptor }))
+      .map((definition) => sanitizeAgentRuntimeDescriptor(definition.descriptor))
       .sort((left, right) => right.priority - left.priority || left.id.localeCompare(right.id));
   }
 
@@ -45,11 +49,8 @@ export class AgentRuntimeRegistry {
   }
 
   select(catalog, preferredRuntimeId = null) {
-    if (preferredRuntimeId) {
-      const preferred = catalog.find((entry) => entry.descriptor.id === preferredRuntimeId);
-      if (preferred) return preferred;
-    }
-    return catalog.find((entry) => entry.readiness.status === "ready") ?? catalog[0] ?? null;
+    const runtimeId = preferredRuntimeId || this.defaultRuntimeId;
+    return catalog.find((entry) => entry.descriptor.id === runtimeId) ?? null;
   }
 
   createAdapter(runtimeId, options) {
@@ -64,11 +65,21 @@ export class AgentRuntimeRegistry {
   }
 
   async dispose() {
-    await Promise.all(Array.from(this.definitions.values()).map((definition) => definition.dispose?.()));
+    const results = await Promise.allSettled(Array.from(this.definitions.values()).map((definition) => definition.dispose?.()));
+    const failures = results.filter((result) => result.status === "rejected").map((result) => result.reason);
+    if (failures.length) throw new AggregateError(failures, "One or more Agent runtimes failed to dispose cleanly.");
   }
 
   hasActiveResources() {
-    return Array.from(this.definitions.values()).some((definition) => definition.hasActiveResources?.() === true);
+    for (const definition of this.definitions.values()) {
+      try {
+        if (definition.hasActiveResources?.() === true) return true;
+      } catch {
+        // A failed resource probe is treated as active so shutdown still runs.
+        return true;
+      }
+    }
+    return false;
   }
 }
 
@@ -99,6 +110,7 @@ export function publicRuntimeReadiness(entry) {
     message: readiness.message ?? "",
     source: readiness.source ?? "external",
     compatibility: readiness.compatibility ?? "unknown",
+    selectable: readiness.status === "ready",
     ...(readiness.diagnostic ? { diagnostic: readiness.diagnostic } : {}),
   };
 }

@@ -229,13 +229,13 @@ describe("Desktop Agent local-tool inventory", () => {
         : { code: 1, stdout: "", stderr: "Not authenticated. Run cursor-agent login." }),
     });
     expect(cursor).toMatchObject({ installation: "detected", authentication: "signed-out" });
-    expect(deriveLocalConnection(cursor)).toMatchObject({ integration: "bridge-required", selectable: false });
+    expect(deriveLocalConnection(cursor)).toMatchObject({ integration: "protocol-unavailable", selectable: false });
   });
 
-  it("derives selectability only when every bridge gate passes", () => {
+  it("derives native selectability from protocol, auth, model and workspace gates", () => {
     const detected = {
       id: "codex",
-      displayName: "Codex CLI",
+      displayName: "Codex",
       installation: "detected",
       version: "0.144.1",
       authentication: "signed-in",
@@ -244,15 +244,12 @@ describe("Desktop Agent local-tool inventory", () => {
       source: "user-installation",
     };
     expect(deriveLocalConnection(detected)).toMatchObject({
-      integration: "bridge-required",
-      selectable: false,
+      integration: "ready",
+      selectable: true,
     });
     expect(deriveLocalConnection(detected, {
-      bridgeAuthorized: true,
-      bridgeCompatible: true,
-      hasTextAndToolsModel: true,
-      workspaceAllowed: true,
-    })).toMatchObject({ integration: "ready", selectable: true });
+      workspaceAllowed: false,
+    })).toMatchObject({ integration: "setup-required", selectable: false });
   });
 
   it("deduplicates concurrent scans, caches for five minutes and isolates per-tool failure", async () => {
@@ -264,7 +261,7 @@ describe("Desktop Agent local-tool inventory", () => {
     let releaseCodex;
     const codexResult = {
       id: "codex",
-      displayName: "Codex CLI",
+      displayName: "Codex",
       installation: "detected",
       version: "0.144.1",
       authentication: "signed-in",
@@ -290,7 +287,7 @@ describe("Desktop Agent local-tool inventory", () => {
     const [snapshot, sameSnapshot] = await Promise.all([first, concurrent]);
     expect(sameSnapshot).toEqual(snapshot);
     expect(snapshot.connections).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "codex", selectable: false }),
+      expect.objectContaining({ id: "codex", selectable: true }),
       expect.objectContaining({ id: "cursor-agent", installation: "broken", selectable: false }),
     ]));
     expect(JSON.stringify(snapshot)).not.toMatch(/\/Users\/example|\/tools\/|private cursor output/);
@@ -307,7 +304,7 @@ describe("Desktop Agent local-tool inventory", () => {
         id: "claude-code",
         displayName: "Claude Code",
         executableNames: ["claude"],
-        bridgeRequiredMessage: "A Claude-to-OpenCode provider bridge is not enabled.",
+        unavailableMessage: "Claude Code native SDK is unavailable.",
         probe: vi.fn(async () => ({
           id: "claude-code",
           displayName: "Claude Code",
@@ -328,9 +325,9 @@ describe("Desktop Agent local-tool inventory", () => {
       expect.objectContaining({
         id: "claude-code",
         displayName: "Claude Code",
-        integration: "bridge-required",
-        selectable: false,
-        statusMessage: expect.stringContaining("Claude-to-OpenCode provider bridge"),
+        integration: "ready",
+        selectable: true,
+        statusMessage: expect.stringContaining("ready for native Agent sessions"),
       }),
     ]);
     inventory.dispose();

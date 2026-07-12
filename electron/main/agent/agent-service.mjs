@@ -80,7 +80,7 @@ export function createAgentService({
       try {
         session.adapter = createAdapterForSession(session, selected.readiness);
         const inspection = assertAgentRuntimeInspection(session.adapter, await session.adapter.inspect(), session.runtimeId);
-        assertAuthenticated(inspection.account);
+        assertAuthenticated(inspection.account, selected.descriptor.displayName);
         applyInspection(session, inspection);
         requireAvailableModel(session, session.selectedModel);
         const providerSession = await session.adapter.createSession({
@@ -151,7 +151,7 @@ export function createAgentService({
       try {
         session.adapter = createAdapterForSession(session, selected.readiness);
         const inspection = assertAgentRuntimeInspection(session.adapter, await session.adapter.inspect(), session.runtimeId);
-        assertAuthenticated(inspection.account);
+        assertAuthenticated(inspection.account, selected.descriptor.displayName);
         applyInspection(session, inspection);
         const resumeRequest = {
           threadId: persisted.providerSessionId,

@@ -26,16 +26,6 @@ export const OPENCODE_RELEASE_ARTIFACTS = Object.freeze({
   "win32-x64": Object.freeze({ archive: "opencode-windows-x64.zip", archiveSha256: "7d489fd9b314e25bccf9c5dd2f17ef2774902c7b7db9aa34f46b0aab4715c70c" }),
 });
 
-export const OPENCODE_RUNTIME_DESCRIPTOR = Object.freeze({
-  id: "opencode",
-  displayName: "OpenCode",
-  description: "Full local coding-agent harness with tools, MCP, skills, prompts, compaction, and session history.",
-  kind: "harness",
-  iconKey: "opencode",
-  priority: 100,
-  upstream: OPENCODE_UPSTREAM,
-});
-
 export const OPENCODE_CAPABILITIES = Object.freeze({
   streamingText: true,
   structuredToolEvents: true,

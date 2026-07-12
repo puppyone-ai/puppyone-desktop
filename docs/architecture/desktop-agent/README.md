@@ -1,12 +1,11 @@
 # Desktop Local Agent Chat architecture
 
-Status: target architecture accepted by
-[ADR-005](ADR-005-multi-native-agent-backends.md); migration from the currently
-implemented OpenCode-only composition is planned. The shared contract,
-registry, service, session model and Renderer projection are already
-backend-neutral. Production composition and the current selector still expose
-only the managed OpenCode path and must migrate. Terminal remains a separate
-sibling surface.
+Status: backend architecture implemented from
+[ADR-005](ADR-005-multi-native-agent-backends.md). The production composition
+registers PuppyOne Agent, native Codex, native Claude Code, user OpenCode and
+capability-gated Cursor. The shared contract, Registry, Service, persistence
+and session model are backend-neutral. Agent-first Renderer integration is a
+separate presentation migration. Terminal remains a separate sibling surface.
 
 This document is intentionally made of prose and plain-text diagrams. It does
 not require a diagram renderer.
@@ -65,8 +64,10 @@ PuppyOne Desktop
             |     |     +-- codex app-server
             |     +-- Claude native adapter
             |     |     +-- Claude Agent SDK + Claude Code
+            |     +-- user OpenCode native adapter
+            |     |     +-- user opencode server/profile
             |     +-- capability-gated native adapters
-            |           +-- Cursor / user OpenCode / Pi / future
+            |           +-- Cursor / Pi / future
             +-- Backend discovery and readiness
             |     +-- executable + version + auth + protocol gates
             |     +-- backend-scoped provider/model/mode catalog
@@ -161,17 +162,19 @@ electron/main/agent/
   connections/                       bounded executable/readiness primitives
   transports/                        bounded reusable process transports
   runtimes/                          one native adapter package per backend
+    opencode-protocol/                shared protocol only; no product identity
+      host + allowlisted client + events + policy + adapter
     puppyone-agent/
+      puppyone-agent-identity.mjs
       puppyone-agent-runtime-definition.mjs
-      opencode/                       managed kernel implementation only
-        discovery + host + client + events + policy + adapter
+      managed-opencode-discovery.mjs  pinned bundle/profile authority
     codex/
       discovery + app-server adapter + events + definition
     claude/
       discovery + Agent SDK adapter + events + definition
     opencode-native/
       user-profile discovery + native adapter + events + definition
-    cursor/                           absent until its protocol gate passes
+    cursor/                           discovery + non-selectable protocol gate
 
 src/features/desktop-agent/
   domain/                             projections + Agent-scoped routing
@@ -189,9 +192,8 @@ discovery, protocol, event mapping, native history, capability translation and
 cleanup. There is no shared `harness/` package because PuppyOne does not own a
 universal loop.
 
-The detailed migration map below retains current filenames and annotates the
-ownership changes required by ADR-005. Lines marked `target` are migration
-destinations, not claims that the implementation is already complete.
+The detailed map below records current backend ownership. Renderer lines
+marked `target` remain presentation migration work and are not backend claims.
 
 ```text
 shared/agent-contract/
@@ -205,7 +207,7 @@ shared/agent-contract/
 
 electron/main/agent/
   agent-events.mjs                    versioned event envelope/redaction
-  agent-persistence.mjs               v2 bounded multi-session journal
+  agent-persistence.mjs               v3 bounded multi-session journal
   agent-reference-authorization.mjs   realpath and file-size authority
   agent-service.mjs                   session/window/turn orchestration
   bootstrap/
@@ -218,7 +220,9 @@ electron/main/agent/
   domain/
     agent-session-model.mjs           session aggregate and DTO projection
   migrations/
-    legacy-session-format.mjs         v1 Codex journal compatibility edge
+    legacy-session-format.mjs         v1 Codex + managed opencode ID migration
+  security/
+    authorized-project-instructions.mjs bounded canonical instruction snapshot
   connections/
     local-agent-inventory.mjs         lazy five-minute cache + per-tool isolation
     local-agent-connection-policy.mjs derived integration/selectability gates
@@ -226,7 +230,6 @@ electron/main/agent/
       local-agent-tool-registry.mjs   validated descriptor registry
       codex-tool.mjs                  Codex inventory descriptor
       cursor-tool.mjs                 Cursor inventory descriptor
-      claude-tool.mjs                 target: Claude inventory descriptor
     probes/
       executable-candidates.mjs       non-login deterministic candidate registry
       bounded-probe-command.mjs       1.5s/16KiB direct-spawn boundary
@@ -238,28 +241,33 @@ electron/main/agent/
     executable-discovery.mjs          bounded generic discovery
   transports/
     jsonl-rpc-connection.mjs          provider-neutral bounded child transport
-  runtimes/opencode/
-    # current managed PuppyOne Agent implementation; target owner is
-    # runtimes/puppyone-agent/ with an opencode kernel sub-boundary
+  runtimes/opencode-protocol/
     opencode-manifest.mjs             release/source/capability pin
-    opencode-discovery.mjs            exact bundle integrity + fallback
     opencode-sidecar-host.mjs         lazy loopback process lifecycle
     opencode-http-client.mjs          pinned SDK + allowlisted HTTP/SSE gateway
     opencode-events.mjs               native-to-AgentEvent mapping
-    opencode-security-policy.mjs      managed config + permission policy
-    opencode-project-instructions.mjs canonical project instruction loader
-    opencode-sidecar-adapter.mjs      AgentRuntimePort implementation
+    opencode-security-policy.mjs      fail-closed permission overlay
+    opencode-sidecar-adapter.mjs      parameterized AgentRuntimePort adapter
+  runtimes/puppyone-agent/
+    puppyone-agent-identity.mjs       product ID/descriptor and provenance
+    managed-opencode-discovery.mjs    exact bundle integrity + isolated profile
+    puppyone-agent-runtime-definition.mjs managed composition
   runtimes/codex/
     codex-discovery.mjs               local CLI discovery/version/auth
     codex-app-server-adapter.mjs      native Codex protocol adapter
-    codex-runtime-definition.mjs      target: production definition
-  runtimes/claude/                    target
-    claude-discovery.mjs              CLI/version/auth readiness
+    codex-runtime-definition.mjs      production definition
+  runtimes/claude/
+    claude-identity.mjs               product ID/descriptor
+    claude-discovery.mjs              SDK + required user CLI readiness
     claude-agent-sdk-adapter.mjs      native Claude SDK protocol adapter
     claude-events.mjs                 native-to-AgentEvent mapping
-    claude-runtime-definition.mjs     production definition after acceptance
-  runtimes/opencode-native/           target
-    user-owned runtime/profile adapter, isolated from PuppyOne Agent
+    claude-runtime-definition.mjs     production definition
+  runtimes/opencode-native/
+    opencode-native-discovery.mjs     user executable/profile readiness
+    opencode-native-runtime-definition.mjs independent host and profile
+  runtimes/cursor/
+    cursor-discovery.mjs              bounded inventory/protocol gate
+    cursor-runtime-definition.mjs     visible but non-selectable definition
 
 src/features/desktop-agent/
   index.ts                            public feature entrypoint

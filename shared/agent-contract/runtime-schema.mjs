@@ -50,10 +50,29 @@ function assertRuntimeDescriptor(value) {
   return value;
 }
 
+/** Project a trusted/native descriptor onto the bounded Renderer-safe DTO. */
+export function sanitizeAgentRuntimeDescriptor(value) {
+  const descriptor = assertRecord(value, "runtime descriptor");
+  const id = assertRuntimeId(descriptor.id, "runtime descriptor.id");
+  const displayName = requiredString(descriptor.displayName, "runtime descriptor.displayName", 160);
+  return {
+    id,
+    displayName,
+    description: boundedOptionalText(descriptor.description, 2_000),
+    kind: boundedOptionalText(descriptor.kind, 80) || "native",
+    iconKey: boundedOptionalText(descriptor.iconKey, 80) || id,
+    priority: Number.isSafeInteger(descriptor.priority) ? descriptor.priority : 0,
+    ...(boundedOptionalText(descriptor.distribution, 80) ? { distribution: boundedOptionalText(descriptor.distribution, 80) } : {}),
+    ...(boundedOptionalText(descriptor.version, 80) ? { version: boundedOptionalText(descriptor.version, 80) } : {}),
+    ...(boundedOptionalText(descriptor.source, 80) ? { source: boundedOptionalText(descriptor.source, 80) } : {}),
+    ...(boundedOptionalText(descriptor.compatibility, 120) ? { compatibility: boundedOptionalText(descriptor.compatibility, 120) } : {}),
+  };
+}
+
 function assertReadiness(value) {
   const readiness = assertRecord(value, "runtime readiness");
   assertRuntimeId(readiness.runtimeId ?? readiness.provider, "runtime readiness.runtimeId");
-  enumValue(readiness.status, "runtime readiness.status", ["not-installed", "installed-not-authenticated", "unsupported-version", "ready", "error"]);
+  enumValue(readiness.status, "runtime readiness.status", ["not-installed", "installed-not-authenticated", "unsupported-version", "protocol-unavailable", "ready", "error"]);
   return value;
 }
 
@@ -83,4 +102,8 @@ function assertNamedEntry(value, label, idKey = "id") {
   const entry = assertRecord(value, `Agent ${label}`);
   requiredString(entry[idKey], `Agent ${label}.${idKey}`, 512);
   return value;
+}
+
+function boundedOptionalText(value, limit) {
+  return typeof value === "string" ? value.trim().slice(0, limit) : "";
 }

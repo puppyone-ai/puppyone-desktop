@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { OpenCodeSidecarAdapter } from "../electron/main/agent/runtimes/opencode/opencode-sidecar-adapter.mjs";
+import { OpenCodeSidecarAdapter } from "../electron/main/agent/runtimes/opencode-protocol/opencode-sidecar-adapter.mjs";
+
+const MANAGED_RUNTIME = Object.freeze({ id: "puppyone-agent", displayName: "PuppyOne Agent" });
 
 describe("OpenCode AgentRuntimePort adapter", () => {
   it("uses native harness sessions, typed controls, files, history, fork and compaction", async () => {
@@ -13,6 +15,8 @@ describe("OpenCode AgentRuntimePort adapter", () => {
     };
     const onEvent = vi.fn();
     const adapter = new OpenCodeSidecarAdapter({
+      runtimeDescriptor: MANAGED_RUNTIME,
+      managed: true,
       readiness: { status: "ready", executablePath: "/opencode", version: "1.17.18", source: "bundled", compatibility: "pinned" },
       workspaceRoot: "/workspace",
       host,
@@ -144,6 +148,8 @@ describe("OpenCode AgentRuntimePort adapter", () => {
     };
     const onEvent = vi.fn();
     const adapter = new OpenCodeSidecarAdapter({
+      runtimeDescriptor: MANAGED_RUNTIME,
+      managed: true,
       readiness: { status: "ready", executablePath: "/opencode", version: "1.17.18", source: "bundled", compatibility: "pinned" },
       workspaceRoot: "/workspace",
       host,
@@ -179,6 +185,8 @@ describe("OpenCode AgentRuntimePort adapter", () => {
       snapshot: vi.fn(() => ({ state: "ready" })),
     };
     const adapter = new OpenCodeSidecarAdapter({
+      runtimeDescriptor: MANAGED_RUNTIME,
+      managed: true,
       readiness: { status: "ready", executablePath: "/opencode", version: "1.17.18", source: "bundled", compatibility: "pinned" },
       workspaceRoot: "/workspace",
       host,
@@ -219,6 +227,8 @@ describe("OpenCode AgentRuntimePort adapter", () => {
       snapshot: vi.fn(() => ({ state: "ready" })),
     };
     const adapter = new OpenCodeSidecarAdapter({
+      runtimeDescriptor: MANAGED_RUNTIME,
+      managed: true,
       readiness: { status: "ready", executablePath: "/opencode", version: "1.17.18", source: "bundled", compatibility: "pinned" },
       workspaceRoot: "/workspace",
       host,

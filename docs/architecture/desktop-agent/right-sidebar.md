@@ -160,7 +160,7 @@ Agent starts a new session rather than mutating or nesting native state.
 | --- | --- |
 | PuppyOne Agent engine verified and provider/model connected | PuppyOne Agent is selectable. |
 | Codex CLI passes version, account, app-server and model/tool gates | Codex is selectable and uses its native thread. |
-| Claude Code passes executable, SDK handshake, login and capability gates | Claude Code is selectable and uses its native session. |
+| Claude Code passes SDK runtime, API/cloud credential and capability gates | Claude Code is selectable and uses its native session. |
 | Cursor Agent is installed but has no supported protocol | Show Detected with a disabled explanation; never fake support through shell output. |
 | User OpenCode passes its independent profile and protocol gates | OpenCode is selectable without using the PuppyOne Agent profile. |
 

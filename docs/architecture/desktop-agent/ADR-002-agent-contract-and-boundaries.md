@@ -39,9 +39,9 @@ own boundaries. Constants and TypeScript unions are checked for drift.
 
 `AgentRuntimeRegistry` and `AgentRuntimeHost` are pure Core. Only
 `bootstrap/create-agent-runtime-host.mjs` imports concrete definitions. The
-current production root still registers only the managed OpenCode definition;
-ADR-005 requires it to register every production-ready native Agent backend.
-Definitions own discovery, adapter construction and resource cleanup.
+production root registers PuppyOne Agent, Codex, Claude Code, user OpenCode
+and capability-gated Cursor as independent definitions. Definitions own
+discovery, adapter construction and resource cleanup.
 
 Renderer code follows:
 
