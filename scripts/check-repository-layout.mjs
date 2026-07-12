@@ -13,6 +13,7 @@ const requiredPaths = [
   "src/features",
   "electron/main",
   "local-api",
+  "scripts/check-desktop-build-environment.mjs",
   "tests/fixtures/editor-rendering/README.md",
 ];
 const retiredPaths = [
@@ -62,6 +63,17 @@ if (/"packages\/\*\*"/.test(eslintConfig)) {
 const packageMetadata = read("package.json");
 if (!packageMetadata.includes('"packages/shared-ui/**"')) {
   errors.push("Packaged Desktop artifacts must include packages/shared-ui.");
+}
+if (!packageMetadata.includes('"build": "node scripts/check-desktop-build-environment.mjs')) {
+  errors.push("Production renderer builds must fail fast on missing endpoint configuration.");
+}
+
+const recentCloudBinding = read("src/features/cloud/workspace/cloudProjectResolution.ts");
+if (/from\s+["']\.\.\/\.\.\/\.\.\/lib\/localFiles["']/.test(recentCloudBinding)) {
+  errors.push("Recent-workspace Cloud binding must not probe inactive folders through active-window IPC authority.");
+}
+if (!recentCloudBinding.includes("item.workspace.cloudProjectId")) {
+  errors.push("Recent-workspace Cloud binding must consume the main-owned registry hint.");
 }
 
 if (errors.length > 0) {

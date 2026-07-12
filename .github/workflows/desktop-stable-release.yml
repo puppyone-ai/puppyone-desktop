@@ -1,0 +1,86 @@
+name: Desktop Stable Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-stable-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  mac:
+    name: Signed and notarized macOS release
+    runs-on: macos-latest
+    env:
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CSC_IDENTITY_AUTO_DISCOVERY: "true"
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      PUPPYONE_RELEASE_TAG: ${{ github.ref_name }}
+      R2_BUCKET: puppyone-desktop
+      VITE_DESKTOP_CLOUD_API_URL: https://api.puppyone.ai/api/v1
+      VITE_DESKTOP_CLOUD_WEB_URL: https://app.puppyone.ai
+
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Stage pinned OpenCode runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLATFORM_KEY="darwin-$(node -p 'process.arch')"
+          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('vendor/opencode/runtime-manifest.json', 'utf8')).runtimeRelease.version")"
+          ARCHIVE="$(node -e "const m=require('./vendor/opencode/runtime-manifest.json'); const a=m.artifacts[process.argv[1]]; if(!a) process.exit(2); process.stdout.write(a.archive)" "${PLATFORM_KEY}")"
+          DOWNLOAD="${RUNNER_TEMP}/${ARCHIVE}"
+          curl --fail --location --retry 3 --output "${DOWNLOAD}" \
+            "https://github.com/anomalyco/opencode/releases/download/v${VERSION}/${ARCHIVE}"
+          npm run stage:opencode-runtime -- "${DOWNLOAD}"
+
+      - name: Build and verify signed release
+        run: npm run dist:mac:release
+
+      - name: Create canonical GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          files=()
+          for pattern in release/*.dmg release/*.zip release/*.yml release/*.blockmap; do
+            for file in $pattern; do
+              [ -e "${file}" ] && files+=("${file}")
+            done
+          done
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No verified release files found."
+            exit 1
+          fi
+          gh release create "${PUPPYONE_RELEASE_TAG}" "${files[@]}" \
+            --verify-tag \
+            --title "puppyone ${PUPPYONE_RELEASE_TAG#v}" \
+            --generate-notes
+
+      - name: Install AWS CLI when unavailable
+        run: command -v aws >/dev/null 2>&1 || brew install awscli
+
+      - name: Publish verified artifacts to stable R2 feed
+        run: npm run publish:mac:r2
