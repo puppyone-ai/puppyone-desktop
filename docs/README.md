@@ -30,7 +30,9 @@ directly:
 - [Desktop Appearance Settings](architecture/desktop-appearance-settings.md)
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
 - [Desktop Agent Architecture](architecture/desktop-agent/README.md)
-  - [OpenCode-only Chat Harness Decision](architecture/desktop-agent/ADR-003-opencode-only-chat-harness.md)
+  - [Multi-Native Agent Backend Decision](architecture/desktop-agent/ADR-005-multi-native-agent-backends.md)
+  - One shared PuppyOne UI and control plane over PuppyOne Agent, Codex,
+    Claude Code, user OpenCode and capability-gated future native Agents.
 
 ## Release
 

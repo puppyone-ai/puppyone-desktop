@@ -1,11 +1,16 @@
 # ADR-004: PuppyOne owns Agent engine distribution and recovery
 
-Date: 2026-07-11. Status: accepted and implemented for discovery, development
-bootstrap and unavailable-state UX.
+Date: 2026-07-11. Status: accepted and implemented for the managed PuppyOne
+Agent backend. Its former global Chat availability scope is superseded by
+[ADR-005](ADR-005-multi-native-agent-backends.md).
+
+The verified OpenCode component described here is the internal kernel of
+PuppyOne Agent. Its absence disables PuppyOne Agent only; it does not disable a
+healthy native Codex, Claude Code, user OpenCode or future backend.
 
 ## Context
 
-OpenCode is the selected harness kernel, but “uses OpenCode” must not mean
+OpenCode is the PuppyOne Agent harness kernel, but “uses OpenCode” must not mean
 “requires the customer to install and upgrade the OpenCode CLI.” Those are two
 different distribution models. The latter leaks an internal implementation
 choice into onboarding, creates version skew and makes PuppyOne support depend
@@ -76,12 +81,13 @@ preload or Renderer.
 ## User experience
 
 ```text
-Engine ready
-  Chat input and Send enabled.
+PuppyOne Agent engine ready
+  PuppyOne Agent is selectable and its Send path may be enabled after Provider
+  and Model inspection.
 
-Engine preparing / repair needed
+PuppyOne Agent engine preparing / repair needed
   Draft input remains editable.
-  Send is temporarily disabled.
+  PuppyOne Agent is temporarily unavailable; other healthy Agents remain.
   Compact status says PuppyOne Agent needs repair/preparation.
   Retry checks PuppyOne's managed component.
   Optional secondary copy may say “powered by OpenCode.”
@@ -89,7 +95,7 @@ Engine preparing / repair needed
 Never shown
   “Install OpenCode”
   “Update OpenCode CLI”
-  an external-runtime selector
+  an implication that all Agent Chat is unavailable
 ```
 
 The harness brand may appear in About, diagnostics and attribution. It must
@@ -110,17 +116,18 @@ Model inference
   Future: optional PuppyOne-managed credits or team plan.
           This is a billing/provider route, not a different harness.
 
-Local coding-product subscriptions
-  Codex CLI, Claude Code or Cursor installation does not imply reusable model
-  entitlement. PuppyOne may detect and show the installation in Local tools;
-  only a documented authorized provider bridge may make it selectable.
+Native Agent product subscriptions
+  Codex, Claude Code, Cursor or user OpenCode keep their own entitlement and
+  harness. A backend becomes selectable only through its supported native
+  protocol and product gate; PuppyOne never copies its private credentials into
+  PuppyOne Agent.
 ```
 
-This keeps the first product version economically simple: PuppyOne absorbs
-engine distribution and update cost; customers pay only their chosen inference
-route unless they later opt into a PuppyOne-managed plan.
+PuppyOne absorbs PuppyOne Agent engine distribution and update cost. A native
+Agent backend retains its own subscription and billing contract. Customers pay
+only the backend or inference route they deliberately select.
 
-## Pi Agent or another embedded kernel
+## Pi Agent or another PuppyOne Agent kernel
 
 Pi is a legitimate embedded-kernel candidate. Its official monorepo publishes
 MIT packages for a stateful agent loop, multi-provider inference and a coding
@@ -129,8 +136,8 @@ agent SDK. As of this decision, the former
 `@earendil-works/pi-agent-core`; a spike must pin the current namespace and an
 exact release rather than copying an old blog example.
 
-Embedding Pi would remove the separate OpenCode executable, but it would also
-move more harness responsibility into PuppyOne. Before a replacement decision,
+Embedding Pi would replace the PuppyOne Agent kernel, but it would also move
+more harness responsibility into PuppyOne. Before that backend-internal decision,
 the spike must demonstrate parity for session resume/history, typed tools,
 permissions/questions, cancellation, MCP/skills, model routing, compaction,
 streaming, persistence, package sandboxing and provenance.
@@ -147,19 +154,20 @@ Embedded Pi packages
   PuppyOne owns more tool, permission, persistence and upgrade composition
 ```
 
-Pi is not a fallback for a missing OpenCode binary and does not create a
-runtime selector in the UI.
+Pi is not a silent fallback for a corrupt PuppyOne Agent engine. It may become
+an independent native Agent backend only through ADR-005's normal adapter,
+capability and product-acceptance path.
 
-Replacing the sole harness requires a new ADR and migration plan. Provider
-selection remains independent of that decision.
+Replacing the PuppyOne Agent kernel requires a dedicated ADR and native-session
+migration plan. It does not change the existence of other Agent backends.
 
 ## Consequences
 
 Benefits:
 
-- zero customer CLI prerequisite and deterministic support surface;
+- zero customer CLI prerequisite for PuppyOne Agent and a deterministic support surface;
 - application and engine versions are tested and rolled back together;
-- old global OpenCode installations cannot disable Chat;
+- old global OpenCode installations cannot disable PuppyOne Agent or another backend;
 - the exact-version SDK is adopted without surrendering the trust boundary;
 - billing language distinguishes a free bundled harness from paid inference.
 

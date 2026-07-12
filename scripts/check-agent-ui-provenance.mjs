@@ -12,7 +12,13 @@ const packageManifest = JSON.parse(read("package.json"));
 const sbom = JSON.parse(read("vendor/claudian/SBOM.cdx.json"));
 
 assert(license.includes("MIT License") && license.includes("Copyright (c) 2025"), "Claudian MIT license is incomplete.");
-assert(ledger.includes(commit) && ledger.includes("frontend") && ledger.includes("OpenCode-only"), "Claudian source ledger is incomplete.");
+assert(
+  ledger.includes(commit)
+    && ledger.includes("frontend")
+    && ledger.includes("multi-native")
+    && ledger.includes("ADR-005"),
+  "Claudian source ledger is incomplete or does not name the current Agent architecture boundary.",
+);
 assert(notice.includes(commit) && notice.includes("vendor/claudian/LICENSE"), "Claudian third-party notice is incomplete.");
 assert(css.includes(commit) && css.includes("vendor/claudian/SOURCE_ADOPTION.md"), "Agent UI source provenance comment is missing.");
 assert(packageManifest.build?.files?.includes("vendor/claudian/**"), "Packaged application omits the Claudian license ledger.");

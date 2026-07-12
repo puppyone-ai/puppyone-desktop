@@ -1,7 +1,13 @@
 # ADR-003: OpenCode is the only product Chat harness
 
-Date: 2026-07-11. Status: accepted; product entry implemented, legacy cleanup
-and explicit provider/variant modeling remain.
+Date: 2026-07-11. Status: superseded by
+[ADR-005](ADR-005-multi-native-agent-backends.md) on 2026-07-12.
+
+This file remains the historical record for the OpenCode-only phase. Its
+single-harness product routing, hidden runtime selector and global OpenCode
+availability rules are no longer the target architecture. Its OpenCode process
+isolation, safe DTO, permission and provenance decisions continue under the
+PuppyOne Agent backend through ADR-001 and ADR-004.
 
 This decision supersedes the product-routing parts of ADR-001 and ADR-002 that
 exposed OpenCode and Codex as peer, user-selectable Chat runtimes. It does not

@@ -53,11 +53,12 @@ single product area can evolve without turning this file into a catch-all.
     fit/resize pipeline). Part 2: the remediation to-do list (spacing-trim
     CSS fix, WebGL renderer with fallback, Unicode 11 widths).
 - [Desktop Agent Architecture](architecture/desktop-agent/README.md)
-  - Existing Terminal plus an experimental, default-off Agent Chat header action
-    and independent right-sidebar panel. OpenCode is the only Chat harness;
-    OpenAI/Codex, Anthropic and other authorized routes are model providers
-    inside it. The architecture defines native OpenCode versus PuppyOne product
-    session ownership, normalized events, approvals, persistence and security.
+  - Existing Terminal plus an independent right-sidebar Agent Chat. PuppyOne
+    owns one UI, control plane, safety boundary and event contract over multiple
+    native Agent backends. PuppyOne Agent uses a managed OpenCode kernel;
+    Codex, Claude Code, user OpenCode and future supported products keep their
+    own harness, login and native session. See the
+    [multi-native backend decision](architecture/desktop-agent/ADR-005-multi-native-agent-backends.md).
 
 ## Document Boundary
 

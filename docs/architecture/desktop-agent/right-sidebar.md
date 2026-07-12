@@ -1,19 +1,22 @@
 # Right Sidebar Agent Chat
 
-This document defines the implemented product, layout, lifecycle, and
-accessibility contract for Agent Chat in PuppyOne Desktop's resizable right
-sidebar.
+This document defines the target product, layout, lifecycle, and accessibility
+contract for Agent Chat in PuppyOne Desktop's resizable right sidebar. The
+current implementation is migrating from an OpenCode-only composer to the
+Agent-first backend architecture below.
 
 Read [Desktop Agent Architecture](README.md) first for the process, IPC,
-provider-adapter, event, security, and persistence boundaries.
+backend-adapter, event, security, and persistence boundaries.
 
 The detailed normative contracts are [Cursor-style Chat UI behavior](chat-ui-behavior-spec.md)
-and [Local Agent and Provider connection discovery](local-agent-connection-discovery.md).
+and [Native Agent backend and model discovery](local-agent-connection-discovery.md).
 
 The archived [Codex Implementation Brief](history/codex-vertical-slice.md)
-records the original direct-runtime slice. It is not the current product route.
-The authoritative decision is [ADR-003](ADR-003-opencode-only-chat-harness.md):
-every new Chat session uses OpenCode and provider/model choice stays inside it.
+records the original direct-runtime slice. The authoritative target decision is
+[ADR-005](ADR-005-multi-native-agent-backends.md): PuppyOne presents one Chat
+surface over multiple session-scoped native Agent backends. PuppyOne Agent uses
+the managed OpenCode kernel; Codex, Claude Code and other supported products use
+their own harness and native session.
 
 ## Status
 
@@ -25,21 +28,21 @@ every new Chat session uses OpenCode and provider/model choice stays inside it.
   Chat and Terminal panels, preserves Terminal's lazy PTY lifecycle,
   retains the selected surface, and keeps a running Agent turn alive while
   Chat is hidden.
-- **Implemented foundation:** OpenCode Harness, connected-provider discovery,
-  provider-first model routing, readiness/account/model/mode states, virtual transcript streaming, safe
+- **Implemented foundation:** managed OpenCode/PuppyOne Agent path,
+  connected-provider discovery, readiness/account/model/mode states, virtual transcript streaming, safe
   Markdown, part/tool registries, plan/tool/command/file activity, permission
   and structured-question docks, `/` commands, authorized `@` context and
   attachments, Stop, partial-history warning, and Jump to latest.
 - **Implemented by capability:** history list/resume/fork/archive/delete,
   compaction, queue/steer controls, and model/mode selection. Unsupported
   controls are omitted.
-- **Legacy boundary:** the runtime selector and direct Codex new-session route
-  are absent from product composition. A sidebar Chat submission must always
-  reach OpenCode; legacy Codex records remain migration-only data.
-- **Product gate:** selectable provider options appear only when OpenCode
-  reports them as connected and at least one text-and-tools Agent model
-  survives capability filtering. Installed Codex/Cursor tools are still shown
-  in a separate Local tools group with detected/auth/bridge status.
+- **Migration target:** restore a deliberate Agent selector, rename the current
+  managed route to PuppyOne Agent, promote the native Codex adapter after its
+  production gates, add Claude Code, and keep Cursor disabled until a supported
+  protocol exists.
+- **Product gate:** an Agent becomes selectable only after installation,
+  version, authentication, protocol, model/tool, workspace and product-policy
+  gates pass. Provider/Model controls are then scoped to that Agent.
 
 ## Product decision
 
@@ -64,7 +67,7 @@ panel components. The sidebar itself contains no Chat/Terminal selector.
 |                                  Deny  Allow once   |
 |                                                      |
 | [ Changes +86 -12 ]                                  |
-| (+)  Send follow-up       Provider / Model     Send  |
+| (+)  Send follow-up       Agent / Model        Send  |
 +------------------------------------------------------+
 ```
 
@@ -81,8 +84,8 @@ The Chat surface has four primary regions in document order:
 1. **Transcript** — user messages, assistant output, and activity items.
 2. **Blocking dock** — an approval or structured question when one is pending.
 3. **Changes handoff** — aggregate additions/deletions linking to the existing Git surface.
-4. **Composer** — prompt, Provider → Model routing, the `+` tools/mode menu,
-   submit, and stop/queue state.
+4. **Composer** — prompt, Agent → backend-scoped routing, the `+` tools/mode
+   menu, submit, and stop/queue state.
 
 Session history/new/overflow actions remain real controls but live in an
 out-of-flow chrome cluster revealed by hover or keyboard focus; they do not
@@ -125,85 +128,65 @@ The Chat panel keeps New Session, history and diagnostics as on-demand chrome
 rather than a persistent visual header. Controls use native buttons and menus,
 become visible on keyboard focus, and expose meaningful accessible names.
 
-## Provider, model and agent controls
+## Agent and backend-scoped controls
 
-OpenCode is fixed and is not a composer control. The composer shows Provider
-first and Model second; lower-frequency actions live in the `+` menu. Provider
-and Model use accessible PuppyOne popovers/listboxes rather than unstyled
-native `<select>` menus because rows require grouping, connection status,
-search and recovery actions:
-
-- provider selector;
-- model selector when model discovery is available;
-- model-scoped variant/effort selector when advertised;
-- mode choices for supported modes such as Agent, Plan, or Ask, inside the `+` menu;
-- compact account/readiness status when action is required.
-
-Provider discovery follows OpenCode's own Desktop implementation boundary:
+The composer shows Agent first. Model, Provider, Variant, effort and mode
+controls appear only when the selected Agent advertises them. These controls
+use accessible PuppyOne popovers/listboxes because rows require grouping,
+readiness, search, keyboard navigation and recovery actions.
 
 ```text
-OpenCode /provider
-|
-+-- all                         catalog metadata only; never sufficient for Send
-+-- connected                   credential/config/environment route detected by OpenCode
-+-- default[provider]           default model inside that Provider
+Agent
+  PuppyOne Agent
+  Codex
+  Claude Code
+  Cursor Agent          disabled with reason until protocol-ready
+  OpenCode
       |
-      +-- PuppyOne capability filter
-            input.text = true
-            output.text = true
-            toolcall = true
-            status != deprecated
+      v
+backend-scoped controls
+  PuppyOne Agent  -> Provider -> Model -> Variant -> Agent/Mode
+  Codex           -> Model -> Reasoning -> Sandbox/Approval profile
+  Claude Code     -> Model -> Effort -> Permission mode
+  OpenCode        -> Provider -> Model -> Agent/Mode
 ```
 
-`/config/providers` is not an authentication signal and is not used for the
-composer. A non-empty configuration catalog must never enable Send. With one
-usable connected Provider PuppyOne may select it; with multiple Providers and
-no valid saved choice, PuppyOne waits for an explicit user selection. The Model
-control is then populated only from that Provider.
+The selected Agent controls which native harness and session will be created.
+It is editable on a blank composer. Once a session exists, the Agent identity
+is pinned and the control becomes a truthful session label; choosing another
+Agent starts a new session rather than mutating or nesting native state.
 
-Executable discovery and inference availability are deliberately different:
-
-| Local observation | Product meaning |
+| Discovery observation | Product meaning |
 | --- | --- |
-| Codex CLI installed | Show `Codex CLI - Detected` with version/auth status. OpenAI/ChatGPT remains selectable only through an OpenCode-supported connected provider route. |
-| Claude Code installed | Show the local inventory state. Anthropic remains selectable only through an authorized OpenCode provider route. |
-| Cursor Agent installed | Show `Cursor Agent - Detected` with version/auth/bridge status. Do not make it selectable without a documented authorized bridge. |
-| OpenCode reports Provider in `connected` | Eligible for capability filtering and explicit selection. |
+| PuppyOne Agent engine verified and provider/model connected | PuppyOne Agent is selectable. |
+| Codex CLI passes version, account, app-server and model/tool gates | Codex is selectable and uses its native thread. |
+| Claude Code passes executable, SDK handshake, login and capability gates | Claude Code is selectable and uses its native session. |
+| Cursor Agent is installed but has no supported protocol | Show Detected with a disabled explanation; never fake support through shell output. |
+| User OpenCode passes its independent profile and protocol gates | OpenCode is selectable without using the PuppyOne Agent profile. |
 
-This prevents both current failure modes: PuppyOne no longer hides a tool the
-user really installed, and it no longer claims that installation is a usable
-inference route. The picker has separate `Connected routes` and `Local tools`
-groups. Detailed candidate paths, probes, state fields, security boundary and
-acceptance fixtures are defined in
-[Local Agent and Provider connection discovery](local-agent-connection-discovery.md).
+Executable presence alone never enables Send. Detailed candidate paths,
+probes, state fields, security boundaries and acceptance fixtures are defined
+in [Native Agent backend and model discovery](local-agent-connection-discovery.md).
 
-API-key validity can still change remotely and cannot be proven by local
-discovery alone. When a turn receives an authoritative authentication
-rejection, PuppyOne collapses duplicate terminal events, quarantines that
-Provider for the current inspection, clears its Model, and requires credential
-repair plus Refresh before it can be selected again.
+Authentication can expire after discovery. An authoritative rejection
+quarantines the affected backend or backend-scoped Provider for the current
+inspection, clears incompatible selections, retains the native session and
+offers the native recovery action. It does not disable or select another Agent.
 
-Changing provider never changes the harness. It selects another inference route
-inside OpenCode and preserves one permission, tool and session authority. If a
-provider/model change requires a new native session, the UI says so before
-creating it; it never nests or falls back to another agent product.
+Changing Model, Variant or Mode follows backend capability:
 
-Changing model or mode follows provider capability:
-
-- if the provider supports a per-turn override, the change applies to the next
-  turn in the current session;
-- if it requires a new session, the UI says so before applying it;
-- if it is unsupported, the control is omitted rather than disabled without an
-  explanation.
-
-Harness and provider readiness are distinct and have explicit recovery actions:
+- a supported per-turn override applies to the next turn;
+- a new-session-only setting explains that boundary before creating a session;
+- an unsupported control is omitted;
+- a backend change always creates or selects another product session.
 
 | State | Sidebar behavior |
 | --- | --- |
-| OpenCode missing/invalid | State that the Chat harness is unavailable and offer the verified application repair/update path; do not fall back. |
-| OpenCode ready, provider unauthenticated | Keep the harness identity and offer that provider's supported login/setup action. |
-| Provider/model ready | Enable OpenCode session creation and composer submission. |
-| Provider error | Keep the native session intact and show a concise provider recovery action without exposing secrets. |
+| PuppyOne Agent engine missing/invalid | Disable PuppyOne Agent and offer application repair; keep healthy native Agents available. |
+| Native Agent missing/incompatible | Show installation/version guidance for that Agent only. |
+| Native Agent signed out | Offer its documented login action, never request or copy raw credentials. |
+| Agent and backend-scoped model ready | Enable session creation and Send. |
+| Active backend/provider error | Preserve native session and file changes; show scoped recovery without fallback. |
 
 ## Transcript
 
@@ -245,7 +228,7 @@ Expanded details are intentionally bounded:
 - file edits show paths and compact addition/deletion counts, then link to the
   existing Review or file preview surface;
 - searches and reads show query/path plus a compact result summary;
-- MCP and OpenCode/provider-backed tools show a human label and redacted
+- MCP and backend-native tools show a human label and redacted
   structured arguments;
 - large results never render an unbounded preformatted block in the sidebar.
 
@@ -255,50 +238,51 @@ editing behavior.
 
 ## Plans
 
-When OpenCode exposes plan updates, the sidebar renders one current plan
-item rather than appending a new card for every update.
+When the selected backend exposes plan updates, the sidebar renders one current
+plan item rather than appending a new card for every update.
 
 The plan shows ordered steps and one of pending, in progress, or completed.
-OpenCode/provider-specific statuses map to this small vocabulary. Unknown
+Backend-specific statuses map to this small vocabulary. Unknown
 statuses remain visible as text but do not invent completion.
 
-Plan mode and an OpenCode-generated plan are different:
+An Agent mode and a backend-generated plan are different:
 
-- **Plan mode** is an operating constraint selected before a turn.
+- **Agent mode** is a backend-scoped operating constraint selected before a turn.
 - **Plan item** is progress content emitted during any compatible turn.
 
-The UI must not imply that showing a plan makes the OpenCode session read-only.
+The UI must not imply that showing a plan changes the native session's
+permission or write policy.
 
 ## Approval dock
 
 An unresolved approval occupies a dock between the transcript and composer.
 The composer remains visible but cannot submit a conflicting new turn unless
-OpenCode explicitly supports steering while blocked.
+the selected backend explicitly supports steering while blocked.
 
 The dock shows:
 
 - requested tool or action;
 - command, path, domain, or other material scope;
-- OpenCode/tool explanation or risk context when available;
+- backend/tool explanation or risk context when available;
 - Deny and Allow Once;
-- Always Allow only when OpenCode supplies an explainable durable rule;
+- Always Allow only when the backend supplies an explainable durable rule;
 - expiration, cancellation, or stale-request state.
 
 For network approvals, the target host and protocol are mandatory UI; for file
-approvals, the authorized root is shown when present. OpenCode resolved-request
-events remove stale docks without waiting for a renderer action.
+approvals, the authorized root is shown when present. Backend resolved-request
+events remove stale docks without waiting for a Renderer action.
 
 The focused action defaults to the safest choice. Keyboard order follows visual
 order. Escape does not silently approve; it either leaves the request open or
 denies only after an explicit product decision and accessible announcement.
 
-Only one blocking dock is shown at a time. Additional provider requests queue
+Only one blocking dock is shown at a time. Additional backend requests queue
 in main-process order and the transcript indicates the count. PuppyOne does not
 resolve or merge independent approvals automatically.
 
 ## Structured-question dock
 
-Provider questions use a distinct dock with:
+Backend-native questions use a distinct dock with:
 
 - one to three concise questions;
 - mutually exclusive or multi-select options as declared by the provider;
@@ -317,10 +301,10 @@ The composer supports:
 - multiline text with IME-safe Enter/Shift+Enter behavior;
 - submit with the product's established keyboard convention;
 - a single `+` menu for optional authorized attachments, workspace context and Agent mode;
-- the current connected Provider followed by a Model scoped to that Provider;
-- a provider-aware placeholder;
+- the selected Agent followed by its backend-scoped controls;
+- an Agent-aware placeholder and readiness state;
 - Stop while a turn is running;
-- queue or steer only when the provider capability advertises it;
+- queue or steer only when the backend capability advertises it;
 - retry as a new turn after a deterministic failure.
 
 Prompt drafts are scoped by workspace and application session. Switching to
@@ -339,40 +323,41 @@ not as a permanently visible third column inside the right sidebar.
 Each entry contains:
 
 - title;
-- provider;
+- Agent backend and optional backend-scoped model;
 - workspace identity;
 - last activity time;
 - last terminal state;
 - partial-history indication when PuppyOne cannot reconstruct all prior items.
 
-Opening history never resumes an active OpenCode turn accidentally. Deleting a
-PuppyOne session mapping and deleting OpenCode-native history are separate
-operations unless OpenCode exposes deletion and the user explicitly
+Opening history never resumes an active native turn accidentally. Deleting a
+PuppyOne session mapping and deleting backend-native history are separate
+operations unless that backend exposes deletion and the user explicitly
 selects both.
 
 ## Empty, loading, and error states
 
 The sidebar uses distinct states:
 
-- discovering the OpenCode harness and its providers;
-- OpenCode harness unavailable;
-- provider setup required;
+- discovering Agent backends;
+- no compatible Agent installed;
+- selected Agent setup required;
+- PuppyOne Agent repair required while other Agents remain available;
 - ready with no active session;
 - restoring a session;
 - active idle session;
 - running turn;
 - waiting for approval/question;
 - interrupted turn;
-- recoverable provider/model error;
-- OpenCode process exited;
+- recoverable backend/provider/model error;
+- native Agent process exited;
 - partial history restored.
 
 Loading retains the previous committed transcript when safe. A temporary model
 or account refresh does not blank the entire sidebar.
 
-Errors state what failed and what remains valid. For example, an OpenCode or
-provider failure can leave file changes on disk; the sidebar must not imply that
-interrupting or retrying automatically reverted them.
+Errors state which Agent failed and what remains valid. A backend failure can
+leave file changes on disk; the sidebar must not imply that interrupting,
+switching Agent or retrying automatically reverted them.
 
 ## Resize and scroll behavior
 
@@ -414,25 +399,26 @@ Persisted presentation preference
   sidebar open
   sidebar width
   last selected surface
-  preferred provider/model/variant/mode
+  preferred Agent and backend-scoped controls for blank sessions
 
 Workspace + session projection
   active application session id
+  immutable Agent backend id
   transcript projection
   last committed event sequence
   draft and attachment references
   independent Chat scroll position
 
 Main-process runtime state
-  OpenCode connection/process
-  OpenCode native session id
-  selected provider/model/variant
+  selected native Agent process/connection
+  backend-native session id
+  backend-scoped provider/model/variant/mode
   active turn
   pending approval/question
   authoritative event ordering
 ```
 
-React component unmount is never the authoritative signal that a provider turn
+React component unmount is never the authoritative signal that a native turn
 ended. The main process owns that lifecycle.
 
 ## Implemented component map
@@ -447,9 +433,9 @@ src/features/desktop-agent/
   agentTypes.ts                   migration-only re-export
 ```
 
-`RightAgentPanel` composes these units but does not implement OpenCode/provider
-mappings. OpenCode-to-event mapping belongs in Electron main-process adapters,
-and pure event-to-view projection belongs in `domain/agent-projection.ts`.
+`RightAgentPanel` composes these units but does not implement backend mappings.
+Native-to-event mapping belongs in Electron main-process adapters, and pure
+event-to-view projection belongs in `domain/agent-projection.ts`.
 
 ## Acceptance criteria
 
@@ -458,16 +444,18 @@ The implemented sidebar contract remains satisfied when:
 - the independent Chat and Terminal header buttons switch panels without losing
   their active state;
 - a hidden running agent continues safely and reports completion on return;
-- every new Chat session uses OpenCode and no runtime selector is rendered;
-- provider/model selection is driven by OpenCode `connected`, is ordered
-  Provider → Model, and never replaces the harness;
+- a blank composer exposes Agent before backend-scoped Model controls;
+- a created session pins one Agent backend and switching Agent creates a new
+  session rather than nesting or mutating native state;
+- PuppyOne Agent, Codex and Claude Code can fail independently without silent
+  fallback or global Chat disablement;
 - image-only, audio-only, Embedding, deprecated, and non-tool Agent models are
-  absent from the Chat Model control;
+  absent when the selected backend requires text-and-tools capability;
 - streamed text, tools, plans, diffs, approvals, and questions preserve event
   order;
 - full diffs and files open in their existing owning surfaces;
-- no provider credential or arbitrary process API crosses into the renderer;
-- stop, reset, hide, window close, OpenCode exit, provider failure, and app quit
-  have distinct, tested outcomes;
+- no backend credential or arbitrary process API crosses into the renderer;
+- stop, reset, hide, window close, native process exit, provider failure, and
+  app quit have distinct, tested outcomes;
 - the entire experience is keyboard accessible from 420px through 760px;
 - Terminal behavior and its current tests remain unchanged.
