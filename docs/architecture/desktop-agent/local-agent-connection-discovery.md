@@ -106,7 +106,8 @@ or add a separate `AgentBackendReadiness` DTO while retaining a small Local
 tools diagnostics view.
 
 Executable paths, account identifiers, tokens, raw status output, credential
-locations, sidecar URLs and process environment remain main-process data.
+locations, internal server addresses and process environment remain
+main-process data.
 Renderer receives sanitized descriptors, status and action IDs only.
 
 `selectable` is true only when every applicable gate passes:
@@ -132,14 +133,17 @@ verified engine plus at least one usable connected Provider/Model route.
   settings open or the user presses Refresh.
 - Managed PuppyOne Agent integrity may be checked independently and lazily when
   its row or an existing PuppyOne Agent session needs it.
-- Cache sanitized readiness for at most five minutes. Invalidate on explicit
-  Refresh, executable identity change, native process restart, login/logout or
-  authoritative authentication rejection.
+- Cache in-process readiness/inspection for five minutes. A sanitized
+  installation inventory may survive an app restart for at most 24 hours so
+  opening Chat does not immediately rescan the machine. Explicit Refresh
+  bypasses both caches; authoritative protocol/auth failures invalidate the
+  affected runtime state.
 - Deduplicate concurrent scans. Application disposal aborts active probes and
   every timeout/output-limit path kills its child process.
 - One backend failure never hides, disables or selects another backend.
-- Restoring a saved session inspects its pinned backend. It does not choose the
-  highest-priority healthy backend as a fallback.
+- Reconnecting the current process's live session inspects its pinned backend.
+  It does not choose the highest-priority healthy backend as a fallback;
+  PuppyOne does not restore a persisted Chat session after restart.
 
 ## 5. Executable discovery
 
@@ -205,7 +209,7 @@ Level 1  canonical Codex executable + supported version
 Level 2  app-server initialize / initialized handshake
 Level 3  account/read authentication state
 Level 4  model/list and required capability check
-Level 5  production security/history/approval contract accepted
+Level 5  production security/native-session/approval contract accepted
 Level 6  selectable Codex backend
 ```
 
@@ -221,7 +225,7 @@ Rules:
 - A Codex session stores its Codex thread ID. It never creates an OpenCode
   session or imports Codex credentials into PuppyOne Agent.
 - The production adapter is selectable only after version, app-server,
-  authentication and model inspection pass; capability, history, crash,
+  authentication and model inspection pass; capability, native-session, crash,
   cancellation and security behavior are covered by backend contract tests.
 
 Reference: [official Codex App Server documentation](https://learn.chatgpt.com/docs/app-server),
@@ -232,19 +236,18 @@ part of the PuppyOne production adapter contract.
 ## 7. Claude Code readiness
 
 Claude Code uses the official Claude Agent SDK and the user's native Claude
-Code installation. PuppyOne bundles the pinned SDK control layer but excludes
-its 200+ MB optional platform executable from the base application; the native
-backend passes the user's canonical Claude Code executable to the SDK. SDK
-`0.3.159` is validated against Claude Code `2.1.159`; older local CLIs stay
-visible as installed but are not selectable until they meet that tested
-protocol baseline.
+Code installation. PuppyOne bundles the SDK control layer and passes the
+user's canonical Claude Code executable to it. Compatibility is
+capability-gated instead of inferred from an arbitrary minimum version. A CLI
+stays visible as installed but is non-selectable when the secure SDK launch
+flags it requires are absent.
 
 ```text
 Level 1  pinned Claude Agent SDK control layer available
-Level 2  canonical user Claude executable + version
+Level 2  canonical user Claude executable + required protocol flags
 Level 3  SDK initialization/native session handshake
 Level 4  native authentication and model/capability inspection
-Level 5  permission/history/recovery contract accepted
+Level 5  permission/native-session/recovery contract accepted
 Level 6  selectable Claude Code backend
 ```
 
@@ -256,11 +259,11 @@ Optional user-CLI resolution uses bounded deterministic categories:
 - documented `@anthropic-ai/claude-code` Node entrypoints;
 - configured provider environment PATH.
 
-The version probe runs with an OS-created temporary `CLAUDE_CONFIG_DIR`, then
-deletes it. This prevents a read-only `--version` check from reading, migrating
-or writing the user's real Claude profile. The resulting session environment
-still uses the user's configured profile; probe isolation is never persisted
-into runtime readiness.
+Version and help/capability probes run with an OS-created temporary
+`CLAUDE_CONFIG_DIR`, then delete it. This prevents a read-only probe from
+reading, migrating or writing the user's real Claude profile. The resulting
+session environment still uses the user's configured profile; probe isolation
+is never persisted into runtime readiness.
 
 PuppyOne passes the resolved user executable to the SDK. Claude Code remains the
 owner of its loop, tools, permission semantics and native session. PuppyOne
@@ -283,7 +286,7 @@ Level 1  canonical Cursor Agent executable + version
 Level 2  bounded native status/auth observation
 Level 3  stable documented streaming/session/approval protocol
 Level 4  explicit credential and billing contract
-Level 5  production security/history/recovery adapter accepted
+Level 5  production security/native-session/recovery adapter accepted
 Level 6  selectable Cursor backend
 ```
 
@@ -307,6 +310,7 @@ PuppyOne Agent
   runtimeId             puppyone-agent
   executable            pinned and verified PuppyOne component
   profile               PuppyOne-owned isolated profile
+  native protocol       ACP over JSON-RPC 2.0 stdio
   provider catalog      managed OpenCode connected routes
   native sessions       managed OpenCode sessions
   repair                PuppyOne application repair/update
@@ -315,14 +319,15 @@ OpenCode
   runtimeId             opencode-native
   executable            user installation
   profile               user-owned OpenCode profile
+  native protocol       ACP over JSON-RPC 2.0 stdio
   provider catalog      user OpenCode connected routes
   native sessions       user OpenCode sessions
   repair                native installation/login guidance
 ```
 
 The two adapters never share implicit config roots, native session IDs or
-credential stores. Existing product `opencode` mappings migrate to
-`puppyone-agent`; they are not reclassified as user OpenCode.
+credential stores. Legacy PuppyOne-owned transcript/session cache data is
+removed rather than reclassified as user OpenCode history.
 
 For either OpenCode-backed backend, configuration catalog entries are not Send
 authority. Only connected Providers with compatible text input, text output and
@@ -383,9 +388,9 @@ Electron main
 ```
 
 Renderer never receives generic spawn, command arguments, raw stdout,
-environment variables, executable/credential paths, auth tokens, sidecar URLs
-or passwords. Each backend has a specific discovery and protocol adapter plus
-contract fixtures.
+environment variables, executable/credential paths, auth tokens, internal
+server addresses or passwords. Each backend has a specific discovery and
+protocol adapter plus contract fixtures.
 
 Target source boundaries:
 
@@ -394,7 +399,7 @@ electron/main/agent/runtime/
   AgentRuntimePort / Registry             provider-neutral contracts
 
 electron/main/agent/runtimes/<backend>/
-  discovery, native protocol, normalization, history and security mapping
+  discovery, native protocol, normalization and security mapping
 
 electron/main/agent/connections/
   bounded local executable inventory and reusable candidate/probe safety

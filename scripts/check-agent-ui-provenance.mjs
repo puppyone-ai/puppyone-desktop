@@ -15,9 +15,10 @@ assert(license.includes("MIT License") && license.includes("Copyright (c) 2025")
 assert(
   ledger.includes(commit)
     && ledger.includes("frontend")
+    && ledger.includes("protocol")
     && ledger.includes("multi-native")
     && ledger.includes("ADR-005"),
-  "Claudian source ledger is incomplete or does not name the current Agent architecture boundary.",
+  "Claudian source ledger is incomplete or does not name the current UI/runtime architecture boundary.",
 );
 assert(notice.includes(commit) && notice.includes("vendor/claudian/LICENSE"), "Claudian third-party notice is incomplete.");
 assert(css.includes(commit) && css.includes("vendor/claudian/SOURCE_ADOPTION.md"), "Agent UI source provenance comment is missing.");
@@ -28,7 +29,7 @@ assert(sbom.components?.[0]?.properties?.some((entry) => entry.name === "puppyon
 const vendorFiles = fs.readdirSync(path.join(root, "vendor/claudian")).sort();
 assert(JSON.stringify(vendorFiles) === JSON.stringify(["LICENSE", "SBOM.cdx.json", "SOURCE_ADOPTION.md"]), "Claudian vendor directory must contain provenance only, not runtime code or assets.");
 
-process.stdout.write("Agent UI provenance check passed.\n");
+process.stdout.write("Agent source provenance check passed.\n");
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");

@@ -5,6 +5,7 @@ export function createClaudeEventState({ turnId = null, resumed = false } = {}) 
     turnId,
     resumed,
     lifecycleEmitted: false,
+    reasoningStarted: false,
     streamedText: new Set(),
     startedTools: new Set(),
     terminal: false,
@@ -115,7 +116,11 @@ function normalizeStreamEvent(message, state, sessionId) {
     return [event("assistant.delta", sessionId, state.turnId, itemId, { delta: text(native.delta.text) })];
   }
   if (native.type === "content_block_delta" && native.delta?.type === "thinking_delta") {
-    return [event("reasoning.summary.delta", sessionId, state.turnId, itemId, { delta: text(native.delta.thinking) })];
+    if (state.reasoningStarted) return [];
+    state.reasoningStarted = true;
+    // The native SDK may expose extended-thinking tokens. PuppyOne surfaces a
+    // working-state boundary but never republishes hidden chain-of-thought.
+    return [event("reasoning.summary.delta", sessionId, state.turnId, itemId, { delta: "", boundary: true })];
   }
   if (native.type === "content_block_start" && native.content_block?.type === "tool_use") {
     return startTool(native.content_block, state, sessionId);
@@ -133,7 +138,10 @@ function normalizeAssistant(message, state, sessionId) {
     if (block?.type === "text" && text(block.text)) {
       result.push(event("assistant.completed", sessionId, state.turnId, itemId, { text: text(block.text) }));
     } else if (block?.type === "thinking" && text(block.thinking)) {
-      result.push(event("reasoning.summary.delta", sessionId, state.turnId, itemId, { delta: text(block.thinking), completed: true }));
+      if (!state.reasoningStarted) {
+        state.reasoningStarted = true;
+        result.push(event("reasoning.summary.delta", sessionId, state.turnId, itemId, { delta: "", boundary: true }));
+      }
     } else if (block?.type === "tool_use") {
       result.push(...startTool(block, state, sessionId));
     }

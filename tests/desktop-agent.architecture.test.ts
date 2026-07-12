@@ -52,7 +52,7 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(adapter).toContain("window.puppyoneDesktop");
   });
 
-  it("keeps sidecar transport and rendered architecture diagrams out of Renderer/docs", () => {
+  it("keeps native transport internals and rendered architecture diagrams out of Renderer/docs", () => {
     const preload = source("electron/preload.cjs");
     const renderer = [
       source("src/features/desktop-agent/ui/RightAgentPanel.tsx"),
@@ -63,6 +63,9 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(preload).not.toMatch(/spawnAgent|agentStdin|OpenCodeHttpClient|OPENCODE_SERVER_PASSWORD/);
     expect(renderer).not.toMatch(/OpenCodeHttpClient|OPENCODE_SERVER_PASSWORD|\/global\/event/);
     expect(docs).not.toContain("```mermaid");
+    expect(docs).toContain("no   Chat transcript");
+    expect(docs).toContain("codex app-server -> Codex harness and thread");
+    expect(docs).toContain("ACP -> user's OpenCode harness/profile/session");
   });
 
   it("keeps Core backend-neutral and concrete backends in the single production composition root", () => {
@@ -80,13 +83,14 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(contract).toContain("assertAgentIpcResponse");
   });
 
-  it("keeps connected-provider authority in the OpenCode adapter and explicit selection in application state", () => {
-    const adapter = source("electron/main/agent/runtimes/opencode-protocol/opencode-sidecar-adapter.mjs");
+  it("keeps ACP model authority in the OpenCode adapter and explicit selection in application state", () => {
+    const adapter = source("electron/main/agent/runtimes/opencode-protocol/opencode-acp-adapter.mjs");
     const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
     const panel = source("src/features/desktop-agent/ui/RightAgentPanel.tsx");
-    expect(adapter).toContain("client.providerCatalog");
-    expect(adapter).not.toContain("client.providers(this.workspaceRoot)");
-    expect(adapter).toContain("isAgentChatModel");
+    expect(adapter).toContain("client.newSession");
+    expect(adapter).toContain("resolveAcpModels");
+    expect(adapter).toContain("publicProviders");
+    expect(adapter).toContain("PuppyOne deliberately does not");
     expect(controller).toContain("selectedProviderId");
     expect(panel.indexOf("providers=")).toBeLessThan(panel.indexOf("models="));
   });

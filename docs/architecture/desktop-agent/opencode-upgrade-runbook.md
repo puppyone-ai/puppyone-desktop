@@ -24,7 +24,7 @@
 8. `npm run check:opencode-release` must pass immediately before packaging.
    It rechecks release metadata, executable SHA-256 and the live `--version`.
 9. Roll out through the normal PuppyOne application channel. Never let the
-   sidecar self-update.
+   managed kernel self-update.
 
 The Desktop internal-build workflow performs step 6 automatically: it selects
 the archive for the runner's native architecture from the checked manifest,

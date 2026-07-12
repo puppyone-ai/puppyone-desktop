@@ -3,9 +3,8 @@ export const OPENCODE_UPSTREAM = Object.freeze({
   commit: "9976269ab1accfc9f9dc98a4a688c516934de422",
   releaseCommit: "b8374b5a7c532e51aeb66b1dee9278de91526ef5",
   sourceVersion: "1.17.18",
-  // The HTTP/SSE contract is generated and tested from the exact release.
-  // Older external CLIs are not assumed wire-compatible without a separately
-  // recorded contract fixture.
+  // The managed binary remains pinned exactly. User-installed OpenCode is
+  // capability-probed through ACP instead of inheriting this release floor.
   protocolFloor: "1.17.18",
   license: "MIT",
   promptManifestVersion: 1,

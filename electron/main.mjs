@@ -14,7 +14,7 @@ import {
 import { initializeWorkspaceEditReview } from "../local-api/edit-review.mjs";
 import { createUpdateService } from "./update-service.mjs";
 import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
-import { createAgentPersistence } from "./main/agent/agent-persistence.mjs";
+import { createEphemeralAgentSessionCache } from "./main/agent/cache/ephemeral-agent-session-cache.mjs";
 import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
 import { createAgentService } from "./main/agent/agent-service.mjs";
 import { createLocalAgentInventory } from "./main/agent/connections/local-agent-inventory.mjs";
@@ -119,7 +119,7 @@ const terminalService = createTerminalService({
   appVersion: app.getVersion(),
   initializeWorkspaceEditReview,
 });
-const agentPersistence = createAgentPersistence({ app });
+const agentSessionCache = createEphemeralAgentSessionCache({ app });
 const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   appVersion: app.getVersion(),
   appPath: app.getAppPath(),
@@ -129,9 +129,12 @@ const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
 });
 const agentService = createAgentService({
   runtimeRegistry: agentRuntimeRegistry,
-  persistence: agentPersistence,
+  sessionCache: agentSessionCache,
 });
-const localAgentInventory = createLocalAgentInventory({ appVersion: app.getVersion() });
+const localAgentInventory = createLocalAgentInventory({
+  appVersion: app.getVersion(),
+  cacheFilePath: path.join(app.getPath("userData"), "agent-runtime-inventory.json"),
+});
 const workspaceWatchService = createWorkspaceWatchService();
 const gitMetadataWatchService = createGitMetadataWatchService();
 const workspaceStateStore = createWorkspaceStateStore({

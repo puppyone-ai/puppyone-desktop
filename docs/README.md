@@ -31,6 +31,7 @@ directly:
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
 - [Desktop Agent Architecture](architecture/desktop-agent/README.md)
   - [Multi-Native Agent Backend Decision](architecture/desktop-agent/ADR-005-multi-native-agent-backends.md)
+  - [Native Harness Adapter and ACP Decision](architecture/desktop-agent/ADR-006-native-harness-adapters-and-acp.md)
   - One shared PuppyOne UI and control plane over PuppyOne Agent, Codex,
     Claude Code, user OpenCode and capability-gated future native Agents.
 

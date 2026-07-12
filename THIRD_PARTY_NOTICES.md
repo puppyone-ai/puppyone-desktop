@@ -2,13 +2,14 @@
 
 ## OpenCode
 
-PuppyOne Desktop can distribute and run the OpenCode coding-agent harness as a
-separate local sidecar. The adopted runtime release is `v1.17.18` at commit
+PuppyOne Desktop can distribute and run the OpenCode coding-agent harness as
+the managed kernel behind PuppyOne Agent. The adopted runtime release is
+`v1.17.18` at commit
 `b8374b5a7c532e51aeb66b1dee9278de91526ef5`; its prompt hashes are taken from
 that exact commit. Broader architecture behavior was also audited at later
 source commit `9976269ab1accfc9f9dc98a4a688c516934de422`.
-The main process also uses the exact-version `@opencode-ai/sdk@1.17.18`
-generated client; its PATH-spawning server helper is not used.
+The main process communicates with the runtime through Agent Client Protocol
+v1 over NDJSON JSON-RPC 2.0. The retired HTTP SDK client is not shipped.
 
 OpenCode is Copyright (c) 2025 opencode and licensed under the MIT License.
 The complete license text is distributed at `vendor/opencode/LICENSE` and in
@@ -37,15 +38,15 @@ collection, usage and retention policies.
 
 ## Claudian frontend reference
 
-PuppyOne Desktop's Agent Chat frontend selectively adapts interaction and
-presentation patterns from `YishenTu/claudian` at immutable commit
-`7d7cc84c60a77431aaccda7ff49a2f1f4ae1c2ab`. The adopted scope is limited to
-message flow, compact tool disclosures, inline diff presentation, composer and
-picker behavior. PuppyOne rewrites these patterns in React with its own design
-tokens, typed Agent contract, accessibility behavior and virtualization.
-Claudian runtime, provider, credential, session, prompt and Obsidian code is not
-included. PuppyOne's native backend implementations are independently owned
-and audited under the shared `AgentRuntimePort` contract.
+PuppyOne Desktop selectively adapts interaction, presentation and native
+protocol orchestration patterns from `YishenTu/claudian` at immutable commit
+`7d7cc84c60a77431aaccda7ff49a2f1f4ae1c2ab`. The adopted runtime patterns are
+the persistent Claude SDK message channel, Electron-safe CLI spawning, and ACP
+method compatibility/event normalization. PuppyOne rewrites these patterns
+under its own typed `AgentRuntimePort`, canonical workspace boundary, approval
+policy, React design tokens, accessibility behavior and virtualization.
+Claudian credential stores, prompts, conversation persistence and Obsidian
+integration are not included.
 
 Claudian is licensed under the MIT License. The complete license, source map and
 CycloneDX record are distributed in `vendor/claudian/LICENSE`,

@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -296,6 +296,96 @@ describe("Desktop Agent local-tool inventory", () => {
     expect(codexProbe).toHaveBeenCalledTimes(1);
     await inventory.discover({ refresh: true });
     expect(codexProbe).toHaveBeenCalledTimes(2);
+  });
+
+  it("lets explicit Refresh supersede an in-flight scan without caching aborted failures", async () => {
+    const ready = {
+      id: "codex",
+      displayName: "Codex",
+      installation: "detected",
+      version: "0.144.1",
+      authentication: "signed-in",
+      protocolCompatible: true,
+      hasModels: true,
+      source: "user-installation",
+    };
+    const probe = vi.fn(({ signal }) => probe.mock.calls.length === 1
+      ? new Promise((_resolve, reject) => signal.addEventListener("abort", () => {
+        const error = new Error("cancelled");
+        error.name = "AbortError";
+        reject(error);
+      }, { once: true }))
+      : Promise.resolve(ready));
+    const inventory = createLocalAgentInventory({
+      toolDescriptors: [{
+        id: "codex",
+        displayName: "Codex",
+        executableNames: ["codex"],
+        unavailableMessage: "Codex unavailable.",
+        probe,
+      }],
+      resolveCandidate: vi.fn(async () => fixedCandidate("/tools/codex", "codex")),
+    });
+
+    const first = inventory.discover();
+    const firstRejection = expect(first).rejects.toMatchObject({ name: "AbortError" });
+    await vi.waitFor(() => expect(probe).toHaveBeenCalledTimes(1));
+    const refreshed = inventory.discover({ refresh: true });
+
+    await firstRejection;
+    await expect(refreshed).resolves.toMatchObject({
+      connections: [expect.objectContaining({ id: "codex", selectable: true })],
+    });
+    expect(probe).toHaveBeenCalledTimes(2);
+    inventory.dispose();
+  });
+
+  it("reuses a sanitized persisted inventory snapshot across application restarts", async () => {
+    const directory = await temporaryDirectory();
+    const cacheFilePath = path.join(directory, "agent-runtime-inventory.json");
+    const firstProbe = vi.fn(async () => ({
+      id: "codex",
+      displayName: "Codex",
+      installation: "detected",
+      version: "0.144.1",
+      authentication: "signed-in",
+      protocolCompatible: true,
+      hasModels: true,
+      source: "user-installation",
+    }));
+    const descriptor = {
+      id: "codex",
+      displayName: "Codex",
+      executableNames: ["codex"],
+      unavailableMessage: "Codex unavailable.",
+      probe: firstProbe,
+    };
+    const first = createLocalAgentInventory({
+      now: () => 1_000,
+      cacheFilePath,
+      toolDescriptors: [descriptor],
+      resolveCandidate: vi.fn(async () => fixedCandidate("/tools/codex", "codex")),
+    });
+    const scanned = await first.discover();
+    expect(firstProbe).toHaveBeenCalledTimes(1);
+    const persisted = await readFile(cacheFilePath, "utf8");
+    expect(persisted).not.toMatch(/\/tools\/codex|executablePath|environment|credential/i);
+    if (process.platform !== "win32") expect((await stat(cacheFilePath)).mode & 0o777).toBe(0o600);
+    first.dispose();
+
+    const restartedProbe = vi.fn(async () => { throw new Error("must not rescan"); });
+    const restarted = createLocalAgentInventory({
+      now: () => 2_000,
+      cacheFilePath,
+      toolDescriptors: [{ ...descriptor, probe: restartedProbe }],
+      resolveCandidate: vi.fn(async () => fixedCandidate("/changed/codex", "codex")),
+    });
+    await expect(restarted.discover()).resolves.toEqual(scanned);
+    expect(restartedProbe).not.toHaveBeenCalled();
+
+    await restarted.discover({ refresh: true });
+    expect(restartedProbe).toHaveBeenCalledTimes(1);
+    restarted.dispose();
   });
 
   it("adds a new inventory tool through one validated descriptor without changing inventory orchestration", async () => {

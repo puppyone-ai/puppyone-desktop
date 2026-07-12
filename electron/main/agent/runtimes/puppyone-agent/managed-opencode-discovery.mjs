@@ -4,7 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { spawn as nodeSpawn } from "node:child_process";
 import { redactSecretText } from "../../agent-events.mjs";
-import { compareVersions, discoverExecutable } from "../../runtime/executable-discovery.mjs";
+import { compareVersions, discoverExecutable, runBounded } from "../../runtime/executable-discovery.mjs";
 import { PUPPYONE_AGENT_RUNTIME_ID } from "./puppyone-agent-identity.mjs";
 import { OPENCODE_RELEASE_ARTIFACTS, OPENCODE_UPSTREAM } from "../opencode-protocol/opencode-manifest.mjs";
 import { OPEN_CODE_LOCKED_ENVIRONMENT } from "../opencode-protocol/opencode-security-policy.mjs";
@@ -109,6 +109,24 @@ export async function discoverOpenCodeExecutable({
       message: `The bundled OpenCode runtime is ${readiness.version}; PuppyOne expects ${OPENCODE_UPSTREAM.sourceVersion}.`,
     };
   }
+  if (readiness.status === "ready" && readiness.executablePath) {
+    try {
+      const probe = await runBounded(spawn, readiness.executablePath, ["acp", "--help"], {
+        env: readiness.environment,
+        timeoutMs: 4_000,
+        maxBytes: 64 * 1024,
+        label: "PuppyOne Agent ACP",
+      });
+      if (probe.code !== 0) throw new Error(`${probe.stdout}\n${probe.stderr}`.trim() || "ACP command failed");
+    } catch (error) {
+      readiness = {
+        ...readiness,
+        status: "error",
+        message: "PuppyOne's managed Agent engine does not expose its required ACP endpoint.",
+        diagnostic: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
   if (readiness.status === "not-installed" && packagedFailures.length === 0) {
     readiness = {
       ...readiness,
@@ -134,8 +152,8 @@ export async function discoverOpenCodeExecutable({
     ...readiness,
     message: redactSecretText(readiness.message),
     ...(readiness.diagnostic ? { diagnostic: redactSecretText(readiness.diagnostic) } : {}),
-    compatibility: source === "bundled" && readiness.version === OPENCODE_UPSTREAM.sourceVersion
-      ? "pinned"
+    compatibility: source === "bundled" && readiness.version === OPENCODE_UPSTREAM.sourceVersion && readiness.status === "ready"
+      ? "pinned-acp-v1"
       : readiness.status === "ready"
         ? "compatible-external"
         : "unavailable",

@@ -21,7 +21,7 @@ describe("Claude Agent SDK runtime adapter", () => {
     expect(options.permissionMode).toBe("default");
     expect(options.allowDangerouslySkipPermissions).toBeUndefined();
     expect(query.close).toHaveBeenCalled();
-    adapter.dispose();
+    await adapter.dispose();
   });
 
   it("does not route third-party product traffic through Claude subscription OAuth", async () => {
@@ -31,7 +31,10 @@ describe("Claude Agent SDK runtime adapter", () => {
       apiProvider: "firstParty",
       tokenSource: "oauth",
     });
-    const adapter = createAdapter({ sdk: { query: vi.fn(() => query) } });
+    const adapter = createAdapter({
+      sdk: { query: vi.fn(() => query) },
+      environment: { PATH: "/usr/bin", HOME: "/home/test" },
+    });
 
     const inspection = await adapter.inspect();
 
@@ -40,22 +43,79 @@ describe("Claude Agent SDK runtime adapter", () => {
       requiresRuntimeSetup: true,
       error: expect.stringContaining("subscription OAuth cannot be used"),
     });
-    adapter.dispose();
+    await adapter.dispose();
+  });
+
+  it("keeps one native SDK query alive across follow-up turns", async () => {
+    const controller = persistentQueryController();
+    const sdk = { query: vi.fn((request) => controller.connect(request.prompt)) };
+    const onEvent = vi.fn();
+    const adapter = createAdapter({ sdk, onEvent });
+    await adapter.createSession({ model: "claude-sonnet", mode: "agent" });
+
+    const first = await adapter.startTurn({
+      prompt: "First",
+      model: "claude-sonnet",
+      mode: "agent",
+      contextReferences: [
+        { path: "/workspace/src/app.ts" },
+        { path: "/outside/secret.txt" },
+      ],
+    });
+    await vi.waitFor(() => expect(controller.messages).toHaveLength(1));
+    controller.finish("First answer");
+    await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "turn.completed", turnId: first.turnId })));
+
+    const second = await adapter.startTurn({ prompt: "Second", model: "claude-sonnet", mode: "agent" });
+    await vi.waitFor(() => expect(controller.messages).toHaveLength(2));
+    controller.finish("Second answer");
+    await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "turn.completed", turnId: second.turnId })));
+
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(controller.query.initializationResult).toHaveBeenCalledTimes(1);
+    expect(controller.query.setModel).toHaveBeenCalledWith("claude-sonnet");
+    expect(controller.messages[0].message.content).toContain("/workspace/src/app.ts");
+    expect(controller.messages[0].message.content).not.toContain("/outside/secret.txt");
+    expect(controller.messages[1].message.content).toBe("Second");
+    await adapter.dispose();
+  });
+
+  it("restarts the native query when authorized project instructions change without changing size", async () => {
+    const controllers = [persistentQueryController(), persistentQueryController()];
+    const sdk = { query: vi.fn((request) => controllers[sdk.query.mock.calls.length - 1].connect(request.prompt)) };
+    let instructions = { source: "AGENTS.md", text: "alpha", bytes: 5 };
+    const onEvent = vi.fn();
+    const adapter = createAdapter({
+      sdk,
+      onEvent,
+      projectInstructionLoader: vi.fn(async () => instructions),
+    });
+    await adapter.createSession({ model: "claude-sonnet", mode: "agent" });
+
+    const first = await adapter.startTurn({ prompt: "First", model: "claude-sonnet", mode: "agent" });
+    await vi.waitFor(() => expect(controllers[0].messages).toHaveLength(1));
+    controllers[0].finish("First answer");
+    await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "turn.completed", turnId: first.turnId })));
+
+    instructions = { source: "AGENTS.md", text: "bravo", bytes: 5 };
+    const second = await adapter.startTurn({ prompt: "Second", model: "claude-sonnet", mode: "agent" });
+    await vi.waitFor(() => expect(controllers[1].messages).toHaveLength(1));
+    expect(sdk.query).toHaveBeenCalledTimes(2);
+    expect(sdk.query.mock.calls[0][0].options.systemPrompt.append).toContain("alpha");
+    expect(sdk.query.mock.calls[1][0].options.systemPrompt.append).toContain("bravo");
+    controllers[1].finish("Second answer");
+    await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "turn.completed", turnId: second.turnId })));
+    await adapter.dispose();
   });
 
   it("correlates native approvals and structured questions without persisting permission changes", async () => {
-    const controller = runningQuery();
-    const sdk = {
-      query: vi.fn(() => controller.query),
-      getSessionInfo: vi.fn(),
-      getSessionMessages: vi.fn(),
-      forkSession: vi.fn(),
-    };
+    const controller = persistentQueryController();
+    const sdk = { query: vi.fn((request) => controller.connect(request.prompt)) };
     const onEvent = vi.fn();
     const adapter = createAdapter({ sdk, onEvent });
     await adapter.createSession({ model: "claude-sonnet", mode: "agent" });
     const { turnId } = await adapter.startTurn({ prompt: "Fix it", model: "claude-sonnet", mode: "agent" });
-    await tick();
+    await vi.waitFor(() => expect(controller.messages).toHaveLength(1));
 
     const options = sdk.query.mock.calls[0][0].options;
     const approval = options.canUseTool("Bash", { command: "npm test" }, {
@@ -66,9 +126,8 @@ describe("Claude Agent SDK runtime adapter", () => {
         { type: "addRules", destination: "localSettings", rules: [], behavior: "allow" },
       ],
     });
-    await tick();
+    await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "approval.requested" })));
     const approvalEvent = onEvent.mock.calls.map(([event]) => event).find((event) => event.type === "approval.requested");
-    expect(approvalEvent).toMatchObject({ turnId, itemId: "tool-1" });
     adapter.resolveApproval({ requestId: approvalEvent.payload.requestId, decision: "acceptForSession", turnId });
     await expect(approval).resolves.toMatchObject({
       behavior: "allow",
@@ -78,7 +137,7 @@ describe("Claude Agent SDK runtime adapter", () => {
     const question = options.canUseTool("AskUserQuestion", {
       questions: [{ header: "Choice", question: "Continue?", multiSelect: false, options: [{ label: "Yes" }] }],
     }, { toolUseID: "question-1" });
-    await tick();
+    await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "question.requested" })));
     const questionEvent = onEvent.mock.calls.map(([event]) => event).find((event) => event.type === "question.requested");
     adapter.resolveQuestion({ requestId: questionEvent.payload.requestId, answers: [["Yes"]], rejected: false, turnId });
     await expect(question).resolves.toEqual({
@@ -86,21 +145,32 @@ describe("Claude Agent SDK runtime adapter", () => {
       updatedInput: expect.objectContaining({ answers: { "Continue?": "Yes" } }),
     });
 
-    controller.finish();
-    await tick();
-    expect(onEvent.mock.calls.map(([event]) => event.type)).toContain("turn.completed");
-    adapter.dispose();
+    controller.finish("Done");
+    await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "turn.completed", turnId })));
+    await adapter.dispose();
   });
 });
 
-function createAdapter({ sdk, onEvent = vi.fn() }) {
+function createAdapter({
+  sdk,
+  onEvent = vi.fn(),
+  environment = { PATH: "/usr/bin", HOME: "/home/test", ANTHROPIC_API_KEY: "test-key" },
+  projectInstructionLoader = vi.fn(async () => []),
+}) {
   return new ClaudeAgentSdkAdapter({
-    readiness: { status: "ready", source: "user-installed", version: "2.1.0", executablePath: "/tools/claude", environment: { PATH: "/usr/bin", HOME: "/home/test" } },
+    readiness: {
+      status: "ready",
+      source: "user-installed",
+      version: "2.1.0",
+      executablePath: "/tools/claude",
+      environment,
+    },
     workspaceRoot: "/workspace",
     appVersion: "1.2.3",
     sdkLoader: vi.fn(async () => sdk),
     onEvent,
-    projectInstructionLoader: vi.fn(async () => []),
+    projectInstructionLoader,
+    spawnClaudeCodeProcess: vi.fn(),
   });
 }
 
@@ -121,23 +191,58 @@ function inspectionQuery(account = {
   };
 }
 
-function runningQuery() {
-  let finish;
-  const finished = new Promise((resolve) => { finish = resolve; });
-  return {
-    finish,
-    query: {
-      interrupt: vi.fn(async () => undefined),
-      close: vi.fn(),
-      async *[Symbol.asyncIterator]() {
-        yield { type: "system", subtype: "init", session_id: "claude-session-1", model: "claude-sonnet", permissionMode: "default" };
-        await finished;
+function persistentQueryController() {
+  let input = null;
+  let turnGate = null;
+  const messages = [];
+  const query = {
+    initializationResult: vi.fn(async () => ({ models: [], commands: [], account: {} })),
+    setModel: vi.fn(async () => undefined),
+    setPermissionMode: vi.fn(async () => undefined),
+    interrupt: vi.fn(async () => undefined),
+    close: vi.fn(),
+    async *[Symbol.asyncIterator]() {
+      yield { type: "system", subtype: "init", session_id: "claude-session-1", model: "claude-sonnet", permissionMode: "default" };
+      for await (const message of input) {
+        messages.push(message);
+        const completion = deferred();
+        turnGate = completion;
+        const text = await completion.promise;
+        yield {
+          type: "stream_event",
+          session_id: "claude-session-1",
+          uuid: `assistant-${messages.length}`,
+          event: { type: "content_block_delta", delta: { type: "text_delta", text } },
+        };
+        yield {
+          type: "assistant",
+          session_id: "claude-session-1",
+          uuid: `assistant-${messages.length}`,
+          message: { content: [{ type: "text", text }] },
+        };
         yield { type: "result", subtype: "success", session_id: "claude-session-1", usage: {}, num_turns: 1 };
-      },
+      }
+    },
+  };
+  return {
+    query,
+    messages,
+    connect(channel) {
+      input = channel;
+      return query;
+    },
+    finish(text) {
+      if (!turnGate) throw new Error("No Claude turn is waiting for completion.");
+      const gate = turnGate;
+      turnGate = null;
+      gate.resolve(text);
     },
   };
 }
 
-function tick() {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
 }

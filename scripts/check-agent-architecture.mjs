@@ -7,10 +7,19 @@ const mainRoot = path.join(repoRoot, "electron", "main", "agent");
 const mainRuntimeRoot = path.join(mainRoot, "runtime");
 const mainDomainRoot = path.join(mainRoot, "domain");
 const mainApplicationRoot = path.join(mainRoot, "application");
+const mainProtocolRoot = path.join(mainRoot, "protocols");
+const mainSecurityRoot = path.join(mainRoot, "security");
+const mainTransportRoot = path.join(mainRoot, "transports");
+const mainRuntimesRoot = path.join(mainRoot, "runtimes");
+const mainCacheRoot = path.join(mainRoot, "cache");
 const mainConcreteRoots = [
   path.join(mainRoot, "adapters"),
   path.join(mainRoot, "runtimes"),
   path.join(mainRoot, "connections"),
+  mainCacheRoot,
+  path.join(mainRoot, "protocols"),
+  path.join(mainRoot, "security"),
+  path.join(mainRoot, "transports"),
   path.join(mainRoot, "bootstrap"),
 ];
 const rendererRoot = path.join(repoRoot, "src", "features", "desktop-agent");
@@ -67,6 +76,35 @@ for (const filePath of walkSourceFiles(mainRoot)) {
       || relative(target).startsWith("electron/main/ipc/")
     )) {
       errors.push(`${relative(filePath)} imports ${relative(target)}; main application must depend on ports, not concrete runtimes/IPC`);
+    }
+    if (isInside(filePath, mainProtocolRoot) && (
+      isInsideOrSame(target, mainRuntimesRoot)
+      || isInsideOrSame(target, mainApplicationRoot)
+      || isInsideOrSame(target, path.join(mainRoot, "bootstrap"))
+    )) {
+      errors.push(`${relative(filePath)} imports ${relative(target)}; protocols may depend on transports/security, never concrete runtimes/application`);
+    }
+    if (isInside(filePath, mainSecurityRoot) && (
+      isInsideOrSame(target, mainRuntimesRoot)
+      || isInsideOrSame(target, mainProtocolRoot)
+      || isInsideOrSame(target, mainApplicationRoot)
+    )) {
+      errors.push(`${relative(filePath)} imports ${relative(target)}; security is a provider-neutral infrastructure floor`);
+    }
+    if (isInside(filePath, mainTransportRoot) && (
+      isInsideOrSame(target, mainRuntimesRoot)
+      || isInsideOrSame(target, mainProtocolRoot)
+      || isInsideOrSame(target, mainSecurityRoot)
+      || isInsideOrSame(target, mainApplicationRoot)
+    )) {
+      errors.push(`${relative(filePath)} imports ${relative(target)}; transports are the infrastructure dependency floor`);
+    }
+    if (isInside(filePath, mainCacheRoot) && (
+      isInsideOrSame(target, mainRuntimesRoot)
+      || isInsideOrSame(target, mainProtocolRoot)
+      || isInsideOrSame(target, mainApplicationRoot)
+    )) {
+      errors.push(`${relative(filePath)} imports ${relative(target)}; cache implementations stay provider-neutral and below application orchestration`);
     }
     if (filePath !== allowedCompositionRoot && isInsideOrSame(target, path.join(mainRoot, "bootstrap"))) {
       errors.push(`${relative(filePath)} imports the composition root; bootstrap is an entrypoint only`);
@@ -150,6 +188,11 @@ for (const entry of readdirSync(agentStyleRoot)) {
 
 const responsibilityBudgets = [
   [path.join(mainRoot, "agent-service.mjs"), 850],
+  [path.join(mainRuntimesRoot, "codex", "codex-app-server-adapter.mjs"), 750],
+  [path.join(mainRuntimesRoot, "claude", "claude-agent-sdk-adapter.mjs"), 750],
+  [path.join(mainRuntimesRoot, "opencode-protocol", "opencode-acp-adapter.mjs"), 750],
+  [path.join(mainProtocolRoot, "acp", "acp-client.mjs"), 300],
+  [path.join(mainProtocolRoot, "acp", "acp-event-normalizer.mjs"), 300],
   [path.join(rendererApplicationRoot, "AgentSessionController.ts"), 500],
   [path.join(rendererDomainRoot, "agent-projection.ts"), 550],
   [path.join(rendererUiRoot, "RightAgentPanel.tsx"), 230],
@@ -183,6 +226,21 @@ for (const filePath of walkSourceFiles(path.join(repoRoot, "src"))) {
 const registrySource = readFileSync(path.join(mainRuntimeRoot, "agent-runtime-registry.mjs"), "utf8");
 if (/\b(?:opencode|codex|claude|cursor)\b/i.test(stripComments(registrySource))) {
   errors.push("electron/main/agent/runtime/agent-runtime-registry.mjs names a concrete provider");
+}
+
+const mainEntrySource = readFileSync(path.join(repoRoot, "electron", "main.mjs"), "utf8");
+const ephemeralCacheSource = readFileSync(
+  path.join(mainCacheRoot, "ephemeral-agent-session-cache.mjs"),
+  "utf8",
+);
+if (!mainEntrySource.includes("createEphemeralAgentSessionCache") || mainEntrySource.includes("createAgentPersistence")) {
+  errors.push("electron/main.mjs must compose the process-local Agent session cache directly");
+}
+if (/\b(?:writeFile|appendFile|createWriteStream|rename)\b/.test(stripComments(ephemeralCacheSource))) {
+  errors.push("ephemeral-agent-session-cache.mjs must never write Chat session or transcript data");
+}
+if (!ephemeralCacheSource.includes("durable: false") || !ephemeralCacheSource.includes("desktop-agent-sessions.json")) {
+  errors.push("ephemeral-agent-session-cache.mjs must declare non-durability and delete the legacy Chat journal");
 }
 
 if (errors.length > 0) {

@@ -47,4 +47,27 @@ describe("Claude Code event normalization", () => {
     expect(events[0].payload.prompt).toBe("Fix it");
     expect(events[1].payload.text).toBe("Done");
   });
+
+  it("shows a working-state boundary without republishing hidden chain-of-thought", () => {
+    const state = createClaudeEventState({ turnId: "claude:turn-1" });
+    const first = normalizeClaudeMessage({
+      type: "stream_event",
+      uuid: "assistant-1",
+      session_id: "session-1",
+      event: { type: "content_block_delta", delta: { type: "thinking_delta", thinking: "private reasoning" } },
+    }, state);
+    const second = normalizeClaudeMessage({
+      type: "stream_event",
+      uuid: "assistant-1",
+      session_id: "session-1",
+      event: { type: "content_block_delta", delta: { type: "thinking_delta", thinking: "more private reasoning" } },
+    }, state);
+
+    expect(first).toEqual([expect.objectContaining({
+      type: "reasoning.summary.delta",
+      payload: { delta: "", boundary: true },
+    })]);
+    expect(second).toEqual([]);
+    expect(JSON.stringify(first)).not.toContain("private reasoning");
+  });
 });

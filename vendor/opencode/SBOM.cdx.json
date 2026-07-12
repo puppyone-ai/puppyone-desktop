@@ -2,12 +2,12 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:6d7d5aa0-64a3-4e7d-a241-a01f21170118",
-  "version": 1,
+  "version": 2,
   "metadata": {
-    "timestamp": "2026-07-11T00:00:00Z",
+    "timestamp": "2026-07-13T00:00:00Z",
     "component": {
       "type": "application",
-      "name": "puppyone-desktop-opencode-sidecar",
+      "name": "puppyone-desktop-managed-agent-kernel",
       "version": "1.17.18"
     }
   },
@@ -27,24 +27,9 @@
       "properties": [
         { "name": "puppyone:source-audit-commit", "value": "9976269ab1accfc9f9dc98a4a688c516934de422" },
         { "name": "puppyone:artifact-manifest", "value": "vendor/opencode/runtime-manifest.json" },
-        { "name": "puppyone:prompt-manifest", "value": "vendor/opencode/PROMPT_MANIFEST.json" }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:npm/%40opencode-ai/sdk@1.17.18",
-      "group": "@opencode-ai",
-      "name": "sdk",
-      "version": "1.17.18",
-      "licenses": [{ "license": { "id": "MIT" } }],
-      "purl": "pkg:npm/%40opencode-ai/sdk@1.17.18",
-      "externalReferences": [
-        { "type": "vcs", "url": "https://github.com/anomalyco/opencode.git#b8374b5a7c532e51aeb66b1dee9278de91526ef5" },
-        { "type": "distribution", "url": "https://www.npmjs.com/package/@opencode-ai/sdk/v/1.17.18" }
-      ],
-      "properties": [
-        { "name": "puppyone:import", "value": "@opencode-ai/sdk/v2/client" },
-        { "name": "puppyone:server-helper-used", "value": "false" }
+        { "name": "puppyone:prompt-manifest", "value": "vendor/opencode/PROMPT_MANIFEST.json" },
+        { "name": "puppyone:integration-protocol", "value": "Agent Client Protocol v1 over NDJSON JSON-RPC 2.0" },
+        { "name": "puppyone:http-sdk-client", "value": "not-used" }
       ]
     }
   ]
