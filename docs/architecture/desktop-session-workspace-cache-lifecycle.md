@@ -114,7 +114,16 @@ Path is location, not identity. An initialized `.puppyone/config.json` uses v2:
   from filesystem identity, so rename/move keeps it while another clone gets a
   different value.
 - `canonicalPath` and `fsIdentity` locate the checkout; they are not project
-  identity.
+identity.
+
+The main-owned recent-workspace registry also caches `cloudProjectId` as a
+non-authoritative home-screen hint. Hydration refreshes it from each persisted
+folder under main-process control. The renderer may display the hint and verify
+it against the signed-in account's accessible Cloud projects, but it must never
+issue config or Git IPC for an inactive recent folder: filesystem authority is
+scoped to the one workspace assigned to that window. Opening a legacy
+remote-only workspace is the point where its binding can be resolved and
+persisted safely.
 - Opening an arbitrary folder never creates `.puppyone`. The ID is generated on
   an explicit config write/Cloud bind. “Treat as new project” generates a new
   project UUID and clears the old Cloud binding without touching files or Git.

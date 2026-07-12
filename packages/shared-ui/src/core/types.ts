@@ -34,6 +34,8 @@ export type Workspace = {
   status: "protected" | "recording" | "paused";
   commitCount?: number;
   cloudState?: "local" | "syncing" | "synced";
+  /** Main-owned cache hint from `.puppyone/config.json`; never grants filesystem authority. */
+  cloudProjectId?: string | null;
   projectId?: string | null;
   workspaceInstanceId?: string;
   fsIdentity?: string;

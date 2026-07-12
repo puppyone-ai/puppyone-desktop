@@ -120,6 +120,7 @@ export function createWorkspaceStateStore({
       const record = {
         workspaceInstanceId: identity.workspaceInstanceId,
         projectId: identity.projectId,
+        cloudProjectId: identity.cloudProjectId,
         fsIdentity: identity.fsIdentity,
         path: canonicalPath,
         name: identity.name ?? (path.basename(canonicalPath) || canonicalPath),
@@ -219,6 +220,7 @@ export function createWorkspaceStateStore({
       return {
         workspaceInstanceId: knownWorkspace.workspaceInstanceId,
         projectId: normalizeOptionalString(knownWorkspace.projectId),
+        cloudProjectId: normalizeOptionalString(knownWorkspace.cloudProjectId),
         fsIdentity: normalizeOptionalString(knownWorkspace.fsIdentity),
         name: normalizeOptionalString(knownWorkspace.name),
       };
@@ -235,6 +237,7 @@ export function createWorkspaceStateStore({
       workspaceInstanceId: normalizeOptionalString(workspace.workspaceInstanceId)
         ?? workspaceInstanceIdFromPath(canonicalPath),
       projectId: normalizeOptionalString(workspace.projectId),
+      cloudProjectId: normalizeOptionalString(workspace.cloudProjectId),
       fsIdentity: normalizeOptionalString(workspace.fsIdentity),
       name: normalizeOptionalString(workspace.name),
     };
@@ -278,6 +281,7 @@ function normalizeWorkspaceState(state) {
     if (existing) {
       if (record.lastOpenedAt) existing.lastOpenedAt = record.lastOpenedAt;
       if (record.projectId) existing.projectId = record.projectId;
+      if (Object.hasOwn(record, "cloudProjectId")) existing.cloudProjectId = record.cloudProjectId;
       if (record.fsIdentity) existing.fsIdentity = record.fsIdentity;
       return;
     }
@@ -322,6 +326,7 @@ function normalizeWorkspaceRecord(value, fallbackTimestamp = null) {
     workspaceInstanceId: normalizeOptionalString(value.workspaceInstanceId)
       ?? workspaceInstanceIdFromPath(resolvedPath),
     projectId: normalizeOptionalString(value.projectId),
+    cloudProjectId: normalizeOptionalString(value.cloudProjectId),
     fsIdentity: normalizeOptionalString(value.fsIdentity),
     path: resolvedPath,
     name: normalizeOptionalString(value.name) ?? (path.basename(resolvedPath) || resolvedPath),
@@ -347,6 +352,7 @@ function lightweightWorkspaceFromRecord(record) {
     path: record.path,
     status: "protected",
     cloudState: "local",
+    cloudProjectId: record.cloudProjectId,
     projectId: record.projectId,
     workspaceInstanceId: record.workspaceInstanceId,
     ...(record.fsIdentity ? { fsIdentity: record.fsIdentity } : {}),

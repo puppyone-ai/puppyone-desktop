@@ -107,9 +107,7 @@ export function useCloudProjectHome({
     let cancelled = false;
     void Promise.all(
       items.map((item) => resolveRecentWorkspaceCloudBinding({
-        apiBaseUrl: desktopCloudApiBaseUrl,
         item,
-        onSessionChange: updateCloudSession,
         projects: homeCloudProjectsRef.current,
         session: activeCloudSession,
       })),

@@ -92,10 +92,12 @@ export async function resolveLocalWorkspaceIdentity(folderPath) {
 
   const fsIdentity = createFileSystemIdentity(metadata, canonicalPath);
   let projectId = null;
+  let cloudProjectId = null;
   let configError = null;
   try {
     const config = await readPuppyoneWorkspaceConfig(canonicalPath);
     projectId = config.project.id;
+    cloudProjectId = config.cloud.projectId;
   } catch (error) {
     // Invalid project metadata must not prevent a local-first folder from
     // opening. The config surface reports the recoverable error separately.
@@ -105,6 +107,7 @@ export async function resolveLocalWorkspaceIdentity(folderPath) {
   const workspaceInstanceId = createWorkspaceInstanceId(fsIdentity);
   return {
     canonicalPath,
+    cloudProjectId,
     fsIdentity,
     projectId,
     workspaceInstanceId,
@@ -125,6 +128,7 @@ export async function workspaceFromPath(folderPath, options = {}) {
       ? { commitCount: await getWorkspaceCommitCount(identity.canonicalPath), hydrationState: "ready" }
       : { hydrationState: "metadata" }),
     cloudState: "local",
+    cloudProjectId: identity.cloudProjectId,
     projectId: identity.projectId,
     workspaceInstanceId: identity.workspaceInstanceId,
     fsIdentity: identity.fsIdentity,

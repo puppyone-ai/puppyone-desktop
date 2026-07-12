@@ -97,6 +97,28 @@ describe("workspace registry lifecycle", () => {
     expect(result.items[0].workspace.projectId).toBe("project-1");
   });
 
+  it("persists and clears the main-owned Cloud binding hint without granting renderer authority", async () => {
+    let cloudProjectId = "cloud-project-1";
+    const store = createStore({
+      resolveWorkspaceIdentity: async (folderPath) => ({
+        canonicalPath: folderPath,
+        workspaceInstanceId: "instance-cloud",
+        fsIdentity: "fs:1:100",
+        projectId: "project-identity",
+        cloudProjectId,
+      }),
+    });
+    const folder = path.join(root, "cloud-linked");
+    await fs.promises.mkdir(folder);
+
+    await store.rememberRecentWorkspacePath(folder);
+    expect((await store.getRecentWorkspacesResult()).items[0].workspace.cloudProjectId).toBe("cloud-project-1");
+
+    cloudProjectId = null;
+    await store.rememberRecentWorkspacePath(folder);
+    expect((await store.getRecentWorkspacesResult()).items[0].workspace.cloudProjectId).toBeNull();
+  });
+
   it("quarantines corrupt JSON and reports a recoverable registry error", async () => {
     await fs.promises.writeFile(path.join(root, "registry.json"), "{broken", "utf8");
     const store = createStore();

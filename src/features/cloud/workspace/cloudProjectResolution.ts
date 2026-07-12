@@ -1,8 +1,4 @@
 import type { Workspace } from "@puppyone/shared-ui";
-import {
-  getWorkspaceGitStatus,
-  readPuppyoneWorkspaceConfig,
-} from "../../../lib/localFiles";
 import type {
   DesktopCloudProject,
   DesktopCloudSession,
@@ -203,42 +199,18 @@ export async function resolveWorkspaceCloudProjectId(
 }
 
 export async function resolveRecentWorkspaceCloudBinding({
-  apiBaseUrl,
   item,
-  onSessionChange,
   projects,
   session,
 }: {
-  apiBaseUrl: string | null;
   item: RecentWorkspaceHomeItem;
-  onSessionChange: (session: DesktopCloudSession | null) => void;
   projects: DesktopCloudProject[];
   session: DesktopCloudSession | null;
 }): Promise<[string, RecentWorkspaceCloudBinding]> {
-  const rootPath = item.workspace.path;
-  let configuredProjectId: string | null = null;
-  let configError: string | null = null;
-  try {
-    const config = await readPuppyoneWorkspaceConfig(rootPath);
-    configuredProjectId = config.cloud.projectId?.trim() || null;
-  } catch (error) {
-    configError = error instanceof Error ? error.message : String(error);
-  }
+  const configuredProjectId = item.workspace.cloudProjectId?.trim() || null;
+  const configError = item.workspace.configError ?? null;
 
-  // Homepage cache hint only — do not treat configured id as verified authorization.
-  if (configuredProjectId && !session) {
-    return [item.workspace.id, {
-      projectId: configuredProjectId,
-      cloudLinked: true,
-      error: configError,
-      reason: null,
-    }];
-  }
-
-  const gitStatusResult = await getWorkspaceGitStatus(rootPath).catch(() => null);
-  const cloudRemote = gitStatusResult ? getPuppyoneRemote(gitStatusResult) : null;
-
-  if (!cloudRemote) {
+  if (!configuredProjectId) {
     return [item.workspace.id, {
       projectId: null,
       cloudLinked: false,
@@ -247,63 +219,23 @@ export async function resolveRecentWorkspaceCloudBinding({
     }];
   }
 
-  if (session) {
-    try {
-      const resolution = await resolveWorkspaceCloudProjectBinding({
-        activeGitStatus: gitStatusResult,
-        apiBaseUrl,
-        configuredProjectId,
-        onSessionChange,
-        projects,
-        session,
-        workspace: item.workspace,
-      });
-      if (resolution.status === "mapped") {
-        return [item.workspace.id, {
-          projectId: resolution.projectId,
-          cloudLinked: true,
-          error: null,
-          reason: null,
-        }];
-      }
-      if (resolution.status === "not-authorized") {
-        return [item.workspace.id, {
-          projectId: null,
-          cloudLinked: true,
-          error: resolution.message,
-          reason: "not-authorized",
-        }];
-      }
-      if (resolution.status === "unresolvable") {
-        return [item.workspace.id, {
-          projectId: null,
-          cloudLinked: true,
-          error: resolution.message,
-          reason: "unresolvable",
-        }];
-      }
-      return [item.workspace.id, {
-        projectId: null,
-        cloudLinked: false,
-        error: null,
-        reason: null,
-      }];
-    } catch (error) {
-      return [item.workspace.id, {
-        projectId: configuredProjectId,
-        cloudLinked: Boolean(configuredProjectId),
-        error: error instanceof Error ? error.message : String(error),
-        reason: "network",
-      }];
-    }
+  // This value is a main-owned cache hint from the recent-workspace registry.
+  // Inactive folders never receive renderer filesystem authority, so the home
+  // surface must not probe their config or Git remotes through workspace IPC.
+  if (!session || isProjectAccessible(projects, configuredProjectId)) {
+    return [item.workspace.id, {
+      projectId: configuredProjectId,
+      cloudLinked: true,
+      error: configError,
+      reason: null,
+    }];
   }
 
-  const remoteProjectId = extractRemoteProjectCandidateId(cloudRemote);
   return [item.workspace.id, {
-    projectId: remoteProjectId ?? configuredProjectId,
-    cloudLinked: Boolean(remoteProjectId ?? configuredProjectId),
-    error: null,
-    reason: null,
+    projectId: null,
+    cloudLinked: true,
+    error: CLOUD_PROJECT_NOT_AUTHORIZED_MESSAGE,
+    reason: "not-authorized",
   }];
 }
 
