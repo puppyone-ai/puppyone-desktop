@@ -18,6 +18,7 @@ import type {
   RecentWorkspaceHomeItem,
 } from "./MinimalOnboarding";
 import { InlineLoading } from "./loading";
+import { createTypographyRootProps } from "../features/typography";
 
 type AssetFilter = "all" | "cloud" | "local";
 type AssetLocationTone = "cloud" | "linked" | "local" | "synced";
@@ -39,6 +40,7 @@ export function AssetLibraryHome({
   lightThemePreset,
   darkThemePreset,
   textSize,
+  typography,
   pointerCursors,
   diffMarkers,
   resolvedTheme,
@@ -165,6 +167,7 @@ export function AssetLibraryHome({
       data-text-size={textSize}
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
+      {...createTypographyRootProps(typography)}
       onDragEnter={() => setDragging(true)}
       onDragOver={(event) => {
         event.preventDefault();

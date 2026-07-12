@@ -1,3 +1,11 @@
+import {
+  DEFAULT_TYPOGRAPHY_PREFERENCES,
+  parseTypographyPreferences,
+  type TypographyPreferences,
+} from "./features/typography/fontCatalog";
+
+export type { TypographyPreferences } from "./features/typography/fontCatalog";
+
 export type ThemeMode = "system" | "light" | "dark";
 export type LightThemePreset = "neutral" | "warm" | "graphite";
 export type DarkThemePreset = "default" | "warm" | "graphite";
@@ -59,6 +67,7 @@ export const LEGACY_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.themePreset";
 export const LIGHT_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.lightThemePreset";
 export const DARK_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.darkThemePreset";
 export const TEXT_SIZE_STORAGE_KEY = "puppyone.desktop.textSize";
+export const TYPOGRAPHY_STORAGE_KEY = "puppyone.desktop.typography";
 export const POINTER_CURSORS_STORAGE_KEY = "puppyone.desktop.pointerCursors";
 export const DOCK_ICON_STORAGE_KEY = "puppyone.desktop.dockIcon";
 export const DIFF_MARKERS_STORAGE_KEY = "puppyone.desktop.diffMarkers";
@@ -77,6 +86,7 @@ export const DEFAULT_THEME_MODE: ThemeMode = "system";
 export const DEFAULT_LIGHT_THEME_PRESET: LightThemePreset = "neutral";
 export const DEFAULT_DARK_THEME_PRESET: DarkThemePreset = "default";
 export const DEFAULT_TEXT_SIZE: TextSize = "default";
+export { DEFAULT_TYPOGRAPHY_PREFERENCES };
 export const DEFAULT_POINTER_CURSORS = false;
 export const DEFAULT_DOCK_ICON: DockIcon = "polished";
 export const DEFAULT_DIFF_MARKERS: DiffMarkers = "color";
@@ -329,6 +339,10 @@ export function isDarkThemePreset(value: string | null | undefined): value is Da
 
 export function parseTextSize(value: string | null | undefined): TextSize {
   return value === "small" || value === "large" || value === "default" ? value : DEFAULT_TEXT_SIZE;
+}
+
+export function parseTypography(value: string | null | undefined): TypographyPreferences {
+  return parseTypographyPreferences(value);
 }
 
 export function parsePointerCursors(value: string | null | undefined): boolean {

@@ -152,6 +152,7 @@
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--po-text);
+  font-family: var(--po-font-content, var(--po-font-sans));
   font-size: var(--po-text-size-body, 13px);
   line-height: 1.62;
 }

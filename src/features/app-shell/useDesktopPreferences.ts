@@ -16,10 +16,12 @@ import {
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
   SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY,
   TEXT_SIZE_STORAGE_KEY,
+  TYPOGRAPHY_STORAGE_KEY,
   THEME_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
   getSidebarNavigationOrientation,
   getSidebarNavigationPlacement,
+  parseTypography,
   type ExternalAppsSettings,
   type DiffMarkers,
   type DockIcon,
@@ -31,6 +33,7 @@ import {
   type SidebarNavigationVisibilitySettings,
   type ThemeMode,
   type TextSize,
+  type TypographyPreferences,
   type TitlebarActionsSettings,
 } from "../../preferences";
 import {
@@ -60,6 +63,7 @@ import {
   readInitialLightThemePreset,
   readInitialPointerCursors,
   readInitialTextSize,
+  readInitialTypographyPreferences,
   readInitialThemeMode,
   readSystemDarkMode,
 } from "./preferences";
@@ -69,6 +73,9 @@ export function useDesktopPreferences() {
   const [lightThemePreset, setLightThemePreset] = useState(() => readInitialLightThemePreset());
   const [darkThemePreset, setDarkThemePreset] = useState(() => readInitialDarkThemePreset());
   const [textSize, setTextSize] = useState<TextSize>(() => readInitialTextSize());
+  const [typographyPreferences, setTypographyPreferences] = useState<TypographyPreferences>(
+    () => readInitialTypographyPreferences(),
+  );
   const [pointerCursors, setPointerCursors] = useState(() => readInitialPointerCursors());
   const [dockIcon, setDockIcon] = useState<DockIcon>(() => readInitialDockIcon());
   const [diffMarkers, setDiffMarkers] = useState<DiffMarkers>(() => readInitialDiffMarkers());
@@ -107,6 +114,19 @@ export function useDesktopPreferences() {
   useEffect(() => {
     window.localStorage.setItem(TEXT_SIZE_STORAGE_KEY, textSize);
   }, [textSize]);
+
+  useEffect(() => {
+    window.localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(typographyPreferences));
+  }, [typographyPreferences]);
+
+  useEffect(() => {
+    const syncTypographyAcrossWindows = (event: StorageEvent) => {
+      if (event.key !== TYPOGRAPHY_STORAGE_KEY && event.key !== null) return;
+      setTypographyPreferences(parseTypography(event.key === null ? null : event.newValue));
+    };
+    window.addEventListener("storage", syncTypographyAcrossWindows);
+    return () => window.removeEventListener("storage", syncTypographyAcrossWindows);
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(POINTER_CURSORS_STORAGE_KEY, pointerCursors ? "true" : "false");
@@ -225,6 +245,7 @@ export function useDesktopPreferences() {
     lightThemePreset,
     themeMode,
     textSize,
+    typographyPreferences,
     pointerCursors,
     setAiEditAssistEnabled,
     setDarkThemePreset,
@@ -249,6 +270,7 @@ export function useDesktopPreferences() {
     setPointerCursors,
     setTextSize,
     setThemeMode,
+    setTypographyPreferences,
   };
 }
 

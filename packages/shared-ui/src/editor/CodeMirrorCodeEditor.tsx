@@ -19,6 +19,7 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { useEffect, useMemo, useRef } from "react";
+import { subscribeTypographyChanges } from "../core/typography";
 
 export type CodeMirrorCodeEditorProps = {
   content: string;
@@ -85,8 +86,12 @@ export function CodeMirrorCodeEditor({
 
     const view = new EditorView({ state, parent: host });
     viewRef.current = view;
+    const unsubscribeTypography = subscribeTypographyChanges(host.ownerDocument, () => {
+      view.requestMeasure();
+    });
 
     return () => {
+      unsubscribeTypography();
       view.destroy();
       viewRef.current = null;
     };

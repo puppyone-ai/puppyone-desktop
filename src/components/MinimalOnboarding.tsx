@@ -1,6 +1,10 @@
 import type { Workspace } from "@puppyone/shared-ui";
 import { AlertTriangle, Cloud, Folder, FolderOpen, Monitor } from "lucide-react";
 import type { DragEvent } from "react";
+import {
+  createTypographyRootProps,
+  type ResolvedTypography,
+} from "../features/typography";
 import { useEffect, useMemo, useState } from "react";
 import type { DarkThemePreset, DiffMarkers, LightThemePreset, TextSize, ThemeMode } from "../preferences";
 import { InlineLoading } from "./loading";
@@ -53,6 +57,7 @@ export type MinimalOnboardingProps = {
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
   textSize: TextSize;
+  typography: ResolvedTypography;
   pointerCursors: boolean;
   diffMarkers: DiffMarkers;
   resolvedTheme: "light" | "dark";
@@ -75,6 +80,7 @@ export function MinimalOnboarding({
   lightThemePreset,
   darkThemePreset,
   textSize,
+  typography,
   pointerCursors,
   diffMarkers,
   resolvedTheme,
@@ -224,6 +230,7 @@ export function MinimalOnboarding({
       data-text-size={textSize}
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
+      {...createTypographyRootProps(typography)}
       onDragEnter={() => setDragging(true)}
       onDragOver={(event) => {
         event.preventDefault();

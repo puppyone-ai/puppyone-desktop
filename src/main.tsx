@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { App } from "./App";
 import { ScrollbarActivity } from "./components/ScrollbarActivity";
 import { FeatureFlagsProvider } from "./features/flags";
+import { TypographyCatalogProvider } from "./features/typography";
 import "./cloud-globals.css";
 import "@puppyone/shared-ui/shared-ui.css";
 import "./styles.css";
@@ -21,9 +22,11 @@ if (window.location.hash === "#agent-visual-smoke") {
   root.render(
     <React.StrictMode>
       <ScrollbarActivity />
-      <FeatureFlagsProvider>
-        <App />
-      </FeatureFlagsProvider>
+      <TypographyCatalogProvider>
+        <FeatureFlagsProvider>
+          <App />
+        </FeatureFlagsProvider>
+      </TypographyCatalogProvider>
     </React.StrictMode>,
   );
 }

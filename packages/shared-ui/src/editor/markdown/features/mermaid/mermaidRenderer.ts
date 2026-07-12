@@ -1,6 +1,7 @@
 import type mermaid from "mermaid";
 import type { MermaidConfig } from "mermaid";
 import { getSafeMarkdownHref } from "../../platform/policy/markdownUrlPolicy";
+import { subscribeTypographyChanges } from "../../../../core/typography";
 
 type MermaidModule = typeof mermaid;
 
@@ -40,6 +41,7 @@ let themeObserver: MutationObserver | null = null;
 let colorSchemeQuery: MediaQueryList | null = null;
 let colorSchemeListener: (() => void) | null = null;
 let themeNotificationFrame: number | null = null;
+let typographyChangeUnsubscribe: (() => void) | null = null;
 
 const svgCache = new Map<string, string>();
 const themeChangeSubscribers = new Set<() => void>();
@@ -56,7 +58,10 @@ export function getMermaidThemeSnapshot(root: Element = document.documentElement
   const success = read("--po-success", "#16a34a");
   const warning = read("--po-warning", "#d97706");
   const danger = read("--po-danger", "#dc2626");
-  const fontFamily = read("--po-font-sans", "ui-sans-serif, system-ui, sans-serif");
+  const fontFamily = read(
+    "--po-font-content",
+    read("--po-font-sans", "ui-sans-serif, system-ui, sans-serif"),
+  );
   const isDark = isDarkColor(background);
 
   const config: MermaidConfig = {
@@ -368,6 +373,7 @@ function ensureMermaidThemeObserver() {
     colorSchemeListener = scheduleMermaidThemeChangeNotification;
     colorSchemeQuery.addEventListener("change", colorSchemeListener);
   }
+  typographyChangeUnsubscribe = subscribeTypographyChanges(document, scheduleMermaidThemeChangeNotification);
 }
 
 function disconnectMermaidThemeObserver() {
@@ -378,6 +384,8 @@ function disconnectMermaidThemeObserver() {
   }
   colorSchemeQuery = null;
   colorSchemeListener = null;
+  typographyChangeUnsubscribe?.();
+  typographyChangeUnsubscribe = null;
   if (themeNotificationFrame !== null) {
     window.cancelAnimationFrame(themeNotificationFrame);
     themeNotificationFrame = null;

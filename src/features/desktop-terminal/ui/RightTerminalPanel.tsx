@@ -5,7 +5,11 @@ import {
   useState,
   type DragEvent as ReactDragEvent,
 } from "react";
-import { EXPLORER_TREE_NODE_DRAG_TYPE, type Workspace } from "@puppyone/shared-ui";
+import {
+  EXPLORER_TREE_NODE_DRAG_TYPE,
+  subscribeTypographyChanges,
+  type Workspace,
+} from "@puppyone/shared-ui";
 import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -147,7 +151,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
       cursorBlink: true,
       cursorStyle: "block",
       convertEol: true,
-      fontFamily: '"SF Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+      fontFamily: readTerminalFontFamily(containerRef.current),
       fontSize: readTerminalFontSize(containerRef.current),
       fontWeight: 450,
       fontWeightBold: 700,
@@ -334,7 +338,15 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
     const shellObserver = new MutationObserver(applyTheme);
     shellObserver.observe(shell, {
       attributes: true,
-      attributeFilter: ["class", "data-theme-mode", "data-light-theme-preset", "data-dark-theme-preset", "data-text-size"],
+      attributeFilter: [
+        "class",
+        "style",
+        "data-theme-mode",
+        "data-light-theme-preset",
+        "data-dark-theme-preset",
+        "data-text-size",
+        "data-font-terminal",
+      ],
     });
     const styleObserver = new MutationObserver(applyTheme);
     styleObserver.observe(document.head, {
@@ -343,9 +355,11 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
       subtree: true,
       attributeFilter: ["href", "style"],
     });
+    const unsubscribeTypography = subscribeTypographyChanges(document, applyTheme);
     return () => {
       shellObserver.disconnect();
       styleObserver.disconnect();
+      unsubscribeTypography();
     };
   }, [hasStarted, scheduleSettledFits, sessionGeneration]);
 
@@ -499,8 +513,14 @@ function readTerminalTheme(element: HTMLElement): ITheme {
 
 function applyTerminalTheme(terminal: Terminal, element: HTMLElement) {
   terminal.options.theme = readTerminalTheme(element);
+  terminal.options.fontFamily = readTerminalFontFamily(element);
   terminal.options.fontSize = readTerminalFontSize(element);
   terminal.refresh(0, Math.max(0, terminal.rows - 1));
+}
+
+function readTerminalFontFamily(element: HTMLElement) {
+  return getComputedStyle(element).getPropertyValue("--po-font-terminal").trim()
+    || '"Geist Mono", "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace';
 }
 
 function readTerminalFontSize(element: HTMLElement) {

@@ -91,6 +91,11 @@ import {
   createExplicitWorkspaceBinding,
 } from "./features/cloud/workspace/explicitWorkspaceBinding";
 import type { CloudWorkspaceAttachOptions } from "./features/cloud/types";
+import {
+  createTypographyRootProps,
+  useTypographyCatalog,
+  useTypographyRuntime,
+} from "./features/typography";
 
 const CLOUD_BROWSER_SIGN_IN_COOLDOWN_MS = 1500;
 
@@ -98,6 +103,9 @@ export function App() {
   const desktopUpdates = useDesktopUpdates();
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
+  const fontCatalog = useTypographyCatalog();
+  const typography = useTypographyRuntime(preferences.typographyPreferences, fontCatalog);
+  const typographyRootProps = useMemo(() => createTypographyRootProps(typography), [typography]);
   const cloudEnabled = useFeatureFlag("cloudWorkspace");
   const cloudOnlyWorkspaceEnabled = useFeatureFlag("cloudOnlyWorkspace");
   const assetLibraryHomeAvailable = useFeatureFlag("assetLibraryHome");
@@ -1037,6 +1045,7 @@ export function App() {
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
         textSize={textSize}
+        typography={typography}
         pointerCursors={pointerCursors}
         diffMarkers={diffMarkers}
         resolvedTheme={resolvedTheme}
@@ -1064,6 +1073,7 @@ export function App() {
           lightThemePreset={lightThemePreset}
           darkThemePreset={darkThemePreset}
           textSize={textSize}
+          typography={typography}
           pointerCursors={pointerCursors}
           diffMarkers={diffMarkers}
           resolvedTheme={resolvedTheme}
@@ -1073,6 +1083,7 @@ export function App() {
           lightThemePreset={lightThemePreset}
           darkThemePreset={darkThemePreset}
           textSize={textSize}
+          typography={typography}
           pointerCursors={pointerCursors}
           diffMarkers={diffMarkers}
         >
@@ -1188,6 +1199,7 @@ export function App() {
       data-text-size={textSize}
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
+      {...typographyRootProps}
     >
       <DesktopCloudShell
         workspaceKind={workspaceIsCloud ? "cloud" : "local"}
@@ -1312,6 +1324,7 @@ export function App() {
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
         textSize={textSize}
+        typography={typography}
         pointerCursors={pointerCursors}
         diffMarkers={diffMarkers}
       >

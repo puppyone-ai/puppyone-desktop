@@ -4,6 +4,9 @@ This document records the durable design contract for the Appearance settings
 surface, the decision record from comparing against deep-customization settings
 pages (Codex-style), and the current to-do list.
 
+The font catalog and runtime lifecycle are specified in
+[Desktop Typography Architecture](./desktop-typography.md).
+
 ## Part 1: Durable Design Contract
 
 ### Principle: Curate, Don't Configure
@@ -11,15 +14,18 @@ pages (Codex-style), and the current to-do list.
 PuppyOne Desktop is a minimal, opinionated product. The Appearance surface
 makes decisions for the user instead of handing decisions to the user.
 
-- The unit of visual choice is a **complete curated preset**, never an
-  individual color, font family, or numeric parameter.
+- The unit of interface visual choice is a **complete curated preset**, never
+  an individual color or numeric parameter. Knowledge content typography is a
+  deliberate exception: users choose a catalog font by stable ID while the
+  application interface remains curated.
 - Every selectable option must be a state the team has designed and verified.
   No setting may produce a visual state we have not seen.
 - A setting earns its place only if it is (a) accessibility, (b) a genuinely
   different working context, or (c) clearer presentation of an existing
   choice. Aesthetic micro-tuning does not qualify.
-- When users want more visual variety, the answer is **adding a new curated
-  preset**, not adding a knob.
+- When users want more interface visual variety, the answer is **adding a new
+  curated preset**, not adding a knob. Content-font ownership stays inside the
+  catalog exception above.
 - Zero-UI beats a toggle when the OS already expresses the preference
   (example: reduce motion follows `prefers-reduced-motion` with no setting).
 
@@ -29,11 +35,13 @@ Compared against Codex-style appearance settings (free accent/background/
 foreground color inputs, custom font families, contrast slider, theme
 import/copy, translucent sidebar toggle).
 
-Accepted, because they are accessibility or curated choices:
+Accepted, because they are accessibility, curated interface choices, or
+deliberate ownership of knowledge content:
 
 | Item | Shape |
 | --- | --- |
 | Text size | One three-tier control (Small / Default / Large). `Default` is an exact identity state that preserves every hand-tuned component font size, line height, and spacing value. Small/Large may scale semantic typography tokens; never bulk-rewrite existing component CSS or introduce two free px inputs. |
+| Content font | One catalog-backed selector. Built-in entries are Geist, System, and Serif. Preferences store an opaque font ID rather than a CSS family or file path, so a future local imported-font catalog can extend the same surface without changing the preference schema. UI, code, and terminal fonts remain fixed until separately designed. |
 | Dock icon | Curated set of 2-3 official icons only, presented in the shared content-sized segmented control. No custom image upload. macOS only. |
 | Pointer cursors | Single toggle. Default off (macOS-native arrow cursor). |
 | Third dark preset | A warm dark preset pairing with the light `warm` preset, giving 3 light + 3 dark. |
@@ -46,7 +54,7 @@ Rejected, and why:
 | Item | Reason |
 | --- | --- |
 | Free color customization (accent / background / foreground) | Presets are designed as complete sets in `tokens.css`; opening one channel breaks the set and produces unverifiable states. |
-| Custom font families | Geist Sans / Geist Mono are part of the product identity; free fonts break metrics and layout. |
+| Free interface/code font fields | Geist Sans / Geist Mono remain part of the product identity and metric contract. Do not expose raw CSS-family inputs or let content customization implicitly replace chrome or terminal typography. |
 | Contrast slider | Infinite intermediate states cannot be visually verified. If contrast demand appears, ship a curated high-contrast preset instead. |
 | Theme import / copy | Only meaningful with a theme editor, which we will not build. |
 | Custom dock icon upload | Same failure as free colors: uncurated brand surface. |
@@ -57,14 +65,15 @@ Rejected, and why:
 ### Page Shape
 
 The Appearance section stays a single flat list (Theme, presets, Text size,
-File icons, Navigation, Header elements, Pointer cursors, Dock icon). It must
-fit in roughly one screen. Do not adopt grouped-card layouts while the list
-stays this small.
+Content font, File icons, Navigation, Header elements, Pointer cursors, Dock
+icon). It must fit in roughly one screen. Do not adopt grouped-card layouts
+while the list stays this small.
 
-Light theme, dark theme, Text size, File icons, Navigation, and Dock icon reuse
-the same segmented-control surface. Buttons are content-sized around their icon
-or palette glyph and label; do not add a fixed group width, equal-width flex
-growth, control-specific background, or control-specific active treatment.
+Light theme, dark theme, Text size, Content font, File icons, Navigation, and
+Dock icon reuse the same segmented-control surface. Buttons are content-sized
+around their icon or palette glyph and label; do not add a fixed group width,
+equal-width flex growth, control-specific background, or control-specific
+active treatment.
 
 Every ordinary row uses the same single-line muted label treatment. Do not turn
 Pointer cursors or Dock icon into a separate subsection with a bold title and
@@ -104,7 +113,8 @@ typography cannot drift independently. The architecture test in
 
 ## Part 2: Implementation Status
 
-All accepted items were implemented on 2026-07-10. Current code boundaries:
+The initial accepted items were implemented on 2026-07-10; the extensible
+typography foundation followed on 2026-07-13. Current code boundaries:
 
 - `src/preferences.ts` - preset definitions, storage keys
   (`puppyone.desktop.*`), parse/normalize helpers.
@@ -124,31 +134,42 @@ Implemented:
    the original 13px sidebar / 14px content / 13px code sizes and does not
    change component spacing. Broader token adoption must be deliberate and
    reviewed component by component.
-2. **Third dark preset.** A warm dark preset is included in `DARK_THEME_PRESETS` and
+2. **Extensible typography.** `puppyone.desktop.typography` stores a versioned
+   UI/content/code/terminal font-ID tuple. `--po-font-ui`,
+   `--po-font-content`, `--po-font-code`, and `--po-font-terminal` are the
+   semantic runtime contract; the legacy
+   `--po-font-sans` / `--po-font-mono` names remain compatibility aliases.
+   Built-in catalog entries provide Geist, System, and Serif content choices.
+   Unknown but syntactically safe IDs are preserved and resolve to the role
+   default until a catalog provider supplies them. This is the extension seam
+   for a future host-owned imported-font store; importing files is not part of
+   the current implementation.
+3. **Third dark preset.** A warm dark preset is included in `DARK_THEME_PRESETS` and
    `tokens.css`, mirroring the light `warm` palette direction.
-3. **Theme previews.** Mini preview cards (sidebar + panel + accent bar) drawn
+4. **Theme previews.** Mini preview cards (sidebar + panel + accent bar) drawn
    with CSS from live tokens replace the text-only System / Light / Dark mode
    buttons. Light and dark preset rows use compact three-color palette swatches
    inside the shared segmented-control treatment.
-4. **Reduce motion.** `src/styles/animations.css` disables animations and
+5. **Reduce motion.** `src/styles/animations.css` disables animations and
    transition-heavy styles behind `@media (prefers-reduced-motion: reduce)`.
    No setting row.
-5. **Pointer cursors.** `puppyone.desktop.pointerCursors` (default false)
+6. **Pointer cursors.** `puppyone.desktop.pointerCursors` (default false)
    uses a root `data-pointer-cursors` attribute; CSS opts interactive elements
    into `cursor: pointer`.
-6. **Dock icon.** `puppyone.desktop.dockIcon` selects among packaged
+7. **Dock icon.** `puppyone.desktop.dockIcon` selects among packaged
    official icons via `app.dock.setIcon()` in the main process. Follows the
    packaging contract in [Desktop App Icon](../DESKTOP_APP_ICON.md) (raw PNG
    resources, not `.icns` slots).
-7. **Diff markers.** `puppyone.desktop.diffMarkers`
+8. **Diff markers.** `puppyone.desktop.diffMarkers`
    (`color | symbols`) is rendered in compact AI review surfaces; its settings
    row lives in the Editor section. The full Git Changes review surface always
    renders `+/-` because color alone cannot communicate its row structure.
 
 ## Invariants
 
-- Do not add a settings control that accepts a free color, free font family,
-  or unbounded numeric value.
+- Do not add a settings control that accepts a free color, raw CSS font family,
+  file path, URL, or unbounded numeric value. Font choices enter through the
+  catalog and preferences store only validated IDs.
 - Do not add an appearance option whose visual result the team has not
   designed and verified.
 - `textSize=default` must remain visually identical to the pre-setting product.
@@ -165,3 +186,11 @@ Implemented:
   requires removing or merging one.
 - Appearance preferences are per-device (`localStorage`, `puppyone.desktop.*`
   keys); they do not sync through cloud sessions.
+- Interface, content, code, and terminal typography remain separate roles. A
+  content font must not change chrome metrics or the terminal grid.
+- Font readiness emits the shared typography lifecycle event. CodeMirror must
+  request a measure, Mermaid must render with the resolved content family in
+  its cache key, and xterm must refit after terminal-font metrics settle.
+- A future imported-font implementation is host-owned, local-only, and exposed
+  to the renderer as catalog entries. It must not store raw paths in renderer
+  preferences or sync font binaries through projects/cloud.

@@ -1,7 +1,7 @@
 import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import type { DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, LightThemePreset, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings } from "../../preferences";
+import type { DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, LightThemePreset, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 
 export type SettingsSection = "account" | "workspace" | "editor" | "git" | "cloud" | "appearance" | "files" | "external-apps" | "experimental";
 
@@ -15,6 +15,7 @@ export type SettingsViewProps = {
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
   textSize: TextSize;
+  typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
   dockIcon: DockIcon;
   diffMarkers: DiffMarkers;
@@ -40,6 +41,7 @@ export type SettingsViewProps = {
   onLightThemePresetChange: (preset: LightThemePreset) => void;
   onDarkThemePresetChange: (preset: DarkThemePreset) => void;
   onTextSizeChange: (textSize: TextSize) => void;
+  onTypographyPreferencesChange: (preferences: TypographyPreferences) => void;
   onPointerCursorsChange: (enabled: boolean) => void;
   onDockIconChange: (icon: DockIcon) => void;
   onDiffMarkersChange: (markers: DiffMarkers) => void;

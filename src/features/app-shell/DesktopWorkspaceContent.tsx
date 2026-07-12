@@ -352,6 +352,7 @@ export function DesktopWorkspaceContent({
       lightThemePreset={preferences.lightThemePreset}
       darkThemePreset={preferences.darkThemePreset}
       textSize={preferences.textSize}
+      typographyPreferences={preferences.typographyPreferences}
       pointerCursors={preferences.pointerCursors}
       dockIcon={preferences.dockIcon}
       diffMarkers={preferences.diffMarkers}
@@ -377,6 +378,7 @@ export function DesktopWorkspaceContent({
       onLightThemePresetChange={preferences.setLightThemePreset}
       onDarkThemePresetChange={preferences.setDarkThemePreset}
       onTextSizeChange={preferences.setTextSize}
+      onTypographyPreferencesChange={preferences.setTypographyPreferences}
       onPointerCursorsChange={preferences.setPointerCursors}
       onDockIconChange={preferences.setDockIcon}
       onDiffMarkersChange={preferences.setDiffMarkers}
