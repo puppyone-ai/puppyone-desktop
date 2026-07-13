@@ -10,6 +10,8 @@ that most directly affect file-opening responsiveness:
   link-heavy synthetic corpus.
 - 10,000-line single-character edits at the top, middle, and end; focus/reveal
   changes; and a table/HTML/Mermaid-heavy edit fixture.
+- Oversized-table policy transitions, a 1,000-row windowed plan, the centralized
+  hard fallback boundary, and variable-height 5,000-row range lookup.
 - Revision-bound continuous A/B file switching and cancellation.
 - Desktop Agent 4,000-event projection, 2,000-row virtual transcript, 128 KiB
   Markdown progressive disclosure, expanded command/diff rendering and a
@@ -64,9 +66,12 @@ npm run build
 The harness performs 4 warm-ups and 30 measured A/B switches with 1,000
 Explorer nodes and 10,000-line Markdown documents. It also applies one real
 CodeMirror edit per sample and verifies the production Worker link-index
-boundary. The command fails when the shell p95 exceeds 16ms, editor-base p95
-exceeds 50ms, input p95 exceeds 16ms, a stale commit occurs, or a path-owned
-Long Task exceeds 50ms.
+boundary. After those samples it opens a 1,001-logical-row table, verifies that
+the mounted row DOM remains at or below 80 before and after a document-scroll
+window change, and retains the structural result in the JSON report. The
+command fails when the shell p95 exceeds 16ms, editor-base p95 exceeds 50ms,
+input p95 exceeds 16ms, a stale commit occurs, a path-owned Long Task exceeds
+50ms, or the oversized-table bound is violated.
 
 Reference Apple M2 Pro / 16 GB / Electron 41.7.2 result on 2026-07-11:
 

@@ -7,6 +7,7 @@ import {
   type MarkdownTableFocusRequest,
 } from "./tableFocusState";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
+import { revealMarkdownTableWindowRow } from "./tableWindowController";
 
 const MAX_FOCUS_RESTORE_ATTEMPTS = 3;
 
@@ -83,7 +84,10 @@ export function focusMarkdownTableCell(wrapper: HTMLElement | null, target: Mark
   const cell = wrapper?.querySelector<HTMLElement>(
     `.cm-md-table-cell-content[data-md-table-row="${target.rowIndex}"][data-md-table-column="${target.columnIndex}"]`,
   );
-  if (!cell) return false;
+  if (!cell) {
+    revealMarkdownTableWindowRow(wrapper, target.rowIndex);
+    return false;
+  }
   cell.focus({ preventScroll: true });
   placeCaretAtEnd(cell);
   return true;

@@ -79,6 +79,8 @@
   "markdown.mermaid.editDiagram": "Editar el código fuente del diagrama",
   "markdown.mermaid.empty": "Diagrama Mermaid vacío",
   "markdown.mermaid.finishEditing": "Terminar de editar el código fuente del diagrama",
+  "markdown.mermaid.largePreviewPaused": "La vista previa del diagrama grande está en pausa.",
+  "markdown.mermaid.renderDiagram": "Renderizar diagrama",
   "markdown.mermaid.renderFailed": "No se pudo renderizar este diagrama Mermaid.",
   "markdown.mermaid.renderFailedDetail": "No se pudo renderizar este diagrama Mermaid: {detail}",
   "markdown.mermaid.rendering": "Renderizando diagrama…",

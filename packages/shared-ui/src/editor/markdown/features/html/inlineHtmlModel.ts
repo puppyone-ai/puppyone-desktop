@@ -31,9 +31,17 @@ type InlineContainer = {
 
 type MarkdownInlineHtmlCacheEntry = {
   tree: ReturnType<typeof syntaxTree>;
-  elements: readonly MarkdownInlineHtml[];
+  elements: readonly MarkdownInlineHtml[] | null;
   intervals: MarkdownInlineHtmlIntervalNode | null;
+  containerElements: Map<string, readonly MarkdownInlineHtml[]>;
 };
+
+export type MarkdownInlineHtmlDiagnostics = Readonly<{
+  fullDocumentScans: number;
+  rangeScans: number;
+  containersScanned: number;
+  tokensScanned: number;
+}>;
 
 type MarkdownInlineHtmlIntervalNode = {
   element: MarkdownInlineHtml;
@@ -43,20 +51,34 @@ type MarkdownInlineHtmlIntervalNode = {
 };
 
 const markdownInlineHtmlCache = new WeakMap<object, MarkdownInlineHtmlCacheEntry>();
+const diagnostics = {
+  fullDocumentScans: 0,
+  rangeScans: 0,
+  containersScanned: 0,
+  tokensScanned: 0,
+};
 
 export function getMarkdownInlineHtml(state: EditorState): readonly MarkdownInlineHtml[] {
   const tree = syntaxTree(state);
   const cached = markdownInlineHtmlCache.get(state.doc);
-  if (cached?.tree === tree) return cached.elements;
+  if (cached?.tree === tree && cached.elements) return cached.elements;
 
   const containers = collectInlineHtmlContainers(state, tree);
-  const elements = Array.from(containers.values())
-    .flatMap(pairInlineHtmlContainer)
+  diagnostics.fullDocumentScans += 1;
+  diagnostics.containersScanned += containers.size;
+  diagnostics.tokensScanned += countContainerTokens(containers);
+  const containerElements = new Map<string, readonly MarkdownInlineHtml[]>();
+  for (const [key, container] of containers) {
+    containerElements.set(key, pairInlineHtmlContainer(container));
+  }
+  const elements = Array.from(containerElements.values())
+    .flat()
     .sort(compareInlineHtmlElements);
   markdownInlineHtmlCache.set(state.doc, {
     tree,
     elements,
     intervals: buildInlineHtmlIntervalIndex(elements, 0, elements.length),
+    containerElements,
   });
   return elements;
 }
@@ -68,15 +90,58 @@ export function getMarkdownInlineHtmlInRange(
 ): readonly MarkdownInlineHtml[] {
   const rangeFrom = Math.max(0, Math.min(from, to, state.doc.length));
   const rangeTo = Math.max(rangeFrom, Math.min(Math.max(from, to), state.doc.length));
-  getMarkdownInlineHtml(state);
+  const tree = syntaxTree(state);
+  const cached = getOrCreateInlineHtmlCacheEntry(state, tree);
+  if (!cached.elements) {
+    diagnostics.rangeScans += 1;
+    const containers = collectInlineHtmlContainersInRange(state, tree, rangeFrom, rangeTo);
+    diagnostics.containersScanned += containers.size;
+    diagnostics.tokensScanned += countContainerTokens(containers);
+    const elements: MarkdownInlineHtml[] = [];
+    for (const [key, container] of containers) {
+      const paired = cached.containerElements.get(key) ?? pairInlineHtmlContainer(container);
+      cached.containerElements.set(key, paired);
+      for (const element of paired) {
+        if (element.from < rangeTo && element.to > rangeFrom) elements.push(element);
+      }
+    }
+    return elements.sort(compareInlineHtmlElements);
+  }
   const result: MarkdownInlineHtml[] = [];
   queryInlineHtmlIntervalIndex(
-    markdownInlineHtmlCache.get(state.doc)?.intervals ?? null,
+    cached.intervals,
     rangeFrom,
     rangeTo,
     result,
   );
   return result;
+}
+
+export function getMarkdownInlineHtmlDiagnostics(): MarkdownInlineHtmlDiagnostics {
+  return { ...diagnostics };
+}
+
+export function resetMarkdownInlineHtmlDiagnostics() {
+  diagnostics.fullDocumentScans = 0;
+  diagnostics.rangeScans = 0;
+  diagnostics.containersScanned = 0;
+  diagnostics.tokensScanned = 0;
+}
+
+function getOrCreateInlineHtmlCacheEntry(
+  state: EditorState,
+  tree: ReturnType<typeof syntaxTree>,
+): MarkdownInlineHtmlCacheEntry {
+  const cached = markdownInlineHtmlCache.get(state.doc);
+  if (cached?.tree === tree) return cached;
+  const created: MarkdownInlineHtmlCacheEntry = {
+    tree,
+    elements: null,
+    intervals: null,
+    containerElements: new Map(),
+  };
+  markdownInlineHtmlCache.set(state.doc, created);
+  return created;
 }
 
 function buildInlineHtmlIntervalIndex(
@@ -143,6 +208,70 @@ function collectInlineHtmlContainers(
     container.tokens.sort((left, right) => left.from - right.from || left.to - right.to);
   }
   return containers;
+}
+
+function collectInlineHtmlContainersInRange(
+  state: EditorState,
+  tree: ReturnType<typeof syntaxTree>,
+  from: number,
+  to: number,
+): Map<string, InlineContainer> {
+  const containers = new Map<string, InlineContainer>();
+  if (state.doc.length === 0) return containers;
+  const probeFrom = from >= state.doc.length ? Math.max(0, state.doc.length - 1) : from;
+  const probeTo = Math.min(
+    state.doc.length,
+    Math.max(to, probeFrom + 1),
+  );
+
+  tree.iterate({
+    from: probeFrom,
+    to: probeTo,
+    enter(nodeRef) {
+      const node = nodeRef.node;
+      if (node.name === "HTMLBlock") return false;
+      if (!isInlineContainerName(node.name)) return true;
+      const key = `${node.from}:${node.to}`;
+      if (!containers.has(key)) {
+        containers.set(key, collectInlineHtmlContainer(state, tree, node));
+      }
+      return false;
+    },
+  });
+  return containers;
+}
+
+function collectInlineHtmlContainer(
+  state: EditorState,
+  tree: ReturnType<typeof syntaxTree>,
+  containerNode: SyntaxNode,
+): InlineContainer {
+  const container: InlineContainer = {
+    from: containerNode.from,
+    to: containerNode.to,
+    tokens: [],
+  };
+  tree.iterate({
+    from: containerNode.from,
+    to: containerNode.to,
+    enter(nodeRef) {
+      const node = nodeRef.node;
+      if (node.name !== "HTMLTag") return true;
+      const owner = findInlineContainerNode(node);
+      if (owner?.from !== containerNode.from || owner.to !== containerNode.to) return false;
+      const token = parseMarkdownHtmlTagToken(state.sliceDoc(node.from, node.to), node.from);
+      if (token) container.tokens.push(token);
+      return false;
+    },
+  });
+  container.tokens.sort((left, right) => left.from - right.from || left.to - right.to);
+  return container;
+}
+
+function countContainerTokens(containers: ReadonlyMap<string, InlineContainer>): number {
+  let count = 0;
+  for (const container of containers.values()) count += container.tokens.length;
+  return count;
 }
 
 function findInlineContainerNode(node: SyntaxNode): SyntaxNode | null {

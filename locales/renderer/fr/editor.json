@@ -79,6 +79,8 @@
   "markdown.mermaid.editDiagram": "Modifier la source du diagramme",
   "markdown.mermaid.empty": "Diagramme Mermaid vide",
   "markdown.mermaid.finishEditing": "Terminer la modification de la source du diagramme",
+  "markdown.mermaid.largePreviewPaused": "L’aperçu du grand diagramme est en pause.",
+  "markdown.mermaid.renderDiagram": "Générer le diagramme",
   "markdown.mermaid.renderFailed": "Impossible de restituer ce diagramme Mermaid.",
   "markdown.mermaid.renderFailedDetail": "Impossible de restituer ce diagramme Mermaid : {detail}",
   "markdown.mermaid.rendering": "Rendu du diagramme…",

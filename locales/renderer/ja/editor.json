@@ -79,6 +79,8 @@
   "markdown.mermaid.editDiagram": "ダイアグラムのソースを編集",
   "markdown.mermaid.empty": "空の Mermaid ダイアグラム",
   "markdown.mermaid.finishEditing": "ダイアグラムのソース編集を完了",
+  "markdown.mermaid.largePreviewPaused": "大きなダイアグラムのプレビューは一時停止中です。",
+  "markdown.mermaid.renderDiagram": "ダイアグラムをレンダリング",
   "markdown.mermaid.renderFailed": "この Mermaid ダイアグラムをレンダリングできませんでした。",
   "markdown.mermaid.renderFailedDetail": "この Mermaid ダイアグラムをレンダリングできませんでした: {detail}",
   "markdown.mermaid.rendering": "ダイアグラムをレンダリング中…",

@@ -79,6 +79,8 @@
   "markdown.mermaid.editDiagram": "编辑图表源代码",
   "markdown.mermaid.empty": "空 Mermaid 图表",
   "markdown.mermaid.finishEditing": "完成编辑图表源代码",
+  "markdown.mermaid.largePreviewPaused": "大型图表预览已暂停。",
+  "markdown.mermaid.renderDiagram": "呈现图表",
   "markdown.mermaid.renderFailed": "无法呈现此 Mermaid 图表。",
   "markdown.mermaid.renderFailedDetail": "无法呈现此 Mermaid 图表：{detail}",
   "markdown.mermaid.rendering": "正在呈现图表…",

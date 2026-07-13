@@ -3,7 +3,8 @@ import type { EditorView } from "@codemirror/view";
 const GEOMETRY_CHANGE_THRESHOLD_PX = 0.75;
 
 export type MarkdownLayoutCoordinator = {
-  observe(element: HTMLElement): () => void;
+  observe(element: HTMLElement, onHeightChange?: (height: number, previousHeight: number | null) => void): () => void;
+  schedule<T>(key: object, read: () => T, write: (value: T) => void): void;
   request(): void;
   dispose(): void;
 };
@@ -15,8 +16,11 @@ export type MarkdownLayoutCoordinator = {
  */
 export function createMarkdownLayoutCoordinator(view: EditorView): MarkdownLayoutCoordinator {
   const lastHeightByElement = new WeakMap<HTMLElement, number>();
+  const heightChangeByElement = new WeakMap<HTMLElement, (height: number, previousHeight: number | null) => void>();
+  const pendingHeightChanges = new Map<HTMLElement, { height: number; previousHeight: number | null }>();
   const observedElements = new Set<HTMLElement>();
   const measureKey = {};
+  const heightMeasureKey = {};
   let disposed = false;
 
   const request = () => {
@@ -47,16 +51,44 @@ export function createMarkdownLayoutCoordinator(view: EditorView): MarkdownLayou
             || Math.abs(height - previousHeight) >= GEOMETRY_CHANGE_THRESHOLD_PX
           ) {
             geometryChanged = true;
+            const callback = heightChangeByElement.get(element);
+            if (callback) {
+              pendingHeightChanges.set(element, {
+                height,
+                previousHeight: previousHeight ?? null,
+              });
+            }
+          }
+        }
+        if (pendingHeightChanges.size > 0) {
+          try {
+            view.requestMeasure({
+              key: heightMeasureKey,
+              read: () => {
+                const pending = Array.from(pendingHeightChanges.entries());
+                pendingHeightChanges.clear();
+                return pending;
+              },
+              write: (pending) => {
+                for (const [element, change] of pending) {
+                  if (!observedElements.has(element)) continue;
+                  heightChangeByElement.get(element)?.(change.height, change.previousHeight);
+                }
+              },
+            });
+          } catch {
+            pendingHeightChanges.clear();
           }
         }
         if (geometryChanged) request();
       });
 
   const coordinator: MarkdownLayoutCoordinator = {
-    observe(element) {
+    observe(element, onHeightChange) {
       if (disposed) return () => undefined;
       observedElements.add(element);
       lastHeightByElement.delete(element);
+      if (onHeightChange) heightChangeByElement.set(element, onHeightChange);
       observer?.observe(element);
       let active = true;
       return () => {
@@ -64,8 +96,18 @@ export function createMarkdownLayoutCoordinator(view: EditorView): MarkdownLayou
         active = false;
         observedElements.delete(element);
         lastHeightByElement.delete(element);
+        heightChangeByElement.delete(element);
+        pendingHeightChanges.delete(element);
         observer?.unobserve(element);
       };
+    },
+    schedule(key, read, write) {
+      if (disposed) return;
+      try {
+        view.requestMeasure({ key, read, write });
+      } catch {
+        // The view may be between async disposal and DOM cleanup.
+      }
     },
     request,
     dispose() {
@@ -73,6 +115,7 @@ export function createMarkdownLayoutCoordinator(view: EditorView): MarkdownLayou
       disposed = true;
       observer?.disconnect();
       observedElements.clear();
+      pendingHeightChanges.clear();
     },
   };
 

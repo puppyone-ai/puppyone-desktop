@@ -14,6 +14,14 @@ export type MarkdownHtmlBlock = {
   source: string;
   tagName: string;
   closed: boolean;
+  metrics: MarkdownHtmlBlockMetrics;
+};
+
+export type MarkdownHtmlBlockMetrics = {
+  logicalItems: number;
+  estimatedDomNodes: number;
+  nestingDepth: number;
+  assetCount: number;
 };
 
 export function getMarkdownHtmlBlock(state: EditorState, lineNumber: number): MarkdownHtmlBlock | null {
@@ -38,6 +46,42 @@ export function getMarkdownHtmlBlock(state: EditorState, lineNumber: number): Ma
     source,
     tagName: opening.tagName,
     closed: isRootHtmlTagClosed(opening, tokens),
+    metrics: estimateHtmlBlockMetrics(tokens),
+  };
+}
+
+function estimateHtmlBlockMetrics(
+  tokens: readonly MarkdownHtmlTagToken[],
+): MarkdownHtmlBlockMetrics {
+  const stack: string[] = [];
+  let nestingDepth = 0;
+  let elementCount = 0;
+  let assetCount = 0;
+
+  for (const token of tokens) {
+    if (token.closing) {
+      const matchingIndex = stack.lastIndexOf(token.tagName);
+      if (matchingIndex >= 0) stack.length = matchingIndex;
+      continue;
+    }
+
+    elementCount += 1;
+    if (token.tagName === "img" || token.tagName === "video" || token.tagName === "audio") {
+      assetCount += 1;
+    }
+    if (token.selfClosing || MARKDOWN_HTML_VOID_TAGS.has(token.tagName)) continue;
+    stack.push(token.tagName);
+    nestingDepth = Math.max(nestingDepth, stack.length);
+  }
+
+  return {
+    logicalItems: tokens.length,
+    // Text nodes and sanitizer wrappers are bounded by the tag count but are
+    // not represented as tokens. A 2x estimate keeps policy conservative
+    // without constructing DOM merely to decide whether DOM is affordable.
+    estimatedDomNodes: Math.max(1, elementCount * 2 + 1),
+    nestingDepth,
+    assetCount,
   };
 }
 

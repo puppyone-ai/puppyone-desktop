@@ -4,11 +4,20 @@ import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { disposeWidgetSessionDom } from "../../platform/codemirror/widgetSession";
 import type { MarkdownTableAlignment, MarkdownTableRow } from "./tableModel";
 import { MarkdownWidgetMeasureController } from "../../platform/codemirror/layoutCoordinator";
-import { createMarkdownTableRenderKey, estimateMarkdownTableLayoutHeight } from "./tableLayout";
+import {
+  createMarkdownTableRenderKey,
+  estimateMarkdownTableColumnWidths,
+  estimateMarkdownTableLayoutHeight,
+} from "./tableLayout";
 import { createTableCellEditor, disposeTableCellEditor } from "./tableCellEditor";
 import { dispatchMarkdownTableStructureOperation, getActiveMarkdownTableCellDraft } from "./tableCommands";
 import { createMarkdownTableDragLayer } from "./tableDragLayer";
 import { getMarkdownLocalization } from "../../core/editor/markdownLocalization";
+import {
+  MARKDOWN_RICH_BLOCK_EXECUTION,
+  type MarkdownMountedBlockExecution,
+} from "../../core/plans/markdownBlockExecution";
+import { createMarkdownTableWindowController } from "./tableWindowController";
 
 export class MarkdownTableWidget extends WidgetType {
   constructor(
@@ -21,6 +30,7 @@ export class MarkdownTableWidget extends WidgetType {
     private readonly _markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
     private readonly layoutEstimatedHeight = estimateMarkdownTableLayoutHeight(rows),
     private readonly renderKey = createMarkdownTableRenderKey(alignments, rows),
+    private readonly execution: MarkdownMountedBlockExecution = MARKDOWN_RICH_BLOCK_EXECUTION,
   ) {
     super();
   }
@@ -32,6 +42,7 @@ export class MarkdownTableWidget extends WidgetType {
       widget.to === this.to &&
       widget.renderKey === this.renderKey &&
       widget.layoutEstimatedHeight === this.layoutEstimatedHeight &&
+      markdownTableExecutionsEqual(widget.execution, this.execution) &&
       widget.markdownLinkGraph === this.markdownLinkGraph &&
       widget.documentPath === this.documentPath &&
       widget._markdownAssetUrlResolver === this._markdownAssetUrlResolver
@@ -44,33 +55,51 @@ export class MarkdownTableWidget extends WidgetType {
 
   toDOM(view: EditorView): HTMLElement {
     const localization = getMarkdownLocalization(view);
+    const doc = view.dom.ownerDocument;
     const host = getMarkdownEmbedHost(view, {
       resolveAssetUrl: this._markdownAssetUrlResolver,
     });
-    const wrapper = document.createElement("div");
+    const wrapper = doc.createElement("div");
     wrapper.dir = localization.direction;
     wrapper.className = view.state.readOnly ? "cm-md-table-widget-wrap is-readonly" : "cm-md-table-widget-wrap";
     wrapper.dataset.mdTableFrom = String(this.from);
+    wrapper.dataset.mdTableExecution = this.execution.mode;
     const rowCount = this.rows.length;
-    const columnCount = Math.max(1, this.alignments.length, ...this.rows.map((row) => row.cells.length));
+    // The semantic table model normalizes every row to the alignment width.
+    // Do not rescan an oversized immutable row collection during DOM mount.
+    const columnCount = Math.max(1, this.alignments.length);
 
-    const frame = document.createElement("div");
+    const frame = doc.createElement("div");
     frame.className = "cm-md-table-frame";
-    const surface = document.createElement("div");
+    const surface = doc.createElement("div");
     surface.className = "cm-md-table-surface";
 
-    const table = document.createElement("table");
+    const table = doc.createElement("table");
     table.className = "cm-md-table-widget";
     table.dir = "auto";
+    table.setAttribute("aria-rowcount", String(rowCount));
+    table.setAttribute("aria-colcount", String(columnCount));
 
-    const header = this.rows.find((row) => row.header);
-    if (header) {
-      const thead = document.createElement("thead");
-      const tr = document.createElement("tr");
-      for (const [columnIndex, cell] of header.cells.entries()) {
-        const th = document.createElement("th");
-        applyTableCellAlignment(th, this.alignments[columnIndex] ?? null);
-        th.appendChild(createTableCellEditor({
+    if (this.execution.mode === "windowed") {
+      table.classList.add("is-windowed");
+      const colgroup = doc.createElement("colgroup");
+      for (const width of estimateMarkdownTableColumnWidths(this.alignments, this.rows)) {
+        const column = doc.createElement("col");
+        column.style.width = `${width}px`;
+        colgroup.appendChild(column);
+      }
+      table.appendChild(colgroup);
+    }
+
+    const createRow = (row: MarkdownTableRow, rowIndex: number, header: boolean) => {
+      const tr = doc.createElement("tr");
+      tr.dataset.mdTableRow = String(rowIndex);
+      tr.setAttribute("aria-rowindex", String(rowIndex + 1));
+      for (const [columnIndex, cell] of row.cells.entries()) {
+        const tableCell = doc.createElement(header ? "th" : "td");
+        tableCell.setAttribute("aria-colindex", String(columnIndex + 1));
+        applyTableCellAlignment(tableCell, this.alignments[columnIndex] ?? null);
+        tableCell.appendChild(createTableCellEditor({
           alignments: this.alignments,
           cell,
           columnCount,
@@ -78,44 +107,63 @@ export class MarkdownTableWidget extends WidgetType {
           documentPath: this.documentPath,
           markdownLinkGraph: this.markdownLinkGraph,
           rowCount,
-          rowIndex: 0,
+          rowIndex,
           rows: this.rows,
           tableFrom: this.from,
           tableTo: this.to,
           view,
         }));
-        tr.appendChild(th);
+        tr.appendChild(tableCell);
       }
-      thead.appendChild(tr);
+      return tr;
+    };
+
+    const disposeRow = (row: HTMLTableRowElement) => {
+      for (const cell of row.querySelectorAll<HTMLElement>(".cm-md-table-cell-content")) {
+        disposeTableCellEditor(cell);
+      }
+    };
+
+    const header = this.rows[0]?.header ? this.rows[0] : null;
+    if (header) {
+      const thead = doc.createElement("thead");
+      thead.appendChild(createRow(header, 0, true));
       table.appendChild(thead);
     }
 
-    const bodyRows = this.rows.filter((row) => !row.header);
-    if (bodyRows.length > 0) {
-      const tbody = document.createElement("tbody");
-      for (const [bodyRowIndex, row] of bodyRows.entries()) {
-        const rowIndex = bodyRowIndex + (header ? 1 : 0);
-        const tr = document.createElement("tr");
-        for (const [columnIndex, cell] of row.cells.entries()) {
-          const td = document.createElement("td");
-          applyTableCellAlignment(td, this.alignments[columnIndex] ?? null);
-          td.appendChild(createTableCellEditor({
-            alignments: this.alignments,
-            cell,
-            columnCount,
-            columnIndex,
-            documentPath: this.documentPath,
-            markdownLinkGraph: this.markdownLinkGraph,
-            rowCount,
-            rowIndex,
-            rows: this.rows,
-            tableFrom: this.from,
-            tableTo: this.to,
-            view,
-          }));
-          tr.appendChild(td);
+    const globalRowOffset = header ? 1 : 0;
+    const bodyRowCount = Math.max(0, this.rows.length - globalRowOffset);
+    const getBodyRow = (bodyIndex: number) => this.rows[bodyIndex + globalRowOffset];
+    let windowController: ReturnType<typeof createMarkdownTableWindowController> | null = null;
+    if (bodyRowCount > 0) {
+      const tbody = doc.createElement("tbody");
+      if (this.execution.mode === "windowed") {
+        windowController = createMarkdownTableWindowController({
+          bodyRowCount,
+          columnCount,
+          createRow: (bodyIndex) => createRow(
+            getBodyRow(bodyIndex),
+            bodyIndex + globalRowOffset,
+            false,
+          ),
+          disposeRow,
+          getBodyRow,
+          globalRowOffset,
+          host,
+          overscan: this.execution.overscanItems,
+          table,
+          tbody,
+          view,
+          wrapper,
+        });
+      } else {
+        for (let bodyRowIndex = 0; bodyRowIndex < bodyRowCount; bodyRowIndex += 1) {
+          tbody.appendChild(createRow(
+            getBodyRow(bodyRowIndex),
+            bodyRowIndex + globalRowOffset,
+            false,
+          ));
         }
-        tbody.appendChild(tr);
       }
       table.appendChild(tbody);
     }
@@ -179,6 +227,7 @@ export class MarkdownTableWidget extends WidgetType {
     host.sessions.mount(wrapper, () => ({
       dispose() {
         dragLayer.dispose();
+        windowController?.dispose();
         for (const cell of wrapper.querySelectorAll<HTMLElement>(".cm-md-table-cell-content")) {
           disposeTableCellEditor(cell);
         }
@@ -258,4 +307,18 @@ function createTableStructureButton({
     onActivate();
   });
   return button;
+}
+
+function markdownTableExecutionsEqual(
+  left: MarkdownMountedBlockExecution,
+  right: MarkdownMountedBlockExecution,
+): boolean {
+  return (
+    left.mode === right.mode
+    && left.budgetVersion === right.budgetVersion
+    && (left.mode !== "windowed" || (
+      right.mode === "windowed"
+      && left.overscanItems === right.overscanItems
+    ))
+  );
 }
