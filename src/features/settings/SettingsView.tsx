@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Cloud, Copy, ExternalLink, FileText, FlaskConical, GitBranch, LogIn, LogOut, Monitor, Moon, PanelBottom, PanelLeft, PanelTop, Pencil, RefreshCw, Settings, ShieldCheck, Sun, Unlink, UserRound } from "lucide-react";
+import { Check, Cloud, Copy, ExternalLink, FileText, FlaskConical, GitBranch, Languages, LogIn, LogOut, Monitor, Moon, PanelBottom, PanelLeft, PanelTop, Pencil, RefreshCw, Settings, ShieldCheck, Sun, Unlink, UserRound } from "lucide-react";
 import { FILE_ICON_THEMES, FileGlyphIcon } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
 import { DesktopUpdateSettingsRow } from "../../components/DesktopUpdateControls";
@@ -12,9 +12,9 @@ import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements"
 import { ExternalAppIcon } from "../external-apps/ExternalAppIcon";
 import { useFeatureFlag } from "../flags";
 import { getPuppyoneRemote, maskRemoteUrl, parsePuppyoneRemote } from "../source-control/remotes";
-import { SettingsGroup, SettingsLine, SettingsSectionHeader } from "./components";
+import { SettingsSectionHeader, SettingsSubsection, SettingsValueRow } from "./components";
 import { ContentFontSetting } from "./ContentFontSetting";
-import { LanguageSetting } from "./LanguageSetting";
+import { LanguageSettingsView } from "./LanguageSetting";
 import { PuppyoneWorkspaceConfigSettings } from "./PuppyoneWorkspaceConfigSettings";
 import type { SettingsSidebarProps, SettingsViewProps, SettingsSection } from "./types";
 import { remoteKindLabel, shortCommit, writeClipboardText } from "./utils";
@@ -199,6 +199,10 @@ export function SettingsView({
     );
   }
 
+  if (activeSection === "language") {
+    return <LanguageSettingsView />;
+  }
+
   if (activeSection === "appearance") {
     return (
       <section className="desktop-utility-view desktop-settings-view">
@@ -209,8 +213,7 @@ export function SettingsView({
               detail={t("settings.appearance.detail")}
             />
             <div className="desktop-settings-list">
-              <LanguageSetting />
-              <div className="desktop-settings-row desktop-settings-row-control desktop-theme-mode-row">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row desktop-theme-mode-row">
                 <span>{t("settings.appearance.theme.title")}</span>
                 <div className="desktop-theme-choice-list" aria-label={t("settings.appearance.theme.ariaLabel")}>
                   {([
@@ -241,7 +244,7 @@ export function SettingsView({
                   })}
                 </div>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.lightTheme.title")}</span>
                 <div className="desktop-theme-segment desktop-theme-preset-list" aria-label={t("settings.appearance.lightTheme.ariaLabel")}>
                   {LIGHT_THEME_PRESETS.map((preset) => (
@@ -263,7 +266,7 @@ export function SettingsView({
                   ))}
                 </div>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.darkTheme.title")}</span>
                 <div className="desktop-theme-segment desktop-theme-preset-list" aria-label={t("settings.appearance.darkTheme.ariaLabel")}>
                   {DARK_THEME_PRESETS.map((preset) => (
@@ -285,7 +288,7 @@ export function SettingsView({
                   ))}
                 </div>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.textSize.title")}</span>
                 <div className="desktop-theme-segment desktop-text-size-segment" aria-label={t("settings.appearance.textSize.ariaLabel")}>
                   {TEXT_SIZE_PRESETS.map((option) => (
@@ -306,7 +309,7 @@ export function SettingsView({
                 preferences={typographyPreferences}
                 onChange={onTypographyPreferencesChange}
               />
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.fileIcons.title")}</span>
                 <div className="desktop-theme-segment desktop-file-icon-theme-segment" aria-label={t("settings.appearance.fileIcons.ariaLabel")}>
                   {FILE_ICON_THEMES.map((theme) => (
@@ -323,7 +326,7 @@ export function SettingsView({
                   ))}
                 </div>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.navigation.title")}</span>
                 <div className="desktop-theme-segment desktop-sidebar-layout-segment" aria-label={t("settings.appearance.navigation.ariaLabel")}>
                   {SIDEBAR_NAVIGATION_LAYOUT_OPTIONS.map((option) => {
@@ -354,6 +357,7 @@ export function SettingsView({
                   <label className="desktop-settings-switch">
                     <input
                       type="checkbox"
+                      aria-label={t("settings.appearance.pluginsShortcut.title")}
                       checked={sidebarNavigationVisibilitySettings.enabled.plugins}
                       onChange={(event) => onSidebarNavigationVisibilitySettingsChange({
                         ...sidebarNavigationVisibilitySettings,
@@ -367,7 +371,7 @@ export function SettingsView({
                   </label>
                 </div>
               )}
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-tools-row">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row desktop-settings-tools-row">
                 <span>{t("settings.appearance.headerElements.title")}</span>
                 <div className="desktop-settings-tool-list">
                   {orderedHeaderElements.map((element) => {
@@ -388,6 +392,7 @@ export function SettingsView({
                         <label className="desktop-settings-switch">
                           <input
                             type="checkbox"
+                            aria-label={t(`settings.appearance.headerElements.${element.id}`)}
                             checked={actionEnabled}
                             onChange={(event) => {
                               const enabled = event.target.checked;
@@ -431,7 +436,7 @@ export function SettingsView({
                   <span aria-hidden="true" />
                 </label>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span id="desktop-dock-icon-label">{t("settings.appearance.dockIcon.title")}</span>
                 <div
                   className="desktop-theme-segment desktop-dock-icon-segment"
@@ -472,11 +477,11 @@ export function SettingsView({
           <div className="desktop-settings-list">
             <div className="desktop-settings-row">
               <span>{t("settings.general.name")}</span>
-              <strong>{workspace.name}</strong>
+              <strong dir="auto" title={workspace.name}>{workspace.name}</strong>
             </div>
             <div className="desktop-settings-row">
               <span>{t("settings.general.path")}</span>
-              <strong>{workspace.path}</strong>
+              <strong dir="ltr" title={workspace.path}>{workspace.path}</strong>
             </div>
             <div className="desktop-settings-row">
               <span>{t("settings.general.mode")}</span>
@@ -672,8 +677,8 @@ function AccountSettingsView({
         <div className="desktop-settings-section desktop-account-settings-section">
           <SettingsSectionHeader title={t("settings.account.title")} detail={t("settings.account.detail")} />
 
-          <SettingsGroup title={t("settings.account.groupTitle")}>
-            <SettingsLine
+          <SettingsSubsection>
+            <SettingsValueRow
               label={t("settings.account.statusLabel")}
               value={accountStatus}
               tone={signedIn ? "success" : undefined}
@@ -681,25 +686,25 @@ function AccountSettingsView({
                 <span className="desktop-settings-badge warning">{t("settings.account.differentService")}</span>
               ) : undefined}
             />
-            <SettingsLine
+            <SettingsValueRow
               label={t("settings.account.email")}
               value={cloudSession?.user_email ?? t("settings.account.notSignedIn")}
             />
-            <SettingsLine
+            <SettingsValueRow
               label={t("settings.account.desktopService")}
               value={resolvedApiBaseUrl}
               title={resolvedApiBaseUrl}
               monospace
             />
-            <SettingsLine
+            <SettingsValueRow
               label={t("settings.account.sessionService")}
               value={cloudSession?.api_base_url ?? t("settings.account.none")}
               title={cloudSession?.api_base_url}
               monospace={Boolean(cloudSession?.api_base_url)}
             />
-            <div className="desktop-settings-line desktop-settings-account-actions-line">
+            <div className="desktop-settings-row desktop-settings-row-control desktop-settings-account-actions-row">
               <span>{t("settings.account.authentication")}</span>
-              <div className="desktop-settings-line-value desktop-settings-account-actions">
+              <div className="desktop-settings-value desktop-settings-account-actions">
                 {signedIn ? (
                   <button
                     className="desktop-settings-action danger"
@@ -728,7 +733,7 @@ function AccountSettingsView({
                 {authError ?? authMessage}
               </div>
             )}
-          </SettingsGroup>
+          </SettingsSubsection>
         </div>
       </div>
     </section>
@@ -761,6 +766,7 @@ function EditorSettingsView({
               <label className="desktop-settings-switch">
                 <input
                   type="checkbox"
+                  aria-label={t("settings.editor.aiAssist.title")}
                   checked={aiEditAssistEnabled}
                   onChange={(event) => onAiEditAssistEnabledChange(event.target.checked)}
                 />
@@ -827,6 +833,7 @@ function ExperimentalSettingsView({
               <label className="desktop-settings-switch">
                 <input
                   type="checkbox"
+                  aria-label={t("settings.experimental.minimalMode.title")}
                   checked={settings.enableMinimalMode}
                   onChange={(event) => onChange({
                     ...settings,
@@ -844,6 +851,7 @@ function ExperimentalSettingsView({
               <label className="desktop-settings-switch">
                 <input
                   type="checkbox"
+                  aria-label={t("settings.experimental.viewerPlugins.title")}
                   checked={settings.enableViewerPlugins}
                   onChange={(event) => onChange({
                     ...settings,
@@ -861,6 +869,7 @@ function ExperimentalSettingsView({
               <label className="desktop-settings-switch">
                 <input
                   type="checkbox"
+                  aria-label={t("settings.experimental.markdownBlockDrag.title")}
                   checked={settings.enableMarkdownBlockDrag}
                   onChange={(event) => onChange({
                     ...settings,
@@ -879,6 +888,7 @@ function ExperimentalSettingsView({
                 <label className="desktop-settings-switch">
                   <input
                     type="checkbox"
+                    aria-label={t("settings.experimental.projectsHome.title")}
                     checked={settings.enableAssetLibraryHome}
                     onChange={(event) => onChange({
                       ...settings,
@@ -898,6 +908,7 @@ function ExperimentalSettingsView({
                 <label className="desktop-settings-switch">
                   <input
                     type="checkbox"
+                    aria-label={t("settings.experimental.agentChat.title")}
                     checked={settings.enableAgentChat}
                     onChange={(event) => onChange({
                       ...settings,
@@ -916,6 +927,7 @@ function ExperimentalSettingsView({
               <label className="desktop-settings-switch">
                 <input
                   type="checkbox"
+                  aria-label={t("settings.experimental.appFiles.title")}
                   checked={settings.enablePuppyoneAppFiles}
                   onChange={(event) => onChange({
                     ...settings,
@@ -933,6 +945,7 @@ function ExperimentalSettingsView({
               <label className="desktop-settings-switch">
                 <input
                   type="checkbox"
+                  aria-label={t("settings.experimental.flowFiles.title")}
                   checked={settings.enablePuppyFlowFiles}
                   onChange={(event) => onChange({
                     ...settings,
@@ -986,14 +999,15 @@ function FilesSettingsView({
     <section className="desktop-utility-view desktop-settings-view">
       <div className="desktop-utility-body desktop-settings-body">
         <div className="desktop-settings-section desktop-files-settings-section">
-          <SettingsSectionHeader title={t("settings.files.title")} />
+          <SettingsSectionHeader title={t("settings.files.title")} detail={t("settings.files.detail")} />
 
-          <SettingsGroup title={t("settings.files.groupTitle")}>
-            <div className="desktop-settings-line desktop-settings-toggle-line desktop-files-toggle-line">
+          <SettingsSubsection>
+            <div className="desktop-settings-row desktop-settings-row-control desktop-settings-toggle-row desktop-files-toggle-row">
               <span>{t("settings.files.showHidden")}</span>
               <label className="desktop-settings-switch">
                 <input
                   type="checkbox"
+                  aria-label={t("settings.files.showHidden")}
                   checked={settings.showHiddenFiles}
                   onChange={(event) => onChange({
                     ...settings,
@@ -1003,37 +1017,40 @@ function FilesSettingsView({
                 <span aria-hidden="true" />
               </label>
             </div>
-            <div className="desktop-settings-pattern-editor desktop-files-pattern-editor">
-              <div className="desktop-files-pattern-editor-toolbar">
-                <span>{t("settings.files.excludePatterns")}</span>
+            <div className="desktop-settings-row desktop-settings-pattern-editor desktop-files-pattern-editor">
+              <span className="desktop-settings-label-stack">
+                <strong>{t("settings.files.excludePatterns")}</strong>
                 <small>{t("settings.files.patternCount", { count: normalizedDraft.length })}</small>
-              </div>
-              <textarea
-                value={patternDraft}
-                spellCheck={false}
-                onChange={(event) => setPatternDraft(event.target.value)}
-              />
-              <div className="desktop-settings-pattern-editor-footer">
-                <button
-                  className="desktop-settings-row-action"
-                  type="button"
-                  disabled={!patternsDirty}
-                  onClick={applyPatterns}
-                >
-                  <Check size={13} />
-                  <span>{t("common.action.apply")}</span>
-                </button>
-                <button
-                  className="desktop-settings-row-action"
-                  type="button"
-                  onClick={resetPatterns}
-                >
-                  <RefreshCw size={13} />
-                  <span>{t("common.action.reset")}</span>
-                </button>
+              </span>
+              <div className="desktop-settings-pattern-control">
+                <textarea
+                  aria-label={t("settings.files.excludePatterns")}
+                  value={patternDraft}
+                  spellCheck={false}
+                  onChange={(event) => setPatternDraft(event.target.value)}
+                />
+                <div className="desktop-settings-pattern-editor-footer">
+                  <button
+                    className="desktop-settings-row-action"
+                    type="button"
+                    disabled={!patternsDirty}
+                    onClick={applyPatterns}
+                  >
+                    <Check size={13} />
+                    <span>{t("common.action.apply")}</span>
+                  </button>
+                  <button
+                    className="desktop-settings-row-action"
+                    type="button"
+                    onClick={resetPatterns}
+                  >
+                    <RefreshCw size={13} />
+                    <span>{t("common.action.reset")}</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </SettingsGroup>
+          </SettingsSubsection>
         </div>
       </div>
     </section>
@@ -1089,33 +1106,34 @@ function DefaultAppsSettingsView({
             detail={t("settings.defaultApps.detail")}
           />
 
-          <SettingsGroup title={t("settings.defaultApps.systemDefault")}>
-            <SettingsLine
+          <SettingsSubsection title={t("settings.defaultApps.systemDefault")}>
+            <SettingsValueRow
               label={t("settings.defaultApps.openMode")}
               value={t("settings.defaultApps.macosDefault")}
               action={(
                 <span className="desktop-settings-badge connected">{t("settings.defaultApps.system")}</span>
               )}
             />
-            <div className="desktop-settings-line">
+            <div className="desktop-settings-row desktop-settings-row-control">
               <span className="desktop-settings-label-stack">
                 <strong>{t("settings.defaultApps.executableProtection.title")}</strong>
                 <small>{t("settings.defaultApps.executableProtection.detail")}</small>
               </span>
               <span className="desktop-settings-badge connected">{t("settings.defaultApps.alwaysOn")}</span>
             </div>
-          </SettingsGroup>
+          </SettingsSubsection>
 
-          <SettingsGroup title={t("settings.defaultApps.fileTypeDefaults")}>
-            <div className="desktop-settings-line desktop-settings-default-app-add">
+          <SettingsSubsection title={t("settings.defaultApps.fileTypeDefaults")}>
+            <div className="desktop-settings-row desktop-settings-row-control desktop-settings-default-app-add">
               <span className="desktop-settings-label-stack">
                 <strong>{t("settings.defaultApps.addFileType.title")}</strong>
                 <small>{t("settings.defaultApps.addFileType.detail")}</small>
               </span>
-              <div className="desktop-settings-line-value">
+              <div className="desktop-settings-value">
                 <input
                   className="desktop-settings-text-input desktop-settings-extension-input"
                   type="text"
+                  aria-label={t("settings.defaultApps.addFileType.title")}
                   spellCheck={false}
                   placeholder="md"
                   value={extensionDraft}
@@ -1178,7 +1196,7 @@ function DefaultAppsSettingsView({
               </div>
             )}
             {choiceError && <div className="desktop-settings-account-feedback danger">{choiceError}</div>}
-          </SettingsGroup>
+          </SettingsSubsection>
         </div>
       </div>
     </section>
@@ -1272,17 +1290,17 @@ function CloudHostingSettingsView({
               />
 
               {usesPuppyoneCloud && (
-                <SettingsGroup title={t("settings.cloud.connectionTitle")}>
-                  <SettingsLine
+                <SettingsSubsection title={t("settings.cloud.connectionTitle")}>
+                  <SettingsValueRow
                     label={t("settings.cloud.status")}
                     value={t(cloudInfo ? "settings.cloud.connected" : "settings.shared.notConfigured")}
                     tone={cloudInfo ? "success" : undefined}
                   />
                   {cloudInfo ? (
                     <>
-                      <SettingsLine label={t("settings.cloud.remote")} value={cloudRemote?.name ?? "puppyone"} />
-                      <SettingsLine label={t("settings.cloud.host")} value={cloudInfo.host} />
-                      <SettingsLine
+                      <SettingsValueRow label={t("settings.cloud.remote")} value={cloudRemote?.name ?? "puppyone"} />
+                      <SettingsValueRow label={t("settings.cloud.host")} value={cloudInfo.host} />
+                      <SettingsValueRow
                         label={cloudInfo.kind === "access-point"
                           ? t("settings.cloud.accessKey")
                           : cloudInfo.kind === "scope"
@@ -1291,7 +1309,7 @@ function CloudHostingSettingsView({
                         value={cloudInfo.displayId}
                         monospace
                       />
-                      <SettingsLine
+                      <SettingsValueRow
                         label={t("settings.cloud.connectionUrl")}
                         value={cloudRemoteUrl ? maskRemoteUrl(cloudRemoteUrl) : t("settings.shared.notConfigured")}
                         title={cloudRemoteUrl ?? undefined}
@@ -1311,7 +1329,7 @@ function CloudHostingSettingsView({
                   ) : (
                     <div className="desktop-settings-muted-row">{t("settings.shared.notConfigured")}</div>
                   )}
-                </SettingsGroup>
+                </SettingsSubsection>
               )}
 
               {copyError && <div className="desktop-utility-empty danger">{copyError}</div>}
@@ -1351,7 +1369,7 @@ function GitSettingsView({
       <div className="desktop-utility-body desktop-settings-body">
         <div className="desktop-settings-section">
           <div className="desktop-settings-heading-row">
-            <SettingsSectionHeader title={t("settings.git.title")} />
+            <SettingsSectionHeader title={t("settings.git.title")} detail={t("settings.git.detail")} />
             <button className="desktop-settings-action" type="button" onClick={onRefresh} disabled={loading}>
               <RefreshCw size={14} className={loading ? "spin" : undefined} />
               <span>{t("common.action.refresh")}</span>
@@ -1366,20 +1384,20 @@ function GitSettingsView({
             <div className="desktop-utility-empty">{t("settings.git.notRepository")}</div>
           ) : (
             <>
-              <SettingsGroup title={t("settings.git.repository")}>
-                <SettingsLine label={t("settings.git.branch")} value={status?.branch ?? t("settings.git.detached")} />
-                <SettingsLine label={t("settings.git.branches")} value={t("settings.git.branchCounts", { localCount: localBranchCount, remoteCount: remoteBranchCount })} />
-                <SettingsLine label={t("settings.git.upstream")} value={currentBranch?.upstream ?? t("settings.shared.notConfigured")} />
-                <SettingsLine
+              <SettingsSubsection title={t("settings.git.repository")}>
+                <SettingsValueRow label={t("settings.git.branch")} value={status?.branch ?? t("settings.git.detached")} />
+                <SettingsValueRow label={t("settings.git.branches")} value={t("settings.git.branchCounts", { localCount: localBranchCount, remoteCount: remoteBranchCount })} />
+                <SettingsValueRow label={t("settings.git.upstream")} value={currentBranch?.upstream ?? t("settings.shared.notConfigured")} />
+                <SettingsValueRow
                   label={t("settings.git.syncStatus")}
                   value={currentBranch?.upstream
                     ? t("settings.git.syncCounts", { ahead: currentBranch.ahead, behind: currentBranch.behind })
                     : t("settings.git.localOnly")}
                 />
-                <SettingsLine label="HEAD" value={status?.headCommitId ? shortCommit(status.headCommitId) : t("settings.git.noCommits")} monospace />
-              </SettingsGroup>
+                <SettingsValueRow label="HEAD" value={status?.headCommitId ? shortCommit(status.headCommitId) : t("settings.git.noCommits")} monospace />
+              </SettingsSubsection>
 
-              <SettingsGroup title={t("settings.git.remotes")}>
+              <SettingsSubsection title={t("settings.git.remotes")}>
                 {remotes.length === 0 ? (
                   <div className="desktop-settings-muted-row">{t("settings.git.noRemotes")}</div>
                 ) : (
@@ -1419,7 +1437,7 @@ function GitSettingsView({
                     );
                   })
                 )}
-              </SettingsGroup>
+              </SettingsSubsection>
               {copyError && <div className="desktop-utility-empty danger">{copyError}</div>}
             </>
           )}
@@ -1448,6 +1466,7 @@ const SETTINGS_SIDEBAR_GROUPS = [
     labelId: "settings.sidebar.desktopApp",
     items: [
       { id: "workspace", labelId: "settings.sidebar.general", icon: Settings, disabled: false },
+      { id: "language", labelId: "settings.sidebar.language", icon: Languages, disabled: false },
       { id: "appearance", labelId: "settings.sidebar.appearance", icon: Monitor, disabled: false },
       { id: "external-apps", labelId: "settings.sidebar.defaultApps", icon: ExternalLink, disabled: false },
       { id: "editor", labelId: "settings.sidebar.editor", icon: Pencil, disabled: false },
