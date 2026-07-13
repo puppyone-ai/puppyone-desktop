@@ -115,16 +115,12 @@ type DesktopWorkspaceContentProps = {
     storedCloudSession: DesktopCloudSession | null;
     enabled: boolean;
     projectId: string | null;
-    selectedProjectId?: string | null;
-    selectedProjectCapabilities?: readonly string[];
     sessionRestoring: boolean;
     onCloudSessionChange: (session: DesktopCloudSession | null) => void;
     onConfigureCloudRemote: import("../cloud/types").CloudServiceMainViewProps["onConfigureCloudRemote"];
     onDetachCloudProject?: () => Promise<void>;
     onOpenDetails: () => void;
     onOpenGitSettings: () => void;
-    onSelectProjectId?: (projectId: string | null) => void;
-    onBackToCloudProjects?: () => void;
     onSelectSection: (section: CloudWorkspaceSection) => void;
     onStartPuppyoneBackup: () => void;
   };
@@ -217,10 +213,7 @@ export function DesktopWorkspaceContent({
     : 0;
   const cloudHubNavigationEnabled = cloud.enabled && !cloudWorkspace;
   const attachment = cloud.attachment ?? { status: "local-only" as const, projectId: null };
-  const cloudNavigationContext = resolveCloudProjectNavigationContext(
-    attachment,
-    cloud.selectedProjectId ?? null,
-  );
+  const cloudNavigationContext = resolveCloudProjectNavigationContext(attachment);
   const cloudToolsNavigationEnabled = cloud.enabled && cloudWorkspace && Boolean(cloud.projectId);
   const needsCloudAccessData = shouldLoadDesktopCloudAccessData({
     workspaceKind,
@@ -488,7 +481,6 @@ export function DesktopWorkspaceContent({
       attachment={cloudWorkspace ? null : attachment}
       onCloudSessionChange={cloud.onCloudSessionChange}
       activeSection={cloud.activeSection}
-      selectedProjectId={cloud.selectedProjectId ?? null}
       loading={git.gitStatusLoading}
       error={git.gitStatusError}
       cloudBackupLoading={cloud.backupLoading}
@@ -496,7 +488,6 @@ export function DesktopWorkspaceContent({
       onStartPuppyoneBackup={cloud.onStartPuppyoneBackup}
       onConfigureCloudRemote={cloud.onConfigureCloudRemote}
       onDetachCloudProject={cloud.onDetachCloudProject}
-      onSelectProjectId={cloud.onSelectProjectId}
       onSelectSection={cloud.onSelectSection}
       onRefresh={git.refreshGitStatus}
       onOpenDetails={cloud.onOpenDetails}
@@ -768,16 +759,13 @@ export function DesktopWorkspaceContent({
                 cloudApiBaseUrl={cloud.cloudApiBaseUrl}
                 activeSection={cloud.activeSection}
                 projectContext={cloudNavigationContext.projectContext}
-                projectBound={cloudNavigationContext.projectBound && !cloudWorkspace}
+                localWorkspaceContext={cloudNavigationContext.localWorkspaceContext && !cloudWorkspace}
                 projectCapabilities={
-                  attachment.status === "linked"
+                  attachment.status === "resolved"
                     ? attachment.capabilities ?? []
-                    : cloud.selectedProjectCapabilities ?? []
+                    : []
                 }
                 onSelectSection={cloud.onSelectSection}
-                onBackToProjects={cloud.onBackToCloudProjects ?? (() => {
-                  cloud.onSelectSection("overview");
-                })}
               />
             ) : (
               <SettingsSidebar

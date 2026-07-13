@@ -4,21 +4,30 @@ import {
   getCloudProject,
   getCloudProjectReadiness,
   getCloudWorkspaceBinding,
+  resolveCanonicalCloudWorkspaceRemote,
   resolveLegacyCloudWorkspaceRemote,
-  type DesktopCloudProject,
   type DesktopCloudSession,
+  type DesktopCloudWorkspaceBinding,
 } from "../../../lib/cloudApi";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../../types/electron";
-import { getPuppyoneRemote } from "../../source-control/remotes";
+import {
+  resolvePuppyoneRemotes,
+  type PuppyoneRemoteResolution,
+} from "../../source-control/remotes";
 import type { RecentWorkspaceCloudBinding } from "./cloudProjectResolution";
-import { bindingMatchesWorkspace, sameCloudOrigin } from "./explicitWorkspaceBinding";
+import {
+  bindingMatchesWorkspace,
+  isTrustedCloudGitOrigin,
+  sameCloudOrigin,
+} from "./explicitWorkspaceBinding";
 import { cloudMessage } from "../cloudPresentation";
 
 const LEGACY_CONFIRMATION_MESSAGE = cloudMessage("binding-confirm-legacy");
-const CANONICAL_CONFIRMATION_MESSAGE = cloudMessage("binding-confirm-workspace");
 const FORBIDDEN_MESSAGE = cloudMessage("binding-forbidden");
+const REMOTE_CONFLICT_MESSAGE = cloudMessage("binding-remote-conflict");
 
 type BindingHint = RecentWorkspaceCloudBinding;
+type UniqueRemote = Extract<PuppyoneRemoteResolution, { status: "unique" }>;
 
 function errorStatus(error: unknown): number | null {
   return error && typeof error === "object" && "status" in error
@@ -26,32 +35,47 @@ function errorStatus(error: unknown): number | null {
     : null;
 }
 
-function upsertProject(
-  projects: DesktopCloudProject[],
-  project: DesktopCloudProject,
-): DesktopCloudProject[] {
-  const index = projects.findIndex((entry) => entry.id === project.id);
-  if (index < 0) return [...projects, project];
-  if (projects[index] === project) return projects;
-  const next = [...projects];
-  next[index] = project;
-  return next;
+function canonicalRemoteMatchesBinding(
+  remote: UniqueRemote,
+  binding: DesktopCloudWorkspaceBinding,
+): boolean {
+  const { info } = remote;
+  if (info.kind === "access-point") return false;
+  if (info.projectId !== binding.project_id) return false;
+  if (!sameCloudOrigin(remote.rawUrl, binding.cloud_origin)) return false;
+  if (info.kind === "project") return binding.binding_kind === "full";
+  return binding.binding_kind === "scoped" && info.scopeId === binding.scope_id;
+}
+
+function canonicalContextMatchesRemote(
+  remote: UniqueRemote,
+  context: Awaited<ReturnType<typeof resolveCanonicalCloudWorkspaceRemote>>,
+): boolean {
+  const { info } = remote;
+  if (info.kind === "access-point") return false;
+  if (
+    context.project.id !== info.projectId
+    || context.locator.project_id !== info.projectId
+    || context.scope.id !== context.locator.scope_id
+    || context.scope.kind !== context.locator.binding_kind
+  ) return false;
+  if (info.kind === "project") return context.locator.binding_kind === "full";
+  return context.locator.binding_kind === "scoped"
+    && context.locator.scope_id === info.scopeId;
 }
 
 /**
- * The single Local workspace -> Cloud Project binding controller.
- *
- * Normal opens resolve one binding id. Git remotes are only a one-time legacy
- * discovery input and never become authorization or identity facts.
+ * Resolve one open Local workspace into a durable binding, an authorized
+ * canonical Project context, local-only, or a fail-closed recovery state.
+ * This controller never creates bindings, rotates credentials, edits Git, or
+ * uploads content.
  */
 export function useCloudWorkspaceBinding({
   activeCloudSession,
   activeGitStatus,
   cloudEnabled,
   desktopCloudApiBaseUrl,
-  homeCloudProjects: _homeCloudProjects,
   puppyoneConfig,
-  setHomeCloudProjects,
   setRecentWorkspaceCloudBindings,
   updateCloudSession,
   workspace,
@@ -61,10 +85,7 @@ export function useCloudWorkspaceBinding({
   activeGitStatus: GitStatusSnapshot | null;
   cloudEnabled: boolean;
   desktopCloudApiBaseUrl: string | null;
-  handlePuppyoneConfigChange: (nextConfig: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
-  homeCloudProjects: DesktopCloudProject[];
   puppyoneConfig: PuppyoneWorkspaceConfig | null;
-  setHomeCloudProjects: Dispatch<SetStateAction<DesktopCloudProject[]>>;
   setRecentWorkspaceCloudBindings: Dispatch<SetStateAction<Record<string, RecentWorkspaceCloudBinding>>>;
   updateCloudSession: (session: DesktopCloudSession | null) => void;
   workspace: Workspace | null;
@@ -78,19 +99,47 @@ export function useCloudWorkspaceBinding({
     const configOrigin = puppyoneConfig?.cloud.origin?.trim() || null;
     const configWorkspaceInstanceId = puppyoneConfig?.project.workspaceInstanceId?.trim() || null;
     const workspaceInstanceId = workspace.workspaceInstanceId?.trim() || null;
-    const cloudRemote = getPuppyoneRemote(activeGitStatus);
+    const remoteResolution = resolvePuppyoneRemotes(activeGitStatus);
+    const apiBaseUrl = desktopCloudApiBaseUrl ?? activeCloudSession?.api_base_url ?? null;
+    let cancelled = false;
 
     const apply = (next: BindingHint) => {
+      if (cancelled) return;
       setRecentWorkspaceCloudBindings((current) => ({
         ...current,
         [workspace.id]: next,
       }));
     };
 
+    if (remoteResolution.status === "conflict") {
+      apply({
+        projectId: null,
+        candidateProjectId: configProjectId,
+        bindingId: configBindingId,
+        cloudLinked: true,
+        error: cloudMessage("binding-locator-conflict"),
+        reason: "locator-conflict",
+      });
+      return () => { cancelled = true; };
+    }
+
+    const cloudRemote = remoteResolution.status === "unique" ? remoteResolution : null;
+
+    if (configBindingId && !configProjectId) {
+      apply({
+        projectId: null,
+        bindingId: configBindingId,
+        cloudLinked: true,
+        error: cloudMessage("binding-response-mismatch"),
+        reason: "binding-revoked",
+      });
+      return () => { cancelled = true; };
+    }
+
     if (!configBindingId || !configProjectId) {
       if (!cloudRemote) {
         apply({ projectId: null, cloudLinked: false, error: null, reason: null });
-        return undefined;
+        return () => { cancelled = true; };
       }
       if (!activeCloudSession) {
         apply({
@@ -99,72 +148,93 @@ export function useCloudWorkspaceBinding({
           error: cloudMessage("binding-sign-in-identify"),
           reason: "wrong-account",
         });
-        return undefined;
+        return () => { cancelled = true; };
       }
-      if (!sameCloudOrigin(
-        cloudRemote.rawUrl,
-        desktopCloudApiBaseUrl ?? activeCloudSession.api_base_url,
-      )) {
+      if (!isTrustedCloudGitOrigin(cloudRemote.rawUrl, apiBaseUrl)) {
         apply({
           projectId: null,
           cloudLinked: true,
-          error: cloudMessage("binding-wrong-host", { origin: cloudRemote.rawUrl }),
-          reason: "unresolvable",
+          error: cloudMessage("binding-wrong-host", { origin: cloudRemote.info.origin }),
+          reason: "wrong-host",
         });
-        return undefined;
+        return () => { cancelled = true; };
       }
 
-      let cancelled = false;
-      if (cloudRemote.info.kind !== "access-point" && cloudRemote.info.projectId) {
-        const candidateProjectId = cloudRemote.info.projectId;
-        void getCloudProject(
+      if (cloudRemote.info.kind !== "access-point") {
+        void resolveCanonicalCloudWorkspaceRemote(
           activeCloudSession,
-          candidateProjectId,
+          cloudRemote.rawUrl,
           updateCloudSession,
           desktopCloudApiBaseUrl,
-        ).then((project) => {
+        ).then((context) => {
           if (cancelled) return;
-          setHomeCloudProjects((projects) => upsertProject(projects, project));
+          if (!canonicalContextMatchesRemote(cloudRemote, context)) {
+            apply({
+              projectId: null,
+              candidateProjectId: cloudRemote.info.projectId ?? null,
+              cloudLinked: true,
+              error: cloudMessage("binding-response-mismatch"),
+              reason: "locator-conflict",
+            });
+            return;
+          }
           apply({
-            projectId: null,
-            candidateProjectId,
-            candidateScopeId: cloudRemote.info.kind === "scope"
-              ? cloudRemote.info.scopeId ?? null
-              : null,
+            projectId: context.project.id,
+            resolutionSource: "canonical-remote",
+            bindingStatus: "not-bound",
             bindingId: null,
-            bindingKind: cloudRemote.info.kind === "scope" ? "scoped" : "full",
-            scopePath: null,
+            bindingKind: context.locator.binding_kind,
+            scopeId: context.scope.id,
+            scopePath: context.scope.path,
+            capabilities: context.project.capabilities,
             cloudLinked: true,
-            error: CANONICAL_CONFIRMATION_MESSAGE,
-            reason: "legacy-confirmation-required",
+            error: null,
+            reason: null,
           });
         }).catch((error) => {
           if (cancelled) return;
+          const status = errorStatus(error);
           apply({
             projectId: null,
-            candidateProjectId,
+            candidateProjectId: cloudRemote.info.projectId ?? null,
             cloudLinked: true,
-            error: errorStatus(error) === 401 || errorStatus(error) === 403
-              ? cloudMessage("binding-not-authorized")
-              : cloudMessage(
-                  "binding-unresolvable",
-                  undefined,
-                  error instanceof Error ? error.message : String(error),
-                ),
-            reason: errorStatus(error) === 401 || errorStatus(error) === 403
-              ? "not-authorized"
-              : "unresolvable",
+            error: status === 401
+              ? cloudMessage("binding-switch-account")
+              : status === 403
+                ? cloudMessage("binding-not-authorized")
+                : status === 404
+                  ? cloudMessage("binding-not-found")
+                  : status == null
+                    ? cloudMessage(
+                        "binding-network-failed",
+                        undefined,
+                        error instanceof Error ? error.message : String(error),
+                      )
+                    : cloudMessage(
+                        "binding-unresolvable",
+                        undefined,
+                        error instanceof Error ? error.message : String(error),
+                      ),
+            reason: status === 401
+              ? "wrong-account"
+              : status === 403
+                ? "not-authorized"
+                : status === 404
+                  ? "not-found"
+                  : status == null
+                    ? "network"
+                    : "unresolvable",
           });
         });
         return () => { cancelled = true; };
       }
+
       void resolveLegacyCloudWorkspaceRemote(
         activeCloudSession,
         cloudRemote.rawUrl,
         updateCloudSession,
         desktopCloudApiBaseUrl,
       ).then((candidate) => {
-        if (cancelled) return;
         apply({
           projectId: null,
           candidateProjectId: candidate.project_id,
@@ -177,24 +247,30 @@ export function useCloudWorkspaceBinding({
           reason: "legacy-confirmation-required",
         });
       }).catch((error) => {
-        if (cancelled) return;
+        const status = errorStatus(error);
         apply({
           projectId: null,
           cloudLinked: true,
-          error: errorStatus(error) === 401
+          error: status === 401
             ? cloudMessage("binding-switch-account")
-            : cloudMessage(
-                "binding-unresolvable",
-                undefined,
-                error instanceof Error ? error.message : String(error),
-              ),
-          reason: errorStatus(error) === 401 ? "wrong-account" : "unresolvable",
+            : status === 403
+              ? cloudMessage("binding-not-authorized")
+              : cloudMessage(
+                  "binding-unresolvable",
+                  undefined,
+                  error instanceof Error ? error.message : String(error),
+                ),
+          reason: status === 401
+            ? "wrong-account"
+            : status === 403
+              ? "not-authorized"
+              : "unresolvable",
         });
       });
       return () => { cancelled = true; };
     }
 
-    if (!configOrigin || !sameCloudOrigin(configOrigin, desktopCloudApiBaseUrl ?? activeCloudSession?.api_base_url)) {
+    if (!configOrigin || !isTrustedCloudGitOrigin(configOrigin, apiBaseUrl)) {
       apply({
         projectId: null,
         candidateProjectId: configProjectId,
@@ -203,7 +279,7 @@ export function useCloudWorkspaceBinding({
         error: cloudMessage("binding-wrong-host", { origin: configOrigin ?? "—" }),
         reason: "wrong-host",
       });
-      return undefined;
+      return () => { cancelled = true; };
     }
     if (
       !configWorkspaceInstanceId
@@ -218,20 +294,39 @@ export function useCloudWorkspaceBinding({
         error: cloudMessage("binding-checkout-mismatch"),
         reason: "binding-revoked",
       });
-      return undefined;
+      return () => { cancelled = true; };
+    }
+    if (
+      cloudRemote
+      && (
+        cloudRemote.info.kind === "access-point"
+        || cloudRemote.info.projectId !== configProjectId
+        || !sameCloudOrigin(cloudRemote.rawUrl, configOrigin)
+      )
+    ) {
+      apply({
+        projectId: null,
+        candidateProjectId: configProjectId,
+        bindingId: configBindingId,
+        cloudLinked: true,
+        error: REMOTE_CONFLICT_MESSAGE,
+        reason: "locator-conflict",
+      });
+      return () => { cancelled = true; };
     }
     if (!activeCloudSession) {
       apply({
         projectId: configProjectId,
+        resolutionSource: "workspace-binding",
+        bindingStatus: "bound",
         bindingId: configBindingId,
         cloudLinked: true,
-        error: null,
+        error: cloudRemote ? null : cloudMessage("binding-remote-missing"),
         reason: null,
       });
-      return undefined;
+      return () => { cancelled = true; };
     }
 
-    let cancelled = false;
     void (async () => {
       try {
         const binding = await getCloudWorkspaceBinding(
@@ -260,6 +355,17 @@ export function useCloudWorkspaceBinding({
           });
           return;
         }
+        if (cloudRemote && !canonicalRemoteMatchesBinding(cloudRemote, binding)) {
+          apply({
+            projectId: null,
+            candidateProjectId: configProjectId,
+            bindingId: binding.id,
+            cloudLinked: true,
+            error: REMOTE_CONFLICT_MESSAGE,
+            reason: "locator-conflict",
+          });
+          return;
+        }
         if (!binding.usable) {
           const reason = binding.unusable_reason === "wrong_account"
             ? "wrong-account"
@@ -271,6 +377,7 @@ export function useCloudWorkspaceBinding({
             candidateProjectId: configProjectId,
             bindingId: binding.id,
             bindingKind: binding.binding_kind,
+            scopeId: binding.scope_id,
             scopePath: binding.scope_path ?? null,
             cloudLinked: true,
             error: reason === "wrong-account" ? cloudMessage("binding-switch-account") : FORBIDDEN_MESSAGE,
@@ -284,16 +391,18 @@ export function useCloudWorkspaceBinding({
           getCloudProjectReadiness(activeCloudSession, configProjectId, updateCloudSession, desktopCloudApiBaseUrl),
         ]);
         if (cancelled) return;
-        setHomeCloudProjects((projects) => upsertProject(projects, project));
         apply({
           projectId: configProjectId,
+          resolutionSource: "workspace-binding",
+          bindingStatus: "bound",
           bindingId: binding.id,
           bindingKind: binding.binding_kind,
+          scopeId: binding.scope_id,
           scopePath: binding.scope_path ?? null,
           readiness,
           capabilities: project.capabilities ?? [],
           cloudLinked: true,
-          error: null,
+          error: cloudRemote ? null : cloudMessage("binding-remote-missing"),
           reason: null,
         });
       } catch (error) {
@@ -301,6 +410,8 @@ export function useCloudWorkspaceBinding({
         const status = errorStatus(error);
         apply({
           projectId: status == null ? configProjectId : null,
+          resolutionSource: "workspace-binding",
+          bindingStatus: "bound",
           candidateProjectId: configProjectId,
           bindingId: configBindingId,
           cloudLinked: true,
@@ -328,7 +439,6 @@ export function useCloudWorkspaceBinding({
     cloudEnabled,
     desktopCloudApiBaseUrl,
     puppyoneConfig,
-    setHomeCloudProjects,
     setRecentWorkspaceCloudBindings,
     updateCloudSession,
     workspace,

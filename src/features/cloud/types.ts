@@ -16,13 +16,13 @@ export type CloudServiceSidebarProps = {
   cloudSession: DesktopCloudSession | null;
   cloudApiBaseUrl?: string | null;
   activeSection: CloudWorkspaceSection;
-  /** True when a bound or explicitly selected Cloud project is active — not derived from route alone. */
+  /** True when an authorized Cloud Project context is active — never derived from route alone. */
   projectContext?: boolean;
-  /** True only when this project is structurally bound to the local workspace. */
-  projectBound?: boolean;
+  /** True when the Project context belongs to the currently open Local workspace. */
+  localWorkspaceContext?: boolean;
   projectCapabilities?: readonly string[];
   onSelectSection: (section: CloudWorkspaceSection) => void;
-  /** Clear browsing selection and return to the Cloud Projects list. */
+  /** Leave an explicit global Project route and return to its parent surface. */
   onBackToProjects?: () => void;
 };
 
@@ -50,7 +50,6 @@ export type CloudServiceMainViewProps = {
   attachment?: ProjectCloudAttachment | null;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   activeSection: CloudWorkspaceSection;
-  selectedProjectId?: string | null;
   loading: boolean;
   error: string | null;
   cloudBackupLoading: boolean;
@@ -61,7 +60,6 @@ export type CloudServiceMainViewProps = {
     options?: CloudWorkspaceAttachOptions,
   ) => Promise<GitStatusSnapshot | null>;
   onDetachCloudProject?: () => Promise<void>;
-  onSelectProjectId?: (projectId: string | null) => void;
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onRefresh: () => void;
   onOpenDetails: () => void;
