@@ -66,9 +66,13 @@ describe("Desktop Agent virtual transcript", () => {
     const next = projectionWithMessages(2);
     act(() => root?.render(React.createElement(AgentTranscript, { projection: next, loading: false })));
     expect(container.querySelectorAll(".desktop-agent-virtual-row.is-new")).toHaveLength(1);
+    const animatedRow = container.querySelector(".desktop-agent-virtual-row.is-new");
+    act(() => animatedRow?.dispatchEvent(new Event("animationend", { bubbles: true })));
+    expect(container.querySelectorAll(".desktop-agent-virtual-row.is-new")).toHaveLength(0);
 
     act(() => root?.render(React.createElement(AgentTranscript, { projection: next, loading: false })));
     expect(container.querySelectorAll(".desktop-agent-virtual-row.is-new")).toHaveLength(0);
+    expect(container.querySelectorAll(".desktop-agent-virtual-row").item(1)).toBe(animatedRow);
   });
 });
 

@@ -75,6 +75,30 @@ describe("Codex app-server normalization", () => {
     });
 
     expect(normalizeCodexNotification({
+      method: "item/started",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        item: { id: "command-1", type: "commandExecution", command: "rg -n needle src", cwd: "/workspace", status: "inProgress" },
+      },
+    })[0]).toMatchObject({
+      type: "tool.started",
+      payload: { kind: "command", tool: "bash", input: { command: "rg -n needle src", cwd: "/workspace" } },
+    });
+
+    expect(normalizeCodexNotification({
+      method: "item/started",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        item: { id: "change-1", type: "fileChange", changes: [{ path: "src/App.tsx", kind: "update", diff: "+one\n-two" }], status: "inProgress" },
+      },
+    })[0]).toMatchObject({
+      type: "tool.started",
+      payload: { kind: "file-change", tool: "edit", path: "src/App.tsx" },
+    });
+
+    expect(normalizeCodexNotification({
       method: "configWarning",
       params: { summary: "Invalid config", details: "Unknown key", path: "/workspace/.codex/config.toml" },
     })[0]).toMatchObject({

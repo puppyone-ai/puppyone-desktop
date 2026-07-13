@@ -2,16 +2,24 @@ import { FileSearch, FolderSearch, Globe2, Search, Wrench } from "lucide-react";
 import {
   agentActivitySummary,
   agentActivityToolName,
+  isContextCompactionActivity,
   outputForActivity,
-  pathForActivity,
   structuredInputForActivity,
 } from "../../domain/agent-activity-presentation";
 import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
 
-export function AgentGenericActivity({ activity, onOpenFile }: { activity: AgentActivity; onOpenFile?: (path: string) => void }) {
+export function AgentGenericActivity({ activity }: { activity: AgentActivity }) {
+  if (isContextCompactionActivity(activity)) {
+    return (
+      <div className="desktop-agent-context-divider" role="status" aria-label="Context compacted">
+        <span aria-hidden="true" />
+        <small>Compacted context</small>
+        <span aria-hidden="true" />
+      </div>
+    );
+  }
   const tool = agentActivityToolName(activity);
-  const path = pathForActivity(activity);
   const output = outputForActivity(activity);
   const input = structuredInputForActivity(activity);
   const detail = output || input;
@@ -22,9 +30,6 @@ export function AgentGenericActivity({ activity, onOpenFile }: { activity: Agent
       status={activity.status}
       icon={iconFor(tool)}
       className="desktop-agent-generic-tool"
-      actions={onOpenFile && path && ["Read", "Glob", "Grep", "List"].includes(tool)
-        ? <button type="button" className="desktop-agent-tool-action" aria-label={`Open ${path}`} onClick={() => onOpenFile(path)}>Open</button>
-        : undefined}
     >
       {detail && <pre className="desktop-agent-tool-output">{detail}</pre>}
     </AgentActivityShell>

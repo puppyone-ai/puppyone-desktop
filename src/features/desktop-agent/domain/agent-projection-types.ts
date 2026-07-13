@@ -81,6 +81,7 @@ type AgentPartBase = {
 
 export type AgentPart =
   | (AgentPartBase & { kind: "user" | "assistant"; text: string; streaming: boolean; terminalState: AgentTurnTerminalState | null })
+  | (AgentPartBase & { kind: "turn-summary"; durationMs: number; status: AgentTurnTerminalState })
   | (AgentPartBase & { kind: "reasoning" | "plan" | "tool" | "command" | "file-change" | "warning" | "error"; label: string; status: AgentActivityStatus; output: string; detail: Record<string, unknown> })
   | (AgentPartBase & { kind: "usage"; usage: Record<string, unknown> })
   | (AgentPartBase & { kind: "permission"; requestId: string; state: "pending" | "resolved" })
@@ -91,7 +92,9 @@ export type AgentTurn = {
   id: string;
   status: "running" | AgentTurnTerminalState;
   startedAtSequence: number;
+  startedAtMs: number | null;
   completedAtSequence: number | null;
+  durationMs: number | null;
   partIds: string[];
 };
 

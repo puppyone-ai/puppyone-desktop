@@ -89,7 +89,7 @@
   border-radius: var(--po-menu-item-radius);
   background: transparent;
   color: var(--po-text-muted);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   font: inherit;
   font-size: 13px;
   font-weight: 500;

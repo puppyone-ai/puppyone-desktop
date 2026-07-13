@@ -24,6 +24,7 @@ import {
   formatProviderLabel,
   formatStatusLabel,
   getApiBaseFromGitUrl,
+  getCanonicalScopeGitUrl,
   getScopeDisplayName,
   getScopePathLabel,
   isConnectorActiveStatus,
@@ -56,7 +57,7 @@ export function CloudScopeDetail({
   onOpenAccess: () => void;
 }) {
   const apiBase = identity?.url ? getApiBaseFromGitUrl(identity.url) : "";
-  const gitUrl = scope.access_key && apiBase ? `${apiBase}/git/ap/${scope.access_key}.git` : identity?.url ?? "";
+  const gitUrl = getCanonicalScopeGitUrl(identity, scope, apiBase);
   const scopeName = getScopeDisplayName(scope);
   const profileName = profileSlug(getScopeDisplayName(scope));
   const cliCommand = scope.access_key && apiBase

@@ -3,6 +3,8 @@ import {
   createCloudWorkspaceBinding,
   getCloudProject,
   projectAllows,
+  revokeCloudWorkspaceBinding,
+  revokeCloudWorkspaceBindingCredential,
   rotateCloudWorkspaceBindingCredential,
   type DesktopCloudProject,
   type DesktopCloudSession,
@@ -31,31 +33,12 @@ export function sameCloudOrigin(
   }
 }
 
-export function bindingCredentialRemoteUrl(remoteUrl: string, credential: string): string {
-  const token = credential.trim();
-  if (!token) throw new Error("Cloud binding did not return a credential.");
-  const parsed = new URL(remoteUrl);
-  const marker = "/git/ap/";
-  const markerIndex = parsed.pathname.indexOf(marker);
-  if (markerIndex < 0) {
-    throw new Error("Cloud Git remote is not an Access remote.");
-  }
-  const suffix = parsed.pathname.toLowerCase().endsWith(".git") ? ".git" : "";
-  parsed.pathname = `${parsed.pathname.slice(0, markerIndex)}${marker}${encodeURIComponent(token)}${suffix}`;
-  parsed.username = "";
-  parsed.password = "";
-  parsed.search = "";
-  parsed.hash = "";
-  return parsed.toString();
-}
-
 export async function createExplicitWorkspaceBinding({
   session,
   apiBaseUrl,
   project,
   projectId,
   workspace,
-  remoteUrl,
   bindingKind = "full",
   scopeId = null,
   onSessionChange,
@@ -65,14 +48,16 @@ export async function createExplicitWorkspaceBinding({
   project?: DesktopCloudProject | null;
   projectId: string;
   workspace: Workspace;
-  remoteUrl: string;
   bindingKind?: "full" | "scoped";
   scopeId?: string | null;
   onSessionChange: MutableSessionHandler;
 }): Promise<{
   binding: DesktopCloudWorkspaceBinding;
-  credentialRemoteUrl: string;
+  remoteUrl: string;
+  credential: string;
+  username: string;
   project: DesktopCloudProject;
+  bindingWasCreated: boolean;
 }> {
   const workspaceInstanceId = workspace.workspaceInstanceId?.trim();
   if (!workspaceInstanceId) {
@@ -102,17 +87,40 @@ export async function createExplicitWorkspaceBinding({
     onSessionChange,
     apiBaseUrl,
   );
-  let credential = binding.credential?.trim() || "";
-  if (!credential) {
-    credential = await rotateCloudWorkspaceBindingCredential(
-      session, binding.id, onSessionChange, apiBaseUrl,
-    );
+  const bindingWasCreated = Boolean(binding.credential?.trim());
+  let credentialIssued = bindingWasCreated;
+  try {
+    let credential = binding.credential?.trim() || "";
+    if (!credential) {
+      credential = await rotateCloudWorkspaceBindingCredential(
+        session, binding.id, onSessionChange, apiBaseUrl,
+      );
+      credentialIssued = true;
+    }
+    const remoteUrl = binding.remote?.url?.trim();
+    if (!remoteUrl || !sameCloudOrigin(remoteUrl, apiBaseUrl ?? session.api_base_url)) {
+      throw new Error("Cloud binding returned an invalid Git remote locator.");
+    }
+    return {
+      binding,
+      remoteUrl,
+      credential,
+      username: binding.remote.username || "x-puppyone-token",
+      project: resolvedProject,
+      bindingWasCreated,
+    };
+  } catch (error) {
+    if (bindingWasCreated) {
+      await revokeCloudWorkspaceBinding(
+        session, binding.id, onSessionChange, apiBaseUrl,
+      ).catch(() => undefined);
+    } else if (credentialIssued) {
+      await revokeCloudWorkspaceBindingCredential(
+        session, binding.id, onSessionChange, apiBaseUrl,
+      ).catch(() => undefined);
+    }
+    throw error;
   }
-  return {
-    binding,
-    credentialRemoteUrl: bindingCredentialRemoteUrl(remoteUrl, credential),
-    project: resolvedProject,
-  };
 }
 
 export function bindingMatchesWorkspace({

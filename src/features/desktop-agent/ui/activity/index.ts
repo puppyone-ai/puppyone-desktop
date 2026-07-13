@@ -1,5 +1,6 @@
 export { AgentCommandActivity } from "./AgentCommandActivity";
 export { AgentFileChangeActivity } from "./AgentFileChangeActivity";
+export { AgentFileQueryActivity } from "./AgentFileQueryActivity";
 export { AgentGenericActivity } from "./AgentGenericActivity";
 export { AgentNoticeActivity } from "./AgentNoticeActivity";
 export { AgentPlanActivity } from "./AgentPlanActivity";

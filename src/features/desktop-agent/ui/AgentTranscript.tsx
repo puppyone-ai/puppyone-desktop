@@ -1,18 +1,26 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, CircleAlert, LoaderCircle, MessageSquareCode } from "lucide-react";
+import { useScrollEdgeState } from "@puppyone/shared-ui";
+import { ArrowDown, CircleAlert, LoaderCircle } from "lucide-react";
+import { PageLoading } from "../../../components/loading";
 import type { AgentPart, AgentProjection, TimelineRow } from "../domain/agent-projection-types";
+import { AgentMessagePart } from "./AgentMessagePart";
 import { AgentPartRenderer } from "./AgentPartRenderer";
+import {
+  agentTranscriptFadeGeometry,
+  agentVirtualCanvasGeometry,
+  agentVirtualRowGeometry,
+} from "./agent-runtime-geometry";
 
 type AgentTranscriptProps = {
   projection: AgentProjection;
   loading: boolean;
+  pendingPrompt?: string | null;
+  working?: boolean;
   runtimeLabel?: string;
   initialScrollTop?: number;
   initialMeasurements?: Record<string, number>;
   initialPinned?: boolean;
   onViewportChange?: (scrollTop: number, measurements: Record<string, number>, pinned: boolean) => void;
-  onViewChanges?: () => void;
-  onOpenTerminal?: () => void;
   onOpenFile?: (path: string) => void;
 };
 
@@ -20,16 +28,16 @@ const OVERSCAN_ROWS = 14;
 const MAX_MOUNTED_ROWS = 120;
 const DEFAULT_VIEWPORT_HEIGHT = 640;
 
-export function AgentTranscript({
+function AgentTranscriptView({
   projection,
   loading,
+  pendingPrompt = null,
+  working = false,
   runtimeLabel = "Agent",
   initialScrollTop = 0,
   initialMeasurements = {},
   initialPinned = true,
   onViewportChange,
-  onViewChanges,
-  onOpenTerminal,
   onOpenFile,
 }: AgentTranscriptProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -52,6 +60,11 @@ export function AgentTranscript({
   const range = useMemo(() => visibleRange(layout.offsets, timeline.rows.length, scrollTop, viewportHeight), [layout.offsets, scrollTop, timeline.rows.length, viewportHeight]);
   const visibleRows = timeline.rows.slice(range.start, range.end);
   const latestSequence = timeline.rows.at(-1)?.sequence ?? 0;
+  const showThinking = shouldShowAgentThinking(projection, working, pendingPrompt);
+  const hasLiveTail = Boolean(pendingPrompt) || showThinking;
+  const scrollEdgeState = useScrollEdgeState(scrollRef, {
+    revision: `${timeline.rows.length}:${layout.totalHeight}:${hasLiveTail ? "live" : "settled"}`,
+  });
   if (!seededPartIdsRef.current) {
     for (const row of timeline.rows) seenPartIdsRef.current.add(row.partId);
     seededPartIdsRef.current = true;
@@ -85,7 +98,7 @@ export function AgentTranscript({
     pinnedRef.current = true;
     setScrollTop(element.scrollTop);
     onViewportChangeRef.current?.(element.scrollTop, measurementsRef.current, true);
-  }, [layout.totalHeight, pinned, projection.approvals.length, projection.questions.length]);
+  }, [layout.totalHeight, pendingPrompt, pinned, projection.approvals.length, projection.questions.length, showThinking]);
 
   useEffect(() => {
     const previous = previousTimelineRef.current;
@@ -134,7 +147,11 @@ export function AgentTranscript({
   }, []);
 
   return (
-    <div className="desktop-agent-transcript-wrap">
+    <div
+      className="desktop-agent-transcript-wrap"
+      data-scroll-at-top={scrollEdgeState.atTop ? "true" : "false"}
+      style={agentTranscriptFadeGeometry(scrollEdgeState.topFade)}
+    >
       <div
         className="desktop-agent-transcript"
         ref={scrollRef}
@@ -144,23 +161,19 @@ export function AgentTranscript({
       >
         {projection.partialHistory && (
           <div className="desktop-agent-history-warning" role="status">
-            <CircleAlert size={14} /> Part of this session history is unavailable.
+            <CircleAlert size={14} /> Earlier live events are no longer available.
           </div>
         )}
-        {timeline.rows.length === 0 && !loading && (
-          <div className="desktop-agent-empty">
-            <div className="desktop-agent-empty-mark"><MessageSquareCode size={18} /></div>
-            <strong>What should we build?</strong>
-            <p>Ask about this workspace, plan a change, run commands, or edit files. You stay in control of approvals.</p>
-          </div>
-        )}
-        {loading && timeline.rows.length === 0 && (
-          <div className="desktop-agent-loading" role="status">
-            <LoaderCircle size={15} className="desktop-agent-spin" /> Restoring session…
-          </div>
+        {loading && timeline.rows.length === 0 && !hasLiveTail && (
+          <PageLoading
+            variant="fill"
+            label={null}
+            ariaLabel={`Preparing ${runtimeLabel}`}
+            className="desktop-agent-startup-loading"
+          />
         )}
         {timeline.rows.length > 0 && (
-          <div className="desktop-agent-virtual-canvas" style={{ height: layout.totalHeight }}>
+          <div className="desktop-agent-virtual-canvas" style={agentVirtualCanvasGeometry(layout.totalHeight)}>
             {visibleRows.map((row, relativeIndex) => {
               const index = range.start + relativeIndex;
               const part = timeline.parts.get(row.partId);
@@ -169,10 +182,30 @@ export function AgentTranscript({
               if (animate) seenPartIdsRef.current.add(part.id);
               return (
                 <MeasuredRow key={row.id} rowId={row.id} kind={part.kind} top={layout.offsets[index]} animate={animate} onMeasure={measure}>
-                  <MemoAgentPartRenderer part={part} runtimeLabel={runtimeLabel} onViewChanges={onViewChanges} onOpenTerminal={onOpenTerminal} onOpenFile={onOpenFile} />
+                  <MemoAgentPartRenderer part={part} runtimeLabel={runtimeLabel} onOpenFile={onOpenFile} />
                 </MeasuredRow>
               );
             })}
+          </div>
+        )}
+        {hasLiveTail && (
+          <div className="desktop-agent-live-tail">
+            {pendingPrompt && <AgentMessagePart part={{
+              id: "optimistic:user",
+              kind: "user",
+              turnId: null,
+              itemId: null,
+              text: pendingPrompt,
+              streaming: false,
+              terminalState: null,
+              sequence: Number.MAX_SAFE_INTEGER,
+            }} runtimeLabel={runtimeLabel} />}
+            {showThinking && (
+              <div className="desktop-agent-thinking-indicator" role="status" aria-label={`${runtimeLabel} is thinking`}>
+                <LoaderCircle size={13} className="desktop-agent-spin" aria-hidden="true" />
+                <span>Thinking</span>
+              </div>
+            )}
           </div>
         )}
         <div className="desktop-agent-announcer" aria-live="polite" aria-atomic="true">
@@ -186,11 +219,14 @@ export function AgentTranscript({
           pinnedRef.current = true;
           setPinned(true);
           setUnreadCount(0);
-        }} aria-label={unreadCount ? `Jump to latest, ${unreadCount} unread updates` : "Jump to latest"}><ArrowDown size={13} /> Jump to latest{unreadCount > 0 ? ` · ${unreadCount}` : ""}</button>
+        }} aria-label={unreadCount ? `Jump to latest, ${unreadCount} unread updates` : "Jump to latest"} title="Jump to latest"><ArrowDown size={15} /></button>
       )}
     </div>
   );
 }
+
+export const AgentTranscript = memo(AgentTranscriptView);
+AgentTranscript.displayName = "AgentTranscript";
 
 const MemoAgentPartRenderer = memo(AgentPartRenderer);
 
@@ -203,6 +239,8 @@ function MeasuredRow({ rowId, kind, top, animate, onMeasure, children }: {
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [entering, setEntering] = useState(animate);
+  useEffect(() => setEntering(animate), [animate, rowId]);
   useEffect(() => {
     const element = ref.current;
     if (!element) return undefined;
@@ -212,31 +250,76 @@ function MeasuredRow({ rowId, kind, top, animate, onMeasure, children }: {
     observer?.observe(element);
     return () => observer?.disconnect();
   }, [onMeasure, rowId]);
-  return <div ref={ref} className={`desktop-agent-virtual-row${animate ? " is-new" : ""}`} data-kind={kind} style={{ transform: `translateY(${top}px)` }}>{children}</div>;
+  return <div
+    ref={ref}
+    className={`desktop-agent-virtual-row${entering ? " is-new" : ""}`}
+    data-kind={kind}
+    style={agentVirtualRowGeometry(top)}
+    onAnimationEnd={() => setEntering(false)}
+  >{children}</div>;
 }
 
 function buildTimeline(projection: AgentProjection) {
+  let parts: AgentPart[];
+  let rows: TimelineRow[];
   if (projection.rows.length > 0 && projection.parts.length > 0) {
-    return { rows: [...projection.rows].sort((left, right) => left.sequence - right.sequence), parts: new Map(projection.parts.map((part) => [part.id, part])) };
+    parts = [...projection.parts];
+    rows = [...projection.rows];
+  } else {
+    // Compatibility for consumers constructing the original projection shape.
+    parts = [
+      ...projection.messages.map((message): AgentPart => ({ ...message, kind: message.role })),
+      ...projection.activities.map((activity): AgentPart => ({ ...activity })),
+    ].sort((left, right) => left.sequence - right.sequence);
+    rows = parts.map((part) => ({
+      id: `row:${part.id}`,
+      partId: part.id,
+      turnId: part.turnId,
+      kind: part.kind,
+      sequence: part.sequence,
+      estimatedHeight: part.kind === "assistant"
+        ? Math.min(640, 50 + Math.ceil(part.text.length / 64) * 20)
+        : part.kind === "user"
+          ? 64
+          : 34,
+    }));
   }
-  // Compatibility for consumers constructing the original projection shape.
-  const parts: AgentPart[] = [
-    ...projection.messages.map((message): AgentPart => ({ ...message, kind: message.role })),
-    ...projection.activities.map((activity): AgentPart => ({ ...activity })),
-  ].sort((left, right) => left.sequence - right.sequence);
-  const rows: TimelineRow[] = parts.map((part) => ({
-    id: `row:${part.id}`,
-    partId: part.id,
-    turnId: part.turnId,
-    kind: part.kind,
-    sequence: part.sequence,
-    estimatedHeight: part.kind === "assistant"
-      ? Math.min(640, 50 + Math.ceil(part.text.length / 64) * 20)
-      : part.kind === "user"
-        ? 64
-        : 34,
-  }));
-  return { rows, parts: new Map(parts.map((part) => [part.id, part])) };
+  return appendTurnSummaries(rows, parts, projection.turns);
+}
+
+function appendTurnSummaries(rows: TimelineRow[], parts: AgentPart[], turns: AgentProjection["turns"]) {
+  const nextRows = [...rows];
+  const partMap = new Map(parts.map((part) => [part.id, part]));
+  for (const turn of turns) {
+    if (turn.status === "running" || turn.durationMs === null || turn.completedAtSequence === null) continue;
+    const id = `turn-summary:${turn.id}`;
+    const lastTurnSequence = nextRows.reduce((latest, row) => (
+      row.turnId === turn.id ? Math.max(latest, row.sequence) : latest
+    ), turn.completedAtSequence);
+    const sequence = lastTurnSequence + 0.5;
+    const part: AgentPart = {
+      id,
+      kind: "turn-summary",
+      turnId: turn.id,
+      itemId: null,
+      durationMs: turn.durationMs,
+      status: turn.status,
+      sequence,
+    };
+    partMap.set(id, part);
+    nextRows.push({
+      id: `row:${id}`,
+      partId: id,
+      turnId: turn.id,
+      kind: "turn-summary",
+      sequence,
+      estimatedHeight: 30,
+    });
+  }
+  return {
+    rows: nextRows.sort((left, right) => left.sequence - right.sequence),
+    parts: partMap,
+  };
 }
 
 function buildLayout(rows: TimelineRow[], measurements: Record<string, number>, _measurementRevision: number) {
@@ -263,6 +346,37 @@ function lowerBound(values: number[], target: number) {
     else high = middle;
   }
   return low;
+}
+
+/** Presentation-only working state; never fabricates or persists model text. */
+export function shouldShowAgentThinking(
+  projection: AgentProjection,
+  working: boolean,
+  pendingPrompt: string | null = null,
+) {
+  if ((!working && !pendingPrompt) || projection.approvals.length > 0 || projection.questions.length > 0) return false;
+  if (pendingPrompt && !projection.runningTurnId) return true;
+  const turnId = projection.runningTurnId;
+  if (!turnId) return Boolean(pendingPrompt);
+  const typedParts = projection.parts.length > 0
+    ? projection.parts
+    : [
+      ...projection.messages.map((message): AgentPart => ({ ...message, kind: message.role })),
+      ...projection.activities.map((activity): AgentPart => ({ ...activity })),
+    ];
+  const visible = typedParts
+    .filter((part) => part.turnId === turnId && !["user", "usage", "permission", "question"].includes(part.kind))
+    .sort((left, right) => left.sequence - right.sequence);
+  const latest = visible.at(-1);
+  if (!latest) return true;
+  if (latest.kind === "assistant") return false;
+  if (latest.kind === "error" || latest.kind === "warning") return false;
+  if ("status" in latest && ["running", "pending", "in-progress", "waiting-for-user", "blocked"].includes(latest.status)) {
+    return false;
+  }
+  // A completed tool/reasoning item while the turn is still active means the
+  // native harness has resumed work and needs a fresh, non-persistent pulse.
+  return true;
 }
 
 export const agentTimelineLimits = Object.freeze({ maxMountedRows: MAX_MOUNTED_ROWS, streamBatchMs: 32 });

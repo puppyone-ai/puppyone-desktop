@@ -8,6 +8,7 @@ import { buildCloudAccessSurfaces } from "../../model";
 import type { CloudAccessSurface } from "../../model";
 import {
   getApiBaseFromGitUrl,
+  getCanonicalScopeGitUrl,
   getScopeDisplayName,
   getScopePathLabel,
   normalizeProviderKey,
@@ -66,7 +67,7 @@ export function getDesktopCloudAccessSurfaceContext({
   const apiBase = identity?.url ? getApiBaseFromGitUrl(identity.url) : apiBaseUrl ?? "";
   const scopeName = getScopeDisplayName(scope);
   const profileName = profileSlug(scopeName);
-  const gitUrl = scope.access_key && apiBase ? `${apiBase}/git/ap/${scope.access_key}.git` : identity?.url ?? "";
+  const gitUrl = getCanonicalScopeGitUrl(identity, scope, apiBase);
   const cliCommand = scope.access_key && apiBase
     ? `printf '%s' ${shellQuote(scope.access_key)} | puppyone ap login ${shellQuote(profileName)} --api-url ${shellQuote(apiBase)} --access-key-stdin`
     : "";

@@ -1,4 +1,5 @@
 import { Box } from "lucide-react";
+import { memo } from "react";
 import type { AgentModel } from "../domain/agent-contract";
 import { AgentPickerPopover, type AgentPickerGroup } from "./AgentPickerPopover";
 
@@ -9,7 +10,7 @@ type AgentModelPickerProps = {
   onSelectModel: (model: string) => void;
 };
 
-export function AgentModelPicker({ models, selectedModel, disabled = false, onSelectModel }: AgentModelPickerProps) {
+export const AgentModelPicker = memo(function AgentModelPicker({ models, selectedModel, disabled = false, onSelectModel }: AgentModelPickerProps) {
   const selected = models.find((model) => model.model === selectedModel) ?? models[0] ?? null;
   const groups: AgentPickerGroup[] = [{
     id: "models",
@@ -17,7 +18,7 @@ export function AgentModelPicker({ models, selectedModel, disabled = false, onSe
     options: models.map((model) => ({
       id: model.model,
       label: model.displayName,
-      description: model.description || "Text and tool-capable model",
+      description: model.description,
       meta: model.contextWindow ? `${compactNumber(model.contextWindow)} context` : undefined,
       keywords: `${model.id} ${model.model} ${(model.variants || []).join(" ")}`,
       selectable: true,
@@ -31,13 +32,14 @@ export function AgentModelPicker({ models, selectedModel, disabled = false, onSe
       ariaLabel="Agent model"
       placeholder="Model"
       valueLabel={selected?.displayName}
+      title={selected?.displayName}
       groups={groups}
       disabled={disabled}
       className="is-model"
       onSelect={onSelectModel}
     />
   );
-}
+});
 
 function compactNumber(value: number) {
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 0 }).format(value);

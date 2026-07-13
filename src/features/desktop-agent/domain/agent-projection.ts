@@ -28,7 +28,11 @@ import {
   cloneAgentProjection,
   projectionIndexes,
 } from "./agent-projection-indexes";
-import { providerActivityIdentity } from "./agent-provider-notice-policy";
+import {
+  isNonDiagnosticProviderStatusMessage,
+  providerActivityIdentity,
+} from "./agent-provider-notice-policy";
+import { parseAgentEventTime, readAgentTurnDurationMs } from "./agent-turn-timing";
 
 export type * from "./agent-projection-types";
 
@@ -270,6 +274,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
     case "provider.error": {
       const kind = event.type === "provider.error" ? "error" : "warning";
       const label = readProviderMessage(payload.message) || (kind === "error" ? "Provider error" : "Provider warning");
+      if (isNonDiagnosticProviderStatusMessage(label)) return next;
       const identity = providerActivityIdentity(next, event, label);
       const activityIndexes = projectionIndexes(next).activities;
       const existingActivityIndex = activityIndexes.get(identity.id);
@@ -452,7 +457,9 @@ function updateTurn(projection: AgentProjection, event: AgentEvent) {
       id: event.turnId,
       status: "running",
       startedAtSequence: event.sequence,
+      startedAtMs: parseAgentEventTime(event.emittedAt),
       completedAtSequence: null,
+      durationMs: null,
       partIds: [],
     };
     turnIndex = projection.turns.length;
@@ -464,6 +471,7 @@ function updateTurn(projection: AgentProjection, event: AgentEvent) {
       ...turn,
       status: event.type.slice("turn.".length) as AgentTurnTerminalState,
       completedAtSequence: event.sequence,
+      durationMs: readAgentTurnDurationMs(event.payload.durationMs, turn.startedAtMs, event.emittedAt),
     };
     if (turnIndex !== undefined) projection.turns[turnIndex] = turn;
   }
@@ -494,6 +502,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
   if (event.type === "provider.warning" || event.type === "provider.error") {
     const label = readProviderMessage(event.payload.message)
       || (event.type === "provider.error" ? "Provider error" : "Provider warning");
+    if (isNonDiagnosticProviderStatusMessage(label)) return null;
     const activityIndex = projectionIndexes(projection).activities.get(providerActivityIdentity(projection, event, label).id);
     const activity = activityIndex === undefined ? null : projection.activities[activityIndex];
     return activity ? activityPart(activity) : null;
@@ -534,6 +543,7 @@ function activityPart(activity: AgentActivity): AgentPart {
 function estimatePartHeight(part: AgentPart) {
   if (part.kind === "user") return 64;
   if (part.kind === "assistant") return Math.min(640, 50 + Math.ceil(part.text.length / 64) * 20);
+  if (part.kind === "turn-summary") return 30;
   if (part.kind === "permission" || part.kind === "question" || part.kind === "usage") return 36;
   return 42;
 }

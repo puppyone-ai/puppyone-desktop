@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const tokensCss = readCss("../src/styles/tokens.css");
 const dataAdapterCss = readCss("../src/features/data-workspace/browser.css");
 const dataTreeCss = readCss("../packages/shared-ui/src/styles/data-workspace.css");
+const agentFoundationCss = readCss("../src/features/desktop-agent/ui/styles/foundation.css");
 const sidebarBaseCss = readCss("../src/features/source-control/styles/sidebar-base.css");
 const gitLayoutCss = readCss("../src/features/source-control/styles/sidebar-layout.css");
 const gitHistoryCss = readCss("../src/features/source-control/styles/history-list.css");
@@ -21,6 +22,7 @@ describe("sidebar spacing architecture", () => {
 
     expect(root).toContain("--desktop-sidebar-row-left-gap: 12px;");
     expect(root).toContain("--desktop-sidebar-row-right-gap: 12px;");
+    expect(root).toContain("--desktop-sidebar-row-radius: 6px;");
     expect(root).toContain("--desktop-sidebar-row-content-left: 6px;");
     expect(root).toContain("--desktop-sidebar-row-content-right: 6px;");
     expect(root).toContain("--desktop-sidebar-list-padding-block: 8px;");
@@ -44,6 +46,7 @@ describe("sidebar spacing architecture", () => {
 
     expect(adapter).toContain("--po-tree-row-left-gap: var(--desktop-sidebar-row-left-gap);");
     expect(adapter).toContain("--po-tree-row-right-gap: var(--desktop-sidebar-row-right-gap);");
+    expect(adapter).toContain("--po-tree-row-radius: var(--desktop-sidebar-row-radius);");
     expect(adapter).toContain("--po-tree-no-root-top-gap: var(--desktop-sidebar-list-padding-block);");
     expect(adapter).toContain("--po-tree-list-bottom-gap: var(--desktop-sidebar-list-padding-block);");
     expect(adapter).toContain("--po-tree-row-icon-label-gap: var(--desktop-sidebar-icon-label-gap);");
@@ -58,6 +61,30 @@ describe("sidebar spacing architecture", () => {
       padding-inline: var(--tree-row-left-gap)
         calc(var(--tree-row-right-gap) - var(--tree-scrollbar-width));
     `));
+  });
+
+  it("keeps Data row colors authoritative while Agent mirrors them one way", () => {
+    const treeShell = compact(readCssBlock(dataTreeCss, ".explorer-tree-shell"));
+    const agentBoundary = compact(readCssBlock(
+      agentFoundationCss,
+      ".desktop-agent-boundary,\n.desktop-agent-overlay",
+    ));
+
+    expect(treeShell).toContain(
+      "--tree-row-hover-bg: var(--po-tree-row-hover-bg, color-mix(in srgb, var(--po-hover) 86%, transparent));",
+    );
+    expect(treeShell).toContain(
+      "color-mix(in srgb, var(--po-selected) 96%, transparent) 0%",
+    );
+    expect(tokensCss).not.toContain("--desktop-sidebar-row-hover-bg");
+    expect(tokensCss).not.toContain("--desktop-sidebar-row-selected-bg");
+    expect(dataAdapterCss).not.toContain("--po-tree-row-hover-bg:");
+    expect(dataAdapterCss).not.toContain("--po-tree-row-selected-bg:");
+    expect(agentBoundary).toContain(
+      "--agent-row-hover-surface: color-mix(in srgb, var(--po-hover) 86%, transparent);",
+    );
+    expect(agentBoundary).not.toContain("--po-tree-row-hover-bg:");
+    expect(agentBoundary).not.toContain("--po-tree-row-selected-bg:");
   });
 
   it("draws every ancestor guide column with one depth-bounded layer", () => {

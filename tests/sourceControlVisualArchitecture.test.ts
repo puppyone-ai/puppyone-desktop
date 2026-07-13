@@ -10,6 +10,10 @@ const workingFileDetailSource = readFileSync(
   new URL("../src/features/source-control/WorkingFileDetail.tsx", import.meta.url),
   "utf8",
 );
+const sourceControlComponentsSource = readFileSync(
+  new URL("../src/features/source-control/components.tsx", import.meta.url),
+  "utf8",
+);
 const fileDiffSurfaceSource = readFileSync(
   new URL("../src/features/source-control/diff/GitFileDiffSurface.tsx", import.meta.url),
   "utf8",
@@ -195,12 +199,8 @@ describe("source-control visual architecture", () => {
     expect(lineView).toContain('className="line-prefix"');
   });
 
-  it("keeps sidebar metadata quieter than primary working-tree content", () => {
+  it("keeps sidebar metadata quieter while preserving the shared file-icon system", () => {
     const sidebar = compact(readCssBlock(sidebarBaseCss, ".desktop-git-sidebar"));
-    const fileIcon = compact(readCssBlock(
-      sidebarResourcesCss,
-      ".desktop-working-tree-icon :is(svg, img)",
-    ));
     const workingTreeMain = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-working-tree-main",
@@ -233,7 +233,9 @@ describe("source-control visual architecture", () => {
       ".desktop-git-sidebar .desktop-working-tree-row.active .desktop-working-tree-name",
     );
     expect(workingTreeMain).toContain("gap: var(--git-icon-label-gap);");
-    expect(fileIcon).toContain("filter: grayscale(1);");
+    expect(sourceControlComponentsSource.match(/<FileGlyphIcon[^>]+size=\{18\}/g)).toHaveLength(2);
+    expect(sourceControlComponentsSource).not.toContain("size={15}");
+    expect(sidebarResourcesCss).not.toContain("filter: grayscale(1);");
   });
 });
 

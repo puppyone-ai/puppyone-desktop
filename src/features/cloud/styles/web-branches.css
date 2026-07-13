@@ -339,7 +339,7 @@
 }
 
 button.desktop-cloud-branch-graph-row {
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-branch-graph-row:hover,

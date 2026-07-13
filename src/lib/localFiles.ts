@@ -349,8 +349,16 @@ export async function configureWorkspaceCloudRemote(
   rootPath: string,
   remoteUrl: string,
   remoteName = "puppyone",
+  credential?: string | null,
+  username = "x-puppyone-token",
 ): Promise<GitStatusSnapshot> {
-  return getDesktopBridge().configureGitCloudRemote({ rootPath, remoteUrl, remoteName });
+  return getDesktopBridge().configureGitCloudRemote({
+    rootPath,
+    remoteUrl,
+    remoteName,
+    credential,
+    username,
+  });
 }
 
 export async function removeWorkspaceGitRemote(

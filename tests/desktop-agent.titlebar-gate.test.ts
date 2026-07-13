@@ -11,7 +11,9 @@ import {
 } from "../src/features/app-shell/headerElements";
 import { AgentChatTitlebarButton } from "../src/features/app-shell/DesktopTitlebarActions";
 import {
+  AGENT_PREFERRED_RUNTIME_STORAGE_KEY,
   RIGHT_SIDEBAR_SURFACE_STORAGE_KEY,
+  readInitialAgentPreferredRuntime,
   readInitialRightSidebarSurface,
 } from "../src/features/app-shell/preferences";
 
@@ -31,6 +33,15 @@ describe("independent Chat and Terminal titlebar buttons", () => {
     expect(readInitialRightSidebarSurface()).toBe("terminal");
     window.localStorage.setItem(RIGHT_SIDEBAR_SURFACE_STORAGE_KEY, "chat");
     expect(readInitialRightSidebarSurface()).toBe("chat");
+  });
+
+  it("restores only a validated last-selected Agent id", () => {
+    expect(readInitialAgentPreferredRuntime()).toBeNull();
+    window.localStorage.setItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY, "codex");
+    expect(readInitialAgentPreferredRuntime()).toBe("codex");
+
+    window.localStorage.setItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY, "../../not-a-runtime");
+    expect(readInitialAgentPreferredRuntime()).toBeNull();
   });
 
   it("keeps the Terminal titlebar control as a stable toggle without a dropdown menu", () => {

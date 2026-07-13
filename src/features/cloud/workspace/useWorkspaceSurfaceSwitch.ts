@@ -10,8 +10,8 @@ import type { Workspace } from "@puppyone/shared-ui";
 import type { RecentWorkspaceHomeItem, OnboardingOperationStatus } from "../../../components/MinimalOnboarding";
 import {
   getCloudProject,
-  getCloudRepoIdentity,
   revokeCloudWorkspaceBinding,
+  revokeCloudWorkspaceBindingCredential,
   type DesktopCloudProject,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
@@ -187,7 +187,10 @@ export function useWorkspaceSurfaceSwitch({
 
       const openedWorkspace = result.workspace;
       if (openedWorkspace) {
-        let createdBindingId: string | null = null;
+        let issuedBindingId: string | null = null;
+        let bindingWasCreated = false;
+        let currentConfig: PuppyoneWorkspaceConfig | null = null;
+        let configUpdated = false;
         try {
           if (!activeCloudSession) {
             throw new Error("Sign in before attaching a Cloud project locally.");
@@ -199,26 +202,17 @@ export function useWorkspaceSurfaceSwitch({
               updateCloudSession,
               desktopCloudApiBaseUrl,
             );
-          const identity = await getCloudRepoIdentity(
-            activeCloudSession,
-            cloudProjectId,
-            updateCloudSession,
-            desktopCloudApiBaseUrl,
-          );
           const attached = await createExplicitWorkspaceBinding({
             session: activeCloudSession,
             apiBaseUrl: desktopCloudApiBaseUrl,
             project,
             projectId: cloudProjectId,
             workspace: openedWorkspace,
-            remoteUrl: identity.url,
             onSessionChange: updateCloudSession,
           });
-          createdBindingId = attached.binding.id;
-          await configureWorkspaceCloudRemote(
-            openedWorkspace.path, attached.credentialRemoteUrl, "puppyone",
-          );
-          const currentConfig = await readPuppyoneWorkspaceConfig(openedWorkspace.path).catch(() => null);
+          issuedBindingId = attached.binding.id;
+          bindingWasCreated = attached.bindingWasCreated;
+          currentConfig = await readPuppyoneWorkspaceConfig(openedWorkspace.path);
           const nextConfig = mergePuppyoneWorkspaceConfig(currentConfig, {
             project: {
               workspaceInstanceId: openedWorkspace.workspaceInstanceId ?? null,
@@ -230,6 +224,14 @@ export function useWorkspaceSurfaceSwitch({
             },
           });
           await writePuppyoneWorkspaceConfig(openedWorkspace.path, nextConfig);
+          configUpdated = true;
+          await configureWorkspaceCloudRemote(
+            openedWorkspace.path,
+            attached.remoteUrl,
+            "puppyone",
+            attached.credential,
+            attached.username,
+          );
           setRecentWorkspaceCloudBindings((current) => ({
             ...current,
             [openedWorkspace.id]: {
@@ -243,10 +245,19 @@ export function useWorkspaceSurfaceSwitch({
             },
           }));
         } catch (error) {
-          if (createdBindingId && activeCloudSession) {
-            await revokeCloudWorkspaceBinding(
+          if (configUpdated && currentConfig) {
+            await writePuppyoneWorkspaceConfig(
+              openedWorkspace.path,
+              currentConfig,
+            ).catch(() => undefined);
+          }
+          if (issuedBindingId && activeCloudSession) {
+            const compensate = bindingWasCreated
+              ? revokeCloudWorkspaceBinding
+              : revokeCloudWorkspaceBindingCredential;
+            await compensate(
               activeCloudSession,
-              createdBindingId,
+              issuedBindingId,
               updateCloudSession,
               desktopCloudApiBaseUrl,
             ).catch(() => undefined);

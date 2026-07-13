@@ -18,6 +18,7 @@ import {
   configureWorkspaceCloudRemote,
   createLocalDataPort,
   getWorkspaceGitStatus,
+  readPuppyoneWorkspaceConfig,
   removeWorkspaceGitRemote,
   showHomepage,
 } from "./lib/localFiles";
@@ -175,6 +176,7 @@ export function App() {
     rightSidebarToolsSettings,
     rightSidebarWidth,
     rightSidebarSurface,
+    agentPreferredRuntime,
     agentPreferredModel,
     sidebarCollapsed,
     sidebarNavigationLayout,
@@ -197,6 +199,7 @@ export function App() {
     setRightSidebarToolsSettings,
     setRightSidebarWidth,
     setRightSidebarSurface,
+    setAgentPreferredRuntime,
     setAgentPreferredModel,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
@@ -677,6 +680,11 @@ export function App() {
     setActiveDataPath(path);
     setActiveDataNode(node);
   }, []);
+  const handleActiveDataNodeChange = useCallback((node: DataNode | null) => {
+    setActiveDataNode((current) => (
+      hasSameActiveDataNodeIdentity(current, node) ? current : node
+    ));
+  }, []);
 
   const handleFilesVisibilitySettingsChange = useCallback((nextSettings: FilesVisibilitySettings) => {
     setFilesVisibilitySettings(nextSettings);
@@ -772,7 +780,7 @@ export function App() {
   }, [activeView, cloudEnabled, setSidebarCollapsed, updateCloudSession, workspaceIsCloud]);
 
   const handleConfigureCloudRemote = useCallback(async (
-    remoteUrl: string,
+    _remoteUrl: string,
     projectId?: string | null,
     options: CloudWorkspaceAttachOptions = {},
   ) => {
@@ -788,8 +796,11 @@ export function App() {
     if (!activeCloudSession) {
       throw new Error("Sign in before attaching this workspace to Cloud.");
     }
-    let remoteConfigured = false;
     let createdBindingId: string | null = null;
+    let previousConfig: PuppyoneWorkspaceConfig | null = null;
+    let configUpdated = false;
+    let attached: Awaited<ReturnType<typeof createExplicitWorkspaceBinding>> | null = null;
+    let configuredStatus = activeGitStatus;
     try {
       const project = homeCloudProjects.find((entry) => entry.id === nextProjectId)
         ?? await getCloudProject(
@@ -798,25 +809,22 @@ export function App() {
           updateCloudSession,
           desktopCloudApiBaseUrl,
         );
-      const attached = await createExplicitWorkspaceBinding({
+      attached = await createExplicitWorkspaceBinding({
         session: activeCloudSession,
         apiBaseUrl: desktopCloudApiBaseUrl,
         project,
         projectId: nextProjectId,
         workspace,
-        remoteUrl,
         bindingKind: options.bindingKind ?? "full",
         scopeId: options.scopeId ?? null,
         onSessionChange: updateCloudSession,
       });
-      if (puppyoneConfig?.cloud.bindingId !== attached.binding.id) {
+      previousConfig = puppyoneConfig
+        ?? await readPuppyoneWorkspaceConfig(context.rootPath);
+      if (previousConfig.cloud.bindingId !== attached.binding.id) {
         createdBindingId = attached.binding.id;
       }
-      await configureWorkspaceCloudRemote(
-        context.rootPath, attached.credentialRemoteUrl, "puppyone",
-      );
-      remoteConfigured = true;
-      const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
+      const nextConfig = mergePuppyoneWorkspaceConfig(previousConfig, {
         project: {
           workspaceInstanceId: workspace.workspaceInstanceId ?? null,
         },
@@ -849,28 +857,18 @@ export function App() {
       if (!savedConfig) {
         throw new Error("Unable to persist the Cloud project binding for this workspace.");
       }
-      setRecentWorkspaceCloudBindings((current) => ({
-        ...current,
-        [workspace.id]: {
-          projectId: nextProjectId,
-          bindingId: attached.binding.id,
-          bindingKind: attached.binding.binding_kind,
-          scopePath: attached.binding.scope_path ?? null,
-          cloudLinked: true,
-          error: null,
-          reason: null,
-        },
-      }));
-      const refreshedStatus = await getWorkspaceGitStatus(context.rootPath);
-      if (applyGitStatus(
-        refreshedStatus,
-        context,
-        createRepositoryRefreshReason("configure-remote", "mutation"),
-      )) {
-        refreshWorkspaceContent();
-      }
-      return refreshedStatus;
+      configUpdated = true;
+      configuredStatus = await configureWorkspaceCloudRemote(
+        context.rootPath,
+        attached.remoteUrl,
+        "puppyone",
+        attached.credential,
+        attached.username,
+      );
     } catch (error) {
+      if (configUpdated && previousConfig) {
+        await handlePuppyoneConfigChange(previousConfig).catch(() => undefined);
+      }
       if (createdBindingId) {
         await revokeCloudWorkspaceBinding(
           activeCloudSession,
@@ -879,23 +877,34 @@ export function App() {
           desktopCloudApiBaseUrl,
         ).catch(() => undefined);
       }
-      // The Git remote mutation happens before the workspace config write. If
-      // persistence fails, publish the real repository state instead of
-      // leaving the UI on a stale pre-attach snapshot. Retrying is idempotent.
-      if (remoteConfigured) {
-        const partiallyConfiguredStatus = await getWorkspaceGitStatus(context.rootPath).catch(() => null);
-        if (partiallyConfiguredStatus && applyGitStatus(
-          partiallyConfiguredStatus,
-          context,
-          createRepositoryRefreshReason("configure-remote", "mutation"),
-        )) {
-          refreshWorkspaceContent();
-        }
-      }
       throw error;
     }
+    if (!attached || !configuredStatus) {
+      throw new Error("Cloud workspace attachment did not return a Git status.");
+    }
+    setRecentWorkspaceCloudBindings((current) => ({
+      ...current,
+      [workspace.id]: {
+        projectId: nextProjectId,
+        bindingId: attached.binding.id,
+        bindingKind: attached.binding.binding_kind,
+        scopePath: attached.binding.scope_path ?? null,
+        cloudLinked: true,
+        error: null,
+        reason: null,
+      },
+    }));
+    if (applyGitStatus(
+      configuredStatus,
+      context,
+      createRepositoryRefreshReason("configure-remote", "mutation"),
+    )) {
+      refreshWorkspaceContent();
+    }
+    return configuredStatus;
   }, [
     applyGitStatus,
+    activeGitStatus,
     activeCloudSession,
     captureGitRepositoryContext,
     cloudEnabled,
@@ -1232,16 +1241,14 @@ export function App() {
                 <RightAgentPanel
                   workspace={workspace}
                   active={rightSidebarOpen && rightSidebarSurface === "chat"}
+                  preferredRuntimeId={agentPreferredRuntime}
+                  onPreferredRuntimeChange={setAgentPreferredRuntime}
                   preferredModel={agentPreferredModel}
                   onPreferredModelChange={setAgentPreferredModel}
                   onViewChanges={() => {
                     setActiveView("git");
                     setSidebarCollapsed(false);
                   }}
-                  onOpenTerminal={desktopTerminalEnabled ? () => {
-                    setRightSidebarSurface("terminal");
-                    setRightSidebarOpen(true);
-                  } : undefined}
                   onOpenFile={(path) => {
                     handleActiveDataPathChange(path);
                     navigateDesktopView("data");
@@ -1293,7 +1300,7 @@ export function App() {
           dataPort={dataPort}
           desktopUpdates={desktopUpdates}
           git={git}
-          onActiveDataNodeChange={setActiveDataNode}
+          onActiveDataNodeChange={handleActiveDataNodeChange}
           onActiveDataPathChange={handleActiveDataPathChange}
           onCreateEntryMenu={openCreateEntryMenu}
           fileClipboardController={fileClipboardController}
@@ -1457,4 +1464,14 @@ export function App() {
 function getPasteMenuLabel(itemCount: number): string {
   if (itemCount <= 0) return "Paste";
   return itemCount === 1 ? "Paste Item" : `Paste ${itemCount} Items`;
+}
+
+function hasSameActiveDataNodeIdentity(left: DataNode | null, right: DataNode | null): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return left.id === right.id
+    && left.path === right.path
+    && left.name === right.name
+    && left.type === right.type
+    && left.mimeType === right.mimeType;
 }

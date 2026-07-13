@@ -71,7 +71,7 @@
   border-radius: 4px;
   background: transparent;
   color: var(--po-text-muted);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .html-preview-toolbar button:hover,
@@ -198,7 +198,7 @@
   border-radius: 4px;
   background: transparent;
   color: var(--po-text-muted);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .app-preview-toolbar button:hover,
@@ -302,7 +302,7 @@
   background: var(--po-control-bg);
   color: var(--po-text);
   font: 600 13px/1 var(--po-font-sans);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .app-preview-state button:hover {

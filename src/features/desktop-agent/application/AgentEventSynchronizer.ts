@@ -76,12 +76,17 @@ export class AgentEventSynchronizer {
     }
     const projection = applyAgentEvents(state.projection, applicable);
     const providerFailure = rejectedProviderPatch(state, projection, applicable);
+    const turnAccepted = applicable.some((event) => event.type === "turn.started");
+    const turnEnded = applicable.some((event) => (
+      event.type === "turn.completed" || event.type === "turn.failed" || event.type === "turn.interrupted"
+    ));
     this.bufferedEvents.push(...deferred);
     for (const event of deferred) this.bufferedSequences.add(event.sequence);
     this.patch({
       projection,
       phase: phaseForProjection(projection, state.phase),
       stopping: projection.runningTurnId ? state.stopping : false,
+      pendingPrompt: turnAccepted || turnEnded ? null : state.pendingPrompt,
       session: state.session
         ? applicable.reduce(updateSessionFromProjectionEvent, state.session)
         : null,
@@ -142,6 +147,7 @@ export class AgentEventSynchronizer {
       stopping: false,
       submitting: false,
       resolvingBlocker: false,
+      pendingPrompt: null,
       error: `${runtimeName} stopped unexpectedly. Files already changed were not reverted. Refresh to resume the saved session.`,
     });
   }
@@ -174,6 +180,7 @@ export class AgentEventSynchronizer {
           this.patch({
             projection,
             phase: phaseForProjection(projection, state.phase),
+            pendingPrompt: projection.runningTurnId ? null : state.pendingPrompt,
             session: {
               ...snapshot.session,
               activeTurnId: projection.runningTurnId,
@@ -184,7 +191,7 @@ export class AgentEventSynchronizer {
           cursor = projection.lastSequence;
           if (this.bufferedEvents.length === 0) return;
         }
-        this.patch({ error: "Part of the live Agent event stream could not be repaired. Refresh to replay saved history." });
+        this.patch({ error: "Part of the live Agent event stream is no longer available. Start a new session if the provider cannot recover it." });
       } catch (error) {
         if (!this.disposed) this.patch({ error: formatAgentError(error) });
       }
@@ -210,7 +217,8 @@ function updateSessionFromProjectionEvent(session: AgentSessionMetadata, event?:
 }
 
 function isUrgentEvent(event: AgentEvent) {
-  return event.type.startsWith("approval.")
+  return event.type === "turn.started"
+    || event.type.startsWith("approval.")
     || event.type.startsWith("question.")
     || event.type === "turn.completed"
     || event.type === "turn.failed"

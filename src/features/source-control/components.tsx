@@ -82,7 +82,7 @@ export function SourceControlPreviewResourceList({
               })}
             >
               <span className="desktop-working-tree-icon">
-                <FileGlyphIcon name={resource.path} size={15} theme={fileIconTheme} />
+                <FileGlyphIcon name={getGitResourceIconName(resource)} size={18} theme={fileIconTheme} />
               </span>
               <span className="desktop-working-tree-copy">
                 <span className="desktop-working-tree-name">{displayParts.name}</span>
@@ -131,7 +131,7 @@ export function SourceControlWorkingTreeRow({
         onClick={() => onSelect({ path: resource.path, status: resource.status, staged })}
       >
         <span className="desktop-working-tree-icon">
-          <FileGlyphIcon name={resource.path} size={15} theme={fileIconTheme} />
+          <FileGlyphIcon name={getGitResourceIconName(resource)} size={18} theme={fileIconTheme} />
         </span>
         <span className="desktop-working-tree-copy">
           <span className="desktop-working-tree-name">{displayParts.name}</span>
@@ -184,6 +184,10 @@ function getGitResourceCommandPaths(resource: GitSourceControlResource) {
   return resource.oldPath && resource.oldPath !== resource.path
     ? [resource.oldPath, resource.path]
     : [resource.path];
+}
+
+function getGitResourceIconName(resource: GitSourceControlResource) {
+  return splitSimplePath(resource.path).name;
 }
 
 function getGitDisplayPath(resource: GitSourceControlResource) {

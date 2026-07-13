@@ -85,6 +85,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
     expect(replay.session.activeTurnId).toBeNull();
     expect(replay.session.terminalState).toBe("completed");
     expect(replay.events.filter((event) => event.type === "turn.started")).toHaveLength(1);
+    expect(replay.events.find((event) => event.type === "turn.completed")?.payload.durationMs).toEqual(expect.any(Number));
   });
 
   it("fails pending approvals closed and emits terminal failure on provider exit", async () => {

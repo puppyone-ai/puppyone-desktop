@@ -399,6 +399,7 @@
 
 .markdown-codemirror-editor .cm-md-task-line {
   --md-task-checkbox-size: 1.05em;
+  --md-task-checkbox-hit-size: 24px;
   /* Checkbox (~14.7px) + ~9px gap to the text — the to-do list convention;
      wider gaps read as disconnected. */
   --md-task-prefix-width: calc(24px + var(--md-list-depth, 0) * 16px);
@@ -418,10 +419,18 @@
   position: absolute;
   /* Center on the first text line: line padding + half the 1.68 line box. */
   top: calc(var(--po-markdown-editor-line-spacing, 0px) + 0.84em);
-  left: calc(var(--md-list-depth, 0) * 16px);
+  left: calc(var(--md-list-depth, 0) * 16px - 5px);
   display: inline-grid;
-  width: var(--md-task-checkbox-size);
-  height: var(--md-task-checkbox-size);
+  width: var(--md-task-checkbox-hit-size);
+  height: var(--md-task-checkbox-hit-size);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: var(--po-clickable-cursor, pointer);
+  font: inherit;
   place-items: center;
   line-height: 1;
   text-decoration: none;
@@ -448,21 +457,21 @@
   border-radius: 1.5px;
   background: transparent;
   color: var(--po-text-inverse);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   text-indent: 0;
   text-decoration: none;
   transition:
     border-color 120ms ease,
     background-color 120ms ease;
+  pointer-events: none;
   user-select: none;
 }
 
-.markdown-codemirror-editor .cm-md-task-checkbox:hover {
-  border-color: color-mix(in srgb, var(--po-text) 88%, transparent);
-  background: color-mix(in srgb, var(--po-text) 6%, transparent);
+.markdown-codemirror-editor .cm-md-task-checkbox-widget:focus-visible {
+  outline: 0;
 }
 
-.markdown-codemirror-editor .cm-md-task-checkbox:focus-visible {
+.markdown-codemirror-editor .cm-md-task-checkbox-widget:focus-visible .cm-md-task-checkbox {
   outline: 2px solid color-mix(in srgb, var(--po-accent) 55%, transparent);
   outline-offset: 2px;
 }

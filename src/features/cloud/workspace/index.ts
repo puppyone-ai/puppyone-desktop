@@ -7,7 +7,6 @@ export {
 export type { CloudWorkspaceBindingState } from "./cloudWorkspaceTypes";
 export { useCloudWorkspaceBinding } from "./useCloudWorkspaceBinding";
 export {
-  bindingCredentialRemoteUrl,
   cloudOriginFromApiBase,
   createExplicitWorkspaceBinding,
   sameCloudOrigin,

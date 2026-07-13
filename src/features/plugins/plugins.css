@@ -301,7 +301,7 @@
   justify-content: center;
   border-radius: 6px;
   color: var(--po-text-muted);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   list-style: none;
 }
 

@@ -51,6 +51,7 @@ const getCloudProjectReadiness = vi.fn().mockResolvedValue({
 const getCloudDashboard = vi.fn();
 const listCloudRoot = vi.fn();
 const listCloudProjects = vi.fn();
+const getCloudProject = vi.fn();
 
 function historyPage(overrides: Partial<DesktopCloudHistory> = {}): DesktopCloudHistory {
   return {
@@ -100,6 +101,7 @@ vi.mock("../src/lib/cloudApi", async () => {
     getCloudDashboard: (...args: unknown[]) => getCloudDashboard(...args),
     listCloudRoot: (...args: unknown[]) => listCloudRoot(...args),
     listCloudProjects: (...args: unknown[]) => listCloudProjects(...args),
+    getCloudProject: (...args: unknown[]) => getCloudProject(...args),
     openCloudApp: vi.fn(),
   };
 });
@@ -840,6 +842,7 @@ describe("useDesktopCloudData request lifecycle", () => {
 
   beforeEach(() => {
     listCloudProjects.mockReset();
+    getCloudProject.mockReset();
     getCloudDashboard.mockReset();
     listCloudRoot.mockReset();
     getCloudHistory.mockReset();
@@ -849,6 +852,10 @@ describe("useDesktopCloudData request lifecycle", () => {
     getCloudRepoIdentity.mockReset();
 
     listCloudProjects.mockResolvedValue(projects);
+    getCloudProject.mockImplementation(async (_session: unknown, projectId: string) => ({
+      id: projectId,
+      name: projectId === "proj-bound" ? "Bound Project" : projectId,
+    }));
     getCloudDashboard.mockImplementation(async (_session: unknown, projectId: string) => ({
       project: { id: projectId, name: projectId === "proj-a" ? "Project A" : "Project B" },
     }));
@@ -994,7 +1001,7 @@ describe("useDesktopCloudData request lifecycle", () => {
     });
   });
 
-  it("keeps a local binding authoritative when the Cloud project list is unavailable", async () => {
+  it("loads a bound project directly without visiting the organization project list", async () => {
     listCloudProjects.mockRejectedValueOnce(new Error("projects offline"));
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -1013,7 +1020,14 @@ describe("useDesktopCloudData request lifecycle", () => {
 
     expect(container.firstElementChild?.getAttribute("data-mapped-project")).toBe("proj-bound");
     expect(container.firstElementChild?.getAttribute("data-active-project")).toBe("proj-bound");
-    expect(container.firstElementChild?.getAttribute("data-error")).toBe("projects offline");
+    expect(container.firstElementChild?.getAttribute("data-error")).toBe("none");
+    expect(getCloudProject).toHaveBeenCalledWith(
+      session,
+      "proj-bound",
+      expect.any(Function),
+      "https://cloud.example",
+    );
+    expect(listCloudProjects).not.toHaveBeenCalled();
   });
 });
 

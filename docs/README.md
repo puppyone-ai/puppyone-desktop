@@ -13,6 +13,9 @@ directly:
   - One Projects entry, one Project shell, and the Local Only, Local + Cloud,
     and Cloud Only capability states.
 - [Automation and Plugin Domain Boundary](architecture/automation-plugin-domain-boundary.md)
+- [Cloud Automation UX and Architecture](architecture/cloud-automation-ux.md)
+  - Automation product definition, UX contract for creation and management,
+    and the desktop/server architecture behind it.
 - [Git and Source Control Architecture](architecture/git/README.md)
   - Local Source Control sidebar, repository status freshness, external Git
     invalidation, and Cloud branch graph topology.
@@ -28,12 +31,18 @@ directly:
 - [Desktop Auto Update Lifecycle](architecture/desktop-auto-update-lifecycle.md)
 - [Desktop Menu Surface](architecture/desktop-menu-surface.md)
 - [Desktop Appearance Settings](architecture/desktop-appearance-settings.md)
+- [Desktop Internationalization and Localization](architecture/desktop-localization.md)
+  - Eight-language product scope, locale ownership across Renderer/Shared UI/
+    Electron/Cloud/Agent/Plugins, message and error contracts, RTL, packaging,
+    testing, and staged migration.
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
 - [Desktop Agent Architecture](architecture/desktop-agent/README.md)
   - [Multi-Native Agent Backend Decision](architecture/desktop-agent/ADR-005-multi-native-agent-backends.md)
   - [Native Harness Adapter and ACP Decision](architecture/desktop-agent/ADR-006-native-harness-adapters-and-acp.md)
   - One shared PuppyOne UI and control plane over PuppyOne Agent, Codex,
     Claude Code, user OpenCode and capability-gated future native Agents.
+    PuppyOne caches the last Agent selection and sanitized local detection,
+    while conversation history remains entirely provider-owned.
 
 ## Release
 

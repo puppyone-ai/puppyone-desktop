@@ -77,7 +77,11 @@ describe("Markdown semantic-plan convergence", () => {
       }),
     });
     expect(view.dom.querySelector(".cm-md-hr-widget")).not.toBeNull();
-    expect(view.dom.querySelector(".cm-md-task-checkbox")?.getAttribute("aria-checked")).toBe("true");
+    const checkbox = view.dom.querySelector<HTMLButtonElement>(".cm-md-task-checkbox-widget");
+    expect(checkbox).toBeInstanceOf(HTMLButtonElement);
+    expect(checkbox?.type).toBe("button");
+    expect(checkbox?.getAttribute("role")).toBe("checkbox");
+    expect(checkbox?.getAttribute("aria-checked")).toBe("true");
     view.destroy();
     parent.remove();
   });

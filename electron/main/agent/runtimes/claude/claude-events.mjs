@@ -8,6 +8,7 @@ export function createClaudeEventState({ turnId = null, resumed = false } = {}) 
     reasoningStarted: false,
     streamedText: new Set(),
     startedTools: new Set(),
+    toolMetadata: new Map(),
     terminal: false,
   };
 }
@@ -30,10 +31,10 @@ export function normalizeClaudeMessage(message, state = createClaudeEventState()
   if (message.type === "assistant") return normalizeAssistant(message, state, sessionId);
   if (message.type === "user") return normalizeToolResults(message, state, sessionId);
   if (message.type === "tool_progress") {
+    const toolId = safeId(message.tool_use_id);
+    const metadata = toolId ? state.toolMetadata.get(toolId) : null;
     return [event("tool.progress", sessionId, turnId, safeId(message.tool_use_id), {
-      kind: toolKind(message.tool_name),
-      label: toolLabel(message.tool_name, {}),
-      status: "running",
+      ...toolPayload(message.tool_name || metadata?.name, metadata?.input ?? {}, "running"),
       elapsedMs: Math.max(0, Number(message.elapsed_time_seconds) || 0) * 1_000,
     })];
   }
@@ -157,9 +158,15 @@ function normalizeAssistant(message, state, sessionId) {
 
 function startTool(block, state, sessionId) {
   const toolId = safeId(block.id) || `claude:tool:${state.startedTools.size + 1}`;
-  if (state.startedTools.has(toolId)) return [];
+  const previous = state.toolMetadata.get(toolId);
+  const name = text(block.name) || previous?.name || "Tool";
+  const input = Object.keys(record(block.input)).length > 0 ? record(block.input) : previous?.input ?? {};
+  state.toolMetadata.set(toolId, { name, input });
+  if (state.startedTools.has(toolId)) {
+    return [event("tool.progress", sessionId, state.turnId, toolId, toolPayload(name, input, "running"))];
+  }
   state.startedTools.add(toolId);
-  return [event("tool.started", sessionId, state.turnId, toolId, toolPayload(block.name, block.input, "running"))];
+  return [event("tool.started", sessionId, state.turnId, toolId, toolPayload(name, input, "running"))];
 }
 
 function normalizeToolResults(message, state, sessionId) {
@@ -168,10 +175,10 @@ function normalizeToolResults(message, state, sessionId) {
     const output = typeof block.content === "string"
       ? block.content
       : asArray(block.content).filter((part) => part?.type === "text").map((part) => text(part.text)).join("\n");
+    const toolId = safeId(block.tool_use_id);
+    const metadata = toolId ? state.toolMetadata.get(toolId) : null;
     return [event("tool.completed", sessionId, state.turnId, safeId(block.tool_use_id), {
-      kind: "tool",
-      label: "Tool",
-      status: block.is_error ? "failed" : "completed",
+      ...toolPayload(metadata?.name || "Tool", metadata?.input ?? {}, block.is_error ? "failed" : "completed"),
       outputPreview: redactSecretText(output).slice(-16 * 1024),
     })];
   });
@@ -196,6 +203,7 @@ function normalizeResult(message, state, sessionId) {
   }
   result.push(event(failed ? "turn.failed" : "turn.completed", sessionId, state.turnId, null, {
     status: failed ? "failed" : "completed",
+    durationMs: Math.max(0, Number(message.duration_ms) || 0),
     stopReason: text(message.stop_reason) || null,
     numTurns: Number(message.num_turns) || 0,
   }));
@@ -204,29 +212,55 @@ function normalizeResult(message, state, sessionId) {
 
 function toolPayload(name, input, status) {
   const safeInput = boundRendererValue(redactSecrets(input ?? {}));
+  const tool = canonicalToolName(name);
   return {
-    kind: toolKind(name),
+    kind: toolKind(tool),
+    tool,
     label: toolLabel(name, safeInput),
     status,
-    arguments: safeInput,
+    input: safeInput,
     path: text(safeInput.file_path || safeInput.path) || null,
     command: text(safeInput.command) || null,
   };
 }
 
 function toolKind(name) {
-  const normalized = text(name).toLowerCase();
+  const normalized = canonicalToolName(name);
   if (normalized === "bash") return "command";
   if (["read", "glob", "grep"].includes(normalized)) return normalized === "read" ? "read" : "search";
-  if (["write", "edit", "multiedit", "notebookedit"].includes(normalized)) return "file-change";
+  if (["write", "edit"].includes(normalized)) return "file-change";
   if (normalized.includes("web")) return "network";
   return "tool";
 }
 
 function toolLabel(name, input) {
-  if (name === "Bash") return text(input?.description) || text(input?.command).slice(0, 240) || "Run command";
+  if (canonicalToolName(name) === "bash") return text(input?.description) || text(input?.command).slice(0, 240) || "Run command";
   const path = text(input?.file_path || input?.path);
   return path ? `${name || "Tool"} ${path}` : text(name) || "Tool";
+}
+
+function canonicalToolName(name) {
+  const normalized = text(name).trim().toLowerCase().replace(/[\s_-]+/g, "");
+  const known = {
+    bash: "bash",
+    shell: "bash",
+    read: "read",
+    write: "write",
+    edit: "edit",
+    multiedit: "edit",
+    notebookedit: "edit",
+    glob: "glob",
+    grep: "grep",
+    ls: "list",
+    webfetch: "webfetch",
+    websearch: "websearch",
+    todowrite: "todo",
+    task: "agent",
+    agent: "agent",
+    skill: "skill",
+    askuserquestion: "question",
+  };
+  return known[normalized] || normalized || "tool";
 }
 
 function event(type, providerSessionId, turnId, itemId, payload) {
@@ -243,4 +277,8 @@ function text(value) {
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function record(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }

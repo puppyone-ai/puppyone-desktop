@@ -799,6 +799,8 @@ declare global {
         rootPath: string;
         remoteUrl: string;
         remoteName?: string;
+        credential?: string | null;
+        username?: string;
       }) => Promise<GitStatusSnapshot>;
       removeGitRemote: (request: {
         rootPath: string;

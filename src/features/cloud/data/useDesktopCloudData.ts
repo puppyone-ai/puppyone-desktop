@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  getCloudProject,
   listCloudProjects,
   type DesktopCloudConnector,
   type DesktopCloudDashboard,
@@ -106,7 +107,14 @@ export function useDesktopCloudData({
     ));
 
     try {
-      const projects = await listCloudProjects(session, onSessionChange, cloudApiBaseUrl);
+      const projects = normalizedBoundProjectId
+        ? [await getCloudProject(
+            session,
+            normalizedBoundProjectId,
+            onSessionChange,
+            cloudApiBaseUrl,
+          )]
+        : await listCloudProjects(session, onSessionChange, cloudApiBaseUrl);
       if (activeRequestRef.current !== requestId) return;
 
       // Mapping is owned by useCloudWorkspaceBinding. This hook only loads data

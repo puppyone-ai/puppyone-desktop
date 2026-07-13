@@ -70,9 +70,14 @@ export function pickUsage(payload: Record<string, unknown>) {
 
 export function pickSafeActivityDetail(payload: Record<string, unknown>) {
   const detail: Record<string, unknown> = {};
-  for (const key of ["command", "cwd", "delta", "status", "kind", "tool", "description", "path", "query", "changes", "steps", "title", "message", "input", "outputPreview", "error", "content", "detail", "metadata", "exitCode", "duration", "diff", "patch", "outputPaths"]) {
+  for (const key of ["command", "cwd", "delta", "status", "kind", "tool", "description", "path", "query", "changes", "steps", "title", "message", "input", "outputPreview", "error", "content", "detail", "metadata", "exitCode", "duration", "durationMs", "elapsedMs", "diff", "patch", "outputPaths"]) {
     if (!(key in payload)) continue;
     detail[key] = boundProjectionValue(payload[key]);
+  }
+  // Older adapters emitted structured tool arguments under `arguments`.
+  // Normalize that compatibility shape into the canonical `input` field.
+  if (!("input" in detail) && "arguments" in payload) {
+    detail.input = boundProjectionValue(payload.arguments);
   }
   return detail;
 }

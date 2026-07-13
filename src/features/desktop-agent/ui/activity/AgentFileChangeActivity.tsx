@@ -8,13 +8,10 @@ import {
 import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
 
-export function AgentFileChangeActivity({ activity, onViewChanges, onOpenFile }: { activity: AgentActivity; onViewChanges?: () => void; onOpenFile?: (path: string) => void }) {
+export function AgentFileChangeActivity({ activity, onOpenFile }: { activity: AgentActivity; onOpenFile?: (path: string) => void }) {
   const changes = fileChangesForActivity(activity);
   const diffLines = diffLinesForActivity(activity);
-  const additions = changes.reduce((sum, change) => sum + change.additions, 0);
-  const deletions = changes.reduce((sum, change) => sum + change.deletions, 0);
   const path = pathForActivity(activity);
-  const stats = additions || deletions ? `+${additions} −${deletions}` : null;
   const reviewable = changes.length > 0 || diffLines.length > 0 || Boolean(path);
   if (!reviewable) return null;
   const defaultTitle = agentActivityToolName(activity);
@@ -26,14 +23,9 @@ export function AgentFileChangeActivity({ activity, onViewChanges, onOpenFile }:
     <AgentActivityShell
       title={title}
       summary={summary}
-      meta={stats}
       status={activity.status}
       icon={<FilePenLine size={13} />}
       className="desktop-agent-file-change"
-      actions={<>
-        {onOpenFile && path && <button type="button" className="desktop-agent-tool-action" aria-label={`Open ${path}`} onClick={() => onOpenFile(path)}>Open file</button>}
-        {onViewChanges && reviewable && <button type="button" className="desktop-agent-tool-action" aria-label="Review file changes" onClick={onViewChanges}>Review</button>}
-      </>}
     >
       {(changes.length > 0 || diffLines.length > 0) && <div className="desktop-agent-file-change-detail">
         {changes.length > 0 && (

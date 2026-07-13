@@ -18,7 +18,7 @@ export type DesktopWorkspaceSurfaceAction = {
 };
 
 export function PuppyGitIcon({
-  size = 15,
+  size = 18,
   className,
   ...props
 }: SVGProps<SVGSVGElement> & { size?: number }) {
@@ -698,7 +698,7 @@ function getDesktopNavigationLabel(
 
 const DESKTOP_NAV_ITEMS: readonly DesktopNavigationItem[] = [
   { view: "data", label: "Files", icon: Folder },
-  { view: "git", label: "Changes", icon: PuppyGitIcon, iconSize: 15 },
+  { view: "git", label: "Changes", icon: PuppyGitIcon, iconSize: 18 },
   { view: "plugins", label: "Plugins", icon: Blocks },
   { view: "access", label: "Assets", icon: AssetsDistributionIcon },
   { view: "automation", label: "Automation", icon: Workflow },

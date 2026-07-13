@@ -1107,7 +1107,7 @@ const DOCX_SHADOW_BASE_CSS = `
   }
 
   [${CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE}] {
-    cursor: pointer;
+    cursor: var(--po-clickable-cursor, pointer);
     text-decoration: underline;
   }
 

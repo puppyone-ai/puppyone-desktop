@@ -99,21 +99,24 @@ export class AcpEventNormalizer {
       completed: false,
       output: "",
       kind: "tool",
+      tool: "tool",
       label: "Tool",
       input: {},
     };
     const kind = normalizeToolKind(update.kind ?? previous.kind);
     const label = text(update.title, 300) || previous.label || "Tool";
     const input = update.rawInput === undefined ? previous.input : record(update.rawInput);
+    const tool = inferAcpToolName({ kind, label, input, previous: previous.tool });
     const output = renderToolOutput(update.content, update.rawOutput) || previous.output;
     const status = text(update.status, 40) || (initial ? "pending" : "in_progress");
     const result = [];
     if (!previous.started) {
       result.push(event("tool.started", sessionId, this.turnId, itemId, {
         kind,
+        tool,
         label,
         status: "running",
-        arguments: boundRendererValue(redactSecrets(input)),
+        input: boundRendererValue(redactSecrets(input)),
         path: toolPath(update, input),
         command: kind === "command" ? text(input.command, 8_192) || null : null,
       }));
@@ -123,7 +126,7 @@ export class AcpEventNormalizer {
       result.push(event(kind === "command" ? "command.output.delta" : "tool.progress", sessionId, this.turnId, itemId,
         kind === "command"
           ? { delta: redactSecretText(delta) }
-          : { kind, label, status: "running", outputPreview: redactSecretText(delta).slice(-16 * 1024) }));
+          : { kind, tool, label, status: "running", input: boundRendererValue(redactSecrets(input)), outputPreview: redactSecretText(delta).slice(-16 * 1024) }));
     }
     if (hasDiff(update.content)) {
       result.push(event("file.change.updated", sessionId, this.turnId, itemId, {
@@ -137,9 +140,10 @@ export class AcpEventNormalizer {
     if (TERMINAL_TOOL_STATUSES.has(status) && !previous.completed) {
       result.push(event("tool.completed", sessionId, this.turnId, itemId, {
         kind,
+        tool,
         label,
         status: status === "failed" ? "failed" : "completed",
-        arguments: boundRendererValue(redactSecrets(input)),
+        input: boundRendererValue(redactSecrets(input)),
         outputPreview: redactSecretText(output).slice(-16 * 1024),
       }));
     }
@@ -148,6 +152,7 @@ export class AcpEventNormalizer {
       completed: previous.completed || TERMINAL_TOOL_STATUSES.has(status),
       output,
       kind,
+      tool,
       label,
       input,
     });
@@ -208,9 +213,33 @@ function normalizeToolKind(value) {
   return "tool";
 }
 
+function inferAcpToolName({ kind, label, input, previous }) {
+  const title = text(label, 300).trim().toLowerCase();
+  const titleToken = title.match(/^([a-z][a-z0-9_-]*)/u)?.[1]?.replace(/[_-]+/g, "") || "";
+  for (const tool of ["bash", "shell", "read", "write", "edit", "grep", "glob", "webfetch", "websearch", "skill", "task"]) {
+    if (titleToken === tool) {
+      return tool === "shell" ? "bash" : tool === "task" ? "agent" : tool;
+    }
+  }
+  if (kind === "command") return "bash";
+  if (kind === "read") return "read";
+  if (kind === "network") return "webfetch";
+  if (kind === "file-change") {
+    if (typeof input.oldString === "string" || typeof input.old_string === "string") return "edit";
+    if (typeof input.content === "string") return "write";
+    return previous && previous !== "tool" ? previous : "edit";
+  }
+  if (kind === "search") {
+    if (/glob|files?/.test(title)) return "glob";
+    if (/grep|search|find/.test(title)) return "grep";
+    return previous && previous !== "tool" ? previous : "search";
+  }
+  return previous || "tool";
+}
+
 function toolPath(update, input) {
   const location = array(update.locations)[0]?.path;
-  return text(location || input.path || input.file_path, 4_096) || null;
+  return text(location || input.path || input.file_path || input.filePath || input.filepath, 4_096) || null;
 }
 
 function hasDiff(value) {

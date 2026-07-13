@@ -2,7 +2,7 @@
 
 Status: superseded. This file preserves the original Codex-only delivery
 record and must not be used as current implementation instructions. Use
-`../README.md`, `../ADR-001-opencode-sidecar.md`, and
+`../README.md`, `../ADR-006-native-harness-adapters-and-acp.md`, and
 `../ADR-002-agent-contract-and-boundaries.md` for the implemented architecture.
 
 This is the implementation handoff for the first production-shaped slice of

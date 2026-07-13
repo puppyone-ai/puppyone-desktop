@@ -1,8 +1,7 @@
-import { EditorSelection } from "@codemirror/state";
 import { EditorView, type Rect, WidgetType } from "@codemirror/view";
 import type { MarkdownTaskLine } from "../rendering/taskModel";
 import { getInlineWidgetEdgeX, getInlineWidgetTextCoords } from "../../shared/widgets/markdownWidgetMeasure";
-import { hasPointerMoved } from "../../shared/widgets/widgetDom";
+import { toggleMarkdownTaskCheckbox } from "../commands/markdownTaskCommands";
 
 export type MarkdownSourceSyntaxKind =
   | "blockquote"
@@ -71,8 +70,6 @@ export class InlineHtmlLineBreakWidget extends WidgetType {
 }
 
 export class TaskCheckboxWidget extends WidgetType {
-  private pointerDown: { x: number; y: number } | null = null;
-
   constructor(private readonly task: MarkdownTaskLine) {
     super();
   }
@@ -88,40 +85,49 @@ export class TaskCheckboxWidget extends WidgetType {
   }
 
   toDOM(view: EditorView): HTMLElement {
-    const wrapper = document.createElement("span");
-    wrapper.className = "cm-md-task-checkbox-widget";
-    wrapper.style.setProperty("--md-list-depth", String(this.task.depth));
+    const control = document.createElement("button");
+    control.type = "button";
+    control.role = "checkbox";
+    control.className = "cm-md-task-checkbox-widget";
+    syncTaskCheckboxControl(control, this.task);
 
-    const checkbox = document.createElement("span");
-    checkbox.role = "checkbox";
-    checkbox.className = this.task.checked ? "cm-md-task-checkbox is-checked" : "cm-md-task-checkbox";
-    checkbox.setAttribute("aria-label", this.task.checked ? "Mark task incomplete" : "Mark task complete");
-    checkbox.setAttribute("aria-checked", String(this.task.checked));
+    const indicator = document.createElement("span");
+    indicator.setAttribute("aria-hidden", "true");
+    control.appendChild(indicator);
+    syncTaskCheckboxIndicator(indicator, this.task.checked);
 
-    checkbox.addEventListener("mousedown", (event) => {
-      this.pointerDown = { x: event.clientX, y: event.clientY };
+    control.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
     });
-
-    checkbox.addEventListener("click", (event) => {
+    control.addEventListener("mousedown", (event) => {
+      // Keep the browser from moving the contenteditable selection before the
+      // command runs. Keyboard activation remains native because it does not
+      // produce a mousedown event.
       event.preventDefault();
       event.stopPropagation();
-      if (this.pointerDown && hasPointerMoved(event, this.pointerDown)) return;
-      if (view.state.readOnly) return;
+    });
+    control.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
 
-      const nextValue = this.task.checked ? "[ ]" : "[x]";
-      view.dispatch({
-        changes: { from: this.task.checkboxFrom, to: this.task.checkboxTo, insert: nextValue },
-        selection: EditorSelection.cursor(this.task.checkboxFrom + nextValue.length),
-      });
-      view.focus();
+      const target = readTaskCheckboxTarget(control);
+      if (!target || !toggleMarkdownTaskCheckbox(view, target)) return;
     });
 
-    wrapper.appendChild(checkbox);
-    return wrapper;
+    return control;
+  }
+
+  updateDOM(dom: HTMLElement): boolean {
+    if (!(dom instanceof HTMLButtonElement)) return false;
+    const indicator = dom.firstElementChild;
+    if (!(indicator instanceof HTMLElement)) return false;
+    syncTaskCheckboxControl(dom, this.task);
+    syncTaskCheckboxIndicator(indicator, this.task.checked);
+    return true;
   }
 
   ignoreEvent() {
-    return false;
+    return true;
   }
 
   coordsAt(dom: HTMLElement): Rect | null {
@@ -133,6 +139,25 @@ export class TaskCheckboxWidget extends WidgetType {
     const textLeft = lineRect.left + Number.parseFloat(lineStyle.paddingLeft || "0");
     return getInlineWidgetTextCoords(dom, textLeft);
   }
+}
+
+function syncTaskCheckboxControl(control: HTMLButtonElement, task: MarkdownTaskLine) {
+  control.style.setProperty("--md-list-depth", String(task.depth));
+  control.dataset.checkboxFrom = String(task.checkboxFrom);
+  control.dataset.checkboxTo = String(task.checkboxTo);
+  control.setAttribute("aria-label", task.checked ? "Mark task incomplete" : "Mark task complete");
+  control.setAttribute("aria-checked", String(task.checked));
+}
+
+function syncTaskCheckboxIndicator(indicator: HTMLElement, checked: boolean) {
+  indicator.className = checked ? "cm-md-task-checkbox is-checked" : "cm-md-task-checkbox";
+}
+
+function readTaskCheckboxTarget(control: HTMLButtonElement) {
+  const from = Number(control.dataset.checkboxFrom);
+  const to = Number(control.dataset.checkboxTo);
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
+  return { from, to };
 }
 
 export class HorizontalRuleWidget extends WidgetType {

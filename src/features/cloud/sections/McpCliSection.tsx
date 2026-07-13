@@ -11,7 +11,7 @@ import {
   CloudWebEmpty,
   CloudWebPage,
 } from "../components/shared";
-import { getApiBaseFromGitUrl, getScopeDisplayName, profileSlug, shellQuote } from "../utils";
+import { getApiBaseFromGitUrl, getCanonicalScopeGitUrl, getScopeDisplayName, profileSlug, shellQuote } from "../utils";
 
 export function CloudMcpCliSection({
   projectId,
@@ -30,7 +30,7 @@ export function CloudMcpCliSection({
 }) {
   const rootScope = scopes.find((scope) => scope.is_root) ?? scopes[0] ?? null;
   const apiBase = identity?.url ? getApiBaseFromGitUrl(identity.url) : "";
-  const gitUrl = rootScope?.access_key && apiBase ? `${apiBase}/git/ap/${rootScope.access_key}.git` : identity?.url ?? "";
+  const gitUrl = getCanonicalScopeGitUrl(identity, rootScope, apiBase);
   const scopeName = rootScope ? getScopeDisplayName(rootScope) : "root";
   const profileName = profileSlug(scopeName);
   const cliCommand = rootScope?.access_key && apiBase
@@ -49,7 +49,7 @@ export function CloudMcpCliSection({
         <div className="desktop-cloud-method-page">
           {!rootScope?.access_key && (
             <div className="desktop-cloud-method-warning">
-              This scope has no access key issued. Open Access to regenerate one before using CLI or Git.
+              This scope has no CLI key issued. Open Access to regenerate one before using the CLI.
             </div>
           )}
           <CloudMethodSection title="Puppyone CLI">

@@ -21,7 +21,10 @@ assert(
   "Claudian source ledger is incomplete or does not name the current UI/runtime architecture boundary.",
 );
 assert(notice.includes(commit) && notice.includes("vendor/claudian/LICENSE"), "Claudian third-party notice is incomplete.");
-assert(css.includes(commit) && css.includes("vendor/claudian/SOURCE_ADOPTION.md"), "Agent UI source provenance comment is missing.");
+assert(
+  css.includes("Third-party source provenance") && css.includes("audited notice ledger"),
+  "Agent UI source provenance pointer is missing.",
+);
 assert(packageManifest.build?.files?.includes("vendor/claudian/**"), "Packaged application omits the Claudian license ledger.");
 assert(sbom.bomFormat === "CycloneDX" && sbom.components?.[0]?.version === commit, "Claudian SBOM is missing or drifted.");
 assert(sbom.components?.[0]?.properties?.some((entry) => entry.name === "puppyone:runtime-code-included" && entry.value === "false"), "Claudian SBOM adoption boundary is missing.");

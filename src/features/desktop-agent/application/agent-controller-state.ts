@@ -4,7 +4,6 @@ import type {
   AgentLocalConnection,
   AgentProviderInspection,
   AgentRuntimeId,
-  AgentSessionListItem,
   AgentSessionMetadata,
 } from "../domain/agent-contract";
 
@@ -23,7 +22,6 @@ export type AgentControllerState = {
   phase: AgentControllerPhase;
   inspection: AgentProviderInspection | null;
   session: AgentSessionMetadata | null;
-  history: AgentSessionListItem[];
   projection: AgentProjection;
   selectedRuntimeId: AgentRuntimeId | null;
   selectedProviderId: string | null;
@@ -34,6 +32,8 @@ export type AgentControllerState = {
   localConnectionsScannedAt: string | null;
   localConnectionsError: string | null;
   draft: string;
+  /** Optimistic prompt shown while the native backend accepts the turn. */
+  pendingPrompt: string | null;
   attachments: AgentFileReference[];
   contextReferences: AgentFileReference[];
   error: string | null;

@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 describe("ContentFontSetting", () => {
-  it("previews the selected content font immediately without changing UI typography", () => {
+  it("updates the selected content font without rendering a redundant preview field", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -41,18 +41,14 @@ describe("ContentFontSetting", () => {
     const serifButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Use Serif for content"]',
     );
-    const preview = container.querySelector<HTMLOutputElement>(".desktop-content-font-preview");
     expect(serifButton).not.toBeNull();
-    expect(preview?.dataset.fontId).toBe("builtin:geist-sans");
-    expect(preview?.style.fontFamily).toContain("Geist Sans");
+    expect(container.querySelector(".desktop-content-font-preview")).toBeNull();
+    expect(container.textContent).not.toContain("Knowledge, notes, and ideas");
+    expect(container.textContent).not.toContain("知识、笔记与思考");
 
     act(() => serifButton?.click());
 
     expect(serifButton?.getAttribute("aria-pressed")).toBe("true");
-    expect(preview?.dataset.fontId).toBe("builtin:system-serif");
-    expect(preview?.style.fontFamily).toContain("ui-serif");
-    expect(preview?.getAttribute("aria-label")).toBe("Serif content font preview");
-    expect(container.querySelector(".desktop-content-font-preview-text")?.textContent).toContain("知识");
   });
 
   it("renders future imported catalog entries without changing its preference contract", () => {

@@ -132,7 +132,7 @@
   color: var(--po-text-muted);
   font: inherit;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   user-select: none;
   transition: background 0.1s ease, color 0.1s ease;
 }

@@ -69,7 +69,7 @@
   background: transparent;
   color: var(--po-text-muted);
   text-align: center;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition:
     color 150ms ease-out,
     transform 150ms ease-out;
@@ -82,7 +82,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .folder-drop-primary-action:focus-visible {
@@ -315,7 +315,7 @@
   border: 0;
   background: transparent;
   color: var(--po-text-subtle);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   font: inherit;
   font-size: 11.5px;
   font-weight: 560;
@@ -438,7 +438,7 @@
   background: transparent;
   color: var(--po-text);
   text-align: left;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition:
     background-color 150ms ease,
     color 150ms ease;

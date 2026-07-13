@@ -15,6 +15,8 @@ import { bindingMatchesWorkspace, sameCloudOrigin } from "./explicitWorkspaceBin
 
 const LEGACY_CONFIRMATION_MESSAGE =
   "Confirm this Cloud project before converting the legacy Git remote into a workspace binding.";
+const CANONICAL_CONFIRMATION_MESSAGE =
+  "Confirm this Cloud project to create a durable binding for this local workspace.";
 const FORBIDDEN_MESSAGE =
   "This folder is linked to a Cloud project that the current account cannot access.";
 
@@ -101,8 +103,57 @@ export function useCloudWorkspaceBinding({
         });
         return undefined;
       }
+      if (!sameCloudOrigin(
+        cloudRemote.rawUrl,
+        desktopCloudApiBaseUrl ?? activeCloudSession.api_base_url,
+      )) {
+        apply({
+          projectId: null,
+          cloudLinked: true,
+          error: "This Git remote belongs to a different PuppyOne Cloud host.",
+          reason: "unresolvable",
+        });
+        return undefined;
+      }
 
       let cancelled = false;
+      if (cloudRemote.info.kind !== "access-point" && cloudRemote.info.projectId) {
+        const candidateProjectId = cloudRemote.info.projectId;
+        void getCloudProject(
+          activeCloudSession,
+          candidateProjectId,
+          updateCloudSession,
+          desktopCloudApiBaseUrl,
+        ).then((project) => {
+          if (cancelled) return;
+          setHomeCloudProjects((projects) => upsertProject(projects, project));
+          apply({
+            projectId: null,
+            candidateProjectId,
+            candidateScopeId: cloudRemote.info.kind === "scope"
+              ? cloudRemote.info.scopeId ?? null
+              : null,
+            bindingId: null,
+            bindingKind: cloudRemote.info.kind === "scope" ? "scoped" : "full",
+            scopePath: null,
+            cloudLinked: true,
+            error: CANONICAL_CONFIRMATION_MESSAGE,
+            reason: "legacy-confirmation-required",
+          });
+        }).catch((error) => {
+          if (cancelled) return;
+          apply({
+            projectId: null,
+            candidateProjectId,
+            cloudLinked: true,
+            error: error instanceof Error ? error.message : String(error),
+            reason: errorStatus(error) === 401 || errorStatus(error) === 403
+              ? "not-authorized"
+              : "unresolvable",
+          });
+        });
+        return () => { cancelled = true; };
+      }
       void resolveLegacyCloudWorkspaceRemote(
         activeCloudSession,
         cloudRemote.rawUrl,

@@ -181,10 +181,26 @@ export function buildCloudAccessPointIdentity(
           name: scope.name,
           path: scope.path,
           is_root: scope.is_root,
+          git_url: cloudRemote.rawUrl,
           access_key: scope.access_key,
         }]
       : [],
   };
+}
+
+export function getCanonicalScopeGitUrl(
+  identity: DesktopCloudRepoIdentity | null,
+  scope: DesktopCloudScope | null,
+  apiBase = "",
+): string {
+  if (!identity) return "";
+  if (!scope || scope.is_root) return identity.url ?? "";
+  const identityScope = identity.scopes.find((entry) => entry.id === scope.id);
+  if (identityScope?.git_url) return identityScope.git_url;
+  const base = apiBase || getApiBaseFromGitUrl(identity.url);
+  return base && identity.project_id
+    ? `${base.replace(/\/+$/, "")}/git/${encodeURIComponent(identity.project_id)}/scopes/${encodeURIComponent(scope.id)}.git`
+    : "";
 }
 
 export function getScopeDisplayName(scope: DesktopCloudScope) {

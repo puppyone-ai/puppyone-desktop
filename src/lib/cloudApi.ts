@@ -93,6 +93,13 @@ export type DesktopCloudWorkspaceBinding = {
   revoked_at?: string | null;
   /** Returned exactly once by create; never persist this field locally. */
   credential?: string | null;
+  remote: {
+    url: string;
+    project_id: string;
+    scope_id: string;
+    kind: "full" | "scoped";
+    username: string;
+  };
 };
 
 export type DesktopCloudWorkspaceBindingCreate = {
@@ -434,6 +441,7 @@ export type DesktopCloudRepoIdentity = {
     name: string;
     path: string;
     is_root: boolean;
+    git_url?: string;
     access_key?: string | null;
   }>;
 };
@@ -667,7 +675,11 @@ export async function rotateCloudWorkspaceBindingCredential(
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
 ): Promise<string> {
-  const result = await cloudApiRequest<{ binding_id: string; credential: string }>(
+  const result = await cloudApiRequest<{
+    binding_id: string;
+    credential: string;
+    remote: DesktopCloudWorkspaceBinding["remote"];
+  }>(
     `/workspace-bindings/${encodeURIComponent(bindingId)}/credential/rotate`,
     session,
     onSessionChange,
@@ -675,6 +687,21 @@ export async function rotateCloudWorkspaceBindingCredential(
     apiBaseUrl,
   );
   return result.credential;
+}
+
+export function revokeCloudWorkspaceBindingCredential(
+  session: DesktopCloudSession,
+  bindingId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<void> {
+  return cloudApiRequest<void>(
+    `/workspace-bindings/${encodeURIComponent(bindingId)}/credential/revoke`,
+    session,
+    onSessionChange,
+    { method: "POST" },
+    apiBaseUrl,
+  );
 }
 
 export function resolveLegacyCloudWorkspaceRemote(

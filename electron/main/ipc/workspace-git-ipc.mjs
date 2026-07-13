@@ -173,10 +173,21 @@ export function registerWorkspaceGitIpcHandlers({
   ipcMain.handle("workspace:git-configure-cloud-remote", withAuthorizedRepositoryMutation((rootPath, request) => {
     const remoteUrl = request?.remoteUrl;
     const remoteName = request?.remoteName ?? "puppyone";
+    const credential = request?.credential ?? null;
+    const username = request?.username ?? "x-puppyone-token";
     if (typeof remoteUrl !== "string" || remoteUrl.trim().length === 0) {
       throw new Error("Cloud remote URL is required.");
     }
-    return configureWorkspaceCloudRemote(rootPath, remoteUrl, remoteName);
+    if (credential !== null && (typeof credential !== "string" || credential.trim().length === 0)) {
+      throw new Error("Cloud Git credential is invalid.");
+    }
+    return configureWorkspaceCloudRemote(
+      rootPath,
+      remoteUrl,
+      remoteName,
+      credential,
+      username,
+    );
   }));
 
   ipcMain.handle("workspace:git-remove-remote", withAuthorizedRepositoryMutation((rootPath, request) => (

@@ -434,6 +434,9 @@ export function normalizeCodexNotification(message) {
     case "item/reasoning/summaryTextDelta":
       return [{ type: "reasoning.summary.delta", providerSessionId: threadId, turnId, itemId, payload: { delta: String(params.delta ?? ""), summaryIndex: params.summaryIndex ?? 0 } }];
     case "item/reasoning/summaryPartAdded":
+      // This is a section boundary, not hidden chain-of-thought content. It is
+      // enough to surface the native working state before readable summary text
+      // arrives without leaking raw reasoning tokens.
       return [{ type: "reasoning.summary.delta", providerSessionId: threadId, turnId, itemId, payload: { delta: "", summaryIndex: params.summaryIndex ?? 0, boundary: true } }];
     case "turn/plan/updated":
       return [{ type: "plan.updated", providerSessionId: threadId, turnId, payload: { explanation: stringOrNull(params.explanation), steps: normalizePlan(params.plan) } }];
@@ -514,8 +517,16 @@ function normalizeItemLifecycle(item, phase, threadId, turnId) {
   }
   if (item.type === "fileChange") {
     const changes = summarizeFileChanges(item.changes);
+    const path = changes.length === 1 ? changes[0]?.path ?? null : null;
     return [
-      { type: phase === "started" ? "tool.started" : "tool.completed", providerSessionId: threadId, turnId, itemId, payload: { kind: "file-change", status: normalizeToolStatus(item.status, phase) } },
+      { type: phase === "started" ? "tool.started" : "tool.completed", providerSessionId: threadId, turnId, itemId, payload: {
+        kind: "file-change",
+        tool: "edit",
+        label: changes.length > 1 ? `Edit ${changes.length} files` : path ? `Edit ${path}` : "Edit files",
+        input: { changes },
+        path,
+        status: normalizeToolStatus(item.status, phase),
+      } },
       { type: "file.change.updated", providerSessionId: threadId, turnId, itemId, payload: { changes, status: normalizeToolStatus(item.status, phase) } },
     ];
   }
@@ -527,8 +538,10 @@ function summarizeToolItem(item, phase) {
   if (item.type === "commandExecution") {
     return boundRendererValue({
       kind: "command",
+      tool: "bash",
       label: item.command || "Command",
       command: item.command || "",
+      input: { command: item.command || "", cwd: item.cwd || null },
       cwd: item.cwd || null,
       status: normalizeToolStatus(item.status, phase),
       exitCode: Number.isInteger(item.exitCode) ? item.exitCode : null,
@@ -539,15 +552,16 @@ function summarizeToolItem(item, phase) {
   if (item.type === "mcpToolCall" || item.type === "dynamicToolCall") {
     return boundRendererValue(redactSecrets({
       kind: item.type === "mcpToolCall" ? "mcp" : "tool",
+      tool: String(item.tool || (item.type === "mcpToolCall" ? "mcp" : "tool")).trim().toLowerCase(),
       label: item.type === "mcpToolCall" ? `${item.server}.${item.tool}` : item.tool,
       status: normalizeToolStatus(item.status, phase),
-      arguments: item.arguments ?? null,
+      input: item.arguments ?? null,
       durationMs: Number.isFinite(item.durationMs) ? item.durationMs : null,
     }));
   }
-  if (item.type === "webSearch") return { kind: "search", label: item.query || "Web search", status: phase === "completed" ? "completed" : "running" };
-  if (item.type === "imageView") return { kind: "read", label: `Viewed ${item.path || "image"}`, status: phase === "completed" ? "completed" : "running" };
-  if (item.type === "contextCompaction") return { kind: "system", label: "Compacted context", status: phase === "completed" ? "completed" : "running" };
+  if (item.type === "webSearch") return { kind: "search", tool: "websearch", label: item.query || "Web search", query: item.query || "", input: { query: item.query || "" }, status: phase === "completed" ? "completed" : "running" };
+  if (item.type === "imageView") return { kind: "read", tool: "read", label: `Viewed ${item.path || "image"}`, path: item.path || null, input: { path: item.path || null }, status: phase === "completed" ? "completed" : "running" };
+  if (item.type === "contextCompaction") return { kind: "system", tool: "compaction", label: "Compacted context", status: phase === "completed" ? "completed" : "running" };
   return null;
 }
 
@@ -642,6 +656,7 @@ function normalizeModels(result) {
 function normalizeCodexReasoningEffort(value) {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase();
+  // Older catalogs/configs used `max`; the app-server wire value is `xhigh`.
   const compatible = normalized === "max" ? "xhigh" : normalized;
   return CODEX_REASONING_EFFORTS.has(compatible) ? compatible : null;
 }

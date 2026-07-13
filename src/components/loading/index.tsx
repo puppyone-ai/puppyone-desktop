@@ -113,6 +113,7 @@ export function Dots({
 
 export function PageLoading({
   label = "Loading",
+  ariaLabel,
   variant = "screen",
   size = "sm",
   tone = "neutral",
@@ -120,6 +121,7 @@ export function PageLoading({
   style,
 }: {
   label?: ReactNode | null;
+  ariaLabel?: string;
   variant?: "screen" | "fill";
   size?: LoaderSize;
   tone?: LoaderTone;
@@ -142,7 +144,11 @@ export function PageLoading({
 
   return (
     <div className={className} style={containerStyle}>
-      <PulseGrid size={size} tone={tone} />
+      <PulseGrid
+        size={size}
+        tone={tone}
+        ariaLabel={ariaLabel || (typeof label === "string" ? label : "Loading")}
+      />
       {label != null && <span style={{ fontSize, lineHeight: 1.4 }}>{label}</span>}
     </div>
   );

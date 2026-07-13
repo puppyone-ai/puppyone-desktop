@@ -1,3 +1,4 @@
+import { installBrokenStdioGuards } from "./main/stdio-guard.mjs";
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, session as electronSession, shell, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
@@ -54,6 +55,11 @@ import {
   loadViewerPackRuntime,
 } from "./main/viewer-packs/bootstrap.mjs";
 import { resolveViewerPackFeatureProfile } from "./main/viewer-packs/feature-profile.mjs";
+
+// Must run before any console.* / IPC replyWithError logging: broken inherited
+// stdout/stderr (Dock launch, detached child, closed terminal) otherwise throws
+// uncaught `write EIO` / `write EPIPE` and Electron shows a fatal dialog.
+installBrokenStdioGuards();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);

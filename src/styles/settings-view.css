@@ -12,8 +12,43 @@
     var(--desktop-utility-page-padding-bottom);
 }
 
-.desktop-settings-sidebar-divider {
+.desktop-settings-sidebar-group {
+  display: grid;
+  min-width: 0;
+}
+
+.desktop-settings-sidebar-group + .desktop-settings-sidebar-group {
+  position: relative;
+  padding-top: 12px;
+}
+
+.desktop-settings-sidebar-group + .desktop-settings-sidebar-group::before {
+  position: absolute;
+  top: 5px;
+  right: calc(-1 * var(--desktop-sidebar-row-right-gap));
+  left: calc(-1 * var(--desktop-sidebar-row-left-gap));
   height: 1px;
-  margin: 7px var(--desktop-sidebar-row-right-gap) 7px var(--desktop-sidebar-row-left-gap);
-  background: var(--po-divider);
+  background: var(--po-border-subtle);
+  content: "";
+}
+
+.desktop-settings-sidebar-group-header {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: var(--desktop-sidebar-row-height);
+  align-items: stretch;
+}
+
+.desktop-settings-sidebar-group-title {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  align-items: center;
+  padding: 0 var(--desktop-sidebar-row-content-right) 0 var(--desktop-sidebar-row-content-left);
+  color: var(--po-text-subtle);
+  font-size: var(--desktop-sidebar-font-size-meta, var(--po-text-size-meta, 12px));
+  font-weight: var(--desktop-sidebar-font-weight, var(--po-text-weight-medium, 500));
+  line-height: var(--desktop-sidebar-line-height, 18px);
 }

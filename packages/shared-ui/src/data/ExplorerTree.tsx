@@ -4,6 +4,7 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   ReactNode,
+  RefObject,
 } from "react";
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DataNode } from "../core/types";
@@ -24,7 +25,15 @@ import {
   type ExplorerRowInteractionState,
   type ExplorerRowStateSources,
 } from "./explorer/explorerRowInteraction";
-import type { ExplorerRowMotionInstruction } from "./explorer/explorerMotionPlan";
+import {
+  createExplorerMotionAnimation,
+  EXPLORER_MOTION_DURATION_MS,
+  EXPLORER_MOTION_EASING,
+} from "./explorer/explorerMotionAnimation";
+import type {
+  ExplorerRevealPhase,
+  ExplorerRowMotionInstruction,
+} from "./explorer/explorerMotionPlan";
 import { useExplorerMotion } from "./explorer/useExplorerMotion";
 import {
   EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS,
@@ -443,6 +452,8 @@ export function ExplorerTree({
       data-scroll-at-bottom={scrollEdgeState.atBottom ? "true" : "false"}
       data-scroll-at-top={scrollEdgeState.atTop ? "true" : "false"}
       style={{
+        "--tree-motion-duration": `${EXPLORER_MOTION_DURATION_MS}ms`,
+        "--tree-motion-easing": EXPLORER_MOTION_EASING,
         "--tree-edge-fade-bottom": scrollEdgeState.bottomFade.toFixed(3),
         "--tree-edge-fade-top": scrollEdgeState.topFade.toFixed(3),
       } as CSSProperties}
@@ -555,7 +566,7 @@ export function ExplorerTree({
                   </ExplorerVirtualMotionShell>
                 </div>
               ))}
-              {motionPlan?.ghosts.map(({ row, top }) => (
+              {motionPlan?.ghosts.map(({ row, top, reveal }) => (
                 <div
                   key={`exit:${motionPlan.generation}:${row.key}`}
                   className="explorer-tree-virtual-row explorer-tree-exit-ghost"
@@ -569,7 +580,7 @@ export function ExplorerTree({
                   <ExplorerVirtualMotionShell
                     depth={row.depth}
                     generation={motionPlan.generation}
-                    exit
+                    exitPhase={reveal}
                   >
                     <ExplorerExitGhostRow
                       row={row}
@@ -581,7 +592,14 @@ export function ExplorerTree({
               ))}
             </div>
           )}
-          {renderListEnd?.()}
+          {renderListEnd && (
+            <ExplorerListEndMotionShell
+              generation={motionPlan?.generation ?? 0}
+              offsetY={motionPlan?.listEndOffsetY ?? 0}
+            >
+              {renderListEnd()}
+            </ExplorerListEndMotionShell>
+          )}
         </div>
       </div>
     </div>
@@ -781,64 +799,85 @@ function ExplorerVirtualMotionShell({
   depth,
   generation,
   instruction,
-  exit = false,
+  exitPhase,
   children,
 }: {
   depth: number;
   generation: number;
   instruction?: ExplorerRowMotionInstruction;
-  exit?: boolean;
+  exitPhase?: ExplorerRevealPhase;
   children: ReactNode;
 }) {
   const elementRef = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    const element = elementRef.current;
-    if (!element || (!instruction && !exit)) return undefined;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return undefined;
-    if (typeof element.animate !== "function") return undefined;
-
-    const rowDelta = instruction?.kind === "move"
-      ? Math.abs(instruction.offsetY) / EXPLORER_VIRTUAL_ROW_SIZE
-      : 0;
-    const duration = exit
-      ? 145
-      : instruction?.kind === "move"
-        ? Math.min(220, 150 + rowDelta * 5)
-        : 165;
-    const keyframes: Keyframe[] = exit
-      ? [
-          { opacity: 1, transform: "translateY(0) scale(1)" },
-          { opacity: 0, transform: "translateY(-5px) scale(0.985)" },
-        ]
-      : instruction?.kind === "move"
-        ? [
-            { transform: `translateY(${instruction.offsetY}px)` },
-            { transform: "translateY(0)" },
-          ]
-        : [
-            { opacity: 0, transform: "translateY(-6px) scale(0.985)" },
-            { opacity: 1, transform: "translateY(0) scale(1)" },
-          ];
-    const animation = element.animate(keyframes, {
-      duration,
-      easing: "cubic-bezier(0.2, 0.75, 0.25, 1)",
-      fill: "both",
-    });
-    return () => animation.cancel();
-  }, [exit, generation, instruction]);
+  useExplorerElementMotion({ elementRef, exitPhase, generation, instruction });
 
   return (
     <div
       ref={elementRef}
       className="explorer-tree-motion-shell"
       data-depth={depth}
-      data-explorer-motion={exit ? "exit" : instruction?.kind}
+      data-explorer-motion={exitPhase ? "exit" : instruction?.kind}
       style={{ "--depth": depth } as CSSProperties}
     >
       {children}
     </div>
   );
+}
+
+function ExplorerListEndMotionShell({
+  generation,
+  offsetY,
+  children,
+}: {
+  generation: number;
+  offsetY: number;
+  children: ReactNode;
+}) {
+  const elementRef = useRef<HTMLDivElement>(null);
+  const instruction = useMemo<ExplorerRowMotionInstruction | undefined>(
+    () => offsetY === 0 ? undefined : { kind: "move", offsetY },
+    [offsetY],
+  );
+  useExplorerElementMotion({ elementRef, generation, instruction });
+
+  return (
+    <div
+      ref={elementRef}
+      className="explorer-tree-list-end-motion"
+      data-explorer-motion={instruction?.kind}
+    >
+      {children}
+    </div>
+  );
+}
+
+function useExplorerElementMotion({
+  elementRef,
+  generation,
+  instruction,
+  exitPhase,
+}: {
+  elementRef: RefObject<HTMLDivElement>;
+  generation: number;
+  instruction?: ExplorerRowMotionInstruction;
+  exitPhase?: ExplorerRevealPhase;
+}) {
+  useLayoutEffect(() => {
+    const element = elementRef.current;
+    const definition = createExplorerMotionAnimation({ instruction, exitPhase });
+    if (!element || !definition) return undefined;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      if (!exitPhase) return undefined;
+      element.style.visibility = "hidden";
+      return () => {
+        element.style.visibility = "";
+      };
+    }
+    if (typeof element.animate !== "function") return undefined;
+
+    const animation = element.animate(definition.keyframes, definition.options);
+    return () => animation.cancel();
+  }, [elementRef, exitPhase, generation, instruction]);
 }
 
 function ExplorerExitGhostRow({

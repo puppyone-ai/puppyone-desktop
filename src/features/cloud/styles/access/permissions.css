@@ -93,7 +93,7 @@
   font-size: 12px;
   font-weight: 400;
   line-height: 16px;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition: background 0.12s ease, opacity 0.12s ease;
 }
 
@@ -152,7 +152,7 @@
   font-size: 12px;
   font-weight: 400;
   line-height: 16px;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, opacity 0.12s ease;
 }
 

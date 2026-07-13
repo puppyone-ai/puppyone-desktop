@@ -1,12 +1,13 @@
 /*
  * Desktop Agent owns its complete visual boundary. Every imported module uses
- * semantic PuppyOne tokens. Frontend structure reference: YishenTu/claudian at
- * 7d7cc84c60a77431aaccda7ff49a2f1f4ae1c2ab (MIT). The exact adoption scope
- * and modified-file map live in vendor/claudian/SOURCE_ADOPTION.md.
+ * semantic PuppyOne tokens. Third-party source provenance and license records
+ * live outside runtime styles in the repository's audited notice ledger.
  */
 @import "./styles/foundation.css";
 @import "./styles/transcript.css";
 @import "./styles/activities.css";
+@import "./styles/tool-results.css";
 @import "./styles/blocking.css";
 @import "./styles/composer.css";
+@import "./styles/pickers.css";
 @import "./styles/responsive.css";

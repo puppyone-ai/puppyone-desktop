@@ -7,7 +7,7 @@
   flex-direction: column;
   color: var(--po-text-muted);
   outline: none;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition: transform 150ms ease;
 }
 
@@ -148,7 +148,7 @@
   font-size: 12px;
   font-weight: 680;
   white-space: nowrap;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-project-folder-card-action:hover:not(:disabled) {
@@ -360,7 +360,7 @@
   border: 0;
   background: transparent;
   color: var(--po-text-muted);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition:
     color 150ms ease,
     transform 150ms ease;

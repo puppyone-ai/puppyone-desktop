@@ -232,7 +232,7 @@
 }
 
 button.desktop-cloud-access-folder-row {
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 button.desktop-cloud-access-folder-row:hover,

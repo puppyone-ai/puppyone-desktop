@@ -21,6 +21,7 @@ export function agentActivityToolName(activity: AgentActivity) {
     patch: "Edit",
     glob: "Glob",
     grep: "Grep",
+    search: "Search",
     list: "List",
     webfetch: "Fetch",
     websearch: "Search",
@@ -34,15 +35,35 @@ export function agentActivitySummary(activity: AgentActivity) {
   if (activity.kind === "command") return commandForActivity(activity) || activity.label;
   if (activity.kind === "file-change") return pathForActivity(activity) || activity.label;
   const input = record(activity.detail.input);
+  const tool = agentActivityToolName(activity);
+  if (["Grep", "Glob", "Search"].includes(tool)) {
+    return firstText(input.pattern, activity.detail.query, input.query, activity.detail.path, input.path, activity.label);
+  }
   return firstText(
     activity.detail.description,
     activity.detail.path,
     input.path,
     input.file,
+    input.file_path,
+    input.filePath,
     activity.detail.query,
     input.query,
+    input.pattern,
     activity.label,
   );
+}
+
+export function isContextCompactionActivity(activity: AgentActivity) {
+  const input = record(activity.detail.input);
+  const values = [
+    activity.detail.tool,
+    activity.detail.kind,
+    activity.detail.description,
+    input.action,
+    activity.label,
+  ].map(text).filter(Boolean);
+  return values.some((value) => /^(?:compaction|context-compaction)$/u.test(value.toLowerCase())
+    || /(?:compact(?:ed|ing|ion)?\s+(?:the\s+)?context|context\s+compact)/iu.test(value));
 }
 
 export function commandForActivity(activity: AgentActivity) {
@@ -51,10 +72,50 @@ export function commandForActivity(activity: AgentActivity) {
   return firstText(activity.detail.command, input.command, input.cmd, metadata.command, typeof activity.detail.input === "string" ? activity.detail.input : "");
 }
 
+export type AgentCommandPresentation = {
+  tool: "bash" | "read" | "grep" | "glob" | "list";
+  title: "Bash" | "Read" | "Grep" | "Glob" | "List";
+  summary: string;
+  viaShell: boolean;
+};
+
+export function commandPresentationForActivity(activity: AgentActivity): AgentCommandPresentation {
+  const command = commandForActivity(activity);
+  const visibleCommand = unwrapLoginShell(command);
+  const executable = readShellExecutable(visibleCommand);
+  const simpleReadOnlyShell = !/[;&|<>`\n\r]/u.test(visibleCommand) && !/\$\(/u.test(visibleCommand);
+  if (!simpleReadOnlyShell) {
+    return { tool: "bash", title: "Bash", summary: command || activity.label, viaShell: false };
+  }
+  if (executable === "rg") {
+    if (/(?:^|\s)--pre(?:-glob)?(?:\s|=|$)/u.test(visibleCommand)) {
+      return { tool: "bash", title: "Bash", summary: command || activity.label, viaShell: false };
+    }
+    const filesOnly = /(?:^|\s)--files(?:\s|$)/u.test(visibleCommand);
+    return { tool: filesOnly ? "glob" : "grep", title: filesOnly ? "Glob" : "Grep", summary: visibleCommand, viaShell: true };
+  }
+  if (executable === "grep" || executable === "git-grep") {
+    return { tool: "grep", title: "Grep", summary: visibleCommand, viaShell: true };
+  }
+  if (executable === "find" || executable === "fd") {
+    if (executable === "find" && /(?:^|\s)-(?:delete|exec|execdir|ok|okdir|fprint|fprintf|fls)(?:\s|$)/u.test(visibleCommand)) {
+      return { tool: "bash", title: "Bash", summary: command || activity.label, viaShell: false };
+    }
+    return { tool: "glob", title: "Glob", summary: visibleCommand, viaShell: true };
+  }
+  if (executable === "ls") {
+    return { tool: "list", title: "List", summary: visibleCommand, viaShell: true };
+  }
+  if (["cat", "head", "tail", "bat", "sed-read", "nl-read"].includes(executable)) {
+    return { tool: "read", title: "Read", summary: visibleCommand, viaShell: true };
+  }
+  return { tool: "bash", title: "Bash", summary: command || activity.label, viaShell: false };
+}
+
 export function pathForActivity(activity: AgentActivity) {
   const input = record(activity.detail.input);
   const firstChange = fileChangesForActivity(activity)[0];
-  return firstText(activity.detail.path, input.path, input.file, input.filepath, firstChange?.path);
+  return firstText(activity.detail.path, input.path, input.file, input.filepath, input.file_path, input.filePath, firstChange?.path);
 }
 
 export function outputForActivity(activity: AgentActivity) {
@@ -70,7 +131,7 @@ export function outputForActivity(activity: AgentActivity) {
 export function commandMetadata(activity: AgentActivity) {
   const metadata = record(activity.detail.metadata);
   const exitCode = finiteNumber(activity.detail.exitCode, metadata.exitCode, metadata.exit, metadata.code);
-  const durationMs = finiteNumber(activity.detail.duration, metadata.duration, metadata.durationMs, metadata.elapsed);
+  const durationMs = finiteNumber(activity.detail.duration, activity.detail.durationMs, activity.detail.elapsedMs, metadata.duration, metadata.durationMs, metadata.elapsed);
   return {
     exitCode,
     duration: durationMs === null ? null : formatDuration(durationMs),
@@ -93,6 +154,16 @@ export function fileChangesForActivity(activity: AgentActivity): AgentFileChange
 
 export function diffLinesForActivity(activity: AgentActivity): AgentDiffLine[] {
   const input = record(activity.detail.input);
+  const oldText = firstText(input.old_string, input.oldString);
+  const newText = firstText(input.new_string, input.newString);
+  if (oldText || newText) {
+    const lines: AgentDiffLine[] = [
+      { kind: "hunk", text: "@@" },
+      ...oldText.split(/\r?\n/u).slice(0, 119).map((line) => ({ kind: "deletion" as const, text: `-${line}` })),
+      ...newText.split(/\r?\n/u).slice(0, 119).map((line) => ({ kind: "addition" as const, text: `+${line}` })),
+    ];
+    return lines.slice(0, 240);
+  }
   const source = firstText(
     activity.detail.diff,
     activity.detail.patch,
@@ -154,4 +225,20 @@ function formatDuration(value: number) {
 
 function titleCase(value: string) {
   return value.replace(/[_-]+/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function unwrapLoginShell(command: string) {
+  const match = command.trim().match(/^(?:\/[^\s]+\/)?(?:zsh|bash|sh)\s+-lc\s+(["'])([\s\S]*)\1$/u);
+  return (match?.[2] || command).trim();
+}
+
+function readShellExecutable(command: string) {
+  const source = command.trim();
+  if (!source) return "";
+  if (/^(?:command\s+)?git\s+grep(?:\s|$)/u.test(source)) return "git-grep";
+  const match = source.match(/^(?:command\s+)?(?:env\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]+\s+)*(?:\/[^\s]+\/)?([A-Za-z0-9._+-]+)(?:\s|$)/u);
+  const executable = match?.[1]?.toLowerCase() || "";
+  if (executable === "sed" && /(?:^|\s)-n(?:\s|$)/u.test(source)) return "sed-read";
+  if (executable === "nl" && /(?:^|\s)-ba(?:\s|$)/u.test(source)) return "nl-read";
+  return executable;
 }

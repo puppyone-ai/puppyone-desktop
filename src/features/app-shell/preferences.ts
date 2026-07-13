@@ -60,6 +60,7 @@ export const EXPLORER_WIDTH_STORAGE_KEY = "puppyone.desktop.explorerWidth";
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = "puppyone.desktop.sidebarCollapsed";
 export const RIGHT_SIDEBAR_WIDTH_STORAGE_KEY = "puppyone.desktop.rightSidebarWidth";
 export const RIGHT_SIDEBAR_SURFACE_STORAGE_KEY = "puppyone.desktop.rightSidebarSurface";
+export const AGENT_PREFERRED_RUNTIME_STORAGE_KEY = "puppyone.desktop.agentPreferredRuntime";
 export const AGENT_PREFERRED_MODEL_STORAGE_KEY = "puppyone.desktop.agentPreferredModel";
 export type RightSidebarSurface = "chat" | "terminal";
 export const DEFAULT_EXPLORER_WIDTH = 320;
@@ -259,6 +260,12 @@ export function readInitialAgentPreferredModel(): string | null {
   if (typeof window === "undefined") return null;
   const stored = window.localStorage.getItem(AGENT_PREFERRED_MODEL_STORAGE_KEY);
   return typeof stored === "string" && stored.trim().length > 0 ? stored.trim().slice(0, 200) : null;
+}
+
+export function readInitialAgentPreferredRuntime(): string | null {
+  if (typeof window === "undefined") return null;
+  const stored = window.localStorage.getItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY)?.trim() ?? "";
+  return /^[a-z][a-z0-9-]{1,39}$/.test(stored) ? stored : null;
 }
 
 export function readSystemDarkMode(): boolean {
