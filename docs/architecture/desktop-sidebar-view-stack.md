@@ -4,6 +4,11 @@ This document records the lifecycle boundary for the desktop sidebar column. It
 focuses on how the Data, Git, Cloud, and Settings sidebar surfaces coexist
 without destroying the files explorer view.
 
+For the complete sidebar composition, ownership, registry, file layout, CSS,
+performance, and testing architecture, see
+[Desktop Sidebar Architecture](desktop-sidebar-architecture.md). This document
+is the focused lifecycle contract beneath that architecture.
+
 For file-tree loading, expansion, subtree animation, and guide-line behavior,
 see [Explorer Tree Lifecycle](explorer-tree-lifecycle.md).
 

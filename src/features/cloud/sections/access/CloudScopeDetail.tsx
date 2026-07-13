@@ -1,5 +1,6 @@
 import { Check, ChevronRight, Copy, Eye, EyeOff, Link, RefreshCw, Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   deleteCloudScope,
   regenerateCloudScopeKey,
@@ -20,11 +21,23 @@ import {
 import type { CloudAccessSurface } from "../../model";
 import { buildCloudAccessSurfaces, getCloudAccessAggregate } from "../../model";
 import {
+  cloudMessage,
+  formatCloudAccessAggregate,
+  formatCloudAccessCommandLabel,
+  formatCloudAccessSurfacePrompt,
+  formatCloudAccessSurfaceSubtitle,
+  formatCloudAccessSurfaceTitle,
+  formatCloudMessage,
+  type CloudMessageDescriptor,
+} from "../../cloudPresentation";
+import {
   copyText,
   formatProviderLabel,
   formatStatusLabel,
   getApiBaseFromGitUrl,
+  getCanonicalScopeGitUrl,
   getScopeDisplayName,
+  getScopeIdentifierName,
   getScopePathLabel,
   isConnectorActiveStatus,
   profileSlug,
@@ -55,10 +68,11 @@ export function CloudScopeDetail({
   onRefresh?: () => Promise<void>;
   onOpenAccess: () => void;
 }) {
+  const { t } = useLocalization();
   const apiBase = identity?.url ? getApiBaseFromGitUrl(identity.url) : "";
-  const gitUrl = scope.access_key && apiBase ? `${apiBase}/git/ap/${scope.access_key}.git` : identity?.url ?? "";
-  const scopeName = getScopeDisplayName(scope);
-  const profileName = profileSlug(getScopeDisplayName(scope));
+  const gitUrl = getCanonicalScopeGitUrl(identity, scope, apiBase);
+  const scopeName = getScopeDisplayName(scope, t);
+  const profileName = profileSlug(getScopeIdentifierName(scope));
   const cliCommand = scope.access_key && apiBase
     ? `printf '%s' ${shellQuote(scope.access_key)} | puppyone ap login ${shellQuote(profileName)} --api-url ${shellQuote(apiBase)} --access-key-stdin`
     : "";
@@ -85,7 +99,7 @@ export function CloudScopeDetail({
   }, [surfaces]);
 
   const aggregate = getCloudAccessAggregate(surfaces);
-  const modeLabel = scope.mode === "rw" ? "Read & write" : "Read only";
+  const modeLabel = t(scope.mode === "rw" ? "cloud.scope.readWrite" : "cloud.scope.readOnly");
   const collapsedCount = collapsedSurfaceIds.size;
   const expandedCount = surfaces.length - collapsedCount;
   const allCollapsed = surfaces.length > 0 && expandedCount === 0;
@@ -112,13 +126,13 @@ export function CloudScopeDetail({
           {surfaces.length > 0 && (
             <div className="desktop-cloud-access-aggregate">
               <span className={`desktop-cloud-web-status-dot ${aggregate.tone}`} aria-hidden="true" />
-              <strong>{aggregate.label}</strong>
+              <strong>{formatCloudAccessAggregate(aggregate.code, t)}</strong>
               <em>·</em>
-              <span>{surfaces.length === 1 ? "1 connector" : `${surfaces.length} connectors`}</span>
+              <span>{t("cloud.access.connectorCount", { count: surfaces.length })}</span>
             </div>
           )}
           <div className="desktop-cloud-access-scope-meta">
-            <span>Scope</span>
+            <span>{t("cloud.common.scope")}</span>
             <code title={getScopePathLabel(scope)}>{getScopePathLabel(scope)}</code>
             <em>·</em>
             <span>{modeLabel}</span>
@@ -126,32 +140,32 @@ export function CloudScopeDetail({
         </div>
         <button className="desktop-cloud-row-action" type="button" onClick={onOpenAccess}>
           <Settings size={13} />
-          <span>Open</span>
+          <span>{t("cloud.common.open")}</span>
         </button>
       </div>
 
       {!scope.access_key && (
         <div className="desktop-cloud-method-warning">
-          This scope has no access key issued. Open Cloud Access to regenerate one before using CLI or Git.
+          {t("cloud.access.noKeyWarning")}
         </div>
       )}
 
       <CloudSectionLabel
         right={(
           <span className="desktop-cloud-access-section-actions">
-            <span>{surfaces.length === 1 ? "1 way in" : `${surfaces.length} ways in`}</span>
+            <span>{t("cloud.access.wayCount", { count: surfaces.length })}</span>
             {surfaces.length > 0 && (
               <button type="button" onClick={() => setAllSurfacesCollapsed(!allCollapsed)}>
-                {allCollapsed ? "Expand all" : "Collapse all"}
+                {t(allCollapsed ? "cloud.common.expandAll" : "cloud.common.collapseAll")}
               </button>
             )}
           </span>
         )}
       >
-        Access surfaces
+        {t("cloud.access.surfaces")}
       </CloudSectionLabel>
       {surfaces.length === 0 ? (
-        <CloudWebEmpty icon={Link} title="No connectors bound to this scope yet" detail="Create one in Cloud Access to expose this folder." />
+        <CloudWebEmpty icon={Link} title={t("cloud.access.noConnectors")} detail={t("cloud.access.noConnectorsDetail")} />
       ) : (
         <div className="desktop-cloud-access-surface-grid">
           {surfaces.map((surface) => (
@@ -195,6 +209,7 @@ export function CloudScopeSettingsBlock({
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onMutated: () => Promise<void>;
 }) {
+  const { t } = useLocalization();
   const [name, setName] = useState(scope.name);
   const [mode, setMode] = useState<"r" | "rw">(scope.mode);
   const [excludeText, setExcludeText] = useState(formatScopeExclude(scope.exclude));
@@ -205,7 +220,7 @@ export function CloudScopeSettingsBlock({
   const [saving, setSaving] = useState(false);
   const [rotating, setRotating] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<CloudMessageDescriptor | null>(null);
 
   useEffect(() => {
     setName(scope.name);
@@ -246,7 +261,7 @@ export function CloudScopeSettingsBlock({
       );
       await onMutated();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Failed to save access point.");
+      setError(cloudMessage("save-scope-failed", undefined, saveError instanceof Error ? saveError.message : undefined));
     } finally {
       setSaving(false);
     }
@@ -279,7 +294,7 @@ export function CloudScopeSettingsBlock({
       await regenerateCloudScopeKey(session, projectId, scope.id, onSessionChange, apiBaseUrl);
       await onMutated();
     } catch (rotateError) {
-      setError(rotateError instanceof Error ? rotateError.message : "Failed to regenerate access key.");
+      setError(cloudMessage("rotate-key-failed", undefined, rotateError instanceof Error ? rotateError.message : undefined));
     } finally {
       setRotating(false);
       setConfirmRotate(false);
@@ -299,7 +314,7 @@ export function CloudScopeSettingsBlock({
       await deleteCloudScope(session, projectId, scope.id, onSessionChange, apiBaseUrl);
       await onMutated();
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete access point.");
+      setError(cloudMessage("delete-access-failed", undefined, deleteError instanceof Error ? deleteError.message : undefined));
     } finally {
       setDeleting(false);
       setConfirmDelete(false);
@@ -308,31 +323,31 @@ export function CloudScopeSettingsBlock({
 
   return (
     <section className="desktop-cloud-scope-settings">
-      <CloudSectionLabel right={dirty ? <span>Unsaved</span> : undefined}>Settings</CloudSectionLabel>
+      <CloudSectionLabel right={dirty ? <span>{t("cloud.common.unsaved")}</span> : undefined}>{t("cloud.common.settings")}</CloudSectionLabel>
 
       <div className="desktop-cloud-scope-settings-grid">
         <div className="desktop-cloud-scope-settings-card">
           <label className="desktop-cloud-scope-settings-field">
-            <span>Name</span>
+            <span>{t("cloud.common.name")}</span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
               disabled={scope.is_root || busy}
-              placeholder={getScopeDisplayName(scope)}
+              placeholder={getScopeDisplayName(scope, t)}
             />
           </label>
-          {scope.is_root && <p>Root access keeps the project name.</p>}
+          {scope.is_root && <p>{t("cloud.scope.rootKeepsProjectName")}</p>}
         </div>
 
         <div className="desktop-cloud-scope-settings-card">
           <div className="desktop-cloud-scope-settings-field">
-            <span>Permission</span>
-            <div className="desktop-cloud-scope-mode-control" role="group" aria-label="Scope permission">
+            <span>{t("cloud.common.permission")}</span>
+            <div className="desktop-cloud-scope-mode-control" role="group" aria-label={t("cloud.scope.permissionAria")}>
               <button type="button" className={mode === "r" ? "active" : ""} disabled={busy} onClick={() => setMode("r")}>
-                Read only
+                {t("cloud.scope.readOnly")}
               </button>
               <button type="button" className={mode === "rw" ? "active" : ""} disabled={busy} onClick={() => setMode("rw")}>
-                Read & write
+                {t("cloud.scope.readWrite")}
               </button>
             </div>
           </div>
@@ -340,7 +355,7 @@ export function CloudScopeSettingsBlock({
 
         <div className="desktop-cloud-scope-settings-card wide">
           <label className="desktop-cloud-scope-settings-field">
-            <span>Exclude</span>
+            <span>{t("cloud.scope.exclude")}</span>
             <textarea
               value={excludeText}
               onChange={(event) => setExcludeText(event.target.value)}
@@ -349,20 +364,20 @@ export function CloudScopeSettingsBlock({
               spellCheck={false}
             />
           </label>
-          <p>One pattern per line. Excluded paths stay outside this access point.</p>
+          <p>{t("cloud.scope.excludeHelp")}</p>
         </div>
 
         <div className="desktop-cloud-scope-settings-card wide">
           <div className="desktop-cloud-scope-settings-field">
-            <span>Access key</span>
+            <span>{t("cloud.common.accessKey")}</span>
             <div className="desktop-cloud-scope-key-row">
               <code title={keyRevealed ? scope.access_key || "" : undefined}>
                 {keyRevealed ? scope.access_key || "-" : maskedKey}
               </code>
-              <button type="button" disabled={!scope.access_key || busy} onClick={() => setKeyRevealed((value) => !value)}>
+              <button type="button" aria-label={t(keyRevealed ? "cloud.common.hideAccessKey" : "cloud.common.showAccessKey")} disabled={!scope.access_key || busy} onClick={() => setKeyRevealed((value) => !value)}>
                 {keyRevealed ? <EyeOff size={13} /> : <Eye size={13} />}
               </button>
-              <button type="button" disabled={!scope.access_key || busy} onClick={handleCopyKey}>
+              <button type="button" aria-label={t("cloud.common.copyAccessKey")} disabled={!scope.access_key || busy} onClick={handleCopyKey}>
                 {keyCopied ? <Check size={13} /> : <Copy size={13} />}
               </button>
             </div>
@@ -375,31 +390,31 @@ export function CloudScopeSettingsBlock({
               onClick={handleRotate}
             >
               <RefreshCw size={13} />
-              <span>{rotating ? "Regenerating" : confirmRotate ? "Confirm regenerate" : "Regenerate"}</span>
+              <span>{t(rotating ? "cloud.scope.regenerating" : confirmRotate ? "cloud.scope.confirmRegenerate" : "cloud.scope.regenerate")}</span>
             </button>
-            {confirmRotate && <em>Current CLI and Git clients must log in again.</em>}
+            {confirmRotate && <em>{t("cloud.scope.regenerateWarning")}</em>}
           </div>
         </div>
 
         <div className="desktop-cloud-scope-settings-card danger wide">
           <div className="desktop-cloud-scope-settings-field">
-            <span>Danger zone</span>
-            <p>Delete this access point after removing bound third-party connectors.</p>
+            <span>{t("cloud.common.dangerZone")}</span>
+            <p>{t("cloud.scope.deleteHelp")}</p>
           </div>
           <button type="button" disabled={scope.is_root || busy} onClick={handleDelete}>
-            {deleting ? "Deleting" : confirmDelete ? "Confirm delete" : "Delete access point"}
+            {t(deleting ? "cloud.common.deleting" : confirmDelete ? "cloud.common.confirmDelete" : "cloud.scope.deleteAccess")}
           </button>
         </div>
       </div>
 
-      {error && <div className="desktop-cloud-scope-settings-error">{error}</div>}
+      {error && <div className="desktop-cloud-scope-settings-error">{formatCloudMessage(error, t)}</div>}
 
       {dirty && (
         <div className="desktop-cloud-scope-settings-footer">
-          <span>Unsaved changes</span>
-          <button type="button" disabled={busy} onClick={handleDiscard}>Discard</button>
+          <span>{t("cloud.common.unsavedChanges")}</span>
+          <button type="button" disabled={busy} onClick={handleDiscard}>{t("cloud.common.discard")}</button>
           <button type="button" className="primary" disabled={busy} onClick={handleSave}>
-            {saving ? "Saving" : "Save changes"}
+            {t(saving ? "cloud.common.saving" : "cloud.common.saveChanges")}
           </button>
         </div>
       )}
@@ -439,6 +454,7 @@ export function CloudAccessSurfaceTile({
   onToggle: () => void;
   onOpenAccess: () => void;
 }) {
+  const { t } = useLocalization();
   const Icon = providerIcon(surface.provider);
   const active = isConnectorActiveStatus(surface.status);
 
@@ -450,38 +466,38 @@ export function CloudAccessSurfaceTile({
             <Icon size={surface.provider === "cli" ? 15 : 14} />
           </span>
           <span>
-            <strong>{surface.title}</strong>
-            <small>{surface.subtitle}</small>
+            <strong dir="auto">{formatCloudAccessSurfaceTitle(surface, t)}</strong>
+            <small dir="auto">{formatCloudAccessSurfaceSubtitle(surface, t)}</small>
           </span>
         </button>
         <span className="desktop-cloud-access-status-cell">
           <span className={`desktop-cloud-web-status-dot ${active ? "ready" : surface.status === "error" ? "warning" : ""}`} aria-hidden="true" />
-          <span>{formatStatusLabel(surface.statusLabel)}</span>
+          <span>{formatStatusLabel(surface.status, t)}</span>
         </span>
         <button className="desktop-cloud-access-open-button" type="button" onClick={onOpenAccess}>
-          Open
+          {t("cloud.common.open")}
         </button>
-        <button className="desktop-cloud-access-surface-toggle" type="button" onClick={onToggle} aria-label={expanded ? "Collapse access details" : "Expand access details"}>
-          <ChevronRight size={14} />
+        <button className="desktop-cloud-access-surface-toggle" type="button" onClick={onToggle} aria-label={t(expanded ? "cloud.access.collapseDetails" : "cloud.access.expandDetails")}>
+          <ChevronRight className="desktop-cloud-directional-icon" size={14} />
         </button>
       </div>
       {expanded && (
         <div className="desktop-cloud-access-surface-details">
-          {surface.prompt && <CloudPromptBlock value={surface.prompt} />}
+          <CloudPromptBlock value={formatCloudAccessSurfacePrompt(surface, t("cloud.scope.workspaceRoot"), t)} />
           {surface.commands?.map((command) => (
-            <CloudCommandBlock key={command.label} label={command.label} value={command.value} disabled={command.disabled} />
+            <CloudCommandBlock key={command.id} label={formatCloudAccessCommandLabel(command, t)} value={command.value} disabled={command.disabled} />
           ))}
           {surface.endpoint && !surface.commands?.length && (
             <div className="desktop-cloud-mcp-key-hint">
-              <span>API key</span>
-              <strong>{surface.endpoint.api_key_hint || "Hidden"}</strong>
+              <span>{t("cloud.common.apiKey")}</span>
+              <strong>{surface.endpoint.api_key_hint || t("cloud.common.hidden")}</strong>
             </div>
           )}
           {surface.connector && (
             <div className="desktop-cloud-access-connector-summary">
-              <CloudAuthorityCell label="Provider" value={formatProviderLabel(surface.connector.provider)} />
-              <CloudAuthorityCell label="Direction" value={surface.connector.direction || "manual"} />
-              <CloudAuthorityCell label="Status" value={surface.connector.status} tone={isConnectorActiveStatus(surface.connector.status) ? "ready" : "warning"} />
+              <CloudAuthorityCell label={t("cloud.common.provider")} value={formatProviderLabel(surface.connector.provider, t)} />
+              <CloudAuthorityCell label={t("cloud.common.direction")} value={formatStatusLabel(surface.connector.direction || "manual", t)} />
+              <CloudAuthorityCell label={t("cloud.common.status")} value={formatStatusLabel(surface.connector.status, t)} tone={isConnectorActiveStatus(surface.connector.status) ? "ready" : "warning"} />
             </div>
           )}
           {surface.endpoint?.description && <p className="desktop-cloud-access-expanded-note">{surface.endpoint.description}</p>}

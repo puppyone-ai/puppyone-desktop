@@ -57,6 +57,7 @@ export type TitlebarActionsSettings = {
 export type ExperimentalSettings = {
   enableAgentChat: boolean;
   enableAssetLibraryHome: boolean;
+  enableMarkdownBlockDrag: boolean;
   enableMinimalMode: boolean;
   enablePuppyoneAppFiles: boolean;
   enablePuppyFlowFiles: boolean;
@@ -131,6 +132,7 @@ export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
 export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableAgentChat: false,
   enableAssetLibraryHome: false,
+  enableMarkdownBlockDrag: false,
   enableMinimalMode: false,
   enablePuppyoneAppFiles: false,
   enablePuppyFlowFiles: false,
@@ -495,6 +497,7 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
     return {
       enableAgentChat: parsed.enableAgentChat === true || legacy.enableAgentCompanion === true,
       enableAssetLibraryHome: parsed.enableAssetLibraryHome === true,
+      enableMarkdownBlockDrag: parsed.enableMarkdownBlockDrag === true,
       enableMinimalMode: parsed.enableMinimalMode === true,
       enablePuppyoneAppFiles: parsed.enablePuppyoneAppFiles === true,
       enablePuppyFlowFiles: parsed.enablePuppyFlowFiles === true,

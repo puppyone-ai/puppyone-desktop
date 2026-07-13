@@ -36,7 +36,7 @@
   color: var(--po-text-muted);
   font-size: 13px;
   font-weight: 650;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-project-browser-link:hover {
@@ -64,66 +64,24 @@
 
 .desktop-cloud-auth-main-view {
   overflow: hidden;
+  padding: 0;
 }
 
 .desktop-cloud-auth-main-view .desktop-cloud-page-shell {
   display: grid;
   flex: 1;
   width: 100%;
+  height: 100%;
   min-height: 0;
   margin: 0;
   gap: 0;
 }
 
-.desktop-cloud-project-auth-stage {
-  position: relative;
-  display: grid;
-  min-height: min(660px, calc(100vh - 132px));
-  overflow: hidden;
-  background: var(--po-canvas);
+.desktop-cloud-project-auth-entry {
+  --desktop-cloud-body-size: var(--po-text-size-body);
 }
 
-.desktop-cloud-auth-main-view .desktop-cloud-project-auth-stage {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-}
-
-.desktop-cloud-project-auth-body {
-  display: grid;
-  min-width: 0;
-  min-height: 0;
-  place-items: center;
-  padding: 32px;
-}
-
-.desktop-cloud-project-auth-shell {
-  --desktop-cloud-body-size: 13px;
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr;
-  width: min(420px, 100%);
-  justify-items: start;
-  padding: 0;
-}
-
-.desktop-cloud-project-auth-visual {
-  position: relative;
-  display: grid;
-  width: 84px;
-  height: 64px;
-  place-items: center start;
-}
-
-.desktop-cloud-project-auth-visual::before {
-  display: none;
-}
-
-.desktop-cloud-project-auth-visual::after {
-  display: none;
-}
-
-.desktop-cloud-project-auth-shell .desktop-cloud-login-logo {
+.desktop-cloud-project-auth-entry .desktop-cloud-login-logo {
   position: relative;
   z-index: 1;
   display: inline-flex;
@@ -138,68 +96,31 @@
   box-shadow: none;
 }
 
-.desktop-cloud-project-auth-shell .desktop-cloud-login-logo::before {
+.desktop-cloud-project-auth-entry .desktop-cloud-login-logo::before {
   display: none;
 }
 
-.desktop-cloud-project-auth-shell .desktop-cloud-product-mark {
+.desktop-cloud-project-auth-entry .desktop-cloud-product-mark {
   width: 74px;
   height: 54px;
   filter: none;
 }
 
-.desktop-cloud-project-auth-shell .desktop-cloud-product-mark-cloud {
+.desktop-cloud-project-auth-entry .desktop-cloud-product-mark-cloud {
   stroke-width: 5.5px;
 }
 
-.desktop-cloud-project-auth-content {
-  display: grid;
-  min-width: 0;
-  align-content: center;
-  width: 100%;
-  justify-items: start;
-}
-
-.desktop-cloud-project-auth-copy {
-  min-width: 0;
-  margin-top: 18px;
-  text-align: left;
-}
-
-.desktop-cloud-project-auth-copy h1 {
-  margin: 0;
-  color: var(--po-text);
-  font-size: 16px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  line-height: 20px;
-}
-
-.desktop-cloud-project-auth-description {
-  max-width: 400px;
-  margin: 8px 0 18px;
-  color: var(--po-text-muted);
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-}
-
-.desktop-cloud-project-auth-action {
-  width: fit-content;
-  margin-top: 0;
-}
-
-.desktop-cloud-project-auth-shell .desktop-cloud-auth-card {
+.desktop-cloud-project-auth-entry .desktop-cloud-auth-card {
   width: auto;
   max-width: none;
   padding: 0;
 }
 
-.desktop-cloud-project-auth-shell .desktop-cloud-auth-heading {
+.desktop-cloud-project-auth-entry .desktop-cloud-auth-heading {
   display: none;
 }
 
-.desktop-cloud-project-auth-shell .desktop-cloud-auth-submit {
+.desktop-cloud-project-auth-entry .desktop-cloud-auth-submit {
   width: auto;
   height: 30px;
   padding: 0 10px;
@@ -208,13 +129,13 @@
   box-shadow: none;
 }
 
-.desktop-cloud-project-auth-shell .desktop-cloud-auth-terms {
+.desktop-cloud-project-auth-entry .desktop-cloud-auth-terms {
   display: none;
 }
 
-.desktop-cloud-project-auth-shell .desktop-cloud-login-error,
-.desktop-cloud-project-auth-shell .desktop-cloud-login-note {
-  font-size: 12px;
+.desktop-cloud-project-auth-entry .desktop-cloud-login-error,
+.desktop-cloud-project-auth-entry .desktop-cloud-login-note {
+  font-size: var(--po-text-size-meta);
 }
 
 @media (max-width: 940px) {
@@ -227,47 +148,16 @@
     gap: 28px;
   }
 
-  .desktop-cloud-project-auth-stage {
-    min-height: auto;
-  }
 }
 
 @media (max-width: 720px) {
-  .desktop-cloud-project-auth-shell {
-    grid-template-columns: 1fr;
-    width: min(400px, 100%);
-  }
-
-  .desktop-cloud-project-auth-visual {
-    width: 76px;
-    height: 58px;
-  }
-
-  .desktop-cloud-project-auth-shell .desktop-cloud-login-logo {
+  .desktop-cloud-project-auth-entry .desktop-cloud-login-logo {
     width: 72px;
     height: 54px;
   }
 
-  .desktop-cloud-project-auth-shell .desktop-cloud-product-mark {
+  .desktop-cloud-project-auth-entry .desktop-cloud-product-mark {
     width: 68px;
     height: 50px;
   }
-}
-
-@media (max-width: 560px) {
-  .desktop-cloud-project-auth-shell {
-    grid-template-columns: 1fr;
-    width: min(360px, 100%);
-    justify-items: start;
-  }
-
-  .desktop-cloud-project-auth-content {
-    width: 100%;
-    justify-items: start;
-  }
-
-  .desktop-cloud-project-auth-copy {
-    text-align: left;
-  }
-
 }

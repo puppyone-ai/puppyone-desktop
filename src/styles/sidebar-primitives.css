@@ -1,0 +1,47 @@
+.desktop-tool-sidebar-group {
+  display: grid;
+  min-width: 0;
+}
+
+.desktop-tool-sidebar-group + .desktop-tool-sidebar-group {
+  position: relative;
+  padding-top: 12px;
+}
+
+.desktop-tool-sidebar-group + .desktop-tool-sidebar-group::before {
+  position: absolute;
+  top: 5px;
+  inset-inline:
+    calc(-1 * var(--desktop-sidebar-row-left-gap))
+    calc(-1 * var(--desktop-sidebar-row-right-gap));
+  height: 1px;
+  background: var(--po-sidebar-divider, var(--po-divider));
+  content: "";
+}
+
+.desktop-tool-sidebar-group-header {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: var(--desktop-sidebar-row-height);
+  align-items: stretch;
+}
+
+.desktop-tool-sidebar-group-title {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  align-items: center;
+  padding-block: 0;
+  padding-inline: var(--desktop-sidebar-row-content-left) var(--desktop-sidebar-row-content-right);
+  color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));
+  font-size: var(--desktop-sidebar-section-title-font-size, var(--po-text-size-meta, 12px));
+  font-weight: var(--desktop-sidebar-section-title-font-weight, var(--po-text-weight-medium, 500));
+  line-height: var(--desktop-sidebar-section-title-line-height, 18px);
+}
+
+.desktop-tool-sidebar-group[data-disabled="true"] .desktop-tool-sidebar-group-title {
+  color: var(--desktop-sidebar-section-title-disabled-color, var(--po-text-disabled));
+  opacity: 0.42;
+}

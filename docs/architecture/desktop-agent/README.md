@@ -1,7 +1,8 @@
 # Desktop Agent architecture
 
-Status: production backend architecture implemented. The UI consumes the same
-backend-neutral contract and may evolve independently.
+Status: current and implemented. This document is the normative architecture
+entry point for Desktop Agent. The UI consumes the same backend-neutral
+contract and may evolve independently without changing harness ownership.
 
 PuppyOne Desktop provides one right-sidebar Chat over multiple native coding
 Agents. It is a client and safety-conscious control plane, not a universal
@@ -12,49 +13,43 @@ The accepted decision is
 [ADR-006: Native harness adapters and ACP](ADR-006-native-harness-adapters-and-acp.md).
 [ADR-005](ADR-005-multi-native-agent-backends.md) defines the product model.
 
-## 1. System map
+## 1. Current system map
 
+This is the canonical Agent architecture. A live Chat session selects exactly
+one route. PuppyOne never nests one vendor harness inside another and never
+silently substitutes a different route.
+
+<!-- agent-runtime-map:start -->
 ```text
-PuppyOne Desktop window
-|
-+-- left workspace surfaces
-|     Data / Files / Git / Cloud / Settings
-|
-+-- center document surface
-|     file router -> format-specific editor or viewer
-|
-+-- right Agent Chat
-      |
-      +-- Renderer feature
-      |     header / transcript / activities / blocking docks / composer
-      |
-      +-- typed preload IPC
-      |     narrow commands and sanitized events only
-      |
-      +-- Electron main application control plane
-      |     workspace authorization
-      |     runtime selection and live session lifecycle
-      |     bounded normalized event projection
-      |     correlated approvals and questions
-      |
-      +-- runtime registry                         one route per session
-            |
-            +-- Codex
-            |     codex app-server -> Codex harness and thread
-            |
-            +-- Claude Code
-            |     official Agent SDK -> Claude Code harness and session
-            |
-            +-- OpenCode
-            |     ACP -> user's OpenCode harness/profile/session
-            |
-            +-- PuppyOne Agent
-            |     ACP -> bundled pinned OpenCode harness
-            |            isolated PuppyOne profile/session
-            |
-            +-- Cursor Agent
-                  detection only until its native protocol is accepted
+One PuppyOne Chat UI / product control plane
+  workspace authority / typed IPC / normalized events / approvals / lifecycle
+        |
+        v
+AgentRuntimeRegistry                 one immutable route per live session
+  |
+  +-- Codex
+  |     -> codex app-server (JSONL-RPC over stdio)
+  |     -> Codex owns Agent loop, tools, login, models and thread
+  |
+  +-- Claude Code
+  |     -> official Claude Agent SDK + user's Claude Code executable
+  |     -> Claude owns Agent loop, tools, permissions and native session
+  |
+  +-- OpenCode
+  |     -> Agent Client Protocol (JSON-RPC 2.0 over stdio)
+  |     -> user's OpenCode executable, profile, auth and native session
+  |
+  +-- PuppyOne Agent
+  |     -> the same provider-neutral ACP adapter
+  |     -> PuppyOne-bundled and pinned OpenCode kernel
+  |     -> isolated PuppyOne profile; OpenCode owns the Agent loop
+  |
+  +-- Cursor Agent
+        -> discovery and diagnostics only
+        -> not selectable until a supported native protocol and approval
+           contract pass the production gates
 ```
+<!-- agent-runtime-map:end -->
 
 The Chat surface never contains a hidden OpenCode requirement. If the user
 selects Codex, the native Codex harness owns the whole loop. If the user selects
@@ -99,40 +94,33 @@ Changing Model inside a live native session uses the selected harness's native
 configuration method when supported. Changing Agent creates a new session. It
 does not translate or migrate the previous transcript.
 
-## 3. Layer model
+## 3. Ports-and-adapters dependency model
 
 ```text
-Layer A  Presentation
-         src/features/desktop-agent/ui
-         renders state and sends typed user intent
-              |
-Layer B  Renderer application/domain
-         AgentSessionController + AgentClientPort
-         provider-neutral transitions and capability-driven behavior
-              |
-Layer C  Shared contract and preload
-         shared/agent-contract + electron/preload.cjs
-         schema validation in both directions
-              |
-Layer D  Main application
-         AgentService + RuntimeCatalog + EventJournal
-         trusted workspace/session/request coordination
-              |
-Layer E  Runtime port and registry
-         provider-neutral lifecycle contract
-              |
-Layer F  Protocol/security/transport floors
-         ACP / JSONL-RPC / workspace files / bounded caches
-              |
-Layer G  Concrete native adapters
-         Codex / Claude / OpenCode / PuppyOne Agent / Cursor diagnostics
-              |
-Layer H  Native harness process or official SDK
+Renderer UI
+  -> Renderer application/domain
+  -> shared public Agent contract
+  -> typed preload IPC
+  -> Main IPC adapter
+  -> Main application control plane
+  -> AgentRuntimePort                         inward-facing interface
+                ^
+                |
+  concrete native adapter                    implements the port
+  -> protocol / transport / security floors
+  -> native harness process or official SDK
+
+Production composition root
+  -> creates the application control plane
+  -> registers concrete native adapters
+  -> is the only module allowed to know both sides
 ```
 
-Allowed dependency direction follows the arrows. A lower shared floor does not
-import the application control plane, and application code does not import a
-concrete provider. The only production composition root is
+Application code depends on ports and shared contracts, never on a concrete
+provider. Concrete adapters depend inward on the runtime port and outward on
+their protocol floor. Provider-neutral ACP, transport, cache and workspace
+security code imports neither application orchestration nor concrete product
+composition. The only production composition root is
 `electron/main/agent/bootstrap/create-agent-runtime-host.mjs`.
 
 ## 4. Source layout
@@ -178,7 +166,8 @@ electron/
       create-agent-runtime-host.mjs  concrete production wiring
 
 src/features/desktop-agent/
-  application/                       controller and client port
+  lazy.ts                            public code-split renderer entrypoint
+  application/                       controller, session preparer and client port
   domain/                            reducer/state/capability decisions
   infrastructure/electron/           typed Electron client adapter
   ui/                                composition and accessible components
@@ -288,12 +277,18 @@ durable conversation state.
 ## 8. Event and turn lifecycle
 
 ```text
+Chat active + selected route ready
+  -> Renderer controller starts one single-flight native-session preparation
+  -> main validates window + workspace + selected native configuration
+  -> create one empty native session/thread owned by the selected harness
+
 User intent
-  -> validate window + workspace + session + selected native configuration
-  -> create or reuse one native session
+  -> render optimistic local prompt
+  -> await that same preparation when it is still in flight
   -> start turn
 
 Native stream
+  -> turn.started authorizes the presentation-only Thinking state
   -> adapter schema/correlation validation
   -> normalized AgentEvent
   -> bounded application projection
@@ -306,10 +301,27 @@ Terminal state
   -> keep native session for a valid follow-up
 ```
 
+Process/runtime startup, account or model inspection, and native-session
+creation are not model thinking. The UI exposes them as `Preparing <Agent>` only
+after a prompt is pending, then uses `Starting turn` until the authoritative
+`turn.started` event. Background preparation has no transcript row. This keeps
+the first-turn latency honest while moving the reusable cold work ahead of the
+first Submit. PuppyOne still writes no Chat History or native-session journal;
+the selected harness remains the sole owner of any native thread/history policy.
+
 Normalized events cover assistant text, safe working-state summaries, tool
 activities, bounded command output, file changes, approval/question requests,
 usage and terminal state. Hidden chain-of-thought is never reconstructed or
 presented as if it were a user-facing native message.
+
+Structured tool identity is lossless across this boundary. Adapters normalize
+native names into stable presentation semantics such as `read`, `write`,
+`edit`, `grep`, `glob`, `bash`, `websearch` and `mcp`, while retaining bounded
+structured input. A Shell command remains a command for security and approval;
+the Renderer may conservatively present recognized read-only commands as
+`Grep`, `Glob`, or `Read` for scanability. The collapsed row omits provenance
+noise while the exact command remains preserved in the disclosure and the
+normalized security/audit state.
 
 The normalizer preserves provider event ordering. Renderer updates are batched
 and transcript mounting is bounded so streaming cannot monopolize the UI
@@ -444,6 +456,21 @@ micro-optimizations.
 - [Managed Agent engine distribution](ADR-004-managed-agent-engine-distribution.md)
 - [OpenCode upgrade runbook](opencode-upgrade-runbook.md)
 
-ADR-001 and ADR-003 remain as historical context only. Their former mandatory
-HTTP sidecar and OpenCode-only product routing are superseded by ADR-005 and
-ADR-006.
+## 15. Document authority and retirement
+
+| Document | Status | Scope |
+| --- | --- | --- |
+| This README | current source of truth | complete system map, ownership, source layout and invariants |
+| [ADR-006](ADR-006-native-harness-adapters-and-acp.md) | accepted and implemented | native harness routes, ACP boundary, persistence and security |
+| [ADR-005](ADR-005-multi-native-agent-backends.md) | accepted and implemented | product vocabulary and multi-native product model |
+| [ADR-002](ADR-002-agent-contract-and-boundaries.md) | accepted and implemented | shared contract and dependency boundaries |
+| [ADR-004](ADR-004-managed-agent-engine-distribution.md) | accepted, narrow scope | managed kernel distribution for PuppyOne Agent only |
+| [ADR-001](ADR-001-opencode-sidecar.md) | retired | former HTTP/SSE sidecar choice; no longer an implementation option |
+| [ADR-003](ADR-003-opencode-only-chat-harness.md) | retired | former single-OpenCode routing choice; no longer an implementation option |
+| [OpenCode adoption spike](opencode-adoption-spike.md) | archived evidence | non-normative research pointer only |
+| [Codex vertical slice](history/codex-vertical-slice.md) | archived history | first-slice delivery record; never current guidance |
+
+Retired decisions are intentionally reduced to short tombstones. Their detailed
+content remains available in Git history, but keeping obsolete executable
+instructions in the current document set would create two competing
+architectures.

@@ -5,6 +5,12 @@ import {
   type ReactNode,
 } from "react";
 import { usePaneResizeDrag } from "@puppyone/shared-ui";
+import { useLocalization } from "@puppyone/localization";
+import {
+  getArrowResizedSidebarWidth,
+  getPointerResizedSidebarWidth,
+  type InlineDirection,
+} from "./auxiliarySidebarGeometry";
 
 export type DesktopView = "data" | "git" | "plugins" | "cloud" | "access" | "automation" | "settings";
 export type DesktopWorkspaceKind = "local" | "cloud";
@@ -40,6 +46,7 @@ export function DesktopCloudShell({
   resizableRightSidebar = false,
   onRightSidebarWidthChange,
 }: DesktopCloudShellProps) {
+  const { t } = useLocalization();
   const beginRightSidebarResize = usePaneResizeDrag({
     enabled: resizableRightSidebar && Boolean(onRightSidebarWidthChange),
     bodyClassName: "desktop-right-sidebar-resizing",
@@ -48,11 +55,17 @@ export function DesktopCloudShell({
 
       const startX = event.clientX;
       const startWidth = rightSidebarWidth ?? 560;
+      const direction = getDocumentDirection();
 
       return {
         onMove: (point) => {
           const nextWidth = clamp(
-            startWidth + startX - point.clientX,
+            getPointerResizedSidebarWidth({
+              currentX: point.clientX,
+              direction,
+              startWidth,
+              startX,
+            }),
             minRightSidebarWidth,
             maxRightSidebarWidth,
           );
@@ -71,12 +84,24 @@ export function DesktopCloudShell({
       if (!resizableRightSidebar || !onRightSidebarWidthChange) return;
 
       const currentWidth = rightSidebarWidth ?? 560;
+      const step = event.shiftKey ? 24 : 12;
+      const direction = getDocumentDirection();
       if (event.key === "ArrowLeft") {
         event.preventDefault();
-        onRightSidebarWidthChange(clamp(currentWidth + (event.shiftKey ? 24 : 12), minRightSidebarWidth, maxRightSidebarWidth));
+        onRightSidebarWidthChange(clamp(getArrowResizedSidebarWidth({
+          currentWidth,
+          direction,
+          key: "ArrowLeft",
+          step,
+        }), minRightSidebarWidth, maxRightSidebarWidth));
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
-        onRightSidebarWidthChange(clamp(currentWidth - (event.shiftKey ? 24 : 12), minRightSidebarWidth, maxRightSidebarWidth));
+        onRightSidebarWidthChange(clamp(getArrowResizedSidebarWidth({
+          currentWidth,
+          direction,
+          key: "ArrowRight",
+          step,
+        }), minRightSidebarWidth, maxRightSidebarWidth));
       } else if (event.key === "Home") {
         event.preventDefault();
         onRightSidebarWidthChange(minRightSidebarWidth);
@@ -129,7 +154,7 @@ export function DesktopCloudShell({
                 className="desktop-right-sidebar-resizer"
                 role="separator"
                 aria-orientation="vertical"
-                aria-label="Resize right sidebar"
+                aria-label={t("shell.sidebar.resizeAuxiliary")}
                 tabIndex={0}
                 onPointerDown={beginRightSidebarResize}
                 onKeyDown={nudgeRightSidebarWidth}
@@ -147,4 +172,8 @@ export function DesktopCloudShell({
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function getDocumentDirection(): InlineDirection {
+  return document.documentElement.dir === "rtl" ? "rtl" : "ltr";
 }

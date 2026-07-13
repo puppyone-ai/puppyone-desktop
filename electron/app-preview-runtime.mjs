@@ -13,6 +13,19 @@ const HEALTH_POLL_INTERVAL_MS = 300;
 const HEALTH_REQUEST_TIMEOUT_MS = 1200;
 const LOG_LIMIT = 60000;
 const TRUST_STORE_FILENAME = "app-preview-trust.json";
+const DEFAULT_DIALOG_MESSAGES = Object.freeze({
+  "native.appPreview.run.message": ({ appName }) => `Run ${appName}?`,
+  "native.appPreview.run.intro": () => "PuppyOne will start a local app preview for this workspace.",
+  "native.appPreview.run.command": ({ command }) => `Command: ${command}`,
+  "native.appPreview.run.workingDirectory": ({ directory }) => `Working directory: ${directory}`,
+  "native.appPreview.run.permissions": ({ permissions }) => `Permissions: ${permissions}`,
+  "native.appPreview.run.confirm": () => "Run App",
+  "native.appPreview.run.cancel": () => "Cancel",
+});
+
+function defaultTranslate(messageId, values = {}) {
+  return DEFAULT_DIALOG_MESSAGES[messageId]?.(values) ?? "";
+}
 
 export function createAppPreviewRuntime({
   app,
@@ -20,6 +33,7 @@ export function createAppPreviewRuntime({
   shell,
   readWorkspaceTextFile,
   resolveWorkspacePath,
+  t = defaultTranslate,
 }) {
   const sessions = new Map();
   const trustedManifests = loadTrustedManifests(app);
@@ -174,15 +188,18 @@ export function createAppPreviewRuntime({
     const permissions = formatPermissions(context.manifest.permissions);
     const dialogOptions = {
       type: "question",
-      message: `Run ${context.manifest.name}?`,
+      message: t("native.appPreview.run.message", { appName: context.manifest.name }),
       detail: [
-        "Puppyone will start a local app preview for this workspace.",
+        t("native.appPreview.run.intro"),
         "",
-        `Command: ${command}`,
-        `Working directory: ${context.cwdRelativePath || "."}`,
-        permissions ? `Permissions: ${permissions}` : null,
+        t("native.appPreview.run.command", { command }),
+        t("native.appPreview.run.workingDirectory", { directory: context.cwdRelativePath || "." }),
+        permissions ? t("native.appPreview.run.permissions", { permissions }) : null,
       ].filter(Boolean).join("\n"),
-      buttons: ["Run App", "Cancel"],
+      buttons: [
+        t("native.appPreview.run.confirm"),
+        t("native.appPreview.run.cancel"),
+      ],
       defaultId: 0,
       cancelId: 1,
       noLink: true,

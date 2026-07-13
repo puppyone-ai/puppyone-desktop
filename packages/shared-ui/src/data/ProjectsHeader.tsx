@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 
 export type BreadcrumbSegment = {
   label: ReactNode;
@@ -12,11 +13,12 @@ export type ProjectsHeaderProps = {
 };
 
 export function ProjectsHeader({ pathSegments, onBack, actionSlot }: ProjectsHeaderProps) {
+  const { direction, t } = useLocalization();
   return (
     <header className="projects-header" style={headerStyle}>
       <div style={headerLeftStyle}>
         {onBack && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", paddingLeft: 8, paddingRight: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", paddingInline: 8 }}>
             <button
               onClick={onBack}
               style={backButtonStyle}
@@ -28,10 +30,11 @@ export function ProjectsHeader({ pathSegments, onBack, actionSlot }: ProjectsHea
                 event.currentTarget.style.background = "transparent";
                 event.currentTarget.style.color = "var(--po-text-subtle)";
               }}
-              title="Back"
+              title={t("shared-ui.navigation.back")}
+              aria-label={t("shared-ui.navigation.back")}
               type="button"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg style={{ transform: direction === "rtl" ? "scaleX(-1)" : undefined }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M19 12H5" />
                 <path d="M12 19l-7-7 7-7" />
               </svg>
@@ -44,7 +47,7 @@ export function ProjectsHeader({ pathSegments, onBack, actionSlot }: ProjectsHea
             const isLast = index === pathSegments.length - 1;
             return (
               <div key={index} style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
-                {index > 0 && <span style={{ margin: "0 8px", color: "var(--po-text-disabled)" }}>/</span>}
+                {index > 0 && <span style={{ marginInline: 8, color: "var(--po-text-disabled)" }}>/</span>}
                 <span
                   style={{
                     ...pathStyle,
@@ -67,8 +70,7 @@ export function ProjectsHeader({ pathSegments, onBack, actionSlot }: ProjectsHea
 
 const headerStyle: CSSProperties = {
   height: 46,
-  paddingLeft: 16,
-  paddingRight: 16,
+  paddingInline: 16,
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
@@ -92,7 +94,7 @@ const headerActionStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "flex-end",
   flexShrink: 0,
-  marginLeft: 16,
+  marginInlineStart: 16,
   position: "relative",
   zIndex: 21,
 };

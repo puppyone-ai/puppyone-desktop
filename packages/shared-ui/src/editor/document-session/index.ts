@@ -5,9 +5,12 @@ export {
   registerActiveDocumentSession,
 } from "./activeDocumentSessions";
 export { useDocumentSessionState } from "./useDocumentSessionState";
+export { formatDocumentSessionError } from "./formatDocumentSessionError";
 export type { DocumentSessionBoundaryProps } from "./DocumentSessionBoundary";
 export type {
   DocumentEditingSessionOptions,
+  DocumentSessionError,
+  DocumentSessionErrorCode,
   DocumentPersistedCommit,
   DocumentSessionState,
   DocumentSessionStatus,

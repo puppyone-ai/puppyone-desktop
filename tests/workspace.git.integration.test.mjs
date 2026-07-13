@@ -18,6 +18,7 @@ import {
   checkoutWorkspaceGitBranch,
   getWorkspaceGitFileDiff,
   configureWorkspaceCloudRemote,
+  parsePuppyoneRemoteInfo,
   createWorkspaceEntry,
   writeWorkspaceTextFile,
 } from "../local-api/workspace.mjs";
@@ -361,6 +362,28 @@ describe("branches", { timeout: 20_000 }, () => {
 });
 
 describe("cloud remote configuration (端 → 云 link)", { timeout: 20_000 }, () => {
+  it("recognizes exact canonical root/scoped locators and bounded legacy locators", () => {
+    expect(parsePuppyoneRemoteInfo(
+      "https://api.puppyone.ai/git/project-1/scopes/docs-scope.git",
+    )).toMatchObject({
+      kind: "scope",
+      projectId: "project-1",
+      scopeId: "docs-scope",
+    });
+    expect(parsePuppyoneRemoteInfo(
+      "https://api.puppyone.ai/not-a-git-remote",
+    )).toBeNull();
+    expect(parsePuppyoneRemoteInfo(
+      "https://user:secret@api.puppyone.ai/git/project-1.git",
+    )).toBeNull();
+    expect(parsePuppyoneRemoteInfo(
+      "ssh://api.puppyone.ai/git/project-1.git",
+    )).toBeNull();
+    expect(parsePuppyoneRemoteInfo(
+      "https://api.puppyone.ai/git/ap/legacy-secret.git",
+    )).toMatchObject({ kind: "access-point" });
+  });
+
   it("configures a PuppyOne-shaped git remote", async () => {
     await initRepoWithIdentity();
     const status = await configureWorkspaceCloudRemote(
@@ -371,6 +394,20 @@ describe("cloud remote configuration (端 → 云 link)", { timeout: 20_000 }, (
     expect(status.remotes.some((r) => r.name === "puppyone")).toBe(true);
     const url = execFileSync("git", ["-C", root, "remote", "get-url", "puppyone"]).toString().trim();
     expect(url).toBe("https://api.puppyone.ai/git/my-project.git");
+  });
+
+  it("configures a canonical scoped remote without credentials in the URL", async () => {
+    await initRepoWithIdentity();
+    await configureWorkspaceCloudRemote(
+      root,
+      "https://api.puppyone.ai/git/my-project/scopes/docs-scope.git",
+      "puppyone",
+    );
+    const url = execFileSync(
+      "git",
+      ["-C", root, "remote", "get-url", "puppyone"],
+    ).toString().trim();
+    expect(url).toBe("https://api.puppyone.ai/git/my-project/scopes/docs-scope.git");
   });
 
   it("updates the URL when the remote already exists (set-url)", async () => {
@@ -393,6 +430,30 @@ describe("cloud remote configuration (端 → 云 link)", { timeout: 20_000 }, (
     await expect(
       configureWorkspaceCloudRemote(root, "ftp://api.puppyone.ai/git/x.git", "puppyone"),
     ).rejects.toThrow(/http or https/i);
+  });
+
+  it("rejects URL credentials, query tokens, and legacy key-in-path remotes", async () => {
+    await initRepoWithIdentity();
+    await expect(configureWorkspaceCloudRemote(
+      root,
+      "https://user:secret@api.puppyone.ai/git/x.git",
+      "puppyone",
+    )).rejects.toThrow(/must not contain credentials/i);
+    await expect(configureWorkspaceCloudRemote(
+      root,
+      "https://api.puppyone.ai/git/x.git?token=secret",
+      "puppyone",
+    )).rejects.toThrow(/must not contain credentials/i);
+    await expect(configureWorkspaceCloudRemote(
+      root,
+      "https://api.puppyone.ai/git/ap/legacy-secret.git",
+      "puppyone",
+    )).rejects.toThrow(/PuppyOne Git endpoint/i);
+    await expect(configureWorkspaceCloudRemote(
+      root,
+      "https://api.puppyone.ai/git/x/scopes/scope%2Fchild.git",
+      "puppyone",
+    )).rejects.toThrow(/PuppyOne Git endpoint/i);
   });
 
   it("rejects an invalid remote name (leading dash)", async () => {

@@ -1,9 +1,10 @@
 import type { Dispatch, ReactNode, Ref, SetStateAction } from "react";
-import { ChevronDown, ExternalLink, Settings, SquareTerminal, type LucideIcon } from "lucide-react";
+import { ChevronDown, ExternalLink, Settings, Terminal, type LucideIcon } from "lucide-react";
 import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
 import { ExternalAppIcon } from "../external-apps/ExternalAppIcon";
 import type { RightSidebarToolId, TitlebarActionId } from "../../preferences";
 import type { WorkspaceExternalOpenTarget } from "../../types/electron";
+import type { MessageFormatter } from "@puppyone/localization";
 
 export type HeaderElementDefinition = {
   id: TitlebarActionId;
@@ -15,6 +16,7 @@ export type HeaderElementDefinition = {
 };
 
 export type HeaderElementRenderContext = {
+  t: MessageFormatter;
   externalOpen: {
     appName?: string | null;
     canOpen: boolean;
@@ -49,8 +51,8 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
           <button
             className="desktop-titlebar-action desktop-titlebar-external-open-main"
             type="button"
-            title={externalOpen.title ?? "Open with app"}
-            aria-label="Open with app"
+            title={externalOpen.title ?? context.t("shell.titlebar.openWithApp")}
+            aria-label={context.t("shell.titlebar.openWithApp")}
             onClick={externalOpen.onOpen}
           >
             <ExternalAppIcon
@@ -65,8 +67,8 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
           <button
             className="desktop-titlebar-action desktop-titlebar-external-open-menu-button"
             type="button"
-            title="Open with..."
-            aria-label="Open with..."
+            title={context.t("shell.titlebar.openWith")}
+            aria-label={context.t("shell.titlebar.openWith")}
             aria-expanded={externalOpen.menuOpen}
             aria-haspopup="menu"
             onClick={() => externalOpen.setMenuOpen((open) => !open)}
@@ -88,7 +90,9 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
                       loaderClassName="desktop-titlebar-external-open-loader"
                     />
                   )}
-                  label={`${target.appName ?? "macOS Default"}${index === 0 ? " (default)" : ""}`}
+                  label={index === 0
+                    ? context.t("shell.titlebar.defaultApp", { app: target.appName ?? context.t("shell.titlebar.macosDefault") })
+                    : target.appName ?? context.t("shell.titlebar.macosDefault")}
                   onClick={() => {
                     externalOpen.setMenuOpen(false);
                     if (index === 0) {
@@ -103,7 +107,7 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
               <DesktopMenuItem
                 className="desktop-branch-menu-row desktop-titlebar-external-open-row"
                 icon={<Settings size={15} />}
-                label="Customize..."
+                label={context.t("shell.titlebar.customize")}
                 onClick={() => {
                   externalOpen.setMenuOpen(false);
                   externalOpen.onCustomize();
@@ -118,12 +122,12 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
   {
     id: "terminal",
     label: "Terminal",
-    icon: SquareTerminal,
+    icon: Terminal,
     linkedRightSidebarToolId: "terminal",
     isAvailable: (context) => context.terminal.enabled,
     render: (context) => {
       const terminal = context.terminal;
-      const toggleLabel = terminal.sidebarOpen ? "Hide Terminal" : "Show Terminal";
+      const toggleLabel = context.t(terminal.sidebarOpen ? "shell.titlebar.hideTerminal" : "shell.titlebar.showTerminal");
       return (
         <button
           className="desktop-titlebar-action desktop-titlebar-terminal"
@@ -133,7 +137,7 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
           aria-pressed={terminal.sidebarOpen}
           onClick={terminal.onToggle}
         >
-          <SquareTerminal size={16} />
+          <Terminal size={15} strokeWidth={1.8} />
         </button>
       );
     },

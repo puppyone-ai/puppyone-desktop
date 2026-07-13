@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
@@ -8,7 +9,7 @@ import type {
   DesktopCloudSession,
 } from "../../../../lib/cloudApi";
 import { PageLoading } from "../../../../components/loading";
-import { getCloudAccessFilterDescriptor, type CloudAccessFilter } from "../../accessFilters";
+import { getCloudAccessFilterPresentation, type CloudAccessFilter } from "../../accessFilters";
 import type { CloudWorkspaceSection } from "../../types";
 import { CloudWebEmpty } from "../../components/shared";
 import { DesktopCloudScopeAccessDetail } from "./ScopeAccessDetail";
@@ -55,6 +56,7 @@ export function CloudAccessSection({
   sidebarOwnsHeader?: boolean;
   canManage?: boolean;
 }) {
+  const { t } = useLocalization();
   const scopeRows = getCloudScopeRows(scopes, identity);
   const accessRows = buildDesktopCloudAccessRows({
     scopeRows,
@@ -63,7 +65,7 @@ export function CloudAccessSection({
     identity,
     apiBaseUrl,
   });
-  const filterDescriptor = getCloudAccessFilterDescriptor(filter);
+  const filterDescriptor = getCloudAccessFilterPresentation(filter, t);
   const pageTitle = filterDescriptor.title;
   const selectedAccessRow = accessRows.find((row) => row.id === activeAccessRowId) ?? accessRows[0] ?? null;
   const selectedScope = selectedAccessRow?.scope ?? scopeRows[0] ?? null;
@@ -88,12 +90,12 @@ export function CloudAccessSection({
         {canManage && (
           <button className="desktop-cloud-access-header-action" type="button" onClick={() => setCreateAccessOpen(true)}>
             <Plus size={14} />
-            <span>New access</span>
+            <span>{t("cloud.access.new")}</span>
           </button>
         )}
       </header>
       {loading ? (
-        <PageLoading variant="fill" label="Loading" className="desktop-cloud-web-loading" />
+        <PageLoading variant="fill" label={t("cloud.common.loading")} className="desktop-cloud-web-loading" />
       ) : scopeRows.length === 0 ? (
         <CloudWebEmpty
           icon={filterDescriptor.icon}

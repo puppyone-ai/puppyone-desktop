@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import { EditorSaveButton } from "../EditorSaveButton";
 import { PlainTextEditor } from "../PlainTextEditor";
 import type { EditorMode, EditorSaveMode } from "../viewerTypes";
@@ -18,6 +19,7 @@ import type {
 } from "../sourceSnapshot";
 import type { EditorDocumentSession } from "../document-session/types";
 import { useDocumentSessionState } from "../document-session/useDocumentSessionState";
+import { formatDocumentSessionError } from "../document-session/formatDocumentSessionError";
 
 export type TextEditorControls = {
   canEdit: boolean;
@@ -57,6 +59,7 @@ export function TextEditorFrame({
   renderLive,
   renderSource,
 }: TextEditorFrameProps) {
+  const { t } = useLocalization();
   const [mode, setMode] = useState<EditorMode>(hideSourceView ? "live" : defaultMode);
   const [draft, setDraft] = useState(content);
   const [editorValue, setEditorValue] = useState(content);
@@ -70,6 +73,7 @@ export function TextEditorFrame({
   const detachSourceRef = useRef<(() => void) | null>(null);
   const sessionRef = useRef<EditorDocumentSession | null>(documentSession);
   const sessionState = useDocumentSessionState(documentSession);
+  const sessionError = formatDocumentSessionError(sessionState.error, t);
 
   useLayoutEffect(() => {
     const previousSession = sessionRef.current;
@@ -239,7 +243,7 @@ export function TextEditorFrame({
         </div>
       )}
 
-      {sessionState.error && <div className="editor-inline-error">{sessionState.error}</div>}
+      {sessionError && <div className="editor-inline-error" dir="auto">{sessionError}</div>}
 
       {mode === "live" ? (
         <div className="editor-live-surface">
@@ -259,13 +263,13 @@ export function TextEditorFrame({
       )}
 
       {!hideSourceView && (
-        <div className="editor-mode-toggle" aria-label="Editor mode">
+        <div className="editor-mode-toggle" aria-label={t("editor.mode.label")}>
           <button
             className={mode === "live" ? "active" : ""}
             type="button"
             onClick={() => switchMode("live")}
-            title="Live view"
-            aria-label="Live view"
+            title={t("editor.mode.live")}
+            aria-label={t("editor.mode.live")}
           >
             <PencilIcon />
           </button>
@@ -273,8 +277,8 @@ export function TextEditorFrame({
             className={mode === "source" ? "active" : ""}
             type="button"
             onClick={() => switchMode("source")}
-            title="Source code"
-            aria-label="Source code"
+            title={t("editor.mode.source")}
+            aria-label={t("editor.mode.source")}
           >
             <CodeIcon />
           </button>

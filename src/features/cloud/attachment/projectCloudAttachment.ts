@@ -1,5 +1,6 @@
 import type { CloudWorkspaceSection } from "../routes/cloudRouteIds";
 import type { DesktopCloudProjectReadiness } from "../../../lib/cloudApi";
+import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
 export type ProjectCloudAttachment =
   | { status: "local-only"; projectId: null }
@@ -12,22 +13,22 @@ export type ProjectCloudAttachment =
       scopePath?: string | null;
       readiness?: DesktopCloudProjectReadiness | null;
       capabilities?: string[];
-      warning?: string;
+      warning?: CloudMessageDescriptor;
     }
-  | { status: "not-authorized"; projectId: string | null; message: string }
-  | { status: "wrong-account"; projectId: string | null; message: string }
-  | { status: "wrong-host"; projectId: string | null; message: string }
-  | { status: "binding-revoked"; projectId: string | null; message: string }
-  | { status: "role-downgraded"; projectId: string | null; message: string }
+  | { status: "not-authorized"; projectId: string | null; message: CloudMessageDescriptor }
+  | { status: "wrong-account"; projectId: string | null; message: CloudMessageDescriptor }
+  | { status: "wrong-host"; projectId: string | null; message: CloudMessageDescriptor }
+  | { status: "binding-revoked"; projectId: string | null; message: CloudMessageDescriptor }
+  | { status: "role-downgraded"; projectId: string | null; message: CloudMessageDescriptor }
   | {
       status: "legacy-confirmation-required";
       projectId: string | null;
       scopeId: string | null;
       bindingKind: "full" | "scoped" | null;
-      message: string;
+      message: CloudMessageDescriptor;
     }
-  | { status: "unresolvable"; projectId: null; message: string }
-  | { status: "error"; projectId: null; message: string };
+  | { status: "unresolvable"; projectId: null; message: CloudMessageDescriptor }
+  | { status: "error"; projectId: null; message: CloudMessageDescriptor };
 
 /** Binding identity only — auth/offline/expired live on CloudAuthState. */
 export function getAttachedCloudProjectId(attachment: ProjectCloudAttachment): string | null {
@@ -66,7 +67,7 @@ export function isCloudAttachmentRecovery(
     || attachment.status === "error";
 }
 
-export function getCloudAttachmentWarning(attachment: ProjectCloudAttachment): string | null {
+export function getCloudAttachmentWarning(attachment: ProjectCloudAttachment): CloudMessageDescriptor | null {
   if (attachment.status === "linked") return attachment.warning ?? null;
   if (isCloudAttachmentRecovery(attachment)) {
     return attachment.message;
@@ -92,7 +93,7 @@ export function resolveProjectCloudAttachment({
   configuredProjectId: string | null;
   bindingProjectId: string | null;
   remoteProjectId: string | null;
-  bindingError: string | null;
+  bindingError: CloudMessageDescriptor | null;
   bindingReason?:
     | "not-authorized"
     | "unresolvable"
@@ -181,7 +182,7 @@ export function resolveProjectCloudAttachment({
     return {
       status: "unresolvable",
       projectId: null,
-      message: "We found a PuppyOne Cloud remote, but couldn’t identify its project.",
+      message: cloudMessage("binding-unknown-remote"),
     };
   }
 

@@ -6,6 +6,7 @@ import {
 } from "../../core/plans/planPrimitives";
 import type { MarkdownElement } from "../../core/syntax/markdownElements";
 import { isMermaidCodeBlockLanguage } from "./codeBlockModel";
+import { estimateCodeBlockLayoutHeight, estimateMermaidLayoutHeight } from "./codeBlockLayout";
 
 export function compileCodeBlockElementPlan(
   element: MarkdownElement,
@@ -19,19 +20,19 @@ export function compileCodeBlockElementPlan(
   }
 
   const { language, sourceReference, code } = fenceData;
+  const mermaid = isMermaidCodeBlockLanguage(language);
   return {
     presentation: "blockAtom",
     sourceRange: rangeOf(element),
-    embed: isMermaidCodeBlockLanguage(language)
+    embed: mermaid
       ? { kind: "mermaid", language, sourceReference, code }
       : { kind: "codeBlock", language, sourceReference, code },
-    layout: { estimatedHeight: estimateFenceHeight(code) },
+    layout: {
+      estimatedHeight: mermaid
+        ? estimateMermaidLayoutHeight(code)
+        : estimateCodeBlockLayoutHeight(code),
+    },
     diagnostics: [],
     capabilities: BLOCK_EMBED_CAPABILITIES,
   };
-}
-
-function estimateFenceHeight(code: string): number {
-  const lineCount = Math.max(1, code.split("\n").length);
-  return Math.max(80, Math.min(42 + lineCount * 20, 1600));
 }

@@ -1,6 +1,7 @@
 import type { AgentEvent } from "./agent-contract";
 import type {
   AgentActivity,
+  AgentActivityLabelCode,
   AgentActivityStatus,
   AgentApproval,
   AgentQuestionPrompt,
@@ -70,9 +71,14 @@ export function pickUsage(payload: Record<string, unknown>) {
 
 export function pickSafeActivityDetail(payload: Record<string, unknown>) {
   const detail: Record<string, unknown> = {};
-  for (const key of ["command", "cwd", "delta", "status", "kind", "tool", "description", "path", "query", "changes", "steps", "title", "message", "input", "outputPreview", "error", "content", "detail", "metadata", "exitCode", "duration", "diff", "patch", "outputPaths"]) {
+  for (const key of ["command", "cwd", "delta", "status", "kind", "tool", "description", "path", "query", "changes", "steps", "title", "message", "input", "outputPreview", "error", "content", "detail", "metadata", "exitCode", "duration", "durationMs", "elapsedMs", "diff", "patch", "outputPaths"]) {
     if (!(key in payload)) continue;
     detail[key] = boundProjectionValue(payload[key]);
+  }
+  // Older adapters emitted structured tool arguments under `arguments`.
+  // Normalize that compatibility shape into the canonical `input` field.
+  if (!("input" in detail) && "arguments" in payload) {
+    detail.input = boundProjectionValue(payload.arguments);
   }
   return detail;
 }
@@ -128,16 +134,14 @@ export function readNetworkApprovalContext(value: unknown): AgentApproval["netwo
   return host && protocol ? { host, protocol } : null;
 }
 
-export function defaultToolLabel(kind: AgentActivity["kind"]) {
-  if (kind === "command") return "Command";
-  if (kind === "file-change") return "File changes";
-  return "Tool activity";
+export function defaultToolLabelCode(kind: AgentActivity["kind"]): AgentActivityLabelCode {
+  if (kind === "command") return "command";
+  if (kind === "file-change") return "file-changes";
+  return "tool-activity";
 }
 
-export function fileChangeLabel(payload: Record<string, unknown>) {
-  const changes = Array.isArray(payload.changes) ? payload.changes : [];
-  if (changes.length === 0) return "File changes";
-  return changes.length === 1 ? "Changed 1 file" : `Changed ${changes.length} files`;
+export function fileChangeLabelCode(_payload: Record<string, unknown>): AgentActivityLabelCode {
+  return "file-changes";
 }
 
 export function readApprovalDecisions(value: unknown): AgentApproval["availableDecisions"] {

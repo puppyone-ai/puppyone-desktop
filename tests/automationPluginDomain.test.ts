@@ -53,7 +53,7 @@ describe("Automation and Plugin product-domain boundary", () => {
   });
 
   it("uses Automation as the product route while preserving the established Cloud web path", () => {
-    expect(getCloudRoute("automation").label).toBe("Automation");
+    expect(getCloudRoute("automation").labelId).toBe("cloud.route.automation.label");
     expect(getCloudAutomationWebPath("project/a")).toBe("/projects/project%2Fa/workflows");
   });
 

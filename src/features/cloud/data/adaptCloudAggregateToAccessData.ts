@@ -7,6 +7,7 @@ import type {
 import { buildDesktopCloudAccessRows } from "../sections/access/accessRows";
 import { getCloudScopeRows, scopeMatchesMcpEndpoint } from "../utils";
 import type { DesktopCloudAccessDataState } from "./useDesktopCloudAccessData";
+import type { CloudMessageDescriptor } from "../cloudPresentation";
 
 /** Adapt aggregate Cloud project details into Access/Automation view state without refetching. */
 export function adaptCloudAggregateToAccessData({
@@ -26,8 +27,8 @@ export function adaptCloudAggregateToAccessData({
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;
   loading: boolean;
-  error: string | null;
-  warning: string | null;
+  error: CloudMessageDescriptor | null;
+  warning: CloudMessageDescriptor | null;
   reload: () => Promise<void>;
 }): DesktopCloudAccessDataState {
   const scopeRows = getCloudScopeRows(scopes, identity);

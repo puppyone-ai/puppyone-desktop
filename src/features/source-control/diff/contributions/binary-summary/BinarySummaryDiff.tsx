@@ -1,8 +1,11 @@
 import { ExternalLink, FileWarning } from "lucide-react";
+import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import type { GitRevisionSide } from "../../../../../types/electron";
 import type { DiffRendererProps } from "../../core/types";
 
 export function BinarySummaryDiff({ file, format, canOpenFile, onOpenFile }: DiffRendererProps) {
+  const { formatNumber, t } = useLocalization();
   const pair = file.revisionPair;
   const unavailable = [pair?.before, pair?.after]
     .filter((side): side is Extract<GitRevisionSide, { kind: "unavailable" }> => side?.kind === "unavailable");
@@ -12,21 +15,23 @@ export function BinarySummaryDiff({ file, format, canOpenFile, onOpenFile }: Dif
       <div className="desktop-binary-diff-heading">
         <FileWarning size={16} aria-hidden="true" />
         <div>
-          <strong>{format.label}</strong>
-          <span>No specialized semantic diff is available for this format yet.</span>
+          <strong dir="auto">{format.label}</strong>
+          <span>{t("source-control.diff.binary.noSemanticDiff")}</span>
         </div>
       </div>
 
       {pair && (
-        <div className="desktop-binary-diff-sides" aria-label="Revision metadata">
-          <RevisionSide label="Before" side={pair.before} />
-          <RevisionSide label="After" side={pair.after} />
+        <div className="desktop-binary-diff-sides" aria-label={t("source-control.diff.binary.revisionMetadata")}>
+          <RevisionSide label={t("source-control.diff.binary.before")} side={pair.before} formatNumber={formatNumber} t={t} />
+          <RevisionSide label={t("source-control.diff.binary.after")} side={pair.after} formatNumber={formatNumber} t={t} />
         </div>
       )}
 
       {unavailable.map((side) => (
         <div className="desktop-binary-diff-warning" key={`${side.identity}:${side.reason}`}>
-          {side.message}
+          {t("source-control.diff.binary.revisionUnavailableDetail", {
+            detail: bidiIsolate(side.message),
+          })}
         </div>
       ))}
 
@@ -37,25 +42,55 @@ export function BinarySummaryDiff({ file, format, canOpenFile, onOpenFile }: Dif
           onClick={() => onOpenFile(file.path)}
         >
           <ExternalLink size={13} aria-hidden="true" />
-          Open current file
+          {t("source-control.diff.binary.openCurrentFile")}
         </button>
       )}
     </div>
   );
 }
 
-function RevisionSide({ label, side }: { label: string; side: GitRevisionSide }) {
+function RevisionSide({
+  label,
+  side,
+  formatNumber,
+  t,
+}: {
+  label: string;
+  side: GitRevisionSide;
+  formatNumber: ReturnType<typeof useLocalization>["formatNumber"];
+  t: MessageFormatter;
+}) {
   return (
     <div className={`desktop-binary-diff-side ${side.kind}`}>
       <span>{label}</span>
-      <strong>{side.kind === "missing" ? "Not present" : formatBytes(side.size)}</strong>
+      <strong>{side.kind === "missing"
+        ? t("source-control.diff.binary.notPresent")
+        : formatBytes(side.size, formatNumber, t)}</strong>
     </div>
   );
 }
 
-function formatBytes(value: number | null) {
-  if (value == null) return "Unavailable";
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+function formatBytes(
+  value: number | null,
+  formatNumber: ReturnType<typeof useLocalization>["formatNumber"],
+  t: MessageFormatter,
+) {
+  if (value == null) return t("source-control.diff.binary.unavailable");
+  if (value < 1024) {
+    return formatNumber(value, { style: "unit", unit: "byte", unitDisplay: "short" });
+  }
+  if (value < 1024 * 1024) {
+    return formatNumber(value / 1024, {
+      maximumFractionDigits: 1,
+      style: "unit",
+      unit: "kilobyte",
+      unitDisplay: "short",
+    });
+  }
+  return formatNumber(value / (1024 * 1024), {
+    maximumFractionDigits: 1,
+    style: "unit",
+    unit: "megabyte",
+    unitDisplay: "short",
+  });
 }

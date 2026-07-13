@@ -374,8 +374,8 @@
   color: var(--po-text-muted);
   font: inherit;
   font-size: 12px;
-  text-align: left;
-  cursor: pointer;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-automation-link-button {
@@ -411,8 +411,8 @@
   color: var(--po-text-muted);
   font: inherit;
   font-size: 11px;
-  text-align: left;
-  cursor: pointer;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-automation-resource-list > button:hover:not(:disabled),
@@ -479,7 +479,7 @@
   color: var(--po-accent);
   font: inherit;
   font-size: 12px;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-automation-inline-note,
@@ -518,19 +518,19 @@
   color: var(--po-text-muted);
   font: inherit;
   font-size: 12px;
-  text-align: left;
-  cursor: pointer;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-automation-folder-toggle svg:last-child {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .desktop-cloud-automation-folder-tree {
   display: grid;
   min-width: 0;
   gap: 2px;
-  padding-left: calc(var(--automation-folder-depth, 0) * 12px);
+  padding-inline-start: calc(var(--automation-folder-depth, 0) * 12px);
 }
 
 .desktop-cloud-automation-folder-row {
@@ -557,7 +557,7 @@
   color: var(--po-text-muted);
   font: inherit;
   font-size: 12px;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-automation-folder-row > button:last-child span {
@@ -713,7 +713,7 @@
 }
 
 .desktop-cloud-automation-manage-editor-actions > span {
-  margin-right: auto;
+  margin-inline-end: auto;
   color: var(--po-danger);
   font-size: 12px;
 }

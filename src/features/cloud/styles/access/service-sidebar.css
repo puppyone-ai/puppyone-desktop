@@ -11,13 +11,12 @@
   justify-content: space-between;
   box-sizing: border-box;
   padding: 0 16px;
-  border-bottom: 1px solid var(--po-active, var(--po-divider));
+  border-bottom: 1px solid var(--po-sidebar-divider, var(--po-divider));
   background: var(--po-canvas);
   font-family: var(--po-font-sans);
 }
 
 .desktop-cloud-service-sidebar.desktop-cloud-access-scope-sidebar {
-  border-right: 1px solid var(--po-border-subtle);
   background: var(--po-canvas);
 }
 
@@ -121,7 +120,7 @@
 }
 
 .desktop-cloud-service-sidebar .desktop-cloud-access-scope-status {
-  margin-left: 0;
+  margin-inline-start: 0;
 }
 
 .desktop-cloud-service-sidebar .desktop-cloud-access-resource-row .desktop-cloud-access-scope-title-line {

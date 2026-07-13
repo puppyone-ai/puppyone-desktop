@@ -181,7 +181,7 @@
   font-size: 12.5px;
   font-weight: 620;
   line-height: 1.25;
-  text-align: left;
+  text-align: start;
 }
 
 .desktop-settings-row .desktop-settings-label-stack small {
@@ -197,7 +197,7 @@
   color: var(--po-text);
   font-size: 12.5px;
   font-weight: 600;
-  text-align: right;
+  text-align: end;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -279,7 +279,7 @@
   color: var(--po-text);
   font-size: 12.5px;
   font-weight: 650;
-  text-align: right;
+  text-align: end;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -453,7 +453,7 @@
   content: "";
   position: absolute;
   top: 2px;
-  left: 2px;
+  inset-inline-start: 2px;
   width: 14px;
   height: 14px;
   border-radius: 999px;
@@ -469,6 +469,10 @@
 .desktop-settings-switch input:checked + span::before {
   background: var(--po-accent);
   transform: translateX(14px);
+}
+
+[dir="rtl"] .desktop-settings-switch input:checked + span::before {
+  transform: translateX(-14px);
 }
 
 .desktop-settings-switch input:focus-visible + span {
@@ -908,7 +912,7 @@
   }
 
   .desktop-settings-line-value strong {
-    text-align: left;
+    text-align: start;
   }
 
   .desktop-settings-remote-setting {

@@ -12,6 +12,7 @@ import {
 } from "../packages/shared-ui/src/data/explorer/explorerVisibleModel";
 import { createExplorerMotionPlan } from "../packages/shared-ui/src/data/explorer/explorerMotionPlan";
 import { EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS } from "../packages/shared-ui/src/data/explorer/useExplorerVirtualWindow";
+import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -40,7 +41,11 @@ describe("Explorer bounded rendering", () => {
         { id: "b", name: "b.md", path: "folder/b.md", type: "markdown" },
       ],
     }];
-    const model = buildExplorerVisibleModel(nodes, { expandedPaths: new Set(["folder"]) });
+    const model = buildExplorerVisibleModel(nodes, {
+      expandedPaths: new Set(["folder"]),
+      emptyLabel: "empty",
+      loadingLabel: "loading",
+    });
 
     expect(model.rows.map((row) => row.kind === "node" ? row.path : row.key)).toEqual([
       "folder",
@@ -75,8 +80,16 @@ describe("Explorer bounded rendering", () => {
       ],
     };
     const tail: DataNode = { id: "tail", name: "tail.md", path: "tail.md", type: "markdown" };
-    const collapsed = buildExplorerVisibleModel([folder, tail], { expandedPaths: new Set() });
-    const expanded = buildExplorerVisibleModel([folder, tail], { expandedPaths: new Set([folder.path]) });
+    const collapsed = buildExplorerVisibleModel([folder, tail], {
+      expandedPaths: new Set(),
+      emptyLabel: "empty",
+      loadingLabel: "loading",
+    });
+    const expanded = buildExplorerVisibleModel([folder, tail], {
+      expandedPaths: new Set([folder.path]),
+      emptyLabel: "empty",
+      loadingLabel: "loading",
+    });
     const enterPlan = createExplorerMotionPlan({
       previousRows: collapsed.rows,
       nextRows: expanded.rows,
@@ -138,7 +151,7 @@ describe("Explorer bounded rendering", () => {
       );
     }
 
-    act(() => root?.render(<ControlledExplorer />));
+    act(() => root?.render(withTestLocalization(<ControlledExplorer />)));
     const folderRow = container.querySelector<HTMLButtonElement>(`[data-explorer-path="${folder.path}"]`)!;
     act(() => folderRow.click());
     expect(container.querySelectorAll('[data-explorer-motion="enter"]').length).toBeGreaterThan(0);
@@ -174,7 +187,7 @@ describe("Explorer bounded rendering", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    const renderSelection = (index: number) => root?.render(
+    const renderSelection = (index: number) => root?.render(withTestLocalization(
       <ExplorerTree
         nodes={nodes}
         activePath={nodes[index]?.path ?? null}
@@ -184,7 +197,7 @@ describe("Explorer bounded rendering", () => {
         onSelectNode={onSelectNode}
         renderNodeActions={renderNodeActions}
       />,
-    );
+    ));
 
     act(() => renderSelection(0));
     expect(renderNodeActions.mock.calls.length).toBeGreaterThan(2);
@@ -261,7 +274,7 @@ function renderExplorer({
   Object.assign(container.style, { width: "320px", height: "640px" });
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root?.render(
+  act(() => root?.render(withTestLocalization(
     <ExplorerTree
       nodes={nodes}
       activePath={activePath}
@@ -272,7 +285,7 @@ function renderExplorer({
       onMoveNode={onMoveNode}
       onSelectNode={onSelectNode}
     />,
-  ));
+  )));
   return container;
 }
 

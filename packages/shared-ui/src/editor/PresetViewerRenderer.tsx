@@ -6,6 +6,7 @@ import {
   type ComponentType,
   type LazyExoticComponent,
 } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   LazyPresetViewerContribution,
   PresetViewerContribution,
@@ -35,13 +36,14 @@ export function PresetViewerRenderer({
   viewer: PresetViewerContribution;
   context: PresetViewerRenderContext;
 }) {
+  const { t } = useLocalization();
   if ("render" in viewer && typeof viewer.render === "function") {
     return <>{viewer.render(context)}</>;
   }
 
   const LazyRenderer = getLazyRenderer(viewer as LazyPresetViewerContribution);
   return (
-    <Suspense fallback={<div className="editor-state">Loading viewer…</div>}>
+    <Suspense fallback={<div className="editor-state">{t("editor.loadingViewer")}</div>}>
       <LazyRenderer {...context} />
     </Suspense>
   );

@@ -263,7 +263,7 @@
 }
 
 .desktop-cloud-commit-files header button {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .desktop-cloud-commit-file-list {

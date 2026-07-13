@@ -7,8 +7,10 @@
 @import "./styles/minimal-mode.css";
 @import "./styles/dialogs.css";
 @import "./styles/layout.css";
+@import "./styles/sidebar-primitives.css";
 @import "./styles/project-folder-card.css";
 @import "./styles/settings.css";
+@import "./styles/entry-state.css";
 @import "./features/cloud/cloud-service.css";
 @import "./features/automation/automation.css";
 @import "./features/automation/automation-dialog.css";

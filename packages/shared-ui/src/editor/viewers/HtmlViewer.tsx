@@ -2,6 +2,8 @@
 
 import { Code2, Eye } from "lucide-react";
 import { useState } from "react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import { getHtmlPreviewInteractionCss } from "../htmlPreviewInteraction";
 import { PlainTextEditor } from "../PlainTextEditor";
 import type { MarkdownHtmlTrustMode, PresetViewerRenderContext } from "../viewerTypes";
@@ -26,14 +28,19 @@ export function HtmlViewer({
   | "error"
   | "htmlTrustMode"
 >) {
+  const { t } = useLocalization();
   const [mode, setMode] = useState<"preview" | "source">("preview");
 
-  if (loading && !content && !fileUrl) return <div className="editor-state">Loading HTML...</div>;
-  if (error && !content && !fileUrl) return <div className="editor-state danger">{error}</div>;
-  if (content && fileUrlLoading && !fileUrl) return <div className="editor-state">Loading preview...</div>;
-  if (fileUrlLoading && !content && !fileUrl) return <div className="editor-state">Loading preview...</div>;
+  if (loading && !content && !fileUrl) return <div className="editor-state">{t("editor.html.loading")}</div>;
+  if (error && !content && !fileUrl) return <div className="editor-state danger" dir="auto">{error}</div>;
+  if (content && fileUrlLoading && !fileUrl) return <div className="editor-state">{t("editor.preview.loading")}</div>;
+  if (fileUrlLoading && !content && !fileUrl) return <div className="editor-state">{t("editor.preview.loading")}</div>;
   if (fileUrlError && !content && !fileUrl) {
-    return <div className="editor-state danger">Failed to load HTML: {fileUrlError}</div>;
+    return (
+      <div className="editor-state danger">
+        {t("editor.html.loadFailed", { detail: bidiIsolate(fileUrlError) })}
+      </div>
+    );
   }
 
   const sourceAvailable = Boolean(content);
@@ -41,12 +48,12 @@ export function HtmlViewer({
 
   return (
     <section className="html-preview-shell" data-mode={resolvedMode}>
-      <div className="html-preview-toolbar" aria-label="HTML view mode">
+      <div className="html-preview-toolbar" aria-label={t("editor.html.mode")}>
         <button
           className={resolvedMode === "preview" ? "active" : ""}
           type="button"
-          title="HTML preview"
-          aria-label="HTML preview"
+          title={t("editor.html.preview")}
+          aria-label={t("editor.html.preview")}
           onClick={() => setMode("preview")}
         >
           <Eye size={14} strokeWidth={2} />
@@ -54,8 +61,8 @@ export function HtmlViewer({
         <button
           className={resolvedMode === "source" ? "active" : ""}
           type="button"
-          title={sourceAvailable ? "HTML source" : "HTML source unavailable"}
-          aria-label="HTML source"
+          title={sourceAvailable ? t("editor.html.source") : t("editor.html.sourceUnavailable")}
+          aria-label={t("editor.html.source")}
           disabled={!sourceAvailable}
           onClick={() => setMode("source")}
         >

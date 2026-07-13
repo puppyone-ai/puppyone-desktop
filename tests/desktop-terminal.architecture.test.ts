@@ -12,8 +12,8 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(panel).toContain("sessionGeneration");
     expect(panel).toContain("handleResetTerminal");
     expect(panel).not.toMatch(/type RightTerminalPanelProps = \{[^}]*onReset/);
-    expect(header).toContain("Clear Terminal");
-    expect(header).toContain("Reset Terminal");
+    expect(header).toContain('t("terminal.clear")');
+    expect(header).toContain('t("terminal.reset")');
     expect(app).not.toContain("terminalSessionResetToken");
     expect(app).not.toContain("onClearTerminal");
     expect(app).not.toContain("onResetTerminal");

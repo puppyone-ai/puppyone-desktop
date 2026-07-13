@@ -7,11 +7,12 @@ import {
   type SetStateAction,
 } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
+import { useLocalization } from "@puppyone/localization";
 import type { RecentWorkspaceHomeItem, OnboardingOperationStatus } from "../../../components/MinimalOnboarding";
 import {
   getCloudProject,
-  getCloudRepoIdentity,
   revokeCloudWorkspaceBinding,
+  revokeCloudWorkspaceBindingCredential,
   type DesktopCloudProject,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
@@ -35,8 +36,12 @@ import {
 } from "./cloudProjectResolution";
 import { findRecentLocalWorkspaceBindingForCloudProject } from "../../app-shell/workspaceHomeModel";
 import { cloudOriginFromApiBase, createExplicitWorkspaceBinding } from "./explicitWorkspaceBinding";
+import { formatCloudMessage } from "../cloudPresentation";
 
-const CLOUD_PROJECT_RESOLVING_MESSAGE = "Resolving Cloud project...";
+type WorkspaceSurfaceFeedback =
+  | { kind: "resolving" }
+  | { kind: "error"; message: string }
+  | null;
 
 export function useWorkspaceSurfaceSwitch({
   activeCloudSession,
@@ -85,9 +90,16 @@ export function useWorkspaceSurfaceSwitch({
   workspace: Workspace | null;
   workspaceIsCloud: boolean;
 }) {
+  const { t } = useLocalization();
   const [workspaceSurfaceSwitching, setWorkspaceSurfaceSwitching] = useState(false);
-  const [workspaceSurfaceError, setWorkspaceSurfaceError] = useState<string | null>(null);
+  const [workspaceSurfaceFeedback, setWorkspaceSurfaceFeedback] = useState<WorkspaceSurfaceFeedback>(null);
   const [workspaceSurfaceDialogOpen, setWorkspaceSurfaceDialogOpen] = useState(false);
+  const setWorkspaceSurfaceError = useCallback((message: string | null) => {
+    setWorkspaceSurfaceFeedback(message ? { kind: "error", message } : null);
+  }, []);
+  const workspaceSurfaceError = workspaceSurfaceFeedback?.kind === "resolving"
+    ? t("cloud.workspaceSurface.resolving")
+    : workspaceSurfaceFeedback?.message ?? null;
 
   const activeLocalCloudProjectId = useMemo(() => {
     if (!workspace || workspaceIsCloud) return null;
@@ -123,7 +135,7 @@ export function useWorkspaceSurfaceSwitch({
     setWorkspaceSurfaceSwitching(false);
     setWorkspaceSurfaceError(null);
     setWorkspaceSurfaceDialogOpen(false);
-  }, [workspace?.path]);
+  }, [setWorkspaceSurfaceError, workspace?.path]);
 
   // Local workspace Cloud project binding is owned by useCloudWorkspaceBinding.
 
@@ -133,16 +145,16 @@ export function useWorkspaceSurfaceSwitch({
       setWorkspaceSurfaceSwitching(true);
       setWorkspaceSurfaceDialogOpen(true);
       const projectId = activeLocalCloudProjectId;
-      setWorkspaceSurfaceError(projectId ? null : CLOUD_PROJECT_RESOLVING_MESSAGE);
+      setWorkspaceSurfaceFeedback(projectId ? null : { kind: "resolving" });
       if (!projectId) {
         if (!activeCloudSession) {
-          const message = "Sign in to Puppyone Cloud, then switch to the cloud project again.";
+          const message = t("cloud.workspaceSurface.signInToSwitch");
           setWorkspaceSurfaceError(message);
           showBrowserSignInStatus(message);
           void startCloudBrowserSignIn();
           return;
         }
-        throw new Error(CLOUD_PROJECT_UNRESOLVABLE_MESSAGE);
+        throw new Error(formatCloudMessage(CLOUD_PROJECT_UNRESOLVABLE_MESSAGE, t));
       }
 
       setWorkspaceSurfaceError(null);
@@ -159,8 +171,10 @@ export function useWorkspaceSurfaceSwitch({
     activeLocalCloudProjectId,
     openCloudProjectFromHomepage,
     setHomeOperationStatus,
+    setWorkspaceSurfaceError,
     showBrowserSignInStatus,
     startCloudBrowserSignIn,
+    t,
     workspaceSurfaceSwitching,
   ]);
 
@@ -176,7 +190,7 @@ export function useWorkspaceSurfaceSwitch({
       .catch((error) => {
         setWorkspaceSurfaceError(error instanceof Error ? error.message : String(error));
       });
-  }, [activeCloudLocalBinding, handleWorkspaceOpenResult]);
+  }, [activeCloudLocalBinding, handleWorkspaceOpenResult, setWorkspaceSurfaceError]);
 
   const openCloudWorkspaceLocally = useCallback(() => {
     if (!cloudProjectId) return;
@@ -187,10 +201,13 @@ export function useWorkspaceSurfaceSwitch({
 
       const openedWorkspace = result.workspace;
       if (openedWorkspace) {
-        let createdBindingId: string | null = null;
+        let issuedBindingId: string | null = null;
+        let bindingWasCreated = false;
+        let currentConfig: PuppyoneWorkspaceConfig | null = null;
+        let configUpdated = false;
         try {
           if (!activeCloudSession) {
-            throw new Error("Sign in before attaching a Cloud project locally.");
+            throw new Error(t("cloud.workspaceSurface.signInToAttach"));
           }
           const project = homeCloudProjects.find((entry) => entry.id === cloudProjectId)
             ?? await getCloudProject(
@@ -199,26 +216,17 @@ export function useWorkspaceSurfaceSwitch({
               updateCloudSession,
               desktopCloudApiBaseUrl,
             );
-          const identity = await getCloudRepoIdentity(
-            activeCloudSession,
-            cloudProjectId,
-            updateCloudSession,
-            desktopCloudApiBaseUrl,
-          );
           const attached = await createExplicitWorkspaceBinding({
             session: activeCloudSession,
             apiBaseUrl: desktopCloudApiBaseUrl,
             project,
             projectId: cloudProjectId,
             workspace: openedWorkspace,
-            remoteUrl: identity.url,
             onSessionChange: updateCloudSession,
           });
-          createdBindingId = attached.binding.id;
-          await configureWorkspaceCloudRemote(
-            openedWorkspace.path, attached.credentialRemoteUrl, "puppyone",
-          );
-          const currentConfig = await readPuppyoneWorkspaceConfig(openedWorkspace.path).catch(() => null);
+          issuedBindingId = attached.binding.id;
+          bindingWasCreated = attached.bindingWasCreated;
+          currentConfig = await readPuppyoneWorkspaceConfig(openedWorkspace.path);
           const nextConfig = mergePuppyoneWorkspaceConfig(currentConfig, {
             project: {
               workspaceInstanceId: openedWorkspace.workspaceInstanceId ?? null,
@@ -230,6 +238,14 @@ export function useWorkspaceSurfaceSwitch({
             },
           });
           await writePuppyoneWorkspaceConfig(openedWorkspace.path, nextConfig);
+          configUpdated = true;
+          await configureWorkspaceCloudRemote(
+            openedWorkspace.path,
+            attached.remoteUrl,
+            "puppyone",
+            attached.credential,
+            attached.username,
+          );
           setRecentWorkspaceCloudBindings((current) => ({
             ...current,
             [openedWorkspace.id]: {
@@ -243,10 +259,19 @@ export function useWorkspaceSurfaceSwitch({
             },
           }));
         } catch (error) {
-          if (createdBindingId && activeCloudSession) {
-            await revokeCloudWorkspaceBinding(
+          if (configUpdated && currentConfig) {
+            await writePuppyoneWorkspaceConfig(
+              openedWorkspace.path,
+              currentConfig,
+            ).catch(() => undefined);
+          }
+          if (issuedBindingId && activeCloudSession) {
+            const compensate = bindingWasCreated
+              ? revokeCloudWorkspaceBinding
+              : revokeCloudWorkspaceBindingCredential;
+            await compensate(
               activeCloudSession,
-              createdBindingId,
+              issuedBindingId,
               updateCloudSession,
               desktopCloudApiBaseUrl,
             ).catch(() => undefined);
@@ -269,6 +294,8 @@ export function useWorkspaceSurfaceSwitch({
     homeCloudProjects,
     refreshRecentWorkspaceList,
     setRecentWorkspaceCloudBindings,
+    setWorkspaceSurfaceError,
+    t,
     updateCloudSession,
   ]);
 
@@ -314,6 +341,6 @@ export function useWorkspaceSurfaceSwitch({
     workspaceSurfaceDialogOpen,
     workspaceSurfaceError,
     workspaceSurfaceSwitching,
-    workspaceSurfaceResolvePending: workspaceSurfaceError === CLOUD_PROJECT_RESOLVING_MESSAGE,
+    workspaceSurfaceResolvePending: workspaceSurfaceFeedback?.kind === "resolving",
   };
 }

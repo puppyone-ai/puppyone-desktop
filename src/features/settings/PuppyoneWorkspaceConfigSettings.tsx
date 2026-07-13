@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, RefreshCw } from "lucide-react";
 import type { GitRemoteSummary, GitStatusSnapshot, PuppyoneBackendService, PuppyoneWorkspaceConfig } from "../../types/electron";
 import { parsePuppyoneRemote } from "../source-control/remotes";
+import { useLocalization } from "@puppyone/localization";
 import { SettingsGroup } from "./components";
 import { remoteKindLabel } from "./utils";
 
@@ -28,6 +29,7 @@ export function PuppyoneWorkspaceConfigSettings({
   onChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
   onRegenerateProjectId: () => Promise<PuppyoneWorkspaceConfig | null>;
 }) {
+  const { t } = useLocalization();
   const [draft, setDraft] = useState<PuppyoneWorkspaceConfig>(() => normalizePuppyoneConfigDraft(config, cloudEnabled));
   const [localError, setLocalError] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
@@ -57,13 +59,13 @@ export function PuppyoneWorkspaceConfigSettings({
     {
       value: "puppyone",
       label: "Puppyone Cloud",
-      detail: "Simple workspace sync managed by Puppyone.",
+      detail: t("settings.workspaceConfig.service.puppyone.detail"),
       available: cloudEnabled,
     },
     {
       value: "github",
       label: "GitHub",
-      detail: "Use the standard GitHub flow and Git remotes.",
+      detail: t("settings.workspaceConfig.service.github.detail"),
       available: true,
     },
   ];
@@ -146,7 +148,7 @@ export function PuppyoneWorkspaceConfigSettings({
   const regenerateProjectIdentity = async () => {
     if (!draft.project.id || regenerating || saving) return;
     const confirmed = window.confirm(
-      "Treat this checkout as a new PuppyOne project? A new local project identity will be created and the current Cloud project binding will be cleared. Local files and Git history are not changed.",
+      t("settings.workspaceConfig.newProject.confirm"),
     );
     if (!confirmed) return;
     setRegenerating(true);
@@ -164,15 +166,15 @@ export function PuppyoneWorkspaceConfigSettings({
   return (
     <SettingsGroup>
       {loading && !config ? (
-        <div className="desktop-settings-muted-row">Reading Puppyone config...</div>
+        <div className="desktop-settings-muted-row">{t("settings.workspaceConfig.reading")}</div>
       ) : (
         <>
           <div className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row desktop-hosting-service-panel">
             <span className="desktop-settings-label-stack">
-              <strong>Source service</strong>
-              <small>Sync authority for this workspace.</small>
+              <strong>{t("settings.workspaceConfig.sourceService.title")}</strong>
+              <small>{t("settings.workspaceConfig.sourceService.detail")}</small>
             </span>
-            <div className="desktop-hosting-service-options" aria-label="Source service">
+            <div className="desktop-hosting-service-options" aria-label={t("settings.workspaceConfig.sourceService.ariaLabel")}>
               {sourceServiceOptions.filter((option) => option.available).map((option) => (
                 <button
                   className={`desktop-hosting-service-option ${sourceService === option.value ? "active" : ""}`}
@@ -192,8 +194,8 @@ export function PuppyoneWorkspaceConfigSettings({
             <>
               <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
                 <span className="desktop-settings-label-stack">
-                  <strong>Git remote</strong>
-                  <small>Remote used for sync state.</small>
+                  <strong>{t("settings.workspaceConfig.gitRemote.title")}</strong>
+                  <small>{t("settings.workspaceConfig.gitRemote.detail")}</small>
                 </span>
                 <select
                   className="desktop-settings-select"
@@ -201,7 +203,7 @@ export function PuppyoneWorkspaceConfigSettings({
                   disabled={saving}
                   onChange={(event) => updateSourceOfTruthConfig({ remote: normalizeSettingsText(event.target.value) })}
                 >
-                  <option value="">Auto</option>
+                  <option value="">{t("settings.workspaceConfig.auto")}</option>
                   {sourceRemoteNames.map((remoteName) => (
                     <option value={remoteName} key={remoteName}>{remoteName}</option>
                   ))}
@@ -210,14 +212,14 @@ export function PuppyoneWorkspaceConfigSettings({
 
               <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
                 <span className="desktop-settings-label-stack">
-                  <strong>Git branch</strong>
-                  <small>Empty uses the current branch.</small>
+                  <strong>{t("settings.workspaceConfig.gitBranch.title")}</strong>
+                  <small>{t("settings.workspaceConfig.gitBranch.detail")}</small>
                 </span>
                 <input
                   className="desktop-settings-text-input"
                   list={watchedBranchListId}
                   value={draft.sync.sourceOfTruth.branch ?? ""}
-                  placeholder={currentBranchName && currentBranchName !== "detached" ? currentBranchName : "current branch"}
+                  placeholder={currentBranchName && currentBranchName !== "detached" ? currentBranchName : t("settings.workspaceConfig.currentBranch")}
                   disabled={saving}
                   onChange={(event) => updateSourceOfTruthConfig({ branch: normalizeSettingsText(event.target.value) })}
                 />
@@ -232,8 +234,8 @@ export function PuppyoneWorkspaceConfigSettings({
 
           <div className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
             <span className="desktop-settings-label-stack">
-              <strong>Backup enabled</strong>
-              <small>Use a separate backup target.</small>
+              <strong>{t("settings.workspaceConfig.backupEnabled.title")}</strong>
+              <small>{t("settings.workspaceConfig.backupEnabled.detail")}</small>
             </span>
             <label className="desktop-settings-switch">
               <input
@@ -250,8 +252,8 @@ export function PuppyoneWorkspaceConfigSettings({
             <>
               <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
                 <span className="desktop-settings-label-stack">
-                  <strong>Backup target</strong>
-                  <small>Service used for backup.</small>
+                  <strong>{t("settings.workspaceConfig.backupTarget.title")}</strong>
+                  <small>{t("settings.workspaceConfig.backupTarget.detail")}</small>
                 </span>
                 <select
                   className="desktop-settings-select"
@@ -274,8 +276,8 @@ export function PuppyoneWorkspaceConfigSettings({
                 <>
                   <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
                     <span className="desktop-settings-label-stack">
-                      <strong>Backup Git remote</strong>
-                      <small>Empty chooses automatically.</small>
+                      <strong>{t("settings.workspaceConfig.backupRemote.title")}</strong>
+                      <small>{t("settings.workspaceConfig.backupRemote.detail")}</small>
                     </span>
                     <select
                       className="desktop-settings-select"
@@ -283,7 +285,7 @@ export function PuppyoneWorkspaceConfigSettings({
                       disabled={saving}
                       onChange={(event) => updateBackupConfig({ remote: normalizeSettingsText(event.target.value) })}
                     >
-                      <option value="">Auto</option>
+                      <option value="">{t("settings.workspaceConfig.auto")}</option>
                       {backupRemoteNames.map((remoteName) => (
                         <option value={remoteName} key={remoteName}>{remoteName}</option>
                       ))}
@@ -292,14 +294,14 @@ export function PuppyoneWorkspaceConfigSettings({
 
                   <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
                     <span className="desktop-settings-label-stack">
-                      <strong>Backup Git branch</strong>
-                      <small>Empty uses the current branch.</small>
+                      <strong>{t("settings.workspaceConfig.backupBranch.title")}</strong>
+                      <small>{t("settings.workspaceConfig.backupBranch.detail")}</small>
                     </span>
                     <input
                       className="desktop-settings-text-input"
                       list={backupBranchListId}
                       value={draft.backup.branch ?? ""}
-                      placeholder={currentBranchName && currentBranchName !== "detached" ? currentBranchName : "current branch"}
+                      placeholder={currentBranchName && currentBranchName !== "detached" ? currentBranchName : t("settings.workspaceConfig.currentBranch")}
                       disabled={saving}
                       onChange={(event) => updateBackupConfig({ branch: normalizeSettingsText(event.target.value) })}
                     />
@@ -317,13 +319,13 @@ export function PuppyoneWorkspaceConfigSettings({
           {showCloudProject && (
             <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
               <span className="desktop-settings-label-stack">
-                <strong>Cloud project id</strong>
-                <small>Project identifier for Puppyone Cloud.</small>
+                <strong>{t("settings.workspaceConfig.cloudProjectId.title")}</strong>
+                <small>{t("settings.workspaceConfig.cloudProjectId.detail")}</small>
               </span>
               <input
                 className="desktop-settings-text-input"
                 value={draft.cloud.projectId ?? ""}
-                placeholder="Not set"
+                placeholder={t("settings.workspaceConfig.notSet")}
                 disabled={saving}
                 onChange={(event) => updateCloudConfig({ projectId: normalizeSettingsText(event.target.value) })}
               />
@@ -332,8 +334,8 @@ export function PuppyoneWorkspaceConfigSettings({
 
           <div className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
             <span className="desktop-settings-label-stack">
-              <strong>Local project identity</strong>
-              <small title={draft.project.id ?? undefined}>{draft.project.id ?? "Created when this config is first saved"}</small>
+              <strong>{t("settings.workspaceConfig.localIdentity.title")}</strong>
+              <small dir="auto" title={draft.project.id ?? undefined}>{draft.project.id ?? t("settings.workspaceConfig.localIdentity.pending")}</small>
             </span>
             <button
               className="desktop-settings-row-action"
@@ -342,12 +344,12 @@ export function PuppyoneWorkspaceConfigSettings({
               onClick={() => void regenerateProjectIdentity()}
             >
               <RefreshCw size={13} className={regenerating ? "spin" : undefined} />
-              <span>{regenerating ? "Creating..." : "Treat as new project"}</span>
+              <span>{t(regenerating ? "settings.workspaceConfig.newProject.creating" : "settings.workspaceConfig.newProject.action")}</span>
             </button>
           </div>
 
           <div className="desktop-puppyone-config-footer">
-            <span>{error ?? localError ?? (dirty ? "Unsaved changes" : "Config is up to date")}</span>
+            <span>{error ?? localError ?? t(dirty ? "settings.workspaceConfig.unsaved" : "settings.workspaceConfig.upToDate")}</span>
             <div>
               <button
                 className="desktop-settings-row-action"
@@ -356,7 +358,7 @@ export function PuppyoneWorkspaceConfigSettings({
                 onClick={() => setDraft(savedConfig)}
               >
                 <RefreshCw size={13} />
-                <span>Reset</span>
+                <span>{t("common.action.reset")}</span>
               </button>
               <button
                 className="desktop-settings-row-action desktop-settings-save-action"
@@ -365,7 +367,7 @@ export function PuppyoneWorkspaceConfigSettings({
                 onClick={() => void saveConfig()}
               >
                 <Check size={13} />
-                <span>{saving ? "Saving" : "Save"}</span>
+                <span>{t(saving ? "settings.workspaceConfig.saving" : "common.action.save")}</span>
               </button>
             </div>
           </div>

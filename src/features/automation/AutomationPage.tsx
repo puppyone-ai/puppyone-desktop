@@ -1,5 +1,7 @@
 import { ArrowRight, ChevronRight, RefreshCw, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   DesktopCloudAutomationProviderSpec,
   DesktopCloudScope,
@@ -8,8 +10,6 @@ import type {
 import { getCloudAutomationRun } from "../../lib/cloudApi";
 import {
   formatProviderLabel,
-  formatRelativeTime,
-  formatStatusLabel,
   getCloudProviderIconUrl,
   getScopePathLabel,
   providerIcon,
@@ -28,6 +28,11 @@ import {
   type AutomationCatalogCategory,
   type AutomationTemplate,
 } from "./automationTemplates";
+import {
+  formatAutomationCategory,
+  formatAutomationRelativeTime,
+  formatAutomationStatus,
+} from "./automationPresentation";
 
 export function CloudAutomationPage({
   projectId,
@@ -64,6 +69,7 @@ export function CloudAutomationPage({
   onRefresh: () => Promise<void>;
   onOpenAutomation: () => void;
 }) {
+  const { t } = useLocalization();
   const [newAutomationOpen, setNewAutomationOpen] = useState(false);
   const [draftTemplate, setDraftTemplate] = useState<AutomationTemplate | null>(null);
   const [activeCategory, setActiveCategory] = useState<AutomationCatalogCategory>("popular");
@@ -93,7 +99,7 @@ export function CloudAutomationPage({
         setCreationEcho((current) => current?.runId === run.id ? {
           ...current,
           status: run.status,
-          summary: run.result_summary || formatStatusLabel(run.status),
+          summary: run.result_summary || null,
           error: run.error || null,
         } : current);
       } catch {
@@ -123,7 +129,7 @@ export function CloudAutomationPage({
         setCreationEcho((current) => current?.runId === runId ? {
           ...current,
           status: run.status,
-          summary: run.result_summary || (isTerminalRunStatus(run.status) ? formatStatusLabel(run.status) : current.summary),
+          summary: run.result_summary || (isTerminalRunStatus(run.status) ? null : current.summary),
           error: run.error || null,
         } : current);
         if (isTerminalRunStatus(run.status)) {
@@ -146,11 +152,11 @@ export function CloudAutomationPage({
     <>
       {hasAnyAutomation && (
         <header className="desktop-cloud-automation-add-more-header">
-          <h2>Add more sources</h2>
-          <p>Connect another external source to a project folder.</p>
+          <h2>{t("automation.page.addMoreSources")}</h2>
+          <p>{t("automation.page.addMoreDescription")}</p>
         </header>
       )}
-      <nav className="desktop-cloud-automation-category-tabs" aria-label="Automation categories" role="tablist">
+      <nav className="desktop-cloud-automation-category-tabs" aria-label={t("automation.page.categories")} role="tablist">
         {AUTOMATION_CATEGORIES.map((category) => {
           const active = activeCategory === category.id;
           return (
@@ -162,12 +168,15 @@ export function CloudAutomationPage({
               className={active ? "active" : undefined}
               onClick={() => setActiveCategory(category.id)}
             >
-              {category.label}
+              {formatAutomationCategory(category.id, t)}
             </button>
           );
         })}
       </nav>
-      <section className="desktop-cloud-automation-template-grid" aria-label={`${activeCategory} automation templates`}>
+      <section
+        className="desktop-cloud-automation-template-grid"
+        aria-label={t("automation.page.categoryTemplates", { category: formatAutomationCategory(activeCategory, t) })}
+      >
         {providerSpecsLoading ? Array.from({ length: 4 }, (_, index) => (
           <div className="desktop-cloud-automation-template-card skeleton" aria-hidden="true" key={index}>
             <span />
@@ -180,11 +189,11 @@ export function CloudAutomationPage({
       </section>
       {!providerSpecsLoading && providerSpecsError && (
         <div className="desktop-cloud-automation-catalog-error" role="alert">
-          Unable to load Automation templates. {providerSpecsError}
+          {t("automation.page.templateLoadFailed", { detail: bidiIsolate(providerSpecsError) })}
         </div>
       )}
       {!providerSpecsLoading && !providerSpecsError && visibleTemplates.length === 0 && (
-        <div className="desktop-cloud-automation-catalog-empty">No available sources in this category.</div>
+        <div className="desktop-cloud-automation-catalog-empty">{t("automation.page.noSourcesInCategory")}</div>
       )}
     </>
   );
@@ -195,29 +204,42 @@ export function CloudAutomationPage({
         <section className={`desktop-cloud-automation-catalog ${hasAnyAutomation ? "has-automations" : ""}`}>
           <header className="desktop-cloud-automation-landing-header">
             <div className="desktop-cloud-automation-landing-copy">
-              <h1>Automations</h1>
-              <p>Keep project knowledge current by watching external sources and importing them into project folders.</p>
+              <h1>{t("automation.page.title")}</h1>
+              <p>{t("automation.page.description")}</p>
             </div>
             <button type="button" className="desktop-cloud-automation-new-button" onClick={() => openNewAutomation()}>
-              New
+              {t("automation.page.new")}
             </button>
           </header>
 
           {creationEcho && (
             <section className={`desktop-cloud-automation-creation-echo ${getAutomationStatusTone(creationEcho.status)}`} role="status">
               <div>
-                <strong>{creationEcho.summary}</strong>
+                <strong>{creationEcho.summary
+                  || (creationEcho.error
+                    ? t("automation.creation.initialFailed")
+                    : formatAutomationStatus(creationEcho.status, t))}</strong>
                 <span>
-                  {formatProviderLabel(creationEcho.provider)} → /{creationEcho.targetPath}
-                  {creationEcho.error ? ` · ${creationEcho.error}` : ""}
+                  {t("automation.creation.route", {
+                    provider: bidiIsolate(formatProviderLabel(creationEcho.provider, t)),
+                    path: bidiIsolate(`/${creationEcho.targetPath}`),
+                  })}
+                  {creationEcho.error
+                    ? ` · ${t("automation.error.detail", { detail: bidiIsolate(creationEcho.error) })}`
+                    : ""}
                 </span>
               </div>
               <div className="desktop-cloud-automation-creation-echo-actions">
-                <button type="button" title="Refresh Automation status" onClick={() => void refreshCreationStatus()}>
+                <button type="button" title={t("automation.creation.refreshStatus")} onClick={() => void refreshCreationStatus()}>
                   <RefreshCw size={14} />
-                  Refresh
+                  {t("common.action.refresh")}
                 </button>
-                <button type="button" aria-label="Dismiss creation status" title="Dismiss creation status" onClick={() => setCreationEcho(null)}>
+                <button
+                  type="button"
+                  aria-label={t("automation.creation.dismissStatus")}
+                  title={t("automation.creation.dismissStatus")}
+                  onClick={() => setCreationEcho(null)}
+                >
                   <X size={14} />
                 </button>
               </div>
@@ -227,11 +249,11 @@ export function CloudAutomationPage({
           {hasAnyAutomation && (
             <section className="desktop-cloud-automation-existing-section primary">
               <header className="desktop-cloud-automation-existing-header">
-                <h2>Your automations</h2>
+                <h2>{t("automation.page.yourAutomations")}</h2>
                 <span>{totalCount}</span>
               </header>
               {loading && rows.length === 0 ? (
-                <div className="desktop-cloud-automation-existing-loading" role="status">Loading your automations…</div>
+                <div className="desktop-cloud-automation-existing-loading" role="status">{t("automation.page.loadingYours")}</div>
               ) : rows.length > 0 ? (
                 <div className="desktop-cloud-automation-detail">
                   <CloudAutomationAccessList
@@ -243,7 +265,7 @@ export function CloudAutomationPage({
                   />
                 </div>
               ) : (
-                <div className="desktop-cloud-automation-catalog-empty">No Automations match the selected source.</div>
+                <div className="desktop-cloud-automation-catalog-empty">{t("automation.page.noMatchingAutomations")}</div>
               )}
             </section>
           )}
@@ -253,7 +275,7 @@ export function CloudAutomationPage({
           </section>
 
           {!hasAnyAutomation && loading && (
-            <div className="desktop-cloud-automation-existing-loading" role="status">Loading your automations…</div>
+            <div className="desktop-cloud-automation-existing-loading" role="status">{t("automation.page.loadingYours")}</div>
           )}
         </section>
       </main>
@@ -303,9 +325,11 @@ function CloudAutomationAccessList({
   creationEcho: CloudAutomationCreationEcho | null;
   onOpenRow: (rowId: string) => void;
 }) {
-  const providerGroups = getAutomationProviderGroups(rows);
+  const localization = useLocalization();
+  const { getCollator, t } = localization;
+  const providerGroups = getAutomationProviderGroups(rows, getCollator({ sensitivity: "base" }), t);
   return (
-    <section className="desktop-cloud-automation-list" aria-label="Cloud automation">
+    <section className="desktop-cloud-automation-list" aria-label={t("automation.page.cloudAutomation")}>
       {providerGroups.map((group) => {
         const ProviderIcon = providerIcon(group.provider);
         const iconUrl = getCloudProviderIconUrl(group.provider);
@@ -313,7 +337,7 @@ function CloudAutomationAccessList({
           <section className="desktop-cloud-automation-provider-group" key={group.provider}>
             <div className="desktop-cloud-automation-provider-header">
               <h2>{group.label}</h2>
-              <span>{group.rows.length}</span>
+              <span>{localization.formatNumber(group.rows.length)}</span>
             </div>
             <div className="desktop-cloud-automation-provider-body">
               <div className="desktop-cloud-automation-provider-summary" aria-hidden="true">
@@ -327,9 +351,12 @@ function CloudAutomationAccessList({
                   const echo = creationEcho?.connectionId === connector.id ? creationEcho : null;
                   const status = echo?.status || connector.status || "active";
                   const connectionTitle = connector.name || group.label;
-                  const statusLabel = formatStatusLabel(status);
+                  const statusLabel = formatAutomationStatus(status, t);
                   const statusTone = getAutomationStatusTone(status);
-                  const lastRunLabel = formatRelativeTime(connector.last_run_at || connector.updated_at);
+                  const lastRunLabel = formatAutomationRelativeTime(
+                    connector.last_run_at || connector.updated_at,
+                    localization,
+                  );
                   const targetPath = formatAutomationPathTrailLabel(row.scope);
                   const highlighted = highlightedConnectionId === connector.id;
                   return (
@@ -337,15 +364,24 @@ function CloudAutomationAccessList({
                       className={`desktop-cloud-automation-connection-card ${selectedRowId === row.id ? "selected" : ""} ${highlighted ? "created" : ""}`.trim()}
                       key={row.id}
                       type="button"
-                      title={`${connectionTitle} · ${getScopePathLabel(row.scope)}`}
+                      title={t("automation.connection.title", {
+                        name: bidiIsolate(connectionTitle),
+                        path: bidiIsolate(getScopePathLabel(row.scope)),
+                      })}
                       onClick={() => onOpenRow(row.id)}
                     >
                       <span className="desktop-cloud-automation-route">
-                        <span className="desktop-cloud-automation-source-config" title={`${group.label}: ${connectionTitle}`}>
+                        <span
+                          className="desktop-cloud-automation-source-config"
+                          title={t("automation.connection.source", {
+                            provider: bidiIsolate(group.label),
+                            name: bidiIsolate(connectionTitle),
+                          })}
+                        >
                           {iconUrl ? <img src={iconUrl} alt="" /> : <ProviderIcon size={16} />}
                           <span>{group.label}</span>
                         </span>
-                        <ArrowRight size={15} />
+                        <ArrowRight className="po-directional-icon" size={15} />
                         <span className="desktop-cloud-automation-path-trail">
                           <img src="/icons/folder.svg" alt="" />
                           <span>{targetPath}</span>
@@ -357,13 +393,21 @@ function CloudAutomationAccessList({
                             <span className="desktop-cloud-automation-status-dot" aria-hidden="true" />
                             {statusLabel}
                           </span>
-                          <span>inbound</span>
-                          <span>{echo?.summary || (lastRunLabel ? `Last run ${lastRunLabel}` : "Never run")}</span>
+                          <span>{t("automation.connection.inbound")}</span>
+                          <span>{echo
+                            ? echo.summary || formatAutomationStatus(echo.status, t)
+                            : lastRunLabel
+                              ? t("automation.connection.lastRun", { time: bidiIsolate(lastRunLabel) })
+                              : t("automation.connection.neverRun")}</span>
                         </span>
-                        <span className="desktop-cloud-automation-manage">Manage<ChevronRight size={13} /></span>
+                        <span className="desktop-cloud-automation-manage">{t("automation.connection.manage")}<ChevronRight className="po-directional-icon" size={13} /></span>
                       </span>
                       {(echo?.error || connector.error_message) && (
-                        <span className="desktop-cloud-automation-error">{echo?.error || connector.error_message}</span>
+                        <span className="desktop-cloud-automation-error" dir="auto">
+                          {t("automation.error.detail", {
+                            detail: bidiIsolate(echo?.error || connector.error_message),
+                          })}
+                        </span>
                       )}
                     </button>
                   );
@@ -377,15 +421,15 @@ function CloudAutomationAccessList({
   );
 }
 
-function getAutomationProviderGroups(rows: CloudAutomationRow[]) {
+function getAutomationProviderGroups(rows: CloudAutomationRow[], collator: Intl.Collator, t: ReturnType<typeof useLocalization>["t"]) {
   const groups = new Map<string, { provider: string; label: string; rows: CloudAutomationRow[] }>();
   for (const row of rows) {
     const provider = row.connector.provider;
-    const group = groups.get(provider) ?? { provider, label: formatProviderLabel(provider), rows: [] };
+    const group = groups.get(provider) ?? { provider, label: formatProviderLabel(provider, t), rows: [] };
     group.rows.push(row);
     groups.set(provider, group);
   }
-  return [...groups.values()].sort((left, right) => left.label.localeCompare(right.label));
+  return [...groups.values()].sort((left, right) => collator.compare(left.label, right.label));
 }
 
 function getAutomationStatusTone(status: string | null | undefined) {

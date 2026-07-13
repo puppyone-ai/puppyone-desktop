@@ -144,6 +144,7 @@ function selectRequestedRuntime(runtimeRegistry, catalog, value) {
     throw new Error("Agent runtime selection is invalid.");
   }
   const selected = runtimeRegistry.select(catalog, value || null);
-  if (value && selected?.descriptor?.id !== value) throw new Error(`Agent runtime ${value} is not registered.`);
-  return selected;
+  return value && selected?.descriptor?.id !== value
+    ? runtimeRegistry.select(catalog, null)
+    : selected;
 }

@@ -117,7 +117,7 @@ function revisionPair(): GitRevisionPair {
 function presentation(): DocxRedlinePresentation {
   return {
     kind: "docx-redline",
-    rendererVersion: "2",
+    rendererVersion: "3",
     state: "empty",
     stats: {
       blocksAdded: 0,
@@ -129,6 +129,6 @@ function presentation(): DocxRedlinePresentation {
     },
     changes: [],
     truncated: false,
-    fidelityNote: "test",
+    fidelity: "body-text-v1",
   };
 }

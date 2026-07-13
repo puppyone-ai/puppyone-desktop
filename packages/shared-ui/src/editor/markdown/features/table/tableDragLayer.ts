@@ -12,6 +12,7 @@ import {
   hasActiveMarkdownTableMenu,
   isActiveMarkdownTableMenu,
 } from "./tableMenuState";
+import { getMarkdownLocalization } from "../../core/editor/markdownLocalization";
 
 export type MarkdownTableDragHandleContext = {
   alignments: readonly MarkdownTableAlignment[];
@@ -32,6 +33,7 @@ export type MarkdownTableDragLayer = {
 };
 
 export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleContext): MarkdownTableDragLayer {
+  const localization = getMarkdownLocalization(context.view);
   const doc = context.table.ownerDocument;
   const layer = doc.createElement("div");
   layer.className = "cm-md-table-drag-layer";
@@ -39,8 +41,16 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
     return { dispose() {}, element: layer };
   }
 
-  const columnHandle = createMarkdownTableHandleElement(doc, "column");
-  const rowHandle = createMarkdownTableHandleElement(doc, "row");
+  const columnHandle = createMarkdownTableHandleElement(
+    doc,
+    "column",
+    localization.t("editor.markdown.table.columnHandleHint"),
+  );
+  const rowHandle = createMarkdownTableHandleElement(
+    doc,
+    "row",
+    localization.t("editor.markdown.table.rowHandleHint"),
+  );
   const dropIndicator = doc.createElement("div");
   dropIndicator.className = "cm-md-table-drop-indicator";
   dropIndicator.hidden = true;
@@ -89,7 +99,12 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
     if (headerCell && hover.columnIndex != null) {
       const rect = headerCell.getBoundingClientRect();
       showHandleAt(columnHandle, `${rect.left - surfaceRect.left + rect.width / 2}px`, "0px");
-      columnHandle.setAttribute("aria-label", `Column ${hover.columnIndex + 1} actions`);
+      columnHandle.setAttribute(
+        "aria-label",
+        localization.t("editor.markdown.table.columnActions", {
+          column: hover.columnIndex + 1,
+        }),
+      );
     } else {
       setHandleVisible(columnHandle, false);
     }
@@ -99,8 +114,17 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
       : getBodyRowElements()[hover.rowIndex - 1] ?? null;
     if (bodyRow && hover.rowIndex != null) {
       const rect = bodyRow.getBoundingClientRect();
-      showHandleAt(rowHandle, "0px", `${rect.top - surfaceRect.top + rect.height / 2}px`);
-      rowHandle.setAttribute("aria-label", `Row ${hover.rowIndex} actions`);
+      if (localization.direction === "rtl") {
+        rowHandle.style.right = "0px";
+        showHandleAt(rowHandle, "", `${rect.top - surfaceRect.top + rect.height / 2}px`);
+      } else {
+        rowHandle.style.removeProperty("right");
+        showHandleAt(rowHandle, "0px", `${rect.top - surfaceRect.top + rect.height / 2}px`);
+      }
+      rowHandle.setAttribute(
+        "aria-label",
+        localization.t("editor.markdown.table.rowActions", { row: hover.rowIndex }),
+      );
     } else {
       setHandleVisible(rowHandle, false);
     }
@@ -151,7 +175,9 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
     const rect = anchor.getBoundingClientRect();
     let nextMenu: HTMLElement | null = null;
     nextMenu = showMarkdownTableContextMenu(buildDispatchContext(), {
-      clientX: kind === "row" ? rect.right + 4 : rect.left,
+      clientX: kind === "row"
+        ? localization.direction === "rtl" ? rect.left - 4 : rect.right + 4
+        : rect.left,
       clientY: kind === "row" ? rect.top : rect.bottom + 4,
       columnCount: context.columnCount,
       columnIndex: kind === "column" ? sourceIndex : hover.columnIndex ?? 0,
@@ -223,9 +249,13 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
       dropIndicator.hidden = true;
       return;
     }
-    const x = boundary < headerCells.length
-      ? headerCells[boundary].getBoundingClientRect().left
-      : headerCells[headerCells.length - 1].getBoundingClientRect().right;
+    const x = localization.direction === "rtl"
+      ? boundary < headerCells.length
+        ? headerCells[boundary].getBoundingClientRect().right
+        : headerCells[headerCells.length - 1].getBoundingClientRect().left
+      : boundary < headerCells.length
+        ? headerCells[boundary].getBoundingClientRect().left
+        : headerCells[headerCells.length - 1].getBoundingClientRect().right;
     dropIndicator.hidden = false;
     dropIndicator.className = "cm-md-table-drop-indicator is-column";
     dropIndicator.style.left = `${x - surfaceRect.left}px`;
@@ -270,10 +300,11 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
         beginVisualDrag();
       }
       dropBoundary = kind === "column"
-        ? getMarkdownTableDropBoundary(getHeaderCellElements().map((cell) => {
-          const rect = cell.getBoundingClientRect();
-          return { start: rect.left, size: rect.width };
-        }), moveEvent.clientX)
+        ? getMarkdownTableColumnDropBoundary(
+          getHeaderCellElements(),
+          moveEvent.clientX,
+          localization.direction,
+        )
         : getMarkdownTableDropBoundary(getBodyRowElements().map((row) => {
           const rect = row.getBoundingClientRect();
           return { start: rect.top, size: rect.height };
@@ -384,7 +415,11 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
   };
 }
 
-function createMarkdownTableHandleElement(doc: Document, kind: MarkdownTableDragKind): HTMLButtonElement {
+function createMarkdownTableHandleElement(
+  doc: Document,
+  kind: MarkdownTableDragKind,
+  title: string,
+): HTMLButtonElement {
   const handle = doc.createElement("button");
   handle.type = "button";
   handle.className = `cm-md-table-drag-handle cm-md-table-${kind}-handle`;
@@ -393,14 +428,32 @@ function createMarkdownTableHandleElement(doc: Document, kind: MarkdownTableDrag
   handle.tabIndex = -1;
   handle.setAttribute("aria-expanded", "false");
   handle.setAttribute("aria-haspopup", "menu");
-  handle.title = kind === "column"
-    ? "Click for column options. Drag to move column"
-    : "Click for row options. Drag to move row";
+  handle.title = title;
   const visual = doc.createElement("span");
   visual.className = "cm-md-table-drag-handle-visual";
   visual.setAttribute("aria-hidden", "true");
   handle.appendChild(visual);
   return handle;
+}
+
+function getMarkdownTableColumnDropBoundary(
+  cells: readonly HTMLTableCellElement[],
+  pointer: number,
+  direction: "ltr" | "rtl",
+): number | null {
+  if (cells.length === 0) return null;
+  if (direction === "ltr") {
+    return getMarkdownTableDropBoundary(cells.map((cell) => {
+      const rect = cell.getBoundingClientRect();
+      return { start: rect.left, size: rect.width };
+    }), pointer);
+  }
+
+  for (const [index, cell] of cells.entries()) {
+    const rect = cell.getBoundingClientRect();
+    if (pointer > rect.left + rect.width / 2) return index;
+  }
+  return cells.length;
 }
 
 function getMarkdownTableDropBoundary(

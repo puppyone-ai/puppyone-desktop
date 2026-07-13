@@ -73,7 +73,7 @@ export function getHomeProjectItems({
       id: project ? `cloud-local:${project.id}:${item.workspace.id}` : `local:${item.workspace.id}`,
       kind: project ? "cloud-local" : cloudLinked ? "cloud-linked" : "local",
       label: item.workspace.path,
-      detail: project?.name ?? (cloudLinked ? "Cloud linked" : null),
+      detail: project?.name ?? null,
       localPath: item.workspace.path,
       cloudProjectId: binding?.projectId ?? project?.id ?? null,
       description: project?.description ?? null,
@@ -88,7 +88,7 @@ export function getHomeProjectItems({
       items.push({
         id: `cloud:${project.id}`,
         kind: "cloud",
-        label: project.name || "Untitled Project",
+        label: project.name || "",
         cloudProjectId: project.id,
         description: project.description ?? null,
         updatedAt: project.updated_at ?? null,

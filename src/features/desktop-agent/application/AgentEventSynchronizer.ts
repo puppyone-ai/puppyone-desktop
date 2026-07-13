@@ -2,7 +2,7 @@ import { applyAgentEvent, applyAgentEvents } from "../domain/agent-projection";
 import type { AgentEvent, AgentSessionMetadata } from "../domain/agent-contract";
 import type { AgentControllerState } from "./agent-controller-state";
 import { phaseForProjection } from "./agent-controller-state";
-import { formatAgentError } from "./agent-error";
+import { createAgentError, formatAgentError } from "./agent-error";
 import type { AgentClientPort, AgentClientProvider } from "./AgentClientPort";
 
 type StatePatch = (patch: Partial<AgentControllerState>) => void;
@@ -76,12 +76,15 @@ export class AgentEventSynchronizer {
     }
     const projection = applyAgentEvents(state.projection, applicable);
     const providerFailure = rejectedProviderPatch(state, projection, applicable);
+    const turnAccepted = applicable.some((event) => event.type === "turn.started");
+    const turnEnded = applicable.some(isTurnTerminalEvent);
     this.bufferedEvents.push(...deferred);
     for (const event of deferred) this.bufferedSequences.add(event.sequence);
     this.patch({
       projection,
       phase: phaseForProjection(projection, state.phase),
       stopping: projection.runningTurnId ? state.stopping : false,
+      pendingPrompt: turnAccepted || turnEnded ? null : state.pendingPrompt,
       session: state.session
         ? applicable.reduce(updateSessionFromProjectionEvent, state.session)
         : null,
@@ -134,7 +137,7 @@ export class AgentEventSynchronizer {
       || latest.inspection?.runtime?.displayName
       || latest.inspection?.runtimes?.find((entry) => entry.descriptor.id === latest.selectedRuntimeId)?.descriptor.displayName
       || humanizeRuntimeId(latest.selectedRuntimeId || latest.session.runtimeId || latest.session.provider)
-      || "Agent runtime";
+      || "";
     this.patch({
       session: { ...latest.session, activeTurnId: null, terminalState: "provider-exited" },
       projection,
@@ -142,7 +145,9 @@ export class AgentEventSynchronizer {
       stopping: false,
       submitting: false,
       resolvingBlocker: false,
-      error: `${runtimeName} stopped unexpectedly. Files already changed were not reverted. Refresh to resume the saved session.`,
+      pendingPrompt: null,
+      sessionPreparation: "failed",
+      error: createAgentError("runtime-exited", runtimeName ? { runtime: runtimeName } : undefined),
     });
   }
 
@@ -162,18 +167,26 @@ export class AgentEventSynchronizer {
           if (state.session?.id !== sessionId) return;
           let projection = applyAgentEvents(state.projection, snapshot.events, { partialHistory: snapshot.partial });
           const buffered = this.bufferedEvents.sort((left, right) => left.sequence - right.sequence);
+          const appliedBuffered: AgentEvent[] = [];
           this.bufferedEvents = [];
           this.bufferedSequences.clear();
           for (const event of buffered) {
-            if (event.sequence <= projection.lastSequence + 1) projection = applyAgentEvent(projection, event);
+            if (event.sequence <= projection.lastSequence + 1) {
+              projection = applyAgentEvent(projection, event);
+              appliedBuffered.push(event);
+            }
             else {
               this.bufferedEvents.push(event);
               this.bufferedSequences.add(event.sequence);
             }
           }
+          const lifecycleEvents = [...snapshot.events, ...appliedBuffered];
+          const turnAccepted = lifecycleEvents.some((event) => event.type === "turn.started");
+          const turnEnded = lifecycleEvents.some(isTurnTerminalEvent);
           this.patch({
             projection,
             phase: phaseForProjection(projection, state.phase),
+            pendingPrompt: turnAccepted || turnEnded ? null : state.pendingPrompt,
             session: {
               ...snapshot.session,
               activeTurnId: projection.runningTurnId,
@@ -184,7 +197,7 @@ export class AgentEventSynchronizer {
           cursor = projection.lastSequence;
           if (this.bufferedEvents.length === 0) return;
         }
-        this.patch({ error: "Part of the live Agent event stream could not be repaired. Refresh to replay saved history." });
+        this.patch({ error: createAgentError("event-gap") });
       } catch (error) {
         if (!this.disposed) this.patch({ error: formatAgentError(error) });
       }
@@ -210,12 +223,17 @@ function updateSessionFromProjectionEvent(session: AgentSessionMetadata, event?:
 }
 
 function isUrgentEvent(event: AgentEvent) {
-  return event.type.startsWith("approval.")
+  return event.type === "turn.started"
+    || event.type.startsWith("approval.")
     || event.type.startsWith("question.")
     || event.type === "turn.completed"
     || event.type === "turn.failed"
     || event.type === "turn.interrupted"
     || event.type === "provider.error";
+}
+
+function isTurnTerminalEvent(event: AgentEvent) {
+  return event.type === "turn.completed" || event.type === "turn.failed" || event.type === "turn.interrupted";
 }
 
 function humanizeRuntimeId(value: string | null | undefined) {
@@ -244,11 +262,11 @@ function rejectedProviderPatch(state: AgentControllerState, projection: AgentCon
         : {
           ...state.inspection.readiness,
           status: "installed-not-authenticated" as const,
-          message: `${providerName} rejected its credentials. Update or reconnect that provider, then refresh Agent providers.`,
+          message: "",
         },
     },
     error: hasAlternative
-      ? `${providerName} rejected its credentials. Choose another connected provider, or update it and refresh.`
+      ? createAgentError("provider-credentials-rejected", { provider: providerName })
       : null,
   } satisfies Partial<AgentControllerState>;
 }

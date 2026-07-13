@@ -20,7 +20,7 @@
   min-height: 0;
   flex: 0 0 auto;
   flex-direction: column;
-  border-right: 1px solid var(--po-divider);
+  border-inline-end: 1px solid var(--po-divider);
   background: var(--po-sidebar);
   transition:
     width 140ms ease,
@@ -43,17 +43,18 @@ body.desktop-history-resizing .desktop-history-panel-tree {
   overflow-x: hidden;
   /* Reserved gutter + reduced right padding keep rows at the standard inset
      whether or not the list scrolls. */
-  padding: 8px calc(var(--git-sidebar-right-gap) - var(--desktop-sidebar-scrollbar-width)) 6px
-    var(--git-sidebar-left-gap);
+  padding-block: 8px 6px;
+  padding-inline:
+    var(--git-sidebar-left-gap)
+    calc(var(--git-sidebar-right-gap) - var(--desktop-sidebar-scrollbar-width));
   scrollbar-gutter: stable;
 }
 
 .desktop-history-panel-tree-resizer {
   position: absolute;
   z-index: 3;
-  top: 0;
-  right: -4px;
-  bottom: 0;
+  inset-block: 0;
+  inset-inline-end: -4px;
   display: flex;
   width: 8px;
   align-items: center;
@@ -67,9 +68,8 @@ body.desktop-history-resizing .desktop-history-panel-tree {
 
 .desktop-history-panel-tree-resizer::after {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 3px;
+  inset-block: 0;
+  inset-inline-start: 3px;
   width: 2px;
   border-radius: 999px;
   background: transparent;
@@ -272,7 +272,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .desktop-working-file-actions .secondary-action,
@@ -414,7 +414,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
 }
 
 .desktop-initial-repo-metrics div + div {
-  border-left: 1px solid var(--po-border-subtle);
+  border-inline-start: 1px solid var(--po-border-subtle);
 }
 
 .desktop-initial-repo-metrics span {

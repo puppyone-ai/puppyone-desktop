@@ -128,6 +128,53 @@ export function createEmbeddedEditSessionStore() {
         });
       }
     },
+    mapRangesWithRelocation(
+      relocation: {
+        oldRange: SourceRange;
+        newRange: SourceRange;
+        mapContainedPosition?: (position: number, assoc?: number) => number;
+      },
+      mapPos: (pos: number, assoc?: number) => number,
+    ) {
+      const { oldRange, newRange } = relocation;
+      for (const [id, session] of sessions) {
+        const range = session.mappedRange;
+        const fullyContained = range.from >= oldRange.from && range.to <= oldRange.to;
+        const disjoint = range.to <= oldRange.from || range.from >= oldRange.to;
+
+        if (fullyContained) {
+          const mappedFrom = range.from === oldRange.from
+            ? newRange.from
+            : relocation.mapContainedPosition
+              ? relocation.mapContainedPosition(range.from, 1)
+            : newRange.from + range.from - oldRange.from;
+          const mappedTo = range.to === oldRange.to
+            ? newRange.to
+            : relocation.mapContainedPosition
+              ? relocation.mapContainedPosition(range.to, -1)
+            : newRange.from + range.to - oldRange.from;
+          sessions.set(id, {
+            ...session,
+            mappedRange: {
+              from: Math.min(mappedFrom, mappedTo),
+              to: Math.max(mappedFrom, mappedTo),
+            },
+          });
+          continue;
+        }
+
+        const mappedFrom = mapPos(range.from, 1);
+        const mappedTo = mapPos(range.to, -1);
+        sessions.set(id, {
+          ...session,
+          mappedRange: {
+            from: Math.min(mappedFrom, mappedTo),
+            to: Math.max(mappedFrom, mappedTo),
+          },
+          lifecycle: disjoint ? session.lifecycle : "conflicted",
+        });
+      }
+    },
     clear() {
       sessions.clear();
     },

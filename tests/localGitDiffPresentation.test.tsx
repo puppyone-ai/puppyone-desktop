@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GitFileDiff } from "../src/types/electron";
 import { GitFileDiffSurface } from "../src/features/source-control/diff/GitFileDiffSurface";
 import { WorkingFileDetail } from "../src/features/source-control/WorkingFileDetail";
+import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -43,7 +44,7 @@ describe("local Git diff presentation", () => {
     expect(focused.querySelector(".desktop-working-diff-context")).toBeNull();
     expect(focused.querySelector(".desktop-file-format-label")?.textContent).toBe("Markdown");
     expect(focused.querySelector(".desktop-change-badge")?.textContent).toBe("Added");
-    expect(focused.querySelector(".desktop-file-diff-stat")?.textContent).toBe("+2-0");
+    expect(focused.querySelector(".desktop-file-diff-stat")?.textContent).toBe("+2−0");
     expect(focused.querySelector(".desktop-file-diff-name")?.textContent).toBe("ISSUE-030.md");
     expect(focused.querySelector(".desktop-file-diff-directory")?.textContent).toBe("dev issues/3-done");
     expect(focused.textContent).not.toContain("OUTGOING");
@@ -71,7 +72,7 @@ describe("local Git diff presentation", () => {
       "desktop-change-badge renamed",
       "desktop-file-diff-stat",
     ]);
-    expect(facts?.textContent).toBe("TypeScriptRenamed+7-3");
+    expect(facts?.textContent).toBe("TypeScriptRenamed+7−3");
     expect(identity?.className).toBe("desktop-file-diff-identity");
     expect(identity?.textContent).toBe("old.ts → new.tssrc/legacy → src/current");
     expect(identity?.getAttribute("title")).toBe("src/legacy/old.ts → src/current/new.ts");
@@ -98,7 +99,7 @@ describe("local Git diff presentation", () => {
     expect(Array.from(surface.querySelectorAll(".desktop-working-file-toolbar button"))
       .map((button) => button.textContent)).toEqual(["Open file", "Stage", "Discard"]);
     expect(surface.querySelector(".desktop-working-diff-context")).toBeNull();
-    expect(surface.querySelector(".desktop-file-diff-facts")?.textContent).toBe("MarkdownAdded+2-0");
+    expect(surface.querySelector(".desktop-file-diff-facts")?.textContent).toBe("MarkdownAdded+2−0");
   });
 });
 
@@ -107,7 +108,7 @@ function render(node: React.ReactNode) {
   document.body.append(container);
   const root = createRoot(container);
   roots.push(root);
-  act(() => root.render(node));
+  act(() => root.render(withTestLocalization(<>{node}</>)));
   return container;
 }
 

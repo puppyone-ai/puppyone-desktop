@@ -175,7 +175,7 @@
   font-size: 12px;
   font-weight: 650;
   letter-spacing: 0;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .editor-state--stacked button:hover {

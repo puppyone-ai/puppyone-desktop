@@ -1,12 +1,21 @@
 import type { GitRemoteSummary, GitStatusSnapshot } from "../../types/electron";
 
 export type PuppyoneRemoteInfo = {
-  kind: "access-point" | "project";
+  kind: "access-point" | "project" | "scope";
   host: string;
   displayId: string;
   projectId?: string;
+  scopeId?: string;
   accessKey?: string;
 };
+
+const CANONICAL_GIT_ID = "[A-Za-z0-9][A-Za-z0-9_-]{0,199}";
+const CANONICAL_SCOPE_REMOTE = new RegExp(
+  `^/git/(${CANONICAL_GIT_ID})/scopes/(${CANONICAL_GIT_ID})\\.git$`,
+);
+const CANONICAL_PROJECT_REMOTE = new RegExp(
+  `^/git/(${CANONICAL_GIT_ID})\\.git$`,
+);
 
 export function getPuppyoneRemote(status: GitStatusSnapshot | null): {
   remote: GitRemoteSummary;
@@ -27,6 +36,9 @@ export function parsePuppyoneRemote(rawUrl: string | null): PuppyoneRemoteInfo |
 
   try {
     const url = new URL(rawUrl);
+    const isCanonicalTransport = url.protocol === "http:" || url.protocol === "https:";
+    const hasUrlCredential = Boolean(url.username || url.password || url.search || url.hash);
+    if (!isCanonicalTransport || !url.host || hasUrlCredential) return null;
     const accessPointMatch = url.pathname.match(/^\/git\/ap\/([^/]+)\.git$/);
     const accessKey = accessPointMatch?.[1];
     if (accessPointMatch) {
@@ -38,7 +50,20 @@ export function parsePuppyoneRemote(rawUrl: string | null): PuppyoneRemoteInfo |
       };
     }
 
-    const projectMatch = url.pathname.match(/^\/git\/([^/]+)\.git$/);
+    const scopeMatch = url.pathname.match(CANONICAL_SCOPE_REMOTE);
+    if (scopeMatch) {
+      const projectId = scopeMatch[1];
+      const scopeId = scopeMatch[2];
+      return {
+        kind: "scope",
+        host: url.host,
+        displayId: `${projectId}/${scopeId}`,
+        projectId,
+        scopeId,
+      };
+    }
+
+    const projectMatch = url.pathname.match(CANONICAL_PROJECT_REMOTE);
     const projectId = projectMatch?.[1];
     if (projectMatch) {
       return {

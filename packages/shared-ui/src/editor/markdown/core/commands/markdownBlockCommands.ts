@@ -166,18 +166,29 @@ function getNextListMarker(marker: string): string {
   return `${Number.parseInt(orderedMatch[1], 10) + 1}${orderedMatch[2]}`;
 }
 
-export function renumberOrderedLists(view: EditorView) {
-  const { state } = view;
+export type OrderedListRenumberScope = Readonly<{
+  from: number;
+  to: number;
+  indent?: string;
+}>;
+
+export function getOrderedListRenumberChanges(
+  state: EditorState,
+  scope?: OrderedListRenumberScope,
+): ChangeSpec[] {
   const changes: ChangeSpec[] = [];
   const countersByIndent = new Map<string, number>();
+  const firstLine = scope ? state.doc.lineAt(scope.from).number : 1;
+  const lastLine = scope ? state.doc.lineAt(scope.to).number : state.doc.lines;
 
-  for (let lineNumber = 1; lineNumber <= state.doc.lines; lineNumber += 1) {
+  for (let lineNumber = firstLine; lineNumber <= lastLine; lineNumber += 1) {
     const line = state.doc.line(lineNumber);
     const match = /^(\s*)(\d+)([.)])\s+/.exec(line.text);
     if (!match) {
-      if (!/^\s*(?:[-*+]|\d+[.)])\s+/.test(line.text)) countersByIndent.clear();
+      if (!scope && !/^\s*(?:[-*+]|\d+[.)])\s+/.test(line.text)) countersByIndent.clear();
       continue;
     }
+    if (scope?.indent !== undefined && match[1] !== scope.indent) continue;
 
     const indentKey = match[1].replace(/\t/g, "  ");
     const nextNumber = (countersByIndent.get(indentKey) ?? 0) + 1;
@@ -188,5 +199,10 @@ export function renumberOrderedLists(view: EditorView) {
     changes.push({ from: markerFrom, to: markerFrom + match[2].length, insert: String(nextNumber) });
   }
 
+  return changes;
+}
+
+export function renumberOrderedLists(view: EditorView) {
+  const changes = getOrderedListRenumberChanges(view.state);
   if (changes.length > 0) view.dispatch({ changes });
 }

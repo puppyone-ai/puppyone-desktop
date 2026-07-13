@@ -35,7 +35,7 @@
   font-size: var(--po-text-size-caption, 11px);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
-  text-align: right;
+  text-align: end;
 }
 
 .desktop-plugins-view {
@@ -136,7 +136,7 @@
 .desktop-plugins-feedback {
   margin-top: -8px;
   padding: 7px 9px;
-  border-left: 2px solid var(--po-success);
+  border-inline-start: 2px solid var(--po-success);
   background: color-mix(in srgb, var(--po-success) 5%, transparent);
   color: var(--po-success);
   font-size: 12px;
@@ -144,7 +144,7 @@
 }
 
 .desktop-plugins-feedback.danger {
-  border-left-color: var(--po-danger);
+  border-inline-start-color: var(--po-danger);
   background: color-mix(in srgb, var(--po-danger) 5%, transparent);
   color: var(--po-danger);
 }
@@ -301,7 +301,7 @@
   justify-content: center;
   border-radius: 6px;
   color: var(--po-text-muted);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   list-style: none;
 }
 
@@ -319,7 +319,7 @@
   position: absolute;
   z-index: 20;
   top: 32px;
-  right: 0;
+  inset-inline-end: 0;
   min-width: 112px;
   padding: 4px;
   border: 1px solid var(--po-border);
@@ -341,7 +341,7 @@
   color: var(--po-danger);
   font: inherit;
   font-size: 12px;
-  text-align: left;
+  text-align: start;
 }
 
 .desktop-plugin-menu button:hover:not(:disabled) {

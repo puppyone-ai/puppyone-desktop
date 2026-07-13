@@ -51,7 +51,7 @@ export function getDocxRedlineCacheUsageForTests() {
 }
 
 export function estimateDocxRedlinePresentationBytes(model: DocxRedlinePresentation) {
-  let bytes = 512 + stringBytes(model.rendererVersion) + stringBytes(model.fidelityNote);
+  let bytes = 512 + stringBytes(model.rendererVersion) + stringBytes(model.fidelity);
   for (const change of model.changes) {
     bytes += 192 + stringBytes(change.id) + stringBytes(change.kind) + stringBytes(change.blockKind);
     for (const segment of change.segments) {

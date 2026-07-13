@@ -11,6 +11,7 @@ type MarkdownViewerProps = Pick<
   | "canEdit"
   | "documentSession"
   | "hideSourceView"
+  | "editorInteractionPreferences"
   | "saveMode"
   | "aiEditFile"
   | "htmlTrustMode"
@@ -38,6 +39,7 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
           value={value}
           readOnly={!controls.canEdit}
           livePreview
+          blockDragEnabled={context.editorInteractionPreferences.markdownBlockDragEnabled}
           aiEditFile={context.aiEditFile}
           htmlTrustMode={context.htmlTrustMode}
           documentPath={context.document.path}

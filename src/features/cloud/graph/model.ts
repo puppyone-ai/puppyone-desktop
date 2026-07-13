@@ -59,8 +59,9 @@ export function getCloudBranchGraphDiagnostics(
       branchCount: history?.refs.filter((ref) => ref.ref_type === "branch").length ?? 0,
       structuralPrefixCount: 0,
       warning: history && !history.topology_available
-        ? "The Cloud response omitted commit ancestry, so this view is using a linear compatibility fallback."
+        ? null
         : null,
+      warningCode: history && !history.topology_available ? "cloud-ancestry-missing" : undefined,
     };
   }
 
@@ -83,7 +84,8 @@ export function getCloudBranchGraphDiagnostics(
       mergeCommitCount,
       branchCount,
       structuralPrefixCount,
-      warning: "The loaded Git status has branches or merge commits but no structural graph prefixes, so this view is showing branch heads on a linear fallback. Refresh Git topology or fetch all refs.",
+      warning: null,
+      warningCode: "git-topology-missing",
     };
   }
   return {
@@ -100,12 +102,14 @@ function buildLinearCloudRows(history: DesktopCloudHistory): CloudBranchGraphRow
   return history.commits.map((commit, index, commits) => ({
     id: commit.commit_id,
     kind: "commit" as const,
-    message: commit.message || "Update workspace",
+    message: commit.message,
+    messageCode: commit.message ? undefined : "update-workspace",
     createdAt: commit.created_at,
     stats: buildCloudCommitStats(commit.changes),
-    authorName: commit.who || "Cloud",
+    authorName: commit.who,
+    authorCode: commit.who ? undefined : "cloud",
     labels: commit.commit_id === history.head_commit_id || (!history.head_commit_id && index === 0)
-      ? [{ name: "Cloud history", kind: "cloud" as const, current: true }]
+      ? [{ name: "", nameCode: "cloud-history" as const, kind: "cloud" as const, current: true }]
       : [],
     prefix: "*",
     laneCount: 1,

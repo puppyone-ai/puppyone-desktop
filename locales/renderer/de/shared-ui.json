@@ -1,0 +1,19 @@
+{
+  "loading": "Wird geladen…",
+  "explorer.root": "Stammverzeichnis",
+  "explorer.emptyFolder": "Leerer Ordner",
+  "explorer.loadingWorkspace": "Arbeitsbereich wird geladen…",
+  "explorer.create": "Erstellen",
+  "explorer.more": "Mehr",
+  "explorer.access": "Zugriff",
+  "explorer.resizeSidebar": "Seitenleiste skalieren",
+  "explorer.cutLabel": "{name}, ausgeschnitten",
+  "navigation.back": "Zurück",
+  "preview.selectFile": "Wähle eine Datei für die Vorschau aus",
+  "preview.crashed": "Dieser Editor kann nicht dargestellt werden.",
+  "status.clean": "Unverändert",
+  "status.modified": "Geändert",
+  "status.created": "Erstellt",
+  "status.deleted": "Gelöscht",
+  "status.moved": "Verschoben"
+}

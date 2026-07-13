@@ -2,6 +2,8 @@
 
 import { Code2, ExternalLink, Eye, RotateCw, Square, TerminalSquare } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import { PlainTextEditor } from "../PlainTextEditor";
 import type { PresetViewerRenderContext } from "../viewerTypes";
 import type { AppPreviewResult } from "../../core/types";
@@ -12,7 +14,11 @@ type AppPreviewState =
   | { status: "idle"; result: null; error: null }
   | { status: "starting"; result: AppPreviewResult | null; error: null }
   | { status: "running"; result: AppPreviewResult; error: null }
-  | { status: "error"; result: AppPreviewResult | null; error: string };
+  | {
+    status: "error";
+    result: AppPreviewResult | null;
+    error: { code: "unavailable" | "start-failed"; detail: string | null };
+  };
 
 export function AppPreviewViewer({
   document,
@@ -24,6 +30,7 @@ export function AppPreviewViewer({
   PresetViewerRenderContext,
   "document" | "content" | "loading" | "error" | "appPreview"
 >) {
+  const { t } = useLocalization();
   const [mode, setMode] = useState<AppPreviewMode>("preview");
   const [state, setState] = useState<AppPreviewState>({ status: "idle", result: null, error: null });
   const [logs, setLogs] = useState("");
@@ -44,7 +51,7 @@ export function AppPreviewViewer({
       setState({
         status: "error",
         result: null,
-        error: "App Preview is not available for this workspace.",
+        error: { code: "unavailable", detail: null },
       });
       return;
     }
@@ -65,7 +72,11 @@ export function AppPreviewViewer({
       setState(
         result.status === "running"
           ? { status: "running", result, error: null }
-          : { status: "error", result, error: result.message || "Unable to start this app." },
+          : {
+            status: "error",
+            result,
+            error: { code: "start-failed", detail: result.message || null },
+          },
       );
       setLogs(result.logs ?? "");
     } catch (startError) {
@@ -73,7 +84,10 @@ export function AppPreviewViewer({
       setState({
         status: "error",
         result: null,
-        error: startError instanceof Error ? startError.message : String(startError),
+        error: {
+          code: "start-failed",
+          detail: startError instanceof Error ? startError.message : String(startError),
+        },
       });
       await refreshLogs();
     }
@@ -89,26 +103,26 @@ export function AppPreviewViewer({
     void refreshLogs();
   }, [mode, refreshLogs]);
 
-  if (loading && !content) return <div className="editor-state">Loading app...</div>;
-  if (error && !content) return <div className="editor-state danger">{error}</div>;
+  if (loading && !content) return <div className="editor-state">{t("editor.app.loading")}</div>;
+  if (error && !content) return <div className="editor-state danger" dir="auto">{error}</div>;
 
   const runningUrl = state.status === "running" ? state.result.url : null;
-  const statusLabel = getAppPreviewStatusLabel(state);
+  const statusLabel = t(`editor.app.status.${state.status}`);
 
   return (
     <section className="app-preview-shell" data-mode={mode}>
       <header className="app-preview-header">
         <div className="app-preview-title">
-          <strong>{appName}</strong>
+          <strong dir="auto">{appName}</strong>
           <span data-status={state.status}>{statusLabel}</span>
         </div>
 
-        <div className="app-preview-toolbar" aria-label="App Preview controls">
+        <div className="app-preview-toolbar" aria-label={t("editor.app.controls")}>
           <button
             className={mode === "preview" ? "active" : ""}
             type="button"
-            title="App preview"
-            aria-label="App preview"
+            title={t("editor.app.preview")}
+            aria-label={t("editor.app.preview")}
             onClick={() => setMode("preview")}
           >
             <Eye size={14} strokeWidth={2} />
@@ -116,8 +130,8 @@ export function AppPreviewViewer({
           <button
             className={mode === "source" ? "active" : ""}
             type="button"
-            title="Manifest source"
-            aria-label="Manifest source"
+            title={t("editor.app.manifestSource")}
+            aria-label={t("editor.app.manifestSource")}
             onClick={() => setMode("source")}
           >
             <Code2 size={14} strokeWidth={2} />
@@ -125,8 +139,8 @@ export function AppPreviewViewer({
           <button
             className={mode === "logs" ? "active" : ""}
             type="button"
-            title="Runtime logs"
-            aria-label="Runtime logs"
+            title={t("editor.app.runtimeLogs")}
+            aria-label={t("editor.app.runtimeLogs")}
             onClick={() => setMode("logs")}
           >
             <TerminalSquare size={14} strokeWidth={2} />
@@ -134,8 +148,8 @@ export function AppPreviewViewer({
           <span className="app-preview-toolbar-separator" aria-hidden="true" />
           <button
             type="button"
-            title="Restart app"
-            aria-label="Restart app"
+            title={t("editor.app.restart")}
+            aria-label={t("editor.app.restart")}
             disabled={!appPreview?.restart || state.status === "starting"}
             onClick={() => {
               setMode("preview");
@@ -146,8 +160,8 @@ export function AppPreviewViewer({
           </button>
           <button
             type="button"
-            title="Open in browser"
-            aria-label="Open in browser"
+            title={t("editor.app.openBrowser")}
+            aria-label={t("editor.app.openBrowser")}
             disabled={!appPreview?.openExternal || !runningUrl}
             onClick={() => {
               void appPreview?.openExternal?.(document.path);
@@ -164,8 +178,8 @@ export function AppPreviewViewer({
             <PlainTextEditor content={content} nodeName={document.name} readOnly />
           </div>
         ) : mode === "logs" ? (
-          <div className="app-preview-logs" role="log" aria-label="App Preview logs">
-            <pre>{logs || "No logs yet."}</pre>
+          <div className="app-preview-logs" role="log" aria-label={t("editor.app.logsLabel")}>
+            <pre dir="ltr">{logs || t("editor.app.noLogs")}</pre>
           </div>
         ) : runningUrl ? (
           <iframe
@@ -202,12 +216,13 @@ function AppPreviewStateView({
   canRestart: boolean;
   onRestart: () => void;
 }) {
+  const { t } = useLocalization();
   if (state.status === "starting") {
     return (
       <div className="app-preview-state">
         <div className="app-preview-spinner" aria-hidden="true" />
-        <strong>Starting {appName}</strong>
-        <span>Preparing local app preview...</span>
+        <strong>{t("editor.app.startingName", { name: bidiIsolate(appName) })}</strong>
+        <span>{t("editor.app.preparingLocal")}</span>
       </div>
     );
   }
@@ -216,10 +231,14 @@ function AppPreviewStateView({
     return (
       <div className="app-preview-state danger">
         <Square size={22} strokeWidth={1.9} aria-hidden="true" />
-        <strong>App preview failed</strong>
-        <span>{state.error || state.result?.message || "Unable to start this app."}</span>
+        <strong>{t("editor.app.failed")}</strong>
+        <span dir="auto">
+          {state.error.code === "unavailable"
+            ? t("editor.app.unavailable")
+            : state.error.detail || t("editor.app.startFailed")}
+        </span>
         <button type="button" disabled={!canRestart} onClick={onRestart}>
-          Restart
+          {t("editor.app.restart")}
         </button>
       </div>
     );
@@ -228,8 +247,8 @@ function AppPreviewStateView({
   return (
     <div className="app-preview-state">
       <div className="app-preview-spinner" aria-hidden="true" />
-      <strong>Preparing {appName}</strong>
-      <span>Waiting for the local runtime...</span>
+      <strong>{t("editor.app.preparingName", { name: bidiIsolate(appName) })}</strong>
+      <span>{t("editor.app.waitingRuntime")}</span>
     </div>
   );
 }
@@ -240,19 +259,5 @@ function getManifestName(content: string): string | null {
     return typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim() : null;
   } catch {
     return null;
-  }
-}
-
-function getAppPreviewStatusLabel(state: AppPreviewState): string {
-  switch (state.status) {
-    case "running":
-      return "Running";
-    case "starting":
-      return "Starting";
-    case "error":
-      return "Failed";
-    case "idle":
-    default:
-      return "Ready";
   }
 }

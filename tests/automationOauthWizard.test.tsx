@@ -10,6 +10,7 @@ import type {
   DesktopCloudSession,
 } from "../src/lib/cloudApi";
 import type { AutomationTemplate } from "../src/features/automation/automationTemplates";
+import { stripBidiIsolation, withTestLocalization } from "./testLocalization";
 
 const apiMocks = vi.hoisted(() => ({
   create: vi.fn(),
@@ -69,7 +70,7 @@ describe("Automation OAuth wizard", () => {
     if (expected === "configure") {
       expect(container.querySelector(".desktop-cloud-automation-builder")).not.toBeNull();
     } else {
-      expect(container.querySelector("h2")?.textContent).toBe("Connect Google Docs");
+      expect(stripBidiIsolation(container.querySelector("h2")?.textContent)).toBe("Connect Google Docs");
       expect(container.querySelector(".desktop-cloud-automation-builder")).toBeNull();
     }
   });
@@ -84,7 +85,7 @@ describe("Automation OAuth wizard", () => {
     apiMocks.resources.mockResolvedValue({ resources: [resource()], next_cursor: null });
     const container = renderWizard(TEMPLATE);
     await flushEffects();
-    expect(container.querySelector("h2")?.textContent).toBe("Connect Google Docs");
+    expect(stripBidiIsolation(container.querySelector("h2")?.textContent)).toBe("Connect Google Docs");
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -105,7 +106,11 @@ describe("Automation OAuth wizard", () => {
     apiMocks.status.mockResolvedValue(oauthStatus(false));
     const container = renderWizard(TEMPLATE);
     await flushEffects();
-    act(() => findButton(container, "Cancel")?.click());
+    await act(async () => {
+      findButton(container, "Cancel")?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
     expect(container.querySelector(".desktop-cloud-automation-chooser-grid")).not.toBeNull();
     expect(apiMocks.create).not.toHaveBeenCalled();
@@ -184,7 +189,7 @@ function renderWizard(template: AutomationTemplate | null, onCreated = vi.fn()) 
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root?.render(
+  act(() => root?.render(withTestLocalization(
     <CloudNewAutomationDialog
       projectId="project-1"
       cloudSession={SESSION}
@@ -198,7 +203,7 @@ function renderWizard(template: AutomationTemplate | null, onCreated = vi.fn()) 
       onCreated={onCreated}
       onClose={vi.fn()}
     />,
-  ));
+  )));
   return container;
 }
 
@@ -264,8 +269,7 @@ const TEMPLATE: AutomationTemplate = {
   id: "google-docs",
   provider: "google_docs",
   sourceLabel: "Google Docs",
-  title: "Collect Google Docs",
-  description: "Bring shared documents into this project.",
+  presentation: "catalog",
   categories: ["popular", "documents"],
   iconUrl: null,
 };

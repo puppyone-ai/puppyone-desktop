@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 
 export type SaveStatus = "clean" | "dirty" | "saving" | "saved" | "error";
 
@@ -10,6 +11,7 @@ export type EditorSaveButtonProps = {
 };
 
 export function EditorSaveButton({ status, onSave }: EditorSaveButtonProps) {
+  const { t } = useLocalization();
   const [shortcutHint, setShortcutHint] = useState("Ctrl+S");
 
   useEffect(() => {
@@ -23,7 +25,7 @@ export function EditorSaveButton({ status, onSave }: EditorSaveButtonProps) {
     return (
       <ChipPill tone="muted">
         <span className="editor-save-pulse" aria-hidden />
-        <span>Saving...</span>
+        <span>{t("editor.save.saving")}</span>
       </ChipPill>
     );
   }
@@ -32,24 +34,24 @@ export function EditorSaveButton({ status, onSave }: EditorSaveButtonProps) {
     return (
       <ChipPill tone="success">
         <CheckIcon />
-        <span>Saved</span>
+        <span>{t("editor.save.saved")}</span>
       </ChipPill>
     );
   }
 
   if (status === "error") {
     return (
-      <ChipButton tone="error" onClick={onSave} title={`Retry save (${shortcutHint})`}>
+      <ChipButton tone="error" onClick={onSave} title={t("editor.save.retryHint", { shortcut: shortcutHint })}>
         <AlertIcon />
-        <span>Save failed</span>
+        <span>{t("editor.save.failed")}</span>
       </ChipButton>
     );
   }
 
   return (
-    <ChipButton tone="action" onClick={onSave} title={`Save changes (${shortcutHint})`}>
+    <ChipButton tone="action" onClick={onSave} title={t("editor.save.hint", { shortcut: shortcutHint })}>
       <SaveDiskIcon />
-      <span>Save changes</span>
+      <span>{t("editor.save.action")}</span>
     </ChipButton>
   );
 }

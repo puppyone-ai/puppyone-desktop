@@ -1,5 +1,7 @@
 import { ChevronDown, ChevronRight, Folder, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   DesktopCloudAutomationConfigField,
   DesktopCloudAutomationProviderResource,
@@ -13,8 +15,7 @@ import {
 } from "../../lib/cloudApi";
 import {
   automationSourceFromProviderResource,
-  formatAutomationTriggerSummary,
-  formatNextAutomationRun,
+  getNextAutomationRun,
   getAutomationTimezones,
   getAutomationTargetPathValidationError,
   getAutomationTriggerPresets,
@@ -25,8 +26,17 @@ import {
   type AutomationTriggerDraft,
   type AutomationTriggerPreset,
 } from "./automationRequest";
+import {
+  formatAutomationNextRun,
+  formatAutomationTriggerPreset,
+  formatAutomationTriggerSummary,
+  formatAutomationValidationError,
+  formatAutomationWeekday,
+} from "./automationPresentation";
 
 type SessionChangeHandler = (session: DesktopCloudSession | null) => void;
+type ResourceFallbackNotice = "empty" | "unavailable" | "manual";
+type ResourceLoadError = Readonly<{ code: "load" | "load-more"; detail: string }>;
 
 export function CloudAutomationSourceEditor({
   provider,
@@ -47,12 +57,13 @@ export function CloudAutomationSourceEditor({
   onConfigValueChange: (key: string, value: string) => void;
   onSourceChange: (source: AutomationSourceSelection | null) => void;
 }) {
+  const { t } = useLocalization();
   const fields = getCloudAutomationUserConfigFields(provider);
   const canEnumerate = provider.auth !== "none" && supportsCloudAutomationOauth(provider.provider);
   const [manualMode, setManualMode] = useState(!canEnumerate);
-  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
-  const handleManualFallback = useCallback((message: string) => {
-    setFallbackNotice(message);
+  const [fallbackNotice, setFallbackNotice] = useState<ResourceFallbackNotice | null>(null);
+  const handleManualFallback = useCallback((notice: ResourceFallbackNotice) => {
+    setFallbackNotice(notice);
     setManualMode(true);
   }, []);
 
@@ -77,7 +88,11 @@ export function CloudAutomationSourceEditor({
         <CloudAutomationManualSourceFields source={source} onChange={onSourceChange} />
       ) : null}
 
-      {fallbackNotice && <div className="desktop-cloud-automation-inline-note">{fallbackNotice}</div>}
+      {fallbackNotice && (
+        <div className="desktop-cloud-automation-inline-note">
+          {t(`automation.resource.fallback.${fallbackNotice}`)}
+        </div>
+      )}
 
       {canEnumerate && manualMode && (
         <button
@@ -88,7 +103,7 @@ export function CloudAutomationSourceEditor({
             setManualMode(false);
           }}
         >
-          Browse connected resources
+          {t("automation.resource.browseConnected")}
         </button>
       )}
 
@@ -105,7 +120,7 @@ export function CloudAutomationSourceEditor({
       ))}
 
       {provider.provider === "url" && fields.length === 0 && (
-        <div className="desktop-cloud-automation-field-empty">No source settings are required.</div>
+        <div className="desktop-cloud-automation-field-empty">{t("automation.source.noSettings")}</div>
       )}
     </div>
   );
@@ -126,14 +141,15 @@ function CloudAutomationResourcePicker({
   value: AutomationSourceSelection | null;
   onCloudSessionChange: SessionChangeHandler;
   onChange: (source: AutomationSourceSelection | null) => void;
-  onManualFallback: (message: string) => void;
+  onManualFallback: (notice: ResourceFallbackNotice) => void;
 }) {
+  const { t } = useLocalization();
   const [query, setQuery] = useState("");
   const [resources, setResources] = useState<DesktopCloudAutomationProviderResource[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ResourceLoadError | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -152,18 +168,21 @@ function CloudAutomationResourcePicker({
           setResources(result.resources);
           setNextCursor(result.next_cursor);
           if (!query.trim() && result.resources.length === 0) {
-            onManualFallback("This source does not expose browsable resources. Enter its resource details instead.");
+            onManualFallback("empty");
           }
         })
         .catch((loadError) => {
           if (cancelled) return;
           if (isResourceFallbackError(loadError)) {
-            onManualFallback("Resource browsing is unavailable for this source. You can still enter its resource details.");
+            onManualFallback("unavailable");
             return;
           }
           setResources([]);
           setNextCursor(null);
-          setError(loadError instanceof Error ? loadError.message : "Unable to load source resources.");
+          setError({
+            code: "load",
+            detail: loadError instanceof Error ? loadError.message : String(loadError),
+          });
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -190,39 +209,45 @@ function CloudAutomationResourcePicker({
       setResources((current) => mergeResources(current, result.resources));
       setNextCursor(result.next_cursor);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load more resources.");
+      setError({
+        code: "load-more",
+        detail: loadError instanceof Error ? loadError.message : String(loadError),
+      });
     } finally {
       setLoadingMore(false);
     }
   };
 
   return (
-    <section className="desktop-cloud-automation-resource-picker" aria-label={`${provider.display_name} resources`}>
+    <section
+      className="desktop-cloud-automation-resource-picker"
+      aria-label={t("automation.resource.providerResources", { provider: bidiIsolate(provider.display_name) })}
+    >
       <label className="desktop-cloud-automation-resource-search">
         <Search size={14} aria-hidden="true" />
         <input
           value={query}
-          aria-label={`Search ${provider.display_name} resources`}
-          placeholder="Search connected resources"
+          aria-label={t("automation.resource.searchProvider", { provider: bidiIsolate(provider.display_name) })}
+          placeholder={t("automation.resource.search")}
           onChange={(event) => setQuery(event.target.value)}
         />
       </label>
       {value && (
         <div className="desktop-cloud-automation-selected-resource">
-          <span>Selected</span>
-          <strong>{value.resourceName}</strong>
-          <button type="button" onClick={() => onChange(null)}>Clear</button>
+          <span>{t("automation.resource.selected")}</span>
+          <strong dir="auto">{value.resourceName}</strong>
+          <button type="button" onClick={() => onChange(null)}>{t("common.action.clear")}</button>
         </div>
       )}
       {loading ? (
-        <div className="desktop-cloud-automation-resource-state" role="status">Loading resources…</div>
+        <div className="desktop-cloud-automation-resource-state" role="status">{t("automation.resource.loading")}</div>
       ) : error ? (
         <div className="desktop-cloud-automation-resource-state error" role="alert">
-          <span>{error}</span>
-          <button type="button" onClick={() => onManualFallback("Enter the source resource details manually.")}>Enter manually</button>
+          <span>{t(`automation.resource.error.${error.code}`, { detail: bidiIsolate(error.detail) })}</span>
+          <button type="button" onClick={() => onManualFallback("manual")}>{t("automation.resource.enterManually")}</button>
         </div>
       ) : resources.length === 0 ? (
-        <div className="desktop-cloud-automation-resource-state">No matching resources.</div>
+        <div className="desktop-cloud-automation-resource-state">{t("automation.resource.noMatches")}</div>
       ) : (
         <div className="desktop-cloud-automation-resource-list">
           {resources.map((resource) => {
@@ -234,14 +259,18 @@ function CloudAutomationResourcePicker({
                 key={`${resource.type}:${resource.id}`}
                 disabled={!resource.authorized}
                 aria-pressed={selected}
-                title={resource.authorized ? resource.name : `${resource.name} is not authorized`}
+                title={resource.authorized
+                  ? resource.name
+                  : t("automation.resource.notAuthorized", { name: bidiIsolate(resource.name) })}
                 onClick={() => onChange(automationSourceFromProviderResource(resource))}
               >
                 <span>
-                  <strong>{resource.name}</strong>
+                  <strong dir="auto">{resource.name}</strong>
                   {(resource.subtitle || resource.type) && <small>{resource.subtitle || resource.type}</small>}
                 </span>
-                <span>{resource.authorized ? selected ? "Selected" : "Select" : "No access"}</span>
+                <span>{resource.authorized
+                  ? selected ? t("automation.resource.selected") : t("automation.resource.select")
+                  : t("automation.resource.noAccess")}</span>
               </button>
             );
           })}
@@ -249,15 +278,15 @@ function CloudAutomationResourcePicker({
       )}
       {nextCursor && (
         <button className="desktop-cloud-automation-link-button" type="button" disabled={loadingMore} onClick={loadMore}>
-          {loadingMore ? "Loading…" : "Load more"}
+          {loadingMore ? t("common.status.loading") : t("automation.resource.loadMore")}
         </button>
       )}
       <button
         className="desktop-cloud-automation-link-button"
         type="button"
-        onClick={() => onManualFallback("Enter the source resource details manually.")}
+        onClick={() => onManualFallback("manual")}
       >
-        Enter a resource ID instead
+        {t("automation.resource.enterIdInstead")}
       </button>
     </section>
   );
@@ -270,6 +299,7 @@ function CloudAutomationManualSourceFields({
   source: AutomationSourceSelection | null;
   onChange: (source: AutomationSourceSelection | null) => void;
 }) {
+  const { t } = useLocalization();
   const update = (patch: Partial<AutomationSourceSelection>) => {
     const next = {
       resourceId: source?.resourceId ?? "",
@@ -282,26 +312,26 @@ function CloudAutomationManualSourceFields({
     onChange(next.resourceId || next.resourceName || next.resourceUrl ? next : null);
   };
   return (
-    <div className="desktop-cloud-automation-manual-source" aria-label="Manual source details">
+    <div className="desktop-cloud-automation-manual-source" aria-label={t("automation.source.manualDetails")}>
       <label className="desktop-cloud-automation-field">
-        <span>Resource ID *</span>
+        <span>{t("automation.source.resourceIdRequired")}</span>
         <input
           value={source?.resourceId ?? ""}
           required
-          placeholder="Provider resource ID"
+          placeholder={t("automation.source.resourceIdPlaceholder")}
           onChange={(event) => update({ resourceId: event.target.value })}
         />
       </label>
       <label className="desktop-cloud-automation-field">
-        <span>Resource name</span>
+        <span>{t("automation.source.resourceName")}</span>
         <input
           value={source?.resourceName ?? ""}
-          placeholder="Display name"
+          placeholder={t("automation.source.displayNamePlaceholder")}
           onChange={(event) => update({ resourceName: event.target.value })}
         />
       </label>
       <label className="desktop-cloud-automation-field">
-        <span>Resource URL</span>
+        <span>{t("automation.source.resourceUrl")}</span>
         <input
           value={source?.resourceUrl ?? ""}
           type="url"
@@ -324,63 +354,68 @@ export function CloudAutomationTriggerEditor({
   onChange: (draft: AutomationTriggerDraft) => void;
   showNextRun?: boolean;
 }) {
+  const localization = useLocalization();
+  const { t } = localization;
   const presets = getAutomationTriggerPresets(provider);
   const validationError = getAutomationTriggerValidationError(draft);
-  const nextRun = showNextRun ? formatNextAutomationRun(draft) : null;
+  const validationMessage = formatAutomationValidationError(validationError, t);
+  const nextRun = showNextRun
+    ? formatAutomationNextRun(getNextAutomationRun(draft), draft.timezone, localization)
+    : null;
   const timezones = useMemo(() => getAutomationTimezones(), []);
   const scheduled = ["hourly", "daily", "weekly", "custom"].includes(draft.preset);
 
   return (
-    <section className="desktop-cloud-automation-trigger-editor" aria-label="Automation trigger settings">
+    <section className="desktop-cloud-automation-trigger-editor" aria-label={t("automation.trigger.settings")}>
       <label className="desktop-cloud-automation-field">
-        <span>Trigger</span>
+        <span>{t("automation.trigger.label")}</span>
         <select
-          aria-label="Run trigger"
+          aria-label={t("automation.trigger.runTrigger")}
           value={draft.preset}
           onChange={(event) => onChange({ ...draft, preset: event.target.value as AutomationTriggerPreset })}
         >
-          {presets.map((preset) => <option key={preset} value={preset}>{formatTriggerPreset(preset)}</option>)}
+          {presets.map((preset) => <option key={preset} value={preset}>{formatAutomationTriggerPreset(preset, t)}</option>)}
         </select>
       </label>
       {(draft.preset === "daily" || draft.preset === "weekly") && (
         <label className="desktop-cloud-automation-field">
-          <span>Time</span>
+          <span>{t("automation.trigger.time")}</span>
           <input type="time" value={draft.time} onChange={(event) => onChange({ ...draft, time: event.target.value })} />
         </label>
       )}
       {draft.preset === "weekly" && (
         <label className="desktop-cloud-automation-field">
-          <span>Day</span>
+          <span>{t("automation.trigger.day")}</span>
           <select value={draft.weekday} onChange={(event) => onChange({ ...draft, weekday: event.target.value })}>
-            {WEEKDAY_OPTIONS.map((day) => <option value={day.value} key={day.value}>{day.label}</option>)}
+            {WEEKDAY_VALUES.map((day) => <option value={day} key={day}>{formatAutomationWeekday(day, t)}</option>)}
           </select>
         </label>
       )}
       {draft.preset === "custom" && (
         <label className="desktop-cloud-automation-field desktop-cloud-automation-custom-cron">
-          <span>Cron expression</span>
+          <span>{t("automation.trigger.cronExpression")}</span>
           <input
             value={draft.customCron}
             aria-invalid={Boolean(validationError)}
             placeholder="0 9 * * 1-5"
             onChange={(event) => onChange({ ...draft, customCron: event.target.value })}
           />
-          <small>Minute, hour, day of month, month, day of week.</small>
+          <small>{t("automation.trigger.cronHint")}</small>
         </label>
       )}
       {scheduled && (
         <label className="desktop-cloud-automation-field">
-          <span>Timezone</span>
+          <span>{t("automation.trigger.timezone")}</span>
           <select value={draft.timezone} onChange={(event) => onChange({ ...draft, timezone: event.target.value })}>
             {timezones.map((timezone) => <option value={timezone} key={timezone}>{timezone}</option>)}
           </select>
         </label>
       )}
       <div className="desktop-cloud-automation-trigger-summary">
-        <span>{formatAutomationTriggerSummary(draft)}</span>
-        {nextRun && <small>Next run: {nextRun}</small>}
+        <span>{formatAutomationTriggerSummary(draft, t)}</span>
+        {nextRun && <small>{t("automation.trigger.nextRun", { date: bidiIsolate(nextRun) })}</small>}
       </div>
-      {validationError && <div className="desktop-cloud-automation-inline-error" role="alert">{validationError}</div>}
+      {validationMessage && <div className="desktop-cloud-automation-inline-error" role="alert">{validationMessage}</div>}
     </section>
   );
 }
@@ -400,20 +435,24 @@ export function CloudAutomationDestinationEditor({
   onCloudSessionChange: SessionChangeHandler;
   onChange: (path: string) => void;
 }) {
+  const { t } = useLocalization();
   const [pickerOpen, setPickerOpen] = useState(false);
   const normalizedPath = normalizeAutomationTargetPath(targetPath);
   const pathError = getAutomationTargetPathValidationError(targetPath);
+  const pathErrorMessage = formatAutomationValidationError(pathError, t);
   return (
     <section className="desktop-cloud-automation-destination-editor">
       <label className="desktop-cloud-automation-field">
-        <span>Project folder</span>
+        <span>{t("automation.destination.projectFolder")}</span>
         <input
           value={targetPath}
           aria-invalid={Boolean(pathError)}
-          placeholder="New or existing folder"
+          placeholder={t("automation.destination.folderPlaceholder")}
           onChange={(event) => onChange(event.target.value)}
         />
-        <small className={pathError ? "error" : undefined}>{pathError ? pathError : `Final path: /${normalizedPath}`}</small>
+        <small className={pathError ? "error" : undefined} dir="auto">
+          {pathErrorMessage ?? t("automation.destination.finalPath", { path: bidiIsolate(`/${normalizedPath}`) })}
+        </small>
       </label>
       <button
         className="desktop-cloud-automation-folder-toggle"
@@ -422,8 +461,8 @@ export function CloudAutomationDestinationEditor({
         onClick={() => setPickerOpen((current) => !current)}
       >
         <Folder size={14} />
-        {pickerOpen ? "Hide project folders" : "Choose from project folders"}
-        {pickerOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        {pickerOpen ? t("automation.destination.hideFolders") : t("automation.destination.chooseFolders")}
+        {pickerOpen ? <ChevronDown size={13} /> : <ChevronRight className="po-directional-icon" size={13} />}
       </button>
       {pickerOpen && (
         <CloudAutomationFolderBranch
@@ -460,6 +499,8 @@ function CloudAutomationFolderBranch({
   onCloudSessionChange: SessionChangeHandler;
   onSelect: (path: string) => void;
 }) {
+  const { getCollator, t } = useLocalization();
+  const nameCollator = useMemo(() => getCollator({ sensitivity: "base" }), [getCollator]);
   const [folders, setFolders] = useState<Array<{ name: string; path: string }>>([]);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
@@ -476,7 +517,7 @@ function CloudAutomationFolderBranch({
           tree.entries
             .filter((entry) => entry.type === "folder")
             .map((entry) => ({ name: entry.name, path: normalizeAutomationTargetPath(entry.path) }))
-            .sort((left, right) => left.name.localeCompare(right.name)),
+            .sort((left, right) => nameCollator.compare(left.name, right.name)),
         );
       })
       .catch(() => {
@@ -488,11 +529,11 @@ function CloudAutomationFolderBranch({
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, cloudSession, onCloudSessionChange, path, projectId]);
+  }, [apiBaseUrl, cloudSession, nameCollator, onCloudSessionChange, path, projectId]);
 
-  if (loading) return <div className="desktop-cloud-automation-folder-state" role="status">Loading folders…</div>;
-  if (error) return <div className="desktop-cloud-automation-folder-state error">Folders could not be loaded. You can still type a path.</div>;
-  if (folders.length === 0) return <div className="desktop-cloud-automation-folder-state">No subfolders here.</div>;
+  if (loading) return <div className="desktop-cloud-automation-folder-state" role="status">{t("automation.destination.loadingFolders")}</div>;
+  if (error) return <div className="desktop-cloud-automation-folder-state error">{t("automation.destination.folderLoadFailed")}</div>;
+  if (folders.length === 0) return <div className="desktop-cloud-automation-folder-state">{t("automation.destination.noSubfolders")}</div>;
 
   return (
     <div className="desktop-cloud-automation-folder-tree" style={{ "--automation-folder-depth": depth } as CSSProperties}>
@@ -504,8 +545,12 @@ function CloudAutomationFolderBranch({
             <div className={`desktop-cloud-automation-folder-row ${selected ? "selected" : ""}`}>
               <button
                 type="button"
-                title={`${isExpanded ? "Collapse" : "Expand"} ${folder.name}`}
-                aria-label={`${isExpanded ? "Collapse" : "Expand"} ${folder.name}`}
+                title={t(isExpanded ? "automation.destination.collapseFolder" : "automation.destination.expandFolder", {
+                  name: bidiIsolate(folder.name),
+                })}
+                aria-label={t(isExpanded ? "automation.destination.collapseFolder" : "automation.destination.expandFolder", {
+                  name: bidiIsolate(folder.name),
+                })}
                 aria-expanded={isExpanded}
                 onClick={() => setExpanded((current) => {
                   const next = new Set(current);
@@ -514,11 +559,11 @@ function CloudAutomationFolderBranch({
                   return next;
                 })}
               >
-                {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                {isExpanded ? <ChevronDown size={13} /> : <ChevronRight className="po-directional-icon" size={13} />}
               </button>
               <button type="button" aria-pressed={selected} onClick={() => onSelect(folder.path)}>
                 <Folder size={14} />
-                <span>{folder.name}</span>
+                <span dir="auto">{folder.name}</span>
               </button>
             </div>
             {isExpanded && (
@@ -567,15 +612,6 @@ function CloudAutomationConfigInput({
   );
 }
 
-function formatTriggerPreset(preset: AutomationTriggerPreset) {
-  if (preset === "hourly") return "Hourly";
-  if (preset === "daily") return "Daily";
-  if (preset === "weekly") return "Weekly";
-  if (preset === "custom") return "Custom cron";
-  if (preset === "realtime") return "Realtime";
-  return "Manual";
-}
-
 function isResourceFallbackError(error: unknown) {
   const status = error && typeof error === "object" && "status" in error
     ? Number((error as { status?: unknown }).status)
@@ -593,12 +629,4 @@ function mergeResources(
   return [...resources.values()];
 }
 
-const WEEKDAY_OPTIONS = [
-  { value: "1", label: "Monday" },
-  { value: "2", label: "Tuesday" },
-  { value: "3", label: "Wednesday" },
-  { value: "4", label: "Thursday" },
-  { value: "5", label: "Friday" },
-  { value: "6", label: "Saturday" },
-  { value: "0", label: "Sunday" },
-];
+const WEEKDAY_VALUES = ["1", "2", "3", "4", "5", "6", "0"] as const;

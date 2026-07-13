@@ -21,6 +21,7 @@
   --desktop-titlebar-hover: var(--po-hover);
   --desktop-titlebar-active: var(--po-selected);
   --desktop-titlebar-focus: var(--po-focus-ring);
+  --desktop-titlebar-control-height: var(--desktop-chrome-control-size);
 
   position: absolute;
   z-index: 90;

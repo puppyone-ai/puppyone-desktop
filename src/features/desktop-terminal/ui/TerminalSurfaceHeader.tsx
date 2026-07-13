@@ -1,4 +1,5 @@
 import { Eraser, RotateCcw } from "lucide-react";
+import { useLocalization } from "@puppyone/localization/react";
 
 type TerminalSurfaceHeaderProps = {
   onClear: () => void;
@@ -6,15 +7,16 @@ type TerminalSurfaceHeaderProps = {
 };
 
 export function TerminalSurfaceHeader({ onClear, onReset }: TerminalSurfaceHeaderProps) {
+  const { t } = useLocalization();
   return (
     <header className="desktop-terminal-surface-header">
-      <strong className="desktop-terminal-surface-title">Terminal</strong>
+      <strong className="desktop-terminal-surface-title">{t("terminal.title")}</strong>
       <div className="desktop-terminal-surface-actions">
         <button
           type="button"
           className="desktop-terminal-icon-button"
-          title="Clear Terminal"
-          aria-label="Clear Terminal"
+          title={t("terminal.clear")}
+          aria-label={t("terminal.clear")}
           onClick={onClear}
         >
           <Eraser size={14} />
@@ -22,8 +24,8 @@ export function TerminalSurfaceHeader({ onClear, onReset }: TerminalSurfaceHeade
         <button
           type="button"
           className="desktop-terminal-icon-button"
-          title="Reset Terminal"
-          aria-label="Reset Terminal"
+          title={t("terminal.reset")}
+          aria-label={t("terminal.reset")}
           onClick={onReset}
         >
           <RotateCcw size={14} />

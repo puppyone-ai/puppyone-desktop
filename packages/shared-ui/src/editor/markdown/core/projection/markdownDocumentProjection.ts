@@ -10,9 +10,7 @@ import {
 import {
   Decoration,
   EditorView,
-  ViewPlugin,
   type DecorationSet,
-  type ViewUpdate,
 } from "@codemirror/view";
 import {
   markdownAssetUrlResolverFacet,
@@ -35,9 +33,8 @@ import { getLivePreviewFocusState } from "../state/livePreviewFocus";
 import { getInlineRevealElement } from "../syntax/markdownElements";
 import { getMarkdownPlansInRange } from "../plans/markdownPlanIndex";
 import { getDocRevision } from "../../platform/brokers/transactionBroker";
-import { getRendererPerformanceTracker } from "../../../../performance/rendererPerformance";
 
-type ProjectionRangeReason = "viewport" | "benchmark";
+type ProjectionRangeReason = "benchmark";
 
 export type MarkdownProjectionRangeRequest = {
   from: number;
@@ -54,26 +51,29 @@ type MarkdownDocumentProjection = {
   composingLineKey: string;
   revealRange: InlineRevealRange | null;
   expandedImageRange: InlineRevealRange | null;
-  viewportRange: InlineRevealRange | null;
+  blockRanges: readonly InlineRevealRange[];
 };
 
-const VIEWPORT_OVERSCAN_LINES = 16;
-const INITIAL_PROJECTION_LINES = 48;
-const rendererPerformance = getRendererPerformanceTracker();
 const markdownProjectionRangeEffect = StateEffect.define<MarkdownProjectionRangeRequest>();
 const projectionDiagnostics = {
   mappedTransactions: 0,
   changedRangePatches: 0,
   focusRevealPatches: 0,
-  viewportPatches: 0,
+  explicitRangePatches: 0,
   globalInvalidations: 0,
 };
 
 /**
- * View-scoped, disposable projection of canonical Markdown source. Existing
- * decorations are mapped through ChangeSet; only changed blocks, old/new
- * reveal ranges and explicitly scheduled viewport/deferred partitions are
- * rebuilt. No ordinary input transaction walks the complete document.
+ * Document-scoped projection of canonical Markdown source.
+ *
+ * This field directly owns every decoration that can change line wrapping or
+ * vertical geometry. CodeMirror must know those ranges before it computes a
+ * viewport; adding/removing them in response to scrolling creates a feedback
+ * loop between the height map, scroll anchoring, and viewport calculation.
+ *
+ * The complete projection is built once. Existing ranges are then mapped
+ * through ChangeSet and only changed blocks plus old/new reveal ranges are
+ * rebuilt, so ordinary input transactions remain incremental.
  */
 export const markdownLivePreviewDecorations = StateField.define<MarkdownDocumentProjection>({
   create(state) {
@@ -89,20 +89,27 @@ export const markdownLivePreviewDecorations = StateField.define<MarkdownDocument
 
     let decorations = previous.decorations.map(transaction.changes);
     let atomicRanges = previous.atomicRanges.map(transaction.changes);
-    let viewportRange = mapOptionalRange(previous.viewportRange, transaction.changes);
+    let blockRanges = transaction.docChanged
+      ? previous.blockRanges.map((range) => mapRange(range, transaction.changes))
+      : previous.blockRanges;
     const patchRanges: InlineRevealRange[] = [];
 
     if (contextInvalidation === "global") {
       decorations = Decoration.none;
       atomicRanges = Decoration.none;
       projectionDiagnostics.globalInvalidations += 1;
-      if (viewportRange) patchRanges.push(viewportRange);
+      patchRanges.push(getDocumentProjectionRange(transaction.state));
     } else {
-      if (contextInvalidation === "viewport" && viewportRange) patchRanges.push(viewportRange);
       if (transaction.docChanged) {
-        patchRanges.push(...getChangedProjectionRanges(transaction));
+        const changedRanges = getChangedProjectionRanges(transaction);
+        patchRanges.push(...changedRanges);
+        for (const blockRange of blockRanges) {
+          if (changedRanges.some((range) => rangesOverlapOrTouch(blockRange, range))) {
+            patchRanges.push(blockRange);
+          }
+        }
         projectionDiagnostics.mappedTransactions += 1;
-        projectionDiagnostics.changedRangePatches += patchRanges.length;
+        projectionDiagnostics.changedRangePatches += changedRanges.length;
       }
 
       const previousRevealRange = mapOptionalRange(previous.revealRange, transaction.changes);
@@ -129,9 +136,11 @@ export const markdownLivePreviewDecorations = StateField.define<MarkdownDocument
       if (
         syntaxTree(transaction.startState) !== syntaxTree(transaction.state)
         && !transaction.docChanged
-        && viewportRange
       ) {
-        patchRanges.push(viewportRange);
+        // Background parsing may finish after initial paint. Reconcile the
+        // complete direct set so newly parsed offscreen structures already
+        // exist in the height map before the user scrolls to them.
+        patchRanges.push(getDocumentProjectionRange(transaction.state));
       }
     }
 
@@ -140,10 +149,7 @@ export const markdownLivePreviewDecorations = StateField.define<MarkdownDocument
       if (effect.value.revision !== getDocRevision(transaction.state.doc)) continue;
       const range = normalizeProjectionRange(transaction.state, effect.value.from, effect.value.to);
       patchRanges.push(range);
-      if (effect.value.reason === "viewport") {
-        viewportRange = range;
-        projectionDiagnostics.viewportPatches += 1;
-      }
+      projectionDiagnostics.explicitRangePatches += 1;
     }
 
     const mergedRanges = mergeProjectionRanges(
@@ -154,6 +160,9 @@ export const markdownLivePreviewDecorations = StateField.define<MarkdownDocument
       decorations = replaceDecorationRange(decorations, range, builders.decorations);
       atomicRanges = replaceDecorationRange(atomicRanges, range, builders.atomicRanges);
     }
+    if (mergedRanges.length > 0) {
+      blockRanges = replaceBlockRanges(transaction.state, blockRanges, mergedRanges);
+    }
 
     return {
       decorations,
@@ -163,7 +172,7 @@ export const markdownLivePreviewDecorations = StateField.define<MarkdownDocument
       composingLineKey: composingLine ? `${composingLine.from}:${composingLine.to}` : "",
       revealRange,
       expandedImageRange,
-      viewportRange,
+      blockRanges,
     };
   },
   provide(field) {
@@ -172,71 +181,6 @@ export const markdownLivePreviewDecorations = StateField.define<MarkdownDocument
       EditorView.atomicRanges.of((view) => view.state.field(field).atomicRanges),
     ];
   },
-});
-
-/**
- * Schedules only visible work. Non-visible CodeMirror content has no DOM and
- * therefore needs no decoration projection; scrolling invalidates the old
- * request and builds the newly visible partition under the current revision.
- */
-export const markdownProjectionSchedulerExtension = ViewPlugin.fromClass(class {
-  private readonly view: EditorView;
-  private animationFrame: number | null = null;
-  private generation = 0;
-  private destroyed = false;
-
-  constructor(view: EditorView) {
-    this.view = view;
-    this.scheduleViewportProjection();
-  }
-
-  update(update: ViewUpdate) {
-    if (
-      update.viewportChanged
-      || update.docChanged
-      || update.transactions.some((transaction) => (
-        getDecorationContextInvalidation(transaction) !== "none"
-      ))
-    ) {
-      this.scheduleViewportProjection();
-    }
-  }
-
-  destroy() {
-    this.destroyed = true;
-    this.generation += 1;
-    if (this.animationFrame !== null) window.cancelAnimationFrame(this.animationFrame);
-    this.animationFrame = null;
-  }
-
-  private scheduleViewportProjection() {
-    if (this.animationFrame !== null || this.destroyed) return;
-    const generation = ++this.generation;
-    this.animationFrame = window.requestAnimationFrame(() => {
-      this.animationFrame = null;
-      if (this.destroyed || generation !== this.generation) return;
-      const ranges = this.view.visibleRanges;
-      if (ranges.length === 0) return;
-      const from = ranges[0]?.from ?? 0;
-      const to = ranges[ranges.length - 1]?.to ?? from;
-      const overscanned = addLineOverscan(this.view.state, from, to, VIEWPORT_OVERSCAN_LINES);
-      this.dispatchRange(overscanned, "viewport");
-    });
-  }
-
-  private dispatchRange(range: InlineRevealRange, reason: ProjectionRangeReason) {
-    if (this.destroyed) return;
-    const revision = getDocRevision(this.view.state.doc);
-    const startedAt = performance.now();
-    this.view.dispatch({
-      effects: markdownProjectionRangeEffect.of({ ...range, revision, reason }),
-    });
-    rendererPerformance.recordOperation(
-      `markdown_projection_${reason}`,
-      performance.now() - startedAt,
-    );
-  }
-
 });
 
 export function requestMarkdownProjectionRange(
@@ -257,7 +201,7 @@ export function resetMarkdownProjectionDiagnostics() {
   projectionDiagnostics.mappedTransactions = 0;
   projectionDiagnostics.changedRangePatches = 0;
   projectionDiagnostics.focusRevealPatches = 0;
-  projectionDiagnostics.viewportPatches = 0;
+  projectionDiagnostics.explicitRangePatches = 0;
   projectionDiagnostics.globalInvalidations = 0;
 }
 
@@ -266,8 +210,7 @@ export function getMarkdownProjectionDiagnostics() {
 }
 
 function createInitialProjection(state: EditorState): MarkdownDocumentProjection {
-  const lastLine = state.doc.line(Math.min(state.doc.lines, INITIAL_PROJECTION_LINES));
-  const initialRange = expandToStableProjectionRange(state, 0, lastLine.to);
+  const initialRange = getDocumentProjectionRange(state);
   const expandedImageRange = state.field(markdownExpandedImageField, false) ?? null;
   const composingLine = state.field(markdownComposingBlockLineField, false) ?? null;
   const builders = buildProjectionRange(state, initialRange, null, expandedImageRange, composingLine);
@@ -283,8 +226,12 @@ function createInitialProjection(state: EditorState): MarkdownDocumentProjection
     composingLineKey: getComposingBlockLineKey(state),
     revealRange: null,
     expandedImageRange,
-    viewportRange: initialRange,
+    blockRanges: getBlockAtomRanges(state, initialRange),
   };
+}
+
+function getDocumentProjectionRange(state: EditorState): InlineRevealRange {
+  return { from: 0, to: state.doc.length };
 }
 
 function buildProjectionRange(
@@ -392,6 +339,53 @@ function mapOptionalRange(
   };
 }
 
+function mapRange(range: InlineRevealRange, changes: ChangeDesc): InlineRevealRange {
+  return {
+    from: changes.mapPos(range.from, -1),
+    to: changes.mapPos(range.to, 1),
+  };
+}
+
+function replaceBlockRanges(
+  state: EditorState,
+  current: readonly InlineRevealRange[],
+  replacedRanges: readonly InlineRevealRange[],
+): readonly InlineRevealRange[] {
+  const next = current.filter((blockRange) => (
+    !replacedRanges.some((range) => rangesOverlapOrTouch(blockRange, range))
+  ));
+  for (const range of replacedRanges) next.push(...getBlockAtomRanges(state, range));
+  return dedupeProjectionRanges(next);
+}
+
+function getBlockAtomRanges(
+  state: EditorState,
+  range: InlineRevealRange,
+): InlineRevealRange[] {
+  const ranges: InlineRevealRange[] = [];
+  for (const { plan } of getMarkdownPlansInRange(state, range.from, range.to)) {
+    if (plan.presentation !== "blockAtom") continue;
+    ranges.push({ from: plan.sourceRange.from, to: plan.sourceRange.to });
+  }
+  return ranges;
+}
+
+function rangesOverlapOrTouch(left: InlineRevealRange, right: InlineRevealRange): boolean {
+  return left.from <= right.to && right.from <= left.to;
+}
+
+function dedupeProjectionRanges(ranges: readonly InlineRevealRange[]): InlineRevealRange[] {
+  const seen = new Set<string>();
+  return ranges
+    .filter((range) => {
+      const key = `${range.from}:${range.to}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => left.from - right.from || left.to - right.to);
+}
+
 function addRangeIfChanged(
   ranges: InlineRevealRange[],
   previous: InlineRevealRange | null,
@@ -451,7 +445,7 @@ function getLivePreviewInlineRevealRange(
 
 function getDecorationContextInvalidation(
   transaction: Transaction,
-): "none" | "viewport" | "global" {
+): "none" | "global" {
   if (!transaction.reconfigured) return "none";
   if (
     transaction.startState.facet(markdownHtmlTrustModeFacet) !== transaction.state.facet(markdownHtmlTrustModeFacet)
@@ -460,8 +454,6 @@ function getDecorationContextInvalidation(
   ) {
     return "global";
   }
-  if (transaction.startState.facet(markdownLinkGraphFacet) !== transaction.state.facet(markdownLinkGraphFacet)) {
-    return "viewport";
-  }
+  if (transaction.startState.facet(markdownLinkGraphFacet) !== transaction.state.facet(markdownLinkGraphFacet)) return "global";
   return "none";
 }

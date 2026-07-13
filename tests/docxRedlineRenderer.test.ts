@@ -14,6 +14,7 @@ vi.mock("../src/features/source-control/diff/contributions/docx-redline/provider
 
 import { docxRedlineContribution } from "../src/features/source-control/diff/contributions/docx-redline/contribution";
 import { loadDocxRedline } from "../src/features/source-control/diff/contributions/docx-redline/provider";
+import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -78,10 +79,10 @@ function renderDiff() {
   document.body.appendChild(container);
   root = createRoot(container);
   const Renderer = docxRedlineContribution.render;
-  act(() => root?.render(React.createElement(Renderer, {
+  act(() => root?.render(withTestLocalization(React.createElement(Renderer, {
     file: fileDiff(),
     format: resolveFileFormat({ name: "report.docx" }),
-  })));
+  }))));
   return container;
 }
 
@@ -94,7 +95,7 @@ async function flushEffects() {
 function presentation(overrides: Partial<DocxRedlinePresentation>): DocxRedlinePresentation {
   return {
     kind: "docx-redline",
-    rendererVersion: "2",
+    rendererVersion: "3",
     state: "ready",
     stats: {
       blocksAdded: 0,
@@ -106,7 +107,7 @@ function presentation(overrides: Partial<DocxRedlinePresentation>): DocxRedlineP
     },
     changes: [],
     truncated: false,
-    fidelityNote: "Layout fidelity is not compared.",
+    fidelity: "body-text-v1",
     ...overrides,
   };
 }

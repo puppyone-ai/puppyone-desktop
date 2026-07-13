@@ -28,6 +28,7 @@ const CLOUD_REF_MARKER_COLORS = {
 export type RefOnlyGroup = {
   commitId: string;
   message: string;
+  messageCode?: CloudBranchGraphRow["messageCode"];
   createdAt: string | null;
   labels: CloudBranchGraphLabel[];
 };
@@ -39,7 +40,7 @@ export function buildRefOnlyGraphRows(groups: RefOnlyGroup[]): CloudBranchGraphR
       const leftTime = left.createdAt ? Date.parse(left.createdAt) || 0 : 0;
       const rightTime = right.createdAt ? Date.parse(right.createdAt) || 0 : 0;
       if (leftTime !== rightTime) return rightTime - leftTime;
-      return left.labels[0]?.name.localeCompare(right.labels[0]?.name ?? "") ?? 0;
+      return compareStableText(left.labels[0]?.name ?? "", right.labels[0]?.name ?? "");
     })
     .map((group) => {
       const labels = sortCloudBranchLabels(group.labels);
@@ -49,9 +50,11 @@ export function buildRefOnlyGraphRows(groups: RefOnlyGroup[]): CloudBranchGraphR
         id: `ref:${group.commitId}:${labels.map((label) => label.name).join("|")}`,
         kind: "ref" as const,
         message: group.message,
+        messageCode: group.messageCode,
         createdAt: group.createdAt,
         stats: null,
         authorName: shortGraphCommitId(group.commitId),
+        authorCode: isGraphCommitId(group.commitId) ? undefined : "ref-only",
         labels,
         prefix: "▣",
         laneCount,
@@ -108,7 +111,7 @@ export function sortCloudBranchLabels(
     if (kindRank[left.kind] !== kindRank[right.kind]) {
       return kindRank[left.kind] - kindRank[right.kind];
     }
-    return left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
+    return compareStableText(left.name, right.name);
   });
 }
 
@@ -145,5 +148,17 @@ export function buildCloudCommitStats(
 }
 
 function shortGraphCommitId(commitId: string): string {
-  return /^[0-9a-f]{7,40}$/i.test(commitId) ? commitId.slice(0, 8) : "ref only";
+  return isGraphCommitId(commitId) ? commitId.slice(0, 8) : "";
+}
+
+function isGraphCommitId(commitId: string): boolean {
+  return /^[0-9a-f]{7,40}$/i.test(commitId);
+}
+
+function compareStableText(left: string, right: string): number {
+  const normalizedLeft = left.normalize("NFKC").toLocaleLowerCase("en-US");
+  const normalizedRight = right.normalize("NFKC").toLocaleLowerCase("en-US");
+  if (normalizedLeft < normalizedRight) return -1;
+  if (normalizedLeft > normalizedRight) return 1;
+  return left < right ? -1 : left > right ? 1 : 0;
 }

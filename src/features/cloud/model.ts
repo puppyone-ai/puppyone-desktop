@@ -5,7 +5,7 @@ import type {
   DesktopCloudScope,
 } from "../../lib/cloudApi";
 import {
-  getScopeDisplayName,
+  getScopeIdentifierName,
   isConnectorActiveStatus,
   shellQuote,
 } from "./utils";
@@ -20,12 +20,18 @@ export type CloudLoginFeature = {
 export type CloudAccessSurface = {
   id: string;
   provider: string;
+  /** Provider-owned/user-authored name only. First-party names are resolved from provider codes. */
   title: string;
+  /** Provider-owned/path detail only. First-party subtitles are resolved at the presentation boundary. */
   subtitle: string;
   status: string;
-  statusLabel: string;
+  /** Provider-owned prompt only. Built-in instructions are resolved from stable provider/id metadata. */
   prompt?: string;
-  commands?: Array<{ label: string; value: string; disabled?: boolean }>;
+  commands?: Array<{
+    id: "login" | "explore" | "existing-folder" | "clone" | "server-url";
+    value: string;
+    disabled?: boolean;
+  }>;
   endpoint?: DesktopCloudMcpEndpoint;
   connector?: DesktopCloudConnector;
 };
@@ -53,35 +59,31 @@ export function buildCloudAccessSurfaces({
     || connector.provider === "git"
     || connector.provider === "git_remote"
   ));
-  const scopeName = getScopeDisplayName(scope);
+  const scopeName = getScopeIdentifierName(scope);
 
   return [
     {
       id: `builtin:cli:${scope.id}`,
       provider: "cli",
-      title: "Puppyone CLI",
-      subtitle: "Direct terminal access",
+      title: "",
+      subtitle: "",
       status: cliConnector?.status ?? (scope.access_key ? "active" : "missing"),
-      statusLabel: cliConnector?.status ?? (scope.access_key ? "Active" : "Needs key"),
-      prompt: `Use Puppyone CLI to read and write ${scopeName} from any terminal.`,
       connector: cliConnector,
       commands: [
-        { label: "Login", value: cliCommand || "Open Cloud Access and regenerate an access key.", disabled: !cliCommand },
-        { label: "Explore", value: `puppyone fs tree / --profile ${shellQuote(profileName)}\npuppyone fs ls / --profile ${shellQuote(profileName)}`, disabled: !cliCommand },
+        { id: "login", value: cliCommand, disabled: !cliCommand },
+        { id: "explore", value: `puppyone fs tree / --profile ${shellQuote(profileName)}\npuppyone fs ls / --profile ${shellQuote(profileName)}`, disabled: !cliCommand },
       ],
     },
     {
       id: `builtin:git:${scope.id}`,
       provider: "filesystem",
-      title: "Git Remote",
-      subtitle: "Native Git clone / push",
+      title: "",
+      subtitle: "",
       status: gitConnector?.status ?? (gitUrl ? "active" : "missing"),
-      statusLabel: gitConnector?.status ?? (gitUrl ? "Active" : "Needs key"),
-      prompt: "This workspace is Git-native. Puppyone Cloud stays the source of truth.",
       connector: gitConnector,
       commands: [
-        { label: "Existing folder", value: `git remote add puppyone ${gitUrl || "<git-url>"}\ngit fetch puppyone`, disabled: !gitUrl },
-        { label: "Clone", value: `git clone ${gitUrl || "<git-url>"} ${shellQuote(scopeName)}`, disabled: !gitUrl },
+        { id: "existing-folder", value: `git remote add puppyone ${gitUrl || "<git-url>"}\ngit fetch puppyone`, disabled: !gitUrl },
+        { id: "clone", value: `git clone ${gitUrl || "<git-url>"} ${shellQuote(scopeName)}`, disabled: !gitUrl },
       ],
     },
     ...mcpEndpoints.map((endpoint): CloudAccessSurface => {
@@ -94,21 +96,20 @@ export function buildCloudAccessSurfaces({
       return {
         id: `mcp:${endpoint.id}`,
         provider: "mcp",
-        title: endpoint.name || "MCP endpoint",
+        title: endpoint.name || "",
         subtitle: accessLabel,
         status: endpoint.status || "active",
-        statusLabel: endpoint.status || "active",
         endpoint,
-        commands: serverUrl ? [{ label: "Server URL", value: serverUrl }] : [],
+        commands: serverUrl ? [{ id: "server-url", value: serverUrl }] : [],
       };
     }),
   ];
 }
 
 export function getCloudAccessAggregate(surfaces: CloudAccessSurface[]) {
-  if (surfaces.some((surface) => surface.status === "error")) return { label: "Error", tone: "warning" };
-  if (surfaces.some((surface) => surface.status === "syncing")) return { label: "Syncing", tone: "ready" };
-  if (surfaces.every((surface) => isConnectorActiveStatus(surface.status))) return { label: "Active", tone: "ready" };
-  if (surfaces.some((surface) => isConnectorActiveStatus(surface.status))) return { label: "Mixed", tone: "warning" };
-  return { label: "Paused", tone: "" };
+  if (surfaces.some((surface) => surface.status === "error")) return { code: "error", tone: "warning" } as const;
+  if (surfaces.some((surface) => surface.status === "syncing")) return { code: "syncing", tone: "ready" } as const;
+  if (surfaces.every((surface) => isConnectorActiveStatus(surface.status))) return { code: "active", tone: "ready" } as const;
+  if (surfaces.some((surface) => isConnectorActiveStatus(surface.status))) return { code: "mixed", tone: "warning" } as const;
+  return { code: "paused", tone: "" } as const;
 }

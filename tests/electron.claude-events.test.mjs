@@ -32,9 +32,41 @@ describe("Claude Code event normalization", () => {
     ]);
     expect(events.find((event) => event.type === "tool.started")?.payload).toMatchObject({
       kind: "command",
+      tool: "bash",
       label: "Run tests",
       command: "npm test",
+      input: { command: "npm test", description: "Run tests" },
     });
+    expect(events.find((event) => event.type === "turn.completed")?.payload.durationMs).toBe(100);
+  });
+
+  it("preserves native Read, Write, Edit, Grep and Glob identity across tool results", () => {
+    const state = createClaudeEventState({ turnId: "claude:turn-tools" });
+    const tools = [
+      { id: "read-1", name: "Read", input: { file_path: "src/read.ts" } },
+      { id: "write-1", name: "Write", input: { file_path: "src/write.ts", content: "hello" } },
+      { id: "edit-1", name: "Edit", input: { file_path: "src/edit.ts", old_string: "old", new_string: "new" } },
+      { id: "grep-1", name: "Grep", input: { pattern: "needle", path: "src" } },
+      { id: "glob-1", name: "Glob", input: { pattern: "**/*.ts", path: "src" } },
+    ];
+    const started = normalizeClaudeMessage({
+      type: "assistant",
+      uuid: "assistant-tools",
+      session_id: "session-1",
+      message: { content: tools.map((tool) => ({ type: "tool_use", ...tool })) },
+    }, state);
+    const completed = normalizeClaudeMessage({
+      type: "user",
+      uuid: "tool-results",
+      session_id: "session-1",
+      message: { content: tools.map((tool) => ({ type: "tool_result", tool_use_id: tool.id, content: `${tool.name} result` })) },
+    }, state);
+
+    expect(started.map((entry) => entry.payload.tool)).toEqual(["read", "write", "edit", "grep", "glob"]);
+    expect(started.map((entry) => entry.payload.kind)).toEqual(["read", "file-change", "file-change", "search", "search"]);
+    expect(started[2].payload).toMatchObject({ path: "src/edit.ts", input: { old_string: "old", new_string: "new" } });
+    expect(completed.map((entry) => entry.payload.tool)).toEqual(["read", "write", "edit", "grep", "glob"]);
+    expect(completed[3].payload).toMatchObject({ kind: "search", input: { pattern: "needle", path: "src" } });
   });
 
   it("reconstructs bounded historical turns from native session messages", () => {

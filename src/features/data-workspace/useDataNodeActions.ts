@@ -19,6 +19,7 @@ import {
   normalizeDesktopExtension,
   normalizeDesktopRenameName,
   rectToCreateEntryAnchor,
+  toDesktopNodeActionError,
   uniqueCreateEntryName,
   type DesktopCreateEntryAnchorInput,
   type DesktopCreateEntryDraft,
@@ -32,6 +33,8 @@ import {
 } from "./explorer";
 import { collapseNestedNodes } from "./fileClipboard";
 import { useFileClipboard } from "./useFileClipboard";
+import { useLocalization } from "@puppyone/localization/react";
+import { bidiIsolate } from "@puppyone/localization/core";
 
 export function useDataNodeActions({
   dataPort,
@@ -54,6 +57,7 @@ export function useDataNodeActions({
   workspace: Workspace | null;
   workspaceIsCloud: boolean;
 }) {
+  const { t } = useLocalization();
   const [createEntryDraft, setCreateEntryDraft] = useState<DesktopCreateEntryDraft | null>(null);
   const [nodeActionMenu, setNodeActionMenu] = useState<DesktopNodeActionMenuDraft | null>(null);
   const fileClipboardController = useFileClipboard({
@@ -109,10 +113,10 @@ export function useDataNodeActions({
     setCreateEntryDraft((current) => current ? {
       ...current,
       selectedKind: kind,
-      name: defaultCreateName(kind),
+      name: defaultCreateName(kind, t),
       error: null,
     } : current);
-  }, []);
+  }, [t]);
 
   const createEntryFromMenu = useCallback(async () => {
     if (
@@ -132,7 +136,7 @@ export function useDataNodeActions({
     } catch (error) {
       setCreateEntryDraft((current) => current ? {
         ...current,
-        error: error instanceof Error ? error.message : String(error),
+        error: toDesktopNodeActionError(error),
       } : current);
       return;
     }
@@ -145,7 +149,20 @@ export function useDataNodeActions({
       if (kind === "folder") {
         await dataPort.createFolder(nextPath);
       } else {
-        await dataPort.createFile(nextPath, getCreateEntryInitialContent(kind));
+        await dataPort.createFile(nextPath, getCreateEntryInitialContent(kind, {
+          csvHeaders: [
+            t("workspace.node.csvColumn", { number: 1 }),
+            t("workspace.node.csvColumn", { number: 2 }),
+          ],
+          puppyFlow: {
+            title: t("editor.puppyflow.untitledFlow"),
+            prompts: [
+              t("editor.puppyflow.defaultPrompt.analyze"),
+              t("editor.puppyflow.defaultPrompt.apply"),
+            ],
+          },
+          untitledAppName: t("workspace.node.untitledApp"),
+        }));
       }
       setCreateEntryDraft(null);
       setNodeActionMenu(null);
@@ -158,7 +175,7 @@ export function useDataNodeActions({
       setCreateEntryDraft((current) => current ? {
         ...current,
         creatingKind: null,
-        error: error instanceof Error ? error.message : String(error),
+        error: toDesktopNodeActionError(error),
       } : current);
     }
   }, [
@@ -171,6 +188,7 @@ export function useDataNodeActions({
     setActiveDataPath,
     workspace,
     workspaceIsCloud,
+    t,
   ]);
 
   const renameNodeFromMenu = useCallback(async () => {
@@ -182,7 +200,7 @@ export function useDataNodeActions({
     } catch (error) {
       setNodeActionMenu((current) => current ? {
         ...current,
-        error: error instanceof Error ? error.message : String(error),
+        error: toDesktopNodeActionError(error),
       } : current);
       return;
     }
@@ -197,7 +215,10 @@ export function useDataNodeActions({
       const nextExtension = getDesktopNodeExtension(nextName);
       if (normalizeDesktopExtension(previousExtension) !== normalizeDesktopExtension(nextExtension)) {
         const confirmed = window.confirm(
-          `Change file type from ${formatDesktopExtensionLabel(previousExtension)} to ${formatDesktopExtensionLabel(nextExtension)}? File content will stay unchanged.`,
+          t("workspace.node.confirmTypeChange", {
+            previous: formatDesktopExtensionLabel(previousExtension, t),
+            next: formatDesktopExtensionLabel(nextExtension, t),
+          }),
         );
         if (!confirmed) return;
       }
@@ -224,7 +245,7 @@ export function useDataNodeActions({
       setNodeActionMenu((current) => current ? {
         ...current,
         operation: null,
-        error: error instanceof Error ? error.message : String(error),
+        error: toDesktopNodeActionError(error),
       } : current);
     }
   }, [
@@ -234,6 +255,7 @@ export function useDataNodeActions({
     onWorkspaceContentChanged,
     setActiveDataNode,
     setActiveDataPath,
+    t,
     workspaceIsCloud,
   ]);
 
@@ -243,19 +265,22 @@ export function useDataNodeActions({
     const nodes = collapseNestedNodes(nodeActionMenu.nodes);
     if (nodes.length === 0) return;
     const confirmed = window.confirm(nodes.length === 1
-      ? `Delete "${nodes[0].name}"? This cannot be undone.`
-      : `Delete ${nodes.length} items? This cannot be undone.`);
+      ? t("workspace.node.confirmDeleteOne", { name: bidiIsolate(nodes[0].name) })
+      : t("workspace.node.confirmDeleteMany", { count: nodes.length }));
     if (!confirmed) return;
 
     setNodeActionMenu((current) => current ? { ...current, operation: "delete", error: null } : current);
     const deletedNodes: DataNode[] = [];
-    const failures: string[] = [];
+    const failures: Array<{ name: string; message: string }> = [];
     for (const node of nodes) {
       try {
         await dataPort.deleteNode(node.path);
         deletedNodes.push(node);
       } catch (error) {
-        failures.push(`${node.name}: ${error instanceof Error ? error.message : String(error)}`);
+        failures.push({
+          name: node.name,
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -277,8 +302,16 @@ export function useDataNodeActions({
         ...current,
         operation: null,
         error: deletedNodes.length > 0
-          ? `Deleted ${formatItemCount(deletedNodes.length)}; ${failures.length} failed. ${failures[0]}`
-          : failures[0],
+          ? {
+              code: "delete-partial",
+              deletedCount: deletedNodes.length,
+              failedCount: failures.length,
+              detail: `${failures[0]?.name ?? ""}: ${failures[0]?.message ?? ""}`,
+            }
+          : {
+              code: "operation-failed",
+              detail: `${failures[0]?.name ?? ""}: ${failures[0]?.message ?? ""}`,
+            },
       } : current);
     }
   }, [
@@ -288,6 +321,7 @@ export function useDataNodeActions({
     onWorkspaceContentChanged,
     setActiveDataNode,
     setActiveDataPath,
+    t,
     workspaceIsCloud,
   ]);
 
@@ -303,7 +337,7 @@ export function useDataNodeActions({
       setNodeActionMenu((current) => current ? {
         ...current,
         operation: null,
-        error: error instanceof Error ? error.message : String(error),
+        error: toDesktopNodeActionError(error),
       } : current);
     }
   }, [nodeActionMenu, workspace, workspaceIsCloud]);
@@ -327,7 +361,7 @@ export function useDataNodeActions({
       setNodeActionMenu((current) => current ? {
         ...current,
         operation: null,
-        error: error instanceof Error ? error.message : String(error),
+        error: toDesktopNodeActionError(error),
       } : current);
     }
   }, [
@@ -357,8 +391,4 @@ export function useDataNodeActions({
 
 function normalizeCreateEntryAnchor(anchor: DesktopCreateEntryAnchorInput) {
   return "toJSON" in anchor ? rectToCreateEntryAnchor(anchor) : anchor;
-}
-
-function formatItemCount(count: number): string {
-  return `${count} ${count === 1 ? "item" : "items"}`;
 }

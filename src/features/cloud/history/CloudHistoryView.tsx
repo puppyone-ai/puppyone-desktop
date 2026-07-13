@@ -3,6 +3,7 @@ import {
   ExternalLink,
   RefreshCw,
 } from "lucide-react";
+import { useLocalization } from "@puppyone/localization/react";
 import { PageLoading } from "../../../components/loading";
 import { openCloudApp } from "../../../lib/cloudApi";
 import { CloudCommitDetail } from "./CloudCommitDetail";
@@ -18,6 +19,7 @@ export function CloudProjectHistoryView({
   error,
   onRefresh,
 }: CloudProjectHistoryProps) {
+  const { t } = useLocalization();
   const selectedRow = rows.find((row) => row.kind === "commit" && row.id === selectedCommitId) ?? null;
   const selectedCommit = history?.commits.find((commit) => commit.commit_id === selectedRow?.id) ?? null;
   const isHead = Boolean(
@@ -30,8 +32,8 @@ export function CloudProjectHistoryView({
         <div className="desktop-cloud-project-history-title">
           <Clock3 size={15} aria-hidden="true" />
           <div>
-            <strong>History</strong>
-            <span>{projectName}</span>
+            <strong>{t("cloud.route.history.title")}</strong>
+            <span dir="auto">{projectName}</span>
           </div>
         </div>
         <div className="desktop-cloud-project-history-actions">
@@ -41,7 +43,7 @@ export function CloudProjectHistoryView({
             onClick={() => void onRefresh()}
           >
             <RefreshCw size={13} className={loading ? "spin" : undefined} aria-hidden="true" />
-            <span>Refresh</span>
+            <span>{t("cloud.common.refresh")}</span>
           </button>
           <button
             type="button"
@@ -49,24 +51,24 @@ export function CloudProjectHistoryView({
             onClick={() => projectId && openCloudApp(`/projects/${projectId}/changes`)}
           >
             <ExternalLink size={13} aria-hidden="true" />
-            <span>Open Cloud</span>
+            <span>{t("cloud.common.openCloud")}</span>
           </button>
         </div>
       </header>
 
       <div className="desktop-cloud-project-history-body">
         {loading && rows.length === 0 ? (
-          <PageLoading variant="fill" label="Loading history" className="desktop-cloud-project-history-loading" />
+          <PageLoading variant="fill" label={t("cloud.history.loading")} className="desktop-cloud-project-history-loading" />
         ) : error && rows.length === 0 ? (
           <CloudProjectHistoryEmpty
-            title="History unavailable"
+            title={t("cloud.history.unavailable")}
             detail={error}
             onRefresh={onRefresh}
           />
         ) : rows.length === 0 ? (
           <CloudProjectHistoryEmpty
-            title="No commits yet"
-            detail="Changes to this Cloud project will appear here as a read-only repository timeline."
+            title={t("cloud.history.noCommits")}
+            detail={t("cloud.history.noCommitsDetail")}
             onRefresh={onRefresh}
           />
         ) : selectedCommit && selectedRow ? (
@@ -78,8 +80,8 @@ export function CloudProjectHistoryView({
           />
         ) : (
           <CloudProjectHistoryEmpty
-            title="Select a commit"
-            detail="Choose a point in the history tree to inspect who changed which files."
+            title={t("cloud.history.selectCommit")}
+            detail={t("cloud.history.selectCommitDetail")}
           />
         )}
       </div>
@@ -96,6 +98,7 @@ function CloudProjectHistoryEmpty({
   detail: string;
   onRefresh?: () => void | Promise<void>;
 }) {
+  const { t } = useLocalization();
   return (
     <div className="desktop-cloud-project-history-empty">
       <span><Clock3 size={26} aria-hidden="true" /></span>
@@ -104,7 +107,7 @@ function CloudProjectHistoryEmpty({
       {onRefresh && (
         <button type="button" onClick={() => void onRefresh()}>
           <RefreshCw size={13} aria-hidden="true" />
-          <span>Try again</span>
+          <span>{t("cloud.common.tryAgain")}</span>
         </button>
       )}
     </div>

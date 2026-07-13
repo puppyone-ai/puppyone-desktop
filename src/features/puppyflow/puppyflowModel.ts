@@ -4,9 +4,13 @@ export type PuppyFlowAgentOption = {
   id: PuppyFlowAgentId;
   label: string;
   provider: string;
-  modelLabel: string;
   tone: "green" | "orange" | "slate" | "blue";
 };
+
+export type PuppyFlowDocumentDefaults = Readonly<{
+  title: string;
+  prompts: readonly [string, string];
+}>;
 
 export type PuppyFlowStep = {
   id: string;
@@ -28,10 +32,10 @@ export type PuppyFlowParseResult =
   | { ok: false; error: string; document: PuppyFlowDocument };
 
 export const PUPPYFLOW_AGENT_OPTIONS: PuppyFlowAgentOption[] = [
-  { id: "codex", label: "Codex", provider: "OpenAI", modelLabel: "Codex default", tone: "green" },
-  { id: "claude-code", label: "Claude Code", provider: "Anthropic", modelLabel: "Claude Code default", tone: "orange" },
-  { id: "cursor-cli", label: "Cursor CLI", provider: "Cursor", modelLabel: "Cursor default", tone: "slate" },
-  { id: "opencode", label: "OpenCode", provider: "OpenCode", modelLabel: "Configured model", tone: "blue" },
+  { id: "codex", label: "Codex", provider: "OpenAI", tone: "green" },
+  { id: "claude-code", label: "Claude Code", provider: "Anthropic", tone: "orange" },
+  { id: "cursor-cli", label: "Cursor CLI", provider: "Cursor", tone: "slate" },
+  { id: "opencode", label: "OpenCode", provider: "OpenCode", tone: "blue" },
 ];
 
 const agentIds = new Set(PUPPYFLOW_AGENT_OPTIONS.map((agent) => agent.id));
@@ -41,34 +45,37 @@ export function isPuppyFlowFile(name: string, type?: string | null): boolean {
   return type === "workflow" || lowerName.endsWith(".puppyflow") || lowerName.endsWith(".puppyflow.json");
 }
 
-export function createDefaultPuppyFlowDocument(title = "Untitled Flow"): PuppyFlowDocument {
+export function createDefaultPuppyFlowDocument(defaults: PuppyFlowDocumentDefaults): PuppyFlowDocument {
   return {
     kind: "puppyflow",
     version: 1,
-    title,
+    title: defaults.title,
     description: "",
     steps: [
       {
         id: createStepId(),
         agent: "codex",
         enabled: true,
-        prompt: "Read @src and summarize the task boundary. Do not edit files.",
+        prompt: defaults.prompts[0],
       },
       {
         id: createStepId(),
         agent: "codex",
         enabled: true,
-        prompt: "Apply the approved changes, run checks, and summarize the result.",
+        prompt: defaults.prompts[1],
       },
     ],
   };
 }
 
-export function parsePuppyFlowDocument(content: string | null | undefined, fallbackTitle?: string): PuppyFlowParseResult {
+export function parsePuppyFlowDocument(
+  content: string | null | undefined,
+  defaults: PuppyFlowDocumentDefaults,
+): PuppyFlowParseResult {
   if (!content?.trim()) {
     return {
       ok: true,
-      document: createDefaultPuppyFlowDocument(fallbackTitle),
+      document: createDefaultPuppyFlowDocument(defaults),
     };
   }
 
@@ -76,19 +83,22 @@ export function parsePuppyFlowDocument(content: string | null | undefined, fallb
     const raw = JSON.parse(content) as unknown;
     return {
       ok: true,
-      document: normalizePuppyFlowDocument(raw, fallbackTitle),
+      document: normalizePuppyFlowDocument(raw, defaults),
     };
   } catch (error) {
     return {
       ok: false,
       error: error instanceof Error ? error.message : String(error),
-      document: createDefaultPuppyFlowDocument(fallbackTitle),
+      document: createDefaultPuppyFlowDocument(defaults),
     };
   }
 }
 
 export function serializePuppyFlowDocument(document: PuppyFlowDocument): string {
-  return `${JSON.stringify(normalizePuppyFlowDocument(document), null, 2)}\n`;
+  return `${JSON.stringify(normalizePuppyFlowDocument(document, {
+    title: document.title,
+    prompts: ["", ""],
+  }), null, 2)}\n`;
 }
 
 export function getPuppyFlowAgent(agentId: PuppyFlowAgentId): PuppyFlowAgentOption {
@@ -138,10 +148,13 @@ export function compilePuppyFlowRun(document: PuppyFlowDocument): { enabledSteps
   };
 }
 
-function normalizePuppyFlowDocument(raw: unknown, fallbackTitle = "Untitled Flow"): PuppyFlowDocument {
-  if (!isRecord(raw)) return createDefaultPuppyFlowDocument(fallbackTitle);
+function normalizePuppyFlowDocument(
+  raw: unknown,
+  defaults: PuppyFlowDocumentDefaults,
+): PuppyFlowDocument {
+  if (!isRecord(raw)) return createDefaultPuppyFlowDocument(defaults);
 
-  const title = normalizeText(raw.title, fallbackTitle);
+  const title = normalizeText(raw.title, defaults.title);
   const description = typeof raw.description === "string" ? raw.description : "";
   const rawSteps = Array.isArray(raw.steps) ? raw.steps : Array.isArray(raw.blocks) ? raw.blocks : [];
   const steps = rawSteps
@@ -153,7 +166,9 @@ function normalizePuppyFlowDocument(raw: unknown, fallbackTitle = "Untitled Flow
     version: 1,
     title,
     description,
-    steps: steps.length > 0 ? steps : createDefaultPuppyFlowDocument(title).steps,
+    steps: steps.length > 0
+      ? steps
+      : createDefaultPuppyFlowDocument({ ...defaults, title }).steps,
   };
 }
 

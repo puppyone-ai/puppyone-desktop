@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "defaultLocale": "en",
+  "locales": [
+    {
+      "locale": "en",
+      "label": "English",
+      "direction": "ltr",
+      "aliases": [],
+      "matchLanguage": true,
+      "productionReady": true
+    },
+    {
+      "locale": "es",
+      "label": "Español",
+      "direction": "ltr",
+      "aliases": [],
+      "matchLanguage": true,
+      "productionReady": true
+    },
+    {
+      "locale": "pt-BR",
+      "label": "Português (Brasil)",
+      "direction": "ltr",
+      "aliases": [],
+      "matchLanguage": true,
+      "productionReady": true
+    },
+    {
+      "locale": "fr",
+      "label": "Français",
+      "direction": "ltr",
+      "aliases": [],
+      "matchLanguage": true,
+      "productionReady": true
+    },
+    {
+      "locale": "de",
+      "label": "Deutsch",
+      "direction": "ltr",
+      "aliases": [],
+      "matchLanguage": true,
+      "productionReady": true
+    },
+    {
+      "locale": "ja",
+      "label": "日本語",
+      "direction": "ltr",
+      "aliases": [],
+      "matchLanguage": true,
+      "productionReady": true
+    },
+    {
+      "locale": "ko",
+      "label": "한국어",
+      "direction": "ltr",
+      "aliases": [],
+      "matchLanguage": true,
+      "productionReady": true
+    },
+    {
+      "locale": "zh-Hans",
+      "label": "简体中文",
+      "direction": "ltr",
+      "aliases": ["zh-CN", "zh-SG"],
+      "matchLanguage": false,
+      "matchScript": "Hans",
+      "productionReady": true
+    }
+  ]
+}

@@ -9,6 +9,8 @@ import {
   markdownLivePreviewExtension,
 } from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
 import { closeActiveMarkdownTableMenu } from "../packages/shared-ui/src/editor/markdown/features/table/tableMenuState";
+import { markdownLocalizationExtension } from "../packages/shared-ui/src/editor/markdown/core/editor/markdownLocalization";
+import { testT } from "./testLocalization";
 
 const TABLE_SOURCE = [
   "| A | B | C |",
@@ -35,6 +37,12 @@ function createTableView() {
       doc: TABLE_SOURCE,
       extensions: [
         ...markdownCodeMirrorBaseExtensions(false),
+        markdownLocalizationExtension({
+          direction: "ltr",
+          formatNumber: (value) => String(value),
+          locale: "en",
+          t: testT,
+        }, false),
         markdownLivePreviewExtension("safe", null, "table.md"),
       ],
     }),

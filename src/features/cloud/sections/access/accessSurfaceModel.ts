@@ -8,7 +8,8 @@ import { buildCloudAccessSurfaces } from "../../model";
 import type { CloudAccessSurface } from "../../model";
 import {
   getApiBaseFromGitUrl,
-  getScopeDisplayName,
+  getCanonicalScopeGitUrl,
+  getScopeIdentifierName,
   getScopePathLabel,
   normalizeProviderKey,
   profileSlug,
@@ -64,9 +65,9 @@ export function getDesktopCloudAccessSurfaceContext({
   apiBaseUrl: string | null;
 }) {
   const apiBase = identity?.url ? getApiBaseFromGitUrl(identity.url) : apiBaseUrl ?? "";
-  const scopeName = getScopeDisplayName(scope);
+  const scopeName = getScopeIdentifierName(scope);
   const profileName = profileSlug(scopeName);
-  const gitUrl = scope.access_key && apiBase ? `${apiBase}/git/ap/${scope.access_key}.git` : identity?.url ?? "";
+  const gitUrl = getCanonicalScopeGitUrl(identity, scope, apiBase);
   const cliCommand = scope.access_key && apiBase
     ? `printf '%s' ${shellQuote(scope.access_key)} | puppyone ap login ${shellQuote(profileName)} --api-url ${shellQuote(apiBase)} --access-key-stdin`
     : "";
@@ -89,11 +90,9 @@ export function ensureDesktopMcpSurface(scope: DesktopCloudScope, surfaces: Clou
     {
       id: `placeholder:mcp:${scope.id}`,
       provider: "mcp",
-      title: "MCP Server",
+      title: "",
       subtitle: getScopePathLabel(scope),
       status: "missing",
-      statusLabel: "Off",
-      prompt: "Create a scoped Model Context Protocol endpoint for external AI clients.",
     },
   ];
 }
@@ -107,11 +106,9 @@ export function ensureDesktopVmSurface(scope: DesktopCloudScope, surfaces: Cloud
     {
       id: `placeholder:vm:${scope.id}`,
       provider: "vm",
-      title: "Remote Workspace",
+      title: "",
       subtitle: getScopePathLabel(scope),
       status: "missing",
-      statusLabel: "Off",
-      prompt: "Add your SSH public key, then open this scope in Cursor or VS Code over Remote-SSH.",
     },
   ];
 }

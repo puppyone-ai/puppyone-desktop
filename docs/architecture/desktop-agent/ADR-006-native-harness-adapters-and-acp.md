@@ -1,11 +1,14 @@
 # ADR-006: Native harness adapters and the ACP boundary
 
-Date: 2026-07-13. Status: accepted and implemented.
+Date: 2026-07-13. Status: accepted and implemented. This is the authoritative
+implementation decision for native harness routing; the canonical system map
+is mirrored in the Desktop Agent architecture README.
 
 This decision refines
 [ADR-005](ADR-005-multi-native-agent-backends.md) and supersedes the transport
 choice in [ADR-001](ADR-001-opencode-sidecar.md),
-[ADR-003](ADR-003-opencode-only-chat-harness.md), and the SDK/HTTP portion of
+[ADR-003](ADR-003-opencode-only-chat-harness.md), and the former global
+sidecar scope narrowed by
 [ADR-004](ADR-004-managed-agent-engine-distribution.md).
 
 ## Decision
@@ -14,42 +17,37 @@ PuppyOne is a multi-harness desktop client. It owns the product control plane,
 but it does not implement a universal agent loop. Every selectable Agent route
 has exactly one native harness owner and one explicit protocol adapter.
 
+<!-- agent-runtime-map:start -->
 ```text
-Right-sidebar Chat
-        |
-        v
-typed Renderer client and preload IPC
-        |
-        v
-Electron main application control plane
-  workspace authority / session lifecycle / normalized events / approvals
+One PuppyOne Chat UI / product control plane
+  workspace authority / typed IPC / normalized events / approvals / lifecycle
         |
         v
 AgentRuntimeRegistry                 one immutable route per live session
   |
-  +-- Codex adapter
+  +-- Codex
   |     -> codex app-server (JSONL-RPC over stdio)
-  |     -> Codex owns loop, tools, login, model catalog and thread
+  |     -> Codex owns Agent loop, tools, login, models and thread
   |
-  +-- Claude Code adapter
-  |     -> official Claude Agent SDK
-  |     -> user's Claude Code executable
-  |     -> Claude owns loop, tools, permissions and native session
+  +-- Claude Code
+  |     -> official Claude Agent SDK + user's Claude Code executable
+  |     -> Claude owns Agent loop, tools, permissions and native session
   |
-  +-- OpenCode adapter
+  +-- OpenCode
   |     -> Agent Client Protocol (JSON-RPC 2.0 over stdio)
-  |     -> user's OpenCode executable and profile
-  |     -> OpenCode owns loop, tools, auth and native session
+  |     -> user's OpenCode executable, profile, auth and native session
   |
-  +-- PuppyOne Agent adapter
-  |     -> the same provider-neutral ACP client
-  |     -> PuppyOne-bundled, pinned OpenCode kernel
-  |     -> isolated PuppyOne profile and fail-closed policy overlay
+  +-- PuppyOne Agent
+  |     -> the same provider-neutral ACP adapter
+  |     -> PuppyOne-bundled and pinned OpenCode kernel
+  |     -> isolated PuppyOne profile; OpenCode owns the Agent loop
   |
-  +-- Cursor diagnostics
-        -> detected only; not selectable until a supported native protocol
-           and approval contract exist
+  +-- Cursor Agent
+        -> discovery and diagnostics only
+        -> not selectable until a supported native protocol and approval
+           contract pass the production gates
 ```
+<!-- agent-runtime-map:end -->
 
 There is no harness nesting. Selecting Codex never means running Codex as a
 model provider inside OpenCode. Selecting Claude Code never sends its private
@@ -80,27 +78,26 @@ append an explicitly authorized project-instruction snapshot. It must not
 replace the native system prompt, synthesize hidden reasoning, emulate missing
 tool calls or silently fall back to another harness.
 
-## Layering and dependency direction
+## Ports-and-adapters dependency direction
 
 ```text
-Layer 5  Renderer feature
-         transcript / composer / Agent and model controls
-             |
-Layer 4  Shared public contract + typed preload IPC
-             |
-Layer 3  Application control plane
-         AgentService / RuntimeCatalog / EventJournal / session coordinator
-             |
-Layer 2  Runtime ports and registry
-         backend-neutral lifecycle and capability contract
-             |
-Layer 1  Provider-neutral infrastructure floors
-         cache / ACP protocol / JSONL transport / workspace security
-             |
-Layer 0  Concrete runtime adapters
-         codex / claude / opencode-native / puppyone-agent / cursor diagnostics
-             |
-External native process or official SDK
+Renderer UI
+  -> Renderer application/domain
+  -> shared public Agent contract
+  -> typed preload IPC
+  -> Main IPC adapter
+  -> Main application control plane
+  -> AgentRuntimePort                         inward-facing interface
+                ^
+                |
+  concrete native adapter                    implements the port
+  -> protocol / transport / security floors
+  -> native harness process or official SDK
+
+Production composition root
+  -> creates the application control plane
+  -> registers concrete native adapters
+  -> is the only module allowed to know both sides
 ```
 
 The source tree groups the concrete adapters at the edge while keeping the
@@ -133,6 +130,11 @@ Dependency rules are enforced by `scripts/check-agent-architecture.mjs`:
 - concrete provider construction happens only in the composition root;
 - adapter size budgets prevent protocols and application policy from growing
   into one unreviewable class.
+
+This is a ports-and-adapters boundary, not a linear stack in which shared Core
+imports provider Features. The control plane sees only `AgentRuntimePort`;
+provider adapters point inward to that port and are injected at the composition
+root.
 
 ## OpenCode routes use ACP, not an HTTP sidecar client
 
@@ -294,3 +296,19 @@ Durable normalized transcript as a second history authority
   Rejected: drifts from provider state and violates the product's no-history
   ownership decision.
 ```
+
+## Superseded architecture closeout
+
+The following are no longer valid production paths:
+
+- OpenCode HTTP/SSE sidecar transport;
+- one mandatory OpenCode harness for every Chat route;
+- direct CLI text scraping as a substitute for a native protocol;
+- PuppyOne-owned durable transcript/session journals;
+- automatic fallback from one Agent to another;
+- treating Codex or Claude as inference providers inside PuppyOne Agent when
+  the user selected their native Agent products.
+
+ADR-001 and ADR-003 are retained only as short retired-decision tombstones.
+Detailed obsolete instructions remain in Git history rather than in the active
+architecture set.

@@ -1,19 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import type { Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudProject, DesktopCloudSession } from "../src/lib/cloudApi";
 import {
   bindingMatchesWorkspace,
-  bindingCredentialRemoteUrl,
   createExplicitWorkspaceBinding,
 } from "../src/features/cloud/workspace/explicitWorkspaceBinding";
 import {
   resolveCloudProjectNavigationContext,
   resolveProjectCloudAttachment,
 } from "../src/features/cloud/attachment/projectCloudAttachment";
+import { parsePuppyoneRemote } from "../src/features/source-control/remotes";
+import { shouldLoadCloudProjectCatalog } from "../src/features/cloud/workspace/cloudProjectResolution";
+import { cloudMessage } from "../src/features/cloud/cloudPresentation";
 
 const getCloudProject = vi.fn();
 const createCloudWorkspaceBinding = vi.fn();
 const rotateCloudWorkspaceBindingCredential = vi.fn();
+const revokeCloudWorkspaceBinding = vi.fn();
+const revokeCloudWorkspaceBindingCredential = vi.fn();
 
 vi.mock("../src/lib/cloudApi", async () => {
   const actual = await vi.importActual<typeof import("../src/lib/cloudApi")>("../src/lib/cloudApi");
@@ -22,6 +27,8 @@ vi.mock("../src/lib/cloudApi", async () => {
     getCloudProject: (...args: unknown[]) => getCloudProject(...args),
     createCloudWorkspaceBinding: (...args: unknown[]) => createCloudWorkspaceBinding(...args),
     rotateCloudWorkspaceBindingCredential: (...args: unknown[]) => rotateCloudWorkspaceBindingCredential(...args),
+    revokeCloudWorkspaceBinding: (...args: unknown[]) => revokeCloudWorkspaceBinding(...args),
+    revokeCloudWorkspaceBindingCredential: (...args: unknown[]) => revokeCloudWorkspaceBindingCredential(...args),
   };
 });
 
@@ -38,6 +45,45 @@ const workspace = {
   path: "/tmp/notes",
   workspaceInstanceId: "workspace-instance-0001",
 } as Workspace;
+
+describe("binding-first Project catalog policy", () => {
+  it("does not scan the Organization catalog while an exact Local target resolves", () => {
+    expect(shouldLoadCloudProjectCatalog({
+      hasOpenWorkspace: true,
+      workspaceIsCloud: false,
+      hasLocalTargetHint: true,
+      explicitBrowse: false,
+    })).toBe(false);
+    expect(shouldLoadCloudProjectCatalog({
+      hasOpenWorkspace: true,
+      workspaceIsCloud: false,
+      hasLocalTargetHint: false,
+      localTargetResolutionPending: true,
+      explicitBrowse: true,
+    })).toBe(false);
+    expect(shouldLoadCloudProjectCatalog({
+      hasOpenWorkspace: true,
+      workspaceIsCloud: false,
+      hasLocalTargetHint: true,
+      explicitBrowse: true,
+    })).toBe(false);
+  });
+
+  it("keeps the catalog available for Cloud-only or explicit unbound browsing", () => {
+    expect(shouldLoadCloudProjectCatalog({
+      hasOpenWorkspace: false,
+      workspaceIsCloud: false,
+      hasLocalTargetHint: false,
+      explicitBrowse: false,
+    })).toBe(true);
+    expect(shouldLoadCloudProjectCatalog({
+      hasOpenWorkspace: true,
+      workspaceIsCloud: false,
+      hasLocalTargetHint: false,
+      explicitBrowse: true,
+    })).toBe(true);
+  });
+});
 
 function binding(overrides: Record<string, unknown> = {}) {
   return {
@@ -56,6 +102,13 @@ function binding(overrides: Record<string, unknown> = {}) {
     updated_at: "2026-07-12T00:00:00Z",
     last_seen_at: "2026-07-12T00:00:00Z",
     credential: "binding_secret",
+    remote: {
+      url: "https://cloud.example/git/project-1.git",
+      project_id: "project-1",
+      scope_id: "scope-root",
+      kind: "full",
+      username: "x-puppyone-token",
+    },
     ...overrides,
   };
 }
@@ -65,13 +118,10 @@ describe("explicit workspace binding", () => {
     getCloudProject.mockReset();
     createCloudWorkspaceBinding.mockReset();
     rotateCloudWorkspaceBindingCredential.mockReset();
-  });
-
-  it("replaces only the Access credential segment and strips URL credentials/query state", () => {
-    expect(bindingCredentialRemoteUrl(
-      "https://user:password@cloud.example/git/ap/legacy.git?token=old#fragment",
-      "new token",
-    )).toBe("https://cloud.example/git/ap/new%20token.git");
+    revokeCloudWorkspaceBinding.mockReset();
+    revokeCloudWorkspaceBindingCredential.mockReset();
+    revokeCloudWorkspaceBinding.mockResolvedValue(undefined);
+    revokeCloudWorkspaceBindingCredential.mockResolvedValue(undefined);
   });
 
   it("fails closed when stable local workspace identity is absent or mismatched", () => {
@@ -103,7 +153,6 @@ describe("explicit workspace binding", () => {
       project,
       projectId: project.id,
       workspace,
-      remoteUrl: "https://cloud.example/git/ap/legacy.git",
       onSessionChange: vi.fn(),
     });
 
@@ -119,7 +168,10 @@ describe("explicit workspace binding", () => {
       expect.any(Function),
       session.api_base_url,
     );
-    expect(result.credentialRemoteUrl).toBe("https://cloud.example/git/ap/binding_secret.git");
+    expect(result.remoteUrl).toBe("https://cloud.example/git/project-1.git");
+    expect(result.credential).toBe("binding_secret");
+    expect(result.remoteUrl).not.toContain(result.credential);
+    expect(result.bindingWasCreated).toBe(true);
   });
 
   it("requires an explicit scope for scoped legacy confirmation and clamps Viewer to read-only", async () => {
@@ -134,7 +186,6 @@ describe("explicit workspace binding", () => {
       project,
       projectId: project.id,
       workspace,
-      remoteUrl: "https://cloud.example/git/ap/legacy.git",
       bindingKind: "scoped",
       scopeId: null,
       onSessionChange: vi.fn(),
@@ -152,7 +203,6 @@ describe("explicit workspace binding", () => {
       project,
       projectId: project.id,
       workspace,
-      remoteUrl: "https://cloud.example/git/ap/legacy.git",
       bindingKind: "scoped",
       scopeId: "scope-docs",
       onSessionChange: vi.fn(),
@@ -175,12 +225,53 @@ describe("explicit workspace binding", () => {
       project: { id: "project-1", name: "Notes", capabilities: ["workspace.bind.readonly"] },
       projectId: "project-1",
       workspace,
-      remoteUrl: "https://cloud.example/git/ap/legacy.git",
       onSessionChange: vi.fn(),
     });
     expect(rotateCloudWorkspaceBindingCredential).toHaveBeenCalledWith(
       session, "binding-1", expect.any(Function), session.api_base_url,
     );
+  });
+
+  it("revokes only the replacement credential when validation fails on an existing binding", async () => {
+    createCloudWorkspaceBinding.mockResolvedValue(binding({
+      credential: null,
+      remote: { ...binding().remote, url: "https://wrong.example/git/project-1.git" },
+    }));
+    rotateCloudWorkspaceBindingCredential.mockResolvedValue("rotated_secret");
+
+    await expect(createExplicitWorkspaceBinding({
+      session,
+      apiBaseUrl: session.api_base_url,
+      project: { id: "project-1", name: "Notes", capabilities: ["workspace.bind.readonly"] },
+      projectId: "project-1",
+      workspace,
+      onSessionChange: vi.fn(),
+    })).rejects.toThrow("invalid Git remote locator");
+
+    expect(revokeCloudWorkspaceBindingCredential).toHaveBeenCalledWith(
+      session, "binding-1", expect.any(Function), session.api_base_url,
+    );
+    expect(revokeCloudWorkspaceBinding).not.toHaveBeenCalled();
+  });
+
+  it("revokes a newly created binding when its returned locator is invalid", async () => {
+    createCloudWorkspaceBinding.mockResolvedValue(binding({
+      remote: { ...binding().remote, url: "https://wrong.example/git/project-1.git" },
+    }));
+
+    await expect(createExplicitWorkspaceBinding({
+      session,
+      apiBaseUrl: session.api_base_url,
+      project: { id: "project-1", name: "Notes", capabilities: ["workspace.bind.readonly"] },
+      projectId: "project-1",
+      workspace,
+      onSessionChange: vi.fn(),
+    })).rejects.toThrow("invalid Git remote locator");
+
+    expect(revokeCloudWorkspaceBinding).toHaveBeenCalledWith(
+      session, "binding-1", expect.any(Function), session.api_base_url,
+    );
+    expect(revokeCloudWorkspaceBindingCredential).not.toHaveBeenCalled();
   });
 });
 
@@ -190,7 +281,7 @@ describe("binding-only attachment semantics", () => {
       configuredProjectId: null,
       bindingProjectId: null,
       remoteProjectId: "project-1",
-      bindingError: "Confirm this project.",
+      bindingError: cloudMessage("binding-confirm-workspace"),
       bindingReason: "legacy-confirmation-required",
       bindingCloudLinked: true,
       bindingKind: "scoped",
@@ -202,7 +293,7 @@ describe("binding-only attachment semantics", () => {
       projectId: "project-1",
       scopeId: "scope-docs",
       bindingKind: "scoped",
-      message: "Confirm this project.",
+      message: cloudMessage("binding-confirm-workspace"),
     });
     expect(resolveCloudProjectNavigationContext(attachment, "stale")).toEqual({
       projectContext: false,
@@ -215,7 +306,7 @@ describe("binding-only attachment semantics", () => {
       configuredProjectId: null,
       bindingProjectId: "project-1",
       remoteProjectId: null,
-      bindingError: "Network offline",
+      bindingError: cloudMessage("binding-network-failed", undefined, "Network offline"),
       bindingReason: "network",
       bindingCloudLinked: true,
       bindingId: "binding-1",
@@ -225,7 +316,78 @@ describe("binding-only attachment semantics", () => {
       status: "linked",
       projectId: "project-1",
       bindingId: "binding-1",
-      warning: "Network offline",
+      warning: cloudMessage("binding-network-failed", undefined, "Network offline"),
     });
+  });
+});
+
+describe("canonical Git locator discovery", () => {
+  it("classifies exact project and scoped locators without treating them as authority", () => {
+    expect(parsePuppyoneRemote("https://cloud.example/git/project-1.git")).toEqual({
+      kind: "project",
+      host: "cloud.example",
+      displayId: "project-1",
+      projectId: "project-1",
+    });
+    expect(parsePuppyoneRemote(
+      "https://cloud.example/git/project-1/scopes/scope-docs.git",
+    )).toEqual({
+      kind: "scope",
+      host: "cloud.example",
+      displayId: "project-1/scope-docs",
+      projectId: "project-1",
+      scopeId: "scope-docs",
+    });
+  });
+
+  it("rejects ambiguous encoded IDs and credential-bearing canonical locators", () => {
+    expect(parsePuppyoneRemote(
+      "https://cloud.example/git/project-1/scopes/scope%2Fchild.git",
+    )).toBeNull();
+    expect(parsePuppyoneRemote(
+      "https://user:secret@cloud.example/git/project-1.git",
+    )).toBeNull();
+    expect(parsePuppyoneRemote(
+      "https://cloud.example/git/project-1.git?token=secret",
+    )).toBeNull();
+    expect(parsePuppyoneRemote(
+      "https://user:secret@cloud.example/git/ap/legacy-secret.git",
+    )).toBeNull();
+    expect(parsePuppyoneRemote(
+      "ssh://cloud.example/git/project-1.git",
+    )).toBeNull();
+    expect(parsePuppyoneRemote(
+      "file:///git/project-1.git",
+    )).toBeNull();
+  });
+});
+
+describe("project attachment routing", () => {
+  it("binds the selected Project ID without a repo-identity or Scope-list preflight", () => {
+    const source = readFileSync(
+      new URL("../src/features/cloud/CloudServiceMainView.tsx", import.meta.url),
+      "utf8",
+    );
+    const attachFlow = source
+      .split("const handleConnectProject", 2)[1]
+      ?.split("const handleCopyCloneCommand", 1)[0] ?? "";
+
+    expect(attachFlow).toContain("onConfigureCloudRemote(project.id)");
+    expect(attachFlow).not.toContain("getCloudRepoIdentity");
+  });
+
+  it("compensates both new and reused binding credentials after local setup failure", () => {
+    const source = readFileSync(
+      new URL("../src/App.tsx", import.meta.url),
+      "utf8",
+    );
+    const attachFlow = source
+      .split("const handleConfigureCloudRemote", 2)[1]
+      ?.split("const handleDetachCloudProject", 1)[0] ?? "";
+
+    expect(attachFlow).toContain("attached.bindingWasCreated");
+    expect(attachFlow).toContain("revokeCloudWorkspaceBinding");
+    expect(attachFlow).toContain("revokeCloudWorkspaceBindingCredential");
+    expect(attachFlow).toContain("attached.binding.id");
   });
 });

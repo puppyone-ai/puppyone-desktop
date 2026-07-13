@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRightLeft, Blocks, Clock3, Cloud, Folder, FolderOpen, Settings, Workflow } from "lucide-react";
+import { useLocalization, type MessageFormatter } from "@puppyone/localization";
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import type { SidebarNavigationOrientation } from "../../preferences";
 import type { GitStatusEntry, GitStatusSnapshot } from "../../types/electron";
+import { VersionControlIcon } from "../source-control/VersionControlIcon";
 
 export type DesktopSidebarIconComponent = (props: { size?: number; className?: string }) => ReactNode;
 type DesktopNavigationItem = {
   view: Extract<DesktopView, "data" | "git" | "plugins" | "cloud" | "access" | "automation">;
-  label: string;
+  labelId: string;
   icon: DesktopSidebarIconComponent;
   iconSize?: number;
 };
@@ -16,35 +18,6 @@ export type DesktopWorkspaceSurfaceAction = {
   disabled?: boolean;
   onClick: () => void;
 };
-
-export function PuppyGitIcon({
-  size = 15,
-  className,
-  ...props
-}: SVGProps<SVGSVGElement> & { size?: number }) {
-  return (
-    <svg
-      className={className}
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-      {...props}
-    >
-      <circle cx="5" cy="6" r="3" />
-      <path d="M5 9v12" />
-      <circle cx="19" cy="18" r="3" />
-      <path d="m15 9-3-3 3-3" />
-      <path d="M12 6h5a2 2 0 0 1 2 2v7" />
-    </svg>
-  );
-}
 
 export function AssetsDistributionIcon({
   size = 16,
@@ -168,13 +141,14 @@ function DesktopWorkspaceSurfaceActionButton({
   action: DesktopWorkspaceSurfaceAction;
   buttonClassName?: string;
 }) {
+  const { t } = useLocalization();
   const config = getDesktopWorkspaceSurfaceActionConfig(action.kind);
   return (
     <button
       className={buttonClassName}
       type="button"
-      title={config.title}
-      aria-label={config.title}
+      title={t(config.titleId)}
+      aria-label={t(config.titleId)}
       disabled={action.disabled}
       onClick={action.onClick}
     >
@@ -189,21 +163,21 @@ function DesktopWorkspaceSurfaceActionButton({
 function getDesktopWorkspaceSurfaceActionConfig(kind: DesktopWorkspaceSurfaceAction["kind"]) {
   if (kind === "switch-to-cloud") {
     return {
-      label: "Cloud",
-      title: "Switch to cloud project",
+      labelId: "shell.navigation.cloud",
+      titleId: "shell.surface.switchToCloud",
       icon: Cloud,
     };
   }
   if (kind === "switch-to-local") {
     return {
-      label: "Local",
-      title: "Switch to local workspace",
+      labelId: "shell.navigation.local",
+      titleId: "shell.surface.switchToLocal",
       icon: Folder,
     };
   }
   return {
-    label: "Open local",
-    title: "Open locally",
+    labelId: "shell.surface.openLocal",
+    titleId: "shell.surface.openLocally",
     icon: FolderOpen,
   };
 }
@@ -237,6 +211,7 @@ export function DesktopSidebarTopNavigation({
   onNavigate: (view: DesktopView) => void;
   onOpenSettings: () => void;
 }) {
+  const { t } = useLocalization();
   const localItems = getDesktopLocalSidebarNavItems({
     gitEnabled,
     pluginsEnabled,
@@ -250,7 +225,7 @@ export function DesktopSidebarTopNavigation({
       data-placement="top"
       data-orientation={orientation}
     >
-      <div className="desktop-sidebar-top-navigation-list" aria-label="Workspace navigation">
+      <div className="desktop-sidebar-top-navigation-list" aria-label={t("shell.navigation.ariaLabel")}>
         <div className="desktop-sidebar-top-navigation-group desktop-sidebar-top-navigation-local">
           <DesktopSidebarButtonNavigation
             activeView={activeView}
@@ -323,6 +298,7 @@ export function DesktopSidebarRailNavigation({
   onNavigate: (view: DesktopView) => void;
   onOpenSettings: () => void;
 }) {
+  const { t } = useLocalization();
   const localItems = getDesktopLocalSidebarNavItems({
     gitEnabled,
     pluginsEnabled,
@@ -331,7 +307,7 @@ export function DesktopSidebarRailNavigation({
   const cloudHubItems = getDesktopCloudHubNavItems(cloudHubEnabled);
   const cloudItems = getDesktopCloudSidebarNavItems(cloudToolsEnabled);
   return (
-    <div className="desktop-sidebar-rail-navigation" aria-label="Workspace navigation">
+    <div className="desktop-sidebar-rail-navigation" aria-label={t("shell.navigation.ariaLabel")}>
       <div className="desktop-sidebar-rail-actions">
         <DesktopSidebarIconNavigation
           activeView={activeView}
@@ -389,12 +365,13 @@ function DesktopSidebarSettingsButton({
   buttonClassName: string;
   onOpenSettings: () => void;
 }) {
+  const { t } = useLocalization();
   return (
     <button
       className={`${buttonClassName} ${activeView === "settings" ? "active" : ""}`}
       type="button"
-      title="Settings"
-      aria-label="Settings"
+      title={t("shell.navigation.settings")}
+      aria-label={t("shell.navigation.settings")}
       aria-current={activeView === "settings" ? "page" : undefined}
       onClick={onOpenSettings}
     >
@@ -420,11 +397,13 @@ function DesktopSidebarButtonNavigation({
   workspaceChangeCount: number;
   onNavigate: (view: DesktopView) => void;
 }) {
+  const { t } = useLocalization();
   return (
     <>
       {items.map((item) => {
         const badge = getDesktopNavigationBadge(item.view, gitIncomingCount, workspaceChangeCount);
-        const navLabel = getDesktopNavigationLabel(item.label, item.view, badge, workspaceChangeCount);
+        const itemLabel = t(item.labelId);
+        const navLabel = getDesktopNavigationLabel(t, itemLabel, item.view, badge, workspaceChangeCount);
         const gitSummary = item.view === "git" ? getDesktopGitNavSummary(gitStatus, gitIncomingCount, gitOperationLoading) : null;
         return (
           <button
@@ -441,7 +420,7 @@ function DesktopSidebarButtonNavigation({
             <i className="desktop-sidebar-nav-icon-wrap" aria-hidden="true">
               <item.icon size={item.iconSize ?? 16} />
             </i>
-            <span className="desktop-sidebar-nav-label">{item.label}</span>
+            <span className="desktop-sidebar-nav-label">{itemLabel}</span>
             <DesktopNavBadge count={badge.count} tone={badge.tone} />
             {gitSummary && <DesktopGitNavBubble summary={gitSummary} />}
           </button>
@@ -470,11 +449,13 @@ function DesktopSidebarIconNavigation({
   workspaceChangeCount: number;
   onNavigate: (view: DesktopView) => void;
 }) {
+  const { t } = useLocalization();
   return (
     <>
       {items.map((item) => {
         const badge = getDesktopNavigationBadge(item.view, gitIncomingCount, workspaceChangeCount);
-        const navLabel = getDesktopNavigationLabel(item.label, item.view, badge, workspaceChangeCount);
+        const itemLabel = t(item.labelId);
+        const navLabel = getDesktopNavigationLabel(t, itemLabel, item.view, badge, workspaceChangeCount);
         const gitSummary = item.view === "git" ? getDesktopGitNavSummary(gitStatus, gitIncomingCount, gitOperationLoading) : null;
         return (
           <button
@@ -522,7 +503,8 @@ type DesktopGitNavSummary = {
 };
 
 function DesktopGitNavBubble({ summary }: { summary: DesktopGitNavSummary }) {
-  const bubble = useTransientGitNavBubble(summary);
+  const { t } = useLocalization();
+  const bubble = useTransientGitNavBubble(summary, t);
   if (!bubble) return null;
 
   return (
@@ -539,14 +521,17 @@ type DesktopGitNavBubbleState = {
 
 const DESKTOP_GIT_NAV_BUBBLE_ENABLED = false;
 
-function useTransientGitNavBubble(summary: DesktopGitNavSummary): DesktopGitNavBubbleState | null {
+function useTransientGitNavBubble(
+  summary: DesktopGitNavSummary,
+  t: MessageFormatter,
+): DesktopGitNavBubbleState | null {
   const [bubble, setBubble] = useState<DesktopGitNavBubbleState | null>(null);
   const previousSignatureRef = useRef<string | null>(null);
   const bubbleIdRef = useRef(0);
   const initializedRef = useRef(false);
   const operationActiveRef = useRef(false);
   const signature = getDesktopGitNavSignature(summary);
-  const bubbleLabel = getDesktopGitNavBubbleLabel(summary);
+  const bubbleLabel = getDesktopGitNavBubbleLabel(summary, t);
 
   useEffect(() => {
     if (!DESKTOP_GIT_NAV_BUBBLE_ENABLED) return undefined;
@@ -589,20 +574,20 @@ function useTransientGitNavBubble(summary: DesktopGitNavSummary): DesktopGitNavB
   return DESKTOP_GIT_NAV_BUBBLE_ENABLED ? bubble : null;
 }
 
-function getDesktopGitNavBubbleLabel(summary: DesktopGitNavSummary): string {
-  const labels = getDesktopGitNavBubbleLabels(summary);
-  if (labels.length === 0) return "Changed";
+function getDesktopGitNavBubbleLabel(summary: DesktopGitNavSummary, t: MessageFormatter): string {
+  const labels = getDesktopGitNavBubbleLabels(summary, t);
+  if (labels.length === 0) return t("shell.gitBubble.changed");
   if (labels.length === 1) return labels[0];
-  return `${labels[0]} + more`;
+  return t("shell.gitBubble.more", { first: labels[0] });
 }
 
-function getDesktopGitNavBubbleLabels(summary: DesktopGitNavSummary): string[] {
+function getDesktopGitNavBubbleLabels(summary: DesktopGitNavSummary, t: MessageFormatter): string[] {
   const labels: string[] = [];
-  if (summary.conflicts > 0) labels.push("Conflicts");
-  if (summary.remoteIncoming > 0) labels.push("Incoming");
-  if (summary.committed > 0) labels.push("Committed");
-  if (summary.staged > 0) labels.push("Staged");
-  if (summary.unstaged > 0) labels.push("Unstaged");
+  if (summary.conflicts > 0) labels.push(t("shell.gitBubble.conflicts"));
+  if (summary.remoteIncoming > 0) labels.push(t("shell.gitBubble.incoming"));
+  if (summary.committed > 0) labels.push(t("shell.gitBubble.committed"));
+  if (summary.staged > 0) labels.push(t("shell.gitBubble.staged"));
+  if (summary.unstaged > 0) labels.push(t("shell.gitBubble.unstaged"));
   return labels;
 }
 
@@ -683,36 +668,39 @@ function getDesktopNavigationBadge(
 }
 
 function getDesktopNavigationLabel(
+  t: MessageFormatter,
   label: string,
   view: DesktopView,
   badge: DesktopNavigationBadge,
   workspaceChangeCount: number,
 ) {
-  if (view === "data" && workspaceChangeCount > 0) return `${label}, workspace changes detected`;
+  if (view === "data" && workspaceChangeCount > 0) {
+    return t("shell.navigation.workspaceChangesDetected", { label });
+  }
   if (badge.count <= 0) return label;
   if (badge.kind === "workspace") {
-    return `${label}, ${badge.count} workspace change${badge.count === 1 ? "" : "s"}`;
+    return t("shell.navigation.workspaceChangeCount", { label, count: badge.count });
   }
-  return `${label}, ${badge.count} remote change${badge.count === 1 ? "" : "s"} to pull`;
+  return t("shell.navigation.remoteChangeCount", { label, count: badge.count });
 }
 
 const DESKTOP_NAV_ITEMS: readonly DesktopNavigationItem[] = [
-  { view: "data", label: "Files", icon: Folder },
-  { view: "git", label: "Changes", icon: PuppyGitIcon, iconSize: 15 },
-  { view: "plugins", label: "Plugins", icon: Blocks },
-  { view: "access", label: "Assets", icon: AssetsDistributionIcon },
-  { view: "automation", label: "Automation", icon: Workflow },
+  { view: "data", labelId: "shell.navigation.files", icon: Folder },
+  { view: "git", labelId: "shell.navigation.changes", icon: VersionControlIcon, iconSize: 18 },
+  { view: "plugins", labelId: "shell.navigation.plugins", icon: Blocks },
+  { view: "access", labelId: "shell.navigation.assets", icon: AssetsDistributionIcon },
+  { view: "automation", labelId: "shell.navigation.automation", icon: Workflow },
 ] as const;
 
 const DESKTOP_CLOUD_HISTORY_NAV_ITEM: DesktopNavigationItem = {
   view: "git",
-  label: "History",
+  labelId: "shell.navigation.history",
   icon: Clock3,
 };
 
 const DESKTOP_CLOUD_HUB_NAV_ITEM: DesktopNavigationItem = {
   view: "cloud",
-  label: "Cloud",
+  labelId: "shell.navigation.cloud",
   icon: Cloud,
 };
 

@@ -1,5 +1,6 @@
 import { Copy, Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   DesktopCloudConnector,
   DesktopCloudCreateMcpEndpointRequest,
@@ -15,7 +16,14 @@ import {
 } from "../../../../lib/cloudApi";
 import { getCloudAccessAggregate, type CloudAccessSurface } from "../../model";
 import {
+  cloudMessage,
+  formatCloudAccessAggregate,
+  formatCloudMessage,
+  type CloudMessageDescriptor,
+} from "../../cloudPresentation";
+import {
   copyText,
+  getScopeDisplayName,
   getScopePathLabel,
   normalizeProviderKey,
 } from "../../utils";
@@ -59,12 +67,13 @@ export function DesktopCloudScopeAccessDetail({
   onRefresh: () => Promise<void>;
   canManage?: boolean;
 }) {
+  const { t } = useLocalization();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [expandedSurfaceId, setExpandedSurfaceId] = useState<string | null>(null);
   const [creatingMcp, setCreatingMcp] = useState(false);
-  const [mcpError, setMcpError] = useState<string | null>(null);
+  const [mcpError, setMcpError] = useState<CloudMessageDescriptor | null>(null);
   const [surfaceConfigBusyId, setSurfaceConfigBusyId] = useState<string | null>(null);
-  const [surfaceConfigError, setSurfaceConfigError] = useState<string | null>(null);
+  const [surfaceConfigError, setSurfaceConfigError] = useState<CloudMessageDescriptor | null>(null);
 
   useEffect(() => {
     setSettingsOpen(false);
@@ -79,7 +88,7 @@ export function DesktopCloudScopeAccessDetail({
     identity,
     apiBaseUrl,
   }), [apiBaseUrl, identity, scope]);
-  const scopeName = accessContext.scopeName;
+  const scopeName = getScopeDisplayName(scope, t);
   const surfaces = useMemo(() => buildDesktopCloudAccessSurfacesForScope({
     scope,
     identity,
@@ -99,12 +108,12 @@ export function DesktopCloudScopeAccessDetail({
   const aggregateInputSurfaces = aggregateSurfaces.length > 0 ? aggregateSurfaces : aggregateSourceSurfaces;
   const aggregate = aggregateInputSurfaces.length > 0
     ? getCloudAccessAggregate(aggregateInputSurfaces)
-    : { label: "Paused", tone: "" };
+    : { code: "paused", tone: "" } as const;
   const aggregateTone = aggregate.tone === "ready" ? "ready" : aggregate.tone === "warning" ? "warning" : "muted";
   const aggregateConnectorCount = aggregateSurfaces.length;
   const scopePath = getScopePathLabel(scope);
-  const modeLabel = scope.mode === "rw" ? "Read & write" : "Read only";
-  const accessKeyLabel = scope.access_key ? maskDesktopScopeAccessKey(scope.access_key) : "Preparing";
+  const modeLabel = t(scope.mode === "rw" ? "cloud.scope.readWrite" : "cloud.scope.readOnly");
+  const accessKeyLabel = scope.access_key ? maskDesktopScopeAccessKey(scope.access_key) : t("cloud.common.preparing");
 
   const handleCreateMcpEndpoint = async () => {
     if (creatingMcp || !canManage) return;
@@ -120,7 +129,7 @@ export function DesktopCloudScopeAccessDetail({
       await createCloudMcpEndpoint(cloudSession, body, onCloudSessionChange, apiBaseUrl);
       await onRefresh();
     } catch (error) {
-      setMcpError(error instanceof Error ? error.message : "Failed to create MCP endpoint.");
+      setMcpError(cloudMessage("create-mcp-failed", undefined, error instanceof Error ? error.message : undefined));
     } finally {
       setCreatingMcp(false);
     }
@@ -133,7 +142,10 @@ export function DesktopCloudScopeAccessDetail({
     setSurfaceConfigError(null);
     try {
       if (provider === "cli") {
-        if (!surface.connector) throw new Error("CLI connector is not available yet.");
+        if (!surface.connector) {
+          setSurfaceConfigError(cloudMessage("cli-unavailable"));
+          return;
+        }
         await updateCloudConnector(
           cloudSession,
           projectId,
@@ -150,7 +162,10 @@ export function DesktopCloudScopeAccessDetail({
           apiBaseUrl,
         );
       } else if (provider === "mcp" || provider === "mcp_endpoint") {
-        if (!surface.endpoint) throw new Error("MCP endpoint is not available yet.");
+        if (!surface.endpoint) {
+          setSurfaceConfigError(cloudMessage("mcp-unavailable"));
+          return;
+        }
         await updateCloudMcpEndpoint(
           cloudSession,
           surface.endpoint.id,
@@ -163,7 +178,7 @@ export function DesktopCloudScopeAccessDetail({
       }
       await onRefresh();
     } catch (error) {
-      setSurfaceConfigError(error instanceof Error ? error.message : "Failed to update configuration.");
+      setSurfaceConfigError(cloudMessage("update-config-failed", undefined, error instanceof Error ? error.message : undefined));
     } finally {
       setSurfaceConfigBusyId(null);
     }
@@ -177,22 +192,22 @@ export function DesktopCloudScopeAccessDetail({
             <h1 title={scopeName}>{scopeName}</h1>
             <div className={`desktop-cloud-access-web-aggregate ${aggregateTone}`}>
               <span className={`desktop-cloud-web-status-dot ${aggregateTone === "ready" ? "ready" : aggregateTone === "warning" ? "warning" : ""}`} aria-hidden="true" />
-              <strong>{aggregate.label}</strong>
+              <strong>{formatCloudAccessAggregate(aggregate.code, t)}</strong>
               <span aria-hidden="true">·</span>
-              <em>{aggregateConnectorCount === 1 ? "1 connector" : `${aggregateConnectorCount} connectors`}</em>
+              <em>{t("cloud.access.connectorCount", { count: aggregateConnectorCount })}</em>
             </div>
             <div className="desktop-cloud-access-web-meta">
-              <span>Scope</span>
+              <span>{t("cloud.common.scope")}</span>
               <code title={scopePath}>{scopePath}</code>
               <span aria-hidden="true">·</span>
               <span>{modeLabel}</span>
               <span aria-hidden="true">·</span>
-              <span>Access key</span>
+              <span>{t("cloud.common.accessKey")}</span>
               <code title={scope.access_key ?? undefined}>{accessKeyLabel}</code>
               <button
                 className="desktop-cloud-access-key-copy"
                 type="button"
-                aria-label="Copy access key"
+                aria-label={t("cloud.common.copyAccessKey")}
                 disabled={!scope.access_key}
                 onClick={() => {
                   if (scope.access_key) void copyText(scope.access_key);
@@ -206,8 +221,8 @@ export function DesktopCloudScopeAccessDetail({
             className={`desktop-cloud-access-settings-button ${settingsOpen ? "active" : ""}`}
             type="button"
             aria-pressed={settingsOpen}
-            aria-label={settingsOpen ? "Close scope settings" : "Open scope settings"}
-            title={settingsOpen ? "Close settings" : "Open settings"}
+            aria-label={t(settingsOpen ? "cloud.scope.closeSettings" : "cloud.scope.openSettings")}
+            title={t(settingsOpen ? "cloud.common.closeSettings" : "cloud.common.openSettings")}
             onClick={() => setSettingsOpen((open) => !open)}
           >
             <Settings size={13} />
@@ -216,7 +231,7 @@ export function DesktopCloudScopeAccessDetail({
 
         {canManage && settingsOpen && (
           <section className="desktop-cloud-access-web-settings">
-            <span className="desktop-cloud-access-section-label">Settings</span>
+            <span className="desktop-cloud-access-section-label">{t("cloud.common.settings")}</span>
             <div className="desktop-cloud-access-web-settings-body">
               <CloudScopeSettingsBlock
                 projectId={projectId}
@@ -230,7 +245,7 @@ export function DesktopCloudScopeAccessDetail({
           </section>
         )}
 
-        <section className="desktop-cloud-access-method-list" aria-label="Access methods">
+        <section className="desktop-cloud-access-method-list" aria-label={t("cloud.access.methods")}>
           {detailSurfaces.map((surface) => (
             <DesktopCloudAccessMethodCard
               key={surface.id}
@@ -238,9 +253,9 @@ export function DesktopCloudScopeAccessDetail({
               surface={surface}
               expanded={expandedSurfaceId === surface.id}
               creatingMcp={creatingMcp}
-              mcpError={mcpError}
+              mcpError={mcpError ? formatCloudMessage(mcpError, t) : null}
               configPending={surfaceConfigBusyId === surface.id}
-              configError={expandedSurfaceId === surface.id ? surfaceConfigError : null}
+              configError={expandedSurfaceId === surface.id && surfaceConfigError ? formatCloudMessage(surfaceConfigError, t) : null}
               onToggle={() => setExpandedSurfaceId((current) => (current === surface.id ? null : surface.id))}
               onCreateMcpEndpoint={handleCreateMcpEndpoint}
               onUpdatePermissions={(nextAllowedKeys) => handleUpdateSurfacePermissions(surface, nextAllowedKeys)}

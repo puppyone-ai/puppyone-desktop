@@ -26,12 +26,24 @@ export type AgentActivityStatus =
   | "interrupted"
   | "unknown";
 
+export type AgentActivityLabelCode =
+  | "reasoning-summary"
+  | "plan-updated"
+  | "command"
+  | "command-output"
+  | "file-changes"
+  | "tool-activity"
+  | "agent-activity"
+  | "provider-error"
+  | "provider-warning";
+
 export type AgentActivity = {
   id: string;
   turnId: string | null;
   itemId: string | null;
   kind: "tool" | "command" | "file-change" | "plan" | "reasoning" | "warning" | "error";
   label: string;
+  labelCode?: AgentActivityLabelCode;
   status: AgentActivityStatus;
   detail: Record<string, unknown>;
   output: string;
@@ -44,6 +56,7 @@ export type AgentApproval = {
   itemId: string | null;
   kind: "command" | "file-change";
   title: string;
+  titleCode?: "approval-required";
   command: string | null;
   cwd: string | null;
   commandActions: Array<Record<string, unknown>>;
@@ -81,17 +94,20 @@ type AgentPartBase = {
 
 export type AgentPart =
   | (AgentPartBase & { kind: "user" | "assistant"; text: string; streaming: boolean; terminalState: AgentTurnTerminalState | null })
-  | (AgentPartBase & { kind: "reasoning" | "plan" | "tool" | "command" | "file-change" | "warning" | "error"; label: string; status: AgentActivityStatus; output: string; detail: Record<string, unknown> })
+  | (AgentPartBase & { kind: "turn-summary"; durationMs: number; status: AgentTurnTerminalState })
+  | (AgentPartBase & { kind: "reasoning" | "plan" | "tool" | "command" | "file-change" | "warning" | "error"; label: string; labelCode?: AgentActivityLabelCode; status: AgentActivityStatus; output: string; detail: Record<string, unknown> })
   | (AgentPartBase & { kind: "usage"; usage: Record<string, unknown> })
   | (AgentPartBase & { kind: "permission"; requestId: string; state: "pending" | "resolved" })
   | (AgentPartBase & { kind: "question"; requestId: string; state: "pending" | "resolved" })
-  | (AgentPartBase & { kind: "unknown"; eventType: string; label: string });
+  | (AgentPartBase & { kind: "unknown"; eventType: string; label: string; labelCode?: "unsupported-event" });
 
 export type AgentTurn = {
   id: string;
   status: "running" | AgentTurnTerminalState;
   startedAtSequence: number;
+  startedAtMs: number | null;
   completedAtSequence: number | null;
+  durationMs: number | null;
   partIds: string[];
 };
 

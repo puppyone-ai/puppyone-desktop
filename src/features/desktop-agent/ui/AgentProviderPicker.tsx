@@ -1,113 +1,79 @@
-import { Cable, TerminalSquare } from "lucide-react";
-import type { AgentInferenceProvider, AgentLocalConnection } from "../domain/agent-contract";
+import { memo } from "react";
+import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
+import type { AgentRuntimeCatalogEntry } from "../domain/agent-contract";
+import { isSelectableAgentBackend } from "../domain/agent-backend-routing";
+import { AgentBrandMark } from "./AgentBrandMark";
 import { AgentPickerPopover, type AgentPickerGroup, type AgentPickerOption } from "./AgentPickerPopover";
 
 type AgentProviderPickerProps = {
-  providers: AgentInferenceProvider[];
-  localConnections: AgentLocalConnection[];
-  localConnectionsPhase: "idle" | "loading" | "ready" | "error";
-  localConnectionsError?: string | null;
-  selectedProviderId: string | null;
+  agentProviders: AgentRuntimeCatalogEntry[];
+  selectedAgentProviderId: string | null;
   disabled?: boolean;
-  onSelectProvider: (providerId: string) => void;
-  onDiscoverLocalConnections: (refresh: boolean) => void | Promise<void>;
+  onSelectAgentProvider: (providerId: string) => void;
 };
 
-export function AgentProviderPicker({
-  providers,
-  localConnections,
-  localConnectionsPhase,
-  localConnectionsError = null,
-  selectedProviderId,
+export const AgentProviderPicker = memo(function AgentProviderPicker({
+  agentProviders,
+  selectedAgentProviderId,
   disabled = false,
-  onSelectProvider,
-  onDiscoverLocalConnections,
+  onSelectAgentProvider,
 }: AgentProviderPickerProps) {
-  const selected = providers.find((provider) => provider.id === selectedProviderId) ?? null;
-  const connectedOptions: AgentPickerOption[] = providers.length > 0
-    ? providers.map((provider) => ({
-      id: provider.id,
-      label: provider.displayName,
-      description: "Available through the managed OpenCode engine",
-      meta: `${provider.modelCount} ${provider.modelCount === 1 ? "model" : "models"}`,
-      keywords: `${provider.id} ${provider.source || ""}`,
+  const { t } = useLocalization();
+  const availableProviders = agentProviders.filter((entry) => Boolean(entry?.descriptor?.id && entry?.readiness));
+  const selected = availableProviders.find((entry) => entry.descriptor.id === selectedAgentProviderId) ?? null;
+  const options: AgentPickerOption[] = [];
+
+  for (const entry of availableProviders) {
+    const runnable = isSelectableAgentBackend(entry);
+    const option: AgentPickerOption = {
+      id: entry.descriptor.id,
+      label: entry.descriptor.displayName,
+      description: entry.descriptor.description,
+      warning: runnable ? undefined : readinessWarning(entry, t),
+      meta: entry.descriptor.version || entry.readiness.version || distributionLabel(entry.descriptor.distribution, t),
+      keywords: `${entry.descriptor.id} ${entry.descriptor.kind || ""} ${entry.descriptor.source || ""}`,
+      // Selection is a presentation concern; readiness only gates execution.
       selectable: true,
-      selected: provider.id === selectedProviderId,
-      kind: "connected",
-      icon: <Cable size={13} />,
-    }))
-    : [statusOption("connected-empty", "No connected routes", "Connect a model provider before sending a message.")];
-  const visibleLocalConnections = localConnections.filter((connection) => connection.installation !== "not-found");
-  const localOptions = visibleLocalConnections.length > 0
-    ? visibleLocalConnections.map(localConnectionOption)
-    : localConnectionsPhase === "loading" || localConnectionsPhase === "idle"
-      ? [statusOption("local-loading", "Checking local tools…", "Looking for supported local Agent tools in known installation locations.")]
-      : [statusOption("local-empty", "No supported local tools found", "No registered local Agent tools were found in known installation locations.")];
-  const groups: AgentPickerGroup[] = [
-    { id: "connected", label: "Connected routes", options: connectedOptions },
-    { id: "local", label: "Local tools on this Mac", options: localOptions },
-  ];
+      selected: entry.descriptor.id === selectedAgentProviderId,
+      kind: "provider",
+      icon: <AgentBrandMark kind="provider" iconKey={entry.descriptor.iconKey} label={entry.descriptor.displayName} />,
+    };
+    options.push(option);
+  }
+
+  const groups: AgentPickerGroup[] = [{ id: "providers", label: "", options }];
 
   return (
     <AgentPickerPopover
-      ariaLabel="Agent provider"
-      placeholder="Provider"
-      valueLabel={selected?.displayName}
+      ariaLabel={t("agent.provider.ariaLabel")}
+      placeholder={t("agent.provider.placeholder")}
+      valueLabel={selected?.descriptor.displayName}
+      triggerIcon={selected ? <AgentBrandMark kind="provider" iconKey={selected.descriptor.iconKey} label={selected.descriptor.displayName} /> : undefined}
+      title={selected
+        ? t("agent.provider.selectedTitle", { provider: bidiIsolate(selected.descriptor.displayName) })
+        : t("agent.provider.choose")}
+      triggerDescription={t("agent.provider.switchStartsNewChat")}
       groups={groups}
-      disabled={disabled}
-      loading={localConnectionsPhase === "loading"}
-      error={localConnectionsError}
-      className="is-provider"
-      onOpen={() => { void onDiscoverLocalConnections(false); }}
-      onRefresh={() => { void onDiscoverLocalConnections(true); }}
-      onSelect={onSelectProvider}
+      disabled={disabled || availableProviders.length === 0}
+      className="is-provider is-header"
+      onSelect={onSelectAgentProvider}
     />
   );
+});
+
+function distributionLabel(value: string | null | undefined, t: MessageFormatter) {
+  if (value === "sdk-bundled") return t("agent.provider.distribution.nativeSdk");
+  if (value === "user-installed") return t("agent.provider.distribution.local");
+  return undefined;
 }
 
-function localConnectionOption(connection: AgentLocalConnection): AgentPickerOption {
-  return {
-    id: `local:${connection.id}`,
-    label: connection.displayName,
-    description: shortStatus(connection),
-    detail: connection.statusMessage,
-    meta: connection.version || undefined,
-    keywords: `${connection.id} ${connection.authentication} ${connection.integration}`,
-    // Local inventory is explanatory only. A future bridge appears as a
-    // connected OpenCode route instead of turning this row into a Provider.
-    selectable: false,
-    kind: "local",
-    icon: <TerminalSquare size={13} />,
-  };
-}
-
-function shortStatus(connection: AgentLocalConnection) {
-  const authentication = connection.authentication === "signed-in"
-    ? "Signed in"
-    : connection.authentication === "signed-out"
-      ? "Sign-in required"
-      : connection.authentication === "expired"
-        ? "Session expired"
-        : connection.authentication === "error"
-          ? "Status unavailable"
-          : "Detected";
-  const integration = connection.integration === "bridge-required"
-    ? "OpenCode bridge required"
-    : connection.integration === "incompatible"
-      ? "Incompatible"
-      : connection.integration === "blocked"
-        ? "Needs attention"
-        : "Inventory only";
-  return `${authentication} · ${integration}`;
-}
-
-function statusOption(id: string, label: string, detail: string): AgentPickerOption {
-  return {
-    id,
-    label,
-    description: detail,
-    detail,
-    selectable: false,
-    kind: "status",
-  };
+function readinessWarning(entry: AgentRuntimeCatalogEntry, t: MessageFormatter) {
+  const detail = entry.readiness.message || entry.descriptor.description;
+  const detailValue = bidiIsolate(detail || t("agent.provider.notReady"));
+  if (entry.readiness.status === "unsupported-version") return t("agent.provider.warning.update", { detail: detailValue });
+  if (entry.readiness.status === "installed-not-authenticated") return t("agent.provider.warning.setup", { detail: detailValue });
+  if (entry.readiness.status === "protocol-unavailable") return t("agent.provider.warning.integration", { detail: detailValue });
+  if (entry.readiness.status === "not-installed") return t("agent.provider.warning.notInstalled", { detail: detailValue });
+  return detail || t("agent.provider.notReady");
 }

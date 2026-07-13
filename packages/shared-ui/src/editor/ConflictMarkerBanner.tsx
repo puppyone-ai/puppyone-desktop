@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   parseConflictMarkers,
   resolveConflictMarkers,
@@ -16,6 +17,7 @@ export function ConflictMarkerBanner({
   content,
   onResolve,
 }: ConflictMarkerBannerProps) {
+  const { t } = useLocalization();
   const blocks = useMemo<ConflictBlock[]>(() => parseConflictMarkers(content), [content]);
   const [expanded, setExpanded] = useState(false);
 
@@ -39,23 +41,22 @@ export function ConflictMarkerBanner({
   return (
     <div className="conflict-marker-banner">
       <div className="conflict-marker-banner-row">
-        <span className="conflict-marker-badge">conflict</span>
+        <span className="conflict-marker-badge">{t("editor.conflict.badge")}</span>
         <span className="conflict-marker-copy">
-          This file has <strong>{blocks.length}</strong> unresolved merge
-          conflict{blocks.length > 1 ? "s" : ""}.
+          {t("editor.conflict.summary", { count: blocks.length })}
         </span>
         {onResolve && (
           <div className="conflict-marker-actions">
             <button type="button" onClick={() => pickAll("ours")}>
-              Keep server
+              {t("editor.conflict.keepServer")}
             </button>
             <button type="button" onClick={() => pickAll("theirs")}>
-              Keep incoming
+              {t("editor.conflict.keepIncoming")}
             </button>
           </div>
         )}
         <button type="button" onClick={() => setExpanded((value) => !value)}>
-          {expanded ? "Hide" : "Show"} blocks
+          {expanded ? t("editor.conflict.hideBlocks") : t("editor.conflict.showBlocks")}
         </button>
       </div>
 
@@ -64,16 +65,20 @@ export function ConflictMarkerBanner({
           {blocks.map((block, index) => (
             <div className="conflict-marker-block" key={`${block.startLine}:${block.endLine}`}>
               <div className="conflict-marker-block-title">
-                block {index + 1} of {blocks.length}, line {block.startLine + 1}
+                {t("editor.conflict.blockPosition", {
+                  index: index + 1,
+                  total: blocks.length,
+                  line: block.startLine + 1,
+                })}
               </div>
               <div className="conflict-marker-sides">
                 <SideColumn
-                  label={block.oursLabel || "current"}
+                  label={block.oursLabel || t("editor.conflict.current")}
                   content={block.ours}
                   onPick={onResolve ? () => pickOne(index, "ours") : undefined}
                 />
                 <SideColumn
-                  label={block.theirsLabel || "incoming"}
+                  label={block.theirsLabel || t("editor.conflict.incoming")}
                   content={block.theirs}
                   onPick={onResolve ? () => pickOne(index, "theirs") : undefined}
                 />
@@ -95,17 +100,18 @@ function SideColumn({
   content: string;
   onPick?: () => void;
 }) {
+  const { t } = useLocalization();
   return (
     <div className="conflict-marker-side">
       <div className="conflict-marker-side-title">
-        <span>{label}</span>
+        <span dir="auto">{label}</span>
         {onPick && (
           <button type="button" onClick={onPick}>
-            Pick
+            {t("editor.conflict.pick")}
           </button>
         )}
       </div>
-      <pre>{content || " "}</pre>
+      <pre dir="auto">{content || " "}</pre>
     </div>
   );
 }

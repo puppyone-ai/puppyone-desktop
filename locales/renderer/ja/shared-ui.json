@@ -1,0 +1,19 @@
+{
+  "loading": "読み込み中…",
+  "explorer.root": "ルート",
+  "explorer.emptyFolder": "空のフォルダー",
+  "explorer.loadingWorkspace": "ワークスペースを読み込み中…",
+  "explorer.create": "作成",
+  "explorer.more": "その他",
+  "explorer.access": "アクセス",
+  "explorer.resizeSidebar": "サイドバーのサイズを変更",
+  "explorer.cutLabel": "{name}、切り取り済み",
+  "navigation.back": "戻る",
+  "preview.selectFile": "プレビューするファイルを選択してください",
+  "preview.crashed": "このエディターを表示できません。",
+  "status.clean": "変更なし",
+  "status.modified": "変更済み",
+  "status.created": "作成済み",
+  "status.deleted": "削除済み",
+  "status.moved": "移動済み"
+}

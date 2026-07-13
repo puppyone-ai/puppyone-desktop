@@ -37,22 +37,22 @@ export function useCreateAccessFolderEntries({
   const [state, setState] = useState<{
     entries: DesktopCloudTreeEntry[];
     loading: boolean;
-    error: string | null;
+    error: boolean;
   }>({
     entries: cachedEntries ?? [],
     loading: !cachedEntries,
-    error: null,
+    error: false,
   });
 
   useEffect(() => {
     const cached = readCloudCache<DesktopCloudTreeEntry[]>(cacheContext);
     if (cached) {
-      setState({ entries: cached, loading: false, error: null });
+      setState({ entries: cached, loading: false, error: false });
       return undefined;
     }
 
     let cancelled = false;
-    setState((current) => ({ ...current, loading: true, error: null }));
+    setState((current) => ({ ...current, loading: true, error: false }));
     void loadCloudCache(
       cacheContext,
       () => listCloudDirectory(cloudSession, projectId, path, onCloudSessionChange, apiBaseUrl)
@@ -60,14 +60,14 @@ export function useCreateAccessFolderEntries({
       { ttlMs: FOLDER_CACHE_TTL_MS },
     )
       .then((entries) => {
-        if (!cancelled) setState({ entries, loading: false, error: null });
+        if (!cancelled) setState({ entries, loading: false, error: false });
       })
-      .catch((loadError) => {
+      .catch(() => {
         if (!cancelled) {
           setState({
             entries: [],
             loading: false,
-            error: loadError instanceof Error ? loadError.message : "Unable to load folder.",
+            error: true,
           });
         }
       });

@@ -1,11 +1,14 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent as ReactDragEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
+  formatDocumentSessionError,
   useDocumentSessionState,
   type DataNode,
   type EditorDocumentSession,
   type FileContent,
 } from "@puppyone/shared-ui";
+import { useLocalization } from "@puppyone/localization/react";
+import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import {
   Copy,
   Folder,
@@ -49,17 +52,29 @@ export function PuppyFlowEditor({
   error = null,
   documentSession = null,
 }: PuppyFlowEditorProps) {
-  const fallbackTitle = getTitleFromFilename(node.name);
+  const { t } = useLocalization();
+  const fallbackTitle = getTitleFromFilename(node.name, t("editor.puppyflow.untitledFlow"));
+  const defaults = useMemo(() => ({
+    title: fallbackTitle,
+    prompts: [
+      t("editor.puppyflow.defaultPrompt.analyze"),
+      t("editor.puppyflow.defaultPrompt.apply"),
+    ] as const,
+  }), [fallbackTitle, t]);
   const parsed = useMemo(
-    () => parsePuppyFlowDocument(fileContent?.content ?? "", fallbackTitle),
-    [fallbackTitle, fileContent?.content],
+    () => parsePuppyFlowDocument(fileContent?.content ?? "", defaults),
+    [defaults, fileContent?.content],
   );
   const [document, setDocument] = useState<PuppyFlowDocument>(parsed.document);
   const [parseError, setParseError] = useState<string | null>(parsed.ok ? null : parsed.error);
-  const [runMessage, setRunMessage] = useState<string | null>(null);
+  const [runMessage, setRunMessage] = useState<"no-enabled-prompts" | null>(null);
   const [draggedStepId, setDraggedStepId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<StepDropTarget>(null);
-  const workdirLabel = useMemo(() => formatWorkspacePath(workspacePath), [workspacePath]);
+  const workdirPath = useMemo(() => formatWorkspacePath(workspacePath), [workspacePath]);
+  const workdirLabel = workdirPath ?? t("editor.puppyflow.workspaceSandbox");
+  const workdirTitle = workdirPath
+    ? t("editor.puppyflow.workdir", { path: bidiIsolate(workdirPath) })
+    : t("editor.puppyflow.workspaceSandbox");
   const latestDocumentRef = useRef<PuppyFlowDocument>(parsed.document);
   const sourceContentRef = useRef(fileContent?.content ?? "");
   const documentPathRef = useRef(node.path);
@@ -67,6 +82,7 @@ export function PuppyFlowEditor({
   const revisionRef = useRef(createPuppyFlowRevision(node.path, 0));
   const draggedStepIdRef = useRef<string | null>(null);
   const sessionState = useDocumentSessionState(documentSession);
+  const sessionError = formatDocumentSessionError(sessionState.error, t);
 
   useLayoutEffect(() => {
     const pathChanged = documentPathRef.current !== node.path;
@@ -207,7 +223,7 @@ export function PuppyFlowEditor({
 
     const compiled = compilePuppyFlowRun(latestDocumentRef.current);
     if (compiled.enabledSteps === 0) {
-      setRunMessage("Add at least one enabled prompt before running.");
+      setRunMessage("no-enabled-prompts");
       return;
     }
 
@@ -215,14 +231,14 @@ export function PuppyFlowEditor({
   }, [documentSession]);
 
   const resetInvalidFile = useCallback(() => {
-    const nextDocument = createDefaultPuppyFlowDocument(fallbackTitle);
+    const nextDocument = createDefaultPuppyFlowDocument(defaults);
     applyDocumentEdit(nextDocument);
-  }, [applyDocumentEdit, fallbackTitle]);
+  }, [applyDocumentEdit, defaults]);
 
   if (loading && !fileContent) {
     return (
       <div className="puppyflow-editor-state">
-        Loading PuppyFlow...
+        {t("editor.puppyflow.loading")}
       </div>
     );
   }
@@ -230,29 +246,31 @@ export function PuppyFlowEditor({
   if (error) {
     return (
       <div className="puppyflow-editor-state error">
-        {error}
+        {t("editor.puppyflow.loadFailedDetail", { detail: bidiIsolate(error) })}
       </div>
     );
   }
 
   return (
-    <section className="puppyflow-editor-shell" aria-label="PuppyFlow editor">
+    <section className="puppyflow-editor-shell" aria-label={t("editor.puppyflow.ariaLabel")}>
       <button className="puppyflow-run-button" type="button" onClick={handleRun}>
         <Play size={14} fill="currentColor" />
-        <span>Run</span>
+        <span>{t("editor.puppyflow.run")}</span>
       </button>
 
       <div className="puppyflow-document">
-        {sessionState.error || runMessage ? (
+        {sessionError || runMessage ? (
           <div className="puppyflow-toolbar-status" role="status">
-            {sessionState.error ?? runMessage}
+            {sessionError ?? (runMessage === "no-enabled-prompts"
+              ? t("editor.puppyflow.noEnabledPrompts")
+              : null)}
           </div>
         ) : null}
 
         {parseError && (
           <div className="puppyflow-parse-error" role="alert">
-            <span>Unable to parse this PuppyFlow file: {parseError}</span>
-            <button type="button" onClick={resetInvalidFile}>Reset template</button>
+            <span>{t("editor.puppyflow.parseFailedDetail", { detail: bidiIsolate(parseError) })}</span>
+            <button type="button" onClick={resetInvalidFile}>{t("editor.puppyflow.resetTemplate")}</button>
           </div>
         )}
 
@@ -299,11 +317,19 @@ export function PuppyFlowEditor({
               onDuplicate={() => duplicateStep(step)}
               onRemove={() => removeStep(step.id)}
               workdirLabel={workdirLabel}
+              workdirIsPath={workdirPath !== null}
+              workdirTitle={workdirTitle}
             />
           ))}
           <div className="puppyflow-add-row">
             <span className="puppyflow-add-connector" aria-hidden="true" />
-            <button className="puppyflow-add-button" type="button" aria-label="Add prompt step" title="Add prompt step" onClick={addStep}>
+            <button
+              className="puppyflow-add-button"
+              type="button"
+              aria-label={t("editor.puppyflow.addStep")}
+              title={t("editor.puppyflow.addStep")}
+              onClick={addStep}
+            >
               <span className="puppyflow-add-icon" aria-hidden="true">
                 <Plus size={15} />
               </span>
@@ -332,6 +358,8 @@ function PuppyFlowStepRow({
   onDuplicate,
   onRemove,
   workdirLabel,
+  workdirIsPath,
+  workdirTitle,
 }: {
   step: PuppyFlowStep;
   index: number;
@@ -349,8 +377,12 @@ function PuppyFlowStepRow({
   onDuplicate: () => void;
   onRemove: () => void;
   workdirLabel: string;
+  workdirIsPath: boolean;
+  workdirTitle: string;
 }) {
+  const { formatNumber, t } = useLocalization();
   const agent = getPuppyFlowAgent(step.agent);
+  const stepNumber = formatNumber(index + 1);
 
   return (
     <article
@@ -369,8 +401,8 @@ function PuppyFlowStepRow({
         className="puppyflow-step-grip"
         type="button"
         draggable
-        aria-label={`Reorder step ${index + 1}`}
-        title="Drag to reorder. Use Up or Down while focused."
+        aria-label={t("editor.puppyflow.reorderStep", { number: index + 1 })}
+        title={t("editor.puppyflow.reorderHint")}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
         onKeyDown={(event) => {
@@ -379,14 +411,15 @@ function PuppyFlowStepRow({
       >
         <GripVertical size={16} />
       </button>
-      <span className="puppyflow-step-index">{index + 1}</span>
+      <span className="puppyflow-step-index">{stepNumber}</span>
       <div className="puppyflow-step-card">
         <div className="puppyflow-prompt-cell">
           <textarea
             value={step.prompt}
             rows={1}
-            placeholder="Write a prompt..."
-            aria-label={`Prompt for step ${index + 1}`}
+            placeholder={t("editor.puppyflow.promptPlaceholder")}
+            aria-label={t("editor.puppyflow.promptForStep", { number: index + 1 })}
+            dir="auto"
             onChange={(event) => onPromptChange(event.target.value)}
           />
         </div>
@@ -397,7 +430,7 @@ function PuppyFlowStepRow({
             </span>
             <select
               value={step.agent}
-              aria-label={`Agent for step ${index + 1}`}
+              aria-label={t("editor.puppyflow.agentForStep", { number: index + 1 })}
               onChange={(event) => onAgentChange(event.target.value as PuppyFlowAgentId)}
             >
               {PUPPYFLOW_AGENT_OPTIONS.map((option) => (
@@ -405,26 +438,28 @@ function PuppyFlowStepRow({
               ))}
             </select>
           </label>
-          <span className="puppyflow-step-meta">{agent.provider} · {agent.modelLabel}</span>
-          <span className="puppyflow-step-meta workdir" title={workspacePathTitle(workdirLabel)}>
+          <span className="puppyflow-step-meta">{agent.provider} · {getAgentModelLabel(agent.id, t)}</span>
+          <span className="puppyflow-step-meta workdir" title={workdirTitle}>
             <Folder size={13} />
-            <span>{workdirLabel}</span>
+            <span dir={workdirIsPath ? "ltr" : "auto"}>{workdirLabel}</span>
           </span>
         </div>
         <div className="puppyflow-step-actions">
-          <button type="button" aria-label={`Duplicate step ${index + 1}`} onClick={onDuplicate}>
+          <button type="button" aria-label={t("editor.puppyflow.duplicateStep", { number: index + 1 })} onClick={onDuplicate}>
             <Copy size={15} />
           </button>
           <button
             className="puppyflow-toggle"
             type="button"
             data-enabled={step.enabled}
-            aria-label={step.enabled ? `Disable step ${index + 1}` : `Enable step ${index + 1}`}
+            aria-label={step.enabled
+              ? t("editor.puppyflow.disableStep", { number: index + 1 })
+              : t("editor.puppyflow.enableStep", { number: index + 1 })}
             onClick={onToggleEnabled}
           >
             <span />
           </button>
-          <button type="button" aria-label={`Delete step ${index + 1}`} onClick={onRemove}>
+          <button type="button" aria-label={t("editor.puppyflow.deleteStep", { number: index + 1 })} onClick={onRemove}>
             <Trash2 size={15} />
           </button>
         </div>
@@ -467,18 +502,18 @@ function PuppyFlowAgentLogo({ agentId }: { agentId: PuppyFlowAgentId }) {
   );
 }
 
-function getTitleFromFilename(name: string): string {
+function getTitleFromFilename(name: string, fallback: string): string {
   const withoutExtension = name
     .replace(/\.puppyflow\.json$/i, "")
     .replace(/\.puppyflow$/i, "");
   const words = withoutExtension
     .replace(/[-_]+/g, " ")
     .trim();
-  return words ? words.replace(/\b\w/g, (char) => char.toUpperCase()) : "Untitled Flow";
+  return words ? words.replace(/\b\w/g, (char) => char.toUpperCase()) : fallback;
 }
 
-function formatWorkspacePath(workspacePath?: string | null): string {
-  if (!workspacePath) return "Workspace sandbox";
+function formatWorkspacePath(workspacePath?: string | null): string | null {
+  if (!workspacePath) return null;
   return workspacePath.replace(/^\/Users\/[^/]+/, "~");
 }
 
@@ -486,8 +521,11 @@ function createPuppyFlowRevision(documentPath: string, sequence: number): string
   return `puppyflow:${documentPath}:${sequence}`;
 }
 
-function workspacePathTitle(workdirLabel: string): string {
-  return workdirLabel === "Workspace sandbox" ? "Workspace sandbox" : `Workdir: ${workdirLabel}`;
+function getAgentModelLabel(agentId: PuppyFlowAgentId, t: MessageFormatter): string {
+  if (agentId === "codex") return t("editor.puppyflow.agent.codexModel");
+  if (agentId === "claude-code") return t("editor.puppyflow.agent.claudeModel");
+  if (agentId === "cursor-cli") return t("editor.puppyflow.agent.cursorModel");
+  return t("editor.puppyflow.agent.configuredModel");
 }
 
 function getStepDropPosition(event: ReactDragEvent<HTMLElement>): StepDropPosition {

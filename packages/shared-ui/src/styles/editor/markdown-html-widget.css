@@ -40,7 +40,7 @@
   background: color-mix(in srgb, var(--po-panel-raised) 92%, transparent);
   color: var(--po-text-muted);
   box-shadow: var(--po-shadow-sm);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .markdown-codemirror-editor .cm-md-html-source-toggle:hover,
@@ -130,7 +130,7 @@
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface summary {
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface img,

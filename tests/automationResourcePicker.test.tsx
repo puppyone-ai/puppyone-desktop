@@ -10,6 +10,7 @@ import type {
   DesktopCloudSession,
 } from "../src/lib/cloudApi";
 import type { AutomationSourceSelection } from "../src/features/automation/automationRequest";
+import { stripBidiIsolation, withTestLocalization } from "./testLocalization";
 
 const apiMocks = vi.hoisted(() => ({ resources: vi.fn(), directory: vi.fn() }));
 
@@ -89,7 +90,7 @@ describe("Automation resource picker", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
-    act(() => root?.render(<DestinationHarness />));
+    act(() => root?.render(withTestLocalization(<DestinationHarness />)));
     act(() => findButton(container, "Choose from project folders")?.click());
     await act(async () => {
       await Promise.resolve();
@@ -107,7 +108,7 @@ describe("Automation resource picker", () => {
       );
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(container.textContent).toContain("Final path: /Research/Docs");
+    expect(stripBidiIsolation(container.textContent)).toContain("Final path: /Research/Docs");
   });
 });
 
@@ -115,7 +116,7 @@ function renderEditor() {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root?.render(<EditorHarness />));
+  act(() => root?.render(withTestLocalization(<EditorHarness />)));
   return container;
 }
 

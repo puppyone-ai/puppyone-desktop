@@ -1,0 +1,66 @@
+.desktop-version-control-setup-entry .desktop-entry-state-visual {
+  color: color-mix(in srgb, var(--po-text) 62%, transparent);
+}
+
+.desktop-version-control-mark-frame {
+  display: inline-flex;
+  width: 78px;
+  height: 58px;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-version-control-mark {
+  width: 74px;
+  height: 54px;
+  overflow: visible;
+}
+
+.desktop-version-control-enable-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--po-text) 72%, transparent);
+  border-radius: 6px;
+  background: var(--po-text);
+  color: var(--po-text-inverse);
+  font-size: var(--po-text-size-body);
+  font-weight: var(--po-text-weight-semibold);
+  line-height: calc(var(--po-text-size-body) + 3px);
+}
+
+.desktop-version-control-enable-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--po-text) 86%, var(--po-canvas));
+}
+
+.desktop-version-control-enable-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--po-accent) 80%, transparent);
+  outline-offset: 2px;
+}
+
+.desktop-version-control-enable-button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.desktop-version-control-setup-error {
+  max-width: 400px;
+  margin: 12px 0 0;
+  color: var(--po-danger);
+  font-size: var(--po-text-size-meta);
+  line-height: calc(var(--po-text-size-meta) + 6px);
+}
+
+@media (max-width: 720px) {
+  .desktop-version-control-mark-frame {
+    width: 72px;
+    height: 54px;
+  }
+
+  .desktop-version-control-mark {
+    width: 68px;
+    height: 50px;
+  }
+}

@@ -50,7 +50,7 @@ export type OfficeTextFallbackTask =
 
 export type PresentationFallbackSlide = {
   index: number;
-  title: string;
+  title: string | null;
   lines: string[];
 };
 
@@ -335,7 +335,7 @@ async function extractPresentationText(
     const [title, ...lines] = selected.lines;
     slides.push({
       index: position + 1,
-      title: title || `Slide ${position + 1}`,
+      title: title || null,
       lines,
     });
 

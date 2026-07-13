@@ -33,6 +33,7 @@ export function createMarkdownBlockFeatureWidget(
         sourceRange.from,
         sourceRange.to,
         embed.sourceReference,
+        plan.layout.estimatedHeight,
       );
     case "mermaid":
       return new MermaidBlockWidget(
@@ -41,6 +42,7 @@ export function createMarkdownBlockFeatureWidget(
         sourceRange.from,
         sourceRange.to,
         embed.sourceReference,
+        plan.layout.estimatedHeight,
       );
     case "table":
       return new MarkdownTableWidget(
@@ -55,6 +57,8 @@ export function createMarkdownBlockFeatureWidget(
         context.markdownLinkGraph,
         context.documentPath,
         context.markdownAssetUrlResolver,
+        plan.layout.estimatedHeight,
+        embed.renderKey,
       );
     case "htmlBlock":
       return new HtmlBlockWidget(
@@ -69,8 +73,9 @@ export function createMarkdownBlockFeatureWidget(
         context.htmlTrustMode,
         context.documentPath,
         context.markdownAssetUrlResolver,
+        plan.layout.estimatedHeight,
       );
     case "horizontalRule":
-      return new HorizontalRuleWidget();
+      return new HorizontalRuleWidget(plan.layout.estimatedHeight);
   }
 }

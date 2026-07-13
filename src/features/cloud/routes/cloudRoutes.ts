@@ -1,4 +1,5 @@
 import { Bot, Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
+import type { MessageFormatter } from "@puppyone/localization/core";
 import { getCloudAutomationWebPath } from "../../automation/automationDomain";
 import type { CloudWorkspaceSection } from "./cloudRouteIds";
 
@@ -6,13 +7,12 @@ export type CloudRouteContext = "projects" | "project" | "account";
 
 export type CloudRouteDescriptor = {
   id: CloudWorkspaceSection;
-  label: string;
-  title: string;
-  description: string;
+  labelId: string;
+  titleId: string;
+  descriptionId: string;
   icon: typeof Cloud;
   context: CloudRouteContext;
   showInSidebar: boolean;
-  groupEnd?: boolean;
   requiredCapability?: string;
   webPath: (projectId?: string) => string;
 };
@@ -20,20 +20,19 @@ export type CloudRouteDescriptor = {
 export const CLOUD_ROUTES = [
   {
     id: "overview",
-    label: "Cloud Projects",
-    title: "Context",
-    description: "Cloud context starts by mapping this local folder to a Cloud project.",
+    labelId: "cloud.route.overview.label",
+    titleId: "cloud.route.overview.title",
+    descriptionId: "cloud.route.overview.description",
     icon: Cloud,
     context: "projects",
     showInSidebar: true,
-    groupEnd: true,
     webPath: (projectId?: string) => (projectId ? `/projects/${projectId}/access` : "/projects"),
   },
   {
     id: "cloud-team",
-    label: "Team",
-    title: "Team",
-    description: "Cloud team members and invitations are managed at the organization level.",
+    labelId: "cloud.route.cloud-team.label",
+    titleId: "cloud.route.cloud-team.title",
+    descriptionId: "cloud.route.cloud-team.description",
     icon: Users,
     context: "account",
     showInSidebar: true,
@@ -41,9 +40,9 @@ export const CLOUD_ROUTES = [
   },
   {
     id: "cloud-billing",
-    label: "Billing",
-    title: "Billing",
-    description: "Cloud plan, seats, and invoices are managed at the organization level.",
+    labelId: "cloud.route.cloud-billing.label",
+    titleId: "cloud.route.cloud-billing.title",
+    descriptionId: "cloud.route.cloud-billing.description",
     icon: CreditCard,
     context: "account",
     showInSidebar: true,
@@ -51,9 +50,9 @@ export const CLOUD_ROUTES = [
   },
   {
     id: "contents",
-    label: "Overview",
-    title: "Overview",
-    description: "Sync status and Cloud project context for this workspace.",
+    labelId: "cloud.route.contents.label",
+    titleId: "cloud.route.contents.title",
+    descriptionId: "cloud.route.contents.description",
     icon: FileText,
     context: "project",
     showInSidebar: true,
@@ -61,9 +60,9 @@ export const CLOUD_ROUTES = [
   },
   {
     id: "history",
-    label: "History",
-    title: "History",
-    description: "Cloud commit history for the linked project.",
+    labelId: "cloud.route.history.label",
+    titleId: "cloud.route.history.title",
+    descriptionId: "cloud.route.history.description",
     icon: Clock3,
     context: "project",
     showInSidebar: true,
@@ -71,9 +70,9 @@ export const CLOUD_ROUTES = [
   },
   {
     id: "claude",
-    label: "Claude",
-    title: "Claude",
-    description: "Project Agent work starts after the root Git remote has accepted its first commit.",
+    labelId: "cloud.route.claude.label",
+    titleId: "cloud.route.claude.title",
+    descriptionId: "cloud.route.claude.description",
     icon: Bot,
     context: "project",
     showInSidebar: true,
@@ -82,9 +81,9 @@ export const CLOUD_ROUTES = [
   },
   {
     id: "branches",
-    label: "Branches",
-    title: "Branches",
-    description: "Branches show the local and remote Git refs connected to this Cloud project.",
+    labelId: "cloud.route.branches.label",
+    titleId: "cloud.route.branches.title",
+    descriptionId: "cloud.route.branches.description",
     icon: GitBranch,
     context: "project",
     showInSidebar: false,
@@ -92,9 +91,9 @@ export const CLOUD_ROUTES = [
   },
   {
     id: "automation",
-    label: "Automation",
-    title: "Automation",
-    description: "Cloud-managed information sources and recurring Automation runs for this project.",
+    labelId: "cloud.route.automation.label",
+    titleId: "cloud.route.automation.title",
+    descriptionId: "cloud.route.automation.description",
     icon: Grid2X2,
     context: "project",
     showInSidebar: true,
@@ -102,20 +101,19 @@ export const CLOUD_ROUTES = [
   },
   {
     id: "access",
-    label: "Access",
-    title: "Access",
-    description: "Access surfaces, scopes, connectors, MCP, and endpoint state belong to a Cloud project.",
+    labelId: "cloud.route.access.label",
+    titleId: "cloud.route.access.title",
+    descriptionId: "cloud.route.access.description",
     icon: ShieldCheck,
     context: "project",
     showInSidebar: true,
-    groupEnd: true,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
   },
   {
     id: "mcp-cli",
-    label: "MCP / CLI",
-    title: "MCP / CLI",
-    description: "MCP endpoints and CLI commands are generated from project access keys.",
+    labelId: "cloud.route.mcp-cli.label",
+    titleId: "cloud.route.mcp-cli.title",
+    descriptionId: "cloud.route.mcp-cli.description",
     icon: SquareTerminal,
     context: "project",
     showInSidebar: false,
@@ -123,20 +121,19 @@ export const CLOUD_ROUTES = [
   },
   {
     id: "git-sync",
-    label: "Git Sync",
-    title: "Git Sync",
-    description: "Desktop Git sync needs a Puppyone Cloud remote mapped to a project.",
+    labelId: "cloud.route.git-sync.label",
+    titleId: "cloud.route.git-sync.title",
+    descriptionId: "cloud.route.git-sync.description",
     icon: GitBranch,
     context: "project",
     showInSidebar: false,
-    groupEnd: true,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
   },
   {
     id: "team",
-    label: "Team",
-    title: "Team",
-    description: "Project members and roles are managed after the local folder is connected.",
+    labelId: "cloud.route.team.label",
+    titleId: "cloud.route.team.title",
+    descriptionId: "cloud.route.team.description",
     icon: Users,
     context: "project",
     showInSidebar: false,
@@ -145,9 +142,9 @@ export const CLOUD_ROUTES = [
   },
   {
     id: "settings",
-    label: "Settings",
-    title: "Settings",
-    description: "Project settings are available after this workspace is connected.",
+    labelId: "cloud.route.settings.label",
+    titleId: "cloud.route.settings.title",
+    descriptionId: "cloud.route.settings.description",
     icon: Settings,
     context: "project",
     showInSidebar: true,
@@ -162,13 +159,7 @@ export const CLOUD_ROUTE_BY_ID = Object.fromEntries(
 
 export const CLOUD_ACCOUNT_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "account" && route.showInSidebar);
 export const CLOUD_PROJECT_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "project");
-export const CLOUD_PROJECT_SIDEBAR_ROUTES = CLOUD_PROJECT_ROUTES.filter((route) => route.showInSidebar).map((route) => (
-  route.id === "settings"
-    ? { ...route, groupEnd: true }
-    : route.id === "access"
-      ? { ...route, groupEnd: false }
-      : route
-));
+export const CLOUD_PROJECT_SIDEBAR_ROUTES = CLOUD_PROJECT_ROUTES.filter((route) => route.showInSidebar);
 /** Local bound project hub: project sections + account Team/Billing as a second group. */
 export const CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES = [
   ...CLOUD_PROJECT_SIDEBAR_ROUTES,
@@ -193,13 +184,17 @@ export function getCloudRoute(section: CloudWorkspaceSection): CloudRouteDescrip
   return CLOUD_ROUTE_BY_ID[section] ?? CLOUD_ROUTE_BY_ID.overview;
 }
 
-export function getCloudSectionDescriptor(section: CloudWorkspaceSection): Pick<CloudRouteDescriptor, "title" | "description" | "icon"> {
+export function getCloudSectionDescriptor(section: CloudWorkspaceSection, t: MessageFormatter) {
   const route = getCloudRoute(section);
   return {
-    title: route.title,
-    description: route.description,
+    title: t(route.titleId),
+    description: t(route.descriptionId),
     icon: route.icon,
   };
+}
+
+export function getCloudRouteLabel(route: CloudRouteDescriptor, t: MessageFormatter) {
+  return t(route.labelId);
 }
 
 export function getCloudRouteWebPath(section: CloudWorkspaceSection, projectId?: string): string {

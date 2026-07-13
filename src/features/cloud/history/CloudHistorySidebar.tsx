@@ -4,8 +4,14 @@ import {
   Cloud,
   RefreshCw,
 } from "lucide-react";
+import { useLocalization } from "@puppyone/localization/react";
 import { PageLoading } from "../../../components/loading";
 import type { CloudBranchGraphRow } from "../graph/model";
+import {
+  formatCloudGraphAuthor,
+  formatCloudGraphLabel,
+  formatCloudGraphRowMessage,
+} from "../cloudPresentation";
 import { formatRelativeTime, shortCommit } from "../utils";
 import {
   HISTORY_GRAPH_ROW_HEIGHT,
@@ -38,22 +44,23 @@ export function CloudProjectHistorySidebar({
   | "onRefresh"
   | "onLoadMore"
 >) {
+  const { formatNumber, t } = useLocalization();
   const commitRows = rows.filter((row) => row.kind === "commit");
   const graphWidth = getHistoryGraphWidth(rows);
   const notice = error ?? warning;
 
   return (
-    <section className="desktop-tool-sidebar desktop-cloud-history-sidebar" aria-label="Cloud project history">
+    <section className="desktop-tool-sidebar desktop-cloud-history-sidebar" aria-label={t("cloud.history.projectHistory")}>
       <header className="desktop-cloud-history-sidebar-header">
         <div>
           <Clock3 size={14} aria-hidden="true" />
-          <span>History</span>
-          <small>{commitRows.length}</small>
+          <span>{t("cloud.route.history.title")}</span>
+          <small>{formatNumber(commitRows.length)}</small>
         </div>
         <button
           type="button"
-          title="Refresh history"
-          aria-label="Refresh history"
+          title={t("cloud.history.refresh")}
+          aria-label={t("cloud.history.refresh")}
           disabled={loading}
           onClick={() => void onRefresh()}
         >
@@ -67,10 +74,10 @@ export function CloudProjectHistorySidebar({
         </div>
       )}
 
-      <ol className="desktop-cloud-history-sidebar-list" aria-label="Commit history">
+      <ol className="desktop-cloud-history-sidebar-list" aria-label={t("cloud.history.commitHistory")}>
         {loading && rows.length === 0 ? (
           <li className="desktop-cloud-history-sidebar-state">
-            <PageLoading variant="fill" label="Loading history" className="desktop-cloud-history-sidebar-loading" />
+            <PageLoading variant="fill" label={t("cloud.history.loading")} className="desktop-cloud-history-sidebar-loading" />
           </li>
         ) : rows.length === 0 ? (
           <li className="desktop-cloud-history-sidebar-state">
@@ -89,7 +96,7 @@ export function CloudProjectHistorySidebar({
 
       <footer className="desktop-cloud-history-sidebar-footer">
         <Cloud size={13} aria-hidden="true" />
-        <span>Cloud repository</span>
+        <span>{t("cloud.history.cloudRepository")}</span>
         {hasMore && (
           <button
             type="button"
@@ -99,10 +106,10 @@ export function CloudProjectHistorySidebar({
             {loadingMore
               ? <RefreshCw size={11} className="spin" aria-hidden="true" />
               : <ChevronDown size={11} aria-hidden="true" />}
-            Load more
+            {t("cloud.common.loadMore")}
           </button>
         )}
-        <small>read-only</small>
+        <small>{t("cloud.scope.readOnly")}</small>
       </footer>
     </section>
   );
@@ -119,14 +126,18 @@ function CloudHistorySidebarRow({
   selected: boolean;
   onSelect: (commitId: string) => void;
 }) {
+  const localization = useLocalization();
+  const { t } = localization;
   const isCommit = row.kind === "commit";
   const isCurrentHead = row.labels.some((label) => label.current);
-  const meta = [row.authorName, row.createdAt ? formatRelativeTime(row.createdAt) : null]
+  const message = formatCloudGraphRowMessage(row, t);
+  const author = formatCloudGraphAuthor(row, t);
+  const meta = [author, row.createdAt ? formatRelativeTime(row.createdAt, localization) : null]
     .filter(Boolean)
     .join(" · ");
   const contents = (
     <>
-      <span className="desktop-cloud-history-graph-cell" style={{ width: graphWidth }} aria-hidden="true">
+      <span className="desktop-cloud-history-graph-cell" style={{ width: graphWidth }} aria-hidden="true" dir="ltr">
         <HistoryGraphVisual
           graphWidth={graphWidth}
           height={HISTORY_GRAPH_ROW_HEIGHT}
@@ -142,20 +153,20 @@ function CloudHistorySidebarRow({
       </span>
       <span className="desktop-cloud-history-sidebar-row-copy">
         <strong>
-          <span>{row.message}</span>
+          <span dir="auto">{message}</span>
           {isCurrentHead && <span className="desktop-cloud-history-inline-ref head">HEAD</span>}
           {row.labels.map((label) => (
             <span
               className={`desktop-cloud-history-inline-ref ${label.kind}`}
-              key={`${label.kind}:${label.name}`}
+              key={`${label.kind}:${label.nameCode ?? label.name}`}
             >
-              {label.name}
+              <bdi>{formatCloudGraphLabel(label, t)}</bdi>
             </span>
           ))}
         </strong>
         <span>
-          {isCommit && <code>{shortCommit(row.id)}</code>}
-          <small>{meta || "Unknown commit"}</small>
+          {isCommit && <code dir="ltr">{shortCommit(row.id)}</code>}
+          <small dir="auto">{meta || t("cloud.history.unknownCommit")}</small>
         </span>
       </span>
     </>
@@ -170,13 +181,13 @@ function CloudHistorySidebarRow({
           type="button"
           aria-current={selected ? "true" : undefined}
           data-commit-id={row.id}
-          title={`${row.message} (${shortCommit(row.id)})`}
+          title={`${message} (${shortCommit(row.id)})`}
           onClick={() => onSelect(row.id)}
         >
           {contents}
         </button>
       ) : (
-        <div className={className} title={row.message}>
+        <div className={className} title={message}>
           {contents}
         </div>
       )}
@@ -185,11 +196,12 @@ function CloudHistorySidebarRow({
 }
 
 function CloudHistorySidebarEmpty({ error }: { error: string | null }) {
+  const { t } = useLocalization();
   return (
     <div className="desktop-cloud-history-sidebar-empty">
       <Clock3 size={18} aria-hidden="true" />
-      <strong>{error ? "History unavailable" : "No commits yet"}</strong>
-      <span>{error ?? "Cloud commits will appear here."}</span>
+      <strong>{t(error ? "cloud.history.unavailable" : "cloud.history.noCommits")}</strong>
+      <span>{error ?? t("cloud.history.commitsAppearHere")}</span>
     </div>
   );
 }

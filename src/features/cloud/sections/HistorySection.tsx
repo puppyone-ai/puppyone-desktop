@@ -1,9 +1,11 @@
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   CloudProjectHistorySidebar,
   CloudProjectHistoryView,
 } from "../history";
 import { useCloudHistoryController } from "../history/useCloudHistoryController";
+import { formatCloudMessage } from "../cloudPresentation";
 
 export function CloudHistorySection({
   projectId,
@@ -20,6 +22,7 @@ export function CloudHistorySection({
   onSessionChange: (session: DesktopCloudSession | null) => void;
   revisionKey?: string | null;
 }) {
+  const { t } = useLocalization();
   const history = useCloudHistoryController({
     session: cloudSession,
     projectId,
@@ -34,15 +37,15 @@ export function CloudHistorySection({
     loading: history.loading,
     loadingMore: history.loadingMore,
     hasMore: history.hasMore,
-    error: history.error,
-    warning: history.warning,
+    error: history.error ? formatCloudMessage(history.error, t) : null,
+    warning: history.warning ? formatCloudMessage(history.warning, t) : null,
     onSelectCommit: history.selectCommit,
     onRefresh: history.reload,
     onLoadMore: history.loadMore,
   };
 
   return (
-    <section className="desktop-cloud-history-surface" aria-label="Cloud project commit history">
+    <section className="desktop-cloud-history-surface" aria-label={t("cloud.history.commitHistoryAria")}>
       <CloudProjectHistorySidebar {...sharedProps} />
       <CloudProjectHistoryView
         {...sharedProps}

@@ -9,7 +9,7 @@
   grid-template-columns: minmax(0, 1fr) 30px;
   gap: 6px;
   padding: 8px 8px 10px;
-  border-bottom: 1px solid var(--po-border-subtle);
+  border-bottom: 1px solid var(--po-sidebar-divider, var(--po-divider));
 }
 
 .desktop-cloud-access-scope-search {
@@ -68,7 +68,7 @@
   position: absolute;
   z-index: 20;
   top: 36px;
-  right: 0;
+  inset-inline-end: 0;
   display: grid;
   width: 150px;
   gap: 1px;
@@ -131,8 +131,8 @@
   background: transparent;
   color: var(--po-text-muted);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
   user-select: none;
   transition: background 0.1s ease, color 0.1s ease;
 }
@@ -212,7 +212,7 @@
   min-width: 0;
   align-items: center;
   gap: 8px;
-  padding-left: 14px;
+  padding-inline-start: 14px;
 }
 
 .desktop-cloud-access-scope-meta code {
@@ -267,7 +267,7 @@
   flex: 0 0 auto;
   justify-content: flex-end;
   padding: 8px;
-  border-top: 1px solid var(--po-divider);
+  border-top: 1px solid var(--po-sidebar-divider, var(--po-divider));
 }
 
 .desktop-cloud-access-scope-sidebar-footer button {

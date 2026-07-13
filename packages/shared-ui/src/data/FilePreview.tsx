@@ -1,4 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   AppPreviewController,
   DataNode,
@@ -10,6 +12,7 @@ import { EditorHost } from "../editor/EditorHost";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
 import type {
   DocumentSourceKind,
+  EditorInteractionPreferences,
   MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
@@ -36,6 +39,7 @@ export type FilePreviewProps = {
   onDocumentPersisted?: (commit: DocumentPersistedCommit) => void;
   hideSourceView?: boolean;
   fileIconTheme?: FileIconThemeId;
+  editorInteractionPreferences?: EditorInteractionPreferences;
   editorSaveMode?: EditorSaveMode;
   htmlTrustMode?: MarkdownHtmlTrustMode;
   workspaceId?: string;
@@ -77,6 +81,7 @@ export function FilePreview({
   onDocumentPersisted,
   hideSourceView = false,
   fileIconTheme = "default",
+  editorInteractionPreferences,
   editorSaveMode = "manual",
   htmlTrustMode = "safe",
   workspaceId = "",
@@ -89,12 +94,13 @@ export function FilePreview({
   viewerExtensionAdapter = null,
   documentSourceKind = "local",
 }: FilePreviewProps) {
+  const { t } = useLocalization();
   if (!node) {
     if (emptySlot) return <>{emptySlot}</>;
 
     return (
       <div className="empty-preview">
-        <span>Select a file to preview</span>
+        <span>{t("shared-ui.preview.selectFile")}</span>
       </div>
     );
   }
@@ -127,13 +133,15 @@ export function FilePreview({
               theme={fileIconTheme}
             />
             <div>
-              <h2>{node.name}</h2>
-              <span>{node.path}</span>
+              <h2 dir="auto">{node.name}</h2>
+              <span dir="ltr">{node.path}</span>
             </div>
           </div>
           <div className="file-preview-actions">
             {node.status && node.status !== "clean" && (
-              <span className={`status-pill ${node.status}`}>{node.status}</span>
+              <span className={`status-pill ${node.status}`}>
+                {t(`shared-ui.status.${node.status}`, { name: bidiIsolate(node.name) })}
+              </span>
             )}
             {actions}
           </div>
@@ -142,7 +150,10 @@ export function FilePreview({
 
       <div className="file-preview-body">
         {customBody !== undefined ? customBody : (
-          <EditorPreviewBoundary key={node.path}>
+          <EditorPreviewBoundary
+            key={node.path}
+            failureTitle={t("shared-ui.preview.crashed")}
+          >
             <EditorHost
               node={node}
               fileContent={fileContent}
@@ -156,6 +167,7 @@ export function FilePreview({
               onDocumentPersisted={onDocumentPersisted}
               hideSourceView={hideSourceView}
               fileIconTheme={fileIconTheme}
+              editorInteractionPreferences={editorInteractionPreferences}
               saveMode={editorSaveMode}
               htmlTrustMode={htmlTrustMode}
               workspaceId={workspaceId}
@@ -178,6 +190,7 @@ export function FilePreview({
 
 type EditorPreviewBoundaryProps = {
   children: ReactNode;
+  failureTitle: string;
 };
 
 type EditorPreviewBoundaryState = {
@@ -203,8 +216,8 @@ class EditorPreviewBoundary extends Component<EditorPreviewBoundaryProps, Editor
     if (this.state.error) {
       return (
         <div className="editor-crash-state">
-          <strong>Unable to render this editor.</strong>
-          <span>{this.state.error}</span>
+          <strong>{this.props.failureTitle}</strong>
+          <span dir="ltr">{this.state.error}</span>
         </div>
       );
     }

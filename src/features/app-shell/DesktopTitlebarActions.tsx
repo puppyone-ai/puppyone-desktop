@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { MessageSquare } from "lucide-react";
+import { useLocalization } from "@puppyone/localization";
 import {
   DesktopUpdateTitlebarButton,
   type useDesktopUpdates,
@@ -51,6 +52,7 @@ export function DesktopTitlebarActions({
   onToggleTerminal,
   onUpdateNow,
 }: DesktopTitlebarActionsProps) {
+  const { t } = useLocalization();
   const externalOpenRef = useRef<HTMLDivElement>(null);
   const [externalOpenMenuOpen, setExternalOpenMenuOpen] = useState(false);
   const defaultTarget = externalOpenTargets[0] ?? null;
@@ -81,6 +83,7 @@ export function DesktopTitlebarActions({
   }, [canOpenActiveFileExternal]);
 
   const headerElementContext: HeaderElementRenderContext = {
+    t,
     externalOpen: {
       appName: activeFileExternalOpenAppName,
       canOpen: canOpenActiveFileExternal,
@@ -135,8 +138,9 @@ export function AgentChatTitlebarButton({
   open: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useLocalization();
   if (!enabled) return null;
-  const label = open ? "Hide Agent Chat" : "Show Agent Chat";
+  const label = t(open ? "shell.titlebar.hideAgentChat" : "shell.titlebar.showAgentChat");
   return (
     <button
       className="desktop-titlebar-action desktop-titlebar-agent-chat"
@@ -146,7 +150,7 @@ export function AgentChatTitlebarButton({
       aria-pressed={open}
       onClick={onToggle}
     >
-      <MessageSquare size={16} />
+      <MessageSquare size={15} strokeWidth={1.8} />
     </button>
   );
 }

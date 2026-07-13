@@ -1,10 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { flushActiveDocumentSessions } from "@puppyone/shared-ui";
+import { LocalizationProvider } from "@puppyone/localization/react";
 import { App } from "./App";
 import { ScrollbarActivity } from "./components/ScrollbarActivity";
 import { FeatureFlagsProvider } from "./features/flags";
 import { TypographyCatalogProvider } from "./features/typography";
+import { bootstrapRendererLocalization } from "./localization";
 import "./cloud-globals.css";
 import "@puppyone/shared-ui/shared-ui.css";
 import "./styles.css";
@@ -57,23 +59,44 @@ window.addEventListener("pagehide", () => {
 
 const root = ReactDOM.createRoot(rootElement);
 
-if (window.location.hash === "#agent-visual-smoke") {
-  void import("./features/desktop-agent/visual-smoke").then(({ AgentVisualSmokeHarness }) => {
-    root.render(<AgentVisualSmokeHarness />);
-  });
-} else if (window.location.hash === "#renderer-performance-smoke") {
-  void import("./performance/RendererPerformanceSmokeHarness").then(({ RendererPerformanceSmokeHarness }) => {
-    root.render(<RendererPerformanceSmokeHarness />);
-  });
-} else {
+async function renderApplication() {
+  const localization = await bootstrapRendererLocalization();
+  let surface: React.ReactNode;
+
+  if (window.location.hash === "#agent-visual-smoke") {
+    const { AgentVisualSmokeHarness } = await import("./features/desktop-agent/visual-smoke");
+    surface = <AgentVisualSmokeHarness />;
+  } else if (window.location.hash === "#renderer-performance-smoke") {
+    const { RendererPerformanceSmokeHarness } = await import("./performance/RendererPerformanceSmokeHarness");
+    surface = <RendererPerformanceSmokeHarness />;
+  } else {
+    surface = (
+      <>
+        <ScrollbarActivity />
+        <TypographyCatalogProvider>
+          <FeatureFlagsProvider>
+            <App />
+          </FeatureFlagsProvider>
+        </TypographyCatalogProvider>
+      </>
+    );
+  }
+
   root.render(
     <React.StrictMode>
-      <ScrollbarActivity />
-      <TypographyCatalogProvider>
-        <FeatureFlagsProvider>
-          <App />
-        </FeatureFlagsProvider>
-      </TypographyCatalogProvider>
+      <LocalizationProvider
+        initialState={localization.state}
+        initialCatalog={localization.catalog}
+        fallbackCatalog={localization.fallbackCatalog}
+        loadCatalog={localization.loadCatalog}
+        client={localization.client}
+      >
+        {surface}
+      </LocalizationProvider>
     </React.StrictMode>,
   );
 }
+
+void renderApplication().catch((error) => {
+  console.error("PuppyOne renderer localization bootstrap failed:", error);
+});

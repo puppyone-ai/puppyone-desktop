@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocalization } from "@puppyone/localization/react";
 import { normalizeDocumentSourceKind } from "./documentSource";
 import { resolveViewerRoute } from "./viewerCapability";
 import type { ExternalViewerSurfaceRenderer } from "./viewerHostAdapters";
@@ -50,11 +51,12 @@ export function ExternalViewerAdapter({
   contribution,
   renderSurface,
 }: ExternalViewerAdapterProps) {
+  const { t } = useLocalization();
   if (!renderSurface) {
     return (
       <div className="external-viewer-adapter external-viewer-adapter-unavailable">
-        <strong>{contribution.label}</strong>
-        <span>This viewer pack cannot render here — no host surface is available.</span>
+        <strong dir="auto">{contribution.label}</strong>
+        <span>{t("editor.viewer.noHostSurface")}</span>
       </div>
     );
   }

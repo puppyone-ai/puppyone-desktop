@@ -1,4 +1,5 @@
 import { ExternalLink } from "lucide-react";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   DesktopCloudProject,
   DesktopCloudSession,
@@ -10,6 +11,7 @@ import {
   ProjectFolderNewCard,
   type ProjectFolderPreviewItem,
 } from "../../../components/project-folder-card";
+import { DesktopEntryState } from "../../../components/DesktopEntryState";
 import { formatRelativeTime } from "../utils";
 import { CloudFilePreviewIcon } from "./shared";
 import { useCloudProjectPreview } from "../hooks/useCloudProjectPreview";
@@ -45,25 +47,27 @@ export function CloudProjectBrowser({
   onConnectProject: (project: DesktopCloudProject) => void;
   onOpenCloudProjects: () => void;
 }) {
+  const { getCollator, t } = useLocalization();
+  const collator = getCollator({ sensitivity: "base", numeric: true });
   const sortedProjects = [...projects].sort((left, right) => {
     if (left.id === mappedProjectId) return -1;
     if (right.id === mappedProjectId) return 1;
     const leftTime = left.updated_at ? new Date(left.updated_at).getTime() : 0;
     const rightTime = right.updated_at ? new Date(right.updated_at).getTime() : 0;
-    return rightTime - leftTime || left.name.localeCompare(right.name);
+    return rightTime - leftTime || collator.compare(left.name, right.name);
   });
   const showBackupCard = !mappedProjectId;
   const actionInProgress = cloudAction.kind !== null || backupLoading;
 
   return (
-    <section className="desktop-cloud-project-browser" aria-label="Cloud projects">
+    <section className="desktop-cloud-project-browser" aria-label={t("cloud.project.projects")}>
       <div className="desktop-cloud-project-browser-header">
         <div>
-          <h1>Cloud Projects</h1>
+          <h1>{t("cloud.project.projects")}</h1>
         </div>
         <button className="desktop-cloud-project-browser-link" type="button" onClick={onOpenCloudProjects}>
           <ExternalLink size={14} />
-          <span>Open Cloud</span>
+          <span>{t("cloud.common.openCloud")}</span>
         </button>
       </div>
 
@@ -114,6 +118,7 @@ export function CloudProjectBrowserSignedOut({
   onSignedOut: () => void;
   onRefresh: () => void | Promise<void>;
 }) {
+  const { t } = useLocalization();
   const auth = useCloudAuthController({
     cloudApiBaseUrl: apiBaseUrl,
     accountEmail,
@@ -124,40 +129,32 @@ export function CloudProjectBrowserSignedOut({
   const signedIn = Boolean(auth.signedInEmail);
 
   return (
-    <section className="desktop-cloud-project-auth-stage" aria-label="Sign in to Puppyone Cloud">
-      <div className="desktop-cloud-project-auth-body">
-        <div className="desktop-cloud-project-auth-shell">
-          <div className="desktop-cloud-project-auth-visual" aria-hidden="true">
-            <div className="desktop-cloud-login-logo">
-              <CloudProductMark />
-            </div>
-          </div>
-          <div className="desktop-cloud-project-auth-content">
-            <header className="desktop-cloud-project-auth-copy">
-              <h1>Puppyone Cloud</h1>
-            </header>
-            <p className="desktop-cloud-project-auth-description">
-              Back up this workspace, collaborate with your team, and keep MCP and CLI access available around the clock.
-            </p>
-            <div className="desktop-cloud-project-auth-action">
-              <CloudAuthCard
-                view={signedIn ? "signedIn" : auth.view}
-                signedInEmail={auth.signedInEmail}
-                signInLabel="Sign in"
-                loading={auth.loading}
-                signingOut={auth.signingOut}
-                error={auth.error}
-                message={auth.message}
-                onProviderLogin={auth.startProviderLogin}
-                onOpenCloud={() => openCloudApp("/projects")}
-                onRefresh={onRefresh}
-                onSignOut={auth.handleSignOut}
-              />
-            </div>
-          </div>
+    <DesktopEntryState
+      className="desktop-cloud-project-auth-entry"
+      ariaLabel={t("cloud.auth.signInToCloud")}
+      visual={(
+        <div className="desktop-cloud-login-logo">
+          <CloudProductMark />
         </div>
-      </div>
-    </section>
+      )}
+      title={t("cloud.productName")}
+      description={t("cloud.auth.description")}
+      action={(
+        <CloudAuthCard
+          view={signedIn ? "signedIn" : auth.view}
+          signedInEmail={auth.signedInEmail}
+          signInLabel={t("cloud.auth.signIn")}
+          loading={auth.loading}
+          signingOut={auth.signingOut}
+          error={auth.error}
+          message={auth.message}
+          onProviderLogin={auth.startProviderLogin}
+          onOpenCloud={() => openCloudApp("/projects")}
+          onRefresh={onRefresh}
+          onSignOut={auth.handleSignOut}
+        />
+      )}
+    />
   );
 }
 
@@ -182,6 +179,8 @@ function CloudProjectCard({
   onSelectProject: (project: DesktopCloudProject) => void;
   onConnectProject: (project: DesktopCloudProject) => void;
 }) {
+  const localization = useLocalization();
+  const { t } = localization;
   const preview = useCloudProjectPreview({
     session,
     projectId: project.id,
@@ -190,7 +189,7 @@ function CloudProjectCard({
     onSessionChange,
   });
   const connectionCount = project.access_point_count ?? 0;
-  const updatedLabel = project.updated_at ? formatRelativeTime(project.updated_at) : "";
+  const updatedLabel = project.updated_at ? formatRelativeTime(project.updated_at, localization) : "";
   const previewItems: ProjectFolderPreviewItem[] = preview.entries.map((entry) => ({
     id: entry.path || entry.name,
     name: entry.name || entry.path,
@@ -207,14 +206,14 @@ function CloudProjectCard({
   return (
     <ProjectFolderCard
       title={project.name}
-      badge={mapped ? "Linked" : null}
+      badge={mapped ? t("cloud.project.linked") : null}
       previewItems={previewItems}
       previewLoading={preview.loading}
       previewError={preview.error}
-      emptyLabel={project.description || "Empty project"}
+      emptyLabel={project.description || t("cloud.project.empty")}
       footer={{
         statusConnected: connectionCount > 0,
-        updatedLabel: updatedLabel || "Recently updated",
+        updatedLabel: updatedLabel || t("cloud.project.recentlyUpdated"),
         connectionCount,
       }}
       actions={!mapped ? (
@@ -228,7 +227,7 @@ function CloudProjectCard({
             onConnectProject(project);
           }}
         >
-          {attachBusy ? "Linking…" : "Link folder"}
+          {t(attachBusy ? "cloud.project.linking" : "cloud.project.linkFolder")}
         </button>
       ) : null}
       onSelect={() => onSelectProject(project)}
@@ -245,9 +244,10 @@ function CloudProjectNewCard({
   disabled: boolean;
   onClick: () => void;
 }) {
+  const { t } = useLocalization();
   return (
     <ProjectFolderNewCard
-      label={loading ? "Creating backup…" : "Back up current folder"}
+      label={t(loading ? "cloud.project.creatingBackup" : "cloud.project.backupCurrentFolder")}
       loading={loading}
       disabled={disabled}
       onClick={onClick}

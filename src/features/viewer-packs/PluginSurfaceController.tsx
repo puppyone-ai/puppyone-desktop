@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { EditorDocument } from "@puppyone/shared-ui";
 import type { ViewerContribution, ViewerPackSessionDescriptor } from "@puppyone/shared-ui";
+import { bidiIsolate, useLocalization } from "@puppyone/localization";
 
 type Bounds = { x: number; y: number; width: number; height: number };
 
@@ -30,6 +31,7 @@ export function PluginSurfaceController({
   contribution,
   workspaceRoot,
 }: PluginSurfaceControllerProps) {
+  const { t } = useLocalization();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [session, setSession] = useState<ViewerPackSessionDescriptor | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,22 +63,22 @@ export function PluginSurfaceController({
       if (payload.sessionId !== sessionIdRef.current) return;
       setStatus(payload.state.status === "loading" ? "activating" : payload.state.status);
       if (payload.state.status === "error") {
-        setError(payload.state.message ?? "Viewer Pack reported an error.");
+        setError(payload.state.message ?? t("workspace.viewerPack.reportedError"));
       }
     });
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let cancelled = false;
     const bridge = getDesktopBridge();
     if (!bridge) {
       setStatus("error");
-      setError("Viewer Pack host bridge is unavailable.");
+      setError(t("workspace.viewerPack.hostUnavailable"));
       return undefined;
     }
     if (!workspaceRoot) {
       setStatus("error");
-      setError("Workspace root is required to activate a Viewer Pack.");
+      setError(t("workspace.viewerPack.rootRequired"));
       return undefined;
     }
 
@@ -126,6 +128,7 @@ export function PluginSurfaceController({
     document.path,
     measureBounds,
     publishBounds,
+    t,
     workspaceRoot,
   ]);
 
@@ -162,14 +165,16 @@ export function PluginSurfaceController({
         ref={hostRef}
         className="viewer-pack-surface-host"
         data-status={status}
-        aria-label={`${contribution.label} viewer surface`}
+        aria-label={t("workspace.viewerPack.surfaceAria", { viewer: bidiIsolate(contribution.label) })}
       />
       {status === "activating" && (
-        <div className="viewer-pack-surface-status">Activating {contribution.label}…</div>
+        <div className="viewer-pack-surface-status">
+          {t("workspace.viewerPack.activating", { viewer: bidiIsolate(contribution.label) })}
+        </div>
       )}
       {status === "error" && (
         <div className="viewer-pack-surface-status viewer-pack-surface-status--error" role="alert">
-          <strong>Viewer Pack failed to activate</strong>
+          <strong>{t("workspace.viewerPack.activationFailed")}</strong>
           <span>{error}</span>
         </div>
       )}

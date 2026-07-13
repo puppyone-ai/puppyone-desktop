@@ -1,54 +1,55 @@
 import type { ReactNode } from "react";
 import { GitBranch, Server, SquareTerminal } from "lucide-react";
+import type { MessageFormatter } from "@puppyone/localization/core";
 
 export type CloudAccessFilter = "all" | "cli" | "git" | "mcp";
 export type CloudAccessIconComponent = (props: { size?: number; className?: string }) => ReactNode;
 
 export type CloudAccessFilterDescriptor = {
   id: CloudAccessFilter;
-  label: string;
-  title: string;
-  description: string;
-  emptyTitle: string;
-  emptyDetail: string;
+  labelId: string;
+  titleId: string;
+  descriptionId: string;
+  emptyTitleId: string;
+  emptyDetailId: string;
   icon: CloudAccessIconComponent;
 };
 
 export const CLOUD_ACCESS_FILTERS: CloudAccessFilterDescriptor[] = [
   {
     id: "all",
-    label: "All Access",
-    title: "Access",
-    description: "Manage Git, CLI, and MCP access for this Cloud project.",
-    emptyTitle: "No access surfaces",
-    emptyDetail: "Open the Cloud Access page to create a scoped key, MCP endpoint, or connector.",
+    labelId: "cloud.access.filter.all.label",
+    titleId: "cloud.access.filter.all.title",
+    descriptionId: "cloud.access.filter.all.description",
+    emptyTitleId: "cloud.access.filter.all.emptyTitle",
+    emptyDetailId: "cloud.access.filter.all.emptyDetail",
     icon: AccessChainIcon,
   },
   {
     id: "cli",
-    label: "Puppyone CLI",
-    title: "Puppyone CLI",
-    description: "Terminal access keys and commands for reading or writing this Cloud project.",
-    emptyTitle: "No CLI access",
-    emptyDetail: "Create or regenerate an access key before using Puppyone CLI.",
+    labelId: "cloud.access.filter.cli.label",
+    titleId: "cloud.access.filter.cli.title",
+    descriptionId: "cloud.access.filter.cli.description",
+    emptyTitleId: "cloud.access.filter.cli.emptyTitle",
+    emptyDetailId: "cloud.access.filter.cli.emptyDetail",
     icon: SquareTerminal,
   },
   {
     id: "git",
-    label: "Git Remote",
-    title: "Git Remote",
-    description: "Git clone, fetch, push, and remote commands generated from Cloud access keys.",
-    emptyTitle: "No Git remote access",
-    emptyDetail: "Create or regenerate an access key before using this Cloud project as a Git remote.",
+    labelId: "cloud.access.filter.git.label",
+    titleId: "cloud.access.filter.git.title",
+    descriptionId: "cloud.access.filter.git.description",
+    emptyTitleId: "cloud.access.filter.git.emptyTitle",
+    emptyDetailId: "cloud.access.filter.git.emptyDetail",
     icon: GitBranch,
   },
   {
     id: "mcp",
-    label: "MCP Endpoints",
-    title: "MCP Endpoints",
-    description: "MCP server endpoints that expose scoped project data to agents and tools.",
-    emptyTitle: "No MCP endpoints",
-    emptyDetail: "Create an MCP endpoint in Cloud Access, then it will appear here.",
+    labelId: "cloud.access.filter.mcp.label",
+    titleId: "cloud.access.filter.mcp.title",
+    descriptionId: "cloud.access.filter.mcp.description",
+    emptyTitleId: "cloud.access.filter.mcp.emptyTitle",
+    emptyDetailId: "cloud.access.filter.mcp.emptyDetail",
     icon: Server,
   },
 ];
@@ -59,6 +60,18 @@ export const CLOUD_ACCESS_BUILTIN_FILTERS = CLOUD_ACCESS_FILTERS.filter((item) =
 
 export function getCloudAccessFilterDescriptor(filter: CloudAccessFilter): CloudAccessFilterDescriptor {
   return CLOUD_ACCESS_FILTERS.find((item) => item.id === filter) ?? CLOUD_ACCESS_FILTERS[0];
+}
+
+export function getCloudAccessFilterPresentation(filter: CloudAccessFilter, t: MessageFormatter) {
+  const descriptor = getCloudAccessFilterDescriptor(filter);
+  return {
+    ...descriptor,
+    label: t(descriptor.labelId),
+    title: t(descriptor.titleId),
+    description: t(descriptor.descriptionId),
+    emptyTitle: t(descriptor.emptyTitleId),
+    emptyDetail: t(descriptor.emptyDetailId),
+  };
 }
 
 export function AccessChainIcon({ size = 15, className }: { size?: number; className?: string }) {

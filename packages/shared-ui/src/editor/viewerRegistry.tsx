@@ -27,6 +27,7 @@ import {
   VideoResourceViewer,
 } from "./viewers/ResourceViewers";
 import { formatJson } from "./viewers/viewerUtils";
+import { useLocalization } from "@puppyone/localization/react";
 
 const PRESET_VIEWER_IMPLEMENTATION_KEYS = new Set([
   "id",
@@ -251,10 +252,13 @@ const PRESET_VIEWER_DEFINITIONS: PresetViewerContribution[] = [
 const FALLBACK_VIEWER = definePresetViewer({
   id: "document-placeholder",
   match: () => true,
-  render: ({ document, content }) => (
-    <DocumentPreview document={document} title={content || "Binary file"} />
-  ),
+  render: (context) => <FallbackDocumentPreview {...context} />,
 });
+
+function FallbackDocumentPreview({ document, content }: Parameters<NonNullable<PresetViewerImplementation["render"]>>[0]) {
+  const { t } = useLocalization();
+  return <DocumentPreview document={document} title={content || t("editor.preview.binaryFile")} />;
+}
 
 export const PRESET_VIEWER_REGISTRY = assertCompletePresetViewerRegistry(
   createPresetViewerRegistry(PRESET_VIEWER_DEFINITIONS, FALLBACK_VIEWER),

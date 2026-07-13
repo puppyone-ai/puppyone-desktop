@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   listCloudAutomationProviderSpecs,
   openCloudApp,
@@ -8,6 +9,7 @@ import {
 } from "../../lib/cloudApi";
 import { CloudProjectBrowserSignedOut } from "../cloud/components/ProjectBrowser";
 import { CloudWorkspaceLoadingState } from "../cloud/components/shared";
+import { formatCloudMessage } from "../cloud/cloudPresentation";
 import type { DesktopCloudAccessDataState } from "../cloud/data/useDesktopCloudAccessData";
 import {
   formatProviderLabel,
@@ -42,6 +44,7 @@ export function DesktopCloudAutomationView({
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onRefresh: () => void | Promise<void>;
 }) {
+  const { t } = useLocalization();
   const [detailRowId, setDetailRowId] = useState<string | null>(null);
   const [providerSpecs, setProviderSpecs] = useState<DesktopCloudAutomationProviderSpec[]>([]);
   const [providerSpecsLoading, setProviderSpecsLoading] = useState(true);
@@ -80,7 +83,7 @@ export function DesktopCloudAutomationView({
       .catch((error) => {
         if (cancelled) return;
         setProviderSpecs([]);
-        setProviderSpecsError(error instanceof Error ? error.message : "Unable to load Automation sources.");
+        setProviderSpecsError(error instanceof Error ? error.message : String(error));
       })
       .finally(() => {
         if (!cancelled) setProviderSpecsLoading(false);
@@ -100,7 +103,7 @@ export function DesktopCloudAutomationView({
     return (
       <div className="desktop-cloud-main-view desktop-cloud-automation-main-view">
         <div className="desktop-cloud-page-shell desktop-cloud-automation-page-shell">
-          <CloudWorkspaceLoadingState label="Loading Cloud session" />
+          <CloudWorkspaceLoadingState label={t("automation.view.loadingCloudSession")} />
         </div>
       </div>
     );
@@ -126,7 +129,7 @@ export function DesktopCloudAutomationView({
     return (
       <div className="desktop-cloud-main-view">
         <div className="desktop-cloud-page-shell">
-          <div className="desktop-cloud-main-alert">No Cloud project is active.</div>
+          <div className="desktop-cloud-main-alert">{t("automation.view.noActiveProject")}</div>
         </div>
       </div>
     );
@@ -158,8 +161,8 @@ export function DesktopCloudAutomationView({
   return (
     <div className="desktop-cloud-main-view desktop-cloud-automation-main-view">
       <div className="desktop-cloud-page-shell desktop-cloud-automation-page-shell">
-        {accessData.error && <div className="desktop-cloud-main-alert">{accessData.error}</div>}
-        {accessData.warning && <div className="desktop-cloud-main-alert">{accessData.warning}</div>}
+        {accessData.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(accessData.error, t)}</div>}
+        {accessData.warning && <div className="desktop-cloud-main-alert">{formatCloudMessage(accessData.warning, t)}</div>}
         {automationPage}
       </div>
     </div>
@@ -175,8 +178,14 @@ export function DesktopCloudAutomationSidebar({
   activeProvider: string | null;
   onSelectProvider: (provider: string | null) => void;
 }) {
+  const localization = useLocalization();
+  const { t } = localization;
   const automationConnectors = accessData.connectors.filter(isCloudAutomationConnector);
-  const providerGroups = getAutomationSidebarProviderGroups(automationConnectors);
+  const providerGroups = getAutomationSidebarProviderGroups(
+    automationConnectors,
+    localization.getCollator({ sensitivity: "base" }),
+    t,
+  );
   const providerKey = providerGroups.map((group) => group.provider).join("|");
 
   useEffect(() => {
@@ -188,7 +197,7 @@ export function DesktopCloudAutomationSidebar({
   return (
     <section className="desktop-tool-sidebar desktop-cloud-service-sidebar desktop-cloud-automation-type-sidebar">
       <div className="desktop-tool-sidebar-list desktop-cloud-sidebar-list">
-        <nav className="desktop-cloud-sidebar-nav" aria-label="Cloud automation">
+        <nav className="desktop-cloud-sidebar-nav" aria-label={t("automation.page.cloudAutomation")}>
           <button
             className={`desktop-tool-sidebar-row desktop-cloud-sidebar-nav-row ${activeProvider ? "" : "active"}`}
             type="button"
@@ -198,7 +207,7 @@ export function DesktopCloudAutomationSidebar({
             <span className="desktop-cloud-sidebar-nav-icon">
               <AutomationGridIcon size={15} />
             </span>
-            <span className="desktop-cloud-sidebar-nav-label">All automations</span>
+            <span className="desktop-cloud-sidebar-nav-label">{t("automation.sidebar.all")}</span>
             {automationConnectors.length > 0 && (
               <span className="desktop-cloud-sidebar-nav-count">{automationConnectors.length}</span>
             )}
@@ -226,13 +235,13 @@ export function DesktopCloudAutomationSidebar({
               );
             })}
             {accessData.loading && providerGroups.length === 0 && (
-              <div className="desktop-cloud-automation-nav-empty" role="status">Loading automation</div>
+              <div className="desktop-cloud-automation-nav-empty" role="status">{t("automation.sidebar.loading")}</div>
             )}
             {!accessData.loading && accessData.error && (
-              <div className="desktop-cloud-automation-nav-empty" role="status">{accessData.error}</div>
+              <div className="desktop-cloud-automation-nav-empty" role="status">{formatCloudMessage(accessData.error, t)}</div>
             )}
             {!accessData.loading && !accessData.error && providerGroups.length === 0 && (
-              <div className="desktop-cloud-automation-nav-empty">No active automation</div>
+              <div className="desktop-cloud-automation-nav-empty">{t("automation.sidebar.noneActive")}</div>
             )}
           </div>
         </nav>
@@ -241,7 +250,11 @@ export function DesktopCloudAutomationSidebar({
   );
 }
 
-function getAutomationSidebarProviderGroups(connectors: DesktopCloudConnector[]) {
+function getAutomationSidebarProviderGroups(
+  connectors: DesktopCloudConnector[],
+  collator: Intl.Collator,
+  t: ReturnType<typeof useLocalization>["t"],
+) {
   const groups = new Map<string, {
     provider: string;
     label: string;
@@ -251,12 +264,12 @@ function getAutomationSidebarProviderGroups(connectors: DesktopCloudConnector[])
   for (const connector of connectors) {
     const group = groups.get(connector.provider) ?? {
       provider: connector.provider,
-      label: formatProviderLabel(connector.provider),
+      label: formatProviderLabel(connector.provider, t),
       connectors: [],
     };
     group.connectors.push(connector);
     groups.set(connector.provider, group);
   }
 
-  return [...groups.values()].sort((left, right) => left.label.localeCompare(right.label));
+  return [...groups.values()].sort((left, right) => collator.compare(left.label, right.label));
 }

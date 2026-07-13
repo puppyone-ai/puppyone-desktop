@@ -11,6 +11,7 @@ import type {
 } from "../src/lib/cloudApi";
 import { CloudNewAutomationDialog } from "../src/features/automation/AutomationDialogs";
 import type { AutomationTemplate } from "../src/features/automation/automationTemplates";
+import { stripBidiIsolation, withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -29,8 +30,7 @@ describe("CloudNewAutomationDialog", () => {
         id: "google-docs",
         provider: "google_docs",
         sourceLabel: "Google Docs",
-        title: "Collect Google Docs",
-        description: "Bring shared documents into this project.",
+        presentation: "catalog",
         categories: ["popular", "documents"],
         iconUrl: null,
       },
@@ -54,7 +54,7 @@ describe("CloudNewAutomationDialog", () => {
     act(() => chooseButtons[1]?.click());
     act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "Continue")?.click());
-    expect(container.querySelector("h2")?.textContent).toBe("Configure Web Page");
+    expect(stripBidiIsolation(container.querySelector("h2")?.textContent)).toBe("Configure Web Page");
   });
 
   it("uses source selection only for the generic New action", () => {
@@ -74,7 +74,7 @@ function renderDialog({ template }: { template: AutomationTemplate | null }) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root?.render(
+  act(() => root?.render(withTestLocalization(
     <CloudNewAutomationDialog
       projectId="project-1"
       cloudSession={{} as DesktopCloudSession}
@@ -91,7 +91,7 @@ function renderDialog({ template }: { template: AutomationTemplate | null }) {
       onCreated={vi.fn()}
       onClose={vi.fn()}
     />,
-  ));
+  )));
   return container;
 }
 

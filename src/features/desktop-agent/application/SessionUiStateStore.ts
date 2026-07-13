@@ -41,7 +41,7 @@ export class SessionUiStateStore {
   }
 
   patch(key: string, value: Partial<SessionUiState>) {
-    const current = this.read(key);
+    const current = this.entries.get(key) ?? EMPTY_SESSION_UI;
     const measurements = value.measurements
       ? Object.fromEntries(Object.entries(value.measurements).slice(-this.maxMeasurementsPerSession))
       : current.measurements;

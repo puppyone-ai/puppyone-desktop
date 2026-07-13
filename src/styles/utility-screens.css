@@ -103,7 +103,7 @@
 
 .panic-undo {
   position: absolute;
-  right: 18px;
+  inset-inline-end: 18px;
   bottom: 18px;
   z-index: 12;
   display: inline-flex;

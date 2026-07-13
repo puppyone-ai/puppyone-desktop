@@ -1,0 +1,17 @@
+{
+  "messageUnavailable": "This text is unavailable.",
+  "action.cancel": "Cancel",
+  "action.close": "Close",
+  "action.confirm": "Confirm",
+  "action.retry": "Retry",
+  "action.apply": "Apply",
+  "action.reset": "Reset",
+  "action.refresh": "Refresh",
+  "action.copy": "Copy",
+  "action.clear": "Clear",
+  "action.copied": "Copied",
+  "action.change": "Change",
+  "action.chooseApp": "Choose App",
+  "action.save": "Save",
+  "status.loading": "Loading…"
+}

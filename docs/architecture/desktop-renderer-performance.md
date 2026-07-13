@@ -24,6 +24,23 @@ first cold Markdown open while workspace content indexing is enabled.
 These are production Electron budgets. Happy-DOM benchmarks are same-machine
 trend evidence and are not cross-machine absolute gates.
 
+Before any editor file-size cap is raised, the production harness must also run
+1 MiB, 5 MiB, and 20 MiB profiles plus oversized single-block fixtures. The
+acceptance conditions are structural as well as temporal:
+
+| Oversized case | Required bound |
+|---|---:|
+| Windowed table mounted rows | visible rows + configured overscan + interaction-pinned rows |
+| Windowed block DOM | O(visible logical items), not O(total logical items) |
+| Oversized block path-owned Long Tasks | 0 over 50ms |
+| Scroll-anchor corrections per settled measurement batch | <= 1 |
+| Stale async block commits after edit/unmount | 0 |
+
+Byte, line, logical-item, DOM-node, nesting, asset, and compute thresholds are
+reported with each benchmark result. Raising a threshold without updating the
+reference trace and memory/DOM evidence is an architecture change, not a local
+widget tweak.
+
 ## Two scheduling lanes
 
 ```text
@@ -90,16 +107,25 @@ canceled on file switch or unmount.
 - existing decoration sets map through `ChangeSet`;
 - `iterChangedRanges` expands edits only to stable neighboring blocks;
 - focus/reveal patches only the previous and next reveal ranges;
-- viewport changes replace the visible partition plus bounded overscan;
+- viewport changes do not dispatch projection transactions;
 - trust, document path, or asset resolver changes are explicit global
-  invalidations; link-graph identity changes invalidate only the viewport;
+  invalidations;
 - structural replacements remain CodeMirror decorations and therefore retain
   line-height, selection, and viewport correctness.
 
-Non-visible presentation decorations are not eagerly materialized. CodeMirror
-keeps its complete incremental Markdown syntax model; scrolling requests the
-new visible presentation partition. This preserves full Markdown behavior
-without a second rich-text document model.
+The complete layout-sensitive decoration set is provided directly before
+CodeMirror computes its viewport. This is full-document range metadata, not
+full-document DOM: CodeMirror still mounts only visible lines and widgets.
+Viewport-only presentation remains a reserved branch for decorations proven
+not to affect glyph metrics, wrapping, height, or measurement. Scrolling is a
+consumer of CodeMirror's height map and must not become an invalidation source.
+
+Document viewport virtualization does not bound one unusually large block. The
+canonical [Markdown architecture oversized-block contract](editor/markdown/architecture.md#46-complexity-budgets-and-oversized-block-execution)
+therefore requires centralized complexity decisions and nested item
+virtualization or typed fallback. Large tables keep total estimated geometry
+but mount only visible rows plus overscan; HTML/code/Mermaid/media use explicit
+feature budgets and never rely on CSS containment as their only bound.
 
 Inline token scanners are line-bounded and advance past an already inspected
 malformed range. They may not rescan the same long suffix for every unmatched
@@ -193,7 +219,8 @@ Changes to this path must retain tests for Explorer DOM/motion bounds and
 interactions, changed-range Markdown projection, source snapshot/flush
 behavior, A/B request cancellation, streaming worker equivalence,
 cancellation and incremental updates, pathological inline-token complexity,
-Markdown round-trip and IME, table interactions, widget/session cleanup, and
+Markdown round-trip and IME, table interactions, oversized-block budget and
+mounted-DOM bounds, active-row recycling/IME, widget/session cleanup, and
 trust/policy/asset/web-embed security. Production smoke must also prove that
 the base EditorView is visually hidden before `preview_ready` and visible only
 after the matching revision commits. The final gate is `npm test`,

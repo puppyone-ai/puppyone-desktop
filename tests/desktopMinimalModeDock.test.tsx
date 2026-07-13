@@ -6,6 +6,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DesktopMinimalModeDock } from "../src/features/app-shell/DesktopMinimalModeDock";
+import { renderWithTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -23,7 +24,7 @@ function renderDock(overrides: Partial<React.ComponentProps<typeof DesktopMinima
   const onNavigate = vi.fn();
   const onExitMinimalMode = vi.fn();
   root = createRoot(container);
-  act(() => root?.render(
+  act(() => renderWithTestLocalization(root,
     <DesktopMinimalModeDock
       activeView="data"
       cloudHubEnabled

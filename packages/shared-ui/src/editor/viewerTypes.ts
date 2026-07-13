@@ -47,6 +47,12 @@ export type EditorDocument = {
 
 export type EditorMode = "live" | "source";
 export type EditorSaveMode = "manual" | "auto";
+export type EditorInteractionPreferences = Readonly<{
+  markdownBlockDragEnabled: boolean;
+}>;
+export const DEFAULT_EDITOR_INTERACTION_PREFERENCES: EditorInteractionPreferences = {
+  markdownBlockDragEnabled: false,
+};
 export type EditorSourceRequirement = PresetViewerSource;
 export type MarkdownHtmlTrustMode = "safe" | "localTrusted";
 
@@ -119,6 +125,7 @@ export type PresetViewerRenderContext = EditorViewerMatch & {
   canEdit: boolean;
   hideSourceView: boolean;
   fileIconTheme: FileIconThemeId;
+  editorInteractionPreferences: EditorInteractionPreferences;
   saveMode: EditorSaveMode;
   htmlTrustMode: MarkdownHtmlTrustMode;
   workspaceId?: string;

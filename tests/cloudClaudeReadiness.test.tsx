@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CloudClaudeSection } from "../src/features/cloud/sections/ClaudeSection";
 import type { DesktopCloudProjectReadiness } from "../src/lib/cloudApi";
+import { renderWithTestLocalization, stripBidiIsolation } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -54,7 +55,7 @@ function renderClaude(input: {
     onOpenGitSync: vi.fn(),
     onOpenClaude: vi.fn(),
   };
-  act(() => root?.render(
+  act(() => renderWithTestLocalization(root,
     <CloudClaudeSection
       readiness={input.state}
       identity={{ project_id: "project-1", url: "https://cloud.example/git/ap/key.git", scopes: [] }}
@@ -80,7 +81,7 @@ describe("Claude root Git readiness", () => {
   it("offers first-push guidance when root Git exists without an accepted head", () => {
     const { container, callbacks } = renderClaude({ state: readiness("awaiting_first_push") });
     const action = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Push your first commit");
-    expect(container.textContent).toContain("Cloud has not accepted the first root Git push on main");
+    expect(stripBidiIsolation(container.textContent)).toContain("Cloud has not accepted the first root Git push on main");
     act(() => action?.click());
     expect(callbacks.onOpenGitSync).toHaveBeenCalledOnce();
     expect(callbacks.onOpenClaude).not.toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { DOCX_REDLINE_BUDGET, DOCX_REDLINE_FIDELITY_NOTE } from "../budget";
+import { DOCX_REDLINE_BUDGET } from "../budget";
 import { DOCX_REDLINE_RENDERER_VERSION, type DocxRedlinePresentation } from "../model";
 import { alignDocxBlocks, summarizeDocxChanges } from "./align";
 import { parseDocxRevision } from "./package";
@@ -44,7 +44,7 @@ export async function buildDocxRedlinePresentation(
     stats,
     changes,
     truncated,
-    fidelityNote: DOCX_REDLINE_FIDELITY_NOTE,
+    fidelity: "body-text-v1",
   };
 }
 

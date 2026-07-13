@@ -1,3 +1,4 @@
+import { installBrokenStdioGuards } from "./main/stdio-guard.mjs";
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, session as electronSession, shell, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
@@ -32,6 +33,7 @@ import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
+import { registerLocalizationIpcHandlers } from "./main/ipc/localization-ipc.mjs";
 import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
 import { registerTerminalIpcHandlers } from "./main/ipc/terminal-ipc.mjs";
@@ -47,6 +49,7 @@ import { createTerminalService } from "./main/terminal-service.mjs";
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
+import { createDesktopLocaleService } from "./main/localization/desktop-locale-service.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
 import {
@@ -54,6 +57,11 @@ import {
   loadViewerPackRuntime,
 } from "./main/viewer-packs/bootstrap.mjs";
 import { resolveViewerPackFeatureProfile } from "./main/viewer-packs/feature-profile.mjs";
+
+// Must run before any console.* / IPC replyWithError logging: broken inherited
+// stdout/stderr (Dock launch, detached child, closed terminal) otherwise throws
+// uncaught `write EIO` / `write EPIPE` and Electron shows a fatal dialog.
+installBrokenStdioGuards();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -107,6 +115,7 @@ let updateService = null;
 let appPreviewRuntime = null;
 let viewerPackHost = null;
 let viewerPackRuntime = null;
+let stopLocaleNativeRefresh = null;
 const windowsById = new Map();
 const windowStateById = new Map();
 const workspaceWindowByPath = new Map();
@@ -116,9 +125,14 @@ const trustedIpcMain = createTrustedIpcMain({
   ipcMain,
   applicationUrl: rendererApplicationUrl,
 });
+const localeService = createDesktopLocaleService({
+  app,
+  getWindows: () => BrowserWindow.getAllWindows(),
+});
 const applicationQuitIntent = createApplicationQuitIntent({ app });
 const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
   dialog,
+  t: (messageId, values) => localeService.t(messageId, values),
   onCloseCancelled: applicationQuitIntent.cancel,
 });
 documentSessionCloseCoordinator.registerIpc(trustedIpcMain);
@@ -176,6 +190,7 @@ if (!gotSingleInstanceLock) {
 }
 
 async function createWindow(options = {}) {
+  await localeService.refreshSystemLanguages();
   const initialWorkspacePath = typeof options.initialWorkspacePath === "string"
     ? path.resolve(options.initialWorkspacePath)
     : null;
@@ -398,7 +413,7 @@ function setDockMenu() {
 
   const dockMenu = Menu.buildFromTemplate([
     {
-      label: "New Window",
+      label: localeService.t("native.dock.newWindow"),
       click: () => {
         void createWindow();
       },
@@ -418,6 +433,10 @@ app.on("second-instance", (_event, argv) => {
 });
 
 app.whenReady().then(async () => {
+  await localeService.initialize();
+  stopLocaleNativeRefresh = localeService.onDidChange(() => {
+    setDockMenu();
+  });
   if (process.platform === "darwin" && app.dock) {
     setDockIcon();
     setDockMenu();
@@ -444,6 +463,7 @@ app.whenReady().then(async () => {
     shell,
     readWorkspaceTextFile,
     resolveWorkspacePath: resolveLocalWorkspacePath,
+    t: (messageId, values) => localeService.t(messageId, values),
   });
   if (viewerPackFeatureProfile.externalViewerPacks) {
     viewerPackRuntime = await loadViewerPackRuntime(true);
@@ -469,6 +489,9 @@ app.whenReady().then(async () => {
   });
 
   app.on("activate", () => {
+    void localeService.refreshSystemLanguages().catch((error) => {
+      console.warn("Unable to refresh the system language preference:", error);
+    });
     if (windowsById.size > 0) {
       revealLastFocusedWindow();
       return;
@@ -490,6 +513,8 @@ app.on("window-all-closed", () => {
 // renderer Document Sessions to drain. `will-quit` runs only after every
 // window accepted closing, so a failed flush can safely leave the app usable.
 app.on("will-quit", () => {
+  stopLocaleNativeRefresh?.();
+  localeService.dispose();
   cloudAuthService.dispose();
   updateService?.dispose();
   viewerPackHost?.destroyAllSessions();
@@ -511,6 +536,10 @@ app.on("before-quit", createAgentQuitCoordinator({
 }));
 
 function registerIpcHandlers() {
+  registerLocalizationIpcHandlers({
+    ipcMain: trustedIpcMain,
+    localeService,
+  });
   registerWorkspaceNavigationIpcHandlers({
     ipcMain: trustedIpcMain,
     workspaceStateStore,
@@ -546,6 +575,7 @@ function registerIpcHandlers() {
     shell,
     authorizeWorkspaceRoot,
     localFileCapabilities,
+    t: (messageId, values) => localeService.t(messageId, values),
   });
 
   registerAppPreviewIpcHandlers({
@@ -569,6 +599,7 @@ function registerIpcHandlers() {
     BrowserWindow,
     dialog,
     authorizeWorkspaceRoot,
+    t: (messageId, values) => localeService.t(messageId, values),
   });
   registerTerminalIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -591,6 +622,7 @@ function registerIpcHandlers() {
       authorizeWorkspaceRoot,
       dialog,
       getDialogOwnerWindow,
+      t: (messageId, values) => localeService.t(messageId, values),
     });
     // Plugin bridge (document/resource/ui/host) uses RAW ipcMain because the
     // sandboxed pack frame's URL is never the trusted application URL; each
@@ -604,15 +636,15 @@ function getUpdateRestartBlockers() {
   if (terminalService.getSessionCount() > 0) {
     blockers.push({
       id: "terminal-sessions",
-      label: "Terminal session running",
-      detail: "Close the active terminal session before restarting to update.",
+      label: localeService.t("native.update.blocker.terminal.label"),
+      detail: localeService.t("native.update.blocker.terminal.detail"),
     });
   }
   if (agentService.getSessionCount() > 0) {
     blockers.push({
       id: "agent-sessions",
-      label: "Agent session running",
-      detail: "Close the active Agent session before restarting to update.",
+      label: localeService.t("native.update.blocker.agent.label"),
+      detail: localeService.t("native.update.blocker.agent.detail"),
     });
   }
   return blockers;
@@ -703,7 +735,7 @@ async function selectWorkspaceForNewWindow(sender = null) {
 
 async function showWorkspaceOpenDialog(ownerWindow) {
   const options = {
-    title: "Open local puppyone workspace",
+    title: localeService.t("native.workspace.open.title"),
     properties: ["openDirectory", "createDirectory"],
   };
 

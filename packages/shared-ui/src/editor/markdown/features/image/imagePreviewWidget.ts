@@ -13,9 +13,10 @@ import { markdownExpandedImageEffect } from "../../core/state/expandedImage";
 import {
   getInlineWidgetEdgeX,
   getInlineWidgetTextCoords,
-  MarkdownWidgetMeasureController,
 } from "../../shared/widgets/markdownWidgetMeasure";
+import { MarkdownWidgetMeasureController } from "../../platform/codemirror/layoutCoordinator";
 import { hasPointerMoved } from "../../shared/widgets/widgetDom";
+import { getMarkdownMessage } from "../../core/editor/markdownLocalization";
 
 /**
  * Immutable image atom descriptor. Asset resolution, measure, and listeners
@@ -56,7 +57,7 @@ export class ImagePreviewWidget extends WidgetType {
     wrapper.setAttribute("role", "img");
     wrapper.setAttribute("aria-label", this.alt || this.source);
 
-    const measure = new MarkdownWidgetMeasureController();
+    const measure = new MarkdownWidgetMeasureController(host.layout);
     const abort = new AbortController();
     let activeHandle: AssetBrokerHandle | null = null;
     let pointerDown: { x: number; y: number } | null = null;
@@ -94,8 +95,8 @@ export class ImagePreviewWidget extends WidgetType {
       image.alt = this.alt;
       image.loading = "lazy";
       if (this.title) image.title = this.title;
-      image.addEventListener("load", () => measure.schedule(view));
-      image.addEventListener("error", () => measure.schedule(view));
+      image.addEventListener("load", () => measure.schedule());
+      image.addEventListener("error", () => measure.schedule());
       return image;
     };
     const createPlaceholder = (labelText: string) => {
@@ -105,7 +106,7 @@ export class ImagePreviewWidget extends WidgetType {
       return label;
     };
 
-    wrapper.appendChild(createPlaceholder("Loading image..."));
+    wrapper.appendChild(createPlaceholder(getMarkdownMessage(view, "editor.markdown.loadingImage")));
     const documentPath = this.documentPath || view.state.facet(markdownDocumentPathFacet);
     void host.assets
       .resolve({
@@ -126,15 +127,15 @@ export class ImagePreviewWidget extends WidgetType {
             ? createImage(handle.url)
             : createPlaceholder(this.alt || this.source),
         );
-        measure.schedule(view);
+        measure.schedule();
       })
       .catch(() => {
         if (abort.signal.aborted || !wrapper.isConnected) return;
         wrapper.replaceChildren(createPlaceholder(this.alt || this.source));
-        measure.schedule(view);
+        measure.schedule();
       });
 
-    measure.observe(wrapper, view);
+    measure.observe(wrapper);
     host.sessions.mount(wrapper, () => ({
       dispose() {
         abort.abort();

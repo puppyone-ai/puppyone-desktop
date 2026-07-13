@@ -73,7 +73,7 @@ describe("Electron document close coordination", () => {
       expect.objectContaining({
         defaultId: 0,
         cancelId: 0,
-        detail: "File changed outside PuppyOne",
+        detail: "Keep the window open and try again to avoid losing changes.",
       }),
     );
     expect(harness.window.destroyed).toBe(false);

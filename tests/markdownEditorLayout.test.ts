@@ -48,6 +48,28 @@ describe("Markdown editor layout", () => {
 
     expect(editorRule).toContain("--po-markdown-breakout-right-gutter: 48px;");
   });
+
+  it("keeps task checkbox visuals compact inside a reliable desktop hit target", () => {
+    const taskLineRule = readCssRule(
+      markdownEditorCss,
+      ".markdown-codemirror-editor .cm-md-task-line",
+    );
+    const controlRule = readCssRule(
+      markdownEditorCss,
+      ".markdown-codemirror-editor .cm-md-task-checkbox-widget",
+    );
+    const indicatorRule = readCssRule(
+      markdownEditorCss,
+      ".markdown-codemirror-editor .cm-md-task-checkbox",
+    );
+    expect(taskLineRule).toContain("--md-task-checkbox-hit-size: 24px;");
+    expect(controlRule).toContain("width: var(--md-task-checkbox-hit-size);");
+    expect(controlRule).toContain("height: var(--md-task-checkbox-hit-size);");
+    expect(controlRule).toContain("font: inherit;");
+    expect(indicatorRule).toContain("width: var(--md-task-checkbox-size);");
+    expect(indicatorRule).toContain("pointer-events: none;");
+    expect(markdownEditorCss).not.toMatch(/cm-md-task-checkbox-widget:hover/);
+  });
 });
 
 describe("Markdown rich-block boundary affordance", () => {

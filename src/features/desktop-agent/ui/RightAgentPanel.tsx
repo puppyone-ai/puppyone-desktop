@@ -1,28 +1,34 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useSyncExternalStore } from "react";
-import { CircleAlert, LoaderCircle, RefreshCw } from "lucide-react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useSyncExternalStore } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import { AgentApprovalDock } from "./AgentApprovalDock";
 import { AgentChangesPill } from "./AgentChangesPill";
-import { AgentComposer } from "./AgentComposer";
+import { AgentComposer, DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID } from "./AgentComposer";
+import { AgentPanelLayout } from "./AgentPanelLayout";
+import { AgentPanelStatus } from "./AgentPanelStatus";
+import { AgentProviderPicker } from "./AgentProviderPicker";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
 import { AgentQuestionDock } from "./AgentQuestionDock";
+import { readinessLabel, readinessStatusCode, sessionStatusCode, sessionStatusLabel } from "./agentPanelPresentation";
 import { getAgentSessionController } from "../application/controllerRegistry";
-import { listAgentInferenceProviders, listAgentModelsForProvider } from "../domain/agent-provider-routing";
-import type { AgentSessionMetadata } from "../domain/agent-contract";
-import { getElectronAgentClient, getElectronFilePath } from "../infrastructure/electron/electronAgentClient";
+import type { AgentSubmissionStage } from "../application/agent-controller-state";
+import { listCodingAgentProviders } from "../domain/agent-backend-routing";
+import { getElectronAgentClient } from "../infrastructure/electron/electronAgentClient";
+import { useAgentSessionPreparation } from "./useAgentSessionPreparation";
 import "./desktop-agent.css";
 
 export type RightAgentPanelHandle = { newSession: () => void };
-
 type RightAgentPanelProps = {
   workspace: Workspace;
   active: boolean;
   minimalMode?: boolean;
   onViewChanges?: () => void;
-  onOpenTerminal?: () => void;
   onOpenFile?: (path: string) => void;
   onRunningChange?: (running: boolean) => void;
+  preferredRuntimeId?: string | null;
+  onPreferredRuntimeChange?: (runtimeId: string) => void;
   preferredModel?: string | null;
   onPreferredModelChange?: (model: string) => void;
 };
@@ -32,194 +38,189 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   active,
   minimalMode = false,
   onViewChanges,
-  onOpenTerminal,
   onOpenFile,
   onRunningChange,
+  preferredRuntimeId = null,
+  onPreferredRuntimeChange,
   preferredModel = null,
   onPreferredModelChange,
 }, ref) {
+  const { t } = useLocalization();
   const controller = useMemo(() => getAgentSessionController(workspace.path, getElectronAgentClient), [workspace.path]);
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
-
   useEffect(() => {
-    if (active) void controller.initialize(false);
-  }, [active, controller]);
-
+    if (!active) return;
+    controller.setInitialRuntimePreference(preferredRuntimeId);
+    void controller.initialize(false);
+  }, [active, controller, preferredRuntimeId]);
   useEffect(() => {
-    if (preferredModel && !state.selectedModel) controller.selectModel(preferredModel);
-  }, [controller, preferredModel, state.selectedModel]);
-
+    if (!state.initialized || !state.selectedRuntimeId || state.selectedRuntimeId === preferredRuntimeId) return;
+    onPreferredRuntimeChange?.(state.selectedRuntimeId);
+  }, [onPreferredRuntimeChange, preferredRuntimeId, state.initialized, state.selectedRuntimeId]);
+  useEffect(() => {
+    if (
+      preferredModel
+      && !state.selectedModel
+      && state.inspection?.selectedRuntimeId === state.selectedRuntimeId
+      && state.inspection.models.some((model) => model.model === preferredModel)
+    ) controller.selectModel(preferredModel);
+  }, [controller, preferredModel, state.inspection, state.selectedModel, state.selectedRuntimeId]);
   useEffect(() => {
     onRunningChange?.(Boolean(state.projection.runningTurnId));
   }, [onRunningChange, state.projection.runningTurnId]);
-
   useImperativeHandle(ref, () => ({ newSession: () => { void controller.newSession(); } }), [controller]);
-
   const inspection = state.inspection;
   const readiness = inspection?.readiness;
   const runtime = state.session?.runtime
     || inspection?.runtime
     || inspection?.runtimes?.find((entry) => entry.descriptor.id === state.selectedRuntimeId)?.descriptor;
-  const runtimeLabel = runtime?.displayName || "Agent";
+  const runtimeLabel = runtime?.displayName || t("agent.name");
   const capabilities = inspection?.capabilities;
   const unavailable = Boolean(readiness && readiness.status !== "ready");
   const loading = state.phase === "discovering" || state.phase === "restoring" || state.phase === "creating";
   const failed = state.phase === "failed" || state.phase === "runtime-exited";
-  const viewport = controller.readViewport();
-  const providers = listAgentInferenceProviders(inspection);
-  const providerModels = listAgentModelsForProvider(inspection, state.selectedProviderId);
+  const hasCommittedTranscript = [state.projection.rows, state.projection.parts, state.projection.messages, state.projection.activities]
+    .some((entries) => entries.length > 0);
+  const startupLoading = active && (!state.initialized || loading) && !state.pendingPrompt && !hasCommittedTranscript;
+  const sessionKey = state.session?.id || "new-agent-session";
+  const viewport = useMemo(() => ({ sessionKey, value: controller.readViewport() }), [controller, sessionKey]).value;
+  const agentProviders = useMemo(() => listCodingAgentProviders(inspection), [inspection]);
+  const codingProviderSelected = agentProviders.some((entry) => entry.descriptor.id === state.selectedRuntimeId);
+  const providerModels = codingProviderSelected ? inspection?.models ?? [] : [];
+  const modelSelectionAvailable = Boolean(capabilities?.modelSelection);
   const routingReady = Boolean(
-    state.selectedProviderId
-    && state.selectedModel
-    && providerModels.some((model) => model.model === state.selectedModel),
+    codingProviderSelected
+    && (!modelSelectionAvailable || (
+      state.selectedModel && providerModels.some((model) => model.model === state.selectedModel)
+    )),
   );
+  const preparingSession = state.sessionPreparation === "preparing";
+  const submissionPending = state.submitting || Boolean(state.pendingPrompt);
+  const submissionStage: AgentSubmissionStage = state.pendingPrompt && !state.projection.runningTurnId
+    ? !state.session || preparingSession ? "preparing-session" : "starting-turn"
+    : null;
+  useAgentSessionPreparation(controller, state, active && routingReady);
   const composerPlaceholder = unavailable || failed
-    ? "Draft while PuppyOne prepares the Agent"
-    : !state.selectedProviderId
-      ? "Choose a provider to start"
-      : !state.selectedModel
-        ? "Choose a model to start"
+    ? t("agent.composer.placeholder.preparing")
+    : !codingProviderSelected
+      ? t("agent.composer.placeholder.chooseAgent")
+      : modelSelectionAvailable && !state.selectedModel
+        ? t("agent.composer.placeholder.chooseModel")
         : state.projection.rows.length > 0 || state.projection.messages.length > 0
-          ? "Send follow-up"
-          : "Ask anything";
+          ? t("agent.composer.placeholder.followUp")
+          : t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID);
+  const sessionStatus = state.session?.terminalState;
+  const statusCode = state.session ? sessionStatusCode(sessionStatus) : readinessStatusCode(readiness?.status);
+
+  const hasStatus = unavailable || failed || Boolean(state.error);
+  const handleViewportChange = useCallback((scrollTop: number, measurements: Record<string, number>, pinned: boolean) => {
+    controller.rememberViewport(scrollTop, measurements, pinned);
+  }, [controller]);
+  const handleDraftChange = useCallback((draft: string) => controller.setDraft(draft), [controller]);
+  const handleSubmit = useCallback((prompt: string) => controller.submit(prompt), [controller]);
+  const handleSelectModel = useCallback((model: string) => {
+    controller.selectModel(model);
+    onPreferredModelChange?.(model);
+  }, [controller, onPreferredModelChange]);
+  const handleSelectRuntime = useCallback((providerId: string) => {
+    void controller.selectRuntime(providerId).then((switched) => {
+      const model = controller.getSnapshot().selectedModel;
+      if (switched) onPreferredRuntimeChange?.(providerId);
+      if (switched && model) onPreferredModelChange?.(model);
+    });
+  }, [controller, onPreferredModelChange, onPreferredRuntimeChange]);
 
   return (
-    <section className="desktop-agent-panel" aria-label={`${runtimeLabel} Chat`} data-minimal-mode={minimalMode ? "true" : undefined} data-phase={state.phase}>
-      {!minimalMode && (
+    <AgentPanelLayout
+      ariaLabel={t("agent.panel.chat", { agent: bidiIsolate(runtimeLabel) })}
+      phase={state.phase}
+      header={minimalMode ? null : (
         <AgentSurfaceHeader
-          title={state.session?.title || "New chat"}
+          title={state.session?.title || t("agent.header.newChat")}
           runtimeLabel={runtimeLabel}
-          statusLabel={state.session ? sessionStatusLabel(state.session.terminalState) : readinessLabel(readiness?.status)}
+          statusCode={statusCode}
+          statusLabel={state.session ? sessionStatusLabel(sessionStatus, t) : readinessLabel(readiness?.status, t)}
           loading={loading}
-          newSessionDisabled={unavailable || !routingReady || Boolean(state.projection.runningTurnId)}
+          newSessionDisabled={unavailable || !routingReady || preparingSession || submissionPending || Boolean(state.projection.runningTurnId)}
           onNewSession={() => void controller.newSession()}
+          agentSelector={<AgentProviderPicker
+            agentProviders={agentProviders}
+            selectedAgentProviderId={codingProviderSelected ? state.selectedRuntimeId : null}
+            disabled={loading || preparingSession || submissionPending || Boolean(state.projection.runningTurnId)}
+            onSelectAgentProvider={handleSelectRuntime}
+          />}
           diagnostic={readiness?.diagnostic || (inspection?.warnings.length ? inspection.warnings.join(" ") : null)}
-          closeDisabled={!state.session || Boolean(state.projection.runningTurnId)}
-          history={state.history}
-          activeSessionId={state.session?.id}
-          onSelectSession={(sessionId) => void controller.switchSession(sessionId)}
-          onForkSession={capabilities?.fork ? () => void controller.forkSession() : undefined}
-          onArchiveSession={state.session ? () => void controller.archiveSession() : undefined}
-          onDeleteSession={state.session ? () => void controller.deleteSession() : undefined}
           onCompactSession={capabilities?.compaction ? () => void controller.compactSession() : undefined}
-          canFork={Boolean(capabilities?.fork)}
           canCompact={Boolean(capabilities?.compaction)}
         />
       )}
-
-      {(unavailable || failed) && (
-        <div className="desktop-agent-readiness" role="status">
-          <CircleAlert size={15} />
-          <div>
-            <strong>{failed ? "Agent session needs attention" : readinessHeading(readiness?.status)}</strong>
-            <p>{failed ? state.error : readiness?.message || state.error || `Unable to inspect ${runtimeLabel}.`}</p>
-            {!failed && <small>Agent engine powered by OpenCode</small>}
-          </div>
-          <button type="button" aria-label="Retry Agent engine" onClick={() => void controller.initialize(true)}><RefreshCw size={14} /> Retry</button>
-        </div>
-      )}
-
-      {loading && (
-        <div className="desktop-agent-provider-progress" role="status">
-          <LoaderCircle size={13} className="desktop-agent-spin" /> {state.phase === "restoring" ? "Restoring session" : state.phase === "creating" ? "Starting session" : `Checking ${runtimeLabel}`}
-        </div>
-      )}
-
-      {state.error && !unavailable && !failed && <div className="desktop-agent-inline-error" role="alert"><CircleAlert size={14} /> {state.error}</div>}
-
-      <AgentTranscript
-        key={state.session?.id || "new-agent-session"}
+      status={hasStatus ? <AgentPanelStatus
+        unavailable={unavailable}
+        failed={failed}
+        error={state.error}
+        runtimeLabel={runtimeLabel}
+        readiness={readiness}
+        onRetry={() => void controller.initialize(true)}
+      /> : null}
+      conversation={<AgentTranscript
+        key={sessionKey}
         projection={state.projection}
-        loading={loading}
+        loading={startupLoading}
+        pendingPrompt={state.pendingPrompt}
+        submissionStage={submissionStage}
+        working={state.submitting || Boolean(state.projection.runningTurnId)}
         runtimeLabel={runtimeLabel}
         initialScrollTop={viewport.scrollTop}
         initialMeasurements={viewport.measurements}
         initialPinned={viewport.pinned}
-        onViewportChange={(scrollTop, measurements, pinned) => controller.rememberViewport(scrollTop, measurements, pinned)}
-        onViewChanges={onViewChanges}
-        onOpenTerminal={onOpenTerminal}
+        onViewportChange={handleViewportChange}
         onOpenFile={onOpenFile}
-      />
-
-      {state.projection.approvals[0] && (
-        <AgentApprovalDock
-          approval={state.projection.approvals[0]}
-          queueLength={state.projection.approvals.length}
-          resolving={state.resolvingBlocker}
+      />}
+      dock={startupLoading ? null : <>
+        {state.projection.approvals[0] && (
+          <AgentApprovalDock
+            approval={state.projection.approvals[0]}
+            queueLength={state.projection.approvals.length}
+            resolving={state.resolvingBlocker}
+            runtimeLabel={runtimeLabel}
+            onResolve={(decision) => void controller.resolveApproval(decision)}
+          />
+        )}
+        {state.projection.questions[0] && (
+          <AgentQuestionDock
+            key={state.projection.questions[0].requestId}
+            request={state.projection.questions[0]}
+            queueLength={state.projection.questions.length}
+            resolving={state.resolvingBlocker}
+            onResolve={(resolution) => void controller.resolveQuestion(resolution)}
+          />
+        )}
+        <AgentComposer
+          floatingAccessory={state.projection.approvals.length === 0 && state.projection.questions.length === 0 ? <AgentChangesPill projection={state.projection} onViewChanges={onViewChanges} /> : null}
+          draft={state.draft}
+          onDraftChange={handleDraftChange}
+          disabled={loading || unavailable || failed || !routingReady || state.projection.approvals.length > 0 || state.projection.questions.length > 0}
+          running={Boolean(state.projection.runningTurnId)}
+          stopping={state.stopping}
+          submitting={submissionPending}
+          placeholder={composerPlaceholder}
           runtimeLabel={runtimeLabel}
-          onResolve={(decision) => void controller.resolveApproval(decision)}
+          hideConfiguration={minimalMode && routingReady}
+          configurationDisabled={loading || preparingSession || submissionPending}
+          models={capabilities?.modelSelection ? providerModels : []}
+          selectedModel={state.selectedModel}
+          onSelectModel={handleSelectModel}
+          commands={capabilities?.slashCommands ? inspection?.commands ?? [] : []}
+          attachments={state.attachments}
+          contextReferences={state.contextReferences}
+          steerAvailable={Boolean(capabilities?.steer)}
+          queueAvailable={Boolean(capabilities?.queue)}
+          onRemoveAttachment={(path) => controller.removeAttachment(path)}
+          onRemoveContext={(path) => controller.removeContextReference(path)}
+          onSubmit={handleSubmit}
+          onStop={() => void controller.stop()}
         />
-      )}
-
-      {state.projection.questions[0] && (
-        <AgentQuestionDock
-          key={state.projection.questions[0].requestId}
-          request={state.projection.questions[0]}
-          queueLength={state.projection.questions.length}
-          resolving={state.resolvingBlocker}
-          onResolve={(resolution) => void controller.resolveQuestion(resolution)}
-        />
-      )}
-
-      <AgentChangesPill projection={state.projection} onViewChanges={onViewChanges} />
-
-      <AgentComposer
-        draft={state.draft}
-        onDraftChange={(draft) => controller.setDraft(draft)}
-        disabled={loading || unavailable || failed || !routingReady || state.projection.approvals.length > 0 || state.projection.questions.length > 0}
-        hideConfiguration={minimalMode && routingReady}
-        running={Boolean(state.projection.runningTurnId)}
-        stopping={state.stopping}
-        submitting={state.submitting}
-        placeholder={composerPlaceholder}
-        runtimeLabel={runtimeLabel}
-        providers={capabilities?.modelSelection ? providers : []}
-        selectedProviderId={state.selectedProviderId}
-        localConnections={state.localConnections}
-        localConnectionsPhase={state.localConnectionsPhase}
-        localConnectionsError={state.localConnectionsError}
-        onDiscoverLocalConnections={(refresh) => controller.discoverLocalConnections(refresh)}
-        onSelectProvider={(providerId) => {
-          const model = controller.selectProvider(providerId);
-          if (model) onPreferredModelChange?.(model);
-        }}
-        models={capabilities?.modelSelection ? providerModels : []}
-        selectedModel={state.selectedModel}
-        onSelectModel={(model) => { controller.selectModel(model); onPreferredModelChange?.(model); }}
-        modes={capabilities?.modeSelection ? inspection?.modes ?? [] : []}
-        selectedMode={state.selectedMode}
-        onSelectMode={(mode) => controller.selectMode(mode)}
-        commands={capabilities?.slashCommands ? inspection?.commands ?? [] : []}
-        attachments={state.attachments}
-        contextReferences={state.contextReferences}
-        attachmentAvailable={Boolean(capabilities?.attachments)}
-        contextAvailable={Boolean(capabilities?.contextReferences)}
-        steerAvailable={Boolean(capabilities?.steer)}
-        queueAvailable={Boolean(capabilities?.queue)}
-        onAddAttachments={(references) => controller.addAttachments(references)}
-        onAddContext={(references) => controller.addContextReferences(references)}
-        onRemoveAttachment={(path) => controller.removeAttachment(path)}
-        onRemoveContext={(path) => controller.removeContextReference(path)}
-        resolveFilePath={getElectronFilePath}
-        onSubmit={(prompt) => controller.submit(prompt)}
-        onStop={() => void controller.stop()}
-      />
-    </section>
+      </>}
+    />
   );
 });
-
-function readinessLabel(status: string | undefined) {
-  if (status === "ready") return "ready";
-  if (status === "installed-not-authenticated") return "provider setup required";
-  if (status === "not-installed" || status === "unsupported-version" || status === "error") return "needs repair";
-  return "checking";
-}
-
-function sessionStatusLabel(status: AgentSessionMetadata["terminalState"]) {
-  return status === "provider-exited" ? "provider exited" : status;
-}
-
-function readinessHeading(status: string | undefined) {
-  if (status === "installed-not-authenticated") return "Connect a model provider";
-  return "PuppyOne Agent needs repair";
-}

@@ -14,6 +14,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ViewerContribution, ViewerPackSnapshot } from "@puppyone/shared-ui";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   OFFICIAL_VIEWER_CATALOG,
   type OfficialViewerCatalogEntry,
@@ -22,6 +24,13 @@ import {
 import type { PluginsSection } from "./PluginsSidebar";
 
 type PluginBridge = NonNullable<NonNullable<typeof window.puppyoneDesktop>["viewerPacks"]>;
+
+type PluginFeedback = Readonly<
+  | { tone: "success"; code: "installed"; pluginId: string; version: string }
+  | { tone: "success"; code: "removed"; label: string }
+  | { tone: "danger"; code: "remove-rejected" }
+  | { tone: "danger"; code: "operation-failed"; detail: string }
+>;
 
 export function PluginsView({
   activeSection,
@@ -36,12 +45,14 @@ export function PluginsView({
   onRefresh: () => void | Promise<void>;
   onSelectSection: (section: PluginsSection) => void;
 }) {
+  const { getCollator, t } = useLocalization();
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<PluginFeedback | null>(null);
   const [query, setQuery] = useState("");
+  const labelCollator = useMemo(() => getCollator({ sensitivity: "base" }), [getCollator]);
   const installed = useMemo(
-    () => [...snapshot.contributions].sort((a, b) => a.label.localeCompare(b.label)),
-    [snapshot.contributions],
+    () => [...snapshot.contributions].sort((a, b) => labelCollator.compare(a.label, b.label)),
+    [labelCollator, snapshot.contributions],
   );
 
   const installLocal = async () => {
@@ -53,9 +64,18 @@ export function PluginsView({
       const result = await bridge.installLocal();
       if (result.canceled) return;
       await onRefresh();
-      setFeedback({ tone: "success", message: `${result.pluginId} ${result.version} installed.` });
+      setFeedback({
+        tone: "success",
+        code: "installed",
+        pluginId: result.pluginId,
+        version: result.version,
+      });
     } catch (error) {
-      setFeedback({ tone: "danger", message: error instanceof Error ? error.message : String(error) });
+      setFeedback({
+        tone: "danger",
+        code: "operation-failed",
+        detail: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setBusyAction(null);
     }
@@ -68,22 +88,26 @@ export function PluginsView({
     setFeedback(null);
     try {
       const result = await bridge.uninstall({ pluginId: plugin.pluginId });
-      if (!result.ok && !result.canceled) throw new Error("Plugin could not be removed.");
+      if (!result.ok && !result.canceled) {
+        setFeedback({ tone: "danger", code: "remove-rejected" });
+        return;
+      }
       if (result.canceled) return;
       await onRefresh();
-      setFeedback({ tone: "success", message: `${plugin.label} removed.` });
+      setFeedback({ tone: "success", code: "removed", label: plugin.label });
     } catch (error) {
-      setFeedback({ tone: "danger", message: error instanceof Error ? error.message : String(error) });
+      setFeedback({
+        tone: "danger",
+        code: "operation-failed",
+        detail: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setBusyAction(null);
     }
   };
 
-  const sectionTitle = activeSection === "installed"
-    ? "Installed"
-    : activeSection === "discover"
-      ? "Discover"
-      : "Included";
+  const sectionTitle = t(`plugins.section.${activeSection}`);
+  const feedbackMessage = formatPluginFeedback(feedback, t);
 
   return (
     <section className="desktop-plugins-view">
@@ -101,14 +125,14 @@ export function PluginsView({
                 onClick={() => void installLocal()}
               >
                 <PackagePlus size={14} aria-hidden="true" />
-                <span>{busyAction === "install" ? "Installing…" : "Install from file"}</span>
+                <span>{busyAction === "install" ? t("plugins.installing") : t("plugins.installFromFile")}</span>
               </button>
             )}
           </header>
 
-          {feedback && (
+          {feedback && feedbackMessage && (
             <div className={`desktop-plugins-feedback ${feedback.tone}`} role={feedback.tone === "danger" ? "alert" : "status"}>
-              {feedback.message}
+              {feedbackMessage}
             </div>
           )}
 
@@ -143,10 +167,13 @@ function DiscoverPlugins({
   query: string;
   onQueryChange: (query: string) => void;
 }) {
-  const normalizedQuery = query.trim().toLowerCase();
+  const { locale, t } = useLocalization();
+  const normalizedQuery = query.trim().toLocaleLowerCase(locale);
   const entries = normalizedQuery
     ? OFFICIAL_VIEWER_CATALOG.filter((entry) => (
-        `${entry.title} ${entry.formats.join(" ")}`.toLowerCase().includes(normalizedQuery)
+        `${getOfficialViewerTitle(entry, t)} ${entry.formats.join(" ")}`
+          .toLocaleLowerCase(locale)
+          .includes(normalizedQuery)
       ))
     : OFFICIAL_VIEWER_CATALOG;
 
@@ -157,18 +184,18 @@ function DiscoverPlugins({
         <input
           type="search"
           value={query}
-          placeholder="Search plugins"
-          aria-label="Search plugins"
+          placeholder={t("plugins.search")}
+          aria-label={t("plugins.search")}
           onChange={(event) => onQueryChange(event.target.value)}
         />
       </label>
       <div className="desktop-plugins-list-heading">
-        <span>Official</span>
+        <span>{t("plugins.official")}</span>
       </div>
       {entries.length > 0 ? (
         <OfficialPluginList entries={entries} showStatus />
       ) : (
-        <div className="desktop-plugins-no-results">No matching plugins</div>
+        <div className="desktop-plugins-no-results">{t("plugins.noMatches")}</div>
       )}
     </>
   );
@@ -197,15 +224,16 @@ function OfficialPluginRow({
   entry: OfficialViewerCatalogEntry;
   showStatus: boolean;
 }) {
+  const { t } = useLocalization();
   const Icon = OFFICIAL_VIEWER_ICONS[entry.icon];
   return (
     <article className="desktop-official-plugin-row">
       <span className="desktop-plugin-mark"><Icon size={19} strokeWidth={1.75} aria-hidden="true" /></span>
       <div>
-        <strong>{entry.title}</strong>
+        <strong>{getOfficialViewerTitle(entry, t)}</strong>
         <span>{entry.formats.join(" · ")}</span>
       </div>
-      {showStatus && <small>Included</small>}
+      {showStatus && <small>{t("plugins.includedStatus")}</small>}
     </article>
   );
 }
@@ -225,18 +253,21 @@ function InstalledPlugins({
   onInstall: () => Promise<void>;
   onUninstall: (plugin: ViewerContribution) => Promise<void>;
 }) {
+  const { t } = useLocalization();
   if (installed.length === 0) {
     return (
       <div className="desktop-plugins-empty">
         <span className="desktop-plugin-mark"><Box size={19} strokeWidth={1.75} aria-hidden="true" /></span>
-        <strong>No plugins installed</strong>
+        <strong>{t("plugins.noneInstalled")}</strong>
         <button
           className="desktop-plugins-empty-action"
           type="button"
           disabled={busyAction !== null}
           onClick={() => hostAvailable ? void onInstall() : onBrowse()}
         >
-          {hostAvailable ? (busyAction === "install" ? "Installing…" : "Install from file") : "Browse plugins"}
+          {hostAvailable
+            ? (busyAction === "install" ? t("plugins.installing") : t("plugins.installFromFile"))
+            : t("plugins.browse")}
         </button>
       </div>
     );
@@ -265,6 +296,7 @@ function InstalledPluginRow({
   busy: boolean;
   onUninstall: (plugin: ViewerContribution) => Promise<void>;
 }) {
+  const { t } = useLocalization();
   const formats = plugin.formats.flatMap((format) => format.extensions).slice(0, 6);
   return (
     <article className="desktop-installed-plugin-row">
@@ -277,13 +309,16 @@ function InstalledPluginRow({
         )}
       </div>
       <details className="desktop-plugin-menu">
-        <summary aria-label={`Manage ${plugin.label}`} title={`Manage ${plugin.label}`}>
+        <summary
+          aria-label={t("plugins.manage", { name: bidiIsolate(plugin.label) })}
+          title={t("plugins.manage", { name: bidiIsolate(plugin.label) })}
+        >
           <MoreHorizontal size={16} aria-hidden="true" />
         </summary>
         <div>
           <button type="button" disabled={busy} onClick={() => void onUninstall(plugin)}>
             <Trash2 size={13} aria-hidden="true" />
-            <span>{busy ? "Removing…" : "Remove"}</span>
+            <span>{busy ? t("plugins.removing") : t("plugins.remove")}</span>
           </button>
         </div>
       </details>
@@ -293,6 +328,31 @@ function InstalledPluginRow({
 
 function getPluginBridge(): PluginBridge | null {
   return typeof window !== "undefined" ? window.puppyoneDesktop?.viewerPacks ?? null : null;
+}
+
+function getOfficialViewerTitle(
+  entry: OfficialViewerCatalogEntry,
+  t: ReturnType<typeof useLocalization>["t"],
+): string {
+  return t(`plugins.catalog.${entry.id}`);
+}
+
+function formatPluginFeedback(
+  feedback: PluginFeedback | null,
+  t: ReturnType<typeof useLocalization>["t"],
+): string | null {
+  if (!feedback) return null;
+  if (feedback.code === "installed") {
+    return t("plugins.feedback.installed", {
+      pluginId: bidiIsolate(feedback.pluginId),
+      version: bidiIsolate(feedback.version),
+    });
+  }
+  if (feedback.code === "removed") {
+    return t("plugins.feedback.removed", { name: bidiIsolate(feedback.label) });
+  }
+  if (feedback.code === "remove-rejected") return t("plugins.feedback.removeRejected");
+  return t("plugins.feedback.operationFailed", { detail: bidiIsolate(feedback.detail) });
 }
 
 const OFFICIAL_VIEWER_ICONS: Record<OfficialViewerIcon, LucideIcon> = {

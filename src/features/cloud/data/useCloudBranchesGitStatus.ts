@@ -4,11 +4,12 @@ import {
   toWorkspaceGitBranchGraphSnapshot,
 } from "../../../lib/localFiles";
 import type { GitBranchGraphSnapshot, GitStatusSnapshot } from "../../../types/electron";
+import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
 export type CloudBranchesGitStatusState = {
   status: GitBranchGraphSnapshot | null;
   loading: boolean;
-  error: string | null;
+  error: CloudMessageDescriptor | null;
   reload: () => Promise<void>;
 };
 
@@ -28,7 +29,7 @@ export function useCloudBranchesGitStatus({
     rootPath: string | null;
     status: GitBranchGraphSnapshot | null;
     loading: boolean;
-    error: string | null;
+    error: CloudMessageDescriptor | null;
   }>(() => ({
     rootPath: null,
     status: fallbackGraphStatus,
@@ -61,7 +62,7 @@ export function useCloudBranchesGitStatus({
           rootPath,
           status: fallbackGraphStatus,
           loading: false,
-          error: error instanceof Error ? error.message : "Unable to load local Git topology.",
+          error: cloudMessage("git-topology-load-failed", undefined, error instanceof Error ? error.message : undefined),
         });
       });
 

@@ -5,6 +5,11 @@ the files explorer, Git working tree, Git history, cloud sidebar lists, and
 future sidebar list surfaces. It also records the app-wide scrollbar styling
 rule that the contract depends on.
 
+For the complete sidebar composition, ownership, registry, file layout, CSS,
+performance, and testing architecture, see
+[Desktop Sidebar Architecture](desktop-sidebar-architecture.md). This document
+is the focused scroll-geometry contract beneath that architecture.
+
 Git status semantics and Source Control state ownership are documented in
 [Local Source Control Sidebar](git/local-source-control-sidebar.md).
 
@@ -169,8 +174,9 @@ so its section rows and nested scroll lists own the inline edge instead.
   - files explorer scroll area (`.explorer-tree-scroll`, reserved gutter),
     list padding compensation (`.explorer-tree-list`), tree row geometry
 - `src/features/source-control/styles/sidebar-base.css`
-  - generic tool sidebar scroll list (`.desktop-tool-sidebar-list`) and
-    sidebar row model
+  - transitional current owner of the generic tool sidebar scroll list
+    (`.desktop-tool-sidebar-list`) and row model; ISSUE-035 moves this shared
+    contract out of Source Control and removes the ownership inversion
 - `src/features/source-control/styles/sidebar-layout.css`
   - `.desktop-git-sidebar-list` gutter opt-out and outer block edge
 - `src/features/source-control/styles/sidebar-resources.css`

@@ -42,16 +42,12 @@ const SNIPPET_PREVIEW_KINDS = new Set<FileVisualKind>(["markdown", "json"]);
 
 const defaultTheme: FileIconThemeDefinition = {
   id: "default",
-  label: "Default",
-  description: "PuppyOne classic file icons.",
   renderGlyph: renderDefaultGlyph,
   renderPreview: renderDefaultPreview,
 };
 
 const linesTheme: FileIconThemeDefinition = createThemeVariant({
   id: "lines",
-  label: "Lines",
-  description: "Standalone line icon for Markdown documents.",
   base: defaultTheme,
   glyphOverrides: {
     markdown: renderStandaloneLinesGlyph,
@@ -63,22 +59,16 @@ const linesTheme: FileIconThemeDefinition = createThemeVariant({
 
 const vscodeTheme: FileIconThemeDefinition = createIconTheme({
   id: "vscode",
-  label: "VS Code",
-  description: "VS Code-style semantic file icons.",
   renderGlyph: renderVsCodeGlyph,
 });
 
 const materialTheme: FileIconThemeDefinition = createIconTheme({
   id: "material",
-  label: "Material",
-  description: "Filled, colorful document icons.",
   renderGlyph: renderMaterialGlyph,
 });
 
 const minimalTheme: FileIconThemeDefinition = createIconTheme({
   id: "minimal",
-  label: "Minimal",
-  description: "Thin outline icons.",
   renderGlyph: renderMinimalGlyph,
 });
 
@@ -103,17 +93,11 @@ export function getFileIconThemeDefinition(theme?: FileIconThemeId | null): File
 }
 
 function getThemeMetadata(theme: FileIconThemeDefinition): FileIconThemeMetadata {
-  return {
-    id: theme.id,
-    label: theme.label,
-    description: theme.description,
-  };
+  return { id: theme.id };
 }
 
 function createThemeVariant({
   id,
-  label,
-  description,
   base,
   glyphOverrides = {},
   previewOverrides = {},
@@ -124,8 +108,6 @@ function createThemeVariant({
 }): FileIconThemeDefinition {
   return {
     id,
-    label,
-    description,
     renderGlyph: (context) => (glyphOverrides[context.kind] ?? base.renderGlyph)(context),
     renderPreview: (context) => (previewOverrides[context.kind] ?? base.renderPreview)(context),
   };
@@ -133,16 +115,12 @@ function createThemeVariant({
 
 function createIconTheme({
   id,
-  label,
-  description,
   renderGlyph,
 }: FileIconThemeMetadata & {
   renderGlyph: FileIconRenderer<FileIconRenderContext>;
 }): FileIconThemeDefinition {
   return {
     id,
-    label,
-    description,
     renderGlyph,
     renderPreview: (context) => renderIconThemePreview(context, id, renderGlyph),
   };

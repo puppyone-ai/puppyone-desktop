@@ -163,7 +163,7 @@
 
   .desktop-cloud-access-sidebar {
     max-height: 260px;
-    border-right: 0;
+    border-inline-end: 0;
     border-bottom: 1px solid var(--po-border-subtle);
   }
 
@@ -188,7 +188,7 @@
   }
 
   .desktop-cloud-access-connector-expanded {
-    padding-left: 12px;
+    padding-inline-start: 12px;
   }
 
   .desktop-cloud-access-connector-summary {
@@ -197,7 +197,7 @@
 
   .desktop-cloud-web-sidebar {
     max-height: 260px;
-    border-right: 0;
+    border-inline-end: 0;
     border-bottom: 1px solid var(--po-border-subtle);
   }
 
@@ -300,7 +300,7 @@
   align-content: start;
   gap: 16px;
   padding: 30px 32px 28px;
-  border-right: 1px solid var(--po-divider);
+  border-inline-end: 1px solid var(--po-divider);
 }
 
 .desktop-cloud-login-badge {
@@ -499,7 +499,7 @@
 
 .desktop-cloud-provider-button-icon {
   position: absolute;
-  left: 16px;
+  inset-inline-start: 16px;
   top: 50%;
   display: inline-flex;
   width: 20px;
@@ -640,7 +640,7 @@
   }
 
   .desktop-cloud-login-copy {
-    border-right: 0;
+    border-inline-end: 0;
     border-bottom: 1px solid var(--po-divider);
     padding: 24px;
   }
@@ -668,7 +668,7 @@
   min-height: 480px;
   overflow: hidden;
   padding: 0;
-  border-right: 1px solid var(--po-divider);
+  border-inline-end: 1px solid var(--po-divider);
   background:
     radial-gradient(circle at 18% 20%, rgba(58, 68, 64, 0.08), transparent 32%),
     linear-gradient(180deg, color-mix(in srgb, var(--po-panel) 82%, #111715) 0%, color-mix(in srgb, var(--po-panel) 66%, #0d1110) 100%);

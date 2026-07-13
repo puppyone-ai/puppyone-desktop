@@ -114,6 +114,29 @@ Both modes must derive from the same snapshot and view model.
 The navigation badge and titlebar branch indicator also consume the active
 snapshot. A stale snapshot therefore affects more than the visible Git sidebar.
 
+### Version-control opt-in setup state
+
+For a local folder without version control, the renderer uses the dedicated
+`VersionControlSetupState` instead of a generic empty-state branch. It has one
+job: help the user opt in without teaching implementation details. The titlebar
+and quiet sidebar label read `No Version Control`; the main view uses a centered
+setup stage with a thin version-control mark, a short product-level description,
+and exactly one primary action: `Enable Version Control`.
+
+```text
+No Version Control
+  -> VersionControlSetupState
+  -> Enable Version Control
+  -> authorized initialize operation
+  -> fresh GitStatusSnapshot
+  -> normal Source Control workspace
+```
+
+The setup component is presentational. It does not execute commands or own
+repository state; the existing controller and authorized IPC path remain the
+only mutation boundary. Loading replaces the action label in place, and a real
+operation error appears below the action without adding a second recovery path.
+
 ## Operation Lifecycle
 
 Application-initiated Git mutations route through controller handlers and the

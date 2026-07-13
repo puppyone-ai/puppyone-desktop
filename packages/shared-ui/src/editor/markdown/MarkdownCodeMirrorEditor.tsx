@@ -2,7 +2,8 @@
 
 import { Annotation, Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   markdownCodeMirrorLanguageExtension,
   markdownCodeMirrorUrgentExtensions,
@@ -10,6 +11,7 @@ import {
 } from "./markdownCodeMirrorExtensions";
 import { markdownLivePreviewContextExtension } from "./core/editor/markdownLivePreviewContext";
 import { markdownAiEditExtension } from "./core/editor/markdownAiEditExtension";
+import { markdownBlockDragExtension } from "./core/interaction/markdownBlockDrag";
 import { getDocRevision } from "./platform/brokers/transactionBroker";
 import type { AiEditFile } from "../ai-edits/types";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
@@ -20,6 +22,7 @@ import type {
 } from "../sourceSnapshot";
 import { getRendererPerformanceTracker } from "../../performance/rendererPerformance";
 import { subscribeTypographyChanges } from "../../core/typography";
+import { markdownLocalizationExtension } from "./core/editor/markdownLocalization";
 
 const rendererPerformance = getRendererPerformanceTracker();
 
@@ -27,6 +30,7 @@ export type MarkdownCodeMirrorEditorProps = {
   value: string;
   readOnly: boolean;
   livePreview: boolean;
+  blockDragEnabled?: boolean;
   aiEditFile?: AiEditFile | null;
   htmlTrustMode?: MarkdownHtmlTrustMode;
   documentPath?: string;
@@ -53,6 +57,7 @@ export function MarkdownCodeMirrorEditor({
   value,
   readOnly,
   livePreview,
+  blockDragEnabled = false,
   aiEditFile = null,
   htmlTrustMode = "safe",
   documentPath = "",
@@ -68,6 +73,12 @@ export function MarkdownCodeMirrorEditor({
   onPreviewReady,
   onPreviewError,
 }: MarkdownCodeMirrorEditorProps) {
+  const { direction, formatNumber, locale, t } = useLocalization();
+  const localization = useMemo(
+    () => ({ direction, formatNumber, locale, t }),
+    [direction, formatNumber, locale, t],
+  );
+  const initialLocalizationRef = useRef(localization);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const externalValueRef = useRef(value);
@@ -94,10 +105,14 @@ export function MarkdownCodeMirrorEditor({
   const editableCompartmentRef = useRef(new Compartment());
   const languageCompartmentRef = useRef(new Compartment());
   const livePreviewCoreCompartmentRef = useRef(new Compartment());
+  const blockDragCompartmentRef = useRef(new Compartment());
   const livePreviewContextCompartmentRef = useRef(new Compartment());
   const aiEditCompartmentRef = useRef(new Compartment());
+  const localizationCompartmentRef = useRef(new Compartment());
   const initialEditorConfigRef = useRef({ aiEditFile, readOnly, value });
   const previewActivatedRef = useRef(false);
+  const blockDragEnabledRef = useRef(blockDragEnabled);
+  blockDragEnabledRef.current = blockDragEnabled;
   const previewGenerationRef = useRef(0);
   const [previewState, setPreviewState] = useState<MarkdownPreviewPresentationState>(
     () => livePreview ? "pending" : "source",
@@ -134,6 +149,7 @@ export function MarkdownCodeMirrorEditor({
         effects: [
           livePreviewContextCompartmentRef.current.reconfigure([]),
           livePreviewCoreCompartmentRef.current.reconfigure([]),
+          blockDragCompartmentRef.current.reconfigure([]),
         ],
       });
     } catch (error) {
@@ -174,10 +190,14 @@ export function MarkdownCodeMirrorEditor({
         doc: initialConfig.value,
         extensions: [
           ...markdownCodeMirrorUrgentExtensions(initialConfig.readOnly),
+          localizationCompartmentRef.current.of(
+            markdownLocalizationExtension(initialLocalizationRef.current, initialConfig.readOnly),
+          ),
           editableCompartmentRef.current.of(getEditableExtensions(initialConfig.readOnly)),
           languageCompartmentRef.current.of([]),
           livePreviewContextCompartmentRef.current.of([]),
           livePreviewCoreCompartmentRef.current.of([]),
+          blockDragCompartmentRef.current.of([]),
           aiEditCompartmentRef.current.of(markdownAiEditExtension(initialConfig.aiEditFile)),
           EditorView.updateListener.of((update) => {
             if (!update.docChanged) return;
@@ -242,6 +262,16 @@ export function MarkdownCodeMirrorEditor({
       effects: editableCompartmentRef.current.reconfigure(getEditableExtensions(readOnly)),
     });
   }, [readOnly]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: localizationCompartmentRef.current.reconfigure(
+        markdownLocalizationExtension(localization, readOnly),
+      ),
+    });
+  }, [localization, readOnly]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -328,6 +358,9 @@ export function MarkdownCodeMirrorEditor({
               livePreviewCoreCompartmentRef.current.reconfigure(
                 markdownLivePreviewCoreExtension(),
               ),
+              blockDragCompartmentRef.current.reconfigure(
+                blockDragEnabledRef.current ? markdownBlockDragExtension() : [],
+              ),
             ],
           });
         } catch (error) {
@@ -350,6 +383,16 @@ export function MarkdownCodeMirrorEditor({
       if (readyFrame !== null) window.cancelAnimationFrame(readyFrame);
     };
   }, [documentPath, livePreview]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !livePreview || !previewActivatedRef.current) return;
+    view.dispatch({
+      effects: blockDragCompartmentRef.current.reconfigure(
+        blockDragEnabled ? markdownBlockDragExtension() : [],
+      ),
+    });
+  }, [blockDragEnabled, livePreview]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -415,15 +458,16 @@ export function MarkdownCodeMirrorEditor({
   }, [value]);
 
   const previewMessage = previewState === "error"
-    ? "Live Preview unavailable — showing Markdown source."
+    ? t("editor.markdown.previewUnavailable")
     : previewState === "pending" && showPendingMessage
-      ? "Preparing preview…"
+      ? t("editor.markdown.preparingPreview")
       : null;
 
   return (
     <>
       <div
         ref={hostRef}
+        dir="auto"
         className="markdown-codemirror-editor"
         data-live-preview={livePreview ? "true" : "false"}
         data-preview-state={previewState}

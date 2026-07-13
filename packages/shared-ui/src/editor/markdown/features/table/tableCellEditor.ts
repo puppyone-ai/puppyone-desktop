@@ -23,6 +23,7 @@ import {
 import { showMarkdownTableContextMenu } from "./tableContextMenu";
 import { closeActiveMarkdownTableMenu, isActiveMarkdownTableMenu } from "./tableMenuState";
 import { focusMarkdownTableCell } from "./tableFocus";
+import { getMarkdownMessageFormatter } from "../../core/editor/markdownLocalization";
 
 export type MarkdownTableCellEditorContext = {
   alignments: readonly MarkdownTableAlignment[];
@@ -63,6 +64,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
     view,
   } = context;
   const content = document.createElement("span");
+  content.dir = "auto";
   content.className = "cm-md-table-cell-content";
   content.dataset.mdTableCell = "true";
   content.dataset.mdTableColumn = String(columnIndex);
@@ -108,7 +110,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
   const renderPreview = (source: string) => {
     resetPreviewAssets();
     renderTableCellPreview(content, source, markdownLinkGraph, documentPath, view, resolvePreviewAsset, () => {
-      view.requestMeasure();
+      host.requestMeasure();
     });
   };
 
@@ -251,7 +253,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
       delete content.dataset.mdTableEditing;
       delete content.dataset.mdTableConflict;
       renderPreview(cell.text);
-      view.requestMeasure();
+      host.requestMeasure();
       return;
     }
     if (commitCellEdit({})) {
@@ -437,6 +439,7 @@ function renderTableCellPreview(
   // adapter, and no raw asset resolver reaches this path.
   content.replaceChildren();
   renderMarkdownInlineFromSharedPolicy(content, source, {
+    t: getMarkdownMessageFormatter(view),
     markdownLinkGraph,
     resolveAssetUrl,
     openHref: (href) => {

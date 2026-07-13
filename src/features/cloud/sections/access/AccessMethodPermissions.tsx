@@ -1,4 +1,5 @@
 import { Check, Minus } from "lucide-react";
+import { useLocalization } from "@puppyone/localization/react";
 import type { DesktopCloudMcpEndpoint, DesktopCloudScope } from "../../../../lib/cloudApi";
 
 type DesktopPermissionCommandKind = "read" | "write";
@@ -8,7 +9,7 @@ type DesktopPermissionSpec = {
   defaultAllowed: boolean;
 };
 export type DesktopPermissionGroup = {
-  title: string;
+  titleId: string;
   specs: readonly DesktopPermissionSpec[];
   muted?: boolean;
   danger?: boolean;
@@ -108,7 +109,7 @@ export function DesktopCloudPermissionPanel({
       <div className="desktop-cloud-access-permission-panel">
         {groups.map((group, index) => (
           <DesktopCloudPermissionGroupRow
-            key={group.title}
+            key={group.titleId}
             group={group}
             allowedKeys={allowedKeys}
             disabled={!canUpdate || pending}
@@ -137,9 +138,9 @@ export function getDesktopCliPermissionGroups(scope: DesktopCloudScope): Desktop
   const deleteCommands = CLI_COMMAND_SPECS.filter((command) => command.kind === "write" && !command.defaultAllowed);
   const scopeReadOnly = scope.mode === "r";
   return [
-    { title: "Read files", specs: readCommands },
-    { title: "Modify files", specs: modifyCommands, muted: scopeReadOnly },
-    { title: "Delete files", specs: deleteCommands, muted: scopeReadOnly, danger: true },
+    { titleId: "cloud.access.permissions.readFiles", specs: readCommands },
+    { titleId: "cloud.access.permissions.modifyFiles", specs: modifyCommands, muted: scopeReadOnly },
+    { titleId: "cloud.access.permissions.deleteFiles", specs: deleteCommands, muted: scopeReadOnly, danger: true },
   ];
 }
 
@@ -148,9 +149,9 @@ export function getDesktopMcpPermissionGroups(writable: boolean): DesktopPermiss
   const writeTools = MCP_TOOL_SPECS.filter((tool) => tool.kind === "write" && tool.defaultAllowed);
   const deleteTools = MCP_TOOL_SPECS.filter((tool) => tool.kind === "write" && !tool.defaultAllowed);
   return [
-    { title: "Read tools", specs: readTools },
-    { title: "Write tools", specs: writeTools, muted: !writable },
-    { title: "Delete tools", specs: deleteTools, muted: !writable, danger: true },
+    { titleId: "cloud.access.permissions.readTools", specs: readTools },
+    { titleId: "cloud.access.permissions.writeTools", specs: writeTools, muted: !writable },
+    { titleId: "cloud.access.permissions.deleteTools", specs: deleteTools, muted: !writable, danger: true },
   ];
 }
 
@@ -237,16 +238,23 @@ function DesktopCloudPermissionGroupRow({
   onToggleAll: (group: DesktopPermissionGroup, nextChecked: boolean) => void;
   onToggleCommand: (command: DesktopPermissionSpec, nextChecked: boolean, group: DesktopPermissionGroup) => void;
 }) {
+  const { t } = useLocalization();
   const allowedCount = group.muted ? 0 : group.specs.filter((command) => allowedKeys.has(command.key)).length;
   const groupEnabled = !group.muted && group.specs.every((command) => allowedKeys.has(command.key));
   const anyEnabled = allowedCount > 0;
-  const statusLabel = groupEnabled ? "Allowed" : allowedCount > 0 ? `${allowedCount}/${group.specs.length} allowed` : "Off";
-  const metaLabel = group.muted ? "Blocked by scope" : `${statusLabel} · ${group.specs.length} commands`;
+  const statusLabel = groupEnabled
+    ? t("cloud.access.permissions.allowed")
+    : allowedCount > 0
+      ? t("cloud.access.permissions.allowedRatio", { allowed: allowedCount, total: group.specs.length })
+      : t("cloud.status.off");
+  const metaLabel = group.muted
+    ? t("cloud.access.permissions.blockedByScope")
+    : t("cloud.access.permissions.groupMeta", { status: statusLabel, count: group.specs.length });
   return (
     <div className={`desktop-cloud-access-permission-group ${isFirst ? "first" : ""} ${group.muted ? "muted" : ""}`}>
       <div className="desktop-cloud-access-permission-group-header">
         <div className="desktop-cloud-access-permission-group-title">
-          <span>{group.title}</span>
+          <span>{t(group.titleId)}</span>
           <em>{metaLabel}</em>
         </div>
         <button
@@ -259,7 +267,7 @@ function DesktopCloudPermissionGroupRow({
           <span className={`desktop-cloud-access-permission-check ${groupEnabled ? "checked" : anyEnabled ? "partial" : ""}`} aria-hidden="true">
             {groupEnabled ? <Check size={9} /> : anyEnabled ? <Minus size={9} /> : null}
           </span>
-          <span>All</span>
+          <span>{t("cloud.common.all")}</span>
         </button>
       </div>
       <div className="desktop-cloud-access-permission-pill-row">

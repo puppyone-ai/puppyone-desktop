@@ -2,6 +2,7 @@ import { FileText } from "lucide-react";
 import type { GitCommitDetail } from "../../types/electron";
 import type { GitWorkingSelection } from "./types";
 import { GitFileDiffSurface } from "./diff/GitFileDiffSurface";
+import { bidiIsolate, useLocalization } from "@puppyone/localization";
 
 export type WorkingFileDetailProps = {
   selection: GitWorkingSelection;
@@ -28,6 +29,7 @@ export function WorkingFileDetail({
   onDiscardPaths,
   onOpenFile,
 }: WorkingFileDetailProps) {
+  const { t } = useLocalization();
   const files = detail?.files ?? [];
   const disabled = Boolean(operationLoading);
   const readOnly = selection.origin === "remote" || selection.origin === "committed";
@@ -44,24 +46,24 @@ export function WorkingFileDetail({
                   <button
                     type="button"
                     className="secondary-action desktop-working-file-open"
-                    title="Open this file in Data"
+                    title={t("source-control.action.openInData")}
                     onClick={() => onOpenFile(selection.path)}
                   >
                     <FileText size={13} aria-hidden="true" />
-                    <span>Open file</span>
+                    <span>{t("source-control.action.openFile")}</span>
                   </button>
                 )}
                 {selection.staged ? (
                   <button type="button" className="secondary-action" disabled={disabled} onClick={() => void onUnstagePaths([selection.path])}>
-                    Unstage
+                    {t("source-control.action.unstage")}
                   </button>
                 ) : (
                   <>
                     <button type="button" className="secondary-action" disabled={disabled} onClick={() => void onStagePaths([selection.path])}>
-                      Stage
+                      {t("source-control.action.stage")}
                     </button>
                     <button type="button" className="danger-action" disabled={disabled} onClick={() => void onDiscardPaths([selection.path])}>
-                      Discard
+                      {t("source-control.action.discard")}
                     </button>
                   </>
                 )}
@@ -71,7 +73,7 @@ export function WorkingFileDetail({
 
           {operationError && <div className="desktop-utility-empty danger">{operationError}</div>}
           {loading ? (
-            <div className="desktop-utility-empty">Loading diff for {selection.path}...</div>
+            <div className="desktop-utility-empty">{t("source-control.status.loadingDiffFor", { path: bidiIsolate(selection.path) })}</div>
           ) : error ? (
             <div className="desktop-utility-empty danger">{error}</div>
           ) : files.length > 0 ? (
@@ -86,7 +88,7 @@ export function WorkingFileDetail({
               ))}
             </div>
           ) : (
-            <div className="desktop-commit-empty">No textual diff available.</div>
+            <div className="desktop-commit-empty">{t("source-control.diff.noText")}</div>
           )}
         </div>
       </div>

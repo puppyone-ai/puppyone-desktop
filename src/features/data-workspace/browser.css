@@ -35,7 +35,8 @@
 
 .file-list-head {
   height: 28px;
-  padding: 0 18px 0 46px;
+  padding-block: 0;
+  padding-inline: 46px 18px;
   color: var(--po-text-disabled);
   font-size: 11px;
   font-weight: 700;
@@ -51,7 +52,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--po-text);
-  text-align: left;
+  text-align: start;
 }
 
 .file-row:hover,
@@ -69,7 +70,7 @@
 
 .file-kind-icon {
   position: absolute;
-  left: 13px;
+  inset-inline-start: 13px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -80,7 +81,7 @@
 .file-name {
   display: grid;
   min-width: 0;
-  padding-left: 26px;
+  padding-inline-start: 26px;
   gap: 2px;
 }
 
@@ -146,7 +147,7 @@
   flex-direction: column;
   gap: 0;
   background: var(--po-panel);
-  border-left: 1px solid var(--po-divider);
+  border-inline-start: 1px solid var(--po-divider);
 }
 
 .file-preview-shell {
@@ -274,7 +275,7 @@
   border: 1px solid var(--po-divider);
   background: var(--po-canvas);
   color: var(--po-text);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-data-workspace-wrap {

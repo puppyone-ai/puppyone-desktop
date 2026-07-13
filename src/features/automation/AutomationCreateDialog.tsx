@@ -6,6 +6,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   DesktopCloudAutomationOauthStatus,
   DesktopCloudAutomationProviderSpec,
@@ -46,6 +48,11 @@ import {
   type AutomationSourceSelection,
 } from "./automationRequest";
 import { buildAutomationTemplates, type AutomationTemplate } from "./automationTemplates";
+import {
+  formatAutomationTemplateDescription,
+  formatAutomationTemplateTitle,
+  formatAutomationValidationError,
+} from "./automationPresentation";
 
 type WizardStep = "choose" | "resolving" | "connect" | "configure";
 type OauthLookup = {
@@ -53,6 +60,11 @@ type OauthLookup = {
   status?: DesktopCloudAutomationOauthStatus;
   error?: string;
 };
+type AutomationCreateFailure = Readonly<{
+  code: "queue-unavailable" | "authorization" | "generic";
+  detail: string;
+  providerLabel: string;
+}>;
 
 export type CloudAutomationCreationEcho = {
   connectionId: string;
@@ -60,7 +72,7 @@ export type CloudAutomationCreationEcho = {
   provider: string;
   targetPath: string;
   status: string;
-  summary: string;
+  summary: string | null;
   error: string | null;
 };
 
@@ -89,6 +101,7 @@ export function CloudNewAutomationDialog({
   onCreated: (echo: CloudAutomationCreationEcho) => void;
   onClose: () => void;
 }) {
+  const { t } = useLocalization();
   const datasourceProviders = useMemo(
     () => providers.filter((provider) => provider.category === "datasource"),
     [providers],
@@ -106,7 +119,7 @@ export function CloudNewAutomationDialog({
   const [source, setSource] = useState<AutomationSourceSelection | null>(null);
   const [trigger, setTrigger] = useState(() => getDefaultAutomationTriggerDraft(null));
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<AutomationCreateFailure | null>(null);
 
   const provider = datasourceProviders.find((item) => item.provider === selectedProviderId) ?? null;
   const activeTemplate = template?.provider === provider?.provider ? template : null;
@@ -136,7 +149,7 @@ export function CloudNewAutomationDialog({
             ...current,
             [item.provider]: {
               state: "error",
-              error: error instanceof Error ? error.message : "Unable to check connection status.",
+              error: error instanceof Error ? error.message : String(error),
             },
           }));
         });
@@ -204,7 +217,7 @@ export function CloudNewAutomationDialog({
             } catch (error) {
               if (cancelled) return;
               setConnectPhase("error");
-              setConnectError(error instanceof Error ? error.message : "Unable to verify the connection.");
+              setConnectError(error instanceof Error ? error.message : String(error));
             }
           };
           pollTimer = window.setTimeout(poll, 1_000);
@@ -212,7 +225,7 @@ export function CloudNewAutomationDialog({
         .catch((error) => {
           if (cancelled) return;
           setConnectPhase("error");
-          setConnectError(error instanceof Error ? error.message : "Unable to start authorization.");
+          setConnectError(error instanceof Error ? error.message : String(error));
         });
     }, 0);
     return () => {
@@ -264,16 +277,23 @@ export function CloudNewAutomationDialog({
       onClose();
       void Promise.resolve().then(onRefresh).catch(() => undefined);
     } catch (error) {
-      setFeedback(formatAutomationCreateError(error, provider.display_name));
+      setFeedback(toAutomationCreateFailure(error, provider.display_name));
       setSaving(false);
     }
   };
 
   const title = step === "choose"
-    ? "Choose an Automation source"
+    ? t("automation.create.chooseTitle")
     : step === "connect"
-      ? `Connect ${provider?.display_name ?? "source"}`
-      : activeTemplate?.title ?? `Configure ${provider?.display_name ?? "Automation"}`;
+      ? t("automation.create.connectTitle", {
+          provider: bidiIsolate(provider?.display_name ?? t("automation.source.generic")),
+        })
+      : activeTemplate
+        ? formatAutomationTemplateTitle(activeTemplate, t)
+        : t("automation.create.configureTitle", {
+            provider: bidiIsolate(provider?.display_name ?? t("automation.source.generic")),
+          });
+  const feedbackMessage = formatAutomationCreateFailure(feedback, t);
 
   return (
     <DesktopDialogRoot onClose={saving ? undefined : onClose}>
@@ -282,30 +302,32 @@ export function CloudNewAutomationDialog({
           <div className="desktop-dialog-title-row">
             <div>
               <h2>{title}</h2>
-              <p>{getWizardDescription(step, provider, activeTemplate)}</p>
+              <p>{getWizardDescription(step, provider, activeTemplate, t)}</p>
             </div>
           </div>
           <DesktopDialogCloseButton disabled={saving} onClick={onClose} />
         </header>
         <div className="desktop-dialog-body desktop-cloud-automation-dialog-body">
           {providersLoading ? (
-            <div className="desktop-cloud-automation-state">Loading Automation sources…</div>
+            <div className="desktop-cloud-automation-state">{t("automation.create.loadingSources")}</div>
           ) : providersError ? (
-            <div className="desktop-dialog-error">{providersError}</div>
+            <div className="desktop-dialog-error" dir="auto">
+              {t("automation.create.sourcesError", { detail: bidiIsolate(providersError) })}
+            </div>
           ) : datasourceProviders.length === 0 ? (
-            <div className="desktop-cloud-automation-state">No Automation sources are available.</div>
+            <div className="desktop-cloud-automation-state">{t("automation.create.noSources")}</div>
           ) : step === "choose" ? (
             <>
               <div className="desktop-cloud-automation-chooser-grid">
                 {templates.map((item) => {
                   const itemProvider = datasourceProviders.find((candidate) => candidate.provider === item.provider);
-                  const status = getProviderConnectionBadge(itemProvider, oauthLookups[item.provider]);
+                  const status = getProviderConnectionBadge(itemProvider, oauthLookups[item.provider], t);
                   return (
                     <AutomationTemplateCard
                       key={item.id}
                       template={item}
                       selected={selectedProviderId === item.provider}
-                      actionLabel="Choose"
+                      actionLabel={t("automation.action.choose")}
                       status={status.label}
                       statusTone={status.tone}
                       onAdd={() => setSelectedProviderId(item.provider)}
@@ -314,20 +336,22 @@ export function CloudNewAutomationDialog({
                 })}
               </div>
               <div className="desktop-cloud-automation-dialog-footer-row">
-                <span className="muted">Choose the external source this Automation will watch.</span>
+                <span className="muted">{t("automation.create.chooseSourceHint")}</span>
                 <div className="desktop-cloud-automation-actions">
-                  <button className="desktop-dialog-button" type="button" onClick={onClose}>Cancel</button>
+                  <button className="desktop-dialog-button" type="button" onClick={onClose}>{t("common.action.cancel")}</button>
                   <button className="desktop-dialog-button primary" type="button" disabled={!provider} onClick={continueWithProvider}>
-                    Continue
-                    <ArrowRight size={14} />
+                    {t("automation.action.continue")}
+                    <ArrowRight className="po-directional-icon" size={14} />
                   </button>
                 </div>
               </div>
             </>
           ) : !provider ? (
             <div className="desktop-cloud-automation-state">
-              <span>This Automation source is no longer available.</span>
-              <button className="desktop-dialog-button" type="button" onClick={() => setStep("choose")}>Choose another source</button>
+              <span>{t("automation.create.sourceUnavailable")}</span>
+              <button className="desktop-dialog-button" type="button" onClick={() => setStep("choose")}>
+                {t("automation.create.chooseAnotherSource")}
+              </button>
             </div>
           ) : step === "resolving" ? (
             <ConnectionResolvingState
@@ -355,7 +379,7 @@ export function CloudNewAutomationDialog({
                     <span className="desktop-cloud-automation-node-icon">
                       <CloudAutomationProviderMark provider={provider.provider} iconUrl={provider.icon_url} />
                     </span>
-                    <span>{provider.display_name}</span>
+                    <span dir="auto">{provider.display_name}</span>
                   </div>
                   <div className="desktop-cloud-automation-node-body">
                     <CloudAutomationSourceEditor
@@ -372,12 +396,12 @@ export function CloudNewAutomationDialog({
                 </section>
                 <div className="desktop-cloud-automation-trigger-bridge">
                   <CloudAutomationTriggerEditor provider={provider} draft={trigger} onChange={setTrigger} />
-                  <ArrowRight size={16} aria-hidden="true" />
+                  <ArrowRight className="po-directional-icon" size={16} aria-hidden="true" />
                 </div>
                 <section className="desktop-cloud-automation-node">
                   <div className="desktop-cloud-automation-node-header">
                     <span className="desktop-cloud-automation-node-icon"><img src="/icons/folder.svg" alt="" /></span>
-                    <span>/{normalizedTargetPath}</span>
+                    <span dir="auto">/{normalizedTargetPath}</span>
                   </div>
                   <div className="desktop-cloud-automation-node-body">
                     <CloudAutomationDestinationEditor
@@ -391,24 +415,30 @@ export function CloudNewAutomationDialog({
                   </div>
                 </section>
               </div>
-              {feedback && <div className="desktop-dialog-error desktop-cloud-automation-action-error" role="alert">{feedback}</div>}
+              {feedbackMessage && (
+                <div className="desktop-dialog-error desktop-cloud-automation-action-error" role="alert" dir="auto">
+                  {feedbackMessage}
+                </div>
+              )}
               <div className="desktop-cloud-automation-dialog-footer-row">
                 <span className={canCreate ? "ready" : "muted"}>
                   {missingRequired
-                    ? "Fill the required source fields."
+                    ? t("automation.create.missingRequired")
                     : sourceMissing
-                      ? "Choose a source resource or enter its ID."
+                      ? t("automation.create.sourceMissing")
                       : targetPathError
-                        ? targetPathError
+                        ? formatAutomationValidationError(targetPathError, t)
                         : triggerError
-                        ? triggerError
-                        : "Ready to create Automation and queue its first sync."}
+                        ? formatAutomationValidationError(triggerError, t)
+                        : t("automation.create.ready")}
                 </span>
                 <div className="desktop-cloud-automation-actions">
-                  <button className="desktop-dialog-button" type="button" disabled={saving} onClick={() => setStep("choose")}>Back</button>
+                  <button className="desktop-dialog-button" type="button" disabled={saving} onClick={() => setStep("choose")}>
+                    {t("automation.action.back")}
+                  </button>
                   <button className="desktop-dialog-button primary" type="button" disabled={!canCreate} onClick={handleCreate}>
                     <Check size={14} />
-                    {saving ? "Creating" : "Create Automation"}
+                    {saving ? t("automation.create.creating") : t("automation.create.submit")}
                   </button>
                 </div>
               </div>
@@ -431,14 +461,22 @@ function ConnectionResolvingState({
   onBack: () => void;
   onRetry: () => void;
 }) {
+  const { t } = useLocalization();
+  const providerLabel = provider?.display_name ?? t("automation.source.generic");
   return (
     <div className="desktop-cloud-automation-connect-state">
       {lookup?.state === "error" ? <ShieldCheck size={28} /> : <LoaderCircle className="desktop-dialog-spinner" size={28} />}
-      <h3>{lookup?.state === "error" ? "Connection status unavailable" : `Checking ${provider?.display_name ?? "source"}…`}</h3>
-      <p>{lookup?.error ?? "Reading the connection for this signed-in Cloud account."}</p>
+      <h3>{lookup?.state === "error"
+        ? t("automation.connection.statusUnavailable")
+        : t("automation.connection.checkingProvider", { provider: bidiIsolate(providerLabel) })}</h3>
+      <p dir="auto">{lookup?.error
+        ? t("automation.error.detail", { detail: bidiIsolate(lookup.error) })
+        : t("automation.connection.readingAccount")}</p>
       <div className="desktop-cloud-automation-actions">
-        <button className="desktop-dialog-button" type="button" onClick={onBack}>Back</button>
-        {lookup?.state === "error" && <button className="desktop-dialog-button primary" type="button" onClick={onRetry}>Retry</button>}
+        <button className="desktop-dialog-button" type="button" onClick={onBack}>{t("automation.action.back")}</button>
+        {lookup?.state === "error" && (
+          <button className="desktop-dialog-button primary" type="button" onClick={onRetry}>{t("common.action.retry")}</button>
+        )}
       </div>
     </div>
   );
@@ -457,18 +495,25 @@ function ConnectionWaitingState({
   onCancel: () => void;
   onRetry: () => void;
 }) {
+  const { t } = useLocalization();
   return (
     <div className="desktop-cloud-automation-connect-state">
       {phase === "error" ? <ExternalLink size={28} /> : <LoaderCircle className="desktop-dialog-spinner" size={28} />}
-      <h3>{phase === "starting" ? "Opening secure authorization…" : phase === "waiting" ? "Waiting for connection" : "Authorization needs attention"}</h3>
+      <h3>{phase === "starting"
+        ? t("automation.connection.openingAuthorization")
+        : phase === "waiting"
+          ? t("automation.connection.waiting")
+          : t("automation.connection.authorizationAttention")}</h3>
       <p>
         {phase === "error"
-          ? error
-          : `Finish connecting ${provider.display_name} in your browser. This window will continue automatically.`}
+          ? t("automation.error.detail", { detail: bidiIsolate(error) })
+          : t("automation.connection.finishInBrowser", { provider: bidiIsolate(provider.display_name) })}
       </p>
       <div className="desktop-cloud-automation-actions">
-        <button className="desktop-dialog-button" type="button" onClick={onCancel}>Cancel</button>
-        {phase === "error" && <button className="desktop-dialog-button primary" type="button" onClick={onRetry}>Try again</button>}
+        <button className="desktop-dialog-button" type="button" onClick={onCancel}>{t("common.action.cancel")}</button>
+        {phase === "error" && (
+          <button className="desktop-dialog-button primary" type="button" onClick={onRetry}>{t("automation.action.tryAgain")}</button>
+        )}
       </div>
     </div>
   );
@@ -493,30 +538,35 @@ function providerNeedsOauth(provider: DesktopCloudAutomationProviderSpec) {
 function getProviderConnectionBadge(
   provider: DesktopCloudAutomationProviderSpec | undefined,
   lookup: OauthLookup | undefined,
+  t: MessageFormatter,
 ): { label: string; tone: "neutral" | "ready" | "required" | "error" } {
   if (!provider || !providerNeedsOauth(provider)) {
-    return { label: "Ready", tone: "ready" };
+    return { label: t("automation.connection.ready"), tone: "ready" };
   }
   if (!supportsCloudAutomationOauth(provider.provider)) {
-    return { label: "Configuration required", tone: "required" };
+    return { label: t("automation.connection.configurationRequired"), tone: "required" };
   }
-  if (!lookup || lookup.state === "loading") return { label: "Checking…", tone: "neutral" };
+  if (!lookup || lookup.state === "loading") return { label: t("automation.connection.checking"), tone: "neutral" };
   if (lookup.state === "connected") {
-    return { label: lookup.status?.workspace_name || "Connected", tone: "ready" };
+    return { label: lookup.status?.workspace_name || t("automation.connection.connected"), tone: "ready" };
   }
-  if (lookup.state === "error") return { label: "Status unavailable", tone: "error" };
-  return { label: "Connection required", tone: "required" };
+  if (lookup.state === "error") return { label: t("automation.connection.statusUnavailableShort"), tone: "error" };
+  return { label: t("automation.connection.required"), tone: "required" };
 }
 
 function getWizardDescription(
   step: WizardStep,
   provider: DesktopCloudAutomationProviderSpec | null,
   template: AutomationTemplate | null,
+  t: MessageFormatter,
 ) {
-  if (step === "choose") return "Choose one external source; you can return here from any configuration.";
-  if (step === "connect") return "Authorization happens in your browser; no Automation is created until configuration is complete.";
-  if (step === "resolving") return "Checking the signed-in account before configuration.";
-  return template?.description ?? `Choose the ${provider?.display_name ?? "source"} data, project folder, and trigger.`;
+  if (step === "choose") return t("automation.create.description.choose");
+  if (step === "connect") return t("automation.create.description.connect");
+  if (step === "resolving") return t("automation.create.description.resolving");
+  if (template) return formatAutomationTemplateDescription(template, t);
+  return t("automation.create.description.configure", {
+    provider: bidiIsolate(provider?.display_name ?? t("automation.source.generic")),
+  });
 }
 
 function createAutomationEcho(
@@ -533,23 +583,34 @@ function createAutomationEcho(
     provider,
     targetPath,
     status,
-    summary: readString(execution.summary) || (error ? "Initial sync failed" : "Initial sync queued"),
+    summary: readString(execution.summary) || null,
     error,
   };
 }
 
-function formatAutomationCreateError(error: unknown, providerLabel: string) {
-  const message = error instanceof Error ? error.message : "Cloud request failed.";
+function toAutomationCreateFailure(error: unknown, providerLabel: string): AutomationCreateFailure {
+  const message = error instanceof Error ? error.message : String(error);
   const status = error && typeof error === "object" && "status" in error
     ? Number((error as { status?: unknown }).status)
     : 0;
   if (status === 503 || /503|worker.*unavailable|enqueue|queue/i.test(message)) {
-    return "The Automation was not created because its first sync could not be queued. Check the Cloud worker and try again.";
+    return { code: "queue-unavailable", detail: message, providerLabel };
   }
   if (/oauth|authoriz|credential|token|connect.*account/i.test(message)) {
-    return `${providerLabel} authorization failed. Go back, reconnect the account, then try again. ${message}`;
+    return { code: "authorization", detail: message, providerLabel };
   }
-  return `The Automation could not be created. Review the source and folder settings, then try again. ${message}`;
+  return { code: "generic", detail: message, providerLabel };
+}
+
+function formatAutomationCreateFailure(
+  failure: AutomationCreateFailure | null,
+  t: MessageFormatter,
+): string | null {
+  if (!failure) return null;
+  return t(`automation.create.error.${failure.code}`, {
+    detail: bidiIsolate(failure.detail),
+    provider: bidiIsolate(failure.providerLabel),
+  });
 }
 
 function readString(value: unknown) {

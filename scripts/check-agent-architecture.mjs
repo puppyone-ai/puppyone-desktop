@@ -30,6 +30,7 @@ const rendererUiRoot = path.join(rendererRoot, "ui");
 const rendererCompositionRoot = path.join(rendererUiRoot, "RightAgentPanel.tsx");
 const electronAgentClient = path.join(rendererInfrastructureRoot, "electron", "electronAgentClient.ts");
 const sharedContractRoot = path.join(repoRoot, "shared", "agent-contract");
+const agentDocsRoot = path.join(repoRoot, "docs", "architecture", "desktop-agent");
 const allowedCompositionRoot = path.join(mainRoot, "bootstrap", "create-agent-runtime-host.mjs");
 const allowedProviderNamedCoreFiles = new Set([
   path.join(mainRoot, "migrations", "legacy-session-format.mjs"),
@@ -171,6 +172,28 @@ for (const filePath of walkSourceFiles(rendererRoot)) {
   ) {
     errors.push(`${relative(filePath)} names a concrete runtime; Renderer domain/application must be provider-neutral`);
   }
+  if (isInsideOrSame(filePath, rendererUiRoot) && filePath.endsWith(".tsx")) {
+    if (/\bstyle=\{\{/.test(source)) {
+      errors.push(`${relative(filePath)} contains a literal inline style object; static Agent presentation belongs in feature CSS`);
+    }
+    if (/\.style(?:\.|\[)/.test(stripComments(source))) {
+      errors.push(`${relative(filePath)} mutates CSS through the DOM; static Agent presentation belongs in feature CSS`);
+    }
+    for (const match of source.matchAll(/\bstyle=\{([^}\n]+)\}/g)) {
+      if (!/^agent[A-Z][A-Za-z0-9]*Geometry\(/.test(match[1].trim())) {
+        errors.push(`${relative(filePath)} bypasses the typed Agent runtime-geometry bridge in a style prop`);
+      }
+    }
+  }
+}
+
+const runtimeGeometryPath = path.join(rendererUiRoot, "agent-runtime-geometry.ts");
+const runtimeGeometrySource = readFileSync(runtimeGeometryPath, "utf8");
+if (!runtimeGeometrySource.includes("Record<`--agent-${string}`")) {
+  errors.push(`${relative(runtimeGeometryPath)} must expose runtime measurements only through typed --agent-* custom properties`);
+}
+if (/[,{]\s*(?:position|visibility|transform|transformOrigin|height|width|maxHeight|padding|margin|color|background|borderRadius)\s*:/.test(runtimeGeometrySource)) {
+  errors.push(`${relative(runtimeGeometryPath)} owns a static visual declaration; move it to Agent CSS`);
 }
 
 const agentStyleRoot = path.join(rendererUiRoot, "styles");
@@ -184,6 +207,9 @@ for (const entry of readdirSync(agentStyleRoot)) {
   const stylePath = path.join(agentStyleRoot, entry);
   const lineCount = readFileSync(stylePath, "utf8").split("\n").length;
   if (lineCount > 450) errors.push(`${relative(stylePath)} has ${lineCount} lines; split styles at a responsibility boundary`);
+  if (entry === "responsive.css" && /desktop-agent-(?:virtual-row\[data-kind=["'](?:assistant|user|turn-summary)["']\]|message\.is-(?:assistant|user)|turn-summary)/.test(readFileSync(stylePath, "utf8"))) {
+    errors.push(`${relative(stylePath)} overrides a conversation-role content rail; responsive rules may change width, not semantic alignment`);
+  }
 }
 
 const responsibilityBudgets = [
@@ -217,7 +243,7 @@ for (const filePath of walkSourceFiles(path.join(repoRoot, "src"))) {
   if (isInsideOrSame(filePath, rendererRoot)) continue;
   const source = readFileSync(filePath, "utf8");
   for (const specifier of collectSpecifiers(source)) {
-    if (/features\/desktop-agent\/(?!index(?:\.|$)|visual-smoke(?:\.|$))/.test(specifier)) {
+    if (/features\/desktop-agent\/(?!index(?:\.|$)|lazy(?:\.|$)|visual-smoke(?:\.|$))/.test(specifier)) {
       errors.push(`${relative(filePath)} deep-imports ${specifier}; consume the feature public index`);
     }
   }
@@ -243,6 +269,59 @@ if (!ephemeralCacheSource.includes("durable: false") || !ephemeralCacheSource.in
   errors.push("ephemeral-agent-session-cache.mjs must declare non-durability and delete the legacy Chat journal");
 }
 
+const architectureReadmeSource = readFileSync(path.join(agentDocsRoot, "README.md"), "utf8");
+const nativeHarnessAdrSource = readFileSync(
+  path.join(agentDocsRoot, "ADR-006-native-harness-adapters-and-acp.md"),
+  "utf8",
+);
+const architectureMapStart = "<!-- agent-runtime-map:start -->";
+const architectureMapEnd = "<!-- agent-runtime-map:end -->";
+const readmeArchitectureMap = extractMarkedDocumentBlock(
+  architectureReadmeSource,
+  architectureMapStart,
+  architectureMapEnd,
+  "docs/architecture/desktop-agent/README.md",
+);
+const adrArchitectureMap = extractMarkedDocumentBlock(
+  nativeHarnessAdrSource,
+  architectureMapStart,
+  architectureMapEnd,
+  "docs/architecture/desktop-agent/ADR-006-native-harness-adapters-and-acp.md",
+);
+if (readmeArchitectureMap && adrArchitectureMap && readmeArchitectureMap !== adrArchitectureMap) {
+  errors.push("Desktop Agent README and ADR-006 must contain the same canonical runtime architecture map");
+}
+for (const requiredText of [
+  "One PuppyOne Chat UI / product control plane",
+  "codex app-server (JSONL-RPC over stdio)",
+  "official Claude Agent SDK + user's Claude Code executable",
+  "Agent Client Protocol (JSON-RPC 2.0 over stdio)",
+  "PuppyOne-bundled and pinned OpenCode kernel",
+  "discovery and diagnostics only",
+]) {
+  if (!readmeArchitectureMap?.includes(requiredText)) {
+    errors.push(`canonical Desktop Agent architecture map is missing: ${requiredText}`);
+  }
+}
+
+for (const retiredDocument of [
+  "ADR-001-opencode-sidecar.md",
+  "ADR-003-opencode-only-chat-harness.md",
+]) {
+  const retiredSource = readFileSync(path.join(agentDocsRoot, retiredDocument), "utf8");
+  if (!/Status: retired and superseded by/.test(retiredSource)) {
+    errors.push(`${retiredDocument} must remain an explicit retired-decision tombstone`);
+  }
+  if (/^## Decision$/m.test(retiredSource) || retiredSource.split("\n").length > 80) {
+    errors.push(`${retiredDocument} contains active or expanded legacy instructions; keep history in Git`);
+  }
+}
+
+const adoptionSpikeSource = readFileSync(path.join(agentDocsRoot, "opencode-adoption-spike.md"), "utf8");
+if (!adoptionSpikeSource.includes("Status: archived research evidence; not an implementation specification.")) {
+  errors.push("opencode-adoption-spike.md must remain explicitly archived and non-normative");
+}
+
 if (errors.length > 0) {
   console.error("Desktop Agent architecture boundary check failed:");
   for (const error of errors) console.error(`- ${error}`);
@@ -259,6 +338,20 @@ function* walkSourceFiles(directory) {
     if (stats.isDirectory()) yield* walkSourceFiles(filePath);
     else if (/\.(?:mjs|cjs|ts|tsx)$/.test(filePath)) yield filePath;
   }
+}
+
+function extractMarkedDocumentBlock(source, startMarker, endMarker, label) {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker);
+  if (start < 0 || end < 0 || end <= start) {
+    errors.push(`${label} is missing the canonical Agent architecture map markers`);
+    return "";
+  }
+  if (source.indexOf(startMarker, start + startMarker.length) >= 0 || source.indexOf(endMarker, end + endMarker.length) >= 0) {
+    errors.push(`${label} must contain exactly one canonical Agent architecture map`);
+    return "";
+  }
+  return source.slice(start + startMarker.length, end).trim();
 }
 
 function collectSpecifiers(source) {

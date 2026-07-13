@@ -16,7 +16,7 @@ const CLOUD_PROJECT_PREVIEW_TTL_MS = 30_000;
 type CloudProjectPreviewState = {
   entries: DesktopCloudTreeEntry[];
   loading: boolean;
-  error: string | null;
+  error: boolean;
 };
 
 export function useCloudProjectPreview({
@@ -45,23 +45,23 @@ export function useCloudProjectPreview({
   const [state, setState] = useState<CloudProjectPreviewState>({
     entries: cachedEntries ?? [],
     loading: Boolean(session && !cachedEntries),
-    error: null,
+    error: false,
   });
 
   useEffect(() => {
     if (!session || !projectId || !cacheContext) {
-      setState({ entries: [], loading: false, error: null });
+      setState({ entries: [], loading: false, error: false });
       return undefined;
     }
 
     const cached = readCloudCache<DesktopCloudTreeEntry[]>(cacheContext);
     if (cached) {
-      setState({ entries: cached, loading: false, error: null });
+      setState({ entries: cached, loading: false, error: false });
       return undefined;
     }
 
     let cancelled = false;
-    setState((current) => ({ ...current, loading: true, error: null }));
+    setState((current) => ({ ...current, loading: true, error: false }));
     void loadCloudCache(
       cacheContext,
       () => listCloudRoot(
@@ -75,14 +75,14 @@ export function useCloudProjectPreview({
       { ttlMs: CLOUD_PROJECT_PREVIEW_TTL_MS },
     )
       .then((entries) => {
-        if (!cancelled) setState({ entries, loading: false, error: null });
+        if (!cancelled) setState({ entries, loading: false, error: false });
       })
-      .catch((error) => {
+      .catch(() => {
         if (!cancelled) {
           setState({
             entries: [],
             loading: false,
-            error: error instanceof Error ? error.message : "Unable to load project preview.",
+            error: true,
           });
         }
       });

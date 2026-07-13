@@ -360,17 +360,17 @@
   grid-template-columns: 94px minmax(0, 1fr);
   gap: 10px;
   padding: 9px 10px;
-  border-left: 2px solid color-mix(in srgb, var(--po-accent) 46%, var(--po-divider));
+  border-inline-start: 2px solid color-mix(in srgb, var(--po-accent) 46%, var(--po-divider));
   border-radius: 3px;
   background: color-mix(in srgb, var(--po-control) 32%, transparent);
 }
 
 .desktop-docx-redline-block.added {
-  border-left-color: color-mix(in srgb, var(--po-success) 62%, var(--po-divider));
+  border-inline-start-color: color-mix(in srgb, var(--po-success) 62%, var(--po-divider));
 }
 
 .desktop-docx-redline-block.deleted {
-  border-left-color: color-mix(in srgb, var(--po-danger) 62%, var(--po-divider));
+  border-inline-start-color: color-mix(in srgb, var(--po-danger) 62%, var(--po-divider));
 }
 
 .desktop-docx-redline-location {
@@ -432,8 +432,8 @@
   }
 
   .desktop-file-diff-identity {
-    justify-content: flex-start;
-    text-align: left;
+    justify-content: start;
+    text-align: start;
   }
 
   .desktop-docx-redline-block {

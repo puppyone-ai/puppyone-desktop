@@ -4,8 +4,9 @@ import {
   createExplorerMotionPlan,
   type ExplorerMotionPlan,
 } from "./explorerMotionPlan";
+import { EXPLORER_MOTION_DURATION_MS } from "./explorerMotionAnimation";
 
-export const EXPLORER_MOTION_DURATION_MS = 180;
+export { EXPLORER_MOTION_DURATION_MS } from "./explorerMotionAnimation";
 
 export type ActiveExplorerMotionPlan = ExplorerMotionPlan & {
   generation: number;

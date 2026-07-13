@@ -12,11 +12,11 @@ import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../../types/
 import { getPuppyoneRemote } from "../../source-control/remotes";
 import type { RecentWorkspaceCloudBinding } from "./cloudProjectResolution";
 import { bindingMatchesWorkspace, sameCloudOrigin } from "./explicitWorkspaceBinding";
+import { cloudMessage } from "../cloudPresentation";
 
-const LEGACY_CONFIRMATION_MESSAGE =
-  "Confirm this Cloud project before converting the legacy Git remote into a workspace binding.";
-const FORBIDDEN_MESSAGE =
-  "This folder is linked to a Cloud project that the current account cannot access.";
+const LEGACY_CONFIRMATION_MESSAGE = cloudMessage("binding-confirm-legacy");
+const CANONICAL_CONFIRMATION_MESSAGE = cloudMessage("binding-confirm-workspace");
+const FORBIDDEN_MESSAGE = cloudMessage("binding-forbidden");
 
 type BindingHint = RecentWorkspaceCloudBinding;
 
@@ -96,13 +96,68 @@ export function useCloudWorkspaceBinding({
         apply({
           projectId: null,
           cloudLinked: true,
-          error: "Sign in to identify this legacy Cloud remote.",
+          error: cloudMessage("binding-sign-in-identify"),
           reason: "wrong-account",
+        });
+        return undefined;
+      }
+      if (!sameCloudOrigin(
+        cloudRemote.rawUrl,
+        desktopCloudApiBaseUrl ?? activeCloudSession.api_base_url,
+      )) {
+        apply({
+          projectId: null,
+          cloudLinked: true,
+          error: cloudMessage("binding-wrong-host", { origin: cloudRemote.rawUrl }),
+          reason: "unresolvable",
         });
         return undefined;
       }
 
       let cancelled = false;
+      if (cloudRemote.info.kind !== "access-point" && cloudRemote.info.projectId) {
+        const candidateProjectId = cloudRemote.info.projectId;
+        void getCloudProject(
+          activeCloudSession,
+          candidateProjectId,
+          updateCloudSession,
+          desktopCloudApiBaseUrl,
+        ).then((project) => {
+          if (cancelled) return;
+          setHomeCloudProjects((projects) => upsertProject(projects, project));
+          apply({
+            projectId: null,
+            candidateProjectId,
+            candidateScopeId: cloudRemote.info.kind === "scope"
+              ? cloudRemote.info.scopeId ?? null
+              : null,
+            bindingId: null,
+            bindingKind: cloudRemote.info.kind === "scope" ? "scoped" : "full",
+            scopePath: null,
+            cloudLinked: true,
+            error: CANONICAL_CONFIRMATION_MESSAGE,
+            reason: "legacy-confirmation-required",
+          });
+        }).catch((error) => {
+          if (cancelled) return;
+          apply({
+            projectId: null,
+            candidateProjectId,
+            cloudLinked: true,
+            error: errorStatus(error) === 401 || errorStatus(error) === 403
+              ? cloudMessage("binding-not-authorized")
+              : cloudMessage(
+                  "binding-unresolvable",
+                  undefined,
+                  error instanceof Error ? error.message : String(error),
+                ),
+            reason: errorStatus(error) === 401 || errorStatus(error) === 403
+              ? "not-authorized"
+              : "unresolvable",
+          });
+        });
+        return () => { cancelled = true; };
+      }
       void resolveLegacyCloudWorkspaceRemote(
         activeCloudSession,
         cloudRemote.rawUrl,
@@ -126,7 +181,13 @@ export function useCloudWorkspaceBinding({
         apply({
           projectId: null,
           cloudLinked: true,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorStatus(error) === 401
+            ? cloudMessage("binding-switch-account")
+            : cloudMessage(
+                "binding-unresolvable",
+                undefined,
+                error instanceof Error ? error.message : String(error),
+              ),
           reason: errorStatus(error) === 401 ? "wrong-account" : "unresolvable",
         });
       });
@@ -139,7 +200,7 @@ export function useCloudWorkspaceBinding({
         candidateProjectId: configProjectId,
         bindingId: configBindingId,
         cloudLinked: true,
-        error: `Switch to the Cloud host used by this binding (${configOrigin ?? "unknown"}).`,
+        error: cloudMessage("binding-wrong-host", { origin: configOrigin ?? "—" }),
         reason: "wrong-host",
       });
       return undefined;
@@ -154,7 +215,7 @@ export function useCloudWorkspaceBinding({
         candidateProjectId: configProjectId,
         bindingId: configBindingId,
         cloudLinked: true,
-        error: "This binding belongs to a different local checkout. Attach this checkout explicitly.",
+        error: cloudMessage("binding-checkout-mismatch"),
         reason: "binding-revoked",
       });
       return undefined;
@@ -194,7 +255,7 @@ export function useCloudWorkspaceBinding({
             candidateProjectId: configProjectId,
             bindingId: configBindingId,
             cloudLinked: true,
-            error: "Cloud returned a binding that does not match this local workspace.",
+            error: cloudMessage("binding-response-mismatch"),
             reason: "binding-revoked",
           });
           return;
@@ -212,7 +273,7 @@ export function useCloudWorkspaceBinding({
             bindingKind: binding.binding_kind,
             scopePath: binding.scope_path ?? null,
             cloudLinked: true,
-            error: reason === "wrong-account" ? "Switch to the account that attached this folder." : FORBIDDEN_MESSAGE,
+            error: reason === "wrong-account" ? cloudMessage("binding-switch-account") : FORBIDDEN_MESSAGE,
             reason,
           });
           return;
@@ -244,10 +305,14 @@ export function useCloudWorkspaceBinding({
           bindingId: configBindingId,
           cloudLinked: true,
           error: status === 401
-            ? "Switch accounts to use this Cloud binding."
+            ? cloudMessage("binding-switch-account")
             : status === 403 || status === 404
               ? FORBIDDEN_MESSAGE
-              : error instanceof Error ? error.message : String(error),
+              : cloudMessage(
+                  "binding-network-failed",
+                  undefined,
+                  error instanceof Error ? error.message : String(error),
+                ),
           reason: status === 401
             ? "wrong-account"
             : status === 403 || status === 404

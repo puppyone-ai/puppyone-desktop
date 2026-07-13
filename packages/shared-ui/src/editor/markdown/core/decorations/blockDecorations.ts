@@ -45,6 +45,7 @@ export function addMarkdownBlockAndLineDecorations(
   const firstLine = state.doc.lineAt(rangeFrom);
   const lastLine = state.doc.lineAt(rangeTo);
   const plans = getMarkdownPlansInRange(state, firstLine.from, lastLine.to);
+  const planLookup = createLinePlanLookup(state, plans);
   markdownDecorationDiagnostics.rangeBuilds += 1;
   markdownDecorationDiagnostics.linesScanned += lastLine.number - firstLine.number + 1;
   if (firstLine.from === 0 && lastLine.to === state.doc.length) {
@@ -63,7 +64,7 @@ export function addMarkdownBlockAndLineDecorations(
       continue;
     }
 
-    const blockPlan = findBlockAtomPlanAtLineStart(plans, line.from);
+    const blockPlan = planLookup.blockAtomsByLineFrom.get(line.from) ?? null;
     if (blockPlan) {
       const widget = createMarkdownBlockFeatureWidget(blockPlan, {
         htmlTrustMode,
@@ -99,22 +100,34 @@ export function addMarkdownBlockAndLineDecorations(
       markdownLinkGraph,
       documentPath,
       markdownAssetUrlResolver,
-      plans,
+      planLookup.plansByLineFrom.get(line.from) ?? EMPTY_INDEXED_PLANS,
     );
     lineNumber += 1;
   }
 }
 
-function findBlockAtomPlanAtLineStart(
+const EMPTY_INDEXED_PLANS: readonly IndexedMarkdownPlan[] = [];
+
+function createLinePlanLookup(
+  state: EditorState,
   plans: readonly IndexedMarkdownPlan[],
-  lineFrom: number,
-): Extract<MarkdownElementPlan, { presentation: "blockAtom" }> | null {
-  for (const { plan } of plans) {
-    if (plan.presentation !== "blockAtom") continue;
-    if (plan.sourceRange.from !== lineFrom) continue;
-    return plan;
+): {
+  blockAtomsByLineFrom: ReadonlyMap<number, Extract<MarkdownElementPlan, { presentation: "blockAtom" }>>;
+  plansByLineFrom: ReadonlyMap<number, readonly IndexedMarkdownPlan[]>;
+} {
+  const blockAtomsByLineFrom = new Map<number, Extract<MarkdownElementPlan, { presentation: "blockAtom" }>>();
+  const plansByLineFrom = new Map<number, IndexedMarkdownPlan[]>();
+  for (const entry of plans) {
+    if (entry.plan.presentation === "blockAtom") {
+      blockAtomsByLineFrom.set(entry.plan.sourceRange.from, entry.plan);
+      continue;
+    }
+    const lineFrom = state.doc.lineAt(entry.plan.sourceRange.from).from;
+    const linePlans = plansByLineFrom.get(lineFrom);
+    if (linePlans) linePlans.push(entry);
+    else plansByLineFrom.set(lineFrom, [entry]);
   }
-  return null;
+  return { blockAtomsByLineFrom, plansByLineFrom };
 }
 
 function decorateMarkdownLine(
@@ -174,6 +187,7 @@ function decorateMarkdownLine(
       markdownLinkGraph,
       documentPath,
       markdownAssetUrlResolver,
+      plans,
       [{ from: taskLine.prefixFrom, to: taskLine.prefixTo }],
     );
     return;
@@ -193,6 +207,7 @@ function decorateMarkdownLine(
     markdownLinkGraph,
     documentPath,
     markdownAssetUrlResolver,
+    plans,
   );
 }
 

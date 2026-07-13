@@ -20,6 +20,11 @@ export function providerActivityIdentity(projection: AgentProjection, event: Age
   };
 }
 
+/** Hides persisted lifecycle-only notices emitted by older adapters. */
+export function isNonDiagnosticProviderStatusMessage(value: string) {
+  return /\bthread entered a system error state\.?$/i.test(value.trim());
+}
+
 function correlatedProviderTurnId(projection: AgentProjection, event: AgentEvent) {
   if (event.turnId) return event.turnId;
   if (projection.runningTurnId) return projection.runningTurnId;

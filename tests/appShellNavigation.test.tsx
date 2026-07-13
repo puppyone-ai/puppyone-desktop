@@ -10,6 +10,7 @@ import {
   DesktopSidebarRailNavigation,
   DesktopSidebarTopNavigation,
 } from "../src/features/app-shell/navigation";
+import { renderWithTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -27,7 +28,7 @@ describe("DesktopSidebarTopNavigation", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    act(() => root?.render(
+    act(() => renderWithTestLocalization(root,
       <DesktopSidebarTopNavigation
         activeView="data"
         cloudToolsEnabled
@@ -57,7 +58,7 @@ describe("DesktopSidebarTopNavigation", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    act(() => root?.render(
+    act(() => renderWithTestLocalization(root,
       <DesktopSidebarTopNavigation
         activeView="data"
         cloudHubEnabled
@@ -95,7 +96,7 @@ describe("DesktopSidebarFooterNavigation", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    act(() => root?.render(
+    act(() => renderWithTestLocalization(root,
       <DesktopSidebarFooterNavigation
         activeView="data"
         cloudHubEnabled
@@ -124,7 +125,7 @@ describe("DesktopSidebarRailNavigation local Cloud hub", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    act(() => root?.render(
+    act(() => renderWithTestLocalization(root,
       <DesktopSidebarRailNavigation
         activeView="git"
         cloudHistoryEnabled={false}

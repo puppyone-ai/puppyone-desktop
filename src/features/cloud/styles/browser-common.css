@@ -57,7 +57,7 @@
 
 .desktop-cloud-source-dock {
   position: absolute;
-  right: 8px;
+  inset-inline-end: 8px;
   bottom: 4px;
   display: inline-flex;
   max-width: min(520px, calc(100% - 16px));
@@ -157,7 +157,7 @@
   background: transparent;
   color: var(--po-text-muted);
   text-align: center;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition:
     background 150ms ease,
     border-color 150ms ease,
@@ -195,7 +195,7 @@
 
 .desktop-cloud-folder-icon em {
   position: absolute;
-  right: -4px;
+  inset-inline-end: -4px;
   bottom: 0;
   display: inline-flex;
   min-width: 18px;
@@ -265,8 +265,8 @@
   border-bottom: 1px solid var(--po-divider);
   background: transparent;
   color: var(--po-text-muted);
-  text-align: left;
-  cursor: pointer;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-home-content-row:last-child {
@@ -323,8 +323,8 @@
   border-radius: 7px;
   background: transparent;
   color: var(--po-text-muted);
-  text-align: left;
-  cursor: pointer;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-home-history-row:hover {
@@ -333,6 +333,7 @@
 }
 
 .desktop-cloud-home-history-graph {
+  direction: ltr;
   position: relative;
   display: block;
   align-self: stretch;
@@ -427,7 +428,7 @@
   width: 100%;
   border-color: var(--po-border);
   color: inherit;
-  text-align: left;
+  text-align: start;
   cursor: default;
 }
 

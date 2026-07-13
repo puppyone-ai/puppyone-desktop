@@ -1,5 +1,6 @@
 import { Check, Copy } from "lucide-react";
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useDeferredValue, useState, type ReactNode } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 
 type SafeMarkdownProps = { text: string; streaming?: boolean };
 
@@ -12,10 +13,16 @@ const MAX_INITIAL_MARKDOWN_BLOCKS = 240;
  * exists at the Agent boundary.
  */
 export function SafeMarkdown({ text, streaming = false }: SafeMarkdownProps) {
+  const { t } = useLocalization();
   const [expanded, setExpanded] = useState(false);
-  const candidate = expanded ? text : initialMarkdownWindow(text);
+  // External-store stream updates are synchronous. Deferring only the growing
+  // Markdown payload keeps typing and scrolling responsive while React catches
+  // up with the latest provider delta.
+  const deferredText = useDeferredValue(text);
+  const renderText = streaming ? deferredText : text;
+  const candidate = expanded ? renderText : initialMarkdownWindow(renderText);
   const parsedBlocks = parseBlocks(candidate);
-  const initiallyTruncated = text.length > MAX_INITIAL_MARKDOWN_TEXT
+  const initiallyTruncated = renderText.length > MAX_INITIAL_MARKDOWN_TEXT
     || parsedBlocks.length > MAX_INITIAL_MARKDOWN_BLOCKS;
   const blocks = expanded ? parsedBlocks : parsedBlocks.slice(0, MAX_INITIAL_MARKDOWN_BLOCKS);
   return (
@@ -29,7 +36,7 @@ export function SafeMarkdown({ text, streaming = false }: SafeMarkdownProps) {
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
         >
-          {expanded ? "Collapse long response" : "Show full response"}
+          {expanded ? t("agent.markdown.collapse") : t("agent.markdown.showFull")}
         </button>
       )}
     </div>
@@ -149,6 +156,7 @@ function safeHref(value: string) {
 }
 
 function CodeBlock({ language, value }: { language: string; value: string }) {
+  const { t } = useLocalization();
   const [copied, setCopied] = useState(false);
   return (
     <div className="desktop-agent-code-block">
@@ -158,7 +166,7 @@ function CodeBlock({ language, value }: { language: string; value: string }) {
           setCopied(true);
           window.setTimeout(() => setCopied(false), 1_200);
         }).catch(() => {});
-      }}>{copied ? <Check size={12} /> : <Copy size={12} />} {copied ? "Copied" : "Copy"}</button></div>
+      }}>{copied ? <Check size={12} /> : <Copy size={12} />} {copied ? t("common.action.copied") : t("common.action.copy")}</button></div>
       <pre><code>{value}</code></pre>
     </div>
   );

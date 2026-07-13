@@ -65,8 +65,8 @@ Rejected, and why:
 ### Page Shape
 
 The Appearance section stays a single flat list (Theme, presets, Text size,
-Content font, File icons, Navigation, Header elements, Pointer cursors, Dock
-icon). It must fit in roughly one screen. Do not adopt grouped-card layouts
+Content font, File icons, Navigation, Header elements,
+Pointer cursors, Dock icon). It must fit in roughly one screen. Do not adopt grouped-card layouts
 while the list stays this small.
 
 Light theme, dark theme, Text size, Content font, File icons, Navigation, and
@@ -164,7 +164,6 @@ Implemented:
    (`color | symbols`) is rendered in compact AI review surfaces; its settings
    row lives in the Editor section. The full Git Changes review surface always
    renders `+/-` because color alone cannot communicate its row structure.
-
 ## Invariants
 
 - Do not add a settings control that accepts a free color, raw CSS font family,
@@ -186,6 +185,9 @@ Implemented:
   requires removing or merging one.
 - Appearance preferences are per-device (`localStorage`, `puppyone.desktop.*`
   keys); they do not sync through cloud sessions.
+- Interaction toggles must remove their runtime extension and event ownership
+  when disabled; hiding an affordance while retaining active commands is not a
+  valid off state.
 - Interface, content, code, and terminal typography remain separate roles. A
   content font must not change chrome metrics or the terminal grid.
 - Font readiness emits the shared typography lifecycle event. CodeMirror must

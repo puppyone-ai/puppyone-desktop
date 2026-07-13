@@ -21,8 +21,6 @@ export type FileIconThemeId = "default" | "lines" | "vscode" | "material" | "min
 
 export type FileIconThemeMetadata = {
   id: FileIconThemeId;
-  label: string;
-  description: string;
 };
 
 const KIND_ACCENT: Record<FileVisualKind, string> = {

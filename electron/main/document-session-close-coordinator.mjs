@@ -5,6 +5,12 @@ export const DOCUMENT_SESSION_FLUSH_RESULT_CHANNEL = "document-session:flush-res
 export const DOCUMENT_SESSION_CLOSE_CANCELLED_CHANNEL = "document-session:close-cancelled";
 
 const DEFAULT_TIMEOUT_MS = 12_000;
+const DEFAULT_DIALOG_MESSAGES = Object.freeze({
+  "native.documentClose.keepOpen": "Keep Window Open",
+  "native.documentClose.closeAnyway": "Close Anyway",
+  "native.documentClose.message": "Some document changes could not be saved.",
+  "native.documentClose.detail": "Keep the window open and try again to avoid losing changes.",
+});
 
 /** Preserve app-quit intent across the asynchronous BrowserWindow close gate. */
 export function createApplicationQuitIntent({ app, platform = process.platform }) {
@@ -34,6 +40,7 @@ export function createDocumentSessionCloseCoordinator({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   logger = console,
   onCloseCancelled = () => undefined,
+  t = (messageId) => DEFAULT_DIALOG_MESSAGES[messageId] ?? "",
 }) {
   if (!dialog || typeof dialog.showMessageBox !== "function") {
     throw new TypeError("A dialog implementation is required.");
@@ -129,16 +136,22 @@ export function createDocumentSessionCloseCoordinator({
     }
 
     if (window.isDestroyed()) return;
+    if (result.error) {
+      logger.warn?.("Document flush failed before close:", result.error);
+    }
     let choice;
     try {
       choice = await dialog.showMessageBox(window, {
         type: "warning",
-        buttons: ["Keep Window Open", "Close Anyway"],
+        buttons: [
+          t("native.documentClose.keepOpen"),
+          t("native.documentClose.closeAnyway"),
+        ],
         defaultId: 0,
         cancelId: 0,
         noLink: true,
-        message: "Some document changes could not be saved.",
-        detail: result.error ?? "Keep the window open and try again to avoid losing changes.",
+        message: t("native.documentClose.message"),
+        detail: t("native.documentClose.detail"),
       });
     } catch (error) {
       notifyRendererCloseCancelled(window, result.requestId);

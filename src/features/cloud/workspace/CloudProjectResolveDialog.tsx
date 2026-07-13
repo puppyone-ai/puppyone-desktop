@@ -1,10 +1,10 @@
 import { Cloud, LoaderCircle } from "lucide-react";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   DesktopDialogCloseButton,
   DesktopDialogRoot,
   DesktopDialogSurface,
 } from "../../../components/DesktopDialog";
-import { CLOUD_PROJECT_MAPPING_ERROR } from "./cloudProjectResolution";
 
 export function CloudProjectResolveDialog({
   error,
@@ -15,6 +15,7 @@ export function CloudProjectResolveDialog({
   resolving: boolean;
   onClose: () => void;
 }) {
+  const { t } = useLocalization();
   const canClose = !resolving;
   return (
     <DesktopDialogRoot
@@ -32,11 +33,11 @@ export function CloudProjectResolveDialog({
               )}
             </span>
             <div>
-              <h2>{resolving ? "Resolving Cloud project" : "Cloud project not found"}</h2>
+              <h2>{t(resolving ? "cloud.resolve.resolvingTitle" : "cloud.resolve.notFoundTitle")}</h2>
               <p>
                 {resolving
-                  ? "Matching this local workspace to its Puppyone Cloud project."
-                  : "Desktop could not match this workspace to a Cloud project root scope."}
+                  ? t("cloud.resolve.matchingDescription")
+                  : t("cloud.resolve.notFoundDescription")}
               </p>
             </div>
           </div>
@@ -48,18 +49,18 @@ export function CloudProjectResolveDialog({
               <strong>
                 <LoaderCircle size={14} strokeWidth={2} className="desktop-dialog-spinner" />
               </strong>
-              <span>Resolving...</span>
+              <span>{t("cloud.common.resolving")}</span>
             </div>
           ) : (
             <div className="desktop-dialog-error desktop-cloud-resolve-error">
-              {error || CLOUD_PROJECT_MAPPING_ERROR}
+              {error || t("cloud.resolve.mappingError")}
             </div>
           )}
         </div>
         {!resolving && (
           <footer className="desktop-dialog-footer">
             <button className="desktop-dialog-button primary" type="button" onClick={onClose}>
-              Close
+              {t("cloud.common.close")}
             </button>
           </footer>
         )}

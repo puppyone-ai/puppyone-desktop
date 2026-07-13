@@ -16,7 +16,7 @@
   min-height: 0;
   flex-direction: column;
   background: var(--po-sidebar);
-  border-right: 1px solid transparent;
+  border-inline-end: 1px solid transparent;
 }
 
 .desktop-surface {
@@ -43,8 +43,11 @@
 
 .desktop-view-surface-sidebar {
   background: var(--po-sidebar);
-  /* Sidebar and content share one material; the hairline is the separator. */
-  border-right: 1px solid var(--po-divider);
+  /*
+   * Divider ownership belongs to DataWorkspace's .explorer-column host.
+   * This surface is injected inside that column; drawing another edge here
+   * would turn the shared 1px separator into a feature-dependent 2px line.
+   */
 }
 
 .desktop-view-surface-main {
@@ -74,7 +77,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-left: 0 solid transparent;
+  border-inline-start: 0 solid transparent;
   background: var(--po-terminal-bg);
   transition: flex-basis 160ms ease, width 160ms ease, border-color 160ms ease;
 }
@@ -85,9 +88,8 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar {
 
 .desktop-right-sidebar::before {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -18px;
+  inset-block: 0;
+  inset-inline-start: -18px;
   width: 18px;
   pointer-events: none;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--po-shadow) 42%, transparent));
@@ -99,8 +101,8 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar {
 .desktop-right-sidebar.is-open {
   flex-basis: var(--desktop-right-sidebar-width);
   width: var(--desktop-right-sidebar-width);
-  border-left-width: 1px;
-  border-left-color: var(--po-divider);
+  border-inline-start-width: 1px;
+  border-inline-start-color: var(--po-shell-divider, var(--po-divider));
 }
 
 .desktop-right-sidebar.is-open::before {
@@ -109,9 +111,8 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar {
 
 .desktop-right-sidebar-resizer {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
+  inset-block: 0;
+  inset-inline-start: 0;
   z-index: 35;
   width: 9px;
   transform: translateX(-4px);
@@ -122,9 +123,8 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar {
 
 .desktop-right-sidebar-resizer::after {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 4px;
+  inset-block: 0;
+  inset-inline-start: 4px;
   width: 1px;
   background: transparent;
   content: "";
@@ -201,7 +201,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   min-height: 0;
   flex-direction: column;
   background: var(--po-sidebar);
-  border-right: 1px solid transparent;
+  border-inline-end: 1px solid transparent;
 }
 
 .desktop-rail-header {
@@ -321,7 +321,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
 
 .desktop-project-option-row > .desktop-project-option {
   width: 100%;
-  padding-right: calc(var(--po-menu-item-padding-inline) + 26px);
+  padding-inline-end: calc(var(--po-menu-item-padding-inline) + 26px);
 }
 
 .desktop-project-option-row:hover > .desktop-project-option:not(:disabled),
@@ -334,7 +334,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
 .desktop-project-copy-path {
   position: absolute;
   top: 50%;
-  right: 5px;
+  inset-inline-end: 5px;
   z-index: 1;
   display: inline-flex;
   width: 22px;

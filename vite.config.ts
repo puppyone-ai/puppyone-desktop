@@ -44,6 +44,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: "@puppyone/localization",
+        replacement: fileURLToPath(new URL("./packages/localization/src", import.meta.url)),
+      },
+      {
         find: "@puppyone/shared-ui/shared-ui.css",
         replacement: fileURLToPath(new URL("./packages/shared-ui/src/styles/shared-ui.css", import.meta.url)),
       },

@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import { adaptCloudAggregateToAccessData } from "../data/adaptCloudAggregateToAccessData";
 import type { DesktopCloudDataState } from "../data/useDesktopCloudData";
@@ -23,6 +24,7 @@ export function CloudAutomationRouteSection({
   sessionRestoring?: boolean;
   onSessionChange: (session: DesktopCloudSession | null) => void;
 }) {
+  const { t } = useLocalization();
   const accessData = adaptCloudAggregateToAccessData({
     apiBaseUrl,
     scopes: cloudData.scopes,
@@ -36,7 +38,7 @@ export function CloudAutomationRouteSection({
   });
 
   return (
-    <Suspense fallback={<div className="desktop-view-route-loading" role="status">Loading automation…</div>}>
+    <Suspense fallback={<div className="desktop-view-route-loading" role="status">{t("cloud.loading.automation")}</div>}>
       <LazyDesktopCloudAutomationView
         projectId={projectId}
         cloudSession={cloudSession}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import type { AiEditFile, AiEditHunk, AiEditRequest } from "@puppyone/shared-ui";
+import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
 
 type AiResponseChangesCardProps = {
   request: AiEditRequest;
@@ -16,6 +17,7 @@ export function AiResponseChangesCard({
   activePath = null,
   onOpenFile,
 }: AiResponseChangesCardProps) {
+  const { t } = useLocalization();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const selectedFile = useMemo(() => {
@@ -38,7 +40,7 @@ export function AiResponseChangesCard({
   if (request.files.length === 0) return null;
 
   return (
-    <section className="ai-response-changes-card" aria-label="AI response changes">
+    <section className="ai-response-changes-card" aria-label={t("source-control.aiChanges.ariaLabel")}>
       <div className="ai-response-changes-card__files">
         {request.files.slice(0, MAX_VISIBLE_FILES).map((file) => (
           <button
@@ -52,8 +54,8 @@ export function AiResponseChangesCard({
             }}
             title={file.path}
           >
-            <span className="ai-response-changes-card__path">{file.path}</span>
-            <span className="ai-response-changes-card__stat">
+            <span className="ai-response-changes-card__path" dir="ltr">{file.path}</span>
+            <span className="ai-response-changes-card__stat" dir="ltr">
               <span className="ai-response-changes-card__stat-add">+{file.additions}</span>
               <span className="ai-response-changes-card__stat-delete">-{file.deletions}</span>
             </span>
@@ -61,48 +63,54 @@ export function AiResponseChangesCard({
         ))}
         {request.files.length > MAX_VISIBLE_FILES && (
           <div className="ai-response-changes-card__more">
-            +{request.files.length - MAX_VISIBLE_FILES} more files
+            {t("source-control.aiChanges.moreFiles", {
+              count: request.files.length - MAX_VISIBLE_FILES,
+            })}
           </div>
         )}
       </div>
 
       {reviewOpen && selectedFile && (
-        <div className="ai-edit-review-popover" role="dialog" aria-label={`Review changes in ${selectedFile.path}`}>
+        <div
+          className="ai-edit-review-popover"
+          role="dialog"
+          aria-label={t("source-control.aiChanges.reviewFile", { path: bidiIsolate(selectedFile.path) })}
+        >
           <header className="ai-edit-review-popover__header">
             <div>
-              <strong title={selectedFile.path}>{selectedFile.path}</strong>
-              <span>+{selectedFile.additions} -{selectedFile.deletions}</span>
+              <strong title={selectedFile.path} dir="ltr">{selectedFile.path}</strong>
+              <span dir="ltr">+{selectedFile.additions} -{selectedFile.deletions}</span>
             </div>
             <button
               type="button"
-              aria-label="Close review"
+              aria-label={t("source-control.aiChanges.closeReview")}
               onClick={() => setReviewOpen(false)}
             >
               <X size={14} />
             </button>
           </header>
-          <AiEditFileDiff file={selectedFile} />
+          <AiEditFileDiff file={selectedFile} t={t} />
         </div>
       )}
     </section>
   );
 }
 
-function AiEditFileDiff({ file }: { file: AiEditFile }) {
+function AiEditFileDiff({ file, t }: { file: AiEditFile; t: MessageFormatter }) {
   if (file.hunks.length === 0) {
-    return <div className="ai-edit-review-popover__empty">No textual diff available.</div>;
+    return <div className="ai-edit-review-popover__empty">{t("source-control.diff.noText")}</div>;
   }
 
   return (
     <div className="ai-edit-review-popover__hunks">
       {file.hunks.map((hunk) => (
-        <AiEditHunkDiff key={hunk.id} hunk={hunk} />
+        <AiEditHunkDiff key={hunk.id} hunk={hunk} t={t} />
       ))}
     </div>
   );
 }
 
-function AiEditHunkDiff({ hunk }: { hunk: AiEditHunk }) {
+function AiEditHunkDiff({ hunk, t }: { hunk: AiEditHunk; t: MessageFormatter }) {
   const oldLines = splitReviewLines(hunk.oldText);
   const newLines = splitReviewLines(hunk.newText);
   const truncated = oldLines.length + newLines.length > MAX_VISIBLE_DIFF_LINES;
@@ -113,8 +121,8 @@ function AiEditHunkDiff({ hunk }: { hunk: AiEditHunk }) {
   return (
     <section className="ai-edit-review-hunk">
       <header>
-        <span>{hunkLabel(hunk)}</span>
-        <small>line {hunk.newRange.startLine}</small>
+        <span>{hunkLabel(hunk, t)}</span>
+        <small>{t("source-control.aiChanges.line", { line: hunk.newRange.startLine })}</small>
       </header>
       <div className="ai-edit-review-hunk__body">
         {visibleOldLines.map((line, index) => (
@@ -134,7 +142,7 @@ function AiEditHunkDiff({ hunk }: { hunk: AiEditHunk }) {
           />
         ))}
         {truncated && (
-          <div className="ai-edit-review-hunk__truncated">Diff truncated</div>
+          <div className="ai-edit-review-hunk__truncated">{t("source-control.diff.truncated")}</div>
         )}
       </div>
     </section>
@@ -151,7 +159,7 @@ function DiffLine({
   text: string;
 }) {
   return (
-    <div className={`ai-edit-review-line ${kind}`}>
+    <div className={`ai-edit-review-line ${kind}`} dir="ltr">
       <span className="ai-edit-review-line__number">{lineNumber > 0 ? lineNumber : ""}</span>
       <span className="ai-edit-review-line__prefix">{kind === "add" ? "+" : "-"}</span>
       <code>{text || " "}</code>
@@ -159,10 +167,10 @@ function DiffLine({
   );
 }
 
-function hunkLabel(hunk: AiEditHunk): string {
-  if (hunk.kind === "added") return "Added";
-  if (hunk.kind === "removed") return "Removed";
-  return "Modified";
+function hunkLabel(hunk: AiEditHunk, t: MessageFormatter): string {
+  if (hunk.kind === "added") return t("source-control.diff.change.added");
+  if (hunk.kind === "removed") return t("source-control.diff.change.deleted");
+  return t("source-control.diff.change.modified");
 }
 
 function splitReviewLines(value: string): string[] {

@@ -87,7 +87,11 @@ describe("recent workspace Cloud binding", () => {
     })).resolves.toEqual(["local:workspace-1", {
       projectId: null,
       cloudLinked: false,
-      error: "Config is invalid",
+      error: {
+        code: "binding-config-error",
+        detail: "Config is invalid",
+        values: undefined,
+      },
       reason: null,
     }]);
   });

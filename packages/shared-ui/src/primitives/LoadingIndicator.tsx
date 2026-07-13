@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 
 export type LoaderSize = "xs" | "sm";
 export type LoaderTone = "neutral" | "info" | "success" | "warning" | "danger";
@@ -32,7 +33,7 @@ export function PulseGridLoader({
   tone = "neutral",
   className,
   style,
-  ariaLabel = "Loading",
+  ariaLabel,
   ariaHidden = false,
 }: {
   size?: LoaderSize;
@@ -42,12 +43,14 @@ export function PulseGridLoader({
   ariaLabel?: string;
   ariaHidden?: boolean;
 }) {
+  const { t } = useLocalization();
   const { dot, gap, radius } = PULSE_GRID_SIZE[size];
   const { active } = TONE_MAP[tone];
+  const resolvedAriaLabel = ariaLabel ?? t("shared-ui.loading");
 
   return (
     <span
-      {...(ariaHidden ? { "aria-hidden": true } : { role: "status", "aria-label": ariaLabel })}
+      {...(ariaHidden ? { "aria-hidden": true } : { role: "status", "aria-label": resolvedAriaLabel })}
       data-puppy-loader="pulse-grid"
       className={className}
       style={{
@@ -79,7 +82,7 @@ export function DotsLoader({
   tone = "neutral",
   className,
   style,
-  ariaLabel = "Loading",
+  ariaLabel,
   ariaHidden = false,
 }: {
   size?: LoaderSize;
@@ -89,12 +92,14 @@ export function DotsLoader({
   ariaLabel?: string;
   ariaHidden?: boolean;
 }) {
+  const { t } = useLocalization();
   const { dot, gap } = DOTS_SIZE[size];
   const { active } = TONE_MAP[tone];
+  const resolvedAriaLabel = ariaLabel ?? t("shared-ui.loading");
 
   return (
     <span
-      {...(ariaHidden ? { "aria-hidden": true } : { role: "status", "aria-label": ariaLabel })}
+      {...(ariaHidden ? { "aria-hidden": true } : { role: "status", "aria-label": resolvedAriaLabel })}
       data-puppy-loader="dots"
       className={className}
       style={{
@@ -126,7 +131,7 @@ export function DotsLoader({
 }
 
 export function InlineLoading({
-  label = "Loading",
+  label,
   size = "xs",
   tone = "neutral",
   indicator = "pulse-grid",
@@ -140,7 +145,9 @@ export function InlineLoading({
   className?: string;
   style?: CSSProperties;
 }) {
-  const ariaLabel = typeof label === "string" ? label : "Loading";
+  const { t } = useLocalization();
+  const resolvedLabel = label === undefined ? t("shared-ui.loading") : label;
+  const ariaLabel = typeof resolvedLabel === "string" ? resolvedLabel : t("shared-ui.loading");
 
   return (
     <span className={className} style={{ display: "inline-flex", alignItems: "center", gap: 8, ...style }}>
@@ -149,7 +156,7 @@ export function InlineLoading({
       ) : (
         <PulseGridLoader size={size} tone={tone} ariaLabel={ariaLabel} />
       )}
-      {label != null && <span>{label}</span>}
+      {resolvedLabel != null && <span>{resolvedLabel}</span>}
     </span>
   );
 }

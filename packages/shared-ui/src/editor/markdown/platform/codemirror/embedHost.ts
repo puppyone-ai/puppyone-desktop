@@ -7,6 +7,7 @@ import { createWebEmbedBroker, type WebEmbedBroker } from "../brokers/webEmbedBr
 import { createEmbeddedEditSessionStore, type EmbeddedEditSessionStore } from "./embeddedEditSession";
 import { createWidgetSessionRegistry, type WidgetSessionRegistry } from "./widgetSession";
 import { createExecutionSessionStore, type ExecutionSessionStore } from "../sessions/executionSession";
+import { createMarkdownLayoutCoordinator, type MarkdownLayoutCoordinator } from "./layoutCoordinator";
 
 export type MarkdownEmbedHost = {
   viewId: string;
@@ -18,6 +19,7 @@ export type MarkdownEmbedHost = {
   links: LinkBroker;
   transactions: TransactionBroker;
   webEmbeds: WebEmbedBroker;
+  layout: MarkdownLayoutCoordinator;
   requestMeasure(): void;
   dispose(): void;
 };
@@ -60,8 +62,8 @@ export function getMarkdownEmbedHost(
   const webEmbeds = createWebEmbedBroker({
     allowAutomaticLoad: options.allowAutomaticWebEmbedLoad === true,
   });
+  const layout = createMarkdownLayoutCoordinator(view);
 
-  let measureQueued = false;
   const host: MarkdownEmbedHost = {
     viewId: `md-view:${++viewSequence}`,
     sessions,
@@ -72,17 +74,9 @@ export function getMarkdownEmbedHost(
     links,
     transactions,
     webEmbeds,
+    layout,
     requestMeasure() {
-      if (measureQueued) return;
-      measureQueued = true;
-      queueMicrotask(() => {
-        measureQueued = false;
-        try {
-          view.requestMeasure();
-        } catch {
-          // EditorView may already be destroyed.
-        }
-      });
+      layout.request();
     },
     dispose() {
       sessions.disposeAll();
@@ -91,6 +85,7 @@ export function getMarkdownEmbedHost(
       assets.disposeAll();
       asyncRender.disposeAll();
       webEmbeds.disposeAll();
+      layout.dispose();
       embedHosts.delete(view);
     },
   };

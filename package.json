@@ -8,7 +8,8 @@
     "externalViewerPacks": false
   },
   "scripts": {
-    "check:boundaries": "node scripts/check-repository-layout.mjs && node scripts/check-local-workspace-architecture.mjs && node scripts/check-macos-release-config.mjs && node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-editor-document-session.mjs && node scripts/check-agent-architecture.mjs && node scripts/check-opencode-provenance.mjs && node scripts/check-claude-agent-sdk-provenance.mjs && node scripts/check-agent-ui-provenance.mjs && node scripts/check-automation-plugin-boundaries.mjs",
+    "check:boundaries": "node scripts/check-repository-layout.mjs && node scripts/check-local-workspace-architecture.mjs && node scripts/check-macos-release-config.mjs && node scripts/check-localization.mjs && node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-editor-document-session.mjs && node scripts/check-agent-architecture.mjs && node scripts/check-opencode-provenance.mjs && node scripts/check-claude-agent-sdk-provenance.mjs && node scripts/check-agent-ui-provenance.mjs && node scripts/check-automation-plugin-boundaries.mjs",
+    "check:localization": "node scripts/check-localization.mjs",
     "check:shared-ui": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-editor-document-session.mjs",
     "check:editor-document-session": "node scripts/check-editor-document-session.mjs",
     "check:viewer-contract": "node scripts/check-viewer-contract.mjs",
@@ -47,12 +48,14 @@
     "@anthropic-ai/claude-agent-sdk": "0.3.159",
     "electron-log": "^5.4.4",
     "electron-updater": "^6.8.9",
+    "intl-messageformat": "^11.2.2",
     "jszip": "^3.10.1",
     "node-pty": "^1.1.0",
     "semver": "^7.7.3"
   },
   "devDependencies": {
     "@aiden0z/pptx-renderer": "^1.2.3",
+    "@formatjs/icu-messageformat-parser": "3.5.5",
     "@codemirror/commands": "^6.10.3",
     "@codemirror/lang-css": "^6.3.1",
     "@codemirror/lang-html": "^6.4.11",
@@ -107,7 +110,9 @@
       "dist/**",
       "electron/**",
       "local-api/**",
+      "locales/**",
       "shared/**",
+      "packages/localization/**",
       "packages/shared-ui/**",
       "vendor/claudian/**",
       "vendor/claude-agent-sdk/**",

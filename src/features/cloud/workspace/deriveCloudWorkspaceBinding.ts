@@ -1,5 +1,6 @@
 import type { getPuppyoneRemote } from "../../source-control/remotes";
 import type { CloudWorkspaceBindingState } from "./cloudWorkspaceTypes";
+import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
 export function deriveCloudWorkspaceBinding({
   cloudRemote,
@@ -10,7 +11,7 @@ export function deriveCloudWorkspaceBinding({
   cloudRemote: ReturnType<typeof getPuppyoneRemote>;
   projectId: string | null;
   loading: boolean;
-  error: string | null;
+  error: CloudMessageDescriptor | null;
 }): CloudWorkspaceBindingState {
   if (projectId) {
     return { status: "bound-full", projectId, readiness: null };
@@ -22,7 +23,7 @@ export function deriveCloudWorkspaceBinding({
     return {
       status: "error",
       projectId: null,
-      message: "This legacy Cloud remote needs an explicit Project binding.",
+      message: cloudMessage("binding-unresolvable"),
     };
   }
   if (error) {

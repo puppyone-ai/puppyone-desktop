@@ -25,6 +25,20 @@ describe("Desktop Agent transcript projection", () => {
       streaming: false,
       terminalState: "completed",
     });
+    expect(projection.turns[0]).toMatchObject({
+      status: "completed",
+      startedAtMs: 1_000,
+      durationMs: 4_000,
+    });
+  });
+
+  it("prefers the provider's normalized turn duration over envelope timing", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Measure" }, "turn-duration"),
+      event(9, "turn.completed", { status: "completed", durationMs: 2_450 }, "turn-duration"),
+    ]);
+
+    expect(projection.turns[0]?.durationMs).toBe(2_450);
   });
 
   it("ignores duplicates, marks gaps, and keeps partial assistant text after interruption", () => {
@@ -56,6 +70,37 @@ describe("Desktop Agent transcript projection", () => {
     expect(projection.activities[0]).toMatchObject({ status: "completed", label: "npm test" });
     expect(projection.activities[0].output.length).toBe(64 * 1024);
     expect(projection.approvals).toEqual([]);
+  });
+
+  it("preserves canonical tool identity and upgrades legacy arguments to structured input", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "tool.started", {
+        kind: "read",
+        tool: "read",
+        label: "Read file",
+        path: "src/App.tsx",
+        arguments: { file_path: "src/App.tsx" },
+        status: "running",
+      }, "turn-tools", "read-1"),
+      event(2, "tool.completed", {
+        kind: "read",
+        tool: "read",
+        label: "Read file",
+        status: "completed",
+        outputPreview: "export function App() {}",
+      }, "turn-tools", "read-1"),
+    ]);
+
+    expect(projection.activities[0]).toMatchObject({
+      kind: "tool",
+      status: "completed",
+      detail: {
+        tool: "read",
+        path: "src/App.tsx",
+        input: { file_path: "src/App.tsx" },
+        outputPreview: "export function App() {}",
+      },
+    });
   });
 
   it("does not project empty file-change placeholders and removes a cleared session diff", () => {
@@ -106,6 +151,18 @@ describe("Desktop Agent transcript projection", () => {
     }, "turn-1"));
 
     expect(projection.activities[0].label).toBe("Invalid value: 'max'. Use 'xhigh'.");
+  });
+
+  it("drops legacy lifecycle-only system-error notices and keeps the actionable diagnostic", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "provider.error", { message: "Codex thread entered a system error state." }, "turn-1"),
+      event(2, "provider.error", { message: "Invalid value: 'max'. Supported value is 'xhigh'." }, "turn-1"),
+    ]);
+
+    expect(projection.activities.map((activity) => activity.label)).toEqual([
+      "Invalid value: 'max'. Supported value is 'xhigh'.",
+    ]);
+    expect(projection.parts.filter((part) => part.kind === "error")).toHaveLength(1);
   });
 
   it("normalizes unrecognized provider activity status to a neutral unknown state", () => {

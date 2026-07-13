@@ -3,10 +3,12 @@ import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../viewe
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { disposeWidgetSessionDom } from "../../platform/codemirror/widgetSession";
 import type { MarkdownTableAlignment, MarkdownTableRow } from "./tableModel";
-import { estimateMarkdownTableWidgetHeight, MarkdownWidgetMeasureController } from "../../shared/widgets/markdownWidgetMeasure";
+import { MarkdownWidgetMeasureController } from "../../platform/codemirror/layoutCoordinator";
+import { createMarkdownTableRenderKey, estimateMarkdownTableLayoutHeight } from "./tableLayout";
 import { createTableCellEditor, disposeTableCellEditor } from "./tableCellEditor";
 import { dispatchMarkdownTableStructureOperation, getActiveMarkdownTableCellDraft } from "./tableCommands";
 import { createMarkdownTableDragLayer } from "./tableDragLayer";
+import { getMarkdownLocalization } from "../../core/editor/markdownLocalization";
 
 export class MarkdownTableWidget extends WidgetType {
   constructor(
@@ -17,6 +19,8 @@ export class MarkdownTableWidget extends WidgetType {
     private readonly markdownLinkGraph: MarkdownLinkGraph | null,
     private readonly documentPath: string,
     private readonly _markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
+    private readonly layoutEstimatedHeight = estimateMarkdownTableLayoutHeight(rows),
+    private readonly renderKey = createMarkdownTableRenderKey(alignments, rows),
   ) {
     super();
   }
@@ -26,8 +30,8 @@ export class MarkdownTableWidget extends WidgetType {
       widget instanceof MarkdownTableWidget &&
       widget.from === this.from &&
       widget.to === this.to &&
-      JSON.stringify(widget.alignments) === JSON.stringify(this.alignments) &&
-      JSON.stringify(widget.rows) === JSON.stringify(this.rows) &&
+      widget.renderKey === this.renderKey &&
+      widget.layoutEstimatedHeight === this.layoutEstimatedHeight &&
       widget.markdownLinkGraph === this.markdownLinkGraph &&
       widget.documentPath === this.documentPath &&
       widget._markdownAssetUrlResolver === this._markdownAssetUrlResolver
@@ -35,14 +39,16 @@ export class MarkdownTableWidget extends WidgetType {
   }
 
   get estimatedHeight(): number {
-    return estimateMarkdownTableWidgetHeight(this.rows.length);
+    return this.layoutEstimatedHeight;
   }
 
   toDOM(view: EditorView): HTMLElement {
+    const localization = getMarkdownLocalization(view);
     const host = getMarkdownEmbedHost(view, {
       resolveAssetUrl: this._markdownAssetUrlResolver,
     });
     const wrapper = document.createElement("div");
+    wrapper.dir = localization.direction;
     wrapper.className = view.state.readOnly ? "cm-md-table-widget-wrap is-readonly" : "cm-md-table-widget-wrap";
     wrapper.dataset.mdTableFrom = String(this.from);
     const rowCount = this.rows.length;
@@ -55,6 +61,7 @@ export class MarkdownTableWidget extends WidgetType {
 
     const table = document.createElement("table");
     table.className = "cm-md-table-widget";
+    table.dir = "auto";
 
     const header = this.rows.find((row) => row.header);
     if (header) {
@@ -117,7 +124,7 @@ export class MarkdownTableWidget extends WidgetType {
     if (!view.state.readOnly) {
       surface.appendChild(createTableStructureButton({
         className: "cm-md-table-add-row",
-        label: "Add row",
+        label: localization.t("editor.markdown.table.addRow"),
         onActivate: () => {
           dispatchMarkdownTableStructureOperation({
             alignments: this.alignments,
@@ -135,7 +142,7 @@ export class MarkdownTableWidget extends WidgetType {
       }));
       surface.appendChild(createTableStructureButton({
         className: "cm-md-table-add-column",
-        label: "Add column",
+        label: localization.t("editor.markdown.table.addColumn"),
         onActivate: () => {
           dispatchMarkdownTableStructureOperation({
             alignments: this.alignments,
@@ -166,8 +173,8 @@ export class MarkdownTableWidget extends WidgetType {
     frame.appendChild(surface);
     wrapper.appendChild(frame);
 
-    const measure = new MarkdownWidgetMeasureController();
-    measure.observe(wrapper, view);
+    const measure = new MarkdownWidgetMeasureController(host.layout);
+    measure.observe(wrapper);
 
     host.sessions.mount(wrapper, () => ({
       dispose() {

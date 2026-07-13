@@ -1,4 +1,5 @@
 import type { MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MessageFormatter } from "@puppyone/localization/core";
 import { renderMarkdownInlineInto } from "../rendering/inlineRenderer";
 
 /**
@@ -20,6 +21,7 @@ export type MarkdownInlinePreviewOptions = {
   ) => string | Promise<string | null> | null;
   /** LinkBroker-backed activation. */
   openHref?: (href: string) => void;
+  t?: MessageFormatter;
 };
 
 /** @deprecated Prefer the contract-accurate MarkdownInlinePreviewOptions name. */
@@ -42,5 +44,6 @@ export function renderMarkdownInlineFromSharedPolicy(
     onLayoutChange: options.onLayoutChange,
     resolveAssetUrl: options.resolveAssetUrl,
     openHref: options.openHref,
+    t: options.t,
   });
 }

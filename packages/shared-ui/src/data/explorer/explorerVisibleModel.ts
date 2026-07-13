@@ -40,8 +40,8 @@ export type ExplorerVisibleModel = {
 export type BuildExplorerVisibleModelOptions = {
   expandedPaths: ReadonlySet<string>;
   loadingPaths?: ReadonlySet<string>;
-  emptyLabel?: string;
-  loadingLabel?: string;
+  emptyLabel: string;
+  loadingLabel: string;
 };
 
 const EMPTY_PATH_SET: ReadonlySet<string> = new Set();
@@ -57,8 +57,8 @@ export function buildExplorerVisibleModel(
   {
     expandedPaths,
     loadingPaths = EMPTY_PATH_SET,
-    emptyLabel = "Empty folder",
-    loadingLabel = "Loading...",
+    emptyLabel,
+    loadingLabel,
   }: BuildExplorerVisibleModelOptions,
 ): ExplorerVisibleModel {
   const rows: ExplorerVisibleRow[] = [];

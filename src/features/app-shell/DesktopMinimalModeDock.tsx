@@ -9,10 +9,11 @@ import {
   Settings,
   Workflow,
 } from "lucide-react";
+import { useLocalization, type MessageFormatter } from "@puppyone/localization";
 import type { DesktopView, DesktopWorkspaceKind } from "../../components/DesktopCloudShell";
+import { VersionControlIcon } from "../source-control/VersionControlIcon";
 import {
   AssetsDistributionIcon,
-  PuppyGitIcon,
   type DesktopWorkspaceSurfaceAction,
 } from "./navigation";
 
@@ -49,6 +50,7 @@ export function DesktopMinimalModeDock({
   onExitMinimalMode,
   onNavigate,
 }: DesktopMinimalModeDockProps) {
+  const { t } = useLocalization();
   const [pinned, setPinned] = useState(false);
   const expanded = pinned || contextMenuOpen;
 
@@ -75,10 +77,10 @@ export function DesktopMinimalModeDock({
       <button
         className="desktop-minimal-mode-logo"
         type="button"
-        aria-label="Minimal Mode controls"
+        aria-label={t("shell.minimal.controls")}
         aria-controls="desktop-minimal-mode-controls"
         aria-expanded={expanded}
-        title="Minimal Mode controls"
+        title={t("shell.minimal.controls")}
         onClick={() => setPinned((value) => !value)}
       >
         <img src="/logo-square.png" alt="" aria-hidden="true" />
@@ -88,7 +90,7 @@ export function DesktopMinimalModeDock({
         id="desktop-minimal-mode-controls"
         className="desktop-minimal-mode-controls"
         role="toolbar"
-        aria-label="Minimal Mode commands"
+        aria-label={t("shell.minimal.commands")}
       >
         <div className="desktop-minimal-mode-context">
           {contextSlot}
@@ -96,20 +98,20 @@ export function DesktopMinimalModeDock({
         <DockSeparator />
         <DockButton
           active={activeView === "data"}
-          label="Files"
+          label={t("shell.navigation.files")}
           icon={<Folder size={16} />}
           onClick={() => navigate("data")}
         />
         <DockButton
           active={activeView === "git"}
-          label={workspaceKind === "cloud" ? "History" : "Changes"}
-          icon={workspaceKind === "cloud" ? <Clock3 size={16} /> : <PuppyGitIcon size={17} />}
+          label={t(workspaceKind === "cloud" ? "shell.navigation.history" : "shell.navigation.changes")}
+          icon={workspaceKind === "cloud" ? <Clock3 size={16} /> : <VersionControlIcon size={17} />}
           onClick={() => navigate("git")}
         />
         {pluginsEnabled && (
           <DockButton
             active={activeView === "plugins"}
-            label="Plugins"
+            label={t("shell.navigation.plugins")}
             icon={<Blocks size={16} />}
             onClick={() => navigate("plugins")}
           />
@@ -117,7 +119,7 @@ export function DesktopMinimalModeDock({
         {cloudHubEnabled && (
           <DockButton
             active={activeView === "cloud"}
-            label="Cloud"
+            label={t("shell.navigation.cloud")}
             icon={<Cloud size={16} />}
             onClick={() => navigate("cloud")}
           />
@@ -126,13 +128,13 @@ export function DesktopMinimalModeDock({
           <>
             <DockButton
               active={activeView === "access"}
-              label="Assets"
+              label={t("shell.navigation.assets")}
               icon={<AssetsDistributionIcon size={16} />}
               onClick={() => navigate("access")}
             />
             <DockButton
               active={activeView === "automation"}
-              label="Automation"
+              label={t("shell.navigation.automation")}
               icon={<Workflow size={16} />}
               onClick={() => navigate("automation")}
             />
@@ -141,7 +143,7 @@ export function DesktopMinimalModeDock({
         {workspaceSurfaceAction && (
           <DockButton
             disabled={workspaceSurfaceAction.disabled}
-            label={surfaceActionLabel(workspaceSurfaceAction.kind)}
+            label={surfaceActionLabel(workspaceSurfaceAction.kind, t)}
             icon={(
               <span className="desktop-minimal-mode-surface-icon" aria-hidden="true">
                 <ArrowRightLeft size={13} />
@@ -158,7 +160,7 @@ export function DesktopMinimalModeDock({
         )}
         <DockButton
           active={activeView === "settings"}
-          label="Settings"
+          label={t("shell.navigation.settings")}
           icon={<Settings size={16} />}
           onClick={() => navigate("settings")}
         />
@@ -167,7 +169,7 @@ export function DesktopMinimalModeDock({
           {titlebarActions}
         </div>
         <DockButton
-          label="Exit Minimal Mode"
+          label={t("shell.minimal.exit")}
           icon={<Maximize2 size={15} />}
           onClick={() => {
             setPinned(false);
@@ -211,8 +213,8 @@ function DockSeparator() {
   return <span className="desktop-minimal-mode-separator" aria-hidden="true" />;
 }
 
-function surfaceActionLabel(kind: DesktopWorkspaceSurfaceAction["kind"]) {
-  if (kind === "switch-to-cloud") return "Switch to cloud project";
-  if (kind === "switch-to-local") return "Switch to local workspace";
-  return "Open locally";
+function surfaceActionLabel(kind: DesktopWorkspaceSurfaceAction["kind"], t: MessageFormatter) {
+  if (kind === "switch-to-cloud") return t("shell.surface.switchToCloud");
+  if (kind === "switch-to-local") return t("shell.surface.switchToLocal");
+  return t("shell.surface.openLocally");
 }

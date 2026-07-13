@@ -1,4 +1,5 @@
 import { Link2, MoreVertical, Plus } from "lucide-react";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   useCallback,
   useEffect,
@@ -33,6 +34,7 @@ import { ProjectsHeader } from "./ProjectsHeader";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
 import type {
   DocumentSourceKind,
+  EditorInteractionPreferences,
   MarkdownHtmlTrustMode,
 } from "../editor/viewerTypes";
 import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
@@ -120,6 +122,7 @@ export type DataWorkspaceProps = {
   showPreviewHeader?: boolean;
   hidePreviewSourceView?: boolean;
   fileIconTheme?: FileIconThemeId;
+  editorInteractionPreferences?: EditorInteractionPreferences;
   editorSaveMode?: EditorSaveMode;
   htmlTrustMode?: MarkdownHtmlTrustMode;
   previewActionSlot?: FilePreviewProps["actionSlot"];
@@ -197,6 +200,7 @@ export function DataWorkspace({
   showPreviewHeader = true,
   hidePreviewSourceView = false,
   fileIconTheme = "default",
+  editorInteractionPreferences,
   editorSaveMode = "manual",
   htmlTrustMode = "safe",
   previewActionSlot,
@@ -226,6 +230,7 @@ export function DataWorkspace({
   onAccess,
   labels,
 }: DataWorkspaceProps) {
+  const { direction, t } = useLocalization();
   const resolvedCapabilities = { ...defaultDataCapabilities, ...capabilities };
   const resolvedDocumentSourceKind: DocumentSourceKind = workspace.path.startsWith("cloud://")
     ? "cloud"
@@ -1170,7 +1175,8 @@ export function DataWorkspace({
 
       return {
         onMove: (point) => {
-          setExplorerWidth(startWidth + point.clientX - startX);
+          const physicalDelta = point.clientX - startX;
+          setExplorerWidth(startWidth + (direction === "rtl" ? -physicalDelta : physicalDelta));
         },
       };
     },
@@ -1179,12 +1185,13 @@ export function DataWorkspace({
   const nudgeExplorerWidth = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (!resizableExplorer) return;
 
+    const step = event.shiftKey ? 24 : 12;
     if (event.key === "ArrowLeft") {
       event.preventDefault();
-      setExplorerWidth(resolvedExplorerWidth - (event.shiftKey ? 24 : 12));
+      setExplorerWidth(resolvedExplorerWidth + (direction === "rtl" ? step : -step));
     } else if (event.key === "ArrowRight") {
       event.preventDefault();
-      setExplorerWidth(resolvedExplorerWidth + (event.shiftKey ? 24 : 12));
+      setExplorerWidth(resolvedExplorerWidth + (direction === "rtl" ? -step : step));
     } else if (event.key === "Home") {
       event.preventDefault();
       setExplorerWidth(minExplorerWidth);
@@ -1231,20 +1238,20 @@ export function DataWorkspace({
                     renderWorkspaceSlot(explorerToolbarSlot, workspaceState)
                   ) : (
                     <div className="desktop-explorer-toolbar">
-                      <span>{labels?.root ?? "Root"}</span>
+                      <span>{labels?.root ?? t("shared-ui.explorer.root")}</span>
                       <div className="desktop-explorer-actions">
                         {resolvedCapabilities.create && onCreate && (
-                          <button type="button" aria-label="Create" onClick={() => onCreate(currentFolderPath)}>
+                          <button type="button" aria-label={t("shared-ui.explorer.create")} onClick={() => onCreate(currentFolderPath)}>
                             <Plus size={15} />
                           </button>
                         )}
                         {onMore && (
-                          <button type="button" aria-label="More" onClick={() => onMore(workspaceState)}>
+                          <button type="button" aria-label={t("shared-ui.explorer.more")} onClick={() => onMore(workspaceState)}>
                             <MoreVertical size={15} />
                           </button>
                         )}
                         {resolvedCapabilities.accessPoints && onAccess && (
-                          <button type="button" aria-label="Access" onClick={() => onAccess(currentFolderPath)}>
+                          <button type="button" aria-label={t("shared-ui.explorer.access")} onClick={() => onAccess(currentFolderPath)}>
                             <Link2 size={15} />
                           </button>
                         )}
@@ -1269,9 +1276,9 @@ export function DataWorkspace({
                       loadingPaths={loadingFolderPaths}
                       rootLoading={rootLoading}
                       rootError={loadError}
-                      rootLabel={labels?.root ?? "Root"}
+                      rootLabel={labels?.root ?? t("shared-ui.explorer.root")}
                       showRoot={showExplorerRoot}
-                      loadingLabel={labels?.loadingWorkspace ?? "Loading workspace..."}
+                      loadingLabel={labels?.loadingWorkspace ?? t("shared-ui.explorer.loadingWorkspace")}
                       onToggleFolder={toggleFolder}
                       onSelectNode={activateNode}
                       fileIconTheme={fileIconTheme}
@@ -1316,7 +1323,7 @@ export function DataWorkspace({
             <div
               className="data-explorer-resizer"
               role="separator"
-              aria-label="Resize sidebar"
+              aria-label={t("shared-ui.explorer.resizeSidebar")}
               aria-orientation="vertical"
               aria-valuemin={minExplorerWidth}
               aria-valuemax={maxExplorerWidth}
@@ -1357,6 +1364,7 @@ export function DataWorkspace({
                   showHeader={showPreviewHeader}
                   hideSourceView={hidePreviewSourceView}
                   fileIconTheme={fileIconTheme}
+                  editorInteractionPreferences={editorInteractionPreferences}
                   editorSaveMode={editorSaveMode}
                   htmlTrustMode={htmlTrustMode}
                   workspaceId={workspace.id}

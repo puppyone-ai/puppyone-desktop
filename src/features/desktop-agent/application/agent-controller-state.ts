@@ -4,9 +4,9 @@ import type {
   AgentLocalConnection,
   AgentProviderInspection,
   AgentRuntimeId,
-  AgentSessionListItem,
   AgentSessionMetadata,
 } from "../domain/agent-contract";
+import type { AgentErrorDescriptor } from "./agent-error";
 
 export type AgentControllerPhase =
   | "idle"
@@ -19,11 +19,13 @@ export type AgentControllerPhase =
   | "runtime-exited"
   | "failed";
 
+export type AgentSessionPreparation = "idle" | "preparing" | "ready" | "failed";
+export type AgentSubmissionStage = "preparing-session" | "starting-turn" | null;
+
 export type AgentControllerState = {
   phase: AgentControllerPhase;
   inspection: AgentProviderInspection | null;
   session: AgentSessionMetadata | null;
-  history: AgentSessionListItem[];
   projection: AgentProjection;
   selectedRuntimeId: AgentRuntimeId | null;
   selectedProviderId: string | null;
@@ -32,11 +34,15 @@ export type AgentControllerState = {
   localConnections: AgentLocalConnection[];
   localConnectionsPhase: "idle" | "loading" | "ready" | "error";
   localConnectionsScannedAt: string | null;
-  localConnectionsError: string | null;
+  localConnectionsError: AgentErrorDescriptor | null;
   draft: string;
+  /** Optimistic prompt shown while the native backend accepts the turn. */
+  pendingPrompt: string | null;
+  /** Lifecycle of the reusable native session prepared for the selected runtime. */
+  sessionPreparation: AgentSessionPreparation;
   attachments: AgentFileReference[];
   contextReferences: AgentFileReference[];
-  error: string | null;
+  error: AgentErrorDescriptor | null;
   submitting: boolean;
   stopping: boolean;
   resolvingBlocker: boolean;

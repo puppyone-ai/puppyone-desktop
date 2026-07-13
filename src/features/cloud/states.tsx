@@ -1,5 +1,7 @@
 import { Cloud, ExternalLink, FolderOpen, GitBranch, RefreshCw, Settings, Users } from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   DesktopCloudProject,
   DesktopCloudRepoIdentity,
@@ -35,17 +37,18 @@ export function CloudSignedOutState({
   workspace: Workspace;
   onOpenDetails: () => void;
 }) {
+  const { t } = useLocalization();
   return (
     <CloudMainSection
-      title="Puppyone Cloud"
-      count="Sign in required"
-      action={<button className="desktop-cloud-row-action primary" type="button" onClick={onOpenDetails}>Sign in</button>}
+      title={t("cloud.productName")}
+      count={t("cloud.auth.signInRequired")}
+      action={<button className="desktop-cloud-row-action primary" type="button" onClick={onOpenDetails}>{t("cloud.auth.signIn")}</button>}
     >
       <div className="desktop-cloud-empty-state">
         <span><Cloud size={22} /></span>
         <div>
-          <strong>{workspace.name} is local only</strong>
-          <p>Sign in before switching this folder to Cloud. After sign-in, you can back up this folder or open an existing Cloud project.</p>
+          <strong>{t("cloud.state.workspaceLocalOnly", { workspace: bidiIsolate(workspace.name) })}</strong>
+          <p>{t("cloud.state.signInBeforeSwitch")}</p>
         </div>
       </div>
     </CloudMainSection>
@@ -73,7 +76,8 @@ export function CloudRemoteConnectedWorkspace({
   onRefresh: () => Promise<void>;
   onOpenGitSettings: () => void;
 }) {
-  const section = getCloudSectionDescriptor(activeSection);
+  const { t } = useLocalization();
+  const section = getCloudSectionDescriptor(activeSection, t);
 
   if (cloudRemote.info.kind === "access-point" && cloudRemote.info.accessKey) {
     const accessPointScope = buildCloudAccessPointScope(cloudRemote.info.accessKey);
@@ -123,50 +127,51 @@ export function CloudRemoteConnectedWorkspace({
   return (
     <>
       <CloudMainSection
-        title={activeSection === "overview" ? "Cloud source" : section.title}
-        count={loading ? "Resolving" : "Connected"}
+        title={activeSection === "overview" ? t("cloud.common.cloudSource") : section.title}
+        count={t(loading ? "cloud.common.resolving" : "cloud.status.connected")}
         action={(
           <>
             <button className="desktop-cloud-row-action" type="button" onClick={() => void onRefresh()}>
               <RefreshCw size={13} className={loading ? "spin" : undefined} />
-              <span>Refresh</span>
+              <span>{t("cloud.common.refresh")}</span>
             </button>
             <button className="desktop-cloud-row-action" type="button" onClick={onOpenGitSettings}>
               <GitBranch size={13} />
-              <span>Git Sync</span>
+              <span>{t("cloud.route.git-sync.title")}</span>
             </button>
           </>
         )}
       >
         <div className="desktop-cloud-project-overview">
           <div>
-            <span>Hosted Git remote</span>
-            <strong title={cloudRemote.rawUrl}>{workspace.name}</strong>
+            <span>{t("cloud.state.hostedGitRemote")}</span>
+            <strong title={cloudRemote.rawUrl} dir="auto">{workspace.name}</strong>
             <p>
-              This workspace is already initialized because its Git remote points to Puppyone Cloud.
-              Desktop is resolving the Cloud project metadata for project-level {activeSection === "overview" ? "sections" : section.title.toLowerCase()}.
+              {t("cloud.state.remoteConnectedDescription", { section: section.title })}
             </p>
           </div>
           <div className="desktop-cloud-sync-summary">
-            <CloudMainMetric label="Source" value="Puppyone Cloud" tone="ready" />
-            <CloudMainMetric label="Remote" value={cloudRemote.info.displayId} tone="ready" mono />
-            <CloudMainMetric label="Branch" value={branchName} />
+            <CloudMainMetric label={t("cloud.common.source")} value={t("cloud.productName")} tone="ready" />
+            <CloudMainMetric label={t("cloud.git.remote")} value={cloudRemote.info.displayId} tone="ready" mono />
+            <CloudMainMetric label={t("cloud.git.branch")} value={branchName} />
           </div>
         </div>
       </CloudMainSection>
 
       <CloudMainSection
         title={section.title}
-        count={loading ? "Resolving" : "Remote connected"}
-        action={<button className="desktop-cloud-row-action" type="button" onClick={() => openCloudApp("/projects")}>Open Cloud</button>}
+        count={t(loading ? "cloud.common.resolving" : "cloud.state.remoteConnected")}
+        action={<button className="desktop-cloud-row-action" type="button" onClick={() => openCloudApp("/projects")}>{t("cloud.common.openCloud")}</button>}
       >
         <div className="desktop-cloud-empty-state">
           <span><Icon size={22} /></span>
           <div>
-            <strong>{loading ? "Resolving project metadata" : "Puppyone Git remote is connected"}</strong>
+            <strong>{t(loading ? "cloud.state.resolvingMetadata" : "cloud.state.gitRemoteConnected")}</strong>
             <p>
-              Remote {cloudRemote.info.displayId} is the source of truth. Project-level access, MCP, branches, team, and settings appear after the Cloud API maps this access point to a project.
-              {localChangeCount > 0 ? ` ${localChangeCount} local change${localChangeCount === 1 ? "" : "s"} are waiting in this working copy.` : ""}
+              {t("cloud.state.remoteSourceDescription", {
+                remote: bidiIsolate(cloudRemote.info.displayId),
+                count: localChangeCount,
+              })}
             </p>
           </div>
         </div>
@@ -206,6 +211,7 @@ export function CloudUnmappedWorkspace({
   onCopyCloneCommand: (project: DesktopCloudProject) => void;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
 }) {
+  const { formatNumber, t } = useLocalization();
   if (activeSection !== "overview") {
     return (
       <CloudUnmappedSection
@@ -227,8 +233,8 @@ export function CloudUnmappedWorkspace({
   return (
     <>
       <CloudMainSection
-        title="Local workspace"
-        count={cloudRemote ? "Remote not matched" : "Not backed up"}
+        title={t("cloud.state.localWorkspace")}
+        count={t(cloudRemote ? "cloud.state.remoteNotMatched" : "cloud.state.notBackedUp")}
         action={(
           <button
             className="desktop-cloud-row-action primary"
@@ -236,34 +242,34 @@ export function CloudUnmappedWorkspace({
             disabled={backupLoading}
             onClick={onBackupWorkspace}
           >
-            {backupLoading ? "Connecting..." : "Back up and connect"}
+            {t(backupLoading ? "cloud.common.connecting" : "cloud.state.backupAndConnect")}
           </button>
         )}
       >
         <div className="desktop-cloud-project-overview">
           <div>
-            <span>Local working copy</span>
-            <strong title={workspace.path}>{workspace.name}</strong>
-            <p>This folder is local only. Back it up to create a hosted Cloud repo, make Cloud the source of truth, and keep this desktop workspace as a Git working copy.</p>
+            <span>{t("cloud.state.localWorkingCopy")}</span>
+            <strong title={workspace.path} dir="auto">{workspace.name}</strong>
+            <p>{t("cloud.state.localOnlyDescription")}</p>
           </div>
           <div className="desktop-cloud-sync-summary">
-            <CloudMainMetric label="Account" value={accountEmail ?? "Signed in"} tone="ready" />
-            <CloudMainMetric label="Branch" value={branchName} />
-            <CloudMainMetric label="Local changes" value={String(localChangeCount)} tone={localChangeCount > 0 ? "warning" : undefined} />
+            <CloudMainMetric label={t("cloud.common.account")} value={accountEmail ?? t("cloud.account.signedIn")} tone="ready" />
+            <CloudMainMetric label={t("cloud.git.branch")} value={branchName} />
+            <CloudMainMetric label={t("cloud.git.localChanges")} value={formatNumber(localChangeCount)} tone={localChangeCount > 0 ? "warning" : undefined} />
           </div>
         </div>
       </CloudMainSection>
 
       <CloudMainSection
-        title="Open existing Cloud project"
-        count={loading ? "Loading" : projects.length}
-        action={<button className="desktop-cloud-row-action" type="button" onClick={() => openCloudApp("/projects")}>Open Cloud</button>}
+        title={t("cloud.project.openExisting")}
+        count={loading ? t("cloud.common.loading") : formatNumber(projects.length)}
+        action={<button className="desktop-cloud-row-action" type="button" onClick={() => openCloudApp("/projects")}>{t("cloud.common.openCloud")}</button>}
       >
         <div className="desktop-cloud-project-list">
           {loading ? (
-            <CloudInlineEmpty icon={RefreshCw} title="Loading projects" detail="Reading your Cloud projects from the API." />
+            <CloudInlineEmpty icon={RefreshCw} title={t("cloud.project.loadingProjects")} detail={t("cloud.project.readingProjects")} />
           ) : projects.length === 0 ? (
-            <CloudInlineEmpty icon={FolderOpen} title="No Cloud projects yet" detail="Create a backup from this folder to start a Cloud project." />
+            <CloudInlineEmpty icon={FolderOpen} title={t("cloud.project.noneYet")} detail={t("cloud.project.noneYetBackupDetail")} />
           ) : (
             projects.map((project) => (
               <CloudProjectRow
@@ -307,15 +313,16 @@ export function CloudUnmappedSection({
   onCopyCloneCommand: (project: DesktopCloudProject) => void;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
 }) {
-  const section = getCloudSectionDescriptor(activeSection);
-  const remoteLabel = cloudRemote?.info.displayId ?? "No Puppyone remote";
+  const { formatNumber, t } = useLocalization();
+  const section = getCloudSectionDescriptor(activeSection, t);
+  const remoteLabel = cloudRemote?.info.displayId ?? t("cloud.state.noRemote");
   const Icon = section.icon;
 
   return (
     <>
       <CloudMainSection
         title={section.title}
-        count="Project required"
+        count={t("cloud.project.required")}
         action={(
           <button
             className="desktop-cloud-row-action primary"
@@ -323,29 +330,33 @@ export function CloudUnmappedSection({
             disabled={backupLoading}
             onClick={onBackupWorkspace}
           >
-            {backupLoading ? "Connecting..." : "Back up and connect"}
+            {t(backupLoading ? "cloud.common.connecting" : "cloud.state.backupAndConnect")}
           </button>
         )}
       >
         <div className="desktop-cloud-empty-state">
           <span><Icon size={22} /></span>
           <div>
-            <strong>{section.title} needs a mapped Cloud project</strong>
-            <p>{section.description} Connect {workspace.name} to a Cloud project first. Current remote: {remoteLabel}.</p>
+            <strong>{t("cloud.state.sectionNeedsProject", { section: section.title })}</strong>
+            <p>{t("cloud.state.connectWorkspaceFirst", {
+              description: section.description,
+              workspace: bidiIsolate(workspace.name),
+              remote: bidiIsolate(remoteLabel),
+            })}</p>
           </div>
         </div>
       </CloudMainSection>
 
       <CloudMainSection
-        title="Available Cloud projects"
-        count={loading ? "Loading" : projects.length}
-        action={<button className="desktop-cloud-row-action" type="button" onClick={() => openCloudApp("/projects")}>Open Cloud</button>}
+        title={t("cloud.project.available")}
+        count={loading ? t("cloud.common.loading") : formatNumber(projects.length)}
+        action={<button className="desktop-cloud-row-action" type="button" onClick={() => openCloudApp("/projects")}>{t("cloud.common.openCloud")}</button>}
       >
         <div className="desktop-cloud-project-list">
           {loading ? (
-            <CloudInlineEmpty icon={RefreshCw} title="Loading projects" detail="Reading your Cloud projects from the API." />
+            <CloudInlineEmpty icon={RefreshCw} title={t("cloud.project.loadingProjects")} detail={t("cloud.project.readingProjects")} />
           ) : projects.length === 0 ? (
-            <CloudInlineEmpty icon={FolderOpen} title="No Cloud projects yet" detail="Back up this workspace to create the Cloud project mapping." />
+            <CloudInlineEmpty icon={FolderOpen} title={t("cloud.project.noneYet")} detail={t("cloud.project.noneYetMappingDetail")} />
           ) : (
             projects.map((project) => (
               <CloudProjectRow
@@ -378,10 +389,11 @@ export function CloudProjectWebSection({
   primaryLabel: string;
   onOpen: () => void;
 }) {
+  const { t } = useLocalization();
   return (
     <CloudWebPage
       title={title}
-      count="Web"
+      count={t("cloud.common.web")}
       action={<button className="desktop-cloud-row-action primary" type="button" onClick={onOpen}>{primaryLabel}</button>}
     >
       <CloudWebEmpty icon={Icon} title={title} detail={description} />

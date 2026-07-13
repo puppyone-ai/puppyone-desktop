@@ -8,7 +8,7 @@ migration.
 
 This document defines how PuppyOne discovers native Agent products without
 confusing an executable, harness, inference provider or model. It also defines
-when an installed product becomes a selectable Agent backend.
+when an installed product becomes execution-ready after its row is registered.
 
 ## 1. Two discovery layers
 
@@ -133,17 +133,21 @@ verified engine plus at least one usable connected Provider/Model route.
   settings open or the user presses Refresh.
 - Managed PuppyOne Agent integrity may be checked independently and lazily when
   its row or an existing PuppyOne Agent session needs it.
-- Cache in-process readiness/inspection for five minutes. A sanitized
-  installation inventory may survive an app restart for at most 24 hours so
-  opening Chat does not immediately rescan the machine. Explicit Refresh
-  bypasses both caches; authoritative protocol/auth failures invalidate the
-  affected runtime state.
+- Cache sanitized readiness in memory for at most five minutes. Persist the
+  Renderer-safe local-installation DTO for at most 24 hours so reopening Chat
+  or restarting PuppyOne does not repeat the same CLI scan immediately.
+- The persisted cache is versioned, capped at 64 KiB, atomically replaced with
+  mode `0600`, and contains no executable path, environment, credential
+  location, token, account identifier or raw probe output.
+- Explicit Refresh bypasses both caches. Expiry, clock rollback, corruption or
+  schema mismatch also causes a bounded rescan. A cache hit is presentation
+  evidence only; execution still passes current main-process readiness gates.
 - Deduplicate concurrent scans. Application disposal aborts active probes and
   every timeout/output-limit path kills its child process.
 - One backend failure never hides, disables or selects another backend.
-- Reconnecting the current process's live session inspects its pinned backend.
-  It does not choose the highest-priority healthy backend as a fallback;
-  PuppyOne does not restore a persisted Chat session after restart.
+- The last selected Agent/backend ID is a separate validated preference. A
+  stale or unregistered ID falls back to the registered default; it never
+  restores a PuppyOne conversation or chooses a hidden healthy fallback.
 
 ## 5. Executable discovery
 
@@ -209,8 +213,8 @@ Level 1  canonical Codex executable + supported version
 Level 2  app-server initialize / initialized handshake
 Level 3  account/read authentication state
 Level 4  model/list and required capability check
-Level 5  production security/native-session/approval contract accepted
-Level 6  selectable Codex backend
+Level 5  production security/native-session/live-recovery/approval accepted
+Level 6  execution-ready Codex backend
 ```
 
 Rules:
@@ -222,13 +226,23 @@ Rules:
   native model metadata; static production model lists are not authoritative.
 - The backend uses `thread/start`, `thread/resume`, `turn/start`, native
   notifications and native approval/question requests.
-- A Codex session stores its Codex thread ID. It never creates an OpenCode
-  session or imports Codex credentials into PuppyOne Agent.
-- The production adapter is selectable only after version, app-server,
-  authentication and model inspection pass; capability, native-session, crash,
+- A live Codex bridge connection holds its Codex thread ID in process memory.
+  PuppyOne does not persist that ID or a Codex transcript, never creates an
+  OpenCode session for it, and never imports Codex credentials into PuppyOne
+  Agent.
+- The transport sends `initialize` once per app-server connection. A live PuppyOne
+  session calls exactly one of `thread/start` or `thread/resume`, caches that native
+  thread ID, and sends later prompts with `turn/start`. Changing the selected model is
+  a local next-turn override; it does not initialize, start or resume the thread again.
+- Model-catalog values are normalized at the Codex adapter boundary. Only `none`,
+  `minimal`, `low`, `medium`, `high` and `xhigh` cross the wire; legacy `max` maps to
+  `xhigh`. A `thread/status/changed` lifecycle transition is not rendered as a second
+  error card; the actionable `error` or failed-turn diagnostic is the user-visible row.
+- The production adapter enables execution only after version, app-server,
+  authentication and model inspection pass; capability, live recovery, crash,
   cancellation and security behavior are covered by backend contract tests.
 
-Reference: [official Codex App Server documentation](https://learn.chatgpt.com/docs/app-server),
+Reference: [official Codex App Server documentation](https://developers.openai.com/codex/app-server),
 including the stable stdio JSONL transport and native thread, turn, account,
 model, approval and event surfaces. Experimental WebSocket transport is not
 part of the PuppyOne production adapter contract.
@@ -247,8 +261,8 @@ Level 1  pinned Claude Agent SDK control layer available
 Level 2  canonical user Claude executable + required protocol flags
 Level 3  SDK initialization/native session handshake
 Level 4  native authentication and model/capability inspection
-Level 5  permission/native-session/recovery contract accepted
-Level 6  selectable Claude Code backend
+Level 5  permission/native-session/live-recovery contract accepted
+Level 6  execution-ready Claude Code backend
 ```
 
 Optional user-CLI resolution uses bounded deterministic categories:
@@ -286,8 +300,8 @@ Level 1  canonical Cursor Agent executable + version
 Level 2  bounded native status/auth observation
 Level 3  stable documented streaming/session/approval protocol
 Level 4  explicit credential and billing contract
-Level 5  production security/native-session/recovery adapter accepted
-Level 6  selectable Cursor backend
+Level 5  production security/native-session/live-recovery adapter accepted
+Level 6  execution-ready Cursor backend
 ```
 
 Rules:
@@ -298,8 +312,8 @@ Rules:
   contracts unless Cursor explicitly guarantees reuse.
 - `--force`, unbounded shell output and simulated tool/approval semantics are
   prohibited.
-- Until Levels 3-5 pass, Cursor is visible as `Detected - protocol not yet
-  supported` and is not selectable.
+- Until Levels 3-5 pass, Cursor remains visible and selectable for inspection
+  with a protocol warning, while Send stays disabled.
 
 ## 9. PuppyOne Agent and user OpenCode
 
@@ -336,26 +350,23 @@ rejection quarantines the affected route for that backend's current snapshot.
 
 ## 10. Agent picker presentation
 
-The compact picker presents Agent backends, not a merged list of unrelated
-Providers and local tools.
+The compact picker presents one flat list of Agent backends, not a merged list
+of unrelated Providers and local tools and not a readiness dashboard.
 
 ```text
-+ Agent ---------------------------------------------------+
-| Ready                                                     |
-|  * PuppyOne Agent        Managed             Ready        |
-|    Codex                 Native login        Ready        |
-|    Claude Code           API/cloud auth      Ready        |
-|                                                           |
-| Detected                                                  |
-|    Cursor Agent          Protocol unavailable Learn why  |
-|    OpenCode              Sign in required       Sign in   |
-|                                                           |
-| [Refresh]                              [Agent settings]   |
-+-----------------------------------------------------------+
++ Agent -------------------------------------+
+|  PuppyOne Agent                     check  |
+|  Codex                              0.144  |
+|  Claude Code                        !      |
+|  OpenCode                           !      |
+|  Cursor Agent                       !      |
++--------------------------------------------+
 ```
 
-- Ready backends appear before detected/non-ready entries.
-- Non-ready rows remain focusable and explain the exact missing gate.
+- Rows retain deterministic registry order; the compact menu has no Ready/Detected
+  headings, descriptions or Refresh footer.
+- Every registered row is selectable. Non-ready rows show one warning icon whose
+  accessible label explains the exact missing gate; execution remains disabled.
 - Not-installed backends may be omitted from the compact picker but remain in
   the Connections/Agent settings page.
 - Selecting a ready Agent on a blank composer loads only that backend's model,
@@ -399,7 +410,7 @@ electron/main/agent/runtime/
   AgentRuntimePort / Registry             provider-neutral contracts
 
 electron/main/agent/runtimes/<backend>/
-  discovery, native protocol, normalization and security mapping
+  discovery, native protocol, normalization, live recovery and security mapping
 
 electron/main/agent/connections/
   bounded local executable inventory and reusable candidate/probe safety
@@ -427,8 +438,8 @@ semantics.
 | probe timeout/broken binary | show scoped probe failure and Retry |
 | unsupported version | show version range and Update/Learn action |
 | signed out/expired | show native Sign in guidance and Refresh |
-| protocol incompatible | keep Detected, disable selection and explain compatibility |
-| model/tool catalog empty | keep backend non-selectable with exact capability reason |
+| protocol incompatible | allow scoped selection, show one warning icon, disable Send and explain compatibility |
+| model/tool catalog empty | keep row selectable, disable Send and show exact capability reason |
 | PuppyOne Agent engine corrupt | disable PuppyOne Agent only; application repair action |
 | backend/provider auth rejected during turn | retain native session, quarantine affected route and reconnect |
 | scan cancelled | retain last verified snapshot and terminate probe child |

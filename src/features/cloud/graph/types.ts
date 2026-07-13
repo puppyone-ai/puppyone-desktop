@@ -1,5 +1,6 @@
 export type CloudBranchGraphLabel = {
   name: string;
+  nameCode?: "cloud-history";
   kind: "local" | "remote" | "cloud" | "tag";
   current: boolean;
 };
@@ -41,9 +42,11 @@ export type CloudBranchGraphRow = {
   kind: "commit" | "ref";
   prefix: string;
   message: string;
+  messageCode?: "update-workspace" | "branch-head-outside-loaded-history" | "branch-head-outside-visible-history";
   createdAt: string | null;
   stats: CloudBranchGraphStats | null;
   authorName: string;
+  authorCode?: "cloud" | "unknown" | "ref-only";
   labels: CloudBranchGraphLabel[];
   laneCount: number;
   nodeLane: number;
@@ -60,4 +63,5 @@ export type CloudBranchGraphDiagnostics = {
   branchCount: number;
   structuralPrefixCount: number;
   warning: string | null;
+  warningCode?: "cloud-ancestry-missing" | "git-topology-missing";
 };

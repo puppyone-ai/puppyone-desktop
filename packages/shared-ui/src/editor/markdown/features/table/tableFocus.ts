@@ -6,6 +6,7 @@ import {
   markdownTableFocusField,
   type MarkdownTableFocusRequest,
 } from "./tableFocusState";
+import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 
 const MAX_FOCUS_RESTORE_ATTEMPTS = 3;
 
@@ -56,7 +57,7 @@ const markdownTableFocusCoordinator = ViewPlugin.fromClass(class {
     if (wrapper && focusMarkdownTableCell(wrapper, pending)) {
       this.attempts = 0;
       this.view.dispatch({ effects: clearMarkdownTableFocus(pending.requestId) });
-      this.view.requestMeasure();
+      getMarkdownEmbedHost(this.view).requestMeasure();
       return;
     }
 

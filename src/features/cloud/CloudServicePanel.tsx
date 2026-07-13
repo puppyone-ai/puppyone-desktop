@@ -1,5 +1,6 @@
 import { Check, Cloud, LogIn, LogOut, RefreshCw, Server, SquareTerminal, Users } from "lucide-react";
 import type { ReactNode } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import type { CloudAuthView, CloudLoginFeature, CloudLoginMethod } from "./model";
 import type { CloudServicePanelProps } from "./types";
 import { useCloudAuthController } from "./hooks/useCloudAuthController";
@@ -18,6 +19,7 @@ export function CloudServicePanel({
   onEnterCloud,
   onOpenGitSettings,
 }: CloudServicePanelProps) {
+  const { t } = useLocalization();
   const cloudEnvironment = resolveCloudEnvironment({ status });
   const cloudRemote = cloudEnvironment.cloudRemote;
   const cloudApiBaseUrl = cloudEnvironment.apiBaseUrl;
@@ -36,36 +38,36 @@ export function CloudServicePanel({
   const effectiveAuthView: CloudAuthView = !hosted && signedInEmail ? "signedIn" : auth.view;
   const showHostedCard = Boolean(hosted && signedInEmail);
   const statusBadge = error
-    ? "Check failed"
+    ? t("cloud.auth.checkFailed")
     : loading && !status
-      ? "Checking"
+      ? t("cloud.common.checking")
       : showHostedCard
-        ? "Hosted"
+        ? t("cloud.auth.hosted")
         : null;
-  const statusTitle = showHostedCard ? "Workspace already connected." : "Sign in to continue.";
+  const statusTitle = t(showHostedCard ? "cloud.auth.workspaceConnected" : "cloud.auth.signInToContinue");
   const cloudFeatures: CloudLoginFeature[] = [
     {
-      label: "Team collaboration",
+      label: t("cloud.auth.feature.team"),
       icon: Users,
     },
     {
-      label: "Cloud backup",
+      label: t("cloud.auth.feature.backup"),
       icon: Cloud,
     },
     {
-      label: "MCP / CLI supported",
+      label: t("cloud.auth.feature.mcpCli"),
       icon: SquareTerminal,
     },
     {
-      label: "24/7 online",
+      label: t("cloud.auth.feature.alwaysOnline"),
       icon: Server,
     },
   ];
 
   return (
     <div className="desktop-cloud-panel-layer">
-      <button className="desktop-cloud-panel-scrim" type="button" aria-label="Close Cloud panel" onClick={onClose} />
-      <section className={`desktop-cloud-panel ${showHostedCard ? "hosted" : "locked"}`} role="dialog" aria-modal="true" aria-label="Cloud Native Service">
+      <button className="desktop-cloud-panel-scrim" type="button" aria-label={t("cloud.auth.closePanel")} onClick={onClose} />
+      <section className={`desktop-cloud-panel ${showHostedCard ? "hosted" : "locked"}`} role="dialog" aria-modal="true" aria-label={t("cloud.auth.serviceAria")}>
         <div className="desktop-cloud-panel-body">
           <section className="desktop-cloud-login-layout">
             <div className="desktop-cloud-login-copy">
@@ -75,11 +77,11 @@ export function CloudServicePanel({
                     <CloudProductMark />
                   </div>
                   <div className="desktop-cloud-login-copy-stack">
-                    <h3>Get Puppyone Cloud</h3>
+                    <h3>{t("cloud.auth.getCloud")}</h3>
                     {statusBadge && (
                       <span className={`desktop-cloud-login-badge ${showHostedCard ? "hosted" : "locked"}`}>{statusBadge}</span>
                     )}
-                    <p>Back up this workspace. Keep agents, teammates, MCP, and CLI connected.</p>
+                    <p>{t("cloud.auth.shortDescription")}</p>
                   </div>
                 </div>
                 <div className="desktop-cloud-login-feature-list">
@@ -126,7 +128,7 @@ export function CloudServicePanel({
 export function CloudAuthCard({
   view,
   signedInEmail,
-  signInLabel = "Sign in with browser",
+  signInLabel,
   loading,
   signingOut,
   error,
@@ -148,7 +150,9 @@ export function CloudAuthCard({
   onRefresh: () => void;
   onSignOut: () => void;
 }) {
+  const { t } = useLocalization();
   const disabled = Boolean(loading) || signingOut;
+  const resolvedSignInLabel = signInLabel ?? t("cloud.auth.signInWithBrowser");
 
   return (
     <div className="desktop-cloud-auth-card">
@@ -160,33 +164,33 @@ export function CloudAuthCard({
           onClick={() => onProviderLogin()}
         >
           <LogIn size={15} />
-          <span>{loading === "browser" ? "Finish sign-in in browser" : signInLabel}</span>
+          <span>{loading === "browser" ? t("cloud.auth.finishInBrowser") : resolvedSignInLabel}</span>
         </button>
       ) : (
         <>
           <div className="desktop-cloud-auth-heading">
-            <h3>Signed in</h3>
-            <p>{signedInEmail ?? "Puppyone Cloud"}</p>
+            <h3>{t("cloud.account.signedIn")}</h3>
+            <p dir="auto">{signedInEmail ?? t("cloud.productName")}</p>
           </div>
           <div className="desktop-cloud-auth-state">
             <span>
               <Check size={14} />
             </span>
             <div>
-              <strong>Puppyone account connected</strong>
-              <p>Back up this workspace to enable Cloud services here.</p>
+              <strong>{t("cloud.auth.accountConnected")}</strong>
+              <p>{t("cloud.auth.backupToEnable")}</p>
             </div>
           </div>
           <button className="desktop-cloud-auth-submit" type="button" onClick={onOpenCloud}>
-            Enter Cloud version
+            {t("cloud.auth.enterCloud")}
           </button>
           <button className="desktop-cloud-auth-secondary" type="button" onClick={onRefresh}>
             <RefreshCw size={14} />
-            <span>Check workspace status</span>
+            <span>{t("cloud.auth.checkWorkspaceStatus")}</span>
           </button>
           <button className="desktop-cloud-auth-secondary" type="button" disabled={signingOut} onClick={onSignOut}>
             <LogOut size={14} />
-            <span>{signingOut ? "Signing out..." : "Sign out"}</span>
+            <span>{t(signingOut ? "cloud.auth.signingOut" : "cloud.auth.signOut")}</span>
           </button>
         </>
       )}
@@ -194,7 +198,7 @@ export function CloudAuthCard({
       <CloudAuthFeedback error={error} message={loading === "browser" ? null : message} />
 
       {view !== "signedIn" && (
-        <p className="desktop-cloud-auth-terms">By continuing you agree to our Terms and Privacy Policy.</p>
+        <p className="desktop-cloud-auth-terms">{t("cloud.auth.terms")}</p>
       )}
     </div>
   );
@@ -219,23 +223,24 @@ export function CloudHostedLoginCard({
   onSignOut: () => void;
   onOpenGitSettings: () => void;
 }) {
+  const { t } = useLocalization();
   return (
     <div className="desktop-cloud-auth-card desktop-cloud-auth-card-hosted">
-      <h3>Puppyone Cloud</h3>
+      <h3>{t("cloud.productName")}</h3>
       <p className="desktop-cloud-auth-hosted-copy">{statusTitle}</p>
       <button className="desktop-cloud-auth-submit" type="button" onClick={onOpenCloud}>
-        Enter Cloud version
+        {t("cloud.auth.enterCloud")}
       </button>
       <button className="desktop-cloud-auth-secondary" type="button" onClick={onRefresh}>
         <RefreshCw size={14} className={loading ? "spin" : undefined} />
-        <span>Check status</span>
+        <span>{t("cloud.auth.checkStatus")}</span>
       </button>
       <button className="desktop-cloud-auth-secondary" type="button" onClick={onOpenGitSettings}>
-        Git sync details
+        {t("cloud.auth.gitSyncDetails")}
       </button>
       <button className="desktop-cloud-auth-secondary" type="button" disabled={signingOut} onClick={onSignOut}>
         <LogOut size={14} />
-        <span>{signingOut ? "Signing out..." : "Sign out"}</span>
+        <span>{t(signingOut ? "cloud.auth.signingOut" : "cloud.auth.signOut")}</span>
       </button>
       {error && <p className="desktop-cloud-login-error">{error}</p>}
     </div>

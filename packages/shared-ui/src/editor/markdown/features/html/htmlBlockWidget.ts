@@ -1,4 +1,5 @@
 import { EditorView, WidgetType } from "@codemirror/view";
+import { bidiIsolate } from "@puppyone/localization/core";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode } from "../../../viewerTypes";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { disposeWidgetSessionDom } from "../../platform/codemirror/widgetSession";
@@ -17,11 +18,12 @@ import {
 } from "../../core/editor/markdownLivePreviewContext";
 import { evaluateAuthorizationGrant, createDocumentTrustContext, type DocumentTrustContext } from "../../platform/policy/markdownTrustPolicy";
 import { workspaceIdForDocument } from "../../platform/security/capabilityPrincipal";
+import { MarkdownWidgetMeasureController } from "../../platform/codemirror/layoutCoordinator";
+import { estimateHtmlBlockLayoutHeight } from "./htmlBlockLayout";
 import {
-  clampNumber,
-  estimateMarkdownHtmlBlockHeight,
-  MarkdownWidgetMeasureController,
-} from "../../shared/widgets/markdownWidgetMeasure";
+  getMarkdownLocalization,
+  type MarkdownLocalization,
+} from "../../core/editor/markdownLocalization";
 
 function extractExternalHttpsEmbed(source: string): string | null {
   const trimmed = source.trim();
@@ -40,6 +42,7 @@ export class HtmlBlockWidget extends WidgetType {
     private readonly htmlTrustMode: MarkdownHtmlTrustMode,
     private readonly documentPath: string,
     private readonly markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
+    private readonly layoutEstimatedHeight = estimateHtmlBlockLayoutHeight(block.source),
   ) {
     super();
   }
@@ -50,6 +53,7 @@ export class HtmlBlockWidget extends WidgetType {
       widget.block.source === this.block.source &&
       widget.block.tagName === this.block.tagName &&
       widget.block.closed === this.block.closed &&
+      widget.layoutEstimatedHeight === this.layoutEstimatedHeight &&
       widget.htmlTrustMode === this.htmlTrustMode &&
       widget.documentPath === this.documentPath &&
       widget.markdownAssetUrlResolver === this.markdownAssetUrlResolver
@@ -57,10 +61,11 @@ export class HtmlBlockWidget extends WidgetType {
   }
 
   get estimatedHeight(): number {
-    return estimateMarkdownHtmlBlockHeight(this.block.source);
+    return this.layoutEstimatedHeight;
   }
 
   toDOM(view: EditorView): HTMLElement {
+    const { direction, t } = getMarkdownLocalization(view);
     const host = getMarkdownEmbedHost(view, {
       resolveAssetUrl: this.markdownAssetUrlResolver,
     });
@@ -73,7 +78,8 @@ export class HtmlBlockWidget extends WidgetType {
       });
     const shell = document.createElement("div");
     shell.className = "cm-md-html-widget";
-    const measure = new MarkdownWidgetMeasureController();
+    shell.dir = direction;
+    const measure = new MarkdownWidgetMeasureController(host.layout);
     let previewVersion = 0;
     let showingSource = false;
     let webEmbedId: string | null = null;
@@ -144,19 +150,19 @@ export class HtmlBlockWidget extends WidgetType {
       wrapper.dataset.embedState = embed.state;
 
       if (embed.state === "blocked") {
-        wrapper.textContent = "Blocked web embed";
+        wrapper.textContent = t("editor.markdown.html.embedBlocked");
         return wrapper;
       }
 
       const button = document.createElement("button");
       button.type = "button";
       button.className = "cm-md-html-web-embed-load";
-      button.textContent = `Load embed: ${href}`;
+      button.textContent = t("editor.markdown.html.loadEmbed", { href: bidiIsolate(href) });
       button.addEventListener("click", async (event) => {
         event.preventDefault();
         event.stopPropagation();
         button.disabled = true;
-        button.textContent = "Loading…";
+        button.textContent = t("shared-ui.loading");
         const initialBounds = getWebEmbedBounds(wrapper);
         startBoundsTracking(embed.id, wrapper);
         const activated = await host.webEmbeds.activate(embed.id, initialBounds);
@@ -171,13 +177,13 @@ export class HtmlBlockWidget extends WidgetType {
           frame.className = "cm-md-html-web-embed-frame";
           frame.dataset.embedId = activated.id;
           frame.dataset.embedHref = href;
-          frame.textContent = `Embedded: ${href}`;
+          frame.textContent = t("editor.markdown.html.embedded", { href: bidiIsolate(href) });
           wrapper.appendChild(frame);
-          measure.schedule(view);
+          measure.schedule();
         } else {
           stopBoundsTracking();
           button.disabled = false;
-          button.textContent = `Load embed: ${href}`;
+          button.textContent = t("editor.markdown.html.loadEmbed", { href: bidiIsolate(href) });
         }
       });
       wrapper.appendChild(button);
@@ -212,7 +218,11 @@ export class HtmlBlockWidget extends WidgetType {
         },
       };
       if (!this.block.closed) {
-        return createUnsupportedHtmlBlock(this.block, ["HTML block is not closed"]);
+        return createUnsupportedHtmlBlock(
+          this.block,
+          t,
+          t("editor.markdown.html.blockNotClosed"),
+        );
       }
 
       const externalHref = extractExternalHttpsEmbed(this.block.source);
@@ -230,10 +240,10 @@ export class HtmlBlockWidget extends WidgetType {
         "local-active-html",
       );
       if ((!activeHtmlGrant || activeHtmlGrant.revoked) && this.htmlTrustMode === "localTrusted") {
-        const wrapper = createSanitizedHtmlPreviewBlock(this.block, this.block.source, sanitizedOptions);
+        const wrapper = createSanitizedHtmlPreviewBlock(this.block, this.block.source, t, sanitizedOptions);
         const notice = document.createElement("div");
         notice.className = "cm-md-html-local-trusted-notice";
-        notice.textContent = "Active HTML (scripts/forms) requires explicit trust grant — showing sanitized preview.";
+        notice.textContent = t("editor.markdown.html.trustRequired");
         wrapper.prepend(notice);
         return wrapper;
       }
@@ -242,17 +252,17 @@ export class HtmlBlockWidget extends WidgetType {
       // iframe in the editor renderer. Active HTML requires a dedicated
       // sandboxed surface that is not yet shipped.
       if (activeHtmlGrant && !activeHtmlGrant.revoked) {
-        const wrapper = createSanitizedHtmlPreviewBlock(this.block, this.block.source, sanitizedOptions);
+        const wrapper = createSanitizedHtmlPreviewBlock(this.block, this.block.source, t, sanitizedOptions);
         const notice = document.createElement("div");
         notice.className = "cm-md-html-local-trusted-notice";
-        notice.textContent = "Active HTML grant recorded — editor still uses sanitized preview (no srcdoc iframe).";
+        notice.textContent = t("editor.markdown.html.trustRecorded");
         wrapper.prepend(notice);
         return wrapper;
       }
 
       const brokerResolver = buildBrokerAssetResolver(version);
       if (!brokerResolver) {
-        return createSanitizedHtmlPreviewBlock(this.block, this.block.source, sanitizedOptions);
+        return createSanitizedHtmlPreviewBlock(this.block, this.block.source, t, sanitizedOptions);
       }
 
       const wrapper = document.createElement("div");
@@ -261,16 +271,16 @@ export class HtmlBlockWidget extends WidgetType {
       resolveMarkdownHtmlImageSources(this.block.source, this.documentPath, brokerResolver)
         .then((source) => {
           if (!isPreviewVersionCurrent(version)) return;
-          replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, source, {
+          replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, source, t, {
             ...sanitizedOptions,
             brokeredMedia: true,
           });
-          measure.schedule(view);
+          measure.schedule();
         })
         .catch(() => {
           if (!isPreviewVersionCurrent(version)) return;
-          replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, this.block.source, sanitizedOptions);
-          measure.schedule(view);
+          replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, this.block.source, t, sanitizedOptions);
+          measure.schedule();
         });
       return wrapper;
     };
@@ -282,10 +292,13 @@ export class HtmlBlockWidget extends WidgetType {
         showingSource ? createHtmlSourceBlock(this.block.source) : createPreviewBlock(version),
       );
       toggleButton.replaceChildren(createHtmlWidgetIcon(showingSource ? "preview" : "source"));
-      toggleButton.title = showingSource ? "Show HTML preview" : "Show HTML source";
-      toggleButton.setAttribute("aria-label", showingSource ? "Show HTML preview" : "Show HTML source");
+      const toggleLabel = showingSource
+        ? t("editor.markdown.html.showPreview")
+        : t("editor.markdown.html.showSource");
+      toggleButton.title = toggleLabel;
+      toggleButton.setAttribute("aria-label", toggleLabel);
       toggleButton.classList.toggle("active", showingSource);
-      measure.schedule(view);
+      measure.schedule();
     };
 
     toggleButton.addEventListener("click", (event) => {
@@ -297,7 +310,7 @@ export class HtmlBlockWidget extends WidgetType {
 
     render();
     shell.append(toolbar, content);
-    measure.observe(shell, view);
+    measure.observe(shell);
 
     host.sessions.mount(shell, () => ({
       dispose() {
@@ -321,6 +334,7 @@ export class HtmlBlockWidget extends WidgetType {
 function createHtmlSourceBlock(source: string): HTMLElement {
   const pre = document.createElement("pre");
   pre.className = "cm-md-html-source-block";
+  pre.dir = "ltr";
 
   const code = document.createElement("code");
   code.textContent = source;
@@ -332,17 +346,19 @@ function createHtmlSourceBlock(source: string): HTMLElement {
 function createSanitizedHtmlPreviewBlock(
   block: MarkdownHtmlBlock,
   source: string,
+  t: MarkdownLocalization["t"],
   options: { brokeredMedia?: boolean; openHref?: (href: string) => void } = {},
 ): HTMLElement {
   const result = createSanitizedBlockHtmlFragment(source, {
     brokeredMedia: options.brokeredMedia === true,
   });
   if (!result.supported) {
-    return createUnsupportedHtmlBlock(block, result.reasons);
+    return createUnsupportedHtmlBlock(block, t, result.reasons[0]);
   }
 
   const wrapper = document.createElement("div");
   wrapper.className = "cm-md-html-rendered-surface cm-md-html-block";
+  wrapper.dir = "auto";
   wrapper.appendChild(result.fragment);
   bindInlineHtmlDomInteractions(wrapper, { openHref: options.openHref });
   return wrapper;
@@ -352,10 +368,12 @@ function replaceWithSanitizedHtmlPreviewBlock(
   target: HTMLElement,
   block: MarkdownHtmlBlock,
   source: string,
+  t: MarkdownLocalization["t"],
   options: { brokeredMedia?: boolean; openHref?: (href: string) => void } = {},
 ) {
-  const nextBlock = createSanitizedHtmlPreviewBlock(block, source, options);
+  const nextBlock = createSanitizedHtmlPreviewBlock(block, source, t, options);
   target.className = nextBlock.className;
+  target.dir = nextBlock.dir;
   target.replaceChildren(...Array.from(nextBlock.childNodes));
 }
 
@@ -457,16 +475,24 @@ function createHtmlWidgetIcon(kind: "preview" | "source"): SVGElement {
 }
 
 
-function createUnsupportedHtmlBlock(block: MarkdownHtmlBlock, reasons: string[]): HTMLElement {
+function createUnsupportedHtmlBlock(
+  block: MarkdownHtmlBlock,
+  t: MarkdownLocalization["t"],
+  reason?: string,
+): HTMLElement {
   const wrapper = document.createElement("div");
   wrapper.className = "cm-md-html-unsupported";
 
   const title = document.createElement("strong");
-  title.textContent = "Unsupported HTML";
+  title.textContent = t("editor.markdown.html.unsupported");
   wrapper.appendChild(title);
 
   const detail = document.createElement("span");
-  detail.textContent = reasons[0] ?? `<${block.tagName}> is not supported in Markdown preview`;
+  detail.textContent = reason
+    ? t("editor.markdown.html.unsupportedDetail", { detail: bidiIsolate(reason) })
+    : t("editor.markdown.html.tagUnsupported", {
+      tag: bidiIsolate(`<${block.tagName ?? "html"}>`),
+    });
   wrapper.appendChild(detail);
 
   const code = document.createElement("code");

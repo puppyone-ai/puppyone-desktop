@@ -1,4 +1,6 @@
 import { Settings, Users } from "lucide-react";
+import type { MessageFormatter } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import { openCloudApp, type DesktopCloudProject, type DesktopCloudSession } from "../../../lib/cloudApi";
 import type { GitStatusSnapshot } from "../../../types/electron";
 import type { Workspace } from "@puppyone/shared-ui";
@@ -28,12 +30,13 @@ import {
 } from "../states";
 import { deriveCloudWorkspaceBinding } from "../workspace";
 import { getCloudRouteWebPath } from "./cloudRoutes";
+import { formatCloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
 export type CloudActionState = {
   kind: "backup" | "connect" | "copy" | null;
   projectId: string | null;
-  message: string | null;
-  error: string | null;
+  notice: CloudMessageDescriptor | null;
+  error: CloudMessageDescriptor | null;
 };
 
 export function CloudRouter({
@@ -100,6 +103,7 @@ export function CloudRouter({
   }) => void;
   onDetachCloudProject?: () => void;
 }) {
+  const { t } = useLocalization();
   const mappedProjectId = getAttachedCloudProjectId(attachment ?? { status: "local-only", projectId: null })
     ?? cloudData.mappedProjectId;
   const mappedProject = cloudData.mappedProject;
@@ -149,13 +153,13 @@ export function CloudRouter({
 
   // 2) Workspace binding before project sections / browser
   if (attachment?.status === "resolving" || (hasPuppyoneRemote && cloudData.initializing && !mappedProjectId)) {
-    return <CloudWorkspaceLoadingState label="Matching Cloud project" />;
+    return <CloudWorkspaceLoadingState label={t("cloud.loading.matchingProject")} />;
   }
 
   if (attachment && isCloudAttachmentRecovery(attachment) && hasPuppyoneRemote && !browsingCloudProject) {
     return (
       <CloudProjectRecoveryState
-        message={attachment.message}
+        message={formatCloudMessage(attachment.message, t)}
         remoteLabel={cloudRemote?.info.displayId ?? null}
         loading={cloudData.loading}
         onRetry={() => {
@@ -167,7 +171,7 @@ export function CloudRouter({
           else onSessionChange(null);
         }}
         onOpenGitDetails={onOpenGitSettings}
-        confirmLabel={attachment.status === "legacy-confirmation-required" ? "Confirm project" : undefined}
+        confirmLabel={attachment.status === "legacy-confirmation-required" ? t("cloud.project.confirm") : undefined}
         onConfirm={attachment.status === "legacy-confirmation-required"
           && attachment.projectId
           && attachment.bindingKind
@@ -182,7 +186,7 @@ export function CloudRouter({
   }
 
   if (cloudData.initializing && !mappedProjectId && !browsingCloudProject) {
-    return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
+    return <CloudWorkspaceLoadingState label={t("cloud.loading.project")} />;
   }
 
   // Mapped local workspace: always enter project overview / contents — never ProjectBrowser.
@@ -211,6 +215,7 @@ export function CloudRouter({
         ? attachment.readiness ?? cloudData.readiness
         : cloudData.readiness,
       onDetachCloudProject,
+      t,
     });
   }
 
@@ -255,7 +260,7 @@ export function CloudRouter({
   }
 
   if (!browsingCloudProject && workspaceBinding.status === "binding-resolving") {
-    return <CloudWorkspaceLoadingState label="Matching Cloud project" />;
+    return <CloudWorkspaceLoadingState label={t("cloud.loading.matchingProject")} />;
   }
 
   if (!browsingCloudProject && (workspaceBinding.status === "local-only" || workspaceBinding.status === "error") && !hasPuppyoneRemote) {
@@ -283,8 +288,8 @@ export function CloudRouter({
     return (
       <CloudProjectRecoveryState
         message={workspaceBinding.status === "error"
-          ? workspaceBinding.message
-          : "We found a PuppyOne Cloud remote, but couldn’t identify its project."}
+          ? formatCloudMessage(workspaceBinding.message, t)
+          : t("cloud.recovery.remoteProjectUnknown")}
         remoteLabel={cloudRemote?.info.displayId ?? null}
         loading={cloudData.loading}
         onRetry={() => {
@@ -304,7 +309,7 @@ export function CloudRouter({
     "projectId" in workspaceBinding ? workspaceBinding.projectId : null
   );
   if (!projectId) {
-    return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
+    return <CloudWorkspaceLoadingState label={t("cloud.loading.project")} />;
   }
 
   const routedProject = (
@@ -314,7 +319,7 @@ export function CloudRouter({
         ?? (mappedProject?.id === projectId ? mappedProject : null)
         ?? {
           id: projectId,
-          name: browsingCloudProject ? "Cloud project" : workspace.name,
+          name: browsingCloudProject ? t("cloud.project.generic") : workspace.name,
         }
   );
 
@@ -349,6 +354,7 @@ export function CloudRouter({
           },
         }
       : null,
+    t,
   });
 }
 
@@ -375,6 +381,7 @@ function renderBoundProjectSection({
   readiness,
   onDetachCloudProject,
   attachAction = null,
+  t,
 }: {
   activeSection: CloudWorkspaceSection;
   workspace: Workspace;
@@ -398,6 +405,7 @@ function renderBoundProjectSection({
   readiness: import("../../../lib/cloudApi").DesktopCloudProjectReadiness | null;
   onDetachCloudProject?: () => void;
   attachAction?: { busy: boolean; onAttach: () => void } | null;
+  t: MessageFormatter;
 }) {
   const connectorsByScope = new Map<string, typeof cloudData.connectors>();
   for (const connector of cloudData.connectors) {
@@ -547,9 +555,9 @@ function renderBoundProjectSection({
       <CloudProjectWebSection
         projectId={projectId}
         icon={Users}
-        title="Team"
-        description="Project members and roles are managed in Puppyone Cloud."
-        primaryLabel="Open team settings"
+        title={t("cloud.route.team.title")}
+        description={t("cloud.project.teamDescription")}
+        primaryLabel={t("cloud.project.openTeamSettings")}
         onOpen={() => onOpenProject(projectId, "team")}
       />
     );
@@ -559,9 +567,9 @@ function renderBoundProjectSection({
     <CloudProjectWebSection
       projectId={projectId}
       icon={Settings}
-      title="Settings"
-      description="Project metadata, branch defaults, and account-level controls are managed in Cloud."
-      primaryLabel="Open project settings"
+      title={t("cloud.route.settings.title")}
+      description={t("cloud.project.settingsDescription")}
+      primaryLabel={t("cloud.project.openSettings")}
       onOpen={() => onOpenProject(projectId, "settings")}
     />
   );

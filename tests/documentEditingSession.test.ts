@@ -269,7 +269,7 @@ describe("DocumentEditingSession", () => {
     expect(session.hasUnpersistedChanges()).toBe(true);
     expect(session.getState()).toMatchObject({
       status: "error",
-      error: "File changed outside PuppyOne",
+      error: { code: "persistence-failed", detail: "File changed outside PuppyOne" },
     });
   });
 
@@ -284,7 +284,7 @@ describe("DocumentEditingSession", () => {
     ).rejects.toThrow("Desktop bridge unavailable");
     expect(session.getState()).toMatchObject({
       status: "error",
-      error: "Desktop bridge unavailable",
+      error: { code: "persistence-failed", detail: "Desktop bridge unavailable" },
     });
   });
 });

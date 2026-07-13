@@ -1,4 +1,5 @@
 import type { AiEditRequest, AppPreviewResult, DataNode, FileContent, Workspace } from "@puppyone/shared-ui";
+import type { AppLanguagePreference, LocaleState } from "@puppyone/localization/core";
 import type {
   AgentAccountReadRequest,
   AgentAccountState,
@@ -582,6 +583,9 @@ export type PuppyoneWorkspaceConfig = {
 declare global {
   interface Window {
     puppyoneDesktop?: {
+      getLocalizationBootstrap: () => Promise<LocaleState>;
+      setLanguagePreference: (preference: AppLanguagePreference) => Promise<LocaleState>;
+      onLocaleChanged: (callback: (state: LocaleState) => void) => () => void;
       onDocumentSessionFlushRequested: (
         callback: (request: { requestId: string }) => void | Promise<void>,
       ) => () => void;
@@ -799,6 +803,8 @@ declare global {
         rootPath: string;
         remoteUrl: string;
         remoteName?: string;
+        credential?: string | null;
+        username?: string;
       }) => Promise<GitStatusSnapshot>;
       removeGitRemote: (request: {
         rootPath: string;

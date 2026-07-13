@@ -37,12 +37,14 @@ import {
   type TitlebarActionsSettings,
 } from "../../preferences";
 import {
+  AGENT_PREFERRED_RUNTIME_STORAGE_KEY,
   AGENT_PREFERRED_MODEL_STORAGE_KEY,
   EXPLORER_WIDTH_STORAGE_KEY,
   RIGHT_SIDEBAR_WIDTH_STORAGE_KEY,
   RIGHT_SIDEBAR_SURFACE_STORAGE_KEY,
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   readInitialAgentPreferredModel,
+  readInitialAgentPreferredRuntime,
   readInitialAiEditAssistEnabled,
   readInitialExperimentalSettings,
   readInitialExplorerWidth,
@@ -96,6 +98,7 @@ export function useDesktopPreferences() {
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(() => readInitialRightSidebarWidth());
   const [rightSidebarSurface, setRightSidebarSurface] = useState(() => readInitialRightSidebarSurface());
+  const [agentPreferredRuntime, setAgentPreferredRuntime] = useState<string | null>(() => readInitialAgentPreferredRuntime());
   const [agentPreferredModel, setAgentPreferredModel] = useState<string | null>(() => readInitialAgentPreferredModel());
   const [systemDark, setSystemDark] = useState(() => readSystemDarkMode());
 
@@ -201,6 +204,11 @@ export function useDesktopPreferences() {
   }, [rightSidebarSurface]);
 
   useEffect(() => {
+    if (agentPreferredRuntime) window.localStorage.setItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY, agentPreferredRuntime);
+    else window.localStorage.removeItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY);
+  }, [agentPreferredRuntime]);
+
+  useEffect(() => {
     if (agentPreferredModel) window.localStorage.setItem(AGENT_PREFERRED_MODEL_STORAGE_KEY, agentPreferredModel);
     else window.localStorage.removeItem(AGENT_PREFERRED_MODEL_STORAGE_KEY);
   }, [agentPreferredModel]);
@@ -233,6 +241,7 @@ export function useDesktopPreferences() {
     rightSidebarToolsSettings,
     rightSidebarWidth,
     rightSidebarSurface,
+    agentPreferredRuntime,
     agentPreferredModel,
     sidebarCollapsed,
     sidebarNavigationLayout,
@@ -261,6 +270,7 @@ export function useDesktopPreferences() {
     setRightSidebarToolsSettings,
     setRightSidebarWidth,
     setRightSidebarSurface,
+    setAgentPreferredRuntime,
     setAgentPreferredModel,
     setSidebarCollapsed,
     setSidebarNavigationLayout,

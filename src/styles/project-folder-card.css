@@ -7,7 +7,7 @@
   flex-direction: column;
   color: var(--po-text-muted);
   outline: none;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition: transform 150ms ease;
 }
 
@@ -118,7 +118,7 @@
 .desktop-project-folder-card-actions {
   position: absolute;
   top: 8px;
-  right: 8px;
+  inset-inline-end: 8px;
   z-index: 4;
   display: inline-flex;
   max-width: calc(100% - 16px);
@@ -148,7 +148,7 @@
   font-size: 12px;
   font-weight: 680;
   white-space: nowrap;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-project-folder-card-action:hover:not(:disabled) {
@@ -309,9 +309,9 @@
 
 .desktop-project-folder-card-footer {
   position: absolute;
-  right: 0;
+  inset-inline-end: 0;
   bottom: 0;
-  left: 0;
+  inset-inline-start: 0;
   z-index: 3;
   display: flex;
   height: 30px;
@@ -360,7 +360,7 @@
   border: 0;
   background: transparent;
   color: var(--po-text-muted);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition:
     color 150ms ease,
     transform 150ms ease;

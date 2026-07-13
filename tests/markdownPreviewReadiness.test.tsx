@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MarkdownCodeMirrorEditor } from "../packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor";
 import { markdownLivePreviewDecorations } from "../packages/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
 import * as markdownExtensions from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
+import { testT, withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -90,9 +91,9 @@ describe("Markdown Live Preview presentation readiness", () => {
       />
     );
 
-    await act(async () => root?.render(render("# First")));
+    await act(async () => root?.render(withTestLocalization(render("# First"))));
     await flushScheduledTasks();
-    await act(async () => root?.render(render("# Second")));
+    await act(async () => root?.render(withTestLocalization(render("# Second"))));
     await flushAnimationFrames();
 
     expect(getHost(container).dataset.previewState).toBe("ready");
@@ -116,8 +117,8 @@ describe("Markdown Live Preview presentation readiness", () => {
       />
     );
 
-    await act(async () => root?.render(render("first.md", "# First")));
-    await act(async () => root?.render(render("second.md", "# Second")));
+    await act(async () => root?.render(withTestLocalization(render("first.md", "# First"))));
+    await act(async () => root?.render(withTestLocalization(render("second.md", "# Second"))));
     expect(getHost(container).dataset.previewState).toBe("pending");
 
     await flushScheduledTasks();
@@ -141,13 +142,13 @@ describe("Markdown Live Preview presentation readiness", () => {
       />
     );
 
-    await act(async () => root?.render(render(true)));
+    await act(async () => root?.render(withTestLocalization(render(true))));
     await flushScheduledTasks();
     await flushAnimationFrames();
     const view = getEditorView(container);
     expect(view.state.field(markdownLivePreviewDecorations, false)).toBeDefined();
 
-    await act(async () => root?.render(render(false)));
+    await act(async () => root?.render(withTestLocalization(render(false))));
 
     expect(getHost(container).dataset.previewState).toBe("source");
     expect(getHost(container).getAttribute("aria-busy")).toBe("false");
@@ -174,7 +175,7 @@ describe("Markdown Live Preview presentation readiness", () => {
 
     const host = getHost(container);
     expect(host.dataset.previewState).toBe("error");
-    expect(host.dataset.previewMessage).toContain("showing Markdown source");
+    expect(host.dataset.previewMessage).toBe(testT("editor.markdown.previewUnavailable"));
     expect(getEditorView(container).state.doc.toString()).toBe("# Recoverable source");
     expect(onPreviewError).toHaveBeenCalledWith(activationError);
   });
@@ -210,7 +211,7 @@ async function renderEditor(element: React.ReactElement) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  await act(async () => root?.render(element));
+  await act(async () => root?.render(withTestLocalization(element)));
   return container;
 }
 

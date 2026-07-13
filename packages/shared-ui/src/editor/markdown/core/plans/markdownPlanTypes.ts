@@ -60,6 +60,7 @@ export type BlockEmbedModel =
       kind: "table";
       alignments: readonly MarkdownTableAlignment[];
       rows: readonly MarkdownTableRow[];
+      renderKey: string;
     }
   | { kind: "htmlBlock"; tagName: string | null; closed: boolean; source: string }
   | { kind: "horizontalRule" };

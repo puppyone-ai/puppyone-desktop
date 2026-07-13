@@ -2559,8 +2559,7 @@ function isPuppyoneRemote(remote) {
 }
 
 function isPuppyoneRemoteUrl(rawUrl) {
-  if (!rawUrl) return false;
-  return /(^|[/:@])api\.puppyone\.ai([/:]|$)/i.test(rawUrl) || /\/git\/(ap\/)?[^/]+\.git$/i.test(rawUrl);
+  return Boolean(parsePuppyoneRemoteInfo(rawUrl));
 }
 
 function buildGithubHostingIdentity(remote) {
@@ -2617,11 +2616,21 @@ function buildPuppyoneHostingIdentity(remote, config) {
   };
 }
 
-function parsePuppyoneRemoteInfo(rawUrl) {
+export function parsePuppyoneRemoteInfo(rawUrl) {
   if (!rawUrl) return null;
 
   try {
     const url = new URL(rawUrl);
+    if (
+      !["http:", "https:"].includes(url.protocol)
+      || !url.host
+      || url.username
+      || url.password
+      || url.search
+      || url.hash
+    ) {
+      return null;
+    }
     const accessPointMatch = url.pathname.match(/^\/git\/ap\/([^/]+)\.git$/);
     const accessKey = accessPointMatch?.[1];
     if (accessPointMatch) {
@@ -2633,7 +2642,21 @@ function parsePuppyoneRemoteInfo(rawUrl) {
       };
     }
 
-    const projectMatch = url.pathname.match(/^\/git\/([^/]+)\.git$/);
+    const id = "[A-Za-z0-9][A-Za-z0-9_-]{0,199}";
+    const scopedMatch = url.pathname.match(
+      new RegExp(`^/git/(${id})/scopes/(${id})\\.git$`),
+    );
+    if (scopedMatch) {
+      return {
+        kind: "scope",
+        host: url.host,
+        displayId: `${scopedMatch[1]}/${scopedMatch[2]}`,
+        projectId: scopedMatch[1],
+        scopeId: scopedMatch[2],
+      };
+    }
+
+    const projectMatch = url.pathname.match(new RegExp(`^/git/(${id})\\.git$`));
     const projectId = projectMatch?.[1];
     if (projectMatch) {
       return {
@@ -3353,8 +3376,13 @@ function normalizeGitRemoteUrl(remoteUrl) {
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error("Remote URL must use http or https.");
   }
-  if (!/^\/git\/(?:ap\/)?[^/]+\.git$/.test(url.pathname)) {
+  if (url.username || url.password || url.search || url.hash) {
+    throw new Error("Remote URL must not contain credentials or query data.");
+  }
+  const id = "[A-Za-z0-9][A-Za-z0-9_-]{0,199}";
+  const canonicalPath = new RegExp(`^/git/(?:${id}\\.git|${id}/scopes/${id}\\.git)$`);
+  if (!canonicalPath.test(url.pathname)) {
     throw new Error("Remote URL is not a PuppyOne Git endpoint.");
   }
-  return normalized;
+  return url.toString();
 }

@@ -14,6 +14,7 @@ import {
   EMPTY_VIEWER_PACK_SNAPSHOT,
   type AiEditRequest,
   type DataNode,
+  type EditorInteractionPreferences,
   type EditorDocumentSession,
   type FilePreviewBodyContext,
   type ViewerExtensionHostAdapter,
@@ -21,6 +22,7 @@ import {
   type Workspace,
 } from "@puppyone/shared-ui";
 import { Plus } from "lucide-react";
+import { useLocalization } from "@puppyone/localization";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
 import { GitSidebar, GitStatusView } from "../source-control";
 import type { DesktopGitController } from "../source-control/useDesktopGitController";
@@ -40,6 +42,7 @@ import {
 import { useDesktopCloudAccessData } from "../cloud/data/useDesktopCloudAccessData";
 import { shouldLoadDesktopCloudAccessData } from "../cloud/data/shouldLoadDesktopCloudAccessData";
 import { useCloudHistoryController } from "../cloud/history/useCloudHistoryController";
+import { formatCloudMessage } from "../cloud/cloudPresentation";
 import { isCloudAccessNavigationResource } from "../cloud/sections/access/accessRows";
 import { getGitHostingMode } from "../source-control/viewModel";
 import type { DesktopView } from "../../components/DesktopCloudShell";
@@ -47,7 +50,10 @@ import type { useDesktopUpdates } from "../../components/DesktopUpdateControls";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import { openExternalUrl } from "../../lib/localFiles";
 import type { FilesVisibilitySettings } from "../../preferences";
-import type { FileClipboardController } from "../data-workspace/useFileClipboard";
+import {
+  formatFileOperationNotice,
+  type FileClipboardController,
+} from "../data-workspace/useFileClipboard";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import {
   DesktopExplorerRowActions,
@@ -186,6 +192,8 @@ export function DesktopWorkspaceContent({
   workspaceKey,
   workspaceRefreshToken,
 }: DesktopWorkspaceContentProps) {
+  const { t } = useLocalization();
+  const fileOperationNotice = formatFileOperationNotice(fileClipboardController.notice, t);
   const cloudWorkspace = workspaceKind === "cloud";
   const viewerPluginsEnabled = isViewerPluginsEnabled({
     settings: preferences.experimentalSettings,
@@ -236,6 +244,8 @@ export function DesktopWorkspaceContent({
     revisionKey: String(workspaceRefreshToken),
     onSessionChange: cloud.onCloudSessionChange,
   });
+  const cloudHistoryError = cloudHistory.error ? formatCloudMessage(cloudHistory.error, t) : null;
+  const cloudHistoryWarning = cloudHistory.warning ? formatCloudMessage(cloudHistory.warning, t) : null;
 
   useEffect(() => {
     const accessRows = cloudAccessData.accessRows.filter(isCloudAccessNavigationResource);
@@ -310,12 +320,12 @@ export function DesktopWorkspaceContent({
       if (cloudWorkspace || !workspace.path) {
         return (
           <div className="viewer-pack-surface-status viewer-pack-surface-status--error">
-            Workspace root unavailable for Viewer Pack activation.
+            {t("workspace.viewerPack.rootUnavailable")}
           </div>
         );
       }
       return (
-        <Suspense fallback={<div className="viewer-pack-surface-status">Loading viewer extension…</div>}>
+        <Suspense fallback={<div className="viewer-pack-surface-status">{t("workspace.viewerPack.loadingExtension")}</div>}>
           <LazyDesktopViewerPackSurface
             document={document}
             contribution={contribution}
@@ -325,11 +335,11 @@ export function DesktopWorkspaceContent({
         </Suspense>
       );
     },
-    [cloudWorkspace, refreshViewerPackSnapshot, workspace.path],
+    [cloudWorkspace, refreshViewerPackSnapshot, t, workspace.path],
   );
   const viewerPackInstallFallback = useCallback<NonNullable<ViewerExtensionHostAdapter["renderInstallFallback"]>>(
     ({ document }: { document: { path: string; name: string; mimeType?: string | null } }) => (
-      <Suspense fallback={<div className="viewer-pack-surface-status">Loading viewer options…</div>}>
+      <Suspense fallback={<div className="viewer-pack-surface-status">{t("workspace.viewerPack.loadingOptions")}</div>}>
         <LazyDesktopViewerPackFallback
           document={{
             path: document.path,
@@ -342,7 +352,7 @@ export function DesktopWorkspaceContent({
         />
       </Suspense>
     ),
-    [refreshViewerPackSnapshot],
+    [refreshViewerPackSnapshot, t],
   );
   const viewerExtensionAdapter = useMemo<ViewerExtensionHostAdapter | null>(() => (
     externalViewerPacksEnabled
@@ -358,6 +368,9 @@ export function DesktopWorkspaceContent({
     viewerPackInstallFallback,
     viewerPackSnapshot,
   ]);
+  const editorInteractionPreferences = useMemo<EditorInteractionPreferences>(() => ({
+    markdownBlockDragEnabled: preferences.experimentalSettings.enableMarkdownBlockDrag,
+  }), [preferences.experimentalSettings.enableMarkdownBlockDrag]);
 
   const settingsView = (
     <SettingsView
@@ -456,8 +469,8 @@ export function DesktopWorkspaceContent({
       loading={cloudHistory.loading}
       loadingMore={cloudHistory.loadingMore}
       hasMore={cloudHistory.hasMore}
-      error={cloudHistory.error}
-      warning={cloudHistory.warning}
+      error={cloudHistoryError}
+      warning={cloudHistoryWarning}
       onSelectCommit={cloudHistory.selectCommit}
       onRefresh={cloudHistory.reload}
       onLoadMore={cloudHistory.loadMore}
@@ -506,7 +519,7 @@ export function DesktopWorkspaceContent({
   );
 
   const cloudAutomationView = (
-    <Suspense fallback={<DesktopRouteLoading label="Loading automation…" />}>
+    <Suspense fallback={<DesktopRouteLoading label={t("workspace.loadingAutomation")} />}>
       <LazyDesktopCloudAutomationView
         projectId={cloud.projectId}
         cloudSession={cloud.cloudSession}
@@ -520,7 +533,7 @@ export function DesktopWorkspaceContent({
   );
 
   const pluginsView = (
-    <Suspense fallback={<div className="desktop-plugins-loading">Loading plugins…</div>}>
+    <Suspense fallback={<div className="desktop-plugins-loading">{t("workspace.loadingPlugins")}</div>}>
       <LazyPluginsView
         activeSection={activePluginsSection}
         hostAvailable={externalViewerPacksEnabled}
@@ -555,14 +568,15 @@ export function DesktopWorkspaceContent({
           {workspaceSurfaceError}
         </div>
       )}
-      {fileClipboardController.notice && (
+      {fileClipboardController.notice && fileOperationNotice && (
         <div
           className="desktop-file-operation-notice"
           data-tone={fileClipboardController.notice.tone}
           role="status"
           aria-live="polite"
+          dir="auto"
         >
-          {fileClipboardController.notice.message}
+          {fileOperationNotice}
         </div>
       )}
       <DataWorkspace
@@ -618,7 +632,7 @@ export function DesktopWorkspaceContent({
                 <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
               </span>
               <span className="tree-label">
-                <span className="tree-label-primary">New</span>
+                <span className="tree-label-primary">{t("workspace.explorer.new")}</span>
               </span>
             </span>
           </button>
@@ -662,6 +676,7 @@ export function DesktopWorkspaceContent({
         hidePreviewSourceView
         renderPreviewBody={renderPreviewBody}
         fileIconTheme={preferences.fileIconTheme}
+        editorInteractionPreferences={editorInteractionPreferences}
         editorSaveMode="auto"
         htmlTrustMode="safe"
         aiEditRequest={activeAiEditRequest}
@@ -710,8 +725,8 @@ export function DesktopWorkspaceContent({
                 loading={cloudHistory.loading}
                 loadingMore={cloudHistory.loadingMore}
                 hasMore={cloudHistory.hasMore}
-                error={cloudHistory.error}
-                warning={cloudHistory.warning}
+                error={cloudHistoryError}
+                warning={cloudHistoryWarning}
                 onSelectCommit={cloudHistory.selectCommit}
                 onRefresh={cloudHistory.reload}
                 onLoadMore={cloudHistory.loadMore}
@@ -733,7 +748,6 @@ export function DesktopWorkspaceContent({
                 onStagePaths={git.handleStageGitPaths}
                 onStageAll={git.handleStageAllGitChanges}
                 onUnstagePaths={git.handleUnstageGitPaths}
-                onUnstageAll={git.handleUnstageAllGitChanges}
                 onDiscardPaths={git.handleDiscardGitPaths}
                 onDiscardAll={git.handleDiscardAllGitChanges}
                 onStageAndCommit={git.handleStageAndCommitGit}
@@ -746,7 +760,6 @@ export function DesktopWorkspaceContent({
                 cloudBackupError={cloud.backupError}
                 cloudEnabled={cloud.enabled}
                 onStartPuppyoneBackup={cloud.onStartPuppyoneBackup}
-                onInitializeRepository={git.handleInitializeGitRepository}
               />
             ) : resolvedActiveView === "cloud" ? (
               <CloudServiceSidebar

@@ -7,11 +7,31 @@ import {
   type FileClipboardState,
 } from "./fileClipboard";
 import { executeFileClipboardPaste, executeFileDuplicate } from "./fileTransfer";
+import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 
-export type FileOperationNotice = {
-  tone: "info" | "error";
-  message: string;
-};
+type FileOperationMode = "copy" | "cut" | "move" | "duplicate";
+
+export type FileOperationNotice = Readonly<
+  | { tone: "info"; code: "selected"; mode: Extract<FileOperationMode, "copy" | "cut">; count: number }
+  | { tone: "error"; code: "invalid-target" }
+  | { tone: "info"; code: "in-progress"; mode: Exclude<FileOperationMode, "cut">; count: number }
+  | {
+      tone: "error";
+      code: "partial";
+      mode: Exclude<FileOperationMode, "cut">;
+      completedCount: number;
+      failedCount: number;
+      detail: string;
+    }
+  | { tone: "error"; code: "failed"; detail: string }
+  | {
+      tone: "info";
+      code: "completed";
+      mode: Exclude<FileOperationMode, "cut">;
+      count: number;
+      targetFolderPath?: string | null;
+    }
+>;
 
 export type FileClipboardOperation = "paste" | "duplicate" | null;
 
@@ -106,7 +126,9 @@ export function useFileClipboard({
     setClipboard(nextClipboard);
     setNotice({
       tone: "info",
-      message: `${mode === "copy" ? "Copied" : "Cut"} ${formatItemCount(nextClipboard.nodes.length)}. Select a folder and paste.`,
+      code: "selected",
+      mode,
+      count: nextClipboard.nodes.length,
     });
     onEnterDataView();
   }, [dataPort, onEnterDataView, workspace, workspaceKey]);
@@ -130,7 +152,7 @@ export function useFileClipboard({
     const activeClipboard = clipboardRef.current;
     if (!workspace || !dataPort || !activeClipboard || operationRef.current !== null) return;
     if (!isValidPasteTarget(activeClipboard, { workspaceKey, path: targetFolderPath })) {
-      setNotice({ tone: "error", message: "These items cannot be pasted into that folder." });
+      setNotice({ tone: "error", code: "invalid-target" });
       return;
     }
     if (activeClipboard.mode === "copy" && !dataPort.copyNode) return;
@@ -145,7 +167,9 @@ export function useFileClipboard({
     setOperation("paste");
     setNotice({
       tone: "info",
-      message: `${activeClipboard.mode === "copy" ? "Copying" : "Moving"} ${formatItemCount(activeClipboard.nodes.length)}...`,
+      code: "in-progress",
+      mode: activeClipboard.mode === "copy" ? "copy" : "move",
+      count: activeClipboard.nodes.length,
     });
     onEnterDataView();
 
@@ -178,12 +202,22 @@ export function useFileClipboard({
       const completedCount = completedSourcePaths.size;
       setNotice(result.failures.length > 0 ? {
         tone: "error",
-        message: completedCount > 0
-          ? `${activeClipboard.mode === "copy" ? "Copied" : "Moved"} ${formatItemCount(completedCount)}; ${result.failures.length} failed. ${formatFailure(firstFailure)}`
-          : formatFailure(firstFailure),
+        ...(completedCount > 0 ? {
+          code: "partial" as const,
+          mode: activeClipboard.mode === "copy" ? "copy" as const : "move" as const,
+          completedCount,
+          failedCount: result.failures.length,
+          detail: formatFailureDetail(firstFailure),
+        } : {
+          code: "failed" as const,
+          detail: formatFailureDetail(firstFailure),
+        }),
       } : {
         tone: "info",
-        message: `${activeClipboard.mode === "copy" ? "Copied" : "Moved"} ${formatItemCount(completedCount)} to ${formatFolderLabel(targetFolderPath)}.`,
+        code: "completed",
+        mode: activeClipboard.mode === "copy" ? "copy" : "move",
+        count: completedCount,
+        targetFolderPath,
       });
     } finally {
       if (
@@ -219,7 +253,12 @@ export function useFileClipboard({
     };
     operationRef.current = operationToken;
     setOperation("duplicate");
-    setNotice({ tone: "info", message: `Duplicating ${formatItemCount(sourceNodes.length)}...` });
+    setNotice({
+      tone: "info",
+      code: "in-progress",
+      mode: "duplicate",
+      count: sourceNodes.length,
+    });
     onEnterDataView();
 
     try {
@@ -240,12 +279,21 @@ export function useFileClipboard({
 
       setNotice(result.failures.length > 0 ? {
         tone: "error",
-        message: result.destinationPaths.length > 0
-          ? `Duplicated ${formatItemCount(result.destinationPaths.length)}; ${result.failures.length} failed. ${formatFailure(firstFailure)}`
-          : formatFailure(firstFailure),
+        ...(result.destinationPaths.length > 0 ? {
+          code: "partial" as const,
+          mode: "duplicate" as const,
+          completedCount: result.destinationPaths.length,
+          failedCount: result.failures.length,
+          detail: formatFailureDetail(firstFailure),
+        } : {
+          code: "failed" as const,
+          detail: formatFailureDetail(firstFailure),
+        }),
       } : {
         tone: "info",
-        message: `Duplicated ${formatItemCount(result.destinationPaths.length)}.`,
+        code: "completed",
+        mode: "duplicate",
+        count: result.destinationPaths.length,
       });
     } finally {
       if (
@@ -296,16 +344,48 @@ export function useFileClipboard({
   ]);
 }
 
-function formatItemCount(count: number): string {
-  return `${count} ${count === 1 ? "item" : "items"}`;
+export function formatFileOperationNotice(
+  notice: FileOperationNotice | null,
+  t: MessageFormatter,
+): string | null {
+  if (!notice) return null;
+  if (notice.code === "selected") {
+    return t(notice.mode === "copy"
+      ? "workspace.clipboard.selectedCopy"
+      : "workspace.clipboard.selectedCut", { count: notice.count });
+  }
+  if (notice.code === "invalid-target") return t("workspace.clipboard.invalidTarget");
+  if (notice.code === "in-progress") {
+    if (notice.mode === "copy") return t("workspace.clipboard.copying", { count: notice.count });
+    if (notice.mode === "move") return t("workspace.clipboard.moving", { count: notice.count });
+    return t("workspace.clipboard.duplicating", { count: notice.count });
+  }
+  if (notice.code === "partial") {
+    return t(`workspace.clipboard.partial.${notice.mode}`, {
+      completed: notice.completedCount,
+      failed: notice.failedCount,
+      detail: bidiIsolate(notice.detail),
+    });
+  }
+  if (notice.code === "failed") {
+    return t("workspace.clipboard.failedDetail", { detail: bidiIsolate(notice.detail) });
+  }
+  if (notice.mode === "duplicate") {
+    return t("workspace.clipboard.completed.duplicate", { count: notice.count });
+  }
+  const target = formatFolderLabel(notice.targetFolderPath ?? null, t);
+  return t(`workspace.clipboard.completed.${notice.mode}`, {
+    count: notice.count,
+    target,
+  });
 }
 
-function formatFolderLabel(path: string | null): string {
-  if (!path) return "the workspace root";
+function formatFolderLabel(path: string | null, t: MessageFormatter): string {
+  if (!path) return t("workspace.clipboard.workspaceRoot");
   const name = path.split("/").filter(Boolean).at(-1);
-  return name ? `"${name}"` : "the workspace root";
+  return name ? bidiIsolate(name) : t("workspace.clipboard.workspaceRoot");
 }
 
-function formatFailure(failure: { name: string; message: string } | undefined): string {
-  return failure ? `${failure.name}: ${failure.message}` : "The file operation failed.";
+function formatFailureDetail(failure: { name: string; message: string } | undefined): string {
+  return failure ? `${failure.name}: ${failure.message}` : "file-operation-failed";
 }

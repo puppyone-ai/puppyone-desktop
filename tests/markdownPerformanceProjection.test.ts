@@ -42,6 +42,34 @@ describe("Markdown incremental document projection", () => {
     expect(getMarkdownProjectionDiagnostics().mappedTransactions).toBeGreaterThanOrEqual(1);
   });
 
+  it("toggles one task token in 10,000 lines without scanning the document", () => {
+    let state = createState(makeTaskMarkdown(10_000));
+    const line = state.doc.line(5_000);
+    const checkboxFrom = line.from + 2;
+    const checkboxTo = checkboxFrom + 3;
+    state = state.update({
+      selection: EditorSelection.cursor(line.to),
+      effects: requestMarkdownProjectionRange(state, line.from, line.to),
+    }).state;
+
+    resetMarkdownProjectionDiagnostics();
+    resetMarkdownDecorationDiagnostics();
+    resetMarkdownPlanIndexDiagnostics();
+    state = state.update({
+      changes: { from: checkboxFrom, to: checkboxTo, insert: "[x]" },
+    }).state;
+
+    expect(state.sliceDoc(checkboxFrom, checkboxTo)).toBe("[x]");
+    expect(getMarkdownDecorationDiagnostics()).toMatchObject({ fullDocumentScans: 0 });
+    expect(getMarkdownDecorationDiagnostics().linesScanned).toBeLessThanOrEqual(8);
+    expect(getMarkdownPlanIndexDiagnostics().fullBuilds).toBe(0);
+    expect(getMarkdownProjectionDiagnostics()).toMatchObject({
+      mappedTransactions: 1,
+      changedRangePatches: 1,
+      globalInvalidations: 0,
+    });
+  });
+
   it("rebuilds only the old/new reveal block when focus changes", () => {
     const source = makeMarkdown(10_000);
     let state = createState(source);
@@ -106,4 +134,8 @@ function makeMarkdown(lineCount: number): string {
       ? `# Heading ${index}`
       : `Paragraph ${index} with **bold**, _emphasis_, and [link](note-${index % 30}.md).`
   )).join("\n");
+}
+
+function makeTaskMarkdown(lineCount: number): string {
+  return Array.from({ length: lineCount }, (_, index) => `- [ ] Task ${index}`).join("\n");
 }

@@ -1,35 +1,34 @@
 import type { GitDiffLine } from "../../../../../types/electron";
 import type { DiffRendererProps } from "../../core/types";
+import { useLocalization } from "@puppyone/localization/react";
 
 export function TextUnifiedDiff({ file }: DiffRendererProps) {
+  const { t } = useLocalization();
   const omittedLines = file.omittedLines ?? 0;
   if (file.lines.length === 0) {
     return (
       <div className="desktop-diff-placeholder">
-        {file.truncated ? formatDiffTruncationMessage(omittedLines) : "No textual diff available"}
+        {file.truncated
+          ? t(omittedLines > 0 ? "source-control.diff.truncatedCount" : "source-control.diff.truncated", { count: omittedLines })
+          : t("source-control.diff.noText")}
       </div>
     );
   }
 
   return (
     <>
-      <div className="desktop-diff-lines">
+      <div className="desktop-diff-lines" dir="ltr">
         {file.lines.map((line, index) => (
           <DiffLineView line={line} key={index} />
         ))}
       </div>
       {file.truncated && (
-        <div className="desktop-diff-placeholder">{formatDiffTruncationMessage(omittedLines)}</div>
+        <div className="desktop-diff-placeholder">
+          {t(omittedLines > 0 ? "source-control.diff.truncatedCount" : "source-control.diff.truncated", { count: omittedLines })}
+        </div>
       )}
     </>
   );
-}
-
-export function formatDiffTruncationMessage(omittedLines: number) {
-  if (omittedLines > 0) {
-    return `Diff truncated. ${omittedLines.toLocaleString()} more line${omittedLines === 1 ? "" : "s"} hidden.`;
-  }
-  return "Diff truncated.";
 }
 
 function DiffLineView({ line }: { line: GitDiffLine }) {

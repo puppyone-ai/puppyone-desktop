@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   AsyncDiffContributionDefinition,
   DiffErrorRendererProps,
@@ -104,14 +106,16 @@ function AsyncDiffRenderer<Model>({
 }
 
 function DefaultDiffLoading(_props: DiffLoadingRendererProps) {
-  return <div className="desktop-diff-placeholder" role="status">Loading format-aware diff…</div>;
+  const { t } = useLocalization();
+  return <div className="desktop-diff-placeholder" role="status">{t("source-control.diff.loading")}</div>;
 }
 
 function DefaultDiffError({ message, onRetry }: DiffErrorRendererProps) {
+  const { t } = useLocalization();
   return (
     <div className="desktop-diff-placeholder" role="alert">
-      <span>{message}</span>
-      <button type="button" className="secondary-action" onClick={onRetry}>Retry</button>
+      <span>{t("source-control.diff.loadFailedDetail", { detail: bidiIsolate(message) })}</span>
+      <button type="button" className="secondary-action" onClick={onRetry}>{t("source-control.diff.retry")}</button>
     </div>
   );
 }

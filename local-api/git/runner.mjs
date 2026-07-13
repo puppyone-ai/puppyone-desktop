@@ -26,6 +26,7 @@ export function execGit(rootPath, args, options = {}) {
     maxBuffer: options.maxBuffer ?? GIT_MAX_BUFFER,
     signal: options.signal,
     env: buildGitEnvironment({ optionalLocks: options.optionalLocks }),
+    input: options.input,
   }).catch((error) => {
     annotateGitError(error, args, timeout);
     throw error;

@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import { DesktopDialogCloseButton, DesktopDialogRoot, DesktopDialogSurface } from "../../../../components/DesktopDialog";
 import type {
   DesktopCloudConnector,
@@ -8,6 +9,7 @@ import type {
   DesktopCloudSession,
 } from "../../../../lib/cloudApi";
 import { scopeMatchesMcpEndpoint } from "../../utils";
+import { cloudMessage, formatCloudMessage, type CloudMessageDescriptor } from "../../cloudPresentation";
 import { CreateAccessFolderTree, TreeDisclosureMarker } from "./CreateAccessFolderTree";
 import { CreateAccessIntentPicker } from "./CreateAccessIntentPicker";
 import { CreateAccessMethodRow } from "./CreateAccessMethodRow";
@@ -50,6 +52,7 @@ export function DesktopCloudCreateAccessDialog({
   onClose: () => void;
   onCreated: (created: DesktopCloudCreateAccessCreated) => Promise<void> | void;
 }) {
+  const { t } = useLocalization();
   const normalizedInitialPath = normalizeAccessPath(initialPath ?? "");
   const initialSelectedPath = normalizedInitialPath === "" ? null : normalizedInitialPath;
   const [selectedPath, setSelectedPath] = useState<string | null>(initialSelectedPath);
@@ -58,7 +61,7 @@ export function DesktopCloudCreateAccessDialog({
   const [optionalProviders, setOptionalProviders] = useState<ReadonlySet<OptionalAccessProvider>>(() => new Set());
   const [intent, setIntent] = useState<CreateAccessIntent>("remote_workspace");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<CloudMessageDescriptor | null>(null);
 
   const existingPathSet = useMemo(
     () => new Set(scopes.map((scope) => normalizeAccessPath(scope.path))),
@@ -97,13 +100,13 @@ export function DesktopCloudCreateAccessDialog({
     && normalizedSelected !== ""
     && (selectedExistingScope !== null || trimmedName.length > 0);
   const actionLabel = saving
-    ? "Saving..."
+    ? t("cloud.common.saving")
     : selectedExistingScope
       ? optionalProvidersToCreate.length > 0
-        ? "Update access"
-        : "Open access"
-      : "Create access";
-  const selectedLabel = normalizedSelected === null ? "Choose a path" : formatAccessPath(normalizedSelected);
+        ? t("cloud.access.create.update")
+        : t("cloud.access.open")
+      : t("cloud.access.create.action");
+  const selectedLabel = normalizedSelected === null ? t("cloud.access.create.choosePath") : formatAccessPath(normalizedSelected, t);
 
   const selectPath = (path: string) => {
     const normalized = normalizeAccessPath(path);
@@ -144,7 +147,7 @@ export function DesktopCloudCreateAccessDialog({
       await onCreated(created);
       onClose();
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Could not create access. Please try again.");
+      setError(cloudMessage("create-access-failed", undefined, createError instanceof Error ? createError.message : undefined));
     } finally {
       setSaving(false);
     }
@@ -160,8 +163,8 @@ export function DesktopCloudCreateAccessDialog({
         <header className="desktop-dialog-header desktop-cloud-create-access-header">
           <div className="desktop-dialog-title-row">
             <div>
-              <h2>New folder access</h2>
-              <p>Choose the job first, then bind it to a folder. Git Remote and Puppyone CLI are always included for the folder.</p>
+              <h2>{t("cloud.access.create.title")}</h2>
+              <p>{t("cloud.access.create.description")}</p>
             </div>
           </div>
           <DesktopDialogCloseButton disabled={saving} onClick={onClose} />
@@ -181,12 +184,12 @@ export function DesktopCloudCreateAccessDialog({
             />
 
             <div className="desktop-cloud-create-access-form">
-              <FieldLabel label="Access name" required>
+              <FieldLabel label={t("cloud.access.create.name")} required>
                 <input
                   className="desktop-cloud-create-access-input"
                   value={name}
                   disabled={saving}
-                  placeholder={normalizedSelected === null ? "Choose a path first" : defaultScopeName(normalizedSelected)}
+                  placeholder={normalizedSelected === null ? t("cloud.access.create.choosePathFirst") : defaultScopeName(normalizedSelected)}
                   onChange={(event) => {
                     setNameTouched(true);
                     setName(event.target.value);
@@ -194,7 +197,7 @@ export function DesktopCloudCreateAccessDialog({
                 />
               </FieldLabel>
 
-              <FieldLabel label="Path" required>
+              <FieldLabel label={t("cloud.common.path")} required>
                 <div
                   className={`desktop-cloud-create-access-path-box ${selectedExistingScope ? "existing" : ""} ${normalizedSelected === null ? "empty" : ""}`}
                   title={selectedLabel}
@@ -204,27 +207,27 @@ export function DesktopCloudCreateAccessDialog({
                 </div>
                 {selectedExistingScope ? (
                   <div className="desktop-cloud-create-access-field-note">
-                    This path already has access. You can add share methods or open it.
+                    {t("cloud.access.create.pathAlreadyHasAccess")}
                   </div>
                 ) : null}
               </FieldLabel>
 
               <div>
-                <SectionHeading>Always included</SectionHeading>
+                <SectionHeading>{t("cloud.access.create.alwaysIncluded")}</SectionHeading>
                 <div className="desktop-cloud-create-access-method-stack">
-                  <CreateAccessMethodRow provider="git_remote" description="Native Git clone, pull, and push for this folder." locked />
-                  <CreateAccessMethodRow provider="cli" description="Scoped FS CLI commands for this folder." locked />
+                  <CreateAccessMethodRow provider="git_remote" description={t("cloud.access.create.method.gitDescription")} locked />
+                  <CreateAccessMethodRow provider="cli" description={t("cloud.access.create.method.cliDescription")} locked />
                 </div>
               </div>
 
               <div>
-                <SectionHeading>Optional methods</SectionHeading>
+                <SectionHeading>{t("cloud.access.create.optionalMethods")}</SectionHeading>
                 <div className="desktop-cloud-create-access-method-stack">
                   {OPTIONAL_ACCESS_METHODS.map((method) => (
                     <CreateAccessMethodRow
                       key={method.provider}
                       provider={method.provider}
-                      description={method.description}
+                      description={t(method.descriptionId)}
                       checked={method.supported && (optionalProviders.has(method.provider) || existingProviders.has(method.provider))}
                       disabled={!method.supported}
                       locked={existingProviders.has(method.provider)}
@@ -236,11 +239,11 @@ export function DesktopCloudCreateAccessDialog({
             </div>
           </div>
 
-          {error ? <div className="desktop-cloud-create-access-error">{error}</div> : null}
+          {error ? <div className="desktop-cloud-create-access-error">{formatCloudMessage(error, t)}</div> : null}
         </div>
         <footer className="desktop-dialog-footer desktop-cloud-create-access-footer">
           <button className="desktop-dialog-button" type="button" disabled={saving} onClick={onClose}>
-            Cancel
+            {t("cloud.common.cancel")}
           </button>
           <button className="desktop-dialog-button primary" type="button" disabled={!canCreate} onClick={handleCreate}>
             <Plus size={14} />

@@ -10,6 +10,54 @@ const workingFileDetailSource = readFileSync(
   new URL("../src/features/source-control/WorkingFileDetail.tsx", import.meta.url),
   "utf8",
 );
+const sourceControlComponentsSource = readFileSync(
+  new URL("../src/features/source-control/components.tsx", import.meta.url),
+  "utf8",
+);
+const sourceControlSidebarSource = readFileSync(
+  new URL("../src/features/source-control/SourceControlSidebar.tsx", import.meta.url),
+  "utf8",
+);
+const versionControlSetupSource = readFileSync(
+  new URL("../src/features/source-control/VersionControlSetupState.tsx", import.meta.url),
+  "utf8",
+);
+const versionControlIconSource = readFileSync(
+  new URL("../src/features/source-control/VersionControlIcon.tsx", import.meta.url),
+  "utf8",
+);
+const versionControlSetupCss = readFileSync(
+  new URL("../src/features/source-control/styles/setup-state.css", import.meta.url),
+  "utf8",
+);
+const desktopEntryStateSource = readFileSync(
+  new URL("../src/components/DesktopEntryState.tsx", import.meta.url),
+  "utf8",
+);
+const desktopEntryStateCss = readFileSync(
+  new URL("../src/styles/entry-state.css", import.meta.url),
+  "utf8",
+);
+const cloudProjectBrowserCss = readFileSync(
+  new URL("../src/features/cloud/styles/project-browser.css", import.meta.url),
+  "utf8",
+);
+const cloudProjectBrowserSource = readFileSync(
+  new URL("../src/features/cloud/components/ProjectBrowser.tsx", import.meta.url),
+  "utf8",
+);
+const titlebarContextSource = readFileSync(
+  new URL("../src/features/app-shell/DesktopTitlebarContext.tsx", import.meta.url),
+  "utf8",
+);
+const navigationSource = readFileSync(
+  new URL("../src/features/app-shell/navigation.tsx", import.meta.url),
+  "utf8",
+);
+const operationDialogsSource = readFileSync(
+  new URL("../src/features/source-control/operationDialogs.tsx", import.meta.url),
+  "utf8",
+);
 const fileDiffSurfaceSource = readFileSync(
   new URL("../src/features/source-control/diff/GitFileDiffSurface.tsx", import.meta.url),
   "utf8",
@@ -30,6 +78,10 @@ const sidebarResourcesCss = readFileSync(
   new URL("../src/features/source-control/styles/sidebar-resources.css", import.meta.url),
   "utf8",
 );
+const gitControllerSource = readFileSync(
+  new URL("../src/features/source-control/useDesktopGitController.ts", import.meta.url),
+  "utf8",
+);
 const historyListCss = readFileSync(
   new URL("../src/features/source-control/styles/history-list.css", import.meta.url),
   "utf8",
@@ -40,6 +92,153 @@ const diffCss = readFileSync(
 );
 
 describe("source-control visual architecture", () => {
+  it("keeps repository identity text inside the shared sidebar type scale", () => {
+    const sectionTitle = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-section-title",
+    ));
+
+    expect(sourceControlSidebarSource).toContain("<bdi>{label}</bdi>");
+    expect(sectionTitle).toContain(
+      "font-size: var(--desktop-sidebar-section-title-font-size, var(--git-font-small));",
+    );
+    expect(sectionTitle).toContain(
+      "font-weight: var(--desktop-sidebar-section-title-font-weight, var(--git-weight-regular));",
+    );
+    expect(sectionTitle).toContain(
+      "line-height: var(--desktop-sidebar-section-title-line-height, var(--git-line-height));",
+    );
+  });
+
+  it("swaps each working-tree status in place without moving destructive actions under the pointer", () => {
+    const stagedGrid = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-working-tree-row.is-staged",
+    ));
+    const stateSlot = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-working-tree-state-slot",
+    ));
+    const state = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-working-tree-state",
+    ));
+
+    expect(sourceControlComponentsSource).toContain('className="desktop-working-tree-state-slot"');
+    expect(sourceControlComponentsSource).toContain("desktop-working-tree-revert-action");
+    expect(sourceControlComponentsSource).toContain("desktop-working-tree-state-action");
+    expect(sidebarBaseCss).toContain(
+      "--git-working-tree-secondary-action-width: var(--git-working-tree-action-size);",
+    );
+    expect(sidebarBaseCss).toContain(
+      "--git-working-tree-state-width: var(--git-working-tree-action-size);",
+    );
+    expect(sidebarBaseCss).toContain("--git-working-tree-status-size: 22px;");
+    expect(stagedGrid).toContain(
+      "grid-template-columns: minmax(0, 1fr) var(--git-working-tree-state-width);",
+    );
+    expect(stateSlot).toContain("grid-column: 3;");
+    expect(stateSlot).toContain("place-items: center;");
+    expect(state).toContain("width: var(--git-working-tree-status-size);");
+    expect(state).toContain("height: var(--git-working-tree-status-size);");
+    expect(state).toContain("justify-self: center;");
+    expect(sourceControlComponentsSource.match(/desktop-working-tree-state-slot/g)).toHaveLength(2);
+    expect(sidebarResourcesCss).toContain(
+      ".desktop-working-tree-row:hover .desktop-working-tree-state-action",
+    );
+    expect(sidebarResourcesCss).toContain(
+      ".desktop-working-tree-row:hover .desktop-working-tree-state",
+    );
+    expect(sourceControlSidebarSource).not.toContain("source-control.action.unstageAll");
+    expect(gitControllerSource).toContain("const handleDiscardGitPaths = useCallback");
+    expect(gitControllerSource).toContain("window.confirm(t(\"source-control.dialog.discard.path\"");
+  });
+
+  it("keeps the no-version-control state to one calm enable action", () => {
+    expect(titlebarContextSource).toContain('t("shell.branch.noGit")');
+    expect(titlebarContextSource).not.toContain('"No Version Control"');
+    expect(viewSource).toContain("<VersionControlSetupState");
+    expect(versionControlSetupSource).toContain('"source-control.setup.enable"');
+    expect(versionControlSetupSource).toContain('"source-control.setup.enabling"');
+    expect(versionControlSetupSource).toContain('t("source-control.setup.description")');
+    expect(versionControlSetupSource).toContain('ariaLabel={t("source-control.setup.ariaLabel")}');
+    expect(versionControlSetupSource.match(/<button/g)).toHaveLength(1);
+    expect(versionControlSetupSource).not.toContain("getElectron");
+    expect(viewSource).not.toContain("This folder is not under source control.");
+    expect(viewSource).not.toContain("Initialize a Git repository");
+    expect(viewSource).not.toContain('"Initialize Repository"');
+    expect(sourceControlSidebarSource).toContain('t("source-control.status.noRepository")');
+    expect(sourceControlSidebarSource).not.toContain('"Initialize Repository"');
+    expect(desktopEntryStateCss).toContain("width: min(420px, 100%);");
+    expect(versionControlSetupCss).toContain("height: 30px;");
+  });
+
+  it("shares the responsive setup type scale with the Cloud entry state", () => {
+    expect(desktopEntryStateCss).toContain("font-size: var(--po-text-size-title);");
+    expect(desktopEntryStateCss).toContain("font-size: var(--po-text-size-body-lg);");
+    expect(desktopEntryStateCss).toContain("font-weight: var(--po-text-weight-medium);");
+
+    expect(versionControlSetupCss).toContain("font-size: var(--po-text-size-body);");
+    expect(versionControlSetupCss).toContain("font-weight: var(--po-text-weight-semibold);");
+    expect(versionControlSetupCss).toContain("font-size: var(--po-text-size-meta);");
+    expect(cloudProjectBrowserCss).toContain(
+      "--desktop-cloud-body-size: var(--po-text-size-body);",
+    );
+    expect(cloudProjectBrowserCss).toContain("font-size: var(--po-text-size-meta);");
+  });
+
+  it("centers Cloud and Version Control in one full-surface coordinate system", () => {
+    const root = compact(readCssBlock(desktopEntryStateCss, ".desktop-entry-state"));
+    const body = compact(readCssBlock(desktopEntryStateCss, ".desktop-entry-state-body"));
+    const cloudMain = compact(readCssBlock(cloudProjectBrowserCss, ".desktop-cloud-auth-main-view"));
+    const cloudPage = compact(readCssBlock(
+      cloudProjectBrowserCss,
+      ".desktop-cloud-auth-main-view .desktop-cloud-page-shell",
+    ));
+
+    expect(versionControlSetupSource).toContain("<DesktopEntryState");
+    expect(cloudProjectBrowserSource).toContain("<DesktopEntryState");
+    expect(desktopEntryStateSource).toContain('className="desktop-entry-state-body"');
+    expect(versionControlSetupSource).not.toContain("desktop-utility-view");
+    expect(root).toContain("display: grid;");
+    expect(root).toContain("width: 100%;");
+    expect(root).toContain("height: 100%;");
+    expect(root).toContain("min-height: 0;");
+    expect(body).toContain("place-items: center;");
+    expect(body).toContain("height: 100%;");
+    expect(cloudMain).toContain("padding: 0;");
+    expect(cloudPage).toContain("height: 100%;");
+  });
+
+  it("reuses the canonical navigation icon in the Cloud-sized entry footprint", () => {
+    const localMark = compact(readCssBlock(versionControlSetupCss, ".desktop-version-control-mark"));
+    const localFrame = compact(readCssBlock(versionControlSetupCss, ".desktop-version-control-mark-frame"));
+    const cloudMark = compact(readCssBlock(
+      cloudProjectBrowserCss,
+      ".desktop-cloud-project-auth-entry .desktop-cloud-product-mark",
+    ));
+
+    expect(versionControlSetupSource).toContain(
+      '<VersionControlIcon className="desktop-version-control-mark" />',
+    );
+    expect(versionControlSetupSource).not.toContain("lucide-react");
+    expect(versionControlIconSource).toContain('viewBox="0 0 24 24"');
+    expect(navigationSource).toContain(
+      '{ view: "git", labelId: "shell.navigation.changes", icon: VersionControlIcon, iconSize: 18 }',
+    );
+    expect(titlebarContextSource).toContain("<GitBranch size={13}");
+    expect(titlebarContextSource).not.toContain("VersionControlIcon");
+    expect(operationDialogsSource).toContain("<VersionControlIcon size={13} />");
+    expect(navigationSource).not.toContain("PuppyGitIcon");
+    expect(operationDialogsSource).not.toContain("../app-shell/navigation");
+    expect(localFrame).toContain("width: 78px;");
+    expect(localFrame).toContain("height: 58px;");
+    expect(localMark).toContain("width: 74px;");
+    expect(localMark).toContain("height: 54px;");
+    expect(cloudMark).toContain("width: 74px;");
+    expect(cloudMark).toContain("height: 54px;");
+  });
+
   it("uses one canonical file diff surface in Changes and History", () => {
     expect(viewSource).toContain("<GitFileDiffSurface");
     expect(workingFileDetailSource).toContain("<GitFileDiffSurface");
@@ -109,6 +308,7 @@ describe("source-control visual architecture", () => {
     ));
 
     expect(contract).toContain("--git-action-size: 24px;");
+    expect(contract).toContain("--git-action-radius: var(--desktop-toolbar-action-radius);");
     expect(contract).toContain("--git-action-padding-inline: 7px;");
     expect(contract).toContain("--git-action-font-size: 12px;");
     expect(operation).toContain("height: var(--git-action-size);");
@@ -195,12 +395,8 @@ describe("source-control visual architecture", () => {
     expect(lineView).toContain('className="line-prefix"');
   });
 
-  it("keeps sidebar metadata quieter than primary working-tree content", () => {
+  it("keeps sidebar metadata quieter while preserving the shared file-icon system", () => {
     const sidebar = compact(readCssBlock(sidebarBaseCss, ".desktop-git-sidebar"));
-    const fileIcon = compact(readCssBlock(
-      sidebarResourcesCss,
-      ".desktop-working-tree-icon :is(svg, img)",
-    ));
     const workingTreeMain = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-working-tree-main",
@@ -229,11 +425,33 @@ describe("source-control visual architecture", () => {
     expect(historyListCss).toContain("line-height: var(--git-line-height);");
     expect(historyListCss).toContain(".desktop-working-tree-main,");
     expect(historyListCss).toContain(".desktop-working-tree-name,");
+    expect(sourceControlComponentsSource).not.toContain("desktop-working-tree-dir");
+    expect(sidebarResourcesCss).not.toContain(".desktop-working-tree-dir");
     expect(historyListCss).not.toContain(
       ".desktop-git-sidebar .desktop-working-tree-row.active .desktop-working-tree-name",
     );
     expect(workingTreeMain).toContain("gap: var(--git-icon-label-gap);");
-    expect(fileIcon).toContain("filter: grayscale(1);");
+    expect(sourceControlComponentsSource.match(/<FileGlyphIcon[^>]+size=\{18\}/g)).toHaveLength(2);
+    expect(sourceControlComponentsSource).not.toContain("size={15}");
+    expect(sidebarResourcesCss).not.toContain("filter: grayscale(1);");
+  });
+
+  it("clips history messages to one line inside the fixed-height timeline row", () => {
+    const row = compact(readCssBlock(historyListCss, ".desktop-history-row"));
+    const main = compact(readCssBlock(historyListCss, ".desktop-history-row-main"));
+    const title = compact(readCssBlock(historyListCss, ".desktop-history-row-title"));
+    const message = compact(readCssBlock(historyListCss, ".desktop-history-row-message"));
+
+    expect(viewSource).toContain('className="desktop-history-row-message"');
+    expect(row).toContain("height: var(--desktop-sidebar-row-height);");
+    expect(row).toContain("overflow: hidden;");
+    expect(main).toContain("min-width: 0;");
+    expect(main).toContain("overflow: hidden;");
+    expect(title).toContain("white-space: nowrap;");
+    expect(message).toContain("overflow: hidden;");
+    expect(message).toContain("text-overflow: ellipsis;");
+    expect(message).toContain("white-space: nowrap;");
+    expect(historyListCss).not.toContain(".desktop-history-row-title > span:last-child");
   });
 });
 

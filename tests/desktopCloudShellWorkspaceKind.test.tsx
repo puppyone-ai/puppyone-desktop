@@ -9,6 +9,7 @@ import {
   DesktopCloudShell,
   type DesktopWorkspaceKind,
 } from "../src/components/DesktopCloudShell";
+import { renderWithTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -28,7 +29,7 @@ describe("DesktopCloudShell workspace-aware titlebar", () => {
       document.body.appendChild(container);
       root = createRoot(container);
 
-      act(() => root?.render(
+      act(() => renderWithTestLocalization(root,
         <DesktopCloudShell workspaceKind={workspaceKind}>
           <div>Workspace content</div>
         </DesktopCloudShell>,
@@ -45,7 +46,7 @@ describe("DesktopCloudShell workspace-aware titlebar", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    act(() => root?.render(
+    act(() => renderWithTestLocalization(root,
       <DesktopCloudShell
         minimalMode
         minimalModeDock={<div data-testid="minimal-dock">Dock</div>}

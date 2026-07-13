@@ -1,7 +1,9 @@
 import type { AgentActivity } from "../domain/agent-projection-types";
+import { agentActivityToolId } from "../domain/agent-activity-presentation";
 import {
   AgentCommandActivity,
   AgentFileChangeActivity,
+  AgentFileQueryActivity,
   AgentGenericActivity,
   AgentNoticeActivity,
   AgentPlanActivity,
@@ -10,16 +12,17 @@ import {
 
 type AgentActivityItemProps = {
   activity: AgentActivity;
-  onViewChanges?: () => void;
-  onOpenTerminal?: () => void;
   onOpenFile?: (path: string) => void;
 };
 
-export function AgentActivityItem({ activity, onViewChanges, onOpenTerminal, onOpenFile }: AgentActivityItemProps) {
-  if (activity.kind === "command") return <AgentCommandActivity activity={activity} onOpenTerminal={onOpenTerminal} />;
-  if (activity.kind === "file-change") return <AgentFileChangeActivity activity={activity} onViewChanges={onViewChanges} onOpenFile={onOpenFile} />;
+export function AgentActivityItem({ activity, onOpenFile }: AgentActivityItemProps) {
+  if (activity.kind === "command") return <AgentCommandActivity activity={activity} />;
+  if (activity.kind === "file-change") return <AgentFileChangeActivity activity={activity} onOpenFile={onOpenFile} />;
   if (activity.kind === "reasoning") return <AgentReasoningActivity activity={activity} />;
   if (activity.kind === "plan") return <AgentPlanActivity activity={activity} />;
   if (activity.kind === "warning" || activity.kind === "error") return <AgentNoticeActivity activity={activity} />;
-  return <AgentGenericActivity activity={activity} onOpenFile={onOpenFile} />;
+  if (["read", "grep", "glob", "search", "list"].includes(agentActivityToolId(activity))) {
+    return <AgentFileQueryActivity activity={activity} onOpenFile={onOpenFile} />;
+  }
+  return <AgentGenericActivity activity={activity} />;
 }

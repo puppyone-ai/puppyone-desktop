@@ -1,0 +1,17 @@
+{
+  "messageUnavailable": "Este texto não está disponível.",
+  "action.cancel": "Cancelar",
+  "action.close": "Fechar",
+  "action.confirm": "Confirmar",
+  "action.retry": "Tentar novamente",
+  "action.apply": "Aplicar",
+  "action.reset": "Redefinir",
+  "action.refresh": "Atualizar",
+  "action.copy": "Copiar",
+  "action.clear": "Limpar",
+  "action.copied": "Copiado",
+  "action.change": "Alterar",
+  "action.chooseApp": "Escolher aplicativo",
+  "action.save": "Salvar",
+  "status.loading": "Carregando…"
+}

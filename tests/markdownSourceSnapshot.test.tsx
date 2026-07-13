@@ -10,6 +10,7 @@ import { MarkdownCodeMirrorEditor } from "../packages/shared-ui/src/editor/markd
 import type { EditorSourceSnapshotPort } from "../packages/shared-ui/src/editor/sourceSnapshot";
 import { DocumentEditingSession } from "../packages/shared-ui/src/editor/document-session/DocumentEditingSession";
 import { TextEditorFrame } from "../packages/shared-ui/src/editor/viewers/TextEditorFrame";
+import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -66,7 +67,7 @@ describe("Markdown source snapshot boundary", () => {
     document.body.appendChild(container);
     root = createRoot(container);
     await act(async () => {
-      root?.render(
+      root?.render(withTestLocalization(
         <TextEditorFrame
           documentId="note.md"
           content="alpha"
@@ -89,7 +90,7 @@ describe("Markdown source snapshot boundary", () => {
             />
           )}
         />,
-      );
+      ));
     });
     const view = getEditorView(container);
     act(() => view.dispatch({ changes: { from: 5, insert: " beta" }, userEvent: "input.type" }));
@@ -118,9 +119,9 @@ describe("Markdown source snapshot boundary", () => {
         onSourceRevisionChange={onRevision}
       />
     );
-    await act(async () => root?.render(render("alpha")));
+    await act(async () => root?.render(withTestLocalization(render("alpha"))));
     onRevision.mockClear();
-    await act(async () => root?.render(render("bravo")));
+    await act(async () => root?.render(withTestLocalization(render("bravo"))));
 
     const view = getEditorView(container);
     expect(view.state.doc.toString()).toBe("bravo");
@@ -133,7 +134,7 @@ async function renderEditor(element: React.ReactElement) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  await act(async () => root?.render(element));
+  await act(async () => root?.render(withTestLocalization(element)));
   return container;
 }
 

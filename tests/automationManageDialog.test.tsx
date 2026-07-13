@@ -10,6 +10,7 @@ import type {
   DesktopCloudSession,
 } from "../src/lib/cloudApi";
 import type { CloudAutomationRow } from "../src/features/automation/automationDomain";
+import { withTestLocalization } from "./testLocalization";
 
 const apiMocks = vi.hoisted(() => ({
   runs: vi.fn(),
@@ -150,7 +151,7 @@ function renderManage({
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root?.render(
+  act(() => root?.render(withTestLocalization(
     <CloudManageAutomationDialog
       projectId="project-1"
       row={ROW}
@@ -162,7 +163,7 @@ function renderManage({
       onOpenAutomation={vi.fn()}
       onClose={onClose}
     />,
-  ));
+  )));
   return container;
 }
 

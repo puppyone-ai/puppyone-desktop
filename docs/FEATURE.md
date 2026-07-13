@@ -17,6 +17,11 @@ single product area can evolve without turning this file into a catch-all.
   - Cloud information-source Automation and local-only file-viewer Plugins
     have separate authority, storage, permissions, lifecycle, and source
     ownership.
+- [Cloud Automation UX and Architecture](architecture/cloud-automation-ux.md)
+  - The Automation product definition (external source → project folder), the
+    user-experience contract for the catalog, creation wizard, OAuth
+    connection flow, and management surface, plus the desktop/server
+    architecture that backs it.
 - [Git and Source Control Architecture](architecture/git/README.md)
   - Local Source Control sidebar and status ownership, external Git refresh
     lifecycle, Git topology source of truth, and branch/ref display rules.
@@ -24,11 +29,15 @@ single product area can evolve without turning this file into a catch-all.
   - Architecture home for file-format routing, source acquisition, committed
     preview lifecycle, the versioned preset Viewer Contract, format-specific
     editors, and the dormant external Viewer Pack adapter boundary.
-- [Desktop Sidebar View Stack](architecture/desktop-sidebar-view-stack.md)
-  - Keep-alive behavior for the Data, Git, Cloud, and Settings sidebar surfaces.
-- [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)
-  - App-wide WebKit-only scrollbar styling rule, reserved scrollbar gutters,
-    and scroll area / list padding / row width boundaries for sidebar lists.
+- [Desktop Sidebar Architecture](architecture/desktop-sidebar-architecture.md)
+  - Architecture home for every left workspace sidebar, right auxiliary panel,
+    and feature-internal secondary pane. Defines the Surface Registry, shared
+    Sidebar Kernel, feature ownership, target file layout, CSS boundaries,
+    performance, accessibility, tests, and migration invariants.
+  - [Desktop Sidebar View Stack](architecture/desktop-sidebar-view-stack.md)
+    records the keep-alive behavior for workspace sidebar surfaces.
+  - [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)
+    records the WebKit-only scrollbar rule and scroll area / list / row geometry.
 - [Explorer Tree Lifecycle](architecture/explorer-tree-lifecycle.md)
   - File-tree loading, expansion, subtree motion, and indentation guide rules.
 - [Desktop Multi-Window Workspaces](architecture/desktop-multi-window-workspaces.md)
@@ -47,6 +56,11 @@ single product area can evolve without turning this file into a catch-all.
     deep-customization settings pages. Part 2: the implementation record (text size,
     third dark preset, preview cards, reduce motion, pointer cursors, dock
     icon, diff markers).
+- [Desktop Internationalization and Localization](architecture/desktop-localization.md)
+  - Implemented eight-language architecture for application-wide locale state,
+    Renderer and native catalogs, product/content ownership, structured
+    errors, locale-aware formatting, French copy, bidirectional-layout
+    readiness, packaging, and release gates.
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
   - Part 1: the durable terminal contract (xterm + node-pty layering, the
     character-grid width invariant, CJK `text-spacing-trim` failure mode,
@@ -57,7 +71,9 @@ single product area can evolve without turning this file into a catch-all.
     owns one UI, control plane, safety boundary and event contract over multiple
     native Agent backends. PuppyOne Agent uses a managed OpenCode kernel;
     Codex, Claude Code, user OpenCode and future supported products keep their
-    own harness, provider-permitted credentials and native session. See the
+    own harness, provider-permitted credentials, native session and history.
+    PuppyOne persists only presentation selections and sanitized local-Agent
+    detection metadata, never transcripts or native session IDs. See the
     [multi-native backend decision](architecture/desktop-agent/ADR-005-multi-native-agent-backends.md)
     and the
     [native harness/ACP decision](architecture/desktop-agent/ADR-006-native-harness-adapters-and-acp.md).

@@ -1,0 +1,19 @@
+{
+  "loading": "Carregando…",
+  "explorer.root": "Raiz",
+  "explorer.emptyFolder": "Pasta vazia",
+  "explorer.loadingWorkspace": "Carregando o espaço de trabalho…",
+  "explorer.create": "Criar",
+  "explorer.more": "Mais",
+  "explorer.access": "Acesso",
+  "explorer.resizeSidebar": "Redimensionar barra lateral",
+  "explorer.cutLabel": "{name}, recortado",
+  "navigation.back": "Voltar",
+  "preview.selectFile": "Selecione um arquivo para visualizar",
+  "preview.crashed": "Não foi possível exibir este editor.",
+  "status.clean": "Sem alterações",
+  "status.modified": "Modificado",
+  "status.created": "Criado",
+  "status.deleted": "Excluído",
+  "status.moved": "Movido"
+}

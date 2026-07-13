@@ -9,7 +9,6 @@ import {
 } from "../../../lib/localFiles";
 import {
   createCloudProject,
-  getCloudRepoIdentity,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
 import type { DesktopView } from "../../../components/DesktopCloudShell";
@@ -21,6 +20,7 @@ import {
 } from "../../source-control/operationDialogs";
 import { createRepositoryRefreshReason } from "../../source-control/repositoryRefreshPolicy";
 import type { GitRefreshReason, GitRepositoryContext } from "../../source-control/gitRefreshScheduler";
+import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
 export function usePuppyoneCloudBackup({
   activeCloudSession,
@@ -53,7 +53,7 @@ export function usePuppyoneCloudBackup({
   clearGitSelection: () => void;
   cloudEnabled: boolean;
   handleCloudSessionChange: (session: DesktopCloudSession | null) => void;
-  onConfigureCloudRemote: (remoteUrl: string, projectId: string) => Promise<GitStatusSnapshot | null>;
+  onConfigureCloudRemote: (projectId: string) => Promise<GitStatusSnapshot | null>;
   isGitRepositoryContextCurrent: (context: GitRepositoryContext) => boolean;
   refreshWorkspaceContent: () => void;
   setActiveCloudSection: (section: CloudWorkspaceSection) => void;
@@ -67,7 +67,7 @@ export function usePuppyoneCloudBackup({
 }) {
   const [pendingCloudBackupSetup, setPendingCloudBackupSetup] = useState(false);
   const [cloudBackupLoading, setCloudBackupLoading] = useState(false);
-  const [cloudBackupError, setCloudBackupError] = useState<string | null>(null);
+  const [cloudBackupError, setCloudBackupError] = useState<CloudMessageDescriptor | null>(null);
 
   const createPuppyoneCloudBackup = useCallback(async (session: DesktopCloudSession) => {
     if (!cloudEnabled) return false;
@@ -104,8 +104,7 @@ export function usePuppyoneCloudBackup({
       }
 
       const project = await createCloudProject(session, workspace.name, handleCloudSessionChange);
-      const identity = await getCloudRepoIdentity(session, project.id, handleCloudSessionChange);
-      nextStatus = await onConfigureCloudRemote(identity.url, project.id)
+      nextStatus = await onConfigureCloudRemote(project.id)
         ?? await getWorkspaceGitStatus(context.rootPath);
 
       if (nextStatus.headCommitId) {
@@ -128,7 +127,7 @@ export function usePuppyoneCloudBackup({
     } catch (error) {
       if (!isGitRepositoryContextCurrent(context)) return false;
       const message = error instanceof Error ? error.message : String(error);
-      setCloudBackupError(message || "Unable to create PuppyOne Cloud backup.");
+      setCloudBackupError(cloudMessage("backup-create-failed", undefined, message || undefined));
       setGitOperationError(createGitOperationErrorState(error, "cloud-backup", context.rootPath));
       setPendingCloudBackupSetup(false);
       setActiveView("cloud");

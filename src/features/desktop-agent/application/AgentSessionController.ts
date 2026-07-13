@@ -8,20 +8,23 @@ import {
 import type {
   AgentApprovalDecision,
   AgentFileReference,
-  AgentProviderInspection,
   AgentQuestionResolution,
   AgentSessionSnapshot,
 } from "../domain/agent-contract";
 import { AgentEventSynchronizer } from "./AgentEventSynchronizer";
-import {
-  agentControllerTransitions,
-  type AgentControllerState,
-} from "./agent-controller-state";
-import { formatAgentError } from "./agent-error";
+import { agentControllerTransitions, type AgentControllerState } from "./agent-controller-state";
+import { AgentKnownError, createAgentError, formatAgentError } from "./agent-error";
 import { SessionUiStateStore, type SessionUiState } from "./SessionUiStateStore";
 import { LocalAgentConnectionLoader } from "./LocalAgentConnectionLoader";
 import type { AgentClientPort, AgentClientProvider } from "./AgentClientPort";
-import { AgentSessionLifecycle, agentSessionLifecycleLimits } from "./AgentSessionLifecycle";
+import { AgentSessionLifecycle } from "./AgentSessionLifecycle";
+import { AgentSessionPreparer } from "./AgentSessionPreparer";
+import {
+  AGENT_RUNTIME_DISCOVERY_CACHE_TTL_MS,
+  hasFreshAgentRuntimeInspection,
+} from "./agent-runtime-discovery-cache";
+import { planAgentRuntimeSwitch } from "./agent-runtime-selection";
+import { chooseAgentMode, mergeAgentReferences } from "./agent-controller-values";
 
 export type { AgentControllerPhase, AgentControllerState } from "./agent-controller-state";
 export { agentControllerTransitions } from "./agent-controller-state";
@@ -40,7 +43,9 @@ export class AgentSessionController {
   private readonly sessionUi = new SessionUiStateStore();
   private readonly localConnectionLoader: LocalAgentConnectionLoader;
   private readonly sessionLifecycle: AgentSessionLifecycle;
+  private readonly sessionPreparer: AgentSessionPreparer;
   private queuedPrompts: string[] = [];
+  private lastInspectionAt = 0;
   private disposed = false;
 
   constructor(workspaceRoot: string, private readonly bridgeProvider: AgentClientProvider) {
@@ -49,7 +54,6 @@ export class AgentSessionController {
       phase: "idle",
       inspection: null,
       session: null,
-      history: [],
       projection: createAgentProjection(),
       selectedRuntimeId: null,
       selectedProviderId: null,
@@ -60,6 +64,8 @@ export class AgentSessionController {
       localConnectionsScannedAt: null,
       localConnectionsError: null,
       draft: "",
+      pendingPrompt: null,
+      sessionPreparation: "idle",
       attachments: [],
       contextReferences: [],
       error: null,
@@ -87,9 +93,15 @@ export class AgentSessionController {
       patch: (patch) => this.patch(patch),
       createSession: () => this.createSession(),
       applySnapshot: (snapshot) => this.applySnapshot(snapshot),
-      saveSessionUi: () => this.saveSessionUi(),
-      restoreSessionUi: () => this.restoreSessionUi(),
       deleteSessionUi: (sessionId) => this.sessionUi.delete(sessionId),
+    });
+    this.sessionPreparer = new AgentSessionPreparer({
+      workspaceRoot,
+      bridgeProvider,
+      readState: this.getSnapshot,
+      patch: (patch) => this.patch(patch),
+      createSession: () => this.createSession(),
+      applySnapshot: (snapshot) => this.applySnapshot(snapshot),
     });
     this.eventSynchronizer.connect();
   }
@@ -105,10 +117,17 @@ export class AgentSessionController {
     return this.listeners.size > 0;
   }
 
+  setInitialRuntimePreference(runtimeId: string | null) {
+    if (this.state.initialized || this.state.phase !== "idle" || this.state.selectedRuntimeId) return;
+    if (!runtimeId || !/^[a-z][a-z0-9-]{1,39}$/.test(runtimeId)) return;
+    this.patch({ selectedRuntimeId: runtimeId });
+  }
+
   /** Releases renderer subscriptions only; it never sends a runtime stop. */
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.sessionPreparer.dispose();
     this.eventSynchronizer.dispose();
     this.localConnectionLoader.dispose();
     this.sessionUi.clear();
@@ -117,13 +136,36 @@ export class AgentSessionController {
   }
 
   async initialize(refresh = false) {
-    if (this.initializePromise && !refresh) return this.initializePromise;
+    if (this.initializePromise) return this.initializePromise;
+    if (!refresh && hasFreshAgentRuntimeInspection(this.state, this.lastInspectionAt)) return;
     this.initializePromise = this.runInitialize(refresh).finally(() => { this.initializePromise = null; });
     return this.initializePromise;
   }
 
   async discoverLocalConnections(refresh = false) {
     return this.localConnectionLoader.discover(refresh);
+  }
+
+  async selectRuntime(runtimeId: string) {
+    const plan = planAgentRuntimeSwitch(this.state, runtimeId);
+    if (!plan) return false;
+    if (plan.alreadySelected) return true;
+    this.patch(plan.patch);
+    try {
+      if (plan.sessionId) {
+        await this.requireBridge("closeAgentSession").closeAgentSession({
+          rootPath: this.workspaceRoot,
+          sessionId: plan.sessionId,
+          removePersistence: true,
+        });
+        this.sessionUi.delete(plan.sessionId);
+      }
+      await this.initialize(false);
+      return this.state.selectedRuntimeId === runtimeId;
+    } catch (error) {
+      this.patch({ phase: "failed", error: formatAgentError(error) });
+      return false;
+    }
   }
 
   private async runInitialize(refresh: boolean) {
@@ -136,32 +178,41 @@ export class AgentSessionController {
         runtimeId: this.state.selectedRuntimeId,
         refresh,
       });
+      this.lastInspectionAt = Date.now();
       const runtimeId = inspection.selectedRuntimeId
         || inspection.runtime?.id
         || inspection.readiness.runtimeId
         || inspection.readiness.provider
         || null;
-      const selectedProviderId = chooseAgentProvider(inspection, this.state.selectedProviderId, this.state.selectedModel);
-      const selectedModel = chooseAgentModel(inspection, this.state.selectedModel, selectedProviderId);
-      const selectedMode = chooseMode(inspection, this.state.selectedMode);
+      const selectedModel = chooseAgentModel(inspection, this.state.selectedModel, null);
+      const selectedModelEntry = inspection.models.find((model) => model.model === selectedModel);
+      const selectedProviderId = agentProviderIdForModel(selectedModelEntry)
+        || chooseAgentProvider(inspection, this.state.selectedProviderId, selectedModel);
+      const selectedMode = chooseAgentMode(inspection, this.state.selectedMode);
       this.patch({ inspection, selectedRuntimeId: runtimeId, selectedProviderId, selectedModel, selectedMode, initialized: true });
       if (inspection.readiness.status !== "ready") {
-        this.patch({ phase: "ready" });
-        await this.refreshHistory();
+        this.patch({ phase: "ready", sessionPreparation: "idle" });
         return;
       }
       this.patch({ phase: "restoring" });
       const restored = await bridge.resumeAgentSession({ rootPath: this.workspaceRoot, runtimeId });
       if (restored) this.applySnapshot(restored);
-      this.patch({ phase: restored?.session.activeTurnId ? "running" : "ready" });
-      await this.refreshHistory();
+      this.patch({
+        phase: restored?.session.activeTurnId ? "running" : "ready",
+        sessionPreparation: restored ? "ready" : "idle",
+      });
     } catch (error) {
-      this.patch({ phase: "failed", error: formatAgentError(error), initialized: true });
+      this.patch({
+        phase: "failed",
+        error: formatAgentError(error),
+        initialized: true,
+        sessionPreparation: "failed",
+      });
     }
   }
 
   selectProvider(providerId: string | null) {
-    if (this.state.projection.runningTurnId) return this.state.selectedModel;
+    if (this.state.projection.runningTurnId || this.state.sessionPreparation === "preparing" || this.state.pendingPrompt) return this.state.selectedModel;
     const selectedProviderId = providerId && listAgentInferenceProviders(this.state.inspection).some((provider) => provider.id === providerId)
       ? providerId
       : null;
@@ -171,18 +222,20 @@ export class AgentSessionController {
   }
 
   selectModel(model: string | null) {
-    if (this.state.projection.runningTurnId) return;
-    const selectedModel = model && this.state.inspection?.models.some((candidate) => candidate.model === model)
-      ? model
+    if (this.state.projection.runningTurnId || this.state.sessionPreparation === "preparing" || this.state.pendingPrompt) return;
+    const selectedModelEntry = model
+      ? this.state.inspection?.models.find((candidate) => candidate.model === model) ?? null
       : null;
+    const selectedModel = selectedModelEntry?.model ?? null;
     this.patch({
-      selectedProviderId: selectedModel ? agentProviderIdForModel(selectedModel) : this.state.selectedProviderId,
+      selectedProviderId: selectedModelEntry ? agentProviderIdForModel(selectedModelEntry) : this.state.selectedProviderId,
       selectedModel,
       error: null,
     });
   }
 
   selectMode(mode: string | null) {
+    if (this.state.sessionPreparation === "preparing" || this.state.pendingPrompt) return;
     this.patch({ selectedMode: mode || null });
   }
 
@@ -192,7 +245,7 @@ export class AgentSessionController {
   }
 
   addAttachments(references: AgentFileReference[]) {
-    this.patch({ attachments: mergeReferences(this.state.attachments, references) });
+    this.patch({ attachments: mergeAgentReferences(this.state.attachments, references) });
   }
 
   removeAttachment(path: string) {
@@ -200,7 +253,7 @@ export class AgentSessionController {
   }
 
   addContextReferences(references: AgentFileReference[]) {
-    this.patch({ contextReferences: mergeReferences(this.state.contextReferences, references) });
+    this.patch({ contextReferences: mergeAgentReferences(this.state.contextReferences, references) });
   }
 
   removeContextReference(path: string) {
@@ -219,16 +272,16 @@ export class AgentSessionController {
     return this.sessionLifecycle.newSession();
   }
 
-  switchSession(sessionId: string) {
-    return this.sessionLifecycle.switchSession(sessionId);
+  prepareSession() {
+    return this.sessionPreparer.prepare();
   }
 
   async submit(prompt: string) {
     const bridge = this.requireBridge("startAgentTurn");
     const text = prompt.trim();
-    if (!text || this.state.submitting) return false;
-    if (!this.state.selectedProviderId || !this.state.selectedModel) {
-      this.patch({ error: "Choose a connected model provider and model before sending a message." });
+    if (!text || this.state.submitting || this.state.pendingPrompt) return false;
+    if (this.state.inspection?.capabilities?.modelSelection && !this.state.selectedModel) {
+      this.patch({ error: createAgentError("model-required") });
       return false;
     }
     const activeTurnId = this.state.projection.runningTurnId;
@@ -239,7 +292,7 @@ export class AgentSessionController {
     }
     if (activeTurnId && this.state.inspection?.capabilities?.queue) {
       if (this.queuedPrompts.length >= MAX_QUEUED_PROMPTS) {
-        this.patch({ error: `The Agent prompt queue is full (${MAX_QUEUED_PROMPTS}). Wait for the active turn to finish.` });
+        this.patch({ error: createAgentError("prompt-queue-full", { limit: MAX_QUEUED_PROMPTS }) });
         return false;
       }
       this.queuedPrompts.push(text);
@@ -247,13 +300,28 @@ export class AgentSessionController {
       return true;
     }
     if (activeTurnId) return false;
-    this.patch({ submitting: true, error: null });
+    this.patch({
+      submitting: true,
+      pendingPrompt: text,
+      draft: "",
+      error: null,
+    });
+    this.writeCurrentSessionUi({ draft: "" });
     try {
       let session = this.state.session;
       if (!session) {
-        const snapshot = await this.createSession();
-        this.applySnapshot(snapshot);
-        session = snapshot.session;
+        const prepared = await this.prepareSession();
+        session = this.state.session;
+        if (!prepared || !session) {
+          const preparationError = this.state.error ?? createAgentError("session-prepare-failed");
+          this.patch({
+            pendingPrompt: null,
+            draft: this.state.draft || text,
+            error: preparationError,
+          });
+          this.writeCurrentSessionUi({ draft: this.state.draft || text });
+          return false;
+        }
       }
       await bridge.startAgentTurn({
         rootPath: this.workspaceRoot,
@@ -264,11 +332,15 @@ export class AgentSessionController {
         attachments: this.state.attachments,
         contextReferences: this.state.contextReferences,
       });
-      this.patch({ draft: "", attachments: [], contextReferences: [], phase: "running" });
-      this.writeCurrentSessionUi({ draft: "" });
+      this.patch({ attachments: [], contextReferences: [], phase: "running" });
       return true;
     } catch (error) {
-      this.patch({ error: formatAgentError(error) });
+      this.patch({
+        pendingPrompt: null,
+        draft: this.state.draft || text,
+        error: formatAgentError(error),
+      });
+      this.writeCurrentSessionUi({ draft: this.state.draft || text });
       return false;
     } finally {
       this.patch({ submitting: false });
@@ -332,24 +404,8 @@ export class AgentSessionController {
     }
   }
 
-  forkSession() {
-    return this.sessionLifecycle.forkSession();
-  }
-
-  archiveSession(sessionId = this.state.session?.id) {
-    return this.sessionLifecycle.archiveSession(sessionId);
-  }
-
-  deleteSession(sessionId = this.state.session?.id) {
-    return this.sessionLifecycle.deleteSession(sessionId);
-  }
-
   compactSession() {
     return this.sessionLifecycle.compactSession();
-  }
-
-  refreshHistory() {
-    return this.sessionLifecycle.refreshHistory();
   }
 
   private async createSession() {
@@ -376,17 +432,20 @@ export class AgentSessionController {
     } : null;
     const selectedModel = snapshot.session.selectedModel
       || this.state.selectedModel
-      || chooseAgentModel(inspection, null, this.state.selectedProviderId);
-    const selectedProviderId = chooseAgentProvider(inspection, this.state.selectedProviderId, selectedModel);
+      || chooseAgentModel(inspection, null, null);
+    const selectedModelEntry = inspection?.models.find((model) => model.model === selectedModel);
+    const selectedProviderId = agentProviderIdForModel(selectedModelEntry)
+      || chooseAgentProvider(inspection, this.state.selectedProviderId, selectedModel);
     this.patch({
       session: snapshot.session,
       inspection,
       selectedRuntimeId: snapshot.session.runtimeId || snapshot.session.provider || this.state.selectedRuntimeId,
       selectedProviderId,
-      selectedModel: chooseAgentModel(inspection, selectedModel, selectedProviderId),
-      selectedMode: snapshot.session.selectedMode || this.state.selectedMode || chooseMode(inspection, null),
+      selectedModel: chooseAgentModel(inspection, selectedModel, null),
+      selectedMode: snapshot.session.selectedMode || this.state.selectedMode || chooseAgentMode(inspection, null),
       projection: applyAgentEvents(createAgentProjection({ partialHistory: snapshot.partial }), snapshot.events, { partialHistory: snapshot.partial }),
       stopping: false,
+      sessionPreparation: "ready",
     });
   }
 
@@ -412,7 +471,7 @@ export class AgentSessionController {
   private requireBridge<K extends keyof AgentClientPort>(...methods: K[]): AgentClientPort {
     const bridge = this.bridgeProvider();
     if (!bridge || methods.some((method) => typeof bridge[method] !== "function")) {
-      throw new Error("Desktop Agent bridge unavailable. Restart PuppyOne so the native bridge can load.");
+      throw new AgentKnownError("native-bridge-unavailable");
     }
     return bridge;
   }
@@ -430,29 +489,9 @@ export class AgentSessionController {
     this.sessionUi.patch(key, value);
   }
 
-  private saveSessionUi() {
-    this.writeCurrentSessionUi({ draft: this.state.draft });
-  }
-
-  private restoreSessionUi() {
-    const ui = this.readSessionUi(this.uiKey());
-    this.patch({ draft: ui.draft });
-  }
 }
 
 export const agentSessionControllerLimits = Object.freeze({
-  maxCachedSessions: agentSessionLifecycleLimits.maxCachedSessions,
+  discoveryCacheTtlMs: AGENT_RUNTIME_DISCOVERY_CACHE_TTL_MS,
   maxQueuedPrompts: MAX_QUEUED_PROMPTS,
 });
-
-function chooseMode(inspection: AgentProviderInspection | null, current: string | null) {
-  const modes = inspection?.modes ?? [];
-  if (current && modes.some((mode) => mode.id === current)) return current;
-  return modes.find((mode) => mode.isDefault)?.id || modes[0]?.id || null;
-}
-
-function mergeReferences(current: AgentFileReference[], incoming: AgentFileReference[]) {
-  const byPath = new Map(current.map((entry) => [entry.path, entry]));
-  for (const entry of incoming) if (entry?.path) byPath.set(entry.path, entry);
-  return Array.from(byPath.values()).slice(0, 32);
-}

@@ -6,7 +6,7 @@ backend uses the Agent-first native-harness architecture below; presentation
 can evolve independently through the shared contract.
 
 Read [Desktop Agent Architecture](README.md) first for the process, IPC,
-backend-adapter, event, security, and persistence boundaries.
+backend-adapter, event, security, and cache-ownership boundaries.
 
 The detailed normative contracts are [Cursor-style Chat UI behavior](chat-ui-behavior-spec.md)
 and [Native Agent backend and model discovery](local-agent-connection-discovery.md).
@@ -28,21 +28,23 @@ their own harness and native session.
 - **Implemented behind that gate:** the local-workspace right-side area is resizable, hosts separate
   Chat and Terminal panels, preserves Terminal's lazy PTY lifecycle,
   retains the selected surface, and keeps a running Agent turn alive while
-  Chat is hidden.
+  Chat is hidden. The experimental Chat feature is a lazy renderer chunk and
+  does not inflate the default desktop entry bundle when the gate is off.
 - **Implemented foundation:** PuppyOne Agent, Codex, Claude Code and user
   OpenCode native routes,
   connected-provider discovery, readiness/account/model/mode states, virtual transcript streaming, safe
   Markdown, part/tool registries, plan/tool/command/file activity, permission
   and structured-question docks, `/` commands, authorized `@` context and
-  attachments, Stop, and Jump to latest.
+  attachments, Stop, live-gap warning, and Jump to latest.
 - **Implemented by capability:** native interruption, approvals/questions,
-  queue/steer controls, and model/mode selection. Unsupported controls are
-  omitted. PuppyOne does not persist Chat history.
-- **Current boundary:** keep Cursor disabled until a supported protocol and
-  approval contract exist.
-- **Product gate:** an Agent becomes selectable only after installation,
-  version, authentication, protocol, model/tool, workspace and product-policy
-  gates pass. Provider/Model controls are then scoped to that Agent.
+  compaction, queue/steer controls, and model/mode selection. PuppyOne does not
+  expose or persist Chat History; unsupported controls are omitted.
+- **Current boundary:** keep Cursor execution-disabled until a supported
+  protocol and approval contract exist.
+- **Product gate:** a registered Agent row is selectable as an inspection scope.
+  Send becomes enabled only after installation, version, authentication,
+  protocol, model/tool, workspace and product-policy gates pass. Provider/Model
+  controls are scoped to that Agent.
 
 ## Product decision
 
@@ -52,22 +54,26 @@ panel components. The sidebar itself contains no Chat/Terminal selector.
 
 ```text
 +------------------------------------------------------+
+| Codex v   +  ...                                  |
+|       scroll-aware surface fade, no divider          |
 | +--------------------------------------------------+ |
 | | Explain the failing test and fix it.             | |
 | +--------------------------------------------------+ |
 |                                                      |
 | I found the failure in workspaceOpening.ts.          |
 |                                                      |
-| Worked for 2s                                       |
-| Read src/lib/workspaceOpening.ts                     |
-| Ran npm test                                         |
+| Read   src/lib/workspaceOpening.ts                   |
+| Bash   npm test                                      |
 |                                                      |
 | Approval required                                   |
 | npm install package-name                            |
 |                                  Deny  Allow once   |
 |                                                      |
-| [ Changes +86 -12 ]                                  |
-| (+)  Send follow-up       Agent / Model        Send  |
+| [ Changes +86 -12 ]       floating, no layout row    |
+| +--------------------------------------------------+ |
+| | Send follow-up                                   | |
+| | Model                                     Send   | |
+| +--------------------------------------------------+ |
 +------------------------------------------------------+
 ```
 
@@ -81,16 +87,22 @@ ordinary messages or controls.
 
 The Chat surface has four primary regions in document order:
 
-1. **Transcript** — user messages, assistant output, and activity items.
-2. **Blocking dock** — an approval or structured question when one is pending.
-3. **Changes handoff** — aggregate additions/deletions linking to the existing Git surface.
-4. **Composer** — prompt, Agent → backend-scoped routing, the `+` tools/mode
-   menu, submit, and stop/queue state.
+1. **Session sub-header** — one left-aligned cluster containing persistent Agent identity,
+   New Session and overflow actions; the right edge stays intentionally quiet.
+2. **Transcript** — user messages, assistant output, and activity items.
+3. **Blocking dock** — an approval or structured question when one is pending.
+4. **Composer** — prompt, backend-scoped Model/configuration, submit, and stop/queue state.
 
-New-session and overflow actions live in compact header chrome; PuppyOne does
-not expose a PuppyOne-owned history browser. Only the transcript is the primary
-scroll region. The blocking dock, Changes handoff and composer remain visible
-without using `position: fixed`.
+**Changes handoff** is a Composer-anchored floating accessory, not a fifth layout
+row. It sits eight pixels above the Composer without intersecting its surface and never
+increases dock height. Blocking approval/question docks take visual priority and
+temporarily suppress this accessory.
+
+New-session and overflow actions remain real flat controls directly beside the Agent identity in
+the in-flow sub-header; there is no enclosing action pill and no PuppyOne History control. Only the
+current live transcript is the primary scroll region. The blocking dock and
+Composer remain in flow; the Changes handoff uses absolute positioning only
+inside the Composer's local containing block.
 
 ## Chat and Terminal header actions
 
@@ -105,7 +117,7 @@ without using `position: fixed`.
   the owner of active work in the main process and replay repairs any missed
   sequence after a renderer gap.
 - Returning to Chat replays events after the renderer's last committed sequence
-  or restores from the latest projection checkpoint.
+  from the current main-process connection or its bounded in-memory checkpoint.
 - Closing the entire workspace window cleans up both terminal and agent
   resources through their respective main-process services.
 - “Reset Terminal” and “New Agent Session” remain separate actions.
@@ -123,23 +135,30 @@ The application header contains:
   enabled;
 - independent pressed/open state and accessible labels for each icon.
 
-The Chat panel keeps New Session and diagnostics as on-demand chrome
-rather than a persistent visual header. Controls use native buttons and menus,
-become visible on keyboard focus, and expose meaningful accessible names.
+The Chat panel keeps Provider identity, New Session and diagnostics together at the left edge of a
+46 px sub-header whose
+geometry follows the left-sidebar top navigation: 12 px top/inline padding, 4 px bottom padding,
+30 px controls and 4 px gaps, all through the shared navigation tokens. Its edge uses the same Data-sidebar contract: no visible
+divider or resting drop shadow, followed by an 18 px same-surface fade that appears only while the
+transcript has scrolled beneath it. It has no underline, surrounding pill, PuppyOne History,
+archive, fork or delete-history menu. Controls use native buttons and menus and expose meaningful
+accessible names.
 
 ## Agent and backend-scoped controls
 
-The composer shows Agent first. Model, Provider, Variant, effort and mode
-controls appear only when the selected Agent advertises them. These controls
-use accessible PuppyOne popovers/listboxes because rows require grouping,
-readiness, search, keyboard navigation and recovery actions.
+The top-left sub-header shows the selected Agent/Provider first, immediately followed by the flat
+New Session and overflow actions, and keeps that session identity visible while the transcript
+scrolls. The far right of this sub-header is empty. Model, inference Provider, Variant, effort and mode
+controls remain in the composer only when the selected Agent advertises them. These controls use
+accessible PuppyOne popovers/listboxes with one flat Agent list, bounded model search, keyboard
+navigation and compact readiness warnings.
 
 ```text
 Agent
   PuppyOne Agent
   Codex
   Claude Code
-  Cursor Agent          disabled with reason until protocol-ready
+  Cursor Agent          selectable row; warning until protocol-ready
   OpenCode
       |
       v
@@ -150,17 +169,19 @@ backend-scoped controls
   OpenCode        -> Provider -> Model -> Agent/Mode
 ```
 
-The selected Agent controls which native harness and session will be created.
-It is editable on a blank composer. Once a session exists, the Agent identity
-is pinned and the control becomes a truthful session label; choosing another
-Agent starts a new session rather than mutating or nesting native state.
+The selected Agent controls which native harness and live connection will be created. Its
+prominent sub-header placement communicates that it is a session boundary rather than a model
+parameter. Choosing another Agent while idle closes the current PuppyOne bridge connection,
+clears the current live projection and starts a new one rather than mutating or nesting native
+state. The native product remains the sole owner of any native conversation history; PuppyOne
+does not offer the discarded projection as Chat History.
 
 | Discovery observation | Product meaning |
 | --- | --- |
 | PuppyOne Agent engine verified and provider/model connected | PuppyOne Agent is selectable. |
 | Codex CLI passes version, account, app-server and model/tool gates | Codex is selectable and uses its native thread. |
 | Claude Code passes SDK runtime, API/cloud credential and capability gates | Claude Code is selectable and uses its native session. |
-| Cursor Agent is installed but has no supported protocol | Show Detected with a disabled explanation; never fake support through shell output. |
+| Cursor Agent is installed but has no supported protocol | Allow scoped selection, show one warning icon and keep Send disabled; never fake support through shell output. |
 | User OpenCode passes its independent profile and protocol gates | OpenCode is selectable without using the PuppyOne Agent profile. |
 
 Executable presence alone never enables Send. Detailed candidate paths,
@@ -177,7 +198,7 @@ Changing Model, Variant or Mode follows backend capability:
 - a supported per-turn override applies to the next turn;
 - a new-session-only setting explains that boundary before creating a session;
 - an unsupported control is omitted;
-- a backend change always creates or selects another product session.
+- a backend change always creates another live bridge connection.
 
 | State | Sidebar behavior |
 | --- | --- |
@@ -205,27 +226,49 @@ semantic items instead of provider protocol objects.
 
 ### Activity items
 
-Tool and system activity uses compact rows or expandable cards:
+Tool and system activity uses one borderless compact-row grammar with optional inline
+disclosure details:
 
 ```text
-Plan updated
-Read src/App.tsx
-Searched for RightTerminalPanel
-Ran npm test
-Edited 2 files
-Called MCP tool linear.get_issue
+Plan    updated
+Read    src/App.tsx
+Grep    RightTerminalPanel
+Bash    npm test
+Edit    2 files
+Linear  get_issue
 ```
 
-Every row has a stable status: pending, running, completed, failed,
-interrupted, or waiting for input. Running state is not communicated by motion
-alone.
+The icon and tool identity are the only accented elements; their one-line command/path
+summary is muted. Resting rows have no outer border or card background. Successful exit,
+duration and provenance metadata, plus repeated `Open terminal`, `Open file` and `Review`
+actions, are omitted from the collapsed row. Every row still has a stable pending, running,
+completed, failed, interrupted, or waiting-for-input state. Running state is not communicated
+by motion alone.
+
+An expandable row places its chevron directly after the tool name and before the muted
+summary. Conversation rows expose no generic Copy toolbar. User-to-Agent and Agent-to-user
+turn transitions use a shared 24 px gap; Agent text hands off to its first tool with 8 px.
+Every completed, failed or interrupted turn ends in one muted `Worked for <duration>` timeline
+summary. Timing is normalized at the lifecycle boundary (native provider timing first, common
+live-turn clock as fallback), so all harness routes share the same UI contract without the
+Renderer owning an Agent loop or fabricating duration.
+User text, Agent prose, working state and turn summary share one 12 px content rail. The summary
+is left-aligned, uses the normal Agent body size and has no decorative divider lines; only its
+muted theme color distinguishes metadata from the response.
+Message/summary leaf components own that rail. Virtual timeline rows own only ordering,
+measurement and vertical spacing, and narrow container rules cannot redefine one role's inset.
+Static visual declarations stay in Agent CSS. Runtime measurement code may publish only typed
+`--agent-*` geometry values; CSS remains the sole owner of height, transforms, positioning,
+visibility, spacing, typography and color. Agent TSX neither writes `element.style` nor carries
+literal style objects. The Composer relies on native CSS content sizing rather than a React
+`scrollHeight`/`ResizeObserver` loop; only virtual-list and anchored-overlay geometry cross the
+typed custom-property bridge.
 
 Expanded details are intentionally bounded:
 
-- commands show argv/command text, working directory, exit state, and a
-  truncated output preview;
-- file edits show paths and compact addition/deletion counts, then link to the
-  existing Review or file preview surface;
+- commands show exact argv/command text and a truncated output preview under a quiet branch rail;
+- file edits show paths and compact addition/deletion counts; paths link to the file preview and
+  the single Composer-level Changes handoff owns review;
 - searches and reads show query/path plus a compact result summary;
 - MCP and backend-native tools show a human label and redacted
   structured arguments;
@@ -306,21 +349,41 @@ The composer supports:
 - queue or steer only when the backend capability advertises it;
 - retry as a new turn after a deterministic failure.
 
-Prompt drafts are scoped by workspace and application session. Switching to
-Terminal does not discard a draft. Starting a new session can offer to carry the
-draft forward, but never copies prior provider history implicitly.
+Prompt drafts are scoped to the current workspace and running Renderer process.
+Switching to Terminal does not discard a draft. Starting a new live connection
+never copies prior provider history implicitly.
 
 Attachment paths are resolved in the main process. Drag-and-drop data from the
 renderer is treated as untrusted input and must pass the same workspace and file
 capability checks as existing file operations.
 
-## History boundary
+## History and cache boundary
 
-PuppyOne does not persist a Chat transcript, session index or duplicate native
-history. The current window may keep a bounded live projection while the app is
-running. A native Agent remains free to own history inside its own product, but
-surfacing that history later requires an explicit provider-owned capability and
-must not create a PuppyOne copy.
+PuppyOne is a unified Agent UI and connection boundary, not a Chat History
+database. It does not persist, list, archive, fork, rename or delete prior
+conversations. If Codex, Claude Code, OpenCode or another native product keeps
+history, that history remains entirely under that product's storage and policy.
+
+```text
+PERSISTED BY PUPPYONE                  NOT PERSISTED BY PUPPYONE
+-----------------------------------    ----------------------------------
+last selected Agent/backend id         prompts, answers and tool output
+valid backend-scoped model preference  transcript rows and titles
+sanitized local-Agent detection DTO    native thread/session ids
+cache schema version + timestamp       history/archive/fork metadata
+
+CURRENT PROCESS ONLY                   PROVIDER OWNED
+-----------------------------------    ----------------------------------
+active bridge/session correlation      native conversation history
+bounded live event replay ring         native resume/fork/compaction state
+current draft and scroll position      provider retention/deletion policy
+```
+
+The selected Agent preference contains only a validated runtime ID. The local
+detection cache contains only the Renderer-safe public DTO: no executable path,
+environment, token, credential location or raw probe output. A cached detection
+result is presentation data, never execution authority; main revalidates the
+selected runtime before starting native work.
 
 ## Empty, loading, and error states
 
@@ -331,17 +394,55 @@ The sidebar uses distinct states:
 - selected Agent setup required;
 - PuppyOne Agent repair required while other Agents remain available;
 - ready with no active session;
-- reconnecting the current live session;
+- reconnecting to a current process-local connection;
 - active idle session;
 - running turn;
 - waiting for approval/question;
 - interrupted turn;
 - recoverable backend/provider/model error;
 - native Agent process exited;
-- live projection gap with a bounded recovery notice.
+- an incomplete current live-event window after a sequence gap.
 
 Loading retains the previous committed transcript when safe. A temporary model
 or account refresh does not blank the entire sidebar.
+
+Cold start has one visual owner: the conversation viewport renders the shared
+product `PageLoading` animation at its center, without a visible label. Header
+and status regions must not add a second spinner, progress card or competing
+"checking / restoring / starting" message. The loader still exposes a concise
+accessible status label. The dock and Composer are absent while this cold-start
+loader is visible. Once committed transcript content exists, background
+discovery or restoration keeps that content visible instead of covering it with
+the cold-start loader. Recovery cards are reserved for actionable unavailable,
+failed or error states.
+
+After discovery/restoration, a routable active panel begins one background
+native-session preparation. The controller owns this as a single-flight promise:
+the panel effect, React remounts and the first Submit all reuse the same work.
+Provider/model switching and New Session are disabled while it is in flight,
+but the Composer stays available so the user can write and submit immediately.
+Closing a stale renderer never publishes its late snapshot; any native session
+that resolves afterward is closed with persistence removal on a best-effort basis.
+
+```text
+application startup       PageLoading; Composer absent
+route ready               background session preparation; no transcript row
+Submit during preparation Preparing <Agent>
+session prepared          Starting turn
+native turn.started       Thinking
+first native output       assistant/tool/reasoning renderer
+```
+
+The ready/no-session transcript is deliberately blank. It has no centered prompt,
+logo tile, title, supporting paragraph, card or decorative surface. The Composer
+is the only invitation to act, and its ready/empty textarea uses the quiet
+`Ask about this project` placeholder plus an accessible name.
+
+The Agent sidebar keeps a 12 px outer inset at every supported width. Its Composer,
+picker rows and compact interactive rows mirror the existing Data tree's 6 px radius
+and quiet white row-state surfaces. This mapping is intentionally one-way and scoped
+to the Agent boundary: the Data sidebar's implementation and color values are not
+overridden by Agent Chat.
 
 Errors state which Agent failed and what remains valid. A backend failure can
 leave file changes on disk; the sidebar must not imply that interrupting,
@@ -356,10 +457,12 @@ switching Agent or retrying automatically reverted them.
 - Transcript rows use breakable paths and commands with expandable full text.
 - The composer grows vertically to a bounded maximum, then scrolls internally.
 - Opening or closing a dock preserves the user's transcript position when they
-  are reading earlier messages in the current live transcript.
+  are reading earlier output in the current live transcript.
 - When pinned to the bottom, new deltas keep the transcript pinned.
 - When scrolled away from the bottom, new deltas do not steal position; a
-  “Jump to latest” action appears.
+  30 px circular, icon-only “Jump to latest” control floats at the lower center
+  of the transcript without occupying a row. Unread detail remains in its
+  accessible name rather than becoming another visible badge.
 - Switching the Chat and Terminal header buttons preserves independent scroll
   positions.
 
@@ -387,9 +490,15 @@ Persisted presentation preference
   sidebar open
   sidebar width
   last selected surface
-  preferred Agent and backend-scoped controls for blank sessions
+  last selected Agent/backend id
+  valid backend-scoped model preference
 
-Workspace + session projection
+Persisted sanitized discovery cache
+  public local-Agent status DTO only
+  schema version + scan timestamp + 24-hour maximum age
+  explicit Refresh bypasses and replaces the cache
+
+Current-process presentation state only
   active application session id
   immutable Agent backend id
   transcript projection
@@ -404,19 +513,25 @@ Main-process runtime state
   active turn
   pending approval/question
   authoritative event ordering
+
+Provider-owned durable state
+  native thread/session and any provider history
+  provider compaction, fork, retention and deletion semantics
 ```
 
 React component unmount is never the authoritative signal that a native turn
-ended. The main process owns that lifecycle.
+ended. The main process owns that live lifecycle, but no PuppyOne transcript or
+native session mapping survives application shutdown.
 
 ## Implemented component map
 
 ```text
 src/features/desktop-agent/
   index.ts                         public feature entrypoint
-  application/                    controller, event sync, UI-state cache
+  lazy.ts                          public code-split Chat entrypoint
+  application/                    controller, single-flight session prep, event sync, UI-state cache
   domain/                         contract alias, projection, rows and readers
-  ui/                             all React views and isolated CSS
+  ui/                             React views, preparation hook and isolated CSS
   agentProjection.ts              migration-only re-export
   agentTypes.ts                   migration-only re-export
 ```
@@ -433,6 +548,14 @@ The implemented sidebar contract remains satisfied when:
   their active state;
 - a hidden running agent continues safely and reports completion on return;
 - a blank composer exposes Agent before backend-scoped Model controls;
+- reopening Chat selects the last valid Agent preference without interpreting
+  it as a saved conversation;
+- opening a routable Chat starts at most one background native-session preparation,
+  and a simultaneous first Submit reuses it;
+- `Thinking` appears only after the selected harness emits `turn.started`;
+- a fresh, schema-valid local-Agent detection cache avoids another CLI scan;
+  explicit Refresh, expiry, corruption or schema mismatch performs a new scan;
+- PuppyOne exposes no Chat History list and writes no transcript/session journal;
 - a created session pins one Agent backend and switching Agent creates a new
   session rather than nesting or mutating native state;
 - PuppyOne Agent, Codex and Claude Code can fail independently without silent

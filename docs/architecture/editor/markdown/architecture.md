@@ -12,8 +12,9 @@ with a single `createPrincipalFromView` helper, `DocumentTrustContext` +
 Electron WebEmbed sessions, typed feature registries, and atomic table
 interaction/focus coordination are landed on the migration branch. The remaining
 acceptance gaps are full document-plan convergence for the isolated table-cell
-preview, a visual regression suite, incremental large-document decoration
-updates, and browser-backed (real renderer) lifecycle/IME/sandbox coverage —
+preview, a visual regression suite, oversized-block budget/windowing,
+production large-document profiling, and browser-backed (real renderer)
+lifecycle/IME/sandbox coverage —
 not product polish. These are enumerated honestly in §12 and Phase 4–6 below.
 
 This document defines the durable technical architecture for PuppyOne's
@@ -379,6 +380,39 @@ Responsibilities:
 Interaction state refers to semantic element ranges. It must not infer element
 identity from CSS classes or rendered DOM ancestry.
 
+#### Same-document block relocation
+
+Block rearrangement is an editor interaction over canonical Markdown source,
+not a rich-text document model. The parser resolves a transient movable block
+reference at the pointer or caret; no persistent block IDs are written into the
+file.
+
+- A root block may move only among direct `Document` children. A list item may
+  move only among sibling items in the same list. Moving into or out of lists,
+  blockquotes, tables, embedded editors, or another document is out of scope.
+- A move preserves the exact source slice and its adjacent separator. Direct
+  ordered-list markers are the only normalization: they are renumbered inside
+  that list so source and rendered order stay aligned. The command issues one
+  CodeMirror transaction; it never parses and serializes the entire document.
+- Selection inside the moved slice relocates by its relative offset. Other
+  selections use CodeMirror change mapping. The transaction is one undo unit
+  and carries the `move.drop` user event plus a typed, history-invertible
+  old/new range effect.
+- Pointer interaction uses one editor-scoped overlay handle and one drop line,
+  a movement threshold, pointer capture, edge autoscroll, and Escape cancel.
+  Keyboard commands expose the same operation without relying on the visual
+  overlay.
+- The default-off block-drag experiment is host-owned. When disabled, the host removes the
+  complete CodeMirror extension compartment: no handle, pointer listeners,
+  autoscroll loop, or block-move keymap remains registered.
+- A move is rejected while read-only, while IME composition is active, when
+  the source revision changed during the gesture, or when source/target no
+  longer share the same structural parent.
+
+The visual overlay is derived and disposable. It must not be inserted into
+CodeMirror's editable `contentDOM`, and it must not become an alternate source
+of block identity.
+
 ### 3.7 Source layout and feature composition
 
 The implementation is a hybrid modular monolith. Stable editor machinery is
@@ -571,10 +605,9 @@ Widget.toDOM()
 `WidgetType` values are immutable descriptors. Timers, observers, listeners,
 abort controllers, asset handles, edit sessions, and execution sessions belong
 to the mounted widget session and have deterministic disposal. Revision-bound
-async work cannot commit into a newer source revision. This does not mean every
-widget operation is already optimal—for example, table descriptor equality can
-still become cheaper—but the transaction timing and resource ownership model is
-the correct one.
+async work cannot commit into a newer source revision. Table descriptors use a
+precompiled semantic render key, rather than serializing every row during
+`eq()`, so descriptor comparison remains constant-time.
 
 ---
 
@@ -674,6 +707,14 @@ The host is an adapter runtime, not a second document model. It owns ephemeral
 DOM and asynchronous state while all committed edits still become CodeMirror
 transactions against Markdown source.
 
+The shipped live adapter currently puts the complete layout-sensitive
+projection in the direct `StateField` set. That includes block replacements,
+line classes, collapsed markers, inline atoms, and atomic ranges because each
+can change wrapping or height. The viewport-presentation branch above is a
+reserved extension point; it must stay empty until a decoration is proven
+geometry-neutral. Scrolling therefore changes only CodeMirror's DOM viewport
+and never dispatches a projection transaction.
+
 Embed isolation is also a compiled decision, not a widget convention:
 
 - ordinary images, controls, and policy-approved marks use typed host DOM;
@@ -705,6 +746,9 @@ Consequences:
 - `ResizeObserver`, event subscriptions, timers, `AbortController`, async
   generation counters, theme listeners, and edit drafts may not be owned only
   by descriptor instance fields.
+- Widget sessions register geometry with the host's single layout coordinator;
+  the coordinator owns one `ResizeObserver`, applies a sub-pixel delta
+  threshold, and coalesces one keyed `requestMeasure()` per `EditorView`.
 - `toDOM()` mounts a DOM-owned `WidgetSession`, registered by DOM element or by
   the per-view host. `destroy(dom)` disposes the session associated with that
   exact DOM node, even if the descriptor instance has changed.
@@ -763,6 +807,10 @@ type EmbeddedEditSession = {
 - Ranges map through transactions. A commit verifies that the current source
   still matches the session's base source or performs an explicit rebase or
   conflict flow.
+- A block-relocation transaction maps sessions wholly contained in the moved
+  block by relative offset into its annotated destination range. Sessions
+  outside the block use ordinary change mapping; a partial overlap is marked
+  conflicted instead of silently attaching a draft to unrelated source.
 - The commit builder dispatches the source change and the selection mapped into
   the new document in one transaction. DOM callbacks do not dispatch a change
   and then reuse stale pre-change offsets.
@@ -858,6 +906,125 @@ View plugins and the embed host own view-local behavior:
   coalesced `requestMeasure()` calls;
 - no canonical content and no unique copy of an uncommitted draft.
 
+### 4.6 Complexity budgets and oversized-block execution
+
+Document viewport virtualization is necessary but not sufficient. CodeMirror
+mounts only visible document ranges, but one visible range may contain a table
+with thousands of rows, a very large HTML subtree, a long code fence, or an
+expensive diagram. Such a construct is one document block and can still create
+unbounded synchronous work and DOM when its outer widget enters the viewport.
+
+Oversized handling is therefore a compile-time policy decision followed by a
+view-local execution strategy. Individual widgets may not invent private size
+thresholds or silently render a cheaper interpretation.
+
+```ts
+type MarkdownBlockComplexity = Readonly<{
+  sourceBytes: number;
+  sourceLines: number;
+  logicalItems: number;
+  estimatedDomNodes: number;
+  nestingDepth: number;
+  assetCount: number;
+}>;
+
+type MarkdownBlockExecution =
+  | { mode: "rich" }
+  | { mode: "windowed"; overscanItems: number }
+  | { mode: "deferred"; reason: MarkdownBudgetReason }
+  | { mode: "visibleSource"; reason: MarkdownBudgetReason };
+
+type MarkdownRenderBudgetPolicy = Readonly<{
+  version: string;
+  documentProfile: "normal" | "large" | "extreme";
+  decide(
+    featureId: string,
+    complexity: MarkdownBlockComplexity,
+  ): MarkdownBlockExecution;
+}>;
+```
+
+The exact thresholds are centralized, versioned, benchmark-derived product
+configuration. They are not part of parser semantics, are not duplicated in
+adapters, and may differ by feature because ten thousand plain lines do not
+have the same cost as ten thousand interactive cells. A decision is stable for
+the same source revision, feature version, and budget-policy version; scrolling
+or a transient slow frame must not flip a block between representations.
+
+The host derives `documentProfile` once from transport size, line count,
+maximum-line length, and aggregate cheap block metrics, using the same policy
+for local and cloud files. A large document may still render ordinary blocks
+richly while applying tighter async and DOM budgets. The profile is disposable
+derived state, is never persisted into Markdown, and does not replace the
+separate filesystem/network byte limits. Those transport limits may be raised
+only after the corresponding large-file profiles pass the production harness.
+
+The four strategies have distinct contracts:
+
+| Strategy | Use | Contract |
+| --- | --- | --- |
+| `rich` | Bounded ordinary block | Mount the complete typed widget. |
+| `windowed` | Large, independently addressable repeated items | Keep total geometry, but mount only the visible item range plus bounded overscan. |
+| `deferred` | Expensive work that can be initiated safely | Mount a stable-height, honest summary and run cancellable work only after viewport proximity or explicit activation. |
+| `visibleSource` | Unvirtualizable or hard-over-budget content | Preserve exact editable source; never freeze the editor attempting a rich representation. |
+
+`deferred` is not a hidden automatic retry loop. Its activation is
+session-scoped, cancellable, revision-bound, and subject to hard resource and
+security ceilings. “Render anyway” may raise a soft presentation budget for
+one block, but it cannot bypass sanitizer, byte, process, or capability limits.
+
+#### Feature-specific execution rules
+
+- **Tables:** use the editor scroller as the single vertical scrolling owner;
+  do not add a nested scrollbar merely to make virtualization easier. A large
+  table uses stable row keys derived from mapped source ranges, a prefix-size
+  index, estimated row heights, bounded overscan, and top/bottom space. Only
+  mounted rows own cell DOM. The focused, selected, pointer-captured, or
+  IME-composing row remains pinned until the interaction ends. Measured height
+  corrections are coalesced through the editor layout coordinator and preserve
+  the visible row as the scroll anchor. A table too irregular to virtualize
+  honestly falls back to source instead of mounting every cell.
+- **HTML blocks:** sanitize and compute complexity before mounting host DOM.
+  Independent, sanitized top-level children may be chunked when their layout
+  cannot escape the block. Arbitrary HTML cannot be split at guessed string or
+  DOM boundaries because CSS flow, tables, lists, and accessibility relations
+  can cross them. `content-visibility` and intrinsic-size containment may
+  reduce style/layout work for already-created safe chunks, but do not count as
+  DOM virtualization. An over-budget indivisible subtree becomes deferred or
+  visible source.
+- **Code fences:** an oversized fence remains canonical source in the outer
+  CodeMirror view or uses a viewport-aware nested editor. It must not create a
+  full-height textarea or duplicate the complete source into one DOM control.
+  Syntax highlighting and diagnostics are time-sliced and may lag behind text;
+  typing, selection, copy, and undo remain available.
+- **Mermaid and future computed embeds:** source bytes plus semantic node/edge
+  counts are bounded before rendering. Work goes through the async-render
+  broker with cancellation, revision checks, timeout/watchdog, and an isolated
+  execution surface when rendering cannot be made cooperatively interruptible
+  in the main renderer. Only sanitized, authority-free output may enter a
+  shared cache. Timeout or budget exhaustion produces an honest typed fallback.
+- **Images and media:** resolve and decode per asset near the viewport rather
+  than waiting for every asset in a compound block. Reserve dimensions from
+  trusted metadata or a bounded estimate, commit each decoded result
+  independently, and cancel/revoke handles on unmount or revision change.
+
+The nested virtualizer is view state, not document state. Its mounted range,
+measurements, and overscan belong to the block's `WidgetSession`; semantic row
+models and drafts remain source-mapped editor state. Unmounting a widget may
+discard DOM and measurement caches, but never canonical source or the only copy
+of an active draft.
+
+Layout invariants are non-negotiable:
+
+- the render plan remains the offscreen total-height authority;
+- scrolling does not dispatch a document or projection transaction;
+- mounted DOM is proportional to the visible item range, not total block size;
+- one coordinator batches measurements and scroll-anchor corrections;
+- a correction above the viewport is deferred while the user is actively
+  scrolling and applied as one anchored adjustment after scrolling settles;
+- accessibility exposes logical row/column counts and positions even when only
+  a window of rows is mounted.
+
 ---
 
 ## 5. Markdown feature contract
@@ -870,6 +1037,7 @@ interface MarkdownFeature<Semantic, Plan extends MarkdownElementPlan> {
   id: string;
   syntax?: readonly MarkdownConfig[];
   normalize: MarkdownSemanticNormalizer<Semantic>;
+  estimateComplexity: MarkdownComplexityEstimator<Semantic>;
   compile: MarkdownPlanCompiler<Semantic, Plan>;
   live: MarkdownLiveAdapter<Plan>;
   preview: MarkdownPreviewAdapter<Plan>;
@@ -888,7 +1056,9 @@ requires:
 5. edit behavior where applicable;
 6. security and capability policy where applicable;
 7. DOM/runtime lifecycle behavior for embedded content;
-8. fixtures proving cross-context consistency.
+8. a cheap structural complexity estimate, budget decision, and honest
+   oversized fallback;
+9. fixtures proving cross-context consistency.
 
 The semantic union and renderers should use exhaustive TypeScript switches or
 an equivalent registry check. Adding a new semantic kind without assigning a
@@ -1289,12 +1459,21 @@ keystroke.
   invalidation signal.
 - Rebuild semantic projections only for changed blocks plus structural
   neighbors when possible.
+- Keep a source-mapped block-range index beside the decoration set. If an edit
+  invalidates the middle or end of a table/fence/embed, patch the complete old
+  structural range as well as the new changed range so stale replacements
+  cannot survive a block becoming malformed or shorter.
 - Cache by document identity, syntax-tree identity, and explicit context
   inputs, never by mutable DOM.
 - Use viewport-only computation only for decorations proven not to affect glyph
   metrics, wrapping, line height, block geometry, or viewport measurement.
 - Provide block replacements that affect layout directly to CodeMirror so
   viewport measurement remains correct.
+- Build the complete direct decoration `RangeSet` before viewport calculation.
+  This is full-document metadata, not full-document DOM: CodeMirror still
+  mounts only visible lines and widgets.
+- Never dispatch projection work from `viewportChanged` or scroll handlers.
+  Scroll is a consumer of the height map, not an invalidation source for it.
 - Debounce expensive asynchronous renders such as Mermaid, but keep the source
   transaction synchronous.
 - Version asynchronous results so stale asset, Mermaid, or HTML results cannot
@@ -1312,10 +1491,30 @@ keystroke.
   tree fragment advances.
 - Maintain a range index for semantic elements and plans; repeated per-line
   queries must not filter the complete element collection for every line.
+- Treat render-plan `layout.estimatedHeight` as the single offscreen-height
+  authority. A windowed table reserves content-aware proportional space within
+  the centralized logical-item and platform scroll-range ceilings; mounted
+  rows then converge through CodeMirror's measured height map. A block beyond
+  those hard ceilings uses the typed fallback instead of saturating geometry.
+- A range-named query must be range-bounded in construction as well as lookup.
+  It may not rebuild a whole-document HTML, link, asset, or plan index merely
+  to answer one changed-range patch.
+- Derive block complexity from source and normalized semantic data before DOM
+  mount. Complexity estimation must be cheaper than the rich renderer it
+  protects and must not parse the same content through a second parser.
+- For a `windowed` block, synchronous mount work and live DOM are proportional
+  to visible items plus bounded overscan. The complete logical item collection
+  may remain as immutable semantic data, but it is not mirrored into DOM.
+- CSS containment and `content-visibility` are supplemental rendering hints,
+  not substitutes for item virtualization or hard resource budgets: they do
+  not avoid parsing or creating an oversized DOM subtree.
+- Widgets consume the centralized render-budget decision. Feature-local magic
+  numbers and timing-triggered representation changes are forbidden.
 
 Correctness comes before incremental optimization. A full semantic rebuild is
-an acceptable first implementation if its contract allows later incremental
-replacement and documents the file-size boundary.
+an acceptable bounded implementation only inside the documented normal-file
+profile. Large and extreme profiles require incremental indexes, feature
+budgets, and explicit fallback rather than an unbounded rebuild.
 
 ---
 
@@ -1377,6 +1576,26 @@ Tests should be split into:
 4. editor interaction tests;
 5. a small visual regression suite for layout and theme behavior.
 
+Oversized-block conformance adds threshold-edge and adversarial fixtures for:
+
+- a table with thousands of rows, a very wide table, variable-height cells,
+  keyboard navigation, active cell editing, IME, selection, and row mutation;
+- one large HTML subtree, many independent top-level HTML children, deep
+  nesting, large safe-media sets, and an indivisible over-budget subtree;
+- large code fences, a huge single line, and diagnostics/highlighting that are
+  intentionally incomplete while editing remains responsive;
+- Mermaid sources just below and above byte, node/edge, timeout, and output
+  limits, including cancellation on edit and viewport removal;
+- mixed large blocks above and below the viewport while heights converge.
+
+The suite asserts asymptotic behavior, not only screenshots: mounted row and
+DOM-node counts remain bounded by the viewport plus overscan; no block mount
+creates an unbudgeted long task; async work is cancellable; active drafts and
+focus survive row recycling; and height correction does not repeatedly move
+the user's scroll anchor. Concrete latency, memory, and DOM ceilings live in
+the production renderer performance baseline and are measured on reference
+hardware.
+
 ---
 
 ## 11. Proposed module boundaries
@@ -1401,8 +1620,10 @@ packages/shared-ui/src/editor/markdown/
     markdownUrlPolicy.ts
     markdownAssetPolicy.ts
     markdownEmbedPolicy.ts
+    markdownRenderBudgetPolicy.ts
     markdownTrustPolicy.ts
   plans/
+    markdownBlockComplexity.ts
     markdownPlanTypes.ts
     markdownPlanCompiler.ts
     markdownPlanIndex.ts
@@ -1423,6 +1644,7 @@ packages/shared-ui/src/editor/markdown/
       editingCommands.ts
       embedHost.ts
       embeddedEditSession.ts
+      blockVirtualizer.ts
       widgetSession.ts
     preview/
       markdownPreviewRenderer.ts
@@ -1494,8 +1716,15 @@ The 2026-07-10 migration now enforces these shipped invariants:
    single-flights repeated activation, enforces pending+active quotas, and
    destroys on revision/owner/load/runtime failure. There is no focused-window
    fallback.
-8. Inline-HTML range queries and compiled plans use interval indexes; nested
+8. Compiled plans and Inline-HTML lookup results use interval indexes; nested
    Markdown marks compose instead of being dropped by an outer reserved range.
+9. Same-document block movement resolves transient structural ranges from the
+   Lezer tree, preserves source slices and separators, normalizes direct
+   ordered-list markers, and commits deletion, insertion, selection relocation,
+   history, and embedded-session relocation as one transaction with a
+   reversible relocation effect. The editor owns one measured overlay rather
+   than one handle per block, and the host can remove the complete interaction
+   compartment through its Experimental feature gate.
 
 The remaining acceptance gaps are explicit rather than hidden behind passing
 unit tests:
@@ -1504,10 +1733,16 @@ unit tests:
   shares policy/token helpers; it is not yet the full document Lezer semantic
   plan. HTML-block plans also still carry raw source for the widget's final
   profile/trust decision.
-- Inline HTML queries no longer add an O(lines × HTML-elements) scan, but the
-  live-decoration StateField still rebuilds the whole document after ordinary
-  non-composition edits. Incremental changed-range invalidation and profiling
-  remain required for large files.
+- Direct layout decorations map through ordinary transactions and rebuild only
+  changed stable block ranges. Inline-HTML interval lookup is fast after index
+  construction, but a new document identity still constructs that index from
+  the complete syntax tree; the range API is therefore not yet truly
+  range-bounded for HTML-heavy large files.
+- Table, HTML, code-fence, and Mermaid widgets do not yet consume one shared
+  complexity-budget decision. In particular, a large table widget mounts every
+  row and cell when its outer CodeMirror block enters the viewport. Nested
+  block virtualization, feature budgets, and typed oversized fallbacks in
+  §4.6 remain implementation work.
 - Happy-DOM and main-process fixtures cover policy, conflicts, remount drafts,
   async cancellation, ownership and sandbox request rules. Real Chromium
   visual regression, viewport reuse, IME and sandbox tests are still required.
@@ -1610,13 +1845,30 @@ remain part of phases 5 and 6.
   popup, download and login denial; deterministic failure/owner cleanup.
 - Adversarial URL/asset policy fixtures (control chars, entities, `file://`,
   traversal, data size/SVG).
-- Changed-range decoration updates, viewport projection, source snapshot
-  boundaries, and large-document production renderer profiling are implemented
+- Changed-range direct-decoration updates, document-level structural
+  projection, source snapshot boundaries, and large-document production
+  renderer profiling are implemented
   under the [Desktop Renderer Performance](../../desktop-renderer-performance.md)
   contract. Initial source-exposure regression is covered by the atomic Preview
   readiness gate and production renderer smoke. **Remaining acceptance gaps:**
   broader feature-level visual regression, full table-cell document plan
-  convergence, and fuller IME/DOM-reuse EditorView coverage in a real renderer.
+  convergence, truly range-bounded Inline-HTML index maintenance, oversized
+  block budget/windowing implementation, and fuller IME/DOM-reuse EditorView
+  coverage in a real renderer.
+
+The oversized-block implementation order is fixed to avoid feature-local
+patches:
+
+1. add shared complexity types, a versioned budget policy, diagnostics, and
+   production counters without changing presentation;
+2. make the table the first `windowed` vertical slice, including outer-scroller
+   geometry, stable row keys, pinned editing/IME rows, and bounded-DOM tests;
+3. route HTML, code fences, Mermaid, and media through the same decision and
+   typed fallback contract;
+4. make Inline-HTML index construction truly changed-range incremental;
+5. run normal/large/extreme and adversarial single-block production profiles,
+   then revisit local/cloud transport limits. A file-size cap is not raised on
+   the strength of unit tests alone.
 
 The shipped foundation preserves source round-trip and has semantic, policy,
 decoration, type, broker, trust, and boundary checks. Phase 6 acceptance
@@ -1679,6 +1931,15 @@ The migration is complete when:
   sandboxed web contents, a temporary partition, no Node/preload, an isolated
   renderer process, host-enforceable byte/time/resource limits, and a killable
   watchdog.
+- Every complex block publishes a cheap structural complexity estimate and
+  consumes the centralized, versioned render-budget policy. Oversized blocks
+  choose `windowed`, `deferred`, or `visibleSource` explicitly; a widget may not
+  silently mount unbounded DOM or keep an uninterruptible main-renderer job.
+- Large tables use bounded row DOM with stable source-mapped keys, retained
+  active edit/IME rows, measured height caching, and anchored correction through
+  the per-view layout coordinator. Arbitrary HTML that cannot be split without
+  semantic or layout changes falls back honestly rather than being naively
+  chunked.
 - Malformed, ambiguous, and unrenderable syntax remains visible and editable.
 - Nested Markdown and inline HTML render without discarding either mark.
 - Source is unchanged unless the user, Agent, or explicit command edits it.
@@ -1686,7 +1947,8 @@ The migration is complete when:
   remains satisfied.
 - Real EditorView and Electron tests cover background parsing, DOM reuse,
   viewport virtualization, layout measurement, IME, edit-session conflicts,
-  async cancellation, and sandbox behavior.
+  async cancellation, sandbox behavior, threshold-edge oversized blocks,
+  bounded mounted-DOM counts, and stable scrolling while measurements converge.
 
 ---
 
@@ -1751,6 +2013,11 @@ The migration is complete when:
     policy version. A separate `ExecutionSession` is bound to an exact revision;
     revision changes restart the session under a still-valid grant instead of
     repeatedly asking the user for trust.
+17. Document viewport virtualization and oversized-block execution are separate
+    layers. CodeMirror owns document DOM windowing; a centralized complexity
+    policy selects rich, nested-windowed, deferred, or visible-source execution
+    for each complex block. CSS containment alone is not considered
+    virtualization.
 
 ---
 
@@ -1760,6 +2027,7 @@ The migration is complete when:
 - [GitHub Flavored Markdown specification](https://github.github.com/gfm/)
 - [CodeMirror decorations](https://codemirror.net/examples/decoration/)
 - [CodeMirror reference manual](https://codemirror.net/docs/ref/)
+- [CodeMirror huge document example](https://codemirror.net/examples/million/)
 - [Mermaid usage and security levels](https://mermaid.js.org/config/usage)
 - [Electron security checklist](https://www.electronjs.org/docs/latest/tutorial/security)
 - [Obsidian HTML content](https://obsidian.md/help/html)
@@ -1767,6 +2035,9 @@ The migration is complete when:
 - [Obsidian plugin security](https://obsidian.md/help/plugin-security)
 - [Obsidian Cure53 client audit](https://obsidian.md/files/security/2023-11-Obsidian-Cure53-Audit-Full.pdf)
 - [Obsidian editor extensions and decorations](https://docs.obsidian.md/Plugins/Editor/Decorations)
+- [Obsidian editor viewport](https://docs.obsidian.md/Plugins/Editor/Viewport)
+- [TanStack Virtual virtualizer contract](https://tanstack.com/virtual/latest/docs/api/virtualizer)
+- [web.dev `content-visibility`](https://web.dev/articles/content-visibility)
 - [Typora HTML support](https://support.typora.io/HTML/)
 - [VS Code Markdown preview security](https://code.visualstudio.com/docs/languages/markdown#_markdown-preview-security)
 - [VS Code Workspace Trust](https://code.visualstudio.com/docs/editing/workspaces/workspace-trust)

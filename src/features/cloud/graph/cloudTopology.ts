@@ -39,7 +39,8 @@ export function buildCloudTopologyGraphRows(
     }
     const group = refOnlyGroups.get(ref.commit_id) ?? {
       commitId: ref.commit_id,
-      message: "Branch head outside loaded history",
+      message: "",
+      messageCode: "branch-head-outside-loaded-history",
       createdAt: null,
       labels: [],
     };
@@ -146,10 +147,12 @@ export function buildCloudTopologyGraphRows(
     return {
       id: commit.commit_id,
       kind: "commit",
-      message: commit.message || "Update workspace",
+      message: commit.message,
+      messageCode: commit.message ? undefined : "update-workspace",
       createdAt: commit.created_at,
       stats: buildCloudCommitStats(commit.changes),
-      authorName: commit.who || "Cloud",
+      authorName: commit.who,
+      authorCode: commit.who ? undefined : "cloud",
       labels,
       prefix: "*",
       laneCount: Math.max(graphLaneCount, ...refMarkers.map((marker) => marker.lane + 1)),

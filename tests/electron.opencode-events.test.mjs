@@ -65,6 +65,29 @@ describe("OpenCode ACP normalization", () => {
     ]);
   });
 
+  it("derives stable Read, Write, Edit, Grep and Glob semantics from ACP tool metadata", () => {
+    const normalizer = new AcpEventNormalizer({ turnId: "opencode:turn-tools" });
+    const cases = [
+      { id: "read", kind: "read", title: "Read file", rawInput: { filePath: "src/read.ts" }, tool: "read" },
+      { id: "write", kind: "edit", title: "Write file", rawInput: { filePath: "src/write.ts", content: "hello" }, tool: "write" },
+      { id: "edit", kind: "edit", title: "Edit file", rawInput: { filePath: "src/edit.ts", oldString: "old", newString: "new" }, tool: "edit" },
+      { id: "grep", kind: "search", title: "Grep", rawInput: { pattern: "needle", path: "src" }, tool: "grep" },
+      { id: "glob", kind: "search", title: "Glob", rawInput: { pattern: "**/*.ts", path: "src" }, tool: "glob" },
+    ];
+    const events = cases.flatMap((entry) => normalizer.normalize(notification({
+      sessionUpdate: "tool_call",
+      toolCallId: entry.id,
+      status: "in_progress",
+      kind: entry.kind,
+      title: entry.title,
+      rawInput: entry.rawInput,
+    })));
+
+    expect(events.map((entry) => entry.payload.tool)).toEqual(cases.map((entry) => entry.tool));
+    expect(events[0].payload).toMatchObject({ path: "src/read.ts", input: { filePath: "src/read.ts" } });
+    expect(events[3].payload).toMatchObject({ kind: "search", input: { pattern: "needle" } });
+  });
+
   it("derives model, mode and effort selection from ACP config options", () => {
     const configOptions = [
       select("model", "model", "openai/gpt-5", [

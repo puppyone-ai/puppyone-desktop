@@ -2,6 +2,16 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 const externalViewerPacksEnabled = process.argv.includes("--puppyone-external-viewer-packs=1");
 
 contextBridge.exposeInMainWorld("puppyoneDesktop", {
+  getLocalizationBootstrap: () => ipcRenderer.invoke("localization:get-bootstrap"),
+  setLanguagePreference: (preference) => (
+    ipcRenderer.invoke("localization:set-language-preference", preference)
+  ),
+  onLocaleChanged: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("localization:changed", listener);
+    return () => ipcRenderer.removeListener("localization:changed", listener);
+  },
   onDocumentSessionFlushRequested: (callback) => {
     if (typeof callback !== "function") return () => {};
     const listener = async (_event, payload) => {

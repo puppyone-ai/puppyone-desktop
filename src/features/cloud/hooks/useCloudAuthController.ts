@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   openCloudApp,
   type DesktopCloudSession,
@@ -12,6 +13,11 @@ import {
   supportsDesktopCloudOAuth,
 } from "../../../lib/cloudSession";
 import type { CloudAuthView, CloudLoginMethod } from "../model";
+import {
+  cloudMessage,
+  formatCloudMessage,
+  type CloudMessageDescriptor,
+} from "../cloudPresentation";
 
 export function useCloudAuthController({
   cloudApiBaseUrl,
@@ -26,12 +32,13 @@ export function useCloudAuthController({
   onSignedOut?: () => void;
   onRefresh: () => void | Promise<void>;
 }) {
+  const { t } = useLocalization();
   const [loading, setLoading] = useState<CloudLoginMethod | null>(() => (
     getCachedDesktopCloudAuthState()?.status === "signing-in" ? "browser" : null
   ));
   const [signingOut, setSigningOut] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<CloudMessageDescriptor | null>(null);
+  const [message, setMessage] = useState<CloudMessageDescriptor | null>(null);
   const [signedInEmail, setSignedInEmail] = useState<string | null | undefined>(undefined);
   const effectiveSignedInEmail = signedInEmail === undefined ? accountEmail : signedInEmail;
 
@@ -40,7 +47,7 @@ export function useCloudAuthController({
       setLoading(null);
       setSigningOut(false);
       setMessage(null);
-      setError(message);
+      setError(cloudMessage("auth-start-failed", undefined, message));
     });
   }, []);
 
@@ -83,7 +90,11 @@ export function useCloudAuthController({
       }
     } catch (loginError) {
       setLoading(null);
-      setError(loginError instanceof Error ? loginError.message : "Unable to start Cloud sign-in");
+      setError(cloudMessage(
+        "auth-start-failed",
+        undefined,
+        loginError instanceof Error ? loginError.message : undefined,
+      ));
     }
   };
 
@@ -95,10 +106,14 @@ export function useCloudAuthController({
       await clearDesktopCloudSession();
       setSignedInEmail(null);
       onSignedOut?.();
-      setMessage("Signed out.");
+      setMessage(cloudMessage("auth-signed-out"));
       void onRefresh();
     } catch (signOutError) {
-      setError(signOutError instanceof Error ? signOutError.message : "Sign-out failed");
+      setError(cloudMessage(
+        "auth-signout-failed",
+        undefined,
+        signOutError instanceof Error ? signOutError.message : undefined,
+      ));
     } finally {
       setSigningOut(false);
     }
@@ -109,8 +124,8 @@ export function useCloudAuthController({
     signedInEmail: effectiveSignedInEmail,
     loading,
     signingOut,
-    error,
-    message,
+    error: error ? formatCloudMessage(error, t) : null,
+    message: message ? formatCloudMessage(message, t) : null,
     startProviderLogin: (method?: Exclude<CloudLoginMethod, "email" | "password" | "browser">) => void startCloudLogin(method),
     handleSignOut: () => void handleSignOut(),
   };

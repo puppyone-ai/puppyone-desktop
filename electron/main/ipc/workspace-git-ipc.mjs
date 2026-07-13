@@ -42,6 +42,7 @@ export function registerWorkspaceGitIpcHandlers({
   authorizeWorkspaceRoot,
   gitOperationCoordinator = createGitOperationCoordinator(),
   gitDiffResourceBroker = createGitDiffResourceBroker(),
+  t = defaultTranslate,
 }) {
   const statusControllers = new Map();
   const cancelledStatusRequests = new Set();
@@ -173,10 +174,21 @@ export function registerWorkspaceGitIpcHandlers({
   ipcMain.handle("workspace:git-configure-cloud-remote", withAuthorizedRepositoryMutation((rootPath, request) => {
     const remoteUrl = request?.remoteUrl;
     const remoteName = request?.remoteName ?? "puppyone";
+    const credential = request?.credential ?? null;
+    const username = request?.username ?? "x-puppyone-token";
     if (typeof remoteUrl !== "string" || remoteUrl.trim().length === 0) {
       throw new Error("Cloud remote URL is required.");
     }
-    return configureWorkspaceCloudRemote(rootPath, remoteUrl, remoteName);
+    if (credential !== null && (typeof credential !== "string" || credential.trim().length === 0)) {
+      throw new Error("Cloud Git credential is invalid.");
+    }
+    return configureWorkspaceCloudRemote(
+      rootPath,
+      remoteUrl,
+      remoteName,
+      credential,
+      username,
+    );
   }));
 
   ipcMain.handle("workspace:git-remove-remote", withAuthorizedRepositoryMutation((rootPath, request) => (
@@ -342,13 +354,13 @@ export function registerWorkspaceGitIpcHandlers({
   )));
 
   ipcMain.handle("workspace:git-pull", withAuthorizedRepositoryMutation((rootPath, request, event) => (
-    runWorkspaceGitIpcOperation({ BrowserWindow, dialog }, event, request, "pull", () => (
+    runWorkspaceGitIpcOperation({ BrowserWindow, dialog, t }, event, request, "pull", () => (
       pullWorkspaceGit(rootPath)
     ))
   )));
 
   ipcMain.handle("workspace:git-push", withAuthorizedRepositoryMutation((rootPath, request, event) => (
-    runWorkspaceGitIpcOperation({ BrowserWindow, dialog }, event, request, "push", () => (
+    runWorkspaceGitIpcOperation({ BrowserWindow, dialog, t }, event, request, "push", () => (
       pushWorkspaceGit(rootPath)
     ))
   )));
@@ -393,26 +405,30 @@ async function runWorkspaceGitIpcOperation(electron, event, request, operation, 
   }
 }
 
-async function showWorkspaceGitErrorDialog({ BrowserWindow, dialog }, sender, operation, error) {
+async function showWorkspaceGitErrorDialog({ BrowserWindow, dialog, t }, sender, operation, error) {
   const owner = BrowserWindow.fromWebContents(sender);
   const detail = error instanceof Error ? error.message : String(error);
-  const operationLabel = operation === "pull" ? "Pull" : operation === "push" ? "Push" : "Git Operation";
-  const message = operation === "pull"
-    ? "Cannot pull remote changes."
+  const titleId = operation === "pull"
+    ? "native.git.pull.error.title"
     : operation === "push"
-      ? "Cannot push local commits."
-      : "Git operation failed.";
+      ? "native.git.push.error.title"
+      : "native.git.operation.error.title";
+  const messageId = operation === "pull"
+    ? "native.git.pull.error.message"
+    : operation === "push"
+      ? "native.git.push.error.message"
+      : "native.git.operation.error.message";
 
   try {
     const options = {
       type: "error",
-      buttons: ["OK"],
+      buttons: [t("native.git.error.ok")],
       defaultId: 0,
       cancelId: 0,
       noLink: true,
-      title: `${operationLabel} Failed`,
-      message,
-      detail: detail.trim() || "No Git error output was captured.",
+      title: t(titleId),
+      message: t(messageId),
+      detail: detail.trim() || t("native.git.error.noOutput"),
     };
     if (owner && !owner.isDestroyed()) {
       await dialog.showMessageBox(owner, options);
@@ -422,4 +438,18 @@ async function showWorkspaceGitErrorDialog({ BrowserWindow, dialog }, sender, op
   } catch (dialogError) {
     console.warn("Unable to show Git operation error dialog:", dialogError);
   }
+}
+
+function defaultTranslate(messageId) {
+  const messages = {
+    "native.git.error.ok": "OK",
+    "native.git.pull.error.title": "Pull Failed",
+    "native.git.push.error.title": "Push Failed",
+    "native.git.operation.error.title": "Git Operation Failed",
+    "native.git.pull.error.message": "Cannot pull remote changes.",
+    "native.git.push.error.message": "Cannot push local commits.",
+    "native.git.operation.error.message": "Git operation failed.",
+    "native.git.error.noOutput": "No Git error output was captured.",
+  };
+  return messages[messageId] ?? "";
 }

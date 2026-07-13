@@ -7,6 +7,7 @@ import {
 } from "../../core/plans/planPrimitives";
 import type { MarkdownElement } from "../../core/syntax/markdownElements";
 import { compileInlineHtmlRenderPlan } from "./inlineHtmlPolicy";
+import { estimateHtmlBlockLayoutHeight } from "./htmlBlockLayout";
 
 export function compileInlineHtmlElementPlan(
   element: Extract<MarkdownElement, { kind: "inlineHtml" }>,
@@ -80,13 +81,8 @@ export function compileHtmlBlockElementPlan(
       closed: htmlData.closed,
       source: htmlData.source,
     },
-    layout: { estimatedHeight: estimateHtmlBlockHeight(htmlData.source) },
+    layout: { estimatedHeight: estimateHtmlBlockLayoutHeight(htmlData.source) },
     diagnostics: [],
     capabilities: BLOCK_EMBED_CAPABILITIES,
   };
-}
-
-function estimateHtmlBlockHeight(source: string): number {
-  const lineCount = Math.max(1, source.split("\n").length);
-  return Math.max(80, Math.min(Math.max(80, lineCount * 24) + 32, 2400));
 }

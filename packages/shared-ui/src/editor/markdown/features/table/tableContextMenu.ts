@@ -8,6 +8,7 @@ import {
   isActiveMarkdownTableMenu,
   setActiveMarkdownTableMenu,
 } from "./tableMenuState";
+import { getMarkdownLocalization } from "../../core/editor/markdownLocalization";
 
 export type MarkdownTableMenuScope = "cell" | "column" | "row";
 
@@ -64,6 +65,7 @@ type MarkdownTableMenuItem = {
 };
 
 type MarkdownTableMenuSection = {
+  id: "rows" | "columns" | "alignment" | "table";
   label?: string;
   items: MarkdownTableMenuItem[];
 };
@@ -72,6 +74,7 @@ export function showMarkdownTableContextMenu(
   context: MarkdownTableDispatchContext,
   target: MarkdownTableMenuTarget,
 ) {
+  const localization = getMarkdownLocalization(context.view);
   closeActiveMarkdownTableMenu();
   const document = context.view.dom.ownerDocument;
   const restoreFocus = target.restoreFocus
@@ -80,7 +83,8 @@ export function showMarkdownTableContextMenu(
   menu.id = `cm-md-table-menu-${++markdownTableMenuSequence}`;
   menu.className = "desktop-menu-surface cm-md-table-context-menu";
   menu.setAttribute("role", "menu");
-  menu.setAttribute("aria-label", "Table actions");
+  menu.setAttribute("aria-label", localization.t("editor.markdown.table.actions"));
+  menu.dir = localization.direction;
   menu.setAttribute("aria-orientation", "vertical");
   menu.tabIndex = -1;
   menu.addEventListener("mousedown", (event) => {
@@ -90,7 +94,7 @@ export function showMarkdownTableContextMenu(
   const portalRoot = document.querySelector<HTMLElement>('[data-po-overlay-root="true"]') ?? document.body;
   if (portalRoot === document.body) applyMarkdownTableMenuTheme(context.view.dom, menu);
 
-  for (const section of getMarkdownTableMenuSections(context, target)) {
+  for (const section of getMarkdownTableMenuSections(context, target, localization)) {
     menu.appendChild(createMarkdownTableMenuSection(document, context, section));
   }
 
@@ -133,14 +137,14 @@ export function showMarkdownTableContextMenu(
       && !event.ctrlKey
       && !event.metaKey
     ) {
-      const query = event.key.toLocaleLowerCase();
+      const query = event.key.toLocaleLowerCase(localization.locale);
       for (let offset = 1; offset <= items.length; offset += 1) {
         const index = (Math.max(currentIndex, -1) + offset) % items.length;
         const label = items[index]
           ?.querySelector(".desktop-menu-item-label")
           ?.textContent
           ?.trim()
-          .toLocaleLowerCase();
+          .toLocaleLowerCase(localization.locale);
         if (label?.startsWith(query)) {
           nextItem = items[index] ?? null;
           break;
@@ -207,83 +211,96 @@ export function showMarkdownTableContextMenu(
 function getMarkdownTableMenuSections(
   context: MarkdownTableDispatchContext,
   target: MarkdownTableMenuTarget,
+  localization: ReturnType<typeof getMarkdownLocalization>,
 ): MarkdownTableMenuSection[] {
+  const { direction, t } = localization;
   const { columnCount, columnIndex, rowCount, rowIndex } = target;
   const scope = target.scope ?? "cell";
   const currentAlignment = context.alignments[columnIndex] ?? null;
   const alignmentItems: Array<{ alignment: MarkdownTableAlignment; label: string }> = [
-    { alignment: null, label: "Default alignment" },
-    { alignment: "left", label: "Align left" },
-    { alignment: "center", label: "Align center" },
-    { alignment: "right", label: "Align right" },
+    { alignment: null, label: t("editor.markdown.table.defaultAlignment") },
+    { alignment: "left", label: t("editor.markdown.table.alignLeft") },
+    { alignment: "center", label: t("editor.markdown.table.alignCenter") },
+    { alignment: "right", label: t("editor.markdown.table.alignRight") },
   ];
 
   const sections: MarkdownTableMenuSection[] = [
     {
-      label: "Rows",
+      id: "rows",
+      label: t("editor.markdown.table.rows"),
       items: [
         {
           disabled: rowIndex === 0,
-          label: "Insert row above",
+          label: t("editor.markdown.table.insertRowAbove"),
           operation: { type: "insert-row-above", rowIndex, columnIndex },
         },
         {
-          label: "Insert row below",
+          label: t("editor.markdown.table.insertRowBelow"),
           operation: { type: "insert-row-below", rowIndex, columnIndex },
         },
         {
-          label: "Duplicate row",
+          label: t("editor.markdown.table.duplicateRow"),
           operation: { type: "duplicate-row", rowIndex, columnIndex },
         },
         {
           disabled: rowIndex <= 1,
-          label: "Move row up",
+          label: t("editor.markdown.table.moveRowUp"),
           operation: { type: "move-row-up", rowIndex, columnIndex },
         },
         {
           disabled: rowIndex === 0 || rowIndex >= rowCount - 1,
-          label: "Move row down",
+          label: t("editor.markdown.table.moveRowDown"),
           operation: { type: "move-row-down", rowIndex, columnIndex },
         },
         {
           destructive: true,
           disabled: rowIndex === 0,
-          label: "Delete row",
+          label: t("editor.markdown.table.deleteRow"),
           operation: { type: "delete-row", rowIndex, columnIndex },
         },
       ],
     },
     {
-      label: "Columns",
+      id: "columns",
+      label: t("editor.markdown.table.columns"),
       items: [
         {
-          label: "Insert column left",
+          label: t(direction === "rtl"
+            ? "editor.markdown.table.insertColumnRight"
+            : "editor.markdown.table.insertColumnLeft"),
           operation: { type: "insert-column-left", rowIndex, columnIndex },
         },
         {
-          label: "Insert column right",
+          label: t(direction === "rtl"
+            ? "editor.markdown.table.insertColumnLeft"
+            : "editor.markdown.table.insertColumnRight"),
           operation: { type: "insert-column-right", rowIndex, columnIndex },
         },
         {
           disabled: columnIndex === 0,
-          label: "Move column left",
+          label: t(direction === "rtl"
+            ? "editor.markdown.table.moveColumnRight"
+            : "editor.markdown.table.moveColumnLeft"),
           operation: { type: "move-column-left", rowIndex, columnIndex },
         },
         {
           disabled: columnIndex >= columnCount - 1,
-          label: "Move column right",
+          label: t(direction === "rtl"
+            ? "editor.markdown.table.moveColumnLeft"
+            : "editor.markdown.table.moveColumnRight"),
           operation: { type: "move-column-right", rowIndex, columnIndex },
         },
         {
           destructive: true,
           disabled: columnCount <= 1,
-          label: "Delete column",
+          label: t("editor.markdown.table.deleteColumn"),
           operation: { type: "delete-column", rowIndex, columnIndex },
         },
       ],
     },
     {
-      label: "Alignment",
+      id: "alignment",
+      label: t("editor.markdown.table.alignment"),
       items: alignmentItems.map(({ alignment, label }) => ({
         label,
         operation: {
@@ -297,19 +314,20 @@ function getMarkdownTableMenuSections(
       })),
     },
     {
+      id: "table",
       items: [{
         destructive: true,
-        label: "Delete table",
+        label: t("editor.markdown.table.deleteTable"),
         operation: { type: "delete-table", rowIndex, columnIndex },
       }],
     },
   ];
 
   if (scope === "row") {
-    return sections.filter((section) => section.label === "Rows");
+    return sections.filter((section) => section.id === "rows");
   }
   if (scope === "column") {
-    return sections.filter((section) => section.label === "Columns" || section.label === "Alignment");
+    return sections.filter((section) => section.id === "columns" || section.id === "alignment");
   }
   return sections;
 }

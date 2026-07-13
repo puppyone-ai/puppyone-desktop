@@ -11,10 +11,18 @@ import type { EditorSaveMode } from "../viewerTypes";
 
 export type DocumentSessionStatus = "clean" | "dirty" | "saving" | "saved" | "error";
 
+export type DocumentSessionErrorCode = "external-conflict" | "persistence-failed";
+
+export type DocumentSessionError = Readonly<{
+  code: DocumentSessionErrorCode;
+  /** Untrusted adapter detail. Presentation layers must wrap and bidi-isolate it. */
+  detail: string | null;
+}>;
+
 export type DocumentSessionState = Readonly<{
   documentId: string;
   status: DocumentSessionStatus;
-  error: string | null;
+  error: DocumentSessionError | null;
   currentRevision: string | null;
   persistedRevision: string | null;
   storageVersion: string | null;

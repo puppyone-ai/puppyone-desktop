@@ -11,6 +11,7 @@ import type { EditorSaveMode } from "../viewerTypes";
 import type {
   DocumentEditingSessionOptions,
   DocumentPersistedCommit,
+  DocumentSessionError,
   DocumentSessionState,
   EditorDocumentSession,
   ExternalBaselineResult,
@@ -153,7 +154,7 @@ export class DocumentEditingSession implements EditorDocumentSession {
         await this.waitFor(this.inFlight.sequence);
       } else if (this.hasUnpersistedChanges()) {
         throw new Error(
-          this.state.error
+          this.state.error?.detail
           ?? `Unable to flush ${this.documentId}: its editor source is unavailable.`,
         );
       }
@@ -177,7 +178,7 @@ export class DocumentEditingSession implements EditorDocumentSession {
     if (this.hasUnpersistedChanges()) {
       this.publish(
         "error",
-        "This file changed outside the current editor while local changes were pending.",
+        createSessionError("external-conflict"),
       );
       return "conflict";
     }
@@ -331,12 +332,13 @@ export class DocumentEditingSession implements EditorDocumentSession {
     }
 
     if (failure) {
+      const sessionError = createSessionError("persistence-failed", toErrorMessage(failure));
       if (this.pending) {
         this.dirty = true;
-        this.publish("dirty", toErrorMessage(failure));
+        this.publish("dirty", sessionError);
       } else {
         this.dirty = true;
-        this.publish("error", toErrorMessage(failure));
+        this.publish("error", sessionError);
         this.rejectWaitersThrough(candidate.sequence, failure);
       }
     }
@@ -413,7 +415,7 @@ export class DocumentEditingSession implements EditorDocumentSession {
     }
   }
 
-  private publish(status: DocumentSessionState["status"], error: string | null): void {
+  private publish(status: DocumentSessionState["status"], error: DocumentSessionError | null): void {
     const next = Object.freeze({
       documentId: this.documentId,
       status,
@@ -474,10 +476,18 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function createSessionError(
+  code: DocumentSessionError["code"],
+  detail: string | null = null,
+): DocumentSessionError {
+  return Object.freeze({ code, detail });
+}
+
 function sameState(left: DocumentSessionState, right: DocumentSessionState): boolean {
   return (
     left.status === right.status
-    && left.error === right.error
+    && left.error?.code === right.error?.code
+    && left.error?.detail === right.error?.detail
     && left.currentRevision === right.currentRevision
     && left.persistedRevision === right.persistedRevision
     && left.storageVersion === right.storageVersion

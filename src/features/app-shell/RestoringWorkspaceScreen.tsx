@@ -3,6 +3,7 @@ import {
   createTypographyRootProps,
   type ResolvedTypography,
 } from "../typography";
+import { useLocalization } from "@puppyone/localization";
 
 const puppyoneLogoUrl = new URL("../../../public/puppyone-logo.svg", import.meta.url).href;
 
@@ -27,6 +28,7 @@ export function RestoringWorkspaceScreen({
   diffMarkers,
   resolvedTheme,
 }: RestoringWorkspaceScreenProps) {
+  const { t } = useLocalization();
   return (
     <main
       className={`onboarding-shell ${resolvedTheme === "dark" ? "dark" : ""}`}
@@ -39,9 +41,9 @@ export function RestoringWorkspaceScreen({
       {...createTypographyRootProps(typography)}
     >
       <div className="onboarding-titlebar" aria-hidden="true" />
-      <section className="restoring-workspace-status" aria-label="Opening last project">
+      <section className="restoring-workspace-status" aria-label={t("workspace.restoring.ariaLabel")}>
         <img src={puppyoneLogoUrl} alt="" className="restoring-workspace-logo" />
-        <span>Opening last project...</span>
+        <span>{t("workspace.restoring.message")}</span>
       </section>
     </main>
   );

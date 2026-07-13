@@ -13,6 +13,7 @@ import {
 import { mergeCloudHistoryPages } from "../src/features/cloud/history/pagination";
 import { buildCloudBranchGraphRows } from "../src/features/cloud/graph/model";
 import type { DesktopCloudHistory } from "../src/lib/cloudHistoryApi";
+import { renderWithTestLocalization, testT } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -181,7 +182,7 @@ describe("Cloud project history", () => {
     expect(loadMore).toBeDefined();
     act(() => loadMore?.click());
     expect(onLoadMore).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain("read-only");
+    expect(container.textContent).toContain(testT("cloud.scope.readOnly"));
     expect(container.textContent).not.toMatch(/checkout|revert|cherry-pick/i);
   });
 
@@ -244,7 +245,7 @@ function render(node: React.ReactNode) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root?.render(node));
+  act(() => renderWithTestLocalization(root, node));
   return container;
 }
 

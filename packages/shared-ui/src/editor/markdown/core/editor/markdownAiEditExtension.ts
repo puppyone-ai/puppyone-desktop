@@ -9,6 +9,12 @@ import {
   showTooltip,
 } from "@codemirror/view";
 import type { AiEditFile, AiEditHunk } from "../../../ai-edits/types";
+import {
+  getMarkdownLocalization,
+  getMarkdownMessage,
+  getMarkdownMessageFormatter,
+  markdownLocalizationFacet,
+} from "./markdownLocalization";
 
 type DeletedContentPreview = {
   key: string;
@@ -42,7 +48,11 @@ const deletedContentTooltipField = StateField.define<DeletedContentTooltipState>
     return null;
   },
   update(value, transaction) {
-    if (transaction.docChanged) return null;
+    if (
+      transaction.docChanged
+      || transaction.startState.facet(markdownLocalizationFacet)
+        !== transaction.state.facet(markdownLocalizationFacet)
+    ) return null;
     for (const effect of transaction.effects) {
       if (effect.is(setDeletedContentTooltip)) return effect.value;
     }
@@ -68,7 +78,12 @@ export function markdownAiEditExtension(aiEditFile: AiEditFile | null | undefine
         }
 
         update(update: ViewUpdate) {
-          if (update.docChanged || update.viewportChanged) {
+          if (
+            update.docChanged
+            || update.viewportChanged
+            || update.startState.facet(markdownLocalizationFacet)
+              !== update.state.facet(markdownLocalizationFacet)
+          ) {
             this.decorations = safeBuildAiEditDecorations(update.view, file);
           }
         }
@@ -141,15 +156,13 @@ function addLineDecoration(
   ranges.push(Decoration.line({
     class: ["cm-ai-edit-line", `cm-ai-edit-line-${classKind}`, ...markerClasses].join(" "),
     attributes: {
-      title: getHunkTitle(hunk),
+      title: getHunkTitle(hunk, view),
     },
   }).range(line.from));
 }
 
-function getHunkTitle(hunk: AiEditHunk): string {
-  if (hunk.kind === "added") return "AI added this line";
-  if (hunk.kind === "removed") return "AI removed nearby content";
-  return "AI modified this line";
+function getHunkTitle(hunk: AiEditHunk, view: EditorView): string {
+  return getMarkdownMessage(view, `editor.markdown.ai.${hunk.kind}`);
 }
 
 function getDeletedContentPreviewForMouseEvent(
@@ -212,12 +225,13 @@ function createDeletedContentTooltip(preview: DeletedContentPreview): Tooltip {
     arrow: false,
     clip: false,
     create(view) {
+      const t = getMarkdownMessageFormatter(view);
       const dom = document.createElement("div");
       dom.className = `cm-ai-edit-delete-preview-tooltip cm-ai-edit-delete-preview-tooltip--${preview.kind}`;
 
       const header = document.createElement("div");
       header.className = "cm-ai-edit-delete-preview-tooltip__header";
-      header.textContent = getPreviewHeaderText(preview);
+      header.textContent = getPreviewHeaderText(preview, t);
       dom.append(header);
 
       const body = document.createElement("div");
@@ -240,7 +254,7 @@ function createDeletedContentTooltip(preview: DeletedContentPreview): Tooltip {
       if (truncated) {
         const footer = document.createElement("div");
         footer.className = "cm-ai-edit-delete-preview-tooltip__footer";
-        footer.textContent = "Open review for full diff";
+        footer.textContent = t("editor.markdown.ai.openReview");
         dom.append(footer);
       }
 
@@ -255,9 +269,18 @@ function createDeletedContentTooltip(preview: DeletedContentPreview): Tooltip {
   };
 }
 
-function getPreviewHeaderText(preview: DeletedContentPreview): string {
-  if (preview.kind === "modified") return preview.hunkCount > 1 ? "Changed from" : "Before agent edit";
-  return preview.hunkCount > 1 ? "Deleted content" : "Deleted by agent";
+function getPreviewHeaderText(
+  preview: DeletedContentPreview,
+  t: ReturnType<typeof getMarkdownMessageFormatter>,
+): string {
+  if (preview.kind === "modified") {
+    return t(preview.hunkCount > 1
+      ? "editor.markdown.ai.changedFrom"
+      : "editor.markdown.ai.beforeEdit");
+  }
+  return t(preview.hunkCount > 1
+    ? "editor.markdown.ai.deletedContent"
+    : "editor.markdown.ai.deletedByAgent");
 }
 
 function getDeletedPreviewLines(oldText: string): { lines: string[]; truncated: boolean } {
@@ -283,9 +306,10 @@ function getMarkerHitbox(view: EditorView, lineNumber: number) {
   const lineElement = getLineElement(view, lineNumber);
   if (!lineElement) return null;
   const rect = lineElement.getBoundingClientRect();
+  const edge = getMarkdownLocalization(view).direction === "rtl" ? rect.left : rect.right;
   return {
-    left: rect.right + MARKER_HITBOX_LEFT,
-    right: rect.right + MARKER_HITBOX_RIGHT,
+    left: edge + MARKER_HITBOX_LEFT,
+    right: edge + MARKER_HITBOX_RIGHT,
     top: rect.top + MARKER_HITBOX_TOP,
     bottom: rect.top + MARKER_HITBOX_HEIGHT,
   };
@@ -315,7 +339,12 @@ function getMarkerTooltipCoords(view: EditorView, lineNumber: number) {
   }
 
   const rect = lineElement.getBoundingClientRect();
-  const x = clampTooltipX(rect.right + 10, viewRect);
+  const x = clampTooltipX(
+    getMarkdownLocalization(view).direction === "rtl"
+      ? rect.left - DELETED_PREVIEW_TOOLTIP_WIDTH - 10
+      : rect.right + 10,
+    viewRect,
+  );
   const y = Math.min(rect.bottom + 8, viewRect.bottom - DELETED_PREVIEW_TOOLTIP_MARGIN);
   return {
     left: x,

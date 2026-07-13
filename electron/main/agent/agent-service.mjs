@@ -34,6 +34,7 @@ import { resolvePersistedRuntimeId } from "./migrations/legacy-session-format.mj
 import { assertAgentRuntimeInspection } from "./runtime/agent-runtime-port.mjs";
 
 const INTERRUPT_CONFIRMATION_TIMEOUT_MS = 5_000;
+const MAX_TURN_DURATION_MS = 30 * 24 * 60 * 60 * 1_000;
 
 export function createAgentService({
   runtimeRegistry,
@@ -202,6 +203,7 @@ export function createAgentService({
     requireAvailableModel(session, model);
     session.pendingPrompt = prompt;
     session.turnStarting = true;
+    session.activeTurnStartedAtMs = Date.now();
     session.selectedModel = model;
     session.selectedMode = mode;
     try {
@@ -229,6 +231,7 @@ export function createAgentService({
     } catch (error) {
       session.pendingPrompt = null;
       session.turnStarting = false;
+      session.activeTurnStartedAtMs = null;
       throw new Error(redactSecretText(error instanceof Error ? error.message : String(error)));
     }
   }
@@ -548,6 +551,7 @@ export function createAgentService({
     }
     if (event.type === "turn.started") {
       session.activeTurnId = event.turnId;
+      if (!Number.isFinite(session.activeTurnStartedAtMs)) session.activeTurnStartedAtMs = Date.now();
       session.lastStartedTurnId = event.turnId;
       session.terminalState = "running";
       if (session.pendingPrompt) {
@@ -555,11 +559,14 @@ export function createAgentService({
       }
     }
     if (["turn.completed", "turn.failed", "turn.interrupted"].includes(event.type)) {
+      const activeTurnEnded = session.turnStarting || !event.turnId || session.activeTurnId === event.turnId;
+      event.payload = withTurnDuration(event.payload, activeTurnEnded ? session.activeTurnStartedAtMs : null);
       rememberTerminalTurn(session, event.turnId);
       failPendingApprovalsForTurn(session, event.turnId, "turn-ended");
       failPendingQuestionsForTurn(session, event.turnId, "turn-ended");
-      if (session.turnStarting || !event.turnId || session.activeTurnId === event.turnId) {
+      if (activeTurnEnded) {
         session.activeTurnId = null;
+        session.activeTurnStartedAtMs = null;
         session.interruptingTurnId = null;
         session.terminalState = event.type.slice("turn.".length);
         clearInterruptFallback(session);
@@ -710,9 +717,10 @@ export function createAgentService({
         type: "turn.failed",
         providerSessionId: session.providerSessionId,
         turnId: activeTurnId,
-        payload: { status: "failed", message: turnMessage },
+        payload: withTurnDuration({ status: "failed", message: turnMessage }, session.activeTurnStartedAtMs),
       });
     }
+    session.activeTurnStartedAtMs = null;
     session.terminalState = "provider-exited";
     emit(session, {
       type: "provider.error",
@@ -808,5 +816,19 @@ export function createAgentService({
     getSessionCount,
     getRetainedSessionCount,
     hasRuntimeResources,
+  };
+}
+
+function withTurnDuration(payload, startedAtMs) {
+  const candidate = Number(payload?.durationMs);
+  const durationMs = Number.isFinite(candidate) && candidate >= 0
+    ? candidate
+    : Number.isFinite(startedAtMs)
+      ? Date.now() - startedAtMs
+      : null;
+  if (!Number.isFinite(durationMs) || durationMs < 0) return { ...(payload || {}) };
+  return {
+    ...(payload || {}),
+    durationMs: Math.min(MAX_TURN_DURATION_MS, Math.round(durationMs)),
   };
 }

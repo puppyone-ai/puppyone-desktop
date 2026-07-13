@@ -30,6 +30,7 @@ export function createAgentSessionRecord({
     providerSessionId: null,
     adapter: null,
     activeTurnId: null,
+    activeTurnStartedAtMs: null,
     lastStartedTurnId: null,
     pendingPrompt: null,
     turnStarting: false,

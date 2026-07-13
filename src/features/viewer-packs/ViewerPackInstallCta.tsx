@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import type { EditorDocument } from "@puppyone/shared-ui";
+import { bidiIsolate, useLocalization } from "@puppyone/localization";
 
 export type ViewerPackInstallCtaProps = {
   document: EditorDocument;
@@ -17,6 +18,7 @@ function getDesktopBridge() {
  * renderer, so the host can stat and cap both files before allocating memory.
  */
 export function ViewerPackInstallCta({ document, onInstalled }: ViewerPackInstallCtaProps) {
+  const { t } = useLocalization();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export function ViewerPackInstallCta({ document, onInstalled }: ViewerPackInstal
   const install = useCallback(async () => {
     const bridge = getDesktopBridge();
     if (!bridge) {
-      setError("Viewer Pack host bridge is unavailable.");
+      setError(t("workspace.viewerPack.hostUnavailable"));
       return;
     }
     setBusy(true);
@@ -33,24 +35,26 @@ export function ViewerPackInstallCta({ document, onInstalled }: ViewerPackInstal
     try {
       const result = await bridge.installLocal();
       if (result.canceled) return;
-      setMessage(`Installed ${result.pluginId}@${result.version}. Re-open the file to activate.`);
+      setMessage(t("workspace.viewerPack.install.success", {
+        plugin: bidiIsolate(`${result.pluginId}@${result.version}`),
+      }));
       await onInstalled?.();
     } catch (installError) {
       setError(installError instanceof Error ? installError.message : String(installError));
     } finally {
       setBusy(false);
     }
-  }, [onInstalled]);
+  }, [onInstalled, t]);
 
   return (
     <div className="viewer-pack-install-cta">
-      <strong>No Viewer Pack installed for {document.name}</strong>
-      <p>
-        This local format is plugin-eligible. Select one signed <code>.puppyplugin</code>
-        package and its JSON <code>.sig</code> envelope.
-      </p>
+      <strong>{t("workspace.viewerPack.install.missing", { name: bidiIsolate(document.name) })}</strong>
+      <p>{t("workspace.viewerPack.install.description", {
+        packageExtension: bidiIsolate(".puppyplugin"),
+        signatureExtension: bidiIsolate(".sig"),
+      })}</p>
       <button type="button" disabled={busy} onClick={() => void install()}>
-        {busy ? "Installing…" : "Install local Viewer Pack"}
+        {t(busy ? "workspace.viewerPack.install.installing" : "workspace.viewerPack.install.action")}
       </button>
       {message && <span className="viewer-pack-install-cta-ok">{message}</span>}
       {error && <span className="viewer-pack-install-cta-error" role="alert">{error}</span>}

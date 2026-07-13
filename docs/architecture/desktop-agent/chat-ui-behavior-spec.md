@@ -1,8 +1,9 @@
 # Cursor-style Agent Chat UI behavior specification
 
-Status: implemented transcript/activity foundation and Agent-first backend
-contract. Visual refinement remains iterative and must preserve the native
-harness boundaries in ADR-005 and ADR-006.
+Status: implemented Cursor-style conversation document, compact work evidence
+and Agent-first selection contract. Multi-native backend capability differences
+remain incremental work and must preserve the native harness boundaries in
+ADR-005 and ADR-006.
 
 This specification turns the visual direction in [Right Sidebar Agent Chat](right-sidebar.md)
 into implementable rules. The pixel reference is the MIT-licensed frontend in
@@ -31,6 +32,9 @@ The following invariants are mandatory:
 
 - user and assistant messages remain the primary visual hierarchy;
 - tool activity is compact by default and expands in place;
+- assistant Markdown never receives a generic card surface, border or shadow;
+- read/search/reasoning/tool rows never share a decorative Research timeline
+  rail; only semantically related command output forms one bounded card;
 - repeated updates mutate one stable row instead of appending duplicates;
 - proposed work, approved work and completed work are visibly different states;
 - raw provider JSON, ANSI control sequences and hidden reasoning are never rendered directly;
@@ -42,8 +46,8 @@ The following invariants are mandatory:
 
 ```text
 +------------------------------------------------------+
-| Agent                                      +      ...|
-|------------------------------------------------------|
+| Codex v   +  ...                                  |
+|       scroll-aware surface fade, no divider          |
 |                                                      |
 |                   +-------------------------------+  |
 |                   | User prompt                   |  |
@@ -51,26 +55,101 @@ The following invariants are mandatory:
 |                                                      |
 | Assistant answer in document flow                    |
 |                                                      |
-| > Explored 4 files                              done |
-| > Ran npm test                                  done |
-| > Edited 3 files                         Review       |
+| Read       4 files                                   |
+| Bash       npm test                                  |
+| Edit       3 files                                   |
 |                                                      |
 | [approval or question dock, only when blocking]      |
-| [Changes +42 -11]                                    |
+| [Changes +42 -11]         floating, no layout row    |
 | +--------------------------------------------------+ |
 | | Send follow-up                                   | |
-| | +   Codex    GPT-5.x                  mic/send   | |
+| | GPT-5.x                                  send    | |
 | +--------------------------------------------------+ |
 +------------------------------------------------------+
 ```
 
-Only the transcript scrolls. The decision dock, Changes handoff and composer stay anchored
-at the bottom in normal document layout. They must not be fixed over transcript content.
+Only the transcript scrolls. The decision dock and Composer stay anchored at the bottom in
+normal document layout. Changes is a local floating accessory anchored to the Composer; it
+must not create another grid row or increase dock height.
+
+The top sub-header owns one left-aligned cluster: selected coding-Agent identity, New Session and
+overflow. Its right edge remains empty so session chrome does not compete with the app-header
+surface controls. It uses the same 46 px top-navigation
+geometry, text scale and flat icon-button treatment as the left sidebar: 12 px top and inline
+padding, 4 px inner/bottom padding, 30 px controls and a 4 px control gap. These values are consumed
+through the shared sidebar-navigation tokens rather than duplicated Agent-only constants. Like the Data sidebar,
+its toolbar edge is transparent at rest. Once the transcript scrolls underneath, the transcript
+owns an 18 px same-surface fade whose opacity ramps over the first 24 px of scrolling. A visible
+bottom border, drop shadow, underline and enclosing action pill are not allowed. Provider identity
+is therefore visually persistent while Model remains a lower-level composer choice.
+
+### 2.1 Shared typography contract
+
+Agent Chat and the left sidebar share one Appearance-controlled type scale:
+
+```text
+Appearance: Small / Default / Large
+                  |
+                  v
+        --po-text-size-sidebar     12 / 13 / 14 px
+                  |
+                  v
+     --desktop-sidebar-font-size
+             /             \
+            v               v
+   left sidebar rows   --agent-font-size
+                         /   |    \
+                        v    v     v
+                 messages  input  tool rows/pickers
+```
+
+- Primary Chat text must use `--agent-font-size`, which aliases the same
+  `--desktop-sidebar-font-size` consumed by left-sidebar rows. Default is 13 px;
+  Small and Large are 12 px and 14 px. A Chat component must not hard-code its own
+  13/14 px body size.
+- Secondary timestamps, statuses and metadata use the shared meta scale. Headings keep
+  semantic hierarchy through the responsive title tokens, and command/code surfaces keep
+  the Appearance-controlled monospace code size.
+- The app shell and the shared overlay root both redeclare the sidebar aliases at their
+  theme boundary. This prevents portalled pickers from freezing at the default size and
+  guarantees that an Appearance change updates the left and right sidebars together.
 
 ## 3. Shared row state model
 
 Every activity renderer consumes the same presentation state instead of inventing its own
 loading and error vocabulary.
+
+The panel cold-start state is separate from activity rows. It has exactly one
+visual owner: a centered instance of the shared product `PageLoading` component
+inside the conversation viewport. It has no visible loading copy, does not
+create a transcript/message row, and must not be duplicated in the header or
+status region. Its accessible name identifies the Agent being prepared. When a
+committed transcript is already present, discovery/restoration preserves the
+transcript and omits the cold-start loader.
+
+Application discovery/restoration and native-session preparation are different
+states. Once routing is ready, the active Chat panel starts one background,
+single-flight native-session preparation. That work does not create a transcript
+row or hide the Composer. If the user submits before it finishes, Submit awaits
+the same promise instead of starting a second Agent process or session.
+
+```text
+panel active + route ready
+  -> background native-session preparation (no transcript status)
+
+first Submit before preparation resolves
+  -> optimistic User row
+  -> Preparing <Agent>
+  -> Starting turn
+  <- native turn.started
+  -> Thinking
+  <- first reasoning summary / tool / assistant text
+  -> native content renderer
+```
+
+`Thinking` is therefore evidence of an accepted, running native turn. It must
+never be inferred from a pending local prompt, process startup, account/model
+inspection, or native thread/session creation.
 
 ```text
 queued -> running -> waiting-for-user -> succeeded
@@ -83,7 +162,7 @@ queued -> running -> waiting-for-user -> succeeded
 | queued | neutral icon | `Queued` | none |
 | running | accent icon | compact spinner or elapsed time | spinner only |
 | waiting-for-user | warning icon | `Review` or `Approval required` | one entrance transition |
-| succeeded | normal icon | optional duration / `done` | none after settle |
+| succeeded | accent tool identity | none | none after settle |
 | failed | error icon | `Failed` | one color transition, no shake |
 | cancelled | muted icon | `Stopped` | none |
 
@@ -94,26 +173,42 @@ substitute for stable event correlation.
 ## 4. User messages
 
 ```text
-                                      +------------------------------+
-                                      | Fix the sidebar scroll stall |
-                                      | [@RightSidebar.tsx]          |
-                                      +------------------------------+
-                                                       Copy  10:42 PM
++--------------------------------------------------------------------+
+| Fix the sidebar scroll stall                                      |
+| [@RightSidebar.tsx]                                                |
++--------------------------------------------------------------------+
 ```
 
 ### Layout
 
-- Align to the right; maximum width is `min(86%, 720px)` and minimum intrinsic width is
-  content-sized.
-- Use a quiet secondary surface, one subtle border and an 18 px radius. Do not add a drop
-  shadow in the resting state.
-- Use 12 px vertical and 14 px horizontal padding. Preserve user whitespace and wrap long
-  paths, URLs and CJK text without horizontal scrolling.
+- Fill the transcript content width. The transcript owns the single 12 px outer inset on both
+  sides, so the message row must not add another horizontal margin or narrower max-width.
+- Reuse the resting Composer background exactly, with no border or shadow and the shared 6 px
+  Sidebar row radius. The surface must read as quiet grouping, not as a raised card.
+- Use 8 px vertical and 12 px horizontal content padding. Preserve user whitespace and wrap long
+  paths, URLs and CJK text without horizontal scrolling. The optimistic live-tail row uses the
+  same width and alignment as the committed virtualized row.
+- Treat that 12 px inset as the shared conversation content rail: User text, Agent prose,
+  `Thinking`, and terminal turn metadata all start on it. The User surface itself remains on the
+  outer transcript rail; its internal padding must not leave Agent prose visually farther left.
+- The leaf presentation component owns this inset (`AgentMessagePart`, working indicator, or turn
+  summary), not the virtual-list row. Virtualization owns only measurement, ordering and vertical
+  rhythm. Responsive styles may change available width but must not override the conversation
+  content rail for an individual message kind.
+- Static presentation declarations—including spacing, typography, color, height, transform,
+  positioning and visibility—live in feature CSS. TypeScript may calculate only runtime geometry
+  that cannot exist before measurement (virtual height/offset, scroll fade or anchored overlay
+  coordinates), and exposes those values through the typed `--agent-*` custom-property bridge.
+  TSX must not contain literal inline style objects, mutate `element.style`, or own visual
+  fallbacks. Composer auto-growth uses CSS `field-sizing: content` with CSS-owned min/max height
+  and overflow; it does not run a React measurement/resize loop.
 - Render `@` context, attachments and quoted files as compact chips below the text inside the
-  same bubble. Chips show a safe basename, never an unbounded absolute path.
-- Actions are hidden visually until hover or keyboard focus but remain reachable by tab. The
-  first required action is Copy. Editing a sent prompt is not implied; a correction is a new
-  follow-up turn.
+  same row. Chips show a safe basename, never an unbounded absolute path.
+- Conversation rows do not add a generic Copy toolbar. Text selection and platform copy remain
+  native; editing a sent prompt is not implied, and a correction is a new follow-up turn.
+- Every transition from a user row into Agent output, or from Agent output into the next user
+  row, uses the shared 24 px turn gap. This is distinct from the compact 8 px Agent-text-to-tool
+  handoff and the zero-gutter sequence between adjacent tools.
 
 ### Motion
 
@@ -135,11 +230,33 @@ sidebar gets another frame, so wheel and pointer input wait behind it.
 ```
 
 - Markdown occupies the available transcript width with a readable measure. Body text uses
-  the product body size and a 1.55-1.7 line height.
+  the shared sidebar/Agent size and a 1.55-1.7 line height.
+- The assistant container is transparent and borderless. Theme tokens control text, inline
+  code, links and code blocks; a generic raised-surface token must not wrap the whole answer.
+- Assistant messages do not create a response-action header or hidden Copy row. Only a
+  non-completed terminal state may occupy reserved trailing status space.
+- Every terminal turn ends with one low-contrast `Worked for <duration>` summary. The duration
+  comes from the normalized terminal event: provider-native timing wins, and the main-process
+  lifecycle clock supplies the live fallback. The Renderer never invents elapsed time from a
+  loading animation. The summary belongs to the turn timeline, follows its final message/tool,
+  and precedes the shared 24 px gap into the next user turn.
+- The duration summary is left-aligned on the shared content rail and uses the ordinary Agent
+  body size and line height. It has no centering rails, divider lines, icon, badge or card; color
+  is the only hierarchy reduction.
+- User rows, assistant text, work evidence, context dividers and errors are five separate
+  semantic treatments. Do not reuse one card component for all five.
 - The first visible assistant content may fade in over 120 ms. Subsequent tokens do not use a
   per-character typewriter animation.
 - Text deltas are coalesced into at most one visual commit per 24-50 ms; permission, question,
   tool-boundary and terminal events bypass the text batch so ordering stays correct.
+- Submission is optimistic at the presentation boundary: the local prompt appears before
+  native session/thread creation finishes. Session preparation is labeled `Preparing <Agent>`;
+  the accepted RPC before its event is labeled `Starting turn`. Only after the authoritative
+  native `turn.started` event and before the first reasoning, tool or text part may one quiet
+  `Thinking` row occupy the live tail. All three labels are presentation-only and never journaled.
+- A native reasoning-summary section boundary may replace the generic `Thinking` row before
+  summary text arrives. Raw reasoning deltas are not rendered. After a completed tool, the
+  generic working pulse may reappear while the same native turn remains active.
 - A streaming caret is optional and may only appear at the final text edge while a text part
   is active. It disappears immediately on tool transition, Stop, failure or completion.
 - Headings, lists, links, tables, inline code and fenced code use PuppyOne Markdown policies.
@@ -150,8 +267,8 @@ sidebar gets another frame, so wheel and pointer input wait behind it.
   24 KiB and 240 blocks; a truthful `Show full response` disclosure retains access to the full
   bounded response. The initial window preserves both the beginning and latest tail so long
   streaming output cannot create a main-thread Long Task merely by becoming visible.
-- Message actions appear after the message settles: Copy is required; feedback actions are
-  optional product features and must not shift the text when they appear.
+- Generic message action chrome is omitted. Text selection and platform copy remain native;
+  code blocks retain their scoped Copy action.
 - Raw chain-of-thought is never shown. A provider-supplied reasoning summary is a separately
   labeled, collapsed part.
 
@@ -177,12 +294,18 @@ Plan
 
 Read-only work should be quieter than Bash or file writes.
 
+Tool identity is part of the normalized event contract. Native structured
+`Read`, `Write`, `Edit`, `Grep`, `Glob`, `Bash`, web and MCP calls retain their
+tool name and bounded structured input from the native adapter through the
+Renderer. A completed result updates the same item; it must not replace the
+original tool with a generic `Tool` or `Bash` row.
+
 | Native work | Collapsed row | Expanded content | Primary action |
 | --- | --- | --- | --- |
-| single file read | `Read AgentComposer.tsx` | safe path, line range, optional bounded excerpt | Open file |
-| repeated reads | `Explored 4 files` | ordered file list and ranges | Open file |
-| text search | `Searched for “providerCatalog”` | query, scope and match count | Open results |
-| directory/list | `Listed desktop-agent` | bounded entries | Reveal folder |
+| single file read | `Read AgentComposer.tsx` | safe path, line range, optional bounded excerpt | expanded path |
+| repeated reads | `Read 4 files` | ordered file list and ranges | expanded path |
+| text search | `Grep providerCatalog` | query, scope and bounded results | expanded result |
+| directory/list | `List desktop-agent` | bounded entries | expanded entry |
 
 - Consecutive read/list/search items in the same work phase may coalesce after 300-500 ms.
   Coalescing never crosses an assistant message, write, Bash, approval or error boundary.
@@ -193,49 +316,72 @@ Read-only work should be quieter than Bash or file writes.
 - Clicking a path opens the existing Editor surface. Agent Chat does not implement a second
   editor.
 
+Provider differences remain truthful:
+
+| Native event | Presentation |
+| --- | --- |
+| Claude/OpenCode structured `Read` | dedicated Read disclosure |
+| Claude/OpenCode structured `Grep` or `Glob` | dedicated search disclosure and bounded result rows |
+| Claude/OpenCode structured `Write` or `Edit` | dedicated file-change disclosure and diff/review handoff |
+| Codex `fileChange` | Edit/file-change disclosure |
+| Codex `commandExecution` running `rg`/`grep` | `Grep <summary>`; expanded details retain the exact shell command |
+| Codex `commandExecution` running `find`/`fd`/`rg --files` | `Glob <summary>`; expanded details retain the exact shell command |
+| unknown or ambiguous Shell | Bash; never guessed as a safer native tool |
+
+Shell semantic classification is conservative presentation only. It never
+changes approval policy, execution provenance, replay identity or the native
+event stored in the live projection. Mutating/ambiguous commands remain Bash.
+
 ## 8. Bash and command rendering
 
 ### Collapsed state
 
 ```text
-> Ran npm test                                      2.8s
+⌘ Bash  npm test
 ```
 
 While running:
 
 ```text
-o Running npm test                                00:07
+⌘ Bash  npm test                                      o
 ```
 
 - The label is derived from a redacted command summary, not raw shell output.
-- Show a compact terminal icon, a single-line command summary, state and duration/exit code.
+- Bash, Read, Grep, Glob, List, Edit and generic tools share one 30 px row skeleton. The icon
+  and tool name use the theme accent; the command/path summary is one muted ellipsized line.
+- When details exist, the disclosure chevron sits immediately after the tool name, before the
+  summary. It never floats at the far-right edge where its ownership becomes ambiguous.
+- The collapsed row has no enclosing card, border, success text, duration, exit code, provenance
+  suffix or secondary action. A spinner or error status is shown only while it is actionable.
+- Adjacent work rows have no card-stack gutter. An assistant paragraph leaves a compact 8 px
+  handoff before the first work row, so a sequence reads as one ordered work trace.
 - Multiline commands collapse to the first meaningful command plus `+N lines`.
 - Environment variables whose names or values are secret-like are redacted before Renderer.
 
 ### Expanded state
 
 ```text
-+------------------------------------------------------+
-| Terminal  npm test                 Copy   Open terminal|
-| cwd  puppyone desktop                                 |
-|------------------------------------------------------|
-| PASS tests/desktop-agent.renderer.test.ts             |
-| 51 tests passed                                       |
-|------------------------------------------------------|
-| exit 0                                      2.8s      |
-+------------------------------------------------------+
+⌘ Bash  npm test
+  |
+  | $ npm test
+  | PASS tests/desktop-agent.renderer.test.ts
+  | 51 tests passed
 ```
 
-- Use monospace output with separate semantic stdout, stderr and exit metadata; ANSI is parsed
-  through an allowlist or stripped.
+- Expanded details sit under the same row on a quiet two-pixel branch rail; they do not introduce
+  a second card header or outer frame.
+- Use monospace output with bounded semantic stdout/stderr; ANSI is parsed through an allowlist
+  or stripped. Successful exit metadata and timing remain in normalized state but are not printed.
 - Follow output only while the user is already at the card bottom. Manual scrolling disables
   tail-follow and reveals a `Latest output` control.
 - Enforce main-process byte limits and Renderer line/DOM limits. Truncation says how much was
-  omitted and offers the existing Terminal/log handoff when available.
-- Copy copies the bounded visible/plain output. `Open terminal` transfers context to the
-  Terminal owning surface; it does not create a second PTY in Chat.
-- Non-zero exit stays in the transcript with `Failed (exit N)`. Retried commands create a new
-  attempt nested under the same logical work item when correlation is available.
+  omitted. Chat does not add `Copy` or `Open terminal` controls to every row.
+- Non-zero exit keeps the failed status and bounded diagnostic output in the transcript. Retried
+  commands create a new attempt nested under the same logical work item when correlation is available.
+- A recognized read-only Shell command may use a Read/Grep/Glob/List label and icon, but the
+  collapsed row does not print `via Bash`. The exact expanded command preserves execution truth,
+  while normalized provenance continues to drive approvals and auditing. Presentation never
+  pretends that Codex emitted a native Grep tool.
 
 ### Command approval
 
@@ -267,14 +413,16 @@ Proposed edits -> approval if required -> applying -> applied -> Review
 Collapsed examples:
 
 ```text
-> Editing 3 files                                  running
-> Edited 3 files                         +86 -12   Review
-! Edited 1 of 3 files                    Partial   Review
+Edit  src/app.ts                                      o
+Edit  3 files
+Edit  1 of 3 files                                    !
 ```
 
 - The row aggregates additions/deletions only from confirmed file-change events.
 - Expanded content lists workspace-relative paths, change type and line statistics. A file
-  click opens the existing Editor; Review opens the existing Changes surface.
+  click opens the existing Editor; the single Composer-level Changes handoff opens review.
+- Collapsed file rows do not repeat additions/deletions, `Open file` or `Review` actions. This
+  keeps file tools aligned with Bash and Read while preserving the details after expansion.
 - A proposed patch is labeled `Proposed` and never contributes to the Changes total until the
   write succeeds.
 - Partial failure retains both applied and failed files. It must not say `Edited 3 files` when
@@ -317,68 +465,95 @@ Known tools use a renderer registry. Unknown tools use a safe fallback instead o
 
 ## 12. Agent and backend-scoped pickers
 
-Native operating-system `<select>` menus are not the target interaction. Use an accessible,
-anchored listbox/popover so status, grouping, search and secondary text remain consistent.
+Native operating-system `<select>` menus are not the target interaction. Use one accessible,
+anchored listbox/popover. The compact surface is deliberately flat: readiness is a row state,
+not a second navigation hierarchy.
 
 ```text
-+ Agent ---------------------------------------------------+
-| Search Agents...                                        |
-|                                                          |
-| Ready                                                     |
-|  * PuppyOne Agent               Managed                 |
-|    Codex                         Native login            |
-|    Claude Code                   API / cloud credential  |
-|                                                          |
-| Detected                                                  |
-|    Cursor Agent                  Protocol unavailable    |
-|    OpenCode                      Sign in required        |
-|                                                          |
-|  Refresh                              Agent settings      |
-+----------------------------------------------------------+
++ Agent ----------------------------------+
+|  PuppyOne Agent                  check  |
+|  Codex                           0.144  |
+|  Claude Code                     warning|
+|  OpenCode                        warning|
+|  Cursor Agent                    warning|
++-----------------------------------------+
 ```
 
-- Agent is chosen before Model or Provider. Backend-scoped triggers stay
-  hidden or disabled with explanatory text until a selectable Agent exists.
-- Ready Agents are selectable. Detected native products remain visible but are
-  selectable only after every rule in
-  [Native Agent backend and model discovery](local-agent-connection-discovery.md) passes.
+- Agent is chosen in the top-left session sub-header before Model or inference Provider.
+  Backend-scoped triggers stay
+  hidden or disabled with explanatory text until a registered Agent is selected.
+- Every registered Agent row can be selected so the trigger changes immediately. A
+  non-ready row shows exactly one right-aligned warning icon; selecting it exposes that
+  backend's scoped readiness state but keeps Send disabled. Selection never implies that
+  execution gates passed.
 - The popover supports arrow navigation, type-ahead/search, Home/End, Enter and Escape; focus
   returns to the trigger on close.
-- Agent rows include name, source and readiness. They never expose executable,
-  credential or native-session paths.
+- Agent rows include only the official local product mark, name, compact version/source and
+  optional warning. They never expose executable, credential or native-session paths. The
+  compact menu has no `Coding Agents`, `Detected`, `Refresh` or descriptive footer chrome.
 - Model results are scoped to the selected Agent and, when applicable, its
   selected Provider. Required text/tool filters are backend capability policy;
   image, embedding and TTS-only models never appear in coding-Agent catalogs.
+- With no still-valid explicit model selection, the first model in the native backend's
+  advertised order is selected. PuppyOne does not reorder that catalog around an `isDefault`
+  flag. The user may then choose another advertised model for the current live configuration.
 - Missing or unrecognized capability metadata fails closed; it is never interpreted as text +
   tools support. The searchable catalog remains complete in memory while at most 120 option
   rows are mounted. A 500-model catalog therefore stays searchable without a 500-row popover.
-- A selected Agent/model is rendered compactly in the composer. Long names ellipsize without
-  shrinking Send or covering the textarea.
+- The selected Agent trigger is a borderless sub-header control with its official mark, name and
+  chevron. New Session and overflow sit immediately beside it. Model/backend-scoped triggers are
+  borderless text controls in the composer and receive a quiet hover surface only while interacting.
+  The standard catalog names (`Codex`, `Claude Code`, `OpenCode`, `Cursor Agent`) remain fully
+  visible even at the 420 px minimum. The identity first reserves the two header actions, then
+  uses all remaining width; only longer third-party names ellipsize at that boundary. Open/selected
+  state must not become a solid fill.
 - An existing session pins its Agent. Choosing another Agent creates a new
-  session after an explicit boundary; it never rewrites the active native session.
+  session after an explicit boundary; it never rewrites the active native session. The trigger
+  exposes the accessible description `Switching provider starts a new chat`, and the switch
+  clears the current PuppyOne live projection before inspecting the new backend.
 
 ## 13. Composer behavior
 
 ```text
 +------------------------------------------------------+
 | Send follow-up                                       |
-|                                                      |
-| +  Codex   GPT-5.x  Agent                 mic/send   |
+| GPT-5.x                                      send    |
 +------------------------------------------------------+
 ```
 
-- Resting height is 64 px at normal sidebar widths. The text region grows to 184 px, then
-  scrolls internally; the control row remains visible.
-- Horizontal outside margin is 12 px at 420 px and 16 px at 560/760 px. Inner horizontal
-  padding is 12-14 px; radius is 20 px.
+- The first row owns only the textarea. It has 12 px padding on every side and a 64 px
+  resting minimum: two 20 px text lines inside that inset. Text grows to six lines/120 px of content,
+  then scrolls internally.
+- The 38 px second row always owns Send/Stop at the right. When a backend exposes Model selection,
+  its borderless control sits at the left; without a Model, the action remains in the same position.
+  Model text aligns with the textarea placeholder and uses the same subtle color and 400 weight;
+  hover may rise only to muted text. The Composer therefore keeps a stable 102 px resting height.
+- Horizontal outside margin is 12 px at every supported sidebar width, matching the Data sidebar's
+  row inset, and the Composer radius is the same 6 px row radius. At rest the Composer uses the
+  Data tree's existing selected-row surface; focus uses that row's stronger selected-hover gradient.
+  This is a one-way Agent-side visual mirror: the Data sidebar remains unchanged and authoritative.
+  A ready empty session uses the quiet `Ask about this project` placeholder; follow-ups use
+  `Send follow-up`, while setup and recovery states use actionable placeholders. The textarea
+  always retains an accessible name.
 - Enter submits, Shift+Enter inserts a newline and IME composition never submits early.
+- Submit clears the controlled draft synchronously, renders the optimistic user prompt and
+  changes Send to a busy indicator before any IPC/session setup await. The first submit reuses
+  an in-flight session-preparation promise and never launches a duplicate initialization. A
+  rejected start restores the prompt only when the user has not already begun another draft.
 - The draft remains editable while Agent setup or runtime repair is required. Send alone is
   disabled and the placeholder explains the next action.
-- `+` owns attachment, `@` context and lower-frequency mode actions. Agent and
-  the most relevant backend-scoped Model/Provider control remain visible.
+- Attachment, `@` context and lower-frequency mode actions remain capability-driven. The most
+  relevant backend-scoped Model/Provider control remains visible; the session-level Agent
+  selector must not be duplicated in the composer.
 - During a turn, Send becomes Stop unless the capability explicitly supports steer or queue.
   Stop remains a stable target and never moves because a model name changes width.
-- The Changes pill sits above the composer, not inside it. Blocking docks sit above both.
+- The Changes pill is absolutely anchored eight pixels above the Composer boundary, with a real
+  visible gap and no surface overlap, while consuming no layout height. It is suppressed while a blocking approval or
+  question dock is present. Slash-command results replace it while their menu is open.
+- While application discovery/restoration owns the cold-start loader, the entire dock—including
+  the Composer—is not mounted. Background native-session preparation begins only after that state
+  resolves, keeps the Composer mounted, and remains invisible until a submitted prompt needs its
+  truthful `Preparing <Agent>` status.
 
 ## 14. Motion tokens
 
@@ -386,7 +561,7 @@ anchored listbox/popover so status, grouping, search and secondary text remain c
 | --- | --- | --- | --- |
 | new local prompt | 140 ms | opacity + translateY 4 px | once only |
 | first assistant content | 120 ms | opacity | no typewriter |
-| popover open/close | 120/90 ms | opacity + scale 0.98 | anchored origin |
+| menu/popover open/close | 0 ms | none | appears and disappears immediately |
 | chevron/status change | 120 ms | rotate/color | no layout animation |
 | compact spinner | 900 ms | rotate | running only |
 | row expand disclosure | 140 ms maximum | opacity/clip | skip for very large output |
@@ -399,7 +574,9 @@ zero except an optional non-essential spinner replacement.
 ## 15. Scroll, streaming and performance
 
 - If the viewport is within 80 px of the bottom when a batch arrives, preserve bottom pinning.
-- If the user scrolls away, never pull them back. Show `Jump to latest` with an unread count.
+- If the user scrolls away, never pull them back. Show a 30 px circular, icon-only
+  `Jump to latest` control at the lower center of the transcript. Unread count is conveyed
+  through its accessible name, never visible copy or another badge.
 - Streaming text and tool progress share a frame budget; projection may update more often than
   React commits, but ordinary commits are capped at one per animation frame.
 - Use flattened stable rows, measurement cache and windowing. A 2,000-row transcript mounts at
@@ -413,6 +590,12 @@ zero except an optional non-essential spinner replacement.
   above 50 ms during steady streaming.
 - Provider discovery, executable probing, Markdown parser initialization and large output
   formatting never run synchronously on the sidebar input path.
+- Draft updates do not clone the transcript measurement map, recreate the textarea width
+  observer or render the virtual transcript. Growing streamed Markdown uses React's deferred
+  rendering path so an external-store delta cannot take priority over typing or scrolling.
+- The benchmark suite includes repeated draft-cache writes with 1,000 measurements and
+  controlled composer commits beside a 2,000-row transcript; these product-critical files
+  remain in source control.
 
 The serial happy-dom benchmark is a synchronous regression signal, not a substitute for the
 production Electron gate. Reference M2 Pro results captured 2026-07-12:

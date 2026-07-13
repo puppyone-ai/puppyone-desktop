@@ -349,7 +349,7 @@
 }
 
 .desktop-cloud-billing-price {
-  text-align: right;
+  text-align: end;
 }
 
 .desktop-cloud-billing-price strong,
@@ -363,7 +363,7 @@
 
 .desktop-cloud-billing-price span,
 .desktop-cloud-billing-plan-price span {
-  margin-left: 4px;
+  margin-inline-start: 4px;
   color: var(--po-text-subtle);
   font-size: 12px;
   font-weight: 500;
@@ -411,7 +411,7 @@
 }
 
 .desktop-cloud-plan-feature .with-value {
-  margin-left: 4px;
+  margin-inline-start: 4px;
 }
 
 .desktop-cloud-billing-options {

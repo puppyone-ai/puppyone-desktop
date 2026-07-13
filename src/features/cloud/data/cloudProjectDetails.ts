@@ -21,6 +21,7 @@ import {
   type DesktopCloudHistory,
 } from "../../../lib/cloudHistoryApi";
 import { unwrapSettled } from "../utils";
+import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
 export type CloudProjectDetailsData = {
   activeProject: DesktopCloudProject | null;
@@ -32,7 +33,7 @@ export type CloudProjectDetailsData = {
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;
   readiness: DesktopCloudProjectReadiness | null;
-  warning: string | null;
+  warning: CloudMessageDescriptor | null;
 };
 
 export async function loadCloudProjectDetails({
@@ -95,8 +96,6 @@ export async function loadCloudProjectDetails({
     mcpEndpoints: unwrapSettled(mcpResult) ?? [],
     identity: unwrapSettled(identityResult),
     readiness: unwrapSettled(readinessResult),
-    warning: sectionErrors.length > 0
-      ? "Some Cloud project details could not be loaded. Refresh after checking the backend connection."
-      : null,
+    warning: sectionErrors.length > 0 ? cloudMessage("project-details-partial") : null,
   };
 }

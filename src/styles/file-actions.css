@@ -112,10 +112,17 @@
 
 .desktop-dialog-field select {
   appearance: none;
-  padding-right: 28px;
+  padding-inline-end: 28px;
   background:
     linear-gradient(45deg, transparent 50%, var(--po-text-muted) 50%) calc(100% - 15px) 13px / 5px 5px no-repeat,
     linear-gradient(135deg, var(--po-text-muted) 50%, transparent 50%) calc(100% - 10px) 13px / 5px 5px no-repeat,
+    var(--po-panel-raised);
+}
+
+[dir="rtl"] .desktop-dialog-field select {
+  background:
+    linear-gradient(45deg, transparent 50%, var(--po-text-muted) 50%) 15px 13px / 5px 5px no-repeat,
+    linear-gradient(135deg, var(--po-text-muted) 50%, transparent 50%) 10px 13px / 5px 5px no-repeat,
     var(--po-panel-raised);
 }
 
@@ -165,7 +172,7 @@
   display: none;
   position: absolute;
   top: -6px;
-  right: -10px;
+  inset-inline-end: -10px;
   width: 14px;
   height: calc(100% + 12px);
   z-index: 1;
@@ -185,7 +192,7 @@
 .desktop-create-entry-submenu {
   position: absolute;
   top: -4px;
-  left: calc(100% + 4px);
+  inset-inline-start: calc(100% + 4px);
   z-index: 2;
   width: 184px;
   padding: var(--po-menu-padding);

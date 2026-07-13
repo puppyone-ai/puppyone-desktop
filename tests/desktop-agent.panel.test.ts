@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { RightAgentPanel } from "../src/features/desktop-agent";
 import { clearAgentControllerRegistryForTests } from "../src/features/desktop-agent/application/controllerRegistry";
 import type { AgentEvent, AgentSessionSnapshot } from "../src/features/desktop-agent/agentTypes";
+import { stripBidiIsolation, withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -22,6 +23,35 @@ afterEach(() => {
 });
 
 describe("Desktop Agent panel lifecycle", () => {
+  it("uses one centered product loader while the chat runtime starts", async () => {
+    const harness = createBridgeHarness();
+    let finishDiscovery: ((inspection: ReturnType<typeof readyInspection>) => void) | null = null;
+    harness.bridge.discoverAgentProviders = vi.fn(() => new Promise<ReturnType<typeof readyInspection>>((resolve) => {
+      finishDiscovery = resolve;
+    }));
+
+    const container = renderPanel(harness.bridge);
+    await act(async () => { await Promise.resolve(); });
+
+    const loaders = container.querySelectorAll("[data-puppy-loader]");
+    const loadingSurface = container.querySelector(".desktop-agent-startup-loading") as HTMLDivElement;
+    expect(loaders).toHaveLength(1);
+    expect(stripBidiIsolation(loaders[0].getAttribute("aria-label"))).toBe("Preparing Agent");
+    expect(loadingSurface).not.toBeNull();
+    expect(loadingSurface.style.alignItems).toBe("center");
+    expect(loadingSurface.style.justifyContent).toBe("center");
+    expect(container.querySelector(".desktop-agent-status-region")).toBeNull();
+    expect(container.querySelector(".desktop-agent-dock-region")).toBeNull();
+    expect(container.querySelector("textarea")).toBeNull();
+    expect(container.textContent).not.toMatch(/Preparing Agent|Checking Agent|Restoring session|Starting session/);
+
+    await act(async () => { finishDiscovery?.(readyInspection()); });
+    await flushEffects();
+    expect(container.querySelector(".desktop-agent-startup-loading")).toBeNull();
+    expect(container.querySelector(".desktop-agent-dock-region")).not.toBeNull();
+    expect(container.querySelector("textarea")).not.toBeNull();
+  });
+
   it("keeps the draft editable and offers recovery after the provider exits", async () => {
     const harness = createBridgeHarness();
     const container = renderPanel(harness.bridge);
@@ -30,18 +60,20 @@ describe("Desktop Agent panel lifecycle", () => {
 
     act(() => harness.exitListener?.({ sessionId: "session-1", reason: "provider-exited" }));
 
-    expect(container.textContent).toContain("OpenCode stopped unexpectedly");
+    expect(stripBidiIsolation(container.textContent)).toContain("OpenCode stopped unexpectedly");
     expect((container.querySelector("textarea") as HTMLTextAreaElement).disabled).toBe(false);
     expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
     expect(container.textContent).toContain("provider exited");
 
-    const newSessionButton = container.querySelector('button[aria-label="New OpenCode session"]') as HTMLButtonElement;
-    act(() => newSessionButton.click());
+    const newSessionButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => stripBidiIsolation(button.getAttribute("aria-label")) === "New OpenCode session");
+    expect(newSessionButton).toBeDefined();
+    act(() => newSessionButton?.click());
     await flushEffects();
     expect(harness.bridge.closeAgentSession).toHaveBeenCalledWith({
       rootPath: "/workspace",
       sessionId: "session-1",
-      removePersistence: false,
+      removePersistence: true,
     });
   });
 
@@ -84,10 +116,12 @@ describe("Desktop Agent panel lifecycle", () => {
 
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(textarea.disabled).toBe(false);
-    expect(textarea.style.height).toBe("20px");
-    expect(container.textContent).toContain("PuppyOne Agent needs repair");
-    expect(container.textContent).toContain("Agent engine powered by OpenCode");
-    expect(container.textContent).not.toContain("OpenCode update required");
+    expect(textarea.getAttribute("style")).toBeNull();
+    const text = stripBidiIsolation(container.textContent);
+    expect(text).toContain("OpenCode needs attention");
+    expect(text).toContain("Update this coding Agent to a supported version");
+    expect(text).toContain("The configured Agent engine is incompatible");
+    expect(text).not.toContain("OpenCode update required");
     expect(container.querySelector('button[aria-label="Retry Agent engine"]')).not.toBeNull();
   });
 
@@ -120,10 +154,10 @@ function renderPanel(bridge: ReturnType<typeof createBridgeHarness>["bridge"]) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root?.render(React.createElement(RightAgentPanel, {
+  act(() => root?.render(withTestLocalization(React.createElement(RightAgentPanel, {
     workspace: { id: "workspace", name: "Workspace", path: "/workspace" },
     active: true,
-  })));
+  }))));
   return container;
 }
 
@@ -138,34 +172,7 @@ function createBridgeHarness() {
     bridge: {},
   };
   harness.bridge = {
-    discoverAgentProviders: vi.fn(async () => ({
-      runtimes: [{
-        descriptor: { id: "opencode", displayName: "OpenCode", kind: "harness" },
-        readiness: {
-          runtimeId: "opencode",
-          provider: "opencode",
-          status: "ready",
-          version: "0.144.1",
-          minimumVersion: "0.144.1",
-          message: "OpenCode is ready.",
-        },
-      }],
-      selectedRuntimeId: "opencode",
-      runtime: { id: "opencode", displayName: "OpenCode", kind: "harness" },
-      readiness: {
-        runtimeId: "opencode",
-        provider: "opencode",
-        status: "ready",
-        version: "0.144.1",
-        minimumVersion: "0.144.1",
-        message: "OpenCode is ready.",
-      },
-      account: { account: { type: "chatgpt", email: null, planType: null }, requiresOpenaiAuth: true },
-      providers: [{ id: "openai", displayName: "OpenAI", defaultModel: "openai/gpt-5", modelCount: 1 }],
-      models: [{ id: "openai/gpt-5", model: "openai/gpt-5", providerId: "openai", displayName: "GPT-5", description: "OpenAI · GPT-5", isDefault: true }],
-      capabilities: capabilities(),
-      warnings: [],
-    })),
+    discoverAgentProviders: vi.fn(async () => readyInspection()),
     resumeAgentSession: vi.fn(async () => snapshot([
       event(1, "session.resumed", { title: "Session" }),
     ])),
@@ -184,6 +191,37 @@ function createBridgeHarness() {
     }) as never,
   };
   return harness;
+}
+
+function readyInspection() {
+  return {
+    runtimes: [{
+      descriptor: { id: "opencode", displayName: "OpenCode", kind: "harness" },
+      readiness: {
+        runtimeId: "opencode",
+        provider: "opencode",
+        status: "ready" as const,
+        version: "0.144.1",
+        minimumVersion: "0.144.1",
+        message: "OpenCode is ready.",
+      },
+    }],
+    selectedRuntimeId: "opencode",
+    runtime: { id: "opencode", displayName: "OpenCode", kind: "harness" },
+    readiness: {
+      runtimeId: "opencode",
+      provider: "opencode",
+      status: "ready" as const,
+      version: "0.144.1",
+      minimumVersion: "0.144.1",
+      message: "OpenCode is ready.",
+    },
+    account: { account: { type: "chatgpt" as const, email: null, planType: null }, requiresOpenaiAuth: true },
+    providers: [{ id: "openai", displayName: "OpenAI", defaultModel: "openai/gpt-5", modelCount: 1 }],
+    models: [{ id: "openai/gpt-5", model: "openai/gpt-5", providerId: "openai", displayName: "GPT-5", description: "OpenAI · GPT-5", isDefault: true }],
+    capabilities: capabilities(),
+    warnings: [],
+  };
 }
 
 function snapshot(events: AgentEvent[]): AgentSessionSnapshot {

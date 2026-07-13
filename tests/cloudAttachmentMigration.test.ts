@@ -15,6 +15,7 @@ import {
 import { isCloudWorkspace, createCloudWorkspace } from "../src/lib/cloudDataPort";
 import type { RecentWorkspaceHomeItem } from "../src/components/MinimalOnboarding";
 import type { Workspace } from "@puppyone/shared-ui";
+import { cloudMessage } from "../src/features/cloud/cloudPresentation";
 
 describe("cloudOnlyWorkspace migration", () => {
   it("defaults cloudOnlyWorkspace to false while keeping cloudWorkspace enabled", () => {
@@ -201,28 +202,28 @@ describe("ProjectCloudAttachment", () => {
       configuredProjectId: null,
       bindingProjectId: null,
       remoteProjectId: "proj-secret",
-      bindingError: "You don’t have access to the Cloud project linked to this folder.",
+      bindingError: cloudMessage("binding-not-authorized"),
       bindingReason: "not-authorized",
       bindingCloudLinked: true,
       resolving: false,
     })).toEqual({
       status: "not-authorized",
       projectId: "proj-secret",
-      message: "You don’t have access to the Cloud project linked to this folder.",
+      message: cloudMessage("binding-not-authorized"),
     });
 
     expect(resolveProjectCloudAttachment({
       configuredProjectId: null,
       bindingProjectId: null,
       remoteProjectId: null,
-      bindingError: "We found a PuppyOne Cloud remote, but couldn’t identify its project.",
+      bindingError: cloudMessage("binding-unknown-remote"),
       bindingReason: "unresolvable",
       bindingCloudLinked: true,
       resolving: false,
     })).toEqual({
       status: "unresolvable",
       projectId: null,
-      message: "We found a PuppyOne Cloud remote, but couldn’t identify its project.",
+      message: cloudMessage("binding-unknown-remote"),
     });
   });
 });

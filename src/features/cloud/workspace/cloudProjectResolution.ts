@@ -7,11 +7,15 @@ import {
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
 import { sameCloudOrigin } from "./explicitWorkspaceBinding";
+import {
+  cloudMessage,
+  type CloudMessageDescriptor,
+} from "../cloudPresentation";
 
 export type RecentWorkspaceCloudBinding = {
   projectId: string | null;
   cloudLinked: boolean;
-  error: string | null;
+  error: CloudMessageDescriptor | null;
   reason?:
     | "not-authorized"
     | "unresolvable"
@@ -31,11 +35,35 @@ export type RecentWorkspaceCloudBinding = {
   capabilities?: string[];
 };
 
-export const CLOUD_PROJECT_NOT_AUTHORIZED_MESSAGE =
-  "You don’t have access to the Cloud project linked to this folder.";
-export const CLOUD_PROJECT_UNRESOLVABLE_MESSAGE =
-  "This legacy Cloud remote needs an explicit Project binding.";
+export const CLOUD_PROJECT_NOT_AUTHORIZED_MESSAGE = cloudMessage("binding-not-authorized");
+export const CLOUD_PROJECT_UNRESOLVABLE_MESSAGE = cloudMessage("binding-unresolvable");
 export const CLOUD_PROJECT_MAPPING_ERROR = CLOUD_PROJECT_UNRESOLVABLE_MESSAGE;
+
+/**
+ * Decide whether the Organization-level Project catalog is needed.
+ *
+ * A Local workspace is resolved binding-first. Session restore must therefore
+ * never race an exact Workspace Binding lookup with a broad Project listing.
+ * The catalog remains available when the user explicitly browses and the
+ * workspace has no canonical Project/binding candidate.
+ */
+export function shouldLoadCloudProjectCatalog({
+  hasOpenWorkspace,
+  workspaceIsCloud,
+  hasLocalTargetHint,
+  localTargetResolutionPending = false,
+  explicitBrowse,
+}: {
+  hasOpenWorkspace: boolean;
+  workspaceIsCloud: boolean;
+  hasLocalTargetHint: boolean;
+  localTargetResolutionPending?: boolean;
+  explicitBrowse: boolean;
+}): boolean {
+  if (!hasOpenWorkspace || workspaceIsCloud) return true;
+  if (localTargetResolutionPending) return false;
+  return explicitBrowse && !hasLocalTargetHint;
+}
 
 function errorStatus(error: unknown): number | null {
   return error && typeof error === "object" && "status" in error
@@ -74,7 +102,7 @@ export async function resolveRecentWorkspaceCloudBinding({
         candidateProjectId: projectId,
         bindingId,
         cloudLinked: true,
-        error: `Switch to the Cloud host used by this binding (${origin}).`,
+        error: cloudMessage("binding-wrong-host", { origin }),
         reason: "wrong-host",
       }];
     }
@@ -84,7 +112,7 @@ export async function resolveRecentWorkspaceCloudBinding({
         candidateProjectId: projectId,
         bindingId,
         cloudLinked: true,
-        error: "This binding belongs to another local checkout.",
+        error: cloudMessage("binding-checkout-mismatch"),
         reason: "binding-revoked",
       }];
     }
@@ -137,7 +165,15 @@ export async function resolveRecentWorkspaceCloudBinding({
         candidateProjectId: projectId,
         bindingId,
         cloudLinked: true,
-        error: error instanceof Error ? error.message : String(error),
+        error: status === 401
+          ? cloudMessage("binding-switch-account")
+          : status === 403 || status === 404
+            ? cloudMessage("binding-not-authorized")
+            : cloudMessage(
+                "binding-network-failed",
+                undefined,
+                error instanceof Error ? error.message : String(error),
+              ),
         reason: status === 401 ? "wrong-account" : status === 403 || status === 404 ? "not-authorized" : "network",
       }];
     }
@@ -154,7 +190,7 @@ export async function resolveRecentWorkspaceCloudBinding({
   return [item.workspace.id, {
     projectId: null,
     cloudLinked: false,
-    error: configError,
+    error: configError ? cloudMessage("binding-config-error", undefined, configError) : null,
     reason: null,
   }];
 }

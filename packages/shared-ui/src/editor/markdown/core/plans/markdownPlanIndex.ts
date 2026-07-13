@@ -59,6 +59,12 @@ export function getMarkdownPlansInRange(
 ): readonly IndexedMarkdownPlan[] {
   const rangeFrom = Math.max(0, Math.min(from, to, state.doc.length));
   const rangeTo = Math.max(rangeFrom, Math.min(Math.max(from, to), state.doc.length));
+  // A document projection needs the canonical full index once so subsequent
+  // incremental patches can use its interval tree instead of compiling an
+  // unrelated range cache for each request.
+  if (rangeFrom === 0 && rangeTo === state.doc.length) {
+    return getMarkdownPlanIndex(state);
+  }
   const cached = getOrCreateCacheEntry(state);
   if (cached.plans) {
     const result: IndexedMarkdownPlan[] = [];

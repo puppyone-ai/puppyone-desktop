@@ -1,5 +1,7 @@
 "use client";
 
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import { ConflictMarkerBanner } from "./ConflictMarkerBanner";
 
 const technicalTextExtensions = [".env", ".log", ".json", ".yml", ".yaml", ".toml", ".ts", ".tsx", ".js", ".jsx", ".css", ".html", ".md"];
@@ -17,6 +19,7 @@ export function PlainTextEditor({
   readOnly = true,
   onChange,
 }: PlainTextEditorProps) {
+  const { t } = useLocalization();
   const lowerName = nodeName.toLowerCase();
   const isTechnicalText = technicalTextExtensions.some((extension) => lowerName.endsWith(extension));
 
@@ -28,7 +31,10 @@ export function PlainTextEditor({
           <pre
             className="plain-text-editor__surface"
             data-technical={isTechnicalText}
-            aria-label={nodeName ? `Read ${nodeName}` : "Read text file"}
+            dir={isTechnicalText ? "ltr" : "auto"}
+            aria-label={nodeName
+              ? t("editor.text.readNamed", { name: bidiIsolate(nodeName) })
+              : t("editor.text.read")}
           >
             {content}
           </pre>
@@ -36,10 +42,13 @@ export function PlainTextEditor({
           <textarea
             className="plain-text-editor__surface plain-text-editor__input"
             data-technical={isTechnicalText}
+            dir={isTechnicalText ? "ltr" : "auto"}
             value={content}
             onChange={(event) => onChange?.(event.currentTarget.value)}
-            placeholder="Start writing..."
-            aria-label={nodeName ? `Edit ${nodeName}` : "Edit text file"}
+            placeholder={t("editor.text.placeholder")}
+            aria-label={nodeName
+              ? t("editor.text.editNamed", { name: bidiIsolate(nodeName) })
+              : t("editor.text.edit")}
             spellCheck={false}
           />
         )}

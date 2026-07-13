@@ -57,7 +57,6 @@ export type CloudServiceMainViewProps = {
   cloudBackupError: string | null;
   onStartPuppyoneBackup: () => void;
   onConfigureCloudRemote: (
-    remoteUrl: string,
     projectId?: string | null,
     options?: CloudWorkspaceAttachOptions,
   ) => Promise<GitStatusSnapshot | null>;

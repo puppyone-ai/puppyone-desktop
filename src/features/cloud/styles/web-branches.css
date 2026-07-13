@@ -78,7 +78,7 @@
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  border-right: 1px solid var(--po-border-subtle);
+  border-inline-end: 1px solid var(--po-border-subtle);
   background: var(--po-canvas);
 }
 
@@ -106,7 +106,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--po-text-muted);
-  text-align: left;
+  text-align: start;
   cursor: default;
   transition: background 120ms ease, color 120ms ease;
 }
@@ -333,13 +333,13 @@
   border-radius: 5px;
   background: transparent;
   color: var(--po-text-muted);
-  text-align: left;
+  text-align: start;
   cursor: default;
   transition: background 120ms ease, color 120ms ease;
 }
 
 button.desktop-cloud-branch-graph-row {
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-branch-graph-row:hover,
@@ -606,8 +606,7 @@ button.desktop-cloud-branch-graph-row {
   }
 
   .desktop-cloud-branches-graph {
-    padding-left: 14px;
-    padding-right: 12px;
+    padding-inline: 14px 12px;
   }
 
   .desktop-cloud-branch-graph-author {
@@ -627,7 +626,7 @@ button.desktop-cloud-branch-graph-row {
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-control) 28%, transparent);
   color: var(--po-text-muted);
-  text-align: left;
+  text-align: start;
   cursor: default;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }

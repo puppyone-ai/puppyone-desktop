@@ -7,42 +7,185 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const styleRoot = path.join(root, "src/features/desktop-agent/ui/styles");
 const css = [
   fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/desktop-agent.css"), "utf8"),
-  ...["foundation.css", "transcript.css", "activities.css", "blocking.css", "composer.css", "responsive.css"]
+  ...["foundation.css", "transcript.css", "activities.css", "tool-results.css", "blocking.css", "composer.css", "pickers.css", "responsive.css"]
     .map((file) => fs.readFileSync(path.join(styleRoot, file), "utf8")),
 ].join("\n");
 const composer = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentComposer.tsx"), "utf8");
 const panel = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/RightAgentPanel.tsx"), "utf8");
+const picker = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentPickerPopover.tsx"), "utf8");
+const brandMark = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentBrandMark.tsx"), "utf8");
+const messagePart = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentMessagePart.tsx"), "utf8");
+const transcript = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentTranscript.tsx"), "utf8");
+const commandActivity = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/activity/AgentCommandActivity.tsx"), "utf8");
+const fileQueryActivity = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/activity/AgentFileQueryActivity.tsx"), "utf8");
+const panelStatus = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentPanelStatus.tsx"), "utf8");
+const dataSidebarCss = fs.readFileSync(path.join(root, "src/features/data-workspace/data-shell.css"), "utf8");
+const tokensCss = fs.readFileSync(path.join(root, "src/styles/tokens.css"), "utf8");
+const responsiveCss = fs.readFileSync(path.join(styleRoot, "responsive.css"), "utf8");
 
-describe("Desktop Agent Cursor sidebar visual contract", () => {
-  it("locks the 420px reference geometry", () => {
-    expect(css).toMatch(/--agent-page-gutter:\s*8px/);
-    expect(css).toMatch(/--agent-composer-gutter:\s*8px/);
-    expect(css).toMatch(/--agent-radius-message:\s*13px/);
-    expect(css).toMatch(/--agent-radius-composer:\s*22px/);
-    expect(css).toMatch(/\.desktop-agent-transcript\s*\{[^}]*padding:\s*10px var\(--agent-page-gutter\) 28px/s);
-    expect(css).toMatch(/\.desktop-agent-message\.is-user\s*\{[^}]*width:\s*fit-content[^}]*max-width:\s*min\(86%, 720px\)[^}]*padding:\s*12px 14px/s);
-    expect(css).toMatch(/\.desktop-agent-message\.is-assistant\s*\{\s*padding:\s*0 10px/);
+describe("Desktop Agent Cursor-style sidebar visual contract", () => {
+  it("keeps user prompts as full-width rows and Agent replies in document flow", () => {
+    expect(css).toMatch(/--agent-inline-inset:\s*var\(--desktop-sidebar-row-left-gap, 12px\)/);
+    expect(css).toMatch(/--agent-dock-padding-top:\s*12px/);
+    expect(css).toMatch(/--agent-dock-padding-bottom:\s*12px/);
+    expect(css).toMatch(/--agent-control-size:\s*30px/);
+    expect(css).toMatch(/--agent-message-content-inset:\s*12px/);
+    expect(css).toMatch(/--agent-message-turn-gap:\s*24px/);
+    expect(css).toMatch(/--agent-work-handoff-gap:\s*8px/);
+    expect(css).toMatch(/--agent-radius-message:\s*var\(--desktop-sidebar-row-radius, 6px\)/);
+    expect(css).toMatch(/--agent-radius-composer:\s*var\(--desktop-sidebar-row-radius, 6px\)/);
+    expect(css).toMatch(/\.desktop-agent-transcript\s*\{[^}]*padding:\s*12px var\(--agent-inline-inset\) 24px/s);
+    expect(css).toMatch(/\.desktop-agent-live-tail\s*\{[^}]*gap:\s*var\(--agent-message-turn-gap\)[^}]*padding:\s*0 0 20px/s);
+    expect(css).toMatch(/\.desktop-agent-message\.is-user\s*\{[^}]*box-sizing:\s*border-box[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*margin:\s*0[^}]*padding:\s*8px var\(--agent-message-content-inset\)[^}]*border:\s*0[^}]*background:\s*var\(--agent-composer-surface\)[^}]*box-shadow:\s*none/s);
+    expect(css).toMatch(/\.desktop-agent-virtual-row\s*\{[^}]*padding-bottom:\s*2px/s);
+    expect(css).toMatch(/\.desktop-agent-virtual-row\[data-kind="user"\]\s*\{[^}]*padding-bottom:\s*var\(--agent-message-turn-gap\)/s);
+    expect(css).toMatch(/\.desktop-agent-virtual-row\[data-kind="assistant"\]\s*\{[^}]*padding:\s*2px 0 var\(--agent-work-handoff-gap\)/s);
+    expect(css).toMatch(/\.desktop-agent-virtual-row\[data-kind="turn-summary"\]\s*\{[^}]*padding:\s*0 0 var\(--agent-work-handoff-gap\)/s);
+    expect(css).toMatch(/\.desktop-agent-virtual-row:not\(\[data-kind="user"\]\):has\(\+ \.desktop-agent-virtual-row\[data-kind="user"\]\)\s*\{[^}]*padding-bottom:\s*var\(--agent-message-turn-gap\)/s);
+    expect(css).toMatch(/\.desktop-agent-virtual-row\[data-kind="tool"\],[^{]*\[data-kind="command"\],[^{]*\[data-kind="file-change"\]\s*\{[^}]*padding-bottom:\s*0/s);
+    expect(css).toMatch(/\.desktop-agent-tool-row\s*\{[^}]*min-height:\s*30px[^}]*grid-template-columns:\s*auto auto minmax\(0, 1fr\) auto[^}]*padding:\s*0 4px/s);
+    expect(css).toMatch(/\.desktop-agent-tool-call\.has-detail \.desktop-agent-tool-row\s*\{[^}]*grid-template-columns:\s*auto auto auto minmax\(0, 1fr\) auto/s);
+    expect(css).toMatch(/\.desktop-agent-message\.is-assistant\s*\{[^}]*box-sizing:\s*border-box[^}]*width:\s*100%[^}]*padding:\s*0 var\(--agent-message-content-inset\)[^}]*border:\s*0[^}]*background:\s*transparent[^}]*box-shadow:\s*none/s);
+    expect(css).not.toContain(".desktop-agent-message-actions");
+    expect(messagePart).not.toContain("Copy response");
+    expect(messagePart).not.toContain("clipboard");
+    expect(css).toMatch(/\.desktop-agent-message-text\s*\{[^}]*font-size:\s*var\(--agent-font-size\)/s);
+    expect(css).toMatch(/\.desktop-agent-markdown\s*\{[^}]*font-size:\s*var\(--agent-font-size\)[^}]*line-height:\s*1\.66/s);
+    expect(messagePart).toContain('data-message-surface={isAssistant ? "document" : "row"}');
+    expect(css).toMatch(/\.desktop-agent-turn-summary\s*\{[^}]*padding-inline:\s*var\(--agent-message-content-inset\)[^}]*color:\s*var\(--agent-text-subtle\)[^}]*font-size:\s*var\(--agent-font-size\)[^}]*line-height:\s*1\.66[^}]*text-align:\s*start/s);
+    expect(css).not.toContain("desktop-agent-turn-summary-line");
+    expect(responsiveCss).not.toMatch(/desktop-agent-virtual-row\[data-kind="assistant"\]/);
+    expect(responsiveCss).not.toMatch(/desktop-agent-message\.is-(?:assistant|user)/);
+    expect(responsiveCss).not.toMatch(/desktop-agent-turn-summary/);
+    expect(transcript).toContain('kind: "turn-summary"');
+    expect(transcript).not.toContain("style={{");
+    expect(transcript).toContain("agentVirtualCanvasGeometry(layout.totalHeight)");
+    expect(transcript).toContain("agentVirtualRowGeometry(top)");
   });
 
-  it("keeps chrome out of the document flow and the composer on one row", () => {
-    expect(css).toMatch(/\.desktop-agent-session-header\s*\{[^}]*position:\s*absolute[^}]*opacity:\s*0/s);
-    expect(css).toMatch(/\.desktop-agent-composer-shell\s*\{[^}]*padding:\s*4px var\(--agent-composer-gutter\) 8px/s);
-    expect(css).toMatch(/\.desktop-agent-composer\s*\{[^}]*padding:\s*3px 7px 3px 8px/s);
-    expect(css).toMatch(/\.desktop-agent-composer-row\s*\{[^}]*min-height:\s*34px[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto[^}]*gap:\s*8px/s);
-    expect(css).toMatch(/\.desktop-agent-composer-tool\s*\{[^}]*width:\s*24px[^}]*height:\s*24px/s);
-    expect(css).toMatch(/\.desktop-agent-composer-action\s*\{[^}]*width:\s*24px[^}]*height:\s*24px/s);
-    expect(css).toMatch(/\.desktop-agent-composer textarea\s*\{[^}]*min-height:\s*20px[^}]*max-height:\s*132px/s);
-    expect(composer).toContain('className="desktop-agent-tools-menu"');
-    expect(composer.indexOf('is-provider')).toBeLessThan(composer.indexOf('is-model'));
+  it("keeps chrome in flow and gives the composer explicit control sizing", () => {
+    expect(css).toMatch(/\.desktop-agent-header-region\s*\{[^}]*height:\s*var\(--desktop-sidebar-navigation-height\)/s);
+    expect(css).not.toMatch(/\.desktop-agent-header-region\s*\{[^}]*box-shadow:/s);
+    expect(tokensCss).toMatch(/--desktop-sidebar-navigation-padding-outer:\s*12px/);
+    expect(tokensCss).toMatch(/--desktop-sidebar-navigation-padding-inline:\s*12px/);
+    expect(tokensCss).toMatch(/--desktop-sidebar-navigation-padding-inner:\s*4px/);
+    expect(dataSidebarCss).toMatch(/\.desktop-sidebar-navigation-surface\[data-placement="top"\]\s*\{[^}]*padding:\s*var\(--desktop-sidebar-navigation-padding-outer\)\s*var\(--desktop-sidebar-navigation-padding-inline\)\s*var\(--desktop-sidebar-navigation-padding-inner\)/s);
+    expect(css).toMatch(/\.desktop-agent-session-header\s*\{[^}]*width:\s*100%[^}]*height:\s*var\(--desktop-sidebar-navigation-height\)[^}]*justify-content:\s*flex-start[^}]*padding:\s*var\(--desktop-sidebar-navigation-padding-outer\)\s*var\(--desktop-sidebar-navigation-padding-inline\)\s*var\(--desktop-sidebar-navigation-padding-inner\)[^}]*border:\s*0/s);
+    expect(css).toMatch(/\.desktop-agent-session-identity\s*\{[^}]*max-width:\s*calc\([^}]*100%[^}]*- var\(--desktop-sidebar-control-size\)[^}]*- var\(--desktop-sidebar-control-size\)[^}]*- var\(--desktop-sidebar-nav-gap\)[^}]*- var\(--desktop-sidebar-nav-gap\)[^}]*\)[^}]*flex:\s*0 1 auto/s);
+    expect(css).toMatch(/\.desktop-agent-session-agent-selector\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*100%/s);
+    expect(css).toMatch(/\.desktop-agent-session-header-actions\s*\{[^}]*gap:\s*var\(--desktop-sidebar-nav-gap\)/s);
+    expect(css).toMatch(/\.desktop-agent-icon-button\s*\{[^}]*width:\s*var\(--desktop-sidebar-control-size\)[^}]*height:\s*var\(--desktop-sidebar-control-size\)/s);
+    expect(css).toMatch(/\.desktop-agent-transcript-wrap::before\s*\{[^}]*inset-inline:\s*0 var\(--desktop-sidebar-navigation-fade-scrollbar-inset\)[^}]*height:\s*calc\(var\(--desktop-sidebar-navigation-fade-size\) \* var\(--agent-edge-fade-top, 0\)\)[^}]*var\(--agent-canvas\) 0%[^}]*color-mix\(in srgb, var\(--agent-canvas\) 78%, transparent\) 46%[^}]*transparent 100%[^}]*opacity:\s*var\(--agent-edge-fade-top, 0\)/s);
+    expect(transcript).toContain("useScrollEdgeState(scrollRef");
+    expect(transcript).toContain("agentTranscriptFadeGeometry(scrollEdgeState.topFade)");
+    expect(css).toMatch(/\.desktop-agent-dock-region\s*\{[^}]*padding:\s*var\(--agent-dock-padding-top\) var\(--agent-inline-inset\) var\(--agent-dock-padding-bottom\)/s);
+    expect(css).toMatch(/\.desktop-agent-composer-shell\s*\{[^}]*padding:\s*0/s);
+    expect(css).toMatch(/\.desktop-agent-composer-floating\s*\{[^}]*position:\s*absolute[^}]*bottom:\s*calc\(100% \+ 8px\)[^}]*pointer-events:\s*none/s);
+    expect(css).toMatch(/--agent-sidebar-border:\s*var\(--po-divider\)/);
+    expect(css).toMatch(/--agent-config-border:\s*var\(--po-border-subtle\)/);
+    expect(css).toMatch(/--agent-row-hover-surface:\s*color-mix\(in srgb, var\(--po-hover\) 86%, transparent\)/);
+    expect(css).toMatch(/--agent-row-selected-surface:\s*linear-gradient\(\s*90deg,\s*color-mix\(in srgb, var\(--po-selected\) 96%, transparent\) 0%,\s*color-mix\(in srgb, var\(--po-selected\) 88%, transparent\) calc\(100% - 36px\),\s*color-mix\(in srgb, var\(--po-selected\) 62%, transparent\) 100%\s*\)/s);
+    expect(css).toMatch(/\.dark \.desktop-agent-boundary,[^{]*\{[^}]*--agent-row-hover-surface:\s*color-mix\(in srgb, rgba\(211, 208, 197, 0\.075\) 86%, transparent\)[^}]*--agent-row-selected-surface:\s*linear-gradient/s);
+    expect(css).toMatch(/\.desktop-agent-composer\s*\{[^}]*padding:\s*0[^}]*border:\s*0[^}]*border-radius:\s*var\(--agent-radius-composer\)[^}]*background:\s*var\(--agent-composer-surface\)/s);
+    expect(css).toMatch(/\.desktop-agent-composer:focus-within\s*\{[^}]*background:\s*var\(--agent-row-selected-surface\)/s);
+    expect(css).toMatch(/\.desktop-agent-picker-option\.is-selected\s*\{[^}]*background:\s*var\(--agent-row-hover-surface\)/s);
+    expect(css).toMatch(/\.desktop-agent-picker-option\.is-selected:not\(\[aria-disabled="true"\]\):hover,[^{]*\{[^}]*background:\s*var\(--agent-row-selected-surface\)/s);
+    expect(css).toMatch(/\.desktop-agent-composer-trailing\s*\{[^}]*min-height:\s*var\(--agent-composer-toolbar-height\)[^}]*padding:\s*0 8px 8px 12px[^}]*border:\s*0/s);
+    expect(css).toMatch(/\.desktop-agent-picker-trigger\s*\{[^}]*width:\s*fit-content[^}]*border:\s*1px solid var\(--agent-config-border\)[^}]*background:\s*transparent/s);
+    expect(css).toMatch(/\.desktop-agent-composer-picker\.is-model\s*\{[^}]*width:\s*fit-content/s);
+    expect(css).toMatch(/--agent-composer-input-padding:\s*12px/);
+    expect(css).toMatch(/--agent-composer-text-min-height:\s*40px/);
+    expect(css).toMatch(/--agent-composer-text-max-height:\s*120px/);
+    expect(css).toMatch(/--agent-composer-input-min-height:\s*64px/);
+    expect(css).toMatch(/--agent-composer-toolbar-height:\s*38px/);
+    expect(css).toMatch(/\.desktop-agent-composer-row\s*\{[^}]*display:\s*flex[^}]*min-height:\s*var\(--agent-composer-input-min-height\)[^}]*flex-direction:\s*column[^}]*gap:\s*0/s);
+    expect(css).toMatch(/\.desktop-agent-composer-input-row\s*\{[^}]*display:\s*grid[^}]*min-height:\s*var\(--agent-composer-input-min-height\)[^}]*grid-template-columns:\s*minmax\(0, 1fr\)[^}]*padding:\s*var\(--agent-composer-input-padding\)/s);
+    expect(css).toMatch(/\.desktop-agent-composer-actions\s*\{[^}]*display:\s*flex[^}]*margin-inline-start:\s*auto/s);
+    expect(css).toMatch(/\.desktop-agent-picker-trigger\.is-compact\s*\{[^}]*width:\s*var\(--agent-control-size\)/s);
+    expect(css).toMatch(/\.desktop-agent-composer-action\s*\{[^}]*width:\s*var\(--agent-control-size\)[^}]*height:\s*var\(--agent-control-size\)[^}]*border-radius:\s*6px/s);
+    expect(css).toMatch(/\.desktop-agent-composer textarea\s*\{[^}]*min-height:\s*var\(--agent-composer-text-min-height\)[^}]*max-height:\s*var\(--agent-composer-text-max-height\)[^}]*field-sizing:\s*content[^}]*overflow-y:\s*auto[^}]*padding:\s*0[^}]*font-size:\s*var\(--agent-font-size\)[^}]*line-height:\s*var\(--agent-composer-line-height\)/s);
+    expect(css).toMatch(/\.desktop-agent-composer-picker \.desktop-agent-picker-trigger\s*\{[^}]*padding:\s*0 6px 0 0[^}]*border:\s*0[^}]*color:\s*var\(--agent-text-subtle\)[^}]*font-weight:\s*400/s);
+    expect(css).toMatch(/\.desktop-agent-session-menu\s*\{[^}]*inset-inline:\s*auto[^}]*inset-inline-start:\s*0/s);
+    expect(transcript).not.toContain("What do you want to do in this project?");
+    expect(transcript).not.toContain("What should we build?");
+    expect(transcript).not.toContain("desktop-agent-empty");
+    expect(panel).toContain("loading={startupLoading}");
+    expect(panel).toContain("dock={startupLoading ? null");
+    expect(panel).toContain("floatingAccessory=");
+    expect(composer).not.toContain("<Plus");
+    expect(composer).toContain('className="desktop-agent-composer-actions"');
+    expect(composer.indexOf('className="desktop-agent-composer-trailing"')).toBeLessThan(composer.indexOf('aria-label={running && steerAvailable'));
+    expect(composer).not.toContain('className="desktop-agent-tools-menu"');
+    expect(composer).not.toContain("AgentBackendPicker");
+    expect(composer).not.toContain('is-backend');
+    expect(composer).not.toContain("AgentProviderPicker");
+    expect(panel).toContain("agentSelector={<AgentProviderPicker");
+    expect(panel).toContain("t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID)");
+    expect(composer).toContain('DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID = "agent.composer.placeholder.default"');
+    expect(css).toMatch(/\.desktop-agent-picker\.is-header\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*100%/s);
+    expect(css).toMatch(/\.desktop-agent-picker\.is-header \.desktop-agent-picker-trigger\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*100%[^}]*border:\s*0[^}]*font-weight:\s*650/s);
+    expect(css).not.toContain("max-width: min(68%, 300px)");
+    expect(css).toMatch(/\.desktop-agent-session-header-actions\s*\{[^}]*border:\s*0[^}]*background:\s*transparent/s);
     expect(composer).not.toContain("<Zap");
-    expect(panel).toContain('"Send follow-up"');
+    expect(panel).toContain('t("agent.composer.placeholder.followUp")');
+    expect(panel).toContain("<AgentPanelLayout");
+    expect(css).toMatch(/\.desktop-agent-jump-latest\s*\{[^}]*position:\s*absolute[^}]*inset-inline-start:\s*50%[^}]*width:\s*var\(--agent-control-size\)[^}]*height:\s*var\(--agent-control-size\)[^}]*border-radius:\s*50%[^}]*transform:\s*translateX\(-50%\)/s);
+    expect(brandMark).toContain("/icons/agent-claude-code.svg");
+    expect(brandMark).toContain("/icons/agent-cursor.svg");
+    expect(brandMark).toContain("/icons/agent-opencode.svg");
+    expect(brandMark).not.toMatch(/https?:\/\//);
+  });
+
+  it("shares the Appearance typography scale with the left sidebar", () => {
+    expect(css).toMatch(/--agent-font-size:\s*var\(--desktop-sidebar-font-size, var\(--po-text-size-sidebar, 13px\)\)/);
+    expect(css).toMatch(/--agent-font-size-meta:\s*var\(--desktop-sidebar-font-size-meta, var\(--po-text-size-meta, 12px\)\)/);
+    expect(css).toMatch(/\.desktop-agent-picker-trigger\s*\{[^}]*font-size:\s*var\(--agent-font-size\)/s);
+    expect(css).toMatch(/\.desktop-agent-tool-name\s*\{[^}]*font-size:\s*var\(--agent-font-size\)/s);
+    expect(css).toMatch(/\.desktop-agent-code-block pre\s*\{[^}]*font-size:\s*var\(--agent-code-font-size\)/s);
+  });
+
+  it("uses one centered product loader for startup without a duplicate status loader", () => {
+    expect(transcript).toContain('import { PageLoading } from "../../../components/loading"');
+    expect(transcript).toContain('className="desktop-agent-startup-loading"');
+    expect(transcript).toContain("label={null}");
+    expect(css).toMatch(/\.desktop-agent-startup-loading\s*\{[^}]*min-height:\s*100%[^}]*pointer-events:\s*none/s);
+    expect(panel).not.toMatch(/hasStatus\s*=.*loading/);
+    expect(panelStatus).not.toContain("LoaderCircle");
+    expect(panelStatus).not.toContain("desktop-agent-provider-progress");
+  });
+
+  it("uses one compact highlighted row grammar for every native tool", () => {
+    expect(css).toMatch(/\.desktop-agent-tool-icon\s*\{[^}]*display:\s*grid[^}]*color:\s*var\(--agent-current-tool-accent, var\(--agent-text-subtle\)\)/s);
+    expect(css).toMatch(/\.desktop-agent-tool-name\s*\{[^}]*color:\s*var\(--agent-current-tool-accent, var\(--agent-text-muted\)\)/s);
+    expect(css).toMatch(/\.desktop-agent-tool-chevron\s*\{[^}]*grid-column:\s*3/s);
+    expect(css).toMatch(/\.desktop-agent-tool-call\.has-detail \.desktop-agent-tool-summary\s*\{[^}]*grid-column:\s*4/s);
+    expect(css).toMatch(/\.desktop-agent-command,[^{]*\.desktop-agent-file-query,[^{]*\.desktop-agent-file-change,[^{]*\.desktop-agent-generic-tool\s*\{[^}]*--agent-current-tool-accent:\s*var\(--po-accent-text\)/s);
+    expect(css).toMatch(/\.desktop-agent-tool-branch\s*\{[^}]*border:\s*0[^}]*border-inline-start:\s*2px solid var\(--agent-border-subtle\)[^}]*background:\s*transparent/s);
+    expect(commandActivity).not.toContain('"via Bash"');
+    expect(commandActivity).not.toContain("commandMetadata");
+    expect(commandActivity).not.toContain("CommandActions");
+    expect(commandActivity).toContain("commandPresentationForActivity");
+    expect(fileQueryActivity).toContain("MAX_VISIBLE_RESULT_LINES = 80");
+    expect(fileQueryActivity).toContain("desktop-agent-search-results");
   });
 
   it("retains bounded overflow and explicit responsive contracts", () => {
     expect(css).toMatch(/\.desktop-agent-transcript\s*\{[^}]*overflow-x:\s*hidden/s);
-    expect(css).toMatch(/@container desktop-agent \(max-width:\s*759px\)/);
+    expect(css).not.toMatch(/@container desktop-agent \(max-width:\s*759px\)/);
     expect(css).toMatch(/@container desktop-agent \(max-width:\s*559px\)/);
     expect(css).toMatch(/@container desktop-agent \(max-width:\s*419px\)/);
-    expect(css).toMatch(/\.desktop-agent-changes-pill\s*\{[^}]*min-height:\s*28px/s);
+    expect(css).toMatch(/\.desktop-agent-changes-pill\s*\{[^}]*min-height:\s*var\(--agent-control-size\)/s);
+    expect(css).toMatch(/\.desktop-agent-tool-call\s*\{[^}]*margin:\s*0 4px[^}]*padding:\s*0[^}]*border:\s*0[^}]*background:\s*transparent/s);
+    expect(css).not.toContain(".desktop-agent-tool-call::before");
+    expect(css).not.toContain("desktop-agent-research-pulse");
+    expect(css).toMatch(/\.desktop-agent-command\s*\{[^}]*overflow:\s*visible[^}]*border:\s*0[^}]*border-radius:\s*6px/s);
+    expect(css).not.toContain(".desktop-agent-tool-meta");
+    expect(css).not.toContain(".desktop-agent-tool-action");
+    expect(css).toMatch(/\.desktop-agent-context-divider\s*\{[^}]*grid-template-columns:\s*minmax\(18px, 1fr\) auto minmax\(18px, 1fr\)/s);
+    expect(css).toMatch(/\.desktop-agent-picker-popover\s*\{[^}]*position:\s*fixed[^}]*top:\s*var\(--agent-overlay-top, 0px\)[^}]*left:\s*var\(--agent-overlay-left, 0px\)[^}]*z-index:\s*1300[^}]*width:\s*var\(--agent-overlay-width, 0px\)[^}]*max-height:\s*var\(--agent-overlay-max-height, 0px\)/s);
+    expect(css).not.toContain("desktop-agent-picker-in");
+    expect(css).not.toMatch(/\.desktop-agent-picker-popover\s*\{[^}]*animation:/s);
+    expect(picker).toContain("DesktopOverlayLayer");
+    expect(picker).toContain('boundarySelector: ".desktop-agent-boundary"');
   });
 });

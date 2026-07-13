@@ -4,8 +4,11 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   ReactNode,
+  RefObject,
 } from "react";
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import type { DataNode } from "../core/types";
 import { FileGlyphIcon, type FileIconThemeId } from "../file/fileIcons";
 import { DotsLoader, InlineLoading } from "../primitives/LoadingIndicator";
@@ -24,7 +27,15 @@ import {
   type ExplorerRowInteractionState,
   type ExplorerRowStateSources,
 } from "./explorer/explorerRowInteraction";
-import type { ExplorerRowMotionInstruction } from "./explorer/explorerMotionPlan";
+import {
+  createExplorerMotionAnimation,
+  EXPLORER_MOTION_DURATION_MS,
+  EXPLORER_MOTION_EASING,
+} from "./explorer/explorerMotionAnimation";
+import type {
+  ExplorerRevealPhase,
+  ExplorerRowMotionInstruction,
+} from "./explorer/explorerMotionPlan";
 import { useExplorerMotion } from "./explorer/useExplorerMotion";
 import {
   EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS,
@@ -110,10 +121,10 @@ export function ExplorerTree({
   loadingPaths,
   rootLoading = false,
   rootError = null,
-  rootLabel = "Root",
+  rootLabel,
   showRoot = true,
-  emptyLabel = "Empty folder",
-  loadingLabel = "Loading...",
+  emptyLabel,
+  loadingLabel,
   fileIconTheme = "default",
   canMoveNodes = false,
   onSelectNode,
@@ -134,6 +145,10 @@ export function ExplorerTree({
   renderFolderActions,
   renderNodeActions,
 }: ExplorerTreeProps) {
+  const { direction, t } = useLocalization();
+  const resolvedRootLabel = rootLabel ?? t("shared-ui.explorer.root");
+  const resolvedEmptyLabel = emptyLabel ?? t("shared-ui.explorer.emptyFolder");
+  const resolvedLoadingLabel = loadingLabel ?? t("shared-ui.loading");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [draggedNodes, setDraggedNodes] = useState<DataNode[]>([]);
   const [dropTarget, setDropTarget] = useState<TreeDropTarget>(null);
@@ -147,9 +162,9 @@ export function ExplorerTree({
   const visibleModel = useMemo(() => buildExplorerVisibleModel(nodes, {
     expandedPaths,
     loadingPaths: resolvedLoadingPaths,
-    emptyLabel,
-    loadingLabel,
-  }), [emptyLabel, expandedPaths, loadingLabel, nodes, resolvedLoadingPaths]);
+    emptyLabel: resolvedEmptyLabel,
+    loadingLabel: resolvedLoadingLabel,
+  }), [expandedPaths, nodes, resolvedEmptyLabel, resolvedLoadingLabel, resolvedLoadingPaths]);
   const nodeIndex = useMemo(() => buildExplorerNodeIndex(nodes), [nodes]);
   const selectedDragNodes = useMemo(
     () => collectTopLevelSelectedNodes(nodeIndex, selectedPaths),
@@ -405,14 +420,14 @@ export function ExplorerTree({
       nextIndex = findNavigableRowIndex(visibleModel.rows, Math.max(0, currentIndex + 1), 1);
     } else if (event.key === "ArrowUp") {
       nextIndex = findNavigableRowIndex(visibleModel.rows, Math.max(0, currentIndex - 1), -1);
-    } else if (currentRow?.kind === "node" && event.key === "ArrowRight") {
+    } else if (currentRow?.kind === "node" && event.key === (direction === "rtl" ? "ArrowLeft" : "ArrowRight")) {
       if (currentRow.node.type === "folder" && !expandedPaths.has(currentRow.path)) {
         event.preventDefault();
         toggleFolder(currentRow.node, true);
         return;
       }
       nextIndex = findNavigableRowIndex(visibleModel.rows, currentIndex + 1, 1);
-    } else if (currentRow?.kind === "node" && event.key === "ArrowLeft") {
+    } else if (currentRow?.kind === "node" && event.key === (direction === "rtl" ? "ArrowRight" : "ArrowLeft")) {
       if (currentRow.node.type === "folder" && expandedPaths.has(currentRow.path)) {
         event.preventDefault();
         toggleFolder(currentRow.node, false);
@@ -430,7 +445,7 @@ export function ExplorerTree({
     event.stopPropagation();
     selectNode(nextRow.node);
     focusRowAtIndex(nextIndex);
-  }, [activeIndex, expandedPaths, focusRowAtIndex, selectNode, toggleFolder, visibleModel]);
+  }, [activeIndex, direction, expandedPaths, focusRowAtIndex, selectNode, toggleFolder, visibleModel]);
 
   const handleTreeKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
     handleClipboardShortcut(event);
@@ -443,6 +458,8 @@ export function ExplorerTree({
       data-scroll-at-bottom={scrollEdgeState.atBottom ? "true" : "false"}
       data-scroll-at-top={scrollEdgeState.atTop ? "true" : "false"}
       style={{
+        "--tree-motion-duration": `${EXPLORER_MOTION_DURATION_MS}ms`,
+        "--tree-motion-easing": EXPLORER_MOTION_EASING,
         "--tree-edge-fade-bottom": scrollEdgeState.bottomFade.toFixed(3),
         "--tree-edge-fade-top": scrollEdgeState.topFade.toFixed(3),
       } as CSSProperties}
@@ -471,7 +488,7 @@ export function ExplorerTree({
             >
               {renderRootContent ? renderRootContent() : (
                 <span className="tree-row-content">
-                  <span className="tree-label">{rootLabel}</span>
+                  <span className="tree-label">{resolvedRootLabel}</span>
                 </span>
               )}
             </button>
@@ -485,7 +502,7 @@ export function ExplorerTree({
               onDrop={dropEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
             >
               <span className="tree-row-content">
-                <span className="tree-label">{rootLabel}</span>
+                <span className="tree-label">{resolvedRootLabel}</span>
                 {renderRootActions && (
                   <span className="tree-row-actions root-actions" onClick={(event) => event.stopPropagation()}>
                     {renderRootActions()}
@@ -509,9 +526,9 @@ export function ExplorerTree({
           {rootError && nodes.length === 0 ? (
             <ExplorerTreeMetaRow depth={0}>{rootError}</ExplorerTreeMetaRow>
           ) : rootLoading && nodes.length === 0 ? (
-            <ExplorerTreeMetaRow depth={0} loading>{loadingLabel}</ExplorerTreeMetaRow>
+            <ExplorerTreeMetaRow depth={0} loading>{resolvedLoadingLabel}</ExplorerTreeMetaRow>
           ) : nodes.length === 0 ? (
-            <ExplorerTreeMetaRow depth={0}>{emptyLabel}</ExplorerTreeMetaRow>
+            <ExplorerTreeMetaRow depth={0}>{resolvedEmptyLabel}</ExplorerTreeMetaRow>
           ) : (
             <div
               className="explorer-tree-virtual-canvas"
@@ -555,7 +572,7 @@ export function ExplorerTree({
                   </ExplorerVirtualMotionShell>
                 </div>
               ))}
-              {motionPlan?.ghosts.map(({ row, top }) => (
+              {motionPlan?.ghosts.map(({ row, top, reveal }) => (
                 <div
                   key={`exit:${motionPlan.generation}:${row.key}`}
                   className="explorer-tree-virtual-row explorer-tree-exit-ghost"
@@ -569,7 +586,7 @@ export function ExplorerTree({
                   <ExplorerVirtualMotionShell
                     depth={row.depth}
                     generation={motionPlan.generation}
-                    exit
+                    exitPhase={reveal}
                   >
                     <ExplorerExitGhostRow
                       row={row}
@@ -581,7 +598,14 @@ export function ExplorerTree({
               ))}
             </div>
           )}
-          {renderListEnd?.()}
+          {renderListEnd && (
+            <ExplorerListEndMotionShell
+              generation={motionPlan?.generation ?? 0}
+              offsetY={motionPlan?.listEndOffsetY ?? 0}
+            >
+              {renderListEnd()}
+            </ExplorerListEndMotionShell>
+          )}
         </div>
       </div>
     </div>
@@ -615,6 +639,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
   onNodeContextMenu,
   renderRowActions,
 }: TreeNodeRowProps) {
+  const { t } = useLocalization();
   const { node, depth, siblingDisplayNameCounts } = row;
   const isFolder = node.type === "folder";
   const hoverExpandTimer = useRef<number | null>(null);
@@ -677,7 +702,9 @@ const TreeNodeRow = memo(function TreeNodeRow({
       aria-expanded={isFolder ? isExpanded : undefined}
       aria-busy={interaction.loading || undefined}
       aria-grabbed={interaction.dragging ? "true" : undefined}
-      aria-label={interaction.cut ? `${node.name}, cut` : node.name}
+      aria-label={interaction.cut
+        ? t("shared-ui.explorer.cutLabel", { name: bidiIsolate(node.name) })
+        : node.name}
       title={displayName.hidden || showExtensionDisambiguator ? node.name : undefined}
       onDragStart={(event) => dragController.onNodeDragStart(event, node)}
       onDragEnd={dragController.onNodeDragEnd}
@@ -781,64 +808,85 @@ function ExplorerVirtualMotionShell({
   depth,
   generation,
   instruction,
-  exit = false,
+  exitPhase,
   children,
 }: {
   depth: number;
   generation: number;
   instruction?: ExplorerRowMotionInstruction;
-  exit?: boolean;
+  exitPhase?: ExplorerRevealPhase;
   children: ReactNode;
 }) {
   const elementRef = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    const element = elementRef.current;
-    if (!element || (!instruction && !exit)) return undefined;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return undefined;
-    if (typeof element.animate !== "function") return undefined;
-
-    const rowDelta = instruction?.kind === "move"
-      ? Math.abs(instruction.offsetY) / EXPLORER_VIRTUAL_ROW_SIZE
-      : 0;
-    const duration = exit
-      ? 145
-      : instruction?.kind === "move"
-        ? Math.min(220, 150 + rowDelta * 5)
-        : 165;
-    const keyframes: Keyframe[] = exit
-      ? [
-          { opacity: 1, transform: "translateY(0) scale(1)" },
-          { opacity: 0, transform: "translateY(-5px) scale(0.985)" },
-        ]
-      : instruction?.kind === "move"
-        ? [
-            { transform: `translateY(${instruction.offsetY}px)` },
-            { transform: "translateY(0)" },
-          ]
-        : [
-            { opacity: 0, transform: "translateY(-6px) scale(0.985)" },
-            { opacity: 1, transform: "translateY(0) scale(1)" },
-          ];
-    const animation = element.animate(keyframes, {
-      duration,
-      easing: "cubic-bezier(0.2, 0.75, 0.25, 1)",
-      fill: "both",
-    });
-    return () => animation.cancel();
-  }, [exit, generation, instruction]);
+  useExplorerElementMotion({ elementRef, exitPhase, generation, instruction });
 
   return (
     <div
       ref={elementRef}
       className="explorer-tree-motion-shell"
       data-depth={depth}
-      data-explorer-motion={exit ? "exit" : instruction?.kind}
+      data-explorer-motion={exitPhase ? "exit" : instruction?.kind}
       style={{ "--depth": depth } as CSSProperties}
     >
       {children}
     </div>
   );
+}
+
+function ExplorerListEndMotionShell({
+  generation,
+  offsetY,
+  children,
+}: {
+  generation: number;
+  offsetY: number;
+  children: ReactNode;
+}) {
+  const elementRef = useRef<HTMLDivElement>(null);
+  const instruction = useMemo<ExplorerRowMotionInstruction | undefined>(
+    () => offsetY === 0 ? undefined : { kind: "move", offsetY },
+    [offsetY],
+  );
+  useExplorerElementMotion({ elementRef, generation, instruction });
+
+  return (
+    <div
+      ref={elementRef}
+      className="explorer-tree-list-end-motion"
+      data-explorer-motion={instruction?.kind}
+    >
+      {children}
+    </div>
+  );
+}
+
+function useExplorerElementMotion({
+  elementRef,
+  generation,
+  instruction,
+  exitPhase,
+}: {
+  elementRef: RefObject<HTMLDivElement>;
+  generation: number;
+  instruction?: ExplorerRowMotionInstruction;
+  exitPhase?: ExplorerRevealPhase;
+}) {
+  useLayoutEffect(() => {
+    const element = elementRef.current;
+    const definition = createExplorerMotionAnimation({ instruction, exitPhase });
+    if (!element || !definition) return undefined;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      if (!exitPhase) return undefined;
+      element.style.visibility = "hidden";
+      return () => {
+        element.style.visibility = "";
+      };
+    }
+    if (typeof element.animate !== "function") return undefined;
+
+    const animation = element.animate(definition.keyframes, definition.options);
+    return () => animation.cancel();
+  }, [elementRef, exitPhase, generation, instruction]);
 }
 
 function ExplorerExitGhostRow({
@@ -894,6 +942,7 @@ function TreeDisclosureMarker({
   expanded?: boolean;
   size?: number;
 }) {
+  const { direction } = useLocalization();
   return (
     <svg
       width={size}
@@ -907,7 +956,9 @@ function TreeDisclosureMarker({
       aria-hidden="true"
       className="tree-disclosure-marker"
       style={{
-        transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
+        transform: expanded
+          ? direction === "rtl" ? "rotate(-90deg)" : "rotate(90deg)"
+          : direction === "rtl" ? "scaleX(-1)" : "rotate(0deg)",
       }}
     >
       <path d="M4 2.5 7.5 6 4 9.5" />

@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DocumentEditingSession } from "../packages/shared-ui/src/editor/document-session/DocumentEditingSession";
 import { PuppyFlowEditor } from "../src/features/puppyflow/PuppyFlowEditor";
+import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -38,7 +39,7 @@ describe("PuppyFlow Document Session integration", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    act(() => root?.render(
+    act(() => root?.render(withTestLocalization(
       <PuppyFlowEditor
         node={{
           id: "workflow.puppyflow",
@@ -55,7 +56,7 @@ describe("PuppyFlow Document Session integration", () => {
         }}
         documentSession={session}
       />,
-    ));
+    )));
 
     expect(container.textContent).toContain("Unable to parse this PuppyFlow file");
     act(() => root?.unmount());

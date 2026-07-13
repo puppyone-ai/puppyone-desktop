@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   getCloudRepoIdentity,
   openCloudApp,
@@ -13,7 +14,9 @@ import { copyText, shellQuote } from "./utils";
 import { CloudWorkspaceLoadingState } from "./components/shared";
 import { CloudProjectBrowserSignedOut } from "./components/ProjectBrowser";
 import { CloudRouter } from "./routes/CloudRouter";
+import type { CloudActionState } from "./routes/CloudRouter";
 import { getCloudRouteWebPath, isCloudAccountSection, normalizeCloudSection } from "./routes/cloudRoutes";
+import { cloudMessage, formatCloudMessage } from "./cloudPresentation";
 
 export function CloudServiceMainView({
   workspace,
@@ -39,6 +42,7 @@ export function CloudServiceMainView({
   onOpenDetails,
   onOpenGitSettings,
 }: CloudServiceMainViewProps) {
+  const { t } = useLocalization();
   const cloudEnvironment = useMemo(
     () => resolveCloudEnvironment({ status, puppyoneConfig, desktopApiBaseUrl }),
     [desktopApiBaseUrl, puppyoneConfig, status],
@@ -63,12 +67,12 @@ export function CloudServiceMainView({
     workspaceRevisionKey: status?.headCommitId ?? null,
     loadProjectDetails: loadAggregateProjectDetails,
   });
-  const [cloudAction, setCloudAction] = useState<{
-    kind: "backup" | "connect" | "copy" | null;
-    projectId: string | null;
-    message: string | null;
-    error: string | null;
-  }>({ kind: null, projectId: null, message: null, error: null });
+  const [cloudAction, setCloudAction] = useState<CloudActionState>({
+    kind: null,
+    projectId: null,
+    notice: null,
+    error: null,
+  });
 
   const accountEmail = getCloudAuthEmail(cloudAuthState);
   const actionContextKey = `${workspace.path}\n${accountEmail ?? ""}\n${cloudApiBaseUrl ?? ""}`;
@@ -78,7 +82,7 @@ export function CloudServiceMainView({
   useEffect(() => {
     actionRequestRef.current = null;
     onSelectProjectId?.(null);
-    setCloudAction({ kind: null, projectId: null, message: null, error: null });
+    setCloudAction({ kind: null, projectId: null, notice: null, error: null });
   }, [workspace.path, accountEmail, cloudApiBaseUrl, onSelectProjectId]);
 
   useEffect(() => {
@@ -92,7 +96,7 @@ export function CloudServiceMainView({
     return (
       <main className="desktop-cloud-main-view">
         <div className="desktop-cloud-page-shell">
-          <CloudWorkspaceLoadingState label="Loading Cloud session" />
+          <CloudWorkspaceLoadingState label={t("cloud.loading.session")} />
         </div>
       </main>
     );
@@ -109,7 +113,7 @@ export function CloudServiceMainView({
       return;
     }
 
-    setCloudAction({ kind: null, projectId: null, message: null, error: null });
+    setCloudAction({ kind: null, projectId: null, notice: null, error: null });
     onStartPuppyoneBackup();
   };
 
@@ -118,21 +122,20 @@ export function CloudServiceMainView({
     const request = Symbol("connect-cloud-project");
     const requestContext = actionContextKey;
     actionRequestRef.current = request;
-    setCloudAction({ kind: "connect", projectId: project.id, message: null, error: null });
+    setCloudAction({ kind: "connect", projectId: project.id, notice: null, error: null });
     try {
-      const identity = await getCloudRepoIdentity(effectiveCloudSession, project.id, onCloudSessionChange, cloudApiBaseUrl);
-      if (actionContextRef.current !== requestContext) return;
-      const configuredStatus = await onConfigureCloudRemote(identity.url, project.id);
+      const configuredStatus = await onConfigureCloudRemote(project.id);
       if (actionContextRef.current !== requestContext) return;
       if (!configuredStatus) {
-        throw new Error("This workspace is no longer available for Cloud attachment.");
+        setCloudAction({ kind: null, projectId: project.id, notice: null, error: cloudMessage("workspace-unavailable") });
+        return;
       }
       // Attach completes the binding; browse selection is no longer needed.
       onSelectProjectId?.(null);
       setCloudAction({
         kind: null,
         projectId: project.id,
-        message: `${project.name} is linked to this folder. Cloud tools are ready under Access.`,
+        notice: cloudMessage("project-linked", { project: project.name }),
         error: null,
       });
       onSelectSection("access");
@@ -141,8 +144,8 @@ export function CloudServiceMainView({
       setCloudAction({
         kind: null,
         projectId: project.id,
-        message: null,
-        error: actionError instanceof Error ? actionError.message : "Unable to connect this project.",
+        notice: null,
+        error: cloudMessage("connect-failed", undefined, actionError instanceof Error ? actionError.message : undefined),
       });
     } finally {
       if (actionRequestRef.current === request) actionRequestRef.current = null;
@@ -154,20 +157,20 @@ export function CloudServiceMainView({
     const request = Symbol("copy-cloud-clone-command");
     const requestContext = actionContextKey;
     actionRequestRef.current = request;
-    setCloudAction({ kind: "copy", projectId: project.id, message: null, error: null });
+    setCloudAction({ kind: "copy", projectId: project.id, notice: null, error: null });
     try {
       const identity = await getCloudRepoIdentity(effectiveCloudSession, project.id, onCloudSessionChange, cloudApiBaseUrl);
       if (actionContextRef.current !== requestContext) return;
       await copyText(`git clone ${identity.url} ${shellQuote(project.name)}`);
       if (actionContextRef.current !== requestContext) return;
-      setCloudAction({ kind: null, projectId: project.id, message: "Clone command copied.", error: null });
+      setCloudAction({ kind: null, projectId: project.id, notice: cloudMessage("clone-command-copied"), error: null });
     } catch (actionError) {
       if (actionContextRef.current !== requestContext) return;
       setCloudAction({
         kind: null,
         projectId: project.id,
-        message: null,
-        error: actionError instanceof Error ? actionError.message : "Unable to copy clone command.",
+        notice: null,
+        error: cloudMessage("copy-clone-failed", undefined, actionError instanceof Error ? actionError.message : undefined),
       });
     } finally {
       if (actionRequestRef.current === request) actionRequestRef.current = null;
@@ -187,20 +190,21 @@ export function CloudServiceMainView({
     const request = Symbol("confirm-legacy-cloud-binding");
     const requestContext = actionContextKey;
     actionRequestRef.current = request;
-    setCloudAction({ kind: "connect", projectId, message: null, error: null });
+    setCloudAction({ kind: "connect", projectId, notice: null, error: null });
     try {
-      const configuredStatus = await onConfigureCloudRemote(cloudRemote.rawUrl, projectId, {
+      const configuredStatus = await onConfigureCloudRemote(projectId, {
         bindingKind,
         scopeId,
       });
       if (actionContextRef.current !== requestContext) return;
-      if (!configuredStatus) throw new Error("This workspace is no longer available for Cloud attachment.");
+      if (!configuredStatus) {
+        setCloudAction({ kind: null, projectId, notice: null, error: cloudMessage("workspace-unavailable") });
+        return;
+      }
       setCloudAction({
         kind: null,
         projectId,
-        message: bindingKind === "scoped"
-          ? "Scoped Cloud binding confirmed. Only the selected Cloud path is synchronized."
-          : "Cloud project binding confirmed.",
+        notice: cloudMessage(bindingKind === "scoped" ? "scoped-binding-confirmed" : "project-binding-confirmed"),
         error: null,
       });
       onSelectSection("contents");
@@ -209,8 +213,8 @@ export function CloudServiceMainView({
       setCloudAction({
         kind: null,
         projectId,
-        message: null,
-        error: actionError instanceof Error ? actionError.message : "Unable to confirm this Cloud binding.",
+        notice: null,
+        error: cloudMessage("confirm-binding-failed", undefined, actionError instanceof Error ? actionError.message : undefined),
       });
     } finally {
       if (actionRequestRef.current === request) actionRequestRef.current = null;
@@ -221,13 +225,13 @@ export function CloudServiceMainView({
     if (!onDetachCloudProject || actionRequestRef.current) return;
     const request = Symbol("detach-cloud-project");
     actionRequestRef.current = request;
-    setCloudAction({ kind: "connect", projectId: boundProjectId, message: null, error: null });
+    setCloudAction({ kind: "connect", projectId: boundProjectId, notice: null, error: null });
     try {
       await onDetachCloudProject();
       setCloudAction({
         kind: null,
         projectId: null,
-        message: "Cloud detached. Local files and Git history remain on this device.",
+        notice: cloudMessage("cloud-detached"),
         error: null,
       });
       onSelectProjectId?.(null);
@@ -236,8 +240,8 @@ export function CloudServiceMainView({
       setCloudAction({
         kind: null,
         projectId: boundProjectId,
-        message: null,
-        error: actionError instanceof Error ? actionError.message : "Unable to detach this Cloud project.",
+        notice: null,
+        error: cloudMessage("detach-failed", undefined, actionError instanceof Error ? actionError.message : undefined),
       });
     } finally {
       if (actionRequestRef.current === request) actionRequestRef.current = null;
@@ -264,7 +268,7 @@ export function CloudServiceMainView({
     return (
       <main className="desktop-cloud-main-view">
         <div className="desktop-cloud-page-shell">
-          <CloudWorkspaceLoadingState label="Loading Cloud session" />
+          <CloudWorkspaceLoadingState label={t("cloud.loading.session")} />
         </div>
       </main>
     );
@@ -276,7 +280,7 @@ export function CloudServiceMainView({
     (status?.stagedEntries.length ?? 0) +
     (status?.unstagedEntries.length ?? 0) +
     (status?.untrackedEntries.length ?? 0);
-  const branchName = currentBranch?.name ?? status?.branch ?? "No branch";
+  const branchName = currentBranch?.name ?? status?.branch ?? t("cloud.git.noBranch");
   const inCloudGlobalAccountSection = isCloudAccountSection(activeSection);
 
   return (
@@ -284,25 +288,25 @@ export function CloudServiceMainView({
       <div className={`desktop-cloud-page-shell ${activeSection === "automation" ? "desktop-cloud-automation-page-shell" : ""}`}>
         {cloudAuthState.status === "offline-authenticated" && (
           <div className="desktop-cloud-main-alert">
-            Cloud is offline. Your local workspace remains available; Cloud data will refresh after reconnecting.
+            {t("cloud.offline")}
           </div>
         )}
         {attachment?.status === "linked" && attachment.warning && (
           <div className="desktop-cloud-main-alert" role="alert">
-            {attachment.warning}
+            {formatCloudMessage(attachment.warning, t)}
           </div>
         )}
         {attachment?.status === "resolving" && (
           <div className="desktop-cloud-main-alert">
-            Matching this folder to its Cloud project…
+            {t("cloud.matchingFolder")}
           </div>
         )}
         {!inCloudGlobalAccountSection && error && <div className="desktop-cloud-main-alert">{error}</div>}
-        {!inCloudGlobalAccountSection && cloudData.error && <div className="desktop-cloud-main-alert">{cloudData.error}</div>}
-        {!inCloudGlobalAccountSection && cloudData.warning && <div className="desktop-cloud-main-alert">{cloudData.warning}</div>}
+        {!inCloudGlobalAccountSection && cloudData.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.error, t)}</div>}
+        {!inCloudGlobalAccountSection && cloudData.warning && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.warning, t)}</div>}
         {!inCloudGlobalAccountSection && cloudBackupError && <div className="desktop-cloud-main-alert">{cloudBackupError}</div>}
-        {!inCloudGlobalAccountSection && cloudAction.error && <div className="desktop-cloud-main-alert">{cloudAction.error}</div>}
-        {!inCloudGlobalAccountSection && cloudAction.message && <div className="desktop-cloud-main-alert success">{cloudAction.message}</div>}
+        {!inCloudGlobalAccountSection && cloudAction.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudAction.error, t)}</div>}
+        {!inCloudGlobalAccountSection && cloudAction.notice && <div className="desktop-cloud-main-alert success">{formatCloudMessage(cloudAction.notice, t)}</div>}
 
         <CloudRouter
           workspace={workspace}

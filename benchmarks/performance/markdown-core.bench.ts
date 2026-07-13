@@ -106,6 +106,11 @@ describe("Markdown incremental projection", () => {
     }, BENCHMARK_OPTIONS);
   }
 
+  const taskToggleHarness = createTaskToggleHarness(source, Math.floor(source.length / 2));
+  bench("task checkbox token toggle · 10000 lines", () => {
+    taskToggleHarness.toggle();
+  }, BENCHMARK_OPTIONS);
+
   const revealPosition = Math.max(1, source.indexOf("bold") + 2);
   const revealHarness = createFocusRevealHarness(source, revealPosition);
   bench("focus/reveal range patch · 10000 lines", () => {
@@ -175,6 +180,27 @@ function createFocusRevealHarness(source: string, position: number) {
       state = state.update({
         selection: EditorSelection.cursor(position),
         effects: markdownLivePreviewFocusEffect.of(focused),
+      }).state;
+    },
+  };
+}
+
+function createTaskToggleHarness(source: string, requestedPosition: number) {
+  let state = createLivePreviewState(source);
+  const searchFrom = Math.min(Math.max(0, requestedPosition), source.length);
+  const from = source.indexOf("[ ]", searchFrom);
+  if (from < 0) throw new Error("Benchmark fixture has no task after the requested position");
+  const to = from + 3;
+  const line = state.doc.lineAt(from);
+  state = state.update({
+    effects: requestMarkdownProjectionRange(state, line.from, line.to),
+  }).state;
+  let checked = false;
+  return {
+    toggle() {
+      checked = !checked;
+      state = state.update({
+        changes: { from, to, insert: checked ? "[x]" : "[ ]" },
       }).state;
     },
   };

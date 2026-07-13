@@ -17,6 +17,16 @@ export type AutomationTriggerDraft = {
   timezone: string;
 };
 
+export type AutomationValidationError = Readonly<
+  | { code: "target-outside-project" }
+  | { code: "target-unsupported-character" }
+  | { code: "invalid-timezone" }
+  | { code: "invalid-time" }
+  | { code: "invalid-weekday" }
+  | { code: "cron-part-count" }
+  | { code: "cron-field"; field: number }
+>;
+
 export type AutomationSourceSelection = {
   resourceId: string;
   resourceName: string;
@@ -50,7 +60,6 @@ const CLOUD_AUTOMATION_INTERNAL_CONFIG_KEYS = new Set([
   "write_behavior",
 ]);
 
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const CRON_RANGES: ReadonlyArray<readonly [number, number]> = [
   [0, 59],
   [0, 23],
@@ -116,7 +125,7 @@ export function automationSourceFromProviderResource(
 }
 
 export function defaultAutomationTargetPath(provider: DesktopCloudAutomationProviderSpec | null) {
-  const label = provider?.display_name || provider?.provider || "Automation";
+  const label = provider?.display_name || provider?.provider || "automation";
   return normalizeAutomationTargetPath(label.replace(/[<>:"|?*]/g, "-"));
 }
 
@@ -134,15 +143,15 @@ export function normalizeAutomationTargetPath(path: string) {
   return parts.join("/");
 }
 
-export function getAutomationTargetPathValidationError(path: string) {
+export function getAutomationTargetPathValidationError(path: string): AutomationValidationError | null {
   let depth = 0;
   for (const part of path.trim().replaceAll("\\", "/").split("/")) {
     if (!part || part === ".") continue;
     if (part === "..") {
       depth -= 1;
-      if (depth < 0) return "Folder path cannot leave the project root.";
+      if (depth < 0) return { code: "target-outside-project" };
     } else {
-      if (/[\x00-\x1f]/.test(part)) return "Folder path contains unsupported control characters.";
+      if (/[\x00-\x1f]/.test(part)) return { code: "target-unsupported-character" };
       depth += 1;
     }
   }
@@ -233,40 +242,28 @@ export function getAutomationTriggerSchedule(draft: AutomationTriggerDraft) {
   return "";
 }
 
-export function getAutomationTriggerValidationError(draft: AutomationTriggerDraft): string | null {
+export function getAutomationTriggerValidationError(draft: AutomationTriggerDraft): AutomationValidationError | null {
   if (!["hourly", "daily", "weekly", "custom"].includes(draft.preset)) return null;
-  if (!isValidAutomationTimezone(draft.timezone)) return "Choose a valid timezone.";
+  if (!isValidAutomationTimezone(draft.timezone)) return { code: "invalid-timezone" };
   if ((draft.preset === "daily" || draft.preset === "weekly") && !isValidClockTime(draft.time)) {
-    return "Choose a valid time.";
+    return { code: "invalid-time" };
   }
-  if (draft.preset === "weekly" && !/^[0-6]$/.test(draft.weekday)) return "Choose a weekday.";
+  if (draft.preset === "weekly" && !/^[0-6]$/.test(draft.weekday)) return { code: "invalid-weekday" };
   return validateFivePartCron(getAutomationTriggerSchedule(draft));
 }
 
-export function validateFivePartCron(schedule: string): string | null {
+export function validateFivePartCron(schedule: string): AutomationValidationError | null {
   const fields = schedule.trim().split(/\s+/);
-  if (fields.length !== 5) return "Enter a five-part cron expression.";
+  if (fields.length !== 5) return { code: "cron-part-count" };
   for (let index = 0; index < fields.length; index += 1) {
     if (!isValidCronField(fields[index], ...CRON_RANGES[index])) {
-      return `Cron field ${index + 1} is outside its valid range or uses unsupported syntax.`;
+      return { code: "cron-field", field: index + 1 };
     }
   }
   return null;
 }
 
-export function formatAutomationTriggerSummary(draft: AutomationTriggerDraft) {
-  const timezone = draft.timezone || "UTC";
-  if (draft.preset === "manual") return "Runs only when you start it manually.";
-  if (draft.preset === "realtime") return "Runs when the source reports a change.";
-  if (draft.preset === "hourly") return `Runs every hour (${timezone}).`;
-  if (draft.preset === "daily") return `Runs every day at ${draft.time} (${timezone}).`;
-  if (draft.preset === "weekly") {
-    return `Runs every ${WEEKDAYS[Number(draft.weekday)] ?? "week"} at ${draft.time} (${timezone}).`;
-  }
-  return `Runs on ${draft.customCron.trim() || "a custom schedule"} (${timezone}).`;
-}
-
-export function formatNextAutomationRun(draft: AutomationTriggerDraft, from = new Date()): string | null {
+export function getNextAutomationRun(draft: AutomationTriggerDraft, from = new Date()): Date | null {
   if (!["hourly", "daily", "weekly"].includes(draft.preset) || getAutomationTriggerValidationError(draft)) return null;
   const [hour, minute] = draft.time.split(":").map(Number);
   const maxMinutes = draft.preset === "hourly" ? 61 : draft.preset === "daily" ? 1_441 : 10_081;
@@ -287,7 +284,7 @@ export function formatNextAutomationRun(draft: AutomationTriggerDraft, from = ne
       : parts.hour === hour
         && parts.minute === minute
         && (draft.preset !== "weekly" || parts.weekday === Number(draft.weekday));
-    if (matches) return formatAutomationDate(candidate, draft.timezone);
+    if (matches) return new Date(candidate);
     candidate.setUTCMinutes(candidate.getUTCMinutes() + 1);
   }
   return null;
@@ -447,17 +444,6 @@ function getZonedDateParts(date: Date, formatter: Intl.DateTimeFormat) {
     minute: Number(parts.minute),
     weekday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parts.weekday),
   };
-}
-
-function formatAutomationDate(date: Date, timezone: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    timeZone: timezone,
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 }
 
 function readString(value: unknown) {

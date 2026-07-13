@@ -1,5 +1,5 @@
 import type { AgentControllerState } from "./agent-controller-state";
-import { formatAgentError } from "./agent-error";
+import { createAgentError, formatAgentError } from "./agent-error";
 import type { AgentClientProvider } from "./AgentClientPort";
 
 type StatePatch = (patch: Partial<AgentControllerState>) => void;
@@ -25,7 +25,7 @@ export class LocalAgentConnectionLoader {
     if (!bridge?.discoverLocalAgentConnections) {
       this.patch({
         localConnectionsPhase: "error",
-        localConnectionsError: "Local Agent discovery is unavailable. Restart PuppyOne so the native bridge can load.",
+        localConnectionsError: createAgentError("native-bridge-unavailable"),
       });
       return Promise.resolve();
     }
@@ -37,7 +37,9 @@ export class LocalAgentConnectionLoader {
           localConnections: snapshot.connections,
           localConnectionsPhase: "ready",
           localConnectionsScannedAt: snapshot.scannedAt,
-          localConnectionsError: snapshot.warnings[0] ?? null,
+          localConnectionsError: snapshot.warnings[0]
+            ? { code: "unknown", detail: snapshot.warnings[0] }
+            : null,
         });
       })
       .catch((error) => {

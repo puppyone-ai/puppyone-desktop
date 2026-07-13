@@ -1,5 +1,6 @@
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, WidgetType } from "@codemirror/view";
+import { bidiIsolate } from "@puppyone/localization/core";
 import { disposeWidgetSessionDom } from "../../platform/codemirror/widgetSession";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import {
@@ -9,8 +10,9 @@ import {
   type MarkdownCodeSourceReference,
 } from "./codeBlockModel";
 import { getDocRevision, type CommitResult } from "../../platform/brokers/transactionBroker";
-import { estimateCodeBlockWidgetHeight } from "../../shared/widgets/markdownWidgetMeasure";
+import { estimateCodeBlockLayoutHeight } from "./codeBlockLayout";
 import { normalizeLineEndings, stopCodeMirrorEvent } from "../../shared/widgets/widgetDom";
+import { getMarkdownLocalization } from "../../core/editor/markdownLocalization";
 
 /**
  * Immutable descriptor. Mounted listeners and draft commit ownership live in
@@ -23,6 +25,7 @@ export class CodeBlockWidget extends WidgetType {
     private readonly from: number,
     private readonly to: number,
     private readonly sourceReference: MarkdownCodeSourceReference | null = null,
+    private readonly layoutEstimatedHeight = estimateCodeBlockLayoutHeight(code),
   ) {
     super();
   }
@@ -34,18 +37,21 @@ export class CodeBlockWidget extends WidgetType {
       widget.language === this.language &&
       widget.from === this.from &&
       widget.to === this.to &&
+      widget.layoutEstimatedHeight === this.layoutEstimatedHeight &&
       codeSourceReferencesEqual(widget.sourceReference, this.sourceReference)
     );
   }
 
   get estimatedHeight(): number {
-    return estimateCodeBlockWidgetHeight(this.code);
+    return this.layoutEstimatedHeight;
   }
 
   toDOM(view: EditorView): HTMLElement {
+    const { direction, t } = getMarkdownLocalization(view);
     const host = getMarkdownEmbedHost(view);
     const wrapper = document.createElement("div");
     wrapper.className = "cm-md-code-widget";
+    wrapper.dir = direction;
     const panel = document.createElement("div");
     panel.className = "cm-md-code-panel";
     const readOnly = view.state.readOnly;
@@ -76,10 +82,11 @@ export class CodeBlockWidget extends WidgetType {
     languageInput.className = "cm-md-code-language";
     if (!recoveredDraft.language) languageInput.classList.add("is-empty");
     languageInput.value = recoveredDraft.language;
-    languageInput.placeholder = "language";
-    languageInput.setAttribute("aria-label", "Code language");
+    languageInput.placeholder = t("editor.markdown.code.languagePlaceholder");
+    languageInput.setAttribute("aria-label", t("editor.markdown.code.language"));
     languageInput.readOnly = readOnly;
     languageInput.spellcheck = false;
+    languageInput.dir = "ltr";
 
     if (this.sourceReference) {
       header.classList.add("has-source-reference");
@@ -88,7 +95,10 @@ export class CodeBlockWidget extends WidgetType {
       sourceReference.className = "cm-md-code-source-reference";
       sourceReference.textContent = sourceReferenceText;
       sourceReference.title = sourceReferenceText;
-      sourceReference.setAttribute("aria-label", `Code source: ${sourceReferenceText}`);
+      sourceReference.setAttribute(
+        "aria-label",
+        t("editor.markdown.code.source", { source: bidiIsolate(sourceReferenceText) }),
+      );
       header.append(sourceReference, languageInput);
     } else {
       header.appendChild(languageInput);
@@ -100,6 +110,7 @@ export class CodeBlockWidget extends WidgetType {
     codeEditor.readOnly = readOnly;
     codeEditor.spellcheck = false;
     codeEditor.wrap = "off";
+    codeEditor.dir = "ltr";
     codeEditor.rows = Math.max(1, recoveredDraft.code.split("\n").length);
 
     const ensureSession = () => {

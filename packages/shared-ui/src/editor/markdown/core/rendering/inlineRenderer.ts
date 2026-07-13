@@ -13,6 +13,7 @@ import {
   resolveMarkdownHtmlImageSources,
 } from "../../features/image/markdownImageModel";
 import { findWikiLinkTokens, type MarkdownWikiLinkToken } from "../links/wikiLinkModel";
+import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 
 type InlineToken =
   | { kind: "code"; from: number; to: number; text: string }
@@ -52,6 +53,7 @@ export type MarkdownInlineRenderOptions = {
   onLayoutChange?: () => void;
   sourcePath?: string;
   openHref?: (href: string) => void;
+  t?: MessageFormatter;
 };
 
 export function createMarkdownInlineFragment(
@@ -253,7 +255,9 @@ function appendWikiLink(target: Node, token: MarkdownWikiLinkToken, options: Mar
     const missing = document.createElement("span");
     missing.className = "cm-md-wiki-link-inline is-missing";
     missing.textContent = token.label;
-    missing.title = `Missing linked note: ${token.target}`;
+    missing.title = options.t
+      ? options.t("editor.markdown.missingLinkedNote", { target: bidiIsolate(token.target) })
+      : token.target;
     target.appendChild(missing);
     return;
   }
@@ -333,7 +337,9 @@ function appendImage(
     return;
   }
 
-  const placeholder = createImagePlaceholder("Loading image...");
+  const placeholder = createImagePlaceholder(
+    options.t ? options.t("editor.markdown.loadingImage") : token.alt || token.href,
+  );
   target.appendChild(placeholder);
 
   Promise.resolve(resolver(options.sourcePath ?? "", token.href))

@@ -379,6 +379,38 @@ affordances.
 - The caret cannot enter a rendered block; it is atomic like the rule. Editing
   happens through the block's source toggle.
 
+### Block rearrangement
+
+When **Markdown block drag handles** is explicitly enabled in Experimental,
+moving the pointer into
+the left reading gutter reveals one quiet six-dot handle for the block under
+the pointer. The document does not tint, lift, fade, or reflow on hover. The
+handle occupies a fixed 22px square on one document-level rail, independent of
+heading size and nested-block indentation. It uses `grab` feedback while
+keeping its glyph visually subordinate to the content.
+
+- Dragging begins only after a short movement threshold. During a drag, the
+  source block stays visually stable and one thin accent line marks the exact
+  insertion boundary. Releasing over the original boundary is a no-op.
+- Root paragraphs, headings, quotes, fenced blocks, tables, and other root
+  blocks move only between root blocks. A list item moves only among sibling
+  items in the same list and carries its nested children with it. Cross-level,
+  cross-container, multi-block, and cross-document dragging are deliberately
+  unsupported.
+- The move preserves the Markdown bytes of the block and surrounding blank-line
+  rhythm. Direct ordered-list numbers are renumbered to match the new order.
+  It commits once, undoes once, and keeps a caret or selection inside the moved
+  block at the same logical text position.
+- `Mod-Shift-ArrowUp` and `Mod-Shift-ArrowDown` move the caret's block through
+  the same command path. Escape cancels an active pointer drag. No document
+  block is made an extra Tab stop merely to expose dragging.
+- The handle and drop indicator have no entrance/bounce animation. Edge
+  autoscroll is continuous and stops immediately on release, cancel, blur, or
+  editor destruction. `prefers-reduced-motion` introduces no different data
+  behavior because the interaction does not depend on decorative motion.
+- Read-only mode, source mode, active IME composition, and the default-disabled
+  experimental preference expose no handle or block-move shortcut.
+
 ### Not yet supported (spec reserved)
 
 Math blocks (`$$`), YAML front matter, footnotes, and `[toc]` follow the
@@ -769,6 +801,20 @@ feedback and motion" / "Selection"; §7 block-selected rule):
       tallest cell, so a ring on the span hugged the text and left empty
       padding.
 
+**Phase 11 — same-document block rearrangement** (Part 1 §5 Block
+rearrangement):
+
+- [x] Resolve root blocks and same-list sibling items from the Lezer tree;
+      preserve nested item content without adding persistent block IDs.
+- [x] Apply lossless source-slice relocation, scoped ordered-list renumbering,
+      selection mapping, embedded-draft relocation, and one-step undo/redo
+      through one transaction with a reversible relocation effect.
+- [x] Add one measured handle/drop-line overlay with pointer threshold,
+      capture, Escape cancellation, and edge autoscroll; add the equivalent
+      keyboard commands without extra Tab stops.
+- [x] Add the default-off Experimental preference and dedicated CodeMirror compartment;
+      the disabled state destroys the overlay and removes the move keymap.
+
 ## 12. Code change map
 
 | Area | Current (`markdownCodeMirrorExtensions.ts`) | Target (Part 1) |
@@ -785,6 +831,7 @@ feedback and motion" / "Selection"; §7 block-selected rule):
 | Link click | Click opens link | Click edits; ⌘-click opens |
 | Mermaid fences | Generic editable code-block widget | Rendered diagram; in-place split editing (Phase 7) |
 | Table structure | Cell edit + navigation only; no row/column ops, alignment ignored | Model-layer ops behind keyboard / menu / hover entry points (Phase 8) |
+| Document block order | Source editing only | Same-parent drag handle + keyboard movement, lossless single transaction (Phase 11) |
 
 User-visible behavior changes shipped by this migration:
 

@@ -25,6 +25,7 @@ import {
 import { puppyMarkdownParserExtensions } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
 import { getInlineRevealElement } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownElements";
 import { InlineHtmlLineBreakWidget } from "../packages/shared-ui/src/editor/markdown/core/widgets/inlineWidgets";
+import { getMarkdownPlansInRange } from "../packages/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
 
 function createMarkdownState(source: string) {
   return EditorState.create({
@@ -61,6 +62,7 @@ function buildInlineDecorations(source: string, reveal: { from: number; to: numb
     null,
     "",
     null,
+    getMarkdownPlansInRange(state, line.from, line.to),
   );
   return builders;
 }

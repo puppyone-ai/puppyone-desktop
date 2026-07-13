@@ -69,11 +69,14 @@ export {
   DocumentEditingSession,
   DocumentSessionBoundary,
   flushActiveDocumentSessions,
+  formatDocumentSessionError,
   registerActiveDocumentSession,
   useDocumentSessionState,
 } from "./editor/document-session";
 export type {
   DocumentEditingSessionOptions,
+  DocumentSessionError,
+  DocumentSessionErrorCode,
   DocumentPersistedCommit,
   DocumentSessionBoundaryProps,
   DocumentSessionState,
@@ -157,6 +160,7 @@ export type {
   ViewerThemeSnapshot,
 } from "./editor/viewerHostApi";
 export type {
+  EditorInteractionPreferences,
   EditorDocument,
   EditorDocumentKind,
   EditorMode,
@@ -174,6 +178,7 @@ export type {
   PresetViewerImplementation,
   PresetViewerRenderContext,
 } from "./editor/viewerTypes";
+export { DEFAULT_EDITOR_INTERACTION_PREFERENCES } from "./editor/viewerTypes";
 export { PlainTextEditor } from "./editor/PlainTextEditor";
 export type { PlainTextEditorProps } from "./editor/PlainTextEditor";
 export { CsvTableEditor } from "./editor/CsvTableEditor";

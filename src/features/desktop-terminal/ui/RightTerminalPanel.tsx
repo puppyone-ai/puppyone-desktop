@@ -10,6 +10,8 @@ import {
   subscribeTypographyChanges,
   type Workspace,
 } from "@puppyone/shared-ui";
+import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -29,6 +31,9 @@ type TerminalSize = {
 };
 
 export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProps) {
+  const { t } = useLocalization();
+  const messageFormatterRef = useRef(t);
+  messageFormatterRef.current = t;
   const bodyRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -201,7 +206,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
     };
 
     if (!bridge?.createTerminal || !bridge.writeTerminal || !bridge.onTerminalData || !bridge.onTerminalExit) {
-      writeSystemLine("Terminal bridge unavailable. Open this workspace in puppyone.");
+      writeSystemLine(messageFormatterRef.current("terminal.bridgeUnavailable"));
       return () => {
         disposed = true;
         safeDispose(webglContextLossDisposable);
@@ -222,8 +227,14 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
 
     removeExitListener = bridge.onTerminalExit((event) => {
       if (event.id !== sessionId || disposed) return;
-      const exitText = event.signal ? `signal ${event.signal}` : `code ${event.code ?? 0}`;
-      terminal.writeln(`\r\n\x1b[38;5;244mProcess exited with ${exitText}.\x1b[0m`);
+      const exitText = event.signal
+        ? messageFormatterRef.current("terminal.processExitedSignal", {
+            signal: bidiIsolate(event.signal),
+          })
+        : messageFormatterRef.current("terminal.processExitedCode", {
+            code: event.code ?? 0,
+          });
+      terminal.writeln(`\r\n\x1b[38;5;244m${exitText}\x1b[0m`);
     });
 
     disposables.push(terminal.onData((data) => {
@@ -283,7 +294,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
       if (activeRef.current) terminal.focus();
     }).catch((error) => {
       if (disposed) return;
-      writeSystemLine(formatTerminalError(error));
+      writeSystemLine(formatTerminalError(error, messageFormatterRef.current));
     });
 
     return () => {
@@ -376,11 +387,12 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
   }, [active, clearSettledFits, scheduleSettledFits]);
 
   return (
-    <section className="desktop-terminal-panel" aria-label="Terminal">
+    <section className="desktop-terminal-panel" aria-label={t("terminal.title")}>
       <TerminalSurfaceHeader onClear={handleClearTerminal} onReset={handleResetTerminal} />
       <div className="desktop-terminal-body" ref={bodyRef}>
         <div
           className="desktop-terminal-xterm"
+          dir="ltr"
           ref={containerRef}
           onDragOver={handleTerminalDragOver}
           onDrop={handleTerminalDrop}
@@ -546,12 +558,12 @@ function resolveCssColor(element: HTMLElement, color: string) {
   return resolved || color;
 }
 
-function formatTerminalError(error: unknown) {
+function formatTerminalError(error: unknown, t: MessageFormatter) {
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("No handler registered for 'terminal:create'")) {
-    return "Terminal runtime was updated. Restart puppyone once so the native bridge can load.";
+    return t("terminal.runtimeRestartRequired");
   }
-  return message;
+  return t("terminal.errorDetail", { detail: bidiIsolate(message) });
 }
 
 function createTerminalId() {

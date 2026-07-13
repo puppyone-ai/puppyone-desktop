@@ -36,9 +36,10 @@ export function buildLocalGitGraphRows(
       const unresolvedCommitId = branch.lastCommitId || `${label.kind}:${branch.name}`;
       const group = refOnlyGroups.get(unresolvedCommitId) ?? {
         commitId: unresolvedCommitId,
-        message: branch.lastCommitMessage || "Branch head outside visible history",
+        message: branch.lastCommitMessage ?? "",
+        messageCode: branch.lastCommitMessage ? undefined : "branch-head-outside-visible-history",
         createdAt: branch.lastCommitDate,
-        labels: [],
+        labels: [] as CloudBranchGraphLabel[],
       };
       group.labels.push(label);
       refOnlyGroups.set(unresolvedCommitId, group);
@@ -111,10 +112,12 @@ function buildGitTopologyGraphRows(
     return {
       id: commit.commit_id,
       kind: "commit" as const,
-      message: commit.message || "Update workspace",
+      message: commit.message,
+      messageCode: commit.message ? undefined : "update-workspace",
       createdAt: commit.created_at,
       stats: buildGitCommitStats(commit.changes),
-      authorName: commit.author_name || "Unknown",
+      authorName: commit.author_name,
+      authorCode: commit.author_name ? undefined : "unknown",
       labels,
       prefix: graphLine.prefix,
       laneCount,

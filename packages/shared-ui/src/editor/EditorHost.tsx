@@ -13,6 +13,7 @@ import {
 import type { AiEditFile } from "./ai-edits/types";
 import type {
   DocumentSourceKind,
+  EditorInteractionPreferences,
   MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
@@ -33,6 +34,7 @@ export type EditorHostProps = {
   aiEditFile?: AiEditFile | null;
   hideSourceView?: boolean;
   fileIconTheme?: FileIconThemeId;
+  editorInteractionPreferences?: EditorInteractionPreferences;
   saveMode?: EditorSaveMode;
   htmlTrustMode?: MarkdownHtmlTrustMode;
   workspaceId?: string;
@@ -60,6 +62,7 @@ export function EditorHost({
   aiEditFile = null,
   hideSourceView = false,
   fileIconTheme = "default",
+  editorInteractionPreferences,
   saveMode = "manual",
   htmlTrustMode = "safe",
   workspaceId = "",
@@ -96,6 +99,7 @@ export function EditorHost({
       aiEditFile={aiEditFile}
       hideSourceView={hideSourceView}
       fileIconTheme={fileIconTheme}
+      editorInteractionPreferences={editorInteractionPreferences}
       saveMode={saveMode}
       htmlTrustMode={htmlTrustMode}
       workspaceId={workspaceId}

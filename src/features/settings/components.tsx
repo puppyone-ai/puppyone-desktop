@@ -39,6 +39,7 @@ export function SettingsLine({
       <div className="desktop-settings-line-value">
         <strong
           className={`${monospace ? "desktop-settings-code" : ""} ${tone === "success" ? "success" : ""}`}
+          dir="auto"
           title={title}
         >
           {value}

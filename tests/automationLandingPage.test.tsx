@@ -11,6 +11,7 @@ import type {
 } from "../src/lib/cloudApi";
 import type { CloudAutomationRow } from "../src/features/automation/automationDomain";
 import type { AutomationTemplate } from "../src/features/automation/automationTemplates";
+import { withTestLocalization } from "./testLocalization";
 
 vi.mock("../src/features/automation/AutomationDialogs", () => ({
   CloudNewAutomationDialog: ({ template }: { template: AutomationTemplate | null }) => (
@@ -44,7 +45,7 @@ function renderAutomationPage(rows: CloudAutomationRow[] = []) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root?.render(
+  act(() => root?.render(withTestLocalization(
     <CloudAutomationPage
       projectId="project-1"
       cloudSession={{} as DesktopCloudSession}
@@ -63,7 +64,7 @@ function renderAutomationPage(rows: CloudAutomationRow[] = []) {
       onRefresh={vi.fn(async () => undefined)}
       onOpenAutomation={vi.fn()}
     />,
-  ));
+  )));
   return container;
 }
 

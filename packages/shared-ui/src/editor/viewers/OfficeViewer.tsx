@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   assertDocxDomWithinBudget,
   CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE,
@@ -38,11 +40,37 @@ type OfficePreviewResult =
   | { kind: "presentation"; arrayBuffer: ArrayBuffer }
   | { kind: "presentationText"; slides: PresentationSlide[]; truncatedSlideCount: number }
   | { kind: "opendocument"; title: string; lines: string[]; truncatedLines: boolean }
-  | { kind: "unsupported"; message: string };
+  | OfficeUnsupportedResult;
+
+type OfficeUnsupportedCode =
+  | "conversion-failed"
+  | "legacy-presentation"
+  | "resource-unavailable"
+  | "resource-rejected"
+  | "unsafe-package"
+  | "unsupported-format"
+  | "legacy-word"
+  | "rich-text-converter";
+
+type OfficePackageSubject =
+  | "converted-word"
+  | "word"
+  | "spreadsheet"
+  | "presentation"
+  | "opendocument"
+  | "office";
+
+type OfficeUnsupportedResult = {
+  kind: "unsupported";
+  code: OfficeUnsupportedCode;
+  detail?: string | null;
+  extension?: string;
+  subject?: OfficePackageSubject;
+};
 
 type PresentationSlide = {
   index: number;
-  title: string;
+  title: string | null;
   lines: string[];
 };
 
@@ -89,6 +117,7 @@ export function OfficeViewer({
   convertOfficeDocumentToDocx,
   markdownLinkGraph,
 }: OfficeViewerProps) {
+  const { t } = useLocalization();
   const [state, setState] = useState<OfficeState>({ status: "idle" });
   const [activeSheet, setActiveSheet] = useState(0);
   const extension = resolvedExtension ?? getExtension(document.name);
@@ -141,7 +170,7 @@ export function OfficeViewer({
   if (fileUrlError && !canUseNativeDocxConversion) {
     return (
       <OfficeEmptyState
-        title="Failed to load file"
+        title={t("editor.office.loadFailed")}
         message={fileUrlError}
         documentPath={document.path}
         openExternalFile={openExternalFile}
@@ -150,14 +179,14 @@ export function OfficeViewer({
   }
 
   if ((previewResourceLoading || state.status === "loading") && !previewResourceUrl && !canUseNativeDocxConversion) {
-    return <div className="editor-state">Loading preview...</div>;
+    return <div className="editor-state">{t("editor.preview.loading")}</div>;
   }
 
   if (!previewResourceUrl && !canUseNativeDocxConversion && state.status !== "ready") {
     return (
       <OfficeEmptyState
-        title="Preview not available"
-        message="No preview resource is available for this file."
+        title={t("editor.preview.unavailable")}
+        message={t("editor.office.resourceUnavailable")}
         documentPath={document.path}
         openExternalFile={openExternalFile}
       />
@@ -169,14 +198,14 @@ export function OfficeViewer({
       <div className="office-preview__body">
         {state.status === "error" && (
           <OfficeEmptyState
-            title="Preview failed"
+            title={t("editor.preview.failed")}
             message={state.message}
             documentPath={document.path}
             openExternalFile={openExternalFile}
           />
         )}
         {state.status === "idle" || state.status === "loading" ? (
-          <div className="editor-state">Loading preview...</div>
+          <div className="editor-state">{t("editor.preview.loading")}</div>
         ) : null}
         {state.status === "ready" && (
           <OfficePreviewContent
@@ -208,11 +237,12 @@ function OfficePreviewContent({
   openExternalFile?: (path: string) => Promise<void>;
   openExternalUrl?: (href: string) => void | Promise<void>;
 }) {
+  const { t } = useLocalization();
   if (result.kind === "unsupported") {
     return (
       <OfficeEmptyState
-        title="Preview not available"
-        message={result.message}
+        title={t("editor.preview.unavailable")}
+        message={formatOfficeUnsupported(result, t)}
         documentPath={documentPath}
         openExternalFile={openExternalFile}
       />
@@ -262,14 +292,14 @@ function OfficePreviewContent({
   return (
     <div className="office-document-preview">
       <article className="office-document-page">
-        <h1>{result.title}</h1>
+        <h1 dir="auto">{result.title}</h1>
         {result.lines.length > 0 ? (
-          result.lines.map((line, index) => <p key={`${line}-${index}`}>{line}</p>)
+          result.lines.map((line, index) => <p dir="auto" key={`${line}-${index}`}>{line}</p>)
         ) : (
-          <p>No readable text was found.</p>
+          <p>{t("editor.office.noReadableText")}</p>
         )}
         {result.truncatedLines && (
-          <div className="office-preview__note">Showing the first 400 extracted text lines.</div>
+          <div className="office-preview__note">{t("editor.office.firstExtractedLines", { count: 400 })}</div>
         )}
       </article>
     </div>
@@ -283,30 +313,38 @@ function PresentationTextPreview({
   slides: PresentationSlide[];
   truncatedSlideCount?: number;
 }) {
+  const { formatNumber, t } = useLocalization();
   if (slides.length === 0) {
-    return <OfficeEmptyState title="Empty presentation" message="No slide text was found in this presentation." />;
+    return (
+      <OfficeEmptyState
+        title={t("editor.office.emptyPresentation")}
+        message={t("editor.office.noSlideText")}
+      />
+    );
   }
 
   return (
     <div className="office-presentation-preview">
       {truncatedSlideCount > 0 && (
         <div className="office-preview__note">
-          {truncatedSlideCount} additional slides were omitted by the text fallback safety budget.
+          {t("editor.office.omittedSlidesSafety", { count: truncatedSlideCount })}
         </div>
       )}
       {slides.map((slide) => (
         <article className="office-slide-card" key={slide.index}>
-          <div className="office-slide-card__number">{slide.index}</div>
+          <div className="office-slide-card__number">{formatNumber(slide.index)}</div>
           <div className="office-slide-card__content">
-            <h2>{slide.title}</h2>
+            <h2 dir="auto">
+              {slide.title ?? t("editor.office.slideNumber", { number: slide.index })}
+            </h2>
             {slide.lines.length > 0 ? (
               <ul>
                 {slide.lines.map((line, index) => (
-                  <li key={`${line}-${index}`}>{line}</li>
+                  <li dir="auto" key={`${line}-${index}`}>{line}</li>
                 ))}
               </ul>
             ) : (
-              <p>No readable text on this slide.</p>
+              <p>{t("editor.office.noSlideReadableText")}</p>
             )}
           </div>
         </article>
@@ -324,11 +362,17 @@ function PptxPresentationPreview({
   documentPath: string;
   openExternalFile?: (path: string) => Promise<void>;
 }) {
+  const { t } = useLocalization();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [renderState, setRenderState] = useState<
     | { status: "loading" | "ready" }
-    | { status: "fallback"; message: string; slides: PresentationSlide[] }
-    | { status: "error"; message: string }
+    | {
+      status: "fallback";
+      detail: string;
+      slides: PresentationSlide[];
+      truncatedSlideCount: number;
+    }
+    | { status: "error"; renderDetail: string; fallbackDetail: string }
   >({ status: "loading" });
 
   useEffect(() => {
@@ -373,8 +417,9 @@ function PptxPresentationPreview({
           if (!cancelled && fallback.kind === "presentationText") {
             setRenderState({
               status: "fallback",
-              message: `PuppyOne could not render the high-fidelity PPTX preview. Showing bounded extracted slide text instead.${fallback.truncatedSlideCount > 0 ? ` ${fallback.truncatedSlideCount} additional slides were omitted.` : ""} ${message}`,
+              detail: message,
               slides: fallback.slides,
+              truncatedSlideCount: fallback.truncatedSlideCount,
             });
           }
         } catch (fallbackError) {
@@ -382,7 +427,8 @@ function PptxPresentationPreview({
             const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
             setRenderState({
               status: "error",
-              message: `PuppyOne could not render this PPTX preview. ${message} Text fallback also failed: ${fallbackMessage}`,
+              renderDetail: message,
+              fallbackDetail: fallbackMessage,
             });
           }
         }
@@ -399,8 +445,13 @@ function PptxPresentationPreview({
   if (renderState.status === "fallback") {
     return (
       <div className="office-pptx-render-preview">
-        <div className="office-preview__note">{renderState.message}</div>
-        <PresentationTextPreview slides={renderState.slides} />
+        <div className="office-preview__note">
+          {t("editor.office.pptxFallback", { detail: bidiIsolate(renderState.detail) })}
+        </div>
+        <PresentationTextPreview
+          slides={renderState.slides}
+          truncatedSlideCount={renderState.truncatedSlideCount}
+        />
       </div>
     );
   }
@@ -408,8 +459,11 @@ function PptxPresentationPreview({
   if (renderState.status === "error") {
     return (
       <OfficeEmptyState
-        title="Preview failed"
-        message={renderState.message}
+        title={t("editor.preview.failed")}
+        message={t("editor.office.pptxFailed", {
+          renderDetail: bidiIsolate(renderState.renderDetail),
+          fallbackDetail: bidiIsolate(renderState.fallbackDetail),
+        })}
         documentPath={documentPath}
         openExternalFile={openExternalFile}
       />
@@ -424,7 +478,7 @@ function PptxPresentationPreview({
         data-rendering={renderState.status === "loading" ? "true" : undefined}
       />
       {renderState.status === "loading" && (
-        <div className="office-pptx-render-state">Rendering presentation...</div>
+        <div className="office-pptx-render-state">{t("editor.office.renderingPresentation")}</div>
       )}
     </div>
   );
@@ -439,6 +493,7 @@ function SpreadsheetPreview({
   activeSheet: number;
   onActiveSheetChange: (index: number) => void;
 }) {
+  const { formatList, formatNumber, t } = useLocalization();
   const gridWrapRef = useRef<HTMLDivElement | null>(null);
   const [viewport, setViewport] = useState({ scrollTop: 0, height: 0 });
 
@@ -465,9 +520,9 @@ function SpreadsheetPreview({
 
   if (result.sheets.length === 0 || !selectedSheet) {
     const hiddenMessage = result.hiddenSheetCount > 0
-      ? `${result.hiddenSheetCount} hidden ${pluralize("sheet", result.hiddenSheetCount)} omitted.`
-      : "No sheets were found in this workbook.";
-    return <OfficeEmptyState title="No visible sheets" message={hiddenMessage} />;
+      ? t("editor.office.hiddenSheetsOmitted", { count: result.hiddenSheetCount })
+      : t("editor.office.noSheets");
+    return <OfficeEmptyState title={t("editor.office.noVisibleSheets")} message={hiddenMessage} />;
   }
 
   const rowCount = selectedSheet.rows.length;
@@ -480,7 +535,7 @@ function SpreadsheetPreview({
   const bottomSpacerHeight = Math.max(0, (rowCount - endRow) * SPREADSHEET_ROW_HEIGHT);
   const renderedRows = getSpreadsheetRenderRows(selectedSheet, startRow, endRow);
   const columnSpan = selectedSheet.columns.length + 1;
-  const previewNotes = createSpreadsheetPreviewNotes(result, selectedSheet);
+  const previewNotes = createSpreadsheetPreviewNotes(result, selectedSheet, t, formatList);
 
   const handleScroll = () => {
     const gridWrap = gridWrapRef.current;
@@ -493,7 +548,7 @@ function SpreadsheetPreview({
 
   return (
     <div className="office-spreadsheet-preview">
-      <div className="office-spreadsheet-tabs" role="tablist" aria-label="Sheets">
+      <div className="office-spreadsheet-tabs" role="tablist" aria-label={t("editor.office.sheets")}>
         {result.sheets.map((sheet, index) => (
           <button
             key={sheet.name}
@@ -502,7 +557,7 @@ function SpreadsheetPreview({
             aria-selected={index === activeSheet}
             onClick={() => onActiveSheetChange(index)}
           >
-            {sheet.name}
+            <span dir="auto">{sheet.name}</span>
           </button>
         ))}
       </div>
@@ -522,14 +577,14 @@ function SpreadsheetPreview({
             )}
             {renderedRows.map((row) => (
               <tr key={row.rowIndex}>
-                <th scope="row">{row.rowIndex + 1}</th>
+                <th scope="row">{formatNumber(row.rowIndex + 1)}</th>
                 {row.cells.map((cell) => (
                   <td
                     key={`${row.rowIndex}-${cell.columnIndex}`}
                     colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
                     rowSpan={cell.rowSpan > 1 ? cell.rowSpan : undefined}
                   >
-                    {cell.value}
+                    <span dir="auto">{cell.value}</span>
                   </td>
                 ))}
               </tr>
@@ -554,37 +609,43 @@ function SpreadsheetPreview({
 function createSpreadsheetPreviewNotes(
   result: SpreadsheetPreviewResult,
   sheet: SpreadsheetSheet,
+  t: MessageFormatter,
+  formatList: ReturnType<typeof useLocalization>["formatList"],
 ): string[] {
   const notes: string[] = [];
   if (result.budget.truncated) {
-    const reasons = result.budget.truncationReasons.map((reason) => (
-      reason === "materialized-cell-limit" ? "cell-count" : "text-memory"
+    const reasons = result.budget.truncationReasons.map((reason) => t(
+      reason === "materialized-cell-limit"
+        ? "editor.office.budget.cellCount"
+        : "editor.office.budget.textMemory",
     ));
-    notes.push(`Preview stopped at the spreadsheet ${reasons.join(" and ")} safety budget.`);
+    notes.push(t("editor.office.budgetStopped", { reasons: formatList(reasons) }));
   }
   if (result.truncatedSheetCount > 0) {
-    notes.push(`Showing ${result.sheets.length} of ${result.totalVisibleSheets} visible sheets.`);
+    notes.push(t("editor.office.visibleSheets", {
+      visible: result.sheets.length,
+      total: result.totalVisibleSheets,
+    }));
   }
   if (result.hiddenSheetCount > 0) {
-    notes.push(`${result.hiddenSheetCount} hidden ${pluralize("sheet", result.hiddenSheetCount)} omitted.`);
+    notes.push(t("editor.office.hiddenSheetsOmitted", { count: result.hiddenSheetCount }));
   }
   if (sheet.truncatedRows) {
-    notes.push(`Showing ${sheet.rows.length} of ${sheet.totalVisibleRows} visible rows.`);
+    notes.push(t("editor.office.visibleRows", { visible: sheet.rows.length, total: sheet.totalVisibleRows }));
   }
   if (sheet.truncatedColumns) {
-    notes.push(`Showing ${sheet.columns.length} of ${sheet.totalVisibleColumns} visible columns.`);
+    notes.push(t("editor.office.visibleColumns", {
+      visible: sheet.columns.length,
+      total: sheet.totalVisibleColumns,
+    }));
   }
   if (sheet.hiddenRowCount > 0) {
-    notes.push(`${sheet.hiddenRowCount} hidden ${pluralize("row", sheet.hiddenRowCount)} omitted.`);
+    notes.push(t("editor.office.hiddenRowsOmitted", { count: sheet.hiddenRowCount }));
   }
   if (sheet.hiddenColumnCount > 0) {
-    notes.push(`${sheet.hiddenColumnCount} hidden ${pluralize("column", sheet.hiddenColumnCount)} omitted.`);
+    notes.push(t("editor.office.hiddenColumnsOmitted", { count: sheet.hiddenColumnCount }));
   }
   return notes;
-}
-
-function pluralize(noun: string, count: number): string {
-  return count === 1 ? noun : `${noun}s`;
 }
 
 function DocxDocumentPreview({
@@ -598,6 +659,7 @@ function DocxDocumentPreview({
   openExternalFile?: (path: string) => Promise<void>;
   openExternalUrl?: (href: string) => void | Promise<void>;
 }) {
+  const { t } = useLocalization();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [renderState, setRenderState] = useState<{ status: "loading" | "ready" | "error"; message?: string }>({
     status: "loading",
@@ -641,7 +703,7 @@ function DocxDocumentPreview({
         void Promise.resolve().then(() => openExternalUrl(externalHref)).catch((error) => {
           setRenderState({
             status: "error",
-            message: `The external link could not be opened. ${error instanceof Error ? error.message : String(error)}`,
+            message: error instanceof Error ? error.message : String(error),
           });
         });
       }
@@ -703,8 +765,10 @@ function DocxDocumentPreview({
   if (renderState.status === "error") {
     return (
       <OfficeEmptyState
-        title="Preview failed"
-        message={`PuppyOne could not render this DOCX preview. ${renderState.message ?? ""}`.trim()}
+        title={t("editor.preview.failed")}
+        message={t("editor.office.docxFailed", {
+          detail: bidiIsolate(renderState.message ?? t("editor.office.unknownError")),
+        })}
         documentPath={documentPath}
         openExternalFile={openExternalFile}
       />
@@ -714,7 +778,7 @@ function DocxDocumentPreview({
   return (
     <div className="office-document-preview office-document-preview--docx">
       {renderState.status === "loading" && (
-        <div className="office-docx-render-state">Rendering Word document...</div>
+        <div className="office-docx-render-state">{t("editor.office.renderingWord")}</div>
       )}
       <div
         ref={hostRef}
@@ -736,6 +800,7 @@ function OfficeEmptyState({
   documentPath?: string;
   openExternalFile?: (path: string) => Promise<void>;
 }) {
+  const { t } = useLocalization();
   const [externalOpenError, setExternalOpenError] = useState<string | null>(null);
   const openExternally = () => {
     if (!documentPath || !openExternalFile) return;
@@ -748,13 +813,17 @@ function OfficeEmptyState({
   return (
     <div className="office-preview-empty">
       <strong>{title}</strong>
-      <span>{message}</span>
+      <span dir="auto">{message}</span>
       {documentPath && openExternalFile && (
         <button type="button" onClick={openExternally}>
-          Open in default app
+          {t("editor.openDefaultApp")}
         </button>
       )}
-      {externalOpenError && <span role="alert">Could not open the desktop app. {externalOpenError}</span>}
+      {externalOpenError && (
+        <span role="alert">
+          {t("editor.office.openDesktopFailed", { detail: bidiIsolate(externalOpenError) })}
+        </span>
+      )}
     </div>
   );
 }
@@ -789,7 +858,9 @@ async function loadOfficePreview({
       const reason = error instanceof Error ? error.message : String(error);
       return {
         kind: "unsupported",
-        message: `PuppyOne could not convert this .${extension} file for preview. Open it in a desktop app or re-save it as .docx. ${reason}`,
+        code: "conversion-failed",
+        extension,
+        detail: reason,
       };
     }
 
@@ -805,21 +876,21 @@ async function loadOfficePreview({
       return { kind: "word", arrayBuffer: validatedBuffer };
     } catch (error) {
       if (isAbortError(error)) throw error;
-      return unsafeOfficePackageMessage("converted Word document", error);
+      return unsafeOfficePackageMessage("converted-word", error);
     }
   }
 
   if (LEGACY_PRESENTATION_EXTENSIONS.has(extension)) {
     return {
       kind: "unsupported",
-      message: "Legacy binary PowerPoint files do not have a built-in preview. Open this file in a desktop app or re-save it as .pptx.",
+      code: "legacy-presentation",
     };
   }
 
   if (!fileUrl) {
     return {
       kind: "unsupported",
-      message: "No file resource is available for the lightweight Office preview.",
+      code: "resource-unavailable",
     };
   }
 
@@ -830,7 +901,8 @@ async function loadOfficePreview({
     if (error instanceof OfficeResourceLimitError) {
       return {
         kind: "unsupported",
-        message: error.message,
+        code: "resource-rejected",
+        detail: error.message,
       };
     }
     throw error;
@@ -850,7 +922,7 @@ async function loadOfficePreview({
       return { kind: "word", arrayBuffer };
     } catch (error) {
       if (isAbortError(error)) throw error;
-      return unsafeOfficePackageMessage("Word document", error);
+      return unsafeOfficePackageMessage("word", error);
     }
   }
   if (isSpreadsheetExtension(extension)) {
@@ -863,7 +935,9 @@ async function loadOfficePreview({
       if (isZipPreflightError(error)) {
         return {
           kind: "unsupported",
-          message: `This spreadsheet was rejected before preview because its package is unsafe or malformed. ${error.message}`,
+          code: "unsafe-package",
+          subject: "spreadsheet",
+          detail: error.message,
         };
       }
       throw error;
@@ -894,13 +968,13 @@ async function loadOfficePreview({
       return await parseOpenDocument(arrayBuffer, filename, signal);
     } catch (error) {
       if (isAbortError(error)) throw error;
-      return unsafeOfficePackageMessage("OpenDocument file", error);
+      return unsafeOfficePackageMessage("opendocument", error);
     }
   }
 
   return {
     kind: "unsupported",
-    message: "This Office format is not available in the lightweight preview.",
+    code: "unsupported-format",
   };
 }
 
@@ -923,13 +997,45 @@ async function validateOfficePackageForPreview(
 }
 
 function unsafeOfficePackageMessage(
-  label: string,
+  subject: OfficePackageSubject,
   error: unknown,
 ): Extract<OfficePreviewResult, { kind: "unsupported" }> {
   return {
     kind: "unsupported",
-    message: `This ${label} was rejected before preview because decompression exceeded a safety budget or the package was malformed. ${error instanceof Error ? error.message : String(error)}`,
+    code: "unsafe-package",
+    subject,
+    detail: error instanceof Error ? error.message : String(error),
   };
+}
+
+function formatOfficeUnsupported(result: OfficeUnsupportedResult, t: MessageFormatter): string {
+  switch (result.code) {
+    case "conversion-failed":
+      return t("editor.office.unsupported.conversionFailed", {
+        extension: bidiIsolate(`.${result.extension ?? "doc"}`),
+        detail: bidiIsolate(result.detail ?? t("editor.office.unknownError")),
+      });
+    case "legacy-presentation":
+      return t("editor.office.unsupported.legacyPresentation");
+    case "resource-unavailable":
+      return t("editor.office.resourceUnavailable");
+    case "resource-rejected":
+      return t("editor.office.unsupported.resourceRejected", {
+        detail: bidiIsolate(result.detail ?? t("editor.office.unknownError")),
+      });
+    case "unsafe-package":
+      return t("editor.office.unsupported.unsafePackage", {
+        subject: t(`editor.office.subject.${result.subject ?? "office"}`),
+        detail: bidiIsolate(result.detail ?? t("editor.office.unknownError")),
+      });
+    case "legacy-word":
+      return t("editor.office.unsupported.legacyWord");
+    case "rich-text-converter":
+      return t("editor.office.unsupported.richTextConverter");
+    case "unsupported-format":
+    default:
+      return t("editor.office.unsupported.format");
+  }
 }
 
 async function parsePresentationText(
@@ -994,13 +1100,13 @@ function unsupportedNativeConversionMessage(extension: string): OfficePreviewRes
   if (LEGACY_WORD_EXTENSIONS.has(extension)) {
     return {
       kind: "unsupported",
-      message: "Legacy binary Word files do not have a built-in preview here. Open this file in a desktop app or re-save it as .docx.",
+      code: "legacy-word",
     };
   }
 
   return {
     kind: "unsupported",
-    message: "Rich Text files need the desktop converter for lightweight preview. Open this file in a desktop app or re-save it as .docx.",
+    code: "rich-text-converter",
   };
 }
 
@@ -1033,7 +1139,9 @@ function getOfficePackageRejection(
     if (!(error instanceof ZipPreflightError)) throw error;
     return {
       kind: "unsupported",
-      message: `This Office file was rejected before preview because its package is unsafe or malformed. ${error.message}`,
+      code: "unsafe-package",
+      subject: "office",
+      detail: error.message,
     };
   }
 }
@@ -1107,7 +1215,7 @@ const DOCX_SHADOW_BASE_CSS = `
   }
 
   [${CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE}] {
-    cursor: pointer;
+    cursor: var(--po-clickable-cursor, pointer);
     text-decoration: underline;
   }
 

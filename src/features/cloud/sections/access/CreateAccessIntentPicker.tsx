@@ -1,4 +1,5 @@
 import { DesktopCloudProviderIcon } from "./accessProviders";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   CREATE_ACCESS_INTENT_OPTIONS,
   getCreateAccessTileProvider,
@@ -12,18 +13,20 @@ export function CreateAccessIntentPicker({
   value: CreateAccessIntent;
   onChange: (value: CreateAccessIntent) => void;
 }) {
+  const { t } = useLocalization();
   return (
     <section className="desktop-cloud-create-access-intent">
       <div className="desktop-cloud-create-access-intent-header">
         <div>
-          <span>Start with the job</span>
-          <strong>What are you trying to do?</strong>
+          <span>{t("cloud.access.create.startWithJob")}</span>
+          <strong>{t("cloud.access.create.intentQuestion")}</strong>
         </div>
-        <small>This helps pick the right way in.</small>
+        <small>{t("cloud.access.create.intentHelp")}</small>
       </div>
       <div className="desktop-cloud-create-access-intent-grid">
         {CREATE_ACCESS_INTENT_OPTIONS.map((option) => {
           const active = value === option.id;
+          const preview = option.preview ?? t(option.previewId!);
           return (
             <button
               key={option.id}
@@ -35,13 +38,13 @@ export function CreateAccessIntentPicker({
                 <span className={`desktop-cloud-create-access-provider-tile ${getCreateAccessTileProvider(option.provider)} ${active ? "active" : ""}`} aria-hidden="true">
                   <DesktopCloudProviderIcon provider={option.provider} size={option.provider === "git_remote" ? 20 : 15} />
                 </span>
-                <span>{option.label}</span>
+                <span>{t(option.labelId)}</span>
               </span>
-              <span className={`desktop-cloud-create-access-intent-preview ${option.preview.includes("://") ? "mono" : ""}`}>
-                {option.preview}
+              <span className={`desktop-cloud-create-access-intent-preview ${preview.includes("://") ? "mono" : ""}`}>
+                {preview}
               </span>
               <span className="desktop-cloud-create-access-chip-list">
-                {option.chips.map((chip) => <span key={chip}>{chip}</span>)}
+                {option.chipIds.map((chipId) => <span key={chipId}>{t(chipId)}</span>)}
               </span>
             </button>
           );

@@ -3,13 +3,15 @@ import { createElement, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { bench, describe } from "vitest";
+import { SessionUiStateStore } from "../../src/features/desktop-agent/application/SessionUiStateStore";
+import { AgentComposer } from "../../src/features/desktop-agent/ui/AgentComposer";
 import { AgentTranscript } from "../../src/features/desktop-agent/ui/AgentTranscript";
 import { SafeMarkdown } from "../../src/features/desktop-agent/ui/SafeMarkdown";
 import {
   AgentPickerPopover,
-  agentPickerLimits,
   type AgentPickerGroup,
 } from "../../src/features/desktop-agent/ui/AgentPickerPopover";
+import { agentPickerLimits } from "../../src/features/desktop-agent/ui/agent-picker-limits";
 import { AgentCommandActivity } from "../../src/features/desktop-agent/ui/activity/AgentCommandActivity";
 import { AgentFileChangeActivity } from "../../src/features/desktop-agent/ui/activity/AgentFileChangeActivity";
 import { applyAgentEvent, applyAgentEvents, createAgentProjection } from "../../src/features/desktop-agent/agentProjection";
@@ -24,6 +26,13 @@ const recordedEvents = createRecordedEvents(1_000);
 const projection = applyAgentEvents(createAgentProjection(), recordedEvents);
 const largeMarkdown = createLargeMarkdown(128 * 1024);
 const pickerGroups = createPickerGroups(500);
+const composerModels = Array.from({ length: 500 }, (_, index) => ({
+  id: `model-${index}`,
+  model: `model-${index}`,
+  displayName: `Model ${index}`,
+  description: `Coding model ${index}`,
+  isDefault: index === 0,
+}));
 const commandActivity = createCommandActivity();
 const fileChangeActivity = createFileChangeActivity();
 
@@ -47,6 +56,46 @@ describe("Desktop Agent virtual timeline", () => {
     flushSync(() => root.unmount());
     parent.remove();
   }, OPTIONS);
+});
+
+describe("Desktop Agent composer isolation", () => {
+  bench("1,000 draft cache writes preserve a 1,000-row measurement map", () => {
+    const store = new SessionUiStateStore(2, 1_000);
+    const measurements = Object.fromEntries(Array.from({ length: 1_000 }, (_, index) => [`row-${index}`, 40 + (index % 7)]));
+    store.patch("session", { measurements });
+    for (let index = 0; index < 1_000; index += 1) store.patch("session", { draft: `Prompt ${index}` });
+    if (Object.keys(store.read("session").measurements).length !== 1_000) throw new Error("Draft writes discarded timeline measurements.");
+  }, OPTIONS);
+
+  bench("50 controlled draft commits beside a memoized 2,000-row transcript", () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const root = createRoot(parent);
+    const noop = () => {};
+    const submit = async () => true;
+    for (let index = 0; index < 50; index += 1) {
+      flushSync(() => root.render(createElement("div", null,
+        createElement(AgentTranscript, { projection, loading: false, onViewportChange: noop }),
+        createElement(AgentComposer, {
+          draft: `Prompt ${index}`,
+          onDraftChange: noop,
+          disabled: false,
+          running: false,
+          stopping: false,
+          submitting: false,
+          placeholder: "Ask anything",
+          models: composerModels,
+          selectedModel: composerModels[0].model,
+          onSelectModel: noop,
+          onSubmit: submit,
+          onStop: noop,
+        }),
+      )));
+    }
+    if (parent.querySelectorAll(".desktop-agent-virtual-row").length > 120) throw new Error("Agent virtual-row budget regressed during typing.");
+    flushSync(() => root.unmount());
+    parent.remove();
+  }, HEAVY_UI_OPTIONS);
 });
 
 describe("Desktop Agent bounded heavy content", () => {

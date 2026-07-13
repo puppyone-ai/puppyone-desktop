@@ -16,6 +16,7 @@ import {
   unwrapSettled,
 } from "../utils";
 import { buildDesktopCloudAccessRows, type CloudAccessSurfaceRow } from "../sections/access/accessRows";
+import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
 type MutableSessionHandler = (session: DesktopCloudSession | null) => void | Promise<void>;
 
@@ -29,8 +30,8 @@ export type DesktopCloudAccessDataState = {
   accessRows: CloudAccessSurfaceRow[];
   identity: DesktopCloudRepoIdentity | null;
   loading: boolean;
-  error: string | null;
-  warning: string | null;
+  error: CloudMessageDescriptor | null;
+  warning: CloudMessageDescriptor | null;
   reload: () => Promise<void>;
 };
 
@@ -44,8 +45,8 @@ type RawCloudAccessData = {
 type CloudAccessInternalState = RawCloudAccessData & {
   contextKey: string | null;
   loading: boolean;
-  error: string | null;
-  warning: string | null;
+  error: CloudMessageDescriptor | null;
+  warning: CloudMessageDescriptor | null;
 };
 
 export function useDesktopCloudAccessData({
@@ -105,17 +106,17 @@ export function useDesktopCloudAccessData({
         contextKey,
         loading: false,
         error: allFailed && firstFailure?.status === "rejected"
-          ? getErrorMessage(firstFailure.reason, "Unable to load Cloud access.")
+          ? cloudMessage("access-load-failed", undefined, getErrorDetail(firstFailure.reason))
           : null,
         warning: !allFailed && failures.length > 0
-          ? "Some Cloud access details could not be loaded. Refresh after checking the backend connection."
+          ? cloudMessage("access-partial")
           : null,
       });
     } catch (loadError) {
       if (activeRequestRef.current !== requestId) return;
       setState(createCloudAccessState({
         contextKey,
-        error: getErrorMessage(loadError, "Unable to load Cloud access."),
+        error: cloudMessage("access-load-failed", undefined, getErrorDetail(loadError)),
       }));
     }
   }, [apiBaseUrl, cloudSession, contextKey, onCloudSessionChange, projectId]);
@@ -214,6 +215,6 @@ function createCloudAccessContextKey({
   ].join("\n");
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
+function getErrorDetail(error: unknown) {
+  return error instanceof Error ? error.message : undefined;
 }

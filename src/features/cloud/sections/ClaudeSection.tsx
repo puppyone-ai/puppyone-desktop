@@ -1,5 +1,7 @@
 import { Bot, Copy, GitBranch, Plus } from "lucide-react";
 import type { ReactNode } from "react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   DesktopCloudProjectReadiness,
   DesktopCloudRepoIdentity,
@@ -26,12 +28,13 @@ export function CloudClaudeSection({
   onOpenGitSync: () => void;
   onOpenClaude: () => void;
 }) {
+  const { t } = useLocalization();
   if (loading || !readiness) {
     return (
-      <CloudMainSection title="Claude" count="Checking Git">
+      <CloudMainSection title="Claude" count={t("cloud.claude.checkingGit")}>
         <ClaudeEmpty
-          title="Checking project readiness"
-          detail="Claude opens only after Cloud confirms both the canonical root Git remote and its first accepted root commit."
+          title={t("cloud.claude.checkingReadiness")}
+          detail={t("cloud.claude.checkingReadinessDetail")}
         />
       </CloudMainSection>
     );
@@ -39,14 +42,16 @@ export function CloudClaudeSection({
 
   if (bindingKind === "scoped") {
     return (
-      <CloudMainSection title="Claude" count="Root checkout required">
+      <CloudMainSection title="Claude" count={t("cloud.claude.rootCheckoutRequired")}>
         <ClaudeEmpty
-          title="This is a scoped checkout"
-          detail={`This workspace syncs only ${scopePath || "a non-root path"}. Scoped Git access never represents the full Project and cannot unlock Claude. Open or attach the canonical root repository first.`}
+          title={t("cloud.claude.scopedCheckout")}
+          detail={t("cloud.claude.scopedCheckoutDetail", {
+            path: bidiIsolate(scopePath || t("cloud.claude.nonRootPath")),
+          })}
           action={(
             <button className="desktop-cloud-row-action" type="button" onClick={onOpenGitSync}>
               <GitBranch size={13} />
-              <span>Git sync details</span>
+              <span>{t("cloud.auth.gitSyncDetails")}</span>
             </button>
           )}
         />
@@ -56,14 +61,14 @@ export function CloudClaudeSection({
 
   if (!readiness.git.root_surface_exists) {
     return (
-      <CloudMainSection title="Claude" count="Git not created">
+      <CloudMainSection title="Claude" count={t("cloud.claude.gitNotCreated")}>
         <ClaudeEmpty
-          title="Create the Project’s root Git remote"
-          detail="Claude stays off until an active Git surface exists on the canonical root scope. Creating a non-root access point will not satisfy this requirement."
+          title={t("cloud.claude.createRootGit")}
+          detail={t("cloud.claude.createRootGitDetail")}
           action={(
             <button className="desktop-cloud-row-action primary" type="button" onClick={onCreateGit}>
               <Plus size={13} />
-              <span>Create Git</span>
+              <span>{t("cloud.claude.createGit")}</span>
             </button>
           )}
         />
@@ -79,21 +84,21 @@ export function CloudClaudeSection({
     return (
       <CloudMainSection
         title="Claude"
-        count="Waiting for first push"
+        count={t("cloud.claude.waitingFirstPush")}
         action={identity?.url ? (
           <button className="desktop-cloud-row-action" type="button" onClick={() => void copyText(identity.url)}>
             <Copy size={13} />
-            <span>Copy remote</span>
+            <span>{t("cloud.claude.copyRemote")}</span>
           </button>
         ) : undefined}
       >
         <ClaudeEmpty
-          title="Push the first root commit"
-          detail={`The root Git remote exists, but Cloud has not accepted the first root Git push on ${readiness.git.default_branch}. Product edits, rejected pushes, and commits on non-root scopes do not unlock Claude.`}
+          title={t("cloud.claude.pushFirstCommit")}
+          detail={t("cloud.claude.pushFirstCommitDetail", { branch: bidiIsolate(readiness.git.default_branch) })}
           action={(
             <button className="desktop-cloud-row-action primary" type="button" onClick={onOpenGitSync}>
               <GitBranch size={13} />
-              <span>Push your first commit</span>
+              <span>{t("cloud.claude.pushFirstAction")}</span>
             </button>
           )}
         />
@@ -104,25 +109,25 @@ export function CloudClaudeSection({
   return (
     <CloudMainSection
       title="Claude"
-      count="Ready"
+      count={t("cloud.status.ready")}
       action={(
         <button className="desktop-cloud-row-action primary" type="button" onClick={onOpenClaude}>
           <Bot size={13} />
-          <span>Open Claude</span>
+          <span>{t("cloud.claude.open")}</span>
         </button>
       )}
     >
       <div className="desktop-cloud-project-overview">
         <div>
-          <span>Project runtime</span>
-          <strong>Ready for Claude</strong>
-          <p>Cloud has an active canonical root Git surface and an accepted root commit. Agent runtime can now be opened for this Project.</p>
+          <span>{t("cloud.claude.projectRuntime")}</span>
+          <strong>{t("cloud.claude.ready")}</strong>
+          <p>{t("cloud.claude.readyDetail")}</p>
         </div>
         <div className="desktop-cloud-sync-summary">
-          <CloudMainMetric label="Root Git" value="Active" tone="ready" />
-          <CloudMainMetric label="Root head" value="Accepted" tone="ready" />
-          <CloudMainMetric label="First Git push" value="Accepted" tone="ready" />
-          <CloudMainMetric label="Default branch" value={readiness.git.default_branch} />
+          <CloudMainMetric label={t("cloud.claude.rootGit")} value={t("cloud.status.active")} tone="ready" />
+          <CloudMainMetric label={t("cloud.claude.rootHead")} value={t("cloud.status.accepted")} tone="ready" />
+          <CloudMainMetric label={t("cloud.claude.firstGitPush")} value={t("cloud.status.accepted")} tone="ready" />
+          <CloudMainMetric label={t("cloud.claude.defaultBranch")} value={readiness.git.default_branch} />
         </div>
       </div>
     </CloudMainSection>

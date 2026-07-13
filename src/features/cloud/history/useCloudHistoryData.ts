@@ -8,14 +8,15 @@ import {
   isHistorySnapshotRestartError,
   mergeCloudHistoryPages,
 } from "./pagination";
+import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
 export type CloudHistoryDataState = {
   history: DesktopCloudHistory | null;
   loading: boolean;
   loadingMore: boolean;
   hasMore: boolean;
-  error: string | null;
-  warning: string | null;
+  error: CloudMessageDescriptor | null;
+  warning: CloudMessageDescriptor | null;
   reload: () => Promise<void>;
   loadMore: () => Promise<void>;
 };
@@ -109,7 +110,7 @@ export function useCloudHistoryData({
         history: current.contextKey === contextKey ? current.history : null,
         loading: false,
         loadingMore: false,
-        error: error instanceof Error ? error.message : "Unable to load branch history.",
+        error: cloudMessage("history-load-failed", undefined, error instanceof Error ? error.message : undefined),
         warning: null,
         contextKey,
       }));
@@ -173,7 +174,7 @@ export function useCloudHistoryData({
           ? {
               ...current,
               loadingMore: false,
-              error: error instanceof Error ? error.message : "Unable to load more history.",
+              error: cloudMessage("history-load-more-failed", undefined, error instanceof Error ? error.message : undefined),
             }
           : current
       ));
@@ -240,10 +241,10 @@ function toPublicCloudHistoryDataState({
   };
 }
 
-function getHistoryHealthWarning(history: DesktopCloudHistory): string | null {
+function getHistoryHealthWarning(history: DesktopCloudHistory): CloudMessageDescriptor | null {
   if (history.graph_health !== "degraded") return null;
   const count = history.unreadable_commit_ids.length;
   return count > 0
-    ? `History is incomplete because ${count} commit object${count === 1 ? " is" : "s are"} unavailable.`
-    : "History is incomplete because part of the commit graph is unavailable.";
+    ? cloudMessage("history-degraded-count", { count })
+    : cloudMessage("history-degraded");
 }

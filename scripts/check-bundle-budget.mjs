@@ -44,6 +44,7 @@ const heavyChunks = [
     entryLeakPattern: /data-pptx-background-gradient/,
   },
 ];
+const rendererLocales = ["en", "es", "pt-BR", "fr", "de", "ja", "ko", "zh-Hans"];
 
 const files = readdirSync(assetsDir);
 const entryChunks = files.filter((fileName) => /^index-.+\.js$/.test(fileName));
@@ -82,13 +83,50 @@ for (const heavyChunk of heavyChunks) {
   }
 }
 
+const localeChunks = new Set();
+for (const locale of rendererLocales) {
+  const onboardingCatalog = JSON.parse(readFileSync(
+    path.join(repoRoot, "locales", "renderer", locale, "onboarding.json"),
+    "utf8",
+  ));
+  const sentinel = onboardingCatalog["error.folderPathUnreadable"];
+  if (typeof sentinel !== "string" || sentinel.length < 20) {
+    errors.push(`${locale} locale bundle sentinel is missing or too short`);
+    continue;
+  }
+  if (entrySource.includes(sentinel)) {
+    errors.push(`${locale} renderer catalog leaked into ${entryChunk}`);
+  }
+  const matchingChunks = files.filter((fileName) => (
+    fileName !== entryChunk
+    && fileName.endsWith(".js")
+    && readLazyChunkSource(fileName).includes(sentinel)
+  ));
+  if (matchingChunks.length !== 1) {
+    errors.push(
+      `${locale} renderer catalog must exist in exactly one lazy chunk; found ${matchingChunks.length}`,
+    );
+    continue;
+  }
+  localeChunks.add(matchingChunks[0]);
+}
+
+if (localeChunks.size !== rendererLocales.length) {
+  errors.push(
+    `expected ${rendererLocales.length} independently lazy renderer locale chunks, found ${localeChunks.size}`,
+  );
+}
+
 if (errors.length > 0) {
   console.error("bundle budget check failed:");
   for (const error of errors) console.error(`- ${error}`);
   process.exit(1);
 }
 
-console.log(`bundle budget check passed: ${entryChunk} is ${formatBytes(entrySize)}.`);
+console.log(
+  `bundle budget check passed: ${entryChunk} is ${formatBytes(entrySize)}; `
+  + `${localeChunks.size} renderer locale chunks are lazy.`,
+);
 
 function fail(message) {
   console.error(`bundle budget check failed: ${message}`);

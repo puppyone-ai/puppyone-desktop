@@ -1,5 +1,6 @@
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, WidgetType } from "@codemirror/view";
+import { bidiIsolate } from "@puppyone/localization/core";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { disposeWidgetSessionDom } from "../../platform/codemirror/widgetSession";
 import { bindInlineHtmlDomInteractions } from "../html/inlineHtmlDomAdapter";
@@ -14,10 +15,15 @@ import {
   subscribeMermaidThemeChanges,
   type MermaidRenderResult,
 } from "./mermaidRenderer";
-import { clampNumber, MarkdownWidgetMeasureController } from "../../shared/widgets/markdownWidgetMeasure";
+import { MarkdownWidgetMeasureController } from "../../platform/codemirror/layoutCoordinator";
+import { estimateMermaidLayoutHeight } from "../code-block/codeBlockLayout";
 import { getDocRevision, type CommitResult } from "../../platform/brokers/transactionBroker";
 import { createPrincipalFromView, openMarkdownHref } from "../../core/editor/markdownLivePreviewContext";
 import { normalizeLineEndings, stopCodeMirrorEvent } from "../../shared/widgets/widgetDom";
+import {
+  getMarkdownLocalization,
+  type MarkdownLocalization,
+} from "../../core/editor/markdownLocalization";
 
 /**
  * Immutable Mermaid descriptor. Debounce, theme subscription, measure, and
@@ -30,6 +36,7 @@ export class MermaidBlockWidget extends WidgetType {
     private readonly from: number,
     private readonly to: number,
     private readonly sourceReference: MarkdownCodeSourceReference | null = null,
+    private readonly layoutEstimatedHeight = estimateMermaidLayoutHeight(code),
   ) {
     super();
   }
@@ -41,21 +48,23 @@ export class MermaidBlockWidget extends WidgetType {
       widget.language === this.language &&
       widget.from === this.from &&
       widget.to === this.to &&
+      widget.layoutEstimatedHeight === this.layoutEstimatedHeight &&
       codeSourceReferencesEqual(widget.sourceReference, this.sourceReference)
     );
   }
 
   get estimatedHeight(): number {
-    const lineCount = Math.max(1, this.code.split("\n").length);
-    return clampNumber(120 + lineCount * 18, 180, 1400);
+    return this.layoutEstimatedHeight;
   }
 
   toDOM(view: EditorView): HTMLElement {
+    const { direction, t } = getMarkdownLocalization(view);
     const host = getMarkdownEmbedHost(view);
     const shell = document.createElement("div");
     shell.className = "cm-md-mermaid-widget";
+    shell.dir = direction;
     const readOnly = view.state.readOnly;
-    const measure = new MarkdownWidgetMeasureController();
+    const measure = new MarkdownWidgetMeasureController(host.layout);
     const elementKey = `${this.from}:${this.to}`;
     const baseSource = view.state.sliceDoc(this.from, this.to);
     const recoveryKey = {
@@ -240,7 +249,7 @@ export class MermaidBlockWidget extends WidgetType {
           errorStrip.hidden = true;
           errorStrip.textContent = "";
           removeMermaidSourceFallback(preview);
-          measure.schedule(view);
+          measure.schedule();
           executionSession.dispose();
         })
         .catch((error: unknown) => {
@@ -250,10 +259,10 @@ export class MermaidBlockWidget extends WidgetType {
             return;
           }
           preview.classList.remove("is-loading");
-          showMermaidError(errorStrip, error instanceof Error ? error : new Error(String(error)));
+          showMermaidError(errorStrip, error instanceof Error ? error : new Error(String(error)), t);
           if (lastGoodSvg) mountMermaidPreviewSvg(preview, lastGoodSvg, (href) => openMarkdownHref(href, view));
-          else preview.replaceChildren(createMermaidSourceFallback(source));
-          measure.schedule(view);
+          else preview.replaceChildren(createMermaidSourceFallback(source, t));
+          measure.schedule();
           executionSession.dispose();
         });
     };
@@ -262,7 +271,7 @@ export class MermaidBlockWidget extends WidgetType {
       const source = textarea?.value ?? draftCode;
       if (!lastGoodSvg) {
         preview.classList.add("is-loading");
-        preview.replaceChildren(createMermaidLoadingElement());
+        preview.replaceChildren(createMermaidLoadingElement(t));
       }
       clearDebounce();
       if (delayMs <= 0) {
@@ -294,8 +303,15 @@ export class MermaidBlockWidget extends WidgetType {
       shell.replaceChildren();
       body.replaceChildren();
 
-      editButton.textContent = editing ? "Done" : "Edit";
-      editButton.setAttribute("aria-label", editing ? "Finish Mermaid editing" : "Edit Mermaid diagram");
+      editButton.textContent = editing
+        ? t("editor.markdown.mermaid.done")
+        : t("editor.markdown.mermaid.edit");
+      editButton.setAttribute(
+        "aria-label",
+        editing
+          ? t("editor.markdown.mermaid.finishEditing")
+          : t("editor.markdown.mermaid.editDiagram"),
+      );
       editButton.hidden = readOnly;
       editButton.onclick = (event) => {
         event.preventDefault();
@@ -312,6 +328,7 @@ export class MermaidBlockWidget extends WidgetType {
         };
         textarea = document.createElement("textarea");
         textarea.className = "cm-md-mermaid-source";
+        textarea.dir = "ltr";
         textarea.value = draftCode;
         textarea.spellcheck = false;
         textarea.rows = Math.max(4, draftCode.split("\n").length);
@@ -370,14 +387,14 @@ export class MermaidBlockWidget extends WidgetType {
 
       shell.appendChild(body);
       renderPreview(0);
-      measure.schedule(view);
+      measure.schedule();
     };
 
     renderSurface();
-    measure.observe(shell, view);
+    measure.observe(shell);
     const unsubscribeTheme = subscribeMermaidThemeChanges(() => {
       renderPreview(0);
-      measure.schedule(view);
+      measure.schedule();
     });
 
     host.sessions.mount(shell, () => ({
@@ -457,23 +474,33 @@ function mountMermaidPreviewSvg(
   bindInlineHtmlDomInteractions(shadowRoot, { openHref });
 }
 
-function showMermaidError(errorStrip: HTMLElement, error: Error) {
+function showMermaidError(
+  errorStrip: HTMLElement,
+  error: Error,
+  t: MarkdownLocalization["t"],
+) {
   errorStrip.hidden = false;
-  errorStrip.textContent = error.message || "Unable to render Mermaid diagram.";
+  errorStrip.textContent = error.message
+    ? t("editor.markdown.mermaid.renderFailedDetail", { detail: bidiIsolate(error.message) })
+    : t("editor.markdown.mermaid.renderFailed");
 }
 
-function createMermaidLoadingElement(): HTMLElement {
+function createMermaidLoadingElement(t: MarkdownLocalization["t"]): HTMLElement {
   const loading = document.createElement("div");
   loading.className = "cm-md-mermaid-loading";
-  loading.textContent = "Rendering diagram...";
+  loading.textContent = t("editor.markdown.mermaid.rendering");
   return loading;
 }
 
-function createMermaidSourceFallback(source: string): HTMLElement {
+function createMermaidSourceFallback(
+  source: string,
+  t: MarkdownLocalization["t"],
+): HTMLElement {
   const fallback = document.createElement("pre");
   fallback.className = "cm-md-mermaid-source-fallback";
+  fallback.dir = "ltr";
   const code = document.createElement("code");
-  code.textContent = source || "Mermaid diagram is empty.";
+  code.textContent = source || t("editor.markdown.mermaid.empty");
   fallback.appendChild(code);
   return fallback;
 }

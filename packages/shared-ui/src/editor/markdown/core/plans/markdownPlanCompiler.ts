@@ -124,7 +124,7 @@ function compileHorizontalRuleAtomPlan(element: MarkdownElement): MarkdownElemen
     presentation: "blockAtom",
     sourceRange: rangeOf(element),
     embed: { kind: "horizontalRule" },
-    layout: { estimatedHeight: 32 },
+    layout: { estimatedHeight: 37 },
     diagnostics: [],
     capabilities: BLOCK_EMBED_CAPABILITIES,
   };

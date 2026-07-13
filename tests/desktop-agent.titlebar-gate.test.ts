@@ -11,9 +11,12 @@ import {
 } from "../src/features/app-shell/headerElements";
 import { AgentChatTitlebarButton } from "../src/features/app-shell/DesktopTitlebarActions";
 import {
+  AGENT_PREFERRED_RUNTIME_STORAGE_KEY,
   RIGHT_SIDEBAR_SURFACE_STORAGE_KEY,
+  readInitialAgentPreferredRuntime,
   readInitialRightSidebarSurface,
 } from "../src/features/app-shell/preferences";
+import { testT, withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -33,10 +36,22 @@ describe("independent Chat and Terminal titlebar buttons", () => {
     expect(readInitialRightSidebarSurface()).toBe("chat");
   });
 
+  it("restores only a validated last-selected Agent id", () => {
+    expect(readInitialAgentPreferredRuntime()).toBeNull();
+    window.localStorage.setItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY, "codex");
+    expect(readInitialAgentPreferredRuntime()).toBe("codex");
+
+    window.localStorage.setItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY, "../../not-a-runtime");
+    expect(readInitialAgentPreferredRuntime()).toBeNull();
+  });
+
   it("keeps the Terminal titlebar control as a stable toggle without a dropdown menu", () => {
     const container = renderHeaderActions(false);
+    const terminalButton = container.querySelector('button[aria-label="Hide Terminal"]');
 
-    expect(container.querySelector('button[aria-label="Hide Terminal"]')).not.toBeNull();
+    expect(terminalButton).not.toBeNull();
+    expect(terminalButton?.querySelector(".lucide-terminal")).not.toBeNull();
+    expect(terminalButton?.querySelector(".lucide-square-terminal")).toBeNull();
     expect(container.querySelector('button[aria-label="Terminal actions"]')).toBeNull();
     expect(container.textContent).not.toContain("Clear Terminal");
     expect(container.textContent).not.toContain("Reset Terminal");
@@ -59,6 +74,7 @@ function renderHeaderActions(chatEnabled: boolean) {
   const definition = getHeaderElementDefinition("terminal");
   if (!definition) throw new Error("Terminal header action is missing.");
   const context: HeaderElementRenderContext = {
+    t: testT,
     externalOpen: {
       canOpen: false,
       loading: false,
@@ -77,7 +93,7 @@ function renderHeaderActions(chatEnabled: boolean) {
     },
   };
 
-  act(() => root?.render(React.createElement(
+  act(() => root?.render(withTestLocalization(React.createElement(
     React.Fragment,
     null,
     definition.render(context),
@@ -86,6 +102,6 @@ function renderHeaderActions(chatEnabled: boolean) {
       open: false,
       onToggle: vi.fn(),
     }),
-  )));
+  ))));
   return container;
 }

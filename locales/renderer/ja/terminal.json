@@ -1,0 +1,10 @@
+{
+  "title": "ターミナル",
+  "clear": "ターミナルを消去",
+  "reset": "ターミナルをリセット",
+  "bridgeUnavailable": "ターミナルブリッジを利用できません。このワークスペースを puppyone で開いてください。",
+  "processExitedSignal": "プロセスはシグナル {signal} で終了しました。",
+  "processExitedCode": "プロセスはコード {code} で終了しました。",
+  "runtimeRestartRequired": "ターミナルランタイムが更新されました。ネイティブブリッジを読み込むため、puppyone を一度再起動してください。",
+  "errorDetail": "ターミナルエラー：{detail}"
+}

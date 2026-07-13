@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import { preloadPresetViewer, PresetViewerRenderer } from "./PresetViewerRenderer";
 import { resolveEditorViewer } from "./viewerRegistry";
 import {
@@ -9,11 +11,13 @@ import {
 } from "./viewerPackAdapter";
 import type {
   EditorDocument,
+  EditorInteractionPreferences,
   EditorSaveMode,
   MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
 } from "./viewerTypes";
+import { DEFAULT_EDITOR_INTERACTION_PREFERENCES } from "./viewerTypes";
 import type {
   ExternalViewerSurfaceRenderer,
   ViewerExtensionHostAdapter,
@@ -42,6 +46,7 @@ export type PuppyoneEditorHostProps = {
   aiEditFile?: AiEditFile | null;
   hideSourceView?: boolean;
   fileIconTheme?: FileIconThemeId;
+  editorInteractionPreferences?: EditorInteractionPreferences;
   saveMode?: EditorSaveMode;
   htmlTrustMode?: MarkdownHtmlTrustMode;
   workspaceId?: string;
@@ -69,6 +74,7 @@ export function PuppyoneEditorHost({
   aiEditFile = null,
   hideSourceView = false,
   fileIconTheme = "default",
+  editorInteractionPreferences = DEFAULT_EDITOR_INTERACTION_PREFERENCES,
   saveMode = "manual",
   htmlTrustMode = "safe",
   workspaceId = "",
@@ -80,6 +86,7 @@ export function PuppyoneEditorHost({
   convertOfficeDocumentToDocx,
   viewerExtensionAdapter = null,
 }: PuppyoneEditorHostProps) {
+  const { t } = useLocalization();
   const { viewer, format, resolvedExtension } = resolveEditorViewer(document);
   const preloadWhileReading = Boolean(
     !viewerExtensionAdapter
@@ -138,16 +145,17 @@ export function PuppyoneEditorHost({
   );
 
   if (viewer.source !== "resource" && loading && !content) {
-    return <div className="editor-state">Loading file...</div>;
+    return <div className="editor-state">{t("editor.loadingFile")}</div>;
   }
 
   if (viewer.source !== "resource" && error && !content) {
     return (
       <EditorUnavailableState
-        title="Cannot open in editor"
+        title={t("editor.unavailable.title")}
         message={error}
         documentPath={document.path}
         openExternalFile={openExternalFile}
+        openLabel={t("editor.openDefaultApp")}
       />
     );
   }
@@ -169,6 +177,7 @@ export function PuppyoneEditorHost({
         canEdit,
         hideSourceView,
         fileIconTheme,
+        editorInteractionPreferences,
         saveMode,
         htmlTrustMode,
         workspaceId,
@@ -210,6 +219,7 @@ function ExternalViewerChooser({
   candidates: readonly ViewerContribution[];
   renderSurface: ExternalViewerSurfaceRenderer;
 }) {
+  const { t } = useLocalization();
   const [selected, setSelected] = useState<ViewerContribution | null>(null);
 
   if (selected) {
@@ -224,13 +234,13 @@ function ExternalViewerChooser({
 
   return (
     <div className="external-viewer-chooser">
-      <strong>Choose a viewer for {document.name}</strong>
+      <strong>{t("editor.viewer.chooseFor", { name: bidiIsolate(document.name) })}</strong>
       <ul>
         {candidates.map((candidate) => (
           <li key={`${candidate.pluginId}@${candidate.version}`}>
             <button type="button" onClick={() => setSelected(candidate)}>
-              {candidate.label}
-              <span>{candidate.publisher} · v{candidate.version}</span>
+              <span dir="auto">{candidate.label}</span>
+              <span dir="auto">{candidate.publisher} · v{candidate.version}</span>
             </button>
           </li>
         ))}
@@ -244,19 +254,21 @@ function EditorUnavailableState({
   message,
   documentPath,
   openExternalFile,
+  openLabel,
 }: {
   title: string;
   message: string;
   documentPath: string;
   openExternalFile?: (path: string) => Promise<void>;
+  openLabel: string;
 }) {
   return (
     <div className="editor-state editor-state--stacked danger">
       <strong>{title}</strong>
-      <span>{message}</span>
+      <span dir="auto">{message}</span>
       {openExternalFile && (
         <button type="button" onClick={() => void openExternalFile(documentPath)}>
-          Open in default app
+          {openLabel}
         </button>
       )}
     </div>

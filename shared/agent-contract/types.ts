@@ -173,9 +173,9 @@ export type AgentEventPayloadMap = {
   "session.updated": AgentEventPayloadBase & { title?: string; status?: string };
   "session.closed": AgentEventPayloadBase & { status?: string };
   "turn.started": AgentEventPayloadBase & { prompt?: string; status?: string };
-  "turn.completed": AgentEventPayloadBase & { status?: string };
-  "turn.failed": AgentEventPayloadBase & { status?: string; message?: string };
-  "turn.interrupted": AgentEventPayloadBase & { status?: string; message?: string };
+  "turn.completed": AgentEventPayloadBase & { status?: string; durationMs?: number };
+  "turn.failed": AgentEventPayloadBase & { status?: string; message?: string; durationMs?: number };
+  "turn.interrupted": AgentEventPayloadBase & { status?: string; message?: string; durationMs?: number };
   "assistant.delta": AgentEventPayloadBase & { delta?: string; text?: string };
   "assistant.completed": AgentEventPayloadBase & { text?: string };
   "reasoning.summary.delta": AgentEventPayloadBase & { delta?: string; text?: string };
@@ -196,10 +196,16 @@ export type AgentEventPayloadMap = {
 };
 
 type AgentActivityPayload = {
+  kind?: string;
+  tool?: string;
   label?: string;
   status?: string;
-  detail?: Record<string, unknown>;
-  output?: string;
+  input?: Record<string, unknown> | null;
+  command?: string | null;
+  path?: string | null;
+  query?: string | null;
+  changes?: unknown[];
+  outputPreview?: string;
 };
 
 type AgentBlockingPayload = {

@@ -52,14 +52,14 @@
   height: 100%;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: 0;
 }
 
 .desktop-titlebar-context-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: var(--desktop-chrome-control-size);
+  height: var(--desktop-titlebar-control-height);
   max-width: none;
   min-width: 0;
   padding: 0 6px;
@@ -103,7 +103,7 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 3px;
-  height: var(--desktop-chrome-control-size);
+  height: var(--desktop-titlebar-control-height);
   -webkit-app-region: no-drag;
 }
 
@@ -114,9 +114,9 @@
   align-items: center;
   justify-content: center;
   width: var(--desktop-chrome-control-size);
-  height: var(--desktop-chrome-control-size);
+  height: var(--desktop-titlebar-control-height);
   border: 0;
-  border-radius: var(--desktop-control-radius);
+  border-radius: var(--desktop-toolbar-action-radius);
   background: transparent;
   color: var(--desktop-titlebar-text-muted);
   outline: 0;
@@ -126,7 +126,7 @@
 
 .desktop-titlebar-action:hover {
   background: var(--desktop-titlebar-hover);
-  color: var(--desktop-titlebar-text);
+  color: var(--desktop-titlebar-text-muted);
 }
 
 .desktop-titlebar-action:focus-visible {
@@ -163,7 +163,7 @@
 .desktop-update-dot {
   position: absolute;
   top: 6px;
-  right: 6px;
+  inset-inline-end: 6px;
   width: 6px;
   height: 6px;
   border: 1px solid var(--desktop-titlebar-bg);
@@ -186,17 +186,17 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  justify-content: flex-start;
+  justify-content: start;
   width: auto;
   max-width: 100%;
-  height: var(--desktop-chrome-control-size);
+  height: var(--desktop-titlebar-control-height);
   min-width: 0;
   padding: 0 6px;
   border: 0;
-  border-radius: var(--desktop-control-radius);
+  border-radius: var(--desktop-toolbar-action-radius);
   background: transparent;
   color: var(--desktop-titlebar-text-muted);
-  text-align: left;
+  text-align: start;
   box-shadow: none;
   -webkit-app-region: no-drag;
   outline: 0;
@@ -237,9 +237,9 @@
   align-items: center;
   justify-content: center;
   width: var(--desktop-chrome-control-size);
-  height: var(--desktop-chrome-control-size);
+  height: var(--desktop-titlebar-control-height);
   border: 0;
-  border-radius: var(--desktop-control-radius);
+  border-radius: var(--desktop-toolbar-action-radius);
   background: transparent;
   color: var(--desktop-titlebar-text-muted);
   outline: 0;
@@ -280,7 +280,7 @@
   position: absolute;
   z-index: 80;
   top: calc(100% + 4px);
-  left: 0;
+  inset-inline-start: 0;
   width: min(360px, calc(100vw - 32px));
   padding: 8px;
   border: 1px solid var(--po-menu-border);
@@ -294,8 +294,8 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: var(--desktop-chrome-control-size);
-  border-radius: var(--desktop-control-radius);
+  height: var(--desktop-titlebar-control-height);
+  border-radius: var(--desktop-toolbar-action-radius);
 }
 
 .desktop-titlebar-external-open:has(.desktop-titlebar-external-open-menu-button[aria-expanded="true"]) {
@@ -303,15 +303,15 @@
 }
 
 .desktop-titlebar-external-open-main {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
 }
 
 .desktop-titlebar-external-open-menu-button {
   width: 17px;
-  margin-left: -2px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
+  margin-inline-start: -2px;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
 }
 
 .desktop-titlebar-external-open-menu-button[aria-expanded="true"] {
@@ -358,13 +358,13 @@
 }
 
 .desktop-titlebar-external-open-menu {
-  right: 0;
-  left: auto;
+  inset-inline-end: 0;
+  inset-inline-start: auto;
   width: 260px;
 }
 
 .desktop-titlebar-external-open-row {
-  text-align: left;
+  text-align: start;
 }
 
 .desktop-titlebar-branch-wrap {
@@ -381,17 +381,17 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  justify-content: flex-start;
+  justify-content: start;
   width: auto;
   max-width: 100%;
-  height: var(--desktop-chrome-control-size);
+  height: var(--desktop-titlebar-control-height);
   min-width: 0;
   padding: 0 6px;
   border: 0;
-  border-radius: var(--desktop-control-radius);
+  border-radius: var(--desktop-toolbar-action-radius);
   background: transparent;
   color: var(--desktop-titlebar-text-muted);
-  text-align: left;
+  text-align: start;
   outline: 0;
   -webkit-app-region: no-drag;
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;

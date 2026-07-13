@@ -106,12 +106,12 @@
   display: grid;
   min-width: 0;
   gap: 2px;
-  padding-left: 18px;
+  padding-inline-start: 18px;
 }
 
 .desktop-cloud-access-nav-child {
   min-height: 30px;
-  padding-left: 9px;
+  padding-inline-start: 9px;
   color: var(--po-text-muted);
 }
 
@@ -126,7 +126,7 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  margin-left: auto;
+  margin-inline-start: auto;
   padding: 0 6px;
   border-radius: 999px;
   background: var(--po-border-subtle);
@@ -211,7 +211,7 @@
   outline: none;
   background: transparent;
   color: inherit;
-  text-align: left;
+  text-align: start;
 }
 
 .desktop-cloud-access-folder-row.header {
@@ -232,7 +232,7 @@
 }
 
 button.desktop-cloud-access-folder-row {
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 button.desktop-cloud-access-folder-row:hover,

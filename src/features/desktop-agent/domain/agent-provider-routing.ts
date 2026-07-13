@@ -17,7 +17,7 @@ export function listAgentInferenceProviders(inspection: AgentProviderInspection 
 }
 
 export function listAgentModelsForProvider(inspection: AgentProviderInspection | null, providerId: string | null) {
-  if (!providerId) return [];
+  if (!providerId) return inspection?.models ?? [];
   return (inspection?.models ?? []).filter((model) => agentProviderIdForModel(model) === providerId);
 }
 
@@ -40,7 +40,10 @@ export function chooseAgentModel(
 ) {
   const models = listAgentModelsForProvider(inspection, providerId);
   if (current && models.some((model) => model.model === current)) return current;
-  return models.find((model) => model.isDefault)?.model || models[0]?.model || null;
+  // The native backend owns catalog ordering. Keep the first advertised model
+  // as the deterministic blank-composer default; an explicit user choice is
+  // retained only while it remains valid for this backend/provider.
+  return models[0]?.model || null;
 }
 
 export function agentProviderIdForModel(model: AgentModel | string | null | undefined) {

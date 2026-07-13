@@ -1,18 +1,13 @@
 import type { AgentEvent, AgentTurnTerminalState } from "./agent-contract";
 import type {
   AgentActivity,
-  AgentPart,
   AgentProjection,
-  AgentQuestion,
-  AgentTranscriptMessage,
-  AgentTurn,
-  TimelineRow,
 } from "./agent-projection-types";
 import { clearProjectedFileChange, hasRenderableFileChange } from "./agent-file-change-projection";
 import {
   activityId,
-  defaultToolLabel,
-  fileChangeLabel,
+  defaultToolLabelCode,
+  fileChangeLabelCode,
   nullableString,
   pickSafeActivityDetail,
   pickUsage,
@@ -28,7 +23,11 @@ import {
   cloneAgentProjection,
   projectionIndexes,
 } from "./agent-projection-indexes";
-import { providerActivityIdentity } from "./agent-provider-notice-policy";
+import {
+  isNonDiagnosticProviderStatusMessage,
+  providerActivityIdentity,
+} from "./agent-provider-notice-policy";
+import { projectTypedPart } from "./agent-typed-part-projection";
 
 export type * from "./agent-projection-types";
 
@@ -147,14 +146,16 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
     case "reasoning.summary.delta":
       return upsertActivity(next, event, {
         kind: "reasoning",
-        label: "Reasoning summary",
+        label: "",
+        labelCode: "reasoning-summary",
         status: payload.completed ? "completed" : "running",
         detail: payload,
       }, { appendDetailField: "delta" });
     case "plan.updated":
       return upsertActivity(next, { ...event, itemId: event.itemId ?? "current-plan" }, {
         kind: "plan",
-        label: "Plan updated",
+        label: "",
+        labelCode: "plan-updated",
         status: payload.completed ? "completed" : "running",
         detail: payload,
       });
@@ -164,7 +165,8 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
       const kind = payload.kind === "command" ? "command" : payload.kind === "file-change" ? "file-change" : "tool";
       return upsertActivity(next, event, {
         kind,
-        label: readString(payload.label) || defaultToolLabel(kind),
+        label: readString(payload.label),
+        labelCode: readString(payload.label) ? undefined : defaultToolLabelCode(kind),
         status: normalizeAgentActivityStatus(payload.status, event.type === "tool.completed" ? "completed" : "running"),
         detail: payload,
       });
@@ -179,7 +181,8 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
           turnId: event.turnId,
           itemId: event.itemId,
           kind: "command",
-          label: "Command output",
+          label: "",
+          labelCode: "command-output",
           status: "running",
           detail: {},
           output: "",
@@ -204,7 +207,8 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
       }
       return upsertActivity(next, event, {
         kind: "file-change",
-        label: fileChangeLabel(payload),
+        label: "",
+        labelCode: fileChangeLabelCode(payload),
         status: normalizeAgentActivityStatus(payload.status, "running"),
         detail: payload,
       });
@@ -219,7 +223,8 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
         turnId: event.turnId,
         itemId: event.itemId,
         kind: payload.kind === "file-change" ? "file-change" : "command",
-        title: readString(payload.title) || "Approval required",
+        title: readString(payload.title),
+        titleCode: readString(payload.title) ? undefined : "approval-required",
         command: nullableString(payload.command),
         cwd: nullableString(payload.cwd),
         commandActions: readRecordArray(payload.commandActions),
@@ -262,15 +267,17 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
     case "provider.activity":
       return upsertActivity(next, event, {
         kind: "tool",
-        label: readString(payload.label) || "Agent activity",
+        label: readString(payload.label),
+        labelCode: readString(payload.label) ? undefined : "agent-activity",
         status: normalizeAgentActivityStatus(payload.status, "running"),
         detail: pickSafeActivityDetail(payload),
       });
     case "provider.warning":
     case "provider.error": {
       const kind = event.type === "provider.error" ? "error" : "warning";
-      const label = readProviderMessage(payload.message) || (kind === "error" ? "Provider error" : "Provider warning");
-      const identity = providerActivityIdentity(next, event, label);
+      const label = readProviderMessage(payload.message);
+      if (label && isNonDiagnosticProviderStatusMessage(label)) return next;
+      const identity = providerActivityIdentity(next, event, label || kind);
       const activityIndexes = projectionIndexes(next).activities;
       const existingActivityIndex = activityIndexes.get(identity.id);
       const existingActivity = existingActivityIndex === undefined ? null : next.activities[existingActivityIndex];
@@ -281,6 +288,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
         itemId: event.itemId ?? existingActivity?.itemId ?? null,
         kind,
         label,
+        labelCode: label ? undefined : kind === "error" ? "provider-error" : "provider-warning",
         status: kind === "error" ? "failed" : "warning",
         detail: pickSafeActivityDetail(payload),
         output: "",
@@ -342,7 +350,7 @@ function upsertAssistant(
 function upsertActivity(
   projection: AgentProjection,
   event: AgentEvent,
-  value: Pick<AgentActivity, "kind" | "label" | "status" | "detail">,
+  value: Pick<AgentActivity, "kind" | "label" | "labelCode" | "status" | "detail">,
   options: { appendDetailField?: string } = {},
 ) {
   const id = activityId(event);
@@ -369,6 +377,7 @@ function upsertActivity(
     projection.activities[existingIndex] = {
       ...existing,
       label: value.label || existing.label,
+      labelCode: value.label ? undefined : value.labelCode ?? existing.labelCode,
       status: value.status,
       detail,
       sequence: event.sequence,
@@ -398,142 +407,3 @@ export const agentProjectionLimits = Object.freeze({
   maxCommandOutput: MAX_COMMAND_OUTPUT,
   maxActivityText: MAX_ACTIVITY_TEXT,
 });
-
-function projectTypedPart(projection: AgentProjection, event: AgentEvent) {
-  const turn = updateTurn(projection, event);
-  if (event.type === "turn.completed" || event.type === "turn.failed" || event.type === "turn.interrupted") {
-    const terminalState = event.type.slice("turn.".length) as AgentTurnTerminalState;
-    const indexes = projectionIndexes(projection);
-    for (const partId of turn?.partIds ?? []) {
-      const partIndex = indexes.parts.get(partId);
-      const part = partIndex === undefined ? null : projection.parts[partIndex];
-      if (partIndex !== undefined && part?.kind === "assistant") {
-        projection.parts[partIndex] = { ...part, streaming: false, terminalState };
-      }
-    }
-  }
-  const part = partForEvent(projection, event);
-  if (!part) return;
-  const indexes = projectionIndexes(projection);
-  const existingIndex = indexes.parts.get(part.id);
-  if (existingIndex !== undefined) projection.parts[existingIndex] = part;
-  else {
-    indexes.parts.set(part.id, projection.parts.length);
-    projection.parts.push(part);
-  }
-  if (turn && !turn.partIds.includes(part.id)) {
-    const turnIndex = indexes.turns.get(turn.id);
-    const nextTurn = { ...turn, partIds: [...turn.partIds, part.id] };
-    if (turnIndex !== undefined) projection.turns[turnIndex] = nextTurn;
-  }
-  const row: TimelineRow = {
-    id: `row:${part.id}`,
-    partId: part.id,
-    turnId: part.turnId,
-    kind: part.kind,
-    sequence: part.sequence,
-    estimatedHeight: estimatePartHeight(part),
-  };
-  const rowIndex = indexes.rows.get(row.id);
-  if (rowIndex !== undefined) projection.rows[rowIndex] = row;
-  else {
-    indexes.rows.set(row.id, projection.rows.length);
-    projection.rows.push(row);
-  }
-}
-
-function updateTurn(projection: AgentProjection, event: AgentEvent) {
-  if (!event.turnId) return null;
-  const indexes = projectionIndexes(projection);
-  let turnIndex = indexes.turns.get(event.turnId);
-  let turn = turnIndex === undefined ? null : projection.turns[turnIndex];
-  if (!turn) {
-    turn = {
-      id: event.turnId,
-      status: "running",
-      startedAtSequence: event.sequence,
-      completedAtSequence: null,
-      partIds: [],
-    };
-    turnIndex = projection.turns.length;
-    indexes.turns.set(event.turnId, turnIndex);
-    projection.turns.push(turn);
-  }
-  if (event.type === "turn.completed" || event.type === "turn.failed" || event.type === "turn.interrupted") {
-    turn = {
-      ...turn,
-      status: event.type.slice("turn.".length) as AgentTurnTerminalState,
-      completedAtSequence: event.sequence,
-    };
-    if (turnIndex !== undefined) projection.turns[turnIndex] = turn;
-  }
-  return turn;
-}
-
-function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart | null {
-  if (event.type === "turn.started") {
-    const indexes = projectionIndexes(projection);
-    const message = (event.turnId ? indexes.messagesByTurn.get(event.turnId) ?? [] : [])
-      .map((index) => projection.messages[index])
-      .find((entry) => entry?.role === "user");
-    return message ? messagePart(message) : null;
-  }
-  if (event.type === "assistant.delta" || event.type === "assistant.completed") {
-    const id = `assistant:${event.itemId ?? event.turnId ?? event.sequence}`;
-    const messageIndex = projectionIndexes(projection).messages.get(id);
-    const message = messageIndex === undefined ? null : projection.messages[messageIndex];
-    return message ? messagePart(message) : null;
-  }
-  if (event.type === "reasoning.summary.delta" || event.type === "plan.updated"
-    || event.type.startsWith("tool.") || event.type === "command.output.delta"
-    || event.type === "file.change.updated" || event.type === "provider.activity") {
-    const activityIndex = projectionIndexes(projection).activities.get(activityId(event));
-    const activity = activityIndex === undefined ? null : projection.activities[activityIndex];
-    return activity ? activityPart(activity) : null;
-  }
-  if (event.type === "provider.warning" || event.type === "provider.error") {
-    const label = readProviderMessage(event.payload.message)
-      || (event.type === "provider.error" ? "Provider error" : "Provider warning");
-    const activityIndex = projectionIndexes(projection).activities.get(providerActivityIdentity(projection, event, label).id);
-    const activity = activityIndex === undefined ? null : projection.activities[activityIndex];
-    return activity ? activityPart(activity) : null;
-  }
-  if (event.type === "usage.updated") {
-    return { id: "usage:current", turnId: event.turnId, itemId: event.itemId, kind: "usage", usage: pickUsage(event.payload), sequence: event.sequence };
-  }
-  if (event.type === "approval.requested" || event.type === "approval.resolved") {
-    const requestId = readString(event.payload.requestId);
-    if (!requestId) return null;
-    return { id: `permission:${requestId}`, turnId: event.turnId, itemId: event.itemId, kind: "permission", requestId, state: event.type.endsWith("resolved") ? "resolved" : "pending", sequence: event.sequence };
-  }
-  if (event.type === "question.requested" || event.type === "question.resolved") {
-    const requestId = readString(event.payload.requestId);
-    if (!requestId) return null;
-    return { id: `question:${requestId}`, turnId: event.turnId, itemId: event.itemId, kind: "question", requestId, state: event.type.endsWith("resolved") ? "resolved" : "pending", sequence: event.sequence };
-  }
-  if (event.type.startsWith("session.") || event.type.startsWith("turn.")) return null;
-  return {
-    id: `unknown:${event.type}:${event.itemId ?? event.sequence}`,
-    turnId: event.turnId,
-    itemId: event.itemId,
-    kind: "unknown",
-    eventType: event.type,
-    label: "Unsupported agent event",
-    sequence: event.sequence,
-  };
-}
-
-function messagePart(message: AgentTranscriptMessage): AgentPart {
-  return { ...message, kind: message.role };
-}
-
-function activityPart(activity: AgentActivity): AgentPart {
-  return { ...activity, detail: pickSafeActivityDetail(activity.detail) };
-}
-
-function estimatePartHeight(part: AgentPart) {
-  if (part.kind === "user") return 64;
-  if (part.kind === "assistant") return Math.min(640, 50 + Math.ceil(part.text.length / 64) * 20);
-  if (part.kind === "permission" || part.kind === "question" || part.kind === "usage") return 36;
-  return 42;
-}

@@ -100,18 +100,18 @@ describe("Automation creation flow", () => {
     expect(daily).toMatchObject({ preset: "daily", time: "08:30", timezone: "Asia/Singapore" });
     expect(weekly).toMatchObject({ preset: "weekly", time: "10:15", weekday: "5" });
     expect(validateFivePartCron("0 9 * * 1-5")).toBeNull();
-    expect(validateFivePartCron("70 25 * * *")).toMatch(/field 1/i);
+    expect(validateFivePartCron("70 25 * * *")).toEqual({ code: "cron-field", field: 1 });
     expect(getAutomationTriggerValidationError({
       ...daily,
       preset: "custom",
       customCron: "not cron",
-    })).toMatch(/five-part/i);
+    })).toEqual({ code: "cron-part-count" });
   });
 
   it("normalizes destination paths while preventing traversal above the project root", () => {
     expect(normalizeAutomationTargetPath("/Research//Drafts/../Docs/")).toBe("Research/Docs");
     expect(getAutomationTargetPathValidationError("Research/../Docs")).toBeNull();
-    expect(getAutomationTargetPathValidationError("../../outside")).toMatch(/project root/i);
+    expect(getAutomationTargetPathValidationError("../../outside")).toEqual({ code: "target-outside-project" });
   });
 
   it("preserves unknown provider options while allowing editable fields to be cleared", () => {

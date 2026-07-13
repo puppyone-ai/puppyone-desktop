@@ -1,0 +1,10 @@
+{
+  "title": "Terminal",
+  "clear": "Limpar terminal",
+  "reset": "Redefinir terminal",
+  "bridgeUnavailable": "A ponte do terminal não está disponível. Abra este espaço de trabalho no puppyone.",
+  "processExitedSignal": "O processo foi encerrado com o sinal {signal}.",
+  "processExitedCode": "O processo foi encerrado com o código {code}.",
+  "runtimeRestartRequired": "O runtime do terminal foi atualizado. Reinicie o puppyone uma vez para carregar a ponte nativa.",
+  "errorDetail": "Erro do terminal: {detail}"
+}

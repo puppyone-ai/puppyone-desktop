@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, Download, RefreshCw, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useLocalization, type MessageFormatter } from "@puppyone/localization";
 import type { DesktopUpdateState, DesktopUpdateStatus } from "../types/electron";
 
 const FALLBACK_UPDATE_STATE: DesktopUpdateState = {
@@ -11,7 +12,7 @@ const FALLBACK_UPDATE_STATE: DesktopUpdateState = {
   progress: null,
   blockers: [],
   error: null,
-  reason: "Desktop update bridge is unavailable.",
+  reason: null,
   lastCheckedAt: null,
   updatedAt: new Date(0).toISOString(),
 };
@@ -76,6 +77,7 @@ export function DesktopUpdateTitlebarButton({
   state: DesktopUpdateState;
   onUpdateNow: () => void;
 }) {
+  const { t, formatNumber } = useLocalization();
   const visible = state.status === "available"
     || state.status === "downloading"
     || state.status === "downloaded"
@@ -91,8 +93,8 @@ export function DesktopUpdateTitlebarButton({
     <button
       className={`desktop-titlebar-action desktop-update-titlebar-action ${state.status}`}
       type="button"
-      title={getUpdateTitle(state)}
-      aria-label={getUpdateTitle(state)}
+      title={getUpdateTitle(state, t, formatNumber)}
+      aria-label={getUpdateTitle(state, t, formatNumber)}
       disabled={busy}
       onClick={onUpdateNow}
     >
@@ -111,14 +113,15 @@ export function DesktopUpdateSettingsRow({
   onCheckForUpdates: () => void;
   onUpdateNow: () => void;
 }) {
-  const action = getSettingsAction(state);
+  const { t, formatNumber } = useLocalization();
+  const action = getSettingsAction(state, t, formatNumber);
   const Icon = getUpdateIcon(state.status);
-  const detail = getUpdateDetail(state);
+  const detail = getUpdateDetail(state, t, formatNumber);
 
   return (
     <div className="desktop-settings-row desktop-settings-row-control desktop-update-settings-row">
       <span className="desktop-settings-label-stack">
-        <strong>App updates</strong>
+        <strong>{t("updates.settings.title")}</strong>
         <small>{detail}</small>
         {state.blockers.length > 0 && (
           <small className="desktop-update-blocker">{state.blockers[0]?.detail ?? state.blockers[0]?.label}</small>
@@ -157,7 +160,11 @@ function getUpdateIcon(status: DesktopUpdateStatus) {
   return Download;
 }
 
-function getSettingsAction(state: DesktopUpdateState): {
+function getSettingsAction(
+  state: DesktopUpdateState,
+  t: MessageFormatter,
+  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string,
+): {
   kind: "check" | "update";
   label: string;
   disabled: boolean;
@@ -165,59 +172,70 @@ function getSettingsAction(state: DesktopUpdateState): {
   primary: boolean;
 } {
   if (state.status === "disabled") {
-    return { kind: "check", label: "Unavailable", disabled: true, spinning: false, primary: false };
+    return { kind: "check", label: t("updates.action.unavailable"), disabled: true, spinning: false, primary: false };
   }
   if (state.status === "checking") {
-    return { kind: "check", label: "Checking", disabled: true, spinning: true, primary: false };
+    return { kind: "check", label: t("updates.action.checking"), disabled: true, spinning: true, primary: false };
   }
   if (state.status === "downloading") {
     return {
       kind: "update",
-      label: formatDownloadProgress(state),
+      label: formatDownloadProgress(state, formatNumber),
       disabled: true,
       spinning: true,
       primary: true,
     };
   }
   if (state.status === "installing") {
-    return { kind: "update", label: "Restarting", disabled: true, spinning: true, primary: true };
+    return { kind: "update", label: t("updates.action.restarting"), disabled: true, spinning: true, primary: true };
   }
   if (state.status === "downloaded") {
-    return { kind: "update", label: "Restart to update", disabled: false, spinning: false, primary: true };
+    return { kind: "update", label: t("updates.action.restart"), disabled: false, spinning: false, primary: true };
   }
   if (state.status === "available" || state.status === "blocked") {
-    return { kind: "update", label: "Update now", disabled: false, spinning: false, primary: true };
+    return { kind: "update", label: t("updates.action.updateNow"), disabled: false, spinning: false, primary: true };
   }
   if (state.status === "error") {
-    return { kind: "update", label: "Try again", disabled: false, spinning: false, primary: false };
+    return { kind: "update", label: t("updates.action.tryAgain"), disabled: false, spinning: false, primary: false };
   }
-  return { kind: "check", label: "Check for updates", disabled: false, spinning: false, primary: false };
+  return { kind: "check", label: t("updates.action.check"), disabled: false, spinning: false, primary: false };
 }
 
-function getUpdateTitle(state: DesktopUpdateState): string {
-  if (state.status === "available") return `Update ${state.availableVersion ?? ""} available`.trim();
-  if (state.status === "downloaded") return "Restart to update";
-  if (state.status === "downloading") return `Downloading update ${formatDownloadProgress(state)}`;
-  if (state.status === "blocked") return state.blockers[0]?.label ?? "Update blocked";
-  if (state.status === "error") return state.error ?? "Update failed";
-  return "App update";
+function getUpdateTitle(
+  state: DesktopUpdateState,
+  t: MessageFormatter,
+  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string,
+): string {
+  if (state.status === "available") return t("updates.title.available", { version: state.availableVersion ?? t("updates.version.new") });
+  if (state.status === "downloaded") return t("updates.action.restart");
+  if (state.status === "downloading") return t("updates.title.downloading", { progress: formatDownloadProgress(state, formatNumber) });
+  if (state.status === "blocked") return state.blockers[0]?.label ?? t("updates.title.blocked");
+  if (state.status === "error") return t("updates.title.failed");
+  return t("updates.title.appUpdate");
 }
 
-function getUpdateDetail(state: DesktopUpdateState): string {
-  if (state.status === "disabled") return state.reason ?? "Auto updates are unavailable in this build.";
-  if (state.status === "idle") return `Version ${state.currentVersion} on ${state.channel}.`;
-  if (state.status === "checking") return "Checking the update feed.";
-  if (state.status === "not-available") return `Version ${state.currentVersion} is up to date.`;
-  if (state.status === "available") return `Version ${state.availableVersion ?? "new"} is ready to download.`;
-  if (state.status === "downloading") return `Downloading ${formatDownloadProgress(state)}.`;
-  if (state.status === "downloaded") return `Version ${state.availableVersion ?? "new"} is ready to install.`;
-  if (state.status === "installing") return "Restarting to install the update.";
-  if (state.status === "blocked") return "Update downloaded. Restart is waiting on active work.";
-  if (state.status === "error") return "The last update operation failed.";
-  return "App update status is unknown.";
+function getUpdateDetail(
+  state: DesktopUpdateState,
+  t: MessageFormatter,
+  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string,
+): string {
+  if (state.status === "disabled") return state.reason ?? t("updates.detail.disabled");
+  if (state.status === "idle") return t("updates.detail.idle", { version: state.currentVersion, channel: state.channel });
+  if (state.status === "checking") return t("updates.detail.checking");
+  if (state.status === "not-available") return t("updates.detail.current", { version: state.currentVersion });
+  if (state.status === "available") return t("updates.detail.available", { version: state.availableVersion ?? t("updates.version.new") });
+  if (state.status === "downloading") return t("updates.detail.downloading", { progress: formatDownloadProgress(state, formatNumber) });
+  if (state.status === "downloaded") return t("updates.detail.downloaded", { version: state.availableVersion ?? t("updates.version.new") });
+  if (state.status === "installing") return t("updates.detail.installing");
+  if (state.status === "blocked") return t("updates.detail.blocked");
+  if (state.status === "error") return t("updates.detail.error");
+  return t("updates.detail.unknown");
 }
 
-function formatDownloadProgress(state: DesktopUpdateState): string {
+function formatDownloadProgress(
+  state: DesktopUpdateState,
+  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string,
+): string {
   const percent = Math.max(0, Math.min(100, Math.round(state.progress?.percent ?? 0)));
-  return `${percent}%`;
+  return formatNumber(percent / 100, { style: "percent", maximumFractionDigits: 0 });
 }

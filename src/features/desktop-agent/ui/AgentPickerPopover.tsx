@@ -1,4 +1,6 @@
-import { Check, ChevronDown, RefreshCw, Search } from "lucide-react";
+import { Check, ChevronDown, CircleAlert, Search } from "lucide-react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   useEffect,
   useId,
@@ -8,17 +10,21 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { DesktopOverlayLayer } from "../../app-shell/DesktopOverlayPortal";
+import { useAnchoredOverlayPosition } from "../../app-shell/useAnchoredOverlayPosition";
+import { agentPickerLimits } from "./agent-picker-limits";
+import { agentPickerOverlayGeometry } from "./agent-runtime-geometry";
 
 export type AgentPickerOption = {
   id: string;
   label: string;
   description?: string;
-  detail?: string;
+  warning?: string;
   meta?: string;
   keywords?: string;
   selectable: boolean;
   selected?: boolean;
-  kind?: "connected" | "local" | "model" | "status";
+  kind?: "agent" | "provider" | "local" | "model" | "status";
   icon?: ReactNode;
 };
 
@@ -28,20 +34,18 @@ export type AgentPickerGroup = {
   options: AgentPickerOption[];
 };
 
-const MAX_RENDERED_OPTIONS = 120;
-
 type AgentPickerPopoverProps = {
   ariaLabel: string;
   placeholder: string;
   valueLabel?: string | null;
   groups: AgentPickerGroup[];
   disabled?: boolean;
-  loading?: boolean;
-  error?: string | null;
   className?: string;
-  onOpen?: () => void;
+  title?: string;
+  triggerDescription?: string;
+  triggerIcon?: ReactNode;
+  compactWhenSelected?: boolean;
   onSelect: (id: string) => void;
-  onRefresh?: () => void;
 };
 
 export function AgentPickerPopover({
@@ -50,13 +54,14 @@ export function AgentPickerPopover({
   valueLabel,
   groups,
   disabled = false,
-  loading = false,
-  error = null,
   className = "",
-  onOpen,
+  title,
+  triggerDescription,
+  triggerIcon,
+  compactWhenSelected = false,
   onSelect,
-  onRefresh,
 }: AgentPickerPopoverProps) {
+  const { locale, t } = useLocalization();
   const popupId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -66,22 +71,30 @@ export function AgentPickerPopover({
   const restoreTimerRef = useRef(0 as number | undefined);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [inspected, setInspected] = useState<string | null>(null);
   const [activeOptionId, setActiveOptionId] = useState<string | null>(null);
-  const matchedGroups = useMemo(() => filterGroups(groups, query), [groups, query]);
+  const matchedGroups = useMemo(() => filterGroups(groups, query, locale), [groups, locale, query]);
   const matchedOptionCount = useMemo(
     () => matchedGroups.reduce((count, group) => count + group.options.length, 0),
     [matchedGroups],
   );
-  const filteredGroups = useMemo(() => limitGroups(matchedGroups, MAX_RENDERED_OPTIONS), [matchedGroups]);
+  const filteredGroups = useMemo(() => limitGroups(matchedGroups, agentPickerLimits.maxRenderedOptions), [matchedGroups]);
   const flatOptions = useMemo(() => filteredGroups.flatMap((group) => group.options), [filteredGroups]);
   const truncated = matchedOptionCount > flatOptions.length;
   const searchable = groups.reduce((count, group) => count + group.options.length, 0) > 6;
+  const compact = compactWhenSelected && Boolean(valueLabel);
+  const { overlayRef, setOverlayRef, overlayPosition } = useAnchoredOverlayPosition({
+    open,
+    anchorRef: triggerRef,
+    boundarySelector: ".desktop-agent-boundary",
+  });
 
   useEffect(() => {
     if (!open) return undefined;
     const closeOnPointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && rootRef.current?.contains(event.target)) return;
+      if (
+        event.target instanceof Node
+        && (rootRef.current?.contains(event.target) || overlayRef.current?.contains(event.target))
+      ) return;
       close(false);
     };
     const closeOnEscape = (event: globalThis.KeyboardEvent) => {
@@ -95,7 +108,7 @@ export function AgentPickerPopover({
       window.removeEventListener("pointerdown", closeOnPointerDown, true);
       window.removeEventListener("keydown", closeOnEscape, true);
     };
-  }, [open]);
+  }, [open, overlayRef]);
 
   useEffect(() => () => {
     if (typeaheadRef.current.timer) window.clearTimeout(typeaheadRef.current.timer);
@@ -108,13 +121,11 @@ export function AgentPickerPopover({
     if (!open) {
       setOpen(true);
       setQuery("");
-      setInspected(null);
-      onOpen?.();
     }
     if (focusTimerRef.current) window.clearTimeout(focusTimerRef.current);
     focusTimerRef.current = window.setTimeout(() => {
       focusTimerRef.current = undefined;
-      const options = limitGroups(filterGroups(groups, ""), MAX_RENDERED_OPTIONS).flatMap((group) => group.options);
+      const options = limitGroups(filterGroups(groups, "", locale), agentPickerLimits.maxRenderedOptions).flatMap((group) => group.options);
       const target = focusDirection === "last"
         ? options.at(-1)
         : focusDirection === "first"
@@ -130,7 +141,6 @@ export function AgentPickerPopover({
   const close = (restoreFocus: boolean) => {
     setOpen(false);
     setQuery("");
-    setInspected(null);
     if (focusTimerRef.current) window.clearTimeout(focusTimerRef.current);
     if (restoreTimerRef.current) window.clearTimeout(restoreTimerRef.current);
     if (restoreFocus) {
@@ -142,12 +152,9 @@ export function AgentPickerPopover({
   };
 
   const choose = (option: AgentPickerOption) => {
-    if (!option.selectable) {
-      setInspected((current) => current === option.id ? null : option.id);
-      return;
-    }
-    onSelect(option.id);
+    if (!option.selectable) return;
     close(true);
+    onSelect(option.id);
   };
 
   const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -173,7 +180,7 @@ export function AgentPickerPopover({
       close(true);
       return;
     } else if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
-      focusByTypeahead(event.key, flatOptions, optionRefs.current, typeaheadRef);
+      focusByTypeahead(event.key, flatOptions, optionRefs.current, typeaheadRef, locale);
       return;
     } else return;
     event.preventDefault();
@@ -189,28 +196,40 @@ export function AgentPickerPopover({
       <button
         ref={triggerRef}
         type="button"
-        className="desktop-agent-picker-trigger"
+        className={`desktop-agent-picker-trigger${compact ? " is-compact" : ""}`}
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? popupId : undefined}
+        aria-description={triggerDescription || (compact && valueLabel
+          ? t("agent.picker.selected", { value: bidiIsolate(valueLabel) })
+          : undefined)}
+        title={title}
         disabled={disabled}
         onClick={() => open ? close(false) : show()}
         onKeyDown={handleTriggerKeyDown}
       >
-        <span>{valueLabel || placeholder}</span>
-        <ChevronDown size={12} aria-hidden="true" />
+        {triggerIcon && <span className="desktop-agent-picker-trigger-mark">{triggerIcon}</span>}
+        {!compact && <span>{valueLabel || placeholder}</span>}
+        {!compact && <ChevronDown size={12} aria-hidden="true" />}
       </button>
       {open && (
-        <div className="desktop-agent-picker-popover" data-loading={loading || undefined}>
+        <DesktopOverlayLayer>
+          <div
+            ref={setOverlayRef}
+            className="desktop-agent-overlay desktop-agent-picker-popover"
+            style={agentPickerOverlayGeometry(overlayPosition)}
+            data-positioned={overlayPosition ? "true" : "false"}
+            data-placement={overlayPosition?.placement}
+          >
           {searchable && (
             <label className="desktop-agent-picker-search">
               <Search size={13} aria-hidden="true" />
-              <span className="desktop-agent-visually-hidden">Search {ariaLabel.toLowerCase()}</span>
+              <span className="desktop-agent-visually-hidden">{t("agent.picker.search", { name: bidiIsolate(ariaLabel) })}</span>
               <input
                 value={query}
                 autoFocus
-                placeholder={`Search ${ariaLabel.toLowerCase()}`}
+                placeholder={t("agent.picker.search", { name: bidiIsolate(ariaLabel) })}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key !== "ArrowDown" || flatOptions.length === 0) return;
@@ -221,72 +240,56 @@ export function AgentPickerPopover({
               />
             </label>
           )}
-          <div id={popupId} className="desktop-agent-picker-list" role="listbox" aria-label={`${ariaLabel} options`}>
-            {filteredGroups.map((group) => {
-              const labelId = `${popupId}-${group.id}`;
-              return (
-                <div className="desktop-agent-picker-group" role="group" aria-labelledby={labelId} key={group.id}>
-                  <div id={labelId} className="desktop-agent-picker-group-label">{group.label}</div>
-                  {group.options.map((option) => (
-                    <div className="desktop-agent-picker-option-shell" key={option.id}>
-                      <button
-                        ref={(node) => {
-                          if (node) optionRefs.current.set(option.id, node);
-                          else optionRefs.current.delete(option.id);
-                        }}
-                        type="button"
-                        role="option"
-                        aria-selected={Boolean(option.selected)}
-                        aria-disabled={!option.selectable}
-                        tabIndex={option.id === activeOptionId ? 0 : -1}
-                        className={`desktop-agent-picker-option is-${option.kind || "status"}${option.selected ? " is-selected" : ""}`}
-                        onClick={() => choose(option)}
-                        onFocus={() => setActiveOptionId(option.id)}
-                        onKeyDown={(event) => handleOptionKeyDown(event, option)}
-                      >
-                        <span className="desktop-agent-picker-option-icon" aria-hidden="true">{option.icon || initial(option.label)}</span>
-                        <span className="desktop-agent-picker-option-copy">
-                          <span><strong>{option.label}</strong>{option.meta && <small>{option.meta}</small>}</span>
-                          {option.description && <span>{option.description}</span>}
-                        </span>
-                        {option.selected && <Check className="desktop-agent-picker-check" size={14} aria-hidden="true" />}
-                      </button>
-                      {inspected === option.id && option.detail && <div className="desktop-agent-picker-detail" role="note">{option.detail}</div>}
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-            {flatOptions.length === 0 && <div className="desktop-agent-picker-empty">No matching options</div>}
-          </div>
-          {(error || onRefresh || truncated) && (
-            <div className="desktop-agent-picker-footer">
-              {(error || truncated) && (
-                <span role="status" data-error={error || undefined}>
-                  {error || `Showing ${flatOptions.length} of ${matchedOptionCount}. Search to narrow.`}
+          <div id={popupId} className="desktop-agent-picker-list" role="listbox" aria-label={t("agent.picker.options", { name: bidiIsolate(ariaLabel) })}>
+            {flatOptions.map((option) => (
+              <button
+                ref={(node) => {
+                  if (node) optionRefs.current.set(option.id, node);
+                  else optionRefs.current.delete(option.id);
+                }}
+                type="button"
+                role="option"
+                aria-selected={Boolean(option.selected)}
+                aria-disabled={!option.selectable || undefined}
+                tabIndex={option.id === activeOptionId ? 0 : -1}
+                className={`desktop-agent-picker-option is-${option.kind || "status"}${option.selected ? " is-selected" : ""}${option.warning ? " has-warning" : ""}${!option.selectable ? " is-unavailable" : ""}`}
+                key={option.id}
+                onClick={() => choose(option)}
+                onFocus={() => setActiveOptionId(option.id)}
+                onKeyDown={(event) => handleOptionKeyDown(event, option)}
+              >
+                <span className="desktop-agent-picker-option-icon" aria-hidden="true">{option.icon || initial(option.label)}</span>
+                <span className="desktop-agent-picker-option-copy">
+                  <span><strong dir="auto">{option.label}</strong>{option.meta && <small dir="auto">{option.meta}</small>}</span>
                 </span>
-              )}
-              {onRefresh && (
-                <button type="button" disabled={loading} onClick={onRefresh}>
-                  <RefreshCw size={13} className={loading ? "desktop-agent-spin" : undefined} />
-                  {loading ? "Checking" : "Refresh"}
-                </button>
-              )}
+                {option.warning
+                  ? <span className="desktop-agent-picker-warning" title={option.warning} aria-label={option.warning}><CircleAlert size={14} strokeWidth={1.8} aria-hidden="true" /></span>
+                  : option.selected
+                  ? <Check className="desktop-agent-picker-check" size={14} aria-hidden="true" />
+                  : null}
+              </button>
+            ))}
+            {flatOptions.length === 0 && <div className="desktop-agent-picker-empty">{t("agent.picker.noMatches")}</div>}
+          </div>
+          {truncated && (
+            <div className="desktop-agent-picker-footer">
+              <span role="status">{t("agent.picker.showing", { visible: flatOptions.length, total: matchedOptionCount })}</span>
             </div>
           )}
-        </div>
+          </div>
+        </DesktopOverlayLayer>
       )}
     </div>
   );
 }
 
-function filterGroups(groups: AgentPickerGroup[], query: string) {
-  const normalized = query.trim().toLowerCase();
+function filterGroups(groups: AgentPickerGroup[], query: string, locale: string) {
+  const normalized = query.trim().toLocaleLowerCase(locale);
   if (!normalized) return groups;
   return groups.flatMap((group) => {
     const options = group.options.filter((option) => (
       `${option.label} ${option.description || ""} ${option.meta || ""} ${option.keywords || ""}`
-        .toLowerCase()
+        .toLocaleLowerCase(locale)
         .includes(normalized)
     ));
     return options.length ? [{ ...group, options }] : [];
@@ -308,10 +311,11 @@ function focusByTypeahead(
   options: AgentPickerOption[],
   refs: Map<string, HTMLButtonElement>,
   state: React.MutableRefObject<{ value: string; timer: number | undefined }>,
+  locale: string,
 ) {
   if (state.current.timer) window.clearTimeout(state.current.timer);
-  state.current.value = `${state.current.value}${key}`.toLowerCase();
-  const target = options.find((option) => option.label.toLowerCase().startsWith(state.current.value));
+  state.current.value = `${state.current.value}${key}`.toLocaleLowerCase(locale);
+  const target = options.find((option) => option.label.toLocaleLowerCase(locale).startsWith(state.current.value));
   if (target) refs.get(target.id)?.focus();
   state.current.timer = window.setTimeout(() => { state.current.value = ""; }, 500);
 }
@@ -319,5 +323,3 @@ function focusByTypeahead(
 function initial(label: string) {
   return label.trim().slice(0, 1).toUpperCase();
 }
-
-export const agentPickerLimits = Object.freeze({ maxRenderedOptions: MAX_RENDERED_OPTIONS });

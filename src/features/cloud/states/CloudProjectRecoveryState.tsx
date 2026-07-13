@@ -1,8 +1,9 @@
 import { AlertTriangle, Check, GitBranch, RefreshCw, UserRound } from "lucide-react";
+import { useLocalization } from "@puppyone/localization/react";
 import { CloudMainSection } from "../components/shared";
 
 export function CloudProjectRecoveryState({
-  title = "Cloud project unavailable",
+  title,
   message,
   remoteLabel = null,
   loading = false,
@@ -22,29 +23,31 @@ export function CloudProjectRecoveryState({
   confirmLabel?: string;
   onConfirm?: () => void;
 }) {
+  const { t } = useLocalization();
+  const resolvedTitle = title ?? t("cloud.recovery.title");
   return (
     <CloudMainSection
-      title={title}
-      count={loading ? "Retrying" : "Action needed"}
+      title={resolvedTitle}
+      count={t(loading ? "cloud.common.retrying" : "cloud.recovery.actionNeeded")}
       action={(
         <>
           {onConfirm && (
             <button className="desktop-cloud-row-action primary" type="button" disabled={loading} onClick={onConfirm}>
               <Check size={13} />
-              <span>{confirmLabel ?? "Confirm"}</span>
+              <span>{confirmLabel ?? t("cloud.common.confirm")}</span>
             </button>
           )}
           <button className="desktop-cloud-row-action" type="button" disabled={loading} onClick={onRetry}>
             <RefreshCw size={13} className={loading ? "spin" : undefined} />
-            <span>Retry</span>
+            <span>{t("cloud.common.retry")}</span>
           </button>
           <button className="desktop-cloud-row-action" type="button" onClick={onUseAnotherAccount}>
             <UserRound size={13} />
-            <span>Use another account</span>
+            <span>{t("cloud.recovery.useAnotherAccount")}</span>
           </button>
           <button className="desktop-cloud-row-action" type="button" onClick={onOpenGitDetails}>
             <GitBranch size={13} />
-            <span>Git sync details</span>
+            <span>{t("cloud.auth.gitSyncDetails")}</span>
           </button>
         </>
       )}
@@ -52,12 +55,12 @@ export function CloudProjectRecoveryState({
       <div className="desktop-cloud-empty-state">
         <span><AlertTriangle size={22} /></span>
         <div>
-          <strong>{title}</strong>
+          <strong>{resolvedTitle}</strong>
           <p>
             {message}
-            {remoteLabel ? ` Remote: ${remoteLabel}.` : ""}
+            {remoteLabel ? ` ${t("cloud.recovery.remote", { remote: remoteLabel })}` : ""}
             {" "}
-            This folder stays connected to its PuppyOne Cloud Git remote; Connectors, MCP, and CLI remain under Access after the project is available again.
+            {t("cloud.recovery.connectionPreserved")}
           </p>
         </div>
       </div>

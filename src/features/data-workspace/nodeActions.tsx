@@ -17,10 +17,16 @@ import {
   Workflow,
 } from "lucide-react";
 import { FileGlyphIcon, getMatchedExtension, type DataNode, type FileIconThemeId } from "@puppyone/shared-ui";
+import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
 import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
 import type { ExperimentalSettings } from "../../preferences";
-import { createDefaultPuppyFlowDocument, serializePuppyFlowDocument } from "../puppyflow/puppyflowModel";
+import {
+  createDefaultPuppyFlowDocument,
+  serializePuppyFlowDocument,
+  type PuppyFlowDocumentDefaults,
+} from "../puppyflow/puppyflowModel";
 
 export type DesktopCreateEntryKind = "folder" | "markdown" | "text" | "json" | "csv" | "app" | "puppyflow";
 export type DesktopCreateEntryAnchor = {
@@ -36,7 +42,7 @@ export type DesktopCreateEntryAnchorInput = DOMRect | DesktopCreateEntryAnchor;
 export type DesktopCreateEntryDraft = {
   parentPath: string | null;
   anchor: DesktopCreateEntryAnchor;
-  error: string | null;
+  error: DesktopNodeActionError | null;
   creatingKind: DesktopCreateEntryKind | null;
   selectedKind: DesktopCreateEntryKind | null;
   name: string;
@@ -49,9 +55,17 @@ export type DesktopNodeActionMenuDraft = {
   renameNameValue: string;
   renameExtensionValue: string;
   renameFocus: "name" | "type";
-  error: string | null;
+  error: DesktopNodeActionError | null;
   operation: "rename" | "delete" | "open" | "reveal" | "paste" | "duplicate" | null;
 };
+
+export type DesktopNodeActionError = Readonly<
+  | { code: "name-required" }
+  | { code: "name-invalid" }
+  | { code: "name-unsupported" }
+  | { code: "operation-failed"; detail: string }
+  | { code: "delete-partial"; deletedCount: number; failedCount: number; detail: string }
+>;
 
 const CREATE_ENTRY_MENU_MARGIN = 12;
 const CREATE_ENTRY_MENU_WIDTH = 184;
@@ -62,67 +76,43 @@ const NODE_ACTION_MENU_ESTIMATED_HEIGHT = 342;
 const CREATE_ENTRY_OPTIONS = [
   {
     kind: "folder",
-    label: "Folder",
-    dialogTitle: "New Folder",
     iconName: "folder",
     iconType: "folder",
-    defaultName: "New Folder",
   },
   {
     kind: "markdown",
-    label: "Markdown",
-    dialogTitle: "New Markdown",
     iconName: "Untitled.md",
     iconType: "markdown",
-    defaultName: "Untitled.md",
   },
   {
     kind: "text",
-    label: "Text",
-    dialogTitle: "New Text File",
     iconName: "Untitled.txt",
     iconType: "text",
-    defaultName: "Untitled.txt",
   },
   {
     kind: "json",
-    label: "JSON",
-    dialogTitle: "New JSON File",
     iconName: "Untitled.json",
     iconType: "json",
-    defaultName: "Untitled.json",
   },
   {
     kind: "app",
-    label: "Puppyone App",
-    dialogTitle: "New Puppyone App",
     iconName: "Untitled.puppyoneapp",
     iconType: "app",
-    defaultName: "Untitled.puppyoneapp",
   },
   {
     kind: "puppyflow",
-    label: "PuppyFlow",
-    dialogTitle: "New PuppyFlow",
     iconName: "Untitled.puppyflow",
     iconType: "workflow",
-    defaultName: "Untitled.puppyflow",
   },
   {
     kind: "csv",
-    label: "CSV",
-    dialogTitle: "New CSV File",
     iconName: "Untitled.csv",
     iconType: "spreadsheet",
-    defaultName: "Untitled.csv",
   },
 ] as const satisfies Array<{
   kind: DesktopCreateEntryKind;
-  label: string;
-  dialogTitle: string;
   iconName: string;
   iconType: DataNode["type"];
-  defaultName: string;
 }>;
 
 type CreateEntryOption = (typeof CREATE_ENTRY_OPTIONS)[number];
@@ -141,6 +131,7 @@ export function DesktopExplorerRowActions({
   onCreate: (parentPath: string | null, anchorRect: DOMRect) => void;
   onOpenNodeMenu: (node: DataNode, anchorRect: DOMRect) => void;
 }) {
+  const { t } = useLocalization();
   const canCreate = node?.type === "folder" || !node;
 
   return (
@@ -149,8 +140,8 @@ export function DesktopExplorerRowActions({
         <button
           className="tree-row-action-button"
           type="button"
-          title="Create new"
-          aria-label="Create new"
+          title={t("workspace.node.createNew")}
+          aria-label={t("workspace.node.createNew")}
           onClick={(event) => onCreate(parentPath, event.currentTarget.getBoundingClientRect())}
         >
           <Plus size={13} />
@@ -160,8 +151,8 @@ export function DesktopExplorerRowActions({
         <button
           className="tree-row-action-button"
           type="button"
-          title="More actions"
-          aria-label={`More actions for ${node.name}`}
+          title={t("workspace.node.moreActions")}
+          aria-label={t("workspace.node.moreActionsFor", { name: bidiIsolate(node.name) })}
           onClick={(event) => onOpenNodeMenu(node, event.currentTarget.getBoundingClientRect())}
         >
           <MoreVertical size={13} />
@@ -178,7 +169,7 @@ export function DesktopCreateEntryMenu({
   onCancel,
   onPaste,
   pasteDisabled = false,
-  pasteLabel = "Paste",
+  pasteLabel,
   onSelectKind,
 }: {
   draft: DesktopCreateEntryDraft;
@@ -190,6 +181,7 @@ export function DesktopCreateEntryMenu({
   pasteLabel?: string;
   onSelectKind: (kind: DesktopCreateEntryKind) => void;
 }) {
+  const { t } = useLocalization();
   const menuRef = useRef<HTMLDivElement>(null);
   const customMenuCloseTimerRef = useRef<number | null>(null);
   const [customMenuOpen, setCustomMenuOpen] = useState(false);
@@ -263,7 +255,7 @@ export function DesktopCreateEntryMenu({
     <DesktopMenuSurface
       ref={menuRef}
       className="desktop-create-entry-menu desktop-node-action-menu"
-      ariaLabel="Create new"
+      ariaLabel={t("workspace.node.createNew")}
       style={menuStyle}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
@@ -272,7 +264,7 @@ export function DesktopCreateEntryMenu({
         <>
           <DesktopNodeActionMenuItem
             icon={<ClipboardPaste size={14} />}
-            label={pasteLabel}
+            label={pasteLabel ?? t("workspace.node.paste")}
             shortcut={getPlatformShortcut("V")}
             disabled={pasteDisabled}
             onClick={onPaste}
@@ -284,7 +276,7 @@ export function DesktopCreateEntryMenu({
         <DesktopNodeActionMenuItem
           key={option.kind}
           icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}
-          label={option.label}
+          label={getCreateEntryOptionLabel(option.kind, t)}
           onClick={() => onSelectKind(option.kind)}
         />
       ))}
@@ -304,8 +296,8 @@ export function DesktopCreateEntryMenu({
           <DesktopMenuItem
             className="desktop-node-action-menu-item desktop-create-entry-submenu-trigger"
             icon={<Workflow size={14} />}
-            label="Custom files"
-            trailing={<ChevronRight size={14} />}
+            label={t("workspace.node.customFiles")}
+            trailing={<ChevronRight className="po-directional-icon" size={14} />}
             aria-haspopup="menu"
             aria-expanded={customMenuOpen}
             onClick={(event) => {
@@ -316,14 +308,14 @@ export function DesktopCreateEntryMenu({
           />
           <DesktopMenuSurface
             className="desktop-create-entry-submenu"
-            ariaLabel="Create custom file"
+            ariaLabel={t("workspace.node.createCustomFile")}
             role="menu"
           >
             {customCreateEntryOptions.map((option) => (
               <DesktopNodeActionMenuItem
                 key={option.kind}
                 icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}
-                label={option.label}
+                label={getCreateEntryOptionLabel(option.kind, t)}
                 onClick={() => onSelectKind(option.kind)}
               />
             ))}
@@ -347,6 +339,7 @@ export function DesktopCreateEntryDialog({
   onCancel: () => void;
   onCreate: () => void;
 }) {
+  const { t } = useLocalization();
   const inputRef = useRef<HTMLInputElement>(null);
   const selectedKind = draft.selectedKind;
 
@@ -368,7 +361,9 @@ export function DesktopCreateEntryDialog({
   if (!selectedKind) return null;
 
   const selectedOption = getCreateEntryOption(selectedKind);
-  const extensionNote = getCreateEntryExtensionNote(selectedKind);
+  const extensionNote = getCreateEntryExtensionNote(selectedKind, t);
+  const optionLabel = getCreateEntryOptionLabel(selectedKind, t);
+  const errorMessage = formatDesktopNodeActionError(draft.error, t);
 
   return (
     <DesktopDialogRoot
@@ -392,8 +387,10 @@ export function DesktopCreateEntryDialog({
               <CreateEntryGlyph option={selectedOption} theme={fileIconTheme} size={16} />
             </span>
             <div>
-              <h2 id="desktop-create-entry-title">{selectedOption.dialogTitle}</h2>
-              <p>{draft.parentPath ? `Create in ${draft.parentPath}` : "Create in workspace root"}</p>
+              <h2 id="desktop-create-entry-title">{getCreateEntryDialogTitle(selectedKind, t)}</h2>
+              <p>{draft.parentPath
+                ? t("workspace.node.createIn", { path: bidiIsolate(draft.parentPath) })
+                : t("workspace.node.createInRoot")}</p>
             </div>
           </div>
           <DesktopDialogCloseButton disabled={draft.creatingKind !== null} onClick={onCancel} />
@@ -401,13 +398,13 @@ export function DesktopCreateEntryDialog({
 
         <div className="desktop-dialog-body desktop-file-dialog-body">
           <label className="desktop-dialog-field">
-            <span>Name</span>
+            <span>{t("workspace.node.name")}</span>
             <input
               ref={inputRef}
               value={draft.name}
               disabled={draft.creatingKind !== null}
-              aria-label={`${selectedOption.label} name`}
-              placeholder={`${selectedOption.label} name`}
+              aria-label={t("workspace.node.kindName", { kind: optionLabel })}
+              placeholder={t("workspace.node.kindName", { kind: optionLabel })}
               onChange={(event) => {
                 const value = event.target.value;
                 onChange((current) => current ? { ...current, name: value, error: null } : current);
@@ -418,7 +415,7 @@ export function DesktopCreateEntryDialog({
           {extensionNote && (
             <div className="desktop-dialog-note">{extensionNote}</div>
           )}
-          {draft.error && <div className="desktop-dialog-error">{draft.error}</div>}
+          {errorMessage && <div className="desktop-dialog-error" dir="auto">{errorMessage}</div>}
         </div>
 
         <footer className="desktop-dialog-footer">
@@ -428,14 +425,14 @@ export function DesktopCreateEntryDialog({
             disabled={draft.creatingKind !== null}
             onClick={onCancel}
           >
-            Cancel
+            {t("common.action.cancel")}
           </button>
           <button
             className="desktop-dialog-button primary file"
             type="submit"
             disabled={draft.creatingKind !== null || !draft.name.trim()}
           >
-            {draft.creatingKind ? "Creating..." : "Create"}
+            {draft.creatingKind ? t("workspace.node.creating") : t("workspace.node.create")}
           </button>
         </footer>
       </form>
@@ -556,6 +553,7 @@ function DesktopNodeActionPopover({
   onOpenInDefaultApp: () => void;
   onRevealInFinder: () => void;
 }) {
+  const { t } = useLocalization();
   const menuRef = useRef<HTMLDivElement>(null);
   const actionCount = Math.max(1, draft.nodes.length);
   const singleNodeAction = actionCount === 1;
@@ -565,6 +563,7 @@ function DesktopNodeActionPopover({
     "--node-action-menu-top": `${position.top}px`,
     "--node-action-menu-width": `${NODE_ACTION_MENU_WIDTH}px`,
   } as CSSProperties;
+  const errorMessage = formatDesktopNodeActionError(draft.error, t);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -600,7 +599,7 @@ function DesktopNodeActionPopover({
     <DesktopMenuSurface
       ref={menuRef}
       className="desktop-node-action-menu"
-      ariaLabel={`Actions for ${draft.node.name}`}
+      ariaLabel={t("workspace.node.actionsFor", { name: bidiIsolate(draft.node.name) })}
       style={menuStyle}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
@@ -608,7 +607,7 @@ function DesktopNodeActionPopover({
       {draft.node.type === "folder" && (
         <DesktopNodeActionMenuItem
           icon={<FolderPlus size={14} />}
-          label="New File or Folder"
+          label={t("workspace.node.newFileOrFolder")}
           disabled={draft.operation !== null}
           onClick={onCreateInside}
         />
@@ -616,7 +615,7 @@ function DesktopNodeActionPopover({
       {draft.node.type === "folder" && (
         <DesktopNodeActionMenuItem
           icon={<ClipboardPaste size={14} />}
-          label="Paste into Folder"
+          label={t("workspace.node.pasteIntoFolder")}
           shortcut={getPlatformShortcut("V")}
           disabled={draft.operation !== null || !canPaste}
           onClick={onPaste}
@@ -625,14 +624,14 @@ function DesktopNodeActionPopover({
       {draft.node.type === "folder" && <DesktopMenuSeparator />}
       <DesktopNodeActionMenuItem
         icon={<Copy size={14} />}
-        label={actionCount > 1 ? `Copy ${actionCount} Items` : "Copy"}
+        label={t("workspace.node.copyItems", { count: actionCount })}
         shortcut={getPlatformShortcut("C")}
         disabled={draft.operation !== null || !canCopy}
         onClick={onCopy}
       />
       <DesktopNodeActionMenuItem
         icon={<Scissors size={14} />}
-        label={actionCount > 1 ? `Cut ${actionCount} Items` : "Cut"}
+        label={t("workspace.node.cutItems", { count: actionCount })}
         shortcut={getPlatformShortcut("X")}
         disabled={draft.operation !== null || !canCut}
         onClick={onCut}
@@ -640,10 +639,8 @@ function DesktopNodeActionPopover({
       <DesktopNodeActionMenuItem
         icon={<CopyPlus size={14} />}
         label={draft.operation === "duplicate"
-          ? "Duplicating..."
-          : actionCount > 1
-            ? `Duplicate ${actionCount} Items`
-            : "Duplicate"}
+          ? t("workspace.node.duplicating")
+          : t("workspace.node.duplicateItems", { count: actionCount })}
         shortcut={getPlatformShortcut("D")}
         disabled={draft.operation !== null || !canDuplicate}
         onClick={onDuplicate}
@@ -652,7 +649,7 @@ function DesktopNodeActionPopover({
       {singleNodeAction && showOpenInDefaultApp && draft.node.type !== "folder" && (
         <DesktopNodeActionMenuItem
           icon={<ExternalLink size={14} />}
-          label={draft.operation === "open" ? "Opening..." : "Open in Default App"}
+          label={draft.operation === "open" ? t("workspace.node.opening") : t("workspace.node.openDefaultApp")}
           disabled={draft.operation !== null}
           onClick={onOpenInDefaultApp}
         />
@@ -660,7 +657,7 @@ function DesktopNodeActionPopover({
       {singleNodeAction && showRevealInFinder && (
         <DesktopNodeActionMenuItem
           icon={<FolderOpen size={14} />}
-          label={draft.operation === "reveal" ? "Opening..." : "Reveal in Finder"}
+          label={draft.operation === "reveal" ? t("workspace.node.opening") : t("workspace.node.revealInFinder")}
           disabled={draft.operation !== null}
           onClick={onRevealInFinder}
         />
@@ -668,7 +665,7 @@ function DesktopNodeActionPopover({
       {singleNodeAction && (
         <DesktopNodeActionMenuItem
           icon={<Pencil size={14} />}
-          label="Rename"
+          label={t("workspace.node.rename")}
           disabled={draft.operation !== null}
           onClick={() => onChange((current) => current ? {
             ...current,
@@ -681,7 +678,7 @@ function DesktopNodeActionPopover({
       {singleNodeAction && draft.node.type !== "folder" && (
         <DesktopNodeActionMenuItem
           icon={<FileText size={14} />}
-          label="Change Type"
+          label={t("workspace.node.changeType")}
           disabled={draft.operation !== null}
           onClick={() => onChange((current) => current ? {
             ...current,
@@ -694,15 +691,13 @@ function DesktopNodeActionPopover({
       <DesktopNodeActionMenuItem
         icon={<Trash2 size={14} />}
         label={draft.operation === "delete"
-          ? "Deleting..."
-          : actionCount > 1
-            ? `Delete ${actionCount} Items`
-            : "Delete"}
+          ? t("workspace.node.deleting")
+          : t("workspace.node.deleteItems", { count: actionCount })}
         destructive
         disabled={draft.operation !== null}
         onClick={onDelete}
       />
-      {draft.error && <div className="desktop-node-action-error">{draft.error}</div>}
+      {errorMessage && <div className="desktop-node-action-error" dir="auto">{errorMessage}</div>}
     </DesktopMenuSurface>
   );
 }
@@ -720,14 +715,18 @@ function DesktopNodeRenameDialog({
   onCancel: () => void;
   onRename: () => void;
 }) {
+  const { t } = useLocalization();
   const inputRef = useRef<HTMLInputElement>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
   const isFile = draft.node.type !== "folder";
   const fileTypeOptions = useMemo(
-    () => getDesktopFileTypeOptions(draft.renameExtensionValue, experimentalSettings),
-    [draft.renameExtensionValue, experimentalSettings],
+    () => getDesktopFileTypeOptions(draft.renameExtensionValue, t, experimentalSettings),
+    [draft.renameExtensionValue, experimentalSettings, t],
   );
-  const title = draft.renameFocus === "type" && isFile ? "Change type" : "Rename";
+  const title = draft.renameFocus === "type" && isFile
+    ? t("workspace.node.changeType")
+    : t("workspace.node.rename");
+  const errorMessage = formatDesktopNodeActionError(draft.error, t);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -775,7 +774,7 @@ function DesktopNodeRenameDialog({
 
         <div className="desktop-dialog-body desktop-file-dialog-body">
           <label className="desktop-dialog-field">
-            <span>Name</span>
+            <span>{t("workspace.node.name")}</span>
             <input
               ref={inputRef}
               value={draft.renameNameValue}
@@ -788,7 +787,7 @@ function DesktopNodeRenameDialog({
           </label>
           {isFile && (
             <label className="desktop-dialog-field">
-              <span>Type</span>
+              <span>{t("workspace.node.type")}</span>
               <select
                 ref={selectRef}
                 value={normalizeDesktopExtension(draft.renameExtensionValue)}
@@ -811,7 +810,7 @@ function DesktopNodeRenameDialog({
               </select>
             </label>
           )}
-          {draft.error && <div className="desktop-dialog-error">{draft.error}</div>}
+          {errorMessage && <div className="desktop-dialog-error" dir="auto">{errorMessage}</div>}
         </div>
 
         <footer className="desktop-dialog-footer">
@@ -821,14 +820,14 @@ function DesktopNodeRenameDialog({
             disabled={draft.operation !== null}
             onClick={onCancel}
           >
-            Cancel
+            {t("common.action.cancel")}
           </button>
           <button
             className="desktop-dialog-button primary file"
             type="submit"
             disabled={draft.operation !== null || !draft.renameNameValue.trim()}
           >
-            {draft.operation === "rename" ? "Saving..." : "Save"}
+            {draft.operation === "rename" ? t("workspace.node.saving") : t("common.action.save")}
           </button>
         </footer>
       </form>
@@ -897,31 +896,31 @@ function getCreateEntryOption(kind: DesktopCreateEntryKind): CreateEntryOption {
 }
 
 type DesktopFileTypeOption = {
-  label: string;
+  id: string;
   extension: string;
   experimentalSetting?: keyof ExperimentalSettings;
 };
 
 const DESKTOP_FILE_TYPE_OPTIONS = [
-  { label: "No extension", extension: "" },
-  { label: "Markdown (.md)", extension: ".md" },
-  { label: "JSON (.json)", extension: ".json" },
-  { label: "JSON Lines (.jsonl)", extension: ".jsonl" },
-  { label: "Text (.txt)", extension: ".txt" },
-  { label: "CSV (.csv)", extension: ".csv" },
-  { label: "HTML (.html)", extension: ".html" },
-  { label: "Puppyone App (.puppyoneapp)", extension: ".puppyoneapp", experimentalSetting: "enablePuppyoneAppFiles" },
-  { label: "PuppyFlow (.puppyflow)", extension: ".puppyflow", experimentalSetting: "enablePuppyFlowFiles" },
-  { label: "JavaScript (.js)", extension: ".js" },
-  { label: "TypeScript (.ts)", extension: ".ts" },
-  { label: "TSX (.tsx)", extension: ".tsx" },
-  { label: "YAML (.yml)", extension: ".yml" },
-  { label: "TOML (.toml)", extension: ".toml" },
-  { label: "PDF (.pdf)", extension: ".pdf" },
-  { label: "PNG image (.png)", extension: ".png" },
-  { label: "JPEG image (.jpg)", extension: ".jpg" },
-  { label: "Archive (.zip)", extension: ".zip" },
-  { label: "Tarball (.tar.gz)", extension: ".tar.gz" },
+  { id: "none", extension: "" },
+  { id: "markdown", extension: ".md" },
+  { id: "json", extension: ".json" },
+  { id: "jsonLines", extension: ".jsonl" },
+  { id: "text", extension: ".txt" },
+  { id: "csv", extension: ".csv" },
+  { id: "html", extension: ".html" },
+  { id: "app", extension: ".puppyoneapp", experimentalSetting: "enablePuppyoneAppFiles" },
+  { id: "puppyflow", extension: ".puppyflow", experimentalSetting: "enablePuppyFlowFiles" },
+  { id: "javascript", extension: ".js" },
+  { id: "typescript", extension: ".ts" },
+  { id: "tsx", extension: ".tsx" },
+  { id: "yaml", extension: ".yml" },
+  { id: "toml", extension: ".toml" },
+  { id: "pdf", extension: ".pdf" },
+  { id: "png", extension: ".png" },
+  { id: "jpeg", extension: ".jpg" },
+  { id: "zip", extension: ".zip" },
+  { id: "tarball", extension: ".tar.gz" },
 ] satisfies DesktopFileTypeOption[];
 
 export function getDesktopRenameDraft(node: DataNode): { nameValue: string; extensionValue: string } {
@@ -956,28 +955,32 @@ export function normalizeDesktopRenameName(draft: DesktopNodeActionMenuDraft): s
 }
 
 export function validateDesktopNodeName(name: string): void {
-  if (!name) throw new Error("Name is required.");
+  if (!name) throw new DesktopNodeNameError("name-required");
   if (name === "." || name === ".." || name.includes("/") || name.includes("\\")) {
-    throw new Error("Name must be a single file or folder name.");
+    throw new DesktopNodeNameError("name-invalid");
   }
   if (name.includes("\0")) {
-    throw new Error("Name contains unsupported characters.");
+    throw new DesktopNodeNameError("name-unsupported");
   }
 }
 
 export function getDesktopFileTypeOptions(
   currentExtension: string,
+  t: MessageFormatter,
   experimentalSettings?: ExperimentalSettings | null,
 ): Array<{ label: string; extension: string }> {
   const extension = normalizeDesktopExtension(currentExtension);
   const options = DESKTOP_FILE_TYPE_OPTIONS
     .filter((option) => !option.experimentalSetting || experimentalSettings?.[option.experimentalSetting] === true)
-    .map(({ label, extension: optionExtension }) => ({ label, extension: optionExtension }));
+    .map(({ id, extension: optionExtension }) => ({
+      label: t(`workspace.node.fileType.${id}`),
+      extension: optionExtension,
+    }));
   if (!extension || options.some((option) => option.extension === extension)) return options;
 
   return [
     options[0],
-    { label: `Current (${extension})`, extension },
+    { label: t("workspace.node.fileType.current", { extension: bidiIsolate(extension) }), extension },
     ...options.slice(1),
   ];
 }
@@ -1001,23 +1004,32 @@ export function getDesktopNodeExtension(name: string): string {
   return name.slice(-suffix.length);
 }
 
-export function formatDesktopExtensionLabel(extension: string): string {
-  return extension || "no extension";
+export function formatDesktopExtensionLabel(extension: string, t: MessageFormatter): string {
+  return extension || t("workspace.node.fileType.noExtensionShort");
 }
 
-export function defaultCreateName(kind: DesktopCreateEntryKind): string {
-  return getCreateEntryOption(kind).defaultName;
+export function defaultCreateName(kind: DesktopCreateEntryKind, t: MessageFormatter): string {
+  return t(`workspace.node.create.kind.${kind}.defaultName`);
 }
 
-export function getCreateEntryInitialContent(kind: DesktopCreateEntryKind): string {
+export type DesktopCreateEntryTemplates = Readonly<{
+  csvHeaders: readonly [string, string];
+  puppyFlow: PuppyFlowDocumentDefaults;
+  untitledAppName: string;
+}>;
+
+export function getCreateEntryInitialContent(
+  kind: DesktopCreateEntryKind,
+  templates: DesktopCreateEntryTemplates,
+): string {
   if (kind === "json") return "{}\n";
-  if (kind === "csv") return "Column 1,Column 2\n";
+  if (kind === "csv") return `${templates.csvHeaders.join(",")}\n`;
   if (kind === "app") {
     return [
       "{",
       '  "type": "puppyone.app",',
       '  "version": 1,',
-      '  "name": "Untitled App",',
+      `  "name": ${JSON.stringify(templates.untitledAppName)},`,
       '  "launch": {',
       '    "kind": "local-server",',
       '    "command": ["node", "server.mjs"],',
@@ -1040,7 +1052,7 @@ export function getCreateEntryInitialContent(kind: DesktopCreateEntryKind): stri
     ].join("\n");
   }
   if (kind === "puppyflow") {
-    return serializePuppyFlowDocument(createDefaultPuppyFlowDocument("Untitled Flow"));
+    return serializePuppyFlowDocument(createDefaultPuppyFlowDocument(templates.puppyFlow));
   }
   return "";
 }
@@ -1048,13 +1060,13 @@ export function getCreateEntryInitialContent(kind: DesktopCreateEntryKind): stri
 export function normalizeCreateEntryName(kind: DesktopCreateEntryKind, value: string): string {
   const name = value.trim();
   if (!name) {
-    throw new Error("Name is required.");
+    throw new DesktopNodeNameError("name-required");
   }
   if (name === "." || name === ".." || name.includes("/") || name.includes("\\")) {
-    throw new Error("Name must be a single file or folder name.");
+    throw new DesktopNodeNameError("name-invalid");
   }
   if (name.includes("\0")) {
-    throw new Error("Name contains unsupported characters.");
+    throw new DesktopNodeNameError("name-unsupported");
   }
   if (kind === "markdown") {
     return ensureCreateEntryExtension(name, /\.(md|markdown|mdx)$/i, ".md");
@@ -1082,14 +1094,55 @@ function ensureCreateEntryExtension(name: string, extensionPattern: RegExp, fall
   return `${name}${fallbackExtension}`;
 }
 
-function getCreateEntryExtensionNote(kind: DesktopCreateEntryKind): string | null {
-  if (kind === "markdown") return "Names without a Markdown extension are saved as .md.";
-  if (kind === "text") return "Names without an extension are saved as .txt.";
-  if (kind === "json") return "Names without a JSON extension are saved as .json.";
-  if (kind === "csv") return "Names without a table extension are saved as .csv.";
-  if (kind === "app") return "Names without a Puppyone App extension are saved as .puppyoneapp.";
-  if (kind === "puppyflow") return "Names without a PuppyFlow extension are saved as .puppyflow.";
-  return null;
+function getCreateEntryExtensionNote(kind: DesktopCreateEntryKind, t: MessageFormatter): string | null {
+  if (kind === "folder") return null;
+  return t(`workspace.node.create.kind.${kind}.extensionNote`);
+}
+
+function getCreateEntryOptionLabel(kind: DesktopCreateEntryKind, t: MessageFormatter): string {
+  return t(`workspace.node.create.kind.${kind}.label`);
+}
+
+function getCreateEntryDialogTitle(kind: DesktopCreateEntryKind, t: MessageFormatter): string {
+  return t(`workspace.node.create.kind.${kind}.title`);
+}
+
+export function toDesktopNodeActionError(error: unknown): DesktopNodeActionError {
+  if (error instanceof DesktopNodeNameError) return Object.freeze({ code: error.code });
+  return Object.freeze({
+    code: "operation-failed",
+    detail: error instanceof Error ? error.message : String(error),
+  });
+}
+
+function formatDesktopNodeActionError(
+  error: DesktopNodeActionError | null,
+  t: MessageFormatter,
+): string | null {
+  if (!error) return null;
+  if (error.code === "name-required") return t("workspace.node.error.nameRequired");
+  if (error.code === "name-invalid") return t("workspace.node.error.nameInvalid");
+  if (error.code === "name-unsupported") return t("workspace.node.error.nameUnsupported");
+  if (error.code === "delete-partial") {
+    return t("workspace.node.error.deletePartial", {
+      deleted: error.deletedCount,
+      failed: error.failedCount,
+      detail: bidiIsolate(error.detail),
+    });
+  }
+  return t("workspace.node.error.operationFailedDetail", { detail: bidiIsolate(error.detail) });
+}
+
+type DesktopNodeNameErrorCode = "name-required" | "name-invalid" | "name-unsupported";
+
+class DesktopNodeNameError extends Error {
+  readonly code: DesktopNodeNameErrorCode;
+
+  constructor(code: DesktopNodeNameError["code"]) {
+    super(code);
+    this.name = "DesktopNodeNameError";
+    this.code = code;
+  }
 }
 
 export function uniqueCreateEntryName(defaultName: string, existingNames: Set<string>): string {

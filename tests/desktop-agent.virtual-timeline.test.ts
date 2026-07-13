@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AgentTranscript, agentTimelineLimits } from "../src/features/desktop-agent/ui/AgentTranscript";
 import { SafeMarkdown, safeMarkdownLimits } from "../src/features/desktop-agent/ui/SafeMarkdown";
 import { createAgentProjection, type AgentPart } from "../src/features/desktop-agent/agentProjection";
+import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let root: Root | null = null;
@@ -64,11 +65,15 @@ describe("Desktop Agent virtual transcript", () => {
     expect(container.querySelectorAll(".desktop-agent-virtual-row.is-new")).toHaveLength(0);
 
     const next = projectionWithMessages(2);
-    act(() => root?.render(React.createElement(AgentTranscript, { projection: next, loading: false })));
+    act(() => root?.render(withTestLocalization(React.createElement(AgentTranscript, { projection: next, loading: false }))));
     expect(container.querySelectorAll(".desktop-agent-virtual-row.is-new")).toHaveLength(1);
-
-    act(() => root?.render(React.createElement(AgentTranscript, { projection: next, loading: false })));
+    const animatedRow = container.querySelector(".desktop-agent-virtual-row.is-new");
+    act(() => animatedRow?.dispatchEvent(new Event("animationend", { bubbles: true })));
     expect(container.querySelectorAll(".desktop-agent-virtual-row.is-new")).toHaveLength(0);
+
+    act(() => root?.render(withTestLocalization(React.createElement(AgentTranscript, { projection: next, loading: false }))));
+    expect(container.querySelectorAll(".desktop-agent-virtual-row.is-new")).toHaveLength(0);
+    expect(container.querySelectorAll(".desktop-agent-virtual-row").item(1)).toBe(animatedRow);
   });
 });
 
@@ -76,7 +81,7 @@ function render(node: React.ReactElement) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root?.render(node));
+  act(() => root?.render(withTestLocalization(node)));
   return container;
 }
 

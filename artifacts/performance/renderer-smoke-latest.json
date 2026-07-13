@@ -1,0 +1,528 @@
+{
+  "schema": "puppyone-renderer-performance/v1",
+  "environment": {
+    "capturedAt": "2026-07-13T19:57:55.473Z",
+    "platform": "darwin",
+    "arch": "arm64",
+    "electron": "41.10.1",
+    "chromium": "146.0.7680.216",
+    "cpu": "Apple M2 Pro",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "build": "production",
+    "sampleTarget": 30,
+    "coldFirstOpen": false,
+    "linkIndex": false,
+    "visible": false
+  },
+  "summary": {
+    "generatedAt": "2026-07-13T19:57:55.469Z",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.7680.216 Electron/41.10.1 Safari/537.36",
+    "completedSamples": 30,
+    "staleCommitCount": 0,
+    "longTasks": {
+      "count": 0,
+      "over50ms": 0,
+      "maxDuration": 0,
+      "entries": []
+    },
+    "inputTransactions": {
+      "samples": 30,
+      "p50": 0.7000000476837158,
+      "p95": 1.100000023841858,
+      "max": 3.200000047683716
+    },
+    "operations": {
+      "editor_snapshot_read": {
+        "samples": 30,
+        "p50": 0.10000002384185791,
+        "p95": 0.20000004768371582,
+        "max": 0.20000004768371582
+      },
+      "editor_destroy": {
+        "samples": 30,
+        "p50": 0.10000002384185791,
+        "p95": 0.20000004768371582,
+        "max": 0.2999999523162842
+      },
+      "editor_base_create": {
+        "samples": 30,
+        "p50": 1.5,
+        "p95": 2,
+        "max": 2.5999999046325684
+      },
+      "markdown_language_activate": {
+        "samples": 30,
+        "p50": 2.899999976158142,
+        "p95": 4,
+        "max": 4.199999928474426
+      },
+      "markdown_preview_activate": {
+        "samples": 30,
+        "p50": 29.5,
+        "p95": 36.700000047683716,
+        "max": 38.10000002384186
+      },
+      "markdown_link_worker_roundtrip": {
+        "samples": 1,
+        "p50": 19.100000023841858,
+        "p95": 19.100000023841858,
+        "max": 19.100000023841858
+      }
+    },
+    "stages": {
+      "preview_shell_committed": {
+        "samples": 30,
+        "p50": 1.4000000953674316,
+        "p95": 1.5,
+        "max": 2.100000023841858
+      },
+      "content_ready": {
+        "samples": 30,
+        "p50": 36.700000047683716,
+        "p95": 45.60000002384186,
+        "max": 48.800000071525574
+      },
+      "editor_base_ready": {
+        "samples": 30,
+        "p50": 3.200000047683716,
+        "p95": 4,
+        "max": 5
+      },
+      "markdown_language_ready": {
+        "samples": 30,
+        "p50": 6.800000071525574,
+        "p95": 8.599999904632568,
+        "max": 10.100000023841858
+      },
+      "preview_ready": {
+        "samples": 30,
+        "p50": 40.700000047683716,
+        "p95": 50.799999952316284,
+        "max": 58.700000047683716
+      }
+    },
+    "traces": [
+      {
+        "id": "file-open:1",
+        "documentId": "performance-a.md",
+        "startedAt": 522.7999999523163,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.399999976158142,
+          "editor_base_ready": 4,
+          "markdown_language_ready": 8.399999976158142,
+          "content_ready": 39.700000047683716,
+          "preview_ready": 43.60000002384186
+        }
+      },
+      {
+        "id": "file-open:2",
+        "documentId": "performance-b.md",
+        "startedAt": 579.8999999761581,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.5,
+          "editor_base_ready": 3.700000047683716,
+          "markdown_language_ready": 8.399999976158142,
+          "content_ready": 45.60000002384186,
+          "preview_ready": 50.799999952316284
+        }
+      },
+      {
+        "id": "file-open:3",
+        "documentId": "performance-a.md",
+        "startedAt": 639.6000000238419,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.5,
+          "editor_base_ready": 3.5999999046325684,
+          "markdown_language_ready": 8.599999904632568,
+          "content_ready": 40.09999990463257,
+          "preview_ready": 44.5
+        }
+      },
+      {
+        "id": "file-open:4",
+        "documentId": "performance-b.md",
+        "startedAt": 692.5,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.399999976158142,
+          "editor_base_ready": 3.600000023841858,
+          "markdown_language_ready": 7.699999928474426,
+          "content_ready": 38.299999952316284,
+          "preview_ready": 42.39999997615814
+        }
+      },
+      {
+        "id": "file-open:5",
+        "documentId": "performance-a.md",
+        "startedAt": 744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.5,
+          "editor_base_ready": 3.5,
+          "markdown_language_ready": 7.799999952316284,
+          "content_ready": 38.39999997615814,
+          "preview_ready": 42.5
+        }
+      },
+      {
+        "id": "file-open:6",
+        "documentId": "performance-b.md",
+        "startedAt": 794.1999999284744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.3000000715255737,
+          "editor_base_ready": 3.3000000715255737,
+          "markdown_language_ready": 7.200000047683716,
+          "content_ready": 37.60000002384186,
+          "preview_ready": 41.60000002384186
+        }
+      },
+      {
+        "id": "file-open:7",
+        "documentId": "performance-a.md",
+        "startedAt": 844.1999999284744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 2.100000023841858,
+          "editor_base_ready": 5,
+          "markdown_language_ready": 10.100000023841858,
+          "content_ready": 48.800000071525574,
+          "preview_ready": 58.700000047683716
+        }
+      },
+      {
+        "id": "file-open:8",
+        "documentId": "performance-b.md",
+        "startedAt": 913.1999999284744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.4000000953674316,
+          "editor_base_ready": 3,
+          "markdown_language_ready": 6.800000071525574,
+          "content_ready": 37.800000071525574,
+          "preview_ready": 43.10000002384186
+        }
+      },
+      {
+        "id": "file-open:9",
+        "documentId": "performance-a.md",
+        "startedAt": 963.1999999284744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.5,
+          "editor_base_ready": 3.200000047683716,
+          "markdown_language_ready": 7,
+          "content_ready": 37.700000047683716,
+          "preview_ready": 41.300000071525574
+        }
+      },
+      {
+        "id": "file-open:10",
+        "documentId": "performance-b.md",
+        "startedAt": 1012.1999999284744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.5,
+          "editor_base_ready": 3.200000047683716,
+          "markdown_language_ready": 6.700000047683716,
+          "content_ready": 36.700000047683716,
+          "preview_ready": 40.300000071525574
+        }
+      },
+      {
+        "id": "file-open:11",
+        "documentId": "performance-a.md",
+        "startedAt": 1060.2999999523163,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.399999976158142,
+          "editor_base_ready": 3,
+          "markdown_language_ready": 6.5,
+          "content_ready": 35.800000071525574,
+          "preview_ready": 39.700000047683716
+        }
+      },
+      {
+        "id": "file-open:12",
+        "documentId": "performance-b.md",
+        "startedAt": 1107.3999999761581,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.2999999523162842,
+          "editor_base_ready": 2.799999952316284,
+          "markdown_language_ready": 6.5,
+          "content_ready": 36.39999997615814,
+          "preview_ready": 40.10000002384186
+        }
+      },
+      {
+        "id": "file-open:13",
+        "documentId": "performance-a.md",
+        "startedAt": 1155,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.5,
+          "editor_base_ready": 3.100000023841858,
+          "markdown_language_ready": 6.600000023841858,
+          "content_ready": 37.799999952316284,
+          "preview_ready": 41.5
+        }
+      },
+      {
+        "id": "file-open:14",
+        "documentId": "performance-b.md",
+        "startedAt": 1204.3999999761581,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.399999976158142,
+          "editor_base_ready": 3.200000047683716,
+          "markdown_language_ready": 7.100000023841858,
+          "content_ready": 36.200000047683716,
+          "preview_ready": 39.60000002384186
+        }
+      },
+      {
+        "id": "file-open:15",
+        "documentId": "performance-a.md",
+        "startedAt": 1252.5,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.5,
+          "editor_base_ready": 3.399999976158142,
+          "markdown_language_ready": 6.799999952316284,
+          "content_ready": 35.89999997615814,
+          "preview_ready": 39.89999997615814
+        }
+      },
+      {
+        "id": "file-open:16",
+        "documentId": "performance-b.md",
+        "startedAt": 1299.1000000238419,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.1999999284744263,
+          "editor_base_ready": 2.6999999284744263,
+          "markdown_language_ready": 6.299999952316284,
+          "content_ready": 35.799999952316284,
+          "preview_ready": 39.89999997615814
+        }
+      },
+      {
+        "id": "file-open:17",
+        "documentId": "performance-a.md",
+        "startedAt": 1346.1999999284744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.3000000715255737,
+          "editor_base_ready": 3,
+          "markdown_language_ready": 6.5,
+          "content_ready": 35.40000009536743,
+          "preview_ready": 38.800000071525574
+        }
+      },
+      {
+        "id": "file-open:18",
+        "documentId": "performance-b.md",
+        "startedAt": 1394.1000000238419,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.5,
+          "editor_base_ready": 3.399999976158142,
+          "markdown_language_ready": 7,
+          "content_ready": 36,
+          "preview_ready": 39.89999997615814
+        }
+      },
+      {
+        "id": "file-open:19",
+        "documentId": "performance-a.md",
+        "startedAt": 1441.2999999523163,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.5,
+          "editor_base_ready": 3.100000023841858,
+          "markdown_language_ready": 6.700000047683716,
+          "content_ready": 36,
+          "preview_ready": 39.800000071525574
+        }
+      },
+      {
+        "id": "file-open:20",
+        "documentId": "performance-b.md",
+        "startedAt": 1488,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.399999976158142,
+          "editor_base_ready": 2.899999976158142,
+          "markdown_language_ready": 6.399999976158142,
+          "content_ready": 35.799999952316284,
+          "preview_ready": 39.5
+        }
+      },
+      {
+        "id": "file-open:21",
+        "documentId": "performance-a.md",
+        "startedAt": 1535.6000000238419,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.2999999523162842,
+          "editor_base_ready": 3,
+          "markdown_language_ready": 6.799999952316284,
+          "content_ready": 35.699999928474426,
+          "preview_ready": 39.799999952316284
+        }
+      },
+      {
+        "id": "file-open:22",
+        "documentId": "performance-b.md",
+        "startedAt": 1582.6999999284744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.5,
+          "editor_base_ready": 3.200000047683716,
+          "markdown_language_ready": 6.800000071525574,
+          "content_ready": 38.700000047683716,
+          "preview_ready": 42.90000009536743
+        }
+      },
+      {
+        "id": "file-open:23",
+        "documentId": "performance-a.md",
+        "startedAt": 1635.6999999284744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.3000000715255737,
+          "editor_base_ready": 3,
+          "markdown_language_ready": 6.600000023841858,
+          "content_ready": 36.700000047683716,
+          "preview_ready": 40.700000047683716
+        }
+      },
+      {
+        "id": "file-open:24",
+        "documentId": "performance-b.md",
+        "startedAt": 1685.6000000238419,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.5,
+          "editor_base_ready": 3.299999952316284,
+          "markdown_language_ready": 6.899999976158142,
+          "content_ready": 36.89999997615814,
+          "preview_ready": 41.09999990463257
+        }
+      },
+      {
+        "id": "file-open:25",
+        "documentId": "performance-a.md",
+        "startedAt": 1735.6999999284744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.5,
+          "editor_base_ready": 3.3000000715255737,
+          "markdown_language_ready": 6.900000095367432,
+          "content_ready": 36.60000002384186,
+          "preview_ready": 40.300000071525574
+        }
+      },
+      {
+        "id": "file-open:26",
+        "documentId": "performance-b.md",
+        "startedAt": 1783.1999999284744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.4000000953674316,
+          "editor_base_ready": 3.100000023841858,
+          "markdown_language_ready": 6.800000071525574,
+          "content_ready": 37.200000047683716,
+          "preview_ready": 41.300000071525574
+        }
+      },
+      {
+        "id": "file-open:27",
+        "documentId": "performance-a.md",
+        "startedAt": 1831.6999999284744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.4000000953674316,
+          "editor_base_ready": 3.100000023841858,
+          "markdown_language_ready": 6.600000023841858,
+          "content_ready": 36.300000071525574,
+          "preview_ready": 40.5
+        }
+      },
+      {
+        "id": "file-open:28",
+        "documentId": "performance-b.md",
+        "startedAt": 1879.8999999761581,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.399999976158142,
+          "editor_base_ready": 3.200000047683716,
+          "markdown_language_ready": 6.700000047683716,
+          "content_ready": 37.10000002384186,
+          "preview_ready": 41.10000002384186
+        }
+      },
+      {
+        "id": "file-open:29",
+        "documentId": "performance-a.md",
+        "startedAt": 1928.6999999284744,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.3000000715255737,
+          "editor_base_ready": 2.9000000953674316,
+          "markdown_language_ready": 7.300000071525574,
+          "content_ready": 36.700000047683716,
+          "preview_ready": 40.40000009536743
+        }
+      },
+      {
+        "id": "file-open:30",
+        "documentId": "performance-b.md",
+        "startedAt": 1977.2999999523163,
+        "status": "complete",
+        "stages": {
+          "file_select": 0,
+          "preview_shell_committed": 1.399999976158142,
+          "editor_base_ready": 2.899999976158142,
+          "markdown_language_ready": 6.600000023841858,
+          "content_ready": 36.60000002384186,
+          "preview_ready": 40.700000047683716
+        }
+      }
+    ]
+  }
+}

@@ -5,6 +5,10 @@ import {
   visibleSourcePlan,
 } from "../../core/plans/planPrimitives";
 import type { MarkdownElement } from "../../core/syntax/markdownElements";
+import {
+  createMarkdownTableRenderKey,
+  estimateMarkdownTableLayoutHeight,
+} from "./tableLayout";
 
 export function compileTableElementPlan(
   element: MarkdownElement,
@@ -24,8 +28,9 @@ export function compileTableElementPlan(
       kind: "table",
       alignments: tableData.alignments,
       rows: tableData.rows,
+      renderKey: createMarkdownTableRenderKey(tableData.alignments, tableData.rows),
     },
-    layout: { estimatedHeight: Math.max(80, 28 + tableData.rows.length * 28) },
+    layout: { estimatedHeight: estimateMarkdownTableLayoutHeight(tableData.rows) },
     diagnostics: [],
     capabilities: BLOCK_EMBED_CAPABILITIES,
   };

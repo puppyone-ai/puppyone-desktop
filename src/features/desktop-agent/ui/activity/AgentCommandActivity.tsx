@@ -1,56 +1,41 @@
-import { Check, Copy, TerminalSquare } from "lucide-react";
-import { useEffect, useState } from "react";
+import { FileSearch, FolderSearch, ListTree, Search, TerminalSquare } from "lucide-react";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   agentActivitySummary,
   commandForActivity,
-  commandMetadata,
+  commandPresentationForActivity,
+  formatAgentActivityLabel,
+  formatAgentToolName,
   outputForActivity,
 } from "../../domain/agent-activity-presentation";
 import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
 
-export function AgentCommandActivity({ activity, onOpenTerminal }: { activity: AgentActivity; onOpenTerminal?: () => void }) {
+export function AgentCommandActivity({ activity }: { activity: AgentActivity }) {
+  const { t } = useLocalization();
   const command = commandForActivity(activity);
   const output = outputForActivity(activity);
-  const metadata = commandMetadata(activity);
-  const meta = [metadata.exitCode === null ? null : `Exit ${metadata.exitCode}`, metadata.duration].filter(Boolean).join(" · ");
+  const presentation = commandPresentationForActivity(activity);
   return (
     <AgentActivityShell
-      title="Bash"
-      summary={command || agentActivitySummary(activity)}
-      meta={activity.status === "completed" ? meta || null : null}
+      title={formatAgentToolName(presentation.tool, t)}
+      summary={presentation.summary || agentActivitySummary(activity) || formatAgentActivityLabel(activity, t)}
       status={activity.status}
-      icon={<TerminalSquare size={13} />}
-      className="desktop-agent-command"
-      actions={(command || output || onOpenTerminal) && <CommandActions value={output || command} onOpenTerminal={onOpenTerminal} />}
+      icon={commandIcon(presentation.tool)}
+      className={`desktop-agent-command is-${presentation.tool}`}
     >
-      {(command || output || meta) && <div className="desktop-agent-command-surface">
+      {(command || output) && <div className="desktop-agent-command-surface">
         {command && <div className="desktop-agent-command-line"><span>$</span><code>{command}</code></div>}
         {output && <pre className="desktop-agent-command-output">{output}</pre>}
-        {meta && <div className="desktop-agent-command-meta">{meta}</div>}
       </div>}
     </AgentActivityShell>
   );
 }
 
-function CommandActions({ value, onOpenTerminal }: { value: string; onOpenTerminal?: () => void }) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return undefined;
-    const timer = window.setTimeout(() => setCopied(false), 1_200);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
-  const copy = async () => {
-    if (!value || !navigator.clipboard?.writeText) return;
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-    } catch {
-      // Clipboard access is optional in hardened renderer contexts.
-    }
-  };
-  return <>
-    {value && <button type="button" className="desktop-agent-tool-action" aria-label={copied ? "Command output copied" : "Copy command output"} onClick={() => void copy()}>{copied ? <Check size={12} /> : <Copy size={12} />}<span className="desktop-agent-visually-hidden">{copied ? "Copied" : "Copy"}</span></button>}
-    {onOpenTerminal && <button type="button" className="desktop-agent-tool-action" aria-label="Open command in terminal" onClick={onOpenTerminal}>Open terminal</button>}
-  </>;
+function commandIcon(tool: "bash" | "read" | "grep" | "glob" | "list") {
+  if (tool === "read") return <FileSearch size={13} />;
+  if (tool === "grep") return <Search size={13} />;
+  if (tool === "glob") return <FolderSearch size={13} />;
+  if (tool === "list") return <ListTree size={13} />;
+  return <TerminalSquare size={13} />;
 }

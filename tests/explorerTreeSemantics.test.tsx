@@ -6,6 +6,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ExplorerTree, type DataNode } from "@puppyone/shared-ui";
+import { renderWithTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -33,7 +34,7 @@ describe("ExplorerTree interactive semantics", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    act(() => root?.render(
+    act(() => renderWithTestLocalization(root,
       <ExplorerTree
         nodes={[node]}
         activePath={node.path}

@@ -9,14 +9,16 @@ import {
   highlightActiveLine,
   highlightSpecialChars,
   keymap,
-  placeholder,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import {
   markdownLivePreviewDecorations,
-  markdownProjectionSchedulerExtension,
 } from "./core/decorations/livePreviewDecorations";
 import { markdownBlockWidgetSelectionExtension } from "./core/interaction/blockWidgetSelection";
+import {
+  markdownBlockRelocationEffect,
+  markdownBlockRelocationHistoryExtension,
+} from "./core/commands/markdownBlockMove";
 import { markdownEditingKeymap } from "./core/commands/markdownEditingKeymap";
 import { markdownLivePreviewContextExtension } from "./core/editor/markdownLivePreviewContext";
 import { markdownComposingBlockLineField, markdownInputCompositionExtension } from "./core/state/composingBlockLine";
@@ -61,7 +63,6 @@ export function markdownCodeMirrorUrgentExtensions(readOnly: boolean): Extension
     }),
     highlightActiveLine(),
     keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
-    placeholder(readOnly ? "" : "Start writing..."),
     puppyMarkdownEditorTheme,
   ];
 }
@@ -104,9 +105,12 @@ export function markdownLivePreviewCoreExtension(): Extension {
     markdownComposingBlockLineField,
     markdownExpandedImageField,
     markdownTableFocusExtension,
+    // History inversion stays in the live-preview core even when the
+    // experimental interaction is disabled, so an earlier move can still
+    // undo and redo embedded-session relocation safely.
+    markdownBlockRelocationHistoryExtension,
     markdownEmbedHostLifecycle,
     markdownLivePreviewDecorations,
-    markdownProjectionSchedulerExtension,
     markdownBlockWidgetSelectionExtension,
   ];
 }
@@ -127,7 +131,23 @@ const markdownEmbedHostLifecycle = ViewPlugin.fromClass(class {
     const host = getMarkdownEmbedHost(this.view);
     const previousRevision = getDocRevision(update.startState.doc);
     const nextRevision = getDocRevision(update.state.doc);
-    host.editSessions.mapRanges((pos, assoc) => update.changes.mapPos(pos, assoc));
+    // Transactions in one ViewUpdate are sequential. Map sessions through each
+    // one in order so a block-move annotation can preserve relative offsets in
+    // the relocated source slice instead of collapsing them into the deletion.
+    for (const transaction of update.transactions) {
+      if (!transaction.docChanged) continue;
+      const relocation = transaction.effects.find((effect) => (
+        effect.is(markdownBlockRelocationEffect)
+      ))?.value;
+      if (relocation) {
+        host.editSessions.mapRangesWithRelocation(
+          relocation,
+          (pos, assoc) => transaction.changes.mapPos(pos, assoc),
+        );
+      } else {
+        host.editSessions.mapRanges((pos, assoc) => transaction.changes.mapPos(pos, assoc));
+      }
+    }
     // A source revision change destroys revision-bound execution sessions,
     // aborts their jobs, and revokes their principal-scoped asset handles.
     host.executionSessions.destroyForRevisionChange(previousRevision, nextRevision);

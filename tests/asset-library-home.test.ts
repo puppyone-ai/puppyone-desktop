@@ -11,6 +11,7 @@ import {
   DEFAULT_TYPOGRAPHY_PREFERENCES,
   resolveTypography,
 } from "../src/features/typography";
+import { renderWithTestLocalization, stripBidiIsolation } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -51,7 +52,8 @@ describe("Asset Library homepage", () => {
   it("opens a local asset through the existing workspace callback", async () => {
     const onOpenWorkspacePath = vi.fn(async () => undefined);
     const container = renderLibrary({ onOpenWorkspacePath });
-    const button = container.querySelector<HTMLButtonElement>('button[aria-label="Open Local Notes"]');
+    const button = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((candidate) => stripBidiIsolation(candidate.getAttribute("aria-label")) === "Open Local Notes");
     if (!button) throw new Error("Local asset button is missing.");
 
     await act(async () => button.click());
@@ -90,7 +92,7 @@ function renderLibrary(overrides: Partial<MinimalOnboardingProps> = {}) {
     ...overrides,
   };
 
-  act(() => root?.render(React.createElement(AssetLibraryHome, props)));
+  act(() => renderWithTestLocalization(root, React.createElement(AssetLibraryHome, props)));
   return container;
 }
 

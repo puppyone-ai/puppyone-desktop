@@ -58,6 +58,10 @@ describe("appearance preferences", () => {
         expect(block).toContain(`${tokenNames[role as keyof typeof tokenNames]}: ${size}px;`);
       }
     }
+
+    expect(css).toMatch(
+      /:root,\s*:where\(\.app-shell, \.onboarding-shell, \.desktop-overlay-root, \.desktop-theme-preview-surface, \.dark\)\s*\{[^}]*--desktop-sidebar-font-size:\s*var\(--po-text-size-sidebar\);[^}]*--desktop-sidebar-font-size-meta:\s*var\(--po-text-size-meta\);/s,
+    );
   });
 
   it("accepts only curated appearance values", () => {
@@ -76,6 +80,7 @@ describe("appearance preferences", () => {
     expect(parsePointerCursors("false")).toBe(false);
     expect(parsePointerCursors(null)).toBe(false);
   });
+
 });
 
 function readCssBlock(css: string, selector: string): string {
@@ -116,6 +121,7 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(JSON.stringify({ enableAgentChat: true }))).toMatchObject({
       enableAgentChat: true,
       enableAssetLibraryHome: false,
+      enableMarkdownBlockDrag: false,
       enableMinimalMode: false,
       enablePuppyoneAppFiles: false,
       enablePuppyFlowFiles: false,
@@ -129,6 +135,13 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings("not-json").enableMinimalMode).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableMinimalMode: false })).enableMinimalMode).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableMinimalMode: true })).enableMinimalMode).toBe(true);
+  });
+
+  it("keeps Markdown block drag handles off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableMarkdownBlockDrag).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableMarkdownBlockDrag).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableMarkdownBlockDrag: false })).enableMarkdownBlockDrag).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableMarkdownBlockDrag: true })).enableMarkdownBlockDrag).toBe(true);
   });
 
   it("keeps the Asset Library homepage off unless the user explicitly opts in", () => {

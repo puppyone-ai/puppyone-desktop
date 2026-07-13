@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  getCloudProject,
   listCloudProjects,
   type DesktopCloudConnector,
   type DesktopCloudDashboard,
@@ -14,6 +15,7 @@ import {
 import type { DesktopCloudHistory } from "../../../lib/cloudHistoryApi";
 import type { CloudEnvironment } from "../environment";
 import { loadCloudProjectDetails } from "./cloudProjectDetails";
+import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
 
 export type DesktopCloudDataState = {
@@ -32,8 +34,8 @@ export type DesktopCloudDataState = {
   readiness: DesktopCloudProjectReadiness | null;
   initializing: boolean;
   loading: boolean;
-  error: string | null;
-  warning: string | null;
+  error: CloudMessageDescriptor | null;
+  warning: CloudMessageDescriptor | null;
   reload: () => Promise<void>;
 };
 
@@ -106,7 +108,14 @@ export function useDesktopCloudData({
     ));
 
     try {
-      const projects = await listCloudProjects(session, onSessionChange, cloudApiBaseUrl);
+      const projects = normalizedBoundProjectId
+        ? [await getCloudProject(
+            session,
+            normalizedBoundProjectId,
+            onSessionChange,
+            cloudApiBaseUrl,
+          )]
+        : await listCloudProjects(session, onSessionChange, cloudApiBaseUrl);
       if (activeRequestRef.current !== requestId) return;
 
       // Mapping is owned by useCloudWorkspaceBinding. This hook only loads data
@@ -180,13 +189,13 @@ export function useDesktopCloudData({
               ...current,
               initializing: false,
               loading: false,
-              error: loadError instanceof Error ? loadError.message : "Unable to load Cloud workspace.",
+              error: cloudMessage("cloud-data-load-failed", undefined, loadError instanceof Error ? loadError.message : undefined),
               warning: null,
             }
           : createCloudDataState({
               initializing: false,
               loading: false,
-              error: loadError instanceof Error ? loadError.message : "Unable to load Cloud workspace.",
+              error: cloudMessage("cloud-data-load-failed", undefined, loadError instanceof Error ? loadError.message : undefined),
               contextKey,
             })
       ));

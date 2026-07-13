@@ -2,6 +2,7 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 
 export type CsvTableEditorProps = {
   documentId?: string;
@@ -14,7 +15,7 @@ export type CsvTableEditorProps = {
 
 type ParsedTable = {
   rows: string[][];
-  warning?: string;
+  warning?: "unclosed-quote";
 };
 
 const MAX_RENDERED_CSV_ROWS = 10000;
@@ -27,6 +28,7 @@ export function CsvTableEditor({
   readOnly = true,
   onChange,
 }: CsvTableEditorProps) {
+  const { formatNumber, t } = useLocalization();
   const resolvedDelimiter = delimiter ?? inferDelimiter(nodeName, content);
   const parsed = useMemo(() => parseDelimitedText(content, resolvedDelimiter), [content, resolvedDelimiter]);
   const parsedRowsRef = useRef(parsed.rows);
@@ -86,14 +88,16 @@ export function CsvTableEditor({
     <section className="csv-table-editor" data-readonly={readOnly ? "true" : undefined}>
       <div className="csv-table-editor__toolbar">
         <div className="csv-table-editor__title">
-          <strong>{nodeName || (resolvedDelimiter === "\t" ? "TSV" : "CSV")}</strong>
-          <span>{rowCount} x {columnCount}</span>
+          <strong dir="auto">{nodeName || (resolvedDelimiter === "\t" ? "TSV" : "CSV")}</strong>
+          <span>{t("editor.csv.dimensions", { rows: rowCount, columns: columnCount })}</span>
         </div>
         <div className="csv-table-editor__actions">
-          {parsed.warning && <span className="csv-table-editor__warning">{parsed.warning}</span>}
+          {parsed.warning && (
+            <span className="csv-table-editor__warning">{t("editor.csv.warning.unclosedQuote")}</span>
+          )}
           {hiddenRowCount > 0 && (
             <span className="csv-table-editor__warning">
-              Showing {visibleDataRows.length} of {dataRows.length} rows
+              {t("editor.csv.visibleRows", { visible: visibleDataRows.length, total: dataRows.length })}
             </span>
           )}
           <label className="csv-table-editor__header-toggle">
@@ -102,14 +106,14 @@ export function CsvTableEditor({
               checked={headerEnabled}
               onChange={(event) => setHeaderEnabled(event.currentTarget.checked)}
             />
-            <span>Header</span>
+            <span>{t("editor.csv.header")}</span>
           </label>
           {!readOnly && (
             <>
-              <button type="button" onClick={addRow} title="Add row" aria-label="Add row">
+              <button type="button" onClick={addRow} title={t("editor.csv.addRow")} aria-label={t("editor.csv.addRow")}>
                 <Plus size={15} />
               </button>
-              <button type="button" onClick={addColumn} title="Add column" aria-label="Add column">
+              <button type="button" onClick={addColumn} title={t("editor.csv.addColumn")} aria-label={t("editor.csv.addColumn")}>
                 <Plus size={15} />
               </button>
             </>
@@ -127,7 +131,7 @@ export function CsvTableEditor({
                   value={matrix[0]?.[columnIndex] ?? ""}
                   readOnly={readOnly}
                   onChange={(event) => updateCell(0, columnIndex, event.currentTarget.value)}
-                  aria-label={`Column ${columnIndex + 1} header`}
+                  aria-label={t("editor.csv.columnHeader", { column: columnIndex + 1 })}
                   spellCheck={false}
                 />
               ) : (
@@ -138,8 +142,8 @@ export function CsvTableEditor({
                   type="button"
                   className="csv-table-editor__cell-action"
                   onClick={() => deleteColumn(columnIndex)}
-                  title="Delete column"
-                  aria-label={`Delete column ${columnIndex + 1}`}
+                  title={t("editor.csv.deleteColumn")}
+                  aria-label={t("editor.csv.deleteColumnNumber", { column: columnIndex + 1 })}
                 >
                   <Trash2 size={13} />
                 </button>
@@ -152,7 +156,7 @@ export function CsvTableEditor({
               {!readOnly && (
                 <button type="button" onClick={addRow}>
                   <Plus size={15} />
-                  <span>Add row</span>
+                  <span>{t("editor.csv.addRow")}</span>
                 </button>
               )}
             </div>
@@ -162,14 +166,14 @@ export function CsvTableEditor({
               return (
                 <Fragment key={`row-${rowIndex}`}>
                   <div className="csv-table-editor__cell csv-table-editor__row-number">
-                    <span>{visibleRowIndex + 1}</span>
+                    <span>{formatNumber(visibleRowIndex + 1)}</span>
                     {!readOnly && (
                       <button
                         type="button"
                         className="csv-table-editor__cell-action"
                         onClick={() => deleteRow(rowIndex)}
-                        title="Delete row"
-                        aria-label={`Delete row ${visibleRowIndex + 1}`}
+                        title={t("editor.csv.deleteRow")}
+                        aria-label={t("editor.csv.deleteRowNumber", { row: visibleRowIndex + 1 })}
                       >
                         <Trash2 size={13} />
                       </button>
@@ -181,7 +185,10 @@ export function CsvTableEditor({
                         value={row[columnIndex] ?? ""}
                         readOnly={readOnly}
                         onChange={(event) => updateCell(rowIndex, columnIndex, event.currentTarget.value)}
-                        aria-label={`Row ${visibleRowIndex + 1}, column ${columnIndex + 1}`}
+                        aria-label={t("editor.csv.cell", {
+                          row: visibleRowIndex + 1,
+                          column: columnIndex + 1,
+                        })}
                         spellCheck={false}
                       />
                     </div>
@@ -220,7 +227,7 @@ function parseDelimitedText(content: string, delimiter: "," | "\t"): ParsedTable
   const rows: string[][] = [[]];
   let current = "";
   let inQuotes = false;
-  let warning: string | undefined;
+  let warning: ParsedTable["warning"];
 
   for (let index = 0; index < content.length; index += 1) {
     const char = content[index];
@@ -256,7 +263,7 @@ function parseDelimitedText(content: string, delimiter: "," | "\t"): ParsedTable
 
   rows[rows.length - 1].push(current);
 
-  if (inQuotes) warning = "Unclosed quote";
+  if (inQuotes) warning = "unclosed-quote";
   if (content.endsWith("\n") || content.endsWith("\r")) {
     const lastRow = rows[rows.length - 1];
     if (lastRow.length === 1 && lastRow[0] === "") rows.pop();
