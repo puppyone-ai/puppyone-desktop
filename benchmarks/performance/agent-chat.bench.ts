@@ -17,6 +17,7 @@ import { AgentFileChangeActivity } from "../../src/features/desktop-agent/ui/act
 import { applyAgentEvent, applyAgentEvents, createAgentProjection } from "../../src/features/desktop-agent/agentProjection";
 import type { AgentEvent } from "../../src/features/desktop-agent/agentTypes";
 import type { AgentActivity } from "../../src/features/desktop-agent/domain/agent-projection-types";
+import { withBenchmarkLocalization } from "./localizationHarness";
 
 // Long enough to make this product-critical signal useful in CI while keeping
 // the complete performance suite practical on release runners.
@@ -51,7 +52,9 @@ describe("Desktop Agent virtual timeline", () => {
     const parent = document.createElement("div");
     document.body.appendChild(parent);
     const root = createRoot(parent);
-    flushSync(() => root.render(createElement(AgentTranscript, { projection, loading: false })));
+    flushSync(() => root.render(withBenchmarkLocalization(
+      createElement(AgentTranscript, { projection, loading: false }),
+    )));
     if (parent.querySelectorAll(".desktop-agent-virtual-row").length > 120) throw new Error("Agent virtual-row budget regressed.");
     flushSync(() => root.unmount());
     parent.remove();
@@ -74,22 +77,24 @@ describe("Desktop Agent composer isolation", () => {
     const noop = () => {};
     const submit = async () => true;
     for (let index = 0; index < 50; index += 1) {
-      flushSync(() => root.render(createElement("div", null,
-        createElement(AgentTranscript, { projection, loading: false, onViewportChange: noop }),
-        createElement(AgentComposer, {
-          draft: `Prompt ${index}`,
-          onDraftChange: noop,
-          disabled: false,
-          running: false,
-          stopping: false,
-          submitting: false,
-          placeholder: "Ask anything",
-          models: composerModels,
-          selectedModel: composerModels[0].model,
-          onSelectModel: noop,
-          onSubmit: submit,
-          onStop: noop,
-        }),
+      flushSync(() => root.render(withBenchmarkLocalization(
+        createElement("div", null,
+          createElement(AgentTranscript, { projection, loading: false, onViewportChange: noop }),
+          createElement(AgentComposer, {
+            draft: `Prompt ${index}`,
+            onDraftChange: noop,
+            disabled: false,
+            running: false,
+            stopping: false,
+            submitting: false,
+            placeholder: "Ask anything",
+            models: composerModels,
+            selectedModel: composerModels[0].model,
+            onSelectModel: noop,
+            onSubmit: submit,
+            onStop: noop,
+          }),
+        ),
       )));
     }
     if (parent.querySelectorAll(".desktop-agent-virtual-row").length > 120) throw new Error("Agent virtual-row budget regressed during typing.");
@@ -138,7 +143,7 @@ function withMounted(node: ReactNode, inspect: (parent: HTMLElement) => void) {
   document.body.appendChild(parent);
   const root = createRoot(parent);
   try {
-    flushSync(() => root.render(node));
+    flushSync(() => root.render(withBenchmarkLocalization(node)));
     inspect(parent);
   } finally {
     flushSync(() => root.unmount());
