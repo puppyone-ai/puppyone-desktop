@@ -14,6 +14,7 @@ import {
 import type { CloudWorkspaceSection } from "../types";
 import { CloudGlobalBillingPage, CloudGlobalTeamPage } from "../components/CloudGlobalPages";
 import { CloudProjectBrowser } from "../components/ProjectBrowser";
+import { CloudTemplateStore } from "../components/CloudTemplateStore";
 import { CloudWorkspaceLoadingState } from "../components/shared";
 import { CloudAutomationRouteSection } from "../sections/AutomationRouteSection";
 import { CloudBranchesSection } from "../sections/BranchesSection";
@@ -147,6 +148,22 @@ export function CloudRouter({
         projects={cloudData.projects}
         onSessionChange={onSessionChange}
         onOpen={() => openCloudApp(getCloudRouteWebPath("cloud-billing"))}
+      />
+    );
+  }
+
+  if (activeSection === "templates") {
+    return (
+      <CloudTemplateStore
+        session={cloudSession}
+        apiBaseUrl={cloudApiBaseUrl}
+        onSessionChange={onSessionChange}
+        onProjectCreated={(project) => {
+          // Selecting the returned Project changes the Cloud data context and
+          // triggers its canonical reload. Avoid a redundant pre-navigation
+          // reload whose failure could incorrectly look like clone failure.
+          onSelectProject(project);
+        }}
       />
     );
   }

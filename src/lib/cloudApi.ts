@@ -52,6 +52,62 @@ export type DesktopCloudProject = {
   capabilities?: string[];
 };
 
+export type DesktopCloudTemplateRegistryStatus = {
+  mode: "disabled" | "builtin" | "remote";
+  catalog_enabled: boolean;
+  instantiation_enabled: boolean;
+  source: "disabled" | "builtin" | "remote";
+  reason?: string | null;
+};
+
+export type DesktopCloudTemplateRelease = {
+  id: string;
+  version: string;
+  bundle_sha256: string;
+  file_count: number;
+  total_bytes: number;
+  published_at?: string | null;
+  signing_key_id?: string | null;
+};
+
+export type DesktopCloudTemplatePreviewNode = {
+  name: string;
+  type: "folder" | "json" | "markdown" | "file";
+};
+
+export type DesktopCloudTemplateSummary = {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category?: string | null;
+  cover_url?: string | null;
+  author?: string | null;
+  tags: string[];
+  preview: DesktopCloudTemplatePreviewNode[];
+  current_release: DesktopCloudTemplateRelease;
+};
+
+export type DesktopCloudTemplateDetail = DesktopCloudTemplateSummary & {
+  screenshots: string[];
+  long_description?: string | null;
+  file_tree: string[];
+  preview_document?: { path: string; content: string } | null;
+  releases: DesktopCloudTemplateRelease[];
+};
+
+export type DesktopCloudTemplateCatalog = {
+  registry: DesktopCloudTemplateRegistryStatus;
+  templates: DesktopCloudTemplateSummary[];
+  next_cursor?: string | null;
+};
+
+export type DesktopCloudTemplateInstantiation = {
+  template_id: string;
+  release_id: string;
+  project: DesktopCloudProject;
+};
+
 export type DesktopCloudProjectReadiness = {
   project_id: string;
   git: {
@@ -762,6 +818,68 @@ export function createCloudProject(
     method: "POST",
     body: JSON.stringify({ name, seed: false }),
   }, apiBaseUrl);
+}
+
+export function listCloudTemplates(
+  session: DesktopCloudSession,
+  options: {
+    query?: string;
+    category?: string;
+    cursor?: string;
+    limit?: number;
+  } = {},
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudTemplateCatalog> {
+  const query = new URLSearchParams();
+  if (options.query) query.set("q", options.query);
+  if (options.category) query.set("category", options.category);
+  if (options.cursor) query.set("cursor", options.cursor);
+  if (options.limit) query.set("limit", String(options.limit));
+  const suffix = query.size ? `?${query.toString()}` : "";
+  return cloudApiRequest<DesktopCloudTemplateCatalog>(
+    `/templates${suffix}`,
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  );
+}
+
+export function getCloudTemplate(
+  session: DesktopCloudSession,
+  templateId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudTemplateDetail> {
+  return cloudApiRequest<DesktopCloudTemplateDetail>(
+    `/templates/${encodeURIComponent(templateId)}`,
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  );
+}
+
+export function instantiateCloudTemplate(
+  session: DesktopCloudSession,
+  templateId: string,
+  payload: {
+    org_id?: string;
+    name?: string;
+    description?: string;
+    release_id?: string;
+  } = {},
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudTemplateInstantiation> {
+  return cloudApiRequest<DesktopCloudTemplateInstantiation>(
+    `/templates/${encodeURIComponent(templateId)}/instantiate`,
+    session,
+    onSessionChange,
+    { method: "POST", body: JSON.stringify(payload) },
+    apiBaseUrl,
+  );
 }
 
 export function getCloudDashboard(

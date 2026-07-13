@@ -281,7 +281,8 @@ export function CloudServiceMainView({
     (status?.unstagedEntries.length ?? 0) +
     (status?.untrackedEntries.length ?? 0);
   const branchName = currentBranch?.name ?? status?.branch ?? t("cloud.git.noBranch");
-  const inCloudGlobalAccountSection = isCloudAccountSection(activeSection);
+  const inCloudGlobalAccountSection = isCloudAccountSection(activeSection)
+    || activeSection === "templates";
 
   return (
     <main className={`desktop-cloud-main-view ${activeSection === "automation" ? "desktop-cloud-automation-main-view" : ""}`}>
