@@ -37,6 +37,7 @@ const REASON_PRIORITY: Record<DocumentPersistenceReason, number> = {
   "mode-switch": 3,
   "document-switch": 4,
   destroy: 5,
+  "app-close": 6,
 };
 
 /**
@@ -131,6 +132,34 @@ export class DocumentEditingSession implements EditorDocumentSession {
     reason: Extract<DocumentPersistenceReason, "document-switch" | "destroy">,
   ): Promise<void> => {
     await this.enqueue(snapshot, reason);
+  };
+
+  flushCurrent = async (
+    reason: Extract<DocumentPersistenceReason, "app-close" | "destroy"> = "app-close",
+  ): Promise<void> => {
+    // A revision may arrive while the first close write is in flight. Keep
+    // snapshotting the attached source until the acknowledged revision is the
+    // newest one, rather than treating the first completed write as the drain.
+    while (true) {
+      const source = this.source;
+      if (source) {
+        await this.enqueue(source.readSnapshot(), reason);
+      } else if (this.pending) {
+        // A source can detach after submitting its final snapshot. Drain the
+        // exact candidate already owned by the session.
+        this.pending.reason = higherPriorityReason(this.pending.reason, reason);
+        await this.waitFor(this.pending.sequence);
+      } else if (this.inFlight) {
+        await this.waitFor(this.inFlight.sequence);
+      } else if (this.hasUnpersistedChanges()) {
+        throw new Error(
+          this.state.error
+          ?? `Unable to flush ${this.documentId}: its editor source is unavailable.`,
+        );
+      }
+
+      if (!this.hasUnpersistedChanges()) return;
+    }
   };
 
   reconcileExternalBaseline = (

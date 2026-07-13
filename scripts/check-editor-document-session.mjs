@@ -73,6 +73,44 @@ if (/\bwriteFile\??\s*:/.test(coreTypesSource)) {
   errors.push(`${relative(coreTypesPath)} exposes the legacy direct writeFile port`);
 }
 
+const closeDrainSources = [
+  {
+    filePath: path.join(sharedEditorRoot, "document-session/DocumentSessionBoundary.tsx"),
+    pattern: /registerActiveDocumentSession\s*\(\s*session\s*\)[\s\S]*session\.dispose\(\)[\s\S]*unregister\(\)/,
+    reason: "does not retain its disposing session for app-close draining",
+  },
+  {
+    filePath: path.join(repoRoot, "src/main.tsx"),
+    pattern: /onDocumentSessionFlushRequested[\s\S]*setCloseInteractionBarrier\(true\)[\s\S]*flushActiveDocumentSessions[\s\S]*onDocumentSessionCloseCancelled[\s\S]*setCloseInteractionBarrier\(false\)/,
+    reason: "does not bridge Electron close requests through an interaction barrier to the active session registry",
+  },
+  {
+    filePath: path.join(repoRoot, "electron/preload.cjs"),
+    pattern: /^(?=[\s\S]*document-session:flush-requested)(?=[\s\S]*document-session:flush-result)(?=[\s\S]*document-session:close-cancelled)/,
+    reason: "does not expose the narrow close-drain handshake",
+  },
+  {
+    filePath: path.join(repoRoot, "electron/main.mjs"),
+    pattern: /documentSessionCloseCoordinator\.attachWindow\s*\(\s*window\s*\)/,
+    reason: "does not gate BrowserWindow close on Document Session drain",
+  },
+  {
+    filePath: path.join(repoRoot, "electron/main.mjs"),
+    pattern: /app\.on\("will-quit",[\s\S]*cloudAuthService\.dispose\(\)[\s\S]*app\.on\("before-quit"/,
+    reason: "disposes Cloud persistence dependencies before document close draining",
+  },
+  {
+    filePath: path.join(repoRoot, "electron/main.mjs"),
+    pattern: /onCloseCancelled:\s*applicationQuitIntent\.cancel[\s\S]*window-all-closed[\s\S]*applicationQuitIntent\.resumeAfterLastWindowClosed/,
+    reason: "does not preserve and cancel app-quit intent across the asynchronous close gate",
+  },
+];
+for (const { filePath, pattern, reason } of closeDrainSources) {
+  if (!pattern.test(readFileSync(filePath, "utf8"))) {
+    errors.push(`${relative(filePath)} ${reason}`);
+  }
+}
+
 if (errors.length > 0) {
   console.error("Document Session architecture boundary check failed:");
   for (const error of errors) console.error(`- ${error}`);

@@ -113,6 +113,84 @@ describe("DocumentEditingSession", () => {
     expect(session.getPersistedContent()).toBe("three");
   });
 
+  it("reads and drains the exact current snapshot before app close", async () => {
+    const persist = vi.fn(async () => ({ version: "v2" }));
+    const session = createSession(persist);
+    const readSnapshot = vi.fn(() => ({ revision: "r2", content: "closing text" }));
+    session.attachSource({ readRevision: () => "r2", readSnapshot });
+    session.reportRevision({ revision: "r2", dirty: true });
+
+    await session.flushCurrent();
+
+    expect(readSnapshot).toHaveBeenCalledOnce();
+    expect(persist).toHaveBeenCalledWith(expect.objectContaining({
+      content: "closing text",
+      revision: "r2",
+      reason: "app-close",
+    }));
+    expect(session.hasUnpersistedChanges()).toBe(false);
+  });
+
+  it("drains a newer revision that arrives during the first app-close write", async () => {
+    const first = deferred<{ version: string }>();
+    const second = deferred<{ version: string }>();
+    const requests: DocumentPersistenceRequest[] = [];
+    const persist = vi.fn((request: DocumentPersistenceRequest) => {
+      requests.push(request);
+      return requests.length === 1 ? first.promise : second.promise;
+    });
+    const session = createSession(persist);
+    let snapshot = { revision: "r2", content: "first close snapshot" };
+    session.attachSource({ readRevision: () => snapshot.revision, readSnapshot: () => snapshot });
+    session.reportRevision({ revision: "r2", dirty: true });
+
+    let closeSettled = false;
+    const closePromise = session.flushCurrent().then(() => {
+      closeSettled = true;
+    });
+    snapshot = { revision: "r3", content: "last close snapshot" };
+    session.reportRevision({ revision: "r3", dirty: true });
+    first.resolve({ version: "v2" });
+    await nextMicrotask();
+
+    expect(closeSettled).toBe(false);
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toMatchObject({
+      revision: "r3",
+      content: "last close snapshot",
+      baseVersion: "v2",
+      reason: "app-close",
+    });
+
+    second.resolve({ version: "v3" });
+    await closePromise;
+    expect(closeSettled).toBe(true);
+    expect(session.hasUnpersistedChanges()).toBe(false);
+  });
+
+  it("waits for a detached source's queued commit during app close", async () => {
+    const write = deferred<{ version: string }>();
+    const persist = vi.fn(() => write.promise);
+    const session = createSession(persist);
+    session.reportRevision({ revision: "r2", dirty: true });
+    const writePromise = session.flushSnapshot(
+      { revision: "r2", content: "closing text" },
+      "destroy",
+    );
+
+    let closeSettled = false;
+    const closePromise = session.flushCurrent().then(() => {
+      closeSettled = true;
+    });
+    await nextMicrotask();
+    expect(closeSettled).toBe(false);
+
+    write.resolve({ version: "v2" });
+    await Promise.all([writePromise, closePromise]);
+    expect(closeSettled).toBe(true);
+    expect(persist).toHaveBeenCalledOnce();
+  });
+
   it("restores the saved baseline when an undo races an older in-flight write", async () => {
     const first = deferred<{ version: string }>();
     const requests: DocumentPersistenceRequest[] = [];

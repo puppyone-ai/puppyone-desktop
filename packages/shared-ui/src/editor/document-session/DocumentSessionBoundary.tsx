@@ -3,6 +3,7 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import type { DocumentPersistencePort } from "../../core/types";
 import type { EditorSaveMode } from "../viewerTypes";
+import { registerActiveDocumentSession } from "./activeDocumentSessions";
 import { DocumentEditingSession } from "./DocumentEditingSession";
 import type { DocumentPersistedCommit, EditorDocumentSession } from "./types";
 
@@ -53,7 +54,15 @@ export function DocumentSessionBoundary({
     session.setSaveMode(saveMode);
   }, [saveMode, session]);
 
-  useEffect(() => () => session.dispose(), [session]);
+  useEffect(() => {
+    const unregister = registerActiveDocumentSession(session);
+    return () => {
+      // Dispose submits the editor's last attached snapshot. Registration
+      // retires only after that queued commit is durably acknowledged.
+      session.dispose();
+      unregister();
+    };
+  }, [session]);
 
   return <>{children(session)}</>;
 }
