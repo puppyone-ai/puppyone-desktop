@@ -68,6 +68,8 @@ export type { EditorHostProps } from "./editor/EditorHost";
 export {
   DocumentEditingSession,
   DocumentSessionBoundary,
+  flushActiveDocumentSessions,
+  registerActiveDocumentSession,
   useDocumentSessionState,
 } from "./editor/document-session";
 export type {

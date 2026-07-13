@@ -582,6 +582,12 @@ export type PuppyoneWorkspaceConfig = {
 declare global {
   interface Window {
     puppyoneDesktop?: {
+      onDocumentSessionFlushRequested: (
+        callback: (request: { requestId: string }) => void | Promise<void>,
+      ) => () => void;
+      onDocumentSessionCloseCancelled: (
+        callback: (request: { requestId: string }) => void,
+      ) => () => void;
       readCloudSession: () => Promise<DesktopStoredCloudSession | null>;
       readCloudAuthState: () => Promise<DesktopCloudAuthStateSnapshot>;
       restoreCloudSession: (request: {

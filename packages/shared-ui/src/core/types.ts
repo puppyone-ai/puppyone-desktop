@@ -143,6 +143,7 @@ export type DocumentPersistenceReason =
   | "manual"
   | "mode-switch"
   | "document-switch"
+  | "app-close"
   | "destroy";
 
 export type DocumentPersistencePolicy = {

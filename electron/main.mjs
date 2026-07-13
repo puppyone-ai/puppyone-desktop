@@ -24,6 +24,10 @@ import {
   requestCloudApi,
 } from "./main/cloud-api-client.mjs";
 import { createCloudAuthService } from "./cloud-auth-service.mjs";
+import {
+  createApplicationQuitIntent,
+  createDocumentSessionCloseCoordinator,
+} from "./main/document-session-close-coordinator.mjs";
 import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
@@ -112,6 +116,12 @@ const trustedIpcMain = createTrustedIpcMain({
   ipcMain,
   applicationUrl: rendererApplicationUrl,
 });
+const applicationQuitIntent = createApplicationQuitIntent({ app });
+const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
+  dialog,
+  onCloseCancelled: applicationQuitIntent.cancel,
+});
+documentSessionCloseCoordinator.registerIpc(trustedIpcMain);
 const authorizeWorkspaceRoot = createSenderWorkspaceAuthorization({
   getWorkspaceRootForSender,
 });
@@ -191,6 +201,7 @@ async function createWindow(options = {}) {
     },
   });
   const webContentsId = window.webContents.id;
+  documentSessionCloseCoordinator.attachWindow(window);
   installWindowNavigationSecurity({
     webContents: window.webContents,
     applicationUrl: rendererApplicationUrl,
@@ -470,22 +481,33 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  // A prevented BrowserWindow close cancels Electron's original quit attempt.
+  // Resume it after the asynchronous document drain closes the last window.
+  applicationQuitIntent.resumeAfterLastWindowClosed();
 });
+
+// Keep persistence dependencies alive while BrowserWindow close handlers ask
+// renderer Document Sessions to drain. `will-quit` runs only after every
+// window accepted closing, so a failed flush can safely leave the app usable.
+app.on("will-quit", () => {
+  cloudAuthService.dispose();
+  updateService?.dispose();
+  viewerPackHost?.destroyAllSessions();
+  appPreviewRuntime?.closeAll();
+  terminalService.closeAll();
+  localAgentInventory.dispose();
+  workspaceWatchService.closeAll();
+  gitMetadataWatchService.closeAll();
+});
+
+app.on("before-quit", applicationQuitIntent.markRequested);
 
 app.on("before-quit", createAgentQuitCoordinator({
   app,
   agentService,
-  disposeApplicationServices: () => {
-    cloudAuthService.dispose();
-    updateService?.dispose();
-    viewerPackHost?.destroyAllSessions();
-    appPreviewRuntime?.closeAll();
-    terminalService.closeAll();
-    localAgentInventory.dispose();
-    workspaceWatchService.closeAll();
-    gitMetadataWatchService.closeAll();
-  },
+  // Agent runtimes require an asynchronous pre-quit drain. General services
+  // are intentionally disposed in will-quit, after document persistence.
+  disposeApplicationServices: () => undefined,
 }));
 
 function registerIpcHandlers() {

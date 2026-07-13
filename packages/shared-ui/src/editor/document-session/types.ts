@@ -49,6 +49,10 @@ export type EditorDocumentSession = {
     snapshot: EditorSourceSnapshot,
     reason: Extract<DocumentPersistenceReason, "document-switch" | "destroy">,
   ) => Promise<void>;
+  /** Read and durably drain the current source before the host closes. */
+  flushCurrent: (
+    reason?: Extract<DocumentPersistenceReason, "app-close" | "destroy">,
+  ) => Promise<void>;
   reconcileExternalBaseline: (content: string, version?: string | null) => ExternalBaselineResult;
   getPersistedContent: () => string;
   hasUnpersistedChanges: () => boolean;

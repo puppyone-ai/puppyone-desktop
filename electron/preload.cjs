@@ -2,6 +2,35 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 const externalViewerPacksEnabled = process.argv.includes("--puppyone-external-viewer-packs=1");
 
 contextBridge.exposeInMainWorld("puppyoneDesktop", {
+  onDocumentSessionFlushRequested: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = async (_event, payload) => {
+      const requestId = typeof payload?.requestId === "string" ? payload.requestId : null;
+      if (!requestId) return;
+      try {
+        await callback({ requestId });
+        ipcRenderer.send("document-session:flush-result", { requestId, ok: true });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        ipcRenderer.send("document-session:flush-result", {
+          requestId,
+          ok: false,
+          error: message.slice(0, 500),
+        });
+      }
+    };
+    ipcRenderer.on("document-session:flush-requested", listener);
+    return () => ipcRenderer.removeListener("document-session:flush-requested", listener);
+  },
+  onDocumentSessionCloseCancelled: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, payload) => {
+      const requestId = typeof payload?.requestId === "string" ? payload.requestId : null;
+      if (requestId) callback({ requestId });
+    };
+    ipcRenderer.on("document-session:close-cancelled", listener);
+    return () => ipcRenderer.removeListener("document-session:close-cancelled", listener);
+  },
   readCloudSession: () => ipcRenderer.invoke("cloud-session:read"),
   readCloudAuthState: () => ipcRenderer.invoke("cloud-auth:read-state"),
   restoreCloudSession: (request) => ipcRenderer.invoke("cloud-session:restore", request),

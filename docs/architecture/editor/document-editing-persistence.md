@@ -155,8 +155,50 @@ overwrite a newer one.
    update caches and derived indexes, but must not replace the active node,
    recreate header actions, or dispatch saved source back into the editor.
 6. Local and Cloud policies may differ without branching inside an Editor.
-7. App shutdown must ask the session owner to flush; the main process remains
-   the final authority for whether a local commit is accepted.
+7. A normal app/window close is a two-phase operation: Electron Main prevents
+   destruction, the renderer snapshots and drains every active session, and
+   Main closes only after a trusted acknowledgement. Failure and timeout keep
+   the window open by default; an explicit destructive choice is required to
+   close anyway.
+8. Cloud authentication, workspace services, and other persistence
+   dependencies remain live during `before-quit`. General service disposal
+   occurs at `will-quit`, after all window close gates have acknowledged.
+9. If Electron's original app-quit attempt was interrupted by the async close
+   gate, closing the last drained window resumes that quit intent. Choosing to
+   keep a failed window open cancels the intent and leaves the app operational.
+10. The renderer installs an interaction barrier before taking the close
+    snapshot, then drains again if a newer revision arrived during an in-flight
+    commit. A cancelled close removes the barrier and restores focus.
+11. An unmounted session enters a retiring state and remains in the renderer
+    registry until its destroy snapshot is acknowledged. Therefore switching
+    files and immediately quitting still waits for the old document.
+
+```mermaid
+sequenceDiagram
+    participant W as Electron BrowserWindow
+    participant B as Preload bridge
+    participant I as Renderer interaction barrier
+    participant R as Active Session Registry
+    participant S as Document Sessions
+    participant P as Persistence Adapters
+
+    W->>W: close event / preventDefault()
+    W->>B: flush-requested(requestId)
+    B->>I: lock input and retain focus target
+    I->>R: flushActiveDocumentSessions()
+    R->>S: flushCurrent(app-close)
+    S->>P: drain serialized commits
+    P-->>S: durable acknowledgements
+    S-->>R: all settled
+    R-->>B: resolved
+    B-->>W: trusted flush-result(requestId, ok)
+    W->>W: allowClose + close()
+    opt failure or timeout, then Keep Window Open
+        W->>B: close-cancelled(requestId)
+        B->>I: unlock input and restore focus
+    end
+    Note over W,P: failure or timeout keeps the live editor window open by default
+```
 
 ## 5. Plugin boundary
 
@@ -238,6 +280,7 @@ Contribution contracts.
 packages/shared-ui/src/editor/document-session/
   DocumentEditingSession.ts       # framework-independent session kernel
   DocumentSessionBoundary.tsx     # trusted React composition/status bridge
+  activeDocumentSessions.ts       # active/retiring close-drain registry
   types.ts                         # revision/snapshot/session contracts
 
 packages/shared-ui/src/editor/
@@ -250,6 +293,12 @@ src/lib/
 
 electron/main + local-api/
   workspace write IPC              # authorization + conditional atomic write
+
+electron/main/document-session-close-coordinator.mjs
+                                   # BrowserWindow close gate + trusted handshake
+
+electron/preload.cjs + src/main.tsx
+                                   # narrow close-drain IPC + interaction barrier
 ```
 
 `DataWorkspace` binds persistence to the **committed preview document**, never
@@ -264,6 +313,11 @@ not own the write queue.
 - Viewer Pack v1 remains `editable: false` and cannot obtain a session.
 - One document has at most one in-flight commit per session.
 - Destroy/file-switch flushes join the queue; no direct write bypass exists.
+- Unmounted sessions remain close-drain participants until their last queued
+  write succeeds; StrictMode cleanup/setup probes cannot unregister a live one.
+- Normal BrowserWindow close is blocked until all active sessions acknowledge
+  an `app-close` drain; the renderer is interaction-locked across the final
+  snapshot, and timeout/failure never silently destroys the window.
 - A commit acknowledgement is identified by editor revision and storage
   version.
 - Local writes are path-authorized, version-checked, and replacement-safe.
