@@ -267,5 +267,9 @@ function broadcastWorkspaceEditReviewChange(entry, rootPath, request) {
 function shouldIgnoreWorkspaceChange(filename) {
   if (!filename) return false;
   const normalized = String(filename).replaceAll("\\", "/");
-  return normalized === ".git" || normalized.startsWith(".git/");
+  return (
+    normalized === ".git"
+    || normalized.startsWith(".git/")
+    || /(^|\/)\.[^/]+\.puppyone-\d+-[0-9a-f-]+\.tmp$/i.test(normalized)
+  );
 }

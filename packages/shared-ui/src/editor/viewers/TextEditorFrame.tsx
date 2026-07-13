@@ -1,7 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { EditorSaveButton, type SaveStatus } from "../EditorSaveButton";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { EditorSaveButton } from "../EditorSaveButton";
 import { PlainTextEditor } from "../PlainTextEditor";
 import type { EditorMode, EditorSaveMode } from "../viewerTypes";
 import type {
@@ -9,6 +16,8 @@ import type {
   EditorSourceSnapshot,
   EditorSourceSnapshotPort,
 } from "../sourceSnapshot";
+import type { EditorDocumentSession } from "../document-session/types";
+import { useDocumentSessionState } from "../document-session/useDocumentSessionState";
 
 export type TextEditorControls = {
   canEdit: boolean;
@@ -20,11 +29,12 @@ export type TextEditorControls = {
 
 export type TextEditorFrameProps = {
   documentId: string;
+  documentVersion?: string | null;
   content: string;
   nodeName: string;
   defaultMode: EditorMode;
   canEdit: boolean;
-  onSaveContent?: (content: string) => Promise<void>;
+  documentSession?: EditorDocumentSession | null;
   hideSourceView: boolean;
   saveMode: EditorSaveMode;
   /** Keep the editor document canonical and read full source only at save boundaries. */
@@ -35,11 +45,12 @@ export type TextEditorFrameProps = {
 
 export function TextEditorFrame({
   documentId,
+  documentVersion = null,
   content,
   nodeName,
   defaultMode,
   canEdit,
-  onSaveContent,
+  documentSession = null,
   hideSourceView,
   saveMode,
   sourceSnapshotMode = false,
@@ -49,192 +60,159 @@ export function TextEditorFrame({
   const [mode, setMode] = useState<EditorMode>(hideSourceView ? "live" : defaultMode);
   const [draft, setDraft] = useState(content);
   const [editorValue, setEditorValue] = useState(content);
-  const [persistedContent, setPersistedContent] = useState(content);
-  const [snapshotDirty, setSnapshotDirty] = useState(false);
-  const [snapshotRevision, setSnapshotRevision] = useState<string | null>(null);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("clean");
-  const [saveError, setSaveError] = useState<string | null>(null);
   const documentIdRef = useRef(documentId);
   const draftRef = useRef(draft);
-  const persistedContentRef = useRef(persistedContent);
-  const snapshotDirtyRef = useRef(snapshotDirty);
-  const snapshotRevisionRef = useRef<string | null>(snapshotRevision);
+  const draftRevisionCounterRef = useRef(0);
+  const draftRevisionRef = useRef(createDraftRevision(documentId, 0));
+  const contentPropRef = useRef(content);
+  const documentVersionPropRef = useRef(documentVersion);
   const snapshotPortRef = useRef<EditorSourceSnapshotPort | null>(null);
-  const savingRef = useRef(false);
-  const queuedAutoSaveRef = useRef(false);
-  const inFlightContentRef = useRef<string | null>(null);
-  const saveCurrentSourceRef = useRef<(automatic: boolean) => Promise<void>>(async () => undefined);
-  const dirty = sourceSnapshotMode ? snapshotDirty : draft !== persistedContent;
+  const detachSourceRef = useRef<(() => void) | null>(null);
+  const sessionRef = useRef<EditorDocumentSession | null>(documentSession);
+  const sessionState = useDocumentSessionState(documentSession);
 
   useLayoutEffect(() => {
-    if (documentIdRef.current === documentId) return;
+    const previousSession = sessionRef.current;
+    const sessionChanged = previousSession !== documentSession;
+    const documentChanged = documentIdRef.current !== documentId;
+    if (!sessionChanged && !documentChanged) return;
+
+    const previousSnapshot = readCurrentSnapshot(sourceSnapshotMode, {
+      draft: draftRef.current,
+      draftRevision: draftRevisionRef.current,
+      snapshotPort: snapshotPortRef.current,
+    });
+    detachSourceRef.current?.();
+    detachSourceRef.current = null;
+    snapshotPortRef.current = null;
+    if (previousSession && previousSnapshot) {
+      void previousSession
+        .flushSnapshot(previousSnapshot, "document-switch")
+        .catch(() => undefined);
+    }
 
     documentIdRef.current = documentId;
-    savingRef.current = false;
-    queuedAutoSaveRef.current = false;
-    inFlightContentRef.current = null;
-    snapshotPortRef.current = null;
-    snapshotDirtyRef.current = false;
-    snapshotRevisionRef.current = null;
+    sessionRef.current = documentSession;
     draftRef.current = content;
-    persistedContentRef.current = content;
+    contentPropRef.current = content;
+    documentVersionPropRef.current = documentVersion;
+    draftRevisionCounterRef.current = 0;
+    draftRevisionRef.current = createDraftRevision(documentId, 0);
     setMode(hideSourceView ? "live" : defaultMode);
     setDraft(content);
     setEditorValue(content);
-    setPersistedContent(content);
-    setSnapshotDirty(false);
-    setSnapshotRevision(null);
-    setSaveStatus("clean");
-    setSaveError(null);
-  }, [content, defaultMode, documentId, hideSourceView]);
+  }, [
+    content,
+    defaultMode,
+    documentId,
+    documentSession,
+    documentVersion,
+    hideSourceView,
+    sourceSnapshotMode,
+  ]);
 
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
 
-  useEffect(() => {
-    persistedContentRef.current = persistedContent;
-  }, [persistedContent]);
+  useLayoutEffect(() => {
+    if (
+      documentIdRef.current !== documentId
+      || (
+        contentPropRef.current === content
+        && documentVersionPropRef.current === documentVersion
+      )
+    ) return;
+    contentPropRef.current = content;
+    documentVersionPropRef.current = documentVersion;
+    const reconciliation = documentSession?.reconcileExternalBaseline(
+      content,
+      documentVersion,
+    ) ?? "applied";
+    if (reconciliation !== "applied") return;
 
-  useEffect(() => {
-    snapshotDirtyRef.current = snapshotDirty;
-  }, [snapshotDirty]);
-
-  useEffect(() => {
-    snapshotRevisionRef.current = snapshotRevision;
-  }, [snapshotRevision]);
+    draftRef.current = content;
+    draftRevisionCounterRef.current = 0;
+    draftRevisionRef.current = createDraftRevision(documentId, 0);
+    if (sourceSnapshotMode) setEditorValue(content);
+    else setDraft(content);
+  }, [content, documentId, documentSession, documentVersion, sourceSnapshotMode]);
 
   useLayoutEffect(() => {
-    if (documentIdRef.current !== documentId) return;
+    if (!documentSession || sourceSnapshotMode) return undefined;
+    const source: EditorSourceSnapshotPort = {
+      readSnapshot: () => ({
+        content: draftRef.current,
+        revision: draftRevisionRef.current,
+      }),
+      readRevision: () => draftRevisionRef.current,
+    };
+    detachSourceRef.current?.();
+    detachSourceRef.current = documentSession.attachSource(source);
+    documentSession.reportRevision({
+      revision: draftRevisionRef.current,
+      dirty: draftRef.current !== documentSession.getPersistedContent(),
+    });
+    return () => {
+      detachSourceRef.current?.();
+      detachSourceRef.current = null;
+    };
+  }, [documentId, documentSession, sourceSnapshotMode]);
 
-    const previousPersistedContent = persistedContentRef.current;
-    const hasLocalDraft = sourceSnapshotMode
-      ? snapshotDirtyRef.current
-      : saveMode === "auto"
-        && draftRef.current !== previousPersistedContent
-        && draftRef.current !== content;
-
-    setPersistedContent(content);
-    persistedContentRef.current = content;
-    setSaveError(null);
-
-    if (hasLocalDraft) {
-      setSaveStatus("dirty");
-      return;
+  useLayoutEffect(() => () => {
+    const session = sessionRef.current;
+    const snapshot = readCurrentSnapshot(sourceSnapshotMode, {
+      draft: draftRef.current,
+      draftRevision: draftRevisionRef.current,
+      snapshotPort: snapshotPortRef.current,
+    });
+    detachSourceRef.current?.();
+    detachSourceRef.current = null;
+    if (session && snapshot) {
+      void session.flushSnapshot(snapshot, "destroy").catch(() => undefined);
     }
-
-    if (sourceSnapshotMode) {
-      // A save acknowledgement already matches the canonical EditorView. Only
-      // a genuinely new external value is dispatched back into the editor.
-      if (content !== previousPersistedContent) setEditorValue(content);
-      setSnapshotDirty(false);
-      snapshotDirtyRef.current = false;
-    } else {
-      setDraft(content);
-      draftRef.current = content;
-    }
-    setSaveStatus("clean");
-  }, [content, documentId, saveMode, sourceSnapshotMode]);
+  }, [sourceSnapshotMode]);
 
   useEffect(() => {
     if (hideSourceView) setMode("live");
   }, [hideSourceView]);
 
-  useEffect(() => {
-    if (dirty) setSaveStatus((status) => (status === "saving" ? status : "dirty"));
-    else if (saveStatus === "dirty" || saveStatus === "error") setSaveStatus("clean");
-  }, [dirty, saveStatus]);
-
-  const saveContent = useCallback(async (
-    contentToSave: string,
-    automatic: boolean,
-    sourceRevision: string | null,
-  ) => {
-    if (!onSaveContent || contentToSave === persistedContentRef.current) return;
-
-    if (savingRef.current) {
-      if (automatic) queuedAutoSaveRef.current = true;
-      return;
-    }
-
-    const saveDocumentId = documentIdRef.current;
-    savingRef.current = true;
-    inFlightContentRef.current = contentToSave;
-    setSaveStatus("saving");
-    setSaveError(null);
-    try {
-      await onSaveContent(contentToSave);
-      if (documentIdRef.current !== saveDocumentId) return;
-
-      persistedContentRef.current = contentToSave;
-      setPersistedContent(contentToSave);
-      if (sourceSnapshotMode) {
-        const currentRevision = snapshotPortRef.current?.readRevision() ?? snapshotRevisionRef.current;
-        const remainsDirty = sourceRevision !== null && currentRevision !== sourceRevision;
-        snapshotDirtyRef.current = remainsDirty;
-        setSnapshotDirty(remainsDirty);
-        setSaveStatus(remainsDirty ? "dirty" : "saved");
-      } else {
-        setSaveStatus(draftRef.current === contentToSave ? "saved" : "dirty");
-      }
-      window.setTimeout(() => {
-        if (documentIdRef.current !== saveDocumentId) return;
-        setSaveStatus((status) => (status === "saved" ? "clean" : status));
-      }, 1200);
-    } catch (error) {
-      if (documentIdRef.current !== saveDocumentId) return;
-      setSaveStatus("error");
-      setSaveError(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (documentIdRef.current === saveDocumentId) {
-        savingRef.current = false;
-        inFlightContentRef.current = null;
-        if (automatic && queuedAutoSaveRef.current) {
-          queuedAutoSaveRef.current = false;
-          window.setTimeout(() => void saveCurrentSourceRef.current(true), 0);
-        }
-      }
-    }
-  }, [onSaveContent, sourceSnapshotMode]);
-
-  const saveCurrentSource = useCallback(async (automatic: boolean) => {
-    if (sourceSnapshotMode) {
-      const snapshot = snapshotPortRef.current?.readSnapshot();
-      if (!snapshot) return;
-      await saveContent(snapshot.content, automatic, snapshot.revision);
-      return;
-    }
-    await saveContent(draftRef.current, automatic, null);
-  }, [saveContent, sourceSnapshotMode]);
-  saveCurrentSourceRef.current = saveCurrentSource;
+  const handleDraftChange = useCallback((nextContent: string) => {
+    draftRef.current = nextContent;
+    setDraft(nextContent);
+    draftRevisionCounterRef.current += 1;
+    draftRevisionRef.current = createDraftRevision(documentIdRef.current, draftRevisionCounterRef.current);
+    const session = sessionRef.current;
+    session?.reportRevision({
+      revision: draftRevisionRef.current,
+      dirty: nextContent !== session.getPersistedContent(),
+    });
+  }, []);
 
   const handleSourceRevisionChange = (revision: EditorSourceRevision) => {
-    snapshotRevisionRef.current = revision.revision;
-    setSnapshotRevision(revision.revision);
-    if (!revision.dirty) return;
-    snapshotDirtyRef.current = true;
-    setSnapshotDirty(true);
+    sessionRef.current?.reportRevision(revision);
   };
 
   const handleSnapshotPortChange = (port: EditorSourceSnapshotPort | null) => {
+    detachSourceRef.current?.();
+    detachSourceRef.current = null;
     snapshotPortRef.current = port;
+    if (port && sessionRef.current) {
+      detachSourceRef.current = sessionRef.current.attachSource(port);
+    }
   };
 
   const handleBeforeDestroy = (snapshot: EditorSourceSnapshot) => {
+    const session = sessionRef.current;
+    detachSourceRef.current?.();
+    detachSourceRef.current = null;
     snapshotPortRef.current = null;
-    if (!onSaveContent || snapshot.content === persistedContentRef.current) return;
-    if (savingRef.current && snapshot.content === inFlightContentRef.current) return;
-    // Destruction/file switch is a mandatory persistence boundary. The write
-    // is started before EditorView disposal and carries the exact revision
-    // snapshot; React state is deliberately not touched after unmount.
-    void onSaveContent(snapshot.content).catch((error) => {
-      console.error("Unable to flush editor source before disposal:", error);
-    });
+    if (session) void session.flushSnapshot(snapshot, "destroy").catch(() => undefined);
   };
 
   const controls: TextEditorControls = {
     canEdit,
-    onChange: setDraft,
+    onChange: handleDraftChange,
     onSourceRevisionChange: handleSourceRevisionChange,
     onSnapshotPortChange: handleSnapshotPortChange,
     onBeforeDestroy: handleBeforeDestroy,
@@ -247,27 +225,21 @@ export function TextEditorFrame({
       if (snapshot) setEditorValue(snapshot.content);
     }
     setMode(nextMode);
+    void documentSession?.requestSave("mode-switch").catch(() => undefined);
   };
-
-  useEffect(() => {
-    if (saveMode !== "auto" || !dirty || !onSaveContent) return undefined;
-
-    const timeoutId = window.setTimeout(() => {
-      void saveCurrentSource(true);
-    }, 400);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [dirty, onSaveContent, saveCurrentSource, saveMode, snapshotRevision, draft]);
 
   return (
     <section className="editor-host">
-      {saveMode === "manual" && (
+      {saveMode === "manual" && documentSession && (
         <div className="editor-save-overlay">
-          <EditorSaveButton status={saveStatus} onSave={() => void saveCurrentSource(false)} />
+          <EditorSaveButton
+            status={sessionState.status}
+            onSave={() => void documentSession.requestSave("manual").catch(() => undefined)}
+          />
         </div>
       )}
 
-      {saveError && <div className="editor-inline-error">{saveError}</div>}
+      {sessionState.error && <div className="editor-inline-error">{sessionState.error}</div>}
 
       {mode === "live" ? (
         <div className="editor-live-surface">
@@ -282,7 +254,7 @@ export function TextEditorFrame({
           content={draft}
           nodeName={nodeName}
           readOnly={!canEdit}
-          onChange={canEdit ? setDraft : undefined}
+          onChange={canEdit ? handleDraftChange : undefined}
         />
       )}
 
@@ -310,6 +282,25 @@ export function TextEditorFrame({
       )}
     </section>
   );
+}
+
+function createDraftRevision(documentId: string, sequence: number): string {
+  return `draft:${documentId}:${sequence}`;
+}
+
+function readCurrentSnapshot(
+  sourceSnapshotMode: boolean,
+  source: {
+    draft: string;
+    draftRevision: string;
+    snapshotPort: EditorSourceSnapshotPort | null;
+  },
+): EditorSourceSnapshot | null {
+  if (sourceSnapshotMode) return source.snapshotPort?.readSnapshot() ?? null;
+  return {
+    content: source.draft,
+    revision: source.draftRevision,
+  };
 }
 
 function PencilIcon() {

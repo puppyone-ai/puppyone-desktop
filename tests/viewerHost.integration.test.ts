@@ -6,7 +6,10 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PuppyoneEditorHost } from "../packages/shared-ui/src/editor/PuppyoneEditorHost";
-import { EMPTY_VIEWER_PACK_SNAPSHOT } from "../packages/shared-ui/src/editor/viewerPackTypes";
+import {
+  EMPTY_VIEWER_PACK_SNAPSHOT,
+  type ViewerPackSnapshot,
+} from "../packages/shared-ui/src/editor/viewerPackTypes";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -102,6 +105,69 @@ describe("preset viewer host composition", () => {
 
     expect(container.querySelector('[data-testid="install-viewer"]')).toBeNull();
     expect(container.querySelector(".document-preview")).not.toBeNull();
+  });
+
+  it("keeps the Document Session and persistence adapter outside Viewer Pack surfaces", () => {
+    const snapshot = {
+      sequence: 1,
+      generatedAt: "2026-07-13T00:00:00.000Z",
+      contributions: [{
+        pluginId: "ai.puppyone.viewer.glb",
+        publisher: "puppyone",
+        version: "1.0.0",
+        label: "glTF Viewer",
+        enabled: true,
+        contentHash: "abc",
+        viewer: {
+          entry: "viewer.html",
+          source: "range-resource",
+          sources: ["local"],
+          runtime: ["worker"],
+        },
+        formats: [{
+          id: "glb",
+          label: "glTF Binary Scene",
+          extensions: [".glb"],
+          mimeTypes: ["model/gltf-binary"],
+          category: "binary",
+          defaultViewer: "plugin:ai.puppyone.viewer.glb",
+          editable: false,
+        }],
+        permissions: {
+          currentDocument: ["metadata", "readRange"],
+          relatedFiles: "none",
+          network: [],
+        },
+        installedAt: "2026-07-13T00:00:00.000Z",
+      }],
+    } as const satisfies ViewerPackSnapshot;
+    const persist = vi.fn(async () => ({ version: "should-not-run" }));
+    const renderSurface = vi.fn((request: object) => React.createElement(
+      "div",
+      { "data-testid": "external-viewer" },
+      Object.keys(request).sort().join(","),
+    ));
+
+    const container = renderHost({
+      document: {
+        path: "assets/scene.glb",
+        name: "scene.glb",
+        type: "binary",
+        mimeType: "model/gltf-binary",
+        sourceKind: "local",
+      },
+      documentPersistence: {
+        kind: "local-fs",
+        policy: { idleDelayMs: 1, maxDelayMs: 2 },
+        persist,
+      },
+      viewerExtensionAdapter: { snapshot, renderSurface },
+    });
+
+    expect(container.querySelector('[data-testid="external-viewer"]')?.textContent)
+      .toBe("contribution,document");
+    expect(renderSurface).toHaveBeenCalledOnce();
+    expect(persist).not.toHaveBeenCalled();
   });
 });
 

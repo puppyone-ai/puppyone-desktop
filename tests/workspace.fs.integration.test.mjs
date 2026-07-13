@@ -139,8 +139,63 @@ describe("read / write round-trips", () => {
 
   it("updates content via writeWorkspaceTextFile", async () => {
     await createWorkspaceEntry(root, { parentPath: null, name: "c.txt", kind: "file", content: "old" });
-    await writeWorkspaceTextFile(root, "c.txt", "new content");
-    expect((await readWorkspaceTextFile(root, "c.txt")).content).toBe("new content");
+    const before = await readWorkspaceTextFile(root, "c.txt");
+    const result = await writeWorkspaceTextFile(root, "c.txt", "new content", {
+      expectedVersion: before.version,
+    });
+    const after = await readWorkspaceTextFile(root, "c.txt");
+    expect(after.content).toBe("new content");
+    expect(result.version).toBe(after.version);
+    expect(after.version).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  it("rejects a stale conditional write instead of overwriting an external edit", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "conflict.txt", kind: "file", content: "base" });
+    const opened = await readWorkspaceTextFile(root, "conflict.txt");
+    await writeFile(path.join(root, "conflict.txt"), "external", "utf8");
+
+    await expect(writeWorkspaceTextFile(root, "conflict.txt", "stale editor", {
+      expectedVersion: opened.version,
+    })).rejects.toThrow(/changed outside PuppyOne/i);
+    expect(await readFile(path.join(root, "conflict.txt"), "utf8")).toBe("external");
+  });
+
+  it("serializes same-path writers so one stale concurrent commit cannot win", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "concurrent.txt", kind: "file", content: "base" });
+    const opened = await readWorkspaceTextFile(root, "concurrent.txt");
+
+    const first = writeWorkspaceTextFile(root, "concurrent.txt", "first", {
+      expectedVersion: opened.version,
+    });
+    const second = writeWorkspaceTextFile(root, "concurrent.txt", "second", {
+      expectedVersion: opened.version,
+    });
+    const [firstResult, secondResult] = await Promise.allSettled([first, second]);
+
+    const results = [firstResult, secondResult];
+    expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
+    expect(results.filter(({ status }) => status === "rejected")).toHaveLength(1);
+    const rejected = results.find(({ status }) => status === "rejected");
+    if (rejected?.status === "rejected") {
+      expect(String(rejected.reason)).toMatch(/changed outside PuppyOne/i);
+    }
+    const winningContent = firstResult.status === "fulfilled" ? "first" : "second";
+    expect(await readFile(path.join(root, "concurrent.txt"), "utf8")).toBe(winningContent);
+  });
+
+  it("preserves local file mode across atomic replacement", async () => {
+    if (process.platform === "win32") return;
+    await createWorkspaceEntry(root, { parentPath: null, name: "mode.txt", kind: "file", content: "base" });
+    const filePath = path.join(root, "mode.txt");
+    // 0666 is deliberately broader than the common 0022 process umask.
+    await chmod(filePath, 0o666);
+    const opened = await readWorkspaceTextFile(root, "mode.txt");
+
+    await writeWorkspaceTextFile(root, "mode.txt", "updated", {
+      expectedVersion: opened.version,
+    });
+
+    expect((await stat(filePath)).mode & 0o777).toBe(0o666);
   });
 
   it("rejects non-string write content", async () => {

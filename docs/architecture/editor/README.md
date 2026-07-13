@@ -24,11 +24,13 @@ Content / resource acquisition
         v
 Committed preview document
         |
-        +----> Markdown editor
+        +----> Document Session Boundary ----> Local FS / Cloud adapter
+        |                |
+        |                +----> Markdown editor
         |
-        +----> Text / code editor
+        |                +----> Text / code editor
         |
-        +----> CSV table editor
+        |                +----> CSV table editor
         |
         +----> HTML viewer
         |
@@ -69,10 +71,13 @@ architecture documents one level above this directory.
    - The experimental local Host retained behind a default-off product
      capability, its security boundary, and the reserved future distribution
      adapter. It is not a marketplace commitment.
-4. [Markdown Editor](markdown/README.md)
+4. [Document Editing and Persistence](document-editing-persistence.md)
+   - The host-owned Document Session, Local/Cloud persistence adapters,
+     revision ordering, flush behavior, and the exact plugin boundary.
+5. [Markdown Editor](markdown/README.md)
    - The format-specific source-first architecture and Live Preview UX contract
      for Markdown files.
-5. [Desktop Renderer Performance](../desktop-renderer-performance.md)
+6. [Desktop Renderer Performance](../desktop-renderer-performance.md)
    - The urgent/deferred scheduling, Explorer virtualization, Markdown
      projection, snapshot, cancellation, worker-index, and production Electron
      performance contracts shared by Explorer and the editor.

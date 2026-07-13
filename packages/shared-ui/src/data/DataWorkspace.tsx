@@ -38,6 +38,7 @@ import type {
 import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
 import { getAiEditFileForPath } from "../editor/ai-edits/diff";
 import type { AiEditRequest } from "../editor/ai-edits/types";
+import type { DocumentPersistedCommit } from "../editor/document-session/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import { usePaneResizeDrag } from "../primitives/usePaneResizeDrag";
 import { getRendererPerformanceTracker } from "../performance/rendererPerformance";
@@ -983,25 +984,23 @@ export function DataWorkspace({
     [folderExpansionStrategy, loadFolder, loadingFolderPaths],
   );
 
-  const saveFileContent = async (node: DataNode, content: string) => {
-    if (!dataPort.writeFile) return;
-
-    await dataPort.writeFile(node.path, content);
-
+  const applyPersistedFileContent = (node: DataNode, commit: DocumentPersistedCommit) => {
+    if (commit.documentId !== node.path) return;
     const existingContent = fileContent?.path === node.path
       ? fileContent
       : fileContentCache[node.path] ?? null;
     const nextContent: FileContent = existingContent
-      ? { ...existingContent, content }
+      ? { ...existingContent, content: commit.content, version: commit.version }
       : {
           path: node.path,
           name: node.name,
           type: node.type,
-          content,
+          content: commit.content,
+          version: commit.version,
         };
 
     setFileContent((current) => (
-      current?.path === node.path || selectedFile?.path === node.path
+      current?.path === node.path
         ? nextContent
         : current
     ));
@@ -1010,15 +1009,13 @@ export function DataWorkspace({
       current?.node.path === node.path
         ? {
             ...current,
-            node: { ...current.node, content },
             fileContent: nextContent,
           }
         : current
     ));
-    setTree((current) => updateNodeContent(current, node.path, content));
     if (enableMarkdownLinkContentIndexing && isMarkdownNodeLike(node)) {
       void markdownLinkIndexCoordinatorRef.current
-        ?.updateDocument({ path: node.path, name: node.name, content })
+        ?.updateDocument({ path: node.path, name: node.name, content: commit.content })
         .then((index) => setMarkdownLinkIndex(index))
         .catch((error) => {
           if (error instanceof Error && error.name === "AbortError") return;
@@ -1374,8 +1371,9 @@ export function DataWorkspace({
                   emptySlot={emptySlot}
                   actionSlot={previewActionSlot}
                   renderBody={renderPreviewBody}
-                  onSaveContent={dataPort.writeFile && renderedPreviewDocument
-                    ? (content) => saveFileContent(renderedPreviewDocument.node, content)
+                  documentPersistence={dataPort.documentPersistence ?? null}
+                  onDocumentPersisted={dataPort.documentPersistence && renderedPreviewDocument
+                    ? (commit) => applyPersistedFileContent(renderedPreviewDocument.node, commit)
                     : undefined}
                 />
               </>
@@ -1514,25 +1512,6 @@ function attachFolderChildren(
       return {
         ...node,
         children: attachFolderChildren(node.children, folderPath, children),
-      };
-    }
-    return node;
-  });
-}
-
-function updateNodeContent(nodes: DataNode[], path: string, content: string): DataNode[] {
-  return nodes.map((node) => {
-    if (node.path === path) {
-      return {
-        ...node,
-        content,
-        preview: buildPreview(content),
-      };
-    }
-    if (node.children) {
-      return {
-        ...node,
-        children: updateNodeContent(node.children, path, content),
       };
     }
     return node;
@@ -1702,16 +1681,6 @@ function rebasePathSetByMoveOperations(paths: ReadonlySet<string>, operations: r
 
 function joinDataPath(folderPath: string | null, name: string): string {
   return folderPath ? `${folderPath}/${name}` : name;
-}
-
-function buildPreview(content: string): string | null {
-  const preview = content
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 8)
-    .join("\n");
-  return preview || null;
 }
 
 function useStableMarkdownLinkWorkspaceIndex(nodes: DataNode[]): {

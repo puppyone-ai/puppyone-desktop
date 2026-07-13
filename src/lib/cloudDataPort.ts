@@ -27,6 +27,14 @@ type CloudCatResponse = {
   content_hash?: string | null;
   mime_type?: string | null;
   size_bytes?: number | null;
+  head_commit_id?: string | null;
+};
+
+type CloudWriteResponse = {
+  path: string;
+  commit_id: string;
+  merged?: boolean;
+  conflicts?: string[];
 };
 
 type CloudInlineUrlResponse = {
@@ -38,6 +46,10 @@ type CloudNodeType = "json" | "markdown" | "file";
 
 const CLOUD_WORKSPACE_ID_PREFIX = "cloud:";
 const CLOUD_WORKSPACE_PATH_PREFIX = "cloud://";
+const CLOUD_DOCUMENT_PERSISTENCE_POLICY = Object.freeze({
+  idleDelayMs: 1000,
+  maxDelayMs: 5000,
+});
 
 export function isCloudWorkspace(workspace: Workspace | null | undefined): boolean {
   return Boolean(
@@ -105,15 +117,21 @@ export function createCloudDataPort({
       onSessionChange,
       apiBaseUrl,
     }),
-    writeFile: async (path, content) => {
-      await writeCloudFile({
-        projectId,
-        path,
-        content,
-        session,
-        onSessionChange,
-        apiBaseUrl,
-      });
+    documentPersistence: {
+      kind: "cloud",
+      policy: CLOUD_DOCUMENT_PERSISTENCE_POLICY,
+      persist: async ({ path, content, baseVersion }) => {
+        const response = await writeCloudFile({
+          projectId,
+          path,
+          content,
+          baseCommitId: baseVersion ?? null,
+          session,
+          onSessionChange,
+          apiBaseUrl,
+        });
+        return { version: response.commit_id };
+      },
     },
     createFolder: async (path) => {
       await cloudApiRequest(
@@ -208,6 +226,7 @@ async function readCloudFile({
     content: cloudContentToEditorText(response),
     mimeType,
     size: typeof response.size_bytes === "number" ? formatFileSize(response.size_bytes) : null,
+    version: response.head_commit_id ?? null,
   };
 }
 
@@ -244,6 +263,7 @@ async function writeCloudFile({
   projectId,
   path,
   content,
+  baseCommitId = null,
   session,
   onSessionChange,
   apiBaseUrl,
@@ -251,13 +271,14 @@ async function writeCloudFile({
   projectId: string;
   path: string;
   content: string;
+  baseCommitId?: string | null;
   session: DesktopCloudSession;
   onSessionChange?: SessionHandler;
   apiBaseUrl?: string | null;
-}): Promise<void> {
+}): Promise<CloudWriteResponse> {
   const normalizedPath = normalizeCloudPath(path);
   const nodeType = getCloudWriteNodeType(normalizedPath);
-  await cloudApiRequest(
+  return cloudApiRequest<CloudWriteResponse>(
     `/content/${encodeURIComponent(projectId)}/write`,
     session,
     onSessionChange,
@@ -267,6 +288,7 @@ async function writeCloudFile({
         path: normalizedPath,
         content: getCloudWriteContent(content, nodeType),
         node_type: nodeType,
+        ...(baseCommitId !== null ? { base_commit_id: baseCommitId } : {}),
       }),
     },
     apiBaseUrl,

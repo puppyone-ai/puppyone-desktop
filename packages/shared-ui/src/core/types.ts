@@ -71,6 +71,8 @@ export type FileContent = {
   mimeType?: string | null;
   size?: string | null;
   url?: string | null;
+  /** Storage revision/fingerprint used as the next conditional-write base. */
+  version?: string | null;
 };
 
 export type AppPreviewStatus = "starting" | "running" | "stopped" | "error";
@@ -133,6 +135,43 @@ export type DataReadOptions = {
   signal?: AbortSignal;
 };
 
+export type DocumentPersistenceKind = "local-fs" | "cloud";
+
+export type DocumentPersistenceReason =
+  | "idle"
+  | "max-delay"
+  | "manual"
+  | "mode-switch"
+  | "document-switch"
+  | "destroy";
+
+export type DocumentPersistencePolicy = {
+  idleDelayMs: number;
+  maxDelayMs: number;
+};
+
+export type DocumentPersistenceRequest = {
+  path: string;
+  content: string;
+  revision: string;
+  baseVersion?: string | null;
+  reason: DocumentPersistenceReason;
+};
+
+export type DocumentPersistenceResult = {
+  version?: string | null;
+};
+
+/**
+ * Host-owned storage strategy. Editors never receive this port directly;
+ * Document Sessions serialize and version every call.
+ */
+export type DocumentPersistencePort = {
+  kind: DocumentPersistenceKind;
+  policy: DocumentPersistencePolicy;
+  persist: (request: DocumentPersistenceRequest) => Promise<DocumentPersistenceResult | void>;
+};
+
 export type DataCapabilities = {
   create?: boolean;
   rename?: boolean;
@@ -155,7 +194,7 @@ export type DataPort = {
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
   appPreview?: AppPreviewController;
-  writeFile?: (path: string, content: string) => Promise<void>;
+  documentPersistence?: DocumentPersistencePort;
   createFolder?: (path: string) => Promise<void>;
   createFile?: (path: string, content?: string) => Promise<void>;
   importFiles?: (files: File[], targetFolderPath: string | null) => Promise<DataImportResult>;

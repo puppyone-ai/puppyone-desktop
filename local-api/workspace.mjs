@@ -77,6 +77,7 @@ const GIT_ALL_BRANCH_HISTORY_LIMIT = 320;
 const GIT_REMOTE_PREVIEW_LIMIT = 12;
 export const GIT_STATUS_ENTRY_LIMIT = 10_000;
 const GIT_STATUS_RECORD_LIMIT = (GIT_STATUS_ENTRY_LIMIT * 2) + 32;
+const workspaceTextWriteTails = new Map();
 const GIT_DETAIL_MAX_TOTAL_DIFF_LINES = 4000;
 const GIT_DETAIL_MAX_FILE_DIFF_LINES = 900;
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
@@ -390,6 +391,7 @@ export async function readWorkspaceTextFile(rootPath, relativePath) {
       content: null,
       mimeType: getMimeType(filePath),
       size: formatFileSize(metadata.size),
+      version: getWorkspaceTextVersion(bytes),
     };
   }
 
@@ -400,6 +402,7 @@ export async function readWorkspaceTextFile(rootPath, relativePath) {
     content: bytes.toString("utf8"),
     mimeType: getMimeType(filePath) ?? "text/plain; charset=utf-8",
     size: formatFileSize(metadata.size),
+    version: getWorkspaceTextVersion(bytes),
   };
 }
 
@@ -525,18 +528,105 @@ async function readFileSlice(filePath, start, end) {
   }
 }
 
-export async function writeWorkspaceTextFile(rootPath, relativePath, content) {
+export async function writeWorkspaceTextFile(rootPath, relativePath, content, options = undefined) {
   if (typeof content !== "string") {
     throw new Error("File content must be text.");
   }
   const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
-  const metadata = await fs.stat(filePath).catch((error) => {
-    throw new Error(`Unable to write file: ${error.message}`);
-  });
-  if (metadata.isDirectory()) {
-    throw new Error("Selected path is a folder.");
+  const contentBytes = Buffer.from(content, "utf8");
+  if (contentBytes.byteLength > MAX_EDITOR_BYTES) {
+    throw new Error("File is too large to edit in PuppyOne Desktop.");
   }
-  await fs.writeFile(filePath, content, "utf8");
+  const expectedVersion = normalizeExpectedWorkspaceVersion(options?.expectedVersion);
+
+  return serializeWorkspaceTextWrite(filePath, async () => {
+    const metadata = await fs.stat(filePath).catch((error) => {
+      throw new Error(`Unable to write file: ${error.message}`);
+    });
+    if (metadata.isDirectory()) throw new Error("Selected path is a folder.");
+    if (!metadata.isFile()) throw new Error("Selected path is not a regular file.");
+
+    if (expectedVersion !== null) {
+      await assertWorkspaceTextVersion(filePath, expectedVersion);
+    }
+
+    await writeWorkspaceFileAtomic(filePath, contentBytes, metadata.mode, expectedVersion);
+    return { version: getWorkspaceTextVersion(contentBytes) };
+  });
+}
+
+async function serializeWorkspaceTextWrite(filePath, operation) {
+  const previous = workspaceTextWriteTails.get(filePath) ?? Promise.resolve();
+  const result = previous.catch(() => undefined).then(operation);
+  const tail = result.then(() => undefined, () => undefined);
+  workspaceTextWriteTails.set(filePath, tail);
+  try {
+    return await result;
+  } finally {
+    if (workspaceTextWriteTails.get(filePath) === tail) {
+      workspaceTextWriteTails.delete(filePath);
+    }
+  }
+}
+
+async function writeWorkspaceFileAtomic(filePath, contentBytes, sourceMode, expectedVersion) {
+  const directory = path.dirname(filePath);
+  const temporaryPath = path.join(
+    directory,
+    `.${path.basename(filePath)}.puppyone-${process.pid}-${crypto.randomUUID()}.tmp`,
+  );
+  let handle = null;
+  try {
+    handle = await fs.open(temporaryPath, "wx", sourceMode & 0o777);
+    // open(2) applies the process umask; restore the source mode explicitly so
+    // an atomic inode replacement does not silently tighten user permissions.
+    await handle.chmod(sourceMode & 0o777);
+    await handle.writeFile(contentBytes);
+    await handle.sync();
+    await handle.close();
+    handle = null;
+
+    // Recheck immediately before replacement. The in-process per-path queue
+    // covers every PuppyOne window; this second check also narrows the race
+    // with external editors to the atomic rename boundary itself.
+    if (expectedVersion !== null) {
+      await assertWorkspaceTextVersion(filePath, expectedVersion);
+    }
+    await fs.rename(temporaryPath, filePath);
+
+    const directoryHandle = await fs.open(directory, "r").catch(() => null);
+    if (directoryHandle) {
+      try {
+        await directoryHandle.sync().catch(() => undefined);
+      } finally {
+        await directoryHandle.close();
+      }
+    }
+  } finally {
+    await handle?.close().catch(() => undefined);
+    await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+  }
+}
+
+async function assertWorkspaceTextVersion(filePath, expectedVersion) {
+  const currentBytes = await fs.readFile(filePath).catch((error) => {
+    throw new Error(`Unable to verify file version: ${error.message}`);
+  });
+  if (getWorkspaceTextVersion(currentBytes) !== expectedVersion) {
+    throw new Error("File changed outside PuppyOne; reload it before saving your edits.");
+  }
+}
+
+function normalizeExpectedWorkspaceVersion(value) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || !/^sha256:[0-9a-f]{64}$/.test(value)) {
+    throw new Error("Expected file version is invalid.");
+  }
+  return value;
+}
+
+function getWorkspaceTextVersion(bytes) {
+  return `sha256:${crypto.createHash("sha256").update(bytes).digest("hex")}`;
 }
 
 export async function createWorkspaceEntry(rootPath, request) {

@@ -8,6 +8,7 @@ import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MarkdownCodeMirrorEditor } from "../packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor";
 import type { EditorSourceSnapshotPort } from "../packages/shared-ui/src/editor/sourceSnapshot";
+import { DocumentEditingSession } from "../packages/shared-ui/src/editor/document-session/DocumentEditingSession";
 import { TextEditorFrame } from "../packages/shared-ui/src/editor/viewers/TextEditorFrame";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -49,7 +50,18 @@ describe("Markdown source snapshot boundary", () => {
   });
 
   it("flushes the canonical EditorView snapshot before destruction", async () => {
-    const onSaveContent = vi.fn(async () => undefined);
+    const persist = vi.fn(async () => ({ version: "v2" }));
+    const documentSession = new DocumentEditingSession({
+      documentId: "note.md",
+      initialContent: "alpha",
+      initialVersion: "v1",
+      saveMode: "manual",
+      persistence: {
+        kind: "local-fs",
+        policy: { idleDelayMs: 400, maxDelayMs: 2000 },
+        persist,
+      },
+    });
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -61,7 +73,7 @@ describe("Markdown source snapshot boundary", () => {
           nodeName="note.md"
           defaultMode="live"
           canEdit
-          onSaveContent={onSaveContent}
+          documentSession={documentSession}
           hideSourceView
           saveMode="manual"
           sourceSnapshotMode
@@ -85,7 +97,11 @@ describe("Markdown source snapshot boundary", () => {
     act(() => root?.unmount());
     root = null;
 
-    expect(onSaveContent).toHaveBeenCalledWith("alpha beta");
+    expect(persist).toHaveBeenCalledWith(expect.objectContaining({
+      path: "note.md",
+      content: "alpha beta",
+      reason: "destroy",
+    }));
   });
 
   it("applies an external source update without a dirty writeback loop", async () => {

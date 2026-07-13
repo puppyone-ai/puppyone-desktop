@@ -66,6 +66,20 @@ export type {
 export { EditorHost } from "./editor/EditorHost";
 export type { EditorHostProps } from "./editor/EditorHost";
 export {
+  DocumentEditingSession,
+  DocumentSessionBoundary,
+  useDocumentSessionState,
+} from "./editor/document-session";
+export type {
+  DocumentEditingSessionOptions,
+  DocumentPersistedCommit,
+  DocumentSessionBoundaryProps,
+  DocumentSessionState,
+  DocumentSessionStatus,
+  EditorDocumentSession,
+  ExternalBaselineResult,
+} from "./editor/document-session";
+export {
   classifyEditorViewerCapability,
   createPresetViewerRegistry,
   definePresetViewer,

@@ -9,7 +9,7 @@ type CodeViewerProps = Pick<
   | "format"
   | "content"
   | "canEdit"
-  | "onSaveContent"
+  | "documentSession"
   | "hideSourceView"
   | "saveMode"
 >;
@@ -19,11 +19,12 @@ export function JsonViewer(context: CodeViewerProps) {
   return (
     <TextEditorFrame
       documentId={context.document.path}
+      documentVersion={context.document.version}
       content={context.content}
       nodeName={context.document.name}
       defaultMode="source"
       canEdit={context.canEdit}
-      onSaveContent={context.onSaveContent}
+      documentSession={context.documentSession}
       hideSourceView={context.hideSourceView}
       saveMode={context.saveMode}
       renderLive={(value, controls) => (
@@ -53,11 +54,12 @@ export function TextFileViewer(context: CodeViewerProps) {
   return (
     <TextEditorFrame
       documentId={context.document.path}
+      documentVersion={context.document.version}
       content={context.content}
       nodeName={context.document.name}
       defaultMode="source"
       canEdit={context.canEdit}
-      onSaveContent={context.onSaveContent}
+      documentSession={context.documentSession}
       hideSourceView={context.hideSourceView}
       saveMode={context.saveMode}
       renderLive={(value, controls) => (

@@ -29,6 +29,8 @@ enabled in the default product.
 - Only a placeholder-grade, explicitly local document is plugin-eligible.
 - Packs render files; they do not add commands, panels, settings, agents, or
   background startup hooks.
+- Packs do not replace or receive the host-owned Document Session or Local/Cloud
+  persistence adapters. Viewer Pack v1 remains read-only.
 - V1 has no network permission, cloud-file access, or related-file access.
 - The catalog transport remains disabled. No marketplace backend or concrete
   Pack is part of the current product scope.
@@ -325,6 +327,14 @@ They do not share registries, package identities, credentials, grants,
 persistence, or lifecycle. A Viewer Pack cannot call Automation or receive a
 Cloud session, and Automation cannot activate a Viewer Pack or read its local
 store.
+
+The editor's persistence boundary is specified separately in
+[Document Editing and Persistence](document-editing-persistence.md). The only
+product extension point below the Viewer Router is a Viewer/Editor
+Contribution. Session ordering, version checks, Local FS writes, and Cloud
+commits remain trusted host infrastructure. A future editable pack would need a
+new versioned, host-mediated edit capability; it must never receive the
+Document Session object or a raw persistence adapter.
 
 The experimental Plugins page is off by default. A local renderer preference
 may opt into the page, and a separate Appearance preference may hide its

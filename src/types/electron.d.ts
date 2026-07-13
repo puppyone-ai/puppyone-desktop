@@ -714,7 +714,8 @@ declare global {
         rootPath: string;
         path: string;
         content: string;
-      }) => Promise<void>;
+        expectedVersion?: string | null;
+      }) => Promise<{ version: string }>;
       createEntry: (request: WorkspaceCreateEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       renameEntry: (request: WorkspaceRenameEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       moveEntry: (request: WorkspaceMoveEntryRequest) => Promise<WorkspaceCreateEntryResult>;

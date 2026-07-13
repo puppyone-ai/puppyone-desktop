@@ -19,9 +19,15 @@ import type {
   ViewerExtensionHostAdapter,
 } from "./viewerHostAdapters";
 import type { ViewerContribution } from "./viewerPackTypes";
-import type { AppPreviewController, OfficeDocumentConverter } from "../core/types";
+import type {
+  AppPreviewController,
+  DocumentPersistencePort,
+  OfficeDocumentConverter,
+} from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
+import { DocumentSessionBoundary } from "./document-session/DocumentSessionBoundary";
+import type { DocumentPersistedCommit, EditorDocumentSession } from "./document-session/types";
 
 export type { EditorDocument, EditorDocumentKind, EditorSaveMode, MarkdownHtmlTrustMode } from "./viewerTypes";
 
@@ -31,7 +37,8 @@ export type PuppyoneEditorHostProps = {
   error?: string | null;
   fileUrlLoading?: boolean;
   fileUrlError?: string | null;
-  onSaveContent?: (content: string) => Promise<void>;
+  documentPersistence?: DocumentPersistencePort | null;
+  onDocumentPersisted?: (commit: DocumentPersistedCommit) => void;
   aiEditFile?: AiEditFile | null;
   hideSourceView?: boolean;
   fileIconTheme?: FileIconThemeId;
@@ -57,7 +64,8 @@ export function PuppyoneEditorHost({
   error = null,
   fileUrlLoading = false,
   fileUrlError = null,
-  onSaveContent,
+  documentPersistence = null,
+  onDocumentPersisted,
   aiEditFile = null,
   hideSourceView = false,
   fileIconTheme = "default",
@@ -124,7 +132,10 @@ export function PuppyoneEditorHost({
     ? document.content ?? ""
     : document.content ?? document.preview ?? "";
   const content = viewer.normalizeContent?.(rawContent, document) ?? rawContent;
-  const canEdit = Boolean(onSaveContent && viewer.isEditable?.({ document, format, resolvedExtension, content }));
+  const canEdit = Boolean(
+    documentPersistence
+    && viewer.isEditable?.({ document, format, resolvedExtension, content }),
+  );
 
   if (viewer.source !== "resource" && loading && !content) {
     return <div className="editor-state">Loading file...</div>;
@@ -141,7 +152,7 @@ export function PuppyoneEditorHost({
     );
   }
 
-  return (
+  const renderPresetViewer = (documentSession: EditorDocumentSession | null) => (
     <PresetViewerRenderer
       viewer={viewer}
       context={{
@@ -167,10 +178,27 @@ export function PuppyoneEditorHost({
         appPreview,
         openExternalFile,
         convertOfficeDocumentToDocx,
-        onSaveContent,
+        documentSession,
       }}
     />
   );
+
+  if (canEdit && documentPersistence) {
+    return (
+      <DocumentSessionBoundary
+        documentId={document.path}
+        initialContent={content}
+        initialVersion={document.version}
+        saveMode={saveMode}
+        persistence={documentPersistence}
+        onPersisted={onDocumentPersisted}
+      >
+        {renderPresetViewer}
+      </DocumentSessionBoundary>
+    );
+  }
+
+  return renderPresetViewer(null);
 }
 
 function ExternalViewerChooser({
