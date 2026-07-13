@@ -10,9 +10,11 @@ import {
 } from "react";
 import {
   DataWorkspace,
+  DocumentSessionBoundary,
   EMPTY_VIEWER_PACK_SNAPSHOT,
   type AiEditRequest,
   type DataNode,
+  type EditorDocumentSession,
   type FilePreviewBodyContext,
   type ViewerExtensionHostAdapter,
   type ViewerPackSnapshot,
@@ -249,15 +251,29 @@ export function DesktopWorkspaceContent({
   const renderPreviewBody = useCallback((node: DataNode, context: FilePreviewBodyContext) => {
     if (!isPuppyFlowFile(node.name, node.type)) return undefined;
 
-    return (
+    const editor = (documentSession: EditorDocumentSession | null = null) => (
       <PuppyFlowEditor
         node={node}
         fileContent={context.fileContent}
         workspacePath={workspace?.path ?? null}
         loading={context.loading}
         error={context.error}
-        onSaveContent={context.onSaveContent}
+        documentSession={documentSession}
       />
+    );
+
+    if (!context.documentPersistence) return editor();
+    return (
+      <DocumentSessionBoundary
+        documentId={node.path}
+        initialContent={context.fileContent?.content ?? ""}
+        initialVersion={context.fileContent?.version ?? null}
+        saveMode="auto"
+        persistence={context.documentPersistence}
+        onPersisted={context.onDocumentPersisted}
+      >
+        {editor}
+      </DocumentSessionBoundary>
     );
   }, [workspace?.path]);
 
@@ -792,7 +808,7 @@ export function DesktopWorkspaceContent({
           delete: true,
           move: true,
           copy: Boolean(dataPort.copyNode),
-          write: true,
+          write: Boolean(dataPort.documentPersistence),
           history: true,
           accessPoints: false,
           cloudSync: false,

@@ -159,8 +159,11 @@ export function registerWorkspaceFileIpcHandlers({
     if (typeof filePath !== "string" || filePath.trim().length === 0) {
       throw new Error("File path is required.");
     }
-    await writeWorkspaceTextFile(rootPath, filePath, content);
+    const result = await writeWorkspaceTextFile(rootPath, filePath, content, {
+      expectedVersion: request?.expectedVersion ?? null,
+    });
     await absorbWorkspaceEditReviewPath(rootPath, filePath);
+    return result;
   });
 
   ipcMain.handle("workspace:create-entry", async (event, request) => {

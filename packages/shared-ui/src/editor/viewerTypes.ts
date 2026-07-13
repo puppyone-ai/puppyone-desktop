@@ -6,6 +6,7 @@ import type { AiEditFile } from "./ai-edits/types";
 import type { PresetViewerSource } from "./viewerContract";
 import type { DocumentSourceKind } from "./documentSource";
 import type { PresetViewerDefinition } from "./presetViewerManifest";
+import type { EditorDocumentSession } from "./document-session/types";
 
 export type { DocumentSourceKind } from "./documentSource";
 
@@ -36,6 +37,7 @@ export type EditorDocument = {
   preview?: string | null;
   mimeType?: string | null;
   url?: string | null;
+  version?: string | null;
   /**
    * Where the document was sourced. Plugin routing fails closed for `cloud`
    * and `unknown`; only explicit `local` documents can activate a Viewer Pack.
@@ -126,7 +128,7 @@ export type PresetViewerRenderContext = EditorViewerMatch & {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
-  onSaveContent?: (content: string) => Promise<void>;
+  documentSession?: EditorDocumentSession | null;
 };
 
 /** @deprecated Prefer PresetViewerRenderContext. */

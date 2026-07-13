@@ -1,5 +1,11 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import type { AppPreviewController, DataNode, FileContent, OfficeDocumentConverter } from "../core/types";
+import type {
+  AppPreviewController,
+  DataNode,
+  DocumentPersistencePort,
+  FileContent,
+  OfficeDocumentConverter,
+} from "../core/types";
 import { EditorHost } from "../editor/EditorHost";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
 import type {
@@ -11,6 +17,7 @@ import type {
 import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
 import type { AiEditFile } from "../editor/ai-edits/types";
 import { FilePreviewIcon, type FileIconThemeId } from "../file/fileIcons";
+import type { DocumentPersistedCommit } from "../editor/document-session/types";
 
 export type FilePreviewProps = {
   node: DataNode | null;
@@ -25,7 +32,8 @@ export type FilePreviewProps = {
   emptySlot?: ReactNode;
   actionSlot?: ReactNode | ((node: DataNode) => ReactNode);
   renderBody?: (node: DataNode, context: FilePreviewBodyContext) => ReactNode;
-  onSaveContent?: (content: string) => Promise<void>;
+  documentPersistence?: DocumentPersistencePort | null;
+  onDocumentPersisted?: (commit: DocumentPersistedCommit) => void;
   hideSourceView?: boolean;
   fileIconTheme?: FileIconThemeId;
   editorSaveMode?: EditorSaveMode;
@@ -48,7 +56,8 @@ export type FilePreviewBodyContext = {
   fileUrlError: string | null;
   loading: boolean;
   error: string | null;
-  onSaveContent?: (content: string) => Promise<void>;
+  documentPersistence: DocumentPersistencePort | null;
+  onDocumentPersisted?: (commit: DocumentPersistedCommit) => void;
 };
 
 export function FilePreview({
@@ -64,7 +73,8 @@ export function FilePreview({
   emptySlot,
   actionSlot,
   renderBody,
-  onSaveContent,
+  documentPersistence = null,
+  onDocumentPersisted,
   hideSourceView = false,
   fileIconTheme = "default",
   editorSaveMode = "manual",
@@ -98,7 +108,8 @@ export function FilePreview({
     fileUrlError,
     loading,
     error,
-    onSaveContent,
+    documentPersistence,
+    onDocumentPersisted,
   };
   const customBody = renderBody?.(node, bodyContext);
 
@@ -141,7 +152,8 @@ export function FilePreview({
               loading={loading}
               error={error}
               aiEditFile={aiEditFile}
-              onSaveContent={onSaveContent}
+              documentPersistence={documentPersistence}
+              onDocumentPersisted={onDocumentPersisted}
               hideSourceView={hideSourceView}
               fileIconTheme={fileIconTheme}
               saveMode={editorSaveMode}

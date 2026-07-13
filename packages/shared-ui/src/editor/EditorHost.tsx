@@ -1,4 +1,10 @@
-import type { AppPreviewController, DataNode, FileContent, OfficeDocumentConverter } from "../core/types";
+import type {
+  AppPreviewController,
+  DataNode,
+  DocumentPersistencePort,
+  FileContent,
+  OfficeDocumentConverter,
+} from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import {
   PuppyoneEditorHost,
@@ -12,6 +18,7 @@ import type {
   MarkdownLinkGraph,
 } from "./viewerTypes";
 import type { ViewerExtensionHostAdapter } from "./viewerHostAdapters";
+import type { DocumentPersistedCommit } from "./document-session/types";
 
 export type EditorHostProps = {
   node: DataNode;
@@ -21,7 +28,8 @@ export type EditorHostProps = {
   fileUrlError?: string | null;
   loading?: boolean;
   error?: string | null;
-  onSaveContent?: (content: string) => Promise<void>;
+  documentPersistence?: DocumentPersistencePort | null;
+  onDocumentPersisted?: (commit: DocumentPersistedCommit) => void;
   aiEditFile?: AiEditFile | null;
   hideSourceView?: boolean;
   fileIconTheme?: FileIconThemeId;
@@ -47,7 +55,8 @@ export function EditorHost({
   fileUrlError = null,
   loading = false,
   error = null,
-  onSaveContent,
+  documentPersistence = null,
+  onDocumentPersisted,
   aiEditFile = null,
   hideSourceView = false,
   fileIconTheme = "default",
@@ -74,6 +83,7 @@ export function EditorHost({
         preview: deferFallbackContent ? undefined : node.preview,
         mimeType: fileContent?.mimeType ?? node.mimeType ?? null,
         url: fileContent?.url ?? fileUrl,
+        version: fileContent?.version ?? null,
         sourceKind: documentSourceKind,
       }}
       viewerExtensionAdapter={viewerExtensionAdapter}
@@ -81,7 +91,8 @@ export function EditorHost({
       error={error}
       fileUrlLoading={fileUrlLoading}
       fileUrlError={fileUrlError}
-      onSaveContent={onSaveContent}
+      documentPersistence={documentPersistence}
+      onDocumentPersisted={onDocumentPersisted}
       aiEditFile={aiEditFile}
       hideSourceView={hideSourceView}
       fileIconTheme={fileIconTheme}

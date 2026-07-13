@@ -58,18 +58,19 @@ the document content and editor instance are ready.
 
    Forced remounts create blank-frame windows and discard editor state too
    aggressively. Text editors receive an explicit `documentId` and reset their
-   local draft/save state in layout phase.
+   local draft/session attachment state in layout phase.
 
 4. Initialize DOM-owned editors before paint.
 
    CodeMirror setup and content reconfiguration must run in `useLayoutEffect`
    so the browser does not paint an empty host before the editor DOM is attached.
 
-5. Bind saving to the rendered document, not the selected document.
+5. Bind the Document Session to the rendered document, not the selected document.
 
    During a pending selection, the main area may still render the previous
-   committed document. Save callbacks must write to the document currently being
-   rendered, not whichever file is currently highlighted in the sidebar.
+   committed document. The session and its persistence acknowledgement must
+   remain bound to the document currently rendered, not whichever file is
+   highlighted in the sidebar.
 
 6. Scope errors by document path.
 
@@ -82,15 +83,19 @@ the document content and editor instance are ready.
   - owns selected file resolution
   - owns file content cache
   - owns committed preview document state
-  - binds save callbacks to the rendered document
+  - binds persistence acknowledgement to the rendered document
 
 - `packages/shared-ui/src/data/FilePreview.tsx`
   - renders the current preview shell
   - avoids fallback preview content while full content is pending
 
 - `packages/shared-ui/src/editor/viewers/TextEditorFrame.tsx`
-  - owns text editor draft, persisted content, save state, and mode state
+  - owns text editor draft, mode state, and editor snapshot attachment
   - resets by `documentId` without forcing a React remount
+
+- `packages/shared-ui/src/editor/document-session/DocumentEditingSession.ts`
+  - owns dirty/save status, scheduling, version state, and serialized writes
+  - flushes the exact rendered document on switch/destroy through one queue
 
 - `packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor.tsx`
   - owns the CodeMirror `EditorView`
@@ -126,4 +131,7 @@ These invariants should remain true after future changes:
 - No viewer should show an unstyled browser-white fallback during normal
   transitions.
 - Text editors reset by document identity, not by React subtree destruction.
-- Autosave must never write old document content to a newly selected path.
+- Session persistence must never write old document content to a newly selected path.
+
+The authoritative persistence and plugin boundary is documented in
+[`document-editing-persistence.md`](./document-editing-persistence.md).

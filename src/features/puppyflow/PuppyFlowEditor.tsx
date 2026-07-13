@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent as ReactDragEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { DataNode, FileContent } from "@puppyone/shared-ui";
+import {
+  useDocumentSessionState,
+  type DataNode,
+  type EditorDocumentSession,
+  type FileContent,
+} from "@puppyone/shared-ui";
 import {
   Copy,
   Folder,
@@ -28,14 +33,12 @@ type PuppyFlowEditorProps = {
   workspacePath?: string | null;
   loading?: boolean;
   error?: string | null;
-  onSaveContent?: (content: string) => Promise<void>;
+  documentSession?: EditorDocumentSession | null;
 };
 
-type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 type StepDropPosition = "before" | "after";
 type StepDropTarget = { stepId: string; position: StepDropPosition } | null;
 
-const SAVE_DEBOUNCE_MS = 450;
 const STEP_DRAG_MIME_TYPE = "application/x-puppyflow-step-id";
 
 export function PuppyFlowEditor({
@@ -44,7 +47,7 @@ export function PuppyFlowEditor({
   workspacePath,
   loading = false,
   error = null,
-  onSaveContent,
+  documentSession = null,
 }: PuppyFlowEditorProps) {
   const fallbackTitle = getTitleFromFilename(node.name);
   const parsed = useMemo(
@@ -53,66 +56,78 @@ export function PuppyFlowEditor({
   );
   const [document, setDocument] = useState<PuppyFlowDocument>(parsed.document);
   const [parseError, setParseError] = useState<string | null>(parsed.ok ? null : parsed.error);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [draggedStepId, setDraggedStepId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<StepDropTarget>(null);
   const workdirLabel = useMemo(() => formatWorkspacePath(workspacePath), [workspacePath]);
-  const saveTimerRef = useRef<number | null>(null);
   const latestDocumentRef = useRef<PuppyFlowDocument>(parsed.document);
+  const sourceContentRef = useRef(fileContent?.content ?? "");
+  const documentPathRef = useRef(node.path);
+  const revisionCounterRef = useRef(0);
+  const revisionRef = useRef(createPuppyFlowRevision(node.path, 0));
   const draggedStepIdRef = useRef<string | null>(null);
+  const sessionState = useDocumentSessionState(documentSession);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const pathChanged = documentPathRef.current !== node.path;
+    const source = fileContent?.content ?? "";
+    const reconciliation = documentSession?.reconcileExternalBaseline(
+      source,
+      fileContent?.version ?? null,
+    ) ?? "applied";
+    if (!pathChanged && reconciliation !== "applied") return;
+
+    documentPathRef.current = node.path;
+    revisionCounterRef.current = 0;
+    revisionRef.current = createPuppyFlowRevision(node.path, 0);
     setDocument(parsed.document);
     latestDocumentRef.current = parsed.document;
+    sourceContentRef.current = source;
     setParseError(parsed.ok ? null : parsed.error);
-    setSaveState("idle");
-    setSaveError(null);
     setRunMessage(null);
-  }, [node.path, parsed]);
+  }, [documentSession, fileContent?.content, fileContent?.version, node.path, parsed]);
 
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current !== null) {
-        window.clearTimeout(saveTimerRef.current);
-      }
+  useLayoutEffect(() => {
+    if (!documentSession) return undefined;
+    const source = {
+      readSnapshot: () => ({
+        content: sourceContentRef.current,
+        revision: revisionRef.current,
+      }),
+      readRevision: () => revisionRef.current,
     };
-  }, []);
+    const detach = documentSession.attachSource(source);
+    documentSession.reportRevision({
+      revision: revisionRef.current,
+      dirty: source.readSnapshot().content !== documentSession.getPersistedContent(),
+    });
+    return () => {
+      const snapshot = source.readSnapshot();
+      detach();
+      void documentSession.flushSnapshot(snapshot, "destroy").catch(() => undefined);
+    };
+  }, [documentSession, node.path]);
 
-  const persistDocument = useCallback(async (nextDocument: PuppyFlowDocument) => {
-    if (!onSaveContent) return;
-    setSaveState("saving");
-    setSaveError(null);
-    try {
-      await onSaveContent(serializePuppyFlowDocument(nextDocument));
-      setSaveState("saved");
-    } catch (saveFailure) {
-      setSaveState("error");
-      setSaveError(saveFailure instanceof Error ? saveFailure.message : String(saveFailure));
-    }
-  }, [onSaveContent]);
-
-  const scheduleSave = useCallback((nextDocument: PuppyFlowDocument) => {
+  const applyDocumentEdit = useCallback((nextDocument: PuppyFlowDocument) => {
+    const nextSource = serializePuppyFlowDocument(nextDocument);
     latestDocumentRef.current = nextDocument;
+    sourceContentRef.current = nextSource;
     setDocument(nextDocument);
     setParseError(null);
     setRunMessage(null);
-    if (!onSaveContent) return;
-
-    setSaveState("dirty");
-    if (saveTimerRef.current !== null) {
-      window.clearTimeout(saveTimerRef.current);
+    revisionCounterRef.current += 1;
+    revisionRef.current = createPuppyFlowRevision(node.path, revisionCounterRef.current);
+    if (documentSession) {
+      documentSession.reportRevision({
+        revision: revisionRef.current,
+        dirty: nextSource !== documentSession.getPersistedContent(),
+      });
     }
-    saveTimerRef.current = window.setTimeout(() => {
-      saveTimerRef.current = null;
-      void persistDocument(latestDocumentRef.current);
-    }, SAVE_DEBOUNCE_MS);
-  }, [onSaveContent, persistDocument]);
+  }, [documentSession, node.path]);
 
   const updateDocument = useCallback((updater: (current: PuppyFlowDocument) => PuppyFlowDocument) => {
-    scheduleSave(updater(latestDocumentRef.current));
-  }, [scheduleSave]);
+    applyDocumentEdit(updater(latestDocumentRef.current));
+  }, [applyDocumentEdit]);
 
   const updateStep = useCallback((stepId: string, patch: Partial<PuppyFlowStep>) => {
     updateDocument((current) => ({
@@ -188,11 +203,7 @@ export function PuppyFlowEditor({
   }, []);
 
   const handleRun = useCallback(() => {
-    if (saveTimerRef.current !== null) {
-      window.clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-      void persistDocument(latestDocumentRef.current);
-    }
+    void documentSession?.requestSave("manual").catch(() => undefined);
 
     const compiled = compilePuppyFlowRun(latestDocumentRef.current);
     if (compiled.enabledSteps === 0) {
@@ -201,12 +212,12 @@ export function PuppyFlowEditor({
     }
 
     setRunMessage(null);
-  }, [persistDocument]);
+  }, [documentSession]);
 
   const resetInvalidFile = useCallback(() => {
     const nextDocument = createDefaultPuppyFlowDocument(fallbackTitle);
-    scheduleSave(nextDocument);
-  }, [fallbackTitle, scheduleSave]);
+    applyDocumentEdit(nextDocument);
+  }, [applyDocumentEdit, fallbackTitle]);
 
   if (loading && !fileContent) {
     return (
@@ -232,9 +243,9 @@ export function PuppyFlowEditor({
       </button>
 
       <div className="puppyflow-document">
-        {(saveState === "error" && saveError) || runMessage ? (
+        {sessionState.error || runMessage ? (
           <div className="puppyflow-toolbar-status" role="status">
-            {saveState === "error" && saveError ? saveError : runMessage}
+            {sessionState.error ?? runMessage}
           </div>
         ) : null}
 
@@ -469,6 +480,10 @@ function getTitleFromFilename(name: string): string {
 function formatWorkspacePath(workspacePath?: string | null): string {
   if (!workspacePath) return "Workspace sandbox";
   return workspacePath.replace(/^\/Users\/[^/]+/, "~");
+}
+
+function createPuppyFlowRevision(documentPath: string, sequence: number): string {
+  return `puppyflow:${documentPath}:${sequence}`;
 }
 
 function workspacePathTitle(workdirLabel: string): string {
