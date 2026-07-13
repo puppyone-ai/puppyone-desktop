@@ -13,6 +13,10 @@ import { getDocRevision, type CommitResult } from "../../platform/brokers/transa
 import { estimateCodeBlockLayoutHeight } from "./codeBlockLayout";
 import { normalizeLineEndings, stopCodeMirrorEvent } from "../../shared/widgets/widgetDom";
 import { getMarkdownLocalization } from "../../core/editor/markdownLocalization";
+import {
+  MARKDOWN_RICH_BLOCK_EXECUTION,
+  type MarkdownMountedBlockExecution,
+} from "../../core/plans/markdownBlockExecution";
 
 /**
  * Immutable descriptor. Mounted listeners and draft commit ownership live in
@@ -26,6 +30,7 @@ export class CodeBlockWidget extends WidgetType {
     private readonly to: number,
     private readonly sourceReference: MarkdownCodeSourceReference | null = null,
     private readonly layoutEstimatedHeight = estimateCodeBlockLayoutHeight(code),
+    private readonly execution: MarkdownMountedBlockExecution = MARKDOWN_RICH_BLOCK_EXECUTION,
   ) {
     super();
   }
@@ -38,6 +43,8 @@ export class CodeBlockWidget extends WidgetType {
       widget.from === this.from &&
       widget.to === this.to &&
       widget.layoutEstimatedHeight === this.layoutEstimatedHeight &&
+      widget.execution.mode === this.execution.mode &&
+      widget.execution.budgetVersion === this.execution.budgetVersion &&
       codeSourceReferencesEqual(widget.sourceReference, this.sourceReference)
     );
   }

@@ -12,6 +12,7 @@ import {
 import { markdownLivePreviewContextExtension } from "./core/editor/markdownLivePreviewContext";
 import { markdownAiEditExtension } from "./core/editor/markdownAiEditExtension";
 import { markdownBlockDragExtension } from "./core/interaction/markdownBlockDrag";
+import { getMarkdownPlanIndex } from "./core/plans/markdownPlanIndex";
 import { getDocRevision } from "./platform/brokers/transactionBroker";
 import type { AiEditFile } from "../ai-edits/types";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
@@ -280,6 +281,7 @@ export function MarkdownCodeMirrorEditor({
     const generation = previewGenerationRef.current;
     let cancelled = false;
     let languageTask: CancellableRendererTask | null = null;
+    let planTask: CancellableRendererTask | null = null;
     let previewTask: CancellableRendererTask | null = null;
     let readyFrame: number | null = null;
 
@@ -336,42 +338,64 @@ export function MarkdownCodeMirrorEditor({
       }
       if (!livePreview) return;
 
-      previewTask = scheduleRendererTask(() => {
-        previewTask = null;
+      // Plan normalization can be a meaningful share of first-open work for a
+      // feature-dense document. Populate the revision/tree-scoped plan cache
+      // in its own renderer task so installing the geometry-sensitive
+      // projection never combines semantic compilation and DOM decoration in
+      // one Long Task. The next task consumes this exact cache entry; a syntax
+      // tree or source revision change invalidates it through the index itself.
+      planTask = scheduleRendererTask(() => {
+        planTask = null;
         if (!isCurrent()) return;
-        const context = livePreviewContextRef.current;
-        previewActivatedRef.current = true;
-        const previewStartedAt = performance.now();
+        const planStartedAt = performance.now();
         try {
-          view.dispatch({
-            effects: [
-              livePreviewContextCompartmentRef.current.reconfigure(
-                markdownLivePreviewContextExtension(
-                  context.htmlTrustMode,
-                  context.markdownLinkGraph,
-                  context.documentPath,
-                  context.markdownAssetUrlResolver,
-                  context.workspaceId,
-                  context.workspaceRoot,
-                ),
-              ),
-              livePreviewCoreCompartmentRef.current.reconfigure(
-                markdownLivePreviewCoreExtension(),
-              ),
-              blockDragCompartmentRef.current.reconfigure(
-                blockDragEnabledRef.current ? markdownBlockDragExtension() : [],
-              ),
-            ],
-          });
+          getMarkdownPlanIndex(view.state);
         } catch (error) {
           failPreview(error);
           return;
         }
         rendererPerformance.recordOperation(
-          "markdown_preview_activate",
-          performance.now() - previewStartedAt,
+          "markdown_plan_precompute",
+          performance.now() - planStartedAt,
         );
-        confirmPreviewPaint();
+
+        previewTask = scheduleRendererTask(() => {
+          previewTask = null;
+          if (!isCurrent()) return;
+          const context = livePreviewContextRef.current;
+          previewActivatedRef.current = true;
+          const previewStartedAt = performance.now();
+          try {
+            view.dispatch({
+              effects: [
+                livePreviewContextCompartmentRef.current.reconfigure(
+                  markdownLivePreviewContextExtension(
+                    context.htmlTrustMode,
+                    context.markdownLinkGraph,
+                    context.documentPath,
+                    context.markdownAssetUrlResolver,
+                    context.workspaceId,
+                    context.workspaceRoot,
+                  ),
+                ),
+                livePreviewCoreCompartmentRef.current.reconfigure(
+                  markdownLivePreviewCoreExtension(),
+                ),
+                blockDragCompartmentRef.current.reconfigure(
+                  blockDragEnabledRef.current ? markdownBlockDragExtension() : [],
+                ),
+              ],
+            });
+          } catch (error) {
+            failPreview(error);
+            return;
+          }
+          rendererPerformance.recordOperation(
+            "markdown_preview_activate",
+            performance.now() - previewStartedAt,
+          );
+          confirmPreviewPaint();
+        });
       });
     });
 
@@ -379,6 +403,7 @@ export function MarkdownCodeMirrorEditor({
       cancelled = true;
       previewActivatedRef.current = false;
       languageTask?.cancel();
+      planTask?.cancel();
       previewTask?.cancel();
       if (readyFrame !== null) window.cancelAnimationFrame(readyFrame);
     };

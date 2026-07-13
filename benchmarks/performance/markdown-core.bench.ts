@@ -7,6 +7,8 @@ import {
 import { createMarkdownLinkGraph } from "../../packages/shared-ui/src/editor/markdown/core/links/markdownLinkGraph";
 import { requestMarkdownProjectionRange } from "../../packages/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
 import { markdownLivePreviewFocusEffect } from "../../packages/shared-ui/src/editor/markdown/core/state/livePreviewFocus";
+import { MarkdownBlockVirtualizer } from "../../packages/shared-ui/src/editor/markdown/platform/codemirror/blockVirtualizer";
+import { MARKDOWN_TABLE_MODEL_ROW_LIMIT } from "../../packages/shared-ui/src/editor/markdown/core/plans/markdownBlockExecution";
 import {
   makeFeatureHeavyMarkdown,
   makeLinkGraphDocuments,
@@ -33,6 +35,8 @@ const syntheticLinkCorpora = new Map(
   [20, 100, 300].map((lineCount) => [lineCount, makeLinkGraphDocuments(250, lineCount)]),
 );
 const featureHeavyDocument = makeFeatureHeavyMarkdown(240);
+const windowedTableDocument = makeOversizedTable(1_000);
+const sourceFallbackTableDocument = makeOversizedTable(MARKDOWN_TABLE_MODEL_ROW_LIMIT + 1);
 
 describe("Markdown EditorState construction", () => {
   bench(
@@ -128,6 +132,23 @@ describe("Markdown incremental projection", () => {
   );
 });
 
+describe("Markdown oversized-block execution", () => {
+  bench("windowed table plan · 1000 rows", () => {
+    createLivePreviewState(windowedTableDocument);
+  }, BENCHMARK_OPTIONS);
+
+  bench(`table visible-source fallback · ${MARKDOWN_TABLE_MODEL_ROW_LIMIT + 1} rows`, () => {
+    createLivePreviewState(sourceFallbackTableDocument);
+  }, BENCHMARK_OPTIONS);
+
+  const virtualizer = new MarkdownBlockVirtualizer(5_000, (index) => 31 + (index % 5));
+  let offset = 0;
+  bench("variable-height nested range lookup · 5000 rows", () => {
+    offset = (offset + 997) % Math.max(1, virtualizer.getTotalSize() - 800);
+    virtualizer.getRange(offset, offset + 800, 8, [2_500]);
+  }, BENCHMARK_OPTIONS);
+});
+
 function formatBytes(source: string): string {
   return `${Math.round(Buffer.byteLength(source) / 1024)} KiB`;
 }
@@ -204,4 +225,12 @@ function createTaskToggleHarness(source: string, requestedPosition: number) {
       }).state;
     },
   };
+}
+
+function makeOversizedTable(bodyRowCount: number): string {
+  return [
+    "| Name | Value |",
+    "| --- | ---: |",
+    ...Array.from({ length: bodyRowCount }, (_, index) => `| row ${index} | ${index} |`),
+  ].join("\n");
 }

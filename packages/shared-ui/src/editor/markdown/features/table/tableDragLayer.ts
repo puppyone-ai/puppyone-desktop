@@ -70,7 +70,9 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
   let disposed = false;
   let ownedMenu: HTMLElement | null = null;
 
-  const getBodyRowElements = () => Array.from(context.table.querySelectorAll<HTMLTableRowElement>("tbody tr"));
+  const getBodyRowElements = () => Array.from(
+    context.table.querySelectorAll<HTMLTableRowElement>("tbody tr[data-md-table-row]"),
+  );
   const getHeaderCellElements = () => Array.from(context.table.querySelectorAll<HTMLTableCellElement>("thead th"));
 
   const setHandleVisible = (handle: HTMLElement, visible: boolean) => {
@@ -111,7 +113,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
 
     const bodyRow = hover.rowIndex == null || hover.rowIndex < 1
       ? null
-      : getBodyRowElements()[hover.rowIndex - 1] ?? null;
+      : getBodyRowElements().find((row) => Number(row.dataset.mdTableRow) === hover.rowIndex) ?? null;
     if (bodyRow && hover.rowIndex != null) {
       const rect = bodyRow.getBoundingClientRect();
       if (localization.direction === "rtl") {
@@ -139,7 +141,10 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
     const rowElement = cell.parentElement;
     if (!(rowElement instanceof HTMLTableRowElement)) return;
     const nextColumnIndex = cell.cellIndex;
-    const nextRowIndex = cell.tagName === "TH" ? 0 : getBodyRowElements().indexOf(rowElement) + 1;
+    const nextRowIndex = cell.tagName === "TH"
+      ? 0
+      : Number.parseInt(rowElement.dataset.mdTableRow ?? "", 10);
+    if (!Number.isInteger(nextRowIndex)) return;
     if (nextColumnIndex === hover.columnIndex && nextRowIndex === hover.rowIndex) return;
     hover.columnIndex = nextColumnIndex;
     hover.rowIndex = nextRowIndex;
@@ -167,6 +172,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
 
   const openHandleMenu = (kind: MarkdownTableDragKind, sourceIndex: number, handle: HTMLElement) => {
     closeActiveMarkdownTableMenu();
+    setInteractionPinnedRow(kind === "row" ? sourceIndex : hover.rowIndex);
     setDragSourceHighlight(kind, sourceIndex, true);
     handle.classList.add("is-menu-active");
     // The button is deliberately larger than the visible grip. Anchor menus
@@ -186,6 +192,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
         handle.classList.remove("is-menu-active");
         handle.setAttribute("aria-expanded", "false");
         handle.removeAttribute("aria-controls");
+        setInteractionPinnedRow(null);
         if (ownedMenu === nextMenu) ownedMenu = null;
         if (!disposed) positionHandles();
       },
@@ -200,7 +207,9 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
 
   const setDragSourceHighlight = (kind: MarkdownTableDragKind, sourceIndex: number, active: boolean) => {
     if (kind === "row") {
-      const row = getBodyRowElements()[sourceIndex - 1];
+      const row = getBodyRowElements().find(
+        (candidate) => Number(candidate.dataset.mdTableRow) === sourceIndex,
+      );
       if (!row) return;
       for (const cell of Array.from(row.cells)) {
         cell.classList.toggle("cm-md-table-drag-source", active);
@@ -231,9 +240,18 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
         dropIndicator.hidden = true;
         return;
       }
-      const y = boundary < bodyRows.length
-        ? bodyRows[boundary].getBoundingClientRect().top
-        : bodyRows[bodyRows.length - 1].getBoundingClientRect().bottom;
+      const nextRow = bodyRows.find(
+        (row) => Number(row.dataset.mdTableRow) - 1 === boundary,
+      );
+      const previousRow = bodyRows.find(
+        (row) => Number(row.dataset.mdTableRow) - 1 === boundary - 1,
+      );
+      const y = nextRow?.getBoundingClientRect().top
+        ?? previousRow?.getBoundingClientRect().bottom;
+      if (y == null) {
+        dropIndicator.hidden = true;
+        return;
+      }
       dropIndicator.hidden = false;
       dropIndicator.className = "cm-md-table-drop-indicator is-row";
       dropIndicator.style.left = `${tableRect.left - surfaceRect.left}px`;
@@ -282,6 +300,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
     let dropBoundary: number | null = null;
 
     hover.dragging = true;
+    setInteractionPinnedRow(kind === "row" ? sourceIndex : hover.rowIndex);
     handle.setPointerCapture(pointerId);
     setDragSourceHighlight(kind, sourceIndex, true);
 
@@ -305,9 +324,13 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
           moveEvent.clientX,
           localization.direction,
         )
-        : getMarkdownTableDropBoundary(getBodyRowElements().map((row) => {
+        : getMarkdownTableRowDropBoundary(getBodyRowElements().map((row) => {
           const rect = row.getBoundingClientRect();
-          return { start: rect.top, size: rect.height };
+          return {
+            bodyIndex: Number(row.dataset.mdTableRow) - 1,
+            start: rect.top,
+            size: rect.height,
+          };
         }), moveEvent.clientY);
       renderDropIndicator(kind, sourceIndex, dropBoundary);
     };
@@ -342,6 +365,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
       hover.dragging = false;
       handle.classList.remove("is-dragging");
       context.wrapper.classList.remove("is-table-dragging");
+      setInteractionPinnedRow(null);
       dropIndicator.hidden = true;
       if (!preserveSourceHighlight) setDragSourceHighlight(kind, sourceIndex, false);
       if (handle.hasPointerCapture(pointerId)) handle.releasePointerCapture(pointerId);
@@ -399,6 +423,14 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
   bindHandle(columnHandle, "column");
   bindHandle(rowHandle, "row");
 
+  const setInteractionPinnedRow = (rowIndex: number | null | undefined) => {
+    if (rowIndex != null && Number.isInteger(rowIndex) && rowIndex > 0) {
+      context.wrapper.dataset.mdTablePinnedRow = String(rowIndex);
+    } else {
+      delete context.wrapper.dataset.mdTablePinnedRow;
+    }
+  };
+
   return {
     element: layer,
     dispose() {
@@ -411,8 +443,20 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
         closeActiveMarkdownTableMenu();
       }
       ownedMenu = null;
+      setInteractionPinnedRow(null);
     },
   };
+}
+
+function getMarkdownTableRowDropBoundary(
+  segments: Array<{ bodyIndex: number; start: number; size: number }>,
+  pointer: number,
+): number | null {
+  if (segments.length === 0) return null;
+  for (const segment of segments) {
+    if (pointer < segment.start + segment.size / 2) return segment.bodyIndex;
+  }
+  return segments[segments.length - 1].bodyIndex + 1;
 }
 
 function createMarkdownTableHandleElement(

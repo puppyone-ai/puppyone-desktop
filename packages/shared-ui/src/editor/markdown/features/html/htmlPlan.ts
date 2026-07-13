@@ -8,6 +8,12 @@ import {
 import type { MarkdownElement } from "../../core/syntax/markdownElements";
 import { compileInlineHtmlRenderPlan } from "./inlineHtmlPolicy";
 import { estimateHtmlBlockLayoutHeight } from "./htmlBlockLayout";
+import {
+  createMarkdownBlockComplexity,
+  decideMarkdownBlockExecution,
+  getMarkdownBudgetFallbackMessage,
+  type MarkdownDocumentProfile,
+} from "../../core/plans/markdownBlockExecution";
 
 export function compileInlineHtmlElementPlan(
   element: Extract<MarkdownElement, { kind: "inlineHtml" }>,
@@ -63,6 +69,7 @@ export function compileInlineHtmlElementPlan(
 
 export function compileHtmlBlockElementPlan(
   element: MarkdownElement,
+  documentProfile: MarkdownDocumentProfile = "normal",
 ): MarkdownElementPlan {
   if (element.kind !== "htmlBlock") return visibleSourcePlan(rangeOf(element), []);
   const htmlData = element.blockData?.kind === "htmlBlock" ? element.blockData : null;
@@ -70,6 +77,20 @@ export function compileHtmlBlockElementPlan(
     return visibleSourcePlan(rangeOf(element), [
       { code: "htmlBlock.missing-data", message: "HTML block data unavailable" },
     ]);
+  }
+
+  const complexity = createMarkdownBlockComplexity(htmlData.source, {
+    logicalItems: htmlData.metrics.logicalItems,
+    estimatedDomNodes: htmlData.metrics.estimatedDomNodes,
+    nestingDepth: htmlData.metrics.nestingDepth,
+    assetCount: htmlData.metrics.assetCount,
+  });
+  const execution = decideMarkdownBlockExecution("htmlBlock", complexity, documentProfile);
+  if (execution.mode === "visibleSource") {
+    return visibleSourcePlan(rangeOf(element), [{
+      code: "htmlBlock.render-budget",
+      message: getMarkdownBudgetFallbackMessage("htmlBlock", execution),
+    }]);
   }
 
   return {
@@ -81,6 +102,8 @@ export function compileHtmlBlockElementPlan(
       closed: htmlData.closed,
       source: htmlData.source,
     },
+    complexity,
+    execution,
     layout: { estimatedHeight: estimateHtmlBlockLayoutHeight(htmlData.source) },
     diagnostics: [],
     capabilities: BLOCK_EMBED_CAPABILITIES,

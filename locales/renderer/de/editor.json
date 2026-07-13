@@ -79,6 +79,8 @@
   "markdown.mermaid.editDiagram": "Diagrammquelltext bearbeiten",
   "markdown.mermaid.empty": "Leeres Mermaid-Diagramm",
   "markdown.mermaid.finishEditing": "Bearbeitung des Diagrammquelltexts abschließen",
+  "markdown.mermaid.largePreviewPaused": "Die Vorschau des großen Diagramms ist pausiert.",
+  "markdown.mermaid.renderDiagram": "Diagramm darstellen",
   "markdown.mermaid.renderFailed": "Dieses Mermaid-Diagramm konnte nicht dargestellt werden.",
   "markdown.mermaid.renderFailedDetail": "Dieses Mermaid-Diagramm konnte nicht dargestellt werden: {detail}",
   "markdown.mermaid.rendering": "Diagramm wird dargestellt…",

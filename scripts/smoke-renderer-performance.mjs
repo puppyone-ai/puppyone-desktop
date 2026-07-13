@@ -13,7 +13,9 @@ const tracePath = resolveOptionalPath(process.argv.slice(2), "--trace");
 const coldFirstOpen = process.argv.includes("--cold");
 const linkIndex = process.argv.includes("--with-link-index");
 const visible = process.argv.includes("--visible");
+const oversizedBlocks = !process.argv.includes("--skip-oversized-blocks");
 const sampleTarget = coldFirstOpen ? 1 : tracePath ? 3 : 30;
+const statusPath = process.env.PUPPYONE_RENDERER_SMOKE_STATUS_PATH || null;
 const tempRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "puppyone-renderer-performance-"));
 app.setPath("userData", path.join(tempRoot, "user-data"));
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
@@ -45,7 +47,7 @@ async function runSmoke() {
     },
   });
   await window.loadURL(
-    `${pathToFileURL(indexPath).toString()}?rendererPerformanceSamples=${sampleTarget}&rendererPerformanceCold=${coldFirstOpen}&rendererPerformanceLinkIndex=${linkIndex}#renderer-performance-smoke`,
+    `${pathToFileURL(indexPath).toString()}?rendererPerformanceSamples=${sampleTarget}&rendererPerformanceCold=${coldFirstOpen}&rendererPerformanceLinkIndex=${linkIndex}&rendererPerformanceOversizedBlocks=${oversizedBlocks}#renderer-performance-smoke`,
   );
 
   const summary = await pollForResult(window);
@@ -67,6 +69,7 @@ async function runSmoke() {
       coldFirstOpen,
       linkIndex,
       visible,
+      oversizedBlocks,
     },
     summary,
   };
@@ -125,6 +128,21 @@ function validateReport(report) {
   if (summary.longTasks.over50ms > 0) {
     throw new Error(`Observed ${summary.longTasks.over50ms} renderer long tasks over 50ms.`);
   }
+  if (report.environment.oversizedBlocks) {
+    const table = summary.structural?.oversizedTable;
+    if (!table) throw new Error("Oversized-table structural result is missing.");
+    if (table.logicalRows !== 1_001) {
+      throw new Error(`Expected 1001 logical table rows, received ${table.logicalRows}.`);
+    }
+    if (table.mountedRowsInitial > 80 || table.mountedRowsAfterScroll > 80) {
+      throw new Error(
+        `Oversized-table DOM bound exceeded 80 rows (${table.mountedRowsInitial}/${table.mountedRowsAfterScroll}).`,
+      );
+    }
+    if (table.virtualStartAfterScroll <= 0) {
+      throw new Error("Oversized-table row window did not advance after document scrolling.");
+    }
+  }
 }
 
 function resolveOutputPath(args) {
@@ -139,14 +157,21 @@ function resolveOptionalPath(args, flag) {
   return requested ? path.resolve(requested) : null;
 }
 
-async function finish() {
+async function finish(exitCode, error = null) {
+  if (statusPath) {
+    await fsp.writeFile(statusPath, `${JSON.stringify({
+      exitCode,
+      error: error instanceof Error ? error.stack || error.message : error ? String(error) : null,
+    })}\n`, "utf8");
+  }
+  // Publish before destroying the last BrowserWindow: on macOS the Electron
+  // process may terminate its lifecycle before later asynchronous work runs.
   window?.destroy();
   await fsp.rm(tempRoot, { recursive: true, force: true }).catch(() => undefined);
-  app.quit();
+  app.exit(exitCode);
 }
 
-app.whenReady().then(runSmoke).then(finish).catch(async (error) => {
+app.whenReady().then(runSmoke).then(() => finish(0)).catch(async (error) => {
   console.error(error);
-  process.exitCode = 1;
-  await finish();
+  await finish(1, error);
 });
