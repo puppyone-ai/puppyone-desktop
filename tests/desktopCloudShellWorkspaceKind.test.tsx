@@ -39,4 +39,26 @@ describe("DesktopCloudShell workspace-aware titlebar", () => {
       ).toBe(workspaceKind);
     },
   );
+
+  it("replaces the persistent titlebar with the supplied Minimal Mode dock", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(
+      <DesktopCloudShell
+        minimalMode
+        minimalModeDock={<div data-testid="minimal-dock">Dock</div>}
+        workspaceKind="local"
+      >
+        <div>Workspace content</div>
+      </DesktopCloudShell>,
+    ));
+
+    expect(container.querySelector(".desktop-titlebar")).toBeNull();
+    expect(container.querySelector(".desktop-shell")?.classList.contains("is-minimal-mode")).toBe(true);
+    expect(container.querySelector(".desktop-minimal-mode-drag-region")).not.toBeNull();
+    expect(container.querySelector('[data-testid="minimal-dock"]')?.textContent).toBe("Dock");
+    expect(container.textContent).toContain("Workspace content");
+  });
 });

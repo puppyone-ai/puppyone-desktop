@@ -4,6 +4,7 @@
 @import "./styles/animations.css";
 @import "./styles/shell.css";
 @import "./styles/titlebar.css";
+@import "./styles/minimal-mode.css";
 @import "./styles/dialogs.css";
 @import "./styles/layout.css";
 @import "./styles/project-folder-card.css";

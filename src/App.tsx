@@ -50,6 +50,7 @@ import {
   mergePuppyoneWorkspaceConfig,
 } from "./features/app-shell/preferences";
 import { DesktopTitlebarContext } from "./features/app-shell/DesktopTitlebarContext";
+import { DesktopMinimalModeDock } from "./features/app-shell/DesktopMinimalModeDock";
 import { DesktopWorkspaceContent } from "./features/app-shell/DesktopWorkspaceContent";
 import { DesktopTitlebarActions } from "./features/app-shell/DesktopTitlebarActions";
 import { DesktopOverlayPortal } from "./features/app-shell/DesktopOverlayPortal";
@@ -202,6 +203,7 @@ export function App() {
     setSidebarNavigationLayout,
     setThemeMode,
   } = preferences;
+  const minimalMode = experimentalSettings.enableMinimalMode;
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
     available: assetLibraryHomeAvailable,
     optedIn: experimentalSettings.enableAssetLibraryHome,
@@ -1190,9 +1192,33 @@ export function App() {
     />
   );
 
+  const minimalModeDock = minimalMode ? (
+    <DesktopMinimalModeDock
+      activeView={activeView}
+      cloudHubEnabled={cloudEnabled && !workspaceIsCloud}
+      cloudToolsEnabled={cloudEnabled && workspaceIsCloud && Boolean(effectiveCloudProjectId)}
+      contextMenuOpen={switcherOpen || branchSwitcherOpen}
+      contextSlot={titlebarSlot}
+      pluginsEnabled={
+        experimentalSettings.enableViewerPlugins
+        && !workspaceIsCloud
+        && preferences.sidebarNavigationVisibilitySettings.enabled.plugins
+      }
+      titlebarActions={titlebarActions}
+      workspaceKind={workspaceIsCloud ? "cloud" : "local"}
+      workspaceSurfaceAction={workspaceSurfaceAction}
+      onNavigate={navigateDesktopView}
+      onExitMinimalMode={() => preferences.setExperimentalSettings({
+        ...experimentalSettings,
+        enableMinimalMode: false,
+      })}
+    />
+  ) : undefined;
+
   return (
     <div
       className={`app-shell cloud-runtime ${resolvedTheme === "dark" ? "dark" : ""}`}
+      data-minimal-mode={minimalMode ? "true" : undefined}
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
@@ -1202,6 +1228,8 @@ export function App() {
       {...typographyRootProps}
     >
       <DesktopCloudShell
+        minimalMode={minimalMode}
+        minimalModeDock={minimalModeDock}
         workspaceKind={workspaceIsCloud ? "cloud" : "local"}
         titlebarSlot={titlebarSlot}
         titlebarActions={titlebarActions}
@@ -1232,6 +1260,7 @@ export function App() {
                 <RightAgentPanel
                   workspace={workspace}
                   active={rightSidebarOpen && rightSidebarSurface === "chat"}
+                  minimalMode={minimalMode}
                   preferredModel={agentPreferredModel}
                   onPreferredModelChange={setAgentPreferredModel}
                   onViewChanges={() => {
@@ -1293,6 +1322,7 @@ export function App() {
           dataPort={dataPort}
           desktopUpdates={desktopUpdates}
           git={git}
+          minimalMode={minimalMode}
           onActiveDataNodeChange={setActiveDataNode}
           onActiveDataPathChange={handleActiveDataPathChange}
           onCreateEntryMenu={openCreateEntryMenu}

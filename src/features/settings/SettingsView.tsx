@@ -808,6 +808,23 @@ function ExperimentalSettingsView({
           <div className="desktop-settings-list">
             <div className="desktop-settings-row desktop-settings-row-control">
               <span className="desktop-settings-label-stack">
+                <strong>Minimal Mode</strong>
+                <small>Replace persistent app chrome with one centered hover dock while keeping project, Git, Chat, and Terminal actions available.</small>
+              </span>
+              <label className="desktop-settings-switch">
+                <input
+                  type="checkbox"
+                  checked={settings.enableMinimalMode}
+                  onChange={(event) => onChange({
+                    ...settings,
+                    enableMinimalMode: event.target.checked,
+                  })}
+                />
+                <span aria-hidden="true" />
+              </label>
+            </div>
+            <div className="desktop-settings-row desktop-settings-row-control">
+              <span className="desktop-settings-label-stack">
                 <strong>Viewer plugins</strong>
                 <small>Enable the experimental local-only Plugins page and its optional navigation shortcut.</small>
               </span>

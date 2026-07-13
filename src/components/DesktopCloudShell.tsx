@@ -14,6 +14,8 @@ type DesktopCloudShellProps = {
   workspaceKind: DesktopWorkspaceKind;
   titlebarSlot?: ReactNode;
   titlebarActions?: ReactNode;
+  minimalMode?: boolean;
+  minimalModeDock?: ReactNode;
   rightSidebar?: ReactNode;
   rightSidebarOpen?: boolean;
   rightSidebarWidth?: number;
@@ -28,6 +30,8 @@ export function DesktopCloudShell({
   workspaceKind,
   titlebarSlot,
   titlebarActions,
+  minimalMode = false,
+  minimalModeDock,
   rightSidebar,
   rightSidebarOpen = false,
   rightSidebarWidth,
@@ -91,18 +95,25 @@ export function DesktopCloudShell({
   );
 
   return (
-    <div className="desktop-shell">
-      <header className="desktop-titlebar" data-workspace-kind={workspaceKind}>
-        <div className="desktop-titlebar-left">
-          {titlebarSlot}
-        </div>
-        <div className="desktop-titlebar-drag-fill" aria-hidden="true" />
-        {titlebarActions && (
-          <div className="desktop-titlebar-actions">
-            {titlebarActions}
+    <div className={`desktop-shell ${minimalMode ? "is-minimal-mode" : ""}`}>
+      {minimalMode ? (
+        <>
+          <div className="desktop-minimal-mode-drag-region" aria-hidden="true" />
+          {minimalModeDock}
+        </>
+      ) : (
+        <header className="desktop-titlebar" data-workspace-kind={workspaceKind}>
+          <div className="desktop-titlebar-left">
+            {titlebarSlot}
           </div>
-        )}
-      </header>
+          <div className="desktop-titlebar-drag-fill" aria-hidden="true" />
+          {titlebarActions && (
+            <div className="desktop-titlebar-actions">
+              {titlebarActions}
+            </div>
+          )}
+        </header>
+      )}
 
       <div className="desktop-shell-body">
         <main className="desktop-surface">

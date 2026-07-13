@@ -8,6 +8,7 @@ type AgentComposerProps = {
   draft: string;
   onDraftChange: (draft: string) => void;
   disabled: boolean;
+  hideConfiguration?: boolean;
   inputDisabled?: boolean;
   running: boolean;
   stopping: boolean;
@@ -50,6 +51,7 @@ export function AgentComposer({
   draft,
   onDraftChange,
   disabled,
+  hideConfiguration = false,
   inputDisabled = false,
   running,
   stopping,
@@ -230,27 +232,31 @@ export function AgentComposer({
           />
           <input ref={fileInputRef} className="desktop-agent-visually-hidden" type="file" multiple tabIndex={-1} onChange={(event) => acceptFiles(event.target.files)} />
           <div className="desktop-agent-composer-trailing">
-            <div className="desktop-agent-composer-picker is-provider">
-              <AgentProviderPicker
-                providers={providers}
-                localConnections={localConnections}
-                localConnectionsPhase={localConnectionsPhase}
-                localConnectionsError={localConnectionsError}
-                selectedProviderId={selectedProviderId}
-                disabled={running}
-                onSelectProvider={(providerId) => onSelectProvider?.(providerId)}
-                onDiscoverLocalConnections={onDiscoverLocalConnections}
-              />
-            </div>
-            {selectedProviderId && models.length > 0 && (
-              <div className="desktop-agent-composer-picker is-model">
-                <AgentModelPicker
-                  models={models}
-                  selectedModel={selectedModel}
-                  disabled={running}
-                  onSelectModel={(model) => onSelectModel?.(model)}
-                />
-              </div>
+            {!hideConfiguration && (
+              <>
+                <div className="desktop-agent-composer-picker is-provider">
+                  <AgentProviderPicker
+                    providers={providers}
+                    localConnections={localConnections}
+                    localConnectionsPhase={localConnectionsPhase}
+                    localConnectionsError={localConnectionsError}
+                    selectedProviderId={selectedProviderId}
+                    disabled={running}
+                    onSelectProvider={(providerId) => onSelectProvider?.(providerId)}
+                    onDiscoverLocalConnections={onDiscoverLocalConnections}
+                  />
+                </div>
+                {selectedProviderId && models.length > 0 && (
+                  <div className="desktop-agent-composer-picker is-model">
+                    <AgentModelPicker
+                      models={models}
+                      selectedModel={selectedModel}
+                      disabled={running}
+                      onSelectModel={(model) => onSelectModel?.(model)}
+                    />
+                  </div>
+                )}
+              </>
             )}
             {running && <button type="button" className="desktop-agent-composer-action is-stop" aria-label={stopping ? `Stopping ${runtimeLabel}` : `Stop ${runtimeLabel}`} disabled={stopping} onClick={onStop}><Square size={11} fill="currentColor" /></button>}
             {(!running || canSendWhileRunning) && <button type="button" className="desktop-agent-composer-action" aria-label={running && steerAvailable ? `Steer ${runtimeLabel}` : "Send message"} disabled={disabled || submitting || !draft.trim()} onClick={() => void submit()}><ArrowUp size={17} strokeWidth={2.2} /></button>}

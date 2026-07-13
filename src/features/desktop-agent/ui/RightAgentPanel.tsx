@@ -18,6 +18,7 @@ export type RightAgentPanelHandle = { newSession: () => void };
 type RightAgentPanelProps = {
   workspace: Workspace;
   active: boolean;
+  minimalMode?: boolean;
   onViewChanges?: () => void;
   onOpenTerminal?: () => void;
   onOpenFile?: (path: string) => void;
@@ -29,6 +30,7 @@ type RightAgentPanelProps = {
 export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanelProps>(function RightAgentPanel({
   workspace,
   active,
+  minimalMode = false,
   onViewChanges,
   onOpenTerminal,
   onOpenFile,
@@ -82,26 +84,28 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
           : "Ask anything";
 
   return (
-    <section className="desktop-agent-panel" aria-label={`${runtimeLabel} Chat`} data-phase={state.phase}>
-      <AgentSurfaceHeader
-        title={state.session?.title || "New chat"}
-        runtimeLabel={runtimeLabel}
-        statusLabel={state.session ? sessionStatusLabel(state.session.terminalState) : readinessLabel(readiness?.status)}
-        loading={loading}
-        newSessionDisabled={unavailable || !routingReady || Boolean(state.projection.runningTurnId)}
-        onNewSession={() => void controller.newSession()}
-        diagnostic={readiness?.diagnostic || (inspection?.warnings.length ? inspection.warnings.join(" ") : null)}
-        closeDisabled={!state.session || Boolean(state.projection.runningTurnId)}
-        history={state.history}
-        activeSessionId={state.session?.id}
-        onSelectSession={(sessionId) => void controller.switchSession(sessionId)}
-        onForkSession={capabilities?.fork ? () => void controller.forkSession() : undefined}
-        onArchiveSession={state.session ? () => void controller.archiveSession() : undefined}
-        onDeleteSession={state.session ? () => void controller.deleteSession() : undefined}
-        onCompactSession={capabilities?.compaction ? () => void controller.compactSession() : undefined}
-        canFork={Boolean(capabilities?.fork)}
-        canCompact={Boolean(capabilities?.compaction)}
-      />
+    <section className="desktop-agent-panel" aria-label={`${runtimeLabel} Chat`} data-minimal-mode={minimalMode ? "true" : undefined} data-phase={state.phase}>
+      {!minimalMode && (
+        <AgentSurfaceHeader
+          title={state.session?.title || "New chat"}
+          runtimeLabel={runtimeLabel}
+          statusLabel={state.session ? sessionStatusLabel(state.session.terminalState) : readinessLabel(readiness?.status)}
+          loading={loading}
+          newSessionDisabled={unavailable || !routingReady || Boolean(state.projection.runningTurnId)}
+          onNewSession={() => void controller.newSession()}
+          diagnostic={readiness?.diagnostic || (inspection?.warnings.length ? inspection.warnings.join(" ") : null)}
+          closeDisabled={!state.session || Boolean(state.projection.runningTurnId)}
+          history={state.history}
+          activeSessionId={state.session?.id}
+          onSelectSession={(sessionId) => void controller.switchSession(sessionId)}
+          onForkSession={capabilities?.fork ? () => void controller.forkSession() : undefined}
+          onArchiveSession={state.session ? () => void controller.archiveSession() : undefined}
+          onDeleteSession={state.session ? () => void controller.deleteSession() : undefined}
+          onCompactSession={capabilities?.compaction ? () => void controller.compactSession() : undefined}
+          canFork={Boolean(capabilities?.fork)}
+          canCompact={Boolean(capabilities?.compaction)}
+        />
+      )}
 
       {(unavailable || failed) && (
         <div className="desktop-agent-readiness" role="status">
@@ -163,6 +167,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         draft={state.draft}
         onDraftChange={(draft) => controller.setDraft(draft)}
         disabled={loading || unavailable || failed || !routingReady || state.projection.approvals.length > 0 || state.projection.questions.length > 0}
+        hideConfiguration={minimalMode && routingReady}
         running={Boolean(state.projection.runningTurnId)}
         stopping={state.stopping}
         submitting={state.submitting}

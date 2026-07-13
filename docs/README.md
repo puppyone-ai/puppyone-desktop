@@ -27,6 +27,7 @@ directly:
 - [Desktop Session, Workspace Identity, and Cache Lifecycle](architecture/desktop-session-workspace-cache-lifecycle.md)
 - [Desktop Auto Update Lifecycle](architecture/desktop-auto-update-lifecycle.md)
 - [Desktop Menu Surface](architecture/desktop-menu-surface.md)
+- [Desktop Minimal Mode](architecture/desktop-minimal-mode.md)
 - [Desktop Appearance Settings](architecture/desktop-appearance-settings.md)
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
 - [Desktop Agent Architecture](architecture/desktop-agent/README.md)

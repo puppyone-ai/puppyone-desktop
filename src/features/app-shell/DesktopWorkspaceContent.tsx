@@ -126,6 +126,7 @@ type DesktopWorkspaceContentProps = {
   fileClipboardController: FileClipboardController;
   desktopUpdates: DesktopUpdatesController;
   git: DesktopGitController;
+  minimalMode?: boolean;
   onActiveDataPathChange: (path: string | null, node?: DataNode | null) => void;
   onActiveDataNodeChange: (node: DataNode | null) => void;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
@@ -160,6 +161,7 @@ export function DesktopWorkspaceContent({
   fileClipboardController,
   desktopUpdates,
   git,
+  minimalMode = false,
   onActiveDataPathChange,
   onActiveDataNodeChange,
   onCreateEntryMenu,
@@ -543,7 +545,11 @@ export function DesktopWorkspaceContent({
   }
 
   return (
-    <div className="desktop-data-workspace-wrap" data-sidebar-navigation-placement={preferences.sidebarNavigationPlacement}>
+    <div
+      className="desktop-data-workspace-wrap"
+      data-minimal-mode={minimalMode ? "true" : undefined}
+      data-sidebar-navigation-placement={minimalMode ? undefined : preferences.sidebarNavigationPlacement}
+    >
       {workspaceSurfaceError && (
         <div className="desktop-workspace-surface-alert" role="status">
           {workspaceSurfaceError}
@@ -617,8 +623,8 @@ export function DesktopWorkspaceContent({
             </span>
           </button>
         }
-        showExplorerToolbar={preferences.sidebarNavigationPlacement === "top"}
-        explorerToolbarSlot={preferences.sidebarNavigationPlacement === "top" ? (
+        showExplorerToolbar={!minimalMode && preferences.sidebarNavigationPlacement === "top"}
+        explorerToolbarSlot={!minimalMode && preferences.sidebarNavigationPlacement === "top" ? (
           <DesktopSidebarTopNavigation
             activeView={resolvedActiveView}
             cloudHistoryEnabled={cloudWorkspace}
@@ -635,7 +641,7 @@ export function DesktopWorkspaceContent({
             onOpenSettings={onOpenSettings}
           />
         ) : undefined}
-        explorerRailSlot={preferences.sidebarNavigationPlacement === "left" ? (
+        explorerRailSlot={!minimalMode && preferences.sidebarNavigationPlacement === "left" ? (
           <DesktopSidebarRailNavigation
             activeView={resolvedActiveView}
             cloudHistoryEnabled={cloudWorkspace}
@@ -769,7 +775,7 @@ export function DesktopWorkspaceContent({
           </div>
         )}
         explorerFooterSlot={
-          preferences.sidebarNavigationPlacement === "bottom" ? (
+          !minimalMode && preferences.sidebarNavigationPlacement === "bottom" ? (
             <DesktopSidebarFooterNavigation
               activeView={resolvedActiveView}
               cloudHistoryEnabled={cloudWorkspace}

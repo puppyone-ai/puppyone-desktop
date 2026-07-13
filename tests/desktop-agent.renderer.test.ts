@@ -98,6 +98,30 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.querySelector('[role="menuitemradio"][aria-checked="true"]')?.textContent).toContain("Agent");
   });
 
+  it("hides configured Provider and Model labels in Minimal Mode without removing the composer", () => {
+    const container = render(React.createElement(AgentComposer, {
+      draft: "Continue",
+      onDraftChange: vi.fn(),
+      disabled: false,
+      hideConfiguration: true,
+      running: false,
+      stopping: false,
+      submitting: false,
+      placeholder: "Ask anything",
+      providers: [{ id: "openai", displayName: "OpenAI", modelCount: 1 }],
+      selectedProviderId: "openai",
+      models: [{ id: "openai/gpt", model: "openai/gpt", providerId: "openai", displayName: "GPT", description: "", isDefault: true }],
+      selectedModel: "openai/gpt",
+      onSubmit: vi.fn(async () => true),
+      onStop: vi.fn(),
+    }));
+
+    expect(container.querySelector('button[aria-label="Agent provider"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Agent model"]')).toBeNull();
+    expect(container.querySelector('textarea[aria-label="Message Agent"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="Send message"]')).not.toBeNull();
+  });
+
   it("shows Provider first and withholds Model until a connected provider is selected", () => {
     const container = render(React.createElement(AgentComposer, {
       draft: "Hello",

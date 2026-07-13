@@ -116,11 +116,19 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(JSON.stringify({ enableAgentChat: true }))).toMatchObject({
       enableAgentChat: true,
       enableAssetLibraryHome: false,
+      enableMinimalMode: false,
       enablePuppyoneAppFiles: false,
       enablePuppyFlowFiles: false,
       enableViewerPlugins: false,
     });
     expect(parseExperimentalSettings(JSON.stringify({ enableAgentCompanion: true })).enableAgentChat).toBe(true);
+  });
+
+  it("keeps Minimal Mode off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableMinimalMode).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableMinimalMode).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableMinimalMode: false })).enableMinimalMode).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableMinimalMode: true })).enableMinimalMode).toBe(true);
   });
 
   it("keeps the Asset Library homepage off unless the user explicitly opts in", () => {
