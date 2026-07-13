@@ -4,19 +4,20 @@ import { describe, expect, it } from "vitest";
 const tokensCss = readCss("../src/styles/tokens.css");
 const layoutCss = readCss("../src/styles/layout.css");
 const titlebarCss = readCss("../src/styles/titlebar.css");
-const sidebarPrimitivesCss = readCss("../src/styles/sidebar-primitives.css");
+const sidebarPrimitivesCss = readCss("../packages/shared-ui/src/styles/sidebar-primitives.css");
+const sidebarPatternsCss = readCss("../src/styles/sidebar/patterns.css");
 const dataAdapterCss = readCss("../src/features/data-workspace/browser.css");
 const dataTreeCss = readCss("../packages/shared-ui/src/styles/data-workspace.css");
 const dataWorkspaceSource = readFileSync(
   new URL("../packages/shared-ui/src/data/DataWorkspace.tsx", import.meta.url),
   "utf8",
 );
-const desktopWorkspaceContentSource = readFileSync(
-  new URL("../src/features/app-shell/DesktopWorkspaceContent.tsx", import.meta.url),
+const workspaceSurfaceOutletSource = readFileSync(
+  new URL("../src/features/app-shell/workspace-surfaces/WorkspaceSurfaceOutlet.tsx", import.meta.url),
   "utf8",
 );
 const settingsSidebarSource = readFileSync(
-  new URL("../src/features/settings/SettingsView.tsx", import.meta.url),
+  new URL("../src/features/settings/sidebar/SettingsSidebar.tsx", import.meta.url),
   "utf8",
 );
 const cloudSidebarSource = readFileSync(
@@ -24,7 +25,6 @@ const cloudSidebarSource = readFileSync(
   "utf8",
 );
 const agentFoundationCss = readCss("../src/features/desktop-agent/ui/styles/foundation.css");
-const sidebarBaseCss = readCss("../src/features/source-control/styles/sidebar-base.css");
 const gitLayoutCss = readCss("../src/features/source-control/styles/sidebar-layout.css");
 const gitResourcesCss = readCss("../src/features/source-control/styles/sidebar-resources.css");
 const gitHistoryCss = readCss("../src/features/source-control/styles/history-list.css");
@@ -48,8 +48,8 @@ describe("sidebar spacing architecture", () => {
 
     expect(dataWorkspaceSource).toContain('<aside className="explorer-column">');
     expect(dataWorkspaceSource).toContain("renderWorkspaceSlot(explorerSlot, workspaceState)");
-    expect(desktopWorkspaceContentSource).toContain(
-      'className="desktop-view-surface desktop-view-surface-sidebar"',
+    expect(workspaceSurfaceOutletSource).toContain(
+      'className={`desktop-view-surface desktop-view-surface-${region}`}',
     );
     expect(explorerColumn).toContain(
       "border-inline-end: 1px solid var(--po-shell-divider, var(--po-divider));",
@@ -114,12 +114,12 @@ describe("sidebar spacing architecture", () => {
     const titlebar = compact(readCssBlock(titlebarCss, ".desktop-titlebar"));
     const rightSidebar = compact(readCssBlock(layoutCss, ".desktop-right-sidebar.is-open"));
     const sharedGroupDivider = compact(readCssBlock(
-      sidebarPrimitivesCss,
-      ".desktop-tool-sidebar-group + .desktop-tool-sidebar-group::before",
+      sidebarPatternsCss,
+      ".po-desktop-sidebar-group + .po-desktop-sidebar-group::before",
     ));
     const sharedGroupTitle = compact(readCssBlock(
-      sidebarPrimitivesCss,
-      ".desktop-tool-sidebar-group-title",
+      sidebarPatternsCss,
+      ".po-desktop-sidebar-group__title",
     ));
     const gitSectionTitle = compact(readCssBlock(
       gitResourcesCss,
@@ -183,8 +183,8 @@ describe("sidebar spacing architecture", () => {
     );
     expect(cloudList).not.toContain("--desktop-sidebar-row-right-gap:");
     expect(cloudSidebarCss).not.toContain(".desktop-cloud-sidebar-nav-row.locked");
-    expect(settingsSidebarSource).toContain('className="desktop-tool-sidebar-group"');
-    expect(cloudSidebarSource).toContain('className="desktop-tool-sidebar-group"');
+    expect(settingsSidebarSource).toContain("<SidebarGroup");
+    expect(cloudSidebarSource).toContain("<SidebarGroup");
     expect(settingsCss).not.toContain("desktop-settings-sidebar-group");
     expect(cloudSidebarCss).not.toContain("desktop-cloud-sidebar-separator");
     expect(cloudHistoryHeader).toContain(
@@ -268,13 +268,13 @@ describe("sidebar spacing architecture", () => {
   });
 
   it("keeps Settings on the shared scroll-list padding", () => {
-    const list = compact(readCssBlock(sidebarBaseCss, ".desktop-tool-sidebar-list"));
+    const list = compact(readCssBlock(sidebarPrimitivesCss, ".po-sidebar-scroll-area"));
 
     expect(list).toContain("padding-block: var(--desktop-sidebar-list-padding-block);");
     expect(list).toContain(
       "padding-inline: var(--desktop-sidebar-row-left-gap) var(--desktop-sidebar-scroll-right-gap);",
     );
-    expect(settingsCss).not.toMatch(/\.desktop-settings-sidebar\s+\.desktop-tool-sidebar-list\s*\{/);
+    expect(settingsCss).not.toMatch(/\.desktop-settings-sidebar\s+\.po-sidebar-scroll-area\s*\{/);
   });
 
   it("keeps Git edges shared while nested lists own scrolling", () => {
@@ -313,15 +313,16 @@ function readCss(relativePath: string): string {
 }
 
 function readCssBlock(css: string, selector: string): string {
-  const marker = `${selector} {`;
-  const lineMarker = `\n${marker}`;
-  const lineStart = css.indexOf(lineMarker);
-  const start = css.startsWith(marker) ? 0 : lineStart >= 0 ? lineStart + 1 : -1;
-  if (start < 0) throw new Error(`Missing CSS block for ${selector}`);
-  const bodyStart = start + marker.length;
-  const end = css.indexOf("\n}", bodyStart);
-  if (end < 0) throw new Error(`Unclosed CSS block for ${selector}`);
-  return css.slice(bodyStart, end);
+  const match = new RegExp(`(?:^|\\n)\\s*${escapeRegExp(selector)}\\s*\\{`).exec(css);
+  if (!match) throw new Error(`Missing CSS block for ${selector}`);
+  const bodyStart = match.index + match[0].length;
+  const close = /\n\s*}/.exec(css.slice(bodyStart));
+  if (!close) throw new Error(`Unclosed CSS block for ${selector}`);
+  return css.slice(bodyStart, bodyStart + close.index);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function compact(value: string): string {

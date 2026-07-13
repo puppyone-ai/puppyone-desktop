@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Filter, Search } from "lucide-react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import { SidebarRoot, SidebarScrollArea } from "@puppyone/shared-ui";
 import {
   openCloudApp,
   type DesktopCloudSession,
@@ -152,7 +153,7 @@ export function DesktopCloudAccessSidebar({
   const selectedAccessRowId = activeAccessRowId ?? resourceRows[0]?.id ?? null;
 
   return (
-    <section className="desktop-tool-sidebar desktop-cloud-service-sidebar desktop-cloud-access-scope-sidebar">
+    <SidebarRoot className="desktop-cloud-service-sidebar desktop-cloud-access-scope-sidebar">
       <div className="desktop-cloud-access-sidebar-page-header">
         <div className="desktop-cloud-access-page-title-group">
           <span className="desktop-cloud-access-page-title">{t("cloud.route.access.title")}</span>
@@ -198,7 +199,7 @@ export function DesktopCloudAccessSidebar({
           )}
         </div>
       </div>
-      <div className="desktop-tool-sidebar-list desktop-cloud-sidebar-list desktop-cloud-access-scope-list" role="listbox" aria-label={t("cloud.access.resources")}>
+      <SidebarScrollArea className="desktop-cloud-sidebar-list desktop-cloud-access-scope-list" role="listbox" aria-label={t("cloud.access.resources")}>
         {accessData.loading && filteredRows.length === 0 ? (
           <div className="desktop-cloud-access-scope-empty">{t("cloud.access.loading")}</div>
         ) : filteredRows.length === 0 ? (
@@ -211,8 +212,8 @@ export function DesktopCloudAccessSidebar({
             onSelect={() => onSelectAccessRow(row.id)}
           />
         ))}
-      </div>
-    </section>
+      </SidebarScrollArea>
+    </SidebarRoot>
   );
 }
 

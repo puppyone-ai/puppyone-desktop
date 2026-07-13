@@ -1,5 +1,6 @@
 @import "./editor.css";
 @import "./data-workspace.css";
+@import "./sidebar-primitives.css";
 
 .po-button,
 .po-icon-button {
@@ -115,4 +116,3 @@
   background: color-mix(in srgb, var(--po-info) 13%, transparent);
   color: var(--po-info);
 }
-

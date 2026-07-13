@@ -1,5 +1,6 @@
 import { Blocks, Compass, PackageCheck } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
+import { SidebarRoot, SidebarRow, SidebarScrollArea } from "@puppyone/shared-ui";
 import { OFFICIAL_VIEWER_CATALOG } from "./pluginCatalog";
 
 export type PluginsSection = "installed" | "discover" | "included";
@@ -22,8 +23,8 @@ export function PluginsSidebar({
 }) {
   const { t } = useLocalization();
   return (
-    <section className="desktop-tool-sidebar desktop-plugins-sidebar">
-      <div className="desktop-tool-sidebar-list desktop-plugins-sidebar-list">
+    <SidebarRoot className="desktop-plugins-sidebar">
+      <SidebarScrollArea className="desktop-plugins-sidebar-list">
         <header className="desktop-plugins-sidebar-heading">{t("plugins.title")}</header>
         <nav aria-label={t("plugins.sections")}>
           {PLUGINS_SIDEBAR_ITEMS.map((item) => {
@@ -35,21 +36,20 @@ export function PluginsSidebar({
                 ? OFFICIAL_VIEWER_CATALOG.length
                 : 0;
             return (
-              <button
+              <SidebarRow
                 key={item.id}
-                type="button"
-                className={`desktop-tool-sidebar-row desktop-plugins-sidebar-row ${active ? "active" : ""}`}
+                className="desktop-plugins-sidebar-row"
+                active={active}
                 aria-current={active ? "page" : undefined}
                 onClick={() => onSelectSection(item.id)}
-              >
-                <Icon size={15} strokeWidth={1.9} aria-hidden="true" />
-                <span>{t(`plugins.section.${item.id}`)}</span>
-                {count > 0 && <small aria-hidden="true">{count}</small>}
-              </button>
+                icon={<Icon size={15} strokeWidth={1.9} />}
+                label={t(`plugins.section.${item.id}`)}
+                meta={count > 0 ? <small aria-hidden="true">{count}</small> : undefined}
+              />
             );
           })}
         </nav>
-      </div>
-    </section>
+      </SidebarScrollArea>
+    </SidebarRoot>
   );
 }

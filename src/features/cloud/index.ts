@@ -47,3 +47,8 @@ export type { CloudEnvironment, CloudEnvironmentSource } from "./environment";
 export type { CloudRouteContext, CloudRouteDescriptor } from "./routes/cloudRoutes";
 export type { CloudWorkspaceSection } from "./types";
 export type { CloudWorkspaceBindingState } from "./workspace";
+export { formatCloudMessage } from "./cloudPresentation";
+export { isCloudAccessNavigationResource } from "./sections/access/accessRows";
+export { shouldLoadDesktopCloudAccessData } from "./data/shouldLoadDesktopCloudAccessData";
+export { useDesktopCloudAccessData } from "./data/useDesktopCloudAccessData";
+export { useCloudHistoryController } from "./history/useCloudHistoryController";

@@ -52,7 +52,7 @@ describe("RTL architecture", () => {
     expect(read("../src/features/source-control/GitStatusView.tsx"))
       .toContain('className="desktop-history-graph" aria-hidden="true" dir="ltr"');
     expect(read("../src/features/cloud/history/CloudHistorySidebar.tsx"))
-      .toContain('aria-hidden="true" dir="ltr"');
+      .toMatch(/aria-hidden="true"\s+dir="ltr"/);
   });
 });
 

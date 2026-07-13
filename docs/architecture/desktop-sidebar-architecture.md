@@ -1,6 +1,6 @@
 # Desktop Sidebar Architecture
 
-**Status:** Accepted target architecture. Migration is tracked by ISSUE-035.
+**Status:** Accepted and implemented by ISSUE-035.
 
 This document is the architecture home for every desktop sidebar and narrow
 panel surface. It defines composition, ownership, directory boundaries, state,
@@ -39,29 +39,28 @@ interaction primitives, but not routing or business lifecycle.
 The word **Sidebar** in component names refers to a visual narrow surface. It
 does not imply that every sidebar participates in the same router or store.
 
-## 2. Current architectural pressure
+## 2. Resolved architectural pressure
 
-The current renderer has already established useful shared tokens, scroll
-rules, keep-alive behavior, and an Agent layout boundary. The remaining
-structural pressure comes from ownership rather than from missing CSS tweaks:
+ISSUE-035 removed the ownership defects that motivated this architecture:
 
-1. `DesktopWorkspaceContent.tsx` selects sidebar content and main content with
-   two separate nested conditional trees. Adding one workspace surface requires
-   editing the central shell in several places.
-2. The shell passes feature-internal controller details directly into large
-   sidebars. It therefore knows too much about Git, Cloud, and other domains.
-3. Generic `.desktop-tool-sidebar*` root, list, row, icon, and empty-state
-   styles are owned by Source Control CSS even though Settings, Cloud, Plugins,
-   Access, and Automation consume them.
-4. `SettingsSidebar` and its navigation model live inside the large
-   `SettingsView.tsx` main-view module.
-5. Shared visual behavior is split between global styles and feature styles,
-   so correctness can depend on stylesheet import order.
-6. Scroll, resize, and virtualization utilities exist, but feature surfaces do
-   not yet consume one coherent sidebar abstraction.
+1. `DesktopWorkspaceContent.tsx` now resolves one typed surface and projects
+   that instance into both the sidebar and main outlets.
+2. Navigation visibility and route availability now come from the same
+   capability-filtered registry contribution.
+3. Canonical root, scroll, list, row, action, resize, and virtual-list behavior
+   lives in `packages/shared-ui`; Desktop-only compositions live in
+   `src/components/sidebar`. Source Control no longer owns shared geometry.
+4. Settings navigation/model, Settings main sections, App Shell navigation,
+   and Source Control sections/resources/layout hooks have focused modules.
+5. The CSS cascade is declared once as
+   `reset -> tokens -> primitives -> patterns -> features -> overrides`.
+6. Git, Cloud History, and other scalable Sidebar lists consume one shared
+   virtualization threshold and mounted-row budget.
+7. `AuxiliaryPanelHost` owns right-panel geometry without placing Agent or
+   Terminal in the left Workspace Surface Registry.
 
-These are dependency and change-isolation problems. A new round of selector
-patches would preserve the same ownership defects.
+Architecture checks reject regressions in these boundaries. Product behavior
+remains Feature-owned; the migration did not create a global Sidebar store.
 
 ## 3. Architectural decision
 
@@ -219,110 +218,91 @@ The registry must not become a service locator. Feature hooks/controllers are
 created in a feature adapter or a feature boundary and passed to the feature's
 own presentation components as a focused view model.
 
-## 6. Target repository layout
+## 6. Implemented repository layout
 
-This is the target ownership tree. It is a boundary map, not an instruction to
-create empty folders or move simple one-file features prematurely.
+This is the implemented ownership tree. It intentionally creates directories
+only where there is a real responsibility; simple Features remain compact.
 
 ```text
 src/
 ├── features/
 │   ├── app-shell/
 │   │   ├── navigation/
-│   │   │   ├── navigationModel.ts
+│   │   │   ├── navigationModel.tsx
+│   │   │   ├── types.ts
+│   │   │   ├── DesktopNavigationItems.tsx
 │   │   │   ├── DesktopSidebarTopNavigation.tsx
 │   │   │   ├── DesktopSidebarRailNavigation.tsx
-│   │   │   └── DesktopSidebarFooterNavigation.tsx
+│   │   │   ├── DesktopSidebarFooterNavigation.tsx
+│   │   │   ├── DesktopWorkspaceSurfaceActionButton.tsx
+│   │   │   └── index.ts
+│   │   ├── auxiliary/
+│   │   │   ├── AuxiliaryPanelHost.tsx
+│   │   │   └── index.ts
 │   │   └── workspace-surfaces/
 │   │       ├── workspaceSurfaceTypes.ts
 │   │       ├── workspaceSurfaceRegistry.ts
 │   │       ├── WorkspaceSurfaceOutlet.tsx
-│   │       ├── SidebarViewStack.tsx
-│   │       └── useActiveWorkspaceSurface.ts
-│   │
-│   ├── data-workspace/
-│   │   ├── sidebar/
-│   │   ├── main/
-│   │   └── index.ts
+│   │       ├── useWorkspaceSurfaceContent.tsx
+│   │       └── index.ts
 │   │
 │   ├── source-control/
+│   │   ├── SourceControlWorkspaceSurface.tsx
+│   │   ├── SourceControlSidebar.tsx
 │   │   ├── sidebar/
-│   │   │   ├── SourceControlSidebar.tsx
-│   │   │   ├── sourceControlSidebarModel.ts
-│   │   │   ├── sections/
-│   │   │   ├── rows/
-│   │   │   ├── hooks/
-│   │   │   └── styles/
-│   │   ├── main/
-│   │   ├── application/
-│   │   ├── domain/
+│   │   │   ├── SourceControlSidebarSections.tsx
+│   │   │   ├── SourceControlResourceLists.tsx
+│   │   │   ├── sourceControlSidebarTypes.ts
+│   │   │   └── useGitSidebarPanelLayout.ts
 │   │   └── index.ts
 │   │
-│   ├── cloud/
-│   │   ├── sidebar/
-│   │   ├── main/
-│   │   ├── application/
-│   │   ├── domain/
-│   │   └── index.ts
-│   │
-│   ├── access/
-│   │   ├── sidebar/
-│   │   ├── main/
-│   │   └── index.ts
-│   ├── automation/
-│   │   ├── sidebar/
-│   │   ├── main/
-│   │   └── index.ts
-│   ├── plugins/
-│   │   ├── sidebar/
-│   │   ├── main/
-│   │   └── index.ts
 │   ├── settings/
+│   │   ├── SettingsWorkspaceSurface.tsx
 │   │   ├── sidebar/
 │   │   │   ├── SettingsSidebar.tsx
 │   │   │   ├── settingsSidebarModel.ts
-│   │   │   └── settings-sidebar.css
+│   │   │   └── index.ts
 │   │   ├── main/
+│   │   │   ├── AccountSettingsView.tsx
+│   │   │   ├── EditorSettingsViews.tsx
+│   │   │   ├── FileSettingsViews.tsx
+│   │   │   ├── GeneralSettingsView.tsx
+│   │   │   ├── RepositorySettingsViews.tsx
+│   │   │   └── ThemePreview.tsx
 │   │   └── index.ts
-│   └── desktop-agent/
-│       ├── application/
-│       ├── domain/
-│       ├── infrastructure/
-│       └── ui/
+│   │
+│   └── <simple-feature>/
+│       └── public entry plus focused Sidebar/Main modules as needed
 │
 ├── components/
 │   └── sidebar/
 │       ├── SidebarSurface.tsx
 │       ├── SidebarGroup.tsx
-│       ├── SidebarSection.tsx
-│       ├── SidebarNavigationRow.tsx
 │       ├── SidebarStatusRow.tsx
 │       ├── SidebarHeader.tsx
 │       └── index.ts
 │
 └── styles/
+    ├── cascade.css
     └── sidebar/
-        ├── tokens.css
-        ├── shell.css
-        ├── patterns.css
-        └── resize.css
+        └── patterns.css
 
 packages/shared-ui/src/
-└── sidebar/
-    ├── SidebarRoot.tsx
-    ├── SidebarScrollArea.tsx
-    ├── SidebarList.tsx
-    ├── SidebarRow.tsx
-    ├── SidebarIconButton.tsx
-    ├── SidebarEmptyState.tsx
-    ├── SidebarResizeHandle.tsx
-    ├── VirtualSidebarList.tsx
-    ├── hooks/
-    │   ├── usePaneResizeDrag.ts
-    │   ├── useScrollableState.ts
-    │   └── useVirtualSidebarWindow.ts
-    ├── sidebar-primitives.css
-    └── index.ts
+├── sidebar/
+│   ├── SidebarRoot.tsx
+│   ├── SidebarScrollArea.tsx
+│   ├── SidebarList.tsx
+│   ├── SidebarRow.tsx
+│   ├── SidebarIconButton.tsx
+│   ├── SidebarEmptyState.tsx
+│   ├── SidebarResizeHandle.tsx
+│   ├── VirtualSidebarList.tsx
+│   ├── useVirtualSidebarWindow.ts
+│   ├── virtualizationPolicy.ts
+│   ├── classNames.ts
+│   └── index.ts
+└── styles/
+    └── sidebar-primitives.css
 ```
 
 ### 6.1 Why there are two shared levels
@@ -429,9 +409,10 @@ appropriate, account.
 
 ### 9.1 Ownership
 
-Shared Sidebar Kernel styles must live with the shared layer that owns the
-corresponding component. A feature stylesheet cannot be the canonical owner of
-`.desktop-tool-sidebar`, its list, row, icon button, group, or empty state.
+Shared Sidebar Kernel styles live with the shared layer that owns the
+corresponding component. A Feature stylesheet cannot own or redefine the
+canonical `.po-sidebar-*` primitive or `.po-desktop-sidebar-*` pattern classes.
+The retired `.desktop-tool-sidebar*` compatibility family must not return.
 
 Feature styles may:
 
@@ -499,8 +480,8 @@ while editors and previews are active.
 2. Expensive features use lazy module boundaries at the feature adapter.
 3. Row renderers receive stable ids and focused view models. Controller objects
    and unrelated shell state must not invalidate every row.
-4. Lists that can grow beyond a bounded product limit use the shared virtual
-   list. Virtualization policy is shared; row content remains feature-owned.
+4. Lists that can grow beyond 200 rows use the shared virtual list. The shared
+   virtual window mounts at most 120 rows; row content remains Feature-owned.
 5. Scroll handlers use passive events and at most one animation-frame update.
 6. Resize observers classify or measure containers; they do not drive row-level
    width compensation.
@@ -531,7 +512,7 @@ visual refactor is not allowed to remove them to make the migration pass.
 
 ## 12. Testing and enforcement
 
-The target architecture uses four complementary test levels:
+The implemented architecture uses four complementary test levels:
 
 ```text
 Architecture checks
@@ -577,9 +558,15 @@ npm run check:boundaries
 npm run build
 ```
 
-## 13. Migration policy
+The executable guard is `scripts/check-sidebar-architecture.mjs`, included by
+`npm run check:boundaries`. Component and contract coverage lives in
+`tests/sidebarPrimitives.test.tsx`, `tests/workspaceSurfaceRegistry.test.ts`,
+`tests/sidebarArchitecture.test.ts`, and the existing Sidebar/Git/Cloud/RTL
+regression suites. Performance benchmarks remain in the repository.
 
-The migration must preserve product behavior and land in dependency order:
+## 13. Completed migration sequence
+
+The migration preserved product behavior and landed in dependency order:
 
 ```text
 1. Lock current behavior with rendered and visual contracts
@@ -592,13 +579,12 @@ The migration must preserve product behavior and land in dependency order:
 8. Add boundary checks, remove compatibility selectors, update focused docs
 ```
 
-Compatibility aliases may exist for one migration phase only. Every alias needs
-an owner and removal step in ISSUE-035. A compatibility class cannot become the
-permanent way that new components consume the Sidebar Kernel.
+All compatibility aliases were removed in the same migration. New components
+consume the canonical public entries and class contracts directly.
 
 ## 14. Invariants
 
-After ISSUE-035, these statements must remain true:
+These statements are enforced after ISSUE-035:
 
 - The App Shell selects one typed workspace surface; it does not understand
   feature row/actions or maintain parallel sidebar/main route trees.
@@ -617,3 +603,29 @@ After ISSUE-035, these statements must remain true:
   focused public adapter/view model.
 - Adding a new workspace surface does not require editing nested conditional
   rendering in `DesktopWorkspaceContent`.
+
+## 15. Implementation map
+
+The following paths are the source of truth for future changes:
+
+| Responsibility | Canonical implementation |
+|---|---|
+| Process-neutral Sidebar primitives | `packages/shared-ui/src/sidebar/` |
+| Primitive CSS | `packages/shared-ui/src/styles/sidebar-primitives.css` |
+| Desktop product patterns | `src/components/sidebar/` |
+| Pattern CSS and cascade order | `src/styles/sidebar/patterns.css`, `src/styles/cascade.css` |
+| Left surface metadata/capabilities/lifecycle | `src/features/app-shell/workspace-surfaces/workspaceSurfaceRegistry.ts` |
+| Single resolved surface wiring | `useWorkspaceSurfaceContent.tsx`, `WorkspaceSurfaceOutlet.tsx` |
+| Data keep-alive projection | `src/features/app-shell/DesktopDataWorkspaceSurface.tsx` |
+| Right auxiliary geometry/lifecycle | `src/features/app-shell/auxiliary/AuxiliaryPanelHost.tsx` |
+| Navigation placements/model | `src/features/app-shell/navigation/` |
+| Settings adapter/sidebar/main split | `src/features/settings/SettingsWorkspaceSurface.tsx`, `sidebar/`, `main/` |
+| Source Control adapter/composition split | `src/features/source-control/SourceControlWorkspaceSurface.tsx`, `sidebar/` |
+| Shared scalable-list policy | `packages/shared-ui/src/sidebar/virtualizationPolicy.ts` |
+| Architecture enforcement | `scripts/check-sidebar-architecture.mjs` |
+
+Runtime measurements use documented CSS custom properties only. Static style
+rules remain in CSS. Shared primitives contain no Feature, App Shell, Electron,
+or product-controller dependency. The Registry contains declarative metadata
+and typed adapter dispatch only; it does not retain controller instances or
+mutable state.

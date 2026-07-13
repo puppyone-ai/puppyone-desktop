@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocalization } from "@puppyone/localization/react";
+import { SidebarRoot, SidebarRow, SidebarScrollArea } from "@puppyone/shared-ui";
 import {
   listCloudAutomationProviderSpecs,
   openCloudApp,
@@ -195,43 +196,41 @@ export function DesktopCloudAutomationSidebar({
   }, [activeProvider, onSelectProvider, providerKey]);
 
   return (
-    <section className="desktop-tool-sidebar desktop-cloud-service-sidebar desktop-cloud-automation-type-sidebar">
-      <div className="desktop-tool-sidebar-list desktop-cloud-sidebar-list">
+    <SidebarRoot className="desktop-cloud-service-sidebar desktop-cloud-automation-type-sidebar">
+      <SidebarScrollArea className="desktop-cloud-sidebar-list">
         <nav className="desktop-cloud-sidebar-nav" aria-label={t("automation.page.cloudAutomation")}>
-          <button
-            className={`desktop-tool-sidebar-row desktop-cloud-sidebar-nav-row ${activeProvider ? "" : "active"}`}
-            type="button"
+          <SidebarRow
+            className="desktop-cloud-sidebar-nav-row"
+            active={!activeProvider}
             aria-current={activeProvider ? undefined : "page"}
             onClick={() => onSelectProvider(null)}
-          >
-            <span className="desktop-cloud-sidebar-nav-icon">
+            icon={<span className="desktop-cloud-sidebar-nav-icon">
               <AutomationGridIcon size={15} />
-            </span>
-            <span className="desktop-cloud-sidebar-nav-label">{t("automation.sidebar.all")}</span>
-            {automationConnectors.length > 0 && (
+            </span>}
+            label={<span className="desktop-cloud-sidebar-nav-label">{t("automation.sidebar.all")}</span>}
+            meta={automationConnectors.length > 0 ? (
               <span className="desktop-cloud-sidebar-nav-count">{automationConnectors.length}</span>
-            )}
-          </button>
+            ) : undefined}
+          />
           <div className="desktop-cloud-automation-nav-group">
             {providerGroups.map((group) => {
               const Icon = providerIcon(group.provider);
               const iconUrl = getCloudProviderIconUrl(group.provider);
               const active = activeProvider === group.provider;
               return (
-                <button
-                  className={`desktop-tool-sidebar-row desktop-cloud-sidebar-nav-row desktop-cloud-automation-provider-row ${active ? "active" : ""}`}
+                <SidebarRow
+                  className="desktop-cloud-sidebar-nav-row desktop-cloud-automation-provider-row"
+                  active={active}
                   key={group.provider}
-                  type="button"
                   aria-current={active ? "page" : undefined}
                   title={group.label}
                   onClick={() => onSelectProvider(group.provider)}
-                >
-                  <span className="desktop-cloud-sidebar-nav-icon">
+                  icon={<span className="desktop-cloud-sidebar-nav-icon">
                     {iconUrl ? <img src={iconUrl} alt="" /> : <Icon size={14} />}
-                  </span>
-                  <span className="desktop-cloud-sidebar-nav-label">{group.label}</span>
-                  <span className="desktop-cloud-sidebar-nav-count">{group.connectors.length}</span>
-                </button>
+                  </span>}
+                  label={<span className="desktop-cloud-sidebar-nav-label">{group.label}</span>}
+                  meta={<span className="desktop-cloud-sidebar-nav-count">{group.connectors.length}</span>}
+                />
               );
             })}
             {accessData.loading && providerGroups.length === 0 && (
@@ -245,8 +244,8 @@ export function DesktopCloudAutomationSidebar({
             )}
           </div>
         </nav>
-      </div>
-    </section>
+      </SidebarScrollArea>
+    </SidebarRoot>
   );
 }
 

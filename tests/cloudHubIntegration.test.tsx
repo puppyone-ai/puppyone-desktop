@@ -320,9 +320,9 @@ describe("CloudServiceSidebar project context", () => {
       "Team",
       "Billing",
     ]);
-    const groups = Array.from(container.querySelectorAll<HTMLElement>(".desktop-tool-sidebar-group"));
+    const groups = Array.from(container.querySelectorAll<HTMLElement>(".po-desktop-sidebar-group"));
     expect(groups.map((group) => (
-      group.querySelector(".desktop-tool-sidebar-group-title")?.textContent
+      group.querySelector(".po-desktop-sidebar-group__title")?.textContent
     ))).toEqual(["Cloud Project", "Organization"]);
     expect(groups.every((group) => group.dataset.disabled === "true")).toBe(true);
     expect(Array.from(groups[0]?.querySelectorAll(".desktop-cloud-sidebar-nav-row") ?? []).map((row) => row.textContent)).toEqual([

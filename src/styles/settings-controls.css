@@ -418,6 +418,7 @@
 }
 
 .desktop-theme-preset-swatches i {
+  background: var(--settings-theme-swatch);
   width: 7px;
   height: 14px;
   border: 1px solid color-mix(in srgb, var(--po-border) 56%, transparent);

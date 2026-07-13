@@ -1,6 +1,12 @@
-import { useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { GitBranch, GripVertical, RefreshCw } from "lucide-react";
-import type { Workspace } from "@puppyone/shared-ui";
+import {
+  SidebarResizeHandle,
+  VirtualSidebarList,
+  usePaneResizeDrag,
+  type SidebarResizeIntent,
+  type Workspace,
+} from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
 import type { GitCommitDetail, GitCommitSummary, GitStatusSnapshot } from "../../types/electron";
 import type { GitMainPanel, GitWorkingSelection } from "./types";
@@ -215,39 +221,35 @@ function GitHistoryPanel({
   const { direction, t } = useLocalization();
   const [treeWidth, setTreeWidth] = useState<number | null>(null);
 
-  const handleTreeResizeStart = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
+  const beginTreeResize = usePaneResizeDrag({
+    bodyClassName: "desktop-history-resizing",
+    onDragStart: (event) => {
+      const treeElement = event.currentTarget.parentElement;
+      const startWidth = treeElement?.getBoundingClientRect().width ?? treeWidth ?? HISTORY_TREE_DEFAULT_WIDTH;
+      const startX = event.clientX;
+      const maxWidth = Math.min(
+        HISTORY_TREE_MAX_WIDTH,
+        Math.max(HISTORY_TREE_MIN_WIDTH, window.innerWidth * 0.55),
+      );
+      return {
+        onMove: (point) => {
+          const pointerDelta = (point.clientX - startX) * (direction === "rtl" ? -1 : 1);
+          setTreeWidth(Math.round(Math.min(
+            Math.max(startWidth + pointerDelta, HISTORY_TREE_MIN_WIDTH),
+            maxWidth,
+          )));
+        },
+      };
+    },
+  });
 
-    event.preventDefault();
-    const treeElement = event.currentTarget.parentElement;
-    const startWidth = treeElement?.getBoundingClientRect().width ?? treeWidth ?? HISTORY_TREE_DEFAULT_WIDTH;
-    const startX = event.clientX;
-    const maxWidth = Math.min(HISTORY_TREE_MAX_WIDTH, Math.max(HISTORY_TREE_MIN_WIDTH, window.innerWidth * 0.55));
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      const pointerDelta = (moveEvent.clientX - startX) * (direction === "rtl" ? -1 : 1);
-      const nextWidth = Math.min(Math.max(startWidth + pointerDelta, HISTORY_TREE_MIN_WIDTH), maxWidth);
-      setTreeWidth(Math.round(nextWidth));
-    };
-
-    const stopResize = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", stopResize);
-      window.removeEventListener("pointercancel", stopResize);
-      document.body.classList.remove("desktop-history-resizing");
-    };
-
-    document.body.classList.add("desktop-history-resizing");
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", stopResize, { once: true });
-    window.addEventListener("pointercancel", stopResize, { once: true });
-  };
-
-  const handleTreeResizeKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-
-    event.preventDefault();
-    const logicalDelta = event.key === "ArrowLeft" ? -16 : 16;
+  const resizeTreeByKeyboard = (intent: SidebarResizeIntent, accelerated: boolean) => {
+    if (intent === "minimum" || intent === "maximum") {
+      setTreeWidth(intent === "minimum" ? HISTORY_TREE_MIN_WIDTH : HISTORY_TREE_MAX_WIDTH);
+      return;
+    }
+    const step = accelerated ? 32 : 16;
+    const logicalDelta = intent === "decrease" ? -step : step;
     const delta = direction === "rtl" ? -logicalDelta : logicalDelta;
     setTreeWidth((width) => clampHistoryTreeWidth((width ?? HISTORY_TREE_DEFAULT_WIDTH) + delta));
   };
@@ -266,13 +268,18 @@ function GitHistoryPanel({
     <section className="desktop-utility-view desktop-history-detail-view desktop-history-panel">
       <aside
         className="desktop-history-panel-tree"
-        style={treeWidth === null ? undefined : { width: treeWidth, minWidth: treeWidth }}
+        style={getHistoryTreeStyle(treeWidth)}
         aria-label={t("source-control.history.ariaLabel")}
       >
-        <div className="desktop-history-list">
-          {commits.map((commit, index) => (
+        <VirtualSidebarList
+          className="desktop-history-list desktop-history-virtual-list"
+          ariaLabel={t("source-control.history.ariaLabel")}
+          items={commits}
+          rowSize={32}
+          activeIndex={commits.findIndex((commit) => commit.commit_id === selectedCommitId)}
+          getKey={(commit) => commit.commit_id}
+          renderRow={(commit, index) => (
             <SidebarHistoryRow
-              key={commit.commit_id}
               commit={commit}
               isHead={commit.commit_id === headCommitId}
               isSelected={commit.commit_id === selectedCommitId}
@@ -280,24 +287,22 @@ function GitHistoryPanel({
               hasNext={index < commits.length - 1}
               onClick={() => onSelectCommit(commit.commit_id)}
             />
-          ))}
-        </div>
-        <div
+          )}
+        />
+        <SidebarResizeHandle
           className="desktop-history-panel-tree-resizer"
-          role="separator"
-          aria-label={t("source-control.history.resizeAriaLabel")}
-          aria-orientation="vertical"
-          aria-valuemin={HISTORY_TREE_MIN_WIDTH}
-          aria-valuemax={HISTORY_TREE_MAX_WIDTH}
-          aria-valuenow={treeWidth ?? HISTORY_TREE_DEFAULT_WIDTH}
-          tabIndex={0}
+          label={t("source-control.history.resizeAriaLabel")}
+          orientation="vertical"
+          min={HISTORY_TREE_MIN_WIDTH}
+          max={HISTORY_TREE_MAX_WIDTH}
+          value={treeWidth ?? HISTORY_TREE_DEFAULT_WIDTH}
           title={t("source-control.history.resizeTitle")}
-          onPointerDown={handleTreeResizeStart}
-          onKeyDown={handleTreeResizeKeyDown}
+          onPointerDown={beginTreeResize}
+          onKeyboardResize={resizeTreeByKeyboard}
           onDoubleClick={() => setTreeWidth(null)}
         >
-          <GripVertical size={12} />
-        </div>
+          <GripVertical size={12} aria-hidden="true" />
+        </SidebarResizeHandle>
       </aside>
       <div className="desktop-history-panel-detail">
         <div className="desktop-history-detail-scroll">
@@ -316,6 +321,11 @@ function GitHistoryPanel({
       </div>
     </section>
   );
+}
+
+function getHistoryTreeStyle(width: number | null): CSSProperties | undefined {
+  if (width === null) return undefined;
+  return { "--desktop-history-tree-width": `${width}px` } as CSSProperties;
 }
 
 function CommitDetail({
