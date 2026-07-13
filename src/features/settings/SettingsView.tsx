@@ -7,7 +7,7 @@ import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements"
 import { useFeatureFlag } from "../flags";
 import { SettingsSectionHeader } from "./components";
 import { ContentFontSetting } from "./ContentFontSetting";
-import { LanguageSetting } from "./LanguageSetting";
+import { LanguageSettingsView } from "./LanguageSetting";
 import { AccountSettingsView } from "./main/AccountSettingsView";
 import { EditorSettingsView, ExperimentalSettingsView } from "./main/EditorSettingsViews";
 import { DefaultAppsSettingsView, FilesSettingsView } from "./main/FileSettingsViews";
@@ -16,7 +16,6 @@ import { CloudHostingSettingsView, GitSettingsView } from "./main/RepositorySett
 import { ThemePreview } from "./main/ThemePreview";
 import type { SettingsViewProps } from "./types";
 import { writeClipboardText } from "./utils";
-
 export function SettingsView({
   workspace,
   activeSection,
@@ -178,6 +177,10 @@ export function SettingsView({
     );
   }
 
+  if (activeSection === "language") {
+    return <LanguageSettingsView />;
+  }
+
   if (activeSection === "appearance") {
     return (
       <section className="desktop-utility-view desktop-settings-view">
@@ -188,8 +191,7 @@ export function SettingsView({
               detail={t("settings.appearance.detail")}
             />
             <div className="desktop-settings-list">
-              <LanguageSetting />
-              <div className="desktop-settings-row desktop-settings-row-control desktop-theme-mode-row">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row desktop-theme-mode-row">
                 <span>{t("settings.appearance.theme.title")}</span>
                 <div className="desktop-theme-choice-list" aria-label={t("settings.appearance.theme.ariaLabel")}>
                   {([
@@ -220,7 +222,7 @@ export function SettingsView({
                   })}
                 </div>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.lightTheme.title")}</span>
                 <div className="desktop-theme-segment desktop-theme-preset-list" aria-label={t("settings.appearance.lightTheme.ariaLabel")}>
                   {LIGHT_THEME_PRESETS.map((preset) => (
@@ -242,7 +244,7 @@ export function SettingsView({
                   ))}
                 </div>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.darkTheme.title")}</span>
                 <div className="desktop-theme-segment desktop-theme-preset-list" aria-label={t("settings.appearance.darkTheme.ariaLabel")}>
                   {DARK_THEME_PRESETS.map((preset) => (
@@ -264,7 +266,7 @@ export function SettingsView({
                   ))}
                 </div>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.textSize.title")}</span>
                 <div className="desktop-theme-segment desktop-text-size-segment" aria-label={t("settings.appearance.textSize.ariaLabel")}>
                   {TEXT_SIZE_PRESETS.map((option) => (
@@ -285,7 +287,7 @@ export function SettingsView({
                 preferences={typographyPreferences}
                 onChange={onTypographyPreferencesChange}
               />
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.fileIcons.title")}</span>
                 <div className="desktop-theme-segment desktop-file-icon-theme-segment" aria-label={t("settings.appearance.fileIcons.ariaLabel")}>
                   {FILE_ICON_THEMES.map((theme) => (
@@ -302,7 +304,7 @@ export function SettingsView({
                   ))}
                 </div>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.navigation.title")}</span>
                 <div className="desktop-theme-segment desktop-sidebar-layout-segment" aria-label={t("settings.appearance.navigation.ariaLabel")}>
                   {SIDEBAR_NAVIGATION_LAYOUT_OPTIONS.map((option) => {
@@ -333,6 +335,7 @@ export function SettingsView({
                   <label className="desktop-settings-switch">
                     <input
                       type="checkbox"
+                      aria-label={t("settings.appearance.pluginsShortcut.title")}
                       checked={sidebarNavigationVisibilitySettings.enabled.plugins}
                       onChange={(event) => onSidebarNavigationVisibilitySettingsChange({
                         ...sidebarNavigationVisibilitySettings,
@@ -346,7 +349,7 @@ export function SettingsView({
                   </label>
                 </div>
               )}
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-tools-row">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row desktop-settings-tools-row">
                 <span>{t("settings.appearance.headerElements.title")}</span>
                 <div className="desktop-settings-tool-list">
                   {orderedHeaderElements.map((element) => {
@@ -367,6 +370,7 @@ export function SettingsView({
                         <label className="desktop-settings-switch">
                           <input
                             type="checkbox"
+                            aria-label={t(`settings.appearance.headerElements.${element.id}`)}
                             checked={actionEnabled}
                             onChange={(event) => {
                               const enabled = event.target.checked;
@@ -410,7 +414,7 @@ export function SettingsView({
                   <span aria-hidden="true" />
                 </label>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control">
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span id="desktop-dock-icon-label">{t("settings.appearance.dockIcon.title")}</span>
                 <div
                   className="desktop-theme-segment desktop-dock-icon-segment"

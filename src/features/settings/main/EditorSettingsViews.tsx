@@ -26,6 +26,7 @@ export function EditorSettingsView({
                 <small>{t("settings.editor.aiAssist.detail")}</small>
               </span>
               <SettingsToggle
+                label={t("settings.editor.aiAssist.title")}
                 checked={aiEditAssistEnabled}
                 onChange={onAiEditAssistEnabledChange}
               />
@@ -106,6 +107,7 @@ export function ExperimentalSettingsView({
                   <small>{t(`settings.experimental.${messageKey}.detail`)}</small>
                 </span>
                 <SettingsToggle
+                  label={t(`settings.experimental.${messageKey}.title`)}
                   checked={settings[settingKey]}
                   onChange={(checked) => onChange({ ...settings, [settingKey]: checked })}
                 />
@@ -118,10 +120,23 @@ export function ExperimentalSettingsView({
   );
 }
 
-function SettingsToggle({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+function SettingsToggle({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
   return (
     <label className="desktop-settings-switch">
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <input
+        type="checkbox"
+        aria-label={label}
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
       <span aria-hidden="true" />
     </label>
   );

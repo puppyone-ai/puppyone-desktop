@@ -22,6 +22,9 @@ export type MarkdownImageToken = {
   title: string | null;
 };
 
+export const MARKDOWN_IMAGE_SRCSET_MAX_CANDIDATES = 16;
+export const MARKDOWN_IMAGE_SRCSET_MAX_SOURCE_UNITS = 8_192;
+
 const OBSIDIAN_IMAGE_EXTENSIONS = new Set([
   "apng",
   "avif",
@@ -287,11 +290,16 @@ export async function resolveMarkdownHtmlImageSources(
   return template.innerHTML;
 }
 
-async function resolveMarkdownImageSrcset(
+export async function resolveMarkdownImageSrcset(
   value: string,
   documentPath: string,
   resolver: BrokeredMarkdownAssetUrlResolver,
+  signal?: AbortSignal,
 ): Promise<string | null> {
+  if (
+    value.length > MARKDOWN_IMAGE_SRCSET_MAX_SOURCE_UNITS
+    || countSrcsetCandidates(value) > MARKDOWN_IMAGE_SRCSET_MAX_CANDIDATES
+  ) return null;
   const entries = await Promise.all(
     value
       .split(",")
@@ -301,11 +309,20 @@ async function resolveMarkdownImageSrcset(
         const parsed = /^(\S+)(.*)$/.exec(candidate);
         if (!parsed) return null;
 
-        const resolvedUrl = await resolver(documentPath, parsed[1]);
+        const resolvedUrl = await resolver(documentPath, parsed[1], signal);
         if (!resolvedUrl || !isBrokerSafeResolvedAssetUrl(resolvedUrl)) return null;
         return `${resolvedUrl}${parsed[2] ?? ""}`;
       }),
   );
 
   return entries.every(Boolean) ? entries.join(", ") : null;
+}
+
+function countSrcsetCandidates(value: string): number {
+  let count = value.trim() ? 1 : 0;
+  for (let index = 0; index < value.length; index += 1) {
+    if (value.charCodeAt(index) === 44) count += 1;
+    if (count > MARKDOWN_IMAGE_SRCSET_MAX_CANDIDATES) return count;
+  }
+  return count;
 }

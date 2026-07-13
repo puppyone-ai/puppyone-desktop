@@ -4,6 +4,7 @@ import {
   FileText,
   FlaskConical,
   GitBranch,
+  Languages,
   Monitor,
   Pencil,
   Settings,
@@ -31,6 +32,7 @@ export const SETTINGS_SIDEBAR_GROUPS = [
     labelId: "settings.sidebar.desktopApp",
     items: [
       { id: "workspace", labelId: "settings.sidebar.general", icon: Settings, disabled: false },
+      { id: "language", labelId: "settings.sidebar.language", icon: Languages, disabled: false },
       { id: "appearance", labelId: "settings.sidebar.appearance", icon: Monitor, disabled: false },
       { id: "external-apps", labelId: "settings.sidebar.defaultApps", icon: ExternalLink, disabled: false },
       { id: "editor", labelId: "settings.sidebar.editor", icon: Pencil, disabled: false },

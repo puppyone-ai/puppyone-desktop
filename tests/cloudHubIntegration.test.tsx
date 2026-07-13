@@ -367,6 +367,7 @@ describe("CloudServiceSidebar project context", () => {
 
     expect(container.querySelector('[aria-label="Cloud sections"]')).not.toBeNull();
     expect(container.textContent).toContain("Cloud Projects");
+    expect(container.textContent).toContain("Templates");
     expect(container.textContent).not.toContain("History");
   });
 

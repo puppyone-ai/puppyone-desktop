@@ -12,7 +12,7 @@ import {
   startDesktopCloudOAuth,
   supportsDesktopCloudOAuth,
 } from "../../../lib/cloudSession";
-import { SettingsGroup, SettingsLine, SettingsSectionHeader } from "../components";
+import { SettingsSectionHeader, SettingsSubsection, SettingsValueRow } from "../components";
 
 type AccountAuthOperation = "signin" | "signout";
 
@@ -101,8 +101,8 @@ export function AccountSettingsView({
       <div className="desktop-utility-body desktop-settings-body">
         <div className="desktop-settings-section desktop-account-settings-section">
           <SettingsSectionHeader title={t("settings.account.title")} detail={t("settings.account.detail")} />
-          <SettingsGroup title={t("settings.account.groupTitle")}>
-            <SettingsLine
+          <SettingsSubsection>
+            <SettingsValueRow
               label={t("settings.account.statusLabel")}
               value={accountStatus}
               tone={signedIn ? "success" : undefined}
@@ -110,17 +110,25 @@ export function AccountSettingsView({
                 <span className="desktop-settings-badge warning">{t("settings.account.differentService")}</span>
               ) : undefined}
             />
-            <SettingsLine label={t("settings.account.email")} value={cloudSession?.user_email ?? t("settings.account.notSignedIn")} />
-            <SettingsLine label={t("settings.account.desktopService")} value={resolvedApiBaseUrl} title={resolvedApiBaseUrl} monospace />
-            <SettingsLine
+            <SettingsValueRow
+              label={t("settings.account.email")}
+              value={cloudSession?.user_email ?? t("settings.account.notSignedIn")}
+            />
+            <SettingsValueRow
+              label={t("settings.account.desktopService")}
+              value={resolvedApiBaseUrl}
+              title={resolvedApiBaseUrl}
+              monospace
+            />
+            <SettingsValueRow
               label={t("settings.account.sessionService")}
               value={cloudSession?.api_base_url ?? t("settings.account.none")}
               title={cloudSession?.api_base_url}
               monospace={Boolean(cloudSession?.api_base_url)}
             />
-            <div className="desktop-settings-line desktop-settings-account-actions-line">
+            <div className="desktop-settings-row desktop-settings-row-control desktop-settings-account-actions-row">
               <span>{t("settings.account.authentication")}</span>
-              <div className="desktop-settings-line-value desktop-settings-account-actions">
+              <div className="desktop-settings-value desktop-settings-account-actions">
                 {signedIn ? (
                   <button
                     className="desktop-settings-action danger"
@@ -149,7 +157,7 @@ export function AccountSettingsView({
                 {authError ?? authMessage}
               </div>
             )}
-          </SettingsGroup>
+          </SettingsSubsection>
         </div>
       </div>
     </section>

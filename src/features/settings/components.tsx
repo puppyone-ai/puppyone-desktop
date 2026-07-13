@@ -1,24 +1,31 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 export function SettingsSectionHeader({ title, detail }: { title: string; detail?: string }) {
   return (
     <div className="desktop-settings-section-header">
-      <strong>{title}</strong>
+      <h2>{title}</h2>
       {detail && <span>{detail}</span>}
     </div>
   );
 }
 
-export function SettingsGroup({ title, children }: { title?: string; children: ReactNode }) {
-  return (
-    <section className="desktop-settings-group">
-      {title && <div className="desktop-settings-group-title">{title}</div>}
-      <div className="desktop-settings-group-body">{children}</div>
-    </section>
+export function SettingsSubsection({ title, children }: { title?: string; children: ReactNode }) {
+  const titleId = useId();
+  const content = (
+    <>
+      {title && <h3 className="desktop-settings-subsection-title" id={titleId}>{title}</h3>}
+      <div className="desktop-settings-subsection-body">{children}</div>
+    </>
+  );
+
+  return title ? (
+    <section className="desktop-settings-subsection" aria-labelledby={titleId}>{content}</section>
+  ) : (
+    <div className="desktop-settings-subsection">{content}</div>
   );
 }
 
-export function SettingsLine({
+export function SettingsValueRow({
   label,
   value,
   title,
@@ -34,12 +41,12 @@ export function SettingsLine({
   tone?: "success";
 }) {
   return (
-    <div className="desktop-settings-line">
+    <div className={`desktop-settings-row desktop-settings-value-row ${action ? "desktop-settings-row-control" : ""}`}>
       <span>{label}</span>
-      <div className="desktop-settings-line-value">
+      <div className="desktop-settings-value">
         <strong
           className={`${monospace ? "desktop-settings-code" : ""} ${tone === "success" ? "success" : ""}`}
-          dir="auto"
+          dir={monospace ? "ltr" : "auto"}
           title={title}
         >
           {value}

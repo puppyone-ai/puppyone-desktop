@@ -78,6 +78,25 @@
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
+.markdown-codemirror-editor .cm-md-table-widget.is-windowed {
+  table-layout: fixed;
+  contain: layout paint style;
+}
+
+.markdown-codemirror-editor .cm-md-table-widget.is-windowed .cm-md-table-virtual-spacer,
+.markdown-codemirror-editor .cm-md-table-widget.is-windowed .cm-md-table-virtual-spacer > td {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.markdown-codemirror-editor .cm-md-table-widget.is-windowed .cm-md-table-virtual-spacer > td {
+  min-width: 0;
+  max-width: none;
+  line-height: 0;
+}
+
 /* Hover model: one outer ring marks the table while its structural border
    stays stable; only the hovered cell tints — never a whole row. */
 .markdown-codemirror-editor .cm-md-table-widget-wrap:hover:not(.is-doc-selected) .cm-md-table-widget,

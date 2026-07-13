@@ -4,8 +4,9 @@ import {
   useLocalization,
   type AppLanguagePreference,
 } from "@puppyone/localization";
+import { SettingsSectionHeader } from "./components";
 
-export function LanguageSetting() {
+export function LanguageSettingsView() {
   const {
     preference,
     locale,
@@ -29,48 +30,58 @@ export function LanguageSetting() {
   };
 
   return (
-    <div className="desktop-settings-row desktop-settings-row-control desktop-language-setting-row">
-      <span className="desktop-settings-label-stack">
-        <strong>{t("settings.language.title")}</strong>
-        <small>{t("settings.language.description")}</small>
-      </span>
-      <span className="desktop-language-setting-control">
-        <select
-          aria-label={t("settings.language.selectorLabel")}
-          value={preference}
-          disabled={changing}
-          onChange={(event) => {
-            const nextPreference = event.target.value;
-            if (isSelectableAppLanguagePreference(nextPreference)) {
-              void changeLanguage(nextPreference);
-            }
-          }}
-        >
-          <option value="system">
-            {t("settings.language.system", { language: resolvedLanguage })}
-          </option>
-          {localeDescriptors.filter((descriptor) => descriptor.productionReady).map((descriptor) => (
-            <option
-              key={descriptor.locale}
-              value={descriptor.locale}
-              lang={descriptor.locale}
-              dir={descriptor.direction}
-            >
-              {descriptor.label}
-            </option>
-          ))}
-        </select>
-        {changing && (
-          <small className="desktop-language-setting-status" role="status">
-            {t("settings.language.changing")}
-          </small>
-        )}
-        {changeFailed && (
-          <small className="desktop-language-setting-error" role="alert">
-            {t("settings.language.changeFailed")}
-          </small>
-        )}
-      </span>
-    </div>
+    <section className="desktop-utility-view desktop-settings-view">
+      <div className="desktop-utility-body desktop-settings-body">
+        <div className="desktop-settings-section">
+          <SettingsSectionHeader
+            title={t("settings.language.title")}
+            detail={t("settings.language.description")}
+          />
+          <div className="desktop-settings-list">
+            <label className="desktop-settings-row desktop-settings-row-control desktop-language-setting-row">
+              <span>{t("settings.language.selectorLabel")}</span>
+              <div className="desktop-language-setting-control">
+                <select
+                  className="desktop-settings-select desktop-language-setting-select"
+                  aria-label={t("settings.language.selectorLabel")}
+                  value={preference}
+                  disabled={changing}
+                  onChange={(event) => {
+                    const nextPreference = event.target.value;
+                    if (isSelectableAppLanguagePreference(nextPreference)) {
+                      void changeLanguage(nextPreference);
+                    }
+                  }}
+                >
+                  <option value="system">
+                    {t("settings.language.system", { language: resolvedLanguage })}
+                  </option>
+                  {localeDescriptors.filter((descriptor) => descriptor.productionReady).map((descriptor) => (
+                    <option
+                      key={descriptor.locale}
+                      value={descriptor.locale}
+                      lang={descriptor.locale}
+                      dir={descriptor.direction}
+                    >
+                      {descriptor.label}
+                    </option>
+                  ))}
+                </select>
+                {changing && (
+                  <small className="desktop-language-setting-status" role="status">
+                    {t("settings.language.changing")}
+                  </small>
+                )}
+                {changeFailed && (
+                  <small className="desktop-language-setting-error" role="alert">
+                    {t("settings.language.changeFailed")}
+                  </small>
+                )}
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

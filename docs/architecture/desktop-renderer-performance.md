@@ -122,10 +122,15 @@ consumer of CodeMirror's height map and must not become an invalidation source.
 
 Document viewport virtualization does not bound one unusually large block. The
 canonical [Markdown architecture oversized-block contract](editor/markdown/architecture.md#46-complexity-budgets-and-oversized-block-execution)
-therefore requires centralized complexity decisions and nested item
+therefore uses centralized, versioned complexity decisions and nested item
 virtualization or typed fallback. Large tables keep total estimated geometry
-but mount only visible rows plus overscan; HTML/code/Mermaid/media use explicit
-feature budgets and never rely on CSS containment as their only bound.
+but mount only visible rows plus overscan and interaction-pinned rows; their
+semantic model is capped at 5,000 rows, 50,000 cells, and 64 columns. The
+64 KiB per-row / 4 MiB total-source bounds prevent a single pathological cell
+from bypassing that row window. HTML and Mermaid use explicit deferred
+activation, oversized code remains visible source, and compound HTML media
+resolves per asset. None of these paths relies on CSS containment as its only
+bound.
 
 Inline token scanners are line-bounded and advance past an already inspected
 malformed range. They may not rescan the same long suffix for every unmatched
@@ -134,6 +139,15 @@ kind, not once per semantic element. Isolated string previews (for example a
 table cell) have explicit source-length, candidate-count, and recursion-depth
 budgets; an over-budget fragment remains exact, selectable plain text rather
 than blocking the renderer.
+
+Cold Live Preview activation uses three revision-checked, cancellable renderer
+tasks: language activation, semantic plan precomputation, then installation of
+the geometry-sensitive projection. The second and third phases share the
+syntax-tree/revision-scoped plan index. They may not be recombined into one
+synchronous task, because a feature-dense 10k-line document can otherwise
+cross the renderer Long Task boundary even though each phase is independently
+bounded. The editor stays behind the atomic preview-readiness gate until the
+matching projection paints.
 
 ## React/source boundary
 
@@ -192,9 +206,19 @@ Run the production smoke and write its JSON report:
 
 ```bash
 npm run build
-./node_modules/.bin/electron scripts/smoke-renderer-performance.mjs \
+node scripts/run-renderer-performance-smoke.mjs \
   --outputJson /tmp/puppyone-renderer-smoke.json
 ```
+
+The warm smoke then opens a 1,001-logical-row Markdown table in the same real
+Chromium renderer, records the initial and post-scroll mounted row counts, and
+fails if either exceeds 80 or the logical window does not advance. Long-task
+observation remains active across this structural check.
+
+The Node launcher is part of the gate: macOS Electron lifecycle helpers can
+return zero through the CLI launcher even after an in-app validation failure.
+The Electron process therefore publishes a completion record to its parent,
+and the parent owns the observable CI exit code.
 
 Run the cold-first-open/index-contention gate in a visible production window:
 

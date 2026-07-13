@@ -2,7 +2,7 @@ import { Copy, RefreshCw } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../../types/electron";
 import { getPuppyoneRemote, maskRemoteUrl, parsePuppyoneRemote } from "../../source-control";
-import { SettingsGroup, SettingsLine, SettingsSectionHeader } from "../components";
+import { SettingsSectionHeader, SettingsSubsection, SettingsValueRow } from "../components";
 import { PuppyoneWorkspaceConfigSettings } from "../PuppyoneWorkspaceConfigSettings";
 import { remoteKindLabel, shortCommit } from "../utils";
 
@@ -82,17 +82,17 @@ export function CloudHostingSettingsView({
                 onRegenerateProjectId={onRegeneratePuppyoneProjectId}
               />
               {usesPuppyoneCloud && (
-                <SettingsGroup title={t("settings.cloud.connectionTitle")}>
-                  <SettingsLine
+                <SettingsSubsection title={t("settings.cloud.connectionTitle")}>
+                  <SettingsValueRow
                     label={t("settings.cloud.status")}
                     value={t(cloudInfo ? "settings.cloud.connected" : "settings.shared.notConfigured")}
                     tone={cloudInfo ? "success" : undefined}
                   />
                   {cloudInfo ? (
                     <>
-                      <SettingsLine label={t("settings.cloud.remote")} value={cloudRemote?.name ?? "puppyone"} />
-                      <SettingsLine label={t("settings.cloud.host")} value={cloudInfo.host} />
-                      <SettingsLine
+                      <SettingsValueRow label={t("settings.cloud.remote")} value={cloudRemote?.name ?? "puppyone"} />
+                      <SettingsValueRow label={t("settings.cloud.host")} value={cloudInfo.host} />
+                      <SettingsValueRow
                         label={cloudInfo.kind === "access-point"
                           ? t("settings.cloud.accessKey")
                           : cloudInfo.kind === "scope"
@@ -101,7 +101,7 @@ export function CloudHostingSettingsView({
                         value={cloudInfo.displayId}
                         monospace
                       />
-                      <SettingsLine
+                      <SettingsValueRow
                         label={t("settings.cloud.connectionUrl")}
                         value={cloudRemoteUrl ? maskRemoteUrl(cloudRemoteUrl) : t("settings.shared.notConfigured")}
                         title={cloudRemoteUrl ?? undefined}
@@ -117,7 +117,7 @@ export function CloudHostingSettingsView({
                   ) : (
                     <div className="desktop-settings-muted-row">{t("settings.shared.notConfigured")}</div>
                   )}
-                </SettingsGroup>
+                </SettingsSubsection>
               )}
               {copyError && <div className="desktop-utility-empty danger">{copyError}</div>}
             </>
@@ -147,7 +147,12 @@ export function GitSettingsView({
     <section className="desktop-utility-view desktop-settings-view">
       <div className="desktop-utility-body desktop-settings-body">
         <div className="desktop-settings-section">
-          <SettingsHeading title={t("settings.git.title")} loading={loading} onRefresh={onRefresh} />
+          <SettingsHeading
+            title={t("settings.git.title")}
+            detail={t("settings.git.detail")}
+            loading={loading}
+            onRefresh={onRefresh}
+          />
           {error ? (
             <div className="desktop-utility-empty danger">{error}</div>
           ) : loading && !status ? (
@@ -156,22 +161,22 @@ export function GitSettingsView({
             <div className="desktop-utility-empty">{t("settings.git.notRepository")}</div>
           ) : (
             <>
-              <SettingsGroup title={t("settings.git.repository")}>
-                <SettingsLine label={t("settings.git.branch")} value={status?.branch ?? t("settings.git.detached")} />
-                <SettingsLine
+              <SettingsSubsection title={t("settings.git.repository")}>
+                <SettingsValueRow label={t("settings.git.branch")} value={status?.branch ?? t("settings.git.detached")} />
+                <SettingsValueRow
                   label={t("settings.git.branches")}
                   value={t("settings.git.branchCounts", { localCount: localBranchCount, remoteCount: remoteBranchCount })}
                 />
-                <SettingsLine label={t("settings.git.upstream")} value={currentBranch?.upstream ?? t("settings.shared.notConfigured")} />
-                <SettingsLine
+                <SettingsValueRow label={t("settings.git.upstream")} value={currentBranch?.upstream ?? t("settings.shared.notConfigured")} />
+                <SettingsValueRow
                   label={t("settings.git.syncStatus")}
                   value={currentBranch?.upstream
                     ? t("settings.git.syncCounts", { ahead: currentBranch.ahead, behind: currentBranch.behind })
                     : t("settings.git.localOnly")}
                 />
-                <SettingsLine label="HEAD" value={status?.headCommitId ? shortCommit(status.headCommitId) : t("settings.git.noCommits")} monospace />
-              </SettingsGroup>
-              <SettingsGroup title={t("settings.git.remotes")}>
+                <SettingsValueRow label="HEAD" value={status?.headCommitId ? shortCommit(status.headCommitId) : t("settings.git.noCommits")} monospace />
+              </SettingsSubsection>
+              <SettingsSubsection title={t("settings.git.remotes")}>
                 {remotes.length === 0 ? (
                   <div className="desktop-settings-muted-row">{t("settings.git.noRemotes")}</div>
                 ) : remotes.map((remote) => {
@@ -202,7 +207,7 @@ export function GitSettingsView({
                     </div>
                   );
                 })}
-              </SettingsGroup>
+              </SettingsSubsection>
               {copyError && <div className="desktop-utility-empty danger">{copyError}</div>}
             </>
           )}

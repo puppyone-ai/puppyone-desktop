@@ -44,8 +44,8 @@ export function GeneralSettingsView({
         <div className="desktop-settings-section">
           <SettingsSectionHeader title={t("settings.general.title")} detail={t("settings.general.detail")} />
           <div className="desktop-settings-list">
-            <div className="desktop-settings-row"><span>{t("settings.general.name")}</span><strong>{workspace.name}</strong></div>
-            <div className="desktop-settings-row"><span>{t("settings.general.path")}</span><strong>{workspace.path}</strong></div>
+            <div className="desktop-settings-row"><span>{t("settings.general.name")}</span><strong dir="auto" title={workspace.name}>{workspace.name}</strong></div>
+            <div className="desktop-settings-row"><span>{t("settings.general.path")}</span><strong dir="ltr" title={workspace.path}>{workspace.path}</strong></div>
             <div className="desktop-settings-row"><span>{t("settings.general.mode")}</span><strong>{t("settings.general.modeLocal")}</strong></div>
             <div className="desktop-settings-row">
               <span>{t("settings.general.status")}</span>

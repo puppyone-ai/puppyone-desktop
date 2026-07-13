@@ -7,7 +7,10 @@ export {
 } from "./inlineHtmlPolicy";
 export {
   getMarkdownInlineHtml,
+  getMarkdownInlineHtmlDiagnostics,
   getMarkdownInlineHtmlInRange,
+  resetMarkdownInlineHtmlDiagnostics,
   type MarkdownInlineHtml,
+  type MarkdownInlineHtmlDiagnostics,
 } from "./inlineHtmlModel";
 export { createSanitizedBlockHtmlFragment } from "./sanitizeHtml";

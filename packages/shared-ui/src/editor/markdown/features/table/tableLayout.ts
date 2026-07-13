@@ -4,19 +4,54 @@ const TABLE_VERTICAL_CHROME_PX = 50;
 const TABLE_ROW_VERTICAL_CHROME_PX = 13;
 const TABLE_TEXT_LINE_HEIGHT_PX = 19;
 const TABLE_CELL_LINE_CAPACITY = 36;
+const TABLE_COLUMN_WIDTH_SAMPLE_ROWS = 128;
 
 /**
  * Pure layout estimate shared by the semantic plan and its widget descriptor.
- * It intentionally has no upper clamp: an offscreen large table must reserve
- * proportional space or CodeMirror's scroll anchor will be corrected by a
- * large delta when the real DOM enters the viewport.
+ * The centralized render-budget policy rejects blocks beyond the supported
+ * logical range, so this estimate can remain proportional for every table
+ * that reaches either the rich or windowed adapter.
  */
 export function estimateMarkdownTableLayoutHeight(rows: readonly MarkdownTableRow[]): number {
-  const rowHeights = rows.reduce((total, row) => {
-    const visualLines = Math.max(1, ...row.cells.map((cell) => estimateCellVisualLines(cell.text)));
-    return total + TABLE_ROW_VERTICAL_CHROME_PX + visualLines * TABLE_TEXT_LINE_HEIGHT_PX;
-  }, 0);
+  const rowHeights = rows.reduce((total, row) => total + estimateMarkdownTableRowHeight(row), 0);
   return Math.max(80, Math.ceil(TABLE_VERTICAL_CHROME_PX + rowHeights));
+}
+
+export function estimateMarkdownTableRowHeight(row: MarkdownTableRow): number {
+  const visualLines = Math.max(1, ...row.cells.map((cell) => estimateCellVisualLines(cell.text)));
+  return Math.ceil(TABLE_ROW_VERTICAL_CHROME_PX + visualLines * TABLE_TEXT_LINE_HEIGHT_PX);
+}
+
+export function estimateMarkdownTableColumnWidths(
+  alignments: readonly MarkdownTableAlignment[],
+  rows: readonly MarkdownTableRow[],
+): readonly number[] {
+  const sampledRows = sampleTableRows(rows, TABLE_COLUMN_WIDTH_SAMPLE_ROWS);
+  const columnCount = Math.max(1, alignments.length, ...sampledRows.map((row) => row.cells.length));
+  return Array.from({ length: columnCount }, (_, columnIndex) => {
+    let visualUnits = 0;
+    for (const row of sampledRows) {
+      const text = row.cells[columnIndex]?.text ?? "";
+      visualUnits = Math.max(visualUnits, estimateMaxLineVisualUnits(text));
+    }
+    return Math.max(96, Math.min(280, 28 + visualUnits * 7));
+  });
+}
+
+function sampleTableRows(
+  rows: readonly MarkdownTableRow[],
+  maximum: number,
+): readonly MarkdownTableRow[] {
+  if (rows.length <= maximum) return rows;
+  const sampled: MarkdownTableRow[] = [];
+  const seen = new Set<number>();
+  for (let sampleIndex = 0; sampleIndex < maximum; sampleIndex += 1) {
+    const rowIndex = Math.round(sampleIndex * (rows.length - 1) / (maximum - 1));
+    if (seen.has(rowIndex)) continue;
+    seen.add(rowIndex);
+    sampled.push(rows[rowIndex]);
+  }
+  return sampled;
 }
 
 /** Stable semantic identity used by WidgetType.eq without serializing a table. */
@@ -62,4 +97,20 @@ function estimateCellVisualLines(text: string): number {
     }
     return total + Math.max(1, Math.ceil(width / TABLE_CELL_LINE_CAPACITY));
   }, 0);
+}
+
+function estimateMaxLineVisualUnits(text: string): number {
+  let maximum = 0;
+  let current = 0;
+  for (const character of text) {
+    if (character === "\n") {
+      maximum = Math.max(maximum, current);
+      current = 0;
+    } else if (character === "\t") {
+      current += 4;
+    } else {
+      current += character.codePointAt(0)! > 0xff ? 2 : 1;
+    }
+  }
+  return Math.max(maximum, current);
 }

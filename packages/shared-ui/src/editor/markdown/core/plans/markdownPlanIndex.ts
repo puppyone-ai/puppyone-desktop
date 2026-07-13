@@ -7,6 +7,7 @@ import {
 } from "../syntax/markdownElements";
 import { compileMarkdownElementPlan } from "./markdownPlanCompiler";
 import type { MarkdownElementPlan, SourceRange } from "./markdownPlanTypes";
+import { getMarkdownDocumentProfile } from "./markdownBlockExecution";
 
 export type IndexedMarkdownPlan = {
   element: MarkdownElement;
@@ -44,7 +45,7 @@ export function getMarkdownPlanIndex(state: EditorState): readonly IndexedMarkdo
   if (cached.plans) return cached.plans;
 
   const elements = getMarkdownElements(state);
-  const plans = compileAndSortPlans(elements);
+  const plans = compileAndSortPlans(state, elements);
   cached.plans = plans;
   cached.intervals = buildIntervalIndex(plans, 0, plans.length);
   markdownPlanIndexDiagnostics.fullBuilds += 1;
@@ -77,7 +78,7 @@ export function getMarkdownPlansInRange(
   if (existing) return existing;
 
   const elements = getMarkdownElementsInRange(state, rangeFrom, rangeTo);
-  const plans = compileAndSortPlans(elements).filter(({ plan }) => (
+  const plans = compileAndSortPlans(state, elements).filter(({ plan }) => (
     plan.sourceRange.from < rangeTo && plan.sourceRange.to > rangeFrom
   ));
   cached.ranges.set(cacheKey, plans);
@@ -110,11 +111,18 @@ function getOrCreateCacheEntry(state: EditorState): MarkdownPlanIndexCacheEntry 
   return created;
 }
 
-function compileAndSortPlans(elements: readonly MarkdownElement[]): IndexedMarkdownPlan[] {
+function compileAndSortPlans(
+  state: EditorState,
+  elements: readonly MarkdownElement[],
+): IndexedMarkdownPlan[] {
+  const documentProfile = getMarkdownDocumentProfile({
+    sourceUnits: state.doc.length,
+    lines: state.doc.lines,
+  });
   return elements
     .map((element) => ({
       element,
-      plan: compileMarkdownElementPlan(element),
+      plan: compileMarkdownElementPlan(element, { documentProfile }),
     }))
     .sort((left, right) => (
       left.plan.sourceRange.from - right.plan.sourceRange.from

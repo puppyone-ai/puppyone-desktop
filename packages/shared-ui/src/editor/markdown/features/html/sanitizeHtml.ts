@@ -154,6 +154,9 @@ function copySafeAttributes(target: HTMLElement, source: HTMLElement, tagName: s
     if (tagName === "img" && name === "src") {
       if (context.capabilities.brokeredMedia && isBrokerSafeResolvedAssetUrl(value)) {
         target.setAttribute("src", value.trim());
+      } else if (context.capabilities.deferredMedia) {
+        target.setAttribute("data-md-asset-src", value);
+        target.setAttribute("aria-busy", "true");
       } else {
         markUnsupported(context, "image source was not resolved by AssetBroker");
       }
@@ -163,6 +166,9 @@ function copySafeAttributes(target: HTMLElement, source: HTMLElement, tagName: s
     if (tagName === "img" && name === "srcset") {
       if (context.capabilities.brokeredMedia && isBrokerSafeImageSrcset(value)) {
         target.setAttribute("srcset", value.trim());
+      } else if (context.capabilities.deferredMedia) {
+        target.setAttribute("data-md-asset-srcset", value);
+        target.setAttribute("aria-busy", "true");
       } else {
         markUnsupported(context, "image srcset was not resolved by AssetBroker");
       }

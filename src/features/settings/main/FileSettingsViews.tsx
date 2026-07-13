@@ -12,7 +12,7 @@ import {
   type FilesVisibilitySettings,
 } from "../../../preferences";
 import { ExternalAppIcon } from "../../external-apps/ExternalAppIcon";
-import { SettingsGroup, SettingsLine, SettingsSectionHeader } from "../components";
+import { SettingsSectionHeader, SettingsSubsection, SettingsValueRow } from "../components";
 
 export function FilesSettingsView({
   settings,
@@ -40,39 +40,43 @@ export function FilesSettingsView({
     <section className="desktop-utility-view desktop-settings-view">
       <div className="desktop-utility-body desktop-settings-body">
         <div className="desktop-settings-section desktop-files-settings-section">
-          <SettingsSectionHeader title={t("settings.files.title")} />
-          <SettingsGroup title={t("settings.files.groupTitle")}>
-            <div className="desktop-settings-line desktop-settings-toggle-line desktop-files-toggle-line">
+          <SettingsSectionHeader title={t("settings.files.title")} detail={t("settings.files.detail")} />
+          <SettingsSubsection>
+            <div className="desktop-settings-row desktop-settings-row-control desktop-settings-toggle-row desktop-files-toggle-row">
               <span>{t("settings.files.showHidden")}</span>
               <label className="desktop-settings-switch">
                 <input
                   type="checkbox"
+                  aria-label={t("settings.files.showHidden")}
                   checked={settings.showHiddenFiles}
                   onChange={(event) => onChange({ ...settings, showHiddenFiles: event.target.checked })}
                 />
                 <span aria-hidden="true" />
               </label>
             </div>
-            <div className="desktop-settings-pattern-editor desktop-files-pattern-editor">
-              <div className="desktop-files-pattern-editor-toolbar">
-                <span>{t("settings.files.excludePatterns")}</span>
+            <div className="desktop-settings-row desktop-settings-pattern-editor desktop-files-pattern-editor">
+              <span className="desktop-settings-label-stack">
+                <strong>{t("settings.files.excludePatterns")}</strong>
                 <small>{t("settings.files.patternCount", { count: normalizedDraft.length })}</small>
-              </div>
-              <textarea
-                value={patternDraft}
-                spellCheck={false}
-                onChange={(event) => setPatternDraft(event.target.value)}
-              />
-              <div className="desktop-settings-pattern-editor-footer">
-                <button className="desktop-settings-row-action" type="button" disabled={!patternsDirty} onClick={applyPatterns}>
-                  <Check size={13} /><span>{t("common.action.apply")}</span>
-                </button>
-                <button className="desktop-settings-row-action" type="button" onClick={resetPatterns}>
-                  <RefreshCw size={13} /><span>{t("common.action.reset")}</span>
-                </button>
+              </span>
+              <div className="desktop-settings-pattern-control">
+                <textarea
+                  aria-label={t("settings.files.excludePatterns")}
+                  value={patternDraft}
+                  spellCheck={false}
+                  onChange={(event) => setPatternDraft(event.target.value)}
+                />
+                <div className="desktop-settings-pattern-editor-footer">
+                  <button className="desktop-settings-row-action" type="button" disabled={!patternsDirty} onClick={applyPatterns}>
+                    <Check size={13} /><span>{t("common.action.apply")}</span>
+                  </button>
+                  <button className="desktop-settings-row-action" type="button" onClick={resetPatterns}>
+                    <RefreshCw size={13} /><span>{t("common.action.reset")}</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </SettingsGroup>
+          </SettingsSubsection>
         </div>
       </div>
     </section>
@@ -123,30 +127,31 @@ export function DefaultAppsSettingsView({
       <div className="desktop-utility-body desktop-settings-body">
         <div className="desktop-settings-section">
           <SettingsSectionHeader title={t("settings.defaultApps.title")} detail={t("settings.defaultApps.detail")} />
-          <SettingsGroup title={t("settings.defaultApps.systemDefault")}>
-            <SettingsLine
+          <SettingsSubsection title={t("settings.defaultApps.systemDefault")}>
+            <SettingsValueRow
               label={t("settings.defaultApps.openMode")}
               value={t("settings.defaultApps.macosDefault")}
               action={<span className="desktop-settings-badge connected">{t("settings.defaultApps.system")}</span>}
             />
-            <div className="desktop-settings-line">
+            <div className="desktop-settings-row desktop-settings-row-control">
               <span className="desktop-settings-label-stack">
                 <strong>{t("settings.defaultApps.executableProtection.title")}</strong>
                 <small>{t("settings.defaultApps.executableProtection.detail")}</small>
               </span>
               <span className="desktop-settings-badge connected">{t("settings.defaultApps.alwaysOn")}</span>
             </div>
-          </SettingsGroup>
-          <SettingsGroup title={t("settings.defaultApps.fileTypeDefaults")}>
-            <div className="desktop-settings-line desktop-settings-default-app-add">
+          </SettingsSubsection>
+          <SettingsSubsection title={t("settings.defaultApps.fileTypeDefaults")}>
+            <div className="desktop-settings-row desktop-settings-row-control desktop-settings-default-app-add">
               <span className="desktop-settings-label-stack">
                 <strong>{t("settings.defaultApps.addFileType.title")}</strong>
                 <small>{t("settings.defaultApps.addFileType.detail")}</small>
               </span>
-              <div className="desktop-settings-line-value">
+              <div className="desktop-settings-value">
                 <input
                   className="desktop-settings-text-input desktop-settings-extension-input"
                   type="text"
+                  aria-label={t("settings.defaultApps.addFileType.title")}
                   spellCheck={false}
                   placeholder="md"
                   value={extensionDraft}
@@ -202,7 +207,7 @@ export function DefaultAppsSettingsView({
               </div>
             )}
             {choiceError && <div className="desktop-settings-account-feedback danger">{choiceError}</div>}
-          </SettingsGroup>
+          </SettingsSubsection>
         </div>
       </div>
     </section>

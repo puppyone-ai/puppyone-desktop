@@ -79,6 +79,8 @@
   "markdown.mermaid.editDiagram": "Edit diagram source",
   "markdown.mermaid.empty": "Empty Mermaid diagram",
   "markdown.mermaid.finishEditing": "Finish editing diagram source",
+  "markdown.mermaid.largePreviewPaused": "Large diagram preview is paused.",
+  "markdown.mermaid.renderDiagram": "Render diagram",
   "markdown.mermaid.renderFailed": "Unable to render this Mermaid diagram.",
   "markdown.mermaid.renderFailedDetail": "Unable to render this Mermaid diagram: {detail}",
   "markdown.mermaid.rendering": "Rendering diagram…",

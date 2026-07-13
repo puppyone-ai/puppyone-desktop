@@ -18,7 +18,7 @@ export function ContentFontSetting({
   const contentFonts = getFontCatalogEntries("content", fontCatalog);
 
   return (
-    <div className="desktop-settings-row desktop-settings-row-control">
+    <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
       <span>{t("settings.appearance.contentFont.title")}</span>
       <div
         className="desktop-theme-segment desktop-content-font-segment"

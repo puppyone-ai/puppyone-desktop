@@ -16,6 +16,9 @@ import { compileInlineHtmlRenderPlan } from "../packages/shared-ui/src/editor/ma
 import { isAllowedStyleProperty } from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownHtmlSanitizerPolicy";
 import {
   getMarkdownInlineHtml,
+  getMarkdownInlineHtmlDiagnostics,
+  getMarkdownInlineHtmlInRange,
+  resetMarkdownInlineHtmlDiagnostics,
   type MarkdownInlineHtml,
 } from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlModel";
 import {
@@ -130,6 +133,41 @@ describe("Markdown inline HTML semantic model", () => {
     expect(element.contentRange).toEqual({
       from: source.indexOf(">") + 1,
       to: source.indexOf("</span>"),
+    });
+  });
+
+  it("pairs a whole semantic container while constructing only the requested range", () => {
+    const source = "Text <span>one\ntwo</span> end";
+    const state = createMarkdownState(source);
+    const secondLine = state.doc.line(2);
+
+    const [element] = getMarkdownInlineHtmlInRange(state, secondLine.from, secondLine.to);
+
+    expect(element).toMatchObject({
+      from: source.indexOf("<span>"),
+      to: source.indexOf("</span>") + "</span>".length,
+      status: "complete",
+    });
+  });
+
+  it("keeps an HTML-heavy 10,000-line range query bounded to its paragraph", () => {
+    const source = Array.from({ length: 5_000 }, (_, index) => (
+      `<span data-index="${index}">paragraph ${index}</span>\n`
+    )).join("\n");
+    const state = createMarkdownState(source);
+    const targetLine = state.doc.line(101);
+    expect(ensureSyntaxTree(state, targetLine.to, 3_000)).not.toBeNull();
+    resetMarkdownInlineHtmlDiagnostics();
+
+    const elements = getMarkdownInlineHtmlInRange(state, targetLine.from, targetLine.to);
+
+    expect(elements).toHaveLength(1);
+    expect(elements[0]?.status).toBe("complete");
+    expect(getMarkdownInlineHtmlDiagnostics()).toMatchObject({
+      fullDocumentScans: 0,
+      rangeScans: 1,
+      containersScanned: 1,
+      tokensScanned: 2,
     });
   });
 

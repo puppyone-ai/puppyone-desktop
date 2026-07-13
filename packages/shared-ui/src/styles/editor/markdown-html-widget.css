@@ -97,6 +97,39 @@
   min-height: 80px;
 }
 
+.markdown-codemirror-editor .cm-md-html-deferred {
+  display: flex;
+  min-height: 80px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--po-divider) 82%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--po-panel) 26%, transparent);
+  color: var(--po-text-muted);
+  font-size: 12px;
+}
+
+.markdown-codemirror-editor .cm-md-html-deferred-load {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--po-divider) 90%, transparent);
+  border-radius: 5px;
+  background: var(--po-control);
+  color: var(--po-text);
+  cursor: var(--po-clickable-cursor, pointer);
+  font: inherit;
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface img[aria-busy="true"] {
+  min-height: 80px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--po-control) 38%, transparent);
+}
+
 .markdown-codemirror-editor .cm-md-html-rendered-surface * {
   box-sizing: border-box;
 }

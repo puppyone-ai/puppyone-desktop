@@ -12,9 +12,9 @@ with a single `createPrincipalFromView` helper, `DocumentTrustContext` +
 Electron WebEmbed sessions, typed feature registries, and atomic table
 interaction/focus coordination are landed on the migration branch. The remaining
 acceptance gaps are full document-plan convergence for the isolated table-cell
-preview, a visual regression suite, oversized-block budget/windowing,
-production large-document profiling, and browser-backed (real renderer)
-lifecycle/IME/sandbox coverage —
+preview, a broader visual regression suite, and browser-backed (real renderer)
+lifecycle/IME/sandbox coverage beyond the shipped oversized-table production
+smoke —
 not product polish. These are enumerated honestly in §12 and Phase 4–6 below.
 
 This document defines the durable technical architecture for PuppyOne's
@@ -926,6 +926,7 @@ type MarkdownBlockComplexity = Readonly<{
   estimatedDomNodes: number;
   nestingDepth: number;
   assetCount: number;
+  maximumItemBreadth: number;
 }>;
 
 type MarkdownBlockExecution =
@@ -951,13 +952,15 @@ have the same cost as ten thousand interactive cells. A decision is stable for
 the same source revision, feature version, and budget-policy version; scrolling
 or a transient slow frame must not flip a block between representations.
 
-The host derives `documentProfile` once from transport size, line count,
-maximum-line length, and aggregate cheap block metrics, using the same policy
-for local and cloud files. A large document may still render ordinary blocks
-richly while applying tighter async and DOM budgets. The profile is disposable
-derived state, is never persisted into Markdown, and does not replace the
-separate filesystem/network byte limits. Those transport limits may be raised
-only after the corresponding large-file profiles pass the production harness.
+The host currently derives `documentProfile` once from source units and line
+count, using the same policy for local and cloud files. Per-block byte, line,
+breadth, nesting, asset, and logical-item metrics then refine the decision.
+A large document may still render ordinary blocks richly while applying tighter
+async and DOM budgets. The profile is disposable derived state, is never
+persisted into Markdown, and does not replace the separate filesystem/network
+byte limits. Additional aggregate metrics may be added only inside the same
+versioned policy. Transport limits may be raised only after the corresponding
+large-file profiles pass the production harness.
 
 The four strategies have distinct contracts:
 
@@ -983,7 +986,11 @@ one block, but it cannot bypass sanitizer, byte, process, or capability limits.
   IME-composing row remains pinned until the interaction ends. Measured height
   corrections are coalesced through the editor layout coordinator and preserve
   the visible row as the scroll anchor. A table too irregular to virtualize
-  honestly falls back to source instead of mounting every cell.
+  honestly falls back to source instead of mounting every cell. The current
+  policy bounds the collected semantic model at 5,000 logical rows, 50,000
+  cells, 64 columns, 64 KiB per row, and 4 MiB total table source; exceeding
+  any hard breadth/model ceiling preserves the exact source without
+  constructing the discarded row model or a widget.
 - **HTML blocks:** sanitize and compute complexity before mounting host DOM.
   Independent, sanitized top-level children may be chunked when their layout
   cannot escape the block. Arbitrary HTML cannot be split at guessed string or
@@ -997,8 +1004,9 @@ one block, but it cannot bypass sanitizer, byte, process, or capability limits.
   full-height textarea or duplicate the complete source into one DOM control.
   Syntax highlighting and diagnostics are time-sliced and may lag behind text;
   typing, selection, copy, and undo remain available.
-- **Mermaid and future computed embeds:** source bytes plus semantic node/edge
-  counts are bounded before rendering. Work goes through the async-render
+- **Mermaid and future computed embeds:** source bytes plus a cheap semantic
+  item estimate (currently non-empty Mermaid source lines) are bounded before
+  rendering. Work goes through the async-render
   broker with cancellation, revision checks, timeout/watchdog, and an isolated
   execution surface when rendering cannot be made cooperatively interruptible
   in the main renderer. Only sanitized, authority-free output may enter a
@@ -1006,7 +1014,9 @@ one block, but it cannot bypass sanitizer, byte, process, or capability limits.
 - **Images and media:** resolve and decode per asset near the viewport rather
   than waiting for every asset in a compound block. Reserve dimensions from
   trusted metadata or a bounded estimate, commit each decoded result
-  independently, and cancel/revoke handles on unmount or revision change.
+  independently, and cancel/revoke handles on unmount or revision change. The
+  HTML adapter uses a six-task resolution queue and rejects a `srcset` above 16
+  candidates before starting broker work.
 
 The nested virtualizer is view state, not document state. Its mounted range,
 measurements, and overscan belong to the block's `WidgetSession`; semantic row
@@ -1734,18 +1744,21 @@ unit tests:
   plan. HTML-block plans also still carry raw source for the widget's final
   profile/trust decision.
 - Direct layout decorations map through ordinary transactions and rebuild only
-  changed stable block ranges. Inline-HTML interval lookup is fast after index
-  construction, but a new document identity still constructs that index from
-  the complete syntax tree; the range API is therefore not yet truly
-  range-bounded for HTML-heavy large files.
-- Table, HTML, code-fence, and Mermaid widgets do not yet consume one shared
-  complexity-budget decision. In particular, a large table widget mounts every
-  row and cell when its outer CodeMirror block enters the viewport. Nested
-  block virtualization, feature budgets, and typed oversized fallbacks in
-  §4.6 remain implementation work.
+  changed stable block ranges. Inline-HTML range construction now finds only
+  intersecting paragraph/heading containers, pairs the complete selected
+  container for cross-line correctness, and caches those container results
+  without forcing a whole-document HTML index.
+- Table, HTML, code-fence, and Mermaid plans consume the same versioned
+  complexity decision. Large tables use the outer EditorView scroller with a
+  variable-height prefix index and bounded row DOM; HTML and Mermaid expose
+  explicit deferred activation; oversized code and hard-over-budget content
+  remain exact visible source; compound HTML media resolves independently.
 - Happy-DOM and main-process fixtures cover policy, conflicts, remount drafts,
   async cancellation, ownership and sandbox request rules. Real Chromium
   visual regression, viewport reuse, IME and sandbox tests are still required.
+  Mermaid remains protected by conservative source/item ceilings and stale
+  result suppression in the renderer; raising those ceilings requires moving
+  non-cooperatively interruptible rendering to an isolated execution surface.
 
 The target architecture is therefore adopted and its shipped paths are
 closed; the bullets above are the bounded Phase 6 work, not permission to add a
@@ -1852,23 +1865,28 @@ remain part of phases 5 and 6.
   contract. Initial source-exposure regression is covered by the atomic Preview
   readiness gate and production renderer smoke. **Remaining acceptance gaps:**
   broader feature-level visual regression, full table-cell document plan
-  convergence, truly range-bounded Inline-HTML index maintenance, oversized
-  block budget/windowing implementation, and fuller IME/DOM-reuse EditorView
-  coverage in a real renderer.
+  convergence, fuller IME/DOM-reuse EditorView coverage in a real renderer,
+  and an isolated Mermaid execution surface before any hard render ceiling is
+  raised.
 
-The oversized-block implementation order is fixed to avoid feature-local
-patches:
+The oversized-block implementation was completed in this order to avoid
+feature-local patches:
 
-1. add shared complexity types, a versioned budget policy, diagnostics, and
-   production counters without changing presentation;
-2. make the table the first `windowed` vertical slice, including outer-scroller
-   geometry, stable row keys, pinned editing/IME rows, and bounded-DOM tests;
-3. route HTML, code fences, Mermaid, and media through the same decision and
-   typed fallback contract;
-4. make Inline-HTML index construction truly changed-range incremental;
-5. run normal/large/extreme and adversarial single-block production profiles,
-   then revisit local/cloud transport limits. A file-size cap is not raised on
-   the strength of unit tests alone.
+1. shared complexity types, a versioned budget policy, diagnostics, and
+   counters were added in `markdownBlockExecution.ts`;
+2. the table became the first `windowed` vertical slice, including the outer
+   scroller, variable-height prefix sums, row pinning, one-batch anchor
+   correction, accessibility indices, and bounded-DOM tests;
+3. HTML, code fences, Mermaid, and compound media were routed through the same
+   decision and typed fallback/deferred contracts;
+4. Inline-HTML changed-range construction became semantic-container bounded;
+5. normal and threshold/adversarial unit profiles plus repeatable performance
+   benches were added;
+6. first-open plan normalization and geometry-sensitive projection installation
+   were split across cancellable renderer tasks. The revision/tree-scoped plan
+   cache joins them without exposing partial source or combining both phases in
+   one Long Task. The production Electron harness remains the authority before
+   any local/cloud transport or hard render limit is raised.
 
 The shipped foundation preserves source round-trip and has semantic, policy,
 decoration, type, broker, trust, and boundary checks. Phase 6 acceptance

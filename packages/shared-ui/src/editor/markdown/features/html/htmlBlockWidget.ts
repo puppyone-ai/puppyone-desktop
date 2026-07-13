@@ -5,7 +5,7 @@ import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { disposeWidgetSessionDom } from "../../platform/codemirror/widgetSession";
 import { bindInlineHtmlDomInteractions } from "./inlineHtmlDomAdapter";
 import {
-  resolveMarkdownHtmlImageSources,
+  resolveMarkdownImageSrcset,
   type BrokeredMarkdownAssetUrlResolver,
 } from "../image/markdownImageModel";
 import type { MarkdownHtmlBlock } from "./htmlBlockModel";
@@ -24,6 +24,13 @@ import {
   getMarkdownLocalization,
   type MarkdownLocalization,
 } from "../../core/editor/markdownLocalization";
+import {
+  MARKDOWN_RICH_BLOCK_EXECUTION,
+  type MarkdownMountedBlockExecution,
+} from "../../core/plans/markdownBlockExecution";
+import { isBrokerSafeResolvedAssetUrl } from "../../platform/policy/markdownAssetPolicy";
+
+const HTML_MEDIA_RESOLUTION_CONCURRENCY = 6;
 
 function extractExternalHttpsEmbed(source: string): string | null {
   const trimmed = source.trim();
@@ -43,6 +50,7 @@ export class HtmlBlockWidget extends WidgetType {
     private readonly documentPath: string,
     private readonly markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
     private readonly layoutEstimatedHeight = estimateHtmlBlockLayoutHeight(block.source),
+    private readonly execution: MarkdownMountedBlockExecution = MARKDOWN_RICH_BLOCK_EXECUTION,
   ) {
     super();
   }
@@ -54,6 +62,8 @@ export class HtmlBlockWidget extends WidgetType {
       widget.block.tagName === this.block.tagName &&
       widget.block.closed === this.block.closed &&
       widget.layoutEstimatedHeight === this.layoutEstimatedHeight &&
+      widget.execution.mode === this.execution.mode &&
+      widget.execution.budgetVersion === this.execution.budgetVersion &&
       widget.htmlTrustMode === this.htmlTrustMode &&
       widget.documentPath === this.documentPath &&
       widget.markdownAssetUrlResolver === this.markdownAssetUrlResolver
@@ -82,8 +92,10 @@ export class HtmlBlockWidget extends WidgetType {
     const measure = new MarkdownWidgetMeasureController(host.layout);
     let previewVersion = 0;
     let showingSource = false;
+    let activated = this.execution.mode !== "deferred";
     let webEmbedId: string | null = null;
     const activeAssetHandles = new Set<AssetBrokerHandle>();
+    let previewAbort = new AbortController();
     let boundsUpdateListener: (() => void) | null = null;
     let boundsResizeObserver: ResizeObserver | null = null;
 
@@ -121,6 +133,8 @@ export class HtmlBlockWidget extends WidgetType {
       }
     };
     const clearPreviewLifecycle = () => {
+      previewAbort.abort();
+      previewAbort = new AbortController();
       stopBoundsTracking();
       for (const handle of activeAssetHandles) handle.revoke();
       activeAssetHandles.clear();
@@ -225,6 +239,13 @@ export class HtmlBlockWidget extends WidgetType {
         );
       }
 
+      if (!activated) {
+        return createDeferredHtmlPlaceholder(() => {
+          activated = true;
+          render();
+        });
+      }
+
       const externalHref = extractExternalHttpsEmbed(this.block.source);
       if (externalHref) {
         return createWebEmbedPlaceholder(externalHref);
@@ -265,23 +286,18 @@ export class HtmlBlockWidget extends WidgetType {
         return createSanitizedHtmlPreviewBlock(this.block, this.block.source, t, sanitizedOptions);
       }
 
-      const wrapper = document.createElement("div");
-      wrapper.className = "cm-md-html-rendered-surface cm-md-html-block is-loading";
-      wrapper.appendChild(createTrustedHtmlLoader());
-      resolveMarkdownHtmlImageSources(this.block.source, this.documentPath, brokerResolver)
-        .then((source) => {
-          if (!isPreviewVersionCurrent(version)) return;
-          replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, source, t, {
-            ...sanitizedOptions,
-            brokeredMedia: true,
-          });
-          measure.schedule();
-        })
-        .catch(() => {
-          if (!isPreviewVersionCurrent(version)) return;
-          replaceWithSanitizedHtmlPreviewBlock(wrapper, this.block, this.block.source, t, sanitizedOptions);
-          measure.schedule();
-        });
+      const wrapper = createSanitizedHtmlPreviewBlock(this.block, this.block.source, t, {
+        ...sanitizedOptions,
+        deferredMedia: true,
+      });
+      hydrateDeferredHtmlMedia({
+        root: wrapper,
+        documentPath: this.documentPath,
+        resolver: brokerResolver,
+        signal: previewAbort.signal,
+        isCurrent: () => isPreviewVersionCurrent(version),
+        onLayoutChange: () => measure.schedule(),
+      });
       return wrapper;
     };
 
@@ -347,10 +363,15 @@ function createSanitizedHtmlPreviewBlock(
   block: MarkdownHtmlBlock,
   source: string,
   t: MarkdownLocalization["t"],
-  options: { brokeredMedia?: boolean; openHref?: (href: string) => void } = {},
+  options: {
+    brokeredMedia?: boolean;
+    deferredMedia?: boolean;
+    openHref?: (href: string) => void;
+  } = {},
 ): HTMLElement {
   const result = createSanitizedBlockHtmlFragment(source, {
     brokeredMedia: options.brokeredMedia === true,
+    deferredMedia: options.deferredMedia === true,
   });
   if (!result.supported) {
     return createUnsupportedHtmlBlock(block, t, result.reasons[0]);
@@ -364,17 +385,89 @@ function createSanitizedHtmlPreviewBlock(
   return wrapper;
 }
 
-function replaceWithSanitizedHtmlPreviewBlock(
-  target: HTMLElement,
-  block: MarkdownHtmlBlock,
-  source: string,
-  t: MarkdownLocalization["t"],
-  options: { brokeredMedia?: boolean; openHref?: (href: string) => void } = {},
+function hydrateDeferredHtmlMedia({
+  root,
+  documentPath,
+  resolver,
+  signal,
+  isCurrent,
+  onLayoutChange,
+}: {
+  root: HTMLElement;
+  documentPath: string;
+  resolver: BrokeredMarkdownAssetUrlResolver;
+  signal: AbortSignal;
+  isCurrent: () => boolean;
+  onLayoutChange: () => void;
+}) {
+  const tasks: Array<() => Promise<void>> = [];
+  for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
+    const source = image.dataset.mdAssetSrc ?? null;
+    const sourceSet = image.dataset.mdAssetSrcset ?? null;
+    if (!source && !sourceSet) continue;
+
+    image.loading = image.loading || "lazy";
+    image.decoding = "async";
+    let pendingResolutions = Number(Boolean(source)) + Number(Boolean(sourceSet));
+    const finishOne = () => {
+      pendingResolutions -= 1;
+      if (pendingResolutions > 0) return;
+      if (signal.aborted || !isCurrent() || !image.isConnected) return;
+      delete image.dataset.mdAssetSrc;
+      delete image.dataset.mdAssetSrcset;
+      image.removeAttribute("aria-busy");
+      onLayoutChange();
+    };
+    image.addEventListener("load", onLayoutChange, { once: true });
+    image.addEventListener("error", onLayoutChange, { once: true });
+
+    if (source) {
+      tasks.push(async () => {
+        try {
+          const resolved = await resolver(documentPath, source, signal);
+          if (signal.aborted || !isCurrent() || !image.isConnected) return;
+          if (resolved && isBrokerSafeResolvedAssetUrl(resolved)) image.src = resolved;
+        } catch {
+          // The inert placeholder remains when an asset cannot be resolved.
+        } finally {
+          finishOne();
+        }
+      });
+    }
+
+    if (sourceSet) {
+      tasks.push(async () => {
+        try {
+          const resolved = await resolveMarkdownImageSrcset(sourceSet, documentPath, resolver, signal);
+          if (signal.aborted || !isCurrent() || !image.isConnected) return;
+          if (resolved) image.srcset = resolved;
+        } catch {
+          // The inert placeholder remains when an asset cannot be resolved.
+        } finally {
+          finishOne();
+        }
+      });
+    }
+  }
+  void runDeferredMediaTasks(tasks, signal);
+}
+
+async function runDeferredMediaTasks(
+  tasks: readonly (() => Promise<void>)[],
+  signal: AbortSignal,
 ) {
-  const nextBlock = createSanitizedHtmlPreviewBlock(block, source, t, options);
-  target.className = nextBlock.className;
-  target.dir = nextBlock.dir;
-  target.replaceChildren(...Array.from(nextBlock.childNodes));
+  const concurrency = Math.min(HTML_MEDIA_RESOLUTION_CONCURRENCY, tasks.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (!signal.aborted) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const task = tasks[index];
+      if (!task) return;
+      await task();
+    }
+  };
+  await Promise.all(Array.from({ length: concurrency }, worker));
 }
 
 function getWebEmbedBounds(element: HTMLElement): { x: number; y: number; width: number; height: number } {
@@ -420,17 +513,25 @@ function getWebEmbedBounds(element: HTMLElement): { x: number; y: number; width:
   };
 }
 
-function createTrustedHtmlLoader(): HTMLElement {
-  const loader = document.createElement("div");
-  loader.className = "cm-md-html-trusted-loader";
-  loader.setAttribute("aria-hidden", "true");
+function createDeferredHtmlPlaceholder(onActivate: () => void): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "cm-md-html-deferred";
 
-  for (let index = 0; index < 3; index += 1) {
-    const line = document.createElement("span");
-    loader.appendChild(line);
-  }
+  const label = document.createElement("span");
+  label.textContent = "Large HTML preview is paused.";
 
-  return loader;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "cm-md-html-deferred-load";
+  button.textContent = "Render preview";
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onActivate();
+  }, { once: true });
+
+  placeholder.append(label, button);
+  return placeholder;
 }
 
 function createHtmlWidgetIcon(kind: "preview" | "source"): SVGElement {
