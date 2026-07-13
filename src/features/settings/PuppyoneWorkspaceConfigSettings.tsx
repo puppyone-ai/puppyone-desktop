@@ -3,7 +3,7 @@ import { Check, RefreshCw } from "lucide-react";
 import type { GitRemoteSummary, GitStatusSnapshot, PuppyoneBackendService, PuppyoneWorkspaceConfig } from "../../types/electron";
 import { parsePuppyoneRemote } from "../source-control/remotes";
 import { useLocalization } from "@puppyone/localization";
-import { SettingsGroup } from "./components";
+import { SettingsSubsection } from "./components";
 import { remoteKindLabel } from "./utils";
 
 export function PuppyoneWorkspaceConfigSettings({
@@ -164,7 +164,7 @@ export function PuppyoneWorkspaceConfigSettings({
   };
 
   return (
-    <SettingsGroup>
+    <SettingsSubsection>
       {loading && !config ? (
         <div className="desktop-settings-muted-row">{t("settings.workspaceConfig.reading")}</div>
       ) : (
@@ -240,6 +240,7 @@ export function PuppyoneWorkspaceConfigSettings({
             <label className="desktop-settings-switch">
               <input
                 type="checkbox"
+                aria-label={t("settings.workspaceConfig.backupEnabled.title")}
                 checked={draft.backup.enabled}
                 disabled={saving}
                 onChange={(event) => updateBackupConfig({ enabled: event.target.checked })}
@@ -373,7 +374,7 @@ export function PuppyoneWorkspaceConfigSettings({
           </div>
         </>
       )}
-    </SettingsGroup>
+    </SettingsSubsection>
   );
 }
 

@@ -13,31 +13,30 @@
 }
 .desktop-language-setting-row {
   align-items: flex-start;
+  padding-block: 7px;
+}
+
+.desktop-language-setting-row > span:first-child {
+  line-height: 28px;
 }
 
 .desktop-language-setting-control {
-  display: flex;
-  min-width: min(300px, 48%);
-  flex-direction: column;
-  align-items: stretch;
+  display: grid;
+  width: min(100%, 220px);
+  min-width: 0;
   gap: 6px;
 }
 
-.desktop-language-setting-control select {
-  min-height: 32px;
-  padding-block: 5px;
-  padding-inline: 10px 30px;
-  border: 1px solid var(--po-border-subtle);
-  border-radius: 8px;
-  color: var(--po-text);
-  background: var(--po-surface-raised);
-  font: inherit;
+.desktop-language-setting-select {
+  width: 100%;
 }
 
 .desktop-language-setting-status,
 .desktop-language-setting-error {
-  max-width: 300px;
+  max-width: 220px;
   color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 520;
   line-height: 1.35;
 }
 
@@ -46,8 +45,22 @@
 }
 
 @media (max-width: 720px) {
+  .desktop-language-setting-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .desktop-language-setting-row > span:first-child {
+    line-height: 18px;
+  }
+
   .desktop-language-setting-control {
     width: 100%;
-    min-width: 0;
+  }
+
+  .desktop-language-setting-status,
+  .desktop-language-setting-error {
+    max-width: none;
   }
 }
