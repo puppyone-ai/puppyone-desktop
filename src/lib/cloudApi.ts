@@ -117,6 +117,27 @@ export type DesktopCloudLegacyBindingCandidate = {
   requires_confirmation: true;
 };
 
+export type DesktopCloudCanonicalProjectContext = {
+  project: DesktopCloudProject & {
+    org_id: string;
+    visibility: string;
+    bound_git_branch: string;
+    effective_role: "admin" | "editor" | "viewer";
+    grant_source: "org_owner" | "project_member" | "org_visibility";
+    capabilities: string[];
+  };
+  scope: {
+    id: string;
+    kind: "full" | "scoped";
+    path: string | null;
+  };
+  locator: {
+    project_id: string;
+    scope_id: string;
+    binding_kind: "full" | "scoped";
+  };
+};
+
 export type DesktopCloudOrganization = {
   id: string;
   name: string;
@@ -712,6 +733,21 @@ export function resolveLegacyCloudWorkspaceRemote(
 ): Promise<DesktopCloudLegacyBindingCandidate> {
   return cloudApiRequest<DesktopCloudLegacyBindingCandidate>(
     "/desktop/project-bindings/resolve-legacy-remote",
+    session,
+    onSessionChange,
+    { method: "POST", body: JSON.stringify({ remote_url: remoteUrl }) },
+    apiBaseUrl,
+  );
+}
+
+export function resolveCanonicalCloudWorkspaceRemote(
+  session: DesktopCloudSession,
+  remoteUrl: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudCanonicalProjectContext> {
+  return cloudApiRequest<DesktopCloudCanonicalProjectContext>(
+    "/desktop/project-bindings/resolve-canonical-remote",
     session,
     onSessionChange,
     { method: "POST", body: JSON.stringify({ remote_url: remoteUrl }) },

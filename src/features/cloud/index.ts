@@ -1,6 +1,8 @@
 export {
   attachmentHasBoundProject,
+  attachmentHasProjectContext,
   getAttachedCloudProjectId,
+  getResolvedCloudProjectId,
   isProjectCloudLinked,
   resolveCloudHubSectionAfterBindingChange,
   resolveCloudProjectNavigationContext,

@@ -3,7 +3,9 @@ import { FEATURE_FLAG_DEFAULTS } from "../src/features/flags/registry";
 import { resolveFeatureFlags } from "../src/features/flags/resolveFlags";
 import {
   attachmentHasBoundProject,
+  attachmentHasProjectContext,
   getAttachedCloudProjectId,
+  getResolvedCloudProjectId,
   isProjectCloudLinked,
   resolveCloudHubSectionForAttachment,
   resolveProjectCloudAttachment,
@@ -154,25 +156,35 @@ describe("ProjectCloudAttachment", () => {
   it("resolves binding state without using CloudAuth / session availability", () => {
     expect(resolveProjectCloudAttachment({
       configuredProjectId: "proj-1",
-      bindingProjectId: null,
+      resolvedProjectId: null,
       remoteProjectId: null,
       bindingError: null,
       bindingCloudLinked: false,
       resolving: false,
-    })).toEqual({ status: "linked", projectId: "proj-1" });
+    })).toEqual({
+      status: "resolved",
+      projectId: "proj-1",
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
+    });
 
     expect(resolveProjectCloudAttachment({
       configuredProjectId: "proj-1",
-      bindingProjectId: null,
+      resolvedProjectId: null,
       remoteProjectId: null,
       bindingError: null,
       bindingCloudLinked: true,
       resolving: false,
-    })).toEqual({ status: "linked", projectId: "proj-1" });
+    })).toEqual({
+      status: "resolved",
+      projectId: "proj-1",
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
+    });
 
     expect(resolveProjectCloudAttachment({
       configuredProjectId: null,
-      bindingProjectId: null,
+      resolvedProjectId: null,
       remoteProjectId: null,
       bindingError: null,
       bindingCloudLinked: false,
@@ -180,10 +192,32 @@ describe("ProjectCloudAttachment", () => {
     })).toEqual({ status: "local-only", projectId: null });
   });
 
+  it("separates an authorized canonical context from a durable binding", () => {
+    const context = resolveProjectCloudAttachment({
+      configuredProjectId: null,
+      resolvedProjectId: "proj-canonical",
+      remoteProjectId: null,
+      bindingError: null,
+      bindingCloudLinked: true,
+      resolutionSource: "canonical-remote",
+      bindingStatus: "not-bound",
+      bindingKind: "scoped",
+      scopeId: "scope-docs",
+      resolving: false,
+    });
+
+    expect(getResolvedCloudProjectId(context)).toBe("proj-canonical");
+    expect(attachmentHasProjectContext(context)).toBe(true);
+    expect(getAttachedCloudProjectId(context)).toBeNull();
+    expect(attachmentHasBoundProject(context)).toBe(false);
+    expect(isProjectCloudLinked(context)).toBe(false);
+    expect(resolveCloudHubSectionForAttachment(context)).toBe("contents");
+  });
+
   it("exposes helpers for attached project ids and hub section resets", () => {
     const linked = resolveProjectCloudAttachment({
       configuredProjectId: null,
-      bindingProjectId: "proj-2",
+      resolvedProjectId: "proj-2",
       remoteProjectId: null,
       bindingError: null,
       bindingCloudLinked: true,
@@ -200,7 +234,7 @@ describe("ProjectCloudAttachment", () => {
   it("separates not-authorized and unresolvable recovery attachments", () => {
     expect(resolveProjectCloudAttachment({
       configuredProjectId: null,
-      bindingProjectId: null,
+      resolvedProjectId: null,
       remoteProjectId: "proj-secret",
       bindingError: cloudMessage("binding-not-authorized"),
       bindingReason: "not-authorized",
@@ -214,7 +248,7 @@ describe("ProjectCloudAttachment", () => {
 
     expect(resolveProjectCloudAttachment({
       configuredProjectId: null,
-      bindingProjectId: null,
+      resolvedProjectId: null,
       remoteProjectId: null,
       bindingError: cloudMessage("binding-unknown-remote"),
       bindingReason: "unresolvable",
@@ -268,6 +302,11 @@ describe("selected vs mapped Cloud project binding", () => {
       error: null,
     });
     expect(afterAttach).toEqual({ status: "bound-full", projectId: "proj-1", readiness: null });
-    expect(isProjectCloudLinked({ status: "linked", projectId: "proj-1" })).toBe(true);
+    expect(isProjectCloudLinked({
+      status: "resolved",
+      projectId: "proj-1",
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
+    })).toBe(true);
   });
 });

@@ -12,6 +12,9 @@ directly:
 - [Local and Cloud UX](architecture/local-and-cloud-ux.md)
   - One Projects entry, one Project shell, and the Local Only, Local + Cloud,
     and Cloud Only capability states.
+  - Defines binding/canonical-remote Project-context resolution, the strict
+    boundary between contextual Cloud navigation and the global Project
+    catalog, recovery states, and the unchanged Version Engine boundary.
 - [Automation and Plugin Domain Boundary](architecture/automation-plugin-domain-boundary.md)
 - [Cloud Automation UX and Architecture](architecture/cloud-automation-ux.md)
   - Automation product definition, UX contract for creation and management,

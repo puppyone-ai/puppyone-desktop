@@ -217,28 +217,35 @@ describe("ProjectCloudAttachment binding-only semantics", () => {
   it("does not infer offline from a missing Cloud session", () => {
     const attachment = resolveProjectCloudAttachment({
       configuredProjectId: "proj-1",
-      bindingProjectId: null,
+      resolvedProjectId: null,
       remoteProjectId: null,
       bindingError: null,
       bindingCloudLinked: true,
       resolving: false,
     });
-    expect(attachment).toEqual({ status: "linked", projectId: "proj-1" });
+    expect(attachment).toEqual({
+      status: "resolved",
+      projectId: "proj-1",
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
+    });
     expect(isProjectCloudLinked(attachment)).toBe(true);
   });
 
   it("keeps a known project structurally linked while preserving a resolver warning", () => {
     const attachment = resolveProjectCloudAttachment({
       configuredProjectId: null,
-      bindingProjectId: "proj-err",
+      resolvedProjectId: "proj-err",
       remoteProjectId: null,
       bindingError: "Mapping failed",
       bindingCloudLinked: true,
       resolving: false,
     });
     expect(attachment).toEqual({
-      status: "linked",
+      status: "resolved",
       projectId: "proj-err",
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
       warning: "Mapping failed",
     });
     expect(isProjectCloudLinked(attachment)).toBe(true);
@@ -247,7 +254,12 @@ describe("ProjectCloudAttachment binding-only semantics", () => {
   });
 
   it("resets Cloud Hub section when switching linked → unlinked", () => {
-    expect(resolveCloudHubSectionForAttachment({ status: "linked", projectId: "a" })).toBe("contents");
+    expect(resolveCloudHubSectionForAttachment({
+      status: "resolved",
+      projectId: "a",
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
+    })).toBe("contents");
     expect(resolveCloudHubSectionForAttachment({ status: "local-only", projectId: null })).toBe("overview");
     expect(resolveCloudHubSectionForAttachment({
       status: "error",
@@ -258,8 +270,10 @@ describe("ProjectCloudAttachment binding-only semantics", () => {
 
   it("keeps a known binding bound during a resolver error, while a browse selection remains transient", () => {
     const degradedBinding = {
-      status: "linked" as const,
+      status: "resolved" as const,
       projectId: "proj-known",
+      resolutionSource: "workspace-binding" as const,
+      bindingStatus: "bound" as const,
       warning: "Cloud is temporarily unavailable",
     };
 
@@ -630,7 +644,7 @@ describe("Cloud History route", () => {
 });
 
 describe("CloudRouter browse context", () => {
-  it("routes History for an explicitly browsed project without promoting it to a local binding", async () => {
+  it("ignores a stale global selection in an open local-only workspace", async () => {
     getCloudHistory.mockReset();
     getCloudHistory.mockResolvedValue(historyPage({ project_id: "proj-browse" }));
     const container = document.createElement("div");
@@ -660,14 +674,10 @@ describe("CloudRouter browse context", () => {
           localChangeCount={0}
           loading={false}
           cloudBackupLoading={false}
-          cloudAction={{ kind: null, projectId: null, notice: null, error: null }}
           onSessionChange={vi.fn()}
           onBackupWorkspace={vi.fn()}
-          onConnectProject={vi.fn()}
-          onCopyCloneCommand={vi.fn()}
           onOpenProject={vi.fn()}
           onOpenGitSettings={vi.fn()}
-          onSelectProject={vi.fn()}
           onSelectSection={vi.fn()}
         />,
       );
@@ -675,15 +685,10 @@ describe("CloudRouter browse context", () => {
       await Promise.resolve();
     });
 
-    expect(getCloudHistory).toHaveBeenCalledWith(
-      session,
-      "proj-preview",
-      80,
-      expect.any(Function),
-      "https://cloud.example",
-    );
+    expect(getCloudHistory).not.toHaveBeenCalled();
     expect(container.textContent).toContain("History");
-    expect(container.textContent).toContain("Preview Project");
+    expect(container.textContent).toContain("Back up and connect");
+    expect(container.textContent).not.toContain("Preview Project");
     expect(container.textContent).not.toContain("Local mapping");
   });
 });
@@ -888,10 +893,10 @@ describe("useDesktopCloudData request lifecycle", () => {
   });
 
   it("clears the previous project's payload as soon as browse context changes", async () => {
-    const secondProjectList = deferred<typeof projects>();
-    listCloudProjects
-      .mockResolvedValueOnce(projects)
-      .mockImplementationOnce(() => secondProjectList.promise);
+    const secondProject = deferred<(typeof projects)[number]>();
+    getCloudProject
+      .mockResolvedValueOnce(projects[0])
+      .mockImplementationOnce(() => secondProject.promise);
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -912,7 +917,7 @@ describe("useDesktopCloudData request lifecycle", () => {
     expect(container.firstElementChild?.getAttribute("data-loading")).toBe("true");
 
     await act(async () => {
-      secondProjectList.resolve(projects);
+      secondProject.resolve(projects[1]);
       await flushPromises();
     });
     expect(container.firstElementChild?.getAttribute("data-loaded-project")).toBe("proj-b");
@@ -935,8 +940,8 @@ describe("useDesktopCloudData request lifecycle", () => {
       await flushPromises();
     });
 
-    const reloadedProjects = deferred<typeof projects>();
-    listCloudProjects.mockImplementationOnce(() => reloadedProjects.promise);
+    const reloadedProject = deferred<(typeof projects)[number]>();
+    getCloudProject.mockImplementationOnce(() => reloadedProject.promise);
     let settled = false;
     let reloadPromise: Promise<void> | null = null;
     await act(async () => {
@@ -947,17 +952,17 @@ describe("useDesktopCloudData request lifecycle", () => {
     expect(settled).toBe(false);
 
     await act(async () => {
-      reloadedProjects.resolve(projects);
+      reloadedProject.resolve(projects[0]);
       await reloadPromise;
     });
     expect(settled).toBe(true);
   });
 
   it("ignores an older project request that finishes after the new browse context", async () => {
-    const firstProjectList = deferred<typeof projects>();
-    listCloudProjects
-      .mockImplementationOnce(() => firstProjectList.promise)
-      .mockResolvedValueOnce(projects);
+    const firstProject = deferred<(typeof projects)[number]>();
+    getCloudProject
+      .mockImplementationOnce(() => firstProject.promise)
+      .mockResolvedValueOnce(projects[1]);
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -974,16 +979,16 @@ describe("useDesktopCloudData request lifecycle", () => {
     expect(container.firstElementChild?.getAttribute("data-active-project")).toBe("proj-b");
 
     await act(async () => {
-      firstProjectList.resolve(projects);
+      firstProject.resolve(projects[0]);
       await flushPromises();
     });
     expect(container.firstElementChild?.getAttribute("data-active-project")).toBe("proj-b");
   });
 
   it("keeps project identity available while switching to a route-scoped loader", async () => {
-    const routeRefresh = deferred<typeof projects>();
-    listCloudProjects
-      .mockResolvedValueOnce(projects)
+    const routeRefresh = deferred<(typeof projects)[number]>();
+    getCloudProject
+      .mockResolvedValueOnce(projects[0])
       .mockImplementationOnce(() => routeRefresh.promise);
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -1016,7 +1021,7 @@ describe("useDesktopCloudData request lifecycle", () => {
     expect(container.firstElementChild?.getAttribute("data-loading")).toBe("true");
 
     await act(async () => {
-      routeRefresh.resolve(projects);
+      routeRefresh.resolve(projects[0]);
       await flushPromises();
     });
   });
@@ -1187,10 +1192,15 @@ describe("Local repo Cloud binding integration", () => {
             cloudRemote={{
               remote: { name: "puppyone", fetchUrl: "", pushUrl: "", branches: [] },
               rawUrl: "https://cloud.example/git/proj-1.git",
-              info: { kind: "project", host: "cloud.example", displayId: "proj-1", projectId: "proj-1" },
+              info: { kind: "project", host: "cloud.example", origin: "https://cloud.example", displayId: "proj-1", projectId: "proj-1" },
             }}
             cloudData={createAggregateCloudData(vi.fn(async () => undefined))}
-            attachment={{ status: "linked", projectId: "proj-1" }}
+            attachment={{
+              status: "resolved",
+              projectId: "proj-1",
+              resolutionSource: "workspace-binding",
+              bindingStatus: "bound",
+            }}
             selectedProjectId={null}
             activeSection="contents"
             accountEmail={session.user_email}
@@ -1240,7 +1250,7 @@ describe("Local repo Cloud binding integration", () => {
           cloudRemote={{
             remote: { name: "puppyone", fetchUrl: "", pushUrl: "", branches: [] },
             rawUrl: "https://cloud.example/git/proj-secret.git",
-            info: { kind: "project", host: "cloud.example", displayId: "proj-secret", projectId: "proj-secret" },
+            info: { kind: "project", host: "cloud.example", origin: "https://cloud.example", displayId: "proj-secret", projectId: "proj-secret" },
           }}
           cloudData={createAggregateCloudData(vi.fn(async () => undefined), {
             mappedProjectId: null,
