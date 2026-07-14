@@ -478,6 +478,7 @@
 }
 
 .desktop-cloud-main-alert {
+  align-self: start;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--po-danger) 18%, var(--po-divider));
   border-radius: 8px;
@@ -485,6 +486,26 @@
   color: var(--po-danger);
   font-size: 13px;
   font-weight: 600;
+}
+
+.desktop-cloud-main-alert.warning {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-color: color-mix(in srgb, var(--po-warning) 28%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-warning) 9%, var(--po-panel));
+  color: var(--po-warning);
+}
+
+.desktop-cloud-main-alert.warning > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.desktop-cloud-main-alert.warning .desktop-cloud-row-action {
+  flex: 0 0 auto;
 }
 
 .desktop-cloud-main-alert.success {

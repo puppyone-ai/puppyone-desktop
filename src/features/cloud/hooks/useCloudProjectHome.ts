@@ -35,6 +35,7 @@ import {
 export function useCloudProjectHome({
   activeCloudSession,
   autoRefreshProjectCatalog = true,
+  autoResolveRecentWorkspaceBindings = true,
   cloudEnabled,
   desktopCloudApiBaseUrl,
   includeUnboundCloudProjects = true,
@@ -49,6 +50,7 @@ export function useCloudProjectHome({
 }: {
   activeCloudSession: DesktopCloudSession | null;
   autoRefreshProjectCatalog?: boolean;
+  autoResolveRecentWorkspaceBindings?: boolean;
   cloudEnabled: boolean;
   desktopCloudApiBaseUrl: string | null;
   includeUnboundCloudProjects?: boolean;
@@ -67,6 +69,17 @@ export function useCloudProjectHome({
   const [homeCloudProjectsErrorState, setHomeCloudProjectsErrorState] = useState<CloudMessageDescriptor | null>(null);
   const [recentWorkspaceCloudBindings, setRecentWorkspaceCloudBindings] = useState<Record<string, RecentWorkspaceCloudBinding>>({});
   const [pendingCloudProjectCreate, setPendingCloudProjectCreate] = useState(false);
+  const activeCloudSessionRef = useRef(activeCloudSession);
+  const updateCloudSessionRef = useRef(updateCloudSession);
+  activeCloudSessionRef.current = activeCloudSession;
+  updateCloudSessionRef.current = updateCloudSession;
+  const cloudSessionIdentityKey = activeCloudSession
+    ? [
+        activeCloudSession.user_id,
+        activeCloudSession.session_generation,
+        activeCloudSession.api_base_url,
+      ].join("\n")
+    : "signed-out";
   const homeCloudProjectsError = homeCloudProjectsErrorState
     ? formatCloudMessage(homeCloudProjectsErrorState, t)
     : null;
@@ -77,7 +90,8 @@ export function useCloudProjectHome({
   }, []);
 
   const refreshHomeCloudProjects = useCallback(async () => {
-    if (!cloudEnabled || !activeCloudSession) {
+    const activeSession = activeCloudSessionRef.current;
+    if (!cloudEnabled || cloudSessionIdentityKey === "signed-out" || !activeSession) {
       setHomeCloudProjects([]);
       setHomeCloudProjectsLoading(false);
       setHomeCloudProjectsErrorState(null);
@@ -88,8 +102,8 @@ export function useCloudProjectHome({
     setHomeCloudProjectsErrorState(null);
     try {
       const projects = await listCloudProjects(
-        activeCloudSession,
-        updateCloudSession,
+        activeSession,
+        updateCloudSessionRef.current,
         desktopCloudApiBaseUrl,
       );
       setHomeCloudProjects(projects);
@@ -102,7 +116,7 @@ export function useCloudProjectHome({
     } finally {
       setHomeCloudProjectsLoading(false);
     }
-  }, [activeCloudSession, cloudEnabled, desktopCloudApiBaseUrl, updateCloudSession]);
+  }, [cloudEnabled, cloudSessionIdentityKey, desktopCloudApiBaseUrl]);
 
   const recentWorkspaceBindingKey = useMemo(
     () => recentWorkspaceItems
@@ -119,6 +133,7 @@ export function useCloudProjectHome({
   homeCloudProjectsRef.current = homeCloudProjects;
 
   useEffect(() => {
+    if (!autoResolveRecentWorkspaceBindings) return undefined;
     const items = recentWorkspaceItems.slice(0, 20);
     if (!cloudEnabled || items.length === 0) {
       setRecentWorkspaceCloudBindings({});
@@ -130,9 +145,9 @@ export function useCloudProjectHome({
       items.map((item) => resolveRecentWorkspaceCloudBinding({
         apiBaseUrl: desktopCloudApiBaseUrl,
         item,
-        onSessionChange: updateCloudSession,
+        onSessionChange: updateCloudSessionRef.current,
         projects: homeCloudProjectsRef.current,
-        session: activeCloudSession,
+        session: activeCloudSessionRef.current,
       })),
     )
       .then((entries) => {
@@ -150,13 +165,13 @@ export function useCloudProjectHome({
       cancelled = true;
     };
   }, [
-    activeCloudSession,
+    autoResolveRecentWorkspaceBindings,
     cloudEnabled,
+    cloudSessionIdentityKey,
     desktopCloudApiBaseUrl,
     homeCloudProjectIdsKey,
     recentWorkspaceBindingKey,
     recentWorkspaceItems,
-    updateCloudSession,
   ]);
 
   const homeProjectItems = useMemo(

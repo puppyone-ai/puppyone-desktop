@@ -19,7 +19,9 @@ import { loadCloudProjectDetails } from "../src/features/cloud/data/cloudProject
 import { CloudHistorySection } from "../src/features/cloud/sections/HistorySection";
 import { CloudAutomationRouteSection } from "../src/features/cloud/sections/AutomationRouteSection";
 import { CloudServiceSidebar } from "../src/features/cloud/CloudServiceSidebar";
+import { CloudServiceMainView } from "../src/features/cloud/CloudServiceMainView";
 import { useCloudAuthController } from "../src/features/cloud/hooks/useCloudAuthController";
+import { useCloudProjectHome } from "../src/features/cloud/hooks/useCloudProjectHome";
 import { CloudProjectBrowser } from "../src/features/cloud/components/ProjectBrowser";
 import { CloudRouter } from "../src/features/cloud/routes/CloudRouter";
 import {
@@ -216,29 +218,38 @@ describe("Cloud browser sign-in state", () => {
 describe("ProjectCloudAttachment binding-only semantics", () => {
   it("does not infer offline from a missing Cloud session", () => {
     const attachment = resolveProjectCloudAttachment({
-      configuredProjectId: "proj-1",
-      bindingProjectId: null,
+      resolvedProjectId: "proj-1",
       remoteProjectId: null,
       bindingError: null,
       bindingCloudLinked: true,
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
       resolving: false,
     });
-    expect(attachment).toEqual({ status: "linked", projectId: "proj-1" });
+    expect(attachment).toEqual({
+      status: "resolved",
+      projectId: "proj-1",
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
+    });
     expect(isProjectCloudLinked(attachment)).toBe(true);
   });
 
   it("keeps a known project structurally linked while preserving a resolver warning", () => {
     const attachment = resolveProjectCloudAttachment({
-      configuredProjectId: null,
-      bindingProjectId: "proj-err",
+      resolvedProjectId: "proj-err",
       remoteProjectId: null,
       bindingError: "Mapping failed",
       bindingCloudLinked: true,
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
       resolving: false,
     });
     expect(attachment).toEqual({
-      status: "linked",
+      status: "resolved",
       projectId: "proj-err",
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
       warning: "Mapping failed",
     });
     expect(isProjectCloudLinked(attachment)).toBe(true);
@@ -247,7 +258,12 @@ describe("ProjectCloudAttachment binding-only semantics", () => {
   });
 
   it("resets Cloud Hub section when switching linked → unlinked", () => {
-    expect(resolveCloudHubSectionForAttachment({ status: "linked", projectId: "a" })).toBe("contents");
+    expect(resolveCloudHubSectionForAttachment({
+      status: "resolved",
+      projectId: "a",
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
+    })).toBe("contents");
     expect(resolveCloudHubSectionForAttachment({ status: "local-only", projectId: null })).toBe("overview");
     expect(resolveCloudHubSectionForAttachment({
       status: "error",
@@ -256,21 +272,18 @@ describe("ProjectCloudAttachment binding-only semantics", () => {
     })).toBe("overview");
   });
 
-  it("keeps a known binding bound during a resolver error, while a browse selection remains transient", () => {
+  it("keeps a known binding bound during a resolver error", () => {
     const degradedBinding = {
-      status: "linked" as const,
+      status: "resolved" as const,
       projectId: "proj-known",
+      resolutionSource: "workspace-binding" as const,
+      bindingStatus: "bound" as const,
       warning: "Cloud is temporarily unavailable",
     };
 
-    expect(resolveCloudProjectNavigationContext(degradedBinding, null)).toEqual({
+    expect(resolveCloudProjectNavigationContext(degradedBinding)).toEqual({
       projectContext: true,
-      projectBound: true,
-    });
-    // Formal binding wins — stale browse selection must not demote projectBound.
-    expect(resolveCloudProjectNavigationContext(degradedBinding, "proj-preview")).toEqual({
-      projectContext: true,
-      projectBound: true,
+      localWorkspaceContext: true,
     });
   });
 
@@ -360,7 +373,7 @@ describe("CloudServiceSidebar project context", () => {
         cloudSession={session}
         activeSection="history"
         projectContext={false}
-        projectBound={false}
+        localWorkspaceContext={false}
         onSelectSection={vi.fn()}
       />,
     ));
@@ -382,7 +395,7 @@ describe("CloudServiceSidebar project context", () => {
         cloudSession={session}
         activeSection="history"
         projectContext
-        projectBound
+        localWorkspaceContext
         onSelectSection={vi.fn()}
       />,
     ));
@@ -407,7 +420,7 @@ describe("CloudServiceSidebar project context", () => {
         cloudSession={session}
         activeSection="contents"
         projectContext
-        projectBound
+        localWorkspaceContext
         projectCapabilities={["project.read", "agent.read"]}
         onSelectSection={vi.fn()}
       />,
@@ -421,7 +434,7 @@ describe("CloudServiceSidebar project context", () => {
         cloudSession={session}
         activeSection="contents"
         projectContext
-        projectBound
+        localWorkspaceContext
         projectCapabilities={["project.read", "agent.read", "project.settings.manage"]}
         onSelectSection={vi.fn()}
       />,
@@ -442,7 +455,7 @@ describe("CloudServiceSidebar project context", () => {
         cloudSession={session}
         activeSection="contents"
         projectContext
-        projectBound={false}
+        localWorkspaceContext={false}
         onSelectSection={onSelectSection}
         onBackToProjects={onBackToProjects}
       />,
@@ -468,7 +481,7 @@ describe("CloudServiceSidebar project context", () => {
         cloudSession={session}
         activeSection="contents"
         projectContext
-        projectBound={false}
+        localWorkspaceContext={false}
         onSelectSection={vi.fn()}
       />,
     ));
@@ -480,7 +493,7 @@ describe("CloudServiceSidebar project context", () => {
         cloudSession={session}
         activeSection="overview"
         projectContext={false}
-        projectBound={false}
+        localWorkspaceContext={false}
         onSelectSection={vi.fn()}
       />,
     ));
@@ -630,8 +643,8 @@ describe("Cloud History route", () => {
   });
 });
 
-describe("CloudRouter browse context", () => {
-  it("routes History for an explicitly browsed project without promoting it to a local binding", async () => {
+describe("CloudRouter local context", () => {
+  it("does not promote aggregate project data in an open local-only workspace", async () => {
     getCloudHistory.mockReset();
     getCloudHistory.mockResolvedValue(historyPage({ project_id: "proj-browse" }));
     const container = document.createElement("div");
@@ -653,7 +666,6 @@ describe("CloudRouter browse context", () => {
             activeProjectId: "proj-preview",
             activeProject: { id: "proj-preview", name: "Preview Project" },
           })}
-          selectedProjectId="proj-preview"
           activeSection="history"
           accountEmail={session.user_email}
           accountConnected
@@ -661,14 +673,10 @@ describe("CloudRouter browse context", () => {
           localChangeCount={0}
           loading={false}
           cloudBackupLoading={false}
-          cloudAction={{ kind: null, projectId: null, notice: null, error: null }}
           onSessionChange={vi.fn()}
           onBackupWorkspace={vi.fn()}
-          onConnectProject={vi.fn()}
-          onCopyCloneCommand={vi.fn()}
           onOpenProject={vi.fn()}
           onOpenGitSettings={vi.fn()}
-          onSelectProject={vi.fn()}
           onSelectSection={vi.fn()}
         />,
       );
@@ -676,15 +684,10 @@ describe("CloudRouter browse context", () => {
       await Promise.resolve();
     });
 
-    expect(getCloudHistory).toHaveBeenCalledWith(
-      session,
-      "proj-preview",
-      80,
-      expect.any(Function),
-      "https://cloud.example",
-    );
+    expect(getCloudHistory).not.toHaveBeenCalled();
     expect(container.textContent).toContain("History");
-    expect(container.textContent).toContain("Preview Project");
+    expect(container.textContent).toContain("Back up and connect");
+    expect(container.textContent).not.toContain("Preview Project");
     expect(container.textContent).not.toContain("Local mapping");
   });
 });
@@ -726,6 +729,92 @@ describe("Cloud project attachment actions", () => {
     expect(attachButtons).toHaveLength(2);
     expect(attachButtons.every((button) => button.disabled)).toBe(true);
     expect(container.querySelector<HTMLButtonElement>(".desktop-project-folder-new-card")?.disabled).toBe(true);
+  });
+});
+
+describe("Resolved Cloud binding recovery", () => {
+  it("keeps the Project visible and offers an explicit repair when its canonical remote is missing", async () => {
+    const localSession = {
+      ...session,
+      api_base_url: "http://localhost:9090",
+    } as DesktopCloudSession;
+    getCloudProject.mockResolvedValue({ id: "proj-1", name: "Project One" });
+    getCloudDashboard.mockResolvedValue({ project: { id: "proj-1", name: "Project One" } });
+    listCloudRoot.mockResolvedValue({ entries: [] });
+    getCloudHistory.mockResolvedValue(historyPage());
+    listCloudScopes.mockResolvedValue([]);
+    listCloudConnectors.mockResolvedValue([]);
+    listCloudMcpEndpoints.mockResolvedValue([]);
+    getCloudRepoIdentity.mockResolvedValue(null);
+    const onConfigureCloudRemote = vi.fn().mockResolvedValue({ isRepo: true });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudServiceMainView
+          workspace={{
+            id: "local-1",
+            name: "Local Notes",
+            path: "/tmp/local-notes",
+            workspaceInstanceId: "workspace-instance-1",
+          }}
+          status={{
+            isRepo: true,
+            branch: "main",
+            branches: [],
+            stagedEntries: [],
+            unstagedEntries: [],
+            untrackedEntries: [],
+            remotes: [],
+          } as unknown as GitStatusSnapshot}
+          puppyoneConfig={null}
+          cloudApiBaseUrl="http://localhost:9090"
+          cloudSession={localSession}
+          attachment={{
+            status: "resolved",
+            projectId: "proj-1",
+            resolutionSource: "workspace-binding",
+            bindingStatus: "bound",
+            bindingId: "binding-1",
+            bindingKind: "full",
+            scopeId: "scope-root",
+            warning: cloudMessage("binding-remote-missing"),
+          }}
+          onCloudSessionChange={vi.fn()}
+          activeSection="contents"
+          loading={false}
+          error={null}
+          cloudBackupLoading={false}
+          cloudBackupError={null}
+          onStartPuppyoneBackup={vi.fn()}
+          onConfigureCloudRemote={onConfigureCloudRemote}
+          onSelectSection={vi.fn()}
+          onRefresh={vi.fn()}
+          onOpenDetails={vi.fn()}
+          onOpenGitSettings={vi.fn()}
+        />,
+      );
+      await flushPromises();
+    });
+
+    const warning = container.querySelector<HTMLElement>(".desktop-cloud-main-alert.warning");
+    expect(warning?.textContent).toContain("canonical Git remote is missing");
+    expect(container.textContent).toContain("Project One");
+    const repairButton = Array.from(warning?.querySelectorAll<HTMLButtonElement>("button") ?? [])
+      .find((button) => button.textContent?.includes("Repair connection"));
+    expect(repairButton).toBeDefined();
+
+    await act(async () => {
+      repairButton?.click();
+      await flushPromises();
+    });
+
+    expect(onConfigureCloudRemote).toHaveBeenCalledWith("proj-1", {
+      bindingKind: "full",
+      scopeId: "scope-root",
+    });
   });
 });
 
@@ -849,6 +938,27 @@ describe("History partial failure in aggregate details", () => {
   });
 });
 
+describe("global Project catalog ownership", () => {
+  it("keeps catalog enumeration in the explicit home owner", async () => {
+    listCloudProjects.mockResolvedValue([{ id: "proj-home", name: "Home Project" }]);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root, <HomeCatalogProbe />);
+      await flushPromises();
+    });
+
+    expect(listCloudProjects).toHaveBeenCalledWith(
+      session,
+      expect.any(Function),
+      "https://cloud.example",
+    );
+    expect(container.querySelector("output")?.getAttribute("data-project-count")).toBe("1");
+  });
+});
+
 describe("useDesktopCloudData request lifecycle", () => {
   const projects = [
     { id: "proj-a", name: "Project A" },
@@ -888,23 +998,45 @@ describe("useDesktopCloudData request lifecycle", () => {
     getCloudRepoIdentity.mockResolvedValue(null);
   });
 
-  it("clears the previous project's payload as soon as browse context changes", async () => {
-    const secondProjectList = deferred<typeof projects>();
-    listCloudProjects
-      .mockResolvedValueOnce(projects)
-      .mockImplementationOnce(() => secondProjectList.promise);
+  it("stays local-only without requesting the organization catalog or any Project data", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
 
     await act(async () => {
-      renderWithTestLocalization(root, <CloudDataProbe selectedProjectId="proj-a" environment={cloudEnvironment} />);
+      renderWithTestLocalization(root,
+        <CloudDataProbe
+          explicitProjectId={null}
+          environment={cloudEnvironment}
+        />,
+      );
+      await flushPromises();
+    });
+
+    expect(container.firstElementChild?.getAttribute("data-active-project")).toBe("none");
+    expect(container.firstElementChild?.getAttribute("data-loading")).toBe("false");
+    expect(listCloudProjects).not.toHaveBeenCalled();
+    expect(getCloudProject).not.toHaveBeenCalled();
+    expect(getCloudDashboard).not.toHaveBeenCalled();
+  });
+
+  it("clears the previous project's payload as soon as browse context changes", async () => {
+    const secondProject = deferred<(typeof projects)[number]>();
+    getCloudProject
+      .mockResolvedValueOnce(projects[0])
+      .mockImplementationOnce(() => secondProject.promise);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root, <CloudDataProbe explicitProjectId="proj-a" environment={cloudEnvironment} />);
       await flushPromises();
     });
     expect(container.firstElementChild?.getAttribute("data-loaded-project")).toBe("proj-a");
 
     await act(async () => {
-      renderWithTestLocalization(root, <CloudDataProbe selectedProjectId="proj-b" environment={cloudEnvironment} />);
+      renderWithTestLocalization(root, <CloudDataProbe explicitProjectId="proj-b" environment={cloudEnvironment} />);
       await Promise.resolve();
     });
 
@@ -913,7 +1045,7 @@ describe("useDesktopCloudData request lifecycle", () => {
     expect(container.firstElementChild?.getAttribute("data-loading")).toBe("true");
 
     await act(async () => {
-      secondProjectList.resolve(projects);
+      secondProject.resolve(projects[1]);
       await flushPromises();
     });
     expect(container.firstElementChild?.getAttribute("data-loaded-project")).toBe("proj-b");
@@ -928,7 +1060,7 @@ describe("useDesktopCloudData request lifecycle", () => {
     await act(async () => {
       renderWithTestLocalization(root,
         <CloudDataProbe
-          selectedProjectId="proj-a"
+          explicitProjectId="proj-a"
           environment={cloudEnvironment}
           onData={(data) => { latestData = data; }}
         />,
@@ -936,8 +1068,8 @@ describe("useDesktopCloudData request lifecycle", () => {
       await flushPromises();
     });
 
-    const reloadedProjects = deferred<typeof projects>();
-    listCloudProjects.mockImplementationOnce(() => reloadedProjects.promise);
+    const reloadedProject = deferred<(typeof projects)[number]>();
+    getCloudProject.mockImplementationOnce(() => reloadedProject.promise);
     let settled = false;
     let reloadPromise: Promise<void> | null = null;
     await act(async () => {
@@ -948,43 +1080,43 @@ describe("useDesktopCloudData request lifecycle", () => {
     expect(settled).toBe(false);
 
     await act(async () => {
-      reloadedProjects.resolve(projects);
+      reloadedProject.resolve(projects[0]);
       await reloadPromise;
     });
     expect(settled).toBe(true);
   });
 
   it("ignores an older project request that finishes after the new browse context", async () => {
-    const firstProjectList = deferred<typeof projects>();
-    listCloudProjects
-      .mockImplementationOnce(() => firstProjectList.promise)
-      .mockResolvedValueOnce(projects);
+    const firstProject = deferred<(typeof projects)[number]>();
+    getCloudProject
+      .mockImplementationOnce(() => firstProject.promise)
+      .mockResolvedValueOnce(projects[1]);
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
 
     await act(async () => {
-      renderWithTestLocalization(root, <CloudDataProbe selectedProjectId="proj-a" environment={cloudEnvironment} />);
+      renderWithTestLocalization(root, <CloudDataProbe explicitProjectId="proj-a" environment={cloudEnvironment} />);
       await Promise.resolve();
     });
 
     await act(async () => {
-      renderWithTestLocalization(root, <CloudDataProbe selectedProjectId="proj-b" environment={cloudEnvironment} />);
+      renderWithTestLocalization(root, <CloudDataProbe explicitProjectId="proj-b" environment={cloudEnvironment} />);
       await flushPromises();
     });
     expect(container.firstElementChild?.getAttribute("data-active-project")).toBe("proj-b");
 
     await act(async () => {
-      firstProjectList.resolve(projects);
+      firstProject.resolve(projects[0]);
       await flushPromises();
     });
     expect(container.firstElementChild?.getAttribute("data-active-project")).toBe("proj-b");
   });
 
   it("keeps project identity available while switching to a route-scoped loader", async () => {
-    const routeRefresh = deferred<typeof projects>();
-    listCloudProjects
-      .mockResolvedValueOnce(projects)
+    const routeRefresh = deferred<(typeof projects)[number]>();
+    getCloudProject
+      .mockResolvedValueOnce(projects[0])
       .mockImplementationOnce(() => routeRefresh.promise);
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -993,7 +1125,7 @@ describe("useDesktopCloudData request lifecycle", () => {
     await act(async () => {
       renderWithTestLocalization(root,
         <CloudDataProbe
-          selectedProjectId="proj-a"
+          explicitProjectId="proj-a"
           environment={cloudEnvironment}
           loadProjectDetails
         />,
@@ -1004,7 +1136,7 @@ describe("useDesktopCloudData request lifecycle", () => {
     await act(async () => {
       renderWithTestLocalization(root,
         <CloudDataProbe
-          selectedProjectId="proj-a"
+          explicitProjectId="proj-a"
           environment={cloudEnvironment}
           loadProjectDetails={false}
         />,
@@ -1017,7 +1149,7 @@ describe("useDesktopCloudData request lifecycle", () => {
     expect(container.firstElementChild?.getAttribute("data-loading")).toBe("true");
 
     await act(async () => {
-      routeRefresh.resolve(projects);
+      routeRefresh.resolve(projects[0]);
       await flushPromises();
     });
   });
@@ -1031,7 +1163,7 @@ describe("useDesktopCloudData request lifecycle", () => {
     await act(async () => {
       renderWithTestLocalization(root,
         <CloudDataProbe
-          selectedProjectId={null}
+          explicitProjectId={null}
           boundProjectId="proj-bound"
           environment={cloudEnvironment}
         />,
@@ -1049,6 +1181,39 @@ describe("useDesktopCloudData request lifecycle", () => {
       "https://cloud.example",
     );
     expect(listCloudProjects).not.toHaveBeenCalled();
+  });
+
+  it("does not reload Project details when only the public session status refreshes", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudDataProbe
+          explicitProjectId="proj-a"
+          environment={cloudEnvironment}
+          sessionOverride={{ ...session, status: "authenticated" } as DesktopCloudSession}
+        />,
+      );
+      await flushPromises();
+    });
+    expect(getCloudProject).toHaveBeenCalledTimes(1);
+    expect(getCloudProjectReadiness).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudDataProbe
+          explicitProjectId="proj-a"
+          environment={cloudEnvironment}
+          sessionOverride={{ ...session, status: "refreshing" } as DesktopCloudSession}
+        />,
+      );
+      await flushPromises();
+    });
+
+    expect(getCloudProject).toHaveBeenCalledTimes(1);
+    expect(getCloudProjectReadiness).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -1089,23 +1254,25 @@ function createAggregateCloudData(
 }
 
 function CloudDataProbe({
-  selectedProjectId,
+  explicitProjectId,
   environment,
   onData,
   loadProjectDetails = true,
   boundProjectId = null,
+  sessionOverride = session,
 }: {
-  selectedProjectId: string | null;
+  explicitProjectId: string | null;
   environment: CloudEnvironment;
   onData?: (data: DesktopCloudDataState) => void;
   loadProjectDetails?: boolean;
   boundProjectId?: string | null;
+  sessionOverride?: DesktopCloudSession;
 }) {
   const onSessionChange = React.useCallback(() => undefined, []);
   const data = useDesktopCloudData({
-    session,
+    session: sessionOverride,
     cloudEnvironment: environment,
-    selectedProjectId,
+    explicitProjectId,
     boundProjectId,
     onSessionChange,
     loadProjectDetails,
@@ -1121,6 +1288,30 @@ function CloudDataProbe({
       data-loading={String(data.loading)}
     />
   );
+}
+
+function HomeCatalogProbe() {
+  const updateSession = React.useCallback(() => undefined, []);
+  const setOperationStatus = React.useCallback(() => undefined, []);
+  const setRestoreError = React.useCallback(() => undefined, []);
+  const noop = React.useCallback(() => undefined, []);
+  const asyncNoop = React.useCallback(async () => undefined, []);
+  const recentWorkspaceItems = React.useMemo(() => [], []);
+  const home = useCloudProjectHome({
+    activeCloudSession: session,
+    autoRefreshProjectCatalog: true,
+    cloudEnabled: true,
+    desktopCloudApiBaseUrl: "https://cloud.example",
+    includeUnboundCloudProjects: true,
+    onOpenCloudProject: noop,
+    recentWorkspaceItems,
+    setHomeOperationStatus: setOperationStatus,
+    setRestoreWorkspaceError: setRestoreError,
+    showBrowserSignInStatus: noop,
+    startCloudBrowserSignIn: asyncNoop,
+    updateCloudSession: updateSession,
+  });
+  return <output data-project-count={String(home.homeCloudProjects.length)} />;
 }
 
 function CloudAccessDataProbe({ projectId }: { projectId: string | null }) {
@@ -1170,7 +1361,7 @@ describe("Local repo Cloud binding integration", () => {
             cloudSession={session}
             activeSection="contents"
             projectContext
-            projectBound
+            localWorkspaceContext
             onSelectSection={onSelectSection}
           />
           <CloudRouter
@@ -1188,11 +1379,15 @@ describe("Local repo Cloud binding integration", () => {
             cloudRemote={{
               remote: { name: "puppyone", fetchUrl: "", pushUrl: "", branches: [] },
               rawUrl: "https://cloud.example/git/proj-1.git",
-              info: { kind: "project", host: "cloud.example", displayId: "proj-1", projectId: "proj-1" },
+              info: { kind: "project", host: "cloud.example", origin: "https://cloud.example", displayId: "proj-1", projectId: "proj-1" },
             }}
             cloudData={createAggregateCloudData(vi.fn(async () => undefined))}
-            attachment={{ status: "linked", projectId: "proj-1" }}
-            selectedProjectId={null}
+            attachment={{
+              status: "resolved",
+              projectId: "proj-1",
+              resolutionSource: "workspace-binding",
+              bindingStatus: "bound",
+            }}
             activeSection="contents"
             accountEmail={session.user_email}
             accountConnected
@@ -1241,7 +1436,7 @@ describe("Local repo Cloud binding integration", () => {
           cloudRemote={{
             remote: { name: "puppyone", fetchUrl: "", pushUrl: "", branches: [] },
             rawUrl: "https://cloud.example/git/proj-secret.git",
-            info: { kind: "project", host: "cloud.example", displayId: "proj-secret", projectId: "proj-secret" },
+            info: { kind: "project", host: "cloud.example", origin: "https://cloud.example", displayId: "proj-secret", projectId: "proj-secret" },
           }}
           cloudData={createAggregateCloudData(vi.fn(async () => undefined), {
             mappedProjectId: null,
@@ -1254,7 +1449,6 @@ describe("Local repo Cloud binding integration", () => {
             projectId: "proj-secret",
             message: cloudMessage("binding-not-authorized"),
           }}
-          selectedProjectId={null}
           activeSection="overview"
           accountEmail={session.user_email}
           accountConnected

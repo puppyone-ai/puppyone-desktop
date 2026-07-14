@@ -1,8 +1,9 @@
 # Local and Cloud UX
 
-**Status:** Accepted target product and UX contract. The current desktop
-implementation is transitional and must move toward this model without claiming
-unfinished behavior as current functionality.
+**Status:** Accepted product and UX contract. The contextual Local workspace →
+Cloud Project resolution mechanism is implemented by ISSUE-037; broader Cloud
+Only and collaboration behavior remains incremental and must not be presented
+as complete before its own milestones ship.
 
 This document defines how PuppyOne presents local-only, local-plus-Cloud, and
 Cloud-only projects. It records the product reasoning behind one Projects
@@ -357,30 +358,359 @@ Four user states must remain separate:
 Purchasing Cloud does not automatically perform the remaining three steps.
 Connecting a Project does not automatically expose all content through MCP.
 
-### Explicit binding contract
+### Contextual Cloud Project resolution
 
-Normal Desktop open never derives Project identity or human permission by
-scanning Projects, scopes, or access keys. A Local + Cloud workspace stores a
-stable `workspaceInstanceId`, Cloud origin, Project ID, and binding ID. It
-resolves that one binding with the current account, then obtains current server
-capabilities.
+Opening Cloud or Claude from an already-open Local workspace is a contextual
+Project-resolution operation. It asks exactly one question:
+
+> Which PuppyOne Cloud Project and Scope, if any, does this local workspace
+> represent for the currently signed-in user?
+
+It is not an Organization Project-browser operation. The contextual surface
+must never answer this question by listing every Project visible to the user or
+by asking the user to choose among unrelated Projects. `Open existing Project`,
+`Use here`, and per-Project clone actions belong to a global Cloud Projects
+browser, not to the Cloud surface of an open Local workspace.
+
+#### Identity and authority remain separate
+
+Five facts participate in resolution and must not be collapsed:
 
 ```text
-local workspace instance
-  -> explicit binding id             identity only
-  -> current JWT ProjectGrant        human permission
-  -> binding-specific credential     Git/CLI runtime only
+Local workspace instance
+  -> identifies this physical checkout on this device
+
+Canonical Git locator
+  -> declares one Project root or one Project + non-root Scope
+  -> contains no credential and grants no access
+
+Human Cloud session
+  -> supplies the current JWT ProjectGrant
+  -> is the only authority for Project UI and control-plane data
+
+WorkspaceBinding
+  -> durably associates one workspace instance with one Project/Scope
+  -> owns binding lifecycle and binding-specific machine credential
+  -> grants no human access
+
+Git runtime credential
+  -> authenticates clone/fetch/push through one bounded RuntimeGrant
+  -> never authorizes Project settings, Team, Billing, or other human APIs
+```
+
+The canonical locator families are:
+
+```text
+Project root  https://<trusted-git-origin>/git/{project_id}.git
+Scoped view   https://<trusted-git-origin>/git/{project_id}/scopes/{scope_id}.git
+```
+
+The repeated Project ID in the scoped URL is intentional. It lets Desktop
+identify one deterministic Project without resolving a secret, while the
+server still verifies the Project/Scope relation and the current human grant.
+Names, paths, access keys, query parameters, and URL credentials are never
+Project identity.
+
+#### Project context is not the same as Workspace Binding
+
+Desktop uses two related but distinct results:
+
+```ts
+type ProjectContextResolution =
+  | { status: "resolving" }
+  | {
+      status: "resolved";
+      resolutionSource: "workspace-binding" | "canonical-remote";
+      projectId: string;
+      scopeId: string;
+      bindingKind: "full" | "scoped";
+      bindingId: string | null;
+      bindingStatus: "bound" | "not-bound";
+      capabilities: string[];
+    }
+  | { status: "local-only" }
+  | {
+      status: "recovery";
+      reason:
+        | "wrong-account"
+        | "wrong-host"
+        | "not-authorized"
+        | "not-found"
+        | "binding-revoked"
+        | "role-downgraded"
+        | "locator-conflict"
+        | "legacy-confirmation-required"
+        | "network"
+        | "unresolvable";
+      projectId?: string;
+    };
+```
+
+`resolved` means the current account may enter exactly one Cloud Project
+context. It does not imply that Desktop may silently create a binding, issue a
+credential, mutate Git configuration, or upload content. A canonical remote
+can therefore open an authorized Project even when a durable WorkspaceBinding
+is missing. The Project shell may show a non-blocking `Finish connecting this
+workspace` or `Repair connection` action when binding-specific sync capability
+is absent.
+
+WorkspaceBinding remains the durable local identity for Local + Cloud. It is
+required before Desktop claims that this workspace has a managed persistent
+attachment or issues a binding-specific machine credential. Creating,
+replacing, or revoking it is an explicit attach, repair, or detach operation.
+
+#### Exact resolution algorithm
+
+Desktop resolves the current Local workspace in this order:
+
+```text
+Open current Local workspace
+        |
+        v
+Wait for workspace config + complete Git remote snapshot
+        |
+        v
+Normalize all PuppyOne fetch and push locators
+        |
+        +-- conflicting Project/Scope/origin facts --> recovery: locator-conflict
+        |
+        +-- valid binding hint exists
+        |       |
+        |       +-- server validates binding, account and capabilities
+        |       |       |
+        |       |       +-- valid and locator agrees --> resolved exact Project
+        |       |       +-- remote missing -----------> resolved + repair warning
+        |       |       `-- revoked/mismatched -------> recovery
+        |       |
+        |       `-- no usable binding
+        |               |
+        |               +-- one canonical locator ----> server context resolver
+        |               +-- legacy access locator ----> explicit migration flow
+        |               `-- no locator ---------------> local-only
+        |
+        `-- no binding hint
+                |
+                +-- one canonical locator ------------> server context resolver
+                +-- legacy access locator ------------> explicit migration flow
+                `-- no locator -----------------------> local-only
+```
+
+The server context resolver must validate the trusted Cloud/Git origin, parse
+the canonical grammar, authorize `Project Read` for the current JWT, verify the
+exact Scope belongs to the Project, and return current capabilities. Only after
+that response may Desktop render Project metadata or navigate to the Project.
+An unauthorized or missing target fails closed and never falls back to a broad
+Project list.
+
+An authorization fact-store or workspace-binding storage outage is different
+from a missing Project, binding, Scope, or grant. The backend must fail closed
+with a generic retryable `503` and must not convert that outage into absence.
+A safe control-plane read retries one HTTP transport failure; mutations are not
+automatically replayed. The Electron bridge must preserve the HTTP status
+across IPC. Desktop may retain a Project only when the same resolution key
+already has a server-verified exact context; otherwise it shows a temporary
+verification recovery state with Retry, not deletion or account-switch
+guidance.
+
+The binding is the durable identity fast path, but an active canonical remote
+is also an integrity fact. When both exist they must agree on Cloud origin,
+Project ID, Scope ID, and full/scoped kind. A valid binding with a missing
+remote may still open the Project with a repair warning. A binding and remote
+that point to different targets are ambiguous and must enter recovery rather
+than silently preferring either one.
+
+The blocking boundary is deliberately narrow. Desktop waits for the initial
+workspace-config read and the first complete Git snapshot; later watcher or
+focus refreshes keep the previous snapshot visible and re-resolve only if an
+identity fact actually changes. Git HEAD/status changes and public session
+status/expiry refreshes are not identity changes and must not repeat binding
+authorization or Project-detail hydration. A successful binding response is already the
+current human authorization decision and must include the current Project
+capabilities, so Desktop may enter the exact Project immediately. Project
+metadata, aggregate details, and Claude/Git readiness hydrate after navigation
+and never hold identity resolution behind `Matching folder`. Readiness affects
+feature availability inside the Project; it is not evidence for Project
+identity and is not part of the resolver's critical path.
+
+#### Remote collection and ambiguity
+
+Desktop must inspect all Git remotes, including both fetch and push URLs. It
+must not stop at the first URL that matches PuppyOne syntax.
+
+1. Reject credentials, query strings, fragments, unsupported transports, and
+   malformed or percent-encoded identity.
+2. Normalize each accepted locator to
+   `(cloudOrigin, projectId, scopeId, bindingKind)`.
+3. Treat duplicate remotes with the same normalized locator as one candidate.
+4. Treat a fetch/push mismatch, different Project IDs, different Scope IDs, or
+   different Cloud origins as `locator-conflict`.
+5. Never resolve ambiguity by Organization-list order, remote iteration order,
+   remote name alone, or a stale browse selection.
+
+The configured primary PuppyOne remote may explain which remote is expected,
+but it cannot override contradictory canonical identity silently. Development
+may map a trusted production Git origin to a loopback API through an explicit
+dev configuration; production origin validation must not be weakened to make
+localhost testing convenient.
+
+#### Contextual surface versus global Project catalog
+
+The two surfaces have different ownership and data contracts:
+
+| Surface | Project identity input | May call Project catalog? | Result |
+| --- | --- | :---: | --- |
+| Open Local workspace -> Cloud/Claude | binding or local Git locator | No | exact Project, local-only, or recovery |
+| App home with no active workspace | current account | Yes | unified Projects list |
+| Explicit global Cloud Projects browser | current account | Yes | Cloud-only browsing/opening |
+| Open Cloud-only workspace | stored Cloud Project ID | No | exact Cloud Project |
+
+The contextual data hook accepts an authorized `projectId` or remains idle. It
+must never interpret a missing `projectId` as permission to call
+`listProjects`. Catalog loading belongs to a separate global/home hook. A
+transient global browse selection must be cleared when a Local workspace opens
+and must never override its binding, locator, local-only, or recovery state.
+While Desktop is restoring the last workspace, the temporary absence of a
+renderer workspace is an unknown startup state—not the global home—and must
+not start an Organization catalog request.
+
+Once context resolves, navigation enters the exact Project overview or
+contents route and exposes Project-scoped routes according to returned
+capabilities. When context is `local-only`, the surface shows the Local
+workspace summary and one primary `Back up and connect`/`Share to PuppyOne
+Cloud` action. It does not render an Organization Project count, unrelated
+Project rows, `Use here`, or clone commands. Team and Billing remain explicit
+global account destinations; they are not the fallback page for unresolved
+local context.
+
+#### Backend contract
+
+The backend canonical resolver may evolve the existing
+`resolve-canonical-remote` endpoint or expose an equivalent Desktop Project
+context endpoint. Its response is an authorized context, not a legacy
+confirmation candidate, and contains no replayable secret:
+
+```ts
+type CanonicalProjectContext = {
+  project: {
+    id: string;
+    name: string;
+    capabilities: string[];
+  };
+  scope: {
+    id: string;
+    kind: "full" | "scoped";
+    path: string | null;
+  };
+  locator: {
+    projectId: string;
+    scopeId: string;
+    bindingKind: "full" | "scoped";
+  };
+};
+```
+
+Canonical resolution does not require user confirmation because the locator is
+stable and secret-free; the current JWT still decides whether the user may see
+the Project. Legacy `/git/ap/<secret>.git` resolution remains confirmation-
+gated during migration because its path is a credential, not durable identity.
+Neither response returns Git credentials, shared keys, binding credentials, or
+an unfiltered Organization Project list.
+
+#### Persistence and race safety
+
+Desktop persists only non-secret identity facts for a durable attachment:
+
+```json
+{
+  "project": { "workspaceInstanceId": "stable-local-instance" },
+  "cloud": {
+    "origin": "https://cloud.puppyone.ai",
+    "projectId": "project-id",
+    "bindingId": "binding-id"
+  }
+}
 ```
 
 The manifest never stores the binding credential, role, capability snapshot,
-or absolute-path-derived identity. A legacy PuppyOne remote is only a one-time
-candidate-discovery input and requires user confirmation; a non-root remote can
-create only a visibly scoped binding.
+absolute path, or access key. A context resolved only from a canonical remote
+must not invent a binding ID. An explicit connect/repair flow may create the
+binding, write its non-secret facts, configure the canonical remote, and place
+the one-time credential in the OS-backed Git credential helper.
+
+Every asynchronous result is keyed by workspace instance, normalized Cloud
+origin, account/session generation, and locator or binding identity. Switching
+folder, account, host, or remote invalidates the prior request. A late catalog,
+resolver, or Project-detail response from an old context must never replace the
+active Project.
+
+The active resolver stamps its in-memory result with that secret-free context
+key, and the attachment projection requires an exact key match before it may
+promote a Project ID. Recent-workspace badges and other cache hints do not carry
+this authority. Legacy locator material contributes only its already-masked
+display identity; the raw access credential never enters the key.
+
+#### Failure behavior
+
+| Condition | Contextual result | Required UX |
+| --- | --- | --- |
+| Folder is not a Git repository | `local-only` | Local summary + Back up and connect |
+| Git repository has no PuppyOne locator | `local-only` | Local summary + Back up and connect |
+| Canonical locator + authorized JWT | `resolved` | Enter exact Project directly |
+| Canonical locator + signed-out session | `recovery` | Sign in for the locator's trusted host |
+| Canonical locator + wrong account/role | `recovery` | Switch account or Request Access |
+| Wrong Cloud/Git host | `recovery` | Explain host and offer explicit switch |
+| Project or Scope was removed | `recovery` | Explain stale remote and open Git repair |
+| Authorization/binding storage returns retryable 503 after its bounded safe-read retry | resolved warning when already verified; otherwise temporary recovery | Retry; do not imply deletion, switch account, or enumerate Projects |
+| Binding revoked or downgraded | `recovery` or resolved read-only warning | Reattach or explain current capability |
+| Conflicting PuppyOne remotes | `recovery` | Show conflicting remote names/targets |
+| Network failure with verified binding | resolved warning when safe | Keep local work usable; retry Cloud |
+| Network failure without verified context | `recovery` | Retry; never guess or list Projects |
+
+Here, `verified` means that the server successfully validated the binding in
+the current secret-free resolution context, or that an in-memory result with
+the exact same workspace, account/session generation, host, binding and remote
+key was already validated. A manifest Project ID or binding ID alone never
+qualifies as verified context.
 
 Role/account/host/binding failures leave local Files, Changes, Terminal, and
-local Agent work usable. The Cloud area shows Request Access, Switch Account,
-Switch Host, Reattach, or the relevant recovery action without deleting or
-silently rebinding local content.
+local Agent work usable. Recovery never deletes local content, silently
+rebinds, rotates a credential, uploads data, or scans the Organization.
+
+#### Version Engine boundary
+
+Context resolution is a control-plane operation above Git transport. It reads
+identity and authorization facts; it does not call S3 object storage, create a
+Version Engine transaction, materialize a RepoFacade, or change canonical root
+state.
+
+```text
+Desktop context resolution
+  -> canonical locator + Human JWT
+  -> ProjectGrant + exact Project/Scope UI context
+
+Git content operation
+  -> canonical locator + Git runtime credential
+  -> RuntimeGrant
+  -> Git adapter / RepoFacade
+  -> existing Version Engine admission and transaction path
+```
+
+Backing up or publishing continues through the existing Git/RuntimeGrant entry
+point. The Project-context resolver must never become a second content-write
+path or bypass Version Engine invariants.
+
+#### Ownership of the implementation
+
+| Layer | Required change | Explicitly unchanged |
+| --- | --- | --- |
+| Desktop | remote-set normalization, resolution state machine, feature-owned Workspace Surface projection, contextual routing, data-hook separation, recovery/local-only UX, stale-request protection | local filesystem and Git authority |
+| Backend control plane | canonical context response, current JWT authorization, exact Project/Scope validation, capabilities, fail-closed errors | machine RuntimeGrant semantics |
+| Database | use existing Project, Scope, membership and WorkspaceBinding facts | no schema or data migration required |
+| Version Engine | no change | canonical root, scope projection, CAS, S3 and transaction kernel |
+
+This is therefore primarily a Desktop architecture change with a small but
+necessary backend control-plane contract change. It is not a database or
+Version Engine migration.
 
 ### MCP rule
 
@@ -601,6 +931,29 @@ applicable scenarios:
 13. Create a root head through Product/API without a Git push; verify Claude
     remains at `Push your first commit`.
 14. Accept the first root Git push; verify Claude becomes ready.
+15. Open a non-Git Local workspace while signed in; verify the contextual Cloud
+    surface does not request or render the Organization Project catalog.
+16. Open a Git workspace with one authorized canonical Project locator; verify
+    Desktop enters that exact Project without binding confirmation or catalog
+    enumeration.
+17. Open a canonical scoped locator; verify the server returns the exact parent
+    Project and non-root Scope and Desktop visibly preserves scoped context.
+18. Open a workspace whose binding and canonical remote disagree; verify
+    Desktop shows recovery and does not prefer either identity silently.
+19. Configure two PuppyOne remotes for different Projects; verify a deterministic
+    locator-conflict state independent of remote order.
+20. Remove all PuppyOne remotes from an unbound Local workspace; verify the UI
+    returns to Local Only with one Back up and connect action.
+21. Switch workspace, account, or host while resolution is in flight; verify a
+    stale response cannot select or render the previous Project.
+22. Open the explicit global Cloud Projects browser with no Local workspace;
+    verify catalog browsing remains available there.
+23. Make the authorization fact store unavailable; verify the backend returns
+    retryable 503, Electron preserves that status, and Desktop neither reports
+    Project deletion nor clears a context already verified for the same key.
+24. Interrupt the binding-store TLS connection once; verify the safe read
+    retries and resolves. Keep it unavailable; verify retryable 503, preserved
+    local binding identity, and no automatic mutation replay.
 
 ## Invariants
 
@@ -618,3 +971,15 @@ applicable scenarios:
 - Share, download, detach, and service deployment are explicit user actions.
 - Temporary cache, cloned workspace, and Cloud attachment never create a
   duplicate Project identity.
+- The Cloud/Claude surface of an open Local workspace never enumerates the
+  Organization Project catalog to discover context.
+- A canonical Git locator identifies one Project/Scope candidate but grants no
+  human or machine authority by itself.
+- Current JWT authorization is required before canonical locator metadata may
+  become Project UI context.
+- WorkspaceBinding is durable attachment identity, not a prerequisite for
+  entering an already-authorized canonical Project context.
+- Canonical context resolution never creates content, credentials, bindings,
+  S3 objects, or Version Engine transactions.
+- Authorization dependency failure is never cached or presented as a missing
+  Project/grant; it remains fail-closed and retryable end to end.

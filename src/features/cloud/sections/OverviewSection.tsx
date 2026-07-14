@@ -351,5 +351,8 @@ export function getLatestCloudHistoryCommit(history: DesktopCloudHistory | null)
 
 function formatAccessSummary(scopeCount: number, endpointCount: number, t: MessageFormatter) {
   if (endpointCount <= 0) return t("cloud.overview.scopeCount", { count: scopeCount });
-  return t("cloud.overview.accessSummary", { scopeCount, endpointCount });
+  return t("cloud.overview.accessSummary", {
+    scopes: scopeCount,
+    connections: endpointCount,
+  });
 }

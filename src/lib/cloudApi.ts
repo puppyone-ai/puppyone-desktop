@@ -143,6 +143,8 @@ export type DesktopCloudWorkspaceBinding = {
   status: "active" | "revoked";
   usable: boolean;
   unusable_reason?: "binding_revoked" | "wrong_account" | "role_downgraded" | string | null;
+  /** Current human Project grant, returned by context-capable binding APIs. */
+  capabilities?: string[] | null;
   created_at: string;
   updated_at: string;
   last_seen_at: string;
@@ -171,6 +173,27 @@ export type DesktopCloudLegacyBindingCandidate = {
   scope_id: string;
   binding_kind: "full" | "scoped";
   requires_confirmation: true;
+};
+
+export type DesktopCloudCanonicalProjectContext = {
+  project: DesktopCloudProject & {
+    org_id: string;
+    visibility: string;
+    bound_git_branch: string;
+    effective_role: "admin" | "editor" | "viewer";
+    grant_source: "org_owner" | "project_member" | "org_visibility";
+    capabilities: string[];
+  };
+  scope: {
+    id: string;
+    kind: "full" | "scoped";
+    path: string | null;
+  };
+  locator: {
+    project_id: string;
+    scope_id: string;
+    binding_kind: "full" | "scoped";
+  };
 };
 
 export type DesktopCloudOrganization = {
@@ -775,6 +798,21 @@ export function resolveLegacyCloudWorkspaceRemote(
   );
 }
 
+export function resolveCanonicalCloudWorkspaceRemote(
+  session: DesktopCloudSession,
+  remoteUrl: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudCanonicalProjectContext> {
+  return cloudApiRequest<DesktopCloudCanonicalProjectContext>(
+    "/desktop/project-bindings/resolve-canonical-remote",
+    session,
+    onSessionChange,
+    { method: "POST", body: JSON.stringify({ remote_url: remoteUrl }) },
+    apiBaseUrl,
+  );
+}
+
 export function projectAllows(
   project: DesktopCloudProject | null | undefined,
   capability: string,
@@ -1249,13 +1287,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function normalizeCloudBridgeError(error: unknown): Error {
   const original = error instanceof Error ? error.message : String(error);
-  const message = original
+  const transportedMessage = original
     .replace(/^Error invoking remote method 'cloud:(?:api-request|session-api-request)':\s*/i, "")
     .replace(/^Error:\s*/i, "")
     .trim();
+  const transportedStatus = transportedMessage.match(
+    /^Request failed \(([1-5]\d\d)\):\s*/i,
+  );
+  const message = transportedMessage
+    .replace(/^Request failed \([1-5]\d\d\):\s*/i, "")
+    .trim();
   const normalized = new Error(message || "Cloud request failed.");
   const sourceStatus = isRecord(error) && typeof error.status === "number" ? error.status : undefined;
-  const statusFromMessage = message.match(/(?:request failed|status)\s*\(?([1-5]\d\d)\)?/i)?.[1];
+  const statusFromMessage = transportedStatus?.[1]
+    ?? transportedMessage.match(/(?:request failed|status)\s*\(?([1-5]\d\d)\)?/i)?.[1];
   const status = sourceStatus ?? (statusFromMessage ? Number(statusFromMessage) : undefined);
   if (status) (normalized as Error & { status?: number }).status = status;
   if (/invalid or expired token|sign in again/i.test(message)) {

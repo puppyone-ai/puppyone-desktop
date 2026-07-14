@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getCloudProject,
-  listCloudProjects,
   type DesktopCloudConnector,
   type DesktopCloudDashboard,
   type DesktopCloudMcpEndpoint,
@@ -46,7 +45,7 @@ type DesktopCloudDataInternalState = Omit<DesktopCloudDataState, "reload"> & {
 export function useDesktopCloudData({
   session,
   cloudEnvironment,
-  selectedProjectId,
+  explicitProjectId,
   boundProjectId = null,
   onSessionChange,
   workspaceRevisionKey = null,
@@ -54,9 +53,9 @@ export function useDesktopCloudData({
 }: {
   session: DesktopCloudSession | null;
   cloudEnvironment: CloudEnvironment;
-  /** A transient project opened from Cloud Projects. This never creates a local binding. */
-  selectedProjectId: string | null;
-  /** The project identity already bound to the local workspace, resolved by the app shell. */
+  /** Exact Project identity owned by an explicit global/Cloud-only route. */
+  explicitProjectId: string | null;
+  /** Exact Project context resolved for the local workspace by the app shell. */
   boundProjectId?: string | null;
   onSessionChange: (session: DesktopCloudSession | null) => void;
   workspaceRevisionKey?: string | null;
@@ -67,21 +66,27 @@ export function useDesktopCloudData({
   const contextKey = createCloudDataContextKey({
     session,
     cloudEnvironment,
-    selectedProjectId,
+    explicitProjectId,
     boundProjectId: normalizedBoundProjectId,
   });
   const [state, setState] = useState<DesktopCloudDataInternalState>(() => createCloudDataState());
   const activeRequestRef = useRef(0);
+  const sessionRef = useRef(session);
+  const onSessionChangeRef = useRef(onSessionChange);
+  sessionRef.current = session;
+  onSessionChangeRef.current = onSessionChange;
   const hasCurrentContext = state.contextKey === contextKey;
 
   const load = useCallback(async () => {
     const requestId = activeRequestRef.current + 1;
     activeRequestRef.current = requestId;
+    const activeProjectId = explicitProjectId?.trim() || normalizedBoundProjectId;
 
-    if (!session) {
+    const activeSession = sessionRef.current;
+    if (!activeSession || !activeProjectId) {
       setState(createCloudDataState({
         mappedProjectId: normalizedBoundProjectId,
-        activeProjectId: selectedProjectId || normalizedBoundProjectId,
+        activeProjectId,
         initializing: false,
         loading: false,
         contextKey,
@@ -100,7 +105,7 @@ export function useDesktopCloudData({
           }
         : createCloudDataState({
             mappedProjectId: normalizedBoundProjectId,
-            activeProjectId: selectedProjectId || normalizedBoundProjectId,
+            activeProjectId: explicitProjectId || normalizedBoundProjectId,
             initializing: true,
             loading: true,
             contextKey,
@@ -108,43 +113,28 @@ export function useDesktopCloudData({
     ));
 
     try {
-      const projects = normalizedBoundProjectId
-        ? [await getCloudProject(
-            session,
-            normalizedBoundProjectId,
-            onSessionChange,
-            cloudApiBaseUrl,
-          )]
-        : await listCloudProjects(session, onSessionChange, cloudApiBaseUrl);
+      const project = await getCloudProject(
+        activeSession,
+        activeProjectId,
+        onSessionChangeRef.current,
+        cloudApiBaseUrl,
+      );
+      const projects = [project];
       if (activeRequestRef.current !== requestId) return;
 
       // Mapping is owned by useCloudWorkspaceBinding. This hook only loads data
-      // for an already-verified bound project or an explicit browse selection.
+      // for an already-authorized local context or an explicit Project route.
       const mappedProjectId = normalizedBoundProjectId;
       const mappedProject = mappedProjectId
         ? projects.find((project) => project.id === mappedProjectId) ?? null
         : null;
-      const activeProjectId = selectedProjectId || mappedProjectId;
-
-      if (!activeProjectId) {
-        setState(createCloudDataState({
-          projects,
-          mappedProjectId,
-          mappedProject,
-          initializing: false,
-          loading: false,
-          contextKey,
-        }));
-        return;
-      }
-
       if (!loadProjectDetails) {
         setState(createCloudDataState({
           projects,
           mappedProjectId,
           mappedProject,
           activeProjectId,
-          activeProject: projects.find((project) => project.id === activeProjectId) ?? mappedProject,
+          activeProject: project,
           initializing: false,
           loading: false,
           contextKey,
@@ -153,10 +143,10 @@ export function useDesktopCloudData({
       }
 
       const details = await loadCloudProjectDetails({
-        session,
+        session: activeSession,
         projectId: activeProjectId,
         projects,
-        onSessionChange,
+        onSessionChange: onSessionChangeRef.current,
         cloudApiBaseUrl,
       });
       if (activeRequestRef.current !== requestId) return;
@@ -205,9 +195,7 @@ export function useDesktopCloudData({
     contextKey,
     loadProjectDetails,
     normalizedBoundProjectId,
-    onSessionChange,
-    selectedProjectId,
-    session,
+    explicitProjectId,
   ]);
 
   useEffect(() => {
@@ -221,7 +209,7 @@ export function useDesktopCloudData({
     return {
       ...toPublicCloudDataState(createCloudDataState({
         mappedProjectId: normalizedBoundProjectId,
-        activeProjectId: selectedProjectId || normalizedBoundProjectId,
+        activeProjectId: explicitProjectId || normalizedBoundProjectId,
         initializing: true,
         loading: true,
       })),
@@ -235,12 +223,12 @@ export function useDesktopCloudData({
 function createCloudDataContextKey({
   session,
   cloudEnvironment,
-  selectedProjectId,
+  explicitProjectId,
   boundProjectId,
 }: {
   session: DesktopCloudSession | null;
   cloudEnvironment: CloudEnvironment;
-  selectedProjectId: string | null;
+  explicitProjectId: string | null;
   boundProjectId: string | null;
 }): string {
   if (!session) return "signed-out";
@@ -252,7 +240,7 @@ function createCloudDataContextKey({
     cloudEnvironment.cloudRemote?.rawUrl ?? "",
     cloudEnvironment.configuredProjectId ?? "",
     boundProjectId ?? "",
-    selectedProjectId ?? "",
+    explicitProjectId ?? "",
   ].join("\n");
 }
 

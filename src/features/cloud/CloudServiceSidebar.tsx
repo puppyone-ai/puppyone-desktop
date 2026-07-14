@@ -43,7 +43,7 @@ export function CloudServiceSidebar({
   cloudApiBaseUrl,
   activeSection,
   projectContext = false,
-  projectBound = false,
+  localWorkspaceContext = false,
   projectCapabilities = [],
   onSelectSection,
   onBackToProjects,
@@ -58,11 +58,11 @@ export function CloudServiceSidebar({
   const effectiveCloudSession = getCloudAuthSession(cloudAuthState);
   const accountEmail = effectiveCloudSession?.user_email ?? null;
   const signedIn = Boolean(effectiveCloudSession);
-  // Project context comes from binding / explicit selection — never from route alone.
+  // Project context comes from an authorized resolver / explicit route — never from route alone.
   const inProjectContext = signedIn && projectContext;
   const baseNavItems: CloudSidebarNavEntry[] = !signedIn
     ? SIGNED_OUT_CLOUD_SIDEBAR_ROUTES
-    : inProjectContext && projectBound
+    : inProjectContext && localWorkspaceContext
       ? CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES
       : inProjectContext
         ? CLOUD_PROJECT_SIDEBAR_ROUTES
@@ -77,7 +77,7 @@ export function CloudServiceSidebar({
 
   return (
     <SidebarRoot className="desktop-cloud-service-sidebar">
-      {inProjectContext && !projectBound && (
+      {inProjectContext && !localWorkspaceContext && (
         <div className="desktop-cloud-sidebar-context">
           <button
             className="desktop-cloud-sidebar-context-back"
@@ -113,11 +113,11 @@ export function CloudServiceSidebar({
                     active={
                       signedIn && !item.locked && (
                         normalizedActiveSection === item.id
-                        || (inProjectContext && projectBound && item.id === "contents" && normalizedActiveSection === "overview")
+                        || (inProjectContext && localWorkspaceContext && item.id === "contents" && normalizedActiveSection === "overview")
                       )
                     }
                     onSelect={(section) => {
-                      if (projectBound && section === "overview") {
+                      if (localWorkspaceContext && section === "overview") {
                         onSelectSection("contents");
                         return;
                       }

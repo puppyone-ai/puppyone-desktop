@@ -10,7 +10,11 @@ import {
   resolveCloudProjectNavigationContext,
   resolveProjectCloudAttachment,
 } from "../src/features/cloud/attachment/projectCloudAttachment";
-import { parsePuppyoneRemote } from "../src/features/source-control/remotes";
+import {
+  describePuppyoneRemoteCandidates,
+  parsePuppyoneRemote,
+  resolvePuppyoneRemotes,
+} from "../src/features/source-control/remotes";
 import { shouldLoadCloudProjectCatalog } from "../src/features/cloud/workspace/cloudProjectResolution";
 import { cloudMessage } from "../src/features/cloud/cloudPresentation";
 
@@ -47,40 +51,30 @@ const workspace = {
 } as Workspace;
 
 describe("binding-first Project catalog policy", () => {
-  it("does not scan the Organization catalog while an exact Local target resolves", () => {
+  it("never scans the Organization catalog from an open Local workspace", () => {
     expect(shouldLoadCloudProjectCatalog({
       hasOpenWorkspace: true,
       workspaceIsCloud: false,
-      hasLocalTargetHint: true,
-      explicitBrowse: false,
     })).toBe(false);
-    expect(shouldLoadCloudProjectCatalog({
-      hasOpenWorkspace: true,
-      workspaceIsCloud: false,
-      hasLocalTargetHint: false,
-      localTargetResolutionPending: true,
-      explicitBrowse: true,
-    })).toBe(false);
-    expect(shouldLoadCloudProjectCatalog({
-      hasOpenWorkspace: true,
-      workspaceIsCloud: false,
-      hasLocalTargetHint: true,
-      explicitBrowse: true,
-    })).toBe(false);
-  });
-
-  it("keeps the catalog available for Cloud-only or explicit unbound browsing", () => {
     expect(shouldLoadCloudProjectCatalog({
       hasOpenWorkspace: false,
       workspaceIsCloud: false,
-      hasLocalTargetHint: false,
-      explicitBrowse: false,
+      workspaceRestoring: true,
+    })).toBe(false);
+  });
+
+  it("keeps the catalog available only for global/home or Cloud-only browsing", () => {
+    expect(shouldLoadCloudProjectCatalog({
+      hasOpenWorkspace: false,
+      workspaceIsCloud: false,
     })).toBe(true);
     expect(shouldLoadCloudProjectCatalog({
       hasOpenWorkspace: true,
       workspaceIsCloud: false,
-      hasLocalTargetHint: false,
-      explicitBrowse: true,
+    })).toBe(false);
+    expect(shouldLoadCloudProjectCatalog({
+      hasOpenWorkspace: true,
+      workspaceIsCloud: true,
     })).toBe(true);
   });
 });
@@ -130,12 +124,33 @@ describe("explicit workspace binding", () => {
       workspace: { ...workspace, workspaceInstanceId: undefined },
       configuredProjectId: "project-1",
       configuredOrigin: "https://cloud.example",
+      expectedUserId: "user-1",
     })).toBe(false);
     expect(bindingMatchesWorkspace({
       binding: binding(),
       workspace: { ...workspace, workspaceInstanceId: "workspace-instance-other" },
       configuredProjectId: "project-1",
       configuredOrigin: "https://cloud.example",
+      expectedUserId: "user-1",
+    })).toBe(false);
+  });
+
+  it("rejects a binding response with a different account or remote geometry", () => {
+    expect(bindingMatchesWorkspace({
+      binding: binding({ bound_user_id: "user-2" }),
+      workspace,
+      configuredProjectId: "project-1",
+      configuredOrigin: "https://cloud.example",
+      expectedUserId: "user-1",
+    })).toBe(false);
+    expect(bindingMatchesWorkspace({
+      binding: binding({
+        remote: { ...binding().remote, scope_id: "scope-other" },
+      }),
+      workspace,
+      configuredProjectId: "project-1",
+      configuredOrigin: "https://cloud.example",
+      expectedUserId: "user-1",
     })).toBe(false);
   });
 
@@ -275,11 +290,10 @@ describe("explicit workspace binding", () => {
   });
 });
 
-describe("binding-only attachment semantics", () => {
+describe("contextual attachment semantics", () => {
   it("requires confirmation for a legacy candidate and never promotes it to linked", () => {
     const attachment = resolveProjectCloudAttachment({
-      configuredProjectId: null,
-      bindingProjectId: null,
+      resolvedProjectId: null,
       remoteProjectId: "project-1",
       bindingError: cloudMessage("binding-confirm-workspace"),
       bindingReason: "legacy-confirmation-required",
@@ -295,26 +309,29 @@ describe("binding-only attachment semantics", () => {
       bindingKind: "scoped",
       message: cloudMessage("binding-confirm-workspace"),
     });
-    expect(resolveCloudProjectNavigationContext(attachment, "stale")).toEqual({
+    expect(resolveCloudProjectNavigationContext(attachment)).toEqual({
       projectContext: false,
-      projectBound: false,
+      localWorkspaceContext: false,
     });
   });
 
   it("keeps a verified binding linked on a transient network warning", () => {
     const attachment = resolveProjectCloudAttachment({
-      configuredProjectId: null,
-      bindingProjectId: "project-1",
+      resolvedProjectId: "project-1",
       remoteProjectId: null,
       bindingError: cloudMessage("binding-network-failed", undefined, "Network offline"),
       bindingReason: "network",
       bindingCloudLinked: true,
       bindingId: "binding-1",
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
       resolving: false,
     });
     expect(attachment).toEqual({
-      status: "linked",
+      status: "resolved",
       projectId: "project-1",
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
       bindingId: "binding-1",
       warning: cloudMessage("binding-network-failed", undefined, "Network offline"),
     });
@@ -326,6 +343,7 @@ describe("canonical Git locator discovery", () => {
     expect(parsePuppyoneRemote("https://cloud.example/git/project-1.git")).toEqual({
       kind: "project",
       host: "cloud.example",
+      origin: "https://cloud.example",
       displayId: "project-1",
       projectId: "project-1",
     });
@@ -334,10 +352,69 @@ describe("canonical Git locator discovery", () => {
     )).toEqual({
       kind: "scope",
       host: "cloud.example",
+      origin: "https://cloud.example",
       displayId: "project-1/scope-docs",
       projectId: "project-1",
       scopeId: "scope-docs",
     });
+  });
+
+  it("deduplicates matching fetch/push locators and fails closed on conflicts", () => {
+    const unique = resolvePuppyoneRemotes({
+      remotes: [{
+        name: "puppyone",
+        fetchUrl: "https://cloud.example/git/project-1.git",
+        pushUrl: "https://cloud.example/git/project-1.git",
+        branches: [],
+      }],
+    } as never);
+    expect(unique.status).toBe("unique");
+    expect(unique.candidates).toHaveLength(2);
+
+    const conflict = resolvePuppyoneRemotes({
+      remotes: [{
+        name: "puppyone",
+        fetchUrl: "https://cloud.example/git/project-1.git",
+        pushUrl: "https://cloud.example/git/project-2.git",
+        branches: [],
+      }],
+    } as never);
+    expect(conflict.status).toBe("conflict");
+
+    const oneSided = resolvePuppyoneRemotes({
+      remotes: [{
+        name: "puppyone",
+        fetchUrl: "https://cloud.example/git/project-1.git",
+        pushUrl: "https://github.com/example/project-1.git",
+        branches: [],
+      }],
+    } as never);
+    expect(oneSided.status).toBe("conflict");
+  });
+
+  it("describes conflicts without exposing a legacy credential", () => {
+    const secret = "pwg_secret-value-1234567890";
+    const conflict = resolvePuppyoneRemotes({
+      remotes: [
+        {
+          name: "legacy",
+          fetchUrl: `https://cloud.example/git/ap/${secret}.git`,
+          pushUrl: `https://cloud.example/git/ap/${secret}.git`,
+          branches: [],
+        },
+        {
+          name: "canonical",
+          fetchUrl: "https://cloud.example/git/project-1.git",
+          pushUrl: "https://cloud.example/git/project-1.git",
+          branches: [],
+        },
+      ],
+    } as never);
+    expect(conflict.status).toBe("conflict");
+    const summary = describePuppyoneRemoteCandidates(conflict.candidates);
+    expect(summary).not.toContain(secret);
+    expect(summary).toContain("pwg_…7890");
+    expect(summary).toContain("project-1");
   });
 
   it("rejects ambiguous encoded IDs and credential-bearing canonical locators", () => {
@@ -363,17 +440,24 @@ describe("canonical Git locator discovery", () => {
 });
 
 describe("project attachment routing", () => {
-  it("binds the selected Project ID without a repo-identity or Scope-list preflight", () => {
-    const source = readFileSync(
-      new URL("../src/features/cloud/CloudServiceMainView.tsx", import.meta.url),
+  it("keeps contextual resolution and Organization catalog data in separate owners", () => {
+    const dataSource = readFileSync(
+      new URL("../src/features/cloud/data/useDesktopCloudData.ts", import.meta.url),
       "utf8",
     );
-    const attachFlow = source
-      .split("const handleConnectProject", 2)[1]
-      ?.split("const handleCopyCloneCommand", 1)[0] ?? "";
+    const resolverSource = readFileSync(
+      new URL("../src/features/cloud/workspace/useCloudWorkspaceBinding.ts", import.meta.url),
+      "utf8",
+    );
+    const localOnlySource = readFileSync(
+      new URL("../src/features/cloud/states.tsx", import.meta.url),
+      "utf8",
+    );
 
-    expect(attachFlow).toContain("onConfigureCloudRemote(project.id)");
-    expect(attachFlow).not.toContain("getCloudRepoIdentity");
+    expect(dataSource).not.toContain("listCloudProjects");
+    expect(resolverSource).toContain("resolveCanonicalCloudWorkspaceRemote");
+    expect(localOnlySource).not.toContain("CloudProjectRow");
+    expect(localOnlySource).not.toContain("onCopyCloneCommand");
   });
 
   it("compensates both new and reused binding credentials after local setup failure", () => {

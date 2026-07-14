@@ -229,6 +229,7 @@
   width: min(100%, 1040px);
   min-height: 100%;
   margin: 0 auto;
+  align-content: start;
   gap: 18px;
 }
 

@@ -9,6 +9,7 @@ export function CloudProjectRecoveryState({
   loading = false,
   onRetry,
   onUseAnotherAccount,
+  showUseAnotherAccount = true,
   onOpenGitDetails,
   confirmLabel,
   onConfirm,
@@ -19,6 +20,7 @@ export function CloudProjectRecoveryState({
   loading?: boolean;
   onRetry: () => void;
   onUseAnotherAccount: () => void;
+  showUseAnotherAccount?: boolean;
   onOpenGitDetails: () => void;
   confirmLabel?: string;
   onConfirm?: () => void;
@@ -41,10 +43,12 @@ export function CloudProjectRecoveryState({
             <RefreshCw size={13} className={loading ? "spin" : undefined} />
             <span>{t("cloud.common.retry")}</span>
           </button>
-          <button className="desktop-cloud-row-action" type="button" onClick={onUseAnotherAccount}>
-            <UserRound size={13} />
-            <span>{t("cloud.recovery.useAnotherAccount")}</span>
-          </button>
+          {showUseAnotherAccount && (
+            <button className="desktop-cloud-row-action" type="button" onClick={onUseAnotherAccount}>
+              <UserRound size={13} />
+              <span>{t("cloud.recovery.useAnotherAccount")}</span>
+            </button>
+          )}
           <button className="desktop-cloud-row-action" type="button" onClick={onOpenGitDetails}>
             <GitBranch size={13} />
             <span>{t("cloud.auth.gitSyncDetails")}</span>

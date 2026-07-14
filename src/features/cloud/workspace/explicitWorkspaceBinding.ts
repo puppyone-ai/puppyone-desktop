@@ -33,6 +33,35 @@ export function sameCloudOrigin(
   }
 }
 
+/**
+ * Production requires the Git locator and API to share an origin. Local API
+ * development may opt into one hosted Git origin explicitly; it never widens
+ * the production trust rule implicitly.
+ */
+export function isTrustedCloudGitOrigin(
+  remoteOrOrigin: string | null | undefined,
+  apiBaseUrl: string | null | undefined,
+): boolean {
+  if (sameCloudOrigin(remoteOrOrigin, apiBaseUrl)) return true;
+  if (!remoteOrOrigin || !isLoopbackOrigin(apiBaseUrl)) return false;
+  const configuredGitOrigin = (
+    import.meta as ImportMeta & { env?: Record<string, string | undefined> }
+  ).env?.VITE_DESKTOP_CLOUD_GIT_ORIGIN?.trim();
+  return Boolean(
+    configuredGitOrigin
+    && sameCloudOrigin(remoteOrOrigin, configuredGitOrigin),
+  );
+}
+
+function isLoopbackOrigin(value: string | null | undefined): boolean {
+  if (!value) return false;
+  try {
+    return ["localhost", "127.0.0.1", "::1"].includes(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+}
+
 export async function createExplicitWorkspaceBinding({
   session,
   apiBaseUrl,
@@ -128,14 +157,21 @@ export function bindingMatchesWorkspace({
   workspace,
   configuredProjectId,
   configuredOrigin,
+  expectedUserId,
 }: {
   binding: DesktopCloudWorkspaceBinding;
   workspace: Workspace;
   configuredProjectId: string;
   configuredOrigin: string;
+  expectedUserId: string;
 }): boolean {
   return binding.id.length > 0
     && binding.project_id === configuredProjectId
     && binding.workspace_instance_id === workspace.workspaceInstanceId
-    && sameCloudOrigin(binding.cloud_origin, configuredOrigin);
+    && binding.bound_user_id === expectedUserId
+    && sameCloudOrigin(binding.cloud_origin, configuredOrigin)
+    && binding.remote.project_id === binding.project_id
+    && binding.remote.scope_id === binding.scope_id
+    && binding.remote.kind === binding.binding_kind
+    && sameCloudOrigin(binding.remote.url, binding.cloud_origin);
 }

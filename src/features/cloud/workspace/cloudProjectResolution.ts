@@ -14,6 +14,11 @@ import {
 
 export type RecentWorkspaceCloudBinding = {
   projectId: string | null;
+  /** Context key is present only on results verified by the active resolver. */
+  resolutionKey?: string;
+  resolutionPending?: boolean;
+  resolutionSource?: "workspace-binding" | "canonical-remote";
+  bindingStatus?: "bound" | "not-bound";
   cloudLinked: boolean;
   error: CloudMessageDescriptor | null;
   reason?:
@@ -25,6 +30,8 @@ export type RecentWorkspaceCloudBinding = {
     | "wrong-host"
     | "role-downgraded"
     | "legacy-confirmation-required"
+    | "locator-conflict"
+    | "not-found"
     | null;
   bindingId?: string | null;
   bindingKind?: "full" | "scoped" | null;
@@ -32,6 +39,7 @@ export type RecentWorkspaceCloudBinding = {
   readiness?: DesktopCloudProjectReadiness | null;
   candidateProjectId?: string | null;
   candidateScopeId?: string | null;
+  scopeId?: string | null;
   capabilities?: string[];
 };
 
@@ -44,31 +52,37 @@ export const CLOUD_PROJECT_MAPPING_ERROR = CLOUD_PROJECT_UNRESOLVABLE_MESSAGE;
  *
  * A Local workspace is resolved binding-first. Session restore must therefore
  * never race an exact Workspace Binding lookup with a broad Project listing.
- * The catalog remains available when the user explicitly browses and the
- * workspace has no canonical Project/binding candidate.
+ * The catalog is a global/home concern. An open Local workspace is always a
+ * contextual surface, including when it has no locator at all.
  */
 export function shouldLoadCloudProjectCatalog({
   hasOpenWorkspace,
   workspaceIsCloud,
-  hasLocalTargetHint,
-  localTargetResolutionPending = false,
-  explicitBrowse,
+  workspaceRestoring = false,
 }: {
   hasOpenWorkspace: boolean;
   workspaceIsCloud: boolean;
-  hasLocalTargetHint: boolean;
-  localTargetResolutionPending?: boolean;
-  explicitBrowse: boolean;
+  workspaceRestoring?: boolean;
 }): boolean {
-  if (!hasOpenWorkspace || workspaceIsCloud) return true;
-  if (localTargetResolutionPending) return false;
-  return explicitBrowse && !hasLocalTargetHint;
+  // While the last local workspace is being restored, "no workspace yet" is
+  // an unknown transient state rather than the global homepage. Starting the
+  // Organization catalog here races (and visually leaks into) contextual
+  // binding resolution.
+  return !workspaceRestoring && (!hasOpenWorkspace || workspaceIsCloud);
 }
 
 function errorStatus(error: unknown): number | null {
   return error && typeof error === "object" && "status" in error
     ? Number((error as { status?: unknown }).status) || null
     : null;
+}
+
+export function isRetryableCloudFailure(status: number | null): boolean {
+  return status == null
+    || status === 408
+    || status === 425
+    || status === 429
+    || status >= 500;
 }
 
 /** Resolve homepage badges from explicit binding facts only. */
@@ -161,7 +175,7 @@ export async function resolveRecentWorkspaceCloudBinding({
     } catch (error) {
       const status = errorStatus(error);
       return [item.workspace.id, {
-        projectId: status == null ? projectId : null,
+        projectId: isRetryableCloudFailure(status) ? projectId : null,
         candidateProjectId: projectId,
         bindingId,
         cloudLinked: true,

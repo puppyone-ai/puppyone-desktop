@@ -8,12 +8,11 @@ import type { getPuppyoneRemote } from "../../source-control/remotes";
 import type { DesktopCloudDataState } from "../data";
 import type { ProjectCloudAttachment } from "../attachment";
 import {
-  getAttachedCloudProjectId,
+  getResolvedCloudProjectId,
   isCloudAttachmentRecovery,
 } from "../attachment";
 import type { CloudWorkspaceSection } from "../types";
 import { CloudGlobalBillingPage, CloudGlobalTeamPage } from "../components/CloudGlobalPages";
-import { CloudProjectBrowser } from "../components/ProjectBrowser";
 import { CloudTemplateStore } from "../components/CloudTemplateStore";
 import { CloudWorkspaceLoadingState } from "../components/shared";
 import { CloudAutomationRouteSection } from "../sections/AutomationRouteSection";
@@ -29,7 +28,6 @@ import {
   CloudProjectWebSection,
   CloudUnmappedWorkspace,
 } from "../states";
-import { deriveCloudWorkspaceBinding } from "../workspace";
 import { getCloudRouteWebPath } from "./cloudRoutes";
 import { formatCloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
@@ -48,7 +46,6 @@ export function CloudRouter({
   cloudRemote,
   cloudData,
   attachment = null,
-  selectedProjectId,
   activeSection,
   accountEmail,
   accountConnected,
@@ -56,14 +53,10 @@ export function CloudRouter({
   localChangeCount,
   loading,
   cloudBackupLoading,
-  cloudAction,
   onSessionChange,
   onBackupWorkspace,
-  onConnectProject,
-  onCopyCloneCommand,
   onOpenProject,
   onOpenGitSettings,
-  onSelectProject,
   onSelectSection,
   onRetryBinding,
   onUseAnotherAccount,
@@ -77,8 +70,6 @@ export function CloudRouter({
   cloudRemote: ReturnType<typeof getPuppyoneRemote>;
   cloudData: DesktopCloudDataState;
   attachment?: ProjectCloudAttachment | null;
-  /** Explicit browse context. Never infer this from loaded project data. */
-  selectedProjectId: string | null;
   activeSection: CloudWorkspaceSection;
   accountEmail: string | null;
   accountConnected: boolean;
@@ -86,14 +77,10 @@ export function CloudRouter({
   localChangeCount: number;
   loading: boolean;
   cloudBackupLoading: boolean;
-  cloudAction: CloudActionState;
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onBackupWorkspace: () => void;
-  onConnectProject: (project: DesktopCloudProject) => void;
-  onCopyCloneCommand: (project: DesktopCloudProject) => void;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
   onOpenGitSettings: () => void;
-  onSelectProject: (project: DesktopCloudProject) => void;
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onRetryBinding?: () => void;
   onUseAnotherAccount?: () => void;
@@ -105,25 +92,10 @@ export function CloudRouter({
   onDetachCloudProject?: () => void;
 }) {
   const { t } = useLocalization();
-  const mappedProjectId = getAttachedCloudProjectId(attachment ?? { status: "local-only", projectId: null })
+  const mappedProjectId = getResolvedCloudProjectId(attachment ?? { status: "local-only", projectId: null })
     ?? cloudData.mappedProjectId;
   const mappedProject = cloudData.mappedProject;
   const activeProject = cloudData.activeProject;
-  const workspaceBinding = deriveCloudWorkspaceBinding({
-    cloudRemote,
-    projectId: mappedProjectId,
-    loading: cloudData.loading || attachment?.status === "resolving",
-    error: attachment && isCloudAttachmentRecovery(attachment)
-      ? attachment.message
-      : cloudData.error,
-  });
-  const browsingProjectId = selectedProjectId?.trim()
-    && selectedProjectId !== mappedProjectId
-    && (!attachment || attachment.status === "local-only")
-    ? selectedProjectId.trim()
-    : null;
-  const browsingCloudProject = Boolean(browsingProjectId);
-  const hasPuppyoneRemote = Boolean(cloudRemote);
 
   // 1) Account routes first
   if (activeSection === "cloud-team") {
@@ -159,23 +131,25 @@ export function CloudRouter({
         apiBaseUrl={cloudApiBaseUrl}
         onSessionChange={onSessionChange}
         onProjectCreated={(project) => {
-          // Selecting the returned Project changes the Cloud data context and
-          // triggers its canonical reload. Avoid a redundant pre-navigation
-          // reload whose failure could incorrectly look like clone failure.
-          onSelectProject(project);
+          // Template instantiation creates a Cloud Project; it must not attach
+          // that Project to the currently open local workspace implicitly.
+          onOpenProject(project.id, "contents");
         }}
       />
     );
   }
 
   // 2) Workspace binding before project sections / browser
-  if (attachment?.status === "resolving" || (hasPuppyoneRemote && cloudData.initializing && !mappedProjectId)) {
+  if (attachment?.status === "resolving") {
     return <CloudWorkspaceLoadingState label={t("cloud.loading.matchingProject")} />;
   }
 
-  if (attachment && isCloudAttachmentRecovery(attachment) && hasPuppyoneRemote && !browsingCloudProject) {
+  if (attachment && isCloudAttachmentRecovery(attachment)) {
     return (
       <CloudProjectRecoveryState
+        title={attachment.status === "temporarily-unavailable"
+          ? t("cloud.message.binding-network-failed")
+          : undefined}
         message={formatCloudMessage(attachment.message, t)}
         remoteLabel={cloudRemote?.info.displayId ?? null}
         loading={cloudData.loading}
@@ -187,6 +161,7 @@ export function CloudRouter({
           if (onUseAnotherAccount) onUseAnotherAccount();
           else onSessionChange(null);
         }}
+        showUseAnotherAccount={attachment.status !== "temporarily-unavailable"}
         onOpenGitDetails={onOpenGitSettings}
         confirmLabel={attachment.status === "legacy-confirmation-required" ? t("cloud.project.confirm") : undefined}
         onConfirm={attachment.status === "legacy-confirmation-required"
@@ -202,13 +177,11 @@ export function CloudRouter({
     );
   }
 
-  if (cloudData.initializing && !mappedProjectId && !browsingCloudProject) {
-    return <CloudWorkspaceLoadingState label={t("cloud.loading.project")} />;
-  }
-
-  // Mapped local workspace: always enter project overview / contents — never ProjectBrowser.
-  if (mappedProjectId && !browsingCloudProject) {
-    return renderBoundProjectSection({
+  // Authorized local context: always enter the exact Project — never a catalog.
+  if (mappedProjectId) {
+    const durableBinding = attachment?.status === "resolved"
+      && attachment.bindingStatus === "bound";
+    return renderProjectContextSection({
       activeSection,
       workspace,
       status,
@@ -218,7 +191,6 @@ export function CloudRouter({
       cloudData,
       projectId: mappedProjectId,
       project: mappedProject ?? activeProject ?? { id: mappedProjectId, name: workspace.name },
-      linkedToWorkspace: true,
       loading,
       accountConnected,
       onSessionChange,
@@ -226,61 +198,17 @@ export function CloudRouter({
       onOpenProject,
       onOpenGitSettings,
       onRefresh: cloudData.reload,
-      bindingKind: attachment?.status === "linked" ? attachment.bindingKind ?? null : null,
-      scopePath: attachment?.status === "linked" ? attachment.scopePath ?? null : null,
-      readiness: attachment?.status === "linked"
+      bindingKind: attachment?.status === "resolved" ? attachment.bindingKind ?? null : null,
+      scopePath: attachment?.status === "resolved" ? attachment.scopePath ?? null : null,
+      readiness: attachment?.status === "resolved"
         ? attachment.readiness ?? cloudData.readiness
         : cloudData.readiness,
-      onDetachCloudProject,
+      onDetachCloudProject: durableBinding ? onDetachCloudProject : undefined,
       t,
     });
   }
 
-  // Explicit Cloud-only / browse path may still use the project browser when local-only.
-  if (activeSection === "overview" && !hasPuppyoneRemote && !browsingCloudProject) {
-    if (attachment?.status === "local-only") {
-      return (
-        <CloudUnmappedWorkspace
-          workspace={workspace}
-          activeSection={activeSection}
-          accountEmail={accountEmail}
-          branchName={branchName}
-          localChangeCount={localChangeCount}
-          projects={cloudData.projects}
-          loading={cloudData.loading}
-          backupLoading={cloudBackupLoading}
-          cloudRemote={null}
-          action={cloudAction}
-          onBackupWorkspace={onBackupWorkspace}
-          onConnectProject={onConnectProject}
-          onCopyCloneCommand={onCopyCloneCommand}
-          onOpenProject={onOpenProject}
-        />
-      );
-    }
-    return (
-      <CloudProjectBrowser
-        projects={cloudData.projects}
-        loading={cloudData.loading}
-        session={cloudSession}
-        apiBaseUrl={cloudApiBaseUrl}
-        mappedProjectId={mappedProjectId}
-        backupLoading={cloudBackupLoading}
-        cloudAction={cloudAction}
-        onSessionChange={onSessionChange}
-        onBackupWorkspace={onBackupWorkspace}
-        onSelectProject={onSelectProject}
-        onConnectProject={onConnectProject}
-        onOpenCloudProjects={() => openCloudApp(getCloudRouteWebPath("overview"))}
-      />
-    );
-  }
-
-  if (!browsingCloudProject && workspaceBinding.status === "binding-resolving") {
-    return <CloudWorkspaceLoadingState label={t("cloud.loading.matchingProject")} />;
-  }
-
-  if (!browsingCloudProject && (workspaceBinding.status === "local-only" || workspaceBinding.status === "error") && !hasPuppyoneRemote) {
+  if (!attachment || attachment.status === "local-only") {
     return (
       <CloudUnmappedWorkspace
         workspace={workspace}
@@ -288,94 +216,17 @@ export function CloudRouter({
         accountEmail={accountEmail}
         branchName={branchName}
         localChangeCount={localChangeCount}
-        projects={cloudData.projects}
-        loading={cloudData.loading}
         backupLoading={cloudBackupLoading}
         cloudRemote={cloudRemote}
-        action={cloudAction}
         onBackupWorkspace={onBackupWorkspace}
-        onConnectProject={onConnectProject}
-        onCopyCloneCommand={onCopyCloneCommand}
-        onOpenProject={onOpenProject}
       />
     );
   }
 
-  if (hasPuppyoneRemote && !mappedProjectId && !browsingCloudProject) {
-    return (
-      <CloudProjectRecoveryState
-        message={workspaceBinding.status === "error"
-          ? formatCloudMessage(workspaceBinding.message, t)
-          : t("cloud.recovery.remoteProjectUnknown")}
-        remoteLabel={cloudRemote?.info.displayId ?? null}
-        loading={cloudData.loading}
-        onRetry={() => {
-          if (onRetryBinding) onRetryBinding();
-          else void cloudData.reload();
-        }}
-        onUseAnotherAccount={() => {
-          if (onUseAnotherAccount) onUseAnotherAccount();
-          else onSessionChange(null);
-        }}
-        onOpenGitDetails={onOpenGitSettings}
-      />
-    );
-  }
-
-  const projectId = browsingProjectId ?? (
-    "projectId" in workspaceBinding ? workspaceBinding.projectId : null
-  );
-  if (!projectId) {
-    return <CloudWorkspaceLoadingState label={t("cloud.loading.project")} />;
-  }
-
-  const routedProject = (
-    activeProject?.id === projectId
-      ? activeProject
-      : cloudData.projects.find((project) => project.id === projectId)
-        ?? (mappedProject?.id === projectId ? mappedProject : null)
-        ?? {
-          id: projectId,
-          name: browsingCloudProject ? t("cloud.project.generic") : workspace.name,
-        }
-  );
-
-  return renderBoundProjectSection({
-    activeSection,
-    workspace,
-    status,
-    cloudSession,
-    cloudApiBaseUrl,
-    cloudRemote,
-    cloudData,
-    projectId,
-    project: routedProject,
-    linkedToWorkspace: !browsingCloudProject,
-    loading,
-    accountConnected,
-    onSessionChange,
-    onSelectSection,
-    onOpenProject,
-    onOpenGitSettings,
-    onRefresh: cloudData.reload,
-    bindingKind: null,
-    scopePath: null,
-    readiness: cloudData.readiness,
-    onDetachCloudProject: undefined,
-    attachAction: browsingCloudProject
-      ? {
-          busy: cloudAction.kind === "connect" && cloudAction.projectId === projectId,
-          onAttach: () => {
-            const project = cloudData.projects.find((entry) => entry.id === projectId) ?? routedProject;
-            onConnectProject(project);
-          },
-        }
-      : null,
-    t,
-  });
+  return <CloudWorkspaceLoadingState label={t("cloud.loading.project")} />;
 }
 
-function renderBoundProjectSection({
+function renderProjectContextSection({
   activeSection,
   workspace,
   status,
@@ -385,7 +236,6 @@ function renderBoundProjectSection({
   cloudData,
   projectId,
   project,
-  linkedToWorkspace,
   loading,
   accountConnected,
   onSessionChange,
@@ -397,7 +247,6 @@ function renderBoundProjectSection({
   scopePath,
   readiness,
   onDetachCloudProject,
-  attachAction = null,
   t,
 }: {
   activeSection: CloudWorkspaceSection;
@@ -409,7 +258,6 @@ function renderBoundProjectSection({
   cloudData: DesktopCloudDataState;
   projectId: string;
   project: DesktopCloudProject;
-  linkedToWorkspace: boolean;
   loading: boolean;
   accountConnected: boolean;
   onSessionChange: (session: DesktopCloudSession | null) => void;
@@ -421,7 +269,6 @@ function renderBoundProjectSection({
   scopePath: string | null;
   readiness: import("../../../lib/cloudApi").DesktopCloudProjectReadiness | null;
   onDetachCloudProject?: () => void;
-  attachAction?: { busy: boolean; onAttach: () => void } | null;
   t: MessageFormatter;
 }) {
   const connectorsByScope = new Map<string, typeof cloudData.connectors>();
@@ -453,13 +300,12 @@ function renderBoundProjectSection({
         connectors={cloudData.connectors}
         mcpEndpoints={cloudData.mcpEndpoints}
         identity={cloudData.identity}
-        linkedToWorkspace={linkedToWorkspace}
+        linkedToWorkspace
         loading={loading || cloudData.loading}
-        attachAction={attachAction}
         onSelectSection={onSelectSection}
         onOpenProject={onOpenProject}
         onRefresh={onRefresh}
-        detachAction={linkedToWorkspace && onDetachCloudProject
+        detachAction={onDetachCloudProject
           ? { onDetach: onDetachCloudProject }
           : null}
       />

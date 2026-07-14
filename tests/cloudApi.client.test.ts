@@ -245,6 +245,22 @@ describe("cloud API client delegation", () => {
 });
 
 describe("session / api-base guards", () => {
+  it("recovers HTTP status after Electron serializes away custom Error fields", async () => {
+    bridge.mockRejectedValue(new Error(
+      "Error invoking remote method 'cloud:session-api-request': Error: "
+      + "Request failed (503): Project authorization is temporarily unavailable",
+    ));
+
+    const error = await cloudApiRequest("/workspace-bindings/binding-1", session, undefined, {}, API)
+      .then(() => null, (reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({
+      message: "Project authorization is temporarily unavailable",
+      status: 503,
+    });
+  });
+
   it("rejects with 401 (without calling the bridge) when the requested api base != the session's", async () => {
     const otherApi = "https://qubits-try.puppyone.ai/api/v1";
     await expect(

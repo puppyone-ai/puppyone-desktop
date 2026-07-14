@@ -95,6 +95,51 @@ if (!formatPolicy.includes("packages/shared-ui/src/core/fileFormats.json")) {
   errors.push("the local file-format policy must consume the canonical Shared UI registry");
 }
 
+const contextualCloudData = read("src/features/cloud/data/useDesktopCloudData.ts");
+const contextualCloudRouter = read("src/features/cloud/routes/CloudRouter.tsx");
+const contextualCloudStates = read("src/features/cloud/states.tsx");
+const contextualCloudResolver = read("src/features/cloud/workspace/useCloudWorkspaceBinding.ts");
+const contextualCloudAttachment = read("src/features/cloud/attachment/useProjectCloudAttachment.ts");
+const contextualWorkspaceSurface = read("src/features/app-shell/workspace-surfaces/useWorkspaceSurfaceContent.tsx");
+const desktopApp = read("src/App.tsx");
+
+if (contextualCloudData.includes("listCloudProjects")) {
+  errors.push("contextual Cloud data must never enumerate the Organization Project catalog");
+}
+if (contextualCloudRouter.includes("CloudProjectBrowser")) {
+  errors.push("the Local workspace Cloud router must not render the global Project browser");
+}
+for (const forbiddenLocalOnlyToken of ["CloudProjectRow", "onCopyCloneCommand"]) {
+  if (contextualCloudStates.includes(forbiddenLocalOnlyToken)) {
+    errors.push(`the Local-only Cloud state reintroduced ${forbiddenLocalOnlyToken}`);
+  }
+}
+if (!contextualCloudResolver.includes("resolveCanonicalCloudWorkspaceRemote")) {
+  errors.push("the Local workspace resolver must authorize canonical Git locators through the backend");
+}
+if (
+  !contextualCloudResolver.includes("createWorkspaceCloudResolutionKey")
+  || !contextualCloudAttachment.includes("createWorkspaceCloudResolutionKey")
+  || !contextualCloudAttachment.includes("resolutionKey === expectedResolutionKey")
+) {
+  errors.push("contextual Cloud results must be keyed to the active workspace/account/host/locator snapshot");
+}
+if (contextualCloudResolver.includes("setHomeCloudProjects")) {
+  errors.push("contextual Project resolution must not mutate the global/home Project catalog");
+}
+for (const obsoleteSelectionToken of [
+  "selectedProjectId",
+  "selectedProjectCapabilities",
+  "onBackToCloudProjects",
+]) {
+  if (contextualWorkspaceSurface.includes(obsoleteSelectionToken) || desktopApp.includes(obsoleteSelectionToken)) {
+    errors.push(`Local workspace composition reintroduced transient catalog state: ${obsoleteSelectionToken}`);
+  }
+}
+if (desktopApp.includes("browseProjectCatalogOnCloudEntry")) {
+  errors.push("entering Cloud from a Local workspace must not trigger catalog browsing");
+}
+
 if (errors.length > 0) {
   console.error("Local Workspace architecture check failed:");
   for (const error of errors) console.error(`- ${error}`);
