@@ -102,6 +102,12 @@ title (`12px / 500`, sentence case), never a panel/card shell. At widths of
 compact. Direction-sensitive spacing uses logical CSS properties, and
 technical URLs remain explicit LTR islands.
 
+These controls depend on the renderer-wide single-reset contract in
+[Desktop Renderer Style Architecture](./desktop-renderer-style-architecture.md).
+Tailwind utilities remain available, but Tailwind Preflight must stay disabled:
+an unscoped form-element reset would otherwise remove the borders, padding,
+backgrounds, and typography owned by the layered Settings controls.
+
 ### Typography Preset Matrix
 
 Text size is a curated token set, not a multiplier. Every value is an integer

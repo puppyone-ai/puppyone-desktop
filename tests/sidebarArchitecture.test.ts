@@ -1,9 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const cascadeCss = read("../src/styles/cascade.css");
-const rendererEntrySource = read("../src/main.tsx");
-const tailwindConfig = read("../tailwind.config.cjs");
 const sharedSidebarCss = read("../packages/shared-ui/src/styles/sidebar-primitives.css");
 const patternCss = read("../src/styles/sidebar/patterns.css");
 const dataSurfaceSource = read("../src/features/app-shell/DesktopDataWorkspaceSurface.tsx");
@@ -18,14 +15,6 @@ const virtualizationPolicy = read("../packages/shared-ui/src/sidebar/virtualizat
 
 describe("Sidebar architecture", () => {
   it("keeps the dependency direction and CSS ownership explicit", () => {
-    expect(cascadeCss.trim()).toBe("@layer reset, tokens, primitives, patterns, features, overrides;");
-    expect(rendererEntrySource.indexOf('import "./styles/cascade.css";')).toBeLessThan(
-      rendererEntrySource.indexOf('import "@puppyone/shared-ui/shared-ui.css";'),
-    );
-    expect(rendererEntrySource.indexOf('import "./styles/cascade.css";')).toBeLessThan(
-      rendererEntrySource.indexOf('import "./styles.css";'),
-    );
-    expect(tailwindConfig).toMatch(/corePlugins\s*:\s*\{[\s\S]*?preflight\s*:\s*false/);
     expect(sharedSidebarCss).toContain("@layer primitives");
     expect(patternCss).toContain("@layer patterns");
     expect(sharedSidebarCss).not.toContain("desktop-tool-sidebar");

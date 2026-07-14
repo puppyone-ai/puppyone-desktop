@@ -429,6 +429,10 @@ Feature styles may not:
 
 ### 9.2 Cascade order
 
+The renderer-wide source of truth is
+[Desktop Renderer Style Architecture](./desktop-renderer-style-architecture.md).
+This section records the Sidebar-specific consequences of that contract.
+
 The stylesheet entry establishes a deterministic cascade:
 
 ```css
