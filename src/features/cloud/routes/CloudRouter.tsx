@@ -12,7 +12,8 @@ import {
   isCloudAttachmentRecovery,
 } from "../attachment";
 import type { CloudWorkspaceSection } from "../types";
-import { CloudGlobalBillingPage, CloudGlobalTeamPage } from "../components/CloudGlobalPages";
+import { CloudGlobalBillingPage } from "../components/CloudBillingPage";
+import { CloudGlobalTeamPage } from "../components/CloudGlobalPages";
 import { CloudProjectBrowser } from "../components/ProjectBrowser";
 import { CloudTemplateStore } from "../components/CloudTemplateStore";
 import { CloudWorkspaceLoadingState } from "../components/shared";
@@ -32,6 +33,7 @@ import {
 import { deriveCloudWorkspaceBinding } from "../workspace";
 import { getCloudRouteWebPath } from "./cloudRoutes";
 import { formatCloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
+import { useFeatureFlag } from "../../flags";
 
 export type CloudActionState = {
   kind: "backup" | "connect" | "copy" | null;
@@ -105,6 +107,7 @@ export function CloudRouter({
   onDetachCloudProject?: () => void;
 }) {
   const { t } = useLocalization();
+  const billingEnabled = useFeatureFlag("cloudBilling");
   const mappedProjectId = getAttachedCloudProjectId(attachment ?? { status: "local-only", projectId: null })
     ?? cloudData.mappedProjectId;
   const mappedProject = cloudData.mappedProject;
@@ -140,6 +143,18 @@ export function CloudRouter({
   }
 
   if (activeSection === "cloud-billing") {
+    if (!billingEnabled) {
+      return (
+        <CloudGlobalTeamPage
+          accountEmail={accountEmail}
+          session={cloudSession}
+          apiBaseUrl={cloudApiBaseUrl}
+          projects={cloudData.projects}
+          onSessionChange={onSessionChange}
+          onOpen={() => openCloudApp(getCloudRouteWebPath("cloud-team"))}
+        />
+      );
+    }
     return (
       <CloudGlobalBillingPage
         accountEmail={accountEmail}
@@ -147,7 +162,6 @@ export function CloudRouter({
         apiBaseUrl={cloudApiBaseUrl}
         projects={cloudData.projects}
         onSessionChange={onSessionChange}
-        onOpen={() => openCloudApp(getCloudRouteWebPath("cloud-billing"))}
       />
     );
   }

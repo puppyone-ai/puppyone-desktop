@@ -14,6 +14,7 @@ import {
   type CloudRouteDescriptor,
 } from "./routes/cloudRoutes";
 import { getAccountInitial } from "./utils";
+import { useFeatureFlag } from "../flags";
 
 type CloudSidebarNavEntry = {
   id: CloudWorkspaceSection;
@@ -49,6 +50,7 @@ export function CloudServiceSidebar({
   onBackToProjects,
 }: CloudServiceSidebarProps) {
   const { t } = useLocalization();
+  const billingEnabled = useFeatureFlag("cloudBilling");
   const normalizedActiveSection = normalizeCloudSection(activeSection);
   const cloudEnvironment = resolveCloudEnvironment({ status, desktopApiBaseUrl: cloudApiBaseUrl });
   const cloudAuthState = resolveCloudAuthState({
@@ -68,10 +70,12 @@ export function CloudServiceSidebar({
         ? CLOUD_PROJECT_SIDEBAR_ROUTES
         : CLOUD_GLOBAL_SIDEBAR_ROUTES;
   const navItems = baseNavItems.filter((item) => (
+    item.id !== "cloud-billing" || billingEnabled
+  )).filter((item) => (
     !signedIn
-    || !("requiredCapability" in item)
-    || !item.requiredCapability
-    || projectCapabilities.includes(item.requiredCapability)
+      || !("requiredCapability" in item)
+      || !item.requiredCapability
+      || projectCapabilities.includes(item.requiredCapability)
   ));
   const navGroups = buildCloudSidebarNavGroups(navItems);
 
