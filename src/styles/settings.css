@@ -433,7 +433,7 @@
   height: 20px;
   flex: 0 0 auto;
   align-items: center;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-settings-switch input {

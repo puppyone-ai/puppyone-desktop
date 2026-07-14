@@ -11,6 +11,10 @@ import {
   buildExplorerVisibleModel,
 } from "../packages/shared-ui/src/data/explorer/explorerVisibleModel";
 import { createExplorerMotionPlan } from "../packages/shared-ui/src/data/explorer/explorerMotionPlan";
+import {
+  EXPLORER_MOTION_DURATION_MS,
+  EXPLORER_MOTION_EASING,
+} from "../packages/shared-ui/src/data/explorer/explorerMotionAnimation";
 import { EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS } from "../packages/shared-ui/src/data/explorer/useExplorerVirtualWindow";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -86,9 +90,17 @@ describe("Explorer bounded rendering", () => {
       maxMountedRows: EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS,
     });
 
-    expect(enterPlan.instructions.get("folder/a.md")?.kind).toBe("enter");
+    expect(enterPlan.instructions.get("folder/a.md")).toEqual({
+      kind: "enter",
+      reveal: { start: 0, end: 0.5 },
+    });
+    expect(enterPlan.instructions.get("folder/b.md")).toEqual({
+      kind: "enter",
+      reveal: { start: 0.5, end: 1 },
+    });
     expect(enterPlan.instructions.get("tail.md")).toEqual({ kind: "move", offsetY: -64 });
     expect(enterPlan.ghosts).toHaveLength(0);
+    expect(enterPlan.listEndOffsetY).toBe(-64);
 
     const exitPlan = createExplorerMotionPlan({
       previousRows: expanded.rows,
@@ -100,12 +112,17 @@ describe("Explorer bounded rendering", () => {
     });
     expect(exitPlan.instructions.get("tail.md")).toEqual({ kind: "move", offsetY: 64 });
     expect(exitPlan.ghosts.map((ghost) => ghost.row.key)).toEqual(["folder/a.md", "folder/b.md"]);
+    expect(exitPlan.ghosts.map((ghost) => ghost.reveal)).toEqual([
+      { start: 0.5, end: 1 },
+      { start: 0, end: 0.5 },
+    ]);
+    expect(exitPlan.listEndOffsetY).toBe(64);
     expect(collapsed.rows.length + exitPlan.ghosts.length).toBeLessThanOrEqual(
       EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS,
     );
   });
 
-  it("animates virtualized folder expansion and collapse using transform/opacity only", () => {
+  it("animates virtualized expansion and collapse with synchronized transform/clip paths", () => {
     const animate = vi.fn(() => ({ cancel: vi.fn() }));
     Object.defineProperty(HTMLElement.prototype, "animate", {
       configurable: true,
@@ -134,6 +151,7 @@ describe("Explorer bounded rendering", () => {
           showRoot={false}
           onSelectNode={() => undefined}
           onToggleFolder={(_node, nextExpanded) => setExpanded(nextExpanded)}
+          renderListEnd={() => <button type="button">New</button>}
         />
       );
     }
@@ -142,12 +160,24 @@ describe("Explorer bounded rendering", () => {
     const folderRow = container.querySelector<HTMLButtonElement>(`[data-explorer-path="${folder.path}"]`)!;
     act(() => folderRow.click());
     expect(container.querySelectorAll('[data-explorer-motion="enter"]').length).toBeGreaterThan(0);
+    expect(container.querySelector('.explorer-tree-list-end-motion[data-explorer-motion="move"]')).not.toBeNull();
     expect(animate).toHaveBeenCalled();
+    const expansionCalls = animate.mock.calls.slice();
+    expect(expansionCalls.some(([keyframes]) => JSON.stringify(keyframes).includes("clipPath"))).toBe(true);
+    expect(expansionCalls.every(([, options]) => (
+      (options as KeyframeAnimationOptions).duration === EXPLORER_MOTION_DURATION_MS
+      && (options as KeyframeAnimationOptions).easing === EXPLORER_MOTION_EASING
+    ))).toBe(true);
+    expect(JSON.stringify(expansionCalls)).not.toMatch(/opacity|scale/i);
     expect(Number(container.querySelector<HTMLElement>(".explorer-tree-virtual-canvas")?.dataset.mountedRowCount))
       .toBeLessThanOrEqual(EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS);
 
+    animate.mockClear();
     act(() => folderRow.click());
     expect(container.querySelectorAll('[data-explorer-motion="exit"]').length).toBeGreaterThan(0);
+    expect(container.querySelector('.explorer-tree-list-end-motion[data-explorer-motion="move"]')).not.toBeNull();
+    expect(animate.mock.calls.some(([keyframes]) => JSON.stringify(keyframes).includes("clipPath"))).toBe(true);
+    expect(JSON.stringify(animate.mock.calls)).not.toMatch(/opacity|scale/i);
     expect(Number(container.querySelector<HTMLElement>(".explorer-tree-virtual-canvas")?.dataset.mountedRowCount))
       .toBeLessThanOrEqual(EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS);
   });

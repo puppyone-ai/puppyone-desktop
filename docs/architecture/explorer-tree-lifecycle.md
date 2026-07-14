@@ -43,6 +43,10 @@ The sidebar file tree must behave as a stable controlled view:
 - User-initiated expand/collapse still animates.
 - Returning to the data tab does not replay existing expansion animations.
 - Expansion motion never mounts or measures the complete subtree.
+- Expansion and collapse use one fixed-duration timeline with smooth
+  acceleration, constant-speed travel, and smooth deceleration.
+- Descendants reveal as one continuous subtree boundary, never as independent
+  opacity/scale pop-ins.
 - Current rows plus exit visuals never exceed the 100-row DOM budget.
 - Guide segments move with their virtual row and remain visually continuous.
 - File-tree rows keep symmetric visual horizontal gutters whether or not the
@@ -73,10 +77,12 @@ assumes tab switching will not unmount the file tree subtree.
 `explorerVisibleModel.ts` owns full-tree flattening. The virtual window owns the
 mounted slice and hard 100-row limit. `explorerMotionPlan.ts` compares the
 previous and next visible models and emits compositor-only instructions for
-that slice: new rows enter, surviving rows move by their inverse index delta,
-and removed rows become inert exit ghosts only when spare DOM capacity exists.
-`useExplorerMotion.ts` owns plan generation, timeout cleanup, and cancellation
-when the virtual window scrolls.
+that slice: contiguous new/removed rows receive shared reveal phases, surviving
+rows move by their inverse index delta, and removed rows become inert exit
+ghosts only when spare DOM capacity exists. `explorerMotionAnimation.ts` owns
+the fixed timing profile and pure keyframe definitions. `useExplorerMotion.ts`
+owns plan generation, timeout cleanup, and cancellation when the virtual window
+scrolls.
 
 This keeps the UX equivalent to the common motion rule `initial={false}`:
 initial/restored state is already settled; only a post-mount expansion change
@@ -120,10 +126,15 @@ animates. It does so without recreating recursive subtree DOM.
 6. Animate with compositor properties and a strict row cap.
 
    Do not measure `scrollHeight` or animate height/top for an expanded subtree.
-   Current rows use FLIP translate transforms; entering/exiting rows may also
-   use opacity and a very small scale. Exit ghosts are `aria-hidden`, inert,
-   pointer-free, short-lived, and admitted only while current rows plus ghosts
-   stay at or below 100.
+   Surviving rows use FLIP translate transforms. Contiguous entering rows split
+   one top-to-bottom reveal boundary into normalized clip-path phases; exit
+   ghosts reverse the same boundary from bottom to top. Enter, move, disclosure,
+   and exit all share a fixed 220ms timeline and a sampled jerk-limited velocity
+   curve: smooth acceleration for the first 22%, constant speed through the
+   middle 56%, then symmetric deceleration for the final 22%. Do not restore
+   per-row opacity, scale, bounce, stagger, or distance-dependent duration.
+   Exit ghosts are `aria-hidden`, inert, pointer-free, short-lived, and admitted
+   only while current rows plus ghosts stay at or below 100.
 
 7. Keep guide geometry inside the motion shell.
 
@@ -198,6 +209,11 @@ animates. It does so without recreating recursive subtree DOM.
 
 - `packages/shared-ui/src/data/explorer/explorerMotionPlan.ts`
   - computes pure enter/move/exit instructions bounded to mounted rows
+  - assigns normalized phases that make contiguous rows one reveal boundary
+
+- `packages/shared-ui/src/data/explorer/explorerMotionAnimation.ts`
+  - owns the fixed duration and sampled accelerate-cruise-decelerate curve
+  - produces pure transform/clip-path keyframes without opacity or scale
 
 - `packages/shared-ui/src/data/explorer/useExplorerMotion.ts`
   - compares committed layouts and owns plan cleanup/scroll cancellation
@@ -225,6 +241,8 @@ Manual verification should cover:
 
 - expanding a never-loaded folder with multiple children
 - expanding and collapsing an already-loaded folder
+- confirming a large folder reveals through one continuous top-to-bottom edge,
+  with no simultaneous per-row pop or scale
 - expanding/collapsing a folder near the top of a 1,000-row tree and confirming
   the rows below move smoothly without mounting the intervening tree
 - switching from Data to Git and back after several folders are expanded
@@ -263,7 +281,10 @@ These invariants should remain true after future changes:
   post-mount expansion/collapse does.
 - Motion work and DOM presence are bounded by the virtual window; current rows
   plus exit ghosts never exceed 100.
-- Expansion uses transform/opacity only and never measures a full subtree.
+- Expansion uses only FLIP transforms and phased inset clip paths, never
+  opacity/scale pop-ins, layout properties, or full-subtree measurement.
+- Enter, move, disclosure, and exit share the fixed motion duration and the
+  accelerate-cruise-decelerate timing profile.
 - Every ancestor guide column lives in one depth-bounded layer inside the row
   motion shell and moves with it; nested depth must not increase DOM count.
 - Explorer rows keep the same geometry in short and long lists. The scroll

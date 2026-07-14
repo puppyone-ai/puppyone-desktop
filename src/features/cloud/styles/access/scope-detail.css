@@ -156,7 +156,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--po-text-muted);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 

@@ -389,7 +389,7 @@
   border-radius: 1.5px;
   background: transparent;
   color: var(--po-text-inverse);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   text-indent: 0;
   text-decoration: none;
   transition:

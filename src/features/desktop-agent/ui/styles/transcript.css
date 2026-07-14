@@ -141,7 +141,7 @@
   border-radius: 7px;
   background: transparent;
   color: inherit;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 .desktop-agent-message-actions button:hover { background: var(--po-hover); color: var(--po-text); }
 .desktop-agent-message-state { margin-left: 2px; color: var(--po-text-muted); font-size: 10px; text-transform: capitalize; }
@@ -197,7 +197,7 @@
   color: var(--po-text-muted);
   font: inherit;
   font-size: 10px;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 .desktop-agent-markdown-disclosure:hover { border-color: var(--po-border-strong); background: var(--po-hover); color: var(--po-text); }
 
@@ -228,7 +228,7 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 .desktop-agent-code-block button:hover { background: var(--po-hover); color: var(--po-text); }
 .desktop-agent-code-block pre {

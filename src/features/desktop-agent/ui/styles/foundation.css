@@ -133,7 +133,7 @@
   border-radius: 7px;
   background: transparent;
   color: var(--po-text-muted);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-agent-icon-button:hover:not(:disabled) {
@@ -193,7 +193,7 @@
   background: transparent;
   color: var(--po-text);
   text-align: left;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-agent-history-menu > button:hover,
@@ -252,7 +252,7 @@
   background: var(--po-control, var(--po-inset));
   color: var(--po-text);
   font: inherit;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-agent-provider-progress,

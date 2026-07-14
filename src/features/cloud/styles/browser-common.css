@@ -157,7 +157,7 @@
   background: transparent;
   color: var(--po-text-muted);
   text-align: center;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition:
     background 150ms ease,
     border-color 150ms ease,
@@ -266,7 +266,7 @@
   background: transparent;
   color: var(--po-text-muted);
   text-align: left;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-home-content-row:last-child {
@@ -324,7 +324,7 @@
   background: transparent;
   color: var(--po-text-muted);
   text-align: left;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-home-history-row:hover {

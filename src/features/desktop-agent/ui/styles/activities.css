@@ -20,7 +20,7 @@
   font-size: 11px;
   text-align: left;
 }
-.desktop-agent-activity-summary:not(:disabled) { cursor: pointer; }
+.desktop-agent-activity-summary:not(:disabled) { cursor: var(--po-clickable-cursor, pointer); }
 .desktop-agent-activity-summary:hover:not(:disabled) { background: var(--po-hover); }
 .desktop-agent-activity-summary span { overflow: hidden; color: var(--po-text-muted); text-overflow: ellipsis; white-space: nowrap; }
 .desktop-agent-activity-summary small { color: var(--po-text-subtle); font-size: 9px; text-transform: capitalize; }
@@ -51,7 +51,7 @@
   color: var(--po-accent-text);
   font: inherit;
   font-size: 10px;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 .desktop-agent-review-change { margin-right: 5px; }
 .desktop-agent-review-change:hover,
@@ -87,7 +87,7 @@
   font: inherit;
   text-align: left;
 }
-.desktop-agent-tool-row:not(:disabled) { cursor: pointer; }
+.desktop-agent-tool-row:not(:disabled) { cursor: var(--po-clickable-cursor, pointer); }
 .desktop-agent-tool-row:hover:not(:disabled),
 .desktop-agent-tool-row:focus-visible { background: color-mix(in srgb, var(--po-hover) 82%, transparent); }
 .desktop-agent-tool-row:disabled { opacity: 1; }
@@ -134,7 +134,7 @@
   color: var(--po-accent-text);
   font: inherit;
   font-size: 10px;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 .desktop-agent-tool-action:hover { background: var(--po-hover); }
 .desktop-agent-tool-branch {
@@ -227,7 +227,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.desktop-agent-file-list li > button { cursor: pointer; }
+.desktop-agent-file-list li > button { cursor: var(--po-clickable-cursor, pointer); }
 .desktop-agent-file-list li > button:hover { color: var(--po-accent-text); }
 .desktop-agent-file-list small { display: inline-flex; gap: 5px; font-style: normal; }
 .desktop-agent-file-list b { color: var(--po-success); font-weight: 500; }
@@ -307,7 +307,7 @@
   color: var(--po-text);
   font: inherit;
   font-size: 10px;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-agent-changes-row {
@@ -329,7 +329,7 @@
   color: var(--po-text-muted);
   font: inherit;
   font-size: 13px;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-agent-changes-pill:hover:not(:disabled) {

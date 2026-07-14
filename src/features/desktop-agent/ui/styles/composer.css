@@ -71,7 +71,7 @@
   border-radius: 50%;
   background: color-mix(in srgb, var(--po-control, var(--po-inset)) 88%, var(--po-canvas));
   color: var(--po-text-muted);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 .desktop-agent-composer-tool:hover:not(:disabled) { background: var(--po-hover); color: var(--po-text); }
 .desktop-agent-composer-tool:disabled { cursor: default; opacity: 0.35; }
@@ -100,7 +100,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 500;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 .desktop-agent-picker-trigger:hover:not(:disabled),
 .desktop-agent-picker-trigger[aria-expanded="true"] {
@@ -203,7 +203,7 @@
   color: var(--po-text);
   font: inherit;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 .desktop-agent-picker-option:hover,
 .desktop-agent-picker-option:focus-visible,
@@ -298,7 +298,7 @@
   color: var(--po-text-muted);
   font: inherit;
   font-size: 10px;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 .desktop-agent-picker-footer > button:hover:not(:disabled) { border-color: var(--po-border-subtle); background: var(--po-hover); color: var(--po-text); }
 .desktop-agent-picker-footer > button:disabled { cursor: default; opacity: 0.55; }
@@ -313,7 +313,7 @@
   border-radius: 50%;
   background: var(--po-text);
   color: var(--po-canvas);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition: transform 120ms ease, opacity 120ms ease;
 }
 .desktop-agent-composer-action:hover:not(:disabled) { transform: translateY(-1px); }
@@ -370,7 +370,7 @@
   font: inherit;
   font-size: 11px;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 .desktop-agent-tools-menu > button:hover,
 .desktop-agent-tools-mode > button:hover { background: var(--po-hover); }

@@ -148,7 +148,7 @@
   background: color-mix(in srgb, var(--po-panel-raised) 92%, transparent);
   color: var(--po-text-muted);
   box-shadow: var(--po-shadow-sm);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   font-family: var(--po-font-sans);
   font-size: 11px;
   font-weight: 650;
@@ -210,7 +210,7 @@
 }
 
 .markdown-codemirror-editor[data-readonly="false"] .cm-md-mermaid-preview {
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .markdown-codemirror-editor[data-readonly="false"] .cm-md-mermaid-body.is-editing .cm-md-mermaid-preview {

@@ -89,12 +89,20 @@ describe("sidebar spacing architecture", () => {
 
   it("keeps Settings on the shared scroll-list padding", () => {
     const list = compact(readCssBlock(sidebarBaseCss, ".desktop-tool-sidebar-list"));
+    const groupLabel = compact(readCssBlock(settingsCss, ".desktop-settings-sidebar-group-title"));
 
     expect(list).toContain("padding-block: var(--desktop-sidebar-list-padding-block);");
     expect(list).toContain(
       "padding-inline: var(--desktop-sidebar-row-left-gap) var(--desktop-sidebar-scroll-right-gap);",
     );
     expect(settingsCss).not.toMatch(/\.desktop-settings-sidebar\s+\.desktop-tool-sidebar-list\s*\{/);
+    expect(groupLabel).toContain(
+      "font-size: var(--desktop-sidebar-font-size-meta, var(--po-text-size-meta, 12px));",
+    );
+    expect(groupLabel).toContain(
+      "font-weight: var(--desktop-sidebar-font-weight, var(--po-text-weight-medium, 500));",
+    );
+    expect(groupLabel).toContain("line-height: var(--desktop-sidebar-line-height, 18px);");
   });
 
   it("keeps Git edges shared while nested lists own scrolling", () => {

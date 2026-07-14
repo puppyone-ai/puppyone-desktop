@@ -36,7 +36,7 @@
   color: var(--po-text-muted);
   font-size: 13px;
   font-weight: 650;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-project-browser-link:hover {
