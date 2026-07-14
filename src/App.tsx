@@ -1223,15 +1223,12 @@ export function App() {
       activeFileExternalOpenAppName={activeExternalOpen.appName}
       activeFileExternalOpenIconDataUrl={activeExternalOpen.iconDataUrl}
       activeFileExternalOpenLoading={activeExternalOpen.loading}
-      externalOpenTargets={activeExternalOpen.targets}
       titlebarActionsSettings={titlebarActionsSettings}
       terminalSidebarOpen={rightSidebarOpen && desktopTerminalEnabled && rightSidebarSurface === "terminal"}
       terminalToolEnabled={desktopTerminalEnabled}
       agentChatEnabled={desktopAgentChatEnabled}
       agentChatSidebarOpen={rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat"}
       onOpenActiveFileExternal={() => void activeExternalOpen.openActiveFileExternal()}
-      onOpenActiveFileWithApp={(appPath) => void activeExternalOpen.openActiveFileWithExternalApp(appPath)}
-      onCustomizeExternalAppForActiveFile={() => void activeExternalOpen.setExternalAppDefaultForActiveFile()}
       onToggleTerminal={() => {
         const terminalIsOpen = rightSidebarOpen && rightSidebarSurface === "terminal";
         setRightSidebarSurface("terminal");

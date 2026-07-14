@@ -83,7 +83,8 @@ while still allowing each menu to own its placement, size, and content.
 - `src/styles/file-actions.css`
   - owns create-entry and node action menu positioning and sizing
 - `src/features/app-shell/*`
-  - titlebar project, branch, and external-open menu rendering
+  - titlebar project and branch menu rendering; external-open is deliberately
+    a single default-app action configured in Settings, not a titlebar menu
 - `src/features/data-workspace/nodeActions.tsx`
   - file-tree create-entry and node action menu rendering
 

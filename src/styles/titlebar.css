@@ -295,35 +295,6 @@
   -webkit-app-region: no-drag;
 }
 
-.desktop-titlebar-external-open {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  height: var(--desktop-titlebar-control-height);
-  border-radius: var(--desktop-toolbar-action-radius);
-}
-
-.desktop-titlebar-external-open:has(.desktop-titlebar-external-open-menu-button[aria-expanded="true"]) {
-  background: var(--desktop-titlebar-hover);
-}
-
-.desktop-titlebar-external-open-main {
-  border-start-end-radius: 0;
-  border-end-end-radius: 0;
-}
-
-.desktop-titlebar-external-open-menu-button {
-  width: 17px;
-  margin-inline-start: -2px;
-  border-start-start-radius: 0;
-  border-end-start-radius: 0;
-}
-
-.desktop-titlebar-external-open-menu-button[aria-expanded="true"] {
-  background: var(--desktop-titlebar-hover);
-  color: var(--desktop-titlebar-text);
-}
-
 .desktop-titlebar-external-app-icon {
   display: grid;
   place-items: center;
@@ -360,16 +331,6 @@
   width: 16px;
   height: 16px;
   object-fit: contain;
-}
-
-.desktop-titlebar-external-open-menu {
-  inset-inline-end: 0;
-  inset-inline-start: auto;
-  width: 260px;
-}
-
-.desktop-titlebar-external-open-row {
-  text-align: start;
 }
 
 .desktop-titlebar-branch-wrap {

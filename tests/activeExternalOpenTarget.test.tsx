@@ -8,12 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_EXTERNAL_APPS_SETTINGS } from "../src/preferences";
 import type { WorkspaceExternalOpenTarget } from "../src/types/electron";
 import { useActiveExternalOpenTarget } from "../src/features/external-apps/useActiveExternalOpenTarget";
-import { listWorkspaceExternalOpenTargets } from "../src/lib/localFiles";
+import { resolveWorkspaceExternalOpenTarget } from "../src/lib/localFiles";
 
 vi.mock("../src/lib/localFiles", () => ({
-  chooseWorkspaceExternalApp: vi.fn(),
-  listWorkspaceExternalOpenTargets: vi.fn(),
   openWorkspaceEntryExternal: vi.fn(),
+  resolveWorkspaceExternalOpenTarget: vi.fn(),
 }));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -36,7 +35,7 @@ const resolvedTarget: WorkspaceExternalOpenTarget = {
 let root: Root | null = null;
 
 beforeEach(() => {
-  vi.mocked(listWorkspaceExternalOpenTargets).mockResolvedValue([resolvedTarget]);
+  vi.mocked(resolveWorkspaceExternalOpenTarget).mockResolvedValue(resolvedTarget);
 });
 
 afterEach(() => {
@@ -53,7 +52,7 @@ describe("active external-open target", () => {
     root = createRoot(container);
 
     await renderHarness(container, createMarkdownNode("before"));
-    expect(listWorkspaceExternalOpenTargets).toHaveBeenCalledTimes(1);
+    expect(resolveWorkspaceExternalOpenTarget).toHaveBeenCalledTimes(1);
     expect(readSnapshot(container)).toEqual({
       iconDataUrl: resolvedTarget.iconDataUrl,
       loading: "false",
@@ -62,7 +61,7 @@ describe("active external-open target", () => {
 
     await renderHarness(container, createMarkdownNode("after"));
 
-    expect(listWorkspaceExternalOpenTargets).toHaveBeenCalledTimes(1);
+    expect(resolveWorkspaceExternalOpenTarget).toHaveBeenCalledTimes(1);
     expect(readSnapshot(container)).toEqual({
       iconDataUrl: resolvedTarget.iconDataUrl,
       loading: "false",
@@ -83,8 +82,8 @@ describe("active external-open target", () => {
       path: "other.md",
     });
 
-    expect(listWorkspaceExternalOpenTargets).toHaveBeenCalledTimes(2);
-    expect(listWorkspaceExternalOpenTargets).toHaveBeenLastCalledWith(expect.objectContaining({
+    expect(resolveWorkspaceExternalOpenTarget).toHaveBeenCalledTimes(2);
+    expect(resolveWorkspaceExternalOpenTarget).toHaveBeenLastCalledWith(expect.objectContaining({
       path: "other.md",
     }));
   });

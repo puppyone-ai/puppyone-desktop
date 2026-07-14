@@ -72,8 +72,9 @@ folders, right-sidebar width, the active Terminal surface, or the Agent turn.
 - Hover and `:focus-within` also reveal the dock.
 - Every icon has an accessible name and native tooltip.
 - Active workspace views expose `aria-current="page"`.
-- Existing project, branch, external-open, Terminal, and Chat controls retain
-  their original menus, pressed state, and labels.
+- Existing project and branch controls retain their menus. External-open stays
+  a single default-app action; Terminal and Chat retain pressed state and
+  accessible labels.
 - `Exit Minimal Mode` is always present in the expanded dock, so hiding the
   Settings navigation cannot trap the user in the mode.
 

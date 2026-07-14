@@ -69,6 +69,11 @@ Content font, File icons, Navigation, Header elements,
 Pointer cursors, Dock icon). It must fit in roughly one screen. Do not adopt grouped-card layouts
 while the list stays this small.
 
+Header elements are visibility controls, not configuration surfaces. The
+external-open Header element executes the current system or extension-specific
+default directly. Application selection belongs only to the separate Default
+Apps Settings page; the Header must not expose an app-picker dropdown.
+
 Language is an application preference rather than an Appearance customization.
 It lives as a first-class page under `Desktop App`, between General and
 Appearance. Its compact select applies immediately through the localization

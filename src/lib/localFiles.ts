@@ -170,12 +170,6 @@ export async function resolveWorkspaceExternalOpenTarget(
   return getDesktopBridge().resolveExternalOpenTarget(request);
 }
 
-export async function listWorkspaceExternalOpenTargets(
-  request: WorkspaceResolveExternalOpenTargetRequest,
-): Promise<WorkspaceExternalOpenTarget[]> {
-  return getDesktopBridge().listExternalOpenTargets(request);
-}
-
 export async function chooseWorkspaceExternalApp(
   request: WorkspaceChooseExternalAppRequest,
 ): Promise<WorkspaceExternalOpenTarget | null> {

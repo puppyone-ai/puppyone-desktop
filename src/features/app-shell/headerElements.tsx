@@ -1,9 +1,7 @@
-import type { Dispatch, ReactNode, Ref, SetStateAction } from "react";
-import { ChevronDown, ExternalLink, Settings, Terminal, type LucideIcon } from "lucide-react";
-import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
+import type { ReactNode } from "react";
+import { ExternalLink, Terminal, type LucideIcon } from "lucide-react";
 import { ExternalAppIcon } from "../external-apps/ExternalAppIcon";
 import type { RightSidebarToolId, TitlebarActionId } from "../../preferences";
-import type { WorkspaceExternalOpenTarget } from "../../types/electron";
 import type { MessageFormatter } from "@puppyone/localization";
 
 export type HeaderElementDefinition = {
@@ -22,13 +20,7 @@ export type HeaderElementRenderContext = {
     canOpen: boolean;
     iconDataUrl?: string | null;
     loading: boolean;
-    menuOpen: boolean;
-    menuTargets: WorkspaceExternalOpenTarget[];
-    onCustomize: () => void;
     onOpen: () => void;
-    onOpenWithApp: (appPath: string | null) => void;
-    ref: Ref<HTMLDivElement>;
-    setMenuOpen: Dispatch<SetStateAction<boolean>>;
     title?: string;
   };
   terminal: {
@@ -46,76 +38,24 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
     isAvailable: (context) => context.externalOpen.canOpen,
     render: (context) => {
       const externalOpen = context.externalOpen;
+      const label = externalOpen.title ?? context.t("shell.titlebar.openWithApp");
       return (
-        <div className="desktop-titlebar-external-open" ref={externalOpen.ref}>
-          <button
-            className="desktop-titlebar-action desktop-titlebar-external-open-main"
-            type="button"
-            title={externalOpen.title ?? context.t("shell.titlebar.openWithApp")}
-            aria-label={context.t("shell.titlebar.openWithApp")}
-            onClick={externalOpen.onOpen}
-          >
-            <ExternalAppIcon
-              appName={externalOpen.appName}
-              className="desktop-titlebar-external-app-icon"
-              iconDataUrl={externalOpen.iconDataUrl}
-              loadingClassName="desktop-titlebar-external-app-loader"
-              loaderClassName="desktop-titlebar-external-open-loader"
-              loading={externalOpen.loading}
-            />
-          </button>
-          <button
-            className="desktop-titlebar-action desktop-titlebar-external-open-menu-button"
-            type="button"
-            title={context.t("shell.titlebar.openWith")}
-            aria-label={context.t("shell.titlebar.openWith")}
-            aria-expanded={externalOpen.menuOpen}
-            aria-haspopup="menu"
-            onClick={() => externalOpen.setMenuOpen((open) => !open)}
-          >
-            <ChevronDown size={12} />
-          </button>
-          {externalOpen.menuOpen && (
-            <DesktopMenuSurface className="desktop-titlebar-menu desktop-branch-menu desktop-titlebar-external-open-menu">
-              {externalOpen.menuTargets.map((target, index) => (
-                <DesktopMenuItem
-                  className="desktop-branch-menu-row desktop-titlebar-external-open-row"
-                  key={`${target.appPath ?? "default"}:${index}`}
-                  icon={(
-                    <ExternalAppIcon
-                      appName={target.appName}
-                      className="desktop-titlebar-external-app-icon"
-                      iconDataUrl={target.iconDataUrl}
-                      loadingClassName="desktop-titlebar-external-app-loader"
-                      loaderClassName="desktop-titlebar-external-open-loader"
-                    />
-                  )}
-                  label={index === 0
-                    ? context.t("shell.titlebar.defaultApp", { app: target.appName ?? context.t("shell.titlebar.macosDefault") })
-                    : target.appName ?? context.t("shell.titlebar.macosDefault")}
-                  onClick={() => {
-                    externalOpen.setMenuOpen(false);
-                    if (index === 0) {
-                      externalOpen.onOpen();
-                      return;
-                    }
-                    externalOpen.onOpenWithApp(target.appPath);
-                  }}
-                />
-              ))}
-              <DesktopMenuSeparator />
-              <DesktopMenuItem
-                className="desktop-branch-menu-row desktop-titlebar-external-open-row"
-                icon={<Settings size={15} />}
-                label={context.t("shell.titlebar.customize")}
-                onClick={() => {
-                  externalOpen.setMenuOpen(false);
-                  externalOpen.onCustomize();
-                }}
-              />
-            </DesktopMenuSurface>
-          )}
-        </div>
+        <button
+          className="desktop-titlebar-action desktop-titlebar-external-open"
+          type="button"
+          title={label}
+          aria-label={label}
+          onClick={externalOpen.onOpen}
+        >
+          <ExternalAppIcon
+            appName={externalOpen.appName}
+            className="desktop-titlebar-external-app-icon"
+            iconDataUrl={externalOpen.iconDataUrl}
+            loadingClassName="desktop-titlebar-external-app-loader"
+            loaderClassName="desktop-titlebar-external-open-loader"
+            loading={externalOpen.loading}
+          />
+        </button>
       );
     },
   },

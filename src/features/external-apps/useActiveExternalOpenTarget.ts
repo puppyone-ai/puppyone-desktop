@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { DataNode, Workspace } from "@puppyone/shared-ui";
 import {
-  chooseWorkspaceExternalApp,
-  listWorkspaceExternalOpenTargets,
   openWorkspaceEntryExternal,
+  resolveWorkspaceExternalOpenTarget,
 } from "../../lib/localFiles";
 import {
   getExternalAppExtension,
@@ -37,7 +36,6 @@ export function useActiveExternalOpenTarget({
   workspaceIsCloud,
 }: UseActiveExternalOpenTargetOptions) {
   const [externalOpenTarget, setExternalOpenTarget] = useState<WorkspaceExternalOpenTarget | null>(null);
-  const [externalOpenTargets, setExternalOpenTargets] = useState<WorkspaceExternalOpenTarget[]>([]);
   const [externalOpenTargetLoading, setExternalOpenTargetLoading] = useState(false);
   const [externalOpenTargetPath, setExternalOpenTargetPath] = useState<string | null>(null);
   const activeDataNodePath = activeDataNode?.path ?? null;
@@ -91,7 +89,6 @@ export function useActiveExternalOpenTarget({
   useEffect(() => {
     if (!workspace || workspaceIsCloud || !activeExternalFilePath) {
       setExternalOpenTarget(null);
-      setExternalOpenTargets([]);
       setExternalOpenTargetLoading(false);
       setExternalOpenTargetPath(null);
       return;
@@ -110,24 +107,21 @@ export function useActiveExternalOpenTarget({
         }
       : null;
     setExternalOpenTarget(optimisticTarget);
-    setExternalOpenTargets(optimisticTarget ? [optimisticTarget] : []);
     setExternalOpenTargetPath(requestPath);
     setExternalOpenTargetLoading(true);
 
-    listWorkspaceExternalOpenTargets({
+    resolveWorkspaceExternalOpenTarget({
       rootPath: workspace.path,
       path: requestPath,
       extension: activeExternalFileExtension,
       overrideAppPath: activeExternalAppOverride?.appPath ?? null,
     })
-      .then((targets) => {
+      .then((target) => {
         if (cancelled) return;
-        const resolvedTarget = targets[0] ?? null;
-        setExternalOpenTargets(targets);
-        setExternalOpenTarget(resolvedTarget);
+        setExternalOpenTarget(target);
         setExternalOpenTargetPath(requestPath);
         setExternalOpenTargetLoading(false);
-        syncExternalAppOverrideIcon(resolvedTarget);
+        syncExternalAppOverrideIcon(target);
       })
       .catch(() => {
         if (cancelled) return;
@@ -140,7 +134,6 @@ export function useActiveExternalOpenTarget({
           source: "unknown",
         };
         setExternalOpenTarget(fallbackTarget);
-        setExternalOpenTargets([fallbackTarget]);
         setExternalOpenTargetPath(requestPath);
         setExternalOpenTargetLoading(false);
       });
@@ -183,66 +176,6 @@ export function useActiveExternalOpenTarget({
     workspaceIsCloud,
   ]);
 
-  const openActiveFileWithExternalApp = useCallback(async (appPath: string | null) => {
-    if (!workspace || workspaceIsCloud || !activeExternalFilePath) return;
-    if (!appPath) return;
-
-    onError(null);
-    try {
-      await openWorkspaceEntryExternal({
-        rootPath: workspace.path,
-        path: activeExternalFilePath,
-        strategy: "app",
-        appPath,
-      });
-    } catch (error) {
-      onError(error instanceof Error ? error.message : String(error));
-    } finally {
-      onActionSettled?.();
-    }
-  }, [
-    activeExternalFilePath,
-    onActionSettled,
-    onError,
-    workspace,
-    workspaceIsCloud,
-  ]);
-
-  const setExternalAppDefaultForActiveFile = useCallback(async () => {
-    if (!activeExternalFileExtension) return;
-
-    onError(null);
-    try {
-      const target = await chooseWorkspaceExternalApp({ extension: activeExternalFileExtension });
-      if (!target?.appPath) return;
-      const extension = activeExternalFileExtension;
-      const appPath = target.appPath;
-      const appName = target.appName;
-      const bundleId = target.bundleId;
-      const iconDataUrl = target.iconDataUrl;
-      setExternalAppsSettings((currentSettings) => upsertExternalAppOverride(currentSettings, {
-        extension,
-        appPath,
-        appName,
-        bundleId,
-        iconDataUrl,
-      }));
-      setExternalOpenTarget(target);
-      if (activeExternalFilePath) setExternalOpenTargetPath(activeExternalFilePath);
-      setExternalOpenTargetLoading(false);
-    } catch (error) {
-      onError(error instanceof Error ? error.message : String(error));
-    } finally {
-      onActionSettled?.();
-    }
-  }, [
-    activeExternalFilePath,
-    activeExternalFileExtension,
-    onActionSettled,
-    onError,
-    setExternalAppsSettings,
-  ]);
-
   const canOpenActiveFileExternal = activeViewIsData
     && !workspaceIsCloud
     && activeExternalFilePath !== null
@@ -260,9 +193,6 @@ export function useActiveExternalOpenTarget({
     iconDataUrl: activeFileExternalOpenTarget?.iconDataUrl ?? null,
     loading: activeFileExternalOpenLoading,
     openActiveFileExternal,
-    openActiveFileWithExternalApp,
-    setExternalAppDefaultForActiveFile,
-    targets: activeFileExternalOpenLoading ? [] : externalOpenTargets,
     title: canOpenActiveFileExternal
       ? `Open ${activeDataNodeName ?? activeExternalFilePath} in ${activeFileExternalOpenTarget?.appName ?? "macOS default"}`
       : undefined,

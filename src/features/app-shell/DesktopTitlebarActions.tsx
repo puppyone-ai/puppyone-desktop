@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment } from "react";
 import { MessageSquare } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
 import {
@@ -7,7 +7,6 @@ import {
 } from "../../components/DesktopUpdateControls";
 import { getOrderedHeaderElementDefinitions, type HeaderElementRenderContext } from "./headerElements";
 import type { TitlebarActionsSettings } from "../../preferences";
-import type { WorkspaceExternalOpenTarget } from "../../types/electron";
 
 type DesktopUpdatesController = ReturnType<typeof useDesktopUpdates>;
 
@@ -17,7 +16,6 @@ type DesktopTitlebarActionsProps = {
   activeFileExternalOpenAppName?: string | null;
   activeFileExternalOpenIconDataUrl?: string | null;
   activeFileExternalOpenLoading?: boolean;
-  externalOpenTargets: WorkspaceExternalOpenTarget[];
   canOpenActiveFileExternal: boolean;
   titlebarActionsSettings: TitlebarActionsSettings;
   terminalSidebarOpen: boolean;
@@ -25,8 +23,6 @@ type DesktopTitlebarActionsProps = {
   agentChatEnabled: boolean;
   agentChatSidebarOpen: boolean;
   onOpenActiveFileExternal: () => void;
-  onOpenActiveFileWithApp: (appPath: string | null) => void;
-  onCustomizeExternalAppForActiveFile: () => void;
   onToggleAgentChat: () => void;
   onToggleTerminal: () => void;
   onUpdateNow: () => void;
@@ -38,7 +34,6 @@ export function DesktopTitlebarActions({
   activeFileExternalOpenAppName,
   activeFileExternalOpenIconDataUrl,
   activeFileExternalOpenLoading = false,
-  externalOpenTargets,
   canOpenActiveFileExternal,
   titlebarActionsSettings,
   terminalSidebarOpen,
@@ -46,41 +41,11 @@ export function DesktopTitlebarActions({
   agentChatEnabled,
   agentChatSidebarOpen,
   onOpenActiveFileExternal,
-  onOpenActiveFileWithApp,
-  onCustomizeExternalAppForActiveFile,
   onToggleAgentChat,
   onToggleTerminal,
   onUpdateNow,
 }: DesktopTitlebarActionsProps) {
   const { t } = useLocalization();
-  const externalOpenRef = useRef<HTMLDivElement>(null);
-  const [externalOpenMenuOpen, setExternalOpenMenuOpen] = useState(false);
-  const defaultTarget = externalOpenTargets[0] ?? null;
-  const menuTargets = externalOpenTargets.length > 0 ? externalOpenTargets : [defaultTarget].filter(Boolean);
-
-  useEffect(() => {
-    if (!externalOpenMenuOpen) return undefined;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target instanceof Node ? event.target : null;
-      if (target && externalOpenRef.current?.contains(target)) return;
-      setExternalOpenMenuOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setExternalOpenMenuOpen(false);
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown, true);
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown, true);
-      window.removeEventListener("keydown", handleKeyDown, true);
-    };
-  }, [externalOpenMenuOpen]);
-
-  useEffect(() => {
-    if (!canOpenActiveFileExternal) setExternalOpenMenuOpen(false);
-  }, [canOpenActiveFileExternal]);
 
   const headerElementContext: HeaderElementRenderContext = {
     t,
@@ -89,13 +54,7 @@ export function DesktopTitlebarActions({
       canOpen: canOpenActiveFileExternal,
       iconDataUrl: activeFileExternalOpenIconDataUrl,
       loading: activeFileExternalOpenLoading,
-      menuOpen: externalOpenMenuOpen,
-      menuTargets,
-      onCustomize: onCustomizeExternalAppForActiveFile,
       onOpen: onOpenActiveFileExternal,
-      onOpenWithApp: onOpenActiveFileWithApp,
-      ref: externalOpenRef,
-      setMenuOpen: setExternalOpenMenuOpen,
       title: activeFileExternalOpenTitle,
     },
     terminal: {
