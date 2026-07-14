@@ -1,6 +1,7 @@
 export const FEATURE_FLAG_DEFAULTS = {
   cloudWorkspace: true,
   cloudOnlyWorkspace: false,
+  cloudBilling: false,
   assetLibraryHome: false,
   desktopAgentChat: false,
 } as const;

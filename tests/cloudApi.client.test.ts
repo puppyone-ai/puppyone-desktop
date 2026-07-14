@@ -6,18 +6,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cloudApiRequest,
+  createCloudBillingCheckout,
   getCloudTemplate,
   getCloudAutomationOauthAuthorizeUrl,
   getCloudAutomationOauthStatus,
+  getCloudBillingCatalog,
+  getCloudOrganizationSeatUsage,
   getCloudProject,
   listCloudAutomationConnectionRuns,
   listCloudAutomationProviderResources,
   listCloudProjects,
   listCloudTemplates,
+  openCloudBillingExternalUrl,
+  quoteCloudBillingPlan,
   instantiateCloudTemplate,
   supportsCloudAutomationOauth,
   updateCloudAutomationConnection,
   updateCloudAutomationTrigger,
+  validateDesktopBillingCatalog,
+  validateDesktopBillingQuote,
+  validateDesktopBillingSummary,
+  validateDesktopCloudOrganizationSeatUsage,
 } from "../src/lib/cloudApi";
 import { getCloudHistory, normalizeCloudHistory } from "../src/lib/cloudHistoryApi";
 
@@ -47,6 +56,144 @@ afterEach(() => {
 });
 
 describe("cloud API client delegation", () => {
+  it("reads capability-derived seat usage without trusting or mis-encoding organization ids", async () => {
+    bridge.mockResolvedValueOnce({ billable_seat_quantity: 2 });
+
+    await expect(getCloudOrganizationSeatUsage(session, "org/1", undefined, API))
+      .resolves.toEqual({ billable_seat_quantity: 2 });
+    expect(bridge).toHaveBeenCalledWith(expect.objectContaining({
+      path: "/organizations/org%2F1/seat-usage",
+      method: "GET",
+    }));
+    expect(() => validateDesktopCloudOrganizationSeatUsage({ billable_seat_quantity: -1 }))
+      .toThrow(/billable_seat_quantity/i);
+  });
+
+  it("uses only the PuppyOne BFF and preserves billing idempotency headers", async () => {
+    bridge
+      .mockResolvedValueOnce(validBillingCatalog())
+      .mockResolvedValueOnce(validBillingQuote())
+      .mockResolvedValueOnce({
+        checkout_id: "checkout-1",
+        checkout_url: "https://checkout.example/session",
+        quote: validBillingQuote(),
+      });
+
+    await getCloudBillingCatalog(session, undefined, API);
+    await quoteCloudBillingPlan(
+      session,
+      "org/1",
+      "plus",
+      2,
+      "desktop:plan-quote:stable-key",
+      undefined,
+      API,
+    );
+    await createCloudBillingCheckout(
+      session,
+      "org/1",
+      { planId: "plus", seatQuantity: 2, quoteId: "quote-1" },
+      "desktop:checkout:stable-key",
+      undefined,
+      API,
+    );
+
+    expect(bridge).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      path: "/billing/catalog",
+      method: "GET",
+    }));
+    expect(bridge).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      path: "/billing/organizations/org%2F1/plan/quote",
+      method: "POST",
+      headers: expect.objectContaining({
+        "Idempotency-Key": "desktop:plan-quote:stable-key",
+      }),
+      body: JSON.stringify({ target_plan_id: "plus", seat_quantity: 2 }),
+    }));
+    expect(bridge).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      path: "/billing/organizations/org%2F1/checkout",
+      method: "POST",
+      headers: expect.objectContaining({ "Idempotency-Key": "desktop:checkout:stable-key" }),
+      body: JSON.stringify({ plan_id: "plus", seat_quantity: 2, quote_id: "quote-1" }),
+    }));
+  });
+
+  it("fails closed on unknown catalog majors and leaked provider mappings", () => {
+    expect(() => validateDesktopBillingCatalog({
+      ...validBillingCatalog(),
+      schema_version: "2.0",
+    })).toThrow(/unsupported/i);
+    const catalog = validBillingCatalog();
+    expect(() => validateDesktopBillingCatalog({
+      ...catalog,
+      plans: [{ ...catalog.plans[0], provider: { checkout_product_id: "secret" } }],
+    })).toThrow(/private provider/i);
+    expect(() => validateDesktopBillingCatalog({
+      ...catalog,
+      runtime: { ...catalog.runtime, overage_enabled: false },
+    })).toThrow(/disabled billing overage/i);
+  });
+
+  it("requires server-declared billing actions instead of inferring them from plan ids", () => {
+    const summary = {
+      org_id: "org-1",
+      plan_id: "starter-v2",
+      status: "active",
+      seat_quantity: 2,
+      pending_plan_id: null,
+      cancel_at_period_end: false,
+      current_period_end: null,
+      catalog_version: "test.1",
+      source_revision: 3,
+      portal_available: true,
+      seat_changes_available: true,
+      runtime_available_units: 10,
+      runtime_reserved_units: 0,
+      runtime_overage_enabled: false,
+      runtime_monthly_limit_cents: 0,
+    };
+    expect(validateDesktopBillingSummary(summary).seat_changes_available).toBe(true);
+    expect(() => validateDesktopBillingSummary({
+      ...summary,
+      seat_changes_available: undefined,
+    })).toThrow(/seat_changes_available/i);
+
+    const quote = {
+      quote_id: "quote-1",
+      org_id: "org-1",
+      kind: "plan",
+      current_plan_id: "starter-v2",
+      target_plan_id: "team-v3",
+      current_seats: 2,
+      target_seats: 3,
+      currency: "USD",
+      current_amount_cents: 100,
+      target_amount_cents: 200,
+      delta_amount_cents: 100,
+      application_mode: "checkout",
+      requires_confirmation: true,
+      catalog_version: "test.1",
+      expires_at: "2026-07-14T00:00:00Z",
+      details: {},
+    };
+    expect(validateDesktopBillingQuote(quote).application_mode).toBe("checkout");
+    expect(() => validateDesktopBillingQuote({
+      ...quote,
+      application_mode: "infer-from-free-plan",
+    })).toThrow(/application_mode/i);
+  });
+
+  it("opens verified checkout URLs through the system-browser bridge", async () => {
+    const openExternalUrl = vi.fn().mockResolvedValue({ ok: true });
+    (globalThis.window as unknown as { puppyoneDesktop: Record<string, unknown> }).puppyoneDesktop
+      .openExternalUrl = openExternalUrl;
+
+    await openCloudBillingExternalUrl("https://checkout.example/session");
+    expect(openExternalUrl).toHaveBeenCalledWith("https://checkout.example/session");
+    await expect(openCloudBillingExternalUrl("http://checkout.example/session"))
+      .rejects.toThrow(/unsafe/i);
+  });
+
   it("listCloudProjects issues GET /projects/ through the bridge and returns its result", async () => {
     bridge.mockResolvedValue([{ id: "p1" }, { id: "p2" }]);
     const result = await listCloudProjects(session, undefined, API);
@@ -243,6 +390,63 @@ describe("cloud API client delegation", () => {
       .rejects.toThrow(/pagination state is inconsistent/i);
   });
 });
+
+function validBillingCatalog() {
+  return {
+    schema_version: "1.0",
+    catalog_version: "test.1",
+    effective_at: "2026-07-14T00:00:00Z",
+    currency: "USD",
+    plans: [{
+      id: "free",
+      aliases: [],
+      name: "Free",
+      description: "Local first",
+      public: true,
+      purchasable: false,
+      highlighted: false,
+      currency: "USD",
+      interval: "none",
+      price_per_seat_cents: 0,
+      seats: { minimum: 1, maximum: 1 },
+      features: {},
+      fixed_limits: {},
+      per_seat_limits: {},
+      allow: {},
+      runtime: { fixed_units: 0, units_per_seat: 0 },
+    }],
+    runtime: {
+      top_ups_enabled: false,
+      overage_enabled: true,
+      unit_seconds: 60,
+      minimum_units: 1,
+      overage_price_cents_per_unit: 2,
+      profiles: [],
+      top_up_packs: [],
+    },
+  };
+}
+
+function validBillingQuote() {
+  return {
+    quote_id: "quote-1",
+    org_id: "org/1",
+    kind: "checkout",
+    current_plan_id: "free",
+    target_plan_id: "plus",
+    current_seats: 1,
+    target_seats: 2,
+    currency: "USD",
+    current_amount_cents: 0,
+    target_amount_cents: 3600,
+    delta_amount_cents: 3600,
+    application_mode: "checkout" as const,
+    requires_confirmation: true,
+    catalog_version: "test.1",
+    expires_at: "2026-07-14T00:30:00Z",
+    details: {},
+  };
+}
 
 describe("session / api-base guards", () => {
   it("recovers HTTP status after Electron serializes away custom Error fields", async () => {
