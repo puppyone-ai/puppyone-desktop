@@ -435,6 +435,13 @@ The stylesheet entry establishes a deterministic cascade:
 @layer reset, tokens, primitives, patterns, features, overrides;
 ```
 
+The layer declaration is loaded before shared and product styles. Tailwind
+Preflight stays disabled because it is an unscoped document reset: if emitted
+after the named layers, its generic `button` typography would override Sidebar
+row typography and make button-backed rows diverge from non-button section
+titles. PuppyOne's `reset` layer is the single renderer reset owner; Tailwind
+utilities may still be used as explicit, opt-in classes.
+
 - `tokens`: theme and product role variables.
 - `primitives`: process-neutral root/list/row/action behavior.
 - `patterns`: Desktop surface/group/header compositions.

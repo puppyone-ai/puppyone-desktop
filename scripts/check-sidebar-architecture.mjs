@@ -63,10 +63,27 @@ for (const filePath of walkSourceFiles(absolute("src"))) {
 const sharedStyle = read(absolute("packages/shared-ui/src/styles/sidebar-primitives.css"));
 const patternStyle = read(absolute("src/styles/sidebar/patterns.css"));
 const cascadeStyle = read(absolute("src/styles/cascade.css"));
+const rendererEntry = read(absolute("src/main.tsx"));
+const tailwindConfig = read(absolute("tailwind.config.cjs"));
 if (!sharedStyle.includes("@layer primitives")) errors.push("Shared Sidebar primitives must live in @layer primitives.");
 if (!patternStyle.includes("@layer patterns")) errors.push("Desktop Sidebar patterns must live in @layer patterns.");
 if (!cascadeStyle.includes("@layer reset, tokens, primitives, patterns, features, overrides;")) {
   errors.push("Sidebar cascade order must remain reset → tokens → primitives → patterns → features → overrides.");
+}
+const cascadeImportIndex = rendererEntry.indexOf('import "./styles/cascade.css";');
+const sharedStyleImportIndex = rendererEntry.indexOf('import "@puppyone/shared-ui/shared-ui.css";');
+const productStyleImportIndex = rendererEntry.indexOf('import "./styles.css";');
+if (
+  cascadeImportIndex < 0
+  || sharedStyleImportIndex < 0
+  || productStyleImportIndex < 0
+  || cascadeImportIndex > sharedStyleImportIndex
+  || cascadeImportIndex > productStyleImportIndex
+) {
+  errors.push("Renderer cascade layers must be registered before shared and product styles are loaded.");
+}
+if (!/corePlugins\s*:\s*\{[\s\S]*?preflight\s*:\s*false/.test(tailwindConfig)) {
+  errors.push("Tailwind Preflight must remain disabled; PuppyOne owns the renderer reset and Sidebar typography.");
 }
 
 for (const filePath of walkFiles(absolute("src"), /\.(?:css|ts|tsx)$/)) {
