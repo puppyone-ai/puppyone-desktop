@@ -129,10 +129,8 @@ export function CloudRouter({
     }
     return (
       <CloudGlobalBillingPage
-        accountEmail={accountEmail}
         session={cloudSession}
         apiBaseUrl={cloudApiBaseUrl}
-        projects={cloudData.projects}
         onSessionChange={onSessionChange}
       />
     );

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   Check,
   Clock3,
@@ -12,286 +12,49 @@ import {
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization, type LocalizationContextValue } from "@puppyone/localization/react";
 import {
-  applyCloudBillingPlanChange,
-  applyCloudBillingSeatChange,
-  createCloudBillingCheckout,
-  createCloudBillingPortal,
-  createDesktopBillingIdempotencyKey,
-  getCloudBillingCatalog,
-  getCloudBillingSummary,
-  getCloudBillingUsage,
-  listCloudBillingOperations,
-  openCloudBillingExternalUrl,
-  quoteCloudBillingPlan,
-  quoteCloudBillingSeats,
-  type DesktopBillingCatalog,
-  type DesktopBillingOperation,
   type DesktopBillingPlan,
-  type DesktopBillingQuote,
-  type DesktopBillingSummary,
-  type DesktopBillingUsage,
 } from "../../../lib/cloudApi";
+import { formatCloudMessage } from "../cloudPresentation";
+import { useCloudBillingController } from "../billing/useCloudBillingController";
 import {
+  CloudOrganizationSelector,
   CloudOrganizationPageShell,
   type CloudGlobalPageProps,
   useCloudOrganizationData,
 } from "./CloudGlobalPages";
 
-type BillingState = {
-  catalog: DesktopBillingCatalog | null;
-  summary: DesktopBillingSummary | null;
-  usage: DesktopBillingUsage | null;
-  operations: DesktopBillingOperation[];
-  loading: boolean;
-  error: string | null;
-};
-
-type CloudBillingPageProps = Omit<CloudGlobalPageProps, "onOpen">;
-
-const EMPTY_BILLING_STATE: BillingState = {
-  catalog: null,
-  summary: null,
-  usage: null,
-  operations: [],
-  loading: false,
-  error: null,
-};
+type CloudBillingPageProps = Pick<
+  CloudGlobalPageProps,
+  "session" | "apiBaseUrl" | "onSessionChange"
+>;
 
 export function CloudGlobalBillingPage({
   session,
   apiBaseUrl,
-  projects,
   onSessionChange,
 }: CloudBillingPageProps) {
   const localization = useLocalization();
   const { t } = localization;
   const orgData = useCloudOrganizationData(session, apiBaseUrl, onSessionChange);
   const organization = orgData.organization;
-  const isOwner = orgData.members.some(
+  const isOwner = orgData.membersStatus === "ready" && orgData.members.some(
     (member) => member.user_id === session.user_id && member.role === "owner",
   );
-  const [billing, setBilling] = useState<BillingState>(EMPTY_BILLING_STATE);
-  const [refreshRevision, setRefreshRevision] = useState(0);
-  const [seatQuantity, setSeatQuantity] = useState(1);
-  const [quote, setQuote] = useState<DesktopBillingQuote | null>(null);
-  const [quotedOperationId, setQuotedOperationId] = useState<string | null>(null);
-  const [requestedPlanId, setRequestedPlanId] = useState<string | null>(null);
-  const [action, setAction] = useState<"quote" | "confirm" | "portal" | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [pollingUntil, setPollingUntil] = useState<number | null>(null);
-  const idempotencyKeys = useRef(new Map<string, string>());
-
-  const idempotencyKeyFor = (intent: string, scope: string): string => {
-    const existing = idempotencyKeys.current.get(intent);
-    if (existing) return existing;
-    const created = createDesktopBillingIdempotencyKey(scope);
-    idempotencyKeys.current.set(intent, created);
-    return created;
-  };
-
-  const clearIdempotencyKey = (intent: string) => {
-    idempotencyKeys.current.delete(intent);
-  };
-
-  const loadBilling = useCallback(async () => {
-    if (!organization || !isOwner) return;
-    setBilling((current) => ({ ...current, loading: true, error: null }));
-    try {
-      const [catalog, summary, usage, operations] = await Promise.all([
-        getCloudBillingCatalog(session, onSessionChange, apiBaseUrl),
-        getCloudBillingSummary(session, organization.id, onSessionChange, apiBaseUrl),
-        getCloudBillingUsage(session, organization.id, onSessionChange, apiBaseUrl),
-        listCloudBillingOperations(session, organization.id, onSessionChange, apiBaseUrl),
-      ]);
-      if (summary.org_id !== organization.id || usage.runtime.org_id !== organization.id) {
-        throw new Error(t("cloud.billing.organizationMismatch"));
-      }
-      setBilling({ catalog, summary, usage, operations, loading: false, error: null });
-      setSeatQuantity((current) => current === 1 ? Math.max(1, summary.seat_quantity) : current);
-    } catch (error) {
-      setBilling((current) => ({
-        ...current,
-        loading: false,
-        error: error instanceof Error ? error.message : t("cloud.billing.loadFailed"),
-      }));
-    }
-  }, [apiBaseUrl, isOwner, onSessionChange, organization, session, t]);
-
-  useEffect(() => {
-    void loadBilling();
-  }, [loadBilling, refreshRevision]);
-
-  useEffect(() => {
-    if (pollingUntil === null) return;
-    const tick = () => {
-      if (Date.now() >= pollingUntil) {
-        setPollingUntil(null);
-        return;
-      }
-      setRefreshRevision((value) => value + 1);
-    };
-    const timer = window.setInterval(tick, 4000);
-    return () => window.clearInterval(timer);
-  }, [pollingUntil]);
+  const controller = useCloudBillingController({
+    session,
+    apiBaseUrl,
+    organizationId: organization?.id ?? null,
+    enabled: Boolean(organization && isOwner),
+    onSessionChange,
+    t,
+  });
+  const billing = controller.state;
+  const organizationNeedsRetry = orgData.error !== null;
 
   const currentPlan = useMemo(
     () => billing.catalog?.plans.find((plan) => plan.id === billing.summary?.plan_id) ?? null,
     [billing.catalog, billing.summary?.plan_id],
   );
-  const pendingOperations = billing.operations.filter(
-    (operation) => !["confirmed", "canceled", "failed"].includes(operation.status),
-  );
-  const actionableSeatOperation = pendingOperations.find(
-    (operation) => (
-      ["member_activation", "member_deactivation"].includes(operation.kind)
-      && Number.isSafeInteger(operation.target_seat_quantity)
-      && (operation.target_seat_quantity ?? 0) > 0
-    ),
-  ) ?? null;
-
-  const refresh = () => {
-    setActionError(null);
-    setRefreshRevision((value) => value + 1);
-  };
-
-  const quotePlan = async (plan: DesktopBillingPlan) => {
-    if (!organization || !plan.purchasable) return;
-    const seats = clampSeats(seatQuantity, plan);
-    setSeatQuantity(seats);
-    setRequestedPlanId(plan.id);
-    setQuote(null);
-    setQuotedOperationId(null);
-    setActionError(null);
-    setAction("quote");
-    const intent = `plan-quote:${organization.id}:${plan.id}:${seats}`;
-    try {
-      setQuote(await quoteCloudBillingPlan(
-        session,
-        organization.id,
-        plan.id,
-        seats,
-        idempotencyKeyFor(intent, "plan-quote"),
-        onSessionChange,
-        apiBaseUrl,
-      ));
-      clearIdempotencyKey(intent);
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : t("cloud.billing.quoteFailed"));
-    } finally {
-      setAction(null);
-    }
-  };
-
-  const quoteSeats = async (requestedOperation: DesktopBillingOperation | null = null) => {
-    if (!organization || !billing.summary?.seat_changes_available) return;
-    const requestedSeats = requestedOperation?.target_seat_quantity
-      ?? Math.max(1, Math.trunc(seatQuantity));
-    const linkedOperation = requestedOperation ?? pendingOperations.find(
-      (operation) => (
-        ["member_activation", "member_deactivation"].includes(operation.kind)
-        && operation.target_seat_quantity === requestedSeats
-      ),
-    ) ?? null;
-    setSeatQuantity(requestedSeats);
-    setRequestedPlanId(billing.summary.plan_id);
-    setQuote(null);
-    setQuotedOperationId(linkedOperation?.id ?? null);
-    setActionError(null);
-    setAction("quote");
-    const intent = `seat-quote:${organization.id}:${requestedSeats}:${linkedOperation?.id ?? "manual"}`;
-    try {
-      setQuote(await quoteCloudBillingSeats(
-        session,
-        organization.id,
-        requestedSeats,
-        idempotencyKeyFor(intent, "seat-quote"),
-        linkedOperation?.id,
-        onSessionChange,
-        apiBaseUrl,
-      ));
-      clearIdempotencyKey(intent);
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : t("cloud.billing.quoteFailed"));
-    } finally {
-      setAction(null);
-    }
-  };
-
-  const confirmQuote = async () => {
-    if (!organization || !billing.summary || !quote) return;
-    setActionError(null);
-    setAction("confirm");
-    const intent = `quote-apply:${organization.id}:${quote.application_mode}:${quote.quote_id}`;
-    const mutationKey = idempotencyKeyFor(intent, quote.application_mode);
-    try {
-      if (quote.application_mode === "checkout") {
-        const checkout = await createCloudBillingCheckout(
-          session,
-          organization.id,
-          {
-            planId: quote.target_plan_id,
-            seatQuantity: quote.target_seats,
-            quoteId: quote.quote_id,
-          },
-          mutationKey,
-          onSessionChange,
-          apiBaseUrl,
-        );
-        await openCloudBillingExternalUrl(checkout.checkout_url);
-      } else if (quote.application_mode === "seat_change") {
-        await applyCloudBillingSeatChange(
-          session,
-          organization.id,
-          quote.quote_id,
-          mutationKey,
-          quotedOperationId,
-          onSessionChange,
-          apiBaseUrl,
-        );
-      } else {
-        await applyCloudBillingPlanChange(
-          session,
-          organization.id,
-          quote.quote_id,
-          mutationKey,
-          onSessionChange,
-          apiBaseUrl,
-        );
-      }
-      setQuote(null);
-      setQuotedOperationId(null);
-      clearIdempotencyKey(intent);
-      setPollingUntil(Date.now() + 60_000);
-      refresh();
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : t("cloud.billing.changeFailed"));
-    } finally {
-      setAction(null);
-    }
-  };
-
-  const openPortal = async () => {
-    if (!organization) return;
-    setActionError(null);
-    setAction("portal");
-    const intent = `portal:${organization.id}`;
-    try {
-      const portal = await createCloudBillingPortal(
-        session,
-        organization.id,
-        idempotencyKeyFor(intent, "portal"),
-        onSessionChange,
-        apiBaseUrl,
-      );
-      await openCloudBillingExternalUrl(portal.portal_url);
-      clearIdempotencyKey(intent);
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : t("cloud.billing.portalFailed"));
-    } finally {
-      setAction(null);
-    }
-  };
-
   return (
     <CloudOrganizationPageShell
       title={t("cloud.route.cloud-billing.title")}
@@ -299,35 +62,56 @@ export function CloudGlobalBillingPage({
         organization: bidiIsolate(organization?.name ?? t("cloud.organization.yours")),
       })}
       actions={(
-        <button
-          className="desktop-cloud-org-secondary-button"
-          type="button"
-          onClick={refresh}
-          disabled={billing.loading}
-        >
-          <RefreshCw size={14} />
-          <span>{t("cloud.common.refresh")}</span>
-        </button>
+        <>
+          <CloudOrganizationSelector organizationData={orgData} />
+          <button
+            className="desktop-cloud-org-secondary-button"
+            type="button"
+            onClick={() => {
+              if (organizationNeedsRetry) {
+                orgData.refresh();
+                return;
+              }
+              void controller.refresh();
+            }}
+            disabled={orgData.loading || (!organizationNeedsRetry && (billing.loading || !isOwner))}
+          >
+            <RefreshCw size={14} />
+            <span>{t("cloud.common.refresh")}</span>
+          </button>
+        </>
       )}
     >
       <div className="desktop-cloud-billing-stack">
-        {!orgData.loading && !organization && (
+        {orgData.status === "none" && (
           <BillingNotice icon={<ShieldAlert size={16} />} title={t("cloud.billing.noOrganization")} />
         )}
-        {!orgData.loading && organization && !isOwner && (
+        {orgData.status === "selection-required" && (
+          <BillingNotice
+            icon={<ShieldAlert size={16} />}
+            title={t("cloud.organization.selectionRequired")}
+          />
+        )}
+        {organization && orgData.membersStatus === "ready" && !isOwner && (
           <BillingNotice
             icon={<ShieldAlert size={16} />}
             title={t("cloud.billing.ownerRequired")}
             detail={t("cloud.billing.ownerRequiredDetail")}
           />
         )}
-        {(billing.error || actionError) && (
+        {orgData.error && (
           <div className="desktop-cloud-org-inline-error standalone">
             <strong>{t("cloud.billing.loadFailed")}</strong>
-            <span>{actionError ?? billing.error}</span>
+            <span>{formatCloudMessage(orgData.error, t)}</span>
           </div>
         )}
-        {pollingUntil !== null && (
+        {(billing.error || billing.actionError) && (
+          <div className="desktop-cloud-org-inline-error standalone">
+            <strong>{t("cloud.billing.loadFailed")}</strong>
+            <span>{billing.actionError ?? billing.error}</span>
+          </div>
+        )}
+        {billing.polling && (
           <BillingNotice
             icon={<Clock3 size={16} />}
             title={t("cloud.billing.waitingForAuthority")}
@@ -362,7 +146,7 @@ export function CloudGlobalBillingPage({
                 <span className="desktop-cloud-plan-feature"><Clock3 size={14} />{t("cloud.billing.cancelPending")}</span>
               )}
               {billing.summary.portal_available && (
-                <button className="desktop-cloud-billing-inline-action" type="button" onClick={() => void openPortal()} disabled={action !== null}>
+                <button className="desktop-cloud-billing-inline-action" type="button" onClick={() => void controller.openPortal()} disabled={billing.action !== null}>
                   {t("cloud.billing.managePortal")} <ExternalLink size={12} />
                 </button>
               )}
@@ -413,14 +197,14 @@ export function CloudGlobalBillingPage({
                   type="number"
                   min={1}
                   step={1}
-                  value={seatQuantity}
-                  onChange={(event) => setSeatQuantity(Math.max(1, Number.parseInt(event.target.value, 10) || 1))}
+                  value={billing.seatQuantity}
+                  onChange={(event) => controller.setSeatQuantity(Number.parseInt(event.target.value, 10))}
                   aria-label={t("cloud.billing.seatQuantity")}
                 />
                 <button
                   type="button"
-                  onClick={() => void quoteSeats()}
-                  disabled={action !== null || !billing.summary.seat_changes_available}
+                  onClick={() => void controller.quoteSeats()}
+                  disabled={billing.action !== null || !billing.summary.seat_changes_available}
                 >
                   {t("cloud.billing.quoteSeatChange")}
                 </button>
@@ -433,59 +217,59 @@ export function CloudGlobalBillingPage({
                   plan={plan}
                   current={plan.id === billing.summary?.plan_id}
                   localization={localization}
-                  busy={action !== null}
-                  onQuote={() => void quotePlan(plan)}
+                  busy={billing.action !== null}
+                  onQuote={() => void controller.quotePlan(plan)}
                 />
               ))}
             </div>
           </section>
         )}
 
-        {quote && (
+        {billing.quote && (
           <section className="desktop-cloud-billing-quote" aria-live="polite">
             <div>
               <span>{t("cloud.billing.quote")}</span>
               <h2>{t("cloud.billing.quoteSummary", {
-                plan: quote.target_plan_id,
-                count: quote.target_seats,
+                plan: billing.quote.target_plan_id,
+                count: billing.quote.target_seats,
               })}</h2>
               <p>{t("cloud.billing.quoteExpires", {
-                time: localization.formatDate(new Date(quote.expires_at), {
+                time: localization.formatDate(new Date(billing.quote.expires_at), {
                   dateStyle: "medium",
                   timeStyle: "short",
                 }),
               })}</p>
             </div>
             <div className="desktop-cloud-billing-quote-price">
-              <strong>{formatCurrency(quote.target_amount_cents, quote.currency, localization)}</strong>
+              <strong>{formatCurrency(billing.quote.target_amount_cents, billing.quote.currency, localization)}</strong>
               <span>{t("cloud.billing.perMonth")}</span>
               <small>{t("cloud.billing.quoteDelta", {
-                amount: formatCurrency(quote.delta_amount_cents, quote.currency, localization),
+                amount: formatCurrency(billing.quote.delta_amount_cents, billing.quote.currency, localization),
               })}</small>
             </div>
-            {(quote.target_plan_id !== requestedPlanId || quote.details.crosses_plan_boundary === true) && (
+            {(billing.quote.target_plan_id !== billing.requestedPlanId || billing.quote.details.crosses_plan_boundary === true) && (
               <div className="desktop-cloud-billing-boundary-warning">
                 <ShieldAlert size={16} />
-                <span>{t("cloud.billing.boundaryChange", { plan: quote.target_plan_id })}</span>
+                <span>{t("cloud.billing.boundaryChange", { plan: billing.quote.target_plan_id })}</span>
               </div>
             )}
-            <button type="button" className="primary" onClick={() => void confirmQuote()} disabled={action !== null}>
+            <button type="button" className="primary" onClick={() => void controller.confirmQuote()} disabled={billing.action !== null}>
               <CreditCard size={14} />
               {t("cloud.billing.confirmQuotedChange")}
             </button>
           </section>
         )}
 
-        {pendingOperations.length > 0 && (
+        {controller.pendingOperations.length > 0 && (
           <BillingNotice
             icon={<Clock3 size={16} />}
-            title={t("cloud.billing.pendingOperations", { count: pendingOperations.length })}
-            detail={pendingOperations.map((operation) => operation.status).join(", ")}
-            action={actionableSeatOperation && (
+            title={t("cloud.billing.pendingOperations", { count: controller.pendingOperations.length })}
+            detail={controller.pendingOperations.map((operation) => operation.status).join(", ")}
+            action={controller.actionableSeatOperation && (
               <button
                 type="button"
-                onClick={() => void quoteSeats(actionableSeatOperation)}
-                disabled={action !== null}
+                onClick={() => void controller.quoteSeats(controller.actionableSeatOperation)}
+                disabled={billing.action !== null}
               >
                 {t("cloud.billing.quoteSeatChange")}
               </button>
@@ -495,7 +279,6 @@ export function CloudGlobalBillingPage({
 
         {billing.catalog && (
           <div className="desktop-cloud-billing-note">
-            <span>{t("cloud.billing.checkoutNote", { count: projects.length })}</span>
             <span>{t("cloud.billing.secure")} <ExternalLink size={12} /></span>
           </div>
         )}
@@ -599,12 +382,6 @@ function BillingNotice({
       {action}
     </div>
   );
-}
-
-function clampSeats(value: number, plan: DesktopBillingPlan): number {
-  const minimum = Math.max(1, plan.seats.minimum);
-  const maximum = plan.seats.maximum ?? Number.MAX_SAFE_INTEGER;
-  return Math.min(maximum, Math.max(minimum, Math.trunc(value) || minimum));
 }
 
 function catalogFacts(plan: DesktopBillingPlan, localization: LocalizationContextValue): string[] {
