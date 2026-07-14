@@ -269,6 +269,7 @@
   "billing.ownerRequired": "請求の表示と変更は組織の所有者のみ行えます。",
   "billing.ownerRequiredDetail": "プラン、使用量、見積もり、請求ポータルの確認を所有者に依頼してください。",
   "billing.quoteFailed": "見積もりを作成できませんでした。",
+  "billing.quoteExpired": "この見積もりは期限切れです。続行する前に再取得してください。",
   "billing.changeFailed": "請求変更を送信できませんでした。",
   "billing.portalFailed": "請求ポータルを開けませんでした。",
   "billing.waitingForAuthority": "検証済みの請求確認を待機中",

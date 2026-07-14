@@ -269,6 +269,7 @@
   "billing.ownerRequired": "Nur der Organisationsinhaber kann die Abrechnung ansehen und ändern.",
   "billing.ownerRequiredDetail": "Bitten Sie den Inhaber, Tarife, Nutzung, Angebote und das Abrechnungsportal zu prüfen.",
   "billing.quoteFailed": "Das Angebot konnte nicht erstellt werden.",
+  "billing.quoteExpired": "Dieses Angebot ist abgelaufen. Fordern Sie ein neues Angebot an.",
   "billing.changeFailed": "Die Abrechnungsänderung konnte nicht übermittelt werden.",
   "billing.portalFailed": "Das Abrechnungsportal konnte nicht geöffnet werden.",
   "billing.waitingForAuthority": "Warten auf verifizierte Abrechnungsbestätigung",

@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   listCloudOrganizationMembers: vi.fn(),
   getCloudOrganizationEntitlements: vi.fn(),
   getCloudOrganizationSeatUsage: vi.fn(),
+  getCloudOrganizationAccess: vi.fn(),
   getCloudBillingCatalog: vi.fn(),
   getCloudBillingSummary: vi.fn(),
   getCloudBillingUsage: vi.fn(),
@@ -162,6 +163,12 @@ beforeEach(() => {
     entitlements: {},
   }));
   api.getCloudOrganizationSeatUsage.mockResolvedValue({ billable_seat_quantity: 1 });
+  api.getCloudOrganizationAccess.mockImplementation(async (_activeSession, orgId: string) => ({
+    org_id: orgId,
+    user_id: session.user_id,
+    role: "owner",
+    can_manage_billing: true,
+  }));
   api.getCloudBillingCatalog.mockResolvedValue(catalog);
   api.getCloudBillingSummary.mockImplementation(async (_activeSession, orgId: string) => summary(orgId));
   api.getCloudBillingUsage.mockImplementation(async (_activeSession, orgId: string) => usage(orgId));
@@ -189,16 +196,19 @@ function renderPage() {
 }
 
 describe("CloudGlobalBillingPage", () => {
-  it("shows a member-load error without misrepresenting the user as a non-owner", async () => {
-    api.listCloudOrganizationMembers.mockRejectedValueOnce(new Error("members unavailable"));
+  it("shows an access-load error without misrepresenting the user as a non-owner", async () => {
+    api.getCloudOrganizationAccess.mockRejectedValueOnce(new Error("access unavailable"));
 
     await act(async () => renderPage());
     await vi.waitFor(() => expect(container.textContent)
-      .toContain("Some organization details could not be loaded."));
+      .toContain("Unable to load the organization."));
 
     expect(container.textContent).not.toContain("Only the organization owner");
     expect(api.getCloudBillingCatalog).not.toHaveBeenCalled();
     expect(api.getCloudBillingSummary).not.toHaveBeenCalled();
+    expect(api.listCloudOrganizationMembers).not.toHaveBeenCalled();
+    expect(api.getCloudOrganizationEntitlements).not.toHaveBeenCalled();
+    expect(api.getCloudOrganizationSeatUsage).not.toHaveBeenCalled();
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".desktop-cloud-org-secondary-button")?.click();
@@ -243,5 +253,8 @@ describe("CloudGlobalBillingPage", () => {
 
     expect(container.textContent).not.toContain("projects in this organization");
     expect(container.textContent).not.toContain("project in this organization");
+    expect(api.listCloudOrganizationMembers).not.toHaveBeenCalled();
+    expect(api.getCloudOrganizationEntitlements).not.toHaveBeenCalled();
+    expect(api.getCloudOrganizationSeatUsage).not.toHaveBeenCalled();
   });
 });

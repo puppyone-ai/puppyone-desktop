@@ -5,6 +5,8 @@
 // access in try/catch) and assert request shaping + the session/api-base guards.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  applyCloudBillingPlanChange,
+  applyCloudBillingSeatChange,
   cloudApiRequest,
   createCloudBillingCheckout,
   getCloudTemplate,
@@ -24,6 +26,7 @@ import {
   updateCloudAutomationConnection,
   updateCloudAutomationTrigger,
   validateDesktopBillingCatalog,
+  validateDesktopBillingOperation,
   validateDesktopBillingQuote,
   validateDesktopBillingSummary,
   validateDesktopCloudOrganizationSeatUsage,
@@ -77,6 +80,19 @@ describe("cloud API client delegation", () => {
         checkout_id: "checkout-1",
         checkout_url: "https://checkout.example/session",
         quote: validBillingQuote(),
+        operation: validBillingOperation(),
+      })
+      .mockResolvedValueOnce({
+        ...validBillingQuote(),
+        kind: "plan",
+        application_mode: "plan_change",
+        operation: { ...validBillingOperation(), kind: "plan_change" },
+      })
+      .mockResolvedValueOnce({
+        ...validBillingQuote(),
+        kind: "seats",
+        application_mode: "seat_change",
+        operation: { ...validBillingOperation(), kind: "seat_increase" },
       });
 
     await getCloudBillingCatalog(session, undefined, API);
@@ -92,8 +108,30 @@ describe("cloud API client delegation", () => {
     await createCloudBillingCheckout(
       session,
       "org/1",
-      { planId: "plus", seatQuantity: 2, quoteId: "quote-1" },
+      {
+        planId: "plus",
+        seatQuantity: 2,
+        quoteId: "quote-1",
+        operationId: "operation-1",
+      },
       "desktop:checkout:stable-key",
+      undefined,
+      API,
+    );
+    await applyCloudBillingPlanChange(
+      session,
+      "org/1",
+      "quote-1",
+      "desktop:plan-change:stable-key",
+      undefined,
+      API,
+    );
+    await applyCloudBillingSeatChange(
+      session,
+      "org/1",
+      "quote-1",
+      "desktop:seat-change:stable-key",
+      "operation-1",
       undefined,
       API,
     );
@@ -114,7 +152,27 @@ describe("cloud API client delegation", () => {
       path: "/billing/organizations/org%2F1/checkout",
       method: "POST",
       headers: expect.objectContaining({ "Idempotency-Key": "desktop:checkout:stable-key" }),
-      body: JSON.stringify({ plan_id: "plus", seat_quantity: 2, quote_id: "quote-1" }),
+      body: JSON.stringify({
+        plan_id: "plus",
+        seat_quantity: 2,
+        quote_id: "quote-1",
+        operation_id: "operation-1",
+      }),
+    }));
+    expect(bridge).toHaveBeenNthCalledWith(4, expect.objectContaining({
+      path: "/billing/organizations/org%2F1/plan/change",
+      headers: expect.objectContaining({ "Idempotency-Key": "desktop:plan-change:stable-key" }),
+      body: JSON.stringify({
+        quote_id: "quote-1",
+      }),
+    }));
+    expect(bridge).toHaveBeenNthCalledWith(5, expect.objectContaining({
+      path: "/billing/organizations/org%2F1/seats/change",
+      headers: expect.objectContaining({ "Idempotency-Key": "desktop:seat-change:stable-key" }),
+      body: JSON.stringify({
+        quote_id: "quote-1",
+        operation_id: "operation-1",
+      }),
     }));
   });
 
@@ -181,6 +239,41 @@ describe("cloud API client delegation", () => {
       ...quote,
       application_mode: "infer-from-free-plan",
     })).toThrow(/application_mode/i);
+  });
+
+  it("rejects malformed or contradictory billing lifecycle data", () => {
+    expect(validateDesktopBillingOperation(validBillingOperation()).state).toBe("processing");
+    expect(() => validateDesktopBillingOperation({
+      ...validBillingOperation(),
+      terminal: true,
+    })).toThrow(/lifecycle flags/i);
+    expect(() => validateDesktopBillingOperation({
+      ...validBillingOperation(),
+      state: "succeeded",
+      terminal: true,
+      retryable: false,
+    })).toThrow(/incomplete succeeded/i);
+    expect(() => validateDesktopBillingOperation({
+      ...validBillingOperation(),
+      state: "retryable_failed",
+    })).toThrow(/retryable billing operation/i);
+    expect(() => validateDesktopBillingSummary({
+      org_id: "org-1",
+      plan_id: "plus",
+      status: "paid-ish",
+      seat_quantity: 2,
+      pending_plan_id: null,
+      cancel_at_period_end: false,
+      current_period_end: null,
+      catalog_version: "test.1",
+      source_revision: 1,
+      portal_available: true,
+      seat_changes_available: true,
+      runtime_available_units: 1,
+      runtime_reserved_units: 0,
+      runtime_overage_enabled: false,
+      runtime_monthly_limit_cents: 0,
+    })).toThrow(/summary.status/i);
   });
 
   it("opens verified checkout URLs through the system-browser bridge", async () => {
@@ -445,6 +538,27 @@ function validBillingQuote() {
     catalog_version: "test.1",
     expires_at: "2026-07-14T00:30:00Z",
     details: {},
+  };
+}
+
+function validBillingOperation() {
+  return {
+    id: "operation-1",
+    org_id: "org/1",
+    kind: "checkout",
+    state: "processing",
+    terminal: false,
+    retryable: true,
+    action_required: false,
+    target_plan_id: "plus",
+    current_seat_quantity: 1,
+    target_seat_quantity: 2,
+    quote_id: "quote-1",
+    confirmed_revision: null,
+    error_code: null,
+    created_at: "2026-07-14T00:00:00Z",
+    updated_at: "2026-07-14T00:00:00Z",
+    completed_at: null,
   };
 }
 

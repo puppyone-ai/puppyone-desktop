@@ -269,6 +269,7 @@
   "billing.ownerRequired": "Solo el propietario de la organización puede ver y cambiar la facturación.",
   "billing.ownerRequiredDetail": "Pide al propietario que revise los planes, el uso, las cotizaciones y el portal de facturación.",
   "billing.quoteFailed": "No se pudo crear la cotización.",
+  "billing.quoteExpired": "Esta cotización ha caducado. Solicita una nueva antes de continuar.",
   "billing.changeFailed": "No se pudo enviar el cambio de facturación.",
   "billing.portalFailed": "No se pudo abrir el portal de facturación.",
   "billing.waitingForAuthority": "Esperando la confirmación de facturación verificada",

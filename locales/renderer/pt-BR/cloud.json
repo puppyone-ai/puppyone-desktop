@@ -269,6 +269,7 @@
   "billing.ownerRequired": "Somente o proprietário da organização pode ver e alterar a cobrança.",
   "billing.ownerRequiredDetail": "Peça ao proprietário para revisar planos, uso, cotações e o portal de cobrança.",
   "billing.quoteFailed": "Não foi possível criar a cotação.",
+  "billing.quoteExpired": "Esta cotação expirou. Solicite uma nova antes de continuar.",
   "billing.changeFailed": "Não foi possível enviar a alteração de cobrança.",
   "billing.portalFailed": "Não foi possível abrir o portal de cobrança.",
   "billing.waitingForAuthority": "Aguardando confirmação de cobrança verificada",

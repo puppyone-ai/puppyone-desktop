@@ -248,6 +248,7 @@
   "billing.ownerRequired": "Only the organization owner can view and change billing.",
   "billing.ownerRequiredDetail": "Ask the owner to review plans, usage, quotes, and the billing portal.",
   "billing.quoteFailed": "The quote could not be created.",
+  "billing.quoteExpired": "This quote has expired. Request a new quote before continuing.",
   "billing.changeFailed": "The billing change could not be submitted.",
   "billing.portalFailed": "The billing portal could not be opened.",
   "billing.waitingForAuthority": "Waiting for verified billing confirmation",

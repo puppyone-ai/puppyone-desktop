@@ -15,11 +15,14 @@ import type {
   DesktopCloudSession,
 } from "../src/lib/cloudApi";
 import {
-  BILLING_POLL_INTERVAL_MS,
-  BILLING_POLL_TIMEOUT_MS,
+  BILLING_POLL_BACKOFF_MS,
   type CloudBillingControllerDependencies,
   useCloudBillingController,
 } from "../src/features/cloud/billing/useCloudBillingController";
+import {
+  billingReducer,
+  createInitialBillingState,
+} from "../src/features/cloud/billing/cloudBillingState";
 import { testT } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -134,6 +137,37 @@ function quote(orgId: string): DesktopBillingQuote {
   };
 }
 
+function operation(
+  orgId: string,
+  state: DesktopBillingOperation["state"] = "processing",
+): DesktopBillingOperation {
+  const lifecycle = {
+    pending: { terminal: false, retryable: true, action_required: false },
+    requires_action: { terminal: false, retryable: false, action_required: true },
+    processing: { terminal: false, retryable: true, action_required: false },
+    retryable_failed: { terminal: false, retryable: true, action_required: false },
+    succeeded: { terminal: true, retryable: false, action_required: false },
+    canceled: { terminal: true, retryable: false, action_required: false },
+    failed: { terminal: true, retryable: false, action_required: false },
+  } as const;
+  return {
+    id: `operation-${orgId}`,
+    org_id: orgId,
+    kind: "checkout",
+    state,
+    ...lifecycle[state],
+    target_plan_id: "plus",
+    current_seat_quantity: 1,
+    target_seat_quantity: 2,
+    quote_id: `quote-${orgId}`,
+    confirmed_revision: state === "succeeded" ? 2 : null,
+    error_code: state === "failed" ? "provider_declined" : null,
+    created_at: "2026-07-15T00:00:00Z",
+    updated_at: "2026-07-15T00:00:00Z",
+    completed_at: state === "succeeded" ? "2026-07-15T00:01:00Z" : null,
+  };
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -150,15 +184,23 @@ function dependencies(): CloudBillingControllerDependencies {
     getSummary: vi.fn().mockImplementation(async (_session, orgId: string) => summary(orgId)),
     getUsage: vi.fn().mockImplementation(async (_session, orgId: string) => usage(orgId)),
     listOperations: vi.fn().mockResolvedValue([]),
+    getOperation: vi.fn().mockImplementation(async (_session, orgId: string) => operation(orgId)),
     quotePlan: vi.fn().mockImplementation(async (_session, orgId: string) => quote(orgId)),
     quoteSeats: vi.fn().mockImplementation(async (_session, orgId: string) => quote(orgId)),
     createCheckout: vi.fn().mockImplementation(async (_session, orgId: string) => ({
       checkout_id: `checkout-${orgId}`,
       checkout_url: "https://checkout.example/session",
       quote: quote(orgId),
+      operation: operation(orgId),
     })),
-    applyPlanChange: vi.fn().mockImplementation(async (_session, orgId: string) => quote(orgId)),
-    applySeatChange: vi.fn().mockImplementation(async (_session, orgId: string) => quote(orgId)),
+    applyPlanChange: vi.fn().mockImplementation(async (_session, orgId: string) => ({
+      ...quote(orgId),
+      operation: { ...operation(orgId), kind: "plan_change" },
+    })),
+    applySeatChange: vi.fn().mockImplementation(async (_session, orgId: string) => ({
+      ...quote(orgId),
+      operation: { ...operation(orgId), kind: "seat_increase" },
+    })),
     createPortal: vi.fn().mockResolvedValue({ portal_url: "https://portal.example", expires_at: null }),
     openExternalUrl: vi.fn().mockResolvedValue(undefined),
     createIdempotencyKey: vi.fn()
@@ -200,6 +242,11 @@ function Probe({
     >
       <button type="button" data-action="refresh" onClick={() => void billing.refresh()}>refresh</button>
       <button type="button" data-action="quote" onClick={() => void billing.quotePlan(plan)}>quote</button>
+      <button
+        type="button"
+        data-action="quote-seats"
+        onClick={() => void billing.quoteSeats(billing.actionableSeatOperation)}
+      >quote seats</button>
       <button type="button" data-action="confirm" onClick={() => void billing.confirmQuote()}>confirm</button>
     </div>
   );
@@ -223,6 +270,34 @@ afterEach(() => {
 });
 
 describe("useCloudBillingController", () => {
+  it("never lets a delayed operation response regress an observed terminal state", () => {
+    const contextKey = "billing-context";
+    const succeeded = operation("org-a", "succeeded");
+    const loaded = billingReducer(createInitialBillingState(contextKey), {
+      type: "loadSucceeded",
+      contextKey,
+      result: {
+        catalog,
+        summary: summary("org-a", 2),
+        usage: usage("org-a"),
+        operations: [succeeded],
+      },
+    });
+    const watching = {
+      ...loaded,
+      polling: { id: "watch", operationId: succeeded.id },
+    };
+
+    const next = billingReducer(watching, {
+      type: "operationUpdated",
+      contextKey,
+      operation: operation("org-a", "processing"),
+    });
+
+    expect(next.operations).toEqual([succeeded]);
+    expect(next.polling).toBeNull();
+  });
+
   it("discards an old account response and resets quote/idempotency state on context change", async () => {
     const deps = dependencies();
     const oldSummary = deferred<DesktopBillingSummary>();
@@ -300,10 +375,10 @@ describe("useCloudBillingController", () => {
     expect(container.firstElementChild?.getAttribute("data-quote")).toBe("");
   });
 
-  it("coalesces overlapping poll ticks into one active request and one trailing refresh", async () => {
+  it("keeps operation polling single-flight while a request is unresolved", async () => {
     vi.useFakeTimers();
     const deps = dependencies();
-    const slowSummary = deferred<DesktopBillingSummary>();
+    const slowOperation = deferred<DesktopBillingOperation>();
 
     await act(async () => root?.render(<Probe deps={deps} />));
     await act(async () => vi.runOnlyPendingTimersAsync());
@@ -314,21 +389,41 @@ describe("useCloudBillingController", () => {
     await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-quote"))
       .toBe("quote-org-a"));
 
-    vi.mocked(deps.getSummary).mockReturnValueOnce(slowSummary.promise);
+    vi.mocked(deps.getOperation).mockReturnValueOnce(slowOperation.promise);
     await act(async () => container.querySelector<HTMLButtonElement>('[data-action="confirm"]')?.click());
     await act(async () => Promise.resolve());
     expect(container.firstElementChild?.getAttribute("data-polling")).toBe("true");
-    expect(deps.getSummary).toHaveBeenCalledTimes(2);
 
-    await act(async () => vi.advanceTimersByTimeAsync(BILLING_POLL_INTERVAL_MS * 3));
-    expect(deps.getSummary).toHaveBeenCalledTimes(2);
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(deps.getOperation).toHaveBeenCalledTimes(1);
 
-    await act(async () => slowSummary.resolve(summary("org-a")));
-    await act(async () => Promise.resolve());
-    expect(deps.getSummary).toHaveBeenCalledTimes(3);
+    await act(async () => slowOperation.resolve(operation("org-a")));
+    await act(async () => vi.advanceTimersByTimeAsync(BILLING_POLL_BACKOFF_MS[1]));
+    expect(deps.getOperation).toHaveBeenCalledTimes(2);
   });
 
-  it("stops polling after the authoritative revision reaches the quoted target", async () => {
+  it("stops polling only after the durable operation succeeds", async () => {
+    vi.useFakeTimers();
+    const deps = dependencies();
+    vi.mocked(deps.getOperation).mockResolvedValue(operation("org-a", "succeeded"));
+
+    await act(async () => root?.render(<Probe deps={deps} />));
+    await act(async () => vi.runOnlyPendingTimersAsync());
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-org"))
+      .toBe("org-a"));
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-action="quote"]')?.click());
+    await act(async () => vi.runOnlyPendingTimersAsync());
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-action="confirm"]')?.click());
+    await act(async () => vi.advanceTimersByTimeAsync(BILLING_POLL_BACKOFF_MS[0]));
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-polling"))
+      .toBe("false"));
+
+    const completedCalls = vi.mocked(deps.getOperation).mock.calls.length;
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(deps.getOperation).toHaveBeenCalledTimes(completedCalls);
+  });
+
+  it("refreshes a watched operation immediately when the window regains focus", async () => {
     vi.useFakeTimers();
     const deps = dependencies();
 
@@ -338,15 +433,16 @@ describe("useCloudBillingController", () => {
       .toBe("org-a"));
     await act(async () => container.querySelector<HTMLButtonElement>('[data-action="quote"]')?.click());
     await act(async () => vi.runOnlyPendingTimersAsync());
-    vi.mocked(deps.getSummary).mockResolvedValueOnce(summary("org-a", 2));
     await act(async () => container.querySelector<HTMLButtonElement>('[data-action="confirm"]')?.click());
-    await act(async () => vi.runOnlyPendingTimersAsync());
-    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-polling"))
-      .toBe("false"));
+    await act(async () => Promise.resolve());
+    expect(deps.getOperation).not.toHaveBeenCalled();
 
-    const completedCalls = vi.mocked(deps.getSummary).mock.calls.length;
-    await act(async () => vi.advanceTimersByTimeAsync(BILLING_POLL_INTERVAL_MS * 2));
-    expect(deps.getSummary).toHaveBeenCalledTimes(completedCalls);
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(deps.getOperation).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the mutation idempotency key stable for retry but rotates it with context", async () => {
@@ -385,7 +481,10 @@ describe("useCloudBillingController", () => {
     vi.mocked(deps.quotePlan).mockResolvedValue(planChangeQuote);
     vi.mocked(deps.applyPlanChange)
       .mockRejectedValueOnce(new Error("provider timeout"))
-      .mockResolvedValue(planChangeQuote);
+      .mockResolvedValue({
+        ...planChangeQuote,
+        operation: { ...operation("org-a"), kind: "plan_change" },
+      });
 
     await act(async () => root?.render(<Probe deps={deps} />));
     await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-org"))
@@ -401,6 +500,45 @@ describe("useCloudBillingController", () => {
 
     expect(vi.mocked(deps.applyPlanChange).mock.calls[1]?.[3])
       .toBe(vi.mocked(deps.applyPlanChange).mock.calls[0]?.[3]);
+  });
+
+  it("reuses a membership operation when its seat quote requires checkout", async () => {
+    const deps = dependencies();
+    const membershipOperation: DesktopBillingOperation = {
+      ...operation("org-a", "requires_action"),
+      kind: "member_activation",
+      target_plan_id: null,
+      quote_id: null,
+    };
+    vi.mocked(deps.listOperations).mockResolvedValue([membershipOperation]);
+    vi.mocked(deps.quoteSeats).mockResolvedValue({
+      ...quote("org-a"),
+      kind: "seats",
+    });
+
+    await act(async () => root?.render(<Probe deps={deps} />));
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-org"))
+      .toBe("org-a"));
+    await act(async () => container
+      .querySelector<HTMLButtonElement>('[data-action="quote-seats"]')?.click());
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-quote"))
+      .toBe("quote-org-a"));
+    await act(async () => container
+      .querySelector<HTMLButtonElement>('[data-action="confirm"]')?.click());
+
+    expect(deps.createCheckout).toHaveBeenCalledWith(
+      session,
+      "org-a",
+      {
+        planId: "plus",
+        seatQuantity: 2,
+        quoteId: "quote-org-a",
+        operationId: "operation-org-a",
+      },
+      expect.any(String),
+      expect.any(Function),
+      session.api_base_url,
+    );
   });
 
   it("ignores a completed checkout after its account context was replaced", async () => {
@@ -431,6 +569,7 @@ describe("useCloudBillingController", () => {
       checkout_id: "checkout-org-a",
       checkout_url: "https://checkout.example/session",
       quote: quote("org-a"),
+      operation: operation("org-a"),
     }));
 
     expect(container.firstElementChild?.getAttribute("data-org")).toBe("org-b");
@@ -439,7 +578,7 @@ describe("useCloudBillingController", () => {
     expect(deps.openExternalUrl).not.toHaveBeenCalled();
   });
 
-  it("ends polling with a retryable error after the confirmation deadline", async () => {
+  it("does not turn a slow browser checkout into a one-minute failure", async () => {
     vi.useFakeTimers();
     const deps = dependencies();
 
@@ -453,11 +592,106 @@ describe("useCloudBillingController", () => {
     await act(async () => vi.runOnlyPendingTimersAsync());
     expect(container.firstElementChild?.getAttribute("data-polling")).toBe("true");
 
-    await act(async () => vi.advanceTimersByTimeAsync(
-      BILLING_POLL_TIMEOUT_MS + BILLING_POLL_INTERVAL_MS,
-    ));
+    await act(async () => vi.advanceTimersByTimeAsync(65_000));
+    expect(container.firstElementChild?.getAttribute("data-polling")).toBe("true");
+    expect(container.firstElementChild?.getAttribute("data-error")).toBe("");
+    expect(vi.mocked(deps.getOperation).mock.calls.length).toBeLessThan(10);
+  });
+
+  it("rejects an expired quote before starting a financial mutation", async () => {
+    const deps = dependencies();
+    deps.now = () => Date.parse("2026-07-17T00:00:00Z");
+
+    await act(async () => root?.render(<Probe deps={deps} />));
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-org"))
+      .toBe("org-a"));
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-action="quote"]')?.click());
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-quote"))
+      .toBe("quote-org-a"));
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-action="confirm"]')?.click());
+
+    expect(deps.createCheckout).not.toHaveBeenCalled();
+    expect(container.firstElementChild?.getAttribute("data-error")).not.toBe("");
+  });
+
+  it("never opens checkout when the returned quote does not match the confirmed quote", async () => {
+    const deps = dependencies();
+    vi.mocked(deps.createCheckout).mockResolvedValue({
+      checkout_id: "checkout-org-a",
+      checkout_url: "https://checkout.example/session",
+      quote: { ...quote("org-a"), quote_id: "quote-other" },
+      operation: operation("org-a"),
+    });
+
+    await act(async () => root?.render(<Probe deps={deps} />));
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-org"))
+      .toBe("org-a"));
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-action="quote"]')?.click());
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-quote"))
+      .toBe("quote-org-a"));
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-action="confirm"]')?.click());
+
+    expect(deps.openExternalUrl).not.toHaveBeenCalled();
     expect(container.firstElementChild?.getAttribute("data-polling")).toBe("false");
-    expect(container.firstElementChild?.getAttribute("data-error"))
-      .toContain("taking longer than expected");
+    expect(container.firstElementChild?.getAttribute("data-error")).not.toBe("");
+  });
+
+  it("resumes a durable commercial operation after the Billing surface reloads", async () => {
+    vi.useFakeTimers();
+    const deps = dependencies();
+    const resumedOperation = deferred<DesktopBillingOperation>();
+    vi.mocked(deps.listOperations).mockResolvedValue([operation("org-a", "pending")]);
+    vi.mocked(deps.getOperation).mockReturnValue(resumedOperation.promise);
+
+    await act(async () => root?.render(<Probe deps={deps} />));
+    await act(async () => Promise.resolve());
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-polling"))
+      .toBe("true"));
+    await act(async () => vi.advanceTimersByTimeAsync(BILLING_POLL_BACKOFF_MS[0]));
+
+    expect(deps.getOperation).toHaveBeenCalledWith(
+      session,
+      "org-a",
+      "operation-org-a",
+      expect.any(Function),
+      session.api_base_url,
+    );
+    await act(async () => resumedOperation.resolve(operation("org-a", "succeeded")));
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-polling"))
+      .toBe("false"));
+  });
+
+  it("stops a permanently mismatched resumed operation until an explicit refresh", async () => {
+    vi.useFakeTimers();
+    const deps = dependencies();
+    vi.mocked(deps.listOperations).mockResolvedValue([operation("org-a", "pending")]);
+    vi.mocked(deps.getOperation).mockResolvedValue({
+      ...operation("org-a", "pending"),
+      id: "unexpected-operation",
+    });
+
+    await act(async () => root?.render(<Probe deps={deps} />));
+    await act(async () => Promise.resolve());
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-polling"))
+      .toBe("true"));
+    await act(async () => vi.advanceTimersByTimeAsync(BILLING_POLL_BACKOFF_MS[0]));
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-polling"))
+      .toBe("false"));
+
+    await act(async () => vi.advanceTimersByTimeAsync(120_000));
+    expect(deps.getOperation).toHaveBeenCalledTimes(1);
+    expect(container.firstElementChild?.getAttribute("data-error")).not.toBe("");
+  });
+
+  it("runs correctly under React StrictMode without retaining an abandoned request", async () => {
+    const deps = dependencies();
+
+    await act(async () => root?.render(
+      <React.StrictMode><Probe deps={deps} /></React.StrictMode>,
+    ));
+
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-org"))
+      .toBe("org-a"));
+    expect(container.firstElementChild?.getAttribute("data-error")).toBe("");
   });
 });

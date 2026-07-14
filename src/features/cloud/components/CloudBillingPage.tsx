@@ -20,6 +20,7 @@ import {
   CloudOrganizationSelector,
   CloudOrganizationPageShell,
   type CloudGlobalPageProps,
+  useCloudOrganizationAccess,
   useCloudOrganizationData,
 } from "./CloudGlobalPages";
 
@@ -35,11 +36,21 @@ export function CloudGlobalBillingPage({
 }: CloudBillingPageProps) {
   const localization = useLocalization();
   const { t } = localization;
-  const orgData = useCloudOrganizationData(session, apiBaseUrl, onSessionChange);
-  const organization = orgData.organization;
-  const isOwner = orgData.membersStatus === "ready" && orgData.members.some(
-    (member) => member.user_id === session.user_id && member.role === "owner",
+  const orgData = useCloudOrganizationData(
+    session,
+    apiBaseUrl,
+    onSessionChange,
+    { loadTeamDetails: false },
   );
+  const organization = orgData.organization;
+  const organizationAccess = useCloudOrganizationAccess(
+    session,
+    apiBaseUrl,
+    organization?.id ?? null,
+    onSessionChange,
+  );
+  const isOwner = organizationAccess.status === "ready"
+    && organizationAccess.access?.can_manage_billing === true;
   const controller = useCloudBillingController({
     session,
     apiBaseUrl,
@@ -49,7 +60,7 @@ export function CloudGlobalBillingPage({
     t,
   });
   const billing = controller.state;
-  const organizationNeedsRetry = orgData.error !== null;
+  const organizationNeedsRetry = orgData.error !== null || organizationAccess.error !== null;
 
   const currentPlan = useMemo(
     () => billing.catalog?.plans.find((plan) => plan.id === billing.summary?.plan_id) ?? null,
@@ -70,11 +81,14 @@ export function CloudGlobalBillingPage({
             onClick={() => {
               if (organizationNeedsRetry) {
                 orgData.refresh();
+                organizationAccess.refresh();
                 return;
               }
               void controller.refresh();
             }}
-            disabled={orgData.loading || (!organizationNeedsRetry && (billing.loading || !isOwner))}
+            disabled={orgData.loading
+              || organizationAccess.loading
+              || (!organizationNeedsRetry && (billing.loading || !isOwner))}
           >
             <RefreshCw size={14} />
             <span>{t("cloud.common.refresh")}</span>
@@ -92,7 +106,7 @@ export function CloudGlobalBillingPage({
             title={t("cloud.organization.selectionRequired")}
           />
         )}
-        {organization && orgData.membersStatus === "ready" && !isOwner && (
+        {organization && organizationAccess.status === "ready" && !isOwner && (
           <BillingNotice
             icon={<ShieldAlert size={16} />}
             title={t("cloud.billing.ownerRequired")}
@@ -103,6 +117,12 @@ export function CloudGlobalBillingPage({
           <div className="desktop-cloud-org-inline-error standalone">
             <strong>{t("cloud.billing.loadFailed")}</strong>
             <span>{formatCloudMessage(orgData.error, t)}</span>
+          </div>
+        )}
+        {organizationAccess.error && (
+          <div className="desktop-cloud-org-inline-error standalone">
+            <strong>{t("cloud.billing.loadFailed")}</strong>
+            <span>{formatCloudMessage(organizationAccess.error, t)}</span>
           </div>
         )}
         {(billing.error || billing.actionError) && (
@@ -264,7 +284,7 @@ export function CloudGlobalBillingPage({
           <BillingNotice
             icon={<Clock3 size={16} />}
             title={t("cloud.billing.pendingOperations", { count: controller.pendingOperations.length })}
-            detail={controller.pendingOperations.map((operation) => operation.status).join(", ")}
+            detail={controller.pendingOperations.map((operation) => operation.state).join(", ")}
             action={controller.actionableSeatOperation && (
               <button
                 type="button"

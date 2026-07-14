@@ -1,14 +1,16 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Mail } from "lucide-react";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import {
   getCloudOrganizationEntitlements,
+  getCloudOrganizationAccess,
   getCloudOrganizationSeatUsage,
   listCloudOrganizationMembers,
   listCloudOrganizations,
   type DesktopCloudOrgMember,
+  type DesktopCloudOrganizationAccess,
   type DesktopCloudOrganization,
   type DesktopCloudOrganizationEntitlements,
   type DesktopCloudOrganizationSeatUsage,
@@ -198,8 +200,10 @@ export function useCloudOrganizationData(
   session: DesktopCloudSession,
   apiBaseUrl: string | null,
   onSessionChange: (session: DesktopCloudSession | null) => void,
+  { loadTeamDetails = true }: { loadTeamDetails?: boolean } = {},
 ) {
   const contextKey = createCloudOrganizationContextKey(session, apiBaseUrl);
+  const preferenceKey = createCloudOrganizationPreferenceKey(session, apiBaseUrl);
   const [state, setState] = useState<CloudOrganizationDataState>(
     () => emptyOrganizationState(contextKey),
   );
@@ -209,9 +213,11 @@ export function useCloudOrganizationData(
   const sessionRef = useRef(session);
   const apiBaseUrlRef = useRef(apiBaseUrl);
   const onSessionChangeRef = useRef(onSessionChange);
-  sessionRef.current = session;
-  apiBaseUrlRef.current = apiBaseUrl;
-  onSessionChangeRef.current = onSessionChange;
+  useLayoutEffect(() => {
+    sessionRef.current = session;
+    apiBaseUrlRef.current = apiBaseUrl;
+    onSessionChangeRef.current = onSessionChange;
+  }, [apiBaseUrl, onSessionChange, session]);
   const effectiveState = state.contextKey === contextKey
     ? state
     : emptyOrganizationState(contextKey);
@@ -237,7 +243,7 @@ export function useCloudOrganizationData(
           });
           return;
         }
-        const storedSelection = readOrganizationSelection(contextKey);
+        const storedSelection = readOrganizationSelection(preferenceKey);
         const [onlyOrganization] = organizations;
         const selectedOrganizationId = organizations.length === 1
           ? onlyOrganization?.id ?? null
@@ -253,9 +259,9 @@ export function useCloudOrganizationData(
           organizations,
           selectedOrganizationId,
           organization,
-          status: organization ? "loading" : "selection-required",
-          membersStatus: organization ? "loading" : "idle",
-          loading: Boolean(organization),
+          status: organization ? (loadTeamDetails ? "loading" : "ready") : "selection-required",
+          membersStatus: organization && loadTeamDetails ? "loading" : "idle",
+          loading: Boolean(organization && loadTeamDetails),
         });
       } catch (error) {
         if (requestEpoch !== organizationRequestEpoch.current) return;
@@ -277,10 +283,10 @@ export function useCloudOrganizationData(
         organizationRequestEpoch.current += 1;
       }
     };
-  }, [contextKey, reloadRevision]);
+  }, [contextKey, loadTeamDetails, preferenceKey, reloadRevision]);
 
   useEffect(() => {
-    if (state.contextKey !== contextKey || !state.organization) return;
+    if (!loadTeamDetails || state.contextKey !== contextKey || !state.organization) return;
     const organization = state.organization;
     const requestEpoch = ++detailsRequestEpoch.current;
     const activeSession = sessionRef.current;
@@ -333,7 +339,7 @@ export function useCloudOrganizationData(
         detailsRequestEpoch.current += 1;
       }
     };
-  }, [contextKey, state.contextKey, state.organization]);
+  }, [contextKey, loadTeamDetails, state.contextKey, state.organization]);
 
   const selectOrganization = useCallback((organizationId: string) => {
     if (effectiveState.contextKey !== contextKey) return;
@@ -342,23 +348,88 @@ export function useCloudOrganizationData(
     );
     if (!organization || effectiveState.organization?.id === organization.id) return;
     detailsRequestEpoch.current += 1;
-    writeOrganizationSelection(contextKey, organization.id);
+    writeOrganizationSelection(preferenceKey, organization.id);
     setState({
       ...emptyOrganizationState(contextKey),
       organizations: effectiveState.organizations,
       selectedOrganizationId: organization.id,
       organization,
-      status: "loading",
-      membersStatus: "loading",
-      loading: true,
+      status: loadTeamDetails ? "loading" : "ready",
+      membersStatus: loadTeamDetails ? "loading" : "idle",
+      loading: loadTeamDetails,
     });
-  }, [contextKey, effectiveState]);
+  }, [contextKey, effectiveState, loadTeamDetails, preferenceKey]);
 
   const refresh = useCallback(() => {
     setReloadRevision((revision) => revision + 1);
   }, []);
 
   return { ...effectiveState, selectOrganization, refresh };
+}
+
+export function useCloudOrganizationAccess(
+  session: DesktopCloudSession,
+  apiBaseUrl: string | null,
+  organizationId: string | null,
+  onSessionChange: (session: DesktopCloudSession | null) => void,
+) {
+  const contextKey = [
+    createCloudOrganizationContextKey(session, apiBaseUrl),
+    organizationId ?? "",
+  ].join("\u001f");
+  const [state, setState] = useState<{
+    contextKey: string;
+    access: DesktopCloudOrganizationAccess | null;
+    status: "idle" | "loading" | "ready" | "error";
+    error: CloudMessageDescriptor | null;
+  }>(() => ({ contextKey, access: null, status: organizationId ? "loading" : "idle", error: null }));
+  const [reloadRevision, setReloadRevision] = useState(0);
+  const requestEpoch = useRef(0);
+  const effectiveState = state.contextKey === contextKey
+    ? state
+    : { contextKey, access: null, status: organizationId ? "loading" as const : "idle" as const, error: null };
+
+  useEffect(() => {
+    const epoch = ++requestEpoch.current;
+    if (!organizationId) {
+      setState({ contextKey, access: null, status: "idle", error: null });
+      return;
+    }
+    setState({ contextKey, access: null, status: "loading", error: null });
+    void getCloudOrganizationAccess(
+      session,
+      organizationId,
+      onSessionChange,
+      apiBaseUrl,
+    ).then((access) => {
+      if (epoch !== requestEpoch.current) return;
+      if (access.org_id !== organizationId || access.user_id !== session.user_id) {
+        throw new Error("Organization access context mismatch.");
+      }
+      setState({ contextKey, access, status: "ready", error: null });
+    }).catch((error: unknown) => {
+      if (epoch !== requestEpoch.current) return;
+      setState({
+        contextKey,
+        access: null,
+        status: "error",
+        error: cloudMessage(
+          "organization-load-failed",
+          undefined,
+          error instanceof Error ? error.message : undefined,
+        ),
+      });
+    });
+    return () => {
+      if (epoch === requestEpoch.current) requestEpoch.current += 1;
+    };
+  }, [apiBaseUrl, contextKey, onSessionChange, organizationId, reloadRevision, session]);
+
+  const refresh = useCallback(() => {
+    setReloadRevision((revision) => revision + 1);
+  }, []);
+
+  return { ...effectiveState, loading: effectiveState.status === "loading", refresh };
 }
 
 export function CloudOrganizationSelector({
@@ -412,6 +483,16 @@ function createCloudOrganizationContextKey(
   ].join("\u001f");
 }
 
+export function createCloudOrganizationPreferenceKey(
+  session: DesktopCloudSession,
+  apiBaseUrl: string | null,
+): string {
+  return [
+    session.user_id,
+    normalizeApiIdentity(apiBaseUrl ?? session.api_base_url),
+  ].join("\u001f");
+}
+
 function normalizeApiIdentity(value: string): string {
   const trimmed = value.trim().replace(/\/+$/, "");
   try {
@@ -422,21 +503,21 @@ function normalizeApiIdentity(value: string): string {
   }
 }
 
-function organizationSelectionStorageKey(contextKey: string): string {
-  return `puppyone.cloud.organization-selection.v1:${encodeURIComponent(contextKey)}`;
+function organizationSelectionStorageKey(preferenceKey: string): string {
+  return `puppyone.cloud.organization-selection.v2:${encodeURIComponent(preferenceKey)}`;
 }
 
-function readOrganizationSelection(contextKey: string): string | null {
+function readOrganizationSelection(preferenceKey: string): string | null {
   try {
-    return window.localStorage.getItem(organizationSelectionStorageKey(contextKey));
+    return window.localStorage.getItem(organizationSelectionStorageKey(preferenceKey));
   } catch {
     return null;
   }
 }
 
-function writeOrganizationSelection(contextKey: string, organizationId: string): void {
+function writeOrganizationSelection(preferenceKey: string, organizationId: string): void {
   try {
-    window.localStorage.setItem(organizationSelectionStorageKey(contextKey), organizationId);
+    window.localStorage.setItem(organizationSelectionStorageKey(preferenceKey), organizationId);
   } catch {
     // Selection remains valid in memory when durable browser storage is unavailable.
   }

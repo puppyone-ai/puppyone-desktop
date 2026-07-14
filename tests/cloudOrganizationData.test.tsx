@@ -131,7 +131,10 @@ describe("useCloudOrganizationData", () => {
   it("requires an explicit choice for multiple organizations and loads only the selected one", async () => {
     api.listCloudOrganizations.mockResolvedValueOnce(organizations);
 
-    await act(async () => root?.render(<Probe />));
+    await act(async () => root?.render(<Probe session={{
+      ...baseSession,
+      session_generation: "generation-after-restart",
+    }} />));
     await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-status"))
       .toBe("selection-required"));
 
@@ -156,6 +159,28 @@ describe("useCloudOrganizationData", () => {
     await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-organization"))
       .toBe("org-b"));
     expect(container.firstElementChild?.getAttribute("data-status")).toBe("ready");
+  });
+
+  it("does not reuse an organization preference on another Cloud host", async () => {
+    api.listCloudOrganizations.mockResolvedValueOnce(organizations);
+    await act(async () => root?.render(<Probe />));
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-status"))
+      .toBe("selection-required"));
+    await act(async () => container.querySelector<HTMLButtonElement>("button")?.click());
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-organization"))
+      .toBe("org-b"));
+
+    act(() => root?.unmount());
+    api.listCloudOrganizations.mockResolvedValueOnce(organizations);
+    root = createRoot(container);
+    await act(async () => root?.render(<Probe session={{
+      ...baseSession,
+      api_base_url: "https://other-cloud.example/api/v1",
+      session_generation: "generation-other-host",
+    }} />));
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-status"))
+      .toBe("selection-required"));
+    expect(container.firstElementChild?.getAttribute("data-organization")).toBe("");
   });
 
   it("keeps a member read failure distinct from a successful non-owner result", async () => {

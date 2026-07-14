@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import type {
   DesktopBillingOperation,
@@ -11,20 +11,22 @@ import {
   type SessionChangeHandler,
 } from "./cloudBillingApi";
 import {
-  BILLING_POLL_INTERVAL_MS,
-  BILLING_POLL_TIMEOUT_MS,
+  BILLING_POLL_BACKOFF_MS,
   actionableSeatOperation as findActionableSeatOperation,
+  assertOperationMatchesQuote,
+  assertQuoteNotExpired,
   assertQuoteOrganization,
+  assertReturnedQuoteMatches,
   billingReducer,
   clampBillingSeats,
   createCloudBillingContextKey,
   createInitialBillingState,
   pendingBillingOperations,
+  resumableBillingOperation as findResumableBillingOperation,
 } from "./cloudBillingState";
 
 export {
-  BILLING_POLL_INTERVAL_MS,
-  BILLING_POLL_TIMEOUT_MS,
+  BILLING_POLL_BACKOFF_MS,
   createCloudBillingContextKey,
 } from "./cloudBillingState";
 export type { CloudBillingControllerDependencies } from "./cloudBillingApi";
@@ -71,9 +73,6 @@ export function useCloudBillingController(
   const trailingRefreshContextRef = useRef<string | null>(null);
   const runLoadRef = useRef<() => Promise<void>>(async () => undefined);
   const idempotencyKeysRef = useRef(new Map<string, string>());
-
-  currentContextRef.current = contextKey;
-  currentEnabledRef.current = enabled;
 
   const isCurrentContext = useCallback((capturedContextKey: string) => (
     currentContextRef.current === capturedContextKey && currentEnabledRef.current
@@ -157,7 +156,11 @@ export function useCloudBillingController(
     session,
     t,
   ]);
-  runLoadRef.current = runLoad;
+  useLayoutEffect(() => {
+    currentContextRef.current = contextKey;
+    currentEnabledRef.current = enabled;
+    runLoadRef.current = runLoad;
+  }, [contextKey, enabled, runLoad]);
 
   useEffect(() => {
     currentEnabledRef.current = enabled;
@@ -178,21 +181,100 @@ export function useCloudBillingController(
 
   useEffect(() => {
     const polling = state.polling;
-    if (!polling) return;
-    const timer = window.setInterval(() => {
-      if (currentContextRef.current !== contextKey) return;
-      if (dependencies.now() >= polling.until) {
-        dispatch({
-          type: "pollExpired",
-          contextKey,
-          error: t("cloud.billing.confirmationTimeout"),
-        });
-        return;
+    const capturedOrganizationId = organizationId;
+    if (!polling || !enabled || !capturedOrganizationId) return;
+    let canceled = false;
+    let inFlight = false;
+    let attempt = 0;
+    let timer: number | null = null;
+
+    const schedule = (delay: number) => {
+      if (canceled) return;
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => void poll(), delay);
+    };
+    const poll = async () => {
+      if (canceled || inFlight || !isCurrentContext(contextKey)) return;
+      inFlight = true;
+      try {
+        const operation = await dependencies.getOperation(
+          session,
+          capturedOrganizationId,
+          polling.operationId,
+          onSessionChange,
+          apiBaseUrl,
+        );
+        if (canceled || !isCurrentContext(contextKey)) return;
+        if (operation.org_id !== capturedOrganizationId
+          || operation.id !== polling.operationId) {
+          dispatch({
+            type: "operationWatchFailed",
+            contextKey,
+            error: t("cloud.billing.organizationMismatch"),
+          });
+          return;
+        }
+        dispatch({ type: "operationUpdated", contextKey, operation });
+        if (operation.terminal) {
+          if (operation.state !== "succeeded") {
+            dispatch({
+              type: "operationWatchFailed",
+              contextKey,
+              error: operation.error_code || t("cloud.billing.changeFailed"),
+            });
+          }
+          void runLoadRef.current();
+          return;
+        }
+        attempt += 1;
+        schedule(BILLING_POLL_BACKOFF_MS[
+          Math.min(attempt, BILLING_POLL_BACKOFF_MS.length - 1)
+        ]);
+      } catch (error) {
+        if (canceled || !isCurrentContext(contextKey)) return;
+        const status = error instanceof Error
+          ? (error as Error & { status?: number }).status
+          : undefined;
+        if (status === 401 || status === 403 || status === 404) {
+          dispatch({
+            type: "operationWatchFailed",
+            contextKey,
+            error: error instanceof Error ? error.message : t("cloud.billing.loadFailed"),
+          });
+          return;
+        }
+        attempt += 1;
+        schedule(BILLING_POLL_BACKOFF_MS[
+          Math.min(attempt, BILLING_POLL_BACKOFF_MS.length - 1)
+        ]);
+      } finally {
+        inFlight = false;
       }
-      void runLoadRef.current();
-    }, BILLING_POLL_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [contextKey, dependencies, state.polling, t]);
+    };
+    const handleFocus = () => {
+      attempt = 0;
+      schedule(0);
+    };
+
+    window.addEventListener("focus", handleFocus);
+    schedule(BILLING_POLL_BACKOFF_MS[0]);
+    return () => {
+      canceled = true;
+      if (timer !== null) window.clearTimeout(timer);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [
+    apiBaseUrl,
+    contextKey,
+    dependencies,
+    enabled,
+    isCurrentContext,
+    onSessionChange,
+    organizationId,
+    session,
+    state.polling,
+    t,
+  ]);
 
   const idempotencyKeyFor = useCallback((
     capturedContextKey: string,
@@ -283,6 +365,26 @@ export function useCloudBillingController(
     () => findActionableSeatOperation(pendingOperations),
     [pendingOperations],
   );
+  const resumableOperation = useMemo(
+    () => findResumableBillingOperation(state.operations),
+    [state.operations],
+  );
+
+  useEffect(() => {
+    // A permanent watch failure (authorization, not-found, or a context
+    // mismatch) must stay stopped until the user explicitly refreshes. Without
+    // this guard the resumable operation selector would immediately recreate
+    // the same failed watch forever.
+    if (!enabled || state.polling || state.actionError || !resumableOperation) return;
+    dispatch({
+      type: "operationWatchStarted",
+      contextKey,
+      polling: {
+        id: `${contextKey}:${resumableOperation.id}`,
+        operationId: resumableOperation.id,
+      },
+    });
+  }, [contextKey, enabled, resumableOperation, state.actionError, state.polling]);
 
   const quoteSeats = useCallback(async (
     requestedOperation: DesktopBillingOperation | null = null,
@@ -366,6 +468,8 @@ export function useCloudBillingController(
     );
     dispatch({ type: "actionStarted", contextKey: capturedContextKey, action: "confirm" });
     try {
+      assertQuoteNotExpired(capturedQuote, dependencies.now(), t);
+      let operation: DesktopBillingOperation;
       if (capturedQuote.application_mode === "checkout") {
         const checkout = await dependencies.createCheckout(
           session,
@@ -374,13 +478,27 @@ export function useCloudBillingController(
             planId: capturedQuote.target_plan_id,
             seatQuantity: capturedQuote.target_seats,
             quoteId: capturedQuote.quote_id,
+            operationId: capturedOperationId,
           },
           mutationKey,
           onSessionChange,
           apiBaseUrl,
         );
         if (!isCurrentAction(capturedContextKey, capturedActionEpoch)) return;
-        assertQuoteOrganization(checkout.quote, capturedOrganizationId, t);
+        assertReturnedQuoteMatches(
+          checkout.quote,
+          capturedQuote,
+          capturedOrganizationId,
+          t,
+        );
+        assertOperationMatchesQuote(
+          checkout.operation,
+          capturedQuote,
+          capturedOrganizationId,
+          t,
+          capturedOperationId,
+        );
+        operation = checkout.operation;
         await dependencies.openExternalUrl(checkout.checkout_url);
       } else if (capturedQuote.application_mode === "seat_change") {
         const appliedQuote = await dependencies.applySeatChange(
@@ -393,7 +511,20 @@ export function useCloudBillingController(
           apiBaseUrl,
         );
         if (!isCurrentAction(capturedContextKey, capturedActionEpoch)) return;
-        assertQuoteOrganization(appliedQuote, capturedOrganizationId, t);
+        assertReturnedQuoteMatches(
+          appliedQuote,
+          capturedQuote,
+          capturedOrganizationId,
+          t,
+        );
+        assertOperationMatchesQuote(
+          appliedQuote.operation,
+          capturedQuote,
+          capturedOrganizationId,
+          t,
+          capturedOperationId,
+        );
+        operation = appliedQuote.operation;
       } else {
         const appliedQuote = await dependencies.applyPlanChange(
           session,
@@ -404,21 +535,29 @@ export function useCloudBillingController(
           apiBaseUrl,
         );
         if (!isCurrentAction(capturedContextKey, capturedActionEpoch)) return;
-        assertQuoteOrganization(appliedQuote, capturedOrganizationId, t);
+        assertReturnedQuoteMatches(
+          appliedQuote,
+          capturedQuote,
+          capturedOrganizationId,
+          t,
+        );
+        assertOperationMatchesQuote(
+          appliedQuote.operation,
+          capturedQuote,
+          capturedOrganizationId,
+          t,
+          capturedOperationId,
+        );
+        operation = appliedQuote.operation;
       }
       if (!isCurrentAction(capturedContextKey, capturedActionEpoch)) return;
       clearIdempotencyKey(capturedContextKey, intent);
-      const startedAt = dependencies.now();
       dispatch({
         type: "mutationSucceeded",
         contextKey: capturedContextKey,
-        polling: {
-          id: `${capturedContextKey}:${capturedQuote.quote_id}:${startedAt}`,
-          until: startedAt + BILLING_POLL_TIMEOUT_MS,
-          baselineSourceRevision: capturedSummary.source_revision,
-          expectedPlanId: capturedQuote.target_plan_id,
-          expectedSeatQuantity: capturedQuote.target_seats,
-          operationId: capturedOperationId,
+        polling: operation.terminal ? null : {
+          id: `${capturedContextKey}:${operation.id}`,
+          operationId: operation.id,
         },
       });
       if (isCurrentContext(capturedContextKey)) void runLoadRef.current();

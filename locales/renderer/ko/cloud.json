@@ -269,6 +269,7 @@
   "billing.ownerRequired": "조직 소유자만 청구를 보고 변경할 수 있습니다.",
   "billing.ownerRequiredDetail": "소유자에게 요금제, 사용량, 견적 및 청구 포털 검토를 요청하세요.",
   "billing.quoteFailed": "견적을 만들 수 없습니다.",
+  "billing.quoteExpired": "이 견적은 만료되었습니다. 계속하기 전에 새 견적을 요청하세요.",
   "billing.changeFailed": "청구 변경을 제출할 수 없습니다.",
   "billing.portalFailed": "청구 포털을 열 수 없습니다.",
   "billing.waitingForAuthority": "검증된 청구 확인 대기 중",

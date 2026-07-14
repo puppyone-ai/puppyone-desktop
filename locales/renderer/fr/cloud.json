@@ -248,6 +248,7 @@
   "billing.ownerRequired": "Seul le propriétaire de l’organisation peut consulter et modifier la facturation.",
   "billing.ownerRequiredDetail": "Demandez au propriétaire de vérifier les offres, l’utilisation, les devis et le portail de facturation.",
   "billing.quoteFailed": "Impossible de créer le devis.",
+  "billing.quoteExpired": "Ce devis a expiré. Demandez-en un nouveau avant de continuer.",
   "billing.changeFailed": "Impossible d’envoyer la modification de facturation.",
   "billing.portalFailed": "Impossible d’ouvrir le portail de facturation.",
   "billing.waitingForAuthority": "En attente de la confirmation de facturation vérifiée",

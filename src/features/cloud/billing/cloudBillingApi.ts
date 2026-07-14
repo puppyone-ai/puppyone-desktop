@@ -5,6 +5,7 @@ import {
   createCloudBillingPortal,
   createDesktopBillingIdempotencyKey,
   getCloudBillingCatalog,
+  getCloudBillingOperation,
   getCloudBillingSummary,
   getCloudBillingUsage,
   listCloudBillingOperations,
@@ -45,6 +46,13 @@ export type CloudBillingControllerDependencies = {
     onSessionChange?: SessionChangeHandler,
     apiBaseUrl?: string | null,
   ) => Promise<DesktopBillingOperation[]>;
+  getOperation: (
+    session: DesktopCloudSession,
+    orgId: string,
+    operationId: string,
+    onSessionChange?: SessionChangeHandler,
+    apiBaseUrl?: string | null,
+  ) => Promise<DesktopBillingOperation>;
   quotePlan: (
     session: DesktopCloudSession,
     orgId: string,
@@ -77,6 +85,7 @@ export const DEFAULT_CLOUD_BILLING_DEPENDENCIES: CloudBillingControllerDependenc
   getSummary: getCloudBillingSummary,
   getUsage: getCloudBillingUsage,
   listOperations: listCloudBillingOperations,
+  getOperation: getCloudBillingOperation,
   quotePlan: quoteCloudBillingPlan,
   quoteSeats: quoteCloudBillingSeats,
   createCheckout: createCloudBillingCheckout,

@@ -241,6 +241,13 @@ export type DesktopCloudOrganizationSeatUsage = {
   billable_seat_quantity: number;
 };
 
+export type DesktopCloudOrganizationAccess = {
+  org_id: string;
+  user_id: string;
+  role: string;
+  can_manage_billing: boolean;
+};
+
 export type DesktopBillingSeatPolicy = {
   minimum: number;
   retention_minimum?: number | null;
@@ -301,7 +308,15 @@ export type DesktopBillingCatalog = {
 export type DesktopBillingSummary = {
   org_id: string;
   plan_id: string;
-  status: string;
+  status:
+    | "free"
+    | "checkout_pending"
+    | "active"
+    | "change_pending"
+    | "cancel_scheduled"
+    | "past_due"
+    | "revoked"
+    | "disputed";
   seat_quantity: number;
   pending_plan_id: string | null;
   cancel_at_period_end: boolean;
@@ -341,7 +356,7 @@ export type DesktopBillingUsage = {
 export type DesktopBillingQuote = {
   quote_id: string;
   org_id: string;
-  kind: string;
+  kind: "checkout" | "plan" | "seats";
   current_plan_id: string;
   target_plan_id: string;
   current_seats: number;
@@ -361,19 +376,48 @@ export type DesktopBillingCheckout = {
   checkout_id: string;
   checkout_url: string;
   quote: DesktopBillingQuote;
+  operation: DesktopBillingOperation;
 };
+
+export type DesktopBillingOperationKind =
+  | "checkout"
+  | "seat_increase"
+  | "seat_decrease"
+  | "plan_change"
+  | "member_activation"
+  | "member_deactivation"
+  | "entitlement_provision";
+
+export type DesktopBillingOperationState =
+  | "pending"
+  | "requires_action"
+  | "processing"
+  | "retryable_failed"
+  | "succeeded"
+  | "canceled"
+  | "failed";
 
 export type DesktopBillingOperation = {
   id: string;
   org_id: string;
-  kind: string;
-  status: string;
-  target_seat_quantity?: number | null;
-  quote_id?: string | null;
-  last_error?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  [key: string]: unknown;
+  kind: DesktopBillingOperationKind;
+  state: DesktopBillingOperationState;
+  terminal: boolean;
+  retryable: boolean;
+  action_required: boolean;
+  target_plan_id: string | null;
+  current_seat_quantity: number | null;
+  target_seat_quantity: number | null;
+  quote_id: string | null;
+  confirmed_revision: number | null;
+  error_code: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
+};
+
+export type DesktopBillingAppliedQuote = DesktopBillingQuote & {
+  operation: DesktopBillingOperation;
 };
 
 export type DesktopCloudDashboard = {
@@ -1004,6 +1048,38 @@ export function getCloudOrganizationSeatUsage(
   ).then(validateDesktopCloudOrganizationSeatUsage);
 }
 
+export function getCloudOrganizationAccess(
+  session: DesktopCloudSession,
+  orgId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudOrganizationAccess> {
+  return cloudApiRequest<unknown>(
+    `/organizations/${encodeURIComponent(orgId)}/access`,
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  ).then(validateDesktopCloudOrganizationAccess);
+}
+
+export function validateDesktopCloudOrganizationAccess(
+  value: unknown,
+): DesktopCloudOrganizationAccess {
+  if (!isRecord(value)
+    || typeof value.org_id !== "string"
+    || !value.org_id
+    || typeof value.user_id !== "string"
+    || !value.user_id
+    || typeof value.role !== "string"
+    || !value.role.trim()
+    || typeof value.can_manage_billing !== "boolean"
+    || value.can_manage_billing !== (value.role === "owner")) {
+    throw new Error("Invalid organization access response.");
+  }
+  return value as DesktopCloudOrganizationAccess;
+}
+
 export function validateDesktopCloudOrganizationSeatUsage(
   value: unknown,
 ): DesktopCloudOrganizationSeatUsage {
@@ -1172,6 +1248,25 @@ function requireBillingString(value: unknown, label: string): string {
   return value;
 }
 
+function requireBillingEnum<T extends string>(
+  value: unknown,
+  values: readonly T[],
+  label: string,
+): T {
+  if (typeof value !== "string" || !values.includes(value as T)) {
+    throw new Error(`Cloud returned an invalid billing ${label}.`);
+  }
+  return value as T;
+}
+
+function requireBillingTimestamp(value: unknown, label: string): string {
+  const timestamp = requireBillingString(value, label);
+  if (!Number.isFinite(Date.parse(timestamp))) {
+    throw new Error(`Cloud returned an invalid billing ${label}.`);
+  }
+  return timestamp;
+}
+
 function requireBillingStringArray(value: unknown, label: string): string[] {
   if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.trim())) {
     throw new Error(`Cloud returned an invalid billing ${label}.`);
@@ -1244,7 +1339,16 @@ export function validateDesktopBillingSummary(value: unknown): DesktopBillingSum
   const summary = requireBillingRecord(value, "summary");
   requireBillingString(summary.org_id, "summary.org_id");
   requireBillingString(summary.plan_id, "summary.plan_id");
-  requireBillingString(summary.status, "summary.status");
+  requireBillingEnum(summary.status, [
+    "free",
+    "checkout_pending",
+    "active",
+    "change_pending",
+    "cancel_scheduled",
+    "past_due",
+    "revoked",
+    "disputed",
+  ] as const, "summary.status");
   requireBillingString(summary.catalog_version, "summary.catalog_version");
   requireBillingInteger(summary.seat_quantity, "summary.seat_quantity", 0);
   requireBillingInteger(summary.source_revision, "summary.source_revision", 1);
@@ -1253,13 +1357,14 @@ export function validateDesktopBillingSummary(value: unknown): DesktopBillingSum
   requireBillingInteger(summary.runtime_available_units, "summary.runtime_available_units", 0);
   requireBillingInteger(summary.runtime_reserved_units, "summary.runtime_reserved_units", 0);
   requireBillingBoolean(summary.runtime_overage_enabled, "summary.runtime_overage_enabled");
+  requireBillingBoolean(summary.cancel_at_period_end, "summary.cancel_at_period_end");
   requireBillingInteger(
     summary.runtime_monthly_limit_cents,
     "summary.runtime_monthly_limit_cents",
     0,
   );
   requireBillingOptionalString(summary.pending_plan_id, "summary.pending_plan_id");
-  requireBillingOptionalString(summary.current_period_end, "summary.current_period_end");
+  requireBillingOptionalTimestamp(summary.current_period_end, "summary.current_period_end");
   return summary as unknown as DesktopBillingSummary;
 }
 
@@ -1268,16 +1373,21 @@ function requireBillingOptionalString(value: unknown, label: string): string | n
   return requireBillingString(value, label);
 }
 
+function requireBillingOptionalTimestamp(value: unknown, label: string): string | null {
+  if (value === null) return null;
+  return requireBillingTimestamp(value, label);
+}
+
 export function validateDesktopBillingQuote(value: unknown): DesktopBillingQuote {
   const quote = requireBillingRecord(value, "quote");
   requireBillingString(quote.quote_id, "quote.quote_id");
   requireBillingString(quote.org_id, "quote.org_id");
-  requireBillingString(quote.kind, "quote.kind");
+  requireBillingEnum(quote.kind, ["checkout", "plan", "seats"] as const, "quote.kind");
   requireBillingString(quote.current_plan_id, "quote.current_plan_id");
   requireBillingString(quote.target_plan_id, "quote.target_plan_id");
   requireBillingString(quote.currency, "quote.currency");
   requireBillingString(quote.catalog_version, "quote.catalog_version");
-  requireBillingString(quote.expires_at, "quote.expires_at");
+  requireBillingTimestamp(quote.expires_at, "quote.expires_at");
   requireBillingInteger(quote.current_seats, "quote.current_seats", 0);
   requireBillingInteger(quote.target_seats, "quote.target_seats", 1);
   requireBillingInteger(quote.current_amount_cents, "quote.current_amount_cents", 0);
@@ -1376,26 +1486,105 @@ export function listCloudBillingOperations(
   ).then(validateDesktopBillingOperations);
 }
 
+export function getCloudBillingOperation(
+  session: DesktopCloudSession,
+  orgId: string,
+  operationId: string,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopBillingOperation> {
+  return cloudApiRequest<unknown>(
+    billingOrganizationPath(orgId, `operations/${encodeURIComponent(operationId)}`),
+    session,
+    onSessionChange,
+    {},
+    apiBaseUrl,
+  ).then(validateDesktopBillingOperation);
+}
+
 export function validateDesktopBillingOperations(value: unknown): DesktopBillingOperation[] {
   if (!Array.isArray(value)) {
     throw new Error("Cloud returned invalid billing operations.");
   }
-  for (const rawOperation of value) {
-    const operation = requireBillingRecord(rawOperation, "operation");
-    requireBillingString(operation.id, "operation.id");
-    requireBillingString(operation.org_id, "operation.org_id");
-    requireBillingString(operation.kind, "operation.kind");
-    requireBillingString(operation.status, "operation.status");
-    if (operation.target_seat_quantity !== null
-      && operation.target_seat_quantity !== undefined) {
-      requireBillingInteger(
-        operation.target_seat_quantity,
-        "operation.target_seat_quantity",
-        1,
-      );
+  for (const rawOperation of value) validateDesktopBillingOperation(rawOperation);
+  return value as DesktopBillingOperation[];
+}
+
+export function validateDesktopBillingOperation(value: unknown): DesktopBillingOperation {
+  const operation = requireBillingRecord(value, "operation");
+  requireBillingString(operation.id, "operation.id");
+  requireBillingString(operation.org_id, "operation.org_id");
+  requireBillingEnum(operation.kind, [
+    "checkout",
+    "seat_increase",
+    "seat_decrease",
+    "plan_change",
+    "member_activation",
+    "member_deactivation",
+    "entitlement_provision",
+  ] as const, "operation.kind");
+  const state = requireBillingEnum(operation.state, [
+    "pending",
+    "requires_action",
+    "processing",
+    "retryable_failed",
+    "succeeded",
+    "canceled",
+    "failed",
+  ] as const, "operation.state");
+  const terminal = requireBillingBoolean(operation.terminal, "operation.terminal");
+  const retryable = requireBillingBoolean(operation.retryable, "operation.retryable");
+  const actionRequired = requireBillingBoolean(
+    operation.action_required,
+    "operation.action_required",
+  );
+  const lifecycle = {
+    pending: [false, true, false],
+    requires_action: [false, false, true],
+    processing: [false, true, false],
+    retryable_failed: [false, true, false],
+    succeeded: [true, false, false],
+    canceled: [true, false, false],
+    failed: [true, false, false],
+  } satisfies Record<DesktopBillingOperationState, [boolean, boolean, boolean]>;
+  const expected = lifecycle[state];
+  if (terminal !== expected[0] || retryable !== expected[1] || actionRequired !== expected[2]) {
+    throw new Error("Cloud returned inconsistent billing operation lifecycle flags.");
+  }
+  if (state === "retryable_failed" && operation.kind !== "entitlement_provision") {
+    throw new Error("Cloud returned an inconsistent retryable billing operation.");
+  }
+  requireBillingOptionalString(operation.target_plan_id, "operation.target_plan_id");
+  requireBillingOptionalString(operation.quote_id, "operation.quote_id");
+  requireBillingOptionalString(operation.error_code, "operation.error_code");
+  for (const [field, minimum] of [
+    ["current_seat_quantity", 0],
+    ["target_seat_quantity", 1],
+    ["confirmed_revision", 1],
+  ] as const) {
+    const fieldValue = operation[field];
+    if (fieldValue !== null) {
+      requireBillingInteger(fieldValue, `operation.${field}`, minimum);
     }
   }
-  return value as DesktopBillingOperation[];
+  for (const field of ["created_at", "updated_at", "completed_at"] as const) {
+    requireBillingOptionalTimestamp(operation[field], `operation.${field}`);
+  }
+  if (state === "succeeded"
+    && (operation.confirmed_revision === null || operation.completed_at === null)) {
+    throw new Error("Cloud returned an incomplete succeeded billing operation.");
+  }
+  if (["checkout", "plan_change", "seat_increase", "seat_decrease"].includes(
+    String(operation.kind),
+  ) && (
+    operation.target_plan_id === null
+    || operation.current_seat_quantity === null
+    || operation.target_seat_quantity === null
+    || operation.quote_id === null
+  )) {
+    throw new Error("Cloud returned an incomplete commercial billing operation.");
+  }
+  return value as DesktopBillingOperation;
 }
 
 export function quoteCloudBillingPlan(
@@ -1448,7 +1637,12 @@ export function quoteCloudBillingSeats(
 export function createCloudBillingCheckout(
   session: DesktopCloudSession,
   orgId: string,
-  values: { planId: string; seatQuantity: number; quoteId?: string | null },
+  values: {
+    planId: string;
+    seatQuantity: number;
+    quoteId?: string | null;
+    operationId?: string | null;
+  },
   idempotencyKey: string,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
@@ -1461,6 +1655,7 @@ export function createCloudBillingCheckout(
       plan_id: values.planId,
       seat_quantity: values.seatQuantity,
       ...(values.quoteId ? { quote_id: values.quoteId } : {}),
+      ...(values.operationId ? { operation_id: values.operationId } : {}),
     }),
     apiBaseUrl,
   ).then(validateDesktopBillingCheckout);
@@ -1471,6 +1666,7 @@ export function validateDesktopBillingCheckout(value: unknown): DesktopBillingCh
   requireBillingString(checkout.checkout_id, "checkout.checkout_id");
   requireBillingString(checkout.checkout_url, "checkout.checkout_url");
   validateDesktopBillingQuote(checkout.quote);
+  validateDesktopBillingOperation(checkout.operation);
   return checkout as unknown as DesktopBillingCheckout;
 }
 
@@ -1481,14 +1677,14 @@ export function applyCloudBillingPlanChange(
   idempotencyKey: string,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
-): Promise<DesktopBillingQuote> {
+): Promise<DesktopBillingAppliedQuote> {
   return cloudApiRequest<unknown>(
     billingOrganizationPath(orgId, "plan/change"),
     session,
     onSessionChange,
     billingMutationInit("POST", idempotencyKey, { quote_id: quoteId }),
     apiBaseUrl,
-  ).then(validateDesktopBillingQuote);
+  ).then(validateDesktopBillingAppliedQuote);
 }
 
 export function applyCloudBillingSeatChange(
@@ -1499,7 +1695,7 @@ export function applyCloudBillingSeatChange(
   operationId?: string | null,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
-): Promise<DesktopBillingQuote> {
+): Promise<DesktopBillingAppliedQuote> {
   return cloudApiRequest<unknown>(
     billingOrganizationPath(orgId, "seats/change"),
     session,
@@ -1509,7 +1705,14 @@ export function applyCloudBillingSeatChange(
       ...(operationId ? { operation_id: operationId } : {}),
     }),
     apiBaseUrl,
-  ).then(validateDesktopBillingQuote);
+  ).then(validateDesktopBillingAppliedQuote);
+}
+
+export function validateDesktopBillingAppliedQuote(value: unknown): DesktopBillingAppliedQuote {
+  const applied = requireBillingRecord(value, "applied quote");
+  validateDesktopBillingQuote(applied);
+  validateDesktopBillingOperation(applied.operation);
+  return value as DesktopBillingAppliedQuote;
 }
 
 export function createCloudBillingPortal(

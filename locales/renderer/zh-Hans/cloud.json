@@ -269,6 +269,7 @@
   "billing.ownerRequired": "只有组织所有者可以查看和更改账单。",
   "billing.ownerRequiredDetail": "请让组织所有者查看套餐、用量、报价和账单门户。",
   "billing.quoteFailed": "无法创建报价。",
+  "billing.quoteExpired": "此报价已过期，请重新获取报价后再继续。",
   "billing.changeFailed": "无法提交计费变更。",
   "billing.portalFailed": "无法打开账单门户。",
   "billing.waitingForAuthority": "正在等待已验证的计费确认",
