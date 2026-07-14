@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { buildCodexTurnInput } from "./codex-reference-input.mjs";
 import { JsonlRpcConnection } from "../../transports/jsonl-rpc-connection.mjs";
 import { boundRendererValue, redactSecrets, redactSecretText } from "../../agent-events.mjs";
-
+export { buildCodexTurnInput } from "./codex-reference-input.mjs";
 const CODEX_REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
 
 export const CODEX_CAPABILITIES = Object.freeze({
@@ -15,8 +16,8 @@ export const CODEX_CAPABILITIES = Object.freeze({
   fork: false,
   steer: false,
   queue: false,
-  attachments: false,
-  contextReferences: false,
+  attachments: true,
+  contextReferences: true,
   modelSelection: true,
   modeSelection: false,
   slashCommands: false,
@@ -26,6 +27,18 @@ export const CODEX_CAPABILITIES = Object.freeze({
   mcp: false,
   skills: false,
   compaction: false,
+  referenceInputs: Object.freeze({
+    workspaceFiles: true,
+    workspaceDirectories: true,
+    images: "local-snapshot",
+    genericFiles: "none",
+    acceptedMimeTypes: Object.freeze(["image/png", "image/jpeg", "image/gif", "image/webp"]),
+    maxReferences: 32,
+    maxReferenceBytes: 25 * 1024 * 1024,
+    maxTotalReferenceBytes: 25 * 1024 * 1024,
+    steer: false,
+    attachmentOnly: false,
+  }),
 });
 
 export class CodexAppServerAdapter {
@@ -184,14 +197,17 @@ export class CodexAppServerAdapter {
     return normalizeHistoricalThread(await this.readThread());
   }
 
-  async startTurn({ prompt, model = null }) {
+  async startTurn({ prompt, model = null, references = [], attachments = [], contextReferences = [] }) {
     if (!this.threadId) throw new Error("No Codex thread is active.");
     const clientUserMessageId = randomUUID();
     const effort = compatibleReasoningEffort(this.modelProfiles.get(model));
+    const input = buildCodexTurnInput(prompt, references.length > 0
+      ? references
+      : [...contextReferences, ...attachments]);
     const result = await this.connection.request("turn/start", {
       threadId: this.threadId,
       clientUserMessageId,
-      input: [{ type: "text", text: prompt, text_elements: [] }],
+      input,
       cwd: this.workspaceRoot,
       approvalPolicy: "on-request",
       ...(model ? { model } : {}),

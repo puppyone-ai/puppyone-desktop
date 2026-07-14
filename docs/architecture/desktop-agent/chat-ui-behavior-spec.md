@@ -1,11 +1,11 @@
 # Cursor-style Agent Chat UI behavior specification
 
 Status: the Cursor-style conversation document, compact work evidence and
-Agent-first selection contract are implemented. Composer reference ingestion
-is a normative target pending `ISSUE-404`; its UI rules below do not claim that
-Explorer/Finder/paste acquisition, external staging or committed reference
-replay is already complete. Multi-native capability work must preserve the
-native harness boundaries in ADR-005 and ADR-006.
+Agent-first selection contract are implemented. Composer reference ingestion,
+including Explorer/Finder/paste acquisition, external staging and committed
+reference replay, is implemented under the canonical reference contract.
+Multi-native capability work must preserve the native harness boundaries in
+ADR-005 and ADR-006.
 
 This specification turns the visual direction in [Right Sidebar Agent Chat](right-sidebar.md)
 into implementable rules. The pixel reference is the MIT-licensed frontend in

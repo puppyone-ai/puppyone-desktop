@@ -38,13 +38,11 @@ their own harness and native session.
   connected-provider discovery, readiness/account/model/mode states, virtual transcript streaming, safe
   Markdown, part/tool registries, plan/tool/command/file activity, permission
   and structured-question docks, `/` commands, Stop, live-gap warning, and
-  Jump to latest. Reference arrays/chips and workspace-only turn-start
-  authorization exist as partial infrastructure.
-- **Reference-ingestion gap:** the current Composer has no add/drop/paste/file
-  picker entry, Explorer outbound drag is coupled to move, external files have
-  no staged-token path, Codex reports references unsupported, and committed
-  user messages do not preserve reference displays. The target contract below
-  is pending `ISSUE-404`, not an implemented claim.
+  Jump to latest.
+- **Implemented reference ingestion:** Explorer/Finder/picker/paste share one
+  typed acquisition path; external files use main-owned immutable staging;
+  runtime capabilities gate exact native mappings; immutable submission
+  intents and committed/replayed user turns preserve sanitized reference chips.
 - **Implemented by capability:** native interruption, approvals/questions,
   compaction, queue/steer controls, and model/mode selection. PuppyOne does not
   expose or persist Chat History; unsupported controls are omitted.

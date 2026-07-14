@@ -1,4 +1,5 @@
-import { authorizeAgentReferences, createAgentReferenceBudget } from "../agent/agent-reference-authorization.mjs";
+import { randomUUID } from "node:crypto";
+import { authorizeAgentReferences, createAgentReferenceBudget, workspaceDraftReferences } from "../agent/agent-reference-authorization.mjs";
 import { assertAgentIpcResponse, parseAgentIpcRequest } from "../../../shared/agent-contract/schema.mjs";
 
 export function registerAgentIpcHandlers({
@@ -6,6 +7,9 @@ export function registerAgentIpcHandlers({
   agentService,
   localAgentInventory,
   authorizeWorkspaceRoot,
+  attachmentStore,
+  dialog,
+  getDialogOwnerWindow,
 }) {
   const register = (channel, handler) => {
     ipcMain.handle(channel, async (event, rawRequest) => {
@@ -59,9 +63,54 @@ export function registerAgentIpcHandlers({
   register("agent:session-close", async (event, request) => (
     agentService.closeSession(event.sender, request, await authorizeRequiredRoot(event, request))
   ));
-  register("agent:turn-steer", async (event, request) => (
-    agentService.steerTurn(event.sender, request, await authorizeRequiredRoot(event, request))
-  ));
+  register("agent:reference-stage", async (event, request) => {
+    const workspaceRoot = await authorizeRequiredRoot(event, request);
+    return attachmentStore.stage({
+      ownerId: event.sender.id,
+      workspaceRoot,
+      epoch: request.epoch,
+      sourcePaths: request.sourcePaths,
+    });
+  });
+  register("agent:reference-revoke", async (event, request) => {
+    const workspaceRoot = await authorizeRequiredRoot(event, request);
+    return attachmentStore.revoke({ ownerId: event.sender.id, workspaceRoot, tokens: request.tokens });
+  });
+  register("agent:reference-resolve-workspace", async (event, request) => {
+    const workspaceRoot = await authorizeRequiredRoot(event, request);
+    return workspaceDraftReferences(await authorizeAgentReferences({ workspaceRoot, references: request.paths }));
+  });
+  register("agent:reference-pick-workspace", async (event, request) => {
+    const workspaceRoot = await authorizeRequiredRoot(event, request);
+    const result = await dialog.showOpenDialog(getDialogOwnerWindow?.(event.sender), {
+      defaultPath: workspaceRoot,
+      properties: ["openFile", "openDirectory", "multiSelections"],
+    });
+    if (result.canceled || result.filePaths.length === 0) return [];
+    return workspaceDraftReferences(await authorizeAgentReferences({ workspaceRoot, references: result.filePaths }));
+  });
+  register("agent:turn-steer", async (event, request) => {
+    const workspaceRoot = await authorizeRequiredRoot(event, request);
+    const { authorized, stagedTokens } = await authorizeTurnReferences({
+      attachmentStore,
+      ownerId: event.sender.id,
+      workspaceRoot,
+      epoch: request.referenceEpoch,
+      references: request.references,
+    });
+    return withStagedReferenceLease({
+      attachmentStore,
+      ownerId: event.sender.id,
+      workspaceRoot,
+      epoch: request.referenceEpoch,
+      tokens: stagedTokens,
+      invoke: (privateReferenceLease) => agentService.steerTurn(event.sender, {
+        ...request,
+        ...(authorized.length > 0 ? { references: authorized } : {}),
+        ...(privateReferenceLease ? { privateReferenceLease } : {}),
+      }, workspaceRoot),
+    });
+  });
   register("agent:turn-interrupt", async (event, request) => (
     agentService.interruptTurn(event.sender, request, await authorizeRequiredRoot(event, request))
   ));
@@ -77,19 +126,65 @@ export function registerAgentIpcHandlers({
 
   register("agent:turn-start", async (event, request) => {
     const workspaceRoot = await authorizeRequiredRoot(event, request);
-    // Attachments and @ context share one memory/count budget. Authorize them
-    // sequentially so two 25 MB groups cannot be buffered at the same time.
-    const referenceBudget = createAgentReferenceBudget();
-    const attachments = await authorizeAgentReferences({
+    const legacyReferences = [
+      ...(Array.isArray(request.contextReferences) ? request.contextReferences : []),
+      ...(Array.isArray(request.attachments) ? request.attachments : []),
+    ].map((entry) => ({ ...entry, kind: "workspace-entry", entryType: "file" }));
+    const { authorized, stagedTokens } = await authorizeTurnReferences({
+      attachmentStore,
+      ownerId: event.sender.id,
       workspaceRoot,
-      references: request.attachments,
-      budget: referenceBudget,
+      epoch: request.referenceEpoch,
+      references: Array.isArray(request.references) ? request.references : legacyReferences,
     });
-    const contextReferences = await authorizeAgentReferences({
+    return withStagedReferenceLease({
+      attachmentStore,
+      ownerId: event.sender.id,
       workspaceRoot,
-      references: request.contextReferences,
-      budget: referenceBudget,
+      epoch: request.referenceEpoch,
+      tokens: stagedTokens,
+      invoke: (privateReferenceLease) => agentService.startTurn(event.sender, {
+        ...request,
+        references: authorized,
+        attachments: undefined,
+        contextReferences: undefined,
+        ...(privateReferenceLease ? { privateReferenceLease } : {}),
+      }, workspaceRoot),
     });
-    return agentService.startTurn(event.sender, { ...request, attachments, contextReferences }, workspaceRoot);
   });
+}
+
+async function withStagedReferenceLease({ attachmentStore, ownerId, workspaceRoot, epoch, tokens, invoke }) {
+  if (!Array.isArray(tokens) || tokens.length === 0) return invoke(null);
+  const leaseId = `lease-${randomUUID()}`;
+  await attachmentStore.lease({ ownerId, workspaceRoot, epoch, tokens, leaseId });
+  try {
+    return await invoke({ leaseId, tokens: [...tokens] });
+  } catch (error) {
+    await attachmentStore.releaseLease({ ownerId, workspaceRoot, tokens, leaseId }).catch(() => undefined);
+    throw error;
+  }
+}
+
+async function authorizeTurnReferences({ attachmentStore, ownerId, workspaceRoot, epoch, references }) {
+  const values = Array.isArray(references) ? references : [];
+  const budget = createAgentReferenceBudget();
+  const workspace = await authorizeAgentReferences({
+    workspaceRoot,
+    references: values.filter((entry) => entry?.kind !== "staged-attachment"),
+    budget,
+  });
+  const stagedDrafts = values.filter((entry) => entry?.kind === "staged-attachment");
+  if (stagedDrafts.length > budget.remainingReferences) {
+    throw new Error("Agent references exceed the 32-file safety limit.");
+  }
+  const staged = stagedDrafts.length > 0
+    ? await attachmentStore.authorize({ ownerId, workspaceRoot, epoch, references: stagedDrafts })
+    : [];
+  const stagedBytes = staged.reduce((total, entry) => total + (entry.size ?? 0), 0);
+  if (stagedBytes > budget.remainingBytes) throw new Error("Agent references exceed the 25 MB total safety limit.");
+  return {
+    authorized: [...workspace, ...staged],
+    stagedTokens: Array.from(new Set(stagedDrafts.map((entry) => entry.token))),
+  };
 }

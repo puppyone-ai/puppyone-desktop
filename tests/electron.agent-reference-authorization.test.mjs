@@ -17,27 +17,47 @@ describe("Agent attachment and context authorization", () => {
     const filename = path.join(root, "notes.md");
     await fs.promises.writeFile(filename, "hello");
     const result = await authorizeAgentReferences({ workspaceRoot: root, references: [{ path: filename }, filename] });
-    expect(result).toEqual([{
+    expect(result).toEqual([expect.objectContaining({
       authorized: true,
+      kind: "workspace-entry",
+      entryType: "file",
       path: await fs.promises.realpath(filename),
+      relativePath: "notes.md",
+      displayName: "notes.md",
       name: "notes.md",
       mime: "text/markdown",
       size: 5,
-      snapshotUrl: "data:text/markdown;base64,aGVsbG8=",
-    }]);
+      status: "ready",
+    })]);
+    expect(result[0]).not.toHaveProperty("snapshotUrl");
     expect(agentReferenceLimits.maxReferences).toBe(32);
     expect(agentReferenceLimits.maxTotalReferenceBytes).toBe(25 * 1024 * 1024);
   });
 
-  it("fails closed for relative paths and symlinks escaping the workspace", async () => {
+  it("resolves relative workspace paths but fails closed for symlinks escaping the workspace", async () => {
     const root = await temporaryRoot();
     const outside = await temporaryRoot();
     const secret = path.join(outside, "secret.txt");
     const link = path.join(root, "escape.txt");
     await fs.promises.writeFile(secret, "secret");
     await fs.promises.symlink(secret, link);
-    await expect(authorizeAgentReferences({ workspaceRoot: root, references: [{ path: "relative.txt" }] })).rejects.toThrow(/absolute/i);
+    await fs.promises.writeFile(path.join(root, "relative.txt"), "inside");
+    await expect(authorizeAgentReferences({ workspaceRoot: root, references: [{ path: "relative.txt" }] }))
+      .resolves.toEqual([expect.objectContaining({ relativePath: "relative.txt", entryType: "file" })]);
     await expect(authorizeAgentReferences({ workspaceRoot: root, references: [{ path: link }] })).rejects.toThrow(/inside the assigned workspace/i);
+  });
+
+  it("authorizes directory identity without recursively reading its contents", async () => {
+    const root = await temporaryRoot();
+    await fs.promises.mkdir(path.join(root, "src"));
+    await fs.promises.writeFile(path.join(root, "src", "secret.txt"), "not snapshotted");
+    const result = await authorizeAgentReferences({ workspaceRoot: root, references: ["src"] });
+    expect(result).toEqual([expect.objectContaining({
+      kind: "workspace-entry",
+      entryType: "directory",
+      relativePath: "src",
+      size: 0,
+    })]);
   });
 
   it("shares one byte and file-count budget across attachments and context", async () => {

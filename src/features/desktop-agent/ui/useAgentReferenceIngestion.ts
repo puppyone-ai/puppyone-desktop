@@ -1,0 +1,158 @@
+import { useCallback, useRef, useState } from "react";
+import type { ClipboardEvent, DragEvent } from "react";
+import {
+  classifyReferenceDataTransfer,
+  hasReferenceDataTransferSource,
+} from "@puppyone/shared-ui";
+import { useLocalization } from "@puppyone/localization/react";
+import type { AgentSessionController } from "../application/AgentSessionController";
+import type { AgentReferenceInputCapabilities } from "../domain/agent-contract";
+
+export function useAgentReferenceIngestion({
+  controller,
+  workspaceId,
+  capabilities,
+}: {
+  controller: AgentSessionController;
+  workspaceId: string;
+  capabilities?: AgentReferenceInputCapabilities;
+}) {
+  const { t } = useLocalization();
+  const dragDepth = useRef(0);
+  const [dropActive, setDropActive] = useState(false);
+  const [dropInvalid, setDropInvalid] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const announceBatchResult = useCallback((beforeIds: Set<string>, count: number) => {
+    const failed = controller.getSnapshot().references
+      .filter((reference) => reference.status === "error" && !beforeIds.has(reference.id)).length;
+    setAnnouncement(failed > 0
+      ? t("agent.reference.batchPartial", { count, failed })
+      : t("agent.reference.batchResult", { count }));
+  }, [controller, t]);
+
+  const onDragEnter = useCallback((event: DragEvent<HTMLElement>) => {
+    if (!hasReferenceDataTransferSource(event.dataTransfer)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current += 1;
+    setDropActive(true);
+    setDropInvalid(!canIngestDataTransfer(event.dataTransfer, workspaceId, capabilities));
+  }, [capabilities, workspaceId]);
+
+  const onDragOver = useCallback((event: DragEvent<HTMLElement>) => {
+    if (!hasReferenceDataTransferSource(event.dataTransfer)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const onDragLeave = useCallback((event: DragEvent<HTMLElement>) => {
+    if (!dropActive) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) {
+      setDropActive(false);
+      setDropInvalid(false);
+    }
+  }, [dropActive]);
+
+  const onDrop = useCallback((event: DragEvent<HTMLElement>) => {
+    if (!hasReferenceDataTransferSource(event.dataTransfer)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current = 0;
+    setDropActive(false);
+    setDropInvalid(false);
+    const beforeIds = new Set(controller.getSnapshot().references.map((reference) => reference.id));
+    void ingestDataTransfer(event.dataTransfer, workspaceId, controller).then((result) => {
+      setAnnouncement(result === "workspace-mismatch"
+        ? t("agent.reference.workspaceMismatch")
+        : "");
+      if (result !== "workspace-mismatch") announceBatchResult(beforeIds, result);
+    });
+  }, [announceBatchResult, controller, t, workspaceId]);
+
+  const onPaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const images = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
+    if (images.length === 0) return;
+    event.preventDefault();
+    const beforeIds = new Set(controller.getSnapshot().references.map((reference) => reference.id));
+    void controller.stageExternalFiles(images).then((count) => {
+      announceBatchResult(beforeIds, count);
+    });
+  }, [announceBatchResult, controller]);
+
+  const addExternalFiles = useCallback((files: File[]) => {
+    const beforeIds = new Set(controller.getSnapshot().references.map((reference) => reference.id));
+    void controller.stageExternalFiles(files).then((count) => {
+      announceBatchResult(beforeIds, count);
+    });
+  }, [announceBatchResult, controller]);
+
+  const pickWorkspaceReferences = useCallback(() => {
+    const beforeIds = new Set(controller.getSnapshot().references.map((reference) => reference.id));
+    void controller.pickWorkspaceReferences().then((count) => {
+      announceBatchResult(beforeIds, count);
+    });
+  }, [announceBatchResult, controller]);
+
+  return {
+    dropActive,
+    dropInvalid,
+    dropLabel: t(dropInvalid ? "agent.reference.dropUnsupported" : "agent.reference.dropLabel"),
+    announcement,
+    onDragEnter,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+    onPaste,
+    addExternalFiles,
+    pickWorkspaceReferences,
+  };
+}
+
+function canIngestDataTransfer(
+  dataTransfer: DataTransfer,
+  workspaceId: string,
+  capabilities: AgentReferenceInputCapabilities | undefined,
+) {
+  const source = classifyReferenceDataTransfer(dataTransfer);
+  if (source.kind === "text") return true;
+  if (source.kind === "none") {
+    const types = Array.from(dataTransfer.types ?? []);
+    if (types.includes("Files")) return Boolean(capabilities
+      && (capabilities.images !== "none" || capabilities.genericFiles !== "none"));
+    return true;
+  }
+  if (!capabilities) return false;
+  if (source.kind === "workspace-entries") {
+    if (source.workspaceId && source.workspaceId !== workspaceId) return false;
+    return source.entries.every((entry) => entry.entryType === "directory"
+      ? capabilities.workspaceDirectories
+      : capabilities.workspaceFiles);
+  }
+  if (source.files.length === 0) {
+    return capabilities.images !== "none" || capabilities.genericFiles !== "none";
+  }
+  return source.files.every((file) => {
+    const transport = file.type.startsWith("image/") ? capabilities.images : capabilities.genericFiles;
+    return transport !== "none"
+      && (!capabilities.acceptedMimeTypes?.length || capabilities.acceptedMimeTypes.includes(file.type));
+  });
+}
+
+async function ingestDataTransfer(
+  dataTransfer: DataTransfer,
+  workspaceId: string,
+  controller: AgentSessionController,
+): Promise<number | "workspace-mismatch"> {
+  const source = classifyReferenceDataTransfer(dataTransfer);
+  if (source.kind === "workspace-entries") {
+    if (source.workspaceId && source.workspaceId !== workspaceId) return "workspace-mismatch";
+    return controller.addWorkspacePaths(source.entries.map((entry) => entry.path));
+  }
+  if (source.kind === "files") return controller.stageExternalFiles(source.files);
+  if (source.kind === "text") return (await controller.addPathTextOrDraft(source.text)) ? 1 : 0;
+  return 0;
+}

@@ -42,6 +42,17 @@ export const OPENCODE_ACP_CAPABILITIES = Object.freeze({
   mcp: true,
   skills: true,
   compaction: false,
+  referenceInputs: Object.freeze({
+    workspaceFiles: true,
+    workspaceDirectories: true,
+    images: "none",
+    genericFiles: "none",
+    maxReferences: 32,
+    maxReferenceBytes: 25 * 1024 * 1024,
+    maxTotalReferenceBytes: 25 * 1024 * 1024,
+    steer: false,
+    attachmentOnly: false,
+  }),
 });
 
 /** One workspace-bound adapter around an OpenCode-owned ACP harness. */
@@ -177,7 +188,7 @@ export class OpenCodeAcpAdapter {
     return [];
   }
 
-  async startTurn({ prompt, model = null, mode = null, attachments = [], contextReferences = [] }) {
+  async startTurn({ prompt, model = null, mode = null, references: allReferences = [], attachments = [], contextReferences = [] }) {
     this.#assertUsable();
     if (!this.client || !this.sessionId) throw new Error("OpenCode ACP session is not connected.");
     if (this.activeTurn) throw new Error("An OpenCode turn is already running.");
@@ -188,7 +199,7 @@ export class OpenCodeAcpAdapter {
     const blocks = buildPromptBlocks({
       prompt,
       instructions: formatAuthorizedProjectInstructions(instructions),
-      references: [...contextReferences, ...attachments],
+      references: allReferences.length > 0 ? allReferences : [...contextReferences, ...attachments],
       workspaceRoot: this.workspaceRoot,
     });
     const active = { turnId, normalizer, interrupted: false };
@@ -335,11 +346,17 @@ export class OpenCodeAcpAdapter {
 
   #capabilities() {
     const native = this.client?.agentCapabilities ?? {};
+    const acceptsImages = Boolean(native.promptCapabilities?.image);
     return {
       ...OPENCODE_ACP_CAPABILITIES,
       resume: native.loadSession === true || Boolean(native.sessionCapabilities?.resume),
       mcp: Boolean(native.mcpCapabilities?.http || native.mcpCapabilities?.sse),
-      attachments: Boolean(native.promptCapabilities?.image || native.promptCapabilities?.audio),
+      attachments: acceptsImages,
+      referenceInputs: {
+        ...OPENCODE_ACP_CAPABILITIES.referenceInputs,
+        images: acceptsImages ? "data-url" : "none",
+        acceptedMimeTypes: acceptsImages ? ["image/png", "image/jpeg", "image/gif", "image/webp"] : [],
+      },
     };
   }
 
@@ -514,13 +531,24 @@ function publicModes(config) {
   }));
 }
 
-function buildPromptBlocks({ prompt, instructions, references, workspaceRoot }) {
+export function buildPromptBlocks({ prompt, instructions, references, workspaceRoot }) {
   const content = instructions ? `${instructions}\n\nUser request:\n${prompt}` : prompt;
   const blocks = [{ type: "text", text: content }];
   const seen = new Set();
   for (const reference of array(references)) {
+    if (reference?.kind === "staged-attachment") {
+      const image = dataUrlParts(reference.snapshotUrl);
+      if (!image || !reference.mime?.startsWith("image/") || image.mime !== reference.mime) {
+        throw new Error("OpenCode ACP received an invalid staged image reference.");
+      }
+      blocks.push({ type: "image", data: image.data, mimeType: image.mime });
+      continue;
+    }
     const filename = typeof reference?.path === "string" ? path.resolve(reference.path) : null;
-    if (!filename || !isInsideWorkspace(workspaceRoot, filename) || seen.has(filename)) continue;
+    if (!filename || !isInsideWorkspace(workspaceRoot, filename)) {
+      throw new Error("OpenCode ACP received an invalid workspace reference.");
+    }
+    if (seen.has(filename)) continue;
     seen.add(filename);
     blocks.push({
       type: "resource_link",
@@ -532,9 +560,15 @@ function buildPromptBlocks({ prompt, instructions, references, workspaceRoot }) 
   return blocks;
 }
 
+function dataUrlParts(value) {
+  if (typeof value !== "string" || value.length > Math.ceil(25 * 1024 * 1024 * 4 / 3) + 256) return null;
+  const match = /^data:([^;,]{1,160});base64,([A-Za-z0-9+/=]+)$/.exec(value);
+  return match ? { mime: match[1], data: match[2] } : null;
+}
+
 function isInsideWorkspace(workspaceRoot, filename) {
   const relative = path.relative(workspaceRoot, filename);
-  return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 function selectPermissionOption(options, decision) {

@@ -1,7 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
-import { ClaudeAgentSdkAdapter } from "../electron/main/agent/runtimes/claude/claude-agent-sdk-adapter.mjs";
+import {
+  ClaudeAgentSdkAdapter,
+  formatClaudePrompt,
+} from "../electron/main/agent/runtimes/claude/claude-agent-sdk-adapter.mjs";
 
 describe("Claude Agent SDK runtime adapter", () => {
+  it("maps only authorized live workspace references into the native prompt", () => {
+    expect(formatClaudePrompt("Review", [
+      { kind: "workspace-entry", path: "/workspace/src/app.ts" },
+      { kind: "workspace-entry", path: "/workspace/src" },
+      { kind: "staged-attachment", path: "/private/staging/image.snapshot" },
+      { kind: "workspace-entry", path: "/outside/secret.txt" },
+    ], "/workspace")).toBe([
+      "Review",
+      "",
+      "Authorized context files for this turn:",
+      "- /workspace/src/app.ts",
+      "- /workspace/src",
+    ].join("\n"));
+  });
+
   it("inspects the native account/model catalog with user-only settings and the Claude Code prompt", async () => {
     const query = inspectionQuery();
     const sdk = { query: vi.fn(() => query) };
@@ -53,14 +71,20 @@ describe("Claude Agent SDK runtime adapter", () => {
     const adapter = createAdapter({ sdk, onEvent });
     await adapter.createSession({ model: "claude-sonnet", mode: "agent" });
 
+    await expect(adapter.startTurn({
+      prompt: "Unsafe",
+      contextReferences: [{ kind: "workspace-entry", path: "/outside/secret.txt" }],
+    })).rejects.toThrow(/unsupported|unauthorized/i);
+    await expect(adapter.startTurn({
+      prompt: "Unsupported",
+      attachments: [{ kind: "staged-attachment", path: "/private/staging/image.snapshot" }],
+    })).rejects.toThrow(/unsupported|unauthorized/i);
+
     const first = await adapter.startTurn({
       prompt: "First",
       model: "claude-sonnet",
       mode: "agent",
-      contextReferences: [
-        { path: "/workspace/src/app.ts" },
-        { path: "/outside/secret.txt" },
-      ],
+      contextReferences: [{ path: "/workspace/src/app.ts" }],
     });
     await vi.waitFor(() => expect(controller.messages).toHaveLength(1));
     controller.finish("First answer");
@@ -75,7 +99,6 @@ describe("Claude Agent SDK runtime adapter", () => {
     expect(controller.query.initializationResult).toHaveBeenCalledTimes(1);
     expect(controller.query.setModel).toHaveBeenCalledWith("claude-sonnet");
     expect(controller.messages[0].message.content).toContain("/workspace/src/app.ts");
-    expect(controller.messages[0].message.content).not.toContain("/outside/secret.txt");
     expect(controller.messages[1].message.content).toBe("Second");
     await adapter.dispose();
   });

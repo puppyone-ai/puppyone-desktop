@@ -7,13 +7,12 @@ import {
 } from "../domain/agent-provider-routing";
 import type {
   AgentApprovalDecision,
-  AgentFileReference,
   AgentQuestionResolution,
   AgentSessionSnapshot,
 } from "../domain/agent-contract";
 import { AgentEventSynchronizer } from "./AgentEventSynchronizer";
 import { agentControllerTransitions, type AgentControllerState } from "./agent-controller-state";
-import { AgentKnownError, createAgentError, formatAgentError } from "./agent-error";
+import { AgentKnownError, formatAgentError } from "./agent-error";
 import { SessionUiStateStore, type SessionUiState } from "./SessionUiStateStore";
 import { LocalAgentConnectionLoader } from "./LocalAgentConnectionLoader";
 import type { AgentClientPort, AgentClientProvider } from "./AgentClientPort";
@@ -24,15 +23,18 @@ import {
   hasFreshAgentRuntimeInspection,
 } from "./agent-runtime-discovery-cache";
 import { planAgentRuntimeSwitch } from "./agent-runtime-selection";
-import { chooseAgentMode, mergeAgentReferences } from "./agent-controller-values";
+import { chooseAgentMode } from "./agent-controller-values";
+import { AgentReferenceDraftManager } from "./AgentReferenceDraftManager";
+import {
+  AgentTurnSubmissionCoordinator,
+  agentTurnSubmissionLimits,
+} from "./AgentTurnSubmissionCoordinator";
 
 export type { AgentControllerPhase, AgentControllerState } from "./agent-controller-state";
 export { agentControllerTransitions } from "./agent-controller-state";
 export { formatAgentError } from "./agent-error";
 
 type Listener = () => void;
-
-const MAX_QUEUED_PROMPTS = 20;
 
 export class AgentSessionController {
   readonly workspaceRoot: string;
@@ -44,7 +46,8 @@ export class AgentSessionController {
   private readonly localConnectionLoader: LocalAgentConnectionLoader;
   private readonly sessionLifecycle: AgentSessionLifecycle;
   private readonly sessionPreparer: AgentSessionPreparer;
-  private queuedPrompts: string[] = [];
+  private readonly referenceDrafts: AgentReferenceDraftManager;
+  private readonly submission: AgentTurnSubmissionCoordinator;
   private lastInspectionAt = 0;
   private disposed = false;
 
@@ -65,9 +68,9 @@ export class AgentSessionController {
       localConnectionsError: null,
       draft: "",
       pendingPrompt: null,
+      pendingIntent: null,
       sessionPreparation: "idle",
-      attachments: [],
-      contextReferences: [],
+      references: [],
       error: null,
       submitting: false,
       stopping: false,
@@ -79,12 +82,28 @@ export class AgentSessionController {
       bridgeProvider,
       (patch) => this.patch(patch),
     );
+    this.referenceDrafts = new AgentReferenceDraftManager({
+      workspaceRoot,
+      bridgeProvider,
+      readState: this.getSnapshot,
+      patch: (patch) => this.patch(patch),
+      appendText: (text) => this.appendDroppedText(text),
+    });
+    this.submission = new AgentTurnSubmissionCoordinator({
+      workspaceRoot,
+      bridgeProvider,
+      references: this.referenceDrafts,
+      readState: this.getSnapshot,
+      patch: (patch) => this.patch(patch),
+      writeDraft: (draft) => this.writeCurrentSessionUi({ draft }),
+      prepareSession: () => this.prepareSession(),
+    });
     this.eventSynchronizer = new AgentEventSynchronizer(
       workspaceRoot,
       bridgeProvider,
       this.getSnapshot,
       (patch) => this.patch(patch),
-      this.drainQueuedPrompt,
+      this.submission.drainQueuedIntent,
     );
     this.sessionLifecycle = new AgentSessionLifecycle({
       workspaceRoot,
@@ -131,7 +150,13 @@ export class AgentSessionController {
     this.eventSynchronizer.dispose();
     this.localConnectionLoader.dispose();
     this.sessionUi.clear();
-    this.queuedPrompts = [];
+    void this.referenceDrafts.revoke([
+      ...this.state.references,
+      ...this.submission.ownedReferences(),
+      ...(this.state.pendingIntent?.references ?? []),
+    ]);
+    this.submission.clearQueue();
+    this.referenceDrafts.clearRetryMaterial();
     this.listeners.clear();
   }
 
@@ -150,6 +175,11 @@ export class AgentSessionController {
     const plan = planAgentRuntimeSwitch(this.state, runtimeId);
     if (!plan) return false;
     if (plan.alreadySelected) return true;
+    await this.referenceDrafts.rotate([
+      ...this.state.references,
+      ...this.submission.ownedReferences(),
+    ]);
+    this.submission.clearQueue();
     this.patch(plan.patch);
     try {
       if (plan.sessionId) {
@@ -244,20 +274,35 @@ export class AgentSessionController {
     this.writeCurrentSessionUi({ draft });
   }
 
-  addAttachments(references: AgentFileReference[]) {
-    this.patch({ attachments: mergeAgentReferences(this.state.attachments, references) });
+  async addWorkspacePaths(paths: string[]) {
+    return this.referenceDrafts.addWorkspacePaths(paths);
   }
 
-  removeAttachment(path: string) {
-    this.patch({ attachments: this.state.attachments.filter((entry) => entry.path !== path) });
+  async pickWorkspaceReferences() {
+    return this.referenceDrafts.pickWorkspaceReferences();
   }
 
-  addContextReferences(references: AgentFileReference[]) {
-    this.patch({ contextReferences: mergeAgentReferences(this.state.contextReferences, references) });
+  async addPathTextOrDraft(text: string) {
+    return this.referenceDrafts.addPathTextOrDraft(text);
   }
 
-  removeContextReference(path: string) {
-    this.patch({ contextReferences: this.state.contextReferences.filter((entry) => entry.path !== path) });
+  async stageExternalFiles(files: File[]) {
+    return this.referenceDrafts.stageExternalFiles(files);
+  }
+
+  removeReference(id: string) {
+    this.referenceDrafts.remove(id);
+  }
+
+  retryReference(id: string) {
+    this.referenceDrafts.retry(id);
+  }
+
+  appendDroppedText(text: string) {
+    const value = text.trim();
+    if (!value) return;
+    const draft = this.state.draft ? `${this.state.draft}\n${value}` : value;
+    this.setDraft(draft);
   }
 
   rememberViewport(scrollTop: number, measurements: Record<string, number> = {}, pinned = true) {
@@ -268,7 +313,14 @@ export class AgentSessionController {
     return this.readSessionUi(this.uiKey());
   }
 
-  newSession() {
+  async newSession() {
+    if (this.state.projection.runningTurnId) return this.sessionLifecycle.newSession();
+    await this.referenceDrafts.reset([
+      ...this.state.references,
+      ...this.submission.ownedReferences(),
+      ...(this.state.pendingIntent?.references ?? []),
+    ]);
+    this.submission.clearQueue();
     return this.sessionLifecycle.newSession();
   }
 
@@ -277,74 +329,7 @@ export class AgentSessionController {
   }
 
   async submit(prompt: string) {
-    const bridge = this.requireBridge("startAgentTurn");
-    const text = prompt.trim();
-    if (!text || this.state.submitting || this.state.pendingPrompt) return false;
-    if (this.state.inspection?.capabilities?.modelSelection && !this.state.selectedModel) {
-      this.patch({ error: createAgentError("model-required") });
-      return false;
-    }
-    const activeTurnId = this.state.projection.runningTurnId;
-    if (activeTurnId && this.state.session && this.state.inspection?.capabilities?.steer && bridge.steerAgentTurn) {
-      await bridge.steerAgentTurn({ rootPath: this.workspaceRoot, sessionId: this.state.session.id, turnId: activeTurnId, message: text });
-      this.patch({ draft: "" });
-      return true;
-    }
-    if (activeTurnId && this.state.inspection?.capabilities?.queue) {
-      if (this.queuedPrompts.length >= MAX_QUEUED_PROMPTS) {
-        this.patch({ error: createAgentError("prompt-queue-full", { limit: MAX_QUEUED_PROMPTS }) });
-        return false;
-      }
-      this.queuedPrompts.push(text);
-      this.patch({ draft: "", error: null });
-      return true;
-    }
-    if (activeTurnId) return false;
-    this.patch({
-      submitting: true,
-      pendingPrompt: text,
-      draft: "",
-      error: null,
-    });
-    this.writeCurrentSessionUi({ draft: "" });
-    try {
-      let session = this.state.session;
-      if (!session) {
-        const prepared = await this.prepareSession();
-        session = this.state.session;
-        if (!prepared || !session) {
-          const preparationError = this.state.error ?? createAgentError("session-prepare-failed");
-          this.patch({
-            pendingPrompt: null,
-            draft: this.state.draft || text,
-            error: preparationError,
-          });
-          this.writeCurrentSessionUi({ draft: this.state.draft || text });
-          return false;
-        }
-      }
-      await bridge.startAgentTurn({
-        rootPath: this.workspaceRoot,
-        sessionId: session.id,
-        prompt: text,
-        model: this.state.selectedModel,
-        mode: this.state.selectedMode,
-        attachments: this.state.attachments,
-        contextReferences: this.state.contextReferences,
-      });
-      this.patch({ attachments: [], contextReferences: [], phase: "running" });
-      return true;
-    } catch (error) {
-      this.patch({
-        pendingPrompt: null,
-        draft: this.state.draft || text,
-        error: formatAgentError(error),
-      });
-      this.writeCurrentSessionUi({ draft: this.state.draft || text });
-      return false;
-    } finally {
-      this.patch({ submitting: false });
-    }
+    return this.submission.submit(prompt);
   }
 
   async stop() {
@@ -449,12 +434,6 @@ export class AgentSessionController {
     });
   }
 
-  private drainQueuedPrompt = () => {
-    if (this.state.projection.runningTurnId || this.queuedPrompts.length === 0) return;
-    const prompt = this.queuedPrompts.shift();
-    if (prompt) queueMicrotask(() => { void this.submit(prompt); });
-  };
-
   private patch(patch: Partial<AgentControllerState>) {
     if (this.disposed) return;
     if (patch.phase && patch.phase !== this.state.phase && !agentControllerTransitions[this.state.phase].includes(patch.phase)) {
@@ -493,5 +472,5 @@ export class AgentSessionController {
 
 export const agentSessionControllerLimits = Object.freeze({
   discoveryCacheTtlMs: AGENT_RUNTIME_DISCOVERY_CACHE_TTL_MS,
-  maxQueuedPrompts: MAX_QUEUED_PROMPTS,
+  maxQueuedPrompts: agentTurnSubmissionLimits.maxQueuedPrompts,
 });

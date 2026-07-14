@@ -20,6 +20,7 @@ import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
 import { createEphemeralAgentSessionCache } from "./main/agent/cache/ephemeral-agent-session-cache.mjs";
 import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
 import { createAgentService } from "./main/agent/agent-service.mjs";
+import { createAgentAttachmentStore } from "./main/agent/agent-attachment-store.mjs";
 import { createLocalAgentInventory } from "./main/agent/connections/local-agent-inventory.mjs";
 import { createDefaultAgentRuntimeHost } from "./main/agent/bootstrap/create-agent-runtime-host.mjs";
 import {
@@ -160,9 +161,16 @@ const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   managedOpenCodeConfigDir: path.join(app.getPath("userData"), "agent-runtime", "opencode", "config"),
   allowExternalOpenCode: !app.isPackaged && process.env.PUPPYONE_ALLOW_EXTERNAL_OPENCODE === "1",
 });
+const agentAttachmentStore = createAgentAttachmentStore({
+  rootPath: path.join(app.getPath("userData"), "agent-runtime", "attachments"),
+});
+void agentAttachmentStore.initialize().catch((error) => {
+  console.error("puppyone failed to initialize Agent attachment staging:", error);
+});
 const agentService = createAgentService({
   runtimeRegistry: agentRuntimeRegistry,
   sessionCache: agentSessionCache,
+  attachmentStore: agentAttachmentStore,
 });
 const localAgentInventory = createLocalAgentInventory({
   appVersion: app.getVersion(),
@@ -650,6 +658,9 @@ function registerIpcHandlers() {
     agentService,
     localAgentInventory,
     authorizeWorkspaceRoot,
+    attachmentStore: agentAttachmentStore,
+    dialog,
+    getDialogOwnerWindow,
   });
 
   if (viewerPackHost && viewerPackRuntime) {

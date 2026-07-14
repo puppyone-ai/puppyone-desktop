@@ -37,6 +37,7 @@
     "smoke:local-api": "node scripts/smoke-local-api.mjs",
     "smoke:format-aware-diff": "electron scripts/smoke-format-aware-diff.mjs",
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
+    "smoke:agent-references": "electron scripts/smoke-agent-reference-ingestion.mjs",
     "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
     "audit:viewer-gpu": "electron scripts/audit-viewer-gpu.mjs",
     "smoke:renderer-performance": "npm run build && node scripts/run-renderer-performance-smoke.mjs",

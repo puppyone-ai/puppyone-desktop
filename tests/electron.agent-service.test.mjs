@@ -326,6 +326,97 @@ describe("Electron AgentService ownership and lifecycle", () => {
     await harness.service.closeSession(owner, { sessionId: second.session.id, removePersistence: true });
     expect(owner.listenerCount("destroyed")).toBe(0);
   });
+
+  it("scrubs private snapshot paths and data URLs from normalized renderer events", async () => {
+    const harness = createServiceHarness({
+      capabilities: {
+        manualApprovals: true,
+        attachments: true,
+        referenceInputs: {
+          workspaceFiles: true,
+          workspaceDirectories: true,
+          images: "local-snapshot",
+          genericFiles: "none",
+          acceptedMimeTypes: ["image/png"],
+          maxReferences: 32,
+          maxReferenceBytes: 25 * 1024 * 1024,
+          maxTotalReferenceBytes: 25 * 1024 * 1024,
+        },
+      },
+    });
+    const owner = createSender(61);
+    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const privatePath = "/private/staging/ref.snapshot";
+    const snapshotUrl = "data:image/png;base64,cHJpdmF0ZQ==";
+    await harness.service.startTurn(owner, {
+      sessionId: snapshot.session.id,
+      prompt: "Inspect",
+      references: [{
+        authorized: true,
+        id: "ref-private",
+        kind: "staged-attachment",
+        path: privatePath,
+        displayName: "photo.png",
+        mime: "image/png",
+        size: 7,
+        snapshotUrl,
+      }],
+    });
+    harness.adapters[0].emit({
+      type: "provider.warning",
+      turnId: "turn-1",
+      payload: { message: `native echo ${privatePath} ${snapshotUrl}` },
+    });
+
+    const serialized = JSON.stringify(sentAgentEvents(owner));
+    expect(serialized).not.toContain(privatePath);
+    expect(serialized).not.toContain(snapshotUrl);
+    expect(serialized).toContain("[attachment:photo.png]");
+  });
+
+  it("rejects references that did not pass main-process authorization", async () => {
+    const harness = createServiceHarness();
+    const owner = createSender(64);
+    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    await expect(harness.service.startTurn(owner, {
+      sessionId: snapshot.session.id,
+      prompt: "Read it",
+      references: [{ kind: "workspace-entry", path: "/workspace/raw.txt" }],
+    })).rejects.toThrow(/authorized by the main process/i);
+  });
+
+  it("releases attachment grants on window and application lifecycle cleanup", async () => {
+    const attachmentStore = { revokeOwner: vi.fn(async () => undefined), close: vi.fn(async () => undefined) };
+    const harness = createServiceHarness({ attachmentStore });
+    await harness.service.closeSessionsForWindow(62);
+    expect(attachmentStore.revokeOwner).toHaveBeenCalledWith(62);
+    await harness.service.closeAll();
+    expect(attachmentStore.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains local snapshots for the native turn and releases them at terminal acceptance", async () => {
+    const attachmentStore = { revoke: vi.fn(async () => ({ revoked: 1 })) };
+    const harness = createServiceHarness({ attachmentStore });
+    const owner = createSender(63);
+    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    await harness.service.startTurn(owner, {
+      sessionId: snapshot.session.id,
+      prompt: "Inspect",
+      privateReferenceLease: { leaseId: "lease-test", tokens: ["a".repeat(43)] },
+    });
+    expect(attachmentStore.revoke).not.toHaveBeenCalled();
+    harness.adapters[0].emit({
+      type: "turn.completed",
+      providerSessionId: "thread-1",
+      turnId: "turn-1",
+      payload: { status: "completed" },
+    });
+    await vi.waitFor(() => expect(attachmentStore.revoke).toHaveBeenCalledWith({
+      ownerId: owner.id,
+      workspaceRoot: "/workspace",
+      tokens: ["a".repeat(43)],
+    }));
+  });
 });
 
 describe("Agent IPC workspace authorization", () => {
@@ -415,6 +506,10 @@ describe("Agent IPC workspace authorization", () => {
       "agent:session-archive",
       "agent:session-delete",
       "agent:session-close",
+      "agent:reference-stage",
+      "agent:reference-revoke",
+      "agent:reference-resolve-workspace",
+      "agent:reference-pick-workspace",
       "agent:turn-start",
       "agent:turn-steer",
       "agent:turn-interrupt",
@@ -434,7 +529,7 @@ describe("Agent IPC workspace authorization", () => {
   });
 });
 
-function createServiceHarness() {
+function createServiceHarness({ capabilities = { manualApprovals: true }, attachmentStore = null } = {}) {
   const adapters = [];
   const persisted = new Map();
   const runtimeRegistry = new AgentRuntimeRegistry([createCodexRuntimeDefinition({
@@ -451,7 +546,7 @@ function createServiceHarness() {
       })),
     },
     adapterFactory: (options) => {
-      const adapter = createFakeAdapter(options);
+      const adapter = createFakeAdapter(options, capabilities);
       adapters.push(adapter);
       return adapter;
     },
@@ -470,17 +565,18 @@ function createServiceHarness() {
       remove: vi.fn(async (id) => persisted.delete(id)),
     },
     logger: { warn: vi.fn() },
+    attachmentStore,
   });
   return { service, adapters };
 }
 
-function createFakeAdapter(options) {
+function createFakeAdapter(options, capabilities) {
   return {
     disposed: false,
     inspect: vi.fn(async () => ({
       account: { account: { type: "chatgpt", email: "user@example.com", planType: "plus" }, requiresOpenaiAuth: true },
       models: [{ id: "gpt-5", model: "gpt-5", displayName: "GPT-5", isDefault: true }],
-      capabilities: { manualApprovals: true },
+      capabilities,
       warnings: [],
     })),
     createSession: vi.fn(async () => ({

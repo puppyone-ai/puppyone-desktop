@@ -38,9 +38,9 @@ export function planAgentRuntimeSwitch(
       selectedMode: null,
       draft: "",
       pendingPrompt: null,
+      pendingIntent: null,
       sessionPreparation: "idle",
-      attachments: [],
-      contextReferences: [],
+      references: [],
       error: null,
     },
   };

@@ -7,6 +7,7 @@ import {
   assertAgentEventEnvelope,
   assertAgentIpcResponse,
   assertAgentRuntimeCapabilities,
+  normalizeReferenceInputCapabilities,
   parseAgentIpcRequest,
 } from "../shared/agent-contract/schema.mjs";
 
@@ -92,6 +93,14 @@ describe("shared Agent contract", () => {
     })).toThrow(/workspaceRoot/i);
     expect(() => assertAgentEventEnvelope(event("approval.requested", {}))).toThrow(/requestId/i);
     expect(assertAgentEventEnvelope(event("assistant.delta", { delta: "safe" }))).toBeTruthy();
+    const referenceDisplay = { id: "ref-1", kind: "attachment", displayName: "capture.png", mime: "image/png", size: 3 };
+    expect(assertAgentEventEnvelope(event("turn.started", { referenceDisplays: [referenceDisplay] }))).toBeTruthy();
+    expect(() => assertAgentEventEnvelope(event("turn.started", {
+      referenceDisplays: [{ ...referenceDisplay, token: "opaque-secret" }],
+    }))).toThrow(/renderer-safe reference metadata/i);
+    expect(() => assertAgentEventEnvelope(event("turn.started", {
+      referenceDisplays: [{ ...referenceDisplay, kind: "workspace-file", relativePath: "/private/source.txt" }],
+    }))).toThrow(/workspace-relative/i);
     expect(() => assertAgentIpcResponse("agent:providers-discover", {
       readiness: { runtimeId: "opencode", status: "ready" },
       providers: [{ id: "openai", displayName: "OpenAI", modelCount: -1 }],
@@ -104,6 +113,11 @@ describe("shared Agent contract", () => {
   it("requires methods for capabilities a runtime advertises", () => {
     expect(() => assertAgentRuntimeCapabilities({}, { manualApprovals: true }, "fixture")).toThrow(/resolveApproval/i);
     expect(assertAgentRuntimeCapabilities({ resolveApproval: vi.fn() }, { manualApprovals: true }, "fixture").manualApprovals).toBe(true);
+  });
+
+  it("fails unknown reference transports closed instead of projecting legacy attachment support", () => {
+    expect(normalizeReferenceInputCapabilities({ images: "future-transport" }, { attachments: true }))
+      .toMatchObject({ images: "none", genericFiles: "none" });
   });
 });
 

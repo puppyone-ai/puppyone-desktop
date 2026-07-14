@@ -4,10 +4,8 @@ import {
   assertAuthenticated,
   assertReady,
   normalizeApprovalDecision,
-  normalizeAuthorizedReferences,
   normalizeOptionalId,
   normalizeOptionalString,
-  normalizePrompt,
   normalizeQuestionAnswers,
   normalizeRequiredId,
   normalizeRuntimeId,
@@ -16,6 +14,7 @@ import {
   requireSenderId,
   requireWorkspaceRoot,
 } from "./application/agent-input-policy.mjs";
+import { abandonAgentTurnReferences, beginAgentTurnReferences, prepareAgentSteerReferenceInput, revokeActiveAgentReferences, scrubPrivateReferencePaths, withAgentSteerReferenceTokens } from "./application/agent-reference-policy.mjs";
 import { createAgentRuntimeCatalog } from "./application/agent-runtime-catalog.mjs";
 import { createAgentEventJournal } from "./application/agent-event-journal.mjs";
 import { AgentSessionStore } from "./application/agent-session-store.mjs";
@@ -41,6 +40,7 @@ export function createAgentService({
   sessionCache = null,
   persistence: legacyPersistence = null,
   logger = console,
+  attachmentStore = null,
 }) {
   if (!runtimeRegistry || typeof runtimeRegistry.createAdapter !== "function") {
     throw new TypeError("AgentService requires a provider-neutral runtime registry.");
@@ -197,11 +197,10 @@ export function createAgentService({
     if (session.activeTurnId || session.turnStarting || session.interruptingTurnId) {
       throw new Error("An Agent turn is already running or stopping.");
     }
-    const prompt = normalizePrompt(request?.prompt);
     const model = normalizeOptionalString(request?.model) || session.selectedModel;
     const mode = normalizeOptionalString(request?.mode) || session.selectedMode;
     requireAvailableModel(session, model);
-    session.pendingPrompt = prompt;
+    const { references, referenceDisplays, prompt } = beginAgentTurnReferences(session, request);
     session.turnStarting = true;
     session.activeTurnStartedAtMs = Date.now();
     session.selectedModel = model;
@@ -211,8 +210,9 @@ export function createAgentService({
         prompt,
         model,
         mode,
-        attachments: normalizeAuthorizedReferences(request?.attachments),
-        contextReferences: normalizeAuthorizedReferences(request?.contextReferences),
+        references,
+        attachments: references.filter((entry) => entry.kind === "staged-attachment"),
+        contextReferences: references.filter((entry) => entry.kind === "workspace-entry"),
       });
       const alreadyTerminal = session.terminalTurnIds.has(result.turnId);
       if (!alreadyTerminal) session.activeTurnId = result.turnId;
@@ -221,15 +221,16 @@ export function createAgentService({
           type: "turn.started",
           providerSessionId: session.providerSessionId,
           turnId: result.turnId,
-          payload: { status: "running", prompt, model, mode },
+          payload: { status: "running", prompt, model, mode, referenceDisplays },
         });
       }
       session.pendingPrompt = null;
+      session.pendingReferenceDisplays = [];
       session.turnStarting = false;
       persistSoon(session);
       return { sessionId: session.id, turnId: result.turnId };
     } catch (error) {
-      session.pendingPrompt = null;
+      abandonAgentTurnReferences(session);
       session.turnStarting = false;
       session.activeTurnStartedAtMs = null;
       throw new Error(redactSecretText(error instanceof Error ? error.message : String(error)));
@@ -245,8 +246,8 @@ export function createAgentService({
     if (!session.capabilities?.steer || typeof session.adapter.steerTurn !== "function") {
       throw new Error("The active Agent runtime does not support steering a running turn.");
     }
-    const message = normalizePrompt(request?.message);
-    await session.adapter.steerTurn({ turnId, message });
+    const { message, references } = prepareAgentSteerReferenceInput(request, session.capabilities);
+    await withAgentSteerReferenceTokens(session, request, () => session.adapter.steerTurn({ turnId, message, references }));
     return { sessionId: session.id, turnId, steered: true };
   }
 
@@ -485,15 +486,17 @@ export function createAgentService({
     return { sessionId: session.id, closed: true };
   }
 
-  function closeSessionsForWindow(webContentsId) {
-    return Promise.all(sessionStore.values()
+  async function closeSessionsForWindow(webContentsId) {
+    await Promise.all(sessionStore.values()
       .filter((session) => session.ownerId === webContentsId)
       .map((session) => closeSessionRecord(session, { persist: true })));
+    await attachmentStore?.revokeOwner?.(webContentsId);
   }
 
   async function closeAll() {
     await Promise.all(sessionStore.values()
       .map((session) => closeSessionRecord(session, { persist: true })));
+    await attachmentStore?.close?.();
     await runtimeRegistry.dispose?.();
   }
 
@@ -540,6 +543,7 @@ export function createAgentService({
   function handleAdapterEvent(session, adapterEvent) {
     if (!sessionStore.isCurrent(session) || session.closing) return;
     const event = { ...adapterEvent };
+    event.payload = scrubPrivateReferencePaths(event.payload, session.privateReferencePaths);
     if (event.type === "session.started" || event.type === "session.resumed") {
       if (session.lifecycleEventSeen) return;
       session.lifecycleEventSeen = true;
@@ -554,8 +558,13 @@ export function createAgentService({
       if (!Number.isFinite(session.activeTurnStartedAtMs)) session.activeTurnStartedAtMs = Date.now();
       session.lastStartedTurnId = event.turnId;
       session.terminalState = "running";
-      if (session.pendingPrompt) {
-        event.payload = { ...(event.payload || {}), prompt: session.pendingPrompt, model: session.selectedModel };
+      if (session.pendingPrompt || session.pendingReferenceDisplays.length > 0) {
+        event.payload = {
+          ...(event.payload || {}),
+          prompt: session.pendingPrompt,
+          model: session.selectedModel,
+          referenceDisplays: session.pendingReferenceDisplays,
+        };
       }
     }
     if (["turn.completed", "turn.failed", "turn.interrupted"].includes(event.type)) {
@@ -570,6 +579,8 @@ export function createAgentService({
         session.interruptingTurnId = null;
         session.terminalState = event.type.slice("turn.".length);
         clearInterruptFallback(session);
+        session.privateReferencePaths.clear();
+        void revokeActiveAgentReferences(session, attachmentStore);
       }
     }
     if (event.type === "approval.requested") {
@@ -711,6 +722,7 @@ export function createAgentService({
     const activeTurnId = session.activeTurnId;
     session.activeTurnId = null;
     session.interruptingTurnId = null;
+    void revokeActiveAgentReferences(session, attachmentStore);
     if (activeTurnId) {
       rememberTerminalTurn(session, activeTurnId);
       emit(session, {
@@ -753,6 +765,7 @@ export function createAgentService({
     try {
       await session.adapter?.dispose();
     } finally {
+      await revokeActiveAgentReferences(session, attachmentStore);
       if (sessionStore.isCurrent(session)) {
         session.closing = false;
         emit(session, {

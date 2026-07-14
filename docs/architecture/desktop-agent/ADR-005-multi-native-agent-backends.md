@@ -188,8 +188,8 @@ the kinds their native protocol actually accepts. The legacy
 `attachments/contextReferences` booleans may remain as a compatibility
 projection during migration, but UI/application behavior cannot infer a
 transport from them or branch on a concrete backend ID. The normative model is
-[Agent Composer reference ingestion](composer-reference-ingestion.md), tracked
-for implementation by `ISSUE-404`.
+[Agent Composer reference ingestion](composer-reference-ingestion.md), now
+implemented and verified by `ISSUE-404`.
 
 ## Backend matrix
 

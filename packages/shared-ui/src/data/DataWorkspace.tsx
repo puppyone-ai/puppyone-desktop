@@ -1323,6 +1323,7 @@ export function DataWorkspace({
                   >
                     <ExplorerTree
                       nodes={tree}
+                      dragWorkspaceId={workspace.id}
                       activePath={resolvedActivePath}
                       selectedPaths={selectedNodePaths}
                       cutPaths={explorerCutPaths}

@@ -9,7 +9,8 @@ import {
   type ForwardedRef,
 } from "react";
 import {
-  EXPLORER_TREE_NODE_DRAG_TYPE,
+  classifyReferenceDataTransfer,
+  hasFileReferenceDataTransferSource,
   subscribeTypographyChanges,
   type Workspace,
 } from "@puppyone/shared-ui";
@@ -483,37 +484,19 @@ function writeTerminalSystemLine(terminal: Terminal, message: string) {
   terminal.writeln(`\x1b[38;5;244m${message}\x1b[0m`);
 }
 
-function hasExplorerNodePath(dataTransfer: DataTransfer) {
-  return Array.from(dataTransfer.types).includes(EXPLORER_TREE_NODE_DRAG_TYPE);
-}
-
 function hasTerminalDroppablePaths(dataTransfer: DataTransfer) {
-  return hasExplorerNodePath(dataTransfer) || hasDataTransferFiles(dataTransfer);
-}
-
-function hasDataTransferFiles(dataTransfer: DataTransfer) {
-  if (dataTransfer.files.length > 0) return true;
-  if (Array.from(dataTransfer.types).includes("Files")) return true;
-  return Array.from(dataTransfer.items).some((item) => item.kind === "file");
+  return hasFileReferenceDataTransferSource(dataTransfer);
 }
 
 function readTerminalDroppedPaths(dataTransfer: DataTransfer, rootPath: string) {
-  const explorerPaths = readExplorerNodePaths(dataTransfer)
-    .map((nodePath) => joinWorkspacePath(rootPath, nodePath));
-  if (explorerPaths.length > 0) return explorerPaths;
-
-  return Array.from(dataTransfer.files)
-    .map(readDroppedFilePath)
-    .filter((pathValue): pathValue is string => Boolean(pathValue));
-}
-
-function readExplorerNodePaths(dataTransfer: DataTransfer) {
-  if (!hasExplorerNodePath(dataTransfer)) return [];
-  return dataTransfer
-    .getData(EXPLORER_TREE_NODE_DRAG_TYPE)
-    .split(/\r?\n/)
-    .map((value) => value.trim())
-    .filter(Boolean);
+  const source = classifyReferenceDataTransfer(dataTransfer);
+  if (source.kind === "workspace-entries") {
+    return source.entries.map((entry) => joinWorkspacePath(rootPath, entry.path));
+  }
+  if (source.kind === "files") {
+    return source.files.map(readDroppedFilePath).filter((pathValue): pathValue is string => Boolean(pathValue));
+  }
+  return [];
 }
 
 function readDroppedFilePath(file: File) {

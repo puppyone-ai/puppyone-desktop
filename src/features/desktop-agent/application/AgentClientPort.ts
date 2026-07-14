@@ -9,6 +9,9 @@ import type {
   AgentModelsListRequest,
   AgentProviderInspection,
   AgentQuestionResolution,
+  AgentDraftReference,
+  AgentReferenceRevokeRequest,
+  AgentReferenceStageRequest,
   AgentReplayRequest,
   AgentRuntimeRequest,
   AgentSessionCloseRequest,
@@ -22,6 +25,7 @@ import type {
   AgentTurnInterruptRequest,
   AgentTurnStartRequest,
   AgentTurnSteerRequest,
+  AgentWorkspaceReferenceResolveRequest,
 } from "../domain/agent-contract";
 
 /** Renderer-side port implemented by the typed Electron preload adapter. */
@@ -38,6 +42,10 @@ export interface AgentClientPort {
   archiveAgentSession(request: AgentSessionMutationRequest): Promise<{ sessionId: string; archived: boolean }>;
   deleteAgentSession(request: AgentSessionMutationRequest): Promise<{ sessionId: string; deleted: boolean; nativeDeleted: boolean }>;
   closeAgentSession(request: AgentSessionCloseRequest): Promise<{ sessionId: string; closed: boolean }>;
+  stageAgentAttachments(request: AgentReferenceStageRequest): Promise<AgentDraftReference[]>;
+  revokeAgentAttachments(request: AgentReferenceRevokeRequest): Promise<{ revoked: number }>;
+  resolveAgentWorkspaceReferences(request: AgentWorkspaceReferenceResolveRequest): Promise<AgentDraftReference[]>;
+  pickAgentWorkspaceReferences(request: Pick<AgentWorkspaceReferenceResolveRequest, "rootPath">): Promise<AgentDraftReference[]>;
   startAgentTurn(request: AgentTurnStartRequest): Promise<{ sessionId: string; turnId: string }>;
   steerAgentTurn(request: AgentTurnSteerRequest): Promise<{ sessionId: string; turnId: string; steered: boolean }>;
   interruptAgentTurn(request: AgentTurnInterruptRequest): Promise<{ sessionId: string; turnId: string; interruptRequested: boolean }>;

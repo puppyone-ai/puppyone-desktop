@@ -1,0 +1,223 @@
+import type { AgentDraftReference, AgentSubmissionIntent } from "../domain/agent-contract";
+import type { AgentClientPort, AgentClientProvider } from "./AgentClientPort";
+import type { AgentControllerState } from "./agent-controller-state";
+import { AgentKnownError, createAgentError, formatAgentError } from "./agent-error";
+import type { AgentReferenceDraftManager } from "./AgentReferenceDraftManager";
+
+const MAX_QUEUED_PROMPTS = 20;
+
+type AgentTurnSubmissionCoordinatorOptions = {
+  workspaceRoot: string;
+  bridgeProvider: AgentClientProvider;
+  references: AgentReferenceDraftManager;
+  readState: () => AgentControllerState;
+  patch: (patch: Partial<AgentControllerState>) => void;
+  writeDraft: (draft: string) => void;
+  prepareSession: () => Promise<boolean>;
+};
+
+/** Captures and advances immutable prompt/configuration/reference intents. */
+export class AgentTurnSubmissionCoordinator {
+  private queuedIntents: AgentSubmissionIntent[] = [];
+
+  constructor(private readonly options: AgentTurnSubmissionCoordinatorOptions) {}
+
+  async submit(prompt: string) {
+    const bridge = this.requireBridge("startAgentTurn");
+    const state = this.options.readState();
+    const text = prompt.trim();
+    const attachmentOnly = state.references.length > 0
+      && state.inspection?.capabilities?.referenceInputs?.attachmentOnly === true;
+    if ((!text && !attachmentOnly) || state.submitting || state.pendingIntent) return false;
+    if (state.references.some((reference) => reference.status !== "ready")) {
+      this.options.patch({ error: createAgentError("references-not-ready") });
+      return false;
+    }
+    if (state.inspection?.capabilities?.modelSelection && !state.selectedModel) {
+      this.options.patch({ error: createAgentError("model-required") });
+      return false;
+    }
+    const intent = createSubmissionIntent({
+      referenceEpoch: this.options.references.referenceEpoch,
+      prompt: text,
+      model: state.selectedModel,
+      mode: state.selectedMode,
+      references: state.references,
+    });
+    const activeTurnId = state.projection.runningTurnId;
+    if (activeTurnId && state.session && state.inspection?.capabilities?.steer && bridge.steerAgentTurn) {
+      if (intent.references.length > 0 && state.inspection.capabilities.referenceInputs?.steer !== true) {
+        this.options.patch({ error: createAgentError("steer-references-unsupported") });
+        return false;
+      }
+      try {
+        await bridge.steerAgentTurn({
+          rootPath: this.options.workspaceRoot,
+          sessionId: state.session.id,
+          turnId: activeTurnId,
+          message: text,
+          referenceEpoch: intent.referenceEpoch,
+          references: intent.references,
+        });
+        this.options.patch({ draft: "", references: [], error: null });
+        this.options.writeDraft("");
+        return true;
+      } catch (error) {
+        this.options.patch({ error: formatAgentError(error) });
+        return false;
+      }
+    }
+    if (activeTurnId && state.inspection?.capabilities?.queue) {
+      if (this.queuedIntents.length >= MAX_QUEUED_PROMPTS) {
+        this.options.patch({ error: createAgentError("prompt-queue-full", { limit: MAX_QUEUED_PROMPTS }) });
+        return false;
+      }
+      this.queuedIntents.push(intent);
+      this.options.patch({ draft: "", references: [], error: null });
+      this.options.writeDraft("");
+      return true;
+    }
+    if (activeTurnId) return false;
+    return this.startIntent(intent, true);
+  }
+
+  drainQueuedIntent = () => {
+    const state = this.options.readState();
+    if (state.projection.runningTurnId || state.pendingIntent || this.queuedIntents.length === 0) return;
+    const intent = this.queuedIntents.shift();
+    if (intent) queueMicrotask(() => { void this.startIntent(intent, false); });
+  };
+
+  ownedReferences() {
+    return this.queuedIntents.flatMap((intent) => intent.references);
+  }
+
+  clearQueue() {
+    this.queuedIntents = [];
+  }
+
+  private async startIntent(intent: AgentSubmissionIntent, captureCurrentDraft: boolean) {
+    const bridge = this.requireBridge("startAgentTurn");
+    this.options.patch({
+      submitting: true,
+      pendingPrompt: intent.prompt,
+      pendingIntent: intent,
+      ...(captureCurrentDraft ? { draft: "", references: [] } : {}),
+      error: null,
+    });
+    if (captureCurrentDraft) this.options.writeDraft("");
+    try {
+      let session = this.options.readState().session;
+      if (!session) {
+        const prepared = await this.options.prepareSession();
+        session = this.options.readState().session;
+        if (!prepared || !session) return this.restorePreparationFailure(intent, captureCurrentDraft);
+      }
+      await bridge.startAgentTurn({
+        rootPath: this.options.workspaceRoot,
+        sessionId: session.id,
+        prompt: intent.prompt,
+        model: intent.model,
+        mode: intent.mode,
+        referenceEpoch: intent.referenceEpoch,
+        references: intent.references,
+      });
+      this.options.patch({ phase: "running" });
+      return true;
+    } catch (error) {
+      const accepted = Boolean(this.options.readState().projection.runningTurnId);
+      if (!captureCurrentDraft && !accepted) {
+        const state = this.options.readState();
+        const restoredDraft = mergeFailedPrompt(intent.prompt, state.draft);
+        this.options.patch({
+          pendingPrompt: null,
+          pendingIntent: null,
+          draft: restoredDraft,
+          references: this.options.references.mergeAndValidate(intent.references, state.references),
+          error: formatAgentError(error),
+        });
+        this.options.writeDraft(restoredDraft);
+        return false;
+      }
+      const state = this.options.readState();
+      const restoredDraft = mergeFailedPrompt(intent.prompt, state.draft);
+      this.options.patch({
+        pendingPrompt: null,
+        pendingIntent: null,
+        ...(accepted ? {} : {
+          draft: restoredDraft,
+          references: this.options.references.mergeAndValidate(intent.references, state.references),
+        }),
+        error: formatAgentError(error),
+      });
+      if (!accepted) this.options.writeDraft(restoredDraft);
+      return false;
+    } finally {
+      this.options.patch({ submitting: false });
+    }
+  }
+
+  private restorePreparationFailure(intent: AgentSubmissionIntent, captureCurrentDraft: boolean) {
+    const state = this.options.readState();
+    const preparationError = state.error ?? createAgentError("session-prepare-failed");
+    if (!captureCurrentDraft) {
+      const restoredDraft = mergeFailedPrompt(intent.prompt, state.draft);
+      this.options.patch({
+        pendingPrompt: null,
+        pendingIntent: null,
+        draft: restoredDraft,
+        references: this.options.references.mergeAndValidate(intent.references, state.references),
+        error: preparationError,
+      });
+      this.options.writeDraft(restoredDraft);
+      return false;
+    }
+    const restoredDraft = mergeFailedPrompt(intent.prompt, state.draft);
+    this.options.patch({
+      pendingPrompt: null,
+      pendingIntent: null,
+      draft: restoredDraft,
+      references: this.options.references.mergeAndValidate(intent.references, state.references),
+      error: preparationError,
+    });
+    this.options.writeDraft(restoredDraft);
+    return false;
+  }
+
+  private requireBridge<K extends keyof AgentClientPort>(...methods: K[]): AgentClientPort {
+    const bridge = this.options.bridgeProvider();
+    if (!bridge || methods.some((method) => typeof bridge[method] !== "function")) {
+      throw new AgentKnownError("native-bridge-unavailable");
+    }
+    return bridge;
+  }
+}
+
+function createSubmissionIntent({
+  referenceEpoch,
+  prompt,
+  model,
+  mode,
+  references,
+}: Omit<AgentSubmissionIntent, "id">): AgentSubmissionIntent {
+  const identity = globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  return {
+    id: `intent-${identity}`,
+    referenceEpoch,
+    prompt,
+    model,
+    mode,
+    references: references.map((reference: AgentDraftReference) => ({
+      ...reference,
+      ...(reference.error ? { error: { ...reference.error } } : {}),
+    })),
+  };
+}
+
+function mergeFailedPrompt(failedPrompt: string, currentDraft: string) {
+  if (!currentDraft) return failedPrompt;
+  if (currentDraft === failedPrompt) return currentDraft;
+  return `${failedPrompt}\n\n${currentDraft}`;
+}
+
+export const agentTurnSubmissionLimits = Object.freeze({ maxQueuedPrompts: MAX_QUEUED_PROMPTS });

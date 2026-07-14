@@ -39,6 +39,17 @@ export const CLAUDE_CAPABILITIES = Object.freeze({
   mcp: true,
   skills: true,
   compaction: false,
+  referenceInputs: Object.freeze({
+    workspaceFiles: true,
+    workspaceDirectories: true,
+    images: "none",
+    genericFiles: "none",
+    maxReferences: 32,
+    maxReferenceBytes: 25 * 1024 * 1024,
+    maxTotalReferenceBytes: 25 * 1024 * 1024,
+    steer: false,
+    attachmentOnly: false,
+  }),
 });
 
 export class ClaudeAgentSdkAdapter {
@@ -169,12 +180,16 @@ export class ClaudeAgentSdkAdapter {
     return normalizeClaudeHistory(messages, this.sessionId);
   }
 
-  async startTurn({ prompt, model = null, mode = "agent", attachments = [], contextReferences = [] }) {
+  async startTurn({ prompt, model = null, mode = "agent", references: allReferences = [], attachments = [], contextReferences = [] }) {
     this.#assertUsable();
     if (this.activeTurnId) throw new Error("A Claude Code turn is already running.");
     const sdk = await this.#loadSdk();
     const projectInstructions = await this.projectInstructionLoader(this.workspaceRoot);
-    const references = [...contextReferences, ...attachments].filter((entry) => entry?.path);
+    const references = allReferences.length > 0 ? allReferences : [...contextReferences, ...attachments];
+    if (references.some((entry) => entry?.kind === "staged-attachment"
+      || typeof entry?.path !== "string" || !isInsideWorkspace(this.workspaceRoot, entry.path))) {
+      throw new Error("Claude Code received an unsupported or unauthorized reference input.");
+    }
     const turnId = `claude:${randomUUID()}`;
     const controller = new AbortController();
     const state = createClaudeEventState({ turnId, resumed: this.resuming || Boolean(this.sessionId) });
@@ -184,7 +199,7 @@ export class ClaudeAgentSdkAdapter {
     this.interruptRequested = false;
     this.messageChannel.setSessionId(this.sessionId ?? "");
     this.messageChannel.enqueue(createClaudeUserMessage(
-      formatPrompt(prompt, references, this.workspaceRoot),
+      formatClaudePrompt(prompt, references, this.workspaceRoot),
       this.sessionId ?? "",
     ));
     return { turnId };
@@ -591,7 +606,7 @@ function questionAnswerMap(questions, answers) {
   }));
 }
 
-function formatPrompt(prompt, references, workspaceRoot) {
+export function formatClaudePrompt(prompt, references, workspaceRoot) {
   const paths = Array.from(new Set(references
     .map((entry) => typeof entry?.path === "string" ? path.resolve(entry.path) : null)
     .filter((filename) => filename && isInsideWorkspace(workspaceRoot, filename))));
@@ -611,7 +626,7 @@ function projectInstructionIdentity(value) {
 
 function isInsideWorkspace(workspaceRoot, filename) {
   const relative = path.relative(workspaceRoot, filename);
-  return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 async function* idleInput(signal) {

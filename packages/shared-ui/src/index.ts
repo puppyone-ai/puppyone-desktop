@@ -45,8 +45,23 @@ export type {
   DataWorkspaceProps,
   DataWorkspaceState,
 } from "./data/DataWorkspace";
-export { EXPLORER_TREE_NODE_DRAG_TYPE, ExplorerTree } from "./data/ExplorerTree";
+export { ExplorerTree } from "./data/ExplorerTree";
 export type { ExplorerSelectionIntent, ExplorerTreeProps } from "./data/ExplorerTree";
+export {
+  EXPLORER_REFERENCE_DRAG_TYPE,
+  EXPLORER_REFERENCE_DRAG_VERSION,
+  EXPLORER_TREE_NODE_DRAG_TYPE,
+  classifyReferenceDataTransfer,
+  hasFileReferenceDataTransferSource,
+  hasReferenceDataTransferSource,
+  parseExplorerReferenceDrag,
+  serializeExplorerReferenceDrag,
+} from "./data/explorer/explorerReferenceDrag";
+export type {
+  ExplorerReferenceDragEntry,
+  ExplorerReferenceDragPayload,
+  ReferenceDataTransferSource,
+} from "./data/explorer/explorerReferenceDrag";
 export {
   getRendererPerformanceTracker,
   RendererPerformanceTracker,

@@ -171,6 +171,27 @@
   line-height: 1.55;
   white-space: pre-wrap;
 }
+.desktop-agent-message-references {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.desktop-agent-message-references:first-child { margin-top: 0; }
+.desktop-agent-message-references > span {
+  display: inline-flex;
+  max-width: 100%;
+  min-height: 24px;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid var(--agent-border-subtle);
+  border-radius: 6px;
+  color: var(--agent-text-muted);
+  font-size: var(--agent-font-size-meta);
+}
+.desktop-agent-message-references > span > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .desktop-agent-message-status {
   position: absolute;

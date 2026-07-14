@@ -85,6 +85,7 @@ export class AgentEventSynchronizer {
       phase: phaseForProjection(projection, state.phase),
       stopping: projection.runningTurnId ? state.stopping : false,
       pendingPrompt: turnAccepted || turnEnded ? null : state.pendingPrompt,
+      pendingIntent: turnAccepted || turnEnded ? null : state.pendingIntent,
       session: state.session
         ? applicable.reduce(updateSessionFromProjectionEvent, state.session)
         : null,
@@ -187,6 +188,7 @@ export class AgentEventSynchronizer {
             projection,
             phase: phaseForProjection(projection, state.phase),
             pendingPrompt: turnAccepted || turnEnded ? null : state.pendingPrompt,
+            pendingIntent: turnAccepted || turnEnded ? null : state.pendingIntent,
             session: {
               ...snapshot.session,
               activeTurnId: projection.runningTurnId,

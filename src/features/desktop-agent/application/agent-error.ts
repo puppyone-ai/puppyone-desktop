@@ -7,6 +7,8 @@ export type AgentErrorCode =
   | "provider-credentials-rejected"
   | "active-turn"
   | "session-prepare-failed"
+  | "references-not-ready"
+  | "steer-references-unsupported"
   | "unknown";
 
 export type AgentErrorDescriptor = Readonly<{

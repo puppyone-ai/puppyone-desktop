@@ -1,6 +1,6 @@
 import type { AgentProjection } from "../domain/agent-projection-types";
 import type {
-  AgentFileReference,
+  AgentDraftReference,
   AgentLocalConnection,
   AgentProviderInspection,
   AgentRuntimeId,
@@ -38,10 +38,11 @@ export type AgentControllerState = {
   draft: string;
   /** Optimistic prompt shown while the native backend accepts the turn. */
   pendingPrompt: string | null;
+  /** Immutable prompt/config/reference capture while native turn acceptance is pending. */
+  pendingIntent: import("../domain/agent-contract").AgentSubmissionIntent | null;
   /** Lifecycle of the reusable native session prepared for the selected runtime. */
   sessionPreparation: AgentSessionPreparation;
-  attachments: AgentFileReference[];
-  contextReferences: AgentFileReference[];
+  references: AgentDraftReference[];
   error: AgentErrorDescriptor | null;
   submitting: boolean;
   stopping: boolean;

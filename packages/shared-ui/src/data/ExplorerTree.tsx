@@ -38,6 +38,11 @@ import type {
 } from "./explorer/explorerMotionPlan";
 import { useExplorerMotion } from "./explorer/useExplorerMotion";
 import {
+  EXPLORER_REFERENCE_DRAG_TYPE,
+  EXPLORER_TREE_NODE_DRAG_TYPE,
+  serializeExplorerReferenceDrag,
+} from "./explorer/explorerReferenceDrag";
+import {
   EXPLORER_VIRTUAL_MAX_MOUNTED_ROWS,
   EXPLORER_VIRTUAL_ROW_SIZE,
   useExplorerVirtualWindow,
@@ -59,6 +64,8 @@ export type ExplorerTreeProps = {
   emptyLabel?: string;
   loadingLabel?: string;
   fileIconTheme?: FileIconThemeId;
+  /** Stable workspace identity embedded in outbound reference drags. */
+  dragWorkspaceId?: string;
   canMoveNodes?: boolean;
   onSelectNode: (node: DataNode | null, intent?: ExplorerSelectionIntent) => void;
   onToggleFolder?: (node: DataNode, expanded: boolean) => void;
@@ -105,7 +112,7 @@ type TreeDragController = {
   onRowDrop: (event: ReactDragEvent<HTMLElement>, targetFolderPath: string | null) => void;
 };
 
-export const EXPLORER_TREE_NODE_DRAG_TYPE = "application/x-puppyone-data-node-path";
+export { EXPLORER_TREE_NODE_DRAG_TYPE } from "./explorer/explorerReferenceDrag";
 const FOLDER_HOVER_EXPAND_MS = 620;
 const FOLDER_PEER_DROP_ZONE_RATIO = 0.34;
 const EXPLORER_ROW_DOM_ID_PREFIX = "puppyone-explorer-row";
@@ -126,6 +133,7 @@ export function ExplorerTree({
   emptyLabel,
   loadingLabel,
   fileIconTheme = "default",
+  dragWorkspaceId = "",
   canMoveNodes = false,
   onSelectNode,
   onToggleFolder,
@@ -272,21 +280,22 @@ export function ExplorerTree({
   }, []);
 
   const beginNodeDrag = useCallback((event: ReactDragEvent<HTMLDivElement>, node: DataNode) => {
-    if (!moveEnabled) {
-      event.preventDefault();
-      return;
-    }
-
     event.stopPropagation();
-    event.dataTransfer.effectAllowed = "copyMove";
+    event.dataTransfer.effectAllowed = moveEnabled ? "copyMove" : "copy";
     const movingNodes = selectedPathsRef.current.has(node.path) && selectedDragNodesRef.current.length > 0
       ? selectedDragNodesRef.current
       : [node];
     event.dataTransfer.setData(EXPLORER_TREE_NODE_DRAG_TYPE, movingNodes.map((item) => item.path).join("\n"));
+    if (dragWorkspaceId) {
+      event.dataTransfer.setData(
+        EXPLORER_REFERENCE_DRAG_TYPE,
+        serializeExplorerReferenceDrag(dragWorkspaceId, movingNodes),
+      );
+    }
     event.dataTransfer.setData("text/plain", movingNodes.map((item) => item.path).join("\n"));
     setDraggedNodes(movingNodes);
     setDropTarget(null);
-  }, [moveEnabled]);
+  }, [dragWorkspaceId, moveEnabled]);
 
   const dragOverRow = useCallback((
     event: ReactDragEvent<HTMLElement>,
@@ -353,7 +362,8 @@ export function ExplorerTree({
   }, [dropTarget]);
 
   const dragController = useMemo<TreeDragController>(() => ({
-    enabled: moveEnabled,
+    // Outbound copy/context drag is independent from in-tree move support.
+    enabled: true,
     onNodeDragStart: beginNodeDrag,
     onNodeDragEnd: clearDragState,
     onRowDragOver: dragOverRow,
@@ -365,7 +375,6 @@ export function ExplorerTree({
     dragLeaveRow,
     dragOverRow,
     dropOnRow,
-    moveEnabled,
   ]);
 
   const handleClipboardShortcut = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
