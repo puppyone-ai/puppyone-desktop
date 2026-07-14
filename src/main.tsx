@@ -7,6 +7,7 @@ import { ScrollbarActivity } from "./components/ScrollbarActivity";
 import { FeatureFlagsProvider } from "./features/flags";
 import { TypographyCatalogProvider } from "./features/typography";
 import { bootstrapRendererLocalization } from "./localization";
+import "./styles/cascade.css";
 import "./cloud-globals.css";
 import "@puppyone/shared-ui/shared-ui.css";
 import "./styles.css";

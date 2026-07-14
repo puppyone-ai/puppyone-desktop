@@ -48,16 +48,16 @@ if (/automation/i.test(viewerPackStore)) {
   errors.push("Viewer Pack storage must not contain an Automation namespace or record.");
 }
 
-const desktopView = read("src/components/DesktopCloudShell.tsx");
-if (!/"plugins"/.test(desktopView) || !/"automation"/.test(desktopView)) {
+const workspaceSurfaceTypes = read("src/features/app-shell/workspace-surfaces/workspaceSurfaceTypes.ts");
+if (!/"plugins"/.test(workspaceSurfaceTypes) || !/"automation"/.test(workspaceSurfaceTypes)) {
   errors.push("Desktop navigation must expose distinct Plugin and Automation view ids.");
 }
 
-const workspaceContent = read("src/features/app-shell/DesktopWorkspaceContent.tsx");
-if (!/lazy\(\(\) => import\("\.\.\/automation\/DesktopCloudAutomationView"\)/.test(workspaceContent)) {
+const workspaceSurfaceContent = read("src/features/app-shell/workspace-surfaces/useWorkspaceSurfaceContent.tsx");
+if (!/lazy\(\(\) => import\("\.\.\/\.\.\/automation"\)/.test(workspaceSurfaceContent)) {
   errors.push("Cloud Automation routes must remain lazy so their provider SDK and dialogs stay outside the local-first startup chunk.");
 }
-if (/from\s+["']\.\.\/automation["']/.test(workspaceContent)) {
+if (/from\s+["']\.\.\/\.\.\/automation["']/.test(workspaceSurfaceContent)) {
   errors.push("The app shell must not statically import the Cloud Automation feature barrel.");
 }
 const cloudAutomationRoute = read("src/features/cloud/sections/AutomationRouteSection.tsx");

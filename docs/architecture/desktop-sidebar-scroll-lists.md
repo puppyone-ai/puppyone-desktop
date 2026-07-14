@@ -168,15 +168,26 @@ so its section rows and nested scroll lists own the inline edge instead.
   - `--po-scrollbar-size`, `--desktop-sidebar-scrollbar-width`,
     `--desktop-sidebar-scroll-right-gap`, and
     `--desktop-sidebar-list-padding-block`
+- `packages/shared-ui/src/sidebar/SidebarScrollArea.tsx`,
+  `SidebarList.tsx`, `SidebarRow.tsx`
+  - process-neutral semantic components for scroll/list/row ownership
+- `packages/shared-ui/src/styles/sidebar-primitives.css`
+  - canonical `.po-sidebar-*` root, scroll, list, row, action, resize, and
+    virtual-list geometry in the `primitives` cascade layer
+- `packages/shared-ui/src/sidebar/VirtualSidebarList.tsx`,
+  `useVirtualSidebarWindow.ts`, `virtualizationPolicy.ts`
+  - native-list virtual window, 200-row activation threshold, and 120 mounted
+    row budget
+- `src/components/sidebar/`, `src/styles/sidebar/patterns.css`
+  - Desktop-only group/header/status/surface patterns in the `patterns` layer
 - `src/features/data-workspace/browser.css`
   - maps the shared sidebar edge tokens into the shared explorer tree contract
 - `packages/shared-ui/src/styles/data-workspace.css`
   - files explorer scroll area (`.explorer-tree-scroll`, reserved gutter),
     list padding compensation (`.explorer-tree-list`), tree row geometry
 - `src/features/source-control/styles/sidebar-base.css`
-  - transitional current owner of the generic tool sidebar scroll list
-    (`.desktop-tool-sidebar-list`) and row model; ISSUE-035 moves this shared
-    contract out of Source Control and removes the ownership inversion
+  - Source Control-scoped semantic accents only; it no longer owns shared
+    root/list/row/action geometry
 - `src/features/source-control/styles/sidebar-layout.css`
   - `.desktop-git-sidebar-list` gutter opt-out and outer block edge
 - `src/features/source-control/styles/sidebar-resources.css`
@@ -197,6 +208,10 @@ so its section rows and nested scroll lists own the inline edge instead.
   - legacy Changes review-list edge mapping
 - `packages/shared-ui/src/primitives/useScrollableClass.ts`
   - scrollability detection and `is-scrollable` class assignment
+- `src/features/source-control/sidebar/SourceControlResourceLists.tsx`,
+  `src/features/source-control/GitStatusView.tsx`,
+  `src/features/cloud/history/CloudHistorySidebar.tsx`
+  - current scalable-list consumers of the shared virtualization policy
 
 ## Invariants
 

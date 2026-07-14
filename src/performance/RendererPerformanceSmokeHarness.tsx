@@ -15,13 +15,30 @@ import {
 const SAMPLE_COUNT = readSampleTarget();
 const COLD_FIRST_OPEN = readBooleanParameter("rendererPerformanceCold");
 const ENABLE_LINK_INDEX = readBooleanParameter("rendererPerformanceLinkIndex");
+const ENABLE_OVERSIZED_BLOCKS = readBooleanParameter("rendererPerformanceOversizedBlocks");
 const WARMUP_COUNT = COLD_FIRST_OPEN ? 0 : 4;
 const FILE_A = "performance-a.md";
 const FILE_B = "performance-b.md";
+const OVERSIZED_TABLE_FILE = "performance-oversized-table.md";
+
+type OversizedTableSmokeResult = {
+  logicalRows: number;
+  mountedRowsInitial: number;
+  mountedRowsAfterScroll: number;
+  virtualStartAfterScroll: number;
+  anchorCorrections: number;
+  scrollSettleMs: number;
+};
+
+type RendererPerformanceSmokeResult = RendererPerformanceSummary & {
+  structural?: {
+    oversizedTable: OversizedTableSmokeResult;
+  };
+};
 
 declare global {
   interface Window {
-    __PUPPYONE_RENDERER_PERFORMANCE_SMOKE_RESULT__?: RendererPerformanceSummary | {
+    __PUPPYONE_RENDERER_PERFORMANCE_SMOKE_RESULT__?: RendererPerformanceSmokeResult | {
       error: string;
     };
   }
@@ -30,6 +47,7 @@ declare global {
 export function RendererPerformanceSmokeHarness() {
   const nodes = useMemo(() => makeExplorerNodes(1_000), []);
   const source = useMemo(() => makeMarkdown(10_000), []);
+  const oversizedTableSource = useMemo(() => makeOversizedTable(1_000), []);
   const workspace = useMemo<Workspace>(() => ({
     id: "renderer-performance-smoke",
     name: "Renderer performance smoke",
@@ -45,10 +63,10 @@ export function RendererPerformanceSmokeHarness() {
         path,
         name: path,
         type: "markdown",
-        content: source,
+        content: path === OVERSIZED_TABLE_FILE ? oversizedTableSource : source,
       };
     },
-  }), [nodes, source]);
+  }), [nodes, oversizedTableSource, source]);
 
   useEffect(() => {
     const tracker = getRendererPerformanceTracker();
@@ -58,6 +76,8 @@ export function RendererPerformanceSmokeHarness() {
     let warmupSamples = 0;
     let measuring = WARMUP_COUNT === 0;
     let timeoutId: number | null = null;
+    let oversizedCheckStarted = false;
+    let oversizedTableResult: OversizedTableSmokeResult | null = null;
 
     const finish = () => {
       if (stopped) return;
@@ -79,7 +99,10 @@ export function RendererPerformanceSmokeHarness() {
         tracker.recordOperation("markdown_link_worker_roundtrip", performance.now() - workerStartedAt);
         window.requestAnimationFrame(() => {
           window.requestAnimationFrame(() => {
-            window.__PUPPYONE_RENDERER_PERFORMANCE_SMOKE_RESULT__ = tracker.getSummary();
+            const summary = tracker.getSummary();
+            window.__PUPPYONE_RENDERER_PERFORMANCE_SMOKE_RESULT__ = oversizedTableResult
+              ? { ...summary, structural: { oversizedTable: oversizedTableResult } }
+              : summary;
           });
         });
       }).catch((error) => {
@@ -99,6 +122,19 @@ export function RendererPerformanceSmokeHarness() {
         return;
       }
       nextFile = nextFile === FILE_A ? FILE_B : FILE_A;
+      button.click();
+    };
+
+    const startOversizedTableCheck = () => {
+      if (stopped || oversizedCheckStarted) return;
+      const button = document.querySelector<HTMLButtonElement>(
+        `[data-explorer-path="${OVERSIZED_TABLE_FILE}"]`,
+      );
+      if (!button) {
+        window.requestAnimationFrame(startOversizedTableCheck);
+        return;
+      }
+      oversizedCheckStarted = true;
       button.click();
     };
 
@@ -144,10 +180,64 @@ export function RendererPerformanceSmokeHarness() {
       return true;
     };
 
+    const verifyOversizedTable = async () => {
+      const editorElement = document.querySelector<HTMLElement>(".markdown-codemirror-editor");
+      const editorView = editorElement ? EditorView.findFromDOM(editorElement) : null;
+      const wrapper = editorElement?.querySelector<HTMLElement>(
+        '.cm-md-table-widget-wrap[data-md-table-execution="windowed"]',
+      ) ?? null;
+      const table = wrapper?.querySelector<HTMLTableElement>(".cm-md-table-widget") ?? null;
+      if (!editorView || !wrapper || !table) {
+        throw new Error("Oversized table did not mount the windowed Markdown adapter.");
+      }
+
+      const logicalRows = Number(table.getAttribute("aria-rowcount"));
+      const mountedRowsInitial = countMountedTableRows(table);
+      if (logicalRows !== 1_001 || mountedRowsInitial <= 0 || mountedRowsInitial > 80) {
+        throw new Error(
+          `Oversized table initial bound failed (logical=${logicalRows}, mounted=${mountedRowsInitial}).`,
+        );
+      }
+
+      const scrollRect = editorView.scrollDOM.getBoundingClientRect();
+      const tableRect = table.getBoundingClientRect();
+      const tableTop = tableRect.top - scrollRect.top + editorView.scrollDOM.scrollTop;
+      const startedAt = performance.now();
+      editorView.scrollDOM.scrollTop = tableTop + tableRect.height * 0.62;
+      editorView.scrollDOM.dispatchEvent(new Event("scroll"));
+      await waitForAnimationFrames(2);
+      await waitForDelay(180);
+      await waitForAnimationFrames(1);
+
+      const mountedRowsAfterScroll = countMountedTableRows(table);
+      const virtualStartAfterScroll = Number(table.dataset.mdVirtualStart ?? "0");
+      if (mountedRowsAfterScroll <= 0 || mountedRowsAfterScroll > 80 || virtualStartAfterScroll <= 0) {
+        throw new Error(
+          `Oversized table scroll bound failed (start=${virtualStartAfterScroll}, mounted=${mountedRowsAfterScroll}).`,
+        );
+      }
+      oversizedTableResult = {
+        logicalRows,
+        mountedRowsInitial,
+        mountedRowsAfterScroll,
+        virtualStartAfterScroll,
+        anchorCorrections: Number(table.dataset.mdAnchorCorrections ?? "0"),
+        scrollSettleMs: performance.now() - startedAt,
+      };
+    };
+
     const onPerformance = (event: Event) => {
-      const detail = (event as CustomEvent<{ stage?: string }>).detail;
+      const detail = (event as CustomEvent<{ documentId?: string; stage?: string }>).detail;
       if (detail?.stage === "editor_base_ready" && !verifyPendingPresentation()) return;
       if (detail?.stage !== "preview_ready") return;
+      if (detail.documentId === OVERSIZED_TABLE_FILE) {
+        void verifyOversizedTable()
+          .then(finish)
+          .catch((error: unknown) => failPresentationContract(
+            error instanceof Error ? error.message : String(error),
+          ));
+        return;
+      }
       window.requestAnimationFrame(() => {
         if (stopped || !verifyReadyPresentation()) return;
         if (!measuring) {
@@ -168,7 +258,8 @@ export function RendererPerformanceSmokeHarness() {
         editorView.dispatch({ changes: { from: 0, insert: "x" } });
         const summary = tracker.getSummary();
         if (summary.completedSamples >= SAMPLE_COUNT) {
-          finish();
+          if (ENABLE_OVERSIZED_BLOCKS) startOversizedTableCheck();
+          else finish();
           return;
         }
         window.requestAnimationFrame(selectNextFile);
@@ -212,7 +303,13 @@ export function RendererPerformanceSmokeHarness() {
 
 function makeExplorerNodes(count: number): DataNode[] {
   return Array.from({ length: count }, (_, index) => {
-    const path = index === 0 ? FILE_A : index === 1 ? FILE_B : `document-${index}.md`;
+    const path = index === 0
+      ? FILE_A
+      : index === 1
+        ? FILE_B
+        : index === 2
+          ? OVERSIZED_TABLE_FILE
+          : `document-${index}.md`;
     return {
       id: path,
       name: path,
@@ -230,6 +327,35 @@ function makeMarkdown(lineCount: number): string {
     else lines.push(`Paragraph ${index} with **bold**, _emphasis_, and [link](note-${index % 30}.md).`);
   }
   return lines.join("\n");
+}
+
+function makeOversizedTable(bodyRowCount: number): string {
+  return [
+    "| Name | Value |",
+    "| --- | ---: |",
+    ...Array.from({ length: bodyRowCount }, (_, index) => `| row ${index} | ${index} |`),
+  ].join("\n");
+}
+
+function countMountedTableRows(table: HTMLTableElement): number {
+  return table.querySelectorAll("tbody tr[data-md-table-body-index]").length;
+}
+
+function waitForAnimationFrames(count: number): Promise<void> {
+  return new Promise((resolve) => {
+    const next = (remaining: number) => {
+      if (remaining <= 0) {
+        resolve();
+        return;
+      }
+      window.requestAnimationFrame(() => next(remaining - 1));
+    };
+    next(count);
+  });
+}
+
+function waitForDelay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
 function nextTask(signal?: AbortSignal): Promise<void> {

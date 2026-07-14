@@ -1,102 +1,41 @@
 import {
-  lazy,
-  Suspense,
   useCallback,
-  useEffect,
   useMemo,
-  useState,
   type ComponentProps,
-  type MouseEvent as ReactMouseEvent,
 } from "react";
 import {
   DataWorkspace,
   DocumentSessionBoundary,
-  EMPTY_VIEWER_PACK_SNAPSHOT,
   type AiEditRequest,
   type DataNode,
   type EditorInteractionPreferences,
   type EditorDocumentSession,
   type FilePreviewBodyContext,
-  type ViewerExtensionHostAdapter,
-  type ViewerPackSnapshot,
   type Workspace,
 } from "@puppyone/shared-ui";
-import { Plus } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
-import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
-import { GitSidebar, GitStatusView } from "../source-control";
-import type { DesktopGitController } from "../source-control/useDesktopGitController";
-import { SettingsSidebar, SettingsView, type SettingsSection } from "../settings";
-import {
-  CloudProjectHistorySidebar,
-  CloudProjectHistoryView,
-  DesktopCloudAccessSidebar,
-  CloudServiceMainView,
-  CloudServiceSidebar,
-  DesktopCloudAccessView,
-  type CloudWorkspaceSection,
-} from "../cloud";
-import {
-  resolveCloudProjectNavigationContext,
-} from "../cloud/attachment";
-import { useDesktopCloudAccessData } from "../cloud/data/useDesktopCloudAccessData";
-import { shouldLoadDesktopCloudAccessData } from "../cloud/data/shouldLoadDesktopCloudAccessData";
-import { useCloudHistoryController } from "../cloud/history/useCloudHistoryController";
-import { formatCloudMessage } from "../cloud/cloudPresentation";
-import { isCloudAccessNavigationResource } from "../cloud/sections/access/accessRows";
-import { getGitHostingMode } from "../source-control/viewModel";
+import type { DesktopGitController } from "../source-control";
+import type { SettingsSection } from "../settings";
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import type { useDesktopUpdates } from "../../components/DesktopUpdateControls";
-import type { DesktopCloudSession } from "../../lib/cloudApi";
-import { openExternalUrl } from "../../lib/localFiles";
 import type { FilesVisibilitySettings } from "../../preferences";
 import {
   formatFileOperationNotice,
   type FileClipboardController,
 } from "../data-workspace/useFileClipboard";
-import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import {
-  DesktopExplorerRowActions,
-  rectToCreateEntryAnchor,
-  type DesktopCreateEntryAnchorInput,
-} from "../data-workspace/nodeActions";
+import type { PuppyoneWorkspaceConfig } from "../../types/electron";
+import type { DesktopCreateEntryAnchorInput } from "../data-workspace/nodeActions";
 import { PuppyFlowEditor } from "../puppyflow/PuppyFlowEditor";
 import { isPuppyFlowFile } from "../puppyflow/puppyflowModel";
-import {
-  DEFAULT_PLUGINS_SECTION,
-  isPluginsNavigationVisible,
-  isViewerPluginsEnabled,
-  PluginsSidebar,
-  type PluginsSection,
-} from "../plugins";
+import { isViewerPluginsEnabled } from "../plugins";
 import type { DesktopPreferencesController } from "./useDesktopPreferences";
+import type { DesktopWorkspaceSurfaceAction } from "./navigation";
 import {
-  COLLAPSED_EXPLORER_WIDTH,
-  MAX_EXPLORER_WIDTH,
-  MIN_EXPLORER_WIDTH,
-} from "./preferences";
-import {
-  DesktopSidebarFooterNavigation,
-  DesktopSidebarRailNavigation,
-  type DesktopWorkspaceSurfaceAction,
-  DesktopSidebarTopNavigation,
-} from "./navigation";
-
-const LazyDesktopViewerPackSurface = lazy(() => import("../viewer-packs").then((module) => ({
-  default: module.DesktopViewerPackSurface,
-})));
-const LazyDesktopViewerPackFallback = lazy(() => import("../viewer-packs").then((module) => ({
-  default: module.DesktopViewerPackFallback,
-})));
-const LazyPluginsView = lazy(() => import("../plugins/PluginsView").then((module) => ({
-  default: module.PluginsView,
-})));
-const LazyDesktopCloudAutomationSidebar = lazy(() => import("../automation/DesktopCloudAutomationView").then((module) => ({
-  default: module.DesktopCloudAutomationSidebar,
-})));
-const LazyDesktopCloudAutomationView = lazy(() => import("../automation/DesktopCloudAutomationView").then((module) => ({
-  default: module.DesktopCloudAutomationView,
-})));
+  useWorkspaceSurfaceContent,
+  type DesktopWorkspaceCloudSurfaceController,
+} from "./workspace-surfaces";
+import { useDesktopViewerPacks } from "../viewer-packs/host";
+import { DesktopDataWorkspaceSurface } from "./DesktopDataWorkspaceSurface";
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopUpdatesController = ReturnType<typeof useDesktopUpdates>;
@@ -105,29 +44,7 @@ type DesktopWorkspaceContentProps = {
   activeAiEditRequest: AiEditRequest | null;
   activeDataPath: string | null;
   activeView: DesktopView;
-  cloud: {
-    activeSection: CloudWorkspaceSection;
-    attachment?: import("../cloud/attachment").ProjectCloudAttachment | null;
-    backupError: string | null;
-    backupLoading: boolean;
-    cloudApiBaseUrl: string | null;
-    cloudSession: DesktopCloudSession | null;
-    storedCloudSession: DesktopCloudSession | null;
-    enabled: boolean;
-    projectId: string | null;
-    selectedProjectId?: string | null;
-    selectedProjectCapabilities?: readonly string[];
-    sessionRestoring: boolean;
-    onCloudSessionChange: (session: DesktopCloudSession | null) => void;
-    onConfigureCloudRemote: import("../cloud/types").CloudServiceMainViewProps["onConfigureCloudRemote"];
-    onDetachCloudProject?: () => Promise<void>;
-    onOpenDetails: () => void;
-    onOpenGitSettings: () => void;
-    onSelectProjectId?: (projectId: string | null) => void;
-    onBackToCloudProjects?: () => void;
-    onSelectSection: (section: CloudWorkspaceSection) => void;
-    onStartPuppyoneBackup: () => void;
-  };
+  cloud: DesktopWorkspaceCloudSurfaceController;
   dataPort: DataWorkspacePort | null;
   fileClipboardController: FileClipboardController;
   desktopUpdates: DesktopUpdatesController;
@@ -199,67 +116,6 @@ export function DesktopWorkspaceContent({
     settings: preferences.experimentalSettings,
     workspaceIsCloud: cloudWorkspace,
   });
-  const pluginsNavigationVisible = isPluginsNavigationVisible({
-    featureEnabled: viewerPluginsEnabled,
-    visibility: preferences.sidebarNavigationVisibilitySettings,
-  });
-  const resolvedActiveView = activeView === "plugins" && !viewerPluginsEnabled
-    ? "data"
-    : cloudWorkspace && activeView === "cloud"
-    ? "data"
-    : !cloudWorkspace && (activeView === "access" || activeView === "automation") ? "data"
-      : activeView === "cloud" && !cloud.enabled ? "data"
-        : (activeView === "access" || activeView === "automation") && !cloud.enabled ? "data" : activeView;
-  const gitEnabled = !cloudWorkspace;
-  const gitHostingMode = getGitHostingMode(git.activeGitStatus, puppyoneConfig);
-  const workspaceChangeCount = gitEnabled
-    ? getDesktopWorkspaceChangeCount(git.activeGitStatus, gitHostingMode === "github")
-    : 0;
-  const cloudHubNavigationEnabled = cloud.enabled && !cloudWorkspace;
-  const attachment = cloud.attachment ?? { status: "local-only" as const, projectId: null };
-  const cloudNavigationContext = resolveCloudProjectNavigationContext(
-    attachment,
-    cloud.selectedProjectId ?? null,
-  );
-  const cloudToolsNavigationEnabled = cloud.enabled && cloudWorkspace && Boolean(cloud.projectId);
-  const needsCloudAccessData = shouldLoadDesktopCloudAccessData({
-    workspaceKind,
-    activeView: resolvedActiveView,
-  });
-  const cloudAccessData = useDesktopCloudAccessData({
-    projectId: needsCloudAccessData ? cloud.projectId : null,
-    cloudSession: cloud.cloudSession,
-    apiBaseUrl: cloud.cloudApiBaseUrl,
-    onCloudSessionChange: cloud.onCloudSessionChange,
-  });
-  const [activeCloudAccessRowId, setActiveCloudAccessRowId] = useState<string | null>(null);
-  const [activeAutomationProvider, setActiveAutomationProvider] = useState<string | null>(null);
-  const [activePluginsSection, setActivePluginsSection] = useState<PluginsSection>(DEFAULT_PLUGINS_SECTION);
-  const cloudHistoryActive = cloudWorkspace && resolvedActiveView === "git";
-  const cloudHistory = useCloudHistoryController({
-    session: cloud.cloudSession,
-    projectId: cloud.projectId,
-    apiBaseUrl: cloud.cloudApiBaseUrl,
-    enabled: cloudHistoryActive,
-    revisionKey: String(workspaceRefreshToken),
-    onSessionChange: cloud.onCloudSessionChange,
-  });
-  const cloudHistoryError = cloudHistory.error ? formatCloudMessage(cloudHistory.error, t) : null;
-  const cloudHistoryWarning = cloudHistory.warning ? formatCloudMessage(cloudHistory.warning, t) : null;
-
-  useEffect(() => {
-    const accessRows = cloudAccessData.accessRows.filter(isCloudAccessNavigationResource);
-    if (activeCloudAccessRowId && accessRows.some((row) => row.id === activeCloudAccessRowId)) return;
-    setActiveCloudAccessRowId(accessRows[0]?.id ?? null);
-  }, [activeCloudAccessRowId, cloudAccessData.accessRows]);
-
-  const handleAutomationProviderChange = useCallback((provider: string | null) => {
-    setActiveAutomationProvider(provider);
-  }, []);
-  const handleOpenGitFile = useCallback((path: string) => {
-    onActiveDataPathChange(path);
-    onNavigate("data");
-  }, [onActiveDataPathChange, onNavigate]);
   const renderPreviewBody = useCallback((node: DataNode, context: FilePreviewBodyContext) => {
     if (!isPuppyFlowFile(node.name, node.type)) return undefined;
 
@@ -289,591 +145,100 @@ export function DesktopWorkspaceContent({
     );
   }, [workspace?.path]);
 
-  const externalViewerPacksEnabled = viewerPluginsEnabled &&
-    typeof window !== "undefined" &&
-    Boolean(window.puppyoneDesktop?.viewerPacks);
-  const [viewerPackSnapshot, setViewerPackSnapshot] = useState<ViewerPackSnapshot>(EMPTY_VIEWER_PACK_SNAPSHOT);
-  const refreshViewerPackSnapshot = useCallback(async () => {
-    const bridge = window.puppyoneDesktop?.viewerPacks;
-    if (!bridge?.getSnapshot) {
-      setViewerPackSnapshot(EMPTY_VIEWER_PACK_SNAPSHOT);
-      return;
-    }
-    try {
-      const snapshot = await bridge.getSnapshot();
-      setViewerPackSnapshot(snapshot ?? EMPTY_VIEWER_PACK_SNAPSHOT);
-    } catch {
-      setViewerPackSnapshot(EMPTY_VIEWER_PACK_SNAPSHOT);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!externalViewerPacksEnabled) {
-      setViewerPackSnapshot(EMPTY_VIEWER_PACK_SNAPSHOT);
-      return;
-    }
-    void refreshViewerPackSnapshot();
-  }, [externalViewerPacksEnabled, refreshViewerPackSnapshot, workspaceKey]);
-
-  const externalViewerSurface = useCallback<NonNullable<ViewerExtensionHostAdapter["renderSurface"]>>(
-    ({ document, contribution }) => {
-      if (cloudWorkspace || !workspace.path) {
-        return (
-          <div className="viewer-pack-surface-status viewer-pack-surface-status--error">
-            {t("workspace.viewerPack.rootUnavailable")}
-          </div>
-        );
-      }
-      return (
-        <Suspense fallback={<div className="viewer-pack-surface-status">{t("workspace.viewerPack.loadingExtension")}</div>}>
-          <LazyDesktopViewerPackSurface
-            document={document}
-            contribution={contribution}
-            workspaceRoot={workspace.path}
-            onInstalled={refreshViewerPackSnapshot}
-          />
-        </Suspense>
-      );
-    },
-    [cloudWorkspace, refreshViewerPackSnapshot, t, workspace.path],
-  );
-  const viewerPackInstallFallback = useCallback<NonNullable<ViewerExtensionHostAdapter["renderInstallFallback"]>>(
-    ({ document }: { document: { path: string; name: string; mimeType?: string | null } }) => (
-      <Suspense fallback={<div className="viewer-pack-surface-status">{t("workspace.viewerPack.loadingOptions")}</div>}>
-        <LazyDesktopViewerPackFallback
-          document={{
-            path: document.path,
-            name: document.name,
-            type: "file",
-            mimeType: document.mimeType ?? null,
-            sourceKind: "local",
-          }}
-          onInstalled={refreshViewerPackSnapshot}
-        />
-      </Suspense>
-    ),
-    [refreshViewerPackSnapshot, t],
-  );
-  const viewerExtensionAdapter = useMemo<ViewerExtensionHostAdapter | null>(() => (
-    externalViewerPacksEnabled
-      ? {
-          snapshot: viewerPackSnapshot,
-          renderSurface: externalViewerSurface,
-          renderInstallFallback: viewerPackInstallFallback,
-        }
-      : null
-  ), [
-    externalViewerPacksEnabled,
-    externalViewerSurface,
-    viewerPackInstallFallback,
-    viewerPackSnapshot,
-  ]);
+  const {
+    adapter: viewerExtensionAdapter,
+    hostAvailable: externalViewerPacksEnabled,
+    refresh: refreshViewerPackSnapshot,
+    snapshot: viewerPackSnapshot,
+  } = useDesktopViewerPacks({
+    cloudWorkspace,
+    enabled: viewerPluginsEnabled,
+    workspaceKey,
+    workspacePath: workspace.path,
+  });
   const editorInteractionPreferences = useMemo<EditorInteractionPreferences>(() => ({
     markdownBlockDragEnabled: preferences.experimentalSettings.enableMarkdownBlockDrag,
   }), [preferences.experimentalSettings.enableMarkdownBlockDrag]);
-
-  const settingsView = (
-    <SettingsView
-      workspace={workspace}
-      activeSection={settingsSection}
-      gitStatus={git.activeGitStatus}
-      gitStatusLoading={git.gitStatusLoading}
-      gitStatusError={git.gitStatusError}
-      themeMode={preferences.themeMode}
-      lightThemePreset={preferences.lightThemePreset}
-      darkThemePreset={preferences.darkThemePreset}
-      textSize={preferences.textSize}
-      typographyPreferences={preferences.typographyPreferences}
-      pointerCursors={preferences.pointerCursors}
-      dockIcon={preferences.dockIcon}
-      diffMarkers={preferences.diffMarkers}
-      fileIconTheme={preferences.fileIconTheme}
-      sidebarNavigationLayout={preferences.sidebarNavigationLayout}
-      sidebarNavigationVisibilitySettings={preferences.sidebarNavigationVisibilitySettings}
-      filesVisibilitySettings={preferences.filesVisibilitySettings}
-      externalAppsSettings={preferences.externalAppsSettings}
-      experimentalSettings={preferences.experimentalSettings}
-      rightSidebarToolsSettings={preferences.rightSidebarToolsSettings}
-      titlebarActionsSettings={preferences.titlebarActionsSettings}
-      aiEditAssistEnabled={preferences.aiEditAssistEnabled}
-      cloudEnabled={cloud.enabled}
-      cloudSession={cloud.storedCloudSession}
-      cloudSessionRestoring={cloud.sessionRestoring}
-      cloudApiBaseUrl={cloud.cloudApiBaseUrl}
-      puppyoneConfig={puppyoneConfig}
-      puppyoneConfigLoading={puppyoneConfigLoading}
-      puppyoneConfigSaving={puppyoneConfigSaving}
-      puppyoneConfigError={puppyoneConfigError}
-      updateState={desktopUpdates.state}
-      onThemeModeChange={preferences.setThemeMode}
-      onLightThemePresetChange={preferences.setLightThemePreset}
-      onDarkThemePresetChange={preferences.setDarkThemePreset}
-      onTextSizeChange={preferences.setTextSize}
-      onTypographyPreferencesChange={preferences.setTypographyPreferences}
-      onPointerCursorsChange={preferences.setPointerCursors}
-      onDockIconChange={preferences.setDockIcon}
-      onDiffMarkersChange={preferences.setDiffMarkers}
-      onFileIconThemeChange={preferences.setFileIconTheme}
-      onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
-      onSidebarNavigationVisibilitySettingsChange={preferences.setSidebarNavigationVisibilitySettings}
-      onFilesVisibilitySettingsChange={onFilesVisibilitySettingsChange}
-      onExternalAppsSettingsChange={preferences.setExternalAppsSettings}
-      onExperimentalSettingsChange={preferences.setExperimentalSettings}
-      onRightSidebarToolsSettingsChange={preferences.setRightSidebarToolsSettings}
-      onTitlebarActionsSettingsChange={preferences.setTitlebarActionsSettings}
-      onAiEditAssistEnabledChange={preferences.setAiEditAssistEnabled}
-      onCloudSessionChange={cloud.onCloudSessionChange}
-      onPuppyoneConfigChange={onPuppyoneConfigChange}
-      onRegeneratePuppyoneProjectId={onRegeneratePuppyoneProjectId}
-      onUnlinkWorkspace={onUnlinkWorkspace}
-      onRefreshGitStatus={git.refreshGitStatus}
-      onCheckForUpdates={() => void desktopUpdates.checkForUpdates()}
-      onUpdateNow={() => void desktopUpdates.updateNow()}
-    />
-  );
-
-  const gitStatusView = (
-    <GitStatusView
-      workspace={workspace}
-      status={git.activeGitStatus}
-      activePanel={git.gitMainPanel}
-      selectedCommitId={git.selectedGitCommitId}
-      selectedWorkingFile={git.selectedGitWorkingFile}
-      commitDetail={git.gitCommitDetail}
-      commitDetailLoading={git.gitCommitDetailLoading}
-      commitDetailError={git.gitCommitDetailError}
-      workingFileDiff={git.gitWorkingFileDiff}
-      workingFileDiffLoading={git.gitWorkingFileDiffLoading}
-      workingFileDiffError={git.gitWorkingFileDiffError}
-      operationLoading={git.gitOperationLoading}
-      operationError={null}
-      loading={git.gitStatusLoading}
-      error={git.gitStatusError}
-      onRefresh={git.refreshGitStatus}
-      onSelectCommit={git.selectGitCommit}
-      onStagePaths={git.handleStageGitPaths}
-      onUnstagePaths={git.handleUnstageGitPaths}
-      onDiscardPaths={git.handleDiscardGitPaths}
-      onOpenWorkingFile={handleOpenGitFile}
-      onInitializeRepository={git.handleInitializeGitRepository}
-    />
-  );
-
-  const cloudProjectHistoryView = (
-    <CloudProjectHistoryView
-      projectId={cloud.projectId}
-      projectName={workspace.name}
-      history={cloudHistory.history}
-      rows={cloudHistory.rows}
-      selectedCommitId={cloudHistory.selectedCommitId}
-      loading={cloudHistory.loading}
-      loadingMore={cloudHistory.loadingMore}
-      hasMore={cloudHistory.hasMore}
-      error={cloudHistoryError}
-      warning={cloudHistoryWarning}
-      onSelectCommit={cloudHistory.selectCommit}
-      onRefresh={cloudHistory.reload}
-      onLoadMore={cloudHistory.loadMore}
-    />
-  );
-
-  const cloudMainView = (
-    <CloudServiceMainView
-      workspace={workspace}
-      status={git.activeGitStatus}
-      puppyoneConfig={puppyoneConfig}
-      cloudApiBaseUrl={cloud.cloudApiBaseUrl}
-      cloudSession={cloud.storedCloudSession}
-      sessionRestoring={cloud.sessionRestoring}
-      attachment={cloudWorkspace ? null : attachment}
-      onCloudSessionChange={cloud.onCloudSessionChange}
-      activeSection={cloud.activeSection}
-      selectedProjectId={cloud.selectedProjectId ?? null}
-      loading={git.gitStatusLoading}
-      error={git.gitStatusError}
-      cloudBackupLoading={cloud.backupLoading}
-      cloudBackupError={cloud.backupError}
-      onStartPuppyoneBackup={cloud.onStartPuppyoneBackup}
-      onConfigureCloudRemote={cloud.onConfigureCloudRemote}
-      onDetachCloudProject={cloud.onDetachCloudProject}
-      onSelectProjectId={cloud.onSelectProjectId}
-      onSelectSection={cloud.onSelectSection}
-      onRefresh={git.refreshGitStatus}
-      onOpenDetails={cloud.onOpenDetails}
-      onOpenGitSettings={cloud.onOpenGitSettings}
-    />
-  );
-
-  const cloudAccessView = (
-    <DesktopCloudAccessView
-      projectId={cloud.projectId}
-      cloudSession={cloud.cloudSession}
-      accessData={cloudAccessData}
-      activeFilter="all"
-      activeAccessRowId={activeCloudAccessRowId}
-      sessionRestoring={cloud.sessionRestoring}
-      onCloudSessionChange={cloud.onCloudSessionChange}
-      onRefresh={() => undefined}
-      onSelectAccessRow={setActiveCloudAccessRowId}
-    />
-  );
-
-  const cloudAutomationView = (
-    <Suspense fallback={<DesktopRouteLoading label={t("workspace.loadingAutomation")} />}>
-      <LazyDesktopCloudAutomationView
-        projectId={cloud.projectId}
-        cloudSession={cloud.cloudSession}
-        accessData={cloudAccessData}
-        activeProvider={activeAutomationProvider}
-        sessionRestoring={cloud.sessionRestoring}
-        onCloudSessionChange={cloud.onCloudSessionChange}
-        onRefresh={() => undefined}
-      />
-    </Suspense>
-  );
-
-  const pluginsView = (
-    <Suspense fallback={<div className="desktop-plugins-loading">{t("workspace.loadingPlugins")}</div>}>
-      <LazyPluginsView
-        activeSection={activePluginsSection}
-        hostAvailable={externalViewerPacksEnabled}
-        snapshot={viewerPackSnapshot}
-        onRefresh={refreshViewerPackSnapshot}
-        onSelectSection={setActivePluginsSection}
-      />
-    </Suspense>
-  );
+  const {
+    availableSurfaceIds,
+    cloudHubNavigationEnabled,
+    cloudToolsNavigationEnabled,
+    gitEnabled,
+    pluginsNavigationVisible,
+    resolvedActiveView,
+    resolvedSurface,
+    workspaceChangeCount,
+  } = useWorkspaceSurfaceContent({
+    activeView,
+    cloud,
+    desktopUpdates,
+    git,
+    onActiveDataPathChange,
+    onFilesVisibilitySettingsChange,
+    onNavigate,
+    onPuppyoneConfigChange,
+    onRegeneratePuppyoneProjectId,
+    onSelectSettingsSection,
+    onUnlinkWorkspace,
+    preferences,
+    puppyoneConfig,
+    puppyoneConfigError,
+    puppyoneConfigLoading,
+    puppyoneConfigSaving,
+    settingsSection,
+    viewerPacks: {
+      hostAvailable: externalViewerPacksEnabled,
+      refresh: refreshViewerPackSnapshot,
+      snapshot: viewerPackSnapshot,
+    },
+    viewerPluginsEnabled,
+    workspace,
+    workspaceKind,
+    workspaceRefreshToken,
+  });
 
   if (!dataPort) {
-    if (cloudWorkspace && !cloud.cloudSession) {
-      return resolvedActiveView === "automation" ? cloudAutomationView : cloudAccessView;
-    }
-    if (resolvedActiveView === "settings") return settingsView;
-    if (resolvedActiveView === "git") return cloudWorkspace ? cloudProjectHistoryView : gitStatusView;
-    if (resolvedActiveView === "cloud") return cloudMainView;
-    if (resolvedActiveView === "access") return cloudAccessView;
-    if (resolvedActiveView === "automation") return cloudAutomationView;
-    if (resolvedActiveView === "plugins") return pluginsView;
-    return null;
+    return resolvedSurface.content.main;
   }
 
   return (
-    <div
-      className="desktop-data-workspace-wrap"
-      data-minimal-mode={minimalMode ? "true" : undefined}
-      data-sidebar-navigation-placement={minimalMode ? undefined : preferences.sidebarNavigationPlacement}
-    >
-      {workspaceSurfaceError && (
-        <div className="desktop-workspace-surface-alert" role="status">
-          {workspaceSurfaceError}
-        </div>
-      )}
-      {fileClipboardController.notice && fileOperationNotice && (
-        <div
-          className="desktop-file-operation-notice"
-          data-tone={fileClipboardController.notice.tone}
-          role="status"
-          aria-live="polite"
-          dir="auto"
-        >
-          {fileOperationNotice}
-        </div>
-      )}
-      <DataWorkspace
-        key={workspaceKey}
-        workspace={workspace}
-        labels={{ root: workspace.name }}
-        dataPort={dataPort}
-        activePath={activeDataPath}
-        onActivePathChange={onActiveDataPathChange}
-        onActiveNodeChange={onActiveDataNodeChange}
-        onOpenExternalUrl={openExternalUrl}
-        viewerExtensionAdapter={viewerExtensionAdapter}
-        documentSourceKind={cloudWorkspace ? "cloud" : "local"}
-        resizableExplorer
-        explorerCollapsed={false}
-        explorerWidth={preferences.explorerWidth}
-        minExplorerWidth={MIN_EXPLORER_WIDTH}
-        maxExplorerWidth={MAX_EXPLORER_WIDTH}
-        collapsedExplorerWidth={COLLAPSED_EXPLORER_WIDTH}
-        onExplorerWidthChange={preferences.setExplorerWidth}
-        showHeader={false}
-        showExplorerRoot={false}
-        onExplorerRootContextMenu={(_state, event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onCreateEntryMenu(null, getContextMenuAnchorRect(event));
-        }}
-        onExplorerNodeContextMenu={(state, node, event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const anchorRect = getContextMenuAnchorRect(event);
-          const selectedNodes = state.selectedNodes.some((selectedNode) => selectedNode.path === node.path)
-            ? state.selectedNodes
-            : [node];
-          onNodeActionMenu(node, anchorRect, selectedNodes);
-        }}
-        explorerCutPaths={fileClipboardController.cutPaths}
-        onCopyNodes={fileClipboardController.copyNodes}
-        onCutNodes={fileClipboardController.cutNodes}
-        onPasteNodes={fileClipboardController.pasteNodes}
-        onDuplicateNodes={fileClipboardController.duplicateNodes}
-        explorerListEndSlot={
-          <button
-            className="tree-row desktop-explorer-list-end-create-row"
-            type="button"
-            onClick={(event) => onCreateEntryMenu(
-              null,
-              rectToCreateEntryAnchor(event.currentTarget.getBoundingClientRect(), "auto-end"),
-            )}
-          >
-            <span className="tree-row-content desktop-explorer-list-end-create-command">
-              <span className="tree-icon-slot">
-                <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
-              </span>
-              <span className="tree-label">
-                <span className="tree-label-primary">{t("workspace.explorer.new")}</span>
-              </span>
-            </span>
-          </button>
-        }
-        showExplorerToolbar={!minimalMode && preferences.sidebarNavigationPlacement === "top"}
-        explorerToolbarSlot={!minimalMode && preferences.sidebarNavigationPlacement === "top" ? (
-          <DesktopSidebarTopNavigation
-            activeView={resolvedActiveView}
-            cloudHistoryEnabled={cloudWorkspace}
-            cloudHubEnabled={cloudHubNavigationEnabled}
-            cloudToolsEnabled={cloudToolsNavigationEnabled}
-            gitEnabled={gitEnabled}
-            pluginsEnabled={pluginsNavigationVisible}
-            orientation={preferences.sidebarNavigationOrientation}
-            gitIncomingCount={git.gitIncomingCount}
-            gitOperationLoading={git.gitOperationLoading}
-            gitStatus={git.activeGitStatus}
-            workspaceChangeCount={workspaceChangeCount}
-            onNavigate={onNavigate}
-            onOpenSettings={onOpenSettings}
-          />
-        ) : undefined}
-        explorerRailSlot={!minimalMode && preferences.sidebarNavigationPlacement === "left" ? (
-          <DesktopSidebarRailNavigation
-            activeView={resolvedActiveView}
-            cloudHistoryEnabled={cloudWorkspace}
-            cloudHubEnabled={cloudHubNavigationEnabled}
-            cloudToolsEnabled={cloudToolsNavigationEnabled}
-            gitEnabled={gitEnabled}
-            pluginsEnabled={pluginsNavigationVisible}
-            gitIncomingCount={git.gitIncomingCount}
-            gitOperationLoading={git.gitOperationLoading}
-            gitStatus={git.activeGitStatus}
-            workspaceChangeCount={workspaceChangeCount}
-            surfaceAction={workspaceSurfaceAction}
-            onNavigate={onNavigate}
-            onOpenSettings={onOpenSettings}
-          />
-        ) : undefined}
-        showPreviewHeader={false}
-        hidePreviewSourceView
-        renderPreviewBody={renderPreviewBody}
-        fileIconTheme={preferences.fileIconTheme}
-        editorInteractionPreferences={editorInteractionPreferences}
-        editorSaveMode="auto"
-        htmlTrustMode="safe"
-        aiEditRequest={activeAiEditRequest}
-        enableMarkdownLinkContentIndexing={!cloudWorkspace}
-        folderExpansionStrategy={cloudWorkspace ? "optimistic" : "load-before-expand"}
-        refreshKey={workspaceRefreshToken}
-        explorerNodeActionSlot={(state, node) => (
-          <DesktopExplorerRowActions
-            node={node}
-            parentPath={node.type === "folder" ? node.path : null}
-            onCreate={onCreateEntryMenu}
-            onOpenNodeMenu={(targetNode, anchorRect) => {
-              const selectedNodes = state.selectedNodes.some((selectedNode) => selectedNode.path === targetNode.path)
-                ? state.selectedNodes
-                : [targetNode];
-              onNodeActionMenu(targetNode, anchorRect, selectedNodes);
-            }}
-          />
-        )}
-        explorerSlot={resolvedActiveView === "data" ? undefined : (
-          <div className="desktop-view-surface desktop-view-surface-sidebar" data-view={resolvedActiveView}>
-            {resolvedActiveView === "access" ? (
-              <DesktopCloudAccessSidebar
-                accessData={cloudAccessData}
-                activeAccessRowId={activeCloudAccessRowId}
-                onSelectAccessRow={setActiveCloudAccessRowId}
-              />
-            ) : resolvedActiveView === "automation" ? (
-              <Suspense fallback={<DesktopRouteLoading label="Loading automation navigation…" />}>
-                <LazyDesktopCloudAutomationSidebar
-                  accessData={cloudAccessData}
-                  activeProvider={activeAutomationProvider}
-                  onSelectProvider={handleAutomationProviderChange}
-                />
-              </Suspense>
-            ) : resolvedActiveView === "plugins" ? (
-              <PluginsSidebar
-                activeSection={activePluginsSection}
-                installedCount={viewerPackSnapshot.contributions.length}
-                onSelectSection={setActivePluginsSection}
-              />
-            ) : resolvedActiveView === "git" && cloudWorkspace ? (
-              <CloudProjectHistorySidebar
-                rows={cloudHistory.rows}
-                selectedCommitId={cloudHistory.selectedCommitId}
-                loading={cloudHistory.loading}
-                loadingMore={cloudHistory.loadingMore}
-                hasMore={cloudHistory.hasMore}
-                error={cloudHistoryError}
-                warning={cloudHistoryWarning}
-                onSelectCommit={cloudHistory.selectCommit}
-                onRefresh={cloudHistory.reload}
-                onLoadMore={cloudHistory.loadMore}
-              />
-            ) : resolvedActiveView === "git" ? (
-              <GitSidebar
-                status={git.activeGitStatus}
-                puppyoneConfig={puppyoneConfig}
-                gitDisplayMode={preferences.gitDisplayMode}
-                fileIconTheme={preferences.fileIconTheme}
-                activePanel={git.gitMainPanel}
-                loading={git.gitStatusLoading}
-                error={git.gitStatusError}
-                selectedWorkingFile={git.selectedGitWorkingFile}
-                operationLoading={git.gitOperationLoading}
-                operationError={null}
-                onSelectPanel={git.selectGitMainPanel}
-                onSelectWorkingFile={git.selectGitWorkingFile}
-                onStagePaths={git.handleStageGitPaths}
-                onStageAll={git.handleStageAllGitChanges}
-                onUnstagePaths={git.handleUnstageGitPaths}
-                onDiscardPaths={git.handleDiscardGitPaths}
-                onDiscardAll={git.handleDiscardAllGitChanges}
-                onStageAndCommit={git.handleStageAndCommitGit}
-                onCommit={git.handleCommitGit}
-                onCommitAndPush={git.handleCommitAndPushGit}
-                onPull={git.handlePullGit}
-                onPush={git.handlePushGit}
-                onPublish={git.handlePublishGitBranch}
-                cloudBackupLoading={cloud.backupLoading}
-                cloudBackupError={cloud.backupError}
-                cloudEnabled={cloud.enabled}
-                onStartPuppyoneBackup={cloud.onStartPuppyoneBackup}
-              />
-            ) : resolvedActiveView === "cloud" ? (
-              <CloudServiceSidebar
-                status={git.activeGitStatus}
-                cloudSession={cloud.storedCloudSession}
-                cloudApiBaseUrl={cloud.cloudApiBaseUrl}
-                activeSection={cloud.activeSection}
-                projectContext={cloudNavigationContext.projectContext}
-                projectBound={cloudNavigationContext.projectBound && !cloudWorkspace}
-                projectCapabilities={
-                  attachment.status === "linked"
-                    ? attachment.capabilities ?? []
-                    : cloud.selectedProjectCapabilities ?? []
-                }
-                onSelectSection={cloud.onSelectSection}
-                onBackToProjects={cloud.onBackToCloudProjects ?? (() => {
-                  cloud.onSelectSection("overview");
-                })}
-              />
-            ) : (
-              <SettingsSidebar
-                activeSection={settingsSection}
-                onSelectSection={onSelectSettingsSection}
-              />
-            )}
-          </div>
-        )}
-        explorerFooterSlot={
-          !minimalMode && preferences.sidebarNavigationPlacement === "bottom" ? (
-            <DesktopSidebarFooterNavigation
-              activeView={resolvedActiveView}
-              cloudHistoryEnabled={cloudWorkspace}
-              cloudHubEnabled={cloudHubNavigationEnabled}
-              cloudToolsEnabled={cloudToolsNavigationEnabled}
-              gitEnabled={gitEnabled}
-              pluginsEnabled={pluginsNavigationVisible}
-              gitIncomingCount={git.gitIncomingCount}
-              gitOperationLoading={git.gitOperationLoading}
-              gitStatus={git.activeGitStatus}
-              workspaceChangeCount={workspaceChangeCount}
-              surfaceAction={workspaceSurfaceAction}
-              onNavigate={onNavigate}
-              onOpenSettings={onOpenSettings}
-            />
-          ) : undefined
-        }
-        mainSlot={resolvedActiveView === "git" || resolvedActiveView === "plugins" || resolvedActiveView === "settings" || resolvedActiveView === "cloud" || resolvedActiveView === "access" || resolvedActiveView === "automation" ? (
-          <div className="desktop-view-surface desktop-view-surface-main" data-view={resolvedActiveView}>
-            {resolvedActiveView === "git"
-              ? cloudWorkspace ? cloudProjectHistoryView : gitStatusView
-              : resolvedActiveView === "plugins"
-                ? pluginsView
-              : resolvedActiveView === "cloud"
-                ? cloudMainView
-                : resolvedActiveView === "access"
-                  ? cloudAccessView
-                  : resolvedActiveView === "automation"
-                    ? cloudAutomationView
-                  : settingsView}
-          </div>
-        ) : undefined}
-        capabilities={{
-          create: true,
-          rename: true,
-          delete: true,
-          move: true,
-          copy: Boolean(dataPort.copyNode),
-          write: Boolean(dataPort.documentPersistence),
-          history: true,
-          accessPoints: false,
-          cloudSync: false,
-          localGit: gitEnabled,
-          connectors: false,
-        }}
-      />
-      {activeAiEditRequest && resolvedActiveView === "data" && (
-        <div className="desktop-ai-edit-review-floating">
-          <AiResponseChangesCard
-            request={activeAiEditRequest}
-            activePath={activeDataPath}
-            onOpenFile={onActiveDataPathChange}
-          />
-        </div>
-      )}
-    </div>
+    <DesktopDataWorkspaceSurface
+      activeAiEditRequest={activeAiEditRequest}
+      activeDataPath={activeDataPath}
+      cloudWorkspace={cloudWorkspace}
+      dataPort={dataPort}
+      editorInteractionPreferences={editorInteractionPreferences}
+      fileClipboardController={fileClipboardController}
+      fileOperationNotice={fileOperationNotice}
+      minimalMode={minimalMode}
+      navigation={{
+        activeView: resolvedActiveView,
+        availableSurfaceIds,
+        cloudHistoryEnabled: cloudWorkspace,
+        cloudHubEnabled: cloudHubNavigationEnabled,
+        cloudToolsEnabled: cloudToolsNavigationEnabled,
+        gitEnabled,
+        pluginsEnabled: pluginsNavigationVisible,
+        gitIncomingCount: git.gitIncomingCount,
+        gitOperationLoading: git.gitOperationLoading,
+        gitStatus: git.activeGitStatus,
+        workspaceChangeCount,
+        surfaceAction: workspaceSurfaceAction,
+        onNavigate,
+        onOpenSettings,
+      }}
+      onActiveDataNodeChange={onActiveDataNodeChange}
+      onActiveDataPathChange={onActiveDataPathChange}
+      onCreateEntryMenu={onCreateEntryMenu}
+      onNodeActionMenu={onNodeActionMenu}
+      preferences={preferences}
+      renderPreviewBody={renderPreviewBody}
+      resolvedSurface={resolvedSurface}
+      viewerExtensionAdapter={viewerExtensionAdapter}
+      workspace={workspace}
+      workspaceKey={workspaceKey}
+      workspaceRefreshToken={workspaceRefreshToken}
+      workspaceSurfaceError={workspaceSurfaceError}
+    />
   );
-}
-
-function DesktopRouteLoading({ label }: { label: string }) {
-  return (
-    <div className="desktop-view-route-loading" role="status" aria-live="polite">
-      {label}
-    </div>
-  );
-}
-
-function getContextMenuAnchorRect(event: ReactMouseEvent<HTMLElement>): DOMRect {
-  if (event.clientX === 0 && event.clientY === 0) {
-    return event.currentTarget.getBoundingClientRect();
-  }
-  return new DOMRect(event.clientX, event.clientY, 0, 0);
-}
-
-function getDesktopWorkspaceChangeCount(
-  status: GitStatusSnapshot | null,
-  includeCommittedChanges: boolean,
-) {
-  if (!status?.isRepo) return 0;
-  const localChangeCount =
-    status.stagedEntries.length +
-    status.unstagedEntries.length +
-    status.untrackedEntries.length;
-  const committedChangeCount = includeCommittedChanges
-    ? Math.max(0, status.sourceControl.remote.ahead)
-    : 0;
-  return localChangeCount + committedChangeCount;
 }

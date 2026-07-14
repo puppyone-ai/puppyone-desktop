@@ -18,6 +18,10 @@ const sourceControlSidebarSource = readFileSync(
   new URL("../src/features/source-control/SourceControlSidebar.tsx", import.meta.url),
   "utf8",
 );
+const sourceControlSidebarSectionsSource = readFileSync(
+  new URL("../src/features/source-control/sidebar/SourceControlSidebarSections.tsx", import.meta.url),
+  "utf8",
+);
 const versionControlSetupSource = readFileSync(
   new URL("../src/features/source-control/VersionControlSetupState.tsx", import.meta.url),
   "utf8",
@@ -51,7 +55,7 @@ const titlebarContextSource = readFileSync(
   "utf8",
 );
 const navigationSource = readFileSync(
-  new URL("../src/features/app-shell/navigation.tsx", import.meta.url),
+  new URL("../src/features/app-shell/navigation/navigationModel.tsx", import.meta.url),
   "utf8",
 );
 const operationDialogsSource = readFileSync(
@@ -98,7 +102,7 @@ describe("source-control visual architecture", () => {
       ".desktop-git-section-title",
     ));
 
-    expect(sourceControlSidebarSource).toContain("<bdi>{label}</bdi>");
+    expect(sourceControlSidebarSectionsSource).toContain("<bdi>{label}</bdi>");
     expect(sectionTitle).toContain(
       "font-size: var(--desktop-sidebar-section-title-font-size, var(--git-font-small));",
     );
@@ -327,7 +331,7 @@ describe("source-control visual architecture", () => {
     ));
     const stageAll = compact(readCssBlock(
       sidebarResourcesCss,
-      ".desktop-git-section-actions .desktop-tool-sidebar-icon.desktop-git-stage-all-action",
+      ".desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-all-action",
     ));
     const select = (overrides: Partial<Parameters<typeof getSourceControlPrimaryActionSlot>[0]> = {}) => (
       getSourceControlPrimaryActionSlot({

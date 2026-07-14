@@ -6,18 +6,6 @@
   --git-action-font-size: 12px;
 }
 
-.desktop-tool-sidebar {
-  display: flex;
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--po-sidebar);
-}
-
 .desktop-git-sidebar {
   --git-sidebar-left-gap: var(--desktop-sidebar-row-left-gap);
   --git-sidebar-right-gap: var(--desktop-sidebar-row-right-gap);
@@ -45,146 +33,6 @@
   --git-weight-regular: var(--desktop-sidebar-font-weight, var(--po-text-weight-medium, 500));
   --git-weight-strong: var(--desktop-sidebar-font-weight-emphasis, 650);
   --git-icon-label-gap: var(--desktop-sidebar-icon-label-gap, 4px);
-}
-
-.desktop-tool-sidebar-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--po-text-muted);
-}
-
-.desktop-tool-sidebar-icon:hover {
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
-.desktop-tool-sidebar-icon.primary {
-  background: color-mix(in srgb, var(--po-text) 10%, transparent);
-  color: var(--po-text);
-}
-
-.desktop-tool-sidebar-icon.primary:hover {
-  background: color-mix(in srgb, var(--po-text) 14%, transparent);
-  color: var(--po-text);
-}
-
-.desktop-tool-sidebar-icon.danger {
-  color: var(--po-danger);
-}
-
-.desktop-tool-sidebar-icon:disabled,
-.desktop-tool-sidebar-icon:disabled:hover {
-  background: transparent;
-  color: var(--po-text-disabled);
-  opacity: 0.58;
-}
-
-.desktop-tool-sidebar-list {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  overflow-x: hidden;
-  /* Reserved gutter + reduced right padding keep the content inset equal to
-     --desktop-sidebar-row-right-gap whether or not the list scrolls. */
-  padding-block: var(--desktop-sidebar-list-padding-block);
-  padding-inline: var(--desktop-sidebar-row-left-gap) var(--desktop-sidebar-scroll-right-gap);
-  scrollbar-gutter: stable;
-}
-
-.desktop-tool-sidebar-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  height: var(--desktop-sidebar-row-height);
-  min-width: 0;
-  margin: 1px 0;
-  padding-block: 0;
-  padding-inline: var(--desktop-sidebar-row-content-left) var(--desktop-sidebar-row-content-right);
-  border: 0;
-  border-radius: var(--desktop-sidebar-row-radius);
-  background: transparent;
-  color: var(--po-text-muted);
-  font-size: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));
-  font-weight: var(--desktop-sidebar-font-weight, var(--po-text-weight-medium, 500));
-  line-height: var(--desktop-sidebar-line-height, 18px);
-  text-align: start;
-}
-
-.desktop-tool-sidebar-row:hover:not(:disabled),
-.desktop-tool-sidebar-row.active {
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
-.desktop-tool-sidebar-row.active {
-  background: var(--po-hover);
-}
-
-.desktop-tool-sidebar-row.active:hover:not(:disabled) {
-  background: var(--po-selected);
-}
-
-.desktop-tool-sidebar-row:disabled,
-.desktop-tool-sidebar-row[aria-disabled="true"] {
-  cursor: default;
-  color: var(--po-text-disabled);
-  opacity: 0.42;
-}
-
-.desktop-tool-sidebar-row:disabled:hover,
-.desktop-tool-sidebar-row[aria-disabled="true"]:hover {
-  background: transparent;
-  color: var(--po-text-disabled);
-}
-
-.desktop-tool-sidebar-row span:last-child {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-tool-sidebar-empty {
-  display: flex;
-  align-items: center;
-  min-height: var(--desktop-sidebar-row-height);
-  margin: 1px 0;
-  padding-block: 0;
-  padding-inline: var(--desktop-sidebar-row-content-left) var(--desktop-sidebar-row-content-right);
-  color: var(--po-text-subtle);
-  font-size: 12.5px;
-}
-
-.desktop-tool-sidebar-empty.vertical {
-  height: auto;
-  min-height: 0;
-  flex-direction: column;
-  align-items: start;
-  gap: 8px;
-  padding-block: 8px;
-  padding-inline: var(--desktop-sidebar-row-content-left) var(--desktop-sidebar-row-content-right);
-}
-
-.desktop-tool-sidebar-empty.danger {
-  color: var(--po-danger);
-}
-
-.desktop-tool-sidebar-list > .desktop-tool-sidebar-empty:only-child {
-  min-height: calc(100% - 2px);
-  justify-content: center;
-  text-align: center;
-}
-
-.desktop-tool-sidebar-list > .desktop-tool-sidebar-empty.vertical:only-child {
-  align-items: center;
 }
 
 .desktop-git-sidebar-empty-history {
@@ -225,40 +73,7 @@
   line-height: 1.35;
 }
 
-.desktop-tool-sidebar-action {
-  height: var(--git-action-size);
-  padding: 0 var(--git-action-padding-inline);
-  border: 1px solid color-mix(in srgb, var(--po-accent) 34%, var(--po-border));
-  border-radius: var(--git-action-radius);
-  background: color-mix(in srgb, var(--po-accent) 10%, var(--po-panel));
-  color: var(--po-accent);
-  font-size: var(--git-action-font-size);
-  font-weight: 650;
-}
-
-.desktop-tool-sidebar-action:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--po-accent) 16%, var(--po-panel));
-}
-
-.desktop-tool-sidebar-action:disabled {
-  border-color: var(--po-border-subtle);
-  background: var(--po-control);
-  color: var(--po-text-disabled);
-}
-
-.desktop-tool-sidebar-error-text {
-  color: var(--po-danger);
-  font-size: 11.5px;
-  line-height: 1.35;
-}
-
-.desktop-tool-sidebar-empty.compact {
-  min-height: 26px;
-  padding-inline-start: calc(var(--desktop-sidebar-row-content-left) + 20px);
-  font-size: 12px;
-}
-
-.desktop-git-sidebar .desktop-tool-sidebar-empty {
+.desktop-git-sidebar .po-sidebar-empty {
   margin: 1px 0;
   padding-block: 0;
   padding-inline:
@@ -266,14 +81,14 @@
     calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
 }
 
-.desktop-git-sidebar .desktop-tool-sidebar-empty.vertical {
+.desktop-git-sidebar .po-sidebar-empty.vertical {
   padding-block: 8px;
   padding-inline:
     calc(var(--git-sidebar-left-gap) + var(--git-sidebar-content-left))
     calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
 }
 
-.desktop-git-sidebar .desktop-tool-sidebar-empty.compact {
+.desktop-git-sidebar .po-sidebar-empty.compact {
   padding-inline-start: calc(var(--git-sidebar-left-gap) + var(--git-sidebar-content-left) + 20px);
 }
 
@@ -305,7 +120,6 @@
   line-height: 1.35;
 }
 
-.desktop-tool-sidebar-icon .spin,
 .desktop-utility-icon-button .spin {
   animation: spin 900ms linear infinite;
 }

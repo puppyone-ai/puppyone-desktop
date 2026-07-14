@@ -2,6 +2,7 @@ import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
 import { getMarkdownHtmlBlock } from "../../features/html/htmlBlockModel";
+import type { MarkdownHtmlBlockMetrics } from "../../features/html/htmlBlockModel";
 import {
   getMarkdownCodeBlock,
   type MarkdownCodeSourceReference,
@@ -31,8 +32,22 @@ export type MarkdownElementBlockData =
       sourceReference: MarkdownCodeSourceReference | null;
       code: string;
     }
-  | { kind: "htmlBlock"; tagName: string | null; closed: boolean; source: string }
-  | { kind: "table"; alignments: readonly MarkdownTableAlignment[]; rows: readonly MarkdownTableRow[] }
+  | {
+      kind: "htmlBlock";
+      tagName: string | null;
+      closed: boolean;
+      source: string;
+      metrics: MarkdownHtmlBlockMetrics;
+    }
+  | {
+      kind: "table";
+      alignments: readonly MarkdownTableAlignment[];
+      rows: readonly MarkdownTableRow[];
+      rowCount: number;
+      cellCount: number;
+      sourceBytes: number;
+      modelComplete: boolean;
+    }
   | { kind: "task"; checked: boolean }
   | { kind: "image"; alt: string; href: string; title: string | null };
 
@@ -455,7 +470,13 @@ function addExtendedLineElements(
         markerRanges: [{ from: htmlBlock.from, to: htmlBlock.to }],
         lineFrom: line.from,
         lineTo: state.doc.line(htmlBlock.nextLineNumber - 1).to,
-        blockData: { kind: "htmlBlock", tagName: htmlBlock.tagName, closed: htmlBlock.closed, source: htmlBlock.source },
+        blockData: {
+          kind: "htmlBlock",
+          tagName: htmlBlock.tagName,
+          closed: htmlBlock.closed,
+          source: htmlBlock.source,
+          metrics: htmlBlock.metrics,
+        },
       });
       lineNumber = htmlBlock.nextLineNumber - 1;
       continue;
@@ -474,6 +495,10 @@ function addExtendedLineElements(
           kind: "table",
           alignments: tableBlock.alignments,
           rows: tableBlock.rows,
+          rowCount: tableBlock.rowCount,
+          cellCount: tableBlock.cellCount,
+          sourceBytes: tableBlock.sourceBytes,
+          modelComplete: tableBlock.modelComplete,
         },
       });
       lineNumber = tableBlock.nextLineNumber - 1;

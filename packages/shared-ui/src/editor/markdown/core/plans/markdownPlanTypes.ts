@@ -1,5 +1,9 @@
 import type { MarkdownTableAlignment, MarkdownTableRow } from "../../features/table/tableModel";
 import type { MarkdownCodeSourceReference } from "../../features/code-block/codeBlockModel";
+import type {
+  MarkdownBlockComplexity,
+  MarkdownMountedBlockExecution,
+} from "./markdownBlockExecution";
 
 export type SourceRange = {
   from: number;
@@ -93,6 +97,8 @@ export type MarkdownElementPlan =
       presentation: "blockAtom";
       sourceRange: SourceRange;
       embed: BlockEmbedModel;
+      complexity: MarkdownBlockComplexity;
+      execution: MarkdownMountedBlockExecution;
       layout: { estimatedHeight: number };
       diagnostics: readonly MarkdownDiagnostic[];
       capabilities: BlockEmbedCapabilities;

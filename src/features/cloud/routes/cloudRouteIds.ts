@@ -1,5 +1,6 @@
 export const CLOUD_WORKSPACE_SECTIONS = [
   "overview",
+  "templates",
   "cloud-team",
   "cloud-billing",
   "contents",

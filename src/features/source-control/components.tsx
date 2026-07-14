@@ -1,6 +1,11 @@
 import { ChevronRight, Minus, Plus, Undo2 } from "lucide-react";
-import { FileGlyphIcon, type FileIconThemeId } from "@puppyone/shared-ui";
-import type { ReactNode } from "react";
+import {
+  FileGlyphIcon,
+  VirtualSidebarList,
+  shouldVirtualizeSidebarList,
+  type FileIconThemeId,
+} from "@puppyone/shared-ui";
+import { Fragment, type ReactNode } from "react";
 import type { GitSourceControlResource } from "../../types/electron";
 import type { GitWorkingSelection } from "./types";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
@@ -64,37 +69,75 @@ export function SourceControlPreviewResourceList({
   ariaLabel: string;
   onSelectWorkingFile: (selection: GitWorkingSelection) => void;
 }) {
+  const renderResource = (resource: GitSourceControlResource) => (
+    <SourceControlPreviewResourceRow
+      resource={resource}
+      fileIconTheme={fileIconTheme}
+      selected={selectedWorkingFile?.origin === origin && selectedWorkingFile.path === resource.path}
+      origin={origin}
+      onSelectWorkingFile={onSelectWorkingFile}
+    />
+  );
+
+  if (shouldVirtualizeSidebarList(resources.length)) {
+    return (
+      <VirtualSidebarList
+        className={`desktop-git-remote-preview desktop-git-${origin}-preview desktop-git-preview-virtual-list`}
+        ariaLabel={ariaLabel}
+        items={resources}
+        rowSize={32}
+        getKey={(resource) => resource.id}
+        renderRow={renderResource}
+      />
+    );
+  }
+
   return (
     <div className={`desktop-git-remote-preview desktop-git-${origin}-preview`} aria-label={ariaLabel}>
-      {resources.map((resource) => {
-        const displayPath = getGitDisplayPath(resource);
-        const displayName = getGitDisplayName(displayPath);
-        const selected = selectedWorkingFile?.origin === origin && selectedWorkingFile.path === resource.path;
-        return (
-          <div className={`desktop-working-tree-row desktop-git-remote-preview-row ${selected ? "active" : ""}`} key={resource.id} title={displayPath}>
-            <button
-              className="desktop-working-tree-main"
-              type="button"
-              onClick={() => onSelectWorkingFile({
-                path: resource.path,
-                status: resource.status,
-                staged: false,
-                origin,
-              })}
-            >
-              <span className="desktop-working-tree-icon">
-                <FileGlyphIcon name={getGitResourceIconName(resource)} size={18} theme={fileIconTheme} />
-              </span>
-              <span className="desktop-working-tree-copy">
-                <span className="desktop-working-tree-name">{displayName}</span>
-              </span>
-            </button>
-            <div className="desktop-working-tree-state-slot">
-              <span className={`desktop-working-tree-state ${resource.status}`}>{resource.letter}</span>
-            </div>
-          </div>
-        );
-      })}
+      {resources.map((resource) => (
+        <Fragment key={resource.id}>{renderResource(resource)}</Fragment>
+      ))}
+    </div>
+  );
+}
+
+function SourceControlPreviewResourceRow({
+  resource,
+  fileIconTheme,
+  selected,
+  origin,
+  onSelectWorkingFile,
+}: {
+  resource: GitSourceControlResource;
+  fileIconTheme: FileIconThemeId;
+  selected: boolean;
+  origin: "remote" | "committed";
+  onSelectWorkingFile: (selection: GitWorkingSelection) => void;
+}) {
+  const displayPath = getGitDisplayPath(resource);
+  const displayName = getGitDisplayName(displayPath);
+  return (
+    <div className={`desktop-working-tree-row desktop-git-remote-preview-row ${selected ? "active" : ""}`} title={displayPath}>
+      <button
+        className="desktop-working-tree-main"
+        type="button"
+        onClick={() => onSelectWorkingFile({
+          path: resource.path,
+          status: resource.status,
+          staged: false,
+          origin,
+        })}
+      >
+        <span className="desktop-working-tree-icon">
+          <FileGlyphIcon name={getGitResourceIconName(resource)} size={18} theme={fileIconTheme} />
+        </span>
+        <span className="desktop-working-tree-copy">
+          <span className="desktop-working-tree-name">{displayName}</span>
+        </span>
+      </button>
+      <div className="desktop-working-tree-state-slot">
+        <span className={`desktop-working-tree-state ${resource.status}`}>{resource.letter}</span>
+      </div>
     </div>
   );
 }
@@ -145,7 +188,7 @@ export function SourceControlWorkingTreeRow({
       </button>
       {!staged && (
         <button
-          className="desktop-tool-sidebar-icon danger desktop-working-tree-revert-action"
+          className="po-sidebar-icon-button danger desktop-working-tree-revert-action"
           type="button"
           title={t("source-control.action.discard")}
           aria-label={t("source-control.action.discardPath", { path: bidiIsolate(resource.path) })}
@@ -159,7 +202,7 @@ export function SourceControlWorkingTreeRow({
         <span className={`desktop-working-tree-state ${resource.status}`}>{statusCode}</span>
         {staged ? (
           <button
-            className="desktop-tool-sidebar-icon desktop-working-tree-state-action"
+            className="po-sidebar-icon-button desktop-working-tree-state-action"
             type="button"
             title={t("source-control.action.unstage")}
             aria-label={t("source-control.action.unstagePath", { path: bidiIsolate(resource.path) })}
@@ -170,7 +213,7 @@ export function SourceControlWorkingTreeRow({
           </button>
         ) : (
           <button
-            className="desktop-tool-sidebar-icon desktop-working-tree-state-action"
+            className="po-sidebar-icon-button desktop-working-tree-state-action"
             type="button"
             title={t("source-control.action.stage")}
             aria-label={t("source-control.action.stagePath", { path: bidiIsolate(resource.path) })}

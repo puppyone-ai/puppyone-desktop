@@ -101,6 +101,21 @@ tree mount. `DataWorkspace` still owns data loading and expansion state, and
 
 ## Current Code Boundaries
 
+- `src/features/app-shell/workspace-surfaces/workspaceSurfaceRegistry.ts`
+  - declares the Data `keep-alive` lifecycle and the on-demand lifecycle of
+    every other left workspace surface
+  - derives navigation visibility and route availability from one capability
+    result
+
+- `src/features/app-shell/DesktopDataWorkspaceSurface.tsx`
+  - keeps one `DataWorkspace` instance mounted for the workspace
+  - projects the same resolved surface instance into the sidebar and main
+    outlets only when the active surface is not Data
+
+- `src/features/app-shell/workspace-surfaces/WorkspaceSurfaceOutlet.tsx`
+  - selects the `sidebar` or `main` region from an already resolved instance
+  - performs no routing, state creation, or Feature-controller lookup
+
 - `packages/shared-ui/src/data/DataWorkspace.tsx`
   - renders the keep-alive explorer view stack
   - owns `expandedFolderPaths`, `loadingFolderPaths`, root loaded state, and
@@ -115,8 +130,14 @@ tree mount. `DataWorkspace` still owns data loading and expansion state, and
   - defines the keep-alive explorer frame stack
   - preserves inactive frame layout without pointer interaction
 
-These files live in `packages/shared-ui` — the canonical copy in this standalone
-repo (ISSUE-021). Edit them in place; there is no upstream to sync from.
+- `tests/workspaceSurfaceRegistry.test.ts`, `tests/sidebarArchitecture.test.ts`
+  - lock the single-instance resolution, capability fallback, Data lifecycle,
+    and two-region projection contracts
+
+The generic Data Workspace implementation remains in `packages/shared-ui`; the
+Desktop lifecycle and routing boundary remains in `src/features/app-shell`.
+Both are canonical in this standalone repository; there is no upstream copy to
+sync from.
 
 ## Verification
 

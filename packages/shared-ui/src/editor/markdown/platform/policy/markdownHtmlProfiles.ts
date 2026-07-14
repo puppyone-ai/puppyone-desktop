@@ -225,6 +225,12 @@ export type MarkdownHtmlSanitizerCapabilities = {
    * explicitly compose the safe-media profile with its base profile.
    */
   brokeredMedia?: boolean;
+  /**
+   * Media source strings may be retained only in inert data attributes while
+   * AssetBroker resolves each element independently. No network-capable sink
+   * receives the Markdown-authored value.
+   */
+  deferredMedia?: boolean;
 };
 
 function getProfileForSanitizerElement(
@@ -234,7 +240,7 @@ function getProfileForSanitizerElement(
 ) {
   const baseProfile = getProfileForSanitizerMode(mode);
   if (baseProfile.tags.has(tagName)) return baseProfile;
-  if (capabilities.brokeredMedia && getSafeMediaProfile().tags.has(tagName)) {
+  if ((capabilities.brokeredMedia || capabilities.deferredMedia) && getSafeMediaProfile().tags.has(tagName)) {
     return getSafeMediaProfile();
   }
   return null;

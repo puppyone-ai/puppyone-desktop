@@ -144,7 +144,7 @@ export function DesktopExplorerRowActions({
           aria-label={t("workspace.node.createNew")}
           onClick={(event) => onCreate(parentPath, event.currentTarget.getBoundingClientRect())}
         >
-          <Plus size={13} />
+          <Plus aria-hidden="true" />
         </button>
       )}
       {node && (
@@ -155,7 +155,7 @@ export function DesktopExplorerRowActions({
           aria-label={t("workspace.node.moreActionsFor", { name: bidiIsolate(node.name) })}
           onClick={(event) => onOpenNodeMenu(node, event.currentTarget.getBoundingClientRect())}
         >
-          <MoreVertical size={13} />
+          <MoreVertical aria-hidden="true" />
         </button>
       )}
     </>

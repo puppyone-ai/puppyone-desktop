@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cloudApiRequest,
   createCloudBillingCheckout,
+  getCloudTemplate,
   getCloudAutomationOauthAuthorizeUrl,
   getCloudAutomationOauthStatus,
   getCloudBillingCatalog,
@@ -15,8 +16,10 @@ import {
   listCloudAutomationConnectionRuns,
   listCloudAutomationProviderResources,
   listCloudProjects,
+  listCloudTemplates,
   openCloudBillingExternalUrl,
   quoteCloudBillingPlan,
+  instantiateCloudTemplate,
   supportsCloudAutomationOauth,
   updateCloudAutomationConnection,
   updateCloudAutomationTrigger,
@@ -207,6 +210,46 @@ describe("cloud API client delegation", () => {
     expect(bridge).toHaveBeenCalledWith(
       expect.objectContaining({ path: "/projects/a%2Fb", method: "GET" }),
     );
+  });
+
+  it("shapes template catalog, detail, and instantiate requests through the secure bridge", async () => {
+    bridge
+      .mockResolvedValueOnce({ registry: { source: "remote" }, templates: [] })
+      .mockResolvedValueOnce({ id: "agent/kit" })
+      .mockResolvedValueOnce({
+        template_id: "agent/kit",
+        release_id: "1.0.0",
+        project: { id: "project-1", name: "Agent Kit" },
+      });
+
+    await listCloudTemplates(
+      session,
+      { query: "agent tools", cursor: "page/2", limit: 24 },
+      undefined,
+      API,
+    );
+    await getCloudTemplate(session, "agent/kit", undefined, API);
+    await instantiateCloudTemplate(
+      session,
+      "agent/kit",
+      { release_id: "1.0.0", name: "My agents" },
+      undefined,
+      API,
+    );
+
+    expect(bridge).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      path: "/templates?q=agent+tools&cursor=page%2F2&limit=24",
+      method: "GET",
+    }));
+    expect(bridge).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      path: "/templates/agent%2Fkit",
+      method: "GET",
+    }));
+    expect(bridge).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      path: "/templates/agent%2Fkit/instantiate",
+      method: "POST",
+      body: JSON.stringify({ release_id: "1.0.0", name: "My agents" }),
+    }));
   });
 
   it("keeps OAuth provider-to-slug translation inside the Automation adapter", async () => {

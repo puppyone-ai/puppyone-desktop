@@ -14,6 +14,7 @@ import {
   makeMarkdown,
   readRepositoryTextFile,
 } from "./fixtures";
+import { withBenchmarkLocalization } from "./localizationHarness";
 
 const BENCHMARK_OPTIONS = {
   iterations: 3,
@@ -84,12 +85,12 @@ async function mountAndDisposeMarkdownEditor(source: string, strictMode: boolean
   const parent = document.createElement("div");
   document.body.appendChild(parent);
   const root = createRoot(parent);
-  const editor = createElement(MarkdownCodeMirrorEditor, {
+  const editor = withBenchmarkLocalization(createElement(MarkdownCodeMirrorEditor, {
     value: source,
     readOnly: false,
     livePreview: true,
     documentPath: "bench.md",
-  });
+  }));
 
   flushSync(() => {
     root.render(strictMode ? createElement(StrictMode, null, editor) : editor);
@@ -135,7 +136,7 @@ function createExplorerHarness(rowCount: number): ExplorerHarness {
 
   const render = () => {
     const activePath = nodes[activeIndex]?.path ?? null;
-    root.render(createElement(ExplorerTree, {
+    root.render(withBenchmarkLocalization(createElement(ExplorerTree, {
       nodes,
       activePath,
       selectedPaths: new Set(activePath ? [activePath] : []),
@@ -143,7 +144,7 @@ function createExplorerHarness(rowCount: number): ExplorerHarness {
       showRoot: false,
       onSelectNode: () => undefined,
       renderNodeActions: () => createElement("span", null, "…"),
-    }));
+    })));
   };
 
   flushSync(render);

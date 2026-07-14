@@ -69,6 +69,11 @@ Content font, File icons, Navigation, Header elements,
 Pointer cursors, Dock icon). It must fit in roughly one screen. Do not adopt grouped-card layouts
 while the list stays this small.
 
+Language is an application preference rather than an Appearance customization.
+It lives as a first-class page under `Desktop App`, between General and
+Appearance. Its compact select applies immediately through the localization
+runtime; do not add a separate Change or Save step or re-embed it in Appearance.
+
 Light theme, dark theme, Text size, Content font, File icons, Navigation, and
 Dock icon reuse the same segmented-control surface. Buttons are content-sized
 around their icon or palette glyph and label; do not add a fixed group width,
@@ -79,6 +84,29 @@ Every ordinary row uses the same single-line muted label treatment. Do not turn
 Pointer cursors or Dock icon into a separate subsection with a bold title and
 visible description. Explanatory copy may remain as a native tooltip and an
 accessible description without changing the page hierarchy.
+
+### Settings-Wide Visual Contract
+
+Appearance defines the visual grammar for every Desktop Settings page. Page
+content is capped at `1040px` with `24px 28px 40px` padding. Page titles use
+`14px / 720`, descriptions use `12px / 1.35`, ordinary labels use `12.5px`,
+and label descriptions use `11px / 520`. Interactive rows are at least `42px`;
+read-only rows are at least `30px`; both use `10px` inline padding and an
+`18px` gap.
+
+Ordinary rows and subsections remain transparent and have no outer border or
+row-level hover. Borders belong only to actual inputs, actions, and Theme
+Preview. Necessary conceptual grouping uses the shared lightweight subsection
+title (`12px / 500`, sentence case), never a panel/card shell. At widths of
+`760px` or less, wide controls move below their labels while switches remain
+compact. Direction-sensitive spacing uses logical CSS properties, and
+technical URLs remain explicit LTR islands.
+
+These controls depend on the renderer-wide single-reset contract in
+[Desktop Renderer Style Architecture](./desktop-renderer-style-architecture.md).
+Tailwind utilities remain available, but Tailwind Preflight must stay disabled:
+an unscoped form-element reset would otherwise remove the borders, padding,
+backgrounds, and typography owned by the layered Settings controls.
 
 ### Typography Preset Matrix
 

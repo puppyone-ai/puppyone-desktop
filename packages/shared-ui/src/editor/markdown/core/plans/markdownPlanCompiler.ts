@@ -5,13 +5,29 @@ import { compileImageElementPlan } from "../../features/image/imagePlan";
 import { compileTableElementPlan } from "../../features/table/tablePlan";
 import type { MarkdownElementPlan } from "./markdownPlanTypes";
 import { BLOCK_EMBED_CAPABILITIES, cloneRange, rangeOf, visibleSourcePlan } from "./planPrimitives";
+import {
+  createMarkdownBlockComplexity,
+  decideMarkdownBlockExecution,
+  type MarkdownDocumentProfile,
+} from "./markdownBlockExecution";
+
+export type MarkdownPlanCompileContext = Readonly<{
+  documentProfile: MarkdownDocumentProfile;
+}>;
+
+const DEFAULT_COMPILE_CONTEXT: MarkdownPlanCompileContext = Object.freeze({
+  documentProfile: "normal",
+});
 
 /**
  * Compiles a semantic Markdown element into a typed render plan.
  * Incomplete / malformed / unrenderable constructs become visibleSource and
  * therefore have no collapsed-marker deletion capability.
  */
-export function compileMarkdownElementPlan(element: MarkdownElement): MarkdownElementPlan {
+export function compileMarkdownElementPlan(
+  element: MarkdownElement,
+  context: MarkdownPlanCompileContext = DEFAULT_COMPILE_CONTEXT,
+): MarkdownElementPlan {
   switch (element.kind) {
     case "inlineHtml":
       return compileInlineHtmlElementPlan(element);
@@ -43,13 +59,13 @@ export function compileMarkdownElementPlan(element: MarkdownElement): MarkdownEl
         },
       };
     case "fence":
-      return compileCodeBlockElementPlan(element);
+      return compileCodeBlockElementPlan(element, context.documentProfile);
     case "table":
-      return compileTableElementPlan(element);
+      return compileTableElementPlan(element, context.documentProfile);
     case "htmlBlock":
-      return compileHtmlBlockElementPlan(element);
+      return compileHtmlBlockElementPlan(element, context.documentProfile);
     case "rule":
-      return compileHorizontalRuleAtomPlan(element);
+      return compileHorizontalRuleAtomPlan(element, context.documentProfile);
     case "task":
       return compileTaskCheckboxAtomPlan(element);
     default:
@@ -119,11 +135,28 @@ function compileLinkLikePlan(element: MarkdownElement): MarkdownElementPlan {
   };
 }
 
-function compileHorizontalRuleAtomPlan(element: MarkdownElement): MarkdownElementPlan {
+function compileHorizontalRuleAtomPlan(
+  element: MarkdownElement,
+  documentProfile: MarkdownDocumentProfile,
+): MarkdownElementPlan {
+  const complexity = createMarkdownBlockComplexity("", {
+    // Horizontal-rule source is ASCII, so the mapped source width is also its
+    // exact UTF-8 byte count without requiring compiler access to the document.
+    sourceBytes: Math.max(0, element.to - element.from),
+    sourceLines: 1,
+    logicalItems: 1,
+    estimatedDomNodes: 1,
+    nestingDepth: 1,
+    assetCount: 0,
+  });
+  const execution = decideMarkdownBlockExecution("horizontalRule", complexity, documentProfile);
+  if (execution.mode === "visibleSource") return visibleSourcePlan(rangeOf(element), []);
   return {
     presentation: "blockAtom",
     sourceRange: rangeOf(element),
     embed: { kind: "horizontalRule" },
+    complexity,
+    execution,
     layout: { estimatedHeight: 37 },
     diagnostics: [],
     capabilities: BLOCK_EMBED_CAPABILITIES,

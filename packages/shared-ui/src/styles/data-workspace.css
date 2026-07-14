@@ -210,6 +210,8 @@ body.data-sidebar-resizing .data-preview-accessory {
   --tree-row-font-size: var(--po-tree-row-font-size, var(--po-text-size-sidebar, 13px));
   --tree-row-font-weight: var(--po-tree-row-font-weight, 500);
   --tree-row-line-height: var(--po-tree-row-line-height, 18px);
+  --tree-row-action-size: var(--po-tree-row-action-size, 24px);
+  --tree-row-action-icon-size: var(--po-tree-row-action-icon-size, 15px);
   --tree-root-top-gap: var(--po-tree-root-top-gap, 5px);
   --tree-no-root-top-gap: var(--po-tree-no-root-top-gap, 12px);
   --tree-list-bottom-gap: var(--po-tree-list-bottom-gap, 6px);
@@ -574,12 +576,18 @@ body.data-sidebar-resizing .data-preview-accessory {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: var(--tree-row-action-size);
+  height: var(--tree-row-action-size);
   border: 0;
   border-radius: 5px;
   background: transparent;
   color: var(--po-text-muted);
+}
+
+.tree-row-action-button > svg {
+  width: var(--tree-row-action-icon-size);
+  height: var(--tree-row-action-icon-size);
+  flex: 0 0 auto;
 }
 
 .tree-row-action-button:hover,

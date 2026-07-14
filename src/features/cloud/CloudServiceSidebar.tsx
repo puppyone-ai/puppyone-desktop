@@ -1,6 +1,8 @@
 import { ArrowLeft } from "lucide-react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import { SidebarRoot, SidebarRow, SidebarScrollArea } from "@puppyone/shared-ui";
+import { SidebarGroup } from "../../components/sidebar";
 import type { CloudServiceSidebarProps, CloudWorkspaceSection } from "./types";
 import { getCloudAuthSession, resolveCloudAuthState } from "./auth";
 import { resolveCloudEnvironment } from "./environment";
@@ -78,7 +80,7 @@ export function CloudServiceSidebar({
   const navGroups = buildCloudSidebarNavGroups(navItems);
 
   return (
-    <section className="desktop-tool-sidebar desktop-cloud-service-sidebar">
+    <SidebarRoot className="desktop-cloud-service-sidebar">
       {inProjectContext && !projectBound && (
         <div className="desktop-cloud-sidebar-context">
           <button
@@ -98,24 +100,16 @@ export function CloudServiceSidebar({
         </div>
       )}
 
-      <div className="desktop-tool-sidebar-list desktop-cloud-sidebar-list">
+      <SidebarScrollArea className="desktop-cloud-sidebar-list">
         <nav className="desktop-cloud-sidebar-nav" aria-label={t(inProjectContext ? "cloud.sidebar.projectSections" : "cloud.sidebar.sections")}>
           {navGroups.map((group) => {
-            const labelId = `desktop-cloud-sidebar-group-${group.id}`;
             const disabled = group.items.every((item) => item.locked);
             return (
-              <div
-                className="desktop-tool-sidebar-group"
-                role="group"
-                aria-labelledby={labelId}
-                data-disabled={disabled || undefined}
+              <SidebarGroup
+                title={t(group.labelId)}
+                disabled={disabled}
                 key={group.id}
               >
-                <div className="desktop-tool-sidebar-group-header">
-                  <div className="desktop-tool-sidebar-group-title" id={labelId}>
-                    {t(group.labelId)}
-                  </div>
-                </div>
                 {group.items.map((item) => (
                   <CloudSidebarNavItem
                     key={item.id}
@@ -135,11 +129,11 @@ export function CloudServiceSidebar({
                     }}
                   />
                 ))}
-              </div>
+              </SidebarGroup>
             );
           })}
         </nav>
-      </div>
+      </SidebarScrollArea>
 
       {signedIn && (
         <div className="desktop-cloud-sidebar-footer">
@@ -148,7 +142,7 @@ export function CloudServiceSidebar({
           </div>
         </div>
       )}
-    </section>
+    </SidebarRoot>
   );
 }
 
@@ -166,20 +160,19 @@ export function CloudSidebarNavItem({
   const label = t(item.labelId);
 
   return (
-    <button
-      className={`desktop-tool-sidebar-row desktop-cloud-sidebar-nav-row ${active ? "active" : ""} ${item.locked ? "locked" : ""}`}
-      type="button"
+    <SidebarRow
+      className={`desktop-cloud-sidebar-nav-row ${item.locked ? "locked" : ""}`}
+      active={active}
       aria-disabled={item.locked || undefined}
       title={item.locked ? t("cloud.sidebar.signInToUse") : undefined}
       onClick={() => {
         if (!item.locked) onSelect(item.id);
       }}
-    >
-      <span className="desktop-cloud-sidebar-nav-icon">
+      icon={<span className="desktop-cloud-sidebar-nav-icon">
         <Icon size={15} />
-      </span>
-      <span className="desktop-cloud-sidebar-nav-label">{label}</span>
-    </button>
+      </span>}
+      label={<span className="desktop-cloud-sidebar-nav-label">{label}</span>}
+    />
   );
 }
 

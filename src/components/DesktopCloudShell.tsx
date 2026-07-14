@@ -1,18 +1,9 @@
-import {
-  useCallback,
-  type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
-} from "react";
-import { usePaneResizeDrag } from "@puppyone/shared-ui";
-import { useLocalization } from "@puppyone/localization";
-import {
-  getArrowResizedSidebarWidth,
-  getPointerResizedSidebarWidth,
-  type InlineDirection,
-} from "./auxiliarySidebarGeometry";
+import type { ReactNode } from "react";
+import { AuxiliaryPanelHost } from "../features/app-shell/auxiliary";
 
-export type DesktopView = "data" | "git" | "plugins" | "cloud" | "access" | "automation" | "settings";
+import type { WorkspaceSurfaceId } from "../features/app-shell/workspace-surfaces";
+
+export type DesktopView = WorkspaceSurfaceId;
 export type DesktopWorkspaceKind = "local" | "cloud";
 
 type DesktopCloudShellProps = {
@@ -46,79 +37,6 @@ export function DesktopCloudShell({
   resizableRightSidebar = false,
   onRightSidebarWidthChange,
 }: DesktopCloudShellProps) {
-  const { t } = useLocalization();
-  const beginRightSidebarResize = usePaneResizeDrag({
-    enabled: resizableRightSidebar && Boolean(onRightSidebarWidthChange),
-    bodyClassName: "desktop-right-sidebar-resizing",
-    onDragStart: (event) => {
-      if (!onRightSidebarWidthChange) return null;
-
-      const startX = event.clientX;
-      const startWidth = rightSidebarWidth ?? 560;
-      const direction = getDocumentDirection();
-
-      return {
-        onMove: (point) => {
-          const nextWidth = clamp(
-            getPointerResizedSidebarWidth({
-              currentX: point.clientX,
-              direction,
-              startWidth,
-              startX,
-            }),
-            minRightSidebarWidth,
-            maxRightSidebarWidth,
-          );
-          onRightSidebarWidthChange(nextWidth);
-        },
-      };
-    },
-  });
-
-  const rightSidebarStyle = rightSidebarWidth
-    ? ({ "--desktop-right-sidebar-width": `${rightSidebarWidth}px` } as CSSProperties)
-    : undefined;
-
-  const nudgeRightSidebarWidth = useCallback(
-    (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      if (!resizableRightSidebar || !onRightSidebarWidthChange) return;
-
-      const currentWidth = rightSidebarWidth ?? 560;
-      const step = event.shiftKey ? 24 : 12;
-      const direction = getDocumentDirection();
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        onRightSidebarWidthChange(clamp(getArrowResizedSidebarWidth({
-          currentWidth,
-          direction,
-          key: "ArrowLeft",
-          step,
-        }), minRightSidebarWidth, maxRightSidebarWidth));
-      } else if (event.key === "ArrowRight") {
-        event.preventDefault();
-        onRightSidebarWidthChange(clamp(getArrowResizedSidebarWidth({
-          currentWidth,
-          direction,
-          key: "ArrowRight",
-          step,
-        }), minRightSidebarWidth, maxRightSidebarWidth));
-      } else if (event.key === "Home") {
-        event.preventDefault();
-        onRightSidebarWidthChange(minRightSidebarWidth);
-      } else if (event.key === "End") {
-        event.preventDefault();
-        onRightSidebarWidthChange(maxRightSidebarWidth);
-      }
-    },
-    [
-      maxRightSidebarWidth,
-      minRightSidebarWidth,
-      onRightSidebarWidthChange,
-      resizableRightSidebar,
-      rightSidebarWidth,
-    ],
-  );
-
   return (
     <div className={`desktop-shell ${minimalMode ? "is-minimal-mode" : ""}`}>
       {minimalMode ? (
@@ -145,35 +63,18 @@ export function DesktopCloudShell({
           {children}
         </main>
         {rightSidebar && (
-          <aside
-            className={`desktop-right-sidebar ${rightSidebarOpen ? "is-open" : ""}`}
-            style={rightSidebarStyle}
+          <AuxiliaryPanelHost
+            open={rightSidebarOpen}
+            width={rightSidebarWidth}
+            minWidth={minRightSidebarWidth}
+            maxWidth={maxRightSidebarWidth}
+            resizable={resizableRightSidebar}
+            onWidthChange={onRightSidebarWidthChange}
           >
-            {resizableRightSidebar && rightSidebarOpen && (
-              <div
-                className="desktop-right-sidebar-resizer"
-                role="separator"
-                aria-orientation="vertical"
-                aria-label={t("shell.sidebar.resizeAuxiliary")}
-                tabIndex={0}
-                onPointerDown={beginRightSidebarResize}
-                onKeyDown={nudgeRightSidebarWidth}
-              />
-            )}
-            <div className="desktop-right-sidebar-inner">
-              {rightSidebar}
-            </div>
-          </aside>
+            {rightSidebar}
+          </AuxiliaryPanelHost>
         )}
       </div>
     </div>
   );
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function getDocumentDirection(): InlineDirection {
-  return document.documentElement.dir === "rtl" ? "rtl" : "ltr";
 }

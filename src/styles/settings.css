@@ -10,46 +10,6 @@
   background: var(--po-canvas);
 }
 
-.desktop-utility-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 54px;
-  min-height: 54px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--po-divider);
-}
-
-.desktop-utility-title {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 10px;
-  color: var(--po-text-muted);
-}
-
-.desktop-utility-title > div {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.desktop-utility-title span {
-  color: var(--po-text-subtle);
-  font-size: 11px;
-  font-weight: 650;
-  text-transform: uppercase;
-}
-
-.desktop-utility-title strong {
-  overflow: hidden;
-  color: var(--po-text);
-  font-size: 13px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .desktop-utility-icon-button {
   display: inline-flex;
   align-items: center;
@@ -94,12 +54,9 @@
 
 .desktop-settings-list {
   display: grid;
-  gap: 2px;
-}
-
-.desktop-settings-list {
   width: 100%;
   max-width: none;
+  gap: 2px;
 }
 
 .desktop-settings-section {
@@ -110,11 +67,6 @@
   max-width: var(--desktop-settings-content-max-width);
   gap: 16px;
   margin: 0 auto;
-}
-
-.desktop-account-settings-section,
-.desktop-files-settings-section {
-  max-width: var(--desktop-settings-content-max-width);
 }
 
 .desktop-settings-section + .desktop-settings-section {
@@ -136,10 +88,12 @@
   gap: 3px;
 }
 
-.desktop-settings-section-header strong {
+.desktop-settings-section-header h2 {
+  margin: 0;
   color: var(--po-text);
   font-size: 14px;
   font-weight: 720;
+  line-height: normal;
 }
 
 .desktop-settings-section-header span {
@@ -151,20 +105,17 @@
 .desktop-settings-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   min-width: 0;
   min-height: 30px;
+  gap: 18px;
+  padding: 0 10px;
   border-radius: 6px;
   color: var(--po-text-muted);
   font-size: 12.5px;
 }
 
-.desktop-settings-row {
-  justify-content: space-between;
-  gap: 18px;
-  padding: 0 10px;
-}
-
-.desktop-settings-row span {
+.desktop-settings-row > span {
   flex: 0 0 auto;
   color: var(--po-text-subtle);
 }
@@ -207,73 +158,42 @@
   font-size: 11.5px !important;
 }
 
-.desktop-settings-group {
+.desktop-settings-subsection {
   display: grid;
-  gap: 6px;
+  min-width: 0;
+  gap: 4px;
 }
 
-.desktop-settings-group-title {
-  padding: 0 2px;
+.desktop-settings-subsection-title {
+  margin: 0;
+  min-height: 18px;
+  padding-inline: 10px;
   color: var(--po-text-subtle);
-  font-size: 11px;
-  font-weight: 760;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
 }
 
-.desktop-settings-group-body {
+.desktop-settings-subsection-body {
   display: grid;
-  overflow: hidden;
-  border: 1px solid var(--po-divider);
-  border-radius: 8px;
-  background: var(--po-panel);
+  min-width: 0;
+  gap: 2px;
 }
 
-.desktop-settings-line,
-.desktop-settings-remote-setting,
-.desktop-settings-muted-row {
-  display: grid;
-  grid-template-columns: minmax(152px, 0.28fr) minmax(0, 1fr);
-  min-height: 42px;
-  align-items: center;
-  gap: 20px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--po-divider);
-  color: var(--po-text-muted);
-  font-size: 12.5px;
+.desktop-settings-value-row {
+  min-height: 30px;
 }
 
-.desktop-settings-line:last-child,
-.desktop-settings-remote-setting:last-child,
-.desktop-settings-muted-row:last-child {
-  border-bottom: 0;
-}
-
-.desktop-settings-line > span {
-  color: var(--po-text-subtle);
-}
-
-.desktop-settings-toggle-line {
-  grid-template-columns: minmax(180px, 1fr) auto;
-}
-
-.desktop-files-toggle-line {
-  min-height: 36px;
-}
-
-.desktop-files-toggle-line > span {
-  color: var(--po-text);
-  font-weight: 600;
-}
-
-.desktop-settings-line-value {
+.desktop-settings-value {
   display: inline-flex;
   min-width: 0;
+  max-width: min(100%, 68%);
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
 }
 
-.desktop-settings-line-value strong {
+.desktop-settings-value strong {
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
@@ -284,12 +204,8 @@
   white-space: nowrap;
 }
 
-.desktop-settings-line-value strong.success {
+.desktop-settings-value strong.success {
   color: var(--po-success);
-}
-
-.desktop-settings-account-actions-line {
-  min-height: 46px;
 }
 
 .desktop-settings-account-actions {
@@ -297,16 +213,13 @@
 }
 
 .desktop-settings-account-feedback {
+  display: flex;
+  align-items: center;
   min-height: 34px;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--po-divider);
+  padding: 6px 10px;
   color: var(--po-text-subtle);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.desktop-settings-account-feedback:last-child {
-  border-bottom: 0;
+  font-size: 11.5px;
+  font-weight: 520;
 }
 
 .desktop-settings-account-feedback.success {
@@ -330,12 +243,18 @@
   background: transparent;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .desktop-settings-row-action:hover:not(:disabled) {
   background: var(--po-hover);
   color: var(--po-text);
+}
+
+.desktop-settings-row-action:focus-visible,
+.desktop-hosting-service-option:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--po-accent) 36%, transparent);
+  outline-offset: 2px;
 }
 
 .desktop-settings-row-action:disabled {
@@ -382,32 +301,17 @@
   padding: 0 9px;
 }
 
-.desktop-settings-select:focus,
-.desktop-settings-text-input:focus {
+.desktop-settings-select:focus-visible,
+.desktop-settings-text-input:focus-visible {
   border-color: color-mix(in srgb, var(--po-accent) 42%, var(--po-divider));
+  outline: 2px solid color-mix(in srgb, var(--po-accent) 22%, transparent);
+  outline-offset: 1px;
 }
 
 .desktop-settings-select:disabled,
 .desktop-settings-text-input:disabled {
   color: var(--po-text-disabled);
   opacity: 0.62;
-}
-
-.desktop-settings-default-app-add .desktop-settings-label-stack {
-  display: grid;
-  gap: 2px;
-}
-
-.desktop-settings-default-app-add .desktop-settings-label-stack strong {
-  color: var(--po-text);
-  font-size: 12.5px;
-  font-weight: 650;
-}
-
-.desktop-settings-default-app-add .desktop-settings-label-stack small {
-  color: var(--po-text-subtle);
-  font-size: 11.5px;
-  font-weight: 560;
 }
 
 .desktop-settings-extension-input {
@@ -481,40 +385,20 @@
 }
 
 .desktop-settings-pattern-editor {
-  display: grid;
-  gap: 9px;
-  padding: 12px 14px 13px;
-  border-bottom: 1px solid var(--po-divider);
-}
-
-.desktop-settings-pattern-editor:last-child {
-  border-bottom: 0;
+  align-items: flex-start;
+  min-height: 184px;
+  padding-block: 7px;
 }
 
 .desktop-files-pattern-editor {
   background: transparent;
 }
 
-.desktop-files-pattern-editor-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 20px;
-  color: var(--po-text-subtle);
-  font-size: 12px;
-}
-
-.desktop-files-pattern-editor-toolbar span {
-  color: var(--po-text);
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-.desktop-files-pattern-editor-toolbar small {
-  color: var(--po-text-subtle);
-  font-size: 11.5px;
-  font-weight: 500;
+.desktop-settings-pattern-control {
+  display: grid;
+  width: min(100%, 520px);
+  min-width: 0;
+  gap: 6px;
 }
 
 .desktop-settings-pattern-editor textarea {
@@ -533,8 +417,10 @@
   line-height: 17px;
 }
 
-.desktop-settings-pattern-editor textarea:focus {
+.desktop-settings-pattern-editor textarea:focus-visible {
   border-color: color-mix(in srgb, var(--po-accent) 42%, var(--po-divider));
+  outline: 2px solid color-mix(in srgb, var(--po-accent) 22%, transparent);
+  outline-offset: 1px;
 }
 
 .desktop-settings-pattern-editor-footer {
@@ -548,8 +434,12 @@
 
 .desktop-settings-muted-row {
   display: flex;
-  min-height: 38px;
+  min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  padding: 0 10px;
   color: var(--po-text-subtle);
+  font-size: 12.5px;
 }
 
 .desktop-settings-external-app-list {
@@ -562,7 +452,7 @@
   align-items: center;
   gap: 10px;
   min-height: 48px;
-  padding: 0 14px;
+  padding: 0 10px;
   border-bottom: 1px solid var(--po-divider);
 }
 
@@ -584,7 +474,7 @@
   background: color-mix(in srgb, var(--po-text-muted) 13%, transparent);
   color: var(--po-text);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 650;
   line-height: 1;
 }
 
@@ -652,7 +542,7 @@
   overflow: hidden;
   color: inherit;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 650;
   line-height: 1;
   text-align: center;
   text-overflow: ellipsis;
@@ -661,8 +551,7 @@
 
 .desktop-puppyone-config-row {
   min-height: 48px;
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--po-divider);
+  padding-block: 7px;
 }
 
 .desktop-puppyone-config-footer {
@@ -671,7 +560,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 7px 12px;
+  padding: 7px 10px;
   color: var(--po-text-subtle);
   font-size: 11.5px;
 }
@@ -691,7 +580,19 @@
 }
 
 .desktop-settings-remote-setting {
+  display: grid;
   grid-template-columns: minmax(120px, 0.28fr) minmax(76px, auto) minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px;
+  color: var(--po-text-muted);
+  font-size: 12.5px;
+}
+
+.desktop-settings-remote-setting + .desktop-settings-remote-setting {
+  border-top: 1px solid var(--po-divider);
 }
 
 .desktop-settings-remote-setting-main {
@@ -706,7 +607,7 @@
   overflow: hidden;
   color: var(--po-text);
   font-size: 12.5px;
-  font-weight: 680;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -719,12 +620,6 @@
   gap: 4px;
   color: var(--po-text-subtle);
   white-space: nowrap;
-}
-
-.desktop-settings-remote-setting-meta strong {
-  color: var(--po-text);
-  font-size: 12.5px;
-  font-weight: 700;
 }
 
 .desktop-settings-remote-setting-meta span {
@@ -747,7 +642,7 @@
   color: var(--po-text);
   font-family: var(--po-font-mono);
   font-size: 11.5px;
-  font-weight: 620;
+  font-weight: 560;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -756,101 +651,7 @@
   color: var(--po-text-subtle);
   font-family: inherit;
   font-size: 11.5px;
-  font-weight: 600;
-}
-
-.desktop-git-settings-summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--po-divider);
-  border-radius: 8px;
-  background: var(--po-divider);
-}
-
-.desktop-git-settings-summary > div {
-  display: grid;
-  min-width: 0;
-  gap: 5px;
-  padding: 12px;
-  background: var(--po-panel);
-}
-
-.desktop-git-settings-summary span,
-.desktop-git-cloud-grid span {
-  overflow: hidden;
-  color: var(--po-text-subtle);
-  font-size: 11px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.desktop-git-settings-summary strong,
-.desktop-git-cloud-grid strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--po-text);
-  font-size: 12.5px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-settings-panel {
-  display: grid;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--po-divider);
-  border-radius: 8px;
-  background: var(--po-panel);
-}
-
-.desktop-settings-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.desktop-settings-panel-header > div {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
-.desktop-settings-panel-header strong {
-  overflow: hidden;
-  color: var(--po-text);
-  font-size: 13px;
-  font-weight: 750;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-settings-panel-header span,
-.desktop-settings-panel-empty {
-  overflow: hidden;
-  color: var(--po-text-subtle);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-git-cloud-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--po-divider);
-}
-
-.desktop-git-cloud-grid > div {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
+  font-weight: 520;
 }
 
 .desktop-settings-badge {
@@ -865,7 +666,7 @@
   background: var(--po-control);
   color: var(--po-text-subtle);
   font-size: 11px;
-  font-weight: 750;
+  font-weight: 650;
   text-transform: none;
 }
 
@@ -894,32 +695,44 @@
     width: fit-content;
   }
 
-  .desktop-settings-line,
-  .desktop-settings-muted-row {
-    grid-template-columns: minmax(0, 1fr);
+  .desktop-settings-value {
+    max-width: min(100%, 72%);
+  }
+
+  .desktop-settings-wide-control-row,
+  .desktop-settings-default-app-add,
+  .desktop-puppyone-config-row {
     align-items: stretch;
-    gap: 6px;
-    padding: 10px 12px;
+    flex-direction: column;
+    gap: 8px;
+    padding-block: 7px;
   }
 
-  .desktop-settings-toggle-line {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-  }
-
-  .desktop-settings-line-value {
+  .desktop-settings-wide-control-row > .desktop-theme-choice-list,
+  .desktop-settings-wide-control-row > .desktop-theme-segment,
+  .desktop-settings-wide-control-row > .desktop-settings-tool-list,
+  .desktop-settings-default-app-add > .desktop-settings-value,
+  .desktop-puppyone-config-row > .desktop-settings-select,
+  .desktop-puppyone-config-row > .desktop-settings-text-input {
+    width: 100%;
+    max-width: none;
     justify-content: flex-start;
   }
 
-  .desktop-settings-line-value strong {
-    text-align: start;
+  .desktop-settings-default-app-add > .desktop-settings-value {
+    flex-wrap: wrap;
+  }
+
+  .desktop-puppyone-config-row > .desktop-settings-switch,
+  .desktop-puppyone-config-row > .desktop-settings-row-action {
+    align-self: flex-end;
   }
 
   .desktop-settings-remote-setting {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
     gap: 8px 12px;
-    padding: 10px 12px;
+    padding: 10px;
   }
 
   .desktop-settings-remote-setting-meta,
@@ -945,5 +758,61 @@
   .desktop-hosting-service-option {
     flex: 1 1 0;
     min-width: 0;
+  }
+
+  .desktop-settings-pattern-editor {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+    padding-block: 8px;
+  }
+
+  .desktop-settings-pattern-control {
+    width: 100%;
+  }
+
+  .desktop-puppyone-config-footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .desktop-puppyone-config-footer > span {
+    white-space: normal;
+  }
+
+  .desktop-puppyone-config-footer > div {
+    align-self: flex-end;
+  }
+}
+
+@media (max-width: 520px) {
+  .desktop-settings-value-row,
+  .desktop-settings-account-actions-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    padding-block: 6px;
+  }
+
+  .desktop-settings-value-row > .desktop-settings-value,
+  .desktop-settings-account-actions-row > .desktop-settings-value {
+    width: 100%;
+    max-width: none;
+    justify-content: flex-start;
+  }
+
+  .desktop-settings-value strong {
+    text-align: start;
+  }
+
+  .desktop-settings-external-app-row {
+    grid-template-columns: 24px minmax(0, 1fr);
+    padding-block: 8px;
+  }
+
+  .desktop-settings-external-app-row > .desktop-settings-row-action-group {
+    grid-column: 2;
+    justify-self: start;
   }
 }

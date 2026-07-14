@@ -181,7 +181,9 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
       const mappedTable = getMappedTableRange();
       finishEditSession("cancel");
       if (target.focus) {
-        focusMarkdownTableCell(content.closest<HTMLElement>(".cm-md-table-widget-wrap"), target.focus);
+        view.dispatch({
+          effects: requestMarkdownTableFocus(mappedTable.from, target.focus),
+        });
         return true;
       }
       if (target.exitPosition != null) {
@@ -356,6 +358,8 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
       event.stopPropagation();
       closeActiveMarkdownTableMenu();
       tableMenuOpen = true;
+      const tableWrapper = content.closest<HTMLElement>(".cm-md-table-widget-wrap");
+      if (tableWrapper && rowIndex > 0) tableWrapper.dataset.mdTablePinnedRow = String(rowIndex);
       const mappedTable = getMappedTableRange();
       const keyboardInvocation = event.clientX === 0 && event.clientY === 0;
       const anchorRect = keyboardInvocation ? content.getBoundingClientRect() : null;
@@ -374,6 +378,9 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
         columnIndex,
         onClose: ({ restoreFocus }) => {
           tableMenuOpen = false;
+          if (tableWrapper?.dataset.mdTablePinnedRow === String(rowIndex)) {
+            delete tableWrapper.dataset.mdTablePinnedRow;
+          }
           if (ownedMenu === nextMenu) ownedMenu = null;
           if (!restoreFocus && editing && content.isConnected) finishCellBlur();
         },
@@ -403,6 +410,10 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
     if (ownedMenu && isActiveMarkdownTableMenu(ownedMenu)) closeActiveMarkdownTableMenu();
     ownedMenu = null;
     tableMenuOpen = false;
+    const tableWrapper = content.closest<HTMLElement>(".cm-md-table-widget-wrap");
+    if (tableWrapper?.dataset.mdTablePinnedRow === String(rowIndex)) {
+      delete tableWrapper.dataset.mdTablePinnedRow;
+    }
     resetPreviewAssets();
     if (editSessionId) host.editSessions.detach(editSessionId);
   });

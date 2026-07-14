@@ -1,6 +1,13 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: 'selector',
+  // PuppyOne owns the renderer reset and component typography through its
+  // explicit cascade layers. Tailwind's Preflight is an unscoped document
+  // reset; enabling it here would override layered Sidebar primitives such
+  // as button row typography across the whole Electron renderer.
+  corePlugins: {
+    preflight: false,
+  },
   content: [
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',

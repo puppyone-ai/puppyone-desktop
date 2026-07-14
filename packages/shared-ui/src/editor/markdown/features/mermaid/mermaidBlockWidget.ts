@@ -24,6 +24,10 @@ import {
   getMarkdownLocalization,
   type MarkdownLocalization,
 } from "../../core/editor/markdownLocalization";
+import {
+  MARKDOWN_RICH_BLOCK_EXECUTION,
+  type MarkdownMountedBlockExecution,
+} from "../../core/plans/markdownBlockExecution";
 
 /**
  * Immutable Mermaid descriptor. Debounce, theme subscription, measure, and
@@ -37,6 +41,7 @@ export class MermaidBlockWidget extends WidgetType {
     private readonly to: number,
     private readonly sourceReference: MarkdownCodeSourceReference | null = null,
     private readonly layoutEstimatedHeight = estimateMermaidLayoutHeight(code),
+    private readonly execution: MarkdownMountedBlockExecution = MARKDOWN_RICH_BLOCK_EXECUTION,
   ) {
     super();
   }
@@ -49,6 +54,8 @@ export class MermaidBlockWidget extends WidgetType {
       widget.from === this.from &&
       widget.to === this.to &&
       widget.layoutEstimatedHeight === this.layoutEstimatedHeight &&
+      widget.execution.mode === this.execution.mode &&
+      widget.execution.budgetVersion === this.execution.budgetVersion &&
       codeSourceReferencesEqual(widget.sourceReference, this.sourceReference)
     );
   }
@@ -87,6 +94,7 @@ export class MermaidBlockWidget extends WidgetType {
     let debounceTimer: number | null = null;
     let renderGeneration = 0;
     let activeRenderExecutionSessionId: string | null = null;
+    let activated = this.execution.mode !== "deferred";
 
     const toolbar = document.createElement("div");
     toolbar.className = "cm-md-mermaid-toolbar";
@@ -269,6 +277,16 @@ export class MermaidBlockWidget extends WidgetType {
 
     const renderPreview = (delayMs: number) => {
       const source = textarea?.value ?? draftCode;
+      if (!activated && !editing) {
+        clearDebounce();
+        disposeActiveRender();
+        preview.classList.remove("is-loading");
+        preview.replaceChildren(createDeferredMermaidPlaceholder(t, () => {
+          activated = true;
+          renderPreview(0);
+        }));
+        return;
+      }
       if (!lastGoodSvg) {
         preview.classList.add("is-loading");
         preview.replaceChildren(createMermaidLoadingElement(t));
@@ -286,6 +304,7 @@ export class MermaidBlockWidget extends WidgetType {
 
     const openEditor = () => {
       if (readOnly || editing) return;
+      activated = true;
       editing = true;
       committed = false;
       draftCode = textarea?.value ?? draftCode;
@@ -490,6 +509,30 @@ function createMermaidLoadingElement(t: MarkdownLocalization["t"]): HTMLElement 
   loading.className = "cm-md-mermaid-loading";
   loading.textContent = t("editor.markdown.mermaid.rendering");
   return loading;
+}
+
+function createDeferredMermaidPlaceholder(
+  t: MarkdownLocalization["t"],
+  onActivate: () => void,
+): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "cm-md-mermaid-deferred";
+
+  const label = document.createElement("span");
+  label.textContent = t("editor.markdown.mermaid.largePreviewPaused");
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "cm-md-mermaid-action";
+  button.textContent = t("editor.markdown.mermaid.renderDiagram");
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onActivate();
+  }, { once: true });
+
+  placeholder.append(label, button);
+  return placeholder;
 }
 
 function createMermaidSourceFallback(

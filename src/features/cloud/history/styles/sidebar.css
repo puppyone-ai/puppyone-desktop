@@ -91,6 +91,12 @@
   list-style: none;
 }
 
+.desktop-cloud-history-sidebar-list .po-sidebar-virtual-row,
+.desktop-cloud-history-sidebar-list .desktop-cloud-history-sidebar-item {
+  width: 100%;
+  height: var(--cloud-history-row-height);
+}
+
 .desktop-cloud-history-sidebar-item,
 .desktop-cloud-history-sidebar-state {
   margin: 0;
@@ -152,6 +158,7 @@
 }
 
 .desktop-cloud-history-graph-cell {
+  width: var(--cloud-history-graph-width);
   display: flex;
   height: var(--cloud-history-row-height);
   min-width: 22px;

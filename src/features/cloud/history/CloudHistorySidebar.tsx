@@ -4,7 +4,9 @@ import {
   Cloud,
   RefreshCw,
 } from "lucide-react";
+import type { CSSProperties } from "react";
 import { useLocalization } from "@puppyone/localization/react";
+import { SidebarRoot, VirtualSidebarList } from "@puppyone/shared-ui";
 import { PageLoading } from "../../../components/loading";
 import type { CloudBranchGraphRow } from "../graph/model";
 import {
@@ -50,7 +52,7 @@ export function CloudProjectHistorySidebar({
   const notice = error ?? warning;
 
   return (
-    <section className="desktop-tool-sidebar desktop-cloud-history-sidebar" aria-label={t("cloud.history.projectHistory")}>
+    <SidebarRoot className="desktop-cloud-history-sidebar" aria-label={t("cloud.history.projectHistory")}>
       <header className="desktop-cloud-history-sidebar-header">
         <div>
           <Clock3 size={14} aria-hidden="true" />
@@ -74,25 +76,34 @@ export function CloudProjectHistorySidebar({
         </div>
       )}
 
-      <ol className="desktop-cloud-history-sidebar-list" aria-label={t("cloud.history.commitHistory")}>
-        {loading && rows.length === 0 ? (
+      {rows.length > 0 ? (
+        <VirtualSidebarList
+          className="desktop-cloud-history-sidebar-list"
+          ariaLabel={t("cloud.history.commitHistory")}
+          items={rows}
+          rowSize={HISTORY_GRAPH_ROW_HEIGHT}
+          activeIndex={rows.findIndex((row) => row.id === selectedCommitId)}
+          getKey={(row) => row.id}
+          renderRow={(row) => (
+            <CloudHistorySidebarRow
+              row={row}
+              graphWidth={graphWidth}
+              selected={row.id === selectedCommitId}
+              onSelect={onSelectCommit}
+            />
+          )}
+        />
+      ) : (
+        <ol className="desktop-cloud-history-sidebar-list" aria-label={t("cloud.history.commitHistory")}>
           <li className="desktop-cloud-history-sidebar-state">
+            {loading ? (
             <PageLoading variant="fill" label={t("cloud.history.loading")} className="desktop-cloud-history-sidebar-loading" />
-          </li>
-        ) : rows.length === 0 ? (
-          <li className="desktop-cloud-history-sidebar-state">
+            ) : (
             <CloudHistorySidebarEmpty error={error} />
+            )}
           </li>
-        ) : rows.map((row) => (
-          <CloudHistorySidebarRow
-            row={row}
-            graphWidth={graphWidth}
-            selected={row.id === selectedCommitId}
-            onSelect={onSelectCommit}
-            key={row.id}
-          />
-        ))}
-      </ol>
+        </ol>
+      )}
 
       <footer className="desktop-cloud-history-sidebar-footer">
         <Cloud size={13} aria-hidden="true" />
@@ -111,7 +122,7 @@ export function CloudProjectHistorySidebar({
         )}
         <small>{t("cloud.scope.readOnly")}</small>
       </footer>
-    </section>
+    </SidebarRoot>
   );
 }
 
@@ -137,7 +148,12 @@ function CloudHistorySidebarRow({
     .join(" · ");
   const contents = (
     <>
-      <span className="desktop-cloud-history-graph-cell" style={{ width: graphWidth }} aria-hidden="true" dir="ltr">
+      <span
+        className="desktop-cloud-history-graph-cell"
+        style={getCloudHistoryGraphCellStyle(graphWidth)}
+        aria-hidden="true"
+        dir="ltr"
+      >
         <HistoryGraphVisual
           graphWidth={graphWidth}
           height={HISTORY_GRAPH_ROW_HEIGHT}
@@ -174,7 +190,7 @@ function CloudHistorySidebarRow({
   const className = `desktop-cloud-history-sidebar-row ${selected ? "active" : ""} ${isCommit ? "" : "ref-only"}`;
 
   return (
-    <li className="desktop-cloud-history-sidebar-item" data-history-row-kind={row.kind}>
+    <div className="desktop-cloud-history-sidebar-item" data-history-row-kind={row.kind}>
       {isCommit ? (
         <button
           className={className}
@@ -191,8 +207,12 @@ function CloudHistorySidebarRow({
           {contents}
         </div>
       )}
-    </li>
+    </div>
   );
+}
+
+function getCloudHistoryGraphCellStyle(graphWidth: number): CSSProperties {
+  return { "--cloud-history-graph-width": `${graphWidth}px` } as CSSProperties;
 }
 
 function CloudHistorySidebarEmpty({ error }: { error: string | null }) {

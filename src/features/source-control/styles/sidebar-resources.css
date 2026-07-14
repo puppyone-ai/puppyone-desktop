@@ -42,12 +42,12 @@
 .desktop-git-resizable-section > .desktop-working-tree-list,
 .desktop-git-resizable-section .desktop-git-remote-preview,
 .desktop-git-resizable-section > .desktop-git-committed-summary,
-.desktop-git-resizable-section > .desktop-tool-sidebar-empty.compact,
+.desktop-git-resizable-section > .po-sidebar-empty.compact,
 .desktop-git-section-collapse-inner > .desktop-working-tree-list,
 .desktop-git-section-collapse-inner > .desktop-git-remote-preview,
 .desktop-git-section-collapse-inner > .desktop-git-committed-summary,
 .desktop-git-section-collapse-inner > .desktop-git-preview-summary,
-.desktop-git-section-collapse-inner > .desktop-tool-sidebar-empty.compact {
+.desktop-git-section-collapse-inner > .po-sidebar-empty.compact {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
@@ -59,7 +59,7 @@
   max-height: none;
 }
 
-.desktop-git-resizable-section > .desktop-tool-sidebar-empty.compact {
+.desktop-git-resizable-section > .po-sidebar-empty.compact {
   display: block;
 }
 
@@ -67,14 +67,14 @@
   .desktop-working-tree-list,
   .desktop-git-remote-preview,
   .desktop-git-committed-summary,
-  .desktop-tool-sidebar-empty.compact
+  .po-sidebar-empty.compact
 )::-webkit-scrollbar,
 .desktop-git-section-collapse-inner :is(
   .desktop-working-tree-list,
   .desktop-git-remote-preview,
   .desktop-git-committed-summary,
   .desktop-git-preview-summary,
-  .desktop-tool-sidebar-empty.compact
+  .po-sidebar-empty.compact
 )::-webkit-scrollbar {
   width: var(--git-sidebar-scrollbar-width);
   height: var(--git-sidebar-scrollbar-width);
@@ -84,14 +84,14 @@
   .desktop-working-tree-list,
   .desktop-git-remote-preview,
   .desktop-git-committed-summary,
-  .desktop-tool-sidebar-empty.compact
+  .po-sidebar-empty.compact
 )::-webkit-scrollbar-track,
 .desktop-git-section-collapse-inner :is(
   .desktop-working-tree-list,
   .desktop-git-remote-preview,
   .desktop-git-committed-summary,
   .desktop-git-preview-summary,
-  .desktop-tool-sidebar-empty.compact
+  .po-sidebar-empty.compact
 )::-webkit-scrollbar-track {
   background: transparent;
 }
@@ -100,14 +100,14 @@
   .desktop-working-tree-list,
   .desktop-git-remote-preview,
   .desktop-git-committed-summary,
-  .desktop-tool-sidebar-empty.compact
+  .po-sidebar-empty.compact
 )::-webkit-scrollbar-thumb,
 .desktop-git-section-collapse-inner :is(
   .desktop-working-tree-list,
   .desktop-git-remote-preview,
   .desktop-git-committed-summary,
   .desktop-git-preview-summary,
-  .desktop-tool-sidebar-empty.compact
+  .po-sidebar-empty.compact
 )::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: var(--po-scrollbar-thumb);
@@ -514,6 +514,14 @@ body.desktop-git-sidebar-resizing {
   animation: puppy-dot-bounce 1.2s ease-in-out infinite;
 }
 
+.desktop-git-loading-dots span:nth-child(2) {
+  animation-delay: 160ms;
+}
+
+.desktop-git-loading-dots span:nth-child(3) {
+  animation-delay: 320ms;
+}
+
 .desktop-git-remote-preview {
   display: grid;
   box-sizing: border-box;
@@ -613,7 +621,7 @@ body.desktop-git-sidebar-resizing {
   white-space: nowrap;
 }
 
-.desktop-git-section-actions .desktop-tool-sidebar-icon {
+.desktop-git-section-actions .po-sidebar-icon-button {
   width: var(--git-section-action-size);
   height: var(--git-section-action-size);
   border: 0;
@@ -622,32 +630,32 @@ body.desktop-git-sidebar-resizing {
   color: var(--po-text-muted);
 }
 
-.desktop-git-section-actions .desktop-tool-sidebar-icon:hover:not(:disabled) {
+.desktop-git-section-actions .po-sidebar-icon-button:hover:not(:disabled) {
   background: var(--po-hover);
   color: var(--po-text);
 }
 
 /* Bulk Stage all is a secondary control: visible gray chrome, never accent primary. */
-.desktop-git-section-actions .desktop-tool-sidebar-icon.desktop-git-stage-all-action {
+.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-all-action {
   background: var(--po-control);
   color: var(--po-text-muted);
 }
 
-.desktop-git-section-actions .desktop-tool-sidebar-icon.desktop-git-stage-all-action:hover:not(:disabled) {
+.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-all-action:hover:not(:disabled) {
   background: var(--po-control-hover);
   color: var(--po-text);
 }
 
-.desktop-git-section-actions .desktop-tool-sidebar-icon.danger {
+.desktop-git-section-actions .po-sidebar-icon-button.danger {
   color: color-mix(in srgb, var(--po-danger) 72%, var(--po-text-muted));
 }
 
-.desktop-git-section-actions .desktop-tool-sidebar-icon.danger:hover:not(:disabled) {
+.desktop-git-section-actions .po-sidebar-icon-button.danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--po-danger) 10%, transparent);
   color: var(--po-danger);
 }
 
-.desktop-git-section-actions .desktop-tool-sidebar-icon:disabled {
+.desktop-git-section-actions .po-sidebar-icon-button:disabled {
   background: transparent;
   color: var(--po-text-disabled);
 }
@@ -768,11 +776,26 @@ body.desktop-git-sidebar-resizing {
     calc(var(--git-sidebar-right-gap) - var(--git-sidebar-scrollbar-width));
 }
 
+.desktop-working-tree-virtual-list,
+.desktop-git-preview-virtual-list {
+  display: block;
+}
+
+.desktop-working-tree-virtual-list > .po-sidebar-virtual-spacer,
+.desktop-git-preview-virtual-list > .po-sidebar-virtual-spacer {
+  width: 100%;
+}
+
+.desktop-working-tree-virtual-list .po-sidebar-virtual-row,
+.desktop-git-preview-virtual-list .po-sidebar-virtual-row {
+  width: 100%;
+}
+
 .desktop-git-section-row + .desktop-working-tree-list {
   margin-top: 3px;
 }
 
-.desktop-git-section-row + .desktop-tool-sidebar-empty.compact {
+.desktop-git-section-row + .po-sidebar-empty.compact {
   margin-top: 4px;
 }
 

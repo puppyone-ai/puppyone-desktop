@@ -253,3 +253,4 @@ export { StatusBadge } from "./primitives/StatusBadge";
 export type { StatusBadgeProps } from "./primitives/StatusBadge";
 export { DotsLoader, InlineLoading, PulseGridLoader } from "./primitives/LoadingIndicator";
 export type { LoaderSize, LoaderTone } from "./primitives/LoadingIndicator";
+export * from "./sidebar";

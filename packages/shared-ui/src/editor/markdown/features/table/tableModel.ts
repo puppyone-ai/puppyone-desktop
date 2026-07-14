@@ -1,4 +1,12 @@
 import type { EditorState } from "@codemirror/state";
+import {
+  MARKDOWN_TABLE_MODEL_CELL_LIMIT,
+  MARKDOWN_TABLE_MODEL_COLUMN_LIMIT,
+  MARKDOWN_TABLE_MODEL_ROW_BYTE_LIMIT,
+  MARKDOWN_TABLE_MODEL_ROW_LIMIT,
+  MARKDOWN_TABLE_MODEL_SOURCE_BYTE_LIMIT,
+  getUtf8ByteLength,
+} from "../../core/plans/markdownBlockExecution";
 
 export type MarkdownTableAlignment = "left" | "center" | "right" | null;
 
@@ -8,6 +16,10 @@ export type MarkdownTableBlock = {
   nextLineNumber: number;
   alignments: MarkdownTableAlignment[];
   rows: MarkdownTableRow[];
+  rowCount: number;
+  cellCount: number;
+  sourceBytes: number;
+  modelComplete: boolean;
 };
 
 export type MarkdownTableCell = {
@@ -74,37 +86,101 @@ export function getMarkdownTableBlock(state: EditorState, lineNumber: number): M
 
   const headerLine = doc.line(lineNumber);
   const delimiterLine = doc.line(lineNumber + 1);
+  const headerBytes = getUtf8ByteLength(headerLine.text);
+  const delimiterBytes = getUtf8ByteLength(delimiterLine.text);
+  // A single unbounded row cannot benefit from row virtualization. Leave it
+  // as exact source before allocating cell segments.
+  if (
+    headerBytes > MARKDOWN_TABLE_MODEL_ROW_BYTE_LIMIT
+    || delimiterBytes > MARKDOWN_TABLE_MODEL_ROW_BYTE_LIMIT
+  ) return null;
   if (!isTableHeaderLine(headerLine.text) || !isTableDelimiterLine(delimiterLine.text)) return null;
 
-  const delimiterCells = splitTableCells(delimiterLine.text);
+  const maximumCollectedCells = MARKDOWN_TABLE_MODEL_COLUMN_LIMIT + 1;
+  let sourceBytes = headerBytes + delimiterBytes + 1;
+  const delimiterCells = splitTableCells(delimiterLine.text, maximumCollectedCells);
+  const parsedHeaderCells = splitTableCellsWithPositions(headerLine, maximumCollectedCells);
+  const headerCells = parsedHeaderCells.slice(0, MARKDOWN_TABLE_MODEL_COLUMN_LIMIT);
   const rows: MarkdownTableRow[] = [{
-    cells: splitTableCellsWithPositions(headerLine),
+    cells: headerCells,
     header: true,
     lineTo: headerLine.to,
   }];
+  let rowCount = 1;
+  let cellCount = parsedHeaderCells.length;
+  let modelComplete = (
+    headerBytes <= MARKDOWN_TABLE_MODEL_ROW_BYTE_LIMIT
+    && delimiterBytes <= MARKDOWN_TABLE_MODEL_ROW_BYTE_LIMIT
+    && sourceBytes <= MARKDOWN_TABLE_MODEL_SOURCE_BYTE_LIMIT
+    && parsedHeaderCells.length <= MARKDOWN_TABLE_MODEL_COLUMN_LIMIT
+    && delimiterCells.length <= MARKDOWN_TABLE_MODEL_COLUMN_LIMIT
+  );
   let lastLine = delimiterLine;
   let nextLineNumber = lineNumber + 2;
 
   while (nextLineNumber <= doc.lines) {
     const rowLine = doc.line(nextLineNumber);
     if (!isMarkdownTableLine(rowLine.text) || isTableDelimiterLine(rowLine.text)) break;
-    rows.push({
-      cells: splitTableCellsWithPositions(rowLine),
-      header: false,
-      lineTo: rowLine.to,
-    });
+    rowCount += 1;
+    const rowBytes = getUtf8ByteLength(rowLine.text);
+    sourceBytes = Math.min(
+      MARKDOWN_TABLE_MODEL_SOURCE_BYTE_LIMIT + 1,
+      sourceBytes + rowBytes + 1,
+    );
+    if (modelComplete) {
+      if (
+        rowBytes > MARKDOWN_TABLE_MODEL_ROW_BYTE_LIMIT
+        || sourceBytes > MARKDOWN_TABLE_MODEL_SOURCE_BYTE_LIMIT
+      ) {
+        modelComplete = false;
+        rows.length = 1;
+        lastLine = rowLine;
+        nextLineNumber += 1;
+        continue;
+      }
+      const cells = splitTableCellsWithPositions(rowLine, maximumCollectedCells);
+      const nextCellCount = cellCount + cells.length;
+      if (
+        rowCount > MARKDOWN_TABLE_MODEL_ROW_LIMIT
+        || nextCellCount > MARKDOWN_TABLE_MODEL_CELL_LIMIT
+        || cells.length > MARKDOWN_TABLE_MODEL_COLUMN_LIMIT
+      ) {
+        modelComplete = false;
+        rows.length = 1;
+        cellCount = Math.max(nextCellCount, MARKDOWN_TABLE_MODEL_CELL_LIMIT + 1);
+      } else {
+        cellCount = nextCellCount;
+        rows.push({
+          cells,
+          header: false,
+          lineTo: rowLine.to,
+        });
+      }
+    }
     lastLine = rowLine;
     nextLineNumber += 1;
   }
 
-  const width = Math.max(delimiterCells.length, ...rows.map((row) => row.cells.length));
+  const width = modelComplete
+    ? rows.reduce((maximum, row) => Math.max(maximum, row.cells.length), delimiterCells.length)
+    : Math.min(
+        MARKDOWN_TABLE_MODEL_COLUMN_LIMIT,
+        Math.max(1, delimiterCells.length, parsedHeaderCells.length),
+      );
 
   return {
     from: headerLine.from,
     to: lastLine.to,
-    alignments: normalizeTableAlignments(delimiterCells.map(parseTableAlignment), width),
+    alignments: normalizeTableAlignments(
+      delimiterCells.slice(0, width).map(parseTableAlignment),
+      width,
+    ),
     nextLineNumber,
-    rows: normalizeTableRows(rows, width),
+    rows: modelComplete ? normalizeTableRows(rows, width) : rows,
+    rowCount,
+    cellCount,
+    sourceBytes,
+    modelComplete,
   };
 }
 
@@ -112,7 +188,7 @@ export function isMarkdownTableLine(text: string): boolean {
   const trimmed = text.trim();
   if (!hasUnescapedPipe(trimmed)) return false;
   if (isTableDelimiterLine(trimmed)) return true;
-  return splitTableCells(trimmed).length > 0;
+  return hasTableCellSegment(trimmed);
 }
 
 export function isMarkdownTableSourceLine(text: string): boolean {
@@ -280,23 +356,26 @@ export function sanitizeMarkdownTableCell(value: string): string {
 }
 
 function isTableHeaderLine(text: string): boolean {
-  return splitTableCells(text).length >= 1 && hasUnescapedPipe(text);
+  return hasTableCellSegment(text);
 }
 
 function isTableDelimiterLine(text: string): boolean {
-  const cells = splitTableCells(text);
+  if (text.length > MARKDOWN_TABLE_MODEL_ROW_BYTE_LIMIT) return false;
+  const cells = splitTableCells(text, MARKDOWN_TABLE_MODEL_COLUMN_LIMIT + 1);
   return cells.length >= 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
 }
 
-function splitTableCells(text: string): string[] {
-  return splitTableCellSegments(text).map((cell) => unescapeMarkdownTablePipes(cell.text.trim()));
+function splitTableCells(text: string, maximumCells = Number.POSITIVE_INFINITY): string[] {
+  return splitTableCellSegments(text, maximumCells).map((cell) => unescapeMarkdownTablePipes(cell.text.trim()));
 }
 
-function splitTableCellsWithPositions(line: MarkdownSourceLine): MarkdownTableCell[] {
+function splitTableCellsWithPositions(
+  line: MarkdownSourceLine,
+  maximumCells = Number.POSITIVE_INFINITY,
+): MarkdownTableCell[] {
   const text = line.text;
-  const segments = splitTableCellSegments(text);
-  const pipeIndexes = getUnescapedPipeIndexes(text);
-  if (pipeIndexes.length === 0) return [];
+  const segments = splitTableCellSegments(text, maximumCells);
+  if (!hasUnescapedPipe(text)) return [];
 
   const cells: MarkdownTableCell[] = [];
   for (const segment of segments) {
@@ -316,8 +395,17 @@ function splitTableCellsWithPositions(line: MarkdownSourceLine): MarkdownTableCe
   return cells;
 }
 
-function splitTableCellSegments(text: string): TableCellSegment[] {
-  const pipeIndexes = getUnescapedPipeIndexes(text);
+function splitTableCellSegments(
+  text: string,
+  maximumSegments = Number.POSITIVE_INFINITY,
+): TableCellSegment[] {
+  const normalizedMaximum = Number.isFinite(maximumSegments)
+    ? Math.max(0, Math.floor(maximumSegments))
+    : Number.POSITIVE_INFINITY;
+  const pipeIndexes = getUnescapedPipeIndexes(
+    text,
+    Number.isFinite(normalizedMaximum) ? normalizedMaximum + 1 : Number.POSITIVE_INFINITY,
+  );
   if (pipeIndexes.length === 0) return [];
 
   const firstContentIndex = text.search(/\S/);
@@ -339,6 +427,7 @@ function splitTableCellSegments(text: string): TableCellSegment[] {
 
   const segments: TableCellSegment[] = [];
   for (let index = 0; index < boundaries.length - 1; index += 1) {
+    if (segments.length >= normalizedMaximum) break;
     const rawFrom = Math.max(0, boundaries[index] + 1);
     const rawTo = Math.min(text.length, boundaries[index + 1]);
     segments.push({
@@ -350,18 +439,35 @@ function splitTableCellSegments(text: string): TableCellSegment[] {
   return segments;
 }
 
-function getUnescapedPipeIndexes(text: string): number[] {
+function getUnescapedPipeIndexes(
+  text: string,
+  maximum = Number.POSITIVE_INFINITY,
+): number[] {
   const indexes: number[] = [];
   for (let index = 0; index < text.length; index += 1) {
     if (text[index] === "|" && !isEscapedMarkdownCharacter(text, index)) {
       indexes.push(index);
+      if (indexes.length >= maximum) break;
     }
   }
   return indexes;
 }
 
 function hasUnescapedPipe(text: string): boolean {
-  return getUnescapedPipeIndexes(text).length > 0;
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === "|" && !isEscapedMarkdownCharacter(text, index)) return true;
+  }
+  return false;
+}
+
+function hasTableCellSegment(text: string): boolean {
+  const pipeIndexes = getUnescapedPipeIndexes(text, 2);
+  if (pipeIndexes.length === 0) return false;
+  const firstContentIndex = text.search(/\S/);
+  const lastContentIndex = findLastNonWhitespaceIndex(text);
+  const hasLeadingPipe = firstContentIndex >= 0 && text[firstContentIndex] === "|";
+  const hasTrailingPipe = lastContentIndex >= 0 && text[lastContentIndex] === "|";
+  return !(hasLeadingPipe && hasTrailingPipe && pipeIndexes.length < 2);
 }
 
 function isEscapedMarkdownCharacter(text: string, index: number): boolean {

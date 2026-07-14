@@ -14,7 +14,7 @@
   padding: 0 9px;
   border: 1px solid var(--po-divider);
   border-radius: 6px;
-  background: var(--po-panel-raised);
+  background: transparent;
   color: var(--po-text-muted);
   font-size: 12px;
   font-weight: 650;
@@ -29,14 +29,21 @@
   color: var(--po-text);
 }
 
+.desktop-settings-action:focus-visible,
+.desktop-theme-segment button:focus-visible,
+.desktop-theme-choice:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--po-accent) 36%, transparent);
+  outline-offset: 2px;
+}
+
 .desktop-settings-action.primary {
   border-color: color-mix(in srgb, var(--po-accent) 28%, transparent);
-  background: color-mix(in srgb, var(--po-accent) 9%, var(--po-panel-raised));
+  background: color-mix(in srgb, var(--po-accent) 9%, transparent);
   color: var(--po-accent);
 }
 
 .desktop-settings-action.primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--po-accent) 14%, var(--po-panel-raised));
+  background: color-mix(in srgb, var(--po-accent) 14%, transparent);
   color: var(--po-accent);
 }
 
@@ -51,12 +58,12 @@
 
 .desktop-settings-action.danger {
   border-color: color-mix(in srgb, var(--po-danger) 22%, transparent);
-  background: color-mix(in srgb, var(--po-danger) 7%, var(--po-panel-raised));
+  background: color-mix(in srgb, var(--po-danger) 7%, transparent);
   color: var(--po-danger);
 }
 
 .desktop-settings-action.danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--po-danger) 12%, var(--po-panel-raised));
+  background: color-mix(in srgb, var(--po-danger) 12%, transparent);
 }
 
 .desktop-settings-row-control {
@@ -77,7 +84,7 @@
 
 .desktop-settings-tools-row {
   align-items: flex-start;
-  min-height: 38px;
+  min-height: 42px;
   padding-top: 5px;
   padding-bottom: 5px;
 }
@@ -130,136 +137,6 @@
   min-width: 0;
   overflow: hidden;
   color: inherit;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-settings-remote-list {
-  display: grid;
-  max-width: 780px;
-  gap: 10px;
-}
-
-.desktop-settings-remote-table {
-  display: grid;
-  overflow: hidden;
-  border: 1px solid var(--po-divider);
-  border-radius: 8px;
-  background: var(--po-panel);
-}
-
-.desktop-settings-remote-table-head,
-.desktop-settings-remote-row {
-  display: grid;
-  grid-template-columns: minmax(120px, 0.9fr) 92px minmax(220px, 2fr) 72px 86px;
-  min-width: 0;
-  align-items: center;
-  gap: 12px;
-}
-
-.desktop-settings-remote-table-head {
-  height: 34px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--po-divider);
-  color: var(--po-text-subtle);
-  font-size: 11px;
-  font-weight: 760;
-  text-transform: uppercase;
-}
-
-.desktop-settings-remote-row {
-  min-height: 46px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--po-divider);
-  color: var(--po-text-muted);
-  font-size: 12.5px;
-}
-
-.desktop-settings-remote-row:last-child {
-  border-bottom: 0;
-}
-
-.desktop-settings-remote-row > strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--po-text);
-  font-size: 12.5px;
-  font-weight: 740;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-settings-remote-url {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.desktop-settings-remote-url code,
-.desktop-settings-remote-url small {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--po-text);
-  font-family: var(--po-font-mono);
-  font-size: 11.5px;
-  font-weight: 620;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-settings-remote-url small {
-  color: var(--po-text-subtle);
-  font-size: 11px;
-  font-weight: 520;
-}
-
-.desktop-settings-icon-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  height: 28px;
-  min-width: 0;
-  padding: 0 8px;
-  border: 1px solid var(--po-divider);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--po-text-muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.desktop-settings-icon-action:hover:not(:disabled) {
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
-.desktop-settings-icon-action:disabled {
-  color: var(--po-text-disabled);
-  opacity: 0.55;
-}
-
-.desktop-settings-remote {
-  display: grid;
-  gap: 4px;
-  padding-top: 8px;
-  border-top: 1px solid var(--po-divider);
-}
-
-.desktop-settings-remote-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 32px;
-  gap: 12px;
-}
-
-.desktop-settings-remote-header > strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--po-text);
-  font-size: 12.5px;
-  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -418,6 +295,7 @@
 }
 
 .desktop-theme-preset-swatches i {
+  background: var(--settings-theme-swatch);
   width: 7px;
   height: 14px;
   border: 1px solid color-mix(in srgb, var(--po-border) 56%, transparent);

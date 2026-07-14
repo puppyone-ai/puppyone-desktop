@@ -16,6 +16,7 @@ const logicalUiStyles = [
   "../src/features/desktop-agent/ui/styles/transcript.css",
   "../src/features/plugins/plugins.css",
   "../src/features/puppyflow/puppyflow.css",
+  "../src/styles/settings-controls.css",
   "../src/styles/settings-view.css",
   "../src/styles/settings.css",
 ] as const;
@@ -52,7 +53,11 @@ describe("RTL architecture", () => {
     expect(read("../src/features/source-control/GitStatusView.tsx"))
       .toContain('className="desktop-history-graph" aria-hidden="true" dir="ltr"');
     expect(read("../src/features/cloud/history/CloudHistorySidebar.tsx"))
-      .toContain('aria-hidden="true" dir="ltr"');
+      .toMatch(/aria-hidden="true"\s+dir="ltr"/);
+    expect(read("../src/features/settings/main/RepositorySettingsViews.tsx"))
+      .toContain('<code dir="ltr" title={copyUrl ?? ""}>');
+    expect(read("../src/features/settings/main/GeneralSettingsView.tsx"))
+      .toContain('<strong dir="ltr" title={workspace.path}>{workspace.path}</strong>');
   });
 });
 
