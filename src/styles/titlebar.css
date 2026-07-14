@@ -124,6 +124,11 @@
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 
+.desktop-titlebar-actions .desktop-titlebar-terminal,
+.desktop-titlebar-actions .desktop-titlebar-agent-chat {
+  width: var(--desktop-titlebar-tool-action-width);
+}
+
 .desktop-titlebar-action:hover {
   background: var(--desktop-titlebar-hover);
   color: var(--desktop-titlebar-text-muted);

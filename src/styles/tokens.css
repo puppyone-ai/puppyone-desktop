@@ -51,6 +51,7 @@
   --desktop-chrome-height: 38px;
   --desktop-chrome-control-size: 30px;
   --desktop-titlebar-control-height: 24px;
+  --desktop-titlebar-tool-action-width: 34px;
   --desktop-sidebar-control-size: var(--desktop-chrome-control-size);
   --desktop-sidebar-nav-height: calc(var(--desktop-sidebar-control-size) + 8px);
   --desktop-sidebar-nav-padding: 4px;
