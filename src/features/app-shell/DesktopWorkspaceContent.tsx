@@ -770,7 +770,7 @@ export function DesktopWorkspaceContent({
                 projectContext={cloudNavigationContext.projectContext}
                 projectBound={cloudNavigationContext.projectBound && !cloudWorkspace}
                 projectCapabilities={
-                  attachment.status === "linked"
+                  attachment.status === "resolved"
                     ? attachment.capabilities ?? []
                     : cloud.selectedProjectCapabilities ?? []
                 }

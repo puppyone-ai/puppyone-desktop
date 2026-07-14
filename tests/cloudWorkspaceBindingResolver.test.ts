@@ -10,7 +10,10 @@ import {
   resolveCloudProjectNavigationContext,
   resolveProjectCloudAttachment,
 } from "../src/features/cloud/attachment/projectCloudAttachment";
-import { parsePuppyoneRemote } from "../src/features/source-control/remotes";
+import {
+  parsePuppyoneRemote,
+  resolvePuppyoneRemotes,
+} from "../src/features/source-control/remotes";
 import { shouldLoadCloudProjectCatalog } from "../src/features/cloud/workspace/cloudProjectResolution";
 import { cloudMessage } from "../src/features/cloud/cloudPresentation";
 
@@ -69,7 +72,7 @@ describe("binding-first Project catalog policy", () => {
     })).toBe(false);
   });
 
-  it("keeps the catalog available for Cloud-only or explicit unbound browsing", () => {
+  it("keeps the catalog available only for global/home or Cloud-only browsing", () => {
     expect(shouldLoadCloudProjectCatalog({
       hasOpenWorkspace: false,
       workspaceIsCloud: false,
@@ -79,6 +82,12 @@ describe("binding-first Project catalog policy", () => {
     expect(shouldLoadCloudProjectCatalog({
       hasOpenWorkspace: true,
       workspaceIsCloud: false,
+      hasLocalTargetHint: false,
+      explicitBrowse: true,
+    })).toBe(false);
+    expect(shouldLoadCloudProjectCatalog({
+      hasOpenWorkspace: true,
+      workspaceIsCloud: true,
       hasLocalTargetHint: false,
       explicitBrowse: true,
     })).toBe(true);
@@ -313,8 +322,10 @@ describe("binding-only attachment semantics", () => {
       resolving: false,
     });
     expect(attachment).toEqual({
-      status: "linked",
+      status: "resolved",
       projectId: "project-1",
+      resolutionSource: "workspace-binding",
+      bindingStatus: "bound",
       bindingId: "binding-1",
       warning: cloudMessage("binding-network-failed", undefined, "Network offline"),
     });
@@ -326,6 +337,7 @@ describe("canonical Git locator discovery", () => {
     expect(parsePuppyoneRemote("https://cloud.example/git/project-1.git")).toEqual({
       kind: "project",
       host: "cloud.example",
+      origin: "https://cloud.example",
       displayId: "project-1",
       projectId: "project-1",
     });
@@ -334,10 +346,34 @@ describe("canonical Git locator discovery", () => {
     )).toEqual({
       kind: "scope",
       host: "cloud.example",
+      origin: "https://cloud.example",
       displayId: "project-1/scope-docs",
       projectId: "project-1",
       scopeId: "scope-docs",
     });
+  });
+
+  it("deduplicates matching fetch/push locators and fails closed on conflicts", () => {
+    const unique = resolvePuppyoneRemotes({
+      remotes: [{
+        name: "puppyone",
+        fetchUrl: "https://cloud.example/git/project-1.git",
+        pushUrl: "https://cloud.example/git/project-1.git",
+        branches: [],
+      }],
+    } as never);
+    expect(unique.status).toBe("unique");
+    expect(unique.candidates).toHaveLength(2);
+
+    const conflict = resolvePuppyoneRemotes({
+      remotes: [{
+        name: "puppyone",
+        fetchUrl: "https://cloud.example/git/project-1.git",
+        pushUrl: "https://cloud.example/git/project-2.git",
+        branches: [],
+      }],
+    } as never);
+    expect(conflict.status).toBe("conflict");
   });
 
   it("rejects ambiguous encoded IDs and credential-bearing canonical locators", () => {
@@ -363,17 +399,24 @@ describe("canonical Git locator discovery", () => {
 });
 
 describe("project attachment routing", () => {
-  it("binds the selected Project ID without a repo-identity or Scope-list preflight", () => {
-    const source = readFileSync(
-      new URL("../src/features/cloud/CloudServiceMainView.tsx", import.meta.url),
+  it("keeps contextual resolution and Organization catalog data in separate owners", () => {
+    const dataSource = readFileSync(
+      new URL("../src/features/cloud/data/useDesktopCloudData.ts", import.meta.url),
       "utf8",
     );
-    const attachFlow = source
-      .split("const handleConnectProject", 2)[1]
-      ?.split("const handleCopyCloneCommand", 1)[0] ?? "";
+    const resolverSource = readFileSync(
+      new URL("../src/features/cloud/workspace/useCloudWorkspaceBinding.ts", import.meta.url),
+      "utf8",
+    );
+    const localOnlySource = readFileSync(
+      new URL("../src/features/cloud/states.tsx", import.meta.url),
+      "utf8",
+    );
 
-    expect(attachFlow).toContain("onConfigureCloudRemote(project.id)");
-    expect(attachFlow).not.toContain("getCloudRepoIdentity");
+    expect(dataSource).not.toContain("listCloudProjects");
+    expect(resolverSource).toContain("resolveCanonicalCloudWorkspaceRemote");
+    expect(localOnlySource).not.toContain("CloudProjectRow");
+    expect(localOnlySource).not.toContain("onCopyCloneCommand");
   });
 
   it("compensates both new and reused binding credentials after local setup failure", () => {
