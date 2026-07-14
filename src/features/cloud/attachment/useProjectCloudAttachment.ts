@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../../types/electron";
 import type { RecentWorkspaceCloudBinding } from "../workspace/cloudProjectResolution";
-import { getPuppyoneRemote } from "../../source-control/remotes";
+import { resolvePuppyoneRemotes } from "../../source-control/remotes";
 import {
   resolveProjectCloudAttachment,
   type ProjectCloudAttachment,
@@ -43,7 +43,8 @@ export function useProjectCloudAttachment({
     );
     const bindingProjectId = binding?.projectId?.trim() || null;
     const remoteProjectId = binding?.candidateProjectId?.trim() || null;
-    const hasCloudRemote = Boolean(getPuppyoneRemote(activeGitStatus));
+    const remoteResolution = resolvePuppyoneRemotes(activeGitStatus);
+    const hasCloudRemote = remoteResolution.status !== "none";
     const hasCandidateSource = Boolean(
       configuredProjectId
       || bindingProjectId
@@ -71,7 +72,9 @@ export function useProjectCloudAttachment({
       scopePath: binding?.scopePath ?? null,
       readiness: binding?.readiness ?? null,
       capabilities: binding?.capabilities ?? [],
-      scopeId: binding?.candidateScopeId ?? null,
+      scopeId: binding?.scopeId ?? binding?.candidateScopeId ?? null,
+      resolutionSource: binding?.resolutionSource ?? null,
+      bindingStatus: binding?.bindingStatus ?? null,
     });
   }, [
     activeGitStatus,

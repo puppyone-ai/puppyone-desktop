@@ -14,6 +14,8 @@ import {
 
 export type RecentWorkspaceCloudBinding = {
   projectId: string | null;
+  resolutionSource?: "workspace-binding" | "canonical-remote";
+  bindingStatus?: "bound" | "not-bound";
   cloudLinked: boolean;
   error: CloudMessageDescriptor | null;
   reason?:
@@ -25,6 +27,8 @@ export type RecentWorkspaceCloudBinding = {
     | "wrong-host"
     | "role-downgraded"
     | "legacy-confirmation-required"
+    | "locator-conflict"
+    | "not-found"
     | null;
   bindingId?: string | null;
   bindingKind?: "full" | "scoped" | null;
@@ -32,6 +36,7 @@ export type RecentWorkspaceCloudBinding = {
   readiness?: DesktopCloudProjectReadiness | null;
   candidateProjectId?: string | null;
   candidateScopeId?: string | null;
+  scopeId?: string | null;
   capabilities?: string[];
 };
 
@@ -44,8 +49,8 @@ export const CLOUD_PROJECT_MAPPING_ERROR = CLOUD_PROJECT_UNRESOLVABLE_MESSAGE;
  *
  * A Local workspace is resolved binding-first. Session restore must therefore
  * never race an exact Workspace Binding lookup with a broad Project listing.
- * The catalog remains available when the user explicitly browses and the
- * workspace has no canonical Project/binding candidate.
+ * The catalog is a global/home concern. An open Local workspace is always a
+ * contextual surface, including when it has no locator at all.
  */
 export function shouldLoadCloudProjectCatalog({
   hasOpenWorkspace,
@@ -60,9 +65,10 @@ export function shouldLoadCloudProjectCatalog({
   localTargetResolutionPending?: boolean;
   explicitBrowse: boolean;
 }): boolean {
-  if (!hasOpenWorkspace || workspaceIsCloud) return true;
-  if (localTargetResolutionPending) return false;
-  return explicitBrowse && !hasLocalTargetHint;
+  void hasLocalTargetHint;
+  void localTargetResolutionPending;
+  void explicitBrowse;
+  return !hasOpenWorkspace || workspaceIsCloud;
 }
 
 function errorStatus(error: unknown): number | null {

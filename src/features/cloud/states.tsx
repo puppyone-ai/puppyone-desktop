@@ -1,9 +1,8 @@
-import { Cloud, ExternalLink, FolderOpen, GitBranch, RefreshCw, Settings, Users } from "lucide-react";
+import { Cloud, ExternalLink, GitBranch, RefreshCw, Settings, Users } from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
-  DesktopCloudProject,
   DesktopCloudRepoIdentity,
   DesktopCloudScope,
 } from "../../lib/cloudApi";
@@ -17,10 +16,8 @@ import {
 import type { CloudWorkspaceSection } from "./types";
 import { getCloudSectionDescriptor } from "./navigation";
 import {
-  CloudInlineEmpty,
   CloudMainMetric,
   CloudMainSection,
-  CloudProjectRow,
   CloudWebEmpty,
   CloudWebPage,
 } from "./components/shared";
@@ -186,30 +183,18 @@ export function CloudUnmappedWorkspace({
   accountEmail,
   branchName,
   localChangeCount,
-  projects,
-  loading,
   backupLoading,
   cloudRemote,
-  action,
   onBackupWorkspace,
-  onConnectProject,
-  onCopyCloneCommand,
-  onOpenProject,
 }: {
   workspace: Workspace;
   activeSection: CloudWorkspaceSection;
   accountEmail: string | null;
   branchName: string;
   localChangeCount: number;
-  projects: DesktopCloudProject[];
-  loading: boolean;
   backupLoading: boolean;
   cloudRemote: ReturnType<typeof getPuppyoneRemote>;
-  action: { kind: "backup" | "connect" | "copy" | null; projectId: string | null };
   onBackupWorkspace: () => void;
-  onConnectProject: (project: DesktopCloudProject) => void;
-  onCopyCloneCommand: (project: DesktopCloudProject) => void;
-  onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
 }) {
   const { formatNumber, t } = useLocalization();
   if (activeSection !== "overview") {
@@ -217,15 +202,9 @@ export function CloudUnmappedWorkspace({
       <CloudUnmappedSection
         workspace={workspace}
         activeSection={activeSection}
-        projects={projects}
-        loading={loading}
         backupLoading={backupLoading}
         cloudRemote={cloudRemote}
-        action={action}
         onBackupWorkspace={onBackupWorkspace}
-        onConnectProject={onConnectProject}
-        onCopyCloneCommand={onCopyCloneCommand}
-        onOpenProject={onOpenProject}
       />
     );
   }
@@ -259,31 +238,6 @@ export function CloudUnmappedWorkspace({
           </div>
         </div>
       </CloudMainSection>
-
-      <CloudMainSection
-        title={t("cloud.project.openExisting")}
-        count={loading ? t("cloud.common.loading") : formatNumber(projects.length)}
-        action={<button className="desktop-cloud-row-action" type="button" onClick={() => openCloudApp("/projects")}>{t("cloud.common.openCloud")}</button>}
-      >
-        <div className="desktop-cloud-project-list">
-          {loading ? (
-            <CloudInlineEmpty icon={RefreshCw} title={t("cloud.project.loadingProjects")} detail={t("cloud.project.readingProjects")} />
-          ) : projects.length === 0 ? (
-            <CloudInlineEmpty icon={FolderOpen} title={t("cloud.project.noneYet")} detail={t("cloud.project.noneYetBackupDetail")} />
-          ) : (
-            projects.map((project) => (
-              <CloudProjectRow
-                key={project.id}
-                project={project}
-                action={action}
-                onOpenProject={onOpenProject}
-                onConnectProject={onConnectProject}
-                onCopyCloneCommand={onCopyCloneCommand}
-              />
-            ))
-          )}
-        </div>
-      </CloudMainSection>
     </>
   );
 }
@@ -291,29 +245,17 @@ export function CloudUnmappedWorkspace({
 export function CloudUnmappedSection({
   workspace,
   activeSection,
-  projects,
-  loading,
   backupLoading,
   cloudRemote,
-  action,
   onBackupWorkspace,
-  onConnectProject,
-  onCopyCloneCommand,
-  onOpenProject,
 }: {
   workspace: Workspace;
   activeSection: CloudWorkspaceSection;
-  projects: DesktopCloudProject[];
-  loading: boolean;
   backupLoading: boolean;
   cloudRemote: ReturnType<typeof getPuppyoneRemote>;
-  action: { kind: "backup" | "connect" | "copy" | null; projectId: string | null };
   onBackupWorkspace: () => void;
-  onConnectProject: (project: DesktopCloudProject) => void;
-  onCopyCloneCommand: (project: DesktopCloudProject) => void;
-  onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
 }) {
-  const { formatNumber, t } = useLocalization();
+  const { t } = useLocalization();
   const section = getCloudSectionDescriptor(activeSection, t);
   const remoteLabel = cloudRemote?.info.displayId ?? t("cloud.state.noRemote");
   const Icon = section.icon;
@@ -344,31 +286,6 @@ export function CloudUnmappedSection({
               remote: bidiIsolate(remoteLabel),
             })}</p>
           </div>
-        </div>
-      </CloudMainSection>
-
-      <CloudMainSection
-        title={t("cloud.project.available")}
-        count={loading ? t("cloud.common.loading") : formatNumber(projects.length)}
-        action={<button className="desktop-cloud-row-action" type="button" onClick={() => openCloudApp("/projects")}>{t("cloud.common.openCloud")}</button>}
-      >
-        <div className="desktop-cloud-project-list">
-          {loading ? (
-            <CloudInlineEmpty icon={RefreshCw} title={t("cloud.project.loadingProjects")} detail={t("cloud.project.readingProjects")} />
-          ) : projects.length === 0 ? (
-            <CloudInlineEmpty icon={FolderOpen} title={t("cloud.project.noneYet")} detail={t("cloud.project.noneYetMappingDetail")} />
-          ) : (
-            projects.map((project) => (
-              <CloudProjectRow
-                key={project.id}
-                project={project}
-                action={action}
-                onOpenProject={onOpenProject}
-                onConnectProject={onConnectProject}
-                onCopyCloneCommand={onCopyCloneCommand}
-              />
-            ))
-          )}
         </div>
       </CloudMainSection>
     </>

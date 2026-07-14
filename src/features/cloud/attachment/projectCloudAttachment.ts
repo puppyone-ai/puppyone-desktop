@@ -6,10 +6,13 @@ export type ProjectCloudAttachment =
   | { status: "local-only"; projectId: null }
   | { status: "resolving"; projectId: null }
   | {
-      status: "linked";
+      status: "resolved";
       projectId: string;
+      resolutionSource: "workspace-binding" | "canonical-remote";
+      bindingStatus: "bound" | "not-bound";
       bindingId?: string | null;
       bindingKind?: "full" | "scoped" | null;
+      scopeId?: string | null;
       scopePath?: string | null;
       readiness?: DesktopCloudProjectReadiness | null;
       capabilities?: string[];
@@ -20,6 +23,8 @@ export type ProjectCloudAttachment =
   | { status: "wrong-host"; projectId: string | null; message: CloudMessageDescriptor }
   | { status: "binding-revoked"; projectId: string | null; message: CloudMessageDescriptor }
   | { status: "role-downgraded"; projectId: string | null; message: CloudMessageDescriptor }
+  | { status: "locator-conflict"; projectId: string | null; message: CloudMessageDescriptor }
+  | { status: "not-found"; projectId: string | null; message: CloudMessageDescriptor }
   | {
       status: "legacy-confirmation-required";
       projectId: string | null;
@@ -30,18 +35,30 @@ export type ProjectCloudAttachment =
   | { status: "unresolvable"; projectId: null; message: CloudMessageDescriptor }
   | { status: "error"; projectId: null; message: CloudMessageDescriptor };
 
-/** Binding identity only — auth/offline/expired live on CloudAuthState. */
+/** Exact authorized Project context — auth/offline/expired live on CloudAuthState. */
+export function getResolvedCloudProjectId(attachment: ProjectCloudAttachment): string | null {
+  if (attachment.status === "resolved") return attachment.projectId;
+  return null;
+}
+
+/** Durable WorkspaceBinding identity only. */
 export function getAttachedCloudProjectId(attachment: ProjectCloudAttachment): string | null {
-  if (attachment.status === "linked") return attachment.projectId;
+  if (attachment.status === "resolved" && attachment.bindingStatus === "bound") {
+    return attachment.projectId;
+  }
   return null;
 }
 
 export function isProjectCloudLinked(attachment: ProjectCloudAttachment): boolean {
-  return attachment.status === "linked";
+  return Boolean(getAttachedCloudProjectId(attachment));
 }
 
 export function attachmentHasBoundProject(attachment: ProjectCloudAttachment): boolean {
   return Boolean(getAttachedCloudProjectId(attachment));
+}
+
+export function attachmentHasProjectContext(attachment: ProjectCloudAttachment): boolean {
+  return Boolean(getResolvedCloudProjectId(attachment));
 }
 
 export function isCloudAttachmentRecovery(
@@ -53,6 +70,8 @@ export function isCloudAttachmentRecovery(
     | "wrong-host"
     | "binding-revoked"
     | "role-downgraded"
+    | "locator-conflict"
+    | "not-found"
     | "legacy-confirmation-required"
     | "unresolvable"
     | "error";
@@ -62,13 +81,15 @@ export function isCloudAttachmentRecovery(
     || attachment.status === "wrong-host"
     || attachment.status === "binding-revoked"
     || attachment.status === "role-downgraded"
+    || attachment.status === "locator-conflict"
+    || attachment.status === "not-found"
     || attachment.status === "legacy-confirmation-required"
     || attachment.status === "unresolvable"
     || attachment.status === "error";
 }
 
 export function getCloudAttachmentWarning(attachment: ProjectCloudAttachment): CloudMessageDescriptor | null {
-  if (attachment.status === "linked") return attachment.warning ?? null;
+  if (attachment.status === "resolved") return attachment.warning ?? null;
   if (isCloudAttachmentRecovery(attachment)) {
     return attachment.message;
   }
@@ -89,6 +110,8 @@ export function resolveProjectCloudAttachment({
   readiness = null,
   capabilities = [],
   scopeId = null,
+  resolutionSource = null,
+  bindingStatus = null,
 }: {
   configuredProjectId: string | null;
   bindingProjectId: string | null;
@@ -103,6 +126,8 @@ export function resolveProjectCloudAttachment({
     | "wrong-host"
     | "role-downgraded"
     | "legacy-confirmation-required"
+    | "locator-conflict"
+    | "not-found"
     | null;
   bindingCloudLinked: boolean;
   resolving: boolean;
@@ -112,22 +137,30 @@ export function resolveProjectCloudAttachment({
   readiness?: DesktopCloudProjectReadiness | null;
   capabilities?: string[];
   scopeId?: string | null;
+  resolutionSource?: "workspace-binding" | "canonical-remote" | null;
+  bindingStatus?: "bound" | "not-bound" | null;
 }): ProjectCloudAttachment {
   const projectId = bindingProjectId?.trim() || configuredProjectId?.trim() || null;
 
-  // A known durable binding stays linked on network/resolver warnings.
-  // Remote-only candidate ids are NOT treated as verified bindings.
+  // Only a verified binding or authorized canonical resolver result can
+  // promote a Project id into resolved context.
   if (projectId) {
+    const source = resolutionSource ?? "workspace-binding";
+    const durableStatus = bindingStatus
+      ?? (source === "workspace-binding" ? "bound" : "not-bound");
     const bindingDetails = {
+      resolutionSource: source,
+      bindingStatus: durableStatus,
       ...(bindingId ? { bindingId } : {}),
       ...(bindingKind ? { bindingKind } : {}),
+      ...(scopeId ? { scopeId } : {}),
       ...(scopePath ? { scopePath } : {}),
       ...(readiness ? { readiness } : {}),
       ...(capabilities.length > 0 ? { capabilities } : {}),
     };
     return bindingError
-      ? { status: "linked", projectId, ...bindingDetails, warning: bindingError }
-      : { status: "linked", projectId, ...bindingDetails };
+      ? { status: "resolved", projectId, ...bindingDetails, warning: bindingError }
+      : { status: "resolved", projectId, ...bindingDetails };
   }
 
   if (bindingError) {
@@ -144,6 +177,8 @@ export function resolveProjectCloudAttachment({
       || bindingReason === "binding-revoked"
       || bindingReason === "role-downgraded"
       || bindingReason === "legacy-confirmation-required"
+      || bindingReason === "locator-conflict"
+      || bindingReason === "not-found"
     ) {
       if (bindingReason === "legacy-confirmation-required") {
         return {
@@ -192,21 +227,20 @@ export function resolveProjectCloudAttachment({
 export function resolveCloudHubSectionForAttachment(
   attachment: ProjectCloudAttachment,
 ): "overview" | "contents" {
-  return attachmentHasBoundProject(attachment) ? "contents" : "overview";
+  return attachmentHasProjectContext(attachment) ? "contents" : "overview";
 }
 
 export function resolveCloudProjectNavigationContext(
   attachment: ProjectCloudAttachment,
   selectedProjectId: string | null,
 ): { projectContext: boolean; projectBound: boolean } {
-  const attachmentBound = attachmentHasBoundProject(attachment);
-  // Stale browse selection must never override a formal local binding, and must
-  // not invent project context when a recovery/local-only state is active.
-  const browsingProject = Boolean(selectedProjectId?.trim()) && !attachmentBound
-    && attachment.status === "local-only";
+  const projectContext = attachmentHasProjectContext(attachment);
+  // A transient catalog selection is never allowed to decide the context of
+  // an already-open Local workspace. Global browsing owns a separate route.
+  void selectedProjectId;
   return {
-    projectContext: attachmentBound || browsingProject,
-    projectBound: attachmentBound,
+    projectContext,
+    projectBound: projectContext,
   };
 }
 

@@ -33,6 +33,35 @@ export function sameCloudOrigin(
   }
 }
 
+/**
+ * Production requires the Git locator and API to share an origin. Local API
+ * development may opt into one hosted Git origin explicitly; it never widens
+ * the production trust rule implicitly.
+ */
+export function isTrustedCloudGitOrigin(
+  remoteOrOrigin: string | null | undefined,
+  apiBaseUrl: string | null | undefined,
+): boolean {
+  if (sameCloudOrigin(remoteOrOrigin, apiBaseUrl)) return true;
+  if (!remoteOrOrigin || !isLoopbackOrigin(apiBaseUrl)) return false;
+  const configuredGitOrigin = (
+    import.meta as ImportMeta & { env?: Record<string, string | undefined> }
+  ).env?.VITE_DESKTOP_CLOUD_GIT_ORIGIN?.trim();
+  return Boolean(
+    configuredGitOrigin
+    && sameCloudOrigin(remoteOrOrigin, configuredGitOrigin),
+  );
+}
+
+function isLoopbackOrigin(value: string | null | undefined): boolean {
+  if (!value) return false;
+  try {
+    return ["localhost", "127.0.0.1", "::1"].includes(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+}
+
 export async function createExplicitWorkspaceBinding({
   session,
   apiBaseUrl,

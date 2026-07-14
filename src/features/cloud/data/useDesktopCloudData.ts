@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getCloudProject,
-  listCloudProjects,
   type DesktopCloudConnector,
   type DesktopCloudDashboard,
   type DesktopCloudMcpEndpoint,
@@ -77,11 +76,12 @@ export function useDesktopCloudData({
   const load = useCallback(async () => {
     const requestId = activeRequestRef.current + 1;
     activeRequestRef.current = requestId;
+    const activeProjectId = selectedProjectId?.trim() || normalizedBoundProjectId;
 
-    if (!session) {
+    if (!session || !activeProjectId) {
       setState(createCloudDataState({
         mappedProjectId: normalizedBoundProjectId,
-        activeProjectId: selectedProjectId || normalizedBoundProjectId,
+        activeProjectId,
         initializing: false,
         loading: false,
         contextKey,
@@ -108,14 +108,13 @@ export function useDesktopCloudData({
     ));
 
     try {
-      const projects = normalizedBoundProjectId
-        ? [await getCloudProject(
-            session,
-            normalizedBoundProjectId,
-            onSessionChange,
-            cloudApiBaseUrl,
-          )]
-        : await listCloudProjects(session, onSessionChange, cloudApiBaseUrl);
+      const project = await getCloudProject(
+        session,
+        activeProjectId,
+        onSessionChange,
+        cloudApiBaseUrl,
+      );
+      const projects = [project];
       if (activeRequestRef.current !== requestId) return;
 
       // Mapping is owned by useCloudWorkspaceBinding. This hook only loads data
@@ -124,27 +123,13 @@ export function useDesktopCloudData({
       const mappedProject = mappedProjectId
         ? projects.find((project) => project.id === mappedProjectId) ?? null
         : null;
-      const activeProjectId = selectedProjectId || mappedProjectId;
-
-      if (!activeProjectId) {
-        setState(createCloudDataState({
-          projects,
-          mappedProjectId,
-          mappedProject,
-          initializing: false,
-          loading: false,
-          contextKey,
-        }));
-        return;
-      }
-
       if (!loadProjectDetails) {
         setState(createCloudDataState({
           projects,
           mappedProjectId,
           mappedProject,
           activeProjectId,
-          activeProject: projects.find((project) => project.id === activeProjectId) ?? mappedProject,
+          activeProject: project,
           initializing: false,
           loading: false,
           contextKey,
