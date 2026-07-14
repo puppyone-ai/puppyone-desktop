@@ -38,6 +38,34 @@
   line-height: 1.5;
 }
 
+.desktop-cloud-org-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.desktop-cloud-organization-selector {
+  display: grid;
+  gap: 4px;
+  color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.desktop-cloud-organization-selector select {
+  width: min(240px, 32vw);
+  height: 32px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: var(--po-panel-raised);
+  color: var(--po-text);
+  font: inherit;
+  font-size: 13px;
+}
+
 .desktop-cloud-org-primary-button,
 .desktop-cloud-org-secondary-button {
   display: inline-flex;
@@ -68,6 +96,12 @@
 .desktop-cloud-org-primary-button:hover,
 .desktop-cloud-org-secondary-button:hover {
   opacity: 0.9;
+}
+
+.desktop-cloud-org-primary-button:disabled,
+.desktop-cloud-org-secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .desktop-cloud-org-card,
@@ -757,6 +791,17 @@
 }
 
 @media (max-width: 1080px) {
+  .desktop-cloud-org-header,
+  .desktop-cloud-org-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .desktop-cloud-org-actions,
+  .desktop-cloud-organization-selector select {
+    width: 100%;
+  }
+
   .desktop-cloud-billing-plan-grid {
     grid-template-columns: 1fr;
   }

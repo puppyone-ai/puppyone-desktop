@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Mail } from "lucide-react";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
@@ -30,6 +30,30 @@ export type CloudGlobalPageProps = {
   onOpen: () => void;
 };
 
+export type CloudOrganizationDataStatus =
+  | "loading"
+  | "selection-required"
+  | "none"
+  | "ready"
+  | "partial"
+  | "error";
+
+export type CloudOrganizationMembersStatus = "idle" | "loading" | "ready" | "error";
+
+type CloudOrganizationDataState = {
+  contextKey: string;
+  organizations: DesktopCloudOrganization[];
+  selectedOrganizationId: string | null;
+  organization: DesktopCloudOrganization | null;
+  members: DesktopCloudOrgMember[];
+  entitlements: DesktopCloudOrganizationEntitlements | null;
+  seatUsage: DesktopCloudOrganizationSeatUsage | null;
+  status: CloudOrganizationDataStatus;
+  membersStatus: CloudOrganizationMembersStatus;
+  loading: boolean;
+  error: CloudMessageDescriptor | null;
+};
+
 export function CloudGlobalTeamPage({
   accountEmail,
   session,
@@ -54,10 +78,18 @@ export function CloudGlobalTeamPage({
         organization: bidiIsolate(organization?.name ?? t("cloud.organization.yours")),
       })}
       actions={(
-        <button className="desktop-cloud-org-primary-button" type="button" onClick={onOpen}>
-          <Mail size={14} />
-          <span>{t("cloud.team.inviteMember")}</span>
-        </button>
+        <>
+          <CloudOrganizationSelector organizationData={orgData} />
+          <button
+            className="desktop-cloud-org-primary-button"
+            type="button"
+            onClick={onOpen}
+            disabled={!organization}
+          >
+            <Mail size={14} />
+            <span>{t("cloud.team.inviteMember")}</span>
+          </button>
+        </>
       )}
     >
       <div className="desktop-cloud-org-card">
@@ -120,6 +152,12 @@ export function CloudGlobalTeamPage({
           </div>
         )}
 
+        {orgData.status === "selection-required" && (
+          <div className="desktop-cloud-org-inline-error">
+            <strong>{t("cloud.organization.selectionRequired")}</strong>
+          </div>
+        )}
+
         <div className="desktop-cloud-org-card-footer">
           <span>{t("cloud.project.sessionCount", { count: projects.length })}</span>
           <button type="button" onClick={onOpen}>{t("cloud.team.openFullPage")}</button>
@@ -148,7 +186,7 @@ export function CloudOrganizationPageShell({
             <h1>{title}</h1>
             <p>{description}</p>
           </div>
-          {actions && <div>{actions}</div>}
+          {actions && <div className="desktop-cloud-org-actions">{actions}</div>}
         </div>
         {children}
       </div>
@@ -161,78 +199,247 @@ export function useCloudOrganizationData(
   apiBaseUrl: string | null,
   onSessionChange: (session: DesktopCloudSession | null) => void,
 ) {
-  const [state, setState] = useState<{
-    organization: DesktopCloudOrganization | null;
-    members: DesktopCloudOrgMember[];
-    entitlements: DesktopCloudOrganizationEntitlements | null;
-    seatUsage: DesktopCloudOrganizationSeatUsage | null;
-    loading: boolean;
-    error: CloudMessageDescriptor | null;
-  }>({
-    organization: null,
-    members: [],
-    entitlements: null,
-    seatUsage: null,
-    loading: true,
-    error: null,
-  });
+  const contextKey = createCloudOrganizationContextKey(session, apiBaseUrl);
+  const [state, setState] = useState<CloudOrganizationDataState>(
+    () => emptyOrganizationState(contextKey),
+  );
+  const [reloadRevision, setReloadRevision] = useState(0);
+  const organizationRequestEpoch = useRef(0);
+  const detailsRequestEpoch = useRef(0);
+  const sessionRef = useRef(session);
+  const apiBaseUrlRef = useRef(apiBaseUrl);
+  const onSessionChangeRef = useRef(onSessionChange);
+  sessionRef.current = session;
+  apiBaseUrlRef.current = apiBaseUrl;
+  onSessionChangeRef.current = onSessionChange;
+  const effectiveState = state.contextKey === contextKey
+    ? state
+    : emptyOrganizationState(contextKey);
 
   useEffect(() => {
-    let cancelled = false;
+    const requestEpoch = ++organizationRequestEpoch.current;
+    detailsRequestEpoch.current += 1;
+    setState(emptyOrganizationState(contextKey));
     const load = async () => {
-      setState((current) => ({ ...current, loading: true, error: null }));
       try {
-        const organizations = await listCloudOrganizations(session, onSessionChange, apiBaseUrl);
-        const organization = organizations[0] ?? null;
-        if (!organization) {
-          if (!cancelled) {
-            setState({ organization: null, members: [], entitlements: null, seatUsage: null, loading: false, error: null });
-          }
+        const organizations = await listCloudOrganizations(
+          sessionRef.current,
+          onSessionChangeRef.current,
+          apiBaseUrlRef.current,
+        );
+        if (requestEpoch !== organizationRequestEpoch.current) return;
+        if (organizations.length === 0) {
+          setState({
+            ...emptyOrganizationState(contextKey),
+            organizations,
+            status: "none",
+            loading: false,
+          });
           return;
         }
-
-        const [membersResult, entitlementResult, seatUsageResult] = await Promise.allSettled([
-          listCloudOrganizationMembers(session, organization.id, onSessionChange, apiBaseUrl),
-          getCloudOrganizationEntitlements(session, organization.id, onSessionChange, apiBaseUrl),
-          getCloudOrganizationSeatUsage(session, organization.id, onSessionChange, apiBaseUrl),
-        ]);
-        if (cancelled) return;
+        const storedSelection = readOrganizationSelection(contextKey);
+        const [onlyOrganization] = organizations;
+        const selectedOrganizationId = organizations.length === 1
+          ? onlyOrganization?.id ?? null
+          : organizations.some((organization) => organization.id === storedSelection)
+            ? storedSelection
+            : null;
+        const organization = organizations.find(
+          (candidate) => candidate.id === selectedOrganizationId,
+        ) ?? null;
         setState({
+          ...emptyOrganizationState(contextKey),
+          contextKey,
+          organizations,
+          selectedOrganizationId,
           organization,
-          members: membersResult.status === "fulfilled" ? membersResult.value : [],
-          entitlements: entitlementResult.status === "fulfilled" ? entitlementResult.value : null,
-          seatUsage: seatUsageResult.status === "fulfilled" ? seatUsageResult.value : null,
-          loading: false,
-          error: membersResult.status === "rejected"
-            || entitlementResult.status === "rejected"
-            || seatUsageResult.status === "rejected"
-            ? cloudMessage("organization-partial")
-            : null,
+          status: organization ? "loading" : "selection-required",
+          membersStatus: organization ? "loading" : "idle",
+          loading: Boolean(organization),
         });
       } catch (error) {
-        if (!cancelled) {
-          setState({
-            organization: null,
-            members: [],
-            entitlements: null,
-            seatUsage: null,
-            loading: false,
-            error: cloudMessage(
-              "organization-load-failed",
-              undefined,
-              error instanceof Error ? error.message : undefined,
-            ),
-          });
-        }
+        if (requestEpoch !== organizationRequestEpoch.current) return;
+        setState({
+          ...emptyOrganizationState(contextKey),
+          status: "error",
+          loading: false,
+          error: cloudMessage(
+            "organization-load-failed",
+            undefined,
+            error instanceof Error ? error.message : undefined,
+          ),
+        });
       }
     };
     void load();
     return () => {
-      cancelled = true;
+      if (requestEpoch === organizationRequestEpoch.current) {
+        organizationRequestEpoch.current += 1;
+      }
     };
-  }, [apiBaseUrl, onSessionChange, session]);
+  }, [contextKey, reloadRevision]);
 
-  return state;
+  useEffect(() => {
+    if (state.contextKey !== contextKey || !state.organization) return;
+    const organization = state.organization;
+    const requestEpoch = ++detailsRequestEpoch.current;
+    const activeSession = sessionRef.current;
+    const activeApiBaseUrl = apiBaseUrlRef.current;
+    const activeOnSessionChange = onSessionChangeRef.current;
+    const load = async () => {
+      const [membersResult, entitlementResult, seatUsageResult] = await Promise.allSettled([
+        listCloudOrganizationMembers(
+          activeSession,
+          organization.id,
+          activeOnSessionChange,
+          activeApiBaseUrl,
+        ),
+        getCloudOrganizationEntitlements(
+          activeSession,
+          organization.id,
+          activeOnSessionChange,
+          activeApiBaseUrl,
+        ),
+        getCloudOrganizationSeatUsage(
+          activeSession,
+          organization.id,
+          activeOnSessionChange,
+          activeApiBaseUrl,
+        ),
+      ]);
+      if (requestEpoch !== detailsRequestEpoch.current) return;
+      const partial = membersResult.status === "rejected"
+        || entitlementResult.status === "rejected"
+        || seatUsageResult.status === "rejected";
+      setState((current) => {
+        if (current.contextKey !== contextKey || current.organization?.id !== organization.id) {
+          return current;
+        }
+        return {
+          ...current,
+          members: membersResult.status === "fulfilled" ? membersResult.value : [],
+          entitlements: entitlementResult.status === "fulfilled" ? entitlementResult.value : null,
+          seatUsage: seatUsageResult.status === "fulfilled" ? seatUsageResult.value : null,
+          status: partial ? "partial" : "ready",
+          membersStatus: membersResult.status === "fulfilled" ? "ready" : "error",
+          loading: false,
+          error: partial ? cloudMessage("organization-partial") : null,
+        };
+      });
+    };
+    void load();
+    return () => {
+      if (requestEpoch === detailsRequestEpoch.current) {
+        detailsRequestEpoch.current += 1;
+      }
+    };
+  }, [contextKey, state.contextKey, state.organization]);
+
+  const selectOrganization = useCallback((organizationId: string) => {
+    if (effectiveState.contextKey !== contextKey) return;
+    const organization = effectiveState.organizations.find(
+      (candidate) => candidate.id === organizationId,
+    );
+    if (!organization || effectiveState.organization?.id === organization.id) return;
+    detailsRequestEpoch.current += 1;
+    writeOrganizationSelection(contextKey, organization.id);
+    setState({
+      ...emptyOrganizationState(contextKey),
+      organizations: effectiveState.organizations,
+      selectedOrganizationId: organization.id,
+      organization,
+      status: "loading",
+      membersStatus: "loading",
+      loading: true,
+    });
+  }, [contextKey, effectiveState]);
+
+  const refresh = useCallback(() => {
+    setReloadRevision((revision) => revision + 1);
+  }, []);
+
+  return { ...effectiveState, selectOrganization, refresh };
+}
+
+export function CloudOrganizationSelector({
+  organizationData,
+}: {
+  organizationData: ReturnType<typeof useCloudOrganizationData>;
+}) {
+  const { t } = useLocalization();
+  if (organizationData.organizations.length <= 1) return null;
+  return (
+    <label className="desktop-cloud-organization-selector">
+      <span>{t("cloud.organization.selectLabel")}</span>
+      <select
+        aria-label={t("cloud.organization.selectLabel")}
+        value={organizationData.selectedOrganizationId ?? ""}
+        onChange={(event) => organizationData.selectOrganization(event.target.value)}
+      >
+        <option value="" disabled>{t("cloud.organization.selectPlaceholder")}</option>
+        {organizationData.organizations.map((organization) => (
+          <option key={organization.id} value={organization.id}>{organization.name}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function emptyOrganizationState(contextKey: string): CloudOrganizationDataState {
+  return {
+    contextKey,
+    organizations: [],
+    selectedOrganizationId: null,
+    organization: null,
+    members: [],
+    entitlements: null,
+    seatUsage: null,
+    status: "loading",
+    membersStatus: "idle",
+    loading: true,
+    error: null,
+  };
+}
+
+function createCloudOrganizationContextKey(
+  session: DesktopCloudSession,
+  apiBaseUrl: string | null,
+): string {
+  return [
+    session.user_id,
+    session.session_generation,
+    normalizeApiIdentity(apiBaseUrl ?? session.api_base_url),
+  ].join("\u001f");
+}
+
+function normalizeApiIdentity(value: string): string {
+  const trimmed = value.trim().replace(/\/+$/, "");
+  try {
+    const url = new URL(trimmed);
+    return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return trimmed;
+  }
+}
+
+function organizationSelectionStorageKey(contextKey: string): string {
+  return `puppyone.cloud.organization-selection.v1:${encodeURIComponent(contextKey)}`;
+}
+
+function readOrganizationSelection(contextKey: string): string | null {
+  try {
+    return window.localStorage.getItem(organizationSelectionStorageKey(contextKey));
+  } catch {
+    return null;
+  }
+}
+
+function writeOrganizationSelection(contextKey: string, organizationId: string): void {
+  try {
+    window.localStorage.setItem(organizationSelectionStorageKey(contextKey), organizationId);
+  } catch {
+    // Selection remains valid in memory when durable browser storage is unavailable.
+  }
 }
 
 function formatRole(role: string, t: MessageFormatter) {
