@@ -38,6 +38,7 @@ describe("titlebar typography architecture", () => {
     expect(rootTokens).toContain("--desktop-chrome-control-size: 30px;");
     expect(rootTokens).toContain("--desktop-toolbar-action-radius: 5px;");
     expect(rootTokens).toContain("--desktop-titlebar-control-height: 24px;");
+    expect(rootTokens).toContain("--desktop-titlebar-tool-action-width: 34px;");
   });
 
   it("uses the compact titlebar height without shrinking shared sidebar controls", () => {
@@ -52,6 +53,15 @@ describe("titlebar typography architecture", () => {
     expect(workspace).toContain("border-radius: var(--desktop-toolbar-action-radius);");
     expect(branch).toContain("height: var(--desktop-titlebar-control-height);");
     expect(branch).toContain("border-radius: var(--desktop-toolbar-action-radius);");
+  });
+
+  it("gives the two right-sidebar tools a wider normal-titlebar target", () => {
+    const toolActions = readCssBlock(
+      titlebarCss,
+      ".desktop-titlebar-actions .desktop-titlebar-terminal,\n.desktop-titlebar-actions .desktop-titlebar-agent-chat",
+    );
+
+    expect(toolActions).toContain("width: var(--desktop-titlebar-tool-action-width);");
   });
 
   it.each([
