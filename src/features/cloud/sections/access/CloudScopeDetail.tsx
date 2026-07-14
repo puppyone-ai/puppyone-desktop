@@ -1,14 +1,13 @@
-import { Check, ChevronRight, Copy, Eye, EyeOff, Link, RefreshCw, Settings } from "lucide-react";
+import { ChevronRight, Link, Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import {
   deleteCloudScope,
-  regenerateCloudScopeKey,
   updateCloudScope,
   type DesktopCloudConnector,
   type DesktopCloudMcpEndpoint,
   type DesktopCloudRepoIdentity,
-  type DesktopCloudScope,
+  type DesktopCloudRepositoryView,
   type DesktopCloudSession,
 } from "../../../../lib/cloudApi";
 import {
@@ -31,17 +30,15 @@ import {
   type CloudMessageDescriptor,
 } from "../../cloudPresentation";
 import {
-  copyText,
   formatProviderLabel,
   formatStatusLabel,
   getApiBaseFromGitUrl,
-  getCanonicalScopeGitUrl,
+  getCanonicalGitUrlForView,
   getScopeDisplayName,
   getScopeIdentifierName,
   getScopePathLabel,
   isConnectorActiveStatus,
   profileSlug,
-  shellQuote,
   providerIcon,
 } from "../../utils";
 
@@ -61,7 +58,7 @@ export function CloudScopeDetail({
   cloudSession?: DesktopCloudSession;
   onCloudSessionChange?: (session: DesktopCloudSession | null) => void;
   apiBaseUrl?: string | null;
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   identity: DesktopCloudRepoIdentity | null;
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
@@ -70,12 +67,10 @@ export function CloudScopeDetail({
 }) {
   const { t } = useLocalization();
   const apiBase = identity?.url ? getApiBaseFromGitUrl(identity.url) : "";
-  const gitUrl = getCanonicalScopeGitUrl(identity, scope, apiBase);
+  const gitUrl = getCanonicalGitUrlForView(identity, scope, apiBase);
   const scopeName = getScopeDisplayName(scope, t);
   const profileName = profileSlug(getScopeIdentifierName(scope));
-  const cliCommand = scope.access_key && apiBase
-    ? `printf '%s' ${shellQuote(scope.access_key)} | puppyone ap login ${shellQuote(profileName)} --api-url ${shellQuote(apiBase)} --access-key-stdin`
-    : "";
+  const cliCommand = "";
   const surfaces = useMemo(() => buildCloudAccessSurfaces({
     scope,
     connectors,
@@ -99,7 +94,7 @@ export function CloudScopeDetail({
   }, [surfaces]);
 
   const aggregate = getCloudAccessAggregate(surfaces);
-  const modeLabel = t(scope.mode === "rw" ? "cloud.scope.readWrite" : "cloud.scope.readOnly");
+  const modeLabel = t(scope.max_mode === "rw" ? "cloud.scope.readWrite" : "cloud.scope.readOnly");
   const collapsedCount = collapsedSurfaceIds.size;
   const expandedCount = surfaces.length - collapsedCount;
   const allCollapsed = surfaces.length > 0 && expandedCount === 0;
@@ -144,11 +139,9 @@ export function CloudScopeDetail({
         </button>
       </div>
 
-      {!scope.access_key && (
-        <div className="desktop-cloud-method-warning">
-          {t("cloud.access.noKeyWarning")}
-        </div>
-      )}
+      <div className="desktop-cloud-method-warning">
+        {t("cloud.access.noKeyWarning")}
+      </div>
 
       <CloudSectionLabel
         right={(
@@ -204,46 +197,41 @@ export function CloudScopeSettingsBlock({
 }: {
   projectId: string;
   session: DesktopCloudSession;
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   apiBaseUrl: string | null;
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onMutated: () => Promise<void>;
 }) {
   const { t } = useLocalization();
+  const isProjectRoot = scope.target.kind === "project_root";
   const [name, setName] = useState(scope.name);
-  const [mode, setMode] = useState<"r" | "rw">(scope.mode);
+  const [mode, setMode] = useState<"r" | "rw">(scope.max_mode);
   const [excludeText, setExcludeText] = useState(formatScopeExclude(scope.exclude));
-  const [keyRevealed, setKeyRevealed] = useState(false);
-  const [keyCopied, setKeyCopied] = useState(false);
-  const [confirmRotate, setConfirmRotate] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [rotating, setRotating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<CloudMessageDescriptor | null>(null);
 
   useEffect(() => {
     setName(scope.name);
-    setMode(scope.mode);
+    setMode(scope.max_mode);
     setExcludeText(formatScopeExclude(scope.exclude));
-    setKeyRevealed(false);
-    setKeyCopied(false);
-    setConfirmRotate(false);
     setConfirmDelete(false);
     setError(null);
-  }, [scope.id, scope.name, scope.mode, scope.exclude, scope.access_key]);
+  }, [scope.id, scope.name, scope.max_mode, scope.exclude]);
 
   const parsedExclude = parseScopeExclude(excludeText);
   const dirty = (
-    (!scope.is_root && name.trim() !== scope.name)
-    || mode !== scope.mode
-    || !sameStringArray(parsedExclude, scope.exclude)
+    !isProjectRoot && (
+      name.trim() !== scope.name
+      || mode !== scope.max_mode
+      || !sameStringArray(parsedExclude, scope.exclude)
+    )
   );
-  const busy = saving || rotating || deleting;
-  const maskedKey = scope.access_key ? maskScopeAccessKey(scope.access_key) : "-";
+  const busy = saving || deleting;
 
   const handleSave = async () => {
-    if (!dirty || busy) return;
+    if (!dirty || busy || scope.target.kind !== "scope") return;
     setSaving(true);
     setError(null);
     try {
@@ -252,8 +240,8 @@ export function CloudScopeSettingsBlock({
         projectId,
         scope.id,
         {
-          name: scope.is_root ? undefined : (name.trim() || scope.name),
-          mode,
+          name: name.trim() || scope.name,
+          max_mode: mode,
           exclude: parsedExclude,
         },
         onSessionChange,
@@ -269,40 +257,13 @@ export function CloudScopeSettingsBlock({
 
   const handleDiscard = () => {
     setName(scope.name);
-    setMode(scope.mode);
+    setMode(scope.max_mode);
     setExcludeText(formatScopeExclude(scope.exclude));
     setError(null);
   };
 
-  const handleCopyKey = async () => {
-    if (!scope.access_key) return;
-    await copyText(scope.access_key);
-    setKeyCopied(true);
-    window.setTimeout(() => setKeyCopied(false), 1400);
-  };
-
-  const handleRotate = async () => {
-    if (!scope.access_key || busy) return;
-    if (!confirmRotate) {
-      setConfirmRotate(true);
-      window.setTimeout(() => setConfirmRotate(false), 4000);
-      return;
-    }
-    setRotating(true);
-    setError(null);
-    try {
-      await regenerateCloudScopeKey(session, projectId, scope.id, onSessionChange, apiBaseUrl);
-      await onMutated();
-    } catch (rotateError) {
-      setError(cloudMessage("rotate-key-failed", undefined, rotateError instanceof Error ? rotateError.message : undefined));
-    } finally {
-      setRotating(false);
-      setConfirmRotate(false);
-    }
-  };
-
   const handleDelete = async () => {
-    if (scope.is_root || busy) return;
+    if (scope.target.kind !== "scope" || busy) return;
     if (!confirmDelete) {
       setConfirmDelete(true);
       window.setTimeout(() => setConfirmDelete(false), 4000);
@@ -332,21 +293,21 @@ export function CloudScopeSettingsBlock({
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              disabled={scope.is_root || busy}
+              disabled={isProjectRoot || busy}
               placeholder={getScopeDisplayName(scope, t)}
             />
           </label>
-          {scope.is_root && <p>{t("cloud.scope.rootKeepsProjectName")}</p>}
+          {isProjectRoot && <p>{t("cloud.scope.projectRootKeepsProjectName")}</p>}
         </div>
 
         <div className="desktop-cloud-scope-settings-card">
           <div className="desktop-cloud-scope-settings-field">
             <span>{t("cloud.common.permission")}</span>
             <div className="desktop-cloud-scope-mode-control" role="group" aria-label={t("cloud.scope.permissionAria")}>
-              <button type="button" className={mode === "r" ? "active" : ""} disabled={busy} onClick={() => setMode("r")}>
+              <button type="button" className={mode === "r" ? "active" : ""} disabled={isProjectRoot || busy} onClick={() => setMode("r")}>
                 {t("cloud.scope.readOnly")}
               </button>
-              <button type="button" className={mode === "rw" ? "active" : ""} disabled={busy} onClick={() => setMode("rw")}>
+              <button type="button" className={mode === "rw" ? "active" : ""} disabled={isProjectRoot || busy} onClick={() => setMode("rw")}>
                 {t("cloud.scope.readWrite")}
               </button>
             </div>
@@ -359,7 +320,7 @@ export function CloudScopeSettingsBlock({
             <textarea
               value={excludeText}
               onChange={(event) => setExcludeText(event.target.value)}
-              disabled={busy}
+              disabled={isProjectRoot || busy}
               placeholder={"dist\n.cache\n*.tmp"}
               spellCheck={false}
             />
@@ -367,44 +328,15 @@ export function CloudScopeSettingsBlock({
           <p>{t("cloud.scope.excludeHelp")}</p>
         </div>
 
-        <div className="desktop-cloud-scope-settings-card wide">
-          <div className="desktop-cloud-scope-settings-field">
-            <span>{t("cloud.common.accessKey")}</span>
-            <div className="desktop-cloud-scope-key-row">
-              <code title={keyRevealed ? scope.access_key || "" : undefined}>
-                {keyRevealed ? scope.access_key || "-" : maskedKey}
-              </code>
-              <button type="button" aria-label={t(keyRevealed ? "cloud.common.hideAccessKey" : "cloud.common.showAccessKey")} disabled={!scope.access_key || busy} onClick={() => setKeyRevealed((value) => !value)}>
-                {keyRevealed ? <EyeOff size={13} /> : <Eye size={13} />}
-              </button>
-              <button type="button" aria-label={t("cloud.common.copyAccessKey")} disabled={!scope.access_key || busy} onClick={handleCopyKey}>
-                {keyCopied ? <Check size={13} /> : <Copy size={13} />}
-              </button>
-            </div>
-          </div>
-          <div className="desktop-cloud-scope-settings-actions">
-            <button
-              type="button"
-              className={confirmRotate ? "danger" : ""}
-              disabled={!scope.access_key || busy}
-              onClick={handleRotate}
-            >
-              <RefreshCw size={13} />
-              <span>{t(rotating ? "cloud.scope.regenerating" : confirmRotate ? "cloud.scope.confirmRegenerate" : "cloud.scope.regenerate")}</span>
-            </button>
-            {confirmRotate && <em>{t("cloud.scope.regenerateWarning")}</em>}
-          </div>
-        </div>
-
-        <div className="desktop-cloud-scope-settings-card danger wide">
+        {!isProjectRoot && <div className="desktop-cloud-scope-settings-card danger wide">
           <div className="desktop-cloud-scope-settings-field">
             <span>{t("cloud.common.dangerZone")}</span>
             <p>{t("cloud.scope.deleteHelp")}</p>
           </div>
-          <button type="button" disabled={scope.is_root || busy} onClick={handleDelete}>
+          <button type="button" disabled={busy} onClick={handleDelete}>
             {t(deleting ? "cloud.common.deleting" : confirmDelete ? "cloud.common.confirmDelete" : "cloud.scope.deleteAccess")}
           </button>
-        </div>
+        </div>}
       </div>
 
       {error && <div className="desktop-cloud-scope-settings-error">{formatCloudMessage(error, t)}</div>}
@@ -436,11 +368,6 @@ export function parseScopeExclude(value: string) {
 export function sameStringArray(left: string[], right: string[]) {
   if (left.length !== right.length) return false;
   return left.every((value, index) => value === right[index]);
-}
-
-export function maskScopeAccessKey(value: string) {
-  if (value.length <= 8) return "••••";
-  return `${value.slice(0, 4)}${"•".repeat(Math.max(0, value.length - 8))}${value.slice(-4)}`;
 }
 
 export function CloudAccessSurfaceTile({

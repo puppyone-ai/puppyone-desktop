@@ -838,8 +838,7 @@ export function App() {
         project,
         projectId: nextProjectId,
         workspace,
-        bindingKind: options.bindingKind ?? "full",
-        scopeId: options.scopeId ?? null,
+        target: options.target,
         onSessionChange: updateCloudSession,
       });
       previousConfig = puppyoneConfig
@@ -912,8 +911,7 @@ export function App() {
         resolutionSource: "workspace-binding",
         bindingStatus: "bound",
         bindingId: attached.binding.id,
-        bindingKind: attached.binding.binding_kind,
-        scopeId: attached.binding.scope_id,
+        target: attached.binding.target,
         scopePath: attached.binding.scope_path ?? null,
         cloudLinked: true,
         error: null,

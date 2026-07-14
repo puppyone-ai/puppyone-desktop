@@ -13,8 +13,7 @@ import {
 function connector(provider: string): DesktopCloudConnector {
   return {
     id: provider,
-    project_id: "project-1",
-    scope_id: "scope-1",
+    target: { kind: "scope", project_id: "project-1", scope_id: "scope-1" },
     provider,
     name: provider,
     direction: "inbound",
@@ -35,12 +34,12 @@ describe("Automation and Plugin product-domain boundary", () => {
     const rows = buildCloudAutomationRows({
       scopes: [{
         id: "scope-1",
+        target: { kind: "scope", project_id: "project-1", scope_id: "scope-1" },
         project_id: "project-1",
-        name: "Root",
-        path: "",
+        name: "Docs",
+        path: "docs",
         exclude: [],
-        mode: "rw",
-        is_root: true,
+        max_mode: "rw",
       }],
       connectors: [connector("notion"), connector("git_remote")],
     });

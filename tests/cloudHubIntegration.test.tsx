@@ -49,8 +49,22 @@ const listCloudMcpEndpoints = vi.fn();
 const getCloudRepoIdentity = vi.fn();
 const getCloudProjectReadiness = vi.fn().mockResolvedValue({
   project_id: "proj-1",
-  git: { root_scope_id: null, root_surface_exists: false, root_head_exists: false, root_git_push_accepted: false, default_branch: "main", state: "git_not_created" },
-  claude: { ready: false, blockers: ["root_git_surface_missing", "root_head_missing", "root_git_push_not_accepted"] },
+  git: {
+    target: { kind: "project_root", project_id: "proj-1" },
+    surface_exists: false,
+    head_exists: false,
+    push_accepted: false,
+    default_branch: "main",
+    state: "git_not_created",
+  },
+  claude: {
+    ready: false,
+    blockers: [
+      "project_git_surface_missing",
+      "project_head_missing",
+      "project_git_push_not_accepted",
+    ],
+  },
 });
 const getCloudDashboard = vi.fn();
 const listCloudRoot = vi.fn();
@@ -224,6 +238,7 @@ describe("ProjectCloudAttachment binding-only semantics", () => {
       bindingCloudLinked: true,
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
+      target: { kind: "project_root", project_id: "proj-1" },
       resolving: false,
     });
     expect(attachment).toEqual({
@@ -231,6 +246,7 @@ describe("ProjectCloudAttachment binding-only semantics", () => {
       projectId: "proj-1",
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
+      target: { kind: "project_root", project_id: "proj-1" },
     });
     expect(isProjectCloudLinked(attachment)).toBe(true);
   });
@@ -243,6 +259,7 @@ describe("ProjectCloudAttachment binding-only semantics", () => {
       bindingCloudLinked: true,
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
+      target: { kind: "project_root", project_id: "proj-err" },
       resolving: false,
     });
     expect(attachment).toEqual({
@@ -250,6 +267,7 @@ describe("ProjectCloudAttachment binding-only semantics", () => {
       projectId: "proj-err",
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
+      target: { kind: "project_root", project_id: "proj-err" },
       warning: "Mapping failed",
     });
     expect(isProjectCloudLinked(attachment)).toBe(true);
@@ -263,6 +281,7 @@ describe("ProjectCloudAttachment binding-only semantics", () => {
       projectId: "a",
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
+      target: { kind: "project_root", project_id: "a" },
     })).toBe("contents");
     expect(resolveCloudHubSectionForAttachment({ status: "local-only", projectId: null })).toBe("overview");
     expect(resolveCloudHubSectionForAttachment({
@@ -278,6 +297,7 @@ describe("ProjectCloudAttachment binding-only semantics", () => {
       projectId: "proj-known",
       resolutionSource: "workspace-binding" as const,
       bindingStatus: "bound" as const,
+      target: { kind: "project_root" as const, project_id: "proj-known" },
       warning: "Cloud is temporarily unavailable",
     };
 
@@ -778,8 +798,7 @@ describe("Resolved Cloud binding recovery", () => {
             resolutionSource: "workspace-binding",
             bindingStatus: "bound",
             bindingId: "binding-1",
-            bindingKind: "full",
-            scopeId: "scope-root",
+            target: { kind: "project_root", project_id: "proj-1" },
             warning: cloudMessage("binding-remote-missing"),
           }}
           onCloudSessionChange={vi.fn()}
@@ -812,8 +831,7 @@ describe("Resolved Cloud binding recovery", () => {
     });
 
     expect(onConfigureCloudRemote).toHaveBeenCalledWith("proj-1", {
-      bindingKind: "full",
-      scopeId: "scope-root",
+      target: { kind: "project_root", project_id: "proj-1" },
     });
   });
 });
@@ -908,7 +926,13 @@ describe("No eager Cloud Access on Local Files", () => {
     expect(container.firstElementChild?.getAttribute("data-loading")).toBe("false");
 
     await act(async () => {
-      delayedScopes.resolve([{ id: "scope-a", path: "/", is_root: true } as DesktopCloudScope]);
+      delayedScopes.resolve([{
+        id: "scope-a",
+        project_id: "proj-a",
+        path: "/docs",
+        name: "Docs",
+        max_mode: "rw",
+      } as DesktopCloudScope]);
       await flushPromises();
     });
     expect(container.firstElementChild?.getAttribute("data-scope-count")).toBe("0");
@@ -1232,13 +1256,14 @@ function createAggregateCloudData(
     history: null,
     scopes: [{
       id: "scope-1",
-      path: "/",
-      is_root: true,
-      name: "Root",
+      project_id: "proj-1",
+      path: "/docs",
+      name: "Docs",
+      max_mode: "rw",
     } as never],
     connectors: [{
       id: "conn-1",
-      scope_id: "scope-1",
+      target: { kind: "scope", project_id: "proj-1", scope_id: "scope-1" },
       provider: "web",
       name: "Web",
     } as never],
@@ -1387,6 +1412,7 @@ describe("Local repo Cloud binding integration", () => {
               projectId: "proj-1",
               resolutionSource: "workspace-binding",
               bindingStatus: "bound",
+              target: { kind: "project_root", project_id: "proj-1" },
             }}
             activeSection="contents"
             accountEmail={session.user_email}

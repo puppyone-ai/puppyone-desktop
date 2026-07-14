@@ -1,7 +1,11 @@
 import { Settings, Users } from "lucide-react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
-import { openCloudApp, type DesktopCloudProject, type DesktopCloudSession } from "../../../lib/cloudApi";
+import {
+  openCloudApp,
+  type DesktopCloudProject,
+  type DesktopCloudSession,
+} from "../../../lib/cloudApi";
 import type { GitStatusSnapshot } from "../../../types/electron";
 import type { Workspace } from "@puppyone/shared-ui";
 import type { getPuppyoneRemote } from "../../source-control/remotes";
@@ -32,6 +36,8 @@ import {
 import { getCloudRouteWebPath } from "./cloudRoutes";
 import { formatCloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 import { useFeatureFlag } from "../../flags";
+import { getCloudScopeRows, scopeMatchesMcpEndpoint } from "../utils";
+import { repositoryTargetKey, type RepositoryTarget } from "../repositoryTarget";
 
 export type CloudActionState = {
   kind: "backup" | "connect" | "copy" | null;
@@ -88,8 +94,7 @@ export function CloudRouter({
   onUseAnotherAccount?: () => void;
   onConfirmLegacyBinding?: (input: {
     projectId: string;
-    scopeId: string | null;
-    bindingKind: "full" | "scoped";
+    target: RepositoryTarget;
   }) => void;
   onDetachCloudProject?: () => void;
 }) {
@@ -180,11 +185,10 @@ export function CloudRouter({
         confirmLabel={attachment.status === "legacy-confirmation-required" ? t("cloud.project.confirm") : undefined}
         onConfirm={attachment.status === "legacy-confirmation-required"
           && attachment.projectId
-          && attachment.bindingKind
+          && attachment.target
           ? () => onConfirmLegacyBinding?.({
               projectId: attachment.projectId as string,
-              scopeId: attachment.scopeId,
-              bindingKind: attachment.bindingKind as "full" | "scoped",
+              target: attachment.target as RepositoryTarget,
             })
           : undefined}
       />
@@ -212,7 +216,7 @@ export function CloudRouter({
       onOpenProject,
       onOpenGitSettings,
       onRefresh: cloudData.reload,
-      bindingKind: attachment?.status === "resolved" ? attachment.bindingKind ?? null : null,
+      repositoryTarget: attachment?.status === "resolved" ? attachment.target : null,
       scopePath: attachment?.status === "resolved" ? attachment.scopePath ?? null : null,
       readiness: attachment?.status === "resolved"
         ? attachment.readiness ?? cloudData.readiness
@@ -257,7 +261,7 @@ function renderProjectContextSection({
   onOpenProject,
   onOpenGitSettings,
   onRefresh,
-  bindingKind,
+  repositoryTarget,
   scopePath,
   readiness,
   onDetachCloudProject,
@@ -279,26 +283,25 @@ function renderProjectContextSection({
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
   onOpenGitSettings: () => void;
   onRefresh: () => Promise<void>;
-  bindingKind: "full" | "scoped" | null;
+  repositoryTarget: RepositoryTarget | null;
   scopePath: string | null;
   readiness: import("../../../lib/cloudApi").DesktopCloudProjectReadiness | null;
   onDetachCloudProject?: () => void;
   t: MessageFormatter;
 }) {
-  const connectorsByScope = new Map<string, typeof cloudData.connectors>();
+  const repositoryViews = getCloudScopeRows(cloudData.scopes, cloudData.identity);
+  const connectorsByTarget = new Map<string, typeof cloudData.connectors>();
   for (const connector of cloudData.connectors) {
-    const group = connectorsByScope.get(connector.scope_id) ?? [];
+    const key = repositoryTargetKey(connector.target);
+    const group = connectorsByTarget.get(key) ?? [];
     group.push(connector);
-    connectorsByScope.set(connector.scope_id, group);
+    connectorsByTarget.set(key, group);
   }
-  const mcpEndpointsByScope = new Map<string, typeof cloudData.mcpEndpoints>();
-  for (const scope of cloudData.scopes) {
-    mcpEndpointsByScope.set(
-      scope.id,
-      cloudData.mcpEndpoints.filter((endpoint) => (
-        endpoint.path === scope.path
-        || (!endpoint.path && scope.is_root)
-      )),
+  const mcpEndpointsByTarget = new Map<string, typeof cloudData.mcpEndpoints>();
+  for (const view of repositoryViews) {
+    mcpEndpointsByTarget.set(
+      repositoryTargetKey(view.target),
+      cloudData.mcpEndpoints.filter((endpoint) => scopeMatchesMcpEndpoint(view, endpoint)),
     );
   }
 
@@ -343,7 +346,7 @@ function renderProjectContextSection({
       <CloudClaudeSection
         readiness={readiness}
         identity={cloudData.identity}
-        bindingKind={bindingKind}
+        repositoryTarget={repositoryTarget}
         scopePath={scopePath}
         loading={cloudData.loading}
         onCreateGit={() => onSelectSection("access")}
@@ -386,7 +389,7 @@ function renderProjectContextSection({
         <CloudMcpCliSection
           projectId={projectId}
           identity={cloudData.identity}
-          scopes={cloudData.scopes}
+          scopes={repositoryViews}
           mcpEndpoints={cloudData.mcpEndpoints}
           loading={cloudData.loading}
           onOpenProject={onOpenProject}
@@ -414,9 +417,9 @@ function renderProjectContextSection({
         identity={cloudData.identity}
         scopes={cloudData.scopes}
         connectors={cloudData.connectors}
-        connectorsByScope={connectorsByScope}
+        connectorsByTarget={connectorsByTarget}
         mcpEndpoints={cloudData.mcpEndpoints}
-        mcpEndpointsByScope={mcpEndpointsByScope}
+        mcpEndpointsByTarget={mcpEndpointsByTarget}
         activeAccessRowId={null}
         loading={cloudData.loading}
         onCloudSessionChange={onSessionChange}

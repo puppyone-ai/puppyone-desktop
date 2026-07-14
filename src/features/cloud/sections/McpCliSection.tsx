@@ -1,7 +1,7 @@
 import { GitBranch, Server, SquareTerminal } from "lucide-react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
-import type { DesktopCloudMcpEndpoint, DesktopCloudRepoIdentity, DesktopCloudScope } from "../../../lib/cloudApi";
+import type { DesktopCloudMcpEndpoint, DesktopCloudRepoIdentity, DesktopCloudRepositoryView } from "../../../lib/cloudApi";
 import { PageLoading } from "../../../components/loading";
 import type { CloudWorkspaceSection } from "../types";
 import {
@@ -13,7 +13,7 @@ import {
   CloudWebEmpty,
   CloudWebPage,
 } from "../components/shared";
-import { getApiBaseFromGitUrl, getCanonicalScopeGitUrl, getScopeDisplayName, getScopeIdentifierName, profileSlug, shellQuote } from "../utils";
+import { getApiBaseFromGitUrl, getCanonicalGitUrlForView, getScopeDisplayName, getScopeIdentifierName, profileSlug, shellQuote } from "../utils";
 
 export function CloudMcpCliSection({
   projectId,
@@ -25,21 +25,19 @@ export function CloudMcpCliSection({
 }: {
   projectId: string;
   identity: DesktopCloudRepoIdentity | null;
-  scopes: DesktopCloudScope[];
+  scopes: DesktopCloudRepositoryView[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   loading: boolean;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
 }) {
   const { t } = useLocalization();
-  const rootScope = scopes.find((scope) => scope.is_root) ?? scopes[0] ?? null;
+  const projectRootView = scopes.find((scope) => scope.target.kind === "project_root") ?? null;
   const apiBase = identity?.url ? getApiBaseFromGitUrl(identity.url) : "";
-  const gitUrl = getCanonicalScopeGitUrl(identity, rootScope, apiBase);
-  const scopeName = rootScope ? getScopeDisplayName(rootScope, t) : t("cloud.scope.workspaceRoot");
-  const scopeIdentifier = rootScope ? getScopeIdentifierName(rootScope) : "root";
+  const gitUrl = getCanonicalGitUrlForView(identity, projectRootView, apiBase);
+  const scopeName = projectRootView ? getScopeDisplayName(projectRootView, t) : t("cloud.scope.workspaceRoot");
+  const scopeIdentifier = projectRootView ? getScopeIdentifierName(projectRootView) : "root";
   const profileName = profileSlug(scopeIdentifier);
-  const cliCommand = rootScope?.access_key && apiBase
-    ? `printf '%s' ${shellQuote(rootScope.access_key)} | puppyone ap login ${shellQuote(profileName)} --api-url ${shellQuote(apiBase)} --access-key-stdin`
-    : "";
+  const cliCommand = "";
 
   return (
     <CloudWebPage
@@ -51,11 +49,9 @@ export function CloudMcpCliSection({
         <PageLoading variant="fill" label={t("cloud.common.loading")} className="desktop-cloud-web-loading" />
       ) : (
         <div className="desktop-cloud-method-page">
-          {!rootScope?.access_key && (
-            <div className="desktop-cloud-method-warning">
-              {t("cloud.access.noCliKeyWarning")}
-            </div>
-          )}
+          <div className="desktop-cloud-method-warning">
+            {t("cloud.access.noCliKeyWarning")}
+          </div>
           <CloudMethodSection title={t("cloud.access.surface.cli.title")}>
             <CloudMethodCard icon={SquareTerminal} subtitle={t("cloud.access.surface.cli.subtitle")} active={Boolean(cliCommand)}>
               <CloudPromptBlock

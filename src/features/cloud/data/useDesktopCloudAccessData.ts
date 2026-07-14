@@ -7,6 +7,7 @@ import {
   type DesktopCloudConnector,
   type DesktopCloudMcpEndpoint,
   type DesktopCloudRepoIdentity,
+  type DesktopCloudRepositoryView,
   type DesktopCloudScope,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
@@ -17,16 +18,17 @@ import {
 } from "../utils";
 import { buildDesktopCloudAccessRows, type CloudAccessSurfaceRow } from "../sections/access/accessRows";
 import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
+import { repositoryTargetKey } from "../repositoryTarget";
 
 type MutableSessionHandler = (session: DesktopCloudSession | null) => void | Promise<void>;
 
 export type DesktopCloudAccessDataState = {
   scopes: DesktopCloudScope[];
-  scopeRows: DesktopCloudScope[];
+  scopeRows: DesktopCloudRepositoryView[];
   connectors: DesktopCloudConnector[];
-  connectorsByScope: Map<string, DesktopCloudConnector[]>;
+  connectorsByTarget: Map<string, DesktopCloudConnector[]>;
   mcpEndpoints: DesktopCloudMcpEndpoint[];
-  mcpEndpointsByScope: Map<string, DesktopCloudMcpEndpoint[]>;
+  mcpEndpointsByTarget: Map<string, DesktopCloudMcpEndpoint[]>;
   accessRows: CloudAccessSurfaceRow[];
   identity: DesktopCloudRepoIdentity | null;
   loading: boolean;
@@ -137,21 +139,22 @@ export function useDesktopCloudAccessData({
     [visibleState.identity, visibleState.scopes],
   );
 
-  const connectorsByScope = useMemo(() => {
+  const connectorsByTarget = useMemo(() => {
     const map = new Map<string, DesktopCloudConnector[]>();
     for (const connector of visibleState.connectors) {
-      const list = map.get(connector.scope_id) ?? [];
+      const key = repositoryTargetKey(connector.target);
+      const list = map.get(key) ?? [];
       list.push(connector);
-      map.set(connector.scope_id, list);
+      map.set(key, list);
     }
     return map;
   }, [visibleState.connectors]);
 
-  const mcpEndpointsByScope = useMemo(() => {
+  const mcpEndpointsByTarget = useMemo(() => {
     const map = new Map<string, DesktopCloudMcpEndpoint[]>();
     for (const scope of scopeRows) {
       const endpoints = visibleState.mcpEndpoints.filter((endpoint) => scopeMatchesMcpEndpoint(scope, endpoint));
-      map.set(scope.id, endpoints);
+      map.set(repositoryTargetKey(scope.target), endpoints);
     }
     return map;
   }, [visibleState.mcpEndpoints, scopeRows]);
@@ -168,9 +171,9 @@ export function useDesktopCloudAccessData({
     scopes: visibleState.scopes,
     scopeRows,
     connectors: visibleState.connectors,
-    connectorsByScope,
+    connectorsByTarget,
     mcpEndpoints: visibleState.mcpEndpoints,
-    mcpEndpointsByScope,
+    mcpEndpointsByTarget,
     accessRows,
     identity: visibleState.identity,
     loading: visibleState.loading,

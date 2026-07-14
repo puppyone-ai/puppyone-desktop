@@ -161,12 +161,14 @@ describe("ProjectCloudAttachment", () => {
       bindingCloudLinked: false,
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
+      target: { kind: "project_root", project_id: "proj-1" },
       resolving: false,
     })).toEqual({
       status: "resolved",
       projectId: "proj-1",
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
+      target: { kind: "project_root", project_id: "proj-1" },
     });
 
     expect(resolveProjectCloudAttachment({
@@ -176,12 +178,14 @@ describe("ProjectCloudAttachment", () => {
       bindingCloudLinked: true,
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
+      target: { kind: "project_root", project_id: "proj-1" },
       resolving: false,
     })).toEqual({
       status: "resolved",
       projectId: "proj-1",
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
+      target: { kind: "project_root", project_id: "proj-1" },
     });
 
     expect(resolveProjectCloudAttachment({
@@ -213,8 +217,7 @@ describe("ProjectCloudAttachment", () => {
       bindingCloudLinked: true,
       resolutionSource: "canonical-remote",
       bindingStatus: "not-bound",
-      bindingKind: "scoped",
-      scopeId: "scope-docs",
+      target: { kind: "scope", project_id: "proj-canonical", scope_id: "scope-docs" },
       resolving: false,
     });
 
@@ -234,6 +237,7 @@ describe("ProjectCloudAttachment", () => {
       bindingCloudLinked: true,
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
+      target: { kind: "project_root", project_id: "proj-2" },
       resolving: false,
     });
     expect(getAttachedCloudProjectId(linked)).toBe("proj-2");
@@ -331,6 +335,7 @@ describe("explicit route vs mapped Cloud project binding", () => {
       projectId: "proj-1",
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
+      target: { kind: "project_root", project_id: "proj-1" },
     })).toBe(true);
   });
 });

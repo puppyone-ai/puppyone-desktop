@@ -88,31 +88,12 @@ function config(
 
 function canonicalContext(
   projectId: string,
-  scopeId = "scope-root",
-  kind: "full" | "scoped" = "full",
+  scopeId: string | null = null,
 ): DesktopCloudCanonicalProjectContext {
   return {
-    project: {
-      id: projectId,
-      name: `Project ${projectId}`,
-      description: null,
-      org_id: "org-1",
-      visibility: "private",
-      bound_git_branch: "main",
-      effective_role: "editor",
-      grant_source: "project_member",
-      capabilities: ["project.read", "content.read"],
-    },
-    scope: {
-      id: scopeId,
-      kind,
-      path: kind === "scoped" ? "docs" : null,
-    },
-    locator: {
-      project_id: projectId,
-      scope_id: scopeId,
-      binding_kind: kind,
-    },
+    target: scopeId
+      ? { kind: "scope", project_id: projectId, scope_id: scopeId }
+      : { kind: "project_root", project_id: projectId },
   };
 }
 
@@ -122,14 +103,12 @@ function workspaceBinding(
 ): DesktopCloudWorkspaceBinding {
   return {
     id: "binding-1",
-    project_id: "project-1",
     org_id: "org-1",
-    scope_id: "scope-root",
+    target: { kind: "project_root", project_id: "project-1" },
     scope_path: null,
     workspace_instance_id: workspace.workspaceInstanceId ?? "",
     bound_user_id: "user-1",
     cloud_origin: "https://cloud.example",
-    binding_kind: "full",
     mode: "rw",
     status: "active",
     usable: true,
@@ -138,9 +117,7 @@ function workspaceBinding(
     last_seen_at: "2026-07-14T00:00:00Z",
     remote: {
       url: "https://cloud.example/git/project-1.git",
-      project_id: "project-1",
-      scope_id: "scope-root",
-      kind: "full",
+      target: { kind: "project_root", project_id: "project-1" },
       username: "x-puppyone-token",
     },
     ...overrides,
@@ -235,6 +212,12 @@ afterEach(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  cloudApi.getCloudProject.mockImplementation(async (_session, projectId: string) => ({
+    id: projectId,
+    name: `Project ${projectId}`,
+    org_id: "org-1",
+    capabilities: ["project.read", "content.read"],
+  }));
   cloudApi.getCloudProjectReadiness.mockResolvedValue({
     project_id: "project-1",
     git: { state: "ready" },
@@ -268,7 +251,7 @@ describe("current Local workspace Cloud context", () => {
     const workspace = localWorkspace("workspace-a");
     const remoteUrl = "https://cloud.example/git/project-1/scopes/scope-docs.git";
     cloudApi.resolveCanonicalCloudWorkspaceRemote.mockResolvedValue(
-      canonicalContext("project-1", "scope-docs", "scoped"),
+      canonicalContext("project-1", "scope-docs"),
     );
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -290,15 +273,14 @@ describe("current Local workspace Cloud context", () => {
       resolutionSource: "canonical-remote",
       bindingStatus: "not-bound",
       bindingId: null,
-      bindingKind: "scoped",
-      scopeId: "scope-docs",
-      scopePath: "docs",
+      target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
+      scopePath: null,
       error: null,
     });
     expect(cloudApi.getCloudWorkspaceBinding).not.toHaveBeenCalled();
   });
 
-  it("authorizes a canonical root locator and preserves the resolved root scope", async () => {
+  it("authorizes a canonical root locator without a sentinel Scope", async () => {
     const workspace = localWorkspace("workspace-root");
     const remoteUrl = "https://cloud.example/git/project-1.git";
     cloudApi.resolveCanonicalCloudWorkspaceRemote.mockResolvedValue(
@@ -317,8 +299,7 @@ describe("current Local workspace Cloud context", () => {
       projectId: "project-1",
       resolutionSource: "canonical-remote",
       bindingStatus: "not-bound",
-      bindingKind: "full",
-      scopeId: "scope-root",
+      target: { kind: "project_root", project_id: "project-1" },
       scopePath: null,
     });
     expect(cloudApi.resolveLegacyCloudWorkspaceRemote).not.toHaveBeenCalled();
@@ -424,6 +405,7 @@ describe("current Local workspace Cloud context", () => {
       projectId: "project-1",
       resolutionSource: "canonical-remote" as const,
       bindingStatus: "not-bound" as const,
+      target: { kind: "project_root" as const, project_id: "project-1" },
       cloudLinked: true,
       error: null,
       reason: null,
@@ -543,9 +525,7 @@ describe("current Local workspace Cloud context", () => {
     }
 
     cloudApi.resolveLegacyCloudWorkspaceRemote.mockResolvedValueOnce({
-      project_id: "project-1",
-      scope_id: "scope-docs",
-      binding_kind: "scoped",
+      target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
       requires_confirmation: true,
     });
     const legacy = localWorkspace("workspace-legacy");
@@ -561,7 +541,11 @@ describe("current Local workspace Cloud context", () => {
     expect(readBindings(container)[legacy.id]).toMatchObject({
       projectId: null,
       candidateProjectId: "project-1",
-      candidateScopeId: "scope-docs",
+      candidateTarget: {
+        kind: "scope",
+        project_id: "project-1",
+        scope_id: "scope-docs",
+      },
       reason: "legacy-confirmation-required",
     });
   });
@@ -650,8 +634,7 @@ describe("current Local workspace Cloud context", () => {
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
       bindingId: "binding-1",
-      bindingKind: "full",
-      scopeId: "scope-root",
+      target: { kind: "project_root", project_id: "project-1" },
       reason: "network",
       error: { code: "binding-network-failed" },
     });
@@ -807,9 +790,15 @@ describe("current Local workspace Cloud context", () => {
       session_generation: "generation-2",
     } satisfies DesktopCloudSession;
     const firstContext = canonicalContext("project-1");
-    firstContext.project.capabilities = ["account-one"];
     const secondContext = canonicalContext("project-1");
-    secondContext.project.capabilities = ["account-two"];
+    cloudApi.getCloudProject.mockImplementation(
+      async (activeSession: DesktopCloudSession, projectId: string) => ({
+        id: projectId,
+        name: `Project ${projectId}`,
+        org_id: "org-1",
+        capabilities: [activeSession.user_id === "user-1" ? "account-one" : "account-two"],
+      }),
+    );
     cloudApi.resolveCanonicalCloudWorkspaceRemote.mockImplementation(
       (activeSession: DesktopCloudSession) => (
         activeSession.user_id === "user-1" ? first.promise : Promise.resolve(secondContext)

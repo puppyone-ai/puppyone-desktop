@@ -16,6 +16,7 @@ import { DesktopCloudScopeAccessDetail } from "./ScopeAccessDetail";
 import { buildDesktopCloudAccessRows } from "./accessRows";
 import { getCloudScopeRows } from "../../utils";
 import { DesktopCloudCreateAccessDialog, type DesktopCloudCreateAccessCreated } from "./CreateAccessDialog";
+import { repositoryTargetKey } from "../../repositoryTarget";
 
 export function CloudAccessSection({
   projectId,
@@ -24,9 +25,9 @@ export function CloudAccessSection({
   identity,
   scopes,
   connectors,
-  connectorsByScope,
+  connectorsByTarget,
   mcpEndpoints,
-  mcpEndpointsByScope,
+  mcpEndpointsByTarget,
   filter = "all",
   activeAccessRowId,
   loading,
@@ -43,9 +44,9 @@ export function CloudAccessSection({
   identity: DesktopCloudRepoIdentity | null;
   scopes: DesktopCloudScope[];
   connectors: DesktopCloudConnector[];
-  connectorsByScope: Map<string, DesktopCloudConnector[]>;
+  connectorsByTarget: Map<string, DesktopCloudConnector[]>;
   mcpEndpoints: DesktopCloudMcpEndpoint[];
-  mcpEndpointsByScope: Map<string, DesktopCloudMcpEndpoint[]>;
+  mcpEndpointsByTarget: Map<string, DesktopCloudMcpEndpoint[]>;
   filter?: CloudAccessFilter;
   activeAccessRowId: string | null;
   loading: boolean;
@@ -112,8 +113,8 @@ export function CloudAccessSection({
             scope={selectedScope}
             activeSurfaceId={selectedSurfaceId}
             identity={identity}
-            connectors={connectorsByScope.get(selectedScope.id) ?? []}
-            mcpEndpoints={mcpEndpointsByScope.get(selectedScope.id) ?? []}
+            connectors={connectorsByTarget.get(repositoryTargetKey(selectedScope.target)) ?? []}
+            mcpEndpoints={mcpEndpointsByTarget.get(repositoryTargetKey(selectedScope.target)) ?? []}
             onRefresh={onRefresh}
             canManage={canManage}
           />
@@ -127,8 +128,8 @@ export function CloudAccessSection({
           cloudSession={cloudSession}
           apiBaseUrl={apiBaseUrl}
           scopes={scopeRows}
-          connectorsByScope={connectorsByScope}
-          mcpEndpointsByScope={mcpEndpointsByScope}
+          connectorsByTarget={connectorsByTarget}
+          mcpEndpointsByTarget={mcpEndpointsByTarget}
           onCloudSessionChange={onCloudSessionChange}
           onClose={() => setCreateAccessOpen(false)}
           onCreated={handleAccessCreated}

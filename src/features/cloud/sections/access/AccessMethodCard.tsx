@@ -2,7 +2,7 @@ import { ChevronDown, ChevronRight, Monitor } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
-import type { DesktopCloudScope } from "../../../../lib/cloudApi";
+import type { DesktopCloudRepositoryView } from "../../../../lib/cloudApi";
 import {
   CloudAuthorityCell,
   CloudCommandBlock,
@@ -55,7 +55,7 @@ export function DesktopCloudAccessMethodCard({
   onUpdatePermissions,
   canManage = false,
 }: {
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   surface: CloudAccessSurface;
   expanded: boolean;
   creatingMcp: boolean;
@@ -201,7 +201,7 @@ function DesktopCloudAccessMethodExpandedDetail({
   canManage,
 }: {
   surface: CloudAccessSurface;
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   pending: boolean;
   error: string | null;
   onUpdatePermissions: (nextAllowedKeys: ReadonlySet<string>) => Promise<void>;
@@ -309,7 +309,7 @@ function DesktopCloudAccessPromptPreview({
   );
 }
 
-function getDesktopCloudAccessPromptText(scope: DesktopCloudScope, surface: CloudAccessSurface, t: MessageFormatter) {
+function getDesktopCloudAccessPromptText(scope: DesktopCloudRepositoryView, surface: CloudAccessSurface, t: MessageFormatter) {
   const commandText = surface.commands
     ?.filter((command) => !command.disabled)
     .map((command) => `${formatCloudAccessCommandLabel(command, t)}\n${command.value}`)

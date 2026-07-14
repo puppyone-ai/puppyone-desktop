@@ -102,9 +102,9 @@ export function DesktopCloudAccessView({
           identity={accessData.identity}
           scopes={accessData.scopeRows}
           connectors={accessData.connectors}
-          connectorsByScope={accessData.connectorsByScope}
+          connectorsByTarget={accessData.connectorsByTarget}
           mcpEndpoints={accessData.mcpEndpoints}
-          mcpEndpointsByScope={accessData.mcpEndpointsByScope}
+          mcpEndpointsByTarget={accessData.mcpEndpointsByTarget}
           filter={activeFilter}
           activeAccessRowId={selectedAccessRowId}
           loading={accessData.loading}

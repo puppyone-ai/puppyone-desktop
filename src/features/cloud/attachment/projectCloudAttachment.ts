@@ -1,6 +1,7 @@
 import type { CloudWorkspaceSection } from "../routes/cloudRouteIds";
 import type { DesktopCloudProjectReadiness } from "../../../lib/cloudApi";
 import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
+import type { RepositoryTarget } from "../repositoryTarget";
 
 export type ProjectCloudAttachment =
   | { status: "local-only"; projectId: null }
@@ -11,8 +12,7 @@ export type ProjectCloudAttachment =
       resolutionSource: "workspace-binding" | "canonical-remote";
       bindingStatus: "bound" | "not-bound";
       bindingId?: string | null;
-      bindingKind?: "full" | "scoped" | null;
-      scopeId?: string | null;
+      target: RepositoryTarget;
       scopePath?: string | null;
       readiness?: DesktopCloudProjectReadiness | null;
       capabilities?: string[];
@@ -29,8 +29,7 @@ export type ProjectCloudAttachment =
   | {
       status: "legacy-confirmation-required";
       projectId: string | null;
-      scopeId: string | null;
-      bindingKind: "full" | "scoped" | null;
+      target: RepositoryTarget | null;
       message: CloudMessageDescriptor;
     }
   | { status: "unresolvable"; projectId: null; message: CloudMessageDescriptor }
@@ -107,11 +106,10 @@ export function resolveProjectCloudAttachment({
   bindingCloudLinked,
   resolving,
   bindingId = null,
-  bindingKind = null,
+  target = null,
   scopePath = null,
   readiness = null,
   capabilities = [],
-  scopeId = null,
   resolutionSource = null,
   bindingStatus = null,
 }: {
@@ -133,11 +131,10 @@ export function resolveProjectCloudAttachment({
   bindingCloudLinked: boolean;
   resolving: boolean;
   bindingId?: string | null;
-  bindingKind?: "full" | "scoped" | null;
+  target?: RepositoryTarget | null;
   scopePath?: string | null;
   readiness?: DesktopCloudProjectReadiness | null;
   capabilities?: string[];
-  scopeId?: string | null;
   resolutionSource?: "workspace-binding" | "canonical-remote" | null;
   bindingStatus?: "bound" | "not-bound" | null;
 }): ProjectCloudAttachment {
@@ -147,13 +144,18 @@ export function resolveProjectCloudAttachment({
 
   // Only a verified binding or authorized canonical resolver result can
   // promote a Project id into resolved context.
-  if (projectId && resolutionSource && bindingStatus) {
+  if (
+    projectId
+    && resolutionSource
+    && bindingStatus
+    && target
+    && target.project_id === projectId
+  ) {
     const bindingDetails = {
       resolutionSource,
       bindingStatus,
       ...(bindingId ? { bindingId } : {}),
-      ...(bindingKind ? { bindingKind } : {}),
-      ...(scopeId ? { scopeId } : {}),
+      target,
       ...(scopePath ? { scopePath } : {}),
       ...(readiness ? { readiness } : {}),
       ...(capabilities.length > 0 ? { capabilities } : {}),
@@ -184,8 +186,7 @@ export function resolveProjectCloudAttachment({
         return {
           status: bindingReason,
           projectId: remoteProjectId?.trim() || null,
-          scopeId,
-          bindingKind,
+          target,
           message: bindingError,
         };
       }
