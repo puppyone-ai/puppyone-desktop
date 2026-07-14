@@ -2,7 +2,7 @@ import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
   DesktopCloudRepoIdentity,
-  DesktopCloudScope,
+  DesktopCloudRepositoryView,
 } from "../../../../lib/cloudApi";
 import type { CloudAccessFilter } from "../../accessFilters";
 import type { CloudAccessSurface } from "../../model";
@@ -17,7 +17,7 @@ import {
 
 export type CloudAccessSurfaceRow = {
   id: string;
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   surface: CloudAccessSurface;
 };
 
@@ -29,7 +29,7 @@ export function buildDesktopCloudAccessRows({
   apiBaseUrl,
   includePlaceholders = false,
 }: {
-  scopeRows: DesktopCloudScope[];
+  scopeRows: DesktopCloudRepositoryView[];
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;

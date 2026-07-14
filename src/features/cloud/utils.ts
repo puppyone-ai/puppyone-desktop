@@ -4,12 +4,13 @@ import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
   DesktopCloudRepoIdentity,
+  DesktopCloudRepositoryView,
   DesktopCloudScope,
   DesktopCloudTreeEntry,
 } from "../../lib/cloudApi";
 import type { DesktopCloudHistory } from "../../lib/cloudHistoryApi";
 import type { GitCommitSummary } from "../../types/electron";
-import type { getPuppyoneRemote } from "../source-control/remotes";
+import { projectRootRepositoryView, repositoryScopeView } from "./repositoryTarget";
 
 export type CloudPresentationContext = Pick<
   LocaleFormatters,
@@ -148,62 +149,22 @@ export async function copyText(value: string) {
 export function getCloudScopeRows(
   scopes: DesktopCloudScope[],
   identity: DesktopCloudRepoIdentity | null,
-): DesktopCloudScope[] {
-  if (scopes.length > 0) return scopes;
-  return (identity?.scopes ?? []).map((scope) => ({
-    id: scope.id,
-    project_id: identity?.project_id ?? "",
-    name: scope.name,
-    path: scope.path,
-    exclude: [],
-    mode: "rw",
-    is_root: scope.is_root,
-    access_key: scope.access_key,
-  }));
+): DesktopCloudRepositoryView[] {
+  const projectId = identity?.project_id ?? scopes[0]?.project_id ?? null;
+  if (!projectId) return [];
+  return [
+    projectRootRepositoryView(projectId),
+    ...scopes.map(repositoryScopeView),
+  ];
 }
 
-export function buildCloudAccessPointScope(accessKey: string): DesktopCloudScope {
-  return {
-    id: `access-point:${accessKey}`,
-    project_id: "",
-    name: "Cloud source",
-    path: "",
-    exclude: [],
-    mode: "rw",
-    is_root: true,
-    access_key: accessKey,
-  };
-}
-
-export function buildCloudAccessPointIdentity(
-  cloudRemote: NonNullable<ReturnType<typeof getPuppyoneRemote>>,
-): DesktopCloudRepoIdentity {
-  const accessKey = cloudRemote.info.kind === "access-point" ? cloudRemote.info.accessKey : null;
-  const scope = accessKey ? buildCloudAccessPointScope(accessKey) : null;
-  return {
-    project_id: "",
-    url: cloudRemote.rawUrl,
-    content_initialized: true,
-    scopes: scope
-      ? [{
-          id: scope.id,
-          name: scope.name,
-          path: scope.path,
-          is_root: scope.is_root,
-          git_url: cloudRemote.rawUrl,
-          access_key: scope.access_key,
-        }]
-      : [],
-  };
-}
-
-export function getCanonicalScopeGitUrl(
+export function getCanonicalGitUrlForView(
   identity: DesktopCloudRepoIdentity | null,
-  scope: DesktopCloudScope | null,
+  scope: DesktopCloudRepositoryView | null,
   apiBase = "",
 ): string {
   if (!identity) return "";
-  if (!scope || scope.is_root) return identity.url ?? "";
+  if (!scope || scope.target.kind === "project_root") return identity.url ?? "";
   const identityScope = identity.scopes.find((entry) => entry.id === scope.id);
   if (identityScope?.git_url) return identityScope.git_url;
   const base = apiBase || getApiBaseFromGitUrl(identity.url);
@@ -212,21 +173,21 @@ export function getCanonicalScopeGitUrl(
     : "";
 }
 
-export function getScopeDisplayName(scope: DesktopCloudScope, t: MessageFormatter) {
+export function getScopeDisplayName(scope: DesktopCloudRepositoryView, t: MessageFormatter) {
   if (scope.name?.trim()) return scope.name.trim();
-  if (scope.is_root || !normalizeCloudEntryPath(scope.path)) return t("cloud.scope.workspaceRoot");
+  if (scope.target.kind === "project_root") return t("cloud.scope.workspaceRoot");
   const parts = normalizeCloudEntryPath(scope.path).split("/");
   return parts[parts.length - 1] || scope.path;
 }
 
 /** Locale-neutral value for command/profile identifiers. */
-export function getScopeIdentifierName(scope: DesktopCloudScope) {
+export function getScopeIdentifierName(scope: DesktopCloudRepositoryView) {
   if (scope.name?.trim()) return scope.name.trim();
   const parts = normalizeCloudEntryPath(scope.path).split("/").filter(Boolean);
   return parts[parts.length - 1] || "root";
 }
 
-export function getScopePathLabel(scope: DesktopCloudScope) {
+export function getScopePathLabel(scope: DesktopCloudRepositoryView) {
   const path = normalizeCloudEntryPath(scope.path);
   return path ? `/${path}` : "/";
 }
@@ -236,19 +197,18 @@ export function isConnectorActiveStatus(status: string | null | undefined) {
 }
 
 export function isScopeActive(
-  scope: DesktopCloudScope,
+  scope: DesktopCloudRepositoryView,
   connectors: DesktopCloudConnector[],
   endpointCount: number,
 ) {
   return Boolean(
-    (scope.access_key && !scope.access_key_revoked) ||
     endpointCount > 0 ||
     connectors.some((connector) => isConnectorActiveStatus(connector.status)),
   );
 }
 
 export function countScopeAccessSurfaces(
-  scope: DesktopCloudScope,
+  scope: DesktopCloudRepositoryView,
   connectors: DesktopCloudConnector[],
   endpointCount: number,
 ) {
@@ -257,17 +217,19 @@ export function countScopeAccessSurfaces(
   return 2 + Math.max(1, endpointCount);
 }
 
-export function scopeMatchesMcpEndpoint(scope: DesktopCloudScope, endpoint: DesktopCloudMcpEndpoint) {
+export function scopeMatchesMcpEndpoint(scope: DesktopCloudRepositoryView, endpoint: DesktopCloudMcpEndpoint) {
   const scopePath = normalizeCloudEntryPath(scope.path);
   const endpointAccesses = endpoint.accesses ?? [];
   if (endpointAccesses.length > 0) {
     return endpointAccesses.some((access) => {
       const accessPath = normalizeCloudEntryPath(access.path || "");
-      return scope.is_root ? accessPath === "" || accessPath === scopePath : accessPath === scopePath;
+      return scope.target.kind === "project_root"
+        ? accessPath === ""
+        : accessPath === scopePath;
     });
   }
   const endpointPath = normalizeCloudEntryPath(endpoint.path ?? "");
-  if (scope.is_root && !endpointPath) return true;
+  if (scope.target.kind === "project_root" && !endpointPath) return true;
   return endpointPath === scopePath;
 }
 

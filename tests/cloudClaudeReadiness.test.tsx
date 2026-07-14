@@ -25,19 +25,19 @@ function readiness(
   return {
     project_id: "project-1",
     git: {
-      root_scope_id: "scope-root",
-      root_surface_exists: state !== "git_not_created",
-      root_head_exists: state === "ready",
-      root_git_push_accepted: state === "ready",
+      target: { kind: "project_root", project_id: "project-1" },
+      surface_exists: state !== "git_not_created",
+      head_exists: state === "ready",
+      push_accepted: state === "ready",
       default_branch: "main",
       state,
     },
     claude: {
       ready: state === "ready",
       blockers: state === "git_not_created"
-        ? ["root_git_surface_missing", "root_head_missing"]
+        ? ["project_git_surface_missing", "project_head_missing"]
         : state === "awaiting_first_push"
-          ? ["root_head_missing", "root_git_push_not_accepted"]
+          ? ["project_head_missing", "project_git_push_not_accepted"]
           : [],
     },
   };
@@ -45,7 +45,7 @@ function readiness(
 
 function renderClaude(input: {
   state: DesktopCloudProjectReadiness;
-  bindingKind?: "full" | "scoped";
+  scoped?: boolean;
 }) {
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -59,8 +59,10 @@ function renderClaude(input: {
     <CloudClaudeSection
       readiness={input.state}
       identity={{ project_id: "project-1", url: "https://cloud.example/git/ap/key.git", scopes: [] }}
-      bindingKind={input.bindingKind ?? "full"}
-      scopePath={input.bindingKind === "scoped" ? "/docs" : null}
+      repositoryTarget={input.scoped
+        ? { kind: "scope", project_id: "project-1", scope_id: "scope-docs" }
+        : { kind: "project_root", project_id: "project-1" }}
+      scopePath={input.scoped ? "/docs" : null}
       loading={false}
       {...callbacks}
     />,
@@ -81,14 +83,16 @@ describe("Claude root Git readiness", () => {
   it("offers first-push guidance when root Git exists without an accepted head", () => {
     const { container, callbacks } = renderClaude({ state: readiness("awaiting_first_push") });
     const action = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Push your first commit");
-    expect(stripBidiIsolation(container.textContent)).toContain("Cloud has not accepted the first root Git push on main");
+    expect(stripBidiIsolation(container.textContent)).toContain(
+      "Cloud has not accepted the first Project-root Git push on main",
+    );
     act(() => action?.click());
     expect(callbacks.onOpenGitSync).toHaveBeenCalledOnce();
     expect(callbacks.onOpenClaude).not.toHaveBeenCalled();
   });
 
-  it("does not unlock Claude for a non-root scoped checkout even if the Project is ready", () => {
-    const { container, callbacks } = renderClaude({ state: readiness("ready"), bindingKind: "scoped" });
+  it("does not unlock Claude for a Scope checkout even if the Project is ready", () => {
+    const { container, callbacks } = renderClaude({ state: readiness("ready"), scoped: true });
     expect(container.textContent).toContain("This is a scoped checkout");
     expect(container.textContent).toContain("/docs");
     expect(container.textContent).not.toContain("Open Claude");
@@ -97,10 +101,10 @@ describe("Claude root Git readiness", () => {
 
   it("does not let a Product/API root edit impersonate the first Git push", () => {
     const productHead = readiness("ready");
-    productHead.git.root_git_push_accepted = false;
+    productHead.git.push_accepted = false;
     productHead.git.state = "awaiting_first_push";
     productHead.claude.ready = false;
-    productHead.claude.blockers = ["root_git_push_not_accepted"];
+    productHead.claude.blockers = ["project_git_push_not_accepted"];
     const { container, callbacks } = renderClaude({ state: productHead });
     expect(container.textContent).toContain("Push the first root commit");
     expect(container.textContent).not.toContain("Open Claude");

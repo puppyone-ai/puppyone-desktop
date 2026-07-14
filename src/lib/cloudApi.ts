@@ -9,6 +9,12 @@ import {
 } from "../../shared/cloudEndpoint.js";
 import { invalidateCloudCacheForMutation } from "../features/cloud/cache/cloudCache";
 import { createCloudAutomationApi } from "./cloud/automationApi";
+import type { RepositoryTarget } from "../features/cloud/repositoryTarget";
+
+export type { RepositoryTarget } from "../features/cloud/repositoryTarget";
+
+export const REPOSITORY_TARGET_CONTRACT_HEADER = "X-PuppyOne-Repository-Contract";
+export const REPOSITORY_TARGET_CONTRACT_VERSION = "2";
 
 type ApiEnvelope<T> = {
   code?: number;
@@ -111,19 +117,19 @@ export type DesktopCloudTemplateInstantiation = {
 export type DesktopCloudProjectReadiness = {
   project_id: string;
   git: {
-    root_scope_id: string | null;
-    root_surface_exists: boolean;
-    root_head_exists: boolean;
-    root_git_push_accepted: boolean;
+    target: Extract<RepositoryTarget, { kind: "project_root" }>;
+    surface_exists: boolean;
+    head_exists: boolean;
+    push_accepted: boolean;
     default_branch: string;
     state: "git_not_created" | "awaiting_first_push" | "ready";
   };
   claude: {
     ready: boolean;
     blockers: Array<
-      | "root_git_surface_missing"
-      | "root_head_missing"
-      | "root_git_push_not_accepted"
+      | "project_git_surface_missing"
+      | "project_head_missing"
+      | "project_git_push_not_accepted"
       | string
     >;
   };
@@ -132,13 +138,11 @@ export type DesktopCloudProjectReadiness = {
 export type DesktopCloudWorkspaceBinding = {
   id: string;
   org_id: string;
-  project_id: string;
-  scope_id: string;
+  target: RepositoryTarget;
   scope_path?: string | null;
   workspace_instance_id: string;
   bound_user_id: string;
   cloud_origin: string;
-  binding_kind: "full" | "scoped";
   mode: "r" | "rw";
   status: "active" | "revoked";
   usable: boolean;
@@ -153,9 +157,7 @@ export type DesktopCloudWorkspaceBinding = {
   credential?: string | null;
   remote: {
     url: string;
-    project_id: string;
-    scope_id: string;
-    kind: "full" | "scoped";
+    target: RepositoryTarget;
     username: string;
   };
 };
@@ -163,37 +165,17 @@ export type DesktopCloudWorkspaceBinding = {
 export type DesktopCloudWorkspaceBindingCreate = {
   workspace_instance_id: string;
   cloud_origin: string;
-  binding_kind: "full" | "scoped";
-  scope_id?: string | null;
+  target: RepositoryTarget;
   mode: "r" | "rw";
 };
 
 export type DesktopCloudLegacyBindingCandidate = {
-  project_id: string;
-  scope_id: string;
-  binding_kind: "full" | "scoped";
+  target: RepositoryTarget;
   requires_confirmation: true;
 };
 
 export type DesktopCloudCanonicalProjectContext = {
-  project: DesktopCloudProject & {
-    org_id: string;
-    visibility: string;
-    bound_git_branch: string;
-    effective_role: "admin" | "editor" | "viewer";
-    grant_source: "org_owner" | "project_member" | "org_visibility";
-    capabilities: string[];
-  };
-  scope: {
-    id: string;
-    kind: "full" | "scoped";
-    path: string | null;
-  };
-  locator: {
-    project_id: string;
-    scope_id: string;
-    binding_kind: "full" | "scoped";
-  };
+  target: RepositoryTarget;
 };
 
 export type DesktopCloudOrganization = {
@@ -502,10 +484,20 @@ export type DesktopCloudScope = {
   name: string;
   path: string;
   exclude: string[];
-  mode: "r" | "rw";
-  is_root: boolean;
-  access_key?: string | null;
-  access_key_revoked?: boolean;
+  max_mode: "r" | "rw";
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+/** Presentation projection over the Project root or one real path Scope. */
+export type DesktopCloudRepositoryView = {
+  id: string;
+  target: RepositoryTarget;
+  project_id: string;
+  name: string;
+  path: string;
+  exclude: string[];
+  max_mode: "r" | "rw";
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -513,20 +505,19 @@ export type DesktopCloudScope = {
 export type DesktopCloudScopePatch = {
   name?: string;
   exclude?: string[];
-  mode?: "r" | "rw";
+  max_mode?: "r" | "rw";
 };
 
 export type DesktopCloudCreateScopeRequest = {
   name: string;
   path: string;
   exclude?: string[];
-  mode?: "r" | "rw";
+  max_mode?: "r" | "rw";
 };
 
 export type DesktopCloudConnector = {
   id: string;
-  project_id: string;
-  scope_id: string;
+  target: RepositoryTarget;
   provider: string;
   name: string;
   direction: string;
@@ -534,7 +525,6 @@ export type DesktopCloudConnector = {
   oauth_connection_id?: number | null;
   trigger?: Record<string, unknown>;
   status: string;
-  access_key?: string | null;
   last_run_at?: string | null;
   last_run_id?: string | null;
   error_message?: string | null;
@@ -706,9 +696,7 @@ export type DesktopCloudRepoIdentity = {
     id: string;
     name: string;
     path: string;
-    is_root: boolean;
-    git_url?: string;
-    access_key?: string | null;
+    git_url: string;
   }>;
 };
 
@@ -813,7 +801,10 @@ export async function cloudApiRequest<T>(
         apiBaseUrl: requestedApiBase,
         path: path.startsWith("/") ? path : `/${path}`,
         method: init.method ?? "GET",
-        headers: normalizeRequestHeaders(init.headers),
+        headers: {
+          ...normalizeRequestHeaders(init.headers),
+          [REPOSITORY_TARGET_CONTRACT_HEADER]: REPOSITORY_TARGET_CONTRACT_VERSION,
+        },
         ...(body === undefined ? {} : { body }),
       }) as T;
       if (isMutationMethod(init.method)) {
@@ -2093,22 +2084,6 @@ export function updateCloudScope(
       method: "PATCH",
       body: JSON.stringify(patch),
     },
-    apiBaseUrl,
-  );
-}
-
-export function regenerateCloudScopeKey(
-  session: DesktopCloudSession,
-  projectId: string,
-  scopeId: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudScope> {
-  return cloudApiRequest<DesktopCloudScope>(
-    `/projects/${projectId}/scopes/${scopeId}/regenerate-key`,
-    session,
-    onSessionChange,
-    { method: "POST", body: JSON.stringify({}) },
     apiBaseUrl,
   );
 }

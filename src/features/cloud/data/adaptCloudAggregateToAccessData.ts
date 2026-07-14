@@ -8,6 +8,7 @@ import { buildDesktopCloudAccessRows } from "../sections/access/accessRows";
 import { getCloudScopeRows, scopeMatchesMcpEndpoint } from "../utils";
 import type { DesktopCloudAccessDataState } from "./useDesktopCloudAccessData";
 import type { CloudMessageDescriptor } from "../cloudPresentation";
+import { repositoryTargetKey } from "../repositoryTarget";
 
 /** Adapt aggregate Cloud project details into Access/Automation view state without refetching. */
 export function adaptCloudAggregateToAccessData({
@@ -32,16 +33,17 @@ export function adaptCloudAggregateToAccessData({
   reload: () => Promise<void>;
 }): DesktopCloudAccessDataState {
   const scopeRows = getCloudScopeRows(scopes, identity);
-  const connectorsByScope = new Map<string, DesktopCloudConnector[]>();
+  const connectorsByTarget = new Map<string, DesktopCloudConnector[]>();
   for (const connector of connectors) {
-    const list = connectorsByScope.get(connector.scope_id) ?? [];
+    const key = repositoryTargetKey(connector.target);
+    const list = connectorsByTarget.get(key) ?? [];
     list.push(connector);
-    connectorsByScope.set(connector.scope_id, list);
+    connectorsByTarget.set(key, list);
   }
-  const mcpEndpointsByScope = new Map<string, DesktopCloudMcpEndpoint[]>();
+  const mcpEndpointsByTarget = new Map<string, DesktopCloudMcpEndpoint[]>();
   for (const scope of scopeRows) {
-    mcpEndpointsByScope.set(
-      scope.id,
+    mcpEndpointsByTarget.set(
+      repositoryTargetKey(scope.target),
       mcpEndpoints.filter((endpoint) => scopeMatchesMcpEndpoint(scope, endpoint)),
     );
   }
@@ -50,9 +52,9 @@ export function adaptCloudAggregateToAccessData({
     scopes,
     scopeRows,
     connectors,
-    connectorsByScope,
+    connectorsByTarget,
     mcpEndpoints,
-    mcpEndpointsByScope,
+    mcpEndpointsByTarget,
     accessRows: buildDesktopCloudAccessRows({
       scopeRows,
       connectors,

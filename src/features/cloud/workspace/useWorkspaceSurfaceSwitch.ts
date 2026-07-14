@@ -251,7 +251,7 @@ export function useWorkspaceSurfaceSwitch({
             [openedWorkspace.id]: {
               projectId: cloudProjectId,
               bindingId: attached.binding.id,
-              bindingKind: attached.binding.binding_kind,
+              target: attached.binding.target,
               scopePath: attached.binding.scope_path ?? null,
               cloudLinked: true,
               error: null,

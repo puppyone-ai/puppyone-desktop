@@ -113,12 +113,10 @@ export function CloudServiceMainView({
 
   const handleConfirmLegacyBinding = async ({
     projectId,
-    scopeId,
-    bindingKind,
+    target,
   }: {
     projectId: string;
-    scopeId: string | null;
-    bindingKind: "full" | "scoped";
+    target: import("./repositoryTarget").RepositoryTarget;
   }) => {
     if (!cloudRemote || actionRequestRef.current || cloudBackupLoading) return;
     const request = Symbol("confirm-legacy-cloud-binding");
@@ -127,8 +125,7 @@ export function CloudServiceMainView({
     setCloudAction({ kind: "connect", projectId, notice: null, error: null });
     try {
       const configuredStatus = await onConfigureCloudRemote(projectId, {
-        bindingKind,
-        scopeId,
+        target,
       });
       if (actionContextRef.current !== requestContext) return;
       if (!configuredStatus) {
@@ -138,7 +135,7 @@ export function CloudServiceMainView({
       setCloudAction({
         kind: null,
         projectId,
-        notice: cloudMessage(bindingKind === "scoped" ? "scoped-binding-confirmed" : "project-binding-confirmed"),
+        notice: cloudMessage(target.kind === "scope" ? "scoped-binding-confirmed" : "project-binding-confirmed"),
         error: null,
       });
       onSelectSection("contents");
@@ -160,7 +157,6 @@ export function CloudServiceMainView({
       attachment?.status !== "resolved"
       || attachment.bindingStatus !== "bound"
       || attachment.warning?.code !== "binding-remote-missing"
-      || !attachment.bindingKind
       || actionRequestRef.current
       || cloudBackupLoading
     ) return;
@@ -172,8 +168,7 @@ export function CloudServiceMainView({
     setCloudAction({ kind: "connect", projectId, notice: null, error: null });
     try {
       const configuredStatus = await onConfigureCloudRemote(projectId, {
-        bindingKind: attachment.bindingKind,
-        scopeId: attachment.scopeId ?? null,
+        target: attachment.target,
       });
       if (actionContextRef.current !== requestContext) return;
       if (!configuredStatus) {
@@ -270,7 +265,7 @@ export function CloudServiceMainView({
             <span>{formatCloudMessage(attachment.warning, t)}</span>
             {attachment.warning.code === "binding-remote-missing"
               && attachment.bindingStatus === "bound"
-              && attachment.bindingKind && (
+              && (
                 <button
                   className="desktop-cloud-row-action"
                   type="button"

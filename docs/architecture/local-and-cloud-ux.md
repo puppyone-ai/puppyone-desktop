@@ -363,7 +363,7 @@ Connecting a Project does not automatically expose all content through MCP.
 Opening Cloud or Claude from an already-open Local workspace is a contextual
 Project-resolution operation. It asks exactly one question:
 
-> Which PuppyOne Cloud Project and Scope, if any, does this local workspace
+> Which PuppyOne Cloud repository target, if any, does this local workspace
 > represent for the currently signed-in user?
 
 It is not an Organization Project-browser operation. The contextual surface
@@ -381,7 +381,7 @@ Local workspace instance
   -> identifies this physical checkout on this device
 
 Canonical Git locator
-  -> declares one Project root or one Project + non-root Scope
+  -> declares one Project root or one Project + Scope
   -> contains no credential and grants no access
 
 Human Cloud session
@@ -389,7 +389,7 @@ Human Cloud session
   -> is the only authority for Project UI and control-plane data
 
 WorkspaceBinding
-  -> durably associates one workspace instance with one Project/Scope
+  -> durably associates one workspace instance with one repository target
   -> owns binding lifecycle and binding-specific machine credential
   -> grants no human access
 
@@ -422,8 +422,9 @@ type ProjectContextResolution =
       status: "resolved";
       resolutionSource: "workspace-binding" | "canonical-remote";
       projectId: string;
-      scopeId: string;
-      bindingKind: "full" | "scoped";
+      target:
+        | { kind: "project_root"; project_id: string }
+        | { kind: "scope"; project_id: string; scope_id: string };
       bindingId: string | null;
       bindingStatus: "bound" | "not-bound";
       capabilities: string[];
@@ -496,9 +497,9 @@ Normalize all PuppyOne fetch and push locators
 ```
 
 The server context resolver must validate the trusted Cloud/Git origin, parse
-the canonical grammar, authorize `Project Read` for the current JWT, verify the
-exact Scope belongs to the Project, and return current capabilities. Only after
-that response may Desktop render Project metadata or navigate to the Project.
+the canonical grammar, authorize `Project Read` for the current JWT, and—only
+for a scoped target—verify the exact Scope belongs to the Project. Only after
+that response may Desktop fetch Project metadata or navigate to the Project.
 An unauthorized or missing target fails closed and never falls back to a broad
 Project list.
 
@@ -514,7 +515,7 @@ guidance.
 
 The binding is the durable identity fast path, but an active canonical remote
 is also an integrity fact. When both exist they must agree on Cloud origin,
-Project ID, Scope ID, and full/scoped kind. A valid binding with a missing
+exact repository target. A valid binding with a missing
 remote may still open the Project with a repair warning. A binding and remote
 that point to different targets are ambiguous and must enter recovery rather
 than silently preferring either one.
@@ -540,7 +541,7 @@ must not stop at the first URL that matches PuppyOne syntax.
 1. Reject credentials, query strings, fragments, unsupported transports, and
    malformed or percent-encoded identity.
 2. Normalize each accepted locator to
-   `(cloudOrigin, projectId, scopeId, bindingKind)`.
+   `(cloudOrigin, RepositoryTarget)`.
 3. Treat duplicate remotes with the same normalized locator as one candidate.
 4. Treat a fetch/push mismatch, different Project IDs, different Scope IDs, or
    different Cloud origins as `locator-conflict`.
@@ -591,27 +592,17 @@ confirmation candidate, and contains no replayable secret:
 
 ```ts
 type CanonicalProjectContext = {
-  project: {
-    id: string;
-    name: string;
-    capabilities: string[];
-  };
-  scope: {
-    id: string;
-    kind: "full" | "scoped";
-    path: string | null;
-  };
-  locator: {
-    projectId: string;
-    scopeId: string;
-    bindingKind: "full" | "scoped";
-  };
+  target:
+    | { kind: "project_root"; project_id: string }
+    | { kind: "scope"; project_id: string; scope_id: string };
 };
 ```
 
 Canonical resolution does not require user confirmation because the locator is
 stable and secret-free; the current JWT still decides whether the user may see
-the Project. Legacy `/git/ap/<secret>.git` resolution remains confirmation-
+the Project. Project capabilities are fetched through the ordinary Project
+endpoint after the exact target is authorized. Legacy `/git/ap/<secret>.git`
+resolution remains confirmation-
 gated during migration because its path is a credential, not durable identity.
 Neither response returns Git credentials, shared keys, binding credentials, or
 an unfiltered Organization Project list.
@@ -751,9 +742,9 @@ Claude Project runtime is not unlocked by Cloud metadata, an empty Project, a
 non-root checkout, or a Web/API-created root head. Cloud must report all three
 durable facts:
 
-1. an active Git surface on the canonical root scope;
-2. a valid canonical root head;
-3. a committed root `access_git` Version Engine transaction proving the first
+1. an active Git surface on the canonical Project repository;
+2. a valid canonical Project repository head;
+3. a committed Project-root `access_git` Version Engine transaction proving the first
    Git push was accepted.
 
 Until then the Project shell shows `Create Git` or `Push your first commit` and
@@ -937,7 +928,7 @@ applicable scenarios:
     Desktop enters that exact Project without binding confirmation or catalog
     enumeration.
 17. Open a canonical scoped locator; verify the server returns the exact parent
-    Project and non-root Scope and Desktop visibly preserves scoped context.
+    Project and Scope and Desktop visibly preserves scoped context.
 18. Open a workspace whose binding and canonical remote disagree; verify
     Desktop shows recovery and does not prefer either identity silently.
 19. Configure two PuppyOne remotes for different Projects; verify a deterministic

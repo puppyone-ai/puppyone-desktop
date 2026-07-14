@@ -2,23 +2,23 @@ import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
   DesktopCloudRepoIdentity,
-  DesktopCloudScope,
+  DesktopCloudRepositoryView,
 } from "../../../../lib/cloudApi";
 import { buildCloudAccessSurfaces } from "../../model";
 import type { CloudAccessSurface } from "../../model";
 import {
   getApiBaseFromGitUrl,
-  getCanonicalScopeGitUrl,
+  getCanonicalGitUrlForView,
   getScopeIdentifierName,
   getScopePathLabel,
   normalizeProviderKey,
   profileSlug,
   scopeMatchesMcpEndpoint,
-  shellQuote,
 } from "../../utils";
+import { sameRepositoryTarget } from "../../repositoryTarget";
 
 export type DesktopCloudAccessSurfaceOptions = {
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;
@@ -35,7 +35,9 @@ export function buildDesktopCloudAccessSurfacesForScope({
   includePlaceholders = false,
 }: DesktopCloudAccessSurfaceOptions): CloudAccessSurface[] {
   const context = getDesktopCloudAccessSurfaceContext({ scope, identity, apiBaseUrl });
-  const scopeConnectors = connectors.filter((connector) => connector.scope_id === scope.id);
+  const scopeConnectors = connectors.filter((connector) => (
+    sameRepositoryTarget(connector.target, scope.target)
+  ));
   const scopeMcpEndpoints = mcpEndpoints.filter((endpoint) => scopeMatchesMcpEndpoint(scope, endpoint));
   const surfaces = buildCloudAccessSurfaces({
     scope,
@@ -60,17 +62,17 @@ export function getDesktopCloudAccessSurfaceContext({
   identity,
   apiBaseUrl,
 }: {
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   identity: DesktopCloudRepoIdentity | null;
   apiBaseUrl: string | null;
 }) {
   const apiBase = identity?.url ? getApiBaseFromGitUrl(identity.url) : apiBaseUrl ?? "";
   const scopeName = getScopeIdentifierName(scope);
   const profileName = profileSlug(scopeName);
-  const gitUrl = getCanonicalScopeGitUrl(identity, scope, apiBase);
-  const cliCommand = scope.access_key && apiBase
-    ? `printf '%s' ${shellQuote(scope.access_key)} | puppyone ap login ${shellQuote(profileName)} --api-url ${shellQuote(apiBase)} --access-key-stdin`
-    : "";
+  const gitUrl = getCanonicalGitUrlForView(identity, scope, apiBase);
+  // Target metadata never exposes shared credentials. One-time issuance is
+  // owned by the dedicated credential action, not ordinary repository reads.
+  const cliCommand = "";
 
   return {
     apiBase,
@@ -81,7 +83,7 @@ export function getDesktopCloudAccessSurfaceContext({
   };
 }
 
-export function ensureDesktopMcpSurface(scope: DesktopCloudScope, surfaces: CloudAccessSurface[]): CloudAccessSurface[] {
+export function ensureDesktopMcpSurface(scope: DesktopCloudRepositoryView, surfaces: CloudAccessSurface[]): CloudAccessSurface[] {
   if (surfaces.some((surface) => isMcpAccessSurface(surface.provider))) {
     return surfaces;
   }
@@ -97,7 +99,7 @@ export function ensureDesktopMcpSurface(scope: DesktopCloudScope, surfaces: Clou
   ];
 }
 
-export function ensureDesktopVmSurface(scope: DesktopCloudScope, surfaces: CloudAccessSurface[]): CloudAccessSurface[] {
+export function ensureDesktopVmSurface(scope: DesktopCloudRepositoryView, surfaces: CloudAccessSurface[]): CloudAccessSurface[] {
   if (surfaces.some((surface) => isVmAccessSurface(surface.provider))) {
     return surfaces;
   }
@@ -142,11 +144,4 @@ export function isGitAccessSurface(provider: string) {
 
 export function isCliAccessSurface(provider: string) {
   return normalizeProviderKey(provider) === "cli";
-}
-
-export function maskDesktopScopeAccessKey(accessKey: string) {
-  const [prefix, rest = ""] = accessKey.split("_", 2);
-  const suffix = rest.slice(-4);
-  if (!prefix || !suffix) return "••••";
-  return `${prefix}_••••••••${suffix}`;
 }

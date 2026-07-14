@@ -6,13 +6,14 @@ import type {
   DesktopCloudProjectReadiness,
   DesktopCloudRepoIdentity,
 } from "../../../lib/cloudApi";
+import type { RepositoryTarget } from "../repositoryTarget";
 import { copyText } from "../utils";
 import { CloudMainMetric, CloudMainSection } from "../components/shared";
 
 export function CloudClaudeSection({
   readiness,
   identity,
-  bindingKind,
+  repositoryTarget,
   scopePath,
   loading,
   onCreateGit,
@@ -21,7 +22,7 @@ export function CloudClaudeSection({
 }: {
   readiness: DesktopCloudProjectReadiness | null;
   identity: DesktopCloudRepoIdentity | null;
-  bindingKind: "full" | "scoped" | null;
+  repositoryTarget: RepositoryTarget | null;
   scopePath: string | null;
   loading: boolean;
   onCreateGit: () => void;
@@ -40,7 +41,7 @@ export function CloudClaudeSection({
     );
   }
 
-  if (bindingKind === "scoped") {
+  if (repositoryTarget?.kind === "scope") {
     return (
       <CloudMainSection title="Claude" count={t("cloud.claude.rootCheckoutRequired")}>
         <ClaudeEmpty
@@ -59,12 +60,12 @@ export function CloudClaudeSection({
     );
   }
 
-  if (!readiness.git.root_surface_exists) {
+  if (!readiness.git.surface_exists) {
     return (
       <CloudMainSection title="Claude" count={t("cloud.claude.gitNotCreated")}>
         <ClaudeEmpty
           title={t("cloud.claude.createRootGit")}
-          detail={t("cloud.claude.createRootGitDetail")}
+          detail={t("cloud.claude.createProjectRootGitDetail")}
           action={(
             <button className="desktop-cloud-row-action primary" type="button" onClick={onCreateGit}>
               <Plus size={13} />
@@ -77,8 +78,8 @@ export function CloudClaudeSection({
   }
 
   if (
-    !readiness.git.root_head_exists
-    || readiness.git.root_git_push_accepted !== true
+    !readiness.git.head_exists
+    || readiness.git.push_accepted !== true
     || !readiness.claude.ready
   ) {
     return (
@@ -94,7 +95,7 @@ export function CloudClaudeSection({
       >
         <ClaudeEmpty
           title={t("cloud.claude.pushFirstCommit")}
-          detail={t("cloud.claude.pushFirstCommitDetail", { branch: bidiIsolate(readiness.git.default_branch) })}
+          detail={t("cloud.claude.pushFirstProjectRootCommitDetail", { branch: bidiIsolate(readiness.git.default_branch) })}
           action={(
             <button className="desktop-cloud-row-action primary" type="button" onClick={onOpenGitSync}>
               <GitBranch size={13} />

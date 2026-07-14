@@ -4,7 +4,7 @@ import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
   DesktopCloudAutomationProviderSpec,
-  DesktopCloudScope,
+  DesktopCloudRepositoryView,
   DesktopCloudSession,
 } from "../../lib/cloudApi";
 import { getCloudAutomationRun } from "../../lib/cloudApi";
@@ -441,7 +441,7 @@ function getAutomationStatusTone(status: string | null | undefined) {
   return "muted";
 }
 
-function formatAutomationPathTrailLabel(scope: DesktopCloudScope) {
+function formatAutomationPathTrailLabel(scope: DesktopCloudRepositoryView) {
   const path = getScopePathLabel(scope);
   if (path === "/") return "/";
   return `/ ${path.replace(/^\/+/, "").split("/").filter(Boolean).join(" / ")}`;

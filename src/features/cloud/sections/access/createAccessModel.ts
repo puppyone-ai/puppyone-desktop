@@ -1,4 +1,4 @@
-import type { DesktopCloudScope } from "../../../../lib/cloudApi";
+import type { DesktopCloudRepositoryView } from "../../../../lib/cloudApi";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import { normalizeCloudEntryPath } from "../../utils";
 
@@ -114,10 +114,10 @@ export function getCreateAccessTileProvider(provider: string) {
   return "default";
 }
 
-export function getCliAccessRowId(scope: DesktopCloudScope) {
+export function getCliAccessRowId(scope: DesktopCloudRepositoryView) {
   return `${scope.id}:builtin:cli:${scope.id}`;
 }
 
-export function getGitAccessRowId(scope: DesktopCloudScope) {
+export function getGitAccessRowId(scope: DesktopCloudRepositoryView) {
   return `${scope.id}:builtin:git:${scope.id}`;
 }

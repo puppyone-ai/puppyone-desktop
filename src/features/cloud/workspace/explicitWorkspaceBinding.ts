@@ -10,6 +10,11 @@ import {
   type DesktopCloudSession,
   type DesktopCloudWorkspaceBinding,
 } from "../../../lib/cloudApi";
+import {
+  projectRootTarget,
+  sameRepositoryTarget,
+  type RepositoryTarget,
+} from "../repositoryTarget";
 
 type MutableSessionHandler = (session: DesktopCloudSession | null) => void | Promise<void>;
 
@@ -68,8 +73,7 @@ export async function createExplicitWorkspaceBinding({
   project,
   projectId,
   workspace,
-  bindingKind = "full",
-  scopeId = null,
+  target,
   onSessionChange,
 }: {
   session: DesktopCloudSession;
@@ -77,8 +81,7 @@ export async function createExplicitWorkspaceBinding({
   project?: DesktopCloudProject | null;
   projectId: string;
   workspace: Workspace;
-  bindingKind?: "full" | "scoped";
-  scopeId?: string | null;
+  target?: RepositoryTarget;
   onSessionChange: MutableSessionHandler;
 }): Promise<{
   binding: DesktopCloudWorkspaceBinding;
@@ -92,11 +95,9 @@ export async function createExplicitWorkspaceBinding({
   if (!workspaceInstanceId) {
     throw new Error("This folder has no stable workspace identity yet.");
   }
-  if (bindingKind === "scoped" && !scopeId?.trim()) {
-    throw new Error("A scoped workspace binding requires an explicit Cloud scope.");
-  }
-  if (bindingKind === "full" && scopeId) {
-    throw new Error("A full workspace binding must resolve the canonical root scope on the server.");
+  const resolvedTarget = target ?? projectRootTarget(projectId);
+  if (resolvedTarget.project_id !== projectId) {
+    throw new Error("The repository target does not belong to the selected Cloud Project.");
   }
   const resolvedProject = project?.id === projectId
     ? project
@@ -109,8 +110,7 @@ export async function createExplicitWorkspaceBinding({
     {
       workspace_instance_id: workspaceInstanceId,
       cloud_origin: origin,
-      binding_kind: bindingKind,
-      scope_id: bindingKind === "scoped" ? scopeId : null,
+      target: resolvedTarget,
       mode,
     },
     onSessionChange,
@@ -166,12 +166,10 @@ export function bindingMatchesWorkspace({
   expectedUserId: string;
 }): boolean {
   return binding.id.length > 0
-    && binding.project_id === configuredProjectId
+    && binding.target.project_id === configuredProjectId
     && binding.workspace_instance_id === workspace.workspaceInstanceId
     && binding.bound_user_id === expectedUserId
     && sameCloudOrigin(binding.cloud_origin, configuredOrigin)
-    && binding.remote.project_id === binding.project_id
-    && binding.remote.scope_id === binding.scope_id
-    && binding.remote.kind === binding.binding_kind
+    && sameRepositoryTarget(binding.remote.target, binding.target)
     && sameCloudOrigin(binding.remote.url, binding.cloud_origin);
 }

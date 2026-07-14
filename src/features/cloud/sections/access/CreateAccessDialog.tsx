@@ -5,10 +5,11 @@ import { DesktopDialogCloseButton, DesktopDialogRoot, DesktopDialogSurface } fro
 import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
-  DesktopCloudScope,
+  DesktopCloudRepositoryView,
   DesktopCloudSession,
 } from "../../../../lib/cloudApi";
 import { scopeMatchesMcpEndpoint } from "../../utils";
+import { repositoryTargetKey } from "../../repositoryTarget";
 import { cloudMessage, formatCloudMessage, type CloudMessageDescriptor } from "../../cloudPresentation";
 import { CreateAccessFolderTree, TreeDisclosureMarker } from "./CreateAccessFolderTree";
 import { CreateAccessIntentPicker } from "./CreateAccessIntentPicker";
@@ -25,7 +26,7 @@ import {
 } from "./createAccessModel";
 
 export type DesktopCloudCreateAccessCreated = {
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   preferredRowId: string;
 };
 
@@ -34,8 +35,8 @@ export function DesktopCloudCreateAccessDialog({
   cloudSession,
   apiBaseUrl,
   scopes,
-  connectorsByScope,
-  mcpEndpointsByScope,
+  connectorsByTarget,
+  mcpEndpointsByTarget,
   initialPath,
   onCloudSessionChange,
   onClose,
@@ -44,9 +45,9 @@ export function DesktopCloudCreateAccessDialog({
   projectId: string;
   cloudSession: DesktopCloudSession;
   apiBaseUrl: string | null;
-  scopes: DesktopCloudScope[];
-  connectorsByScope: Map<string, DesktopCloudConnector[]>;
-  mcpEndpointsByScope: Map<string, DesktopCloudMcpEndpoint[]>;
+  scopes: DesktopCloudRepositoryView[];
+  connectorsByTarget: Map<string, DesktopCloudConnector[]>;
+  mcpEndpointsByTarget: Map<string, DesktopCloudMcpEndpoint[]>;
   initialPath?: string | null;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onClose: () => void;
@@ -74,19 +75,22 @@ export function DesktopCloudCreateAccessDialog({
       : scopes.find((scope) => normalizeAccessPath(scope.path) === normalizedSelected) ?? null
   ), [normalizedSelected, scopes]);
   const selectedMcpEndpoints = useMemo(
-    () => (selectedExistingScope ? mcpEndpointsByScope.get(selectedExistingScope.id) ?? [] : []),
-    [mcpEndpointsByScope, selectedExistingScope],
+    () => (selectedExistingScope
+      ? mcpEndpointsByTarget.get(repositoryTargetKey(selectedExistingScope.target)) ?? []
+      : []),
+    [mcpEndpointsByTarget, selectedExistingScope],
   );
   const existingProviders = useMemo(() => {
     if (!selectedExistingScope) return new Set<string>();
     const providers = new Set(
-      (connectorsByScope.get(selectedExistingScope.id) ?? []).map((connector) => normalizeAccessProviderKey(connector.provider)),
+      (connectorsByTarget.get(repositoryTargetKey(selectedExistingScope.target)) ?? [])
+        .map((connector) => normalizeAccessProviderKey(connector.provider)),
     );
     if (selectedMcpEndpoints.some((endpoint) => scopeMatchesMcpEndpoint(selectedExistingScope, endpoint))) {
       providers.add("mcp");
     }
     return providers;
-  }, [connectorsByScope, selectedExistingScope, selectedMcpEndpoints]);
+  }, [connectorsByTarget, selectedExistingScope, selectedMcpEndpoints]);
   const optionalProvidersToCreate = useMemo(
     () => Array.from(optionalProviders).filter((provider) => {
       const method = OPTIONAL_ACCESS_METHODS.find((item) => item.provider === provider);
