@@ -195,7 +195,10 @@ describe("sidebar spacing architecture", () => {
   it("maps the Data tree onto the shared edge contract", () => {
     const adapter = readCssBlock(dataAdapterCss, ".desktop-data-workspace-wrap");
     const list = compact(readCssBlock(dataTreeCss, ".explorer-tree-list"));
+    const treeShell = compact(readCssBlock(dataTreeCss, ".explorer-tree-shell"));
     const treeRow = compact(readCssBlock(dataTreeCss, ".tree-row"));
+    const treeRowAction = compact(readCssBlock(dataTreeCss, ".tree-row-action-button"));
+    const treeRowActionIcon = compact(readCssBlock(dataTreeCss, ".tree-row-action-button > svg"));
 
     expect(adapter).toContain("--po-tree-row-left-gap: var(--desktop-sidebar-row-left-gap);");
     expect(adapter).toContain("--po-tree-row-right-gap: var(--desktop-sidebar-row-right-gap);");
@@ -209,6 +212,12 @@ describe("sidebar spacing architecture", () => {
     expect(treeRow).toContain("font-size: var(--tree-row-font-size);");
     expect(treeRow).toContain("font-weight: var(--tree-row-font-weight);");
     expect(treeRow).toContain("line-height: var(--tree-row-line-height);");
+    expect(treeShell).toContain("--tree-row-action-size: var(--po-tree-row-action-size, 24px);");
+    expect(treeShell).toContain("--tree-row-action-icon-size: var(--po-tree-row-action-icon-size, 15px);");
+    expect(treeRowAction).toContain("width: var(--tree-row-action-size);");
+    expect(treeRowAction).toContain("height: var(--tree-row-action-size);");
+    expect(treeRowActionIcon).toContain("width: var(--tree-row-action-icon-size);");
+    expect(treeRowActionIcon).toContain("height: var(--tree-row-action-icon-size);");
     expect(list).toContain("padding-block: 0 var(--tree-list-bottom-gap);");
     expect(list).toContain(compact(`
       padding-inline: var(--tree-row-left-gap)
