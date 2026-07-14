@@ -31,7 +31,7 @@ export function SourceControlSectionHeader({
 }) {
   const titleContent = (
     <>
-      {onToggle && <ChevronRight size={13} className={`po-disclosure-icon ${expanded ? "expanded" : ""}`} />}
+      {onToggle && <ChevronRight size={14} className={`po-disclosure-icon ${expanded ? "expanded" : ""}`} />}
       {leadingIcon && <span className="desktop-git-section-leading-icon">{leadingIcon}</span>}
       <span>{title}</span>
       <small className={highlightCount ? "desktop-git-section-count-badge" : undefined}>{count}</small>

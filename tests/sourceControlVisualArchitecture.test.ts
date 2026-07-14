@@ -114,6 +114,39 @@ describe("source-control visual architecture", () => {
     );
   });
 
+  it("aligns every Git section empty state with its section label", () => {
+    const sectionTitle = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-section-title",
+    ));
+    const sectionTitleIcon = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-section-title svg",
+    ));
+    const sectionEmpty = compact(readCssBlock(
+      sidebarBaseCss,
+      ".desktop-git-section-empty",
+    ));
+    const emptyStateSources = `${sourceControlSidebarSource}\n${sourceControlSidebarSectionsSource}`;
+
+    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(4);
+    expect(emptyStateSources).not.toMatch(/desktop-git-empty-(?:remote|committed|stage|changes)/);
+    expect(sourceControlComponentsSource).toContain("<ChevronRight size={14}");
+    expect(sidebarBaseCss).toContain("--git-section-leading-slot-size: 14px;");
+    expect(sidebarBaseCss).toContain("--git-section-title-gap: 6px;");
+    expect(sectionTitle).toContain("gap: var(--git-section-title-gap);");
+    expect(sectionTitleIcon).toContain("width: var(--git-section-leading-slot-size);");
+    expect(sectionTitleIcon).toContain("height: var(--git-section-leading-slot-size);");
+    expect(sectionEmpty).toContain(compact(`
+      padding-inline-start: calc(
+        var(--desktop-sidebar-row-left-gap)
+        + var(--desktop-sidebar-row-content-left)
+        + var(--git-section-leading-slot-size)
+        + var(--git-section-title-gap)
+      );
+    `));
+  });
+
   it("swaps each working-tree status in place without moving destructive actions under the pointer", () => {
     const stagedGrid = compact(readCssBlock(
       sidebarResourcesCss,

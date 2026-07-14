@@ -251,7 +251,7 @@ export function GitSidebar({
           />
           <GitSectionCollapse expanded={committedExpanded}>
             {committedCount === 0 ? (
-              <SidebarEmptyState compact className="desktop-git-empty-committed">{t("source-control.status.empty")}</SidebarEmptyState>
+              <SidebarEmptyState compact className="desktop-git-section-empty">{t("source-control.status.empty")}</SidebarEmptyState>
             ) : committedResources.length > 0 ? (
               <SourceControlPreviewResourceList
                 resources={committedResources}
@@ -310,7 +310,7 @@ export function GitSidebar({
           />
           <GitSectionCollapse expanded={stagedExpanded}>
             {stagedResources.length === 0 ? (
-              <SidebarEmptyState compact className="desktop-git-empty-stage">{t("source-control.status.empty")}</SidebarEmptyState>
+              <SidebarEmptyState compact className="desktop-git-section-empty">{t("source-control.status.empty")}</SidebarEmptyState>
             ) : (
               <SourceControlWorkingResourceList
                 resources={stagedResources}
@@ -391,7 +391,7 @@ export function GitSidebar({
         />
         <GitSectionCollapse expanded={workingExpanded}>
           {localChangeResources.length === 0 ? (
-            <SidebarEmptyState compact className="desktop-git-empty-changes">{t("source-control.status.empty")}</SidebarEmptyState>
+            <SidebarEmptyState compact className="desktop-git-section-empty">{t("source-control.status.empty")}</SidebarEmptyState>
           ) : (
             <SourceControlWorkingResourceList
               resources={localChangeResources}

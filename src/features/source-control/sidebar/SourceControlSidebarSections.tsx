@@ -96,7 +96,7 @@ export function PuppyoneCloudProviderSection({
             onSelectWorkingFile={onSelectWorkingFile}
           />
         ) : (
-          <SidebarEmptyState compact className="desktop-git-empty-remote">
+          <SidebarEmptyState compact className="desktop-git-section-empty">
             {cloudUpdateCount > 0
               ? t("source-control.cloud.updateCount", { count: cloudUpdateCount })
               : t("source-control.status.empty")}

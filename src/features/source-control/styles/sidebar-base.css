@@ -21,6 +21,8 @@
   --git-working-tree-state-width: var(--git-working-tree-action-size);
   --git-working-tree-status-size: 22px;
   --git-section-body-top-gap: 2px;
+  --git-section-leading-slot-size: 14px;
+  --git-section-title-gap: 6px;
   --git-section-divider-height: 12px;
   --git-section-divider-line-offset: 5px;
   --git-control-radius: 8px;
@@ -88,17 +90,16 @@
     calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
 }
 
-.desktop-git-sidebar .po-sidebar-empty.compact {
-  padding-inline-start: calc(var(--git-sidebar-left-gap) + var(--git-sidebar-content-left) + 20px);
-}
-
-.desktop-git-sidebar .desktop-git-empty-stage,
-.desktop-git-sidebar .desktop-git-empty-committed,
-.desktop-git-sidebar .desktop-git-empty-changes {
+.desktop-git-section-empty {
   align-items: start;
   min-height: 46px;
   justify-content: start;
-  padding-inline-start: calc(var(--git-sidebar-left-gap) + var(--git-sidebar-content-left) + 20px);
+  padding-inline-start: calc(
+    var(--desktop-sidebar-row-left-gap)
+    + var(--desktop-sidebar-row-content-left)
+    + var(--git-section-leading-slot-size)
+    + var(--git-section-title-gap)
+  );
   padding-block-start: 6px;
   font-style: normal;
   text-align: start;
@@ -112,7 +113,12 @@
   margin: 4px 0 0;
   padding-block: 6px 0;
   padding-inline:
-    calc(var(--git-sidebar-left-gap) + var(--git-sidebar-content-left) + 20px)
+    calc(
+      var(--git-sidebar-left-gap)
+      + var(--git-sidebar-content-left)
+      + var(--git-section-leading-slot-size)
+      + var(--git-section-title-gap)
+    )
     calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right) - var(--git-sidebar-scrollbar-width));
   color: var(--po-text-subtle);
   font-size: 12px;

@@ -688,7 +688,7 @@ body.desktop-git-sidebar-resizing {
   min-width: 0;
   flex: 1;
   align-items: center;
-  gap: 6px;
+  gap: var(--git-section-title-gap);
   height: var(--desktop-sidebar-row-height);
   padding-block: 0;
   padding-inline: var(--git-sidebar-content-left) var(--git-sidebar-content-right);
@@ -703,6 +703,8 @@ body.desktop-git-sidebar-resizing {
 }
 
 .desktop-git-section-title svg {
+  width: var(--git-section-leading-slot-size);
+  height: var(--git-section-leading-slot-size);
   flex: 0 0 auto;
   color: var(--po-text-disabled);
   transition: transform 150ms ease;
