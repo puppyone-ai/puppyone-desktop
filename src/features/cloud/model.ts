@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
-  DesktopCloudScope,
+  DesktopCloudRepositoryView,
 } from "../../lib/cloudApi";
 import {
   getScopeIdentifierName,
@@ -45,7 +45,7 @@ export function buildCloudAccessSurfaces({
   cliCommand,
   profileName,
 }: {
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   apiBase: string;
@@ -67,7 +67,7 @@ export function buildCloudAccessSurfaces({
       provider: "cli",
       title: "",
       subtitle: "",
-      status: cliConnector?.status ?? (scope.access_key ? "active" : "missing"),
+      status: cliConnector?.status ?? "missing",
       connector: cliConnector,
       commands: [
         { id: "login", value: cliCommand, disabled: !cliCommand },

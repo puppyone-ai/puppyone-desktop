@@ -7,6 +7,7 @@ import {
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
 import { sameCloudOrigin } from "./explicitWorkspaceBinding";
+import type { RepositoryTarget } from "../repositoryTarget";
 import {
   cloudMessage,
   type CloudMessageDescriptor,
@@ -34,12 +35,11 @@ export type RecentWorkspaceCloudBinding = {
     | "not-found"
     | null;
   bindingId?: string | null;
-  bindingKind?: "full" | "scoped" | null;
+  target?: RepositoryTarget | null;
   scopePath?: string | null;
   readiness?: DesktopCloudProjectReadiness | null;
   candidateProjectId?: string | null;
-  candidateScopeId?: string | null;
-  scopeId?: string | null;
+  candidateTarget?: RepositoryTarget | null;
   capabilities?: string[];
 };
 
@@ -144,7 +144,7 @@ export async function resolveRecentWorkspaceCloudBinding({
         session, bindingId, onSessionChange, apiBaseUrl,
       );
       if (
-        binding.project_id !== projectId
+        binding.target.project_id !== projectId
         || binding.workspace_instance_id !== workspaceInstance
         || !binding.usable
       ) {
@@ -152,7 +152,7 @@ export async function resolveRecentWorkspaceCloudBinding({
           projectId: null,
           candidateProjectId: projectId,
           bindingId,
-          bindingKind: binding.binding_kind,
+          target: binding.target,
           scopePath: binding.scope_path ?? null,
           cloudLinked: true,
           error: CLOUD_PROJECT_NOT_AUTHORIZED_MESSAGE,
@@ -165,7 +165,7 @@ export async function resolveRecentWorkspaceCloudBinding({
       return [item.workspace.id, {
         projectId,
         bindingId,
-        bindingKind: binding.binding_kind,
+        target: binding.target,
         scopePath: binding.scope_path ?? null,
         readiness,
         cloudLinked: true,

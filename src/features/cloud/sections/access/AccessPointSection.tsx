@@ -1,6 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
-import type { DesktopCloudRepoIdentity, DesktopCloudScope } from "../../../../lib/cloudApi";
+import type { DesktopCloudRepoIdentity, DesktopCloudRepositoryView } from "../../../../lib/cloudApi";
 import { openCloudApp } from "../../../../lib/cloudApi";
 import type { getPuppyoneRemote } from "../../../source-control/remotes";
 import { CloudSourceDock } from "../../components/shared";
@@ -12,7 +12,7 @@ export function CloudAccessPointAccessSection({
   branchName,
   cloudRemote,
 }: {
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   identity: DesktopCloudRepoIdentity;
   branchName: string;
   cloudRemote: NonNullable<ReturnType<typeof getPuppyoneRemote>>;

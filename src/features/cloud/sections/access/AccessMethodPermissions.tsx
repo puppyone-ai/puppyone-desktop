@@ -1,6 +1,6 @@
 import { Check, Minus } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
-import type { DesktopCloudMcpEndpoint, DesktopCloudScope } from "../../../../lib/cloudApi";
+import type { DesktopCloudMcpEndpoint, DesktopCloudRepositoryView } from "../../../../lib/cloudApi";
 
 type DesktopPermissionCommandKind = "read" | "write";
 type DesktopPermissionSpec = {
@@ -132,11 +132,11 @@ export function DesktopCloudPermissionPanel({
   );
 }
 
-export function getDesktopCliPermissionGroups(scope: DesktopCloudScope): DesktopPermissionGroup[] {
+export function getDesktopCliPermissionGroups(scope: DesktopCloudRepositoryView): DesktopPermissionGroup[] {
   const readCommands = CLI_COMMAND_SPECS.filter((command) => command.kind === "read");
   const modifyCommands = CLI_COMMAND_SPECS.filter((command) => command.kind === "write" && command.defaultAllowed);
   const deleteCommands = CLI_COMMAND_SPECS.filter((command) => command.kind === "write" && !command.defaultAllowed);
-  const scopeReadOnly = scope.mode === "r";
+  const scopeReadOnly = scope.max_mode === "r";
   return [
     { titleId: "cloud.access.permissions.readFiles", specs: readCommands },
     { titleId: "cloud.access.permissions.modifyFiles", specs: modifyCommands, muted: scopeReadOnly },
@@ -216,8 +216,8 @@ export function buildMcpToolsConfig(raw: unknown, allowedTools: ReadonlySet<stri
   };
 }
 
-export function getDesktopMcpWritable(endpoint: DesktopCloudMcpEndpoint | undefined, scope: DesktopCloudScope): boolean {
-  if (scope.mode !== "rw") return false;
+export function getDesktopMcpWritable(endpoint: DesktopCloudMcpEndpoint | undefined, scope: DesktopCloudRepositoryView): boolean {
+  if (scope.max_mode !== "rw") return false;
   const accesses = endpoint?.accesses ?? [];
   if (accesses.length === 0) return true;
   return accesses.some((access) => access.readonly === false);

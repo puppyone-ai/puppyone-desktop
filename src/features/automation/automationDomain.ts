@@ -1,11 +1,12 @@
 import type {
   DesktopCloudConnector,
-  DesktopCloudScope,
+  DesktopCloudRepositoryView,
 } from "../../lib/cloudApi";
+import { repositoryTargetKey } from "../cloud/repositoryTarget";
 
 export type CloudAutomationRow = {
   id: string;
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   connector: DesktopCloudConnector;
 };
 
@@ -41,13 +42,15 @@ export function buildCloudAutomationRows({
   scopes,
   connectors,
 }: {
-  scopes: DesktopCloudScope[];
+  scopes: DesktopCloudRepositoryView[];
   connectors: DesktopCloudConnector[];
 }): CloudAutomationRow[] {
-  const scopeById = new Map(scopes.map((scope) => [scope.id, scope]));
+  const scopeByTarget = new Map(
+    scopes.map((scope) => [repositoryTargetKey(scope.target), scope]),
+  );
   return connectors.flatMap((connector) => {
     if (!isCloudAutomationConnector(connector)) return [];
-    const scope = scopeById.get(connector.scope_id);
+    const scope = scopeByTarget.get(repositoryTargetKey(connector.target));
     if (!scope) return [];
     return [{
       id: `automation:${scope.id}:${connector.id}`,

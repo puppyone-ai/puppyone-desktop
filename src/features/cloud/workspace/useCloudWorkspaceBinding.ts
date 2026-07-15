@@ -25,6 +25,9 @@ import {
 } from "./explicitWorkspaceBinding";
 import { createWorkspaceCloudResolutionKey } from "./workspaceCloudResolutionKey";
 import { cloudMessage } from "../cloudPresentation";
+import {
+  repositoryTargetMatchesRemote,
+} from "../repositoryTarget";
 
 const LEGACY_CONFIRMATION_MESSAGE = cloudMessage("binding-confirm-legacy");
 const FORBIDDEN_MESSAGE = cloudMessage("binding-forbidden");
@@ -53,10 +56,8 @@ function canonicalRemoteMatchesBinding(
 ): boolean {
   const { info } = remote;
   if (info.kind === "access-point") return false;
-  if (info.projectId !== binding.project_id) return false;
   if (!sameCloudOrigin(remote.rawUrl, binding.cloud_origin)) return false;
-  if (info.kind === "project") return binding.binding_kind === "full";
-  return binding.binding_kind === "scoped" && info.scopeId === binding.scope_id;
+  return repositoryTargetMatchesRemote(binding.target, info);
 }
 
 function canonicalContextMatchesRemote(
@@ -65,15 +66,7 @@ function canonicalContextMatchesRemote(
 ): boolean {
   const { info } = remote;
   if (info.kind === "access-point") return false;
-  if (
-    context.project.id !== info.projectId
-    || context.locator.project_id !== info.projectId
-    || context.scope.id !== context.locator.scope_id
-    || context.scope.kind !== context.locator.binding_kind
-  ) return false;
-  if (info.kind === "project") return context.locator.binding_kind === "full";
-  return context.locator.binding_kind === "scoped"
-    && context.locator.scope_id === info.scopeId;
+  return repositoryTargetMatchesRemote(context.target, info);
 }
 
 /**
@@ -240,7 +233,7 @@ export function useCloudWorkspaceBinding({
           cloudRemote.rawUrl,
           updateCloudSession,
           desktopCloudApiBaseUrl,
-        ).then((context) => {
+        ).then(async (context) => {
           if (cancelled) return;
           if (!canonicalContextMatchesRemote(cloudRemote, context)) {
             apply({
@@ -252,15 +245,31 @@ export function useCloudWorkspaceBinding({
             });
             return;
           }
+          const project = await getCloudProject(
+            activeCloudSession,
+            context.target.project_id,
+            updateCloudSession,
+            desktopCloudApiBaseUrl,
+          );
+          if (cancelled) return;
+          if (project.id !== context.target.project_id) {
+            apply({
+              projectId: null,
+              candidateProjectId: cloudRemote.info.projectId ?? null,
+              cloudLinked: true,
+              error: cloudMessage("binding-response-mismatch"),
+              reason: "locator-conflict",
+            });
+            return;
+          }
           apply({
-            projectId: context.project.id,
+            projectId: project.id,
             resolutionSource: "canonical-remote",
             bindingStatus: "not-bound",
             bindingId: null,
-            bindingKind: context.locator.binding_kind,
-            scopeId: context.scope.id,
-            scopePath: context.scope.path,
-            capabilities: context.project.capabilities,
+            target: context.target,
+            scopePath: null,
+            capabilities: project.capabilities ?? [],
             cloudLinked: true,
             error: null,
             reason: null,
@@ -311,10 +320,10 @@ export function useCloudWorkspaceBinding({
       ).then((candidate) => {
         apply({
           projectId: null,
-          candidateProjectId: candidate.project_id,
-          candidateScopeId: candidate.scope_id,
+          candidateProjectId: candidate.target.project_id,
+          candidateTarget: candidate.target,
           bindingId: null,
-          bindingKind: candidate.binding_kind,
+          target: candidate.target,
           scopePath: null,
           cloudLinked: true,
           error: LEGACY_CONFIRMATION_MESSAGE,
@@ -459,8 +468,7 @@ export function useCloudWorkspaceBinding({
             projectId: null,
             candidateProjectId: configProjectId,
             bindingId: binding.id,
-            bindingKind: binding.binding_kind,
-            scopeId: binding.scope_id,
+            target: binding.target,
             scopePath: binding.scope_path ?? null,
             cloudLinked: true,
             error: reason === "wrong-account" ? cloudMessage("binding-switch-account") : FORBIDDEN_MESSAGE,
@@ -479,8 +487,7 @@ export function useCloudWorkspaceBinding({
           resolutionSource: "workspace-binding",
           bindingStatus: "bound",
           bindingId: binding.id,
-          bindingKind: binding.binding_kind,
-          scopeId: binding.scope_id,
+          target: binding.target,
           scopePath: binding.scope_path ?? null,
           capabilities: binding.capabilities ?? [],
           cloudLinked: true,
@@ -488,10 +495,9 @@ export function useCloudWorkspaceBinding({
           reason: null,
         });
 
-        // Older Cloud deployments do not include capabilities on the binding
-        // response. Hydrate only that missing metadata as a backward-compatible
-        // fallback; readiness is owned by useDesktopCloudData and is never part
-        // of identity resolution.
+        // Target authorization and Project presentation are separate. Hydrate
+        // current Project capabilities only when the binding response omits
+        // them; readiness remains owned by useDesktopCloudData.
         if (binding.capabilities != null) return;
         const project = await getCloudProject(
           activeCloudSession,
@@ -519,8 +525,7 @@ export function useCloudWorkspaceBinding({
           resolutionSource: "workspace-binding",
           bindingStatus: "bound",
           bindingId: binding.id,
-          bindingKind: binding.binding_kind,
-          scopeId: binding.scope_id,
+          target: binding.target,
           scopePath: binding.scope_path ?? null,
           capabilities: project.capabilities ?? [],
           cloudLinked: true,
@@ -553,8 +558,7 @@ export function useCloudWorkspaceBinding({
                   bindingStatus: "bound",
                   candidateProjectId: configProjectId,
                   bindingId: configBindingId,
-                  bindingKind: verifiedBinding?.binding_kind ?? retained?.bindingKind ?? null,
-                  scopeId: verifiedBinding?.scope_id ?? retained?.scopeId ?? null,
+                  target: verifiedBinding?.target ?? retained?.target ?? null,
                   scopePath: verifiedBinding?.scope_path ?? retained?.scopePath ?? null,
                   readiness: retained?.readiness ?? null,
                   capabilities: retained?.capabilities ?? [],

@@ -89,11 +89,10 @@ export function useProjectCloudAttachment({
       bindingCloudLinked: Boolean(binding?.cloudLinked || hasCloudRemote),
       resolving,
       bindingId: binding?.bindingId ?? null,
-      bindingKind: binding?.bindingKind ?? null,
+      target: binding?.target ?? binding?.candidateTarget ?? null,
       scopePath: binding?.scopePath ?? null,
       readiness: binding?.readiness ?? null,
       capabilities: binding?.capabilities ?? [],
-      scopeId: binding?.scopeId ?? binding?.candidateScopeId ?? null,
       resolutionSource: binding?.resolutionSource ?? null,
       bindingStatus: binding?.bindingStatus ?? null,
     });

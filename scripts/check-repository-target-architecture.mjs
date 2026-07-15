@@ -1,0 +1,109 @@
+#!/usr/bin/env node
+
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const errors = [];
+
+const fixture = JSON.parse(read("contracts/repository-target-v2.json"));
+if (fixture.contract !== "puppyone.repository-target" || fixture.version !== 2) {
+  errors.push("the repository-target fixture must declare contract v2");
+}
+if (
+  fixture.request_header?.name !== "X-PuppyOne-Repository-Contract"
+  || fixture.request_header?.value !== "2"
+) {
+  errors.push("the repository-target fixture must pin the v2 request header");
+}
+if (fixture.targets?.project_root?.kind !== "project_root") {
+  errors.push("the fixture must include a Project-root target without a Scope id");
+}
+if (
+  Object.hasOwn(fixture.targets?.project_root ?? {}, "scope_id")
+  || fixture.targets?.scope?.kind !== "scope"
+  || !fixture.targets?.scope?.scope_id
+) {
+  errors.push("the fixture must distinguish Project root from an exact Scope target");
+}
+if (
+  fixture.association_rows?.project_root?.scope_id !== null
+  || fixture.association_rows?.scope?.scope_id !== fixture.targets?.scope?.scope_id
+) {
+  errors.push("storage associations must use NULL for Project root and an exact id for Scope");
+}
+const expectedErrors = {
+  client_upgrade_required: 1007,
+  target_kind_mismatch: 1008,
+  scope_not_found: 1009,
+  repository_storage_unavailable: 1010,
+};
+if (JSON.stringify(fixture.errors) !== JSON.stringify(expectedErrors)) {
+  errors.push("the fixture must pin the stable repository-target error codes");
+}
+
+const targetModel = read("src/features/cloud/repositoryTarget.ts");
+for (const required of [
+  'kind: "project_root"',
+  'kind: "scope"',
+  "projectRootTarget",
+  "repositoryTargetMatchesRemote",
+]) {
+  if (!targetModel.includes(required)) {
+    errors.push(`repositoryTarget.ts must own ${required}`);
+  }
+}
+
+const cloudApi = read("src/lib/cloudApi.ts");
+if (!cloudApi.includes('REPOSITORY_TARGET_CONTRACT_VERSION = "2"')) {
+  errors.push("Desktop Cloud requests must advertise repository-target contract v2");
+}
+if (/DesktopCloudCanonicalProjectContext\s*=\s*DesktopCloudLegacy/.test(cloudApi)) {
+  errors.push("canonical locator resolution must not reuse the legacy confirmation DTO");
+}
+
+const forbidden = /\b(?:binding_kind|bindingKind|root_scope_id|rootScope|rootScopeId|is_root|candidateScopeId)\b/;
+for (const filePath of [
+  ...walk(path.join(repoRoot, "src", "features", "cloud")),
+  path.join(repoRoot, "src", "lib", "cloudApi.ts"),
+  ...walk(path.join(repoRoot, "tests")),
+]) {
+  const source = readFileSync(filePath, "utf8");
+  if (forbidden.test(source)) {
+    errors.push(`${relative(filePath)} reintroduced a synthetic root-Scope identity field`);
+  }
+}
+
+const configTypes = read("src/types/electron.d.ts");
+const cloudConfig = configTypes.match(/cloud:\s*\{[\s\S]*?\n\s*\};/)?.[0] ?? "";
+if (/scope|credential|accessKey|access_key/i.test(cloudConfig)) {
+  errors.push("local workspace config must remain target-secret-free and store no Scope identity");
+}
+
+if (errors.length > 0) {
+  console.error("Repository target architecture check failed:");
+  for (const error of errors) console.error(`- ${error}`);
+  process.exit(1);
+}
+
+console.log("Repository target architecture check passed.");
+
+function read(relativePath) {
+  return readFileSync(path.join(repoRoot, relativePath), "utf8");
+}
+
+function relative(filePath) {
+  return path.relative(repoRoot, filePath);
+}
+
+function walk(root) {
+  const result = [];
+  for (const entry of readdirSync(root)) {
+    const filePath = path.join(root, entry);
+    const stats = statSync(filePath);
+    if (stats.isDirectory()) result.push(...walk(filePath));
+    else if (/\.(?:ts|tsx)$/.test(filePath)) result.push(filePath);
+  }
+  return result;
+}

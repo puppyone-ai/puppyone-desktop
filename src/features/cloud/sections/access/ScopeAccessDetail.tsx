@@ -1,4 +1,4 @@
-import { Copy, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
@@ -6,7 +6,7 @@ import type {
   DesktopCloudCreateMcpEndpointRequest,
   DesktopCloudMcpEndpoint,
   DesktopCloudRepoIdentity,
-  DesktopCloudScope,
+  DesktopCloudRepositoryView,
   DesktopCloudSession,
 } from "../../../../lib/cloudApi";
 import {
@@ -22,7 +22,6 @@ import {
   type CloudMessageDescriptor,
 } from "../../cloudPresentation";
 import {
-  copyText,
   getScopeDisplayName,
   getScopePathLabel,
   normalizeProviderKey,
@@ -39,7 +38,6 @@ import {
   buildDesktopCloudAccessSurfacesForScope,
   getDesktopCloudAccessSurfaceContext,
   isDesktopAccessPlaceholderSurface,
-  maskDesktopScopeAccessKey,
 } from "./accessSurfaceModel";
 
 export function DesktopCloudScopeAccessDetail({
@@ -59,7 +57,7 @@ export function DesktopCloudScopeAccessDetail({
   cloudSession: DesktopCloudSession;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   apiBaseUrl: string | null;
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   activeSurfaceId?: string | null;
   identity: DesktopCloudRepoIdentity | null;
   connectors: DesktopCloudConnector[];
@@ -112,8 +110,7 @@ export function DesktopCloudScopeAccessDetail({
   const aggregateTone = aggregate.tone === "ready" ? "ready" : aggregate.tone === "warning" ? "warning" : "muted";
   const aggregateConnectorCount = aggregateSurfaces.length;
   const scopePath = getScopePathLabel(scope);
-  const modeLabel = t(scope.mode === "rw" ? "cloud.scope.readWrite" : "cloud.scope.readOnly");
-  const accessKeyLabel = scope.access_key ? maskDesktopScopeAccessKey(scope.access_key) : t("cloud.common.preparing");
+  const modeLabel = t(scope.max_mode === "rw" ? "cloud.scope.readWrite" : "cloud.scope.readOnly");
 
   const handleCreateMcpEndpoint = async () => {
     if (creatingMcp || !canManage) return;
@@ -123,7 +120,7 @@ export function DesktopCloudScopeAccessDetail({
       project_id: projectId,
       path: scope.path,
       name: "MCP Server",
-      accesses: [{ path: scope.path, json_path: "", readonly: scope.mode !== "rw" }],
+      accesses: [{ path: scope.path, json_path: "", readonly: scope.max_mode !== "rw" }],
     };
     try {
       await createCloudMcpEndpoint(cloudSession, body, onCloudSessionChange, apiBaseUrl);
@@ -201,20 +198,6 @@ export function DesktopCloudScopeAccessDetail({
               <code title={scopePath}>{scopePath}</code>
               <span aria-hidden="true">·</span>
               <span>{modeLabel}</span>
-              <span aria-hidden="true">·</span>
-              <span>{t("cloud.common.accessKey")}</span>
-              <code title={scope.access_key ?? undefined}>{accessKeyLabel}</code>
-              <button
-                className="desktop-cloud-access-key-copy"
-                type="button"
-                aria-label={t("cloud.common.copyAccessKey")}
-                disabled={!scope.access_key}
-                onClick={() => {
-                  if (scope.access_key) void copyText(scope.access_key);
-                }}
-              >
-                <Copy size={11} />
-              </button>
             </div>
           </div>
           {canManage && <button

@@ -3,6 +3,7 @@ import type {
   DesktopCloudWorkspaceBinding,
 } from "../../../lib/cloudApi";
 import type { CloudMessageDescriptor } from "../cloudPresentation";
+import type { RepositoryTarget } from "../repositoryTarget";
 
 export type CloudWorkspaceBindingState =
   | { status: "local-only" }
@@ -13,7 +14,7 @@ export type CloudWorkspaceBindingState =
       binding?: DesktopCloudWorkspaceBinding;
       readiness?: DesktopCloudProjectReadiness | null;
     }
-  | { status: "legacy-confirmation-required"; projectId: string; scopeId: string; bindingKind: "full" | "scoped" }
+  | { status: "legacy-confirmation-required"; projectId: string; target: RepositoryTarget }
   | { status: "identified-but-forbidden"; projectId: string | null; message: CloudMessageDescriptor }
   | { status: "binding-revoked"; projectId: string | null }
   | { status: "wrong-account"; projectId: string | null }

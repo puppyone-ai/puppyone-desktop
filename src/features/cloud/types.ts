@@ -2,13 +2,13 @@ import type { Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import type { ProjectCloudAttachment } from "./attachment";
+import type { RepositoryTarget } from "./repositoryTarget";
 import type { CloudWorkspaceSection } from "./routes/cloudRouteIds";
 
 export type { CloudWorkspaceSection } from "./routes/cloudRouteIds";
 
 export type CloudWorkspaceAttachOptions = {
-  bindingKind?: "full" | "scoped";
-  scopeId?: string | null;
+  target?: RepositoryTarget;
 };
 
 export type CloudServiceSidebarProps = {

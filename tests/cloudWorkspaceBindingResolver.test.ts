@@ -80,15 +80,14 @@ describe("binding-first Project catalog policy", () => {
 });
 
 function binding(overrides: Record<string, unknown> = {}) {
+  const target = { kind: "project_root" as const, project_id: "project-1" };
   return {
     id: "binding-1",
     org_id: "org-1",
-    project_id: "project-1",
-    scope_id: "scope-root",
+    target,
     workspace_instance_id: "workspace-instance-0001",
     bound_user_id: "user-1",
     cloud_origin: "https://cloud.example",
-    binding_kind: "full",
     mode: "rw",
     status: "active",
     usable: true,
@@ -98,9 +97,7 @@ function binding(overrides: Record<string, unknown> = {}) {
     credential: "binding_secret",
     remote: {
       url: "https://cloud.example/git/project-1.git",
-      project_id: "project-1",
-      scope_id: "scope-root",
-      kind: "full",
+      target,
       username: "x-puppyone-token",
     },
     ...overrides,
@@ -145,7 +142,10 @@ describe("explicit workspace binding", () => {
     })).toBe(false);
     expect(bindingMatchesWorkspace({
       binding: binding({
-        remote: { ...binding().remote, scope_id: "scope-other" },
+        remote: {
+          ...binding().remote,
+          target: { kind: "scope", project_id: "project-1", scope_id: "scope-other" },
+        },
       }),
       workspace,
       configuredProjectId: "project-1",
@@ -154,7 +154,7 @@ describe("explicit workspace binding", () => {
     })).toBe(false);
   });
 
-  it("creates a full binding without accepting a client-selected root scope", async () => {
+  it("creates a Project-root binding without a sentinel Scope", async () => {
     const project: DesktopCloudProject = {
       id: "project-1",
       name: "Notes",
@@ -175,8 +175,7 @@ describe("explicit workspace binding", () => {
       session,
       "project-1",
       expect.objectContaining({
-        binding_kind: "full",
-        scope_id: null,
+        target: { kind: "project_root", project_id: "project-1" },
         mode: "rw",
         workspace_instance_id: "workspace-instance-0001",
       }),
@@ -189,7 +188,7 @@ describe("explicit workspace binding", () => {
     expect(result.bindingWasCreated).toBe(true);
   });
 
-  it("requires an explicit scope for scoped legacy confirmation and clamps Viewer to read-only", async () => {
+  it("requires a target in the selected Project and clamps Viewer to read-only", async () => {
     const project: DesktopCloudProject = {
       id: "project-1",
       name: "Notes",
@@ -201,16 +200,19 @@ describe("explicit workspace binding", () => {
       project,
       projectId: project.id,
       workspace,
-      bindingKind: "scoped",
-      scopeId: null,
+      target: { kind: "scope", project_id: "other-project", scope_id: "scope-docs" },
       onSessionChange: vi.fn(),
-    })).rejects.toThrow("requires an explicit Cloud scope");
+    })).rejects.toThrow("does not belong to the selected Cloud Project");
 
     createCloudWorkspaceBinding.mockResolvedValue(binding({
-      scope_id: "scope-docs",
+      target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
       scope_path: "/docs",
-      binding_kind: "scoped",
       mode: "r",
+      remote: {
+        ...binding().remote,
+        url: "https://cloud.example/git/project-1/scopes/scope-docs.git",
+        target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
+      },
     }));
     await createExplicitWorkspaceBinding({
       session,
@@ -218,14 +220,16 @@ describe("explicit workspace binding", () => {
       project,
       projectId: project.id,
       workspace,
-      bindingKind: "scoped",
-      scopeId: "scope-docs",
+      target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
       onSessionChange: vi.fn(),
     });
     expect(createCloudWorkspaceBinding).toHaveBeenCalledWith(
       session,
       "project-1",
-      expect.objectContaining({ binding_kind: "scoped", scope_id: "scope-docs", mode: "r" }),
+      expect.objectContaining({
+        target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
+        mode: "r",
+      }),
       expect.any(Function),
       session.api_base_url,
     );
@@ -298,15 +302,13 @@ describe("contextual attachment semantics", () => {
       bindingError: cloudMessage("binding-confirm-workspace"),
       bindingReason: "legacy-confirmation-required",
       bindingCloudLinked: true,
-      bindingKind: "scoped",
-      scopeId: "scope-docs",
+      target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
       resolving: false,
     });
     expect(attachment).toEqual({
       status: "legacy-confirmation-required",
       projectId: "project-1",
-      scopeId: "scope-docs",
-      bindingKind: "scoped",
+      target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
       message: cloudMessage("binding-confirm-workspace"),
     });
     expect(resolveCloudProjectNavigationContext(attachment)).toEqual({
@@ -325,6 +327,7 @@ describe("contextual attachment semantics", () => {
       bindingId: "binding-1",
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
+      target: { kind: "project_root", project_id: "project-1" },
       resolving: false,
     });
     expect(attachment).toEqual({
@@ -333,6 +336,7 @@ describe("contextual attachment semantics", () => {
       resolutionSource: "workspace-binding",
       bindingStatus: "bound",
       bindingId: "binding-1",
+      target: { kind: "project_root", project_id: "project-1" },
       warning: cloudMessage("binding-network-failed", undefined, "Network offline"),
     });
   });
