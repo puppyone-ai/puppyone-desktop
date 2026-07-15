@@ -23,8 +23,8 @@ import {
   getHomeProjectItems,
 } from "../../app-shell/workspaceHomeModel";
 import {
-  resolveRecentWorkspaceCloudBinding,
-  type RecentWorkspaceCloudBinding,
+  resolveRecentWorkspaceCloudContext,
+  type RecentWorkspaceCloudContext,
 } from "../workspace/cloudProjectResolution";
 import {
   cloudMessage,
@@ -35,7 +35,7 @@ import {
 export function useCloudProjectHome({
   activeCloudSession,
   autoRefreshProjectCatalog = true,
-  autoResolveRecentWorkspaceBindings = true,
+  autoResolveRecentWorkspaceContexts = true,
   cloudEnabled,
   desktopCloudApiBaseUrl,
   includeUnboundCloudProjects = true,
@@ -50,7 +50,7 @@ export function useCloudProjectHome({
 }: {
   activeCloudSession: DesktopCloudSession | null;
   autoRefreshProjectCatalog?: boolean;
-  autoResolveRecentWorkspaceBindings?: boolean;
+  autoResolveRecentWorkspaceContexts?: boolean;
   cloudEnabled: boolean;
   desktopCloudApiBaseUrl: string | null;
   includeUnboundCloudProjects?: boolean;
@@ -67,7 +67,7 @@ export function useCloudProjectHome({
   const [homeCloudProjects, setHomeCloudProjects] = useState<DesktopCloudProject[]>([]);
   const [homeCloudProjectsLoading, setHomeCloudProjectsLoading] = useState(false);
   const [homeCloudProjectsErrorState, setHomeCloudProjectsErrorState] = useState<CloudMessageDescriptor | null>(null);
-  const [recentWorkspaceCloudBindings, setRecentWorkspaceCloudBindings] = useState<Record<string, RecentWorkspaceCloudBinding>>({});
+  const [recentWorkspaceCloudContexts, setRecentWorkspaceCloudContexts] = useState<Record<string, RecentWorkspaceCloudContext>>({});
   const [pendingCloudProjectCreate, setPendingCloudProjectCreate] = useState(false);
   const activeCloudSessionRef = useRef(activeCloudSession);
   const updateCloudSessionRef = useRef(updateCloudSession);
@@ -118,7 +118,7 @@ export function useCloudProjectHome({
     }
   }, [cloudEnabled, cloudSessionIdentityKey, desktopCloudApiBaseUrl]);
 
-  const recentWorkspaceBindingKey = useMemo(
+  const recentWorkspaceContextKey = useMemo(
     () => recentWorkspaceItems
       .slice(0, 20)
       .map((item) => `${item.workspace.id}\t${item.workspace.path}\t${item.lastOpenedAt ?? ""}`)
@@ -133,16 +133,16 @@ export function useCloudProjectHome({
   homeCloudProjectsRef.current = homeCloudProjects;
 
   useEffect(() => {
-    if (!autoResolveRecentWorkspaceBindings) return undefined;
+    if (!autoResolveRecentWorkspaceContexts) return undefined;
     const items = recentWorkspaceItems.slice(0, 20);
     if (!cloudEnabled || items.length === 0) {
-      setRecentWorkspaceCloudBindings({});
+      setRecentWorkspaceCloudContexts({});
       return undefined;
     }
 
     let cancelled = false;
     void Promise.all(
-      items.map((item) => resolveRecentWorkspaceCloudBinding({
+      items.map((item) => resolveRecentWorkspaceCloudContext({
         apiBaseUrl: desktopCloudApiBaseUrl,
         item,
         onSessionChange: updateCloudSessionRef.current,
@@ -152,12 +152,12 @@ export function useCloudProjectHome({
     )
       .then((entries) => {
         if (cancelled) return;
-        setRecentWorkspaceCloudBindings(Object.fromEntries(entries));
+        setRecentWorkspaceCloudContexts(Object.fromEntries(entries));
       })
       .catch((error) => {
         if (!cancelled) {
-          console.warn("Unable to resolve recent workspace Cloud bindings:", error);
-          setRecentWorkspaceCloudBindings({});
+          console.warn("Unable to resolve recent workspace Cloud repository contexts:", error);
+          setRecentWorkspaceCloudContexts({});
         }
       });
 
@@ -165,23 +165,23 @@ export function useCloudProjectHome({
       cancelled = true;
     };
   }, [
-    autoResolveRecentWorkspaceBindings,
+    autoResolveRecentWorkspaceContexts,
     cloudEnabled,
     cloudSessionIdentityKey,
     desktopCloudApiBaseUrl,
     homeCloudProjectIdsKey,
-    recentWorkspaceBindingKey,
+    recentWorkspaceContextKey,
     recentWorkspaceItems,
   ]);
 
   const homeProjectItems = useMemo(
     () => getHomeProjectItems({
-      bindings: recentWorkspaceCloudBindings,
+      contexts: recentWorkspaceCloudContexts,
       cloudProjects: homeCloudProjects,
       includeUnboundCloudProjects,
       recentWorkspaceItems,
     }),
-    [homeCloudProjects, includeUnboundCloudProjects, recentWorkspaceCloudBindings, recentWorkspaceItems],
+    [homeCloudProjects, includeUnboundCloudProjects, recentWorkspaceCloudContexts, recentWorkspaceItems],
   );
 
   const activateCreatedCloudProject = useCallback(async (session: DesktopCloudSession) => {
@@ -308,11 +308,11 @@ export function useCloudProjectHome({
     homeProjectItems,
     openCloudProjectFromHomepage,
     pendingCloudProjectCreate,
-    recentWorkspaceCloudBindings,
+    recentWorkspaceCloudContexts,
     refreshHomeCloudProjects,
     setHomeCloudProjects,
     setHomeCloudProjectsError,
     setPendingCloudProjectCreate,
-    setRecentWorkspaceCloudBindings,
+    setRecentWorkspaceCloudContexts,
   };
 }

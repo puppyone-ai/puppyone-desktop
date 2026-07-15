@@ -1,27 +1,24 @@
 import { desktopCloudApiBaseUrlFromRemote } from "../../../lib/cloudApi";
-import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../../types/electron";
-import { getPuppyoneRemote } from "../../source-control/remotes";
+import type { GitStatusSnapshot } from "../../../types/electron";
+import { getCanonicalPuppyoneRemote } from "../../source-control/remotes";
 import { normalizeCloudApiBaseUrl } from "../../../../shared/cloudEndpoint.js";
 
-export type CloudEnvironmentSource = "remote" | "config" | "default";
+export type CloudEnvironmentSource = "remote" | "default";
 
 export type CloudEnvironment = {
   apiBaseUrl: string | null;
   source: CloudEnvironmentSource;
-  cloudRemote: ReturnType<typeof getPuppyoneRemote>;
-  configuredProjectId: string | null;
+  cloudRemote: ReturnType<typeof getCanonicalPuppyoneRemote>;
 };
 
 export function resolveCloudEnvironment({
   status,
-  puppyoneConfig,
   desktopApiBaseUrl,
 }: {
   status: GitStatusSnapshot | null;
-  puppyoneConfig?: PuppyoneWorkspaceConfig | null;
   desktopApiBaseUrl?: string | null;
 }): CloudEnvironment {
-  const cloudRemote = getPuppyoneRemote(status);
+  const cloudRemote = getCanonicalPuppyoneRemote(status);
   const remoteApiBaseUrl = desktopCloudApiBaseUrlFromRemote(cloudRemote?.rawUrl ?? null);
   const configuredDesktopApiBaseUrl = normalizeCloudApiBaseUrl(desktopApiBaseUrl);
   // Local desktop development owns its API + web pair. A production Git remote
@@ -29,13 +26,10 @@ export function resolveCloudEnvironment({
   const apiBaseUrl = isLoopbackApiBase(configuredDesktopApiBaseUrl)
     ? configuredDesktopApiBaseUrl
     : remoteApiBaseUrl ?? configuredDesktopApiBaseUrl;
-  const configuredProjectId = puppyoneConfig?.cloud?.projectId?.trim() || null;
-
   return {
     apiBaseUrl,
-    source: cloudRemote ? "remote" : configuredProjectId ? "config" : "default",
+    source: cloudRemote ? "remote" : "default",
     cloudRemote,
-    configuredProjectId,
   };
 }
 

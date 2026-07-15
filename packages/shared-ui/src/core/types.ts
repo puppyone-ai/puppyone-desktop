@@ -34,12 +34,12 @@ export type Workspace = {
   status: "protected" | "recording" | "paused";
   commitCount?: number;
   cloudState?: "local" | "syncing" | "synced";
-  /** Main-owned cache hint from `.puppyone/config.json`; never grants filesystem authority. */
-  cloudProjectId?: string | null;
-  cloudBindingId?: string | null;
-  cloudBindingOrigin?: string | null;
-  cloudBindingWorkspaceInstanceId?: string | null;
-  hasPuppyoneCloudRemote?: boolean;
+  /** Secret-free canonical PuppyOne Git locator cached for recent-workspace UI. */
+  puppyoneGitRemote?: {
+    origin: string;
+    projectId: string;
+    scopeId?: string | null;
+  } | null;
   projectId?: string | null;
   workspaceInstanceId?: string;
   fsIdentity?: string;

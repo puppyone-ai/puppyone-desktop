@@ -1,7 +1,7 @@
-# Desktop Session, Workspace Identity, and Cache Lifecycle
+# Desktop Session, Workspace Registry, and Cache Lifecycle
 
 This document is the durable contract for PuppyOne Desktop authentication,
-local project identity, recent-workspace persistence, and account-scoped Cloud
+local workspace-instance state, recent-workspace persistence, and account-scoped Cloud
 caches. The implementation is local-first: Cloud availability must never block
 opening or editing a local folder.
 
@@ -94,52 +94,51 @@ requests, attempts remote revoke with a bounded timeout, and always clears local
 runtime/credential/cache state before broadcasting `signed-out` to every
 window. Remote unavailability never prevents local logout.
 
-## Project and workspace identity
+## Workspace instance and Project location
 
-Path is location, not identity. An initialized `.puppyone/config.json` uses v2:
+An initialized `.puppyone/config.json` uses v3 and contains preferences only:
 
 ```json
 {
-  "version": 2,
-  "project": { "id": "stable UUID" },
+  "version": 3,
   "sync": { "sourceOfTruth": {} },
   "git": {},
-  "backup": {},
-  "cloud": { "projectId": null }
+  "backup": {}
 }
 ```
 
-- `project.id` is shareable and follows a project when it moves or is cloned.
 - `workspaceInstanceId` represents one physical local checkout. It is derived
   from filesystem identity, so rename/move keeps it while another clone gets a
   different value.
 - `canonicalPath` and `fsIdentity` locate the checkout; they are not project
-identity.
+  identity.
+- A local folder has no persisted PuppyOne Project identity. The canonical Git
+  remote is the only local-to-Cloud Project/Scope locator.
 
-The main-owned recent-workspace registry also caches non-authoritative
-home-screen hints for the explicit Cloud binding (`projectId`, `bindingId`,
-origin, and configured workspace-instance ID) plus whether a legacy PuppyOne
-remote exists. Hydration refreshes those facts from each persisted folder under
-main-process control. The renderer may verify the explicit binding through
-Cloud APIs, but it must never issue config or Git IPC for an inactive recent
-folder: filesystem authority is scoped to the one workspace assigned to that
-window. Opening a legacy remote-only workspace is the point where its binding
-can be confirmed and persisted safely.
-- Opening an arbitrary folder never creates `.puppyone`. The ID is generated on
-  an explicit config write/Cloud bind. “Treat as new project” generates a new
-  project UUID and clears the old Cloud binding without touching files or Git.
+The main-owned v4 recent-workspace registry stores local instance metadata and a secret-free
+canonical PuppyOne remote hint for home-screen presentation. Hydration refreshes
+the hint from each persisted folder under main-process control. The renderer
+must never issue config or Git IPC for an inactive recent folder: filesystem
+authority is scoped to the one workspace assigned to that window. Cloud context
+is resolved only after the folder is active and its actual canonical remote has
+been read.
 
-Multiple paths with one project ID are valid clones/worktrees. The global v2
-workspace registry stores instance/project IDs, canonical path, filesystem
-identity, name, and `lastOpenedAt`. Main serializes all mutations and reconciles
-a moved path through instance/filesystem identity.
+- Opening an arbitrary folder never creates `.puppyone`. Saving preferences may
+  create the config file, but it never creates a Project, checkout, device, or
+  folder identity for Cloud.
+
+Clones and worktrees have independent local instance IDs. They refer to the same
+Cloud Project only when their canonical remotes say so. The global v4 workspace
+registry stores instance ID, canonical path, filesystem identity, name,
+`lastOpenedAt`, and an optional secret-free remote hint. Main serializes all
+mutations and reconciles a moved path through instance/filesystem identity.
 
 Recent projects return registry metadata immediately. Full existence/Git/commit
 hydration happens in the background with at most four workers; a slow network
 volume cannot head-of-line block the remaining list. The existing workspace
 watcher reloads atomic create/rename/modify/delete changes to
-`.puppyone/config.json`. Invalid or incomplete external replacements preserve
-the last verified config and surface a recoverable error.
+`.puppyone/config.json`. Invalid external replacements preserve the last verified
+preferences and surface a recoverable error; deletion returns defaults.
 
 ## Cloud cache contract
 

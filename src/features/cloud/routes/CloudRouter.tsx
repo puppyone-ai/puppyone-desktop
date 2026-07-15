@@ -8,13 +8,13 @@ import {
 } from "../../../lib/cloudApi";
 import type { GitStatusSnapshot } from "../../../types/electron";
 import type { Workspace } from "@puppyone/shared-ui";
-import type { getPuppyoneRemote } from "../../source-control/remotes";
+import type { getCanonicalPuppyoneRemote } from "../../source-control/remotes";
 import type { DesktopCloudDataState } from "../data";
-import type { ProjectCloudAttachment } from "../attachment";
+import type { ProjectCloudContext } from "../context";
 import {
   getResolvedCloudProjectId,
-  isCloudAttachmentRecovery,
-} from "../attachment";
+  isCloudContextRecovery,
+} from "../context";
 import type { CloudWorkspaceSection } from "../types";
 import { CloudGlobalBillingPage } from "../components/CloudBillingPage";
 import { CloudGlobalTeamPage } from "../components/CloudGlobalPages";
@@ -26,12 +26,12 @@ import { CloudGitSyncSection } from "../sections/GitSyncSection";
 import { CloudHistorySection } from "../sections/HistorySection";
 import { CloudClaudeSection } from "../sections/ClaudeSection";
 import { CloudMcpCliSection } from "../sections/McpCliSection";
-import { CloudMappedOverview } from "../sections/OverviewSection";
+import { CloudRepositoryOverview } from "../sections/OverviewSection";
 import { CloudAccessSection } from "../sections/access/AccessSection";
 import {
   CloudProjectRecoveryState,
   CloudProjectWebSection,
-  CloudUnmappedWorkspace,
+  CloudLocalOnlyWorkspace,
 } from "../states";
 import { getCloudRouteWebPath } from "./cloudRoutes";
 import { formatCloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
@@ -40,7 +40,7 @@ import { getCloudScopeRows, scopeMatchesMcpEndpoint } from "../utils";
 import { repositoryTargetKey, type RepositoryTarget } from "../repositoryTarget";
 
 export type CloudActionState = {
-  kind: "backup" | "connect" | "copy" | null;
+  kind: "backup" | "configure-remote" | "copy" | null;
   projectId: string | null;
   notice: CloudMessageDescriptor | null;
   error: CloudMessageDescriptor | null;
@@ -53,7 +53,7 @@ export function CloudRouter({
   cloudApiBaseUrl,
   cloudRemote,
   cloudData,
-  attachment = null,
+  projectContext = null,
   activeSection,
   accountEmail,
   accountConnected,
@@ -66,18 +66,17 @@ export function CloudRouter({
   onOpenProject,
   onOpenGitSettings,
   onSelectSection,
-  onRetryBinding,
+  onRetryContext,
   onUseAnotherAccount,
-  onConfirmLegacyBinding,
-  onDetachCloudProject,
+  onRemoveCloudRemote,
 }: {
   workspace: Workspace;
   status: GitStatusSnapshot | null;
   cloudSession: DesktopCloudSession;
   cloudApiBaseUrl: string | null;
-  cloudRemote: ReturnType<typeof getPuppyoneRemote>;
+  cloudRemote: ReturnType<typeof getCanonicalPuppyoneRemote>;
   cloudData: DesktopCloudDataState;
-  attachment?: ProjectCloudAttachment | null;
+  projectContext?: ProjectCloudContext | null;
   activeSection: CloudWorkspaceSection;
   accountEmail: string | null;
   accountConnected: boolean;
@@ -90,19 +89,15 @@ export function CloudRouter({
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
   onOpenGitSettings: () => void;
   onSelectSection: (section: CloudWorkspaceSection) => void;
-  onRetryBinding?: () => void;
+  onRetryContext?: () => void;
   onUseAnotherAccount?: () => void;
-  onConfirmLegacyBinding?: (input: {
-    projectId: string;
-    target: RepositoryTarget;
-  }) => void;
-  onDetachCloudProject?: () => void;
+  onRemoveCloudRemote?: () => void;
 }) {
   const { t } = useLocalization();
   const billingEnabled = useFeatureFlag("cloudBilling");
-  const mappedProjectId = getResolvedCloudProjectId(attachment ?? { status: "local-only", projectId: null })
-    ?? cloudData.mappedProjectId;
-  const mappedProject = cloudData.mappedProject;
+  const contextProjectId = getResolvedCloudProjectId(projectContext ?? { status: "local-only", projectId: null })
+    ?? cloudData.contextProjectId;
+  const contextProject = cloudData.contextProject;
   const activeProject = cloudData.activeProject;
 
   // 1) Account routes first
@@ -148,55 +143,45 @@ export function CloudRouter({
         apiBaseUrl={cloudApiBaseUrl}
         onSessionChange={onSessionChange}
         onProjectCreated={(project) => {
-          // Template instantiation creates a Cloud Project; it must not attach
-          // that Project to the currently open local workspace implicitly.
+          // Template instantiation creates a Cloud Project; it must not
+          // configure the currently open local repository implicitly.
           onOpenProject(project.id, "contents");
         }}
       />
     );
   }
 
-  // 2) Workspace binding before project sections / browser
-  if (attachment?.status === "resolving") {
+  // 2) Resolve the local repository's canonical PuppyOne Git locator before
+  // entering Project sections.
+  if (projectContext?.status === "resolving") {
     return <CloudWorkspaceLoadingState label={t("cloud.loading.matchingProject")} />;
   }
 
-  if (attachment && isCloudAttachmentRecovery(attachment)) {
+  if (projectContext && isCloudContextRecovery(projectContext)) {
     return (
       <CloudProjectRecoveryState
-        title={attachment.status === "temporarily-unavailable"
-          ? t("cloud.message.binding-network-failed")
+        title={projectContext.status === "temporarily-unavailable"
+          ? t("cloud.message.remote-network-failed")
           : undefined}
-        message={formatCloudMessage(attachment.message, t)}
+        message={formatCloudMessage(projectContext.message, t)}
         remoteLabel={cloudRemote?.info.displayId ?? null}
         loading={cloudData.loading}
         onRetry={() => {
-          if (onRetryBinding) onRetryBinding();
+          if (onRetryContext) onRetryContext();
           else void cloudData.reload();
         }}
         onUseAnotherAccount={() => {
           if (onUseAnotherAccount) onUseAnotherAccount();
           else onSessionChange(null);
         }}
-        showUseAnotherAccount={attachment.status !== "temporarily-unavailable"}
+        showUseAnotherAccount={projectContext.status !== "temporarily-unavailable"}
         onOpenGitDetails={onOpenGitSettings}
-        confirmLabel={attachment.status === "legacy-confirmation-required" ? t("cloud.project.confirm") : undefined}
-        onConfirm={attachment.status === "legacy-confirmation-required"
-          && attachment.projectId
-          && attachment.target
-          ? () => onConfirmLegacyBinding?.({
-              projectId: attachment.projectId as string,
-              target: attachment.target as RepositoryTarget,
-            })
-          : undefined}
       />
     );
   }
 
   // Authorized local context: always enter the exact Project — never a catalog.
-  if (mappedProjectId) {
-    const durableBinding = attachment?.status === "resolved"
-      && attachment.bindingStatus === "bound";
+  if (contextProjectId) {
     return renderProjectContextSection({
       activeSection,
       workspace,
@@ -205,8 +190,8 @@ export function CloudRouter({
       cloudApiBaseUrl,
       cloudRemote,
       cloudData,
-      projectId: mappedProjectId,
-      project: mappedProject ?? activeProject ?? { id: mappedProjectId, name: workspace.name },
+      projectId: contextProjectId,
+      project: contextProject ?? activeProject ?? { id: contextProjectId, name: workspace.name },
       loading,
       accountConnected,
       onSessionChange,
@@ -214,21 +199,20 @@ export function CloudRouter({
       onOpenProject,
       onOpenGitSettings,
       onRefresh: cloudData.reload,
-      repositoryTarget: attachment?.status === "resolved" ? attachment.target : null,
-      scopePath: attachment?.status === "resolved" ? attachment.scopePath ?? null : null,
-      readiness: attachment?.status === "resolved"
-        ? attachment.readiness ?? cloudData.readiness
+      repositoryTarget: projectContext?.status === "resolved" ? projectContext.target : null,
+      scopePath: projectContext?.status === "resolved" ? projectContext.scopePath ?? null : null,
+      readiness: projectContext?.status === "resolved"
+        ? projectContext.readiness ?? cloudData.readiness
         : cloudData.readiness,
-      onDetachCloudProject: durableBinding ? onDetachCloudProject : undefined,
+      onRemoveCloudRemote: projectContext?.status === "resolved" ? onRemoveCloudRemote : undefined,
       t,
     });
   }
 
-  if (!attachment || attachment.status === "local-only") {
+  if (!projectContext || projectContext.status === "local-only") {
     return (
-      <CloudUnmappedWorkspace
+      <CloudLocalOnlyWorkspace
         workspace={workspace}
-        activeSection={activeSection}
         accountEmail={accountEmail}
         branchName={branchName}
         localChangeCount={localChangeCount}
@@ -262,7 +246,7 @@ function renderProjectContextSection({
   repositoryTarget,
   scopePath,
   readiness,
-  onDetachCloudProject,
+  onRemoveCloudRemote,
   t,
 }: {
   activeSection: CloudWorkspaceSection;
@@ -270,7 +254,7 @@ function renderProjectContextSection({
   status: GitStatusSnapshot | null;
   cloudSession: DesktopCloudSession;
   cloudApiBaseUrl: string | null;
-  cloudRemote: ReturnType<typeof getPuppyoneRemote>;
+  cloudRemote: ReturnType<typeof getCanonicalPuppyoneRemote>;
   cloudData: DesktopCloudDataState;
   projectId: string;
   project: DesktopCloudProject;
@@ -284,7 +268,7 @@ function renderProjectContextSection({
   repositoryTarget: RepositoryTarget | null;
   scopePath: string | null;
   readiness: import("../../../lib/cloudApi").DesktopCloudProjectReadiness | null;
-  onDetachCloudProject?: () => void;
+  onRemoveCloudRemote?: () => void;
   t: MessageFormatter;
 }) {
   const repositoryViews = getCloudScopeRows(cloudData.scopes, cloudData.identity);
@@ -305,7 +289,7 @@ function renderProjectContextSection({
 
   if (activeSection === "overview" || activeSection === "contents") {
     return (
-      <CloudMappedOverview
+      <CloudRepositoryOverview
         workspace={workspace}
         project={project}
         dashboard={cloudData.dashboard}
@@ -315,13 +299,13 @@ function renderProjectContextSection({
         connectors={cloudData.connectors}
         mcpEndpoints={cloudData.mcpEndpoints}
         identity={cloudData.identity}
-        linkedToWorkspace
+        matchesRepositoryRemote
         loading={loading || cloudData.loading}
         onSelectSection={onSelectSection}
         onOpenProject={onOpenProject}
         onRefresh={onRefresh}
-        detachAction={onDetachCloudProject
-          ? { onDetach: onDetachCloudProject }
+        removeRemoteAction={onRemoveCloudRemote
+          ? { onRemove: onRemoveCloudRemote }
           : null}
       />
     );

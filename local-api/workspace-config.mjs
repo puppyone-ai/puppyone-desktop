@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
@@ -10,11 +9,7 @@ const PUPPYONE_CONFIG_DIR = ".puppyone";
 const PUPPYONE_CONFIG_FILE = "config.json";
 
 const DEFAULT_PUPPYONE_WORKSPACE_CONFIG = Object.freeze({
-  version: 2,
-  project: {
-    id: null,
-    workspaceInstanceId: null,
-  },
+  version: 3,
   sync: {
     sourceOfTruth: {
       service: "github",
@@ -31,11 +26,6 @@ const DEFAULT_PUPPYONE_WORKSPACE_CONFIG = Object.freeze({
     service: "github",
     remote: null,
     branch: null,
-  },
-  cloud: {
-    projectId: null,
-    origin: null,
-    bindingId: null,
   },
 });
 
@@ -76,13 +66,8 @@ export async function readPuppyoneWorkspaceConfig(rootPath) {
 export async function writePuppyoneWorkspaceConfig(rootPath, config) {
   const root = await resolveExistingWorkspacePath(rootPath, null);
   const configDir = path.join(root, PUPPYONE_CONFIG_DIR);
-  const existingConfig = await readPuppyoneWorkspaceConfig(root);
-  const projectId = normalizeWorkspaceProjectId(config?.project?.id)
-    ?? existingConfig.project.id
-    ?? crypto.randomUUID();
   const normalizedConfig = normalizePuppyoneWorkspaceConfig(config, {
     updatedAt: new Date().toISOString(),
-    projectId,
   });
 
   await fs.mkdir(configDir, { recursive: false }).catch((error) => {
@@ -133,35 +118,16 @@ export async function writePuppyoneWorkspaceConfig(rootPath, config) {
   return normalizedConfig;
 }
 
-export async function regeneratePuppyoneWorkspaceProjectId(rootPath, options = {}) {
-  const current = await readPuppyoneWorkspaceConfig(rootPath);
-  return writePuppyoneWorkspaceConfig(rootPath, {
-    ...current,
-    project: {
-      ...current.project,
-      id: crypto.randomUUID(),
-    },
-    cloud: {
-      ...current.cloud,
-      projectId: options.preserveCloudBinding === true ? current.cloud.projectId : null,
-      origin: options.preserveCloudBinding === true ? current.cloud.origin : null,
-      bindingId: options.preserveCloudBinding === true ? current.cloud.bindingId : null,
-    },
-  });
-}
-
 export function normalizePuppyoneWorkspaceConfig(value, options = {}) {
   const source = value && typeof value === "object" ? value : {};
   const sourceVersion = Number(source.version ?? 1);
-  if (!Number.isInteger(sourceVersion) || sourceVersion < 1 || sourceVersion > 2) {
+  if (!Number.isInteger(sourceVersion) || sourceVersion < 1 || sourceVersion > 3) {
     throw new Error(`Unsupported PuppyOne config version: ${String(source.version)}`);
   }
-  const project = source.project && typeof source.project === "object" ? source.project : {};
   const sync = source.sync && typeof source.sync === "object" ? source.sync : {};
   const sourceOfTruth = sync.sourceOfTruth && typeof sync.sourceOfTruth === "object" ? sync.sourceOfTruth : {};
   const git = source.git && typeof source.git === "object" ? source.git : {};
   const backup = source.backup && typeof source.backup === "object" ? source.backup : {};
-  const cloud = source.cloud && typeof source.cloud === "object" ? source.cloud : {};
   const primaryRemote = normalizeOptionalConfigText(git.primaryRemote);
   const watchedBranch = normalizeOptionalConfigText(git.watchedBranch);
   const sourceOfTruthService = normalizeBackendService(sourceOfTruth.service ?? backup.service);
@@ -180,18 +146,9 @@ export function normalizePuppyoneWorkspaceConfig(value, options = {}) {
     : typeof source.updatedAt === "string"
       ? source.updatedAt
       : undefined;
-  const projectId = options.projectId
-    ?? normalizeWorkspaceProjectId(project.id, { strict: true });
-
   return {
-    ...source,
     ...DEFAULT_PUPPYONE_WORKSPACE_CONFIG,
-    version: 2,
-    project: {
-      ...project,
-      id: projectId,
-      workspaceInstanceId: normalizeWorkspaceInstanceId(project.workspaceInstanceId),
-    },
+    version: 3,
     sync: {
       ...sync,
       sourceOfTruth: {
@@ -208,59 +165,13 @@ export function normalizePuppyoneWorkspaceConfig(value, options = {}) {
     },
     backup: {
       ...backup,
-      enabled: backup.enabled === true || cloud.backupEnabled === true,
+      enabled: backup.enabled === true,
       service: normalizeBackendService(backup.service ?? sourceOfTruthService),
       remote: normalizeOptionalConfigText(backup.remote) ?? sourceOfTruthRemote,
       branch: normalizeOptionalConfigText(backup.branch) ?? (isPuppyoneSource ? null : sourceOfTruthBranch),
     },
-    cloud: {
-      ...cloud,
-      projectId: normalizeOptionalConfigText(cloud.projectId),
-      origin: normalizeCloudBindingOrigin(cloud.origin),
-      bindingId: normalizeOptionalConfigText(cloud.bindingId),
-    },
     ...(updatedAt ? { updatedAt } : {}),
   };
-}
-
-function normalizeWorkspaceProjectId(value, { strict = false } = {}) {
-  if (value == null || value === "") return null;
-  const normalized = normalizeOptionalConfigText(value);
-  const valid = normalized && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalized);
-  if (valid) return normalized.toLowerCase();
-  if (strict || normalized) throw new Error("PuppyOne project.id must be a valid UUID.");
-  return null;
-}
-
-function normalizeWorkspaceInstanceId(value) {
-  const normalized = normalizeOptionalConfigText(value);
-  if (!normalized) return null;
-  if (normalized.length < 16 || normalized.length > 200 || /\s/.test(normalized)) {
-    throw new Error("PuppyOne project.workspaceInstanceId is invalid.");
-  }
-  return normalized;
-}
-
-function normalizeCloudBindingOrigin(value) {
-  const normalized = normalizeOptionalConfigText(value);
-  if (!normalized) return null;
-  let parsed;
-  try {
-    parsed = new URL(normalized);
-  } catch {
-    throw new Error("PuppyOne cloud.origin must be an HTTP(S) origin.");
-  }
-  if (
-    !["http:", "https:"].includes(parsed.protocol)
-    || parsed.username
-    || parsed.password
-    || parsed.pathname !== "/"
-    || parsed.search
-    || parsed.hash
-  ) {
-    throw new Error("PuppyOne cloud.origin must be an HTTP(S) origin.");
-  }
-  return parsed.origin.toLowerCase();
 }
 
 function normalizeBackendService(value) {

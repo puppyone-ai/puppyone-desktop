@@ -32,8 +32,7 @@ import {
   getDesktopCloudApiBaseUrl,
   getCloudProject,
   isCloudSessionForApiBase,
-  revokeCloudWorkspaceBinding,
-  revokeCloudWorkspaceBindingCredential,
+  revokeCloudGitCredential,
   type DesktopCloudProject,
   type DesktopCloudSession,
 } from "./lib/cloudApi";
@@ -71,9 +70,9 @@ import { useDesktopCloudSession } from "./features/cloud/hooks/useDesktopCloudSe
 import { useCloudProjectHome } from "./features/cloud/hooks/useCloudProjectHome";
 import {
   getResolvedCloudProjectId,
-  resolveCloudHubSectionAfterBindingChange,
-  useProjectCloudAttachment,
-} from "./features/cloud/attachment";
+  resolveCloudHubSectionAfterContextChange,
+  useProjectCloudContext,
+} from "./features/cloud/context";
 import { useFeatureFlag } from "./features/flags";
 import {
   DesktopCreateEntryDialog,
@@ -91,15 +90,12 @@ import { useDesktopGitController } from "./features/source-control/useDesktopGit
 import { createRepositoryRefreshReason } from "./features/source-control/repositoryRefreshPolicy";
 import { CloudProjectResolveDialog } from "./features/cloud/workspace/CloudProjectResolveDialog";
 import { useWorkspaceSurfaceSwitch } from "./features/cloud/workspace/useWorkspaceSurfaceSwitch";
-import { useCloudWorkspaceBinding } from "./features/cloud/workspace/useCloudWorkspaceBinding";
+import { useCloudWorkspaceContext } from "./features/cloud/workspace/useCloudWorkspaceContext";
 import { shouldBlockWorkspaceCloudResolution } from "./features/cloud/workspace/workspaceCloudResolutionKey";
 import { usePuppyoneCloudBackup } from "./features/cloud/workspace/usePuppyoneCloudBackup";
 import { shouldLoadCloudProjectCatalog } from "./features/cloud/workspace/cloudProjectResolution";
-import {
-  cloudOriginFromApiBase,
-  createExplicitWorkspaceBinding,
-} from "./features/cloud/workspace/explicitWorkspaceBinding";
-import type { CloudWorkspaceAttachOptions } from "./features/cloud/types";
+import { issueWorkspaceGitRemote } from "./features/cloud/workspace/workspaceGitRemote";
+import type { CloudGitRemoteOptions } from "./features/cloud/types";
 import { formatCloudMessage } from "./features/cloud/cloudPresentation";
 import {
   createTypographyRootProps,
@@ -357,7 +353,6 @@ export function App() {
     puppyoneConfigLoading,
     puppyoneConfigSaving,
     handlePuppyoneConfigChange: savePuppyoneConfig,
-    regeneratePuppyoneProjectIdentity,
   } = usePuppyoneConfig(workspace && !workspaceIsCloud ? workspace.path : null);
   const workspaceKey = useMemo(() => workspace?.path ?? "no-workspace", [workspace?.path]);
   const desktopCloudApiBaseUrl = useMemo(() => getDesktopCloudApiBaseUrl(), []);
@@ -553,16 +548,16 @@ export function App() {
     homeProjectItems,
     openCloudProjectFromHomepage,
     pendingCloudProjectCreate,
-    recentWorkspaceCloudBindings,
+    recentWorkspaceCloudContexts,
     refreshHomeCloudProjects,
     setHomeCloudProjects,
     setHomeCloudProjectsError,
     setPendingCloudProjectCreate,
-    setRecentWorkspaceCloudBindings,
+    setRecentWorkspaceCloudContexts,
   } = useCloudProjectHome({
     activeCloudSession,
     autoRefreshProjectCatalog,
-    autoResolveRecentWorkspaceBindings: autoRefreshProjectCatalog,
+    autoResolveRecentWorkspaceContexts: autoRefreshProjectCatalog,
     cloudEnabled,
     desktopCloudApiBaseUrl,
     includeUnboundCloudProjects: cloudOnlyWorkspaceEnabled,
@@ -581,21 +576,19 @@ export function App() {
   const cloudResolutionInputsLoading = shouldBlockWorkspaceCloudResolution({
     gitStatusError,
     gitStatusPath,
-    puppyoneConfigLoading,
     workspacePath: workspace?.path ?? null,
   });
 
-  const projectCloudAttachment = useProjectCloudAttachment({
+  const projectCloudContext = useProjectCloudContext({
     workspace,
     workspaceIsCloud,
-    puppyoneConfig,
-    recentWorkspaceCloudBindings,
+    recentWorkspaceCloudContexts,
     activeGitStatus,
     activeCloudSession,
     desktopCloudApiBaseUrl,
     resolutionInputsLoading: cloudResolutionInputsLoading,
   });
-  const resolvedCloudProjectId = getResolvedCloudProjectId(projectCloudAttachment);
+  const resolvedCloudProjectId = getResolvedCloudProjectId(projectCloudContext);
   const effectiveCloudProjectId = workspaceIsCloud ? cloudOnlyProjectId : resolvedCloudProjectId;
 
   const workspacePath = workspace?.path ?? null;
@@ -607,9 +600,9 @@ export function App() {
     const workspaceChanged = previousCloudHubWorkspaceIdentityRef.current !== cloudHubWorkspaceIdentity;
     previousCloudHubWorkspaceIdentityRef.current = cloudHubWorkspaceIdentity;
     if (!workspacePath || workspaceIsCloud) return;
-    setActiveCloudSection((currentSection) => resolveCloudHubSectionAfterBindingChange({
+    setActiveCloudSection((currentSection) => resolveCloudHubSectionAfterContextChange({
       currentSection,
-      hasBoundProject: Boolean(resolvedCloudProjectId),
+      hasProjectContext: Boolean(resolvedCloudProjectId),
       workspaceChanged,
     }));
   }, [resolvedCloudProjectId, cloudHubWorkspaceIdentity, workspaceIsCloud, workspacePath]);
@@ -732,14 +725,13 @@ export function App() {
     return savedConfig;
   }, [refreshGitStatus, savePuppyoneConfig]);
 
-  useCloudWorkspaceBinding({
+  useCloudWorkspaceContext({
     activeCloudSession,
     activeGitStatus,
     cloudEnabled,
     desktopCloudApiBaseUrl,
-    puppyoneConfig,
     resolutionInputsLoading: cloudResolutionInputsLoading,
-    setRecentWorkspaceCloudBindings,
+    setRecentWorkspaceCloudContexts,
     updateCloudSession,
     workspace,
     workspaceIsCloud,
@@ -755,22 +747,17 @@ export function App() {
     workspaceSurfaceSwitching,
   } = useWorkspaceSurfaceSwitch({
     activeCloudSession,
-    activeGitStatus,
-    cloudEnabled,
     cloudOnlyWorkspaceEnabled,
     cloudProjectId: cloudOnlyProjectId,
     desktopCloudApiBaseUrl,
-    handlePuppyoneConfigChange,
     handleWorkspaceOpenResult,
     homeCloudProjects,
     openCloudProjectFromHomepage,
-    puppyoneConfig,
-    recentWorkspaceCloudBindings,
+    recentWorkspaceCloudContexts,
     recentWorkspaceItems,
     refreshRecentWorkspaceList,
-    setHomeCloudProjects,
     setHomeOperationStatus,
-    setRecentWorkspaceCloudBindings,
+    setRecentWorkspaceCloudContexts,
     showBrowserSignInStatus,
     startCloudBrowserSignIn,
     updateCloudSession,
@@ -811,7 +798,7 @@ export function App() {
 
   const handleConfigureCloudRemote = useCallback(async (
     projectId?: string | null,
-    options: CloudWorkspaceAttachOptions = {},
+    options: CloudGitRemoteOptions = {},
   ) => {
     if (!cloudEnabled) return null;
     if (!workspace) return null;
@@ -820,14 +807,14 @@ export function App() {
     if (!context) return null;
     const nextProjectId = projectId?.trim() || null;
     if (!nextProjectId) {
-      throw new Error("Cloud project identity is required before attaching this workspace.");
+      throw new Error("Choose a Cloud Project before configuring its Git remote.");
     }
     if (!activeCloudSession) {
-      throw new Error("Sign in before attaching this workspace to Cloud.");
+      throw new Error("Sign in before configuring the Cloud Git remote.");
     }
     let previousConfig: PuppyoneWorkspaceConfig | null = null;
     let configUpdated = false;
-    let attached: Awaited<ReturnType<typeof createExplicitWorkspaceBinding>> | null = null;
+    let issued: Awaited<ReturnType<typeof issueWorkspaceGitRemote>> | null = null;
     let configuredStatus = activeGitStatus;
     try {
       const project = homeCloudProjects.find((entry) => entry.id === nextProjectId)
@@ -837,21 +824,17 @@ export function App() {
           updateCloudSession,
           desktopCloudApiBaseUrl,
         );
-      attached = await createExplicitWorkspaceBinding({
+      issued = await issueWorkspaceGitRemote({
         session: activeCloudSession,
         apiBaseUrl: desktopCloudApiBaseUrl,
         project,
         projectId: nextProjectId,
-        workspace,
         target: options.target,
         onSessionChange: updateCloudSession,
       });
       previousConfig = puppyoneConfig
         ?? await readPuppyoneWorkspaceConfig(context.rootPath);
       const nextConfig = mergePuppyoneWorkspaceConfig(previousConfig, {
-        project: {
-          workspaceInstanceId: workspace.workspaceInstanceId ?? null,
-        },
         sync: {
           sourceOfTruth: {
             service: "puppyone",
@@ -869,56 +852,43 @@ export function App() {
           primaryRemote: "puppyone",
           watchedBranch: null,
         },
-        cloud: {
-          projectId: nextProjectId,
-          origin: cloudOriginFromApiBase(
-            desktopCloudApiBaseUrl ?? activeCloudSession.api_base_url,
-          ),
-          bindingId: attached.binding.id,
-        },
       });
       const savedConfig = await handlePuppyoneConfigChange(nextConfig);
       if (!savedConfig) {
-        throw new Error("Unable to persist the Cloud project binding for this workspace.");
+        throw new Error("Unable to persist the local Git sync settings for this workspace.");
       }
       configUpdated = true;
       configuredStatus = await configureWorkspaceCloudRemote(
         context.rootPath,
-        attached.remoteUrl,
+        issued.remoteUrl,
         "puppyone",
-        attached.credential,
-        attached.username,
+        issued.credential,
+        issued.username,
       );
     } catch (error) {
-      if (configUpdated && previousConfig) {
-        await handlePuppyoneConfigChange(previousConfig).catch(() => undefined);
-      }
-      if (attached) {
-        const compensate = attached.bindingWasCreated
-          ? revokeCloudWorkspaceBinding
-          : revokeCloudWorkspaceBindingCredential;
-        await compensate(
+      if (issued) {
+        await revokeCloudGitCredential(
           activeCloudSession,
-          attached.binding.id,
+          issued.project.id,
+          issued.credentialId,
           updateCloudSession,
           desktopCloudApiBaseUrl,
         ).catch(() => undefined);
       }
+      if (configUpdated && previousConfig) {
+        await handlePuppyoneConfigChange(previousConfig).catch(() => undefined);
+      }
       throw error;
     }
-    if (!attached || !configuredStatus) {
-      throw new Error("Cloud workspace attachment did not return a Git status.");
+    if (!issued || !configuredStatus) {
+      throw new Error("Cloud Git remote configuration did not return a Git status.");
     }
-    setRecentWorkspaceCloudBindings((current) => ({
+    setRecentWorkspaceCloudContexts((current) => ({
       ...current,
       [workspace.id]: {
         projectId: nextProjectId,
-        resolutionSource: "workspace-binding",
-        bindingStatus: "bound",
-        bindingId: attached.binding.id,
-        target: attached.binding.target,
-        scopePath: attached.binding.scope_path ?? null,
-        cloudLinked: true,
+        target: issued.target,
+        hasCloudRemote: true,
         error: null,
         reason: null,
       },
@@ -942,32 +912,14 @@ export function App() {
     homeCloudProjects,
     puppyoneConfig,
     refreshWorkspaceContent,
-    setRecentWorkspaceCloudBindings,
+    setRecentWorkspaceCloudContexts,
     updateCloudSession,
     workspace,
     workspaceIsCloud,
   ]);
 
-  const handleDetachCloudProject = useCallback(async () => {
+  const handleRemoveCloudRemote = useCallback(async () => {
     if (!workspace || workspaceIsCloud) return;
-    const bindingId = puppyoneConfig?.cloud.bindingId?.trim() || null;
-    if (bindingId) {
-      if (!activeCloudSession) {
-        throw new Error("Sign in before detaching this Cloud project.");
-      }
-      await revokeCloudWorkspaceBinding(
-        activeCloudSession,
-        bindingId,
-        updateCloudSession,
-        desktopCloudApiBaseUrl,
-      ).catch((error: unknown) => {
-        const status = error && typeof error === "object" && "status" in error
-          ? Number((error as { status?: unknown }).status)
-          : null;
-        if (status !== 404) throw error;
-      });
-    }
-
     const refreshedStatus = await removeWorkspaceGitRemote(workspace.path, "puppyone");
     const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
       sync: {
@@ -983,19 +935,19 @@ export function App() {
         primaryRemote: null,
         watchedBranch: null,
       },
-      cloud: {
-        projectId: null,
-        origin: null,
-        bindingId: null,
-      },
     });
     const savedConfig = await handlePuppyoneConfigChange(nextConfig);
     if (!savedConfig) {
-      throw new Error("Cloud access was revoked, but Desktop could not clear the local binding manifest.");
+      throw new Error("The PuppyOne Git remote was removed, but Desktop could not update the local sync settings.");
     }
-    setRecentWorkspaceCloudBindings((current) => ({
+    setRecentWorkspaceCloudContexts((current) => ({
       ...current,
-      [workspace.id]: { projectId: null, cloudLinked: false, error: null, reason: null },
+      [workspace.id]: {
+        projectId: null,
+        hasCloudRemote: false,
+        error: null,
+        reason: null,
+      },
     }));
     const context = captureGitRepositoryContext(workspace.path);
     if (context && applyGitStatus(
@@ -1007,15 +959,12 @@ export function App() {
     }
     setActiveCloudSection("overview");
   }, [
-    activeCloudSession,
     applyGitStatus,
     captureGitRepositoryContext,
-    desktopCloudApiBaseUrl,
     handlePuppyoneConfigChange,
     puppyoneConfig,
     refreshWorkspaceContent,
-    setRecentWorkspaceCloudBindings,
-    updateCloudSession,
+    setRecentWorkspaceCloudContexts,
     workspace,
     workspaceIsCloud,
   ]);
@@ -1331,7 +1280,7 @@ export function App() {
           activeView={activeView}
           cloud={{
             activeSection: activeCloudSection,
-            attachment: workspaceIsCloud ? null : projectCloudAttachment,
+            projectContext: workspaceIsCloud ? null : projectCloudContext,
             backupError: cloudBackupErrorMessage,
             backupLoading: cloudBackupLoading,
             cloudApiBaseUrl: desktopCloudApiBaseUrl,
@@ -1341,8 +1290,7 @@ export function App() {
             projectId: effectiveCloudProjectId,
             sessionRestoring: cloudSessionRestoring,
             onCloudSessionChange: handleCloudSessionChange,
-            onConfigureCloudRemote: handleConfigureCloudRemote,
-            onDetachCloudProject: handleDetachCloudProject,
+            onRemoveCloudRemote: handleRemoveCloudRemote,
             onOpenDetails: () => {
               if (!cloudEnabled) return;
               navigateDesktopView("cloud");
@@ -1367,7 +1315,6 @@ export function App() {
           onNodeActionMenu={openNodeActionMenu}
           onOpenSettings={() => navigateDesktopView("settings")}
           onPuppyoneConfigChange={handlePuppyoneConfigChange}
-          onRegeneratePuppyoneProjectId={regeneratePuppyoneProjectIdentity}
           onSelectSettingsSection={setActiveSettingsSection}
           onUnlinkWorkspace={unlinkCurrentWorkspace}
           preferences={preferences}

@@ -67,7 +67,6 @@ export function SettingsView({
   onAiEditAssistEnabledChange,
   onCloudSessionChange,
   onPuppyoneConfigChange,
-  onRegeneratePuppyoneProjectId,
   onUnlinkWorkspace,
   onRefreshGitStatus,
   onCheckForUpdates,
@@ -131,7 +130,6 @@ export function SettingsView({
         cloudEnabled={cloudEnabled}
         onCopyRemoteUrl={copyRemoteUrl}
         onPuppyoneConfigChange={onPuppyoneConfigChange}
-        onRegeneratePuppyoneProjectId={onRegeneratePuppyoneProjectId}
         onRefresh={onRefreshGitStatus}
       />
     );

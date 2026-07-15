@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PuppyoneWorkspaceConfig } from "../../types/electron";
 import {
   readPuppyoneWorkspaceConfig,
-  regeneratePuppyoneWorkspaceProjectId,
   writePuppyoneWorkspaceConfig,
 } from "../../lib/localFiles";
 
@@ -23,32 +22,25 @@ export function usePuppyoneConfig(workspacePath: string | null) {
     }
 
     let cancelled = false;
-    // Last-known-good state is scoped to one workspace. Never carry a project
-    // identity or Cloud binding across a direct workspace-to-workspace switch.
+    // Last-known-good state is scoped to one workspace. Never carry config
+    // preferences across a direct workspace-to-workspace switch.
     lastKnownConfigRef.current = null;
     setPuppyoneConfig(null);
     setPuppyoneConfigLoading(true);
     setPuppyoneConfigError(null);
 
     let reloadTimer: number | null = null;
-    const loadConfig = async ({ external = false } = {}) => {
+    const loadConfig = async () => {
       try {
         const config = await readPuppyoneWorkspaceConfig(workspacePath);
         if (cancelled) return;
-        if (external && lastKnownConfigRef.current?.project.id && !config.project.id) {
-          setPuppyoneConfigError(
-            "PuppyOne project config was removed or became incomplete. Keeping the last verified project identity.",
-          );
-          return;
-        }
         lastKnownConfigRef.current = config;
         setPuppyoneConfig(config);
         setPuppyoneConfigError(null);
       } catch (error) {
         if (cancelled) return;
         // Keep the last verified config on a half-write, invalid JSON, or
-        // symlink swap. Losing the Cloud binding is worse than showing stale
-        // data with an explicit recoverable error.
+        // symlink swap and surface an explicit recoverable error.
         setPuppyoneConfigError(error instanceof Error ? error.message : String(error));
       } finally {
         if (!cancelled) setPuppyoneConfigLoading(false);
@@ -61,7 +53,7 @@ export function usePuppyoneConfig(workspacePath: string | null) {
       if (reloadTimer !== null) window.clearTimeout(reloadTimer);
       reloadTimer = window.setTimeout(() => {
         reloadTimer = null;
-        void loadConfig({ external: true });
+        void loadConfig();
       }, 150);
     });
     void contentWatch?.ready.catch(() => undefined);
@@ -92,31 +84,12 @@ export function usePuppyoneConfig(workspacePath: string | null) {
     }
   }, [workspacePath]);
 
-  const regeneratePuppyoneProjectIdentity = useCallback(async () => {
-    if (!workspacePath) return null;
-    setPuppyoneConfigSaving(true);
-    setPuppyoneConfigError(null);
-    try {
-      const savedConfig = await regeneratePuppyoneWorkspaceProjectId(workspacePath);
-      lastKnownConfigRef.current = savedConfig;
-      setPuppyoneConfig(savedConfig);
-      return savedConfig;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setPuppyoneConfigError(message);
-      throw error;
-    } finally {
-      setPuppyoneConfigSaving(false);
-    }
-  }, [workspacePath]);
-
   return {
     puppyoneConfig,
     puppyoneConfigError,
     puppyoneConfigLoading,
     puppyoneConfigSaving,
     handlePuppyoneConfigChange,
-    regeneratePuppyoneProjectIdentity,
   };
 }
 

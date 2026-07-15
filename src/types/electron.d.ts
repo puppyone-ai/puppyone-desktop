@@ -547,14 +547,18 @@ export type DesktopCloudAuthStateSnapshot = {
   session: DesktopStoredCloudSession | null;
 };
 
+export type DesktopCloudIpcEnvelope<T> =
+  | { transport: "puppyone-cloud-ipc-v1"; ok: true; data: T }
+  | {
+      transport: "puppyone-cloud-ipc-v1";
+      ok: false;
+      error: { message: string; status?: number; code?: string };
+    };
+
 export type PuppyoneBackendService = "puppyone" | "github" | "custom";
 
 export type PuppyoneWorkspaceConfig = {
-  version: 2;
-  project: {
-    id: string | null;
-    workspaceInstanceId: string | null;
-  };
+  version: 3;
   sync: {
     sourceOfTruth: {
       service: PuppyoneBackendService;
@@ -571,11 +575,6 @@ export type PuppyoneWorkspaceConfig = {
     service: PuppyoneBackendService;
     remote: string | null;
     branch: string | null;
-  };
-  cloud: {
-    projectId: string | null;
-    origin: string | null;
-    bindingId: string | null;
   };
   updatedAt?: string;
 };
@@ -617,14 +616,14 @@ declare global {
         method?: string;
         headers?: Record<string, string>;
         body?: string;
-      }) => Promise<unknown>;
+      }) => Promise<DesktopCloudIpcEnvelope<unknown>>;
       requestCloudSessionApi: (request: {
         apiBaseUrl: string;
         path: string;
         method?: string;
         headers?: Record<string, string>;
         body?: string;
-      }) => Promise<unknown>;
+      }) => Promise<DesktopCloudIpcEnvelope<unknown>>;
       listCloudAccessPointDirectory: (request: {
         accessKey: string;
         path?: string;
@@ -816,10 +815,6 @@ declare global {
       writePuppyoneConfig: (request: {
         rootPath: string;
         config: PuppyoneWorkspaceConfig;
-      }) => Promise<PuppyoneWorkspaceConfig>;
-      regeneratePuppyoneProjectId: (request: {
-        rootPath: string;
-        preserveCloudBinding?: boolean;
       }) => Promise<PuppyoneWorkspaceConfig>;
       getGitCommitDetail: (request: {
         rootPath: string;

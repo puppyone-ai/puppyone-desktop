@@ -25,38 +25,38 @@ export function CloudProjectBrowser({
   loading,
   session,
   apiBaseUrl,
-  mappedProjectId,
+  currentRepositoryProjectId,
   backupLoading,
   cloudAction,
   onSessionChange,
   onBackupWorkspace,
   onSelectProject,
-  onConnectProject,
+  onConfigureProjectRemote,
   onOpenCloudProjects,
 }: {
   projects: DesktopCloudProject[];
   loading: boolean;
   session: DesktopCloudSession;
   apiBaseUrl: string | null;
-  mappedProjectId: string | null;
+  currentRepositoryProjectId: string | null;
   backupLoading: boolean;
-  cloudAction: { kind: "backup" | "connect" | "copy" | null; projectId: string | null };
+  cloudAction: { kind: "backup" | "configure-remote" | "copy" | null; projectId: string | null };
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onBackupWorkspace: () => void;
   onSelectProject: (project: DesktopCloudProject) => void;
-  onConnectProject: (project: DesktopCloudProject) => void;
+  onConfigureProjectRemote: (project: DesktopCloudProject) => void;
   onOpenCloudProjects: () => void;
 }) {
   const { getCollator, t } = useLocalization();
   const collator = getCollator({ sensitivity: "base", numeric: true });
   const sortedProjects = [...projects].sort((left, right) => {
-    if (left.id === mappedProjectId) return -1;
-    if (right.id === mappedProjectId) return 1;
+    if (left.id === currentRepositoryProjectId) return -1;
+    if (right.id === currentRepositoryProjectId) return 1;
     const leftTime = left.updated_at ? new Date(left.updated_at).getTime() : 0;
     const rightTime = right.updated_at ? new Date(right.updated_at).getTime() : 0;
     return rightTime - leftTime || collator.compare(left.name, right.name);
   });
-  const showBackupCard = !mappedProjectId;
+  const showBackupCard = !currentRepositoryProjectId;
   const actionInProgress = cloudAction.kind !== null || backupLoading;
 
   return (
@@ -83,12 +83,12 @@ export function CloudProjectBrowser({
               project={project}
               session={session}
               apiBaseUrl={apiBaseUrl}
-              mapped={project.id === mappedProjectId}
-              attachBusy={cloudAction.kind === "connect" && cloudAction.projectId === project.id}
-              attachDisabled={actionInProgress}
+              currentRepositoryProject={project.id === currentRepositoryProjectId}
+              remoteBusy={cloudAction.kind === "configure-remote" && cloudAction.projectId === project.id}
+              remoteDisabled={actionInProgress}
               onSessionChange={onSessionChange}
               onSelectProject={onSelectProject}
-              onConnectProject={onConnectProject}
+              onConfigureProjectRemote={onConfigureProjectRemote}
             />
           ))
         )}
@@ -162,22 +162,22 @@ function CloudProjectCard({
   project,
   session,
   apiBaseUrl,
-  mapped,
-  attachBusy,
-  attachDisabled,
+  currentRepositoryProject,
+  remoteBusy,
+  remoteDisabled,
   onSessionChange,
   onSelectProject,
-  onConnectProject,
+  onConfigureProjectRemote,
 }: {
   project: DesktopCloudProject;
   session: DesktopCloudSession;
   apiBaseUrl: string | null;
-  mapped: boolean;
-  attachBusy: boolean;
-  attachDisabled: boolean;
+  currentRepositoryProject: boolean;
+  remoteBusy: boolean;
+  remoteDisabled: boolean;
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onSelectProject: (project: DesktopCloudProject) => void;
-  onConnectProject: (project: DesktopCloudProject) => void;
+  onConfigureProjectRemote: (project: DesktopCloudProject) => void;
 }) {
   const localization = useLocalization();
   const { t } = localization;
@@ -206,7 +206,7 @@ function CloudProjectCard({
   return (
     <ProjectFolderCard
       title={project.name}
-      badge={mapped ? t("cloud.project.linked") : null}
+      badge={currentRepositoryProject ? t("cloud.project.currentRemote") : null}
       previewItems={previewItems}
       previewLoading={preview.loading}
       previewError={preview.error}
@@ -216,18 +216,18 @@ function CloudProjectCard({
         updatedLabel: updatedLabel || t("cloud.project.recentlyUpdated"),
         connectionCount,
       }}
-      actions={!mapped ? (
+      actions={!currentRepositoryProject ? (
         <button
           type="button"
           className="desktop-project-folder-card-action"
-          disabled={attachDisabled}
+          disabled={remoteDisabled}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            onConnectProject(project);
+            onConfigureProjectRemote(project);
           }}
         >
-          {t(attachBusy ? "cloud.project.linking" : "cloud.project.linkFolder")}
+          {t(remoteBusy ? "cloud.project.addingRemote" : "cloud.project.addRemote")}
         </button>
       ) : null}
       onSelect={() => onSelectProject(project)}

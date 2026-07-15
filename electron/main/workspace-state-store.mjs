@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-const WORKSPACE_REGISTRY_VERSION = 2;
+const WORKSPACE_REGISTRY_VERSION = 4;
 const RECENT_WORKSPACE_LIMIT = 20;
 const HYDRATION_CONCURRENCY = 4;
 
@@ -119,12 +119,7 @@ export function createWorkspaceStateStore({
       const state = normalizeWorkspaceState(await readWorkspaceState());
       const record = {
         workspaceInstanceId: identity.workspaceInstanceId,
-        projectId: identity.projectId,
-        cloudProjectId: identity.cloudProjectId,
-        cloudBindingId: identity.cloudBindingId,
-        cloudBindingOrigin: identity.cloudBindingOrigin,
-        cloudBindingWorkspaceInstanceId: identity.cloudBindingWorkspaceInstanceId,
-        hasPuppyoneCloudRemote: identity.hasPuppyoneCloudRemote,
+        puppyoneGitRemote: normalizePuppyoneGitRemote(identity.puppyoneGitRemote),
         fsIdentity: identity.fsIdentity,
         path: canonicalPath,
         name: identity.name ?? (path.basename(canonicalPath) || canonicalPath),
@@ -223,12 +218,7 @@ export function createWorkspaceStateStore({
     if (knownWorkspace?.workspaceInstanceId) {
       return {
         workspaceInstanceId: knownWorkspace.workspaceInstanceId,
-        projectId: normalizeOptionalString(knownWorkspace.projectId),
-        cloudProjectId: normalizeOptionalString(knownWorkspace.cloudProjectId),
-        cloudBindingId: normalizeOptionalString(knownWorkspace.cloudBindingId),
-        cloudBindingOrigin: normalizeOptionalString(knownWorkspace.cloudBindingOrigin),
-        cloudBindingWorkspaceInstanceId: normalizeOptionalString(knownWorkspace.cloudBindingWorkspaceInstanceId),
-        hasPuppyoneCloudRemote: knownWorkspace.hasPuppyoneCloudRemote === true,
+        puppyoneGitRemote: normalizePuppyoneGitRemote(knownWorkspace.puppyoneGitRemote),
         fsIdentity: normalizeOptionalString(knownWorkspace.fsIdentity),
         name: normalizeOptionalString(knownWorkspace.name),
       };
@@ -236,7 +226,10 @@ export function createWorkspaceStateStore({
     if (resolveWorkspaceIdentity) {
       const identity = await resolveWorkspaceIdentity(canonicalPath);
       return {
-        ...identity,
+        workspaceInstanceId: normalizeOptionalString(identity.workspaceInstanceId)
+          ?? workspaceInstanceIdFromPath(canonicalPath),
+        puppyoneGitRemote: normalizePuppyoneGitRemote(identity.puppyoneGitRemote),
+        fsIdentity: normalizeOptionalString(identity.fsIdentity),
         name: path.basename(identity.canonicalPath ?? canonicalPath) || canonicalPath,
       };
     }
@@ -244,12 +237,7 @@ export function createWorkspaceStateStore({
     return {
       workspaceInstanceId: normalizeOptionalString(workspace.workspaceInstanceId)
         ?? workspaceInstanceIdFromPath(canonicalPath),
-      projectId: normalizeOptionalString(workspace.projectId),
-      cloudProjectId: normalizeOptionalString(workspace.cloudProjectId),
-      cloudBindingId: normalizeOptionalString(workspace.cloudBindingId),
-      cloudBindingOrigin: normalizeOptionalString(workspace.cloudBindingOrigin),
-      cloudBindingWorkspaceInstanceId: normalizeOptionalString(workspace.cloudBindingWorkspaceInstanceId),
-      hasPuppyoneCloudRemote: workspace.hasPuppyoneCloudRemote === true,
+      puppyoneGitRemote: normalizePuppyoneGitRemote(workspace.puppyoneGitRemote),
       fsIdentity: normalizeOptionalString(workspace.fsIdentity),
       name: normalizeOptionalString(workspace.name),
     };
@@ -292,15 +280,8 @@ function normalizeWorkspaceState(state) {
     const existing = records.find((item) => isSameWorkspaceRecord(item, record));
     if (existing) {
       if (record.lastOpenedAt) existing.lastOpenedAt = record.lastOpenedAt;
-      if (record.projectId) existing.projectId = record.projectId;
-      if (Object.hasOwn(record, "cloudProjectId")) existing.cloudProjectId = record.cloudProjectId;
-      if (Object.hasOwn(record, "cloudBindingId")) existing.cloudBindingId = record.cloudBindingId;
-      if (Object.hasOwn(record, "cloudBindingOrigin")) existing.cloudBindingOrigin = record.cloudBindingOrigin;
-      if (Object.hasOwn(record, "cloudBindingWorkspaceInstanceId")) {
-        existing.cloudBindingWorkspaceInstanceId = record.cloudBindingWorkspaceInstanceId;
-      }
-      if (Object.hasOwn(record, "hasPuppyoneCloudRemote")) {
-        existing.hasPuppyoneCloudRemote = record.hasPuppyoneCloudRemote;
+      if (Object.hasOwn(record, "puppyoneGitRemote")) {
+        existing.puppyoneGitRemote = record.puppyoneGitRemote;
       }
       if (record.fsIdentity) existing.fsIdentity = record.fsIdentity;
       return;
@@ -331,7 +312,6 @@ function normalizeWorkspaceRecord(value, fallbackTimestamp = null) {
     const resolvedPath = path.resolve(value);
     return {
       workspaceInstanceId: workspaceInstanceIdFromPath(resolvedPath),
-      projectId: null,
       fsIdentity: null,
       path: resolvedPath,
       name: path.basename(resolvedPath) || resolvedPath,
@@ -345,12 +325,7 @@ function normalizeWorkspaceRecord(value, fallbackTimestamp = null) {
   return {
     workspaceInstanceId: normalizeOptionalString(value.workspaceInstanceId)
       ?? workspaceInstanceIdFromPath(resolvedPath),
-    projectId: normalizeOptionalString(value.projectId),
-    cloudProjectId: normalizeOptionalString(value.cloudProjectId),
-    cloudBindingId: normalizeOptionalString(value.cloudBindingId),
-    cloudBindingOrigin: normalizeOptionalString(value.cloudBindingOrigin),
-    cloudBindingWorkspaceInstanceId: normalizeOptionalString(value.cloudBindingWorkspaceInstanceId),
-    hasPuppyoneCloudRemote: value.hasPuppyoneCloudRemote === true,
+    puppyoneGitRemote: normalizePuppyoneGitRemote(value.puppyoneGitRemote),
     fsIdentity: normalizeOptionalString(value.fsIdentity),
     path: resolvedPath,
     name: normalizeOptionalString(value.name) ?? (path.basename(resolvedPath) || resolvedPath),
@@ -376,12 +351,7 @@ function lightweightWorkspaceFromRecord(record) {
     path: record.path,
     status: "protected",
     cloudState: "local",
-    cloudProjectId: record.cloudProjectId,
-    cloudBindingId: record.cloudBindingId,
-    cloudBindingOrigin: record.cloudBindingOrigin,
-    cloudBindingWorkspaceInstanceId: record.cloudBindingWorkspaceInstanceId,
-    hasPuppyoneCloudRemote: record.hasPuppyoneCloudRemote,
-    projectId: record.projectId,
+    puppyoneGitRemote: record.puppyoneGitRemote,
     workspaceInstanceId: record.workspaceInstanceId,
     ...(record.fsIdentity ? { fsIdentity: record.fsIdentity } : {}),
     hydrationState: "metadata",
@@ -397,6 +367,23 @@ function isSameWorkspaceRecord(left, right) {
 
 function workspaceInstanceIdFromPath(folderPath) {
   return `legacy_${crypto.createHash("sha256").update(folderPath).digest("base64url").slice(0, 24)}`;
+}
+
+function normalizePuppyoneGitRemote(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const origin = normalizeOptionalString(value.origin);
+  const projectId = normalizeOptionalString(value.projectId);
+  const scopeId = normalizeOptionalString(value.scopeId);
+  if (!origin || !projectId) return null;
+  try {
+    const parsed = new URL(origin);
+    if (!['http:', 'https:'].includes(parsed.protocol)
+      || parsed.username || parsed.password || parsed.pathname !== '/'
+      || parsed.search || parsed.hash) return null;
+    return { origin: parsed.origin.toLowerCase(), projectId, scopeId };
+  } catch {
+    return null;
+  }
 }
 
 async function syncDirectoryBestEffort(directory, fsApi) {

@@ -4,12 +4,13 @@ import {
   openCloudApp,
 } from "../../lib/cloudApi";
 import type { CloudServiceMainViewProps, CloudWorkspaceSection } from "./types";
-import { getResolvedCloudProjectId } from "./attachment";
+import { getResolvedCloudProjectId } from "./context";
 import { getCloudAuthEmail, getCloudAuthSession, isCloudAuthBlocking, useCloudSessionForEnvironment } from "./auth";
 import { useDesktopCloudData } from "./data";
 import { resolveCloudEnvironment } from "./environment";
 import { CloudWorkspaceLoadingState } from "./components/shared";
 import { CloudProjectBrowserSignedOut } from "./components/ProjectBrowser";
+import { CloudLocalOnlyWorkspace } from "./states";
 import { CloudRouter } from "./routes/CloudRouter";
 import type { CloudActionState } from "./routes/CloudRouter";
 import { getCloudRouteWebPath, isCloudAccountSection, normalizeCloudSection } from "./routes/cloudRoutes";
@@ -18,11 +19,10 @@ import { cloudMessage, formatCloudMessage } from "./cloudPresentation";
 export function CloudServiceMainView({
   workspace,
   status,
-  puppyoneConfig,
   cloudApiBaseUrl: desktopApiBaseUrl,
   cloudSession,
   sessionRestoring = false,
-  attachment = null,
+  projectContext = null,
   onCloudSessionChange,
   activeSection,
   loading,
@@ -30,8 +30,7 @@ export function CloudServiceMainView({
   cloudBackupLoading,
   cloudBackupError,
   onStartPuppyoneBackup,
-  onConfigureCloudRemote,
-  onDetachCloudProject,
+  onRemoveCloudRemote,
   onSelectSection,
   onRefresh,
   onOpenDetails,
@@ -39,25 +38,30 @@ export function CloudServiceMainView({
 }: CloudServiceMainViewProps) {
   const { t } = useLocalization();
   const cloudEnvironment = useMemo(
-    () => resolveCloudEnvironment({ status, puppyoneConfig, desktopApiBaseUrl }),
-    [desktopApiBaseUrl, puppyoneConfig, status],
+    () => resolveCloudEnvironment({ status, desktopApiBaseUrl }),
+    [desktopApiBaseUrl, status],
   );
   const cloudRemote = cloudEnvironment.cloudRemote;
   const cloudApiBaseUrl = cloudEnvironment.apiBaseUrl;
+  const inCloudGlobalAccountSection = isCloudAccountSection(activeSection)
+    || activeSection === "templates";
+  const localOnlyContext = projectContext?.status === "local-only"
+    && !inCloudGlobalAccountSection;
   const cloudAuthState = useCloudSessionForEnvironment({
     cloudSession,
     sessionRestoring,
+    restoreEnabled: !localOnlyContext,
     environment: cloudEnvironment,
     onCloudSessionChange,
   });
   const effectiveCloudSession = getCloudAuthSession(cloudAuthState);
   const loadAggregateProjectDetails = shouldLoadAggregateProjectDetails(activeSection);
-  const contextProjectId = attachment ? getResolvedCloudProjectId(attachment) : null;
+  const contextProjectId = projectContext ? getResolvedCloudProjectId(projectContext) : null;
   const cloudData = useDesktopCloudData({
     session: effectiveCloudSession,
     cloudEnvironment,
     explicitProjectId: null,
-    boundProjectId: contextProjectId,
+    repositoryProjectId: contextProjectId,
     onSessionChange: onCloudSessionChange,
     workspaceRevisionKey: status?.headCommitId ?? null,
     loadProjectDetails: loadAggregateProjectDetails,
@@ -86,6 +90,34 @@ export function CloudServiceMainView({
     }
   }, [activeSection, onSelectSection]);
 
+  const currentBranch = status?.branches.find((branch) => branch.current) ?? null;
+  const localChangeCount =
+    (status?.stagedEntries.length ?? 0) +
+    (status?.unstagedEntries.length ?? 0) +
+    (status?.untrackedEntries.length ?? 0);
+  const branchName = currentBranch?.name ?? status?.branch ?? t("cloud.git.noBranch");
+
+  if (localOnlyContext) {
+    return (
+      <main className="desktop-cloud-main-view">
+        <div className="desktop-cloud-page-shell">
+          <CloudLocalOnlyWorkspace
+            workspace={workspace}
+            accountEmail={accountEmail}
+            branchName={branchName}
+            localChangeCount={localChangeCount}
+            backupLoading={cloudBackupLoading}
+            cloudRemote={cloudRemote}
+            onBackupWorkspace={() => {
+              if (effectiveCloudSession) onStartPuppyoneBackup();
+              else onOpenDetails();
+            }}
+          />
+        </div>
+      </main>
+    );
+  }
+
   if (cloudAuthState.status === "restoring" && !effectiveCloudSession) {
     return (
       <main className="desktop-cloud-main-view">
@@ -111,96 +143,17 @@ export function CloudServiceMainView({
     onStartPuppyoneBackup();
   };
 
-  const handleConfirmLegacyBinding = async ({
-    projectId,
-    target,
-  }: {
-    projectId: string;
-    target: import("./repositoryTarget").RepositoryTarget;
-  }) => {
-    if (!cloudRemote || actionRequestRef.current || cloudBackupLoading) return;
-    const request = Symbol("confirm-legacy-cloud-binding");
-    const requestContext = actionContextKey;
+  const handleRemoveCloudRemote = async () => {
+    if (!onRemoveCloudRemote || actionRequestRef.current) return;
+    const request = Symbol("remove-cloud-git-remote");
     actionRequestRef.current = request;
-    setCloudAction({ kind: "connect", projectId, notice: null, error: null });
+    setCloudAction({ kind: "configure-remote", projectId: contextProjectId, notice: null, error: null });
     try {
-      const configuredStatus = await onConfigureCloudRemote(projectId, {
-        target,
-      });
-      if (actionContextRef.current !== requestContext) return;
-      if (!configuredStatus) {
-        setCloudAction({ kind: null, projectId, notice: null, error: cloudMessage("workspace-unavailable") });
-        return;
-      }
-      setCloudAction({
-        kind: null,
-        projectId,
-        notice: cloudMessage(target.kind === "scope" ? "scoped-binding-confirmed" : "project-binding-confirmed"),
-        error: null,
-      });
-      onSelectSection("contents");
-    } catch (actionError) {
-      if (actionContextRef.current !== requestContext) return;
-      setCloudAction({
-        kind: null,
-        projectId,
-        notice: null,
-        error: cloudMessage("confirm-binding-failed", undefined, actionError instanceof Error ? actionError.message : undefined),
-      });
-    } finally {
-      if (actionRequestRef.current === request) actionRequestRef.current = null;
-    }
-  };
-
-  const handleRepairCloudRemote = async () => {
-    if (
-      attachment?.status !== "resolved"
-      || attachment.bindingStatus !== "bound"
-      || attachment.warning?.code !== "binding-remote-missing"
-      || actionRequestRef.current
-      || cloudBackupLoading
-    ) return;
-
-    const request = Symbol("repair-cloud-remote");
-    const requestContext = actionContextKey;
-    const projectId = attachment.projectId;
-    actionRequestRef.current = request;
-    setCloudAction({ kind: "connect", projectId, notice: null, error: null });
-    try {
-      const configuredStatus = await onConfigureCloudRemote(projectId, {
-        target: attachment.target,
-      });
-      if (actionContextRef.current !== requestContext) return;
-      if (!configuredStatus) {
-        setCloudAction({ kind: null, projectId, notice: null, error: cloudMessage("workspace-unavailable") });
-        return;
-      }
-      setCloudAction({ kind: null, projectId, notice: null, error: null });
-      onSelectSection("contents");
-    } catch (actionError) {
-      if (actionContextRef.current !== requestContext) return;
-      setCloudAction({
-        kind: null,
-        projectId,
-        notice: null,
-        error: cloudMessage("connect-failed", undefined, actionError instanceof Error ? actionError.message : undefined),
-      });
-    } finally {
-      if (actionRequestRef.current === request) actionRequestRef.current = null;
-    }
-  };
-
-  const handleDetachCloudProject = async () => {
-    if (!onDetachCloudProject || actionRequestRef.current) return;
-    const request = Symbol("detach-cloud-project");
-    actionRequestRef.current = request;
-    setCloudAction({ kind: "connect", projectId: contextProjectId, notice: null, error: null });
-    try {
-      await onDetachCloudProject();
+      await onRemoveCloudRemote();
       setCloudAction({
         kind: null,
         projectId: null,
-        notice: cloudMessage("cloud-detached"),
+        notice: cloudMessage("cloud-remote-removed"),
         error: null,
       });
       onSelectSection("overview");
@@ -209,7 +162,7 @@ export function CloudServiceMainView({
         kind: null,
         projectId: contextProjectId,
         notice: null,
-        error: cloudMessage("detach-failed", undefined, actionError instanceof Error ? actionError.message : undefined),
+        error: cloudMessage("remove-remote-failed", undefined, actionError instanceof Error ? actionError.message : undefined),
       });
     } finally {
       if (actionRequestRef.current === request) actionRequestRef.current = null;
@@ -243,15 +196,6 @@ export function CloudServiceMainView({
   }
 
   const accountConnected = Boolean(accountEmail);
-  const currentBranch = status?.branches.find((branch) => branch.current) ?? null;
-  const localChangeCount =
-    (status?.stagedEntries.length ?? 0) +
-    (status?.unstagedEntries.length ?? 0) +
-    (status?.untrackedEntries.length ?? 0);
-  const branchName = currentBranch?.name ?? status?.branch ?? t("cloud.git.noBranch");
-  const inCloudGlobalAccountSection = isCloudAccountSection(activeSection)
-    || activeSection === "templates";
-
   return (
     <main className={`desktop-cloud-main-view ${activeSection === "automation" ? "desktop-cloud-automation-main-view" : ""}`}>
       <div className={`desktop-cloud-page-shell ${activeSection === "automation" ? "desktop-cloud-automation-page-shell" : ""}`}>
@@ -260,21 +204,9 @@ export function CloudServiceMainView({
             {t("cloud.offline")}
           </div>
         )}
-        {attachment?.status === "resolved" && attachment.warning && (
+        {projectContext?.status === "resolved" && projectContext.warning && (
           <div className="desktop-cloud-main-alert warning" role="status">
-            <span>{formatCloudMessage(attachment.warning, t)}</span>
-            {attachment.warning.code === "binding-remote-missing"
-              && attachment.bindingStatus === "bound"
-              && (
-                <button
-                  className="desktop-cloud-row-action"
-                  type="button"
-                  disabled={cloudAction.kind === "connect" || cloudBackupLoading}
-                  onClick={() => void handleRepairCloudRemote()}
-                >
-                  {t(cloudAction.kind === "connect" ? "cloud.common.connecting" : "cloud.common.repairConnection")}
-                </button>
-              )}
+            <span>{formatCloudMessage(projectContext.warning, t)}</span>
           </div>
         )}
         {!inCloudGlobalAccountSection && error && <div className="desktop-cloud-main-alert">{error}</div>}
@@ -291,7 +223,7 @@ export function CloudServiceMainView({
           cloudApiBaseUrl={cloudApiBaseUrl}
           cloudRemote={cloudRemote}
           cloudData={cloudData}
-          attachment={attachment}
+          projectContext={projectContext}
           activeSection={activeSection}
           accountEmail={accountEmail}
           accountConnected={accountConnected}
@@ -304,13 +236,12 @@ export function CloudServiceMainView({
           onOpenProject={handleOpenProject}
           onOpenGitSettings={onOpenGitSettings}
           onSelectSection={onSelectSection}
-          onRetryBinding={() => {
+          onRetryContext={() => {
             void cloudData.reload();
             onRefresh();
           }}
           onUseAnotherAccount={() => onCloudSessionChange(null)}
-          onConfirmLegacyBinding={(input) => void handleConfirmLegacyBinding(input)}
-          onDetachCloudProject={onDetachCloudProject ? () => void handleDetachCloudProject() : undefined}
+          onRemoveCloudRemote={onRemoveCloudRemote ? () => void handleRemoveCloudRemote() : undefined}
         />
       </div>
     </main>

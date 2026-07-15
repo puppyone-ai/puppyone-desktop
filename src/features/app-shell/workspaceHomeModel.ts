@@ -9,7 +9,7 @@ import {
   isCloudWorkspace,
 } from "../../lib/cloudDataPort";
 import type { DesktopWorkspaceSwitcherItem } from "./DesktopWorkspaceSwitcher";
-import type { RecentWorkspaceCloudBinding } from "../cloud/workspace/cloudProjectResolution";
+import type { RecentWorkspaceCloudContext } from "../cloud/workspace/cloudProjectResolution";
 import type { getRecentWorkspaces } from "../../lib/localFiles";
 
 export function mergeWorkspaceLists(current: Workspace[], incoming: Workspace[]) {
@@ -49,12 +49,12 @@ export function getWorkspaceSwitcherItems({
 }
 
 export function getHomeProjectItems({
-  bindings,
+  contexts,
   cloudProjects,
   includeUnboundCloudProjects = true,
   recentWorkspaceItems,
 }: {
-  bindings: Record<string, RecentWorkspaceCloudBinding>;
+  contexts: Record<string, RecentWorkspaceCloudContext>;
   cloudProjects: DesktopCloudProject[];
   includeUnboundCloudProjects?: boolean;
   recentWorkspaceItems: RecentWorkspaceHomeItem[];
@@ -64,18 +64,18 @@ export function getHomeProjectItems({
   const items: ProjectHomeItem[] = [];
 
   for (const item of recentWorkspaceItems.slice(0, 20)) {
-    const binding = bindings[item.workspace.id];
-    const project = binding?.projectId ? cloudProjectById.get(binding.projectId) ?? null : null;
+    const context = contexts[item.workspace.id];
+    const project = context?.projectId ? cloudProjectById.get(context.projectId) ?? null : null;
     if (project) consumedCloudProjectIds.add(project.id);
 
-    const cloudLinked = Boolean(project || binding?.cloudLinked);
+    const hasCloudRemote = context?.hasCloudRemote === true;
     items.push({
       id: project ? `cloud-local:${project.id}:${item.workspace.id}` : `local:${item.workspace.id}`,
-      kind: project ? "cloud-local" : cloudLinked ? "cloud-linked" : "local",
+      kind: project ? "cloud-local" : hasCloudRemote ? "cloud-linked" : "local",
       label: item.workspace.path,
       detail: project?.name ?? null,
       localPath: item.workspace.path,
-      cloudProjectId: binding?.projectId ?? project?.id ?? null,
+      cloudProjectId: context?.projectId ?? project?.id ?? null,
       description: project?.description ?? null,
       lastOpenedAt: item.lastOpenedAt ?? null,
       updatedAt: project?.updated_at ?? null,
@@ -99,18 +99,18 @@ export function getHomeProjectItems({
   return items;
 }
 
-export function findRecentLocalWorkspaceBindingForCloudProject({
-  bindings,
+export function findRecentLocalWorkspaceForCloudProject({
+  contexts,
   projectId,
   recentWorkspaceItems,
 }: {
-  bindings: Record<string, RecentWorkspaceCloudBinding>;
+  contexts: Record<string, RecentWorkspaceCloudContext>;
   projectId: string | null;
   recentWorkspaceItems: RecentWorkspaceHomeItem[];
 }): RecentWorkspaceHomeItem | null {
   if (!projectId) return null;
   return recentWorkspaceItems.find((item) => (
-    bindings[item.workspace.id]?.projectId === projectId
+    contexts[item.workspace.id]?.projectId === projectId
   )) ?? null;
 }
 

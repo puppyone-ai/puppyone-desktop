@@ -1,13 +1,13 @@
 import type { Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
-import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import type { ProjectCloudAttachment } from "./attachment";
+import type { GitStatusSnapshot } from "../../types/electron";
+import type { ProjectCloudContext } from "./context";
 import type { RepositoryTarget } from "./repositoryTarget";
 import type { CloudWorkspaceSection } from "./routes/cloudRouteIds";
 
 export type { CloudWorkspaceSection } from "./routes/cloudRouteIds";
 
-export type CloudWorkspaceAttachOptions = {
+export type CloudGitRemoteOptions = {
   target?: RepositoryTarget;
 };
 
@@ -43,11 +43,10 @@ export type CloudServicePanelProps = {
 export type CloudServiceMainViewProps = {
   workspace: Workspace;
   status: GitStatusSnapshot | null;
-  puppyoneConfig: PuppyoneWorkspaceConfig | null;
   cloudApiBaseUrl: string | null;
   cloudSession: DesktopCloudSession | null;
   sessionRestoring?: boolean;
-  attachment?: ProjectCloudAttachment | null;
+  projectContext?: ProjectCloudContext | null;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   activeSection: CloudWorkspaceSection;
   loading: boolean;
@@ -55,11 +54,7 @@ export type CloudServiceMainViewProps = {
   cloudBackupLoading: boolean;
   cloudBackupError: string | null;
   onStartPuppyoneBackup: () => void;
-  onConfigureCloudRemote: (
-    projectId?: string | null,
-    options?: CloudWorkspaceAttachOptions,
-  ) => Promise<GitStatusSnapshot | null>;
-  onDetachCloudProject?: () => Promise<void>;
+  onRemoveCloudRemote?: () => Promise<void>;
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onRefresh: () => void;
   onOpenDetails: () => void;

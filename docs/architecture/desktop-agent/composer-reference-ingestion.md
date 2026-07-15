@@ -196,7 +196,7 @@ selected Agent rejects their type, then presents the rejection as product UI.
 
 Workspace context remains path-based. At turn start main:
 
-1. authorizes the requesting webContents and workspace binding;
+1. authorizes the requesting webContents against its active workspace;
 2. resolves the submitted relative path against the canonical root;
 3. realpaths the target and rejects traversal/symlink escape;
 4. validates file or directory type against the declared entry type;
@@ -403,7 +403,7 @@ Rejected:
 - claiming every file type is supported because a file picker can select it;
 - clearing chips before native turn acceptance or omitting them from replay.
 
-This contract does not create cloud attachment storage, durable PuppyOne Chat
+This contract does not create Cloud-side file storage, durable PuppyOne Chat
 History, cross-device synchronization, automatic document extraction or a
 universal native file protocol. Those require separate product and security
 decisions.

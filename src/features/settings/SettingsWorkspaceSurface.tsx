@@ -86,7 +86,6 @@ export type SettingsWorkspaceSurfaceProps = {
     saving: boolean;
     error: string | null;
     change: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
-    regenerateProjectId: () => Promise<PuppyoneWorkspaceConfig | null>;
     unlink: () => Promise<void>;
   };
   updates: {
@@ -161,7 +160,6 @@ export function createSettingsWorkspaceSurface({
         onAiEditAssistEnabledChange={preferences.setAiEditAssistEnabled}
         onCloudSessionChange={cloud.onSessionChange}
         onPuppyoneConfigChange={workspaceConfig.change}
-        onRegeneratePuppyoneProjectId={workspaceConfig.regenerateProjectId}
         onUnlinkWorkspace={workspaceConfig.unlink}
         onRefreshGitStatus={git.refresh}
         onCheckForUpdates={() => void updates.check()}

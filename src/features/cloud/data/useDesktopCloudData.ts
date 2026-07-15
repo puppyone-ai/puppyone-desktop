@@ -19,8 +19,8 @@ import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation"
 
 export type DesktopCloudDataState = {
   projects: DesktopCloudProject[];
-  mappedProjectId: string | null;
-  mappedProject: DesktopCloudProject | null;
+  contextProjectId: string | null;
+  contextProject: DesktopCloudProject | null;
   activeProjectId: string | null;
   activeProject: DesktopCloudProject | null;
   dashboard: DesktopCloudDashboard | null;
@@ -46,7 +46,7 @@ export function useDesktopCloudData({
   session,
   cloudEnvironment,
   explicitProjectId,
-  boundProjectId = null,
+  repositoryProjectId = null,
   onSessionChange,
   workspaceRevisionKey = null,
   loadProjectDetails = true,
@@ -56,18 +56,18 @@ export function useDesktopCloudData({
   /** Exact Project identity owned by an explicit global/Cloud-only route. */
   explicitProjectId: string | null;
   /** Exact Project context resolved for the local workspace by the app shell. */
-  boundProjectId?: string | null;
+  repositoryProjectId?: string | null;
   onSessionChange: (session: DesktopCloudSession | null) => void;
   workspaceRevisionKey?: string | null;
   loadProjectDetails?: boolean;
 }): DesktopCloudDataState {
   const cloudApiBaseUrl = cloudEnvironment.apiBaseUrl;
-  const normalizedBoundProjectId = boundProjectId?.trim() || null;
+  const normalizedRepositoryProjectId = repositoryProjectId?.trim() || null;
   const contextKey = createCloudDataContextKey({
     session,
     cloudEnvironment,
     explicitProjectId,
-    boundProjectId: normalizedBoundProjectId,
+    repositoryProjectId: normalizedRepositoryProjectId,
   });
   const [state, setState] = useState<DesktopCloudDataInternalState>(() => createCloudDataState());
   const activeRequestRef = useRef(0);
@@ -80,12 +80,12 @@ export function useDesktopCloudData({
   const load = useCallback(async () => {
     const requestId = activeRequestRef.current + 1;
     activeRequestRef.current = requestId;
-    const activeProjectId = explicitProjectId?.trim() || normalizedBoundProjectId;
+    const activeProjectId = explicitProjectId?.trim() || normalizedRepositoryProjectId;
 
     const activeSession = sessionRef.current;
     if (!activeSession || !activeProjectId) {
       setState(createCloudDataState({
-        mappedProjectId: normalizedBoundProjectId,
+        contextProjectId: normalizedRepositoryProjectId,
         activeProjectId,
         initializing: false,
         loading: false,
@@ -104,8 +104,8 @@ export function useDesktopCloudData({
             warning: null,
           }
         : createCloudDataState({
-            mappedProjectId: normalizedBoundProjectId,
-            activeProjectId: explicitProjectId || normalizedBoundProjectId,
+            contextProjectId: normalizedRepositoryProjectId,
+            activeProjectId: explicitProjectId || normalizedRepositoryProjectId,
             initializing: true,
             loading: true,
             contextKey,
@@ -122,17 +122,17 @@ export function useDesktopCloudData({
       const projects = [project];
       if (activeRequestRef.current !== requestId) return;
 
-      // Mapping is owned by useCloudWorkspaceBinding. This hook only loads data
-      // for an already-authorized local context or an explicit Project route.
-      const mappedProjectId = normalizedBoundProjectId;
-      const mappedProject = mappedProjectId
-        ? projects.find((project) => project.id === mappedProjectId) ?? null
+      // Repository-context resolution owns identity and authorization. This
+      // hook only loads data for that Project or an explicit global route.
+      const contextProjectId = normalizedRepositoryProjectId;
+      const contextProject = contextProjectId
+        ? projects.find((project) => project.id === contextProjectId) ?? null
         : null;
       if (!loadProjectDetails) {
         setState(createCloudDataState({
           projects,
-          mappedProjectId,
-          mappedProject,
+          contextProjectId,
+          contextProject,
           activeProjectId,
           activeProject: project,
           initializing: false,
@@ -153,8 +153,8 @@ export function useDesktopCloudData({
 
       setState({
         projects,
-        mappedProjectId,
-        mappedProject,
+        contextProjectId,
+        contextProject,
         activeProjectId,
         activeProject: details.activeProject,
         dashboard: details.dashboard,
@@ -194,7 +194,7 @@ export function useDesktopCloudData({
     cloudApiBaseUrl,
     contextKey,
     loadProjectDetails,
-    normalizedBoundProjectId,
+    normalizedRepositoryProjectId,
     explicitProjectId,
   ]);
 
@@ -208,8 +208,8 @@ export function useDesktopCloudData({
   if (session && !hasCurrentContext) {
     return {
       ...toPublicCloudDataState(createCloudDataState({
-        mappedProjectId: normalizedBoundProjectId,
-        activeProjectId: explicitProjectId || normalizedBoundProjectId,
+        contextProjectId: normalizedRepositoryProjectId,
+        activeProjectId: explicitProjectId || normalizedRepositoryProjectId,
         initializing: true,
         loading: true,
       })),
@@ -224,12 +224,12 @@ function createCloudDataContextKey({
   session,
   cloudEnvironment,
   explicitProjectId,
-  boundProjectId,
+  repositoryProjectId,
 }: {
   session: DesktopCloudSession | null;
   cloudEnvironment: CloudEnvironment;
   explicitProjectId: string | null;
-  boundProjectId: string | null;
+  repositoryProjectId: string | null;
 }): string {
   if (!session) return "signed-out";
   return [
@@ -238,8 +238,7 @@ function createCloudDataContextKey({
     session.session_generation,
     session.api_base_url ?? "",
     cloudEnvironment.cloudRemote?.rawUrl ?? "",
-    cloudEnvironment.configuredProjectId ?? "",
-    boundProjectId ?? "",
+    repositoryProjectId ?? "",
     explicitProjectId ?? "",
   ].join("\n");
 }
@@ -249,8 +248,8 @@ function createCloudDataState(
 ): DesktopCloudDataInternalState {
   return {
     projects: [],
-    mappedProjectId: null,
-    mappedProject: null,
+    contextProjectId: null,
+    contextProject: null,
     activeProjectId: null,
     activeProject: null,
     dashboard: null,

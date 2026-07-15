@@ -59,8 +59,8 @@ const cloudApi = read("src/lib/cloudApi.ts");
 if (!cloudApi.includes('REPOSITORY_TARGET_CONTRACT_VERSION = "2"')) {
   errors.push("Desktop Cloud requests must advertise repository-target contract v2");
 }
-if (/DesktopCloudCanonicalProjectContext\s*=\s*DesktopCloudLegacy/.test(cloudApi)) {
-  errors.push("canonical locator resolution must not reuse the legacy confirmation DTO");
+if (!cloudApi.includes("getCloudRepositoryContext") || cloudApi.includes("remote_url")) {
+  errors.push("Cloud context must send an ordinary Project target, never a local remote URL");
 }
 
 const forbidden = /\b(?:binding_kind|bindingKind|root_scope_id|rootScope|rootScopeId|is_root|candidateScopeId)\b/;
@@ -76,9 +76,12 @@ for (const filePath of [
 }
 
 const configTypes = read("src/types/electron.d.ts");
-const cloudConfig = configTypes.match(/cloud:\s*\{[\s\S]*?\n\s*\};/)?.[0] ?? "";
-if (/scope|credential|accessKey|access_key/i.test(cloudConfig)) {
-  errors.push("local workspace config must remain target-secret-free and store no Scope identity");
+const workspaceConfig = configTypes.match(/export type PuppyoneWorkspaceConfig\s*=\s*\{[\s\S]*?\n\};/)?.[0] ?? "";
+if (/\b(?:cloud|project)\s*:|scope|credential|accessKey|access_key|binding/i.test(workspaceConfig)) {
+  errors.push("local workspace config must store no Cloud/Project identity, target, credential, or Binding");
+}
+if (/\bproject\s*:/.test(read("local-api/workspace-config.mjs"))) {
+  errors.push("workspace config normalization must physically discard the obsolete local Project identity");
 }
 
 if (errors.length > 0) {

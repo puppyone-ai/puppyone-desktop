@@ -1,24 +1,16 @@
 /**
  * @vitest-environment happy-dom
  */
-import React from "react";
+import React, { useState } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Workspace } from "@puppyone/shared-ui";
-import type {
-  DesktopCloudCanonicalProjectContext,
-  DesktopCloudSession,
-  DesktopCloudWorkspaceBinding,
-} from "../src/lib/cloudApi";
-import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../src/types/electron";
+import type { DesktopCloudSession } from "../src/lib/cloudApi";
+import type { GitStatusSnapshot } from "../src/types/electron";
 
 const cloudApi = vi.hoisted(() => ({
-  getCloudProject: vi.fn(),
-  getCloudProjectReadiness: vi.fn(),
-  getCloudWorkspaceBinding: vi.fn(),
-  resolveCanonicalCloudWorkspaceRemote: vi.fn(),
-  resolveLegacyCloudWorkspaceRemote: vi.fn(),
+  getCloudRepositoryContext: vi.fn(),
 }));
 
 vi.mock("../src/lib/cloudApi", async () => {
@@ -26,13 +18,9 @@ vi.mock("../src/lib/cloudApi", async () => {
   return { ...actual, ...cloudApi };
 });
 
-import { useCloudWorkspaceBinding } from "../src/features/cloud/workspace/useCloudWorkspaceBinding";
-import type { RecentWorkspaceCloudBinding } from "../src/features/cloud/workspace/cloudProjectResolution";
-import { useProjectCloudAttachment } from "../src/features/cloud/attachment/useProjectCloudAttachment";
-import {
-  createWorkspaceCloudResolutionKey,
-  shouldBlockWorkspaceCloudResolution,
-} from "../src/features/cloud/workspace/workspaceCloudResolutionKey";
+import { useCloudWorkspaceContext } from "../src/features/cloud/workspace/useCloudWorkspaceContext";
+import type { RecentWorkspaceCloudContext } from "../src/features/cloud/workspace/cloudProjectResolution";
+import { shouldBlockWorkspaceCloudResolution } from "../src/features/cloud/workspace/workspaceCloudResolutionKey";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -47,794 +35,228 @@ const session = {
   expires_in: 3_600,
 } satisfies DesktopCloudSession;
 
-function localWorkspace(id: string): Workspace {
-  return {
-    id,
-    name: id,
-    path: `/tmp/${id}`,
-    workspaceInstanceId: `instance-${id}`,
-  } as Workspace;
-}
+const workspace: Workspace = {
+  id: "local:notes",
+  name: "Notes",
+  path: "/tmp/notes",
+  workspaceInstanceId: "local-only-instance",
+  status: "protected",
+};
 
-function status(...urls: string[]): GitStatusSnapshot {
+function gitStatus(...remotes: Array<{ fetch: string; push?: string }>): GitStatusSnapshot {
   return {
-    remotes: urls.map((url, index) => ({
+    remotes: remotes.map((remote, index) => ({
       name: `remote-${index}`,
-      fetchUrl: url,
-      pushUrl: url,
+      fetchUrl: remote.fetch,
+      pushUrl: remote.push ?? remote.fetch,
       branches: [],
     })),
   } as GitStatusSnapshot;
 }
 
-function config(
-  workspace: Workspace,
-  projectId: string | null = null,
-  bindingId: string | null = null,
-): PuppyoneWorkspaceConfig {
-  return {
-    version: 2,
-    project: { id: null, workspaceInstanceId: workspace.workspaceInstanceId ?? null },
-    sync: { sourceOfTruth: { service: "puppyone", remote: null, branch: null } },
-    git: { primaryRemote: null, watchedBranch: null },
-    backup: { enabled: false, service: "puppyone", remote: null, branch: null },
-    cloud: {
-      projectId,
-      bindingId,
-      origin: projectId ? "https://cloud.example" : null,
-    },
-  };
-}
-
-function canonicalContext(
-  projectId: string,
-  scopeId: string | null = null,
-  capabilities: string[] = ["project.read", "content.read"],
-): DesktopCloudCanonicalProjectContext {
-  return {
-    target: scopeId
-      ? { kind: "scope", project_id: projectId, scope_id: scopeId }
-      : { kind: "project_root", project_id: projectId },
-    project: {
-      id: projectId,
-      name: `Project ${projectId}`,
-      org_id: "org-1",
-      capabilities,
-    },
-    scope_path: scopeId ? `docs/${scopeId}` : null,
-  };
-}
-
-function workspaceBinding(
-  workspace: Workspace,
-  overrides: Partial<DesktopCloudWorkspaceBinding> = {},
-): DesktopCloudWorkspaceBinding {
-  return {
-    id: "binding-1",
-    org_id: "org-1",
-    target: { kind: "project_root", project_id: "project-1" },
-    scope_path: null,
-    workspace_instance_id: workspace.workspaceInstanceId ?? "",
-    bound_user_id: "user-1",
-    cloud_origin: "https://cloud.example",
-    mode: "rw",
-    status: "active",
-    usable: true,
-    created_at: "2026-07-14T00:00:00Z",
-    updated_at: "2026-07-14T00:00:00Z",
-    last_seen_at: "2026-07-14T00:00:00Z",
-    remote: {
-      url: "https://cloud.example/git/project-1.git",
-      target: { kind: "project_root", project_id: "project-1" },
-      username: "x-puppyone-token",
-    },
-    ...overrides,
-  };
-}
-
-function ResolutionProbe({
-  workspace,
-  gitStatus,
-  workspaceConfig,
-  activeSession = session,
-  resolutionInputsLoading = false,
+function ContextHarness({
+  activeCloudSession = session,
+  status,
 }: {
-  workspace: Workspace;
-  gitStatus: GitStatusSnapshot;
-  workspaceConfig?: PuppyoneWorkspaceConfig;
-  activeSession?: DesktopCloudSession | null;
-  resolutionInputsLoading?: boolean;
+  activeCloudSession?: DesktopCloudSession | null;
+  status: GitStatusSnapshot;
 }) {
-  const [bindings, setBindings] = React.useState<Record<string, RecentWorkspaceCloudBinding>>({});
-  const updateSession = React.useCallback(() => undefined, []);
-  const effectiveConfig = React.useMemo(
-    () => workspaceConfig ?? config(workspace),
-    [workspace, workspaceConfig],
-  );
-
-  useCloudWorkspaceBinding({
-    activeCloudSession: activeSession,
-    activeGitStatus: gitStatus,
+  const [contexts, setContexts] = useState<Record<string, RecentWorkspaceCloudContext>>({});
+  const updateCloudSession = React.useCallback(() => undefined, []);
+  useCloudWorkspaceContext({
+    activeCloudSession,
+    activeGitStatus: status,
     cloudEnabled: true,
     desktopCloudApiBaseUrl: session.api_base_url,
-    puppyoneConfig: effectiveConfig,
-    resolutionInputsLoading,
-    setRecentWorkspaceCloudBindings: setBindings,
-    updateCloudSession: updateSession,
-    workspace,
-    workspaceIsCloud: false,
-  });
-
-  return <output data-bindings={JSON.stringify(bindings)} />;
-}
-
-function readBindings(container: HTMLElement) {
-  return JSON.parse(
-    container.querySelector("output")?.getAttribute("data-bindings") ?? "{}",
-  ) as Record<string, RecentWorkspaceCloudBinding>;
-}
-
-function AttachmentProbe({
-  workspace,
-  gitStatus,
-  workspaceConfig,
-  bindings,
-}: {
-  workspace: Workspace;
-  gitStatus: GitStatusSnapshot;
-  workspaceConfig: PuppyoneWorkspaceConfig;
-  bindings: Record<string, RecentWorkspaceCloudBinding>;
-}) {
-  const attachment = useProjectCloudAttachment({
-    workspace,
-    workspaceIsCloud: false,
-    puppyoneConfig: workspaceConfig,
-    recentWorkspaceCloudBindings: bindings,
-    activeGitStatus: gitStatus,
-    activeCloudSession: session,
-    desktopCloudApiBaseUrl: session.api_base_url,
     resolutionInputsLoading: false,
+    setRecentWorkspaceCloudContexts: setContexts,
+    updateCloudSession,
+    workspace,
+    workspaceIsCloud: false,
   });
-  return <output data-attachment={JSON.stringify(attachment)} />;
+  return <output data-context={JSON.stringify(contexts[workspace.id] ?? null)} />;
 }
 
-async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise; });
-  return { promise, resolve };
-}
-
-let root: Root | null = null;
-
-afterEach(() => {
-  act(() => root?.unmount());
-  root = null;
-  document.body.innerHTML = "";
-});
+let container: HTMLDivElement;
+let root: Root;
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  cloudApi.getCloudProject.mockImplementation(async (_session, projectId: string) => ({
-    id: projectId,
-    name: `Project ${projectId}`,
-    org_id: "org-1",
-    capabilities: ["project.read", "content.read"],
-  }));
-  cloudApi.getCloudProjectReadiness.mockResolvedValue({
-    project_id: "project-1",
-    git: { state: "ready" },
-    claude: { ready: true, blockers: [] },
-  });
+  cloudApi.getCloudRepositoryContext.mockReset();
+  container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
 });
 
-describe("current Local workspace Cloud context", () => {
-  it("blocks only the initial Git snapshot, not background Git refreshes", () => {
-    expect(shouldBlockWorkspaceCloudResolution({
-      gitStatusError: null,
-      gitStatusPath: null,
-      puppyoneConfigLoading: false,
-      workspacePath: "/tmp/workspace-a",
-    })).toBe(true);
-    expect(shouldBlockWorkspaceCloudResolution({
-      gitStatusError: null,
-      gitStatusPath: "/tmp/workspace-a",
-      puppyoneConfigLoading: false,
-      workspacePath: "/tmp/workspace-a",
-    })).toBe(false);
-    expect(shouldBlockWorkspaceCloudResolution({
-      gitStatusError: "Git status unavailable",
-      gitStatusPath: null,
-      puppyoneConfigLoading: false,
-      workspacePath: "/tmp/workspace-a",
-    })).toBe(false);
+afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+});
+
+async function render(element: React.ReactNode) {
+  await act(async () => {
+    root.render(element);
+    await Promise.resolve();
+  });
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const context = readContext();
+    if (context) return context;
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  }
+  return readContext();
+}
+
+function readContext(): RecentWorkspaceCloudContext | null {
+  return JSON.parse(container.querySelector("output")?.getAttribute("data-context") ?? "null");
+}
+
+describe("remote-first Cloud repository context", () => {
+  it("treats a repository without a PuppyOne remote as local-only and performs no Cloud request", async () => {
+    const context = await render(<ContextHarness status={gitStatus()} />);
+    expect(context).toMatchObject({
+      projectId: null,
+      hasCloudRemote: false,
+      error: null,
+      reason: null,
+    });
+    expect(cloudApi.getCloudRepositoryContext).not.toHaveBeenCalled();
   });
 
-  it("authorizes a canonical scoped locator and resolves it without creating a binding", async () => {
-    const workspace = localWorkspace("workspace-a");
-    const remoteUrl = "https://cloud.example/git/project-1/scopes/scope-docs.git";
-    cloudApi.resolveCanonicalCloudWorkspaceRemote.mockResolvedValue(
-      canonicalContext("project-1", "scope-docs"),
-    );
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(<ResolutionProbe workspace={workspace} gitStatus={status(remoteUrl)} />);
-      await flushPromises();
+  it("resolves a canonical Project remote through the user session", async () => {
+    cloudApi.getCloudRepositoryContext.mockResolvedValue({
+      target: { kind: "project_root", project_id: "project-1" },
+      project: { id: "project-1", name: "Notes", capabilities: ["content.read"] },
+      scope_path: null,
     });
-
-    expect(cloudApi.resolveCanonicalCloudWorkspaceRemote).toHaveBeenCalledWith(
+    const context = await render(
+      <ContextHarness status={gitStatus({ fetch: "https://cloud.example/git/project-1.git" })} />,
+    );
+    expect(context).toMatchObject({
+      projectId: "project-1",
+      target: { kind: "project_root", project_id: "project-1" },
+      hasCloudRemote: true,
+      capabilities: ["content.read"],
+      error: null,
+    });
+    expect(cloudApi.getCloudRepositoryContext).toHaveBeenCalledWith(
       session,
-      remoteUrl,
+      "project-1",
+      { kind: "project_root", project_id: "project-1" },
       expect.any(Function),
       session.api_base_url,
     );
-    expect(readBindings(container)[workspace.id]).toMatchObject({
-      projectId: "project-1",
-      resolutionSource: "canonical-remote",
-      bindingStatus: "not-bound",
-      bindingId: null,
+  });
+
+  it("resolves an exact Scope view without changing the owning Project", async () => {
+    cloudApi.getCloudRepositoryContext.mockResolvedValue({
       target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
-      scopePath: "docs/scope-docs",
-      capabilities: ["project.read", "content.read"],
-      error: null,
+      project: { id: "project-1", name: "Notes", capabilities: ["content.read"] },
+      scope_path: "docs",
     });
-    expect(cloudApi.getCloudProject).not.toHaveBeenCalled();
-    expect(cloudApi.getCloudWorkspaceBinding).not.toHaveBeenCalled();
-  });
-
-  it("authorizes a canonical root locator without a sentinel Scope", async () => {
-    const workspace = localWorkspace("workspace-root");
-    const remoteUrl = "https://cloud.example/git/project-1.git";
-    cloudApi.resolveCanonicalCloudWorkspaceRemote.mockResolvedValue(
-      canonicalContext("project-1"),
+    const context = await render(
+      <ContextHarness status={gitStatus({
+        fetch: "https://cloud.example/git/project-1/scopes/scope-docs.git",
+      })} />,
     );
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(<ResolutionProbe workspace={workspace} gitStatus={status(remoteUrl)} />);
-      await flushPromises();
-    });
-
-    expect(readBindings(container)[workspace.id]).toMatchObject({
+    expect(context).toMatchObject({
       projectId: "project-1",
-      resolutionSource: "canonical-remote",
-      bindingStatus: "not-bound",
-      target: { kind: "project_root", project_id: "project-1" },
-      scopePath: null,
+      target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
+      scopePath: "docs",
     });
-    expect(cloudApi.resolveLegacyCloudWorkspaceRemote).not.toHaveBeenCalled();
-    expect(cloudApi.getCloudWorkspaceBinding).not.toHaveBeenCalled();
   });
 
-  it("keeps no-locator workspaces local-only and rejects incomplete binding identity", async () => {
-    const localOnly = localWorkspace("workspace-local-only");
-    const malformedBinding = localWorkspace("workspace-malformed-binding");
-    const malformedConfig = config(malformedBinding);
-    malformedConfig.cloud.bindingId = "binding-without-project";
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(<ResolutionProbe workspace={localOnly} gitStatus={status()} />);
-      await flushPromises();
-    });
-    expect(readBindings(container)[localOnly.id]).toMatchObject({
-      projectId: null,
-      cloudLinked: false,
-      error: null,
-    });
-
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={malformedBinding}
-          workspaceConfig={malformedConfig}
-          gitStatus={status()}
-        />,
-      );
-      await flushPromises();
-    });
-    expect(readBindings(container)[malformedBinding.id]).toMatchObject({
-      projectId: null,
-      bindingId: "binding-without-project",
-      reason: "binding-revoked",
-    });
-    expect(cloudApi.resolveCanonicalCloudWorkspaceRemote).not.toHaveBeenCalled();
-    expect(cloudApi.getCloudWorkspaceBinding).not.toHaveBeenCalled();
-  });
-
-  it("stays unresolved until workspace config and Git discovery are complete", async () => {
-    const workspace = localWorkspace("workspace-loading");
-    const remoteUrl = "https://cloud.example/git/project-1.git";
-    cloudApi.resolveCanonicalCloudWorkspaceRemote.mockResolvedValue(
-      canonicalContext("project-1"),
+  it("requires sign-in for a remote but still performs no request while signed out", async () => {
+    const context = await render(
+      <ContextHarness
+        activeCloudSession={null}
+        status={gitStatus({ fetch: "https://cloud.example/git/project-1.git" })}
+      />,
     );
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspace}
-          gitStatus={status(remoteUrl)}
-          resolutionInputsLoading
-        />,
-      );
-      await flushPromises();
-    });
-    expect(readBindings(container)[workspace.id]).toMatchObject({
-      projectId: null,
-      resolutionPending: true,
-      error: null,
-    });
-    expect(cloudApi.resolveCanonicalCloudWorkspaceRemote).not.toHaveBeenCalled();
-    expect(cloudApi.getCloudWorkspaceBinding).not.toHaveBeenCalled();
-
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspace}
-          gitStatus={status(remoteUrl)}
-          resolutionInputsLoading={false}
-        />,
-      );
-      await flushPromises();
-    });
-    expect(readBindings(container)[workspace.id]).toMatchObject({
-      projectId: "project-1",
-      resolutionSource: "canonical-remote",
-      bindingStatus: "not-bound",
-      error: null,
-    });
-  });
-
-  it("never promotes a cached result from an earlier resolution context", async () => {
-    const workspace = localWorkspace("workspace-stale-cache");
-    const gitStatus = status("https://cloud.example/git/project-1.git");
-    const workspaceConfig = config(workspace);
-    const currentKey = createWorkspaceCloudResolutionKey({
-      activeCloudSession: session,
-      activeGitStatus: gitStatus,
-      desktopCloudApiBaseUrl: session.api_base_url,
-      puppyoneConfig: workspaceConfig,
-      workspace,
-    });
-    const candidate = {
-      projectId: "project-1",
-      resolutionSource: "canonical-remote" as const,
-      bindingStatus: "not-bound" as const,
-      target: { kind: "project_root" as const, project_id: "project-1" },
-      cloudLinked: true,
-      error: null,
-      reason: null,
-    };
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(
-        <AttachmentProbe
-          workspace={workspace}
-          gitStatus={gitStatus}
-          workspaceConfig={workspaceConfig}
-          bindings={{
-            [workspace.id]: { ...candidate, resolutionKey: "previous-account" },
-          }}
-        />,
-      );
-    });
-    expect(JSON.parse(
-      container.querySelector("output")?.getAttribute("data-attachment") ?? "{}",
-    )).toEqual({ status: "resolving", projectId: null });
-
-    await act(async () => {
-      root?.render(
-        <AttachmentProbe
-          workspace={workspace}
-          gitStatus={gitStatus}
-          workspaceConfig={workspaceConfig}
-          bindings={{
-            [workspace.id]: { ...candidate, resolutionKey: currentKey },
-          }}
-        />,
-      );
-    });
-    expect(JSON.parse(
-      container.querySelector("output")?.getAttribute("data-attachment") ?? "{}",
-    )).toMatchObject({
-      status: "resolved",
-      projectId: "project-1",
-      resolutionSource: "canonical-remote",
-      bindingStatus: "not-bound",
-    });
-  });
-
-  it("distinguishes signed-out, wrong-host, unauthorized, missing, network, and legacy recovery", async () => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    const signedOut = localWorkspace("workspace-signed-out");
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={signedOut}
-          gitStatus={status("https://cloud.example/git/project-1.git")}
-          activeSession={null}
-        />,
-      );
-      await flushPromises();
-    });
-    expect(readBindings(container)[signedOut.id]?.reason).toBe("wrong-account");
-    expect(readBindings(container)[signedOut.id]?.error).toEqual(
-      expect.objectContaining({ code: "binding-switch-account" }),
-    );
-
-    const signedOutBinding = localWorkspace("workspace-signed-out-binding");
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={signedOutBinding}
-          workspaceConfig={config(signedOutBinding, "project-1", "binding-1")}
-          gitStatus={status("https://cloud.example/git/project-1.git")}
-          activeSession={null}
-        />,
-      );
-      await flushPromises();
-    });
-    expect(readBindings(container)[signedOutBinding.id]).toMatchObject({
+    expect(context).toMatchObject({
       projectId: null,
       candidateProjectId: "project-1",
+      hasCloudRemote: true,
       reason: "wrong-account",
+      error: { code: "remote-sign-in" },
     });
-    expect(cloudApi.getCloudWorkspaceBinding).not.toHaveBeenCalled();
-
-    const wrongHost = localWorkspace("workspace-wrong-host");
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={wrongHost}
-          gitStatus={status("https://other.example/git/project-1.git")}
-        />,
-      );
-      await flushPromises();
-    });
-    expect(readBindings(container)[wrongHost.id]?.reason).toBe("wrong-host");
-
-    for (const [id, error, reason] of [
-      ["unauthorized", Object.assign(new Error("forbidden"), { status: 403 }), "not-authorized"],
-      ["missing", Object.assign(new Error("missing"), { status: 404 }), "not-found"],
-      ["unavailable", Object.assign(new Error("temporarily unavailable"), { status: 503 }), "network"],
-      ["network", new Error("offline"), "network"],
-    ] as const) {
-      cloudApi.resolveCanonicalCloudWorkspaceRemote.mockRejectedValueOnce(error);
-      const workspace = localWorkspace(`workspace-${id}`);
-      await act(async () => {
-        root?.render(
-          <ResolutionProbe
-            workspace={workspace}
-            gitStatus={status("https://cloud.example/git/project-1.git")}
-          />,
-        );
-        await flushPromises();
-      });
-      expect(readBindings(container)[workspace.id]?.reason).toBe(reason);
-    }
-
-    cloudApi.resolveLegacyCloudWorkspaceRemote.mockResolvedValueOnce({
-      target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
-      requires_confirmation: true,
-    });
-    const legacy = localWorkspace("workspace-legacy");
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={legacy}
-          gitStatus={status("https://cloud.example/git/ap/legacy-secret.git")}
-        />,
-      );
-      await flushPromises();
-    });
-    expect(readBindings(container)[legacy.id]).toMatchObject({
-      projectId: null,
-      candidateProjectId: "project-1",
-      candidateTarget: {
-        kind: "scope",
-        project_id: "project-1",
-        scope_id: "scope-docs",
-      },
-      reason: "legacy-confirmation-required",
-    });
+    expect(cloudApi.getCloudRepositoryContext).not.toHaveBeenCalled();
   });
 
-  it("fails closed before network I/O when a durable binding and canonical remote disagree", async () => {
-    const workspace = localWorkspace("workspace-bound");
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
+  it("fails locally on a wrong host or conflicting locators", async () => {
+    const wrongHost = await render(
+      <ContextHarness status={gitStatus({ fetch: "https://other.example/git/project-1.git" })} />,
+    );
+    expect(wrongHost).toMatchObject({ reason: "wrong-host", error: { code: "remote-wrong-host" } });
 
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspace}
-          workspaceConfig={config(workspace, "project-1", "binding-1")}
-          gitStatus={status("https://cloud.example/git/project-2.git")}
-        />,
-      );
-      await flushPromises();
-    });
-
-    expect(readBindings(container)[workspace.id]).toMatchObject({
-      projectId: null,
-      candidateProjectId: "project-1",
+    const conflict = await render(
+      <ContextHarness status={gitStatus({
+        fetch: "https://cloud.example/git/project-1.git",
+        push: "https://cloud.example/git/project-2.git",
+      })} />,
+    );
+    expect(conflict).toMatchObject({
       reason: "locator-conflict",
+      error: { code: "remote-locator-conflict" },
     });
-    expect(cloudApi.getCloudWorkspaceBinding).not.toHaveBeenCalled();
-    expect(cloudApi.resolveCanonicalCloudWorkspaceRemote).not.toHaveBeenCalled();
+    expect(cloudApi.getCloudRepositoryContext).not.toHaveBeenCalled();
   });
 
-  it("does not promote a configured Project when binding verification returns a retryable 503", async () => {
-    const workspace = localWorkspace("workspace-binding-offline");
-    cloudApi.getCloudWorkspaceBinding.mockRejectedValue(
-      Object.assign(new Error("temporarily unavailable"), { status: 503 }),
+  it("treats a legacy access-key remote as local-only Cloud context without an API request", async () => {
+    const context = await render(
+      <ContextHarness status={gitStatus({ fetch: "https://cloud.example/git/ap/pwg_secret.git" })} />,
     );
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspace}
-          workspaceConfig={config(workspace, "project-1", "binding-1")}
-          gitStatus={status()}
-        />,
-      );
-      await flushPromises();
-    });
-
-    expect(readBindings(container)[workspace.id]).toMatchObject({
+    expect(context).toMatchObject({
       projectId: null,
-      candidateProjectId: "project-1",
-      bindingId: "binding-1",
-      reason: "network",
-      error: { code: "binding-network-failed" },
+      hasCloudRemote: false,
+      reason: null,
+      error: null,
     });
-    expect(readBindings(container)[workspace.id]?.resolutionSource).toBeUndefined();
-    expect(readBindings(container)[workspace.id]?.bindingStatus).toBeUndefined();
-    expect(cloudApi.getCloudProject).not.toHaveBeenCalled();
+    expect(cloudApi.getCloudRepositoryContext).not.toHaveBeenCalled();
   });
 
-  it("keeps an exact Project context when Project details return a retryable 503 after binding verification", async () => {
-    const workspace = localWorkspace("workspace-binding-details-offline");
-    cloudApi.getCloudWorkspaceBinding.mockResolvedValue(workspaceBinding(workspace));
-    cloudApi.getCloudProject.mockRejectedValue(
-      Object.assign(new Error("temporarily unavailable"), { status: 503 }),
+  it.each([
+    [401, "wrong-account", "remote-sign-in"],
+    [403, "not-authorized", "remote-not-authorized"],
+    [404, "not-found", "remote-not-found"],
+    [503, "network", "remote-network-failed"],
+  ] as const)("maps HTTP %s without exposing raw transport state", async (statusCode, reason, code) => {
+    const error = Object.assign(new Error("server detail"), { status: statusCode });
+    cloudApi.getCloudRepositoryContext.mockRejectedValue(error);
+    const context = await render(
+      <ContextHarness status={gitStatus({ fetch: "https://cloud.example/git/project-1.git" })} />,
     );
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspace}
-          workspaceConfig={config(workspace, "project-1", "binding-1")}
-          gitStatus={status()}
-        />,
-      );
-      await flushPromises();
-    });
-
-    expect(readBindings(container)[workspace.id]).toMatchObject({
-      projectId: "project-1",
-      resolutionSource: "workspace-binding",
-      bindingStatus: "bound",
-      bindingId: "binding-1",
-      target: { kind: "project_root", project_id: "project-1" },
-      reason: "network",
-      error: { code: "binding-network-failed" },
-    });
+    expect(context).toMatchObject({ reason, error: { code } });
   });
 
-  it("keeps an authorized binding context but warns when its Git remote is missing", async () => {
-    const workspace = localWorkspace("workspace-bound");
-    cloudApi.getCloudWorkspaceBinding.mockResolvedValue(workspaceBinding(workspace));
-    cloudApi.getCloudProject.mockResolvedValue({
-      id: "project-1",
-      name: "Project One",
-      capabilities: ["project.read"],
-    });
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspace}
-          workspaceConfig={config(workspace, "project-1", "binding-1")}
-          gitStatus={status()}
-        />,
-      );
-      await flushPromises();
-    });
-
-    expect(readBindings(container)[workspace.id]).toMatchObject({
-      projectId: "project-1",
-      resolutionSource: "workspace-binding",
-      bindingStatus: "bound",
-      error: { code: "binding-remote-missing" },
-    });
-  });
-
-  it("enters an authorized binding before secondary Project readiness hydration", async () => {
-    const workspace = localWorkspace("workspace-binding-fast-path");
-    cloudApi.getCloudWorkspaceBinding.mockResolvedValue(workspaceBinding(workspace, {
-      capabilities: ["project.read", "agent.read"],
-    }));
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspace}
-          workspaceConfig={config(workspace, "project-1", "binding-1")}
-          gitStatus={status()}
-        />,
-      );
-      await flushPromises();
-    });
-
-    expect(readBindings(container)[workspace.id]).toMatchObject({
-      projectId: "project-1",
-      resolutionSource: "workspace-binding",
-      bindingStatus: "bound",
-      capabilities: ["project.read", "agent.read"],
-    });
-    expect(cloudApi.getCloudProject).not.toHaveBeenCalled();
-    expect(cloudApi.getCloudProjectReadiness).not.toHaveBeenCalled();
-  });
-
-  it("does not reauthorize when a background Git refresh keeps the same Cloud identity", async () => {
-    const workspace = localWorkspace("workspace-binding-stable-refresh");
-    cloudApi.getCloudWorkspaceBinding.mockResolvedValue(workspaceBinding(workspace, {
-      capabilities: ["project.read"],
-    }));
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspace}
-          workspaceConfig={config(workspace, "project-1", "binding-1")}
-          gitStatus={{ ...status(), headCommitId: "commit-a" } as GitStatusSnapshot}
-        />,
-      );
-      await flushPromises();
-    });
-    expect(cloudApi.getCloudWorkspaceBinding).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspace}
-          workspaceConfig={config(workspace, "project-1", "binding-1")}
-          gitStatus={{ ...status(), headCommitId: "commit-b" } as GitStatusSnapshot}
-        />,
-      );
-      await flushPromises();
-    });
-
-    expect(cloudApi.getCloudWorkspaceBinding).toHaveBeenCalledTimes(1);
-    expect(readBindings(container)[workspace.id]?.projectId).toBe("project-1");
-  });
-
-  it("ignores a canonical resolver response after the workspace changes", async () => {
-    const workspaceA = localWorkspace("workspace-a");
-    const workspaceB = localWorkspace("workspace-b");
-    const resultA = deferred<DesktopCloudCanonicalProjectContext>();
-    cloudApi.resolveCanonicalCloudWorkspaceRemote.mockImplementation(
-      (_session: DesktopCloudSession, remoteUrl: string) => (
-        remoteUrl.includes("project-a")
-          ? resultA.promise
-          : Promise.resolve(canonicalContext("project-b"))
-      ),
+  it("does not render SESSION_CHANGED as a repository failure", async () => {
+    cloudApi.getCloudRepositoryContext.mockRejectedValue(
+      Object.assign(new Error("Cloud session changed while the request was in flight."), {
+        code: "SESSION_CHANGED",
+      }),
     );
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspaceA}
-          gitStatus={status("https://cloud.example/git/project-a.git")}
-        />,
-      );
-      await Promise.resolve();
-    });
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspaceB}
-          gitStatus={status("https://cloud.example/git/project-b.git")}
-        />,
-      );
-      await flushPromises();
-    });
-    expect(readBindings(container)[workspaceB.id]?.projectId).toBe("project-b");
-
-    await act(async () => {
-      resultA.resolve(canonicalContext("project-a"));
-      await flushPromises();
-    });
-    expect(readBindings(container)[workspaceB.id]?.projectId).toBe("project-b");
-    expect(readBindings(container)[workspaceA.id]).toBeUndefined();
-  });
-
-  it("ignores a canonical resolver response from the previous account generation", async () => {
-    const workspace = localWorkspace("workspace-account-race");
-    const first = deferred<DesktopCloudCanonicalProjectContext>();
-    const secondSession = {
-      ...session,
-      user_id: "user-2",
-      user_email: "second@example.com",
-      session_generation: "generation-2",
-    } satisfies DesktopCloudSession;
-    const firstContext = canonicalContext("project-1", null, ["account-one"]);
-    const secondContext = canonicalContext("project-1", null, ["account-two"]);
-    cloudApi.resolveCanonicalCloudWorkspaceRemote.mockImplementation(
-      (activeSession: DesktopCloudSession) => (
-        activeSession.user_id === "user-1" ? first.promise : Promise.resolve(secondContext)
-      ),
+    const context = await render(
+      <ContextHarness status={gitStatus({ fetch: "https://cloud.example/git/project-1.git" })} />,
     );
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
+    expect(context?.error).toBeNull();
+    expect(context?.resolutionPending).toBe(true);
+  });
+});
 
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspace}
-          gitStatus={status("https://cloud.example/git/project-1.git")}
-        />,
-      );
-      await Promise.resolve();
-    });
-    await act(async () => {
-      root?.render(
-        <ResolutionProbe
-          workspace={workspace}
-          gitStatus={status("https://cloud.example/git/project-1.git")}
-          activeSession={secondSession}
-        />,
-      );
-      await flushPromises();
-    });
-    expect(readBindings(container)[workspace.id]?.capabilities).toEqual(["account-two"]);
-
-    await act(async () => {
-      first.resolve(firstContext);
-      await flushPromises();
-    });
-    expect(readBindings(container)[workspace.id]?.capabilities).toEqual(["account-two"]);
+describe("resolution input gating", () => {
+  it("waits only for the initial Git snapshot, never for local config", () => {
+    expect(shouldBlockWorkspaceCloudResolution({
+      gitStatusError: null,
+      gitStatusPath: null,
+      workspacePath: "/tmp/notes",
+    })).toBe(true);
+    expect(shouldBlockWorkspaceCloudResolution({
+      gitStatusError: null,
+      gitStatusPath: "/tmp/notes",
+      workspacePath: "/tmp/notes",
+    })).toBe(false);
+    expect(shouldBlockWorkspaceCloudResolution({
+      gitStatusError: "not a repository",
+      gitStatusPath: null,
+      workspacePath: "/tmp/notes",
+    })).toBe(false);
   });
 });

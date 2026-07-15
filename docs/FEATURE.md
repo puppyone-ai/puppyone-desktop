@@ -7,7 +7,7 @@ single product area can evolve without turning this file into a catch-all.
 ## Architecture Documents
 
 - [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
-  - Cloud environment, auth, workspace binding, project data, and route-state
+  - Cloud environment, auth, canonical Git locator, project data, and route-state
     boundaries.
 - [Local and Cloud UX](architecture/local-and-cloud-ux.md)
   - One Projects entry and one Project shell across Local Only, Local + Cloud,

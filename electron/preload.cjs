@@ -184,7 +184,6 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   removeGitRemote: (request) => ipcRenderer.invoke("workspace:git-remove-remote", request),
   readPuppyoneConfig: (request) => ipcRenderer.invoke("workspace:puppyone-config-read", request),
   writePuppyoneConfig: (request) => ipcRenderer.invoke("workspace:puppyone-config-write", request),
-  regeneratePuppyoneProjectId: (request) => ipcRenderer.invoke("workspace:puppyone-project-regenerate", request),
   getGitCommitDetail: (request) => ipcRenderer.invoke("workspace:git-commit-detail", request),
   getGitFileDiff: (request) => ipcRenderer.invoke("workspace:git-file-diff", request),
   cancelGitFileDiff: (request) => ipcRenderer.invoke("workspace:git-file-diff-cancel", request),

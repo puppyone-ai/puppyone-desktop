@@ -57,7 +57,7 @@ export function GeneralSettingsView({
               onUpdateNow={onUpdateNow}
             />
             <div className="desktop-settings-row desktop-settings-row-control">
-              <span>{t("settings.general.projectBinding")}</span>
+              <span>{t("settings.general.recentWorkspace")}</span>
               <button
                 className="desktop-settings-action danger"
                 type="button"

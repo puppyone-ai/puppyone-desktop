@@ -135,26 +135,10 @@ export type DesktopCloudProjectReadiness = {
   };
 };
 
-export type DesktopCloudWorkspaceBinding = {
+export type DesktopCloudGitCredential = {
   id: string;
-  org_id: string;
-  target: RepositoryTarget;
-  scope_path?: string | null;
-  workspace_instance_id: string;
-  bound_user_id: string;
-  cloud_origin: string;
+  credential: string;
   mode: "r" | "rw";
-  status: "active" | "revoked";
-  usable: boolean;
-  unusable_reason?: "binding_revoked" | "wrong_account" | "role_downgraded" | string | null;
-  /** Current human Project grant, returned by context-capable binding APIs. */
-  capabilities?: string[] | null;
-  created_at: string;
-  updated_at: string;
-  last_seen_at: string;
-  revoked_at?: string | null;
-  /** Returned exactly once by create; never persist this field locally. */
-  credential?: string | null;
   remote: {
     url: string;
     target: RepositoryTarget;
@@ -162,19 +146,12 @@ export type DesktopCloudWorkspaceBinding = {
   };
 };
 
-export type DesktopCloudWorkspaceBindingCreate = {
-  workspace_instance_id: string;
-  cloud_origin: string;
+export type DesktopCloudGitCredentialIssue = {
   target: RepositoryTarget;
   mode: "r" | "rw";
 };
 
-export type DesktopCloudLegacyBindingCandidate = {
-  target: RepositoryTarget;
-  requires_confirmation: true;
-};
-
-export type DesktopCloudCanonicalProjectContext = {
+export type DesktopCloudRepositoryContext = {
   target: RepositoryTarget;
   project: DesktopCloudProject;
   scope_path?: string | null;
@@ -799,7 +776,7 @@ export async function cloudApiRequest<T>(
   if (window.puppyoneDesktop?.requestCloudSessionApi) {
     const body = typeof init.body === "string" ? init.body : undefined;
     try {
-      const result = await window.puppyoneDesktop.requestCloudSessionApi({
+      const transported = await window.puppyoneDesktop.requestCloudSessionApi({
         apiBaseUrl: requestedApiBase,
         path: path.startsWith("/") ? path : `/${path}`,
         method: init.method ?? "GET",
@@ -808,14 +785,14 @@ export async function cloudApiRequest<T>(
           [REPOSITORY_TARGET_CONTRACT_HEADER]: REPOSITORY_TARGET_CONTRACT_VERSION,
         },
         ...(body === undefined ? {} : { body }),
-      }) as T;
+      });
+      const result = unwrapCloudIpcEnvelope<T>(transported);
       if (isMutationMethod(init.method)) {
         invalidateCloudCacheForMutation({ session, apiPath: path });
       }
       return result;
     } catch (error) {
-      const normalized = normalizeCloudBridgeError(error);
-      throw normalized;
+      throw normalizeCloudBridgeInvocationError(error);
     }
   }
 
@@ -867,15 +844,15 @@ export function getCloudProjectReadiness(
   );
 }
 
-export function createCloudWorkspaceBinding(
+export function issueCloudGitCredential(
   session: DesktopCloudSession,
   projectId: string,
-  payload: DesktopCloudWorkspaceBindingCreate,
+  payload: DesktopCloudGitCredentialIssue,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
-): Promise<DesktopCloudWorkspaceBinding> {
-  return cloudApiRequest<DesktopCloudWorkspaceBinding>(
-    `/projects/${encodeURIComponent(projectId)}/workspace-bindings`,
+): Promise<DesktopCloudGitCredential> {
+  return cloudApiRequest<DesktopCloudGitCredential>(
+    `/projects/${encodeURIComponent(projectId)}/git-credentials`,
     session,
     onSessionChange,
     { method: "POST", body: JSON.stringify(payload) },
@@ -883,44 +860,15 @@ export function createCloudWorkspaceBinding(
   );
 }
 
-export function getCloudWorkspaceBinding(
+export function revokeCloudGitCredential(
   session: DesktopCloudSession,
-  bindingId: string,
+  projectId: string,
+  credentialId: string,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
-): Promise<DesktopCloudWorkspaceBinding> {
-  return cloudApiRequest<DesktopCloudWorkspaceBinding>(
-    `/workspace-bindings/${encodeURIComponent(bindingId)}`,
-    session,
-    onSessionChange,
-    {},
-    apiBaseUrl,
-  );
-}
-
-export function heartbeatCloudWorkspaceBinding(
-  session: DesktopCloudSession,
-  bindingId: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudWorkspaceBinding> {
-  return cloudApiRequest<DesktopCloudWorkspaceBinding>(
-    `/workspace-bindings/${encodeURIComponent(bindingId)}/heartbeat`,
-    session,
-    onSessionChange,
-    { method: "POST" },
-    apiBaseUrl,
-  );
-}
-
-export function revokeCloudWorkspaceBinding(
-  session: DesktopCloudSession,
-  bindingId: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<void> {
-  return cloudApiRequest<void>(
-    `/workspace-bindings/${encodeURIComponent(bindingId)}`,
+): Promise<{ id: string; revoked: true }> {
+  return cloudApiRequest<{ id: string; revoked: true }>(
+    `/projects/${encodeURIComponent(projectId)}/git-credentials/${encodeURIComponent(credentialId)}`,
     session,
     onSessionChange,
     { method: "DELETE" },
@@ -928,67 +876,18 @@ export function revokeCloudWorkspaceBinding(
   );
 }
 
-export async function rotateCloudWorkspaceBindingCredential(
+export function getCloudRepositoryContext(
   session: DesktopCloudSession,
-  bindingId: string,
+  projectId: string,
+  target: RepositoryTarget,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
-): Promise<string> {
-  const result = await cloudApiRequest<{
-    binding_id: string;
-    credential: string;
-    remote: DesktopCloudWorkspaceBinding["remote"];
-  }>(
-    `/workspace-bindings/${encodeURIComponent(bindingId)}/credential/rotate`,
+): Promise<DesktopCloudRepositoryContext> {
+  return cloudApiRequest<DesktopCloudRepositoryContext>(
+    `/projects/${encodeURIComponent(projectId)}/repository-context`,
     session,
     onSessionChange,
-    { method: "POST" },
-    apiBaseUrl,
-  );
-  return result.credential;
-}
-
-export function revokeCloudWorkspaceBindingCredential(
-  session: DesktopCloudSession,
-  bindingId: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<void> {
-  return cloudApiRequest<void>(
-    `/workspace-bindings/${encodeURIComponent(bindingId)}/credential/revoke`,
-    session,
-    onSessionChange,
-    { method: "POST" },
-    apiBaseUrl,
-  );
-}
-
-export function resolveLegacyCloudWorkspaceRemote(
-  session: DesktopCloudSession,
-  remoteUrl: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudLegacyBindingCandidate> {
-  return cloudApiRequest<DesktopCloudLegacyBindingCandidate>(
-    "/desktop/project-bindings/resolve-legacy-remote",
-    session,
-    onSessionChange,
-    { method: "POST", body: JSON.stringify({ remote_url: remoteUrl }) },
-    apiBaseUrl,
-  );
-}
-
-export function resolveCanonicalCloudWorkspaceRemote(
-  session: DesktopCloudSession,
-  remoteUrl: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudCanonicalProjectContext> {
-  return cloudApiRequest<DesktopCloudCanonicalProjectContext>(
-    "/desktop/project-bindings/resolve-canonical-remote",
-    session,
-    onSessionChange,
-    { method: "POST", body: JSON.stringify({ remote_url: remoteUrl }) },
+    { method: "POST", body: JSON.stringify({ target }) },
     apiBaseUrl,
   );
 }
@@ -2136,15 +2035,16 @@ async function requestRaw<T = unknown>(path: string, init: RequestInit, apiBaseU
   if (window.puppyoneDesktop?.requestCloudApi) {
     const body = typeof init.body === "string" ? init.body : undefined;
     try {
-      return await window.puppyoneDesktop.requestCloudApi({
+      const transported = await window.puppyoneDesktop.requestCloudApi({
         apiBaseUrl: normalizedApiBaseUrl,
         path: path.startsWith("/") ? path : `/${path}`,
         method: init.method ?? "GET",
         headers: normalizeRequestHeaders(init.headers),
         ...(body === undefined ? {} : { body }),
-      }) as T;
+      });
+      return unwrapCloudIpcEnvelope<T>(transported);
     } catch (error) {
-      throw normalizeCloudBridgeError(error);
+      throw normalizeCloudBridgeInvocationError(error);
     }
   }
 
@@ -2178,28 +2078,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object");
 }
 
-function normalizeCloudBridgeError(error: unknown): Error {
-  const original = error instanceof Error ? error.message : String(error);
-  const transportedMessage = original
-    .replace(/^Error invoking remote method 'cloud:(?:api-request|session-api-request)':\s*/i, "")
-    .replace(/^Error:\s*/i, "")
-    .trim();
-  const transportedStatus = transportedMessage.match(
-    /^Request failed \(([1-5]\d\d)\):\s*/i,
-  );
-  const message = transportedMessage
-    .replace(/^Request failed \([1-5]\d\d\):\s*/i, "")
-    .trim();
-  const normalized = new Error(message || "Cloud request failed.");
-  const sourceStatus = isRecord(error) && typeof error.status === "number" ? error.status : undefined;
-  const statusFromMessage = transportedStatus?.[1]
-    ?? transportedMessage.match(/(?:request failed|status)\s*\(?([1-5]\d\d)\)?/i)?.[1];
-  const status = sourceStatus ?? (statusFromMessage ? Number(statusFromMessage) : undefined);
-  if (status) (normalized as Error & { status?: number }).status = status;
-  if (/invalid or expired token|sign in again/i.test(message)) {
-    (normalized as Error & { status?: number }).status = 401;
+function unwrapCloudIpcEnvelope<T>(value: unknown): T {
+  if (!isRecord(value) || value.transport !== "puppyone-cloud-ipc-v1") {
+    // Unit-test adapters may return data directly. The production Electron
+    // bridge always uses the versioned envelope above.
+    return value as T;
   }
-  return normalized;
+  if (value.ok === true) return value.data as T;
+  const transported = isRecord(value.error) ? value.error : {};
+  const normalized = new Error(
+    typeof transported.message === "string" && transported.message
+      ? transported.message
+      : "Cloud request failed.",
+  );
+  if (typeof transported.status === "number") {
+    (normalized as Error & { status?: number }).status = transported.status;
+  }
+  if (typeof transported.code === "string" && transported.code) {
+    (normalized as Error & { code?: string }).code = transported.code;
+  }
+  throw normalized;
+}
+
+function normalizeCloudBridgeInvocationError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  return new Error(String(error || "Cloud IPC invocation failed."));
 }
 
 function formatCloudApiHost(apiBaseUrl: string) {

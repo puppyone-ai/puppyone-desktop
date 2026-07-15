@@ -6,4 +6,9 @@ export type { SourceControlWorkspaceSurfaceProps } from "./SourceControlWorkspac
 export type { GitMainPanel, GitWorkingSelection } from "./types";
 export type { DesktopGitController } from "./useDesktopGitController";
 export { getGitHostingMode } from "./viewModel";
-export { getPuppyoneRemote, maskRemoteUrl, parsePuppyoneRemote } from "./remotes";
+export {
+  getCanonicalPuppyoneRemote,
+  getPuppyoneRemote,
+  maskRemoteUrl,
+  parsePuppyoneRemote,
+} from "./remotes";

@@ -43,7 +43,6 @@ import {
 } from "./git/source-control-model.mjs";
 import {
   readPuppyoneWorkspaceConfig,
-  regeneratePuppyoneWorkspaceProjectId,
   writePuppyoneWorkspaceConfig,
 } from "./workspace-config.mjs";
 export { getGitEnvironmentForTests } from "./git/runner.mjs";
@@ -54,7 +53,6 @@ export {
 } from "./files/path-policy.mjs";
 export {
   readPuppyoneWorkspaceConfig,
-  regeneratePuppyoneWorkspaceProjectId,
   writePuppyoneWorkspaceConfig,
 } from "./workspace-config.mjs";
 
@@ -110,19 +108,9 @@ export async function resolveLocalWorkspaceIdentity(folderPath) {
   }
 
   const fsIdentity = createFileSystemIdentity(metadata, canonicalPath);
-  let projectId = null;
-  let cloudProjectId = null;
-  let cloudBindingId = null;
-  let cloudBindingOrigin = null;
-  let cloudBindingWorkspaceInstanceId = null;
   let configError = null;
   try {
-    const config = await readPuppyoneWorkspaceConfig(canonicalPath);
-    projectId = config.project.id;
-    cloudProjectId = config.cloud.projectId;
-    cloudBindingId = config.cloud.bindingId;
-    cloudBindingOrigin = config.cloud.origin;
-    cloudBindingWorkspaceInstanceId = config.project.workspaceInstanceId;
+    await readPuppyoneWorkspaceConfig(canonicalPath);
   } catch (error) {
     // Invalid project metadata must not prevent a local-first folder from
     // opening. The config surface reports the recoverable error separately.
@@ -132,12 +120,7 @@ export async function resolveLocalWorkspaceIdentity(folderPath) {
   const workspaceInstanceId = createWorkspaceInstanceId(fsIdentity);
   return {
     canonicalPath,
-    cloudBindingId,
-    cloudBindingOrigin,
-    cloudBindingWorkspaceInstanceId,
-    cloudProjectId,
     fsIdentity,
-    projectId,
     workspaceInstanceId,
     configError,
   };
@@ -149,7 +132,7 @@ export async function workspaceFromPath(folderPath, options = {}) {
   const gitMetadata = includeGitMetadata
     ? await Promise.all([
       getWorkspaceCommitCount(identity.canonicalPath),
-      hasWorkspacePuppyoneCloudRemote(identity.canonicalPath),
+      readWorkspacePuppyoneRemoteMetadata(identity.canonicalPath),
     ])
     : null;
 
@@ -161,25 +144,41 @@ export async function workspaceFromPath(folderPath, options = {}) {
     ...(gitMetadata
       ? {
         commitCount: gitMetadata[0],
-        hasPuppyoneCloudRemote: gitMetadata[1],
+        puppyoneGitRemote: gitMetadata[1].puppyoneGitRemote,
         hydrationState: "ready",
       }
       : { hydrationState: "metadata" }),
     cloudState: "local",
-    cloudBindingId: identity.cloudBindingId,
-    cloudBindingOrigin: identity.cloudBindingOrigin,
-    cloudBindingWorkspaceInstanceId: identity.cloudBindingWorkspaceInstanceId,
-    cloudProjectId: identity.cloudProjectId,
-    projectId: identity.projectId,
     workspaceInstanceId: identity.workspaceInstanceId,
     fsIdentity: identity.fsIdentity,
     ...(identity.configError ? { configError: identity.configError } : {}),
   };
 }
 
-async function hasWorkspacePuppyoneCloudRemote(rootPath) {
+async function readWorkspacePuppyoneRemoteMetadata(rootPath) {
   const remotes = await readGitRemotes(rootPath).catch(() => []);
-  return remotes.some((remote) => isPuppyoneRemote(remote));
+  const candidates = remotes.flatMap((remote) => [remote?.fetchUrl, remote?.pushUrl])
+    .map((url) => parsePuppyoneRemoteInfo(url))
+    .filter(Boolean);
+  if (candidates.length === 0) {
+    return { puppyoneGitRemote: null };
+  }
+  const canonical = candidates.filter((candidate) => candidate.kind !== "access-point");
+  const identities = new Map(canonical.map((candidate) => [
+    `${candidate.origin}\n${candidate.projectId}\n${candidate.scopeId ?? ""}`,
+    candidate,
+  ]));
+  if (identities.size !== 1) {
+    return { puppyoneGitRemote: null };
+  }
+  const [candidate] = identities.values();
+  return {
+    puppyoneGitRemote: {
+      origin: candidate.origin,
+      projectId: candidate.projectId,
+      scopeId: candidate.scopeId ?? null,
+    },
+  };
 }
 
 export async function listFolderChildren(rootPath, folderPath) {
@@ -1975,7 +1974,7 @@ function createFileSystemIdentity(metadata, canonicalPath) {
     return `fs:${device}:${inode}`;
   }
   // Some virtual/network filesystems do not expose a stable inode. Keep the
-  // fallback explicit so the registry can later reconcile it with project.id.
+  // fallback explicit; it remains a local workspace-instance concern only.
   return `path:${canonicalPath}`;
 }
 
@@ -2068,9 +2067,6 @@ async function chooseDefaultPushRemote(rootPath, requestedRemoteName = null) {
   if (isPuppyoneHostingConfig(config)) {
     const puppyoneRemote = choosePuppyoneRemoteName(remotes, config);
     if (puppyoneRemote) return puppyoneRemote;
-    if (config?.cloud?.projectId) {
-      throw new Error("Unable to push changes: PuppyOne Cloud remote is not configured.");
-    }
   }
   if (remotes.some((remote) => remote.name === "origin")) return "origin";
   if (remotes.some((remote) => remote.name === "puppyone")) return "puppyone";
@@ -2306,7 +2302,7 @@ function resolveGitEffectiveHosting({ remotes, branches, currentBranchName, sync
   if (isPuppyoneHostingConfig(config)) {
     const puppyoneRemoteName = choosePuppyoneRemoteName(remotes, config);
     const puppyoneRemote = puppyoneRemoteName ? remotes.find((remote) => remote.name === puppyoneRemoteName) ?? null : null;
-    if (puppyoneRemote || config?.cloud?.projectId) {
+    if (puppyoneRemote) {
       return {
         kind: "puppyone-cloud",
         remoteName: puppyoneRemote?.name ?? null,
@@ -2314,7 +2310,7 @@ function resolveGitEffectiveHosting({ remotes, branches, currentBranchName, sync
         ref: puppyoneRemote?.name ? ref ?? `${puppyoneRemote.name}/${branchName ?? PUPPYONE_CLOUD_DEFAULT_BRANCH}` : null,
         ready: Boolean(puppyoneRemote),
         reason: puppyoneRemote ? "configured" : "missing-remote",
-        identity: buildPuppyoneHostingIdentity(puppyoneRemote, config),
+        identity: buildPuppyoneHostingIdentity(puppyoneRemote),
       };
     }
   }
@@ -2412,7 +2408,7 @@ function buildRemoteHosting({ kind, remote, branchName, ref, reason }) {
     identity: kind === "github"
       ? buildGithubHostingIdentity(remote)
       : kind === "puppyone-cloud"
-        ? buildPuppyoneHostingIdentity(remote, null)
+        ? buildPuppyoneHostingIdentity(remote)
         : null,
   };
 }
@@ -2426,7 +2422,7 @@ function chooseGitSyncTarget(remotes, branches, currentBranchName, config) {
 
   if (isPuppyoneHostingConfig(config)) {
     const puppyoneRemote = choosePuppyoneRemoteName(remotes, config);
-    if (puppyoneRemote || config?.cloud?.projectId) {
+    if (puppyoneRemote) {
       return {
         remote: puppyoneRemote,
         branch: getConfiguredSyncBranch(config, PUPPYONE_CLOUD_DEFAULT_BRANCH, true),
@@ -2514,7 +2510,7 @@ function isPuppyoneHostingConfig(config) {
 
 function hasEffectivePuppyoneHostingTarget(remotes, config) {
   if (!isPuppyoneHostingConfig(config)) return false;
-  return Boolean(choosePuppyoneRemoteName(remotes, config) || config?.cloud?.projectId);
+  return Boolean(choosePuppyoneRemoteName(remotes, config));
 }
 
 function getConfiguredSyncBranch(config, fallbackBranch = PUPPYONE_CLOUD_DEFAULT_BRANCH, puppyoneHostingActive = isPuppyoneHostingConfig(config)) {
@@ -2606,12 +2602,11 @@ function formatGithubRepoIdentity(owner, repo) {
   };
 }
 
-function buildPuppyoneHostingIdentity(remote, config) {
+function buildPuppyoneHostingIdentity(remote) {
   const info = parsePuppyoneRemoteInfo(getRemoteUrl(remote));
-  const projectId = config?.cloud?.projectId;
   return {
     provider: "puppyone-cloud",
-    label: info?.displayId ?? projectId ?? remote?.name ?? "Puppyone Cloud",
+    label: info?.displayId ?? remote?.name ?? "Puppyone Cloud",
     href: null,
   };
 }
@@ -2637,6 +2632,7 @@ export function parsePuppyoneRemoteInfo(rawUrl) {
       return {
         kind: "access-point",
         host: url.host,
+        origin: url.origin.toLowerCase(),
         displayId: accessKey ? maskSecret(accessKey) : "access point",
         accessKey,
       };
@@ -2650,6 +2646,7 @@ export function parsePuppyoneRemoteInfo(rawUrl) {
       return {
         kind: "scope",
         host: url.host,
+        origin: url.origin.toLowerCase(),
         displayId: `${scopedMatch[1]}/${scopedMatch[2]}`,
         projectId: scopedMatch[1],
         scopeId: scopedMatch[2],
@@ -2662,6 +2659,7 @@ export function parsePuppyoneRemoteInfo(rawUrl) {
       return {
         kind: "project",
         host: url.host,
+        origin: url.origin.toLowerCase(),
         displayId: projectId ?? "project",
         projectId,
       };

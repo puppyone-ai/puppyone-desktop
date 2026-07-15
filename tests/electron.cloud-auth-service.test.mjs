@@ -249,6 +249,62 @@ describe("main-owned Cloud Auth Broker", () => {
       expect(messages.at(-1)).toEqual(["cloud-session:changed", null]);
     }
   });
+
+  it("replays a read-only repository-context POST once after a newer session generation wins", async () => {
+    const fixture = createFixture();
+    let onCallback = null;
+    let resolveFirstContext;
+    let contextRequests = 0;
+    fixture.startCallbackServer.mockImplementation(async ({ onCallback: callback }) => {
+      onCallback = callback;
+      return {
+        redirectUri: "http://127.0.0.1:43123/auth/callback",
+        close: vi.fn(async () => {}),
+      };
+    });
+    fixture.requestCloudApi.mockImplementation(async (_base, path, init) => {
+      if (path === "/auth/refresh") {
+        return authResponse({ accessToken: jwtFor("user-123", "initial") });
+      }
+      if (path === "/auth/initialize") return { ok: true };
+      if (path === "/auth/desktop/start") {
+        return { state: "replacement-state", login_url: "https://app.puppyone.ai/login" };
+      }
+      if (path === "/auth/desktop/exchange") {
+        return authResponse({
+          accessToken: jwtFor("user-123", "replacement"),
+          refreshToken: "replacement-refresh",
+        });
+      }
+      if (path === "/projects/project-1/repository-context") {
+        contextRequests += 1;
+        expect(init.method).toBe("POST");
+        if (contextRequests === 1) {
+          return new Promise((resolve) => { resolveFirstContext = resolve; });
+        }
+        expect(init.headers.Authorization).toBe(`Bearer ${jwtFor("user-123", "replacement")}`);
+        return { project: { id: "project-1" } };
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+
+    await fixture.service.restoreSession(API);
+    const pending = fixture.service.requestSessionApi(
+      API,
+      "/projects/project-1/repository-context",
+      { method: "POST", body: JSON.stringify({ target: { kind: "project_root", project_id: "project-1" } }) },
+    );
+    await vi.waitFor(() => expect(resolveFirstContext).toBeTypeOf("function"));
+
+    await fixture.service.startOAuth({ apiBase: API, provider: "github" });
+    await onCallback(
+      "http://127.0.0.1:43123/auth/callback?state=replacement-state&code=replacement-code",
+    );
+    resolveFirstContext({ stale: true });
+
+    await expect(pending).resolves.toEqual({ project: { id: "project-1" } });
+    expect(contextRequests).toBe(2);
+  });
 });
 
 function createFixture({

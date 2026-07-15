@@ -29,7 +29,7 @@ describe("workspace registry lifecycle", () => {
     expect(result.items).toHaveLength(12);
     expect(new Set(result.items.map((item) => item.workspace.workspaceInstanceId)).size).toBe(12);
     const raw = JSON.parse(await fs.promises.readFile(path.join(root, "registry.json"), "utf8"));
-    expect(raw.version).toBe(2);
+    expect(raw.version).toBe(4);
     expect(raw.recentWorkspaces).toHaveLength(12);
   });
 
@@ -81,7 +81,6 @@ describe("workspace registry lifecycle", () => {
         canonicalPath: folderPath,
         workspaceInstanceId: identities.get(folderPath) ?? "instance-1",
         fsIdentity: "fs:1:99",
-        projectId: "project-1",
       }),
     });
     const before = path.join(root, "before");
@@ -94,22 +93,21 @@ describe("workspace registry lifecycle", () => {
     const result = await store.getRecentWorkspacesResult();
     expect(result.items).toHaveLength(1);
     expect(result.items[0].workspace.path).toBe(await fs.promises.realpath(after));
-    expect(result.items[0].workspace.projectId).toBe("project-1");
+    expect(result.items[0].workspace).not.toHaveProperty("projectId");
   });
 
-  it("persists and clears the main-owned Cloud binding hint without granting renderer authority", async () => {
-    let bindingEnabled = true;
+  it("persists and clears only a secret-free canonical Git remote hint", async () => {
+    let remoteEnabled = true;
     const store = createStore({
       resolveWorkspaceIdentity: async (folderPath) => ({
         canonicalPath: folderPath,
         workspaceInstanceId: "instance-cloud",
         fsIdentity: "fs:1:100",
-        projectId: "project-identity",
-        cloudProjectId: bindingEnabled ? "cloud-project-1" : null,
-        cloudBindingId: bindingEnabled ? "binding-1" : null,
-        cloudBindingOrigin: bindingEnabled ? "https://api.puppyone.ai" : null,
-        cloudBindingWorkspaceInstanceId: bindingEnabled ? "instance-cloud" : null,
-        hasPuppyoneCloudRemote: bindingEnabled,
+        puppyoneGitRemote: remoteEnabled ? {
+          origin: "https://API.PUPPYONE.AI",
+          projectId: "cloud-project-1",
+          scopeId: null,
+        } : null,
       }),
     });
     const folder = path.join(root, "cloud-linked");
@@ -117,22 +115,42 @@ describe("workspace registry lifecycle", () => {
 
     await store.rememberRecentWorkspacePath(folder);
     expect((await store.getRecentWorkspacesResult()).items[0].workspace).toMatchObject({
-      cloudProjectId: "cloud-project-1",
-      cloudBindingId: "binding-1",
-      cloudBindingOrigin: "https://api.puppyone.ai",
-      cloudBindingWorkspaceInstanceId: "instance-cloud",
-      hasPuppyoneCloudRemote: true,
+      puppyoneGitRemote: {
+        origin: "https://api.puppyone.ai",
+        projectId: "cloud-project-1",
+        scopeId: null,
+      },
     });
 
-    bindingEnabled = false;
+    remoteEnabled = false;
     await store.rememberRecentWorkspacePath(folder);
-    expect((await store.getRecentWorkspacesResult()).items[0].workspace).toMatchObject({
-      cloudProjectId: null,
-      cloudBindingId: null,
-      cloudBindingOrigin: null,
-      cloudBindingWorkspaceInstanceId: null,
-      hasPuppyoneCloudRemote: false,
-    });
+    const localWorkspace = (await store.getRecentWorkspacesResult()).items[0].workspace;
+    expect(localWorkspace).toMatchObject({ puppyoneGitRemote: null });
+    expect(localWorkspace).not.toHaveProperty("hasPuppyoneCloudRemote");
+  });
+
+  it("drops the obsolete local Project identity when migrating the registry", async () => {
+    const folder = path.join(root, "legacy-project-identity");
+    await fs.promises.mkdir(folder);
+    await fs.promises.writeFile(path.join(root, "registry.json"), JSON.stringify({
+      version: 3,
+      lastActiveWorkspacePath: folder,
+      recentWorkspaces: [{
+        workspaceInstanceId: "instance-legacy",
+        projectId: "obsolete-local-project-id",
+        path: folder,
+        name: "Legacy",
+      }],
+    }), "utf8");
+    const store = createStore();
+
+    const beforeRewrite = await store.getRecentWorkspacesResult();
+    expect(beforeRewrite.items[0].workspace).not.toHaveProperty("projectId");
+
+    await store.rememberRecentWorkspacePath(folder, beforeRewrite.items[0].workspace);
+    const persisted = JSON.parse(await fs.promises.readFile(path.join(root, "registry.json"), "utf8"));
+    expect(persisted.version).toBe(4);
+    expect(persisted.recentWorkspaces[0]).not.toHaveProperty("projectId");
   });
 
   it("quarantines corrupt JSON and reports a recoverable registry error", async () => {
@@ -181,7 +199,6 @@ function createStore(overrides = {}) {
     canonicalPath: folderPath,
     workspaceInstanceId: `instance-${path.basename(folderPath)}`,
     fsIdentity: `fs-${path.basename(folderPath)}`,
-    projectId: null,
   }));
   return createWorkspaceStateStore({
     app: { getPath: () => root },
