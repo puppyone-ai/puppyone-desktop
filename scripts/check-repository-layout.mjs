@@ -68,12 +68,12 @@ if (!packageMetadata.includes('"build": "node scripts/check-desktop-build-enviro
   errors.push("Production renderer builds must fail fast on missing endpoint configuration.");
 }
 
-const recentCloudBinding = read("src/features/cloud/workspace/cloudProjectResolution.ts");
-if (/from\s+["']\.\.\/\.\.\/\.\.\/lib\/localFiles["']/.test(recentCloudBinding)) {
-  errors.push("Recent-workspace Cloud binding must not probe inactive folders through active-window IPC authority.");
+const recentCloudContext = read("src/features/cloud/workspace/cloudProjectResolution.ts");
+if (/from\s+["']\.\.\/\.\.\/\.\.\/lib\/localFiles["']/.test(recentCloudContext)) {
+  errors.push("Recent-workspace Cloud context must not probe inactive folders through active-window IPC authority.");
 }
-if (!recentCloudBinding.includes("item.workspace.cloudProjectId")) {
-  errors.push("Recent-workspace Cloud binding must consume the main-owned registry hint.");
+if (!recentCloudContext.includes("item.workspace.puppyoneGitRemote")) {
+  errors.push("Recent-workspace Cloud context must consume the main-owned, secret-free Git remote hint.");
 }
 
 if (errors.length > 0) {

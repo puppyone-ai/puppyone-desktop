@@ -368,7 +368,7 @@ choice. Neither cache is Chat history.
 ```text
 untrusted Renderer intent
   -> shared schema
-  -> trusted window/workspace binding
+  -> trusted window and active-workspace authorization
   -> canonical path and session correlation
   -> runtime adapter capability check
   -> native process

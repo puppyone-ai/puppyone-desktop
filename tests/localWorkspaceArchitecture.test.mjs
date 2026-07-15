@@ -64,13 +64,13 @@ describe("source-control presentation model", () => {
 });
 
 describe("workspace config normalization", () => {
-  it("migrates v1 Git metadata into the v2 source-of-truth shape", () => {
+  it("migrates v1 Git metadata into the v3 source-of-truth shape", () => {
     expect(normalizePuppyoneWorkspaceConfig({
       version: 1,
       git: { primaryRemote: "origin", watchedBranch: "main" },
       backup: { enabled: true, service: "github" },
     })).toMatchObject({
-      version: 2,
+      version: 3,
       sync: {
         sourceOfTruth: { service: "github", remote: "origin", branch: "main" },
       },
@@ -78,8 +78,8 @@ describe("workspace config normalization", () => {
     });
   });
 
-  it("normalizes explicit Cloud binding identity without weakening checkout isolation", () => {
-    expect(normalizePuppyoneWorkspaceConfig({
+  it("strips historical Cloud, Project, and checkout identity from the local config", () => {
+    const normalized = normalizePuppyoneWorkspaceConfig({
       version: 2,
       project: {
         id: "01234567-89ab-4def-8123-456789abcdef",
@@ -88,28 +88,20 @@ describe("workspace config normalization", () => {
       cloud: {
         projectId: "cloud-project-123",
         origin: "https://API.PUPPYONE.AI",
-        bindingId: "binding-123",
-      },
-    })).toMatchObject({
-      project: {
-        id: "01234567-89ab-4def-8123-456789abcdef",
-        workspaceInstanceId: "workspace-instance-1234",
-      },
-      cloud: {
-        projectId: "cloud-project-123",
-        origin: "https://api.puppyone.ai",
-        bindingId: "binding-123",
       },
     });
+    expect(normalized).toMatchObject({ version: 3 });
+    expect(normalized).not.toHaveProperty("project");
+    expect(normalized).not.toHaveProperty("cloud");
   });
 
-  it("rejects malformed checkout identities and non-origin Cloud endpoints", () => {
-    expect(() => normalizePuppyoneWorkspaceConfig({
-      project: { workspaceInstanceId: "too short" },
-    })).toThrow(/workspaceInstanceId is invalid/i);
+  it("ignores obsolete local Project ids and rejects unsupported config versions", () => {
+    expect(normalizePuppyoneWorkspaceConfig({
+      project: { id: "not-a-uuid" },
+    })).not.toHaveProperty("project");
 
     expect(() => normalizePuppyoneWorkspaceConfig({
-      cloud: { origin: "https://user:secret@api.puppyone.ai/v1" },
-    })).toThrow(/cloud\.origin must be an HTTP\(S\) origin/i);
+      version: 4,
+    })).toThrow(/Unsupported PuppyOne config version/i);
   });
 });

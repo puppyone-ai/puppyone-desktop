@@ -59,7 +59,7 @@ This subsystem owns:
 - the dormant, capability-gated external Viewer Pack adapter boundary.
 
 It does not own Explorer loading and tree state, app-shell navigation,
-workspace binding, or native-window lifecycle. Those remain in their focused
+workspace authorization, or native-window lifecycle. Those remain in their focused
 architecture documents one level above this directory.
 
 ## Authoritative documents

@@ -32,7 +32,7 @@ const requiredBoundaries = [
   },
   {
     path: "local-api/workspace-config.mjs",
-    exports: ["readPuppyoneWorkspaceConfig", "regeneratePuppyoneWorkspaceProjectId", "writePuppyoneWorkspaceConfig"],
+    exports: ["readPuppyoneWorkspaceConfig", "writePuppyoneWorkspaceConfig"],
   },
 ];
 
@@ -98,8 +98,8 @@ if (!formatPolicy.includes("packages/shared-ui/src/core/fileFormats.json")) {
 const contextualCloudData = read("src/features/cloud/data/useDesktopCloudData.ts");
 const contextualCloudRouter = read("src/features/cloud/routes/CloudRouter.tsx");
 const contextualCloudStates = read("src/features/cloud/states.tsx");
-const contextualCloudResolver = read("src/features/cloud/workspace/useCloudWorkspaceBinding.ts");
-const contextualCloudAttachment = read("src/features/cloud/attachment/useProjectCloudAttachment.ts");
+const contextualCloudResolver = read("src/features/cloud/workspace/useCloudWorkspaceContext.ts");
+const contextualProjectContext = read("src/features/cloud/context/useProjectCloudContext.ts");
 const contextualWorkspaceSurface = read("src/features/app-shell/workspace-surfaces/useWorkspaceSurfaceContent.tsx");
 const desktopApp = read("src/App.tsx");
 
@@ -114,13 +114,16 @@ for (const forbiddenLocalOnlyToken of ["CloudProjectRow", "onCopyCloneCommand"])
     errors.push(`the Local-only Cloud state reintroduced ${forbiddenLocalOnlyToken}`);
   }
 }
-if (!contextualCloudResolver.includes("resolveCanonicalCloudWorkspaceRemote")) {
-  errors.push("the Local workspace resolver must authorize canonical Git locators through the backend");
+if (
+  !contextualCloudResolver.includes("resolveCanonicalPuppyoneRemotes")
+  || !contextualCloudResolver.includes("getCloudRepositoryContext")
+) {
+  errors.push("the Local workspace resolver must parse canonical Git locally and authorize its Project target");
 }
 if (
   !contextualCloudResolver.includes("createWorkspaceCloudResolutionKey")
-  || !contextualCloudAttachment.includes("createWorkspaceCloudResolutionKey")
-  || !contextualCloudAttachment.includes("resolutionKey === expectedResolutionKey")
+  || !contextualProjectContext.includes("createWorkspaceCloudResolutionKey")
+  || !contextualProjectContext.includes("resolutionKey === expectedKey")
 ) {
   errors.push("contextual Cloud results must be keyed to the active workspace/account/host/locator snapshot");
 }
@@ -138,6 +141,29 @@ for (const obsoleteSelectionToken of [
 }
 if (desktopApp.includes("browseProjectCatalogOnCloudEntry")) {
   errors.push("entering Cloud from a Local workspace must not trigger catalog browsing");
+}
+
+const cloudIdentitySources = [
+  contextualCloudResolver,
+  contextualProjectContext,
+  read("src/features/cloud/workspace/cloudProjectResolution.ts"),
+  read("src/lib/cloudApi.ts"),
+  desktopApp,
+];
+for (const forbiddenIdentityToken of [
+  "WorkspaceBinding",
+  "workspaceBinding",
+  "workspace_binding",
+  "cloudBinding",
+  "bindingId",
+  "ProjectCloudAttachment",
+]) {
+  if (cloudIdentitySources.some((source) => source.includes(forbiddenIdentityToken))) {
+    errors.push(`Cloud repository identity reintroduced ${forbiddenIdentityToken}`);
+  }
+}
+if (/resolveLegacyCloudRepositoryRemote|remote_url|resolve-legacy-remote/.test(read("src/lib/cloudApi.ts"))) {
+  errors.push("Cloud context APIs must accept Project targets, never local remote URLs or legacy credentials");
 }
 
 if (errors.length > 0) {

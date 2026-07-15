@@ -1,29 +1,30 @@
 import type { Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
-import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../../types/electron";
-import { resolvePuppyoneRemotes, type PuppyoneRemoteCandidate } from "../../source-control/remotes";
+import type { GitStatusSnapshot } from "../../../types/electron";
+import {
+  resolveCanonicalPuppyoneRemotes,
+  type PuppyoneRemoteCandidate,
+} from "../../source-control/remotes";
 
 /**
  * Build a secret-free identity key for one contextual resolution snapshot.
  *
  * The key is kept in renderer memory only. It prevents a result authorized for
- * an earlier workspace, account, host, config, or Git locator from being
+ * an earlier workspace, account, host, or Git locator from being
  * promoted while the next resolver effect is still starting.
  */
 export function createWorkspaceCloudResolutionKey({
   activeCloudSession,
   activeGitStatus,
   desktopCloudApiBaseUrl,
-  puppyoneConfig,
   workspace,
 }: {
   activeCloudSession: DesktopCloudSession | null;
   activeGitStatus: GitStatusSnapshot | null;
   desktopCloudApiBaseUrl: string | null;
-  puppyoneConfig: PuppyoneWorkspaceConfig | null;
   workspace: Workspace;
 }): string {
-  const remoteResolution = resolvePuppyoneRemotes(activeGitStatus);
+  const remoteResolution = resolveCanonicalPuppyoneRemotes(activeGitStatus);
   const remoteFacts = remoteResolution.candidates
     .map(secretFreeRemoteFact)
     .sort();
@@ -31,11 +32,6 @@ export function createWorkspaceCloudResolutionKey({
   return JSON.stringify([
     workspace.id,
     workspace.path,
-    workspace.workspaceInstanceId?.trim() || "",
-    puppyoneConfig?.project.workspaceInstanceId?.trim() || "",
-    puppyoneConfig?.cloud.projectId?.trim() || "",
-    puppyoneConfig?.cloud.bindingId?.trim() || "",
-    normalizeOrigin(puppyoneConfig?.cloud.origin),
     activeCloudSession?.user_id ?? "",
     activeCloudSession?.session_generation ?? "",
     normalizeOrigin(desktopCloudApiBaseUrl ?? activeCloudSession?.api_base_url),
@@ -53,20 +49,16 @@ export function createWorkspaceCloudResolutionKey({
 export function shouldBlockWorkspaceCloudResolution({
   gitStatusError,
   gitStatusPath,
-  puppyoneConfigLoading,
   workspacePath,
 }: {
   gitStatusError: string | null;
   gitStatusPath: string | null;
-  puppyoneConfigLoading: boolean;
   workspacePath: string | null;
 }): boolean {
   if (!workspacePath) return false;
-  if (puppyoneConfigLoading) return true;
   if (gitStatusPath === workspacePath) return false;
   // A failed initial Git read cannot be repaired by an indefinite Cloud
-  // spinner. Continue with config-only resolution and surface the Git error in
-  // its normal workspace error channel.
+  // spinner. Surface the Git error in its normal workspace error channel.
   return !gitStatusError;
 }
 

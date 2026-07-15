@@ -32,7 +32,7 @@ import {
   getCloudProviderIconUrl,
 } from "../utils";
 
-export function CloudMappedOverview({
+export function CloudRepositoryOverview({
   workspace,
   project,
   dashboard,
@@ -42,10 +42,9 @@ export function CloudMappedOverview({
   connectors,
   mcpEndpoints,
   identity,
-  linkedToWorkspace,
+  matchesRepositoryRemote,
   loading,
-  attachAction = null,
-  detachAction = null,
+  removeRemoteAction = null,
   onSelectSection,
   onOpenProject,
   onRefresh,
@@ -59,16 +58,11 @@ export function CloudMappedOverview({
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;
-  linkedToWorkspace: boolean;
+  matchesRepositoryRemote: boolean;
   loading: boolean;
-  attachAction?: {
-    busy: boolean;
-    disabled?: boolean;
-    onAttach: () => void;
-  } | null;
-  detachAction?: {
+  removeRemoteAction?: {
     busy?: boolean;
-    onDetach: () => void;
+    onRemove: () => void;
   } | null;
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
@@ -94,8 +88,8 @@ export function CloudMappedOverview({
       ? t("cloud.status.synced")
       : t("cloud.git.noChanges");
   const hasOverviewData = Boolean(dashboard || tree || history || identity);
-  const localMappingValue = linkedToWorkspace ? workspace.path : identity?.url ?? "";
-  const [confirmDetach, setConfirmDetach] = useState(false);
+  const repositoryRemoteValue = matchesRepositoryRemote ? workspace.path : identity?.url ?? "";
+  const [confirmRemoveRemote, setConfirmRemoveRemote] = useState(false);
 
   if (loading && !hasOverviewData) {
     return <CloudWorkspaceLoadingState label={t("cloud.loading.project")} />;
@@ -109,7 +103,7 @@ export function CloudMappedOverview({
             <h1 dir="auto">{projectName}</h1>
             <span className="desktop-cloud-source-pill">
               <Cloud size={13} />
-              <span>{t(attachAction ? "cloud.overview.preview" : "cloud.common.cloudSource")}</span>
+              <span>{t("cloud.common.cloudSource")}</span>
             </span>
           </div>
           {project?.description || dashboard?.project.description ? (
@@ -126,33 +120,23 @@ export function CloudMappedOverview({
             <RefreshCw size={13} className={loading ? "spin" : undefined} />
             <span>{t("cloud.common.refresh")}</span>
           </button>
-          {attachAction && (
-            <button
-              className="desktop-cloud-row-action primary"
-              type="button"
-              disabled={attachAction.busy || attachAction.disabled}
-              onClick={attachAction.onAttach}
-            >
-              <span>{t(attachAction.busy ? "cloud.project.linking" : "cloud.project.linkFolder")}</span>
-            </button>
-          )}
-          {detachAction && (
+          {removeRemoteAction && (
             <button
               className="desktop-cloud-row-action"
               type="button"
-              disabled={detachAction.busy}
-              onBlur={() => setConfirmDetach(false)}
+              disabled={removeRemoteAction.busy}
+              onBlur={() => setConfirmRemoveRemote(false)}
               onClick={() => {
-                if (!confirmDetach) {
-                  setConfirmDetach(true);
+                if (!confirmRemoveRemote) {
+                  setConfirmRemoveRemote(true);
                   return;
                 }
-                setConfirmDetach(false);
-                detachAction.onDetach();
+                setConfirmRemoveRemote(false);
+                removeRemoteAction.onRemove();
               }}
             >
               <Unlink size={13} />
-              <span>{t(detachAction.busy ? "cloud.project.detaching" : confirmDetach ? "cloud.project.confirmDetach" : "cloud.project.detach")}</span>
+              <span>{t(removeRemoteAction.busy ? "cloud.project.removingRemote" : confirmRemoveRemote ? "cloud.project.confirmRemoveRemote" : "cloud.project.removeRemote")}</span>
             </button>
           )}
           {projectId && (
@@ -171,7 +155,7 @@ export function CloudMappedOverview({
             entries={rootEntries}
             loading={loading}
             updatedLabel={latestChangeLabel}
-            statusConnected={linkedToWorkspace}
+            statusConnected={matchesRepositoryRemote}
             onSelect={() => onSelectSection("contents")}
           />
         </div>
@@ -192,9 +176,9 @@ export function CloudMappedOverview({
             <CloudAutomationCard connectors={automationConnectors} />
           </div>
 
-          <CloudLocalMappingPanel
-            mapped={linkedToWorkspace}
-            value={localMappingValue}
+          <CloudRepositoryRemotePanel
+            hasRepositoryRemote={matchesRepositoryRemote}
+            value={repositoryRemoteValue}
           />
         </div>
       </div>
@@ -202,19 +186,19 @@ export function CloudMappedOverview({
   );
 }
 
-export function CloudLocalMappingPanel({
-  mapped,
+export function CloudRepositoryRemotePanel({
+  hasRepositoryRemote,
   value,
 }: {
-  mapped: boolean;
+  hasRepositoryRemote: boolean;
   value: string;
 }) {
   const { t } = useLocalization();
   return (
-    <div className={`desktop-cloud-local-map ${mapped ? "mapped" : "unmapped"}`}>
+    <div className={`desktop-cloud-local-map ${hasRepositoryRemote ? "has-remote" : "no-remote"}`}>
       <div className="desktop-cloud-local-map-main">
-        <span>{t(mapped ? "cloud.overview.localMapping" : "cloud.overview.cloudUrl")}</span>
-        <code title={value} dir="auto">{value || t("cloud.overview.notLinkedLocally")}</code>
+        <span>{t(hasRepositoryRemote ? "cloud.overview.repositoryRemote" : "cloud.overview.cloudUrl")}</span>
+        <code title={value} dir="auto">{value || t("cloud.overview.noRepositoryRemote")}</code>
       </div>
     </div>
   );

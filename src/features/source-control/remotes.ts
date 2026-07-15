@@ -51,6 +51,22 @@ export function getPuppyoneRemote(status: GitStatusSnapshot | null): {
     : null;
 }
 
+/** Return the one credential-free canonical Project/Scope remote, if any. */
+export function getCanonicalPuppyoneRemote(status: GitStatusSnapshot | null): {
+  remote: GitRemoteSummary;
+  rawUrl: string;
+  info: PuppyoneRemoteInfo & { kind: "project" | "scope" };
+} | null {
+  const resolution = resolveCanonicalPuppyoneRemotes(status);
+  return resolution.status === "unique"
+    ? {
+        remote: resolution.remote,
+        rawUrl: resolution.rawUrl,
+        info: resolution.info as PuppyoneRemoteInfo & { kind: "project" | "scope" },
+      }
+    : null;
+}
+
 /**
  * Collect every recognized PuppyOne fetch/push locator before choosing a
  * target. Duplicate URLs for the same Project/Scope are harmless; distinct
@@ -59,11 +75,31 @@ export function getPuppyoneRemote(status: GitStatusSnapshot | null): {
 export function resolvePuppyoneRemotes(
   status: GitStatusSnapshot | null,
 ): PuppyoneRemoteResolution {
+  return resolvePuppyoneRemoteSet(status, () => true);
+}
+
+/**
+ * Resolve only canonical Project/Scope locators for Cloud UI context. Legacy
+ * access-key remotes remain transport compatibility input and never identify
+ * a Cloud Project for Desktop.
+ */
+export function resolveCanonicalPuppyoneRemotes(
+  status: GitStatusSnapshot | null,
+): PuppyoneRemoteResolution {
+  return resolvePuppyoneRemoteSet(status, (info) => info.kind !== "access-point");
+}
+
+function resolvePuppyoneRemoteSet(
+  status: GitStatusSnapshot | null,
+  include: (info: PuppyoneRemoteInfo) => boolean,
+): PuppyoneRemoteResolution {
   const candidates: PuppyoneRemoteCandidate[] = [];
   let directionConflict = false;
   for (const remote of status?.remotes ?? []) {
-    const fetchInfo = parsePuppyoneRemote(remote.fetchUrl);
-    const pushInfo = parsePuppyoneRemote(remote.pushUrl);
+    const parsedFetchInfo = parsePuppyoneRemote(remote.fetchUrl);
+    const parsedPushInfo = parsePuppyoneRemote(remote.pushUrl);
+    const fetchInfo = parsedFetchInfo && include(parsedFetchInfo) ? parsedFetchInfo : null;
+    const pushInfo = parsedPushInfo && include(parsedPushInfo) ? parsedPushInfo : null;
     if (Boolean(fetchInfo) !== Boolean(pushInfo)) {
       // A PuppyOne fetch paired with a different/invalid push target (or the
       // inverse) is an ambiguous transport and must never choose one side.

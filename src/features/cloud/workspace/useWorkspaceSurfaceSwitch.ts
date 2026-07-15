@@ -11,8 +11,7 @@ import { useLocalization } from "@puppyone/localization";
 import type { RecentWorkspaceHomeItem, OnboardingOperationStatus } from "../../../components/MinimalOnboarding";
 import {
   getCloudProject,
-  revokeCloudWorkspaceBinding,
-  revokeCloudWorkspaceBindingCredential,
+  revokeCloudGitCredential,
   type DesktopCloudProject,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
@@ -25,17 +24,15 @@ import {
   openWorkspaceTarget,
   selectLocalWorkspaceFolder,
 } from "../../../lib/workspaceOpening";
-import type { PuppyoneWorkspaceConfig, GitStatusSnapshot, WorkspaceOpenResult } from "../../../types/electron";
-import {
-  mergePuppyoneWorkspaceConfig,
-} from "../../app-shell/preferences";
+import type { PuppyoneWorkspaceConfig, WorkspaceOpenResult } from "../../../types/electron";
+import { mergePuppyoneWorkspaceConfig } from "../../app-shell/preferences";
 import type { DesktopWorkspaceSurfaceAction } from "../../app-shell/navigation";
 import {
   CLOUD_PROJECT_UNRESOLVABLE_MESSAGE,
-  type RecentWorkspaceCloudBinding,
+  type RecentWorkspaceCloudContext,
 } from "./cloudProjectResolution";
-import { findRecentLocalWorkspaceBindingForCloudProject } from "../../app-shell/workspaceHomeModel";
-import { cloudOriginFromApiBase, createExplicitWorkspaceBinding } from "./explicitWorkspaceBinding";
+import { findRecentLocalWorkspaceForCloudProject } from "../../app-shell/workspaceHomeModel";
+import { issueWorkspaceGitRemote } from "./workspaceGitRemote";
 import { formatCloudMessage } from "../cloudPresentation";
 
 type WorkspaceSurfaceFeedback =
@@ -45,22 +42,17 @@ type WorkspaceSurfaceFeedback =
 
 export function useWorkspaceSurfaceSwitch({
   activeCloudSession,
-  activeGitStatus,
-  cloudEnabled,
   cloudOnlyWorkspaceEnabled = false,
   cloudProjectId,
   desktopCloudApiBaseUrl,
-  handlePuppyoneConfigChange,
   handleWorkspaceOpenResult,
   homeCloudProjects,
   openCloudProjectFromHomepage,
-  puppyoneConfig,
-  recentWorkspaceCloudBindings,
+  recentWorkspaceCloudContexts,
   recentWorkspaceItems,
   refreshRecentWorkspaceList,
-  setHomeCloudProjects: _setHomeCloudProjects,
   setHomeOperationStatus,
-  setRecentWorkspaceCloudBindings,
+  setRecentWorkspaceCloudContexts,
   showBrowserSignInStatus,
   startCloudBrowserSignIn,
   updateCloudSession,
@@ -68,22 +60,17 @@ export function useWorkspaceSurfaceSwitch({
   workspaceIsCloud,
 }: {
   activeCloudSession: DesktopCloudSession | null;
-  activeGitStatus: GitStatusSnapshot | null;
-  cloudEnabled: boolean;
   cloudOnlyWorkspaceEnabled?: boolean;
   cloudProjectId: string | null;
   desktopCloudApiBaseUrl: string | null;
-  handlePuppyoneConfigChange: (nextConfig: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
   handleWorkspaceOpenResult: (result: WorkspaceOpenResult | null) => void;
   homeCloudProjects: DesktopCloudProject[];
   openCloudProjectFromHomepage: (projectId: string) => Promise<void>;
-  puppyoneConfig: PuppyoneWorkspaceConfig | null;
-  recentWorkspaceCloudBindings: Record<string, RecentWorkspaceCloudBinding>;
+  recentWorkspaceCloudContexts: Record<string, RecentWorkspaceCloudContext>;
   recentWorkspaceItems: RecentWorkspaceHomeItem[];
   refreshRecentWorkspaceList: () => Promise<void>;
-  setHomeCloudProjects: Dispatch<SetStateAction<DesktopCloudProject[]>>;
   setHomeOperationStatus: Dispatch<SetStateAction<OnboardingOperationStatus | null>>;
-  setRecentWorkspaceCloudBindings: Dispatch<SetStateAction<Record<string, RecentWorkspaceCloudBinding>>>;
+  setRecentWorkspaceCloudContexts: Dispatch<SetStateAction<Record<string, RecentWorkspaceCloudContext>>>;
   showBrowserSignInStatus: (detail: string) => void;
   startCloudBrowserSignIn: () => Promise<void>;
   updateCloudSession: (session: DesktopCloudSession | null) => void;
@@ -103,41 +90,23 @@ export function useWorkspaceSurfaceSwitch({
 
   const activeLocalCloudProjectId = useMemo(() => {
     if (!workspace || workspaceIsCloud) return null;
-    const binding = recentWorkspaceCloudBindings[workspace.id];
-    return binding?.bindingId && !binding.error
-      ? binding.projectId?.trim() || null
-      : null;
-  }, [
-    recentWorkspaceCloudBindings,
-    workspace,
-    workspaceIsCloud,
-  ]);
-  const activeLocalCloudLinked = useMemo(() => (
-    Boolean(activeLocalCloudProjectId)
-  ), [activeLocalCloudProjectId]);
-  const activeLocalCloudHostAvailable = useMemo(() => {
-    if (!workspace || workspaceIsCloud) return false;
-    return activeLocalCloudLinked;
-  }, [
-    activeLocalCloudLinked,
-    workspace,
-    workspaceIsCloud,
-  ]);
-  const activeCloudLocalBinding = useMemo(() => (
-    findRecentLocalWorkspaceBindingForCloudProject({
-      bindings: recentWorkspaceCloudBindings,
+    const context = recentWorkspaceCloudContexts[workspace.id];
+    return !context?.error ? context?.projectId?.trim() || null : null;
+  }, [recentWorkspaceCloudContexts, workspace, workspaceIsCloud]);
+  const activeLocalCloudHostAvailable = Boolean(activeLocalCloudProjectId);
+  const activeCloudLocalWorkspace = useMemo(() => (
+    findRecentLocalWorkspaceForCloudProject({
+      contexts: recentWorkspaceCloudContexts,
       projectId: workspaceIsCloud ? cloudProjectId : null,
       recentWorkspaceItems,
     })
-  ), [cloudProjectId, recentWorkspaceCloudBindings, recentWorkspaceItems, workspaceIsCloud]);
+  ), [cloudProjectId, recentWorkspaceCloudContexts, recentWorkspaceItems, workspaceIsCloud]);
 
   useEffect(() => {
     setWorkspaceSurfaceSwitching(false);
     setWorkspaceSurfaceError(null);
     setWorkspaceSurfaceDialogOpen(false);
   }, [setWorkspaceSurfaceError, workspace?.path]);
-
-  // Local workspace Cloud project binding is owned by useCloudWorkspaceBinding.
 
   const switchToCloudProjectSurface = useCallback(() => {
     if (workspaceSurfaceSwitching) return;
@@ -179,18 +148,15 @@ export function useWorkspaceSurfaceSwitch({
   ]);
 
   const switchToLocalWorkspaceSurface = useCallback(() => {
-    const localPath = activeCloudLocalBinding?.workspace.path;
+    const localPath = activeCloudLocalWorkspace?.workspace.path;
     if (!localPath) return;
     setWorkspaceSurfaceError(null);
-    void openWorkspaceTarget({
-      kind: "local",
-      path: localPath,
-    })
+    void openWorkspaceTarget({ kind: "local", path: localPath })
       .then(handleWorkspaceOpenResult)
       .catch((error) => {
         setWorkspaceSurfaceError(error instanceof Error ? error.message : String(error));
       });
-  }, [activeCloudLocalBinding, handleWorkspaceOpenResult, setWorkspaceSurfaceError]);
+  }, [activeCloudLocalWorkspace, handleWorkspaceOpenResult, setWorkspaceSurfaceError]);
 
   const openCloudWorkspaceLocally = useCallback(() => {
     if (!cloudProjectId) return;
@@ -201,13 +167,12 @@ export function useWorkspaceSurfaceSwitch({
 
       const openedWorkspace = result.workspace;
       if (openedWorkspace) {
-        let issuedBindingId: string | null = null;
-        let bindingWasCreated = false;
-        let currentConfig: PuppyoneWorkspaceConfig | null = null;
+        let previousConfig: PuppyoneWorkspaceConfig | null = null;
         let configUpdated = false;
+        let issued: Awaited<ReturnType<typeof issueWorkspaceGitRemote>> | null = null;
         try {
           if (!activeCloudSession) {
-            throw new Error(t("cloud.workspaceSurface.signInToAttach"));
+            throw new Error(t("cloud.workspaceSurface.signInToConfigureRemote"));
           }
           const project = homeCloudProjects.find((entry) => entry.id === cloudProjectId)
             ?? await getCloudProject(
@@ -216,67 +181,60 @@ export function useWorkspaceSurfaceSwitch({
               updateCloudSession,
               desktopCloudApiBaseUrl,
             );
-          const attached = await createExplicitWorkspaceBinding({
+          issued = await issueWorkspaceGitRemote({
             session: activeCloudSession,
             apiBaseUrl: desktopCloudApiBaseUrl,
             project,
             projectId: cloudProjectId,
-            workspace: openedWorkspace,
             onSessionChange: updateCloudSession,
           });
-          issuedBindingId = attached.binding.id;
-          bindingWasCreated = attached.bindingWasCreated;
-          currentConfig = await readPuppyoneWorkspaceConfig(openedWorkspace.path);
-          const nextConfig = mergePuppyoneWorkspaceConfig(currentConfig, {
-            project: {
-              workspaceInstanceId: openedWorkspace.workspaceInstanceId ?? null,
+          previousConfig = await readPuppyoneWorkspaceConfig(openedWorkspace.path);
+          const nextConfig = mergePuppyoneWorkspaceConfig(previousConfig, {
+            sync: {
+              sourceOfTruth: { service: "puppyone", remote: "puppyone", branch: null },
             },
-            cloud: {
-              projectId: cloudProjectId,
-              origin: cloudOriginFromApiBase(desktopCloudApiBaseUrl ?? activeCloudSession.api_base_url),
-              bindingId: attached.binding.id,
+            backup: {
+              enabled: true,
+              service: "puppyone",
+              remote: "puppyone",
+              branch: null,
             },
+            git: { primaryRemote: "puppyone", watchedBranch: null },
           });
           await writePuppyoneWorkspaceConfig(openedWorkspace.path, nextConfig);
           configUpdated = true;
           await configureWorkspaceCloudRemote(
             openedWorkspace.path,
-            attached.remoteUrl,
+            issued.remoteUrl,
             "puppyone",
-            attached.credential,
-            attached.username,
+            issued.credential,
+            issued.username,
           );
-          setRecentWorkspaceCloudBindings((current) => ({
+          const configuredTarget = issued.target;
+          setRecentWorkspaceCloudContexts((current) => ({
             ...current,
             [openedWorkspace.id]: {
               projectId: cloudProjectId,
-              bindingId: attached.binding.id,
-              target: attached.binding.target,
-              scopePath: attached.binding.scope_path ?? null,
-              cloudLinked: true,
+              target: configuredTarget,
+              hasCloudRemote: true,
               error: null,
               reason: null,
             },
           }));
         } catch (error) {
-          if (configUpdated && currentConfig) {
-            await writePuppyoneWorkspaceConfig(
-              openedWorkspace.path,
-              currentConfig,
-            ).catch(() => undefined);
-          }
-          if (issuedBindingId && activeCloudSession) {
-            const compensate = bindingWasCreated
-              ? revokeCloudWorkspaceBinding
-              : revokeCloudWorkspaceBindingCredential;
-            await compensate(
+          if (issued && activeCloudSession) {
+            await revokeCloudGitCredential(
               activeCloudSession,
-              issuedBindingId,
+              issued.project.id,
+              issued.credentialId,
               updateCloudSession,
               desktopCloudApiBaseUrl,
             ).catch(() => undefined);
           }
-          console.warn("Unable to bind local workspace to Cloud project:", error);
+          if (configUpdated && previousConfig) {
+            await writePuppyoneWorkspaceConfig(openedWorkspace.path, previousConfig).catch(() => undefined);
+          }
+          console.warn("Unable to configure the local PuppyOne Git remote:", error);
           setWorkspaceSurfaceError(error instanceof Error ? error.message : String(error));
         }
       }
@@ -293,7 +251,7 @@ export function useWorkspaceSurfaceSwitch({
     handleWorkspaceOpenResult,
     homeCloudProjects,
     refreshRecentWorkspaceList,
-    setRecentWorkspaceCloudBindings,
+    setRecentWorkspaceCloudContexts,
     setWorkspaceSurfaceError,
     t,
     updateCloudSession,
@@ -309,20 +267,14 @@ export function useWorkspaceSurfaceSwitch({
       };
     }
     if (workspaceIsCloud && cloudProjectId) {
-      if (activeCloudLocalBinding) {
-        return {
-          kind: "switch-to-local",
-          onClick: switchToLocalWorkspaceSurface,
-        };
+      if (activeCloudLocalWorkspace) {
+        return { kind: "switch-to-local", onClick: switchToLocalWorkspaceSurface };
       }
-      return {
-        kind: "open-locally",
-        onClick: openCloudWorkspaceLocally,
-      };
+      return { kind: "open-locally", onClick: openCloudWorkspaceLocally };
     }
     return null;
   }, [
-    activeCloudLocalBinding,
+    activeCloudLocalWorkspace,
     activeLocalCloudHostAvailable,
     cloudOnlyWorkspaceEnabled,
     cloudProjectId,

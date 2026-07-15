@@ -1,60 +1,42 @@
 import type { RecentWorkspaceHomeItem } from "../../../components/MinimalOnboarding";
 import {
+  getCloudRepositoryContext,
   getCloudProjectReadiness,
-  getCloudWorkspaceBinding,
   type DesktopCloudProject,
   type DesktopCloudProjectReadiness,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
-import { sameCloudOrigin } from "./explicitWorkspaceBinding";
 import type { RepositoryTarget } from "../repositoryTarget";
-import {
-  cloudMessage,
-  type CloudMessageDescriptor,
-} from "../cloudPresentation";
+import { repositoryTargetMatchesRemote } from "../repositoryTarget";
+import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
+import { isTrustedCloudGitOrigin } from "./workspaceGitRemote";
 
-export type RecentWorkspaceCloudBinding = {
+export type RecentWorkspaceCloudContext = {
   projectId: string | null;
-  /** Context key is present only on results verified by the active resolver. */
   resolutionKey?: string;
   resolutionPending?: boolean;
-  resolutionSource?: "workspace-binding" | "canonical-remote";
-  bindingStatus?: "bound" | "not-bound";
-  cloudLinked: boolean;
+  hasCloudRemote: boolean;
   error: CloudMessageDescriptor | null;
   reason?:
     | "not-authorized"
     | "unresolvable"
     | "network"
-    | "binding-revoked"
     | "wrong-account"
     | "wrong-host"
-    | "role-downgraded"
-    | "legacy-confirmation-required"
     | "locator-conflict"
     | "not-found"
     | null;
-  bindingId?: string | null;
   target?: RepositoryTarget | null;
   scopePath?: string | null;
   readiness?: DesktopCloudProjectReadiness | null;
   candidateProjectId?: string | null;
-  candidateTarget?: RepositoryTarget | null;
   capabilities?: string[];
 };
 
-export const CLOUD_PROJECT_NOT_AUTHORIZED_MESSAGE = cloudMessage("binding-not-authorized");
-export const CLOUD_PROJECT_UNRESOLVABLE_MESSAGE = cloudMessage("binding-unresolvable");
+export const CLOUD_PROJECT_NOT_AUTHORIZED_MESSAGE = cloudMessage("remote-not-authorized");
+export const CLOUD_PROJECT_UNRESOLVABLE_MESSAGE = cloudMessage("remote-unresolvable");
 export const CLOUD_PROJECT_MAPPING_ERROR = CLOUD_PROJECT_UNRESOLVABLE_MESSAGE;
 
-/**
- * Decide whether the Organization-level Project catalog is needed.
- *
- * A Local workspace is resolved binding-first. Session restore must therefore
- * never race an exact Workspace Binding lookup with a broad Project listing.
- * The catalog is a global/home concern. An open Local workspace is always a
- * contextual surface, including when it has no locator at all.
- */
 export function shouldLoadCloudProjectCatalog({
   hasOpenWorkspace,
   workspaceIsCloud,
@@ -64,10 +46,6 @@ export function shouldLoadCloudProjectCatalog({
   workspaceIsCloud: boolean;
   workspaceRestoring?: boolean;
 }): boolean {
-  // While the last local workspace is being restored, "no workspace yet" is
-  // an unknown transient state rather than the global homepage. Starting the
-  // Organization catalog here races (and visually leaks into) contextual
-  // binding resolution.
   return !workspaceRestoring && (!hasOpenWorkspace || workspaceIsCloud);
 }
 
@@ -78,15 +56,11 @@ function errorStatus(error: unknown): number | null {
 }
 
 export function isRetryableCloudFailure(status: number | null): boolean {
-  return status == null
-    || status === 408
-    || status === 425
-    || status === 429
-    || status >= 500;
+  return status == null || status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
-/** Resolve homepage badges from explicit binding facts only. */
-export async function resolveRecentWorkspaceCloudBinding({
+/** Resolve a recent-workspace badge from its secret-free canonical Git hint. */
+export async function resolveRecentWorkspaceCloudContext({
   apiBaseUrl,
   item,
   onSessionChange,
@@ -98,113 +72,96 @@ export async function resolveRecentWorkspaceCloudBinding({
   onSessionChange: (session: DesktopCloudSession | null) => void;
   projects: DesktopCloudProject[];
   session: DesktopCloudSession | null;
-}): Promise<[string, RecentWorkspaceCloudBinding]> {
-  // These are non-authoritative hints hydrated by the main process from its
-  // persisted recent-workspace list. Never probe an inactive folder through
-  // the current window's workspace IPC capability.
-  const projectId = item.workspace.cloudProjectId?.trim() || null;
-  const bindingId = item.workspace.cloudBindingId?.trim() || null;
-  const origin = item.workspace.cloudBindingOrigin?.trim() || null;
-  const configuredInstance = item.workspace.cloudBindingWorkspaceInstanceId?.trim() || null;
-  const workspaceInstance = item.workspace.workspaceInstanceId?.trim() || null;
-  const configError = item.workspace.configError ?? null;
+}): Promise<[string, RecentWorkspaceCloudContext]> {
+  const remote = item.workspace.puppyoneGitRemote ?? null;
+  if (!remote) {
+    return [item.workspace.id, {
+      projectId: null,
+      hasCloudRemote: false,
+      error: null,
+      reason: null,
+    }];
+  }
 
-  if (projectId && bindingId && origin) {
-    if (!sameCloudOrigin(origin, apiBaseUrl ?? session?.api_base_url)) {
+  if (!isTrustedCloudGitOrigin(remote.origin, apiBaseUrl ?? session?.api_base_url)) {
+    return [item.workspace.id, {
+      projectId: null,
+      candidateProjectId: remote.projectId,
+      hasCloudRemote: true,
+      error: cloudMessage("remote-wrong-host", { origin: remote.origin }),
+      reason: "wrong-host",
+    }];
+  }
+  if (!session) {
+    return [item.workspace.id, {
+      projectId: null,
+      candidateProjectId: remote.projectId,
+      hasCloudRemote: true,
+      error: cloudMessage("remote-sign-in"),
+      reason: "wrong-account",
+    }];
+  }
+
+  const target: RepositoryTarget = remote.scopeId
+    ? { kind: "scope", project_id: remote.projectId, scope_id: remote.scopeId }
+    : { kind: "project_root", project_id: remote.projectId };
+  try {
+    const context = await getCloudRepositoryContext(
+      session, remote.projectId, target, onSessionChange, apiBaseUrl,
+    );
+    if (
+      context.project.id !== remote.projectId
+      || !repositoryTargetMatchesRemote(context.target, {
+        kind: remote.scopeId ? "scope" : "project",
+        projectId: remote.projectId,
+        ...(remote.scopeId ? { scopeId: remote.scopeId } : {}),
+      })
+    ) {
       return [item.workspace.id, {
         projectId: null,
-        candidateProjectId: projectId,
-        bindingId,
-        cloudLinked: true,
-        error: cloudMessage("binding-wrong-host", { origin }),
-        reason: "wrong-host",
+        candidateProjectId: remote.projectId,
+        hasCloudRemote: true,
+        error: cloudMessage("remote-response-mismatch"),
+        reason: "locator-conflict",
       }];
     }
-    if (!configuredInstance || !workspaceInstance || configuredInstance !== workspaceInstance) {
-      return [item.workspace.id, {
-        projectId: null,
-        candidateProjectId: projectId,
-        bindingId,
-        cloudLinked: true,
-        error: cloudMessage("binding-checkout-mismatch"),
-        reason: "binding-revoked",
-      }];
-    }
-    if (!session) {
-      return [item.workspace.id, {
-        projectId,
-        bindingId,
-        cloudLinked: true,
-        error: null,
-        reason: null,
-      }];
-    }
-    try {
-      const binding = await getCloudWorkspaceBinding(
-        session, bindingId, onSessionChange, apiBaseUrl,
-      );
-      if (
-        binding.target.project_id !== projectId
-        || binding.workspace_instance_id !== workspaceInstance
-        || !binding.usable
-      ) {
-        return [item.workspace.id, {
-          projectId: null,
-          candidateProjectId: projectId,
-          bindingId,
-          target: binding.target,
-          scopePath: binding.scope_path ?? null,
-          cloudLinked: true,
-          error: CLOUD_PROJECT_NOT_AUTHORIZED_MESSAGE,
-          reason: binding.unusable_reason === "wrong_account" ? "wrong-account" : "binding-revoked",
-        }];
-      }
-      const readiness = await getCloudProjectReadiness(
-        session, projectId, onSessionChange, apiBaseUrl,
-      );
-      return [item.workspace.id, {
-        projectId,
-        bindingId,
-        target: binding.target,
-        scopePath: binding.scope_path ?? null,
-        readiness,
-        cloudLinked: true,
-        error: null,
-        reason: null,
-      }];
-    } catch (error) {
-      const status = errorStatus(error);
-      return [item.workspace.id, {
-        projectId: isRetryableCloudFailure(status) ? projectId : null,
-        candidateProjectId: projectId,
-        bindingId,
-        cloudLinked: true,
-        error: status === 401
-          ? cloudMessage("binding-switch-account")
-          : status === 403 || status === 404
-            ? cloudMessage("binding-not-authorized")
+    const readiness = await getCloudProjectReadiness(
+      session, context.project.id, onSessionChange, apiBaseUrl,
+    );
+    return [item.workspace.id, {
+      projectId: context.project.id,
+      target: context.target,
+      scopePath: context.scope_path ?? null,
+      readiness,
+      capabilities: context.project.capabilities ?? [],
+      hasCloudRemote: true,
+      error: null,
+      reason: null,
+    }];
+  } catch (error) {
+    const status = errorStatus(error);
+    return [item.workspace.id, {
+      projectId: null,
+      candidateProjectId: remote.projectId,
+      hasCloudRemote: true,
+      error: status === 401
+        ? cloudMessage("remote-sign-in")
+        : status === 403
+          ? cloudMessage("remote-not-authorized")
+          : status === 404
+            ? cloudMessage("remote-not-found")
             : cloudMessage(
-                "binding-network-failed",
+                isRetryableCloudFailure(status) ? "remote-network-failed" : "remote-unresolvable",
                 undefined,
                 error instanceof Error ? error.message : String(error),
               ),
-        reason: status === 401 ? "wrong-account" : status === 403 || status === 404 ? "not-authorized" : "network",
-      }];
-    }
-  }
-
-  if (item.workspace.hasPuppyoneCloudRemote === true) {
-    return [item.workspace.id, {
-      projectId: null,
-      cloudLinked: true,
-      error: CLOUD_PROJECT_UNRESOLVABLE_MESSAGE,
-      reason: "legacy-confirmation-required",
+      reason: status === 401
+        ? "wrong-account"
+        : status === 403
+          ? "not-authorized"
+          : status === 404
+            ? "not-found"
+            : isRetryableCloudFailure(status) ? "network" : "unresolvable",
     }];
   }
-  return [item.workspace.id, {
-    projectId: null,
-    cloudLinked: false,
-    error: configError ? cloudMessage("binding-config-error", undefined, configError) : null,
-    reason: null,
-  }];
 }

@@ -170,7 +170,7 @@ export const CLOUD_ROUTE_BY_ID = Object.fromEntries(
 export const CLOUD_ACCOUNT_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "account" && route.showInSidebar);
 export const CLOUD_PROJECT_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "project");
 export const CLOUD_PROJECT_SIDEBAR_ROUTES = CLOUD_PROJECT_ROUTES.filter((route) => route.showInSidebar);
-/** Local bound project hub: project sections + account Team/Billing as a second group. */
+/** Repository-context Project hub: Project sections + account Team/Billing as a second group. */
 export const CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES = [
   ...CLOUD_PROJECT_SIDEBAR_ROUTES,
   ...CLOUD_ACCOUNT_ROUTES,

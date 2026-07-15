@@ -21,7 +21,6 @@ import {
   deleteWorkspaceEntry,
   importWorkspaceEntries,
   readPuppyoneWorkspaceConfig,
-  regeneratePuppyoneWorkspaceProjectId,
   writePuppyoneWorkspaceConfig,
 } from "../local-api/workspace.mjs";
 
@@ -65,7 +64,7 @@ describe("workspaceFromPath", () => {
     const after = await workspaceFromPath(root);
     expect(after.workspaceInstanceId).toBe(before.workspaceInstanceId);
     expect(after.id).toBe(before.id);
-    expect(after.projectId).toBeNull();
+    expect(after).not.toHaveProperty("projectId");
     await expect(lstat(path.join(root, ".puppyone"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
@@ -281,16 +280,17 @@ describe("workspace config containment", () => {
       version: 1,
       cloud: { projectId: "safe-project" },
     });
-    expect(result.version).toBe(2);
-    expect(result.project.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(result.cloud.projectId).toBe("safe-project");
+    expect(result.version).toBe(3);
+    expect(result).not.toHaveProperty("project");
+    expect(result).not.toHaveProperty("cloud");
     expect((await lstat(path.join(root, ".puppyone", "config.json"))).isFile()).toBe(true);
-    expect((await readPuppyoneWorkspaceConfig(root)).cloud.projectId).toBe("safe-project");
+    expect(await readPuppyoneWorkspaceConfig(root)).not.toHaveProperty("cloud");
   });
 
-  it("keeps project identity across clones while assigning each checkout a different instance", async () => {
-    const configured = await writePuppyoneWorkspaceConfig(root, {
+  it("keeps shared config free of Project identity while assigning each checkout a local instance", async () => {
+    await writePuppyoneWorkspaceConfig(root, {
       version: 1,
+      project: { id: "01234567-89ab-4def-8123-456789abcdef" },
       cloud: { projectId: "cloud-project" },
     });
     const clone = path.join(external, "clone");
@@ -302,13 +302,10 @@ describe("workspace config containment", () => {
 
     const sourceWorkspace = await workspaceFromPath(root, { includeGitMetadata: false });
     const cloneWorkspace = await workspaceFromPath(clone, { includeGitMetadata: false });
-    expect(sourceWorkspace.projectId).toBe(configured.project.id);
-    expect(cloneWorkspace.projectId).toBe(configured.project.id);
+    expect(sourceWorkspace).not.toHaveProperty("projectId");
+    expect(cloneWorkspace).not.toHaveProperty("projectId");
     expect(cloneWorkspace.workspaceInstanceId).not.toBe(sourceWorkspace.workspaceInstanceId);
-
-    const duplicated = await regeneratePuppyoneWorkspaceProjectId(clone);
-    expect(duplicated.project.id).not.toBe(configured.project.id);
-    expect(duplicated.cloud.projectId).toBeNull();
+    expect(await readPuppyoneWorkspaceConfig(clone)).not.toHaveProperty("project");
   });
 
   it("rejects a symlinked config directory instead of reading or writing outside", async () => {

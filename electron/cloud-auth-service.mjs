@@ -78,6 +78,11 @@ export function createCloudAuthService({
       return toPublicSession(session, authStatus, sessionGeneration);
     } catch (error) {
       if (isRefreshCredentialInvalid(error)) return null;
+      if (error?.code === "SESSION_CHANGED") {
+        // A concurrent refresh/sign-in adopted a newer generation. This is
+        // internal coordination, not an offline signal.
+        return toPublicSession(getSessionSource(), authStatus, sessionGeneration);
+      }
       // Network and server availability failures do not destroy a valid refresh
       // credential. The renderer can keep local work available and show offline.
       setAuthStatus("offline-authenticated");
@@ -256,6 +261,9 @@ export function createCloudAuthService({
       setAuthStatus("authenticated");
       return result;
     } catch (error) {
+      if (error?.code === "SESSION_CHANGED" && isSafeSessionRetry(apiPath, init)) {
+        return retrySessionApiWithCurrentGeneration(normalizedApiBase, apiPath, init);
+      }
       if (!isAccessTokenFailure(error)) {
         if (isNetworkFailure(error)) setAuthStatus("offline-authenticated");
         throw error;
@@ -269,14 +277,35 @@ export function createCloudAuthService({
         && isFreshSession(runtimeSession, now())
         ? runtimeSession
         : await refreshSessionSingleflight(normalizedApiBase);
-      return performAuthenticatedRequest(
-        normalizedApiBase,
-        apiPath,
-        init,
-        refreshed,
-        requestGeneration,
-      );
+      try {
+        return await performAuthenticatedRequest(
+          normalizedApiBase,
+          apiPath,
+          init,
+          refreshed,
+          requestGeneration,
+        );
+      } catch (retryError) {
+        if (retryError?.code === "SESSION_CHANGED" && isSafeSessionRetry(apiPath, init)) {
+          return retrySessionApiWithCurrentGeneration(normalizedApiBase, apiPath, init);
+        }
+        throw retryError;
+      }
     }
+  }
+
+  async function retrySessionApiWithCurrentGeneration(apiBase, apiPath, init) {
+    if (authStatus === "signing-out") throw createSessionChangedError();
+    await ensureCredentialLoaded();
+    if (!credential || !isSessionForApiBase(credential, apiBase)) {
+      throw createSessionChangedError();
+    }
+    const session = runtimeSession && isFreshSession(runtimeSession, now())
+      ? runtimeSession
+      : await refreshSessionSingleflight(apiBase);
+    const retryGeneration = sessionGeneration;
+    await initializeCurrentSessionBestEffort(apiBase, session);
+    return performAuthenticatedRequest(apiBase, apiPath, init, session, retryGeneration);
   }
 
   async function clearSession() {
@@ -664,6 +693,15 @@ function isRefreshCredentialInvalid(error) {
 
 function isNetworkFailure(error) {
   return !Number.isFinite(error?.status) && error?.code !== "SESSION_CHANGED";
+}
+
+function isSafeSessionRetry(apiPath, init) {
+  const method = String(init?.method ?? "GET").toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) return true;
+  // Repository-context POST is a read-only ProjectGrant lookup. Replaying it
+  // cannot create, rotate, or revoke Cloud state.
+  return method === "POST"
+    && /^\/projects\/[^/]+\/repository-context$/.test(apiPath);
 }
 
 function createSignedOutError(apiBase) {

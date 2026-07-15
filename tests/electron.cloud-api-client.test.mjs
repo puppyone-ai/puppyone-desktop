@@ -19,7 +19,7 @@ describe("Electron Cloud API error transport", () => {
 
     const error = await requestCloudApi(
       "http://localhost:9090/api/v1",
-      "/workspace-bindings/binding-1",
+      "/projects/project-1",
       { method: "GET" },
     ).then(() => null, (reason) => reason);
 

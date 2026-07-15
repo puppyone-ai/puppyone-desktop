@@ -1,16 +1,13 @@
 export {
-  attachmentHasBoundProject,
-  attachmentHasProjectContext,
-  getAttachedCloudProjectId,
+  cloudContextHasProject,
   getResolvedCloudProjectId,
-  isProjectCloudLinked,
-  resolveCloudHubSectionAfterBindingChange,
+  resolveCloudHubSectionAfterContextChange,
   resolveCloudProjectNavigationContext,
-  resolveCloudHubSectionForAttachment,
-  resolveProjectCloudAttachment,
-  useProjectCloudAttachment,
-  type ProjectCloudAttachment,
-} from "./attachment";
+  resolveCloudHubSectionForContext,
+  resolveProjectCloudContext,
+  useProjectCloudContext,
+  type ProjectCloudContext,
+} from "./context";
 export { CloudServiceMainView } from "./CloudServiceMainView";
 export {
   CloudProjectHistorySidebar,
@@ -41,14 +38,14 @@ export {
   normalizeCloudSection,
 } from "./routes/cloudRoutes";
 export {
-  deriveCloudWorkspaceBinding,
+  deriveCloudWorkspaceContext,
 } from "./workspace";
 export { CLOUD_WORKSPACE_SECTIONS } from "./routes/cloudRouteIds";
 export type { CloudAuthState } from "./auth";
 export type { CloudEnvironment, CloudEnvironmentSource } from "./environment";
 export type { CloudRouteContext, CloudRouteDescriptor } from "./routes/cloudRoutes";
 export type { CloudWorkspaceSection } from "./types";
-export type { CloudWorkspaceBindingState } from "./workspace";
+export type { CloudWorkspaceContextState } from "./workspace";
 export { formatCloudMessage } from "./cloudPresentation";
 export { isCloudAccessNavigationResource } from "./sections/access/accessRows";
 export { shouldLoadDesktopCloudAccessData } from "./data/shouldLoadDesktopCloudAccessData";

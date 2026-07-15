@@ -367,13 +367,6 @@ export async function writePuppyoneWorkspaceConfig(
   return getDesktopBridge().writePuppyoneConfig({ rootPath, config });
 }
 
-export async function regeneratePuppyoneWorkspaceProjectId(
-  rootPath: string,
-  options: { preserveCloudBinding?: boolean } = {},
-): Promise<PuppyoneWorkspaceConfig> {
-  return getDesktopBridge().regeneratePuppyoneProjectId({ rootPath, ...options });
-}
-
 export async function getWorkspaceGitCommitDetail(rootPath: string, commitId: string): Promise<GitCommitDetail> {
   return getDesktopBridge().getGitCommitDetail({ rootPath, commitId });
 }

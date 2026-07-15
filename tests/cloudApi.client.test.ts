@@ -563,19 +563,25 @@ function validBillingOperation() {
 }
 
 describe("session / api-base guards", () => {
-  it("recovers HTTP status after Electron serializes away custom Error fields", async () => {
-    bridge.mockRejectedValue(new Error(
-      "Error invoking remote method 'cloud:session-api-request': Error: "
-      + "Request failed (503): Project authorization is temporarily unavailable",
-    ));
+  it("reconstructs typed errors from the structured IPC envelope", async () => {
+    bridge.mockResolvedValue({
+      transport: "puppyone-cloud-ipc-v1",
+      ok: false,
+      error: {
+        status: 503,
+        code: "AUTHORIZATION_UNAVAILABLE",
+        message: "Project authorization is temporarily unavailable",
+      },
+    });
 
-    const error = await cloudApiRequest("/workspace-bindings/binding-1", session, undefined, {}, API)
+    const error = await cloudApiRequest("/projects/project-1", session, undefined, {}, API)
       .then(() => null, (reason: unknown) => reason);
 
     expect(error).toBeInstanceOf(Error);
     expect(error).toMatchObject({
       message: "Project authorization is temporarily unavailable",
       status: 503,
+      code: "AUTHORIZATION_UNAVAILABLE",
     });
   });
 

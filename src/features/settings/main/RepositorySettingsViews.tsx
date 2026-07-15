@@ -29,7 +29,6 @@ export function CloudHostingSettingsView({
   cloudEnabled,
   onCopyRemoteUrl,
   onPuppyoneConfigChange,
-  onRegeneratePuppyoneProjectId,
   onRefresh,
 }: RepositorySettingsBaseProps & {
   puppyoneConfig: PuppyoneWorkspaceConfig | null;
@@ -38,7 +37,6 @@ export function CloudHostingSettingsView({
   puppyoneConfigError: string | null;
   cloudEnabled: boolean;
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
-  onRegeneratePuppyoneProjectId: () => Promise<PuppyoneWorkspaceConfig | null>;
 }) {
   const { t } = useLocalization();
   const remotes = status?.remotes ?? [];
@@ -79,7 +77,6 @@ export function CloudHostingSettingsView({
                 saving={puppyoneConfigSaving}
                 error={puppyoneConfigError}
                 onChange={onPuppyoneConfigChange}
-                onRegenerateProjectId={onRegeneratePuppyoneProjectId}
               />
               {usesPuppyoneCloud && (
                 <SettingsSubsection title={t("settings.cloud.connectionTitle")}>

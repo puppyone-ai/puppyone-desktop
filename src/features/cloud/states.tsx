@@ -1,10 +1,7 @@
 import { Cloud } from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
-import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type { getPuppyoneRemote } from "../source-control/remotes";
-import type { CloudWorkspaceSection } from "./types";
-import { getCloudSectionDescriptor } from "./navigation";
 import {
   CloudMainMetric,
   CloudMainSection,
@@ -14,9 +11,8 @@ import {
 
 export { CloudProjectRecoveryState } from "./states/CloudProjectRecoveryState";
 
-export function CloudUnmappedWorkspace({
+export function CloudLocalOnlyWorkspace({
   workspace,
-  activeSection,
   accountEmail,
   branchName,
   localChangeCount,
@@ -25,7 +21,6 @@ export function CloudUnmappedWorkspace({
   onBackupWorkspace,
 }: {
   workspace: Workspace;
-  activeSection: CloudWorkspaceSection;
   accountEmail: string | null;
   branchName: string;
   localChangeCount: number;
@@ -34,18 +29,6 @@ export function CloudUnmappedWorkspace({
   onBackupWorkspace: () => void;
 }) {
   const { formatNumber, t } = useLocalization();
-  if (activeSection !== "overview") {
-    return (
-      <CloudUnmappedSection
-        workspace={workspace}
-        activeSection={activeSection}
-        backupLoading={backupLoading}
-        cloudRemote={cloudRemote}
-        onBackupWorkspace={onBackupWorkspace}
-      />
-    );
-  }
-
   return (
     <>
       <CloudMainSection
@@ -58,7 +41,7 @@ export function CloudUnmappedWorkspace({
             disabled={backupLoading}
             onClick={onBackupWorkspace}
           >
-            {t(backupLoading ? "cloud.common.connecting" : "cloud.state.backupAndConnect")}
+            {t(backupLoading ? "cloud.project.addingRemote" : "cloud.state.backupAndAddRemote")}
           </button>
         )}
       >
@@ -69,59 +52,9 @@ export function CloudUnmappedWorkspace({
             <p>{t("cloud.state.localOnlyDescription")}</p>
           </div>
           <div className="desktop-cloud-sync-summary">
-            <CloudMainMetric label={t("cloud.common.account")} value={accountEmail ?? t("cloud.account.signedIn")} tone="ready" />
+            <CloudMainMetric label={t("cloud.common.account")} value={accountEmail ?? t("cloud.state.accountNotRequired")} tone="ready" />
             <CloudMainMetric label={t("cloud.git.branch")} value={branchName} />
             <CloudMainMetric label={t("cloud.git.localChanges")} value={formatNumber(localChangeCount)} tone={localChangeCount > 0 ? "warning" : undefined} />
-          </div>
-        </div>
-      </CloudMainSection>
-    </>
-  );
-}
-
-export function CloudUnmappedSection({
-  workspace,
-  activeSection,
-  backupLoading,
-  cloudRemote,
-  onBackupWorkspace,
-}: {
-  workspace: Workspace;
-  activeSection: CloudWorkspaceSection;
-  backupLoading: boolean;
-  cloudRemote: ReturnType<typeof getPuppyoneRemote>;
-  onBackupWorkspace: () => void;
-}) {
-  const { t } = useLocalization();
-  const section = getCloudSectionDescriptor(activeSection, t);
-  const remoteLabel = cloudRemote?.info.displayId ?? t("cloud.state.noRemote");
-  const Icon = section.icon;
-
-  return (
-    <>
-      <CloudMainSection
-        title={section.title}
-        count={t("cloud.project.required")}
-        action={(
-          <button
-            className="desktop-cloud-row-action primary"
-            type="button"
-            disabled={backupLoading}
-            onClick={onBackupWorkspace}
-          >
-            {t(backupLoading ? "cloud.common.connecting" : "cloud.state.backupAndConnect")}
-          </button>
-        )}
-      >
-        <div className="desktop-cloud-empty-state">
-          <span><Icon size={22} /></span>
-          <div>
-            <strong>{t("cloud.state.sectionNeedsProject", { section: section.title })}</strong>
-            <p>{t("cloud.state.connectWorkspaceFirst", {
-              description: section.description,
-              workspace: bidiIsolate(workspace.name),
-              remote: bidiIsolate(remoteLabel),
-            })}</p>
           </div>
         </div>
       </CloudMainSection>

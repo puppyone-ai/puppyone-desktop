@@ -306,7 +306,6 @@ export function getGitHostingMode(
 }
 
 function hasConfiguredPuppyoneCloudIntent(config: PuppyoneWorkspaceConfig | null) {
-  if (config?.cloud?.projectId) return true;
   const configuredRemoteName = config?.sync?.sourceOfTruth?.remote
     ?? config?.git?.primaryRemote
     ?? config?.backup?.remote

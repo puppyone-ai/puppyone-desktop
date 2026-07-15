@@ -64,7 +64,7 @@ export function CloudProjectRecoveryState({
             {message}
             {remoteLabel ? ` ${t("cloud.recovery.remote", { remote: remoteLabel })}` : ""}
             {" "}
-            {t("cloud.recovery.connectionPreserved")}
+            {t("cloud.recovery.localStatePreserved")}
           </p>
         </div>
       </div>

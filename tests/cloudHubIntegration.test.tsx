@@ -6,14 +6,12 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  attachmentHasBoundProject,
-  getAttachedCloudProjectId,
-  isProjectCloudLinked,
-  resolveCloudHubSectionAfterBindingChange,
-  resolveCloudHubSectionForAttachment,
+  cloudContextHasProject,
+  resolveCloudHubSectionAfterContextChange,
+  resolveCloudHubSectionForContext,
   resolveCloudProjectNavigationContext,
-  resolveProjectCloudAttachment,
-} from "../src/features/cloud/attachment/projectCloudAttachment";
+  resolveProjectCloudContext,
+} from "../src/features/cloud/context/projectCloudContext";
 import { adaptCloudAggregateToAccessData } from "../src/features/cloud/data/adaptCloudAggregateToAccessData";
 import { loadCloudProjectDetails } from "../src/features/cloud/data/cloudProjectDetails";
 import { CloudHistorySection } from "../src/features/cloud/sections/HistorySection";
@@ -162,7 +160,7 @@ const session = {
 } as DesktopCloudSession;
 
 describe("Cloud environment endpoint precedence", () => {
-  it("keeps the configured loopback API when a local workspace has a hosted Puppyone remote", () => {
+  it("keeps the configured API but ignores a legacy access-key remote as Cloud context", () => {
     const environment = resolveCloudEnvironment({
       status: {
         remotes: [{
@@ -176,7 +174,7 @@ describe("Cloud environment endpoint precedence", () => {
     });
 
     expect(environment.apiBaseUrl).toBe("http://localhost:9090/api/v1");
-    expect(environment.cloudRemote?.rawUrl).toBe("https://api.puppyone.ai/git/ap/example.git");
+    expect(environment.cloudRemote).toBeNull();
   });
 });
 
@@ -229,98 +227,86 @@ describe("Cloud browser sign-in state", () => {
   });
 });
 
-describe("ProjectCloudAttachment binding-only semantics", () => {
-  it("does not infer offline from a missing Cloud session", () => {
-    const attachment = resolveProjectCloudAttachment({
+describe("Project Cloud repository context semantics", () => {
+  it("does not infer offline from an already authorized repository context", () => {
+    const context = resolveProjectCloudContext({
       resolvedProjectId: "proj-1",
       remoteProjectId: null,
-      bindingError: null,
-      bindingCloudLinked: true,
-      resolutionSource: "workspace-binding",
-      bindingStatus: "bound",
+      contextError: null,
+      hasCanonicalRemote: true,
       target: { kind: "project_root", project_id: "proj-1" },
       resolving: false,
     });
-    expect(attachment).toEqual({
+    expect(context).toEqual({
       status: "resolved",
       projectId: "proj-1",
-      resolutionSource: "workspace-binding",
-      bindingStatus: "bound",
       target: { kind: "project_root", project_id: "proj-1" },
     });
-    expect(isProjectCloudLinked(attachment)).toBe(true);
+    expect(cloudContextHasProject(context)).toBe(true);
   });
 
-  it("keeps a known project structurally linked while preserving a resolver warning", () => {
-    const attachment = resolveProjectCloudAttachment({
+  it("keeps an exact Project context while preserving a structured warning", () => {
+    const warning = cloudMessage("remote-network-failed");
+    const context = resolveProjectCloudContext({
       resolvedProjectId: "proj-err",
       remoteProjectId: null,
-      bindingError: "Mapping failed",
-      bindingCloudLinked: true,
-      resolutionSource: "workspace-binding",
-      bindingStatus: "bound",
+      contextError: warning,
+      contextReason: "network",
+      hasCanonicalRemote: true,
       target: { kind: "project_root", project_id: "proj-err" },
       resolving: false,
     });
-    expect(attachment).toEqual({
+    expect(context).toEqual({
       status: "resolved",
       projectId: "proj-err",
-      resolutionSource: "workspace-binding",
-      bindingStatus: "bound",
       target: { kind: "project_root", project_id: "proj-err" },
-      warning: "Mapping failed",
+      warning,
     });
-    expect(isProjectCloudLinked(attachment)).toBe(true);
-    expect(attachmentHasBoundProject(attachment)).toBe(true);
-    expect(getAttachedCloudProjectId(attachment)).toBe("proj-err");
+    expect(cloudContextHasProject(context)).toBe(true);
   });
 
-  it("resets Cloud Hub section when switching linked → unlinked", () => {
-    expect(resolveCloudHubSectionForAttachment({
+  it("resets Cloud Hub section when switching Project context → local-only", () => {
+    expect(resolveCloudHubSectionForContext({
       status: "resolved",
       projectId: "a",
-      resolutionSource: "workspace-binding",
-      bindingStatus: "bound",
       target: { kind: "project_root", project_id: "a" },
     })).toBe("contents");
-    expect(resolveCloudHubSectionForAttachment({ status: "local-only", projectId: null })).toBe("overview");
-    expect(resolveCloudHubSectionForAttachment({
+    expect(resolveCloudHubSectionForContext({ status: "local-only", projectId: null })).toBe("overview");
+    expect(resolveCloudHubSectionForContext({
       status: "error",
       projectId: null,
       message: "boom",
     })).toBe("overview");
   });
 
-  it("keeps a known binding bound during a resolver error", () => {
-    const degradedBinding = {
+  it("keeps an already resolved Project in project navigation", () => {
+    const degradedContext = {
       status: "resolved" as const,
       projectId: "proj-known",
-      resolutionSource: "workspace-binding" as const,
-      bindingStatus: "bound" as const,
       target: { kind: "project_root" as const, project_id: "proj-known" },
-      warning: "Cloud is temporarily unavailable",
+      warning: cloudMessage("remote-network-failed"),
     };
 
-    expect(resolveCloudProjectNavigationContext(degradedBinding)).toEqual({
+    expect(resolveCloudProjectNavigationContext(degradedContext)).toEqual({
       projectContext: true,
       localWorkspaceContext: true,
     });
   });
 
-  it("does not let a binding effect overwrite an explicit post-Attach route", () => {
-    expect(resolveCloudHubSectionAfterBindingChange({
+  it("does not let context refresh overwrite an explicit Project route", () => {
+    expect(resolveCloudHubSectionAfterContextChange({
       currentSection: "access",
-      hasBoundProject: true,
+      hasProjectContext: true,
       workspaceChanged: false,
     })).toBe("access");
-    expect(resolveCloudHubSectionAfterBindingChange({
+    expect(resolveCloudHubSectionAfterContextChange({
       currentSection: "overview",
-      hasBoundProject: true,
+      hasProjectContext: true,
       workspaceChanged: false,
     })).toBe("contents");
-    expect(resolveCloudHubSectionAfterBindingChange({
+    expect(resolveCloudHubSectionAfterContextChange({
       currentSection: "history",
-      hasBoundProject: false,
+      hasProjectContext: false,
       workspaceChanged: false,
     })).toBe("overview");
   });
@@ -382,7 +368,7 @@ describe("CloudServiceSidebar project context", () => {
     expect(onSelectSection).not.toHaveBeenCalled();
   });
 
-  it("does not treat a stale project route as project context without binding/selection", () => {
+  it("does not treat a stale route as an authorized Project context", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -681,8 +667,8 @@ describe("CloudRouter local context", () => {
           cloudRemote={null}
           cloudData={createAggregateCloudData(vi.fn(async () => undefined), {
             projects: [{ id: "proj-preview", name: "Preview Project" }],
-            mappedProjectId: null,
-            mappedProject: null,
+            contextProjectId: null,
+            contextProject: null,
             activeProjectId: "proj-preview",
             activeProject: { id: "proj-preview", name: "Preview Project" },
           })}
@@ -705,15 +691,15 @@ describe("CloudRouter local context", () => {
     });
 
     expect(getCloudHistory).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("History");
-    expect(container.textContent).toContain("Back up and connect");
+    expect(container.textContent).toContain("This workspace is local only");
+    expect(container.textContent).toContain("Back up and add Git remote");
     expect(container.textContent).not.toContain("Preview Project");
-    expect(container.textContent).not.toContain("Local mapping");
+    expect(container.textContent).not.toContain("Repository Git remote");
   });
 });
 
-describe("Cloud project attachment actions", () => {
-  it("disables every competing attach/create action while one project is connecting", async () => {
+describe("Cloud Project selection actions", () => {
+  it("disables every competing remote/create action while one remote is being configured", async () => {
     listCloudRoot.mockReset();
     listCloudRoot.mockResolvedValue({ entries: [] });
     const container = document.createElement("div");
@@ -730,43 +716,34 @@ describe("Cloud project attachment actions", () => {
           loading={false}
           session={session}
           apiBaseUrl="https://cloud.example"
-          mappedProjectId={null}
+          currentRepositoryProjectId={null}
           backupLoading={false}
-          cloudAction={{ kind: "connect", projectId: "proj-a" }}
+          cloudAction={{ kind: "configure-remote", projectId: "proj-a" }}
           onSessionChange={vi.fn()}
           onBackupWorkspace={vi.fn()}
           onSelectProject={vi.fn()}
-          onConnectProject={vi.fn()}
+          onConfigureProjectRemote={vi.fn()}
           onOpenCloudProjects={vi.fn()}
         />,
       );
       await Promise.resolve();
     });
 
-    const attachButtons = Array.from(
+    const remoteButtons = Array.from(
       container.querySelectorAll<HTMLButtonElement>(".desktop-project-folder-card-action"),
     );
-    expect(attachButtons).toHaveLength(2);
-    expect(attachButtons.every((button) => button.disabled)).toBe(true);
+    expect(remoteButtons).toHaveLength(2);
+    expect(remoteButtons.every((button) => button.disabled)).toBe(true);
     expect(container.querySelector<HTMLButtonElement>(".desktop-project-folder-new-card")?.disabled).toBe(true);
   });
 });
 
-describe("Resolved Cloud binding recovery", () => {
-  it("keeps the Project visible and offers an explicit repair when its canonical remote is missing", async () => {
+describe("Local-only Cloud page", () => {
+  it("does not infer a Cloud Project or show an error when the repository has no PuppyOne remote", async () => {
     const localSession = {
       ...session,
       api_base_url: "http://localhost:9090",
     } as DesktopCloudSession;
-    getCloudProject.mockResolvedValue({ id: "proj-1", name: "Project One" });
-    getCloudDashboard.mockResolvedValue({ project: { id: "proj-1", name: "Project One" } });
-    listCloudRoot.mockResolvedValue({ entries: [] });
-    getCloudHistory.mockResolvedValue(historyPage());
-    listCloudScopes.mockResolvedValue([]);
-    listCloudConnectors.mockResolvedValue([]);
-    listCloudMcpEndpoints.mockResolvedValue([]);
-    getCloudRepoIdentity.mockResolvedValue(null);
-    const onConfigureCloudRemote = vi.fn().mockResolvedValue({ isRepo: true });
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -789,18 +766,9 @@ describe("Resolved Cloud binding recovery", () => {
             untrackedEntries: [],
             remotes: [],
           } as unknown as GitStatusSnapshot}
-          puppyoneConfig={null}
           cloudApiBaseUrl="http://localhost:9090"
           cloudSession={localSession}
-          attachment={{
-            status: "resolved",
-            projectId: "proj-1",
-            resolutionSource: "workspace-binding",
-            bindingStatus: "bound",
-            bindingId: "binding-1",
-            target: { kind: "project_root", project_id: "proj-1" },
-            warning: cloudMessage("binding-remote-missing"),
-          }}
+          projectContext={{ status: "local-only", projectId: null }}
           onCloudSessionChange={vi.fn()}
           activeSection="contents"
           loading={false}
@@ -808,7 +776,6 @@ describe("Resolved Cloud binding recovery", () => {
           cloudBackupLoading={false}
           cloudBackupError={null}
           onStartPuppyoneBackup={vi.fn()}
-          onConfigureCloudRemote={onConfigureCloudRemote}
           onSelectSection={vi.fn()}
           onRefresh={vi.fn()}
           onOpenDetails={vi.fn()}
@@ -818,20 +785,77 @@ describe("Resolved Cloud binding recovery", () => {
       await flushPromises();
     });
 
-    const warning = container.querySelector<HTMLElement>(".desktop-cloud-main-alert.warning");
-    expect(warning?.textContent).toContain("canonical Git remote is missing");
-    expect(container.textContent).toContain("Project One");
-    const repairButton = Array.from(warning?.querySelectorAll<HTMLButtonElement>("button") ?? [])
-      .find((button) => button.textContent?.includes("Repair connection"));
-    expect(repairButton).toBeDefined();
+    expect(container.textContent).toContain("This workspace is local only");
+    expect(container.textContent).toContain("Back up and add Git remote");
+    expect(container.textContent).not.toContain("Unable to verify");
+    expect(container.querySelector(".desktop-cloud-main-alert")).toBeNull();
+    expect(getCloudProject).not.toHaveBeenCalled();
+  });
+
+  it("stays local-only while signed out and does not restore a Cloud session", async () => {
+    const restoreCloudSession = vi.fn().mockResolvedValue(null);
+    const onOpenDetails = vi.fn();
+    const previousBridge = window.puppyoneDesktop;
+    Object.defineProperty(window, "puppyoneDesktop", {
+      configurable: true,
+      value: { restoreCloudSession },
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
 
     await act(async () => {
-      repairButton?.click();
+      renderWithTestLocalization(root,
+        <CloudServiceMainView
+          workspace={{
+            id: "local-signed-out",
+            name: "Local Notes",
+            path: "/tmp/local-notes",
+            workspaceInstanceId: "workspace-instance-local",
+          }}
+          status={{
+            isRepo: true,
+            branch: "main",
+            branches: [],
+            stagedEntries: [],
+            unstagedEntries: [],
+            untrackedEntries: [],
+            remotes: [],
+          } as unknown as GitStatusSnapshot}
+          cloudApiBaseUrl="http://localhost:9090"
+          cloudSession={null}
+          projectContext={{ status: "local-only", projectId: null }}
+          onCloudSessionChange={vi.fn()}
+          activeSection="contents"
+          loading={false}
+          error="This must not be rendered"
+          cloudBackupLoading={false}
+          cloudBackupError="This must not be rendered either"
+          onStartPuppyoneBackup={vi.fn()}
+          onSelectSection={vi.fn()}
+          onRefresh={vi.fn()}
+          onOpenDetails={onOpenDetails}
+          onOpenGitSettings={vi.fn()}
+        />,
+      );
       await flushPromises();
     });
 
-    expect(onConfigureCloudRemote).toHaveBeenCalledWith("proj-1", {
-      target: { kind: "project_root", project_id: "proj-1" },
+    expect(container.textContent).toContain("This workspace is local only");
+    expect(container.textContent).toContain("Back up and add Git remote");
+    expect(container.textContent).not.toContain("Sign in");
+    expect(container.querySelector(".desktop-cloud-main-alert")).toBeNull();
+    expect(restoreCloudSession).not.toHaveBeenCalled();
+    expect(getCloudProject).not.toHaveBeenCalled();
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    expect(onOpenDetails).toHaveBeenCalledOnce();
+
+    Object.defineProperty(window, "puppyoneDesktop", {
+      configurable: true,
+      value: previousBridge,
     });
   });
 });
@@ -883,7 +907,7 @@ describe("Cloud Automation route dedupe", () => {
 });
 
 describe("No eager Cloud Access on Local Files", () => {
-  it("does not enable Access loading for Local workspaces even with a bound project id", async () => {
+  it("does not enable Access loading for Local workspaces even with a repository Project context", async () => {
     const { shouldLoadDesktopCloudAccessData } = await import("../src/features/cloud/data/shouldLoadDesktopCloudAccessData");
     expect(shouldLoadDesktopCloudAccessData({
       workspaceKind: "local",
@@ -1009,7 +1033,7 @@ describe("useDesktopCloudData request lifecycle", () => {
     listCloudProjects.mockResolvedValue(projects);
     getCloudProject.mockImplementation(async (_session: unknown, projectId: string) => ({
       id: projectId,
-      name: projectId === "proj-bound" ? "Bound Project" : projectId,
+      name: projectId === "proj-context" ? "Context Project" : projectId,
     }));
     getCloudDashboard.mockImplementation(async (_session: unknown, projectId: string) => ({
       project: { id: projectId, name: projectId === "proj-a" ? "Project A" : "Project B" },
@@ -1178,7 +1202,7 @@ describe("useDesktopCloudData request lifecycle", () => {
     });
   });
 
-  it("loads a bound project directly without visiting the organization project list", async () => {
+  it("loads a repository-resolved Project directly without visiting the organization project list", async () => {
     listCloudProjects.mockRejectedValueOnce(new Error("projects offline"));
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -1188,19 +1212,19 @@ describe("useDesktopCloudData request lifecycle", () => {
       renderWithTestLocalization(root,
         <CloudDataProbe
           explicitProjectId={null}
-          boundProjectId="proj-bound"
+          repositoryProjectId="proj-context"
           environment={cloudEnvironment}
         />,
       );
       await flushPromises();
     });
 
-    expect(container.firstElementChild?.getAttribute("data-mapped-project")).toBe("proj-bound");
-    expect(container.firstElementChild?.getAttribute("data-active-project")).toBe("proj-bound");
+    expect(container.firstElementChild?.getAttribute("data-context-project")).toBe("proj-context");
+    expect(container.firstElementChild?.getAttribute("data-active-project")).toBe("proj-context");
     expect(container.firstElementChild?.getAttribute("data-error")).toBe("none");
     expect(getCloudProject).toHaveBeenCalledWith(
       session,
-      "proj-bound",
+      "proj-context",
       expect.any(Function),
       "https://cloud.example",
     );
@@ -1247,8 +1271,8 @@ function createAggregateCloudData(
 ): DesktopCloudDataState {
   return {
     projects: [{ id: "proj-1", name: "Demo" }],
-    mappedProjectId: "proj-1",
-    mappedProject: { id: "proj-1", name: "Demo" },
+    contextProjectId: "proj-1",
+    contextProject: { id: "proj-1", name: "Demo" },
     activeProjectId: "proj-1",
     activeProject: { id: "proj-1", name: "Demo" },
     dashboard: null,
@@ -1283,14 +1307,14 @@ function CloudDataProbe({
   environment,
   onData,
   loadProjectDetails = true,
-  boundProjectId = null,
+  repositoryProjectId = null,
   sessionOverride = session,
 }: {
   explicitProjectId: string | null;
   environment: CloudEnvironment;
   onData?: (data: DesktopCloudDataState) => void;
   loadProjectDetails?: boolean;
-  boundProjectId?: string | null;
+  repositoryProjectId?: string | null;
   sessionOverride?: DesktopCloudSession;
 }) {
   const onSessionChange = React.useCallback(() => undefined, []);
@@ -1298,7 +1322,7 @@ function CloudDataProbe({
     session: sessionOverride,
     cloudEnvironment: environment,
     explicitProjectId,
-    boundProjectId,
+    repositoryProjectId,
     onSessionChange,
     loadProjectDetails,
   });
@@ -1307,7 +1331,7 @@ function CloudDataProbe({
     <div
       data-active-project={data.activeProjectId ?? "none"}
       data-loaded-project={data.activeProject?.id ?? "none"}
-      data-mapped-project={data.mappedProjectId ?? "none"}
+      data-context-project={data.contextProjectId ?? "none"}
       data-error={data.error ?? "none"}
       data-initializing={String(data.initializing)}
       data-loading={String(data.loading)}
@@ -1371,8 +1395,8 @@ async function flushPromises() {
   await Promise.resolve();
 }
 
-describe("Local repo Cloud binding integration", () => {
-  it("enters contents after a verified binding and keeps Team/Billing in the bound sidebar", async () => {
+describe("Local repository Cloud context integration", () => {
+  it("enters contents after Project authorization and keeps Team/Billing in the Project sidebar", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -1407,11 +1431,9 @@ describe("Local repo Cloud binding integration", () => {
               info: { kind: "project", host: "cloud.example", origin: "https://cloud.example", displayId: "proj-1", projectId: "proj-1" },
             }}
             cloudData={createAggregateCloudData(vi.fn(async () => undefined))}
-            attachment={{
+            projectContext={{
               status: "resolved",
               projectId: "proj-1",
-              resolutionSource: "workspace-binding",
-              bindingStatus: "bound",
               target: { kind: "project_root", project_id: "proj-1" },
             }}
             activeSection="contents"
@@ -1465,15 +1487,15 @@ describe("Local repo Cloud binding integration", () => {
             info: { kind: "project", host: "cloud.example", origin: "https://cloud.example", displayId: "proj-secret", projectId: "proj-secret" },
           }}
           cloudData={createAggregateCloudData(vi.fn(async () => undefined), {
-            mappedProjectId: null,
-            mappedProject: null,
+            contextProjectId: null,
+            contextProject: null,
             activeProjectId: null,
             activeProject: null,
           })}
-          attachment={{
+          projectContext={{
             status: "not-authorized",
             projectId: "proj-secret",
-            message: cloudMessage("binding-not-authorized"),
+            message: cloudMessage("remote-not-authorized"),
           }}
           activeSection="overview"
           accountEmail={session.user_email}
