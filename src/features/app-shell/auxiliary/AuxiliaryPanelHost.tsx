@@ -73,7 +73,12 @@ export function AuxiliaryPanelHost({
   };
 
   return (
-    <aside className={`desktop-right-sidebar ${open ? "is-open" : ""}`} style={panelStyle}>
+    <aside
+      className={`desktop-right-sidebar ${open ? "is-open" : ""}`}
+      style={panelStyle}
+      aria-hidden={open ? undefined : true}
+      {...(!open ? { inert: "" } : {})}
+    >
       {resizable && open && (
         <SidebarResizeHandle
           className="desktop-right-sidebar-resizer"

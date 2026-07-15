@@ -1,5 +1,6 @@
 {
   "title": "터미널",
+  "actions": "터미널 작업",
   "clear": "터미널 지우기",
   "reset": "터미널 재설정",
   "bridgeUnavailable": "터미널 브리지를 사용할 수 없습니다. 이 작업 영역을 puppyone에서 여세요.",

@@ -10,6 +10,9 @@ backend-adapter, event, security, and cache-ownership boundaries.
 
 The detailed normative contracts are [Cursor-style Chat UI behavior](chat-ui-behavior-spec.md)
 and [Native Agent backend and model discovery](local-agent-connection-discovery.md).
+[Agent Composer reference ingestion](composer-reference-ingestion.md) is the
+normative contract for Explorer/Finder/paste acquisition, external staging,
+runtime input capabilities and committed reference displays.
 
 The archived [Codex Implementation Brief](history/codex-vertical-slice.md)
 records the original direct-runtime slice. The authoritative target decision is
@@ -30,12 +33,18 @@ their own harness and native session.
   retains the selected surface, and keeps a running Agent turn alive while
   Chat is hidden. The experimental Chat feature is a lazy renderer chunk and
   does not inflate the default desktop entry bundle when the gate is off.
-- **Implemented foundation:** PuppyOne Agent, Codex, Claude Code and user
+- **Implemented runtime foundation:** PuppyOne Agent, Codex, Claude Code and user
   OpenCode native routes,
   connected-provider discovery, readiness/account/model/mode states, virtual transcript streaming, safe
   Markdown, part/tool registries, plan/tool/command/file activity, permission
-  and structured-question docks, `/` commands, authorized `@` context and
-  attachments, Stop, live-gap warning, and Jump to latest.
+  and structured-question docks, `/` commands, Stop, live-gap warning, and
+  Jump to latest. Reference arrays/chips and workspace-only turn-start
+  authorization exist as partial infrastructure.
+- **Reference-ingestion gap:** the current Composer has no add/drop/paste/file
+  picker entry, Explorer outbound drag is coupled to move, external files have
+  no staged-token path, Codex reports references unsupported, and committed
+  user messages do not preserve reference displays. The target contract below
+  is pending `ISSUE-404`, not an implemented claim.
 - **Implemented by capability:** native interruption, approvals/questions,
   compaction, queue/steer controls, and model/mode selection. PuppyOne does not
   expose or persist Chat History; unsupported controls are omitted.
@@ -353,9 +362,35 @@ Prompt drafts are scoped to the current workspace and running Renderer process.
 Switching to Terminal does not discard a draft. Starting a new live connection
 never copies prior provider history implicitly.
 
-Attachment paths are resolved in the main process. Drag-and-drop data from the
-renderer is treated as untrusted input and must pass the same workspace and file
-capability checks as existing file operations.
+The whole Chat surface is a hit target for recognized file/reference drags. A
+valid drag presents a non-layout-changing overlay and Composer highlight;
+dropping adds pending chips but never sends, moves an Explorer node, imports a
+file or changes the workspace. The `+` menu is the keyboard-accessible
+equivalent and remains the primary discoverable entry.
+
+| Source | Composer result |
+| --- | --- |
+| Explorer file | live workspace-file context |
+| Explorer directory | live directory scope; never a recursive upload |
+| Finder/file picker/pasted image | main-owned immutable staged attachment |
+| validated workspace-relative path text | workspace context |
+| absolute path, `file://` or other plain text | ordinary text; no access grant |
+
+Workspace context and external attachments use different security semantics.
+Main canonicalizes a workspace entry again when the turn starts. A real
+operating-system `File` is resolved in preload, copied once into a
+permission-restricted main-owned staging area and represented in Renderer state
+only by an owner/workspace-bound opaque token plus bounded metadata. Raw
+external path strings never grant access, and external files are not silently
+copied into the workspace.
+
+Prompt, model/mode and ready references are captured atomically as one
+submission intent. Queue stores complete intents rather than strings; steer may
+carry references only when the native method advertises that exact capability.
+Turn-start failure preserves the intent without overwriting a newer draft, and
+native acceptance transfers sanitized reference displays into the committed
+user message. Full data model, cleanup and adapter rules are defined in
+[Agent Composer reference ingestion](composer-reference-ingestion.md).
 
 ## History and cache boundary
 
@@ -503,7 +538,7 @@ Current-process presentation state only
   immutable Agent backend id
   transcript projection
   last committed event sequence
-  draft and attachment references
+  draft references and immutable submission intents
   independent Chat scroll position
 
 Main-process runtime state
@@ -512,6 +547,7 @@ Main-process runtime state
   backend-scoped provider/model/variant/mode
   active turn
   pending approval/question
+  short-lived staged-attachment token registry and leases
   authoritative event ordering
 
 Provider-owned durable state

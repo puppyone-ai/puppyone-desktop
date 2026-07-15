@@ -1,9 +1,12 @@
 import {
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
   type DragEvent as ReactDragEvent,
+  type ForwardedRef,
 } from "react";
 import {
   EXPLORER_TREE_NODE_DRAG_TYPE,
@@ -15,9 +18,9 @@ import { useLocalization } from "@puppyone/localization/react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebglAddon } from "@xterm/addon-webgl";
+import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal, type IDisposable, type ITheme } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import { TerminalSurfaceHeader } from "./TerminalSurfaceHeader";
 import "./desktop-terminal.css";
 
 type RightTerminalPanelProps = {
@@ -25,12 +28,20 @@ type RightTerminalPanelProps = {
   active: boolean;
 };
 
+export type RightTerminalPanelHandle = {
+  clear: () => void;
+  reset: () => void;
+};
+
 type TerminalSize = {
   cols: number;
   rows: number;
 };
 
-export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProps) {
+function RightTerminalPanelComponent(
+  { workspace, active }: RightTerminalPanelProps,
+  ref: ForwardedRef<RightTerminalPanelHandle>,
+) {
   const { t } = useLocalization();
   const messageFormatterRef = useRef(t);
   messageFormatterRef.current = t;
@@ -57,6 +68,11 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
   const handleResetTerminal = useCallback(() => {
     setSessionGeneration((generation) => generation + 1);
   }, []);
+
+  useImperativeHandle(ref, () => ({
+    clear: handleClearTerminal,
+    reset: handleResetTerminal,
+  }), [handleClearTerminal, handleResetTerminal]);
 
   const handleTerminalDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (!hasTerminalDroppablePaths(event.dataTransfer)) return;
@@ -150,7 +166,9 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
     let disposed = false;
     const bridge = window.puppyoneDesktop;
     const terminalTheme = readTerminalTheme(containerRef.current);
-    const terminal = new Terminal({
+    let terminal: Terminal;
+    const openLink = (href: string) => openTerminalExternalUrl(href, terminal, messageFormatterRef.current);
+    terminal = new Terminal({
       allowProposedApi: true,
       customGlyphs: true,
       cursorBlink: true,
@@ -162,6 +180,10 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
       fontWeightBold: 700,
       letterSpacing: 0,
       lineHeight: 1.24,
+      linkHandler: {
+        activate: (_event, href) => openLink(href),
+        allowNonHttpProtocols: false,
+      },
       rescaleOverlappingGlyphs: true,
       scrollback: 6000,
       theme: terminalTheme,
@@ -187,6 +209,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
 
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(unicode11Addon);
+    terminal.loadAddon(new WebLinksAddon((_event, href) => openLink(href)));
     activateUnicode11(terminal);
     terminal.open(containerRef.current);
     const webglRenderer = loadWebglRenderer(terminal, () => {
@@ -202,7 +225,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
     if (webglAddon) scheduleFitAndResize();
 
     const writeSystemLine = (message: string) => {
-      terminal.writeln(`\x1b[38;5;244m${message}\x1b[0m`);
+      writeTerminalSystemLine(terminal, message);
     };
 
     if (!bridge?.createTerminal || !bridge.writeTerminal || !bridge.onTerminalData || !bridge.onTerminalExit) {
@@ -388,7 +411,6 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
 
   return (
     <section className="desktop-terminal-panel" aria-label={t("terminal.title")}>
-      <TerminalSurfaceHeader onClear={handleClearTerminal} onReset={handleResetTerminal} />
       <div className="desktop-terminal-body" ref={bodyRef}>
         <div
           className="desktop-terminal-xterm"
@@ -401,6 +423,10 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
     </section>
   );
 }
+
+export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerminalPanelProps>(
+  RightTerminalPanelComponent,
+);
 
 type WebglRendererHandle = {
   addon: WebglAddon;
@@ -440,6 +466,21 @@ function safeDispose(disposable: { dispose: () => void } | null | undefined) {
   } catch {
     // Disposal should never break terminal teardown.
   }
+}
+
+function openTerminalExternalUrl(href: string, terminal: Terminal, t: MessageFormatter) {
+  const bridge = window.puppyoneDesktop;
+  if (!bridge?.openExternalUrl) {
+    writeTerminalSystemLine(terminal, t("terminal.bridgeUnavailable"));
+    return;
+  }
+  void bridge.openExternalUrl(href).catch((error) => {
+    writeTerminalSystemLine(terminal, formatTerminalError(error, t));
+  });
+}
+
+function writeTerminalSystemLine(terminal: Terminal, message: string) {
+  terminal.writeln(`\x1b[38;5;244m${message}\x1b[0m`);
 }
 
 function hasExplorerNodePath(dataTransfer: DataTransfer) {

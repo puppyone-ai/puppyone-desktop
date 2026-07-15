@@ -1,5 +1,5 @@
 import { ArrowUp, AtSign, LoaderCircle, Paperclip, Square, X } from "lucide-react";
-import type { KeyboardEvent, ReactNode } from "react";
+import { useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentCommand, AgentFileReference, AgentModel } from "../domain/agent-contract";
@@ -34,6 +34,7 @@ type AgentComposerProps = {
 
 export const DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID = "agent.composer.placeholder.default";
 const ignoreSelection = () => {};
+const COMPOSER_CONTROL_SELECTOR = "textarea, button, a[href], input, select, [role='button'], [role='option'], [contenteditable='true']";
 
 export function AgentComposer({
   draft,
@@ -62,6 +63,7 @@ export function AgentComposer({
   onStop,
 }: AgentComposerProps) {
   const { t } = useLocalization();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const runtimeLabel = runtimeLabelProp || t("agent.name");
   const resolvedPlaceholder = placeholder.trim() || t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID);
   const commandQuery = /^\/([^\s]*)$/.exec(draft.trimStart())?.[1]?.toLowerCase() ?? null;
@@ -80,6 +82,13 @@ export function AgentComposer({
     event.preventDefault();
     void submit();
   };
+  const handleSurfaceMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    if (inputDisabled || event.button !== 0) return;
+    const target = event.target;
+    if (!(target instanceof Element) || target.closest(COMPOSER_CONTROL_SELECTOR)) return;
+    event.preventDefault();
+    textareaRef.current?.focus();
+  };
   return (
     <div className="desktop-agent-composer-shell">
       {floatingAccessory && visibleCommands.length === 0 && (
@@ -94,7 +103,11 @@ export function AgentComposer({
           ))}
         </div>
       )}
-      <div className="desktop-agent-composer">
+      <div
+        className="desktop-agent-composer"
+        data-input-disabled={inputDisabled || undefined}
+        onMouseDown={handleSurfaceMouseDown}
+      >
         {(attachments.length > 0 || contextReferences.length > 0) && (
           <div className="desktop-agent-reference-chips">
             {contextReferences.map((reference) => {
@@ -110,6 +123,7 @@ export function AgentComposer({
         <div className="desktop-agent-composer-row">
           <div className="desktop-agent-composer-input-row">
             <textarea
+              ref={textareaRef}
               value={draft}
               disabled={inputDisabled}
               rows={1}

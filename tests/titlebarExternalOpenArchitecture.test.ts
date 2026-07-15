@@ -14,6 +14,14 @@ describe("titlebar external-open architecture", () => {
     expect(actions).not.toMatch(/externalOpenTargets|externalOpenMenuOpen|onCustomizeExternalApp|onOpenActiveFileWithApp/);
     expect(app).not.toMatch(/externalOpenTargets=|onCustomizeExternalAppForActiveFile=|onOpenActiveFileWithApp=/);
     expect(titlebarCss).not.toMatch(/external-open-(?:main|menu-button|menu|row)/);
+    expect(titlebarCss).toMatch(
+      /\.desktop-titlebar-external-open\s*\{[^}]*width:\s*var\(--desktop-titlebar-control-height\);[^}]*\}/s,
+    );
+    expect(actions).toContain('group: "right-sidebar"');
+    expect(actions).toContain('className="desktop-titlebar-action-divider"');
+    expect(titlebarCss).toMatch(
+      /\.desktop-titlebar-action-divider\s*\{[^}]*height:\s*18px;[^}]*margin-inline:\s*3px;[^}]*background:\s*var\(--desktop-titlebar-divider\);[^}]*\}/s,
+    );
   });
 
   it("keeps application choice in Default Apps settings", () => {

@@ -1,8 +1,11 @@
 # Desktop Agent architecture
 
-Status: current and implemented. This document is the normative architecture
-entry point for Desktop Agent. The UI consumes the same backend-neutral
-contract and may evolve independently without changing harness ownership.
+Status: current architecture entry point. The multi-native runtime/session
+foundation is implemented. The complete Composer reference-acquisition path is
+a normative target in
+[Agent Composer reference ingestion](composer-reference-ingestion.md) and is
+tracked separately by `ISSUE-404`; it must not be described as implemented
+until its acquisition, staging, adapter and transcript gates pass.
 
 PuppyOne Desktop provides one right-sidebar Chat over multiple native coding
 Agents. It is a client and safety-conscious control plane, not a universal
@@ -224,6 +227,13 @@ branching on IDs. Unsupported operations fail closed. New native products are
 added through a runtime definition and adapter, not a switch statement in the
 controller or UI.
 
+Reference input is also capability-driven. Workspace files, workspace
+directories, staged images and generic staged files are distinct capabilities;
+the legacy `attachments/contextReferences` booleans are not sufficient to
+infer a native transport. The canonical reference model, external File grant
+and draft/turn ownership rules are defined in
+[Agent Composer reference ingestion](composer-reference-ingestion.md).
+
 ## 7. Provider-specific execution
 
 ### Codex
@@ -283,7 +293,8 @@ Chat active + selected route ready
   -> create one empty native session/thread owned by the selected harness
 
 User intent
-  -> render optimistic local prompt
+  -> atomically capture prompt, configuration and draft references
+  -> render optimistic local prompt and sanitized reference displays
   -> await that same preparation when it is still in flight
   -> start turn
 
@@ -368,7 +379,11 @@ untrusted Renderer intent
 - JSON-RPC frame, pending-request and diagnostic limits;
 - no arbitrary timeout/retry for a mutating long-running prompt;
 - workspace-only ACP file callbacks with symlink/traversal protection;
-- references outside the workspace are not forwarded;
+- raw paths outside the workspace are never forwarded as references;
+- an external file may cross the boundary only through a real preload File
+  grant, main-owned immutable staging and an owner/workspace-bound opaque token;
+- Renderer events and logs never contain staging tokens, snapshot bytes/data
+  URLs or external absolute source paths;
 - approval replies require exact live request/turn/session ownership;
 - no credential-store scraping or translation between native products;
 - no automatic Agent fallback after auth, protocol or process failure;
@@ -453,6 +468,7 @@ micro-optimizations.
 - [Native Agent discovery](local-agent-connection-discovery.md)
 - [Right Sidebar Agent Chat](right-sidebar.md)
 - [Chat UI behavior specification](chat-ui-behavior-spec.md)
+- [Agent Composer reference ingestion](composer-reference-ingestion.md)
 - [Managed Agent engine distribution](ADR-004-managed-agent-engine-distribution.md)
 - [OpenCode upgrade runbook](opencode-upgrade-runbook.md)
 
@@ -464,6 +480,7 @@ micro-optimizations.
 | [ADR-006](ADR-006-native-harness-adapters-and-acp.md) | accepted and implemented | native harness routes, ACP boundary, persistence and security |
 | [ADR-005](ADR-005-multi-native-agent-backends.md) | accepted and implemented | product vocabulary and multi-native product model |
 | [ADR-002](ADR-002-agent-contract-and-boundaries.md) | accepted and implemented | shared contract and dependency boundaries |
+| [Composer reference ingestion](composer-reference-ingestion.md) | normative target; implementation pending | workspace context, external staging, Composer UX, capability and transcript contract |
 | [ADR-004](ADR-004-managed-agent-engine-distribution.md) | accepted, narrow scope | managed kernel distribution for PuppyOne Agent only |
 | [ADR-001](ADR-001-opencode-sidecar.md) | retired | former HTTP/SSE sidecar choice; no longer an implementation option |
 | [ADR-003](ADR-003-opencode-only-chat-harness.md) | retired | former single-OpenCode routing choice; no longer an implementation option |

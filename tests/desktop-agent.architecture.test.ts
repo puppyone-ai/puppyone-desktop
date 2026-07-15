@@ -32,6 +32,7 @@ describe("Desktop Agent architecture boundaries", () => {
     const runtimeGeometry = source("src/features/desktop-agent/ui/agent-runtime-geometry.ts");
     const cssEntry = source("src/features/desktop-agent/ui/desktop-agent.css");
     const foundation = source("src/features/desktop-agent/ui/styles/foundation.css");
+    const pickers = source("src/features/desktop-agent/ui/styles/pickers.css");
     const css = agentStyles();
     const globalLayout = source("src/styles/layout.css");
     expect(timeline).toContain("MAX_MOUNTED_ROWS = 120");
@@ -45,6 +46,9 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(foundation).toMatch(/\.desktop-agent-panel\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\) auto/s);
     expect(foundation).toContain("--agent-radius-composer: var(--desktop-sidebar-row-radius, 6px)");
     expect(foundation).toContain("--agent-inline-inset: var(--desktop-sidebar-row-left-gap, 12px)");
+    expect(pickers).toMatch(
+      /\.desktop-agent-picker\.is-header \.desktop-agent-picker-trigger\s*\{[^}]*color:\s*var\(--desktop-titlebar-text-muted, var\(--po-text-muted\)\);[^}]*font-size:\s*var\(--po-font-size-chrome, 13px\);[^}]*font-weight:\s*var\(--po-font-weight-chrome, 500\);[^}]*line-height:\s*18px;/s,
+    );
     expect(css).not.toContain("max-width: 759px");
     expect(css).toContain("max-width: 559px");
     expect(css).toContain("max-width: 419px");

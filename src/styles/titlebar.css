@@ -15,12 +15,23 @@
   gap: 6px;
   height: var(--desktop-chrome-height);
   min-height: var(--desktop-chrome-height);
-  padding: 4px 6px 4px 86px;
-  border-bottom: 1px solid var(--desktop-titlebar-divider);
+  padding: 4px 6px 5px 86px;
+  border-bottom: 0;
   background: var(--desktop-titlebar-bg);
   color: var(--desktop-titlebar-text);
   -webkit-app-region: drag;
   user-select: none;
+}
+
+/* Keep the app-owned divider out of the native window frame's edge pixels. */
+.desktop-titlebar::after {
+  position: absolute;
+  inset-inline: 1px;
+  inset-block-end: 0;
+  height: 1px;
+  background: var(--desktop-titlebar-divider);
+  content: "";
+  pointer-events: none;
 }
 
 .desktop-titlebar[data-workspace-kind="cloud"] {
@@ -107,6 +118,14 @@
   -webkit-app-region: no-drag;
 }
 
+.desktop-titlebar-action-divider {
+  width: 1px;
+  height: 18px;
+  flex: 0 0 1px;
+  margin-inline: 3px;
+  background: var(--desktop-titlebar-divider);
+}
+
 .desktop-titlebar-action {
   position: relative;
   appearance: none;
@@ -124,9 +143,49 @@
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 
+.desktop-titlebar-external-open {
+  width: var(--desktop-titlebar-control-height);
+}
+
 .desktop-titlebar-actions .desktop-titlebar-terminal,
 .desktop-titlebar-actions .desktop-titlebar-agent-chat {
   width: var(--desktop-titlebar-tool-action-width);
+}
+
+.desktop-titlebar-terminal-cluster {
+  position: relative;
+  display: inline-flex;
+  height: var(--desktop-titlebar-control-height);
+  align-items: center;
+  overflow: visible;
+  border-radius: var(--desktop-toolbar-action-radius);
+  background: var(--desktop-titlebar-active);
+}
+
+.desktop-titlebar-terminal-cluster > .desktop-titlebar-terminal {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  background: transparent;
+}
+
+.desktop-titlebar-terminal-menu-wrap {
+  position: relative;
+  display: flex;
+  height: 100%;
+  align-items: center;
+}
+
+.desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger {
+  width: 24px;
+  border-inline-end: 1px solid color-mix(in srgb, var(--desktop-titlebar-text) 10%, transparent);
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+  background: transparent;
+}
+
+.desktop-titlebar-terminal-menu-trigger[aria-expanded="true"] {
+  background: var(--desktop-titlebar-hover);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-action:hover {
@@ -293,6 +352,15 @@
   background: var(--po-menu-bg);
   box-shadow: var(--po-menu-shadow);
   -webkit-app-region: no-drag;
+}
+
+/* Keep the shared titlebar-menu treatment; only reverse its anchor near the window edge. */
+.desktop-titlebar-terminal-menu {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+  display: grid;
+  gap: 2px;
+  width: min(200px, calc(100vw - 32px));
 }
 
 .desktop-titlebar-external-app-icon {

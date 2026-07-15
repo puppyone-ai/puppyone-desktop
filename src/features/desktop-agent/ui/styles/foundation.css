@@ -136,6 +136,11 @@
 .desktop-agent-brand-mark.is-fallback { border: 1px solid var(--agent-border-subtle); background: var(--agent-control-surface); color: var(--agent-text-muted); }
 
 .desktop-agent-header-region {
+  --desktop-sidebar-control-size: 26px;
+  --desktop-sidebar-navigation-height: var(--desktop-chrome-height);
+  --desktop-sidebar-navigation-padding-outer: 6px;
+  --desktop-sidebar-navigation-padding-inner: 6px;
+
   position: relative;
   z-index: 30;
   display: flex;

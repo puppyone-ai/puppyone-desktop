@@ -10,56 +10,6 @@
   color: var(--po-terminal-fg);
 }
 
-.desktop-terminal-surface-header {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 36px;
-  padding: 4px 8px 4px 14px;
-  border-bottom: 1px solid color-mix(in srgb, var(--po-border-subtle) 72%, transparent);
-  background: var(--po-terminal-bg);
-}
-
-.desktop-terminal-surface-title {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--po-text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-terminal-surface-actions {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 2px;
-}
-
-.desktop-terminal-icon-button {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
-  place-items: center;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--po-text-muted);
-  cursor: var(--po-clickable-cursor, pointer);
-}
-
-.desktop-terminal-icon-button:hover {
-  border-color: var(--po-border-subtle);
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
 .desktop-terminal-body {
   box-sizing: border-box;
   flex: 1;

@@ -1,5 +1,6 @@
 {
   "title": "Terminal",
+  "actions": "Acciones del terminal",
   "clear": "Limpiar terminal",
   "reset": "Restablecer terminal",
   "bridgeUnavailable": "El puente del terminal no está disponible. Abre este espacio de trabajo en puppyone.",

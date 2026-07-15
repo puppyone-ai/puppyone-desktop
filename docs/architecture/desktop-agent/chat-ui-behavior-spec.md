@@ -1,9 +1,11 @@
 # Cursor-style Agent Chat UI behavior specification
 
-Status: implemented Cursor-style conversation document, compact work evidence
-and Agent-first selection contract. Multi-native backend capability differences
-remain incremental work and must preserve the native harness boundaries in
-ADR-005 and ADR-006.
+Status: the Cursor-style conversation document, compact work evidence and
+Agent-first selection contract are implemented. Composer reference ingestion
+is a normative target pending `ISSUE-404`; its UI rules below do not claim that
+Explorer/Finder/paste acquisition, external staging or committed reference
+replay is already complete. Multi-native capability work must preserve the
+native harness boundaries in ADR-005 and ADR-006.
 
 This specification turns the visual direction in [Right Sidebar Agent Chat](right-sidebar.md)
 into implementable rules. The pixel reference is the MIT-licensed frontend in
@@ -517,7 +519,8 @@ not a second navigation hierarchy.
 ```text
 +------------------------------------------------------+
 | Send follow-up                                       |
-| GPT-5.x                                      send    |
+| [@ src/App.tsx] [image.png]                          |
+| GPT-5.x                                  +   send    |
 +------------------------------------------------------+
 ```
 
@@ -544,7 +547,40 @@ not a second navigation hierarchy.
   disabled and the placeholder explains the next action.
 - Attachment, `@` context and lower-frequency mode actions remain capability-driven. The most
   relevant backend-scoped Model/Provider control remains visible; the session-level Agent
-  selector must not be duplicated in the composer.
+  selector must not be duplicated in the composer. A single 30 px `+` menu action sits
+  immediately before Send/Stop so Model remains aligned with the textarea. It is the keyboard
+  equivalent of drag/paste and exposes only actions the current reference capability can resolve
+  or explain.
+- The entire Chat boundary accepts recognized Explorer/file drags, not only the textarea. A valid
+  drag shows a quiet overlay and Composer focus treatment without changing layout height. Nested
+  dragenter/dragleave events use a drag-depth/session state so the overlay does not flicker while
+  crossing transcript, dock and Composer children. Drop adds draft references and never sends.
+- Explorer file and directory payloads use copy/context semantics. A file becomes live workspace
+  context; a directory becomes a scope chip and is never recursively uploaded. Dropping into Chat
+  must not invoke Explorer move/import, alter selection or depend on the tree's move capability.
+- Finder/file-picker files and pasted images first render resolving state, then become ready only
+  after main-owned staging succeeds. An external absolute path, `file://` or path-like plain text
+  is never a file grant. Text may become workspace context only after main validates it inside the
+  active canonical root; otherwise it stays ordinary draft text.
+- Chips appear above the textarea and grow the Composer upward. Workspace chips show a basename
+  plus accessible relative path; directory and staged-attachment chips use distinct semantics.
+  External source paths, staging tokens and data URLs are never rendered. Each pending/error chip
+  has a visible status and remove/retry action.
+- A mixed batch keeps valid entries and reports rejected entries explicitly. One polite live
+  announcement summarizes the result, while per-item UI identifies unsupported MIME, size/count,
+  missing file or safety rejection. No item is silently omitted and color is not the only signal.
+- Ready references do not auto-enable an otherwise invalid turn. If the selected native contract
+  requires text, the user must provide text; PuppyOne does not synthesize a hidden prompt. If the
+  backend rejects a reference kind, the chip remains actionable and the UI never switches Agent.
+- Send atomically captures text, model/mode and references as one immutable submission intent.
+  The optimistic row uses the same reference displays. Failure preserves that intent without
+  overwriting newer edits; authoritative turn acceptance clears draft ownership and commits chips
+  to the user message. Queue stores complete intents, and steer may use references only when its
+  native capability explicitly supports them.
+- Source classification, external token staging, capability mapping, cleanup and transcript DTO
+  fields follow
+  [Agent Composer reference ingestion](composer-reference-ingestion.md); UI code must not implement
+  backend-ID branches or read attachment bytes.
 - During a turn, Send becomes Stop unless the capability explicitly supports steer or queue.
   Stop remains a stable target and never moves because a model name changes width.
 - The Changes pill is absolutely anchored eight pixels above the Composer boundary, with a real

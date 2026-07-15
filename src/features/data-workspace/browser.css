@@ -333,7 +333,7 @@
   --po-active: rgba(211, 208, 197, 0.11);
   --po-selected: rgba(211, 208, 197, 0.14);
   --po-control-hover: rgba(211, 208, 197, 0.12);
-  --po-tree-guide: rgba(185, 182, 174, 0.18);
+  --po-tree-guide: rgba(185, 182, 174, 0.15);
   --po-file-icon-body: #24231f;
   --po-file-icon-fold: #2d2a25;
   --po-file-icon-stroke: rgba(185, 182, 174, 0.62);

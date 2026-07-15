@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const sharedSidebarCss = read("../packages/shared-ui/src/styles/sidebar-primitives.css");
 const patternCss = read("../src/styles/sidebar/patterns.css");
+const layoutCss = read("../src/styles/layout.css");
 const dataSurfaceSource = read("../src/features/app-shell/DesktopDataWorkspaceSurface.tsx");
 const workspaceContentSource = read("../src/features/app-shell/DesktopWorkspaceContent.tsx");
 const registrySource = read("../src/features/app-shell/workspace-surfaces/workspaceSurfaceRegistry.ts");
@@ -41,6 +42,23 @@ describe("Sidebar architecture", () => {
     expect(auxiliaryHostSource).toContain('orientation="vertical"');
     expect(settingsSidebarSource).toContain("SETTINGS_SIDEBAR_GROUPS.map");
     expect(settingsModelSource).toContain("SETTINGS_SIDEBAR_GROUPS");
+  });
+
+  it("reveals Auxiliary content without compressing its text during open and close", () => {
+    expect(layoutCss).toMatch(
+      /\.desktop-right-sidebar-inner\s*\{[^}]*position:\s*absolute[^}]*inset-inline-end:\s*0[^}]*width:\s*var\(--desktop-right-sidebar-width\)[^}]*min-width:\s*var\(--desktop-right-sidebar-width\)[^}]*max-width:\s*none[^}]*pointer-events:\s*none/s,
+    );
+    expect(layoutCss).toMatch(
+      /\.desktop-right-sidebar\.is-open \.desktop-right-sidebar-inner\s*\{[^}]*pointer-events:\s*auto/s,
+    );
+    expect(layoutCss).not.toMatch(
+      /\.desktop-right-sidebar-inner\s*\{[^}]*(?:opacity|visibility|transition):/s,
+    );
+    expect(layoutCss).not.toMatch(
+      /\.desktop-right-sidebar-inner\s*\{[^}]*width:\s*100%/s,
+    );
+    expect(auxiliaryHostSource).toContain("aria-hidden={open ? undefined : true}");
+    expect(auxiliaryHostSource).toContain('{...(!open ? { inert: "" } : {})}');
   });
 
   it("enforces one large-list policy with a bounded mounted-row budget", () => {

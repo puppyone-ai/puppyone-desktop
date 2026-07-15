@@ -30,6 +30,17 @@ describe("titlebar typography architecture", () => {
     expect(titlebarCss).not.toContain(".desktop-titlebar-workspace-button.cloud {");
   });
 
+  it("keeps the titlebar divider inside the native window edge", () => {
+    const titlebarRule = readCssBlock(`\n${titlebarCss}`, ".desktop-titlebar");
+    const dividerRule = readCssBlock(titlebarCss, ".desktop-titlebar::after");
+
+    expect(titlebarRule).toContain("padding: 4px 6px 5px 86px;");
+    expect(titlebarRule).toContain("border-bottom: 0;");
+    expect(dividerRule).toContain("inset-inline: 1px;");
+    expect(dividerRule).toContain("inset-block-end: 0;");
+    expect(dividerRule).toContain("background: var(--desktop-titlebar-divider);");
+  });
+
   it("keeps chrome text at the shared medium-weight contract", () => {
     const rootTokens = readCssBlock(tokensCss, ":root");
 

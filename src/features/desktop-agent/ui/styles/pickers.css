@@ -60,14 +60,16 @@
   padding: 0 6px;
   border: 0;
   background: transparent;
-  color: var(--agent-text);
-  font-weight: 650;
+  color: var(--desktop-titlebar-text-muted, var(--po-text-muted));
+  font-size: var(--po-font-size-chrome, 13px);
+  font-weight: var(--po-font-weight-chrome, 500);
+  line-height: 18px;
 }
 .desktop-agent-picker.is-header .desktop-agent-picker-trigger:hover:not(:disabled),
 .desktop-agent-picker.is-header .desktop-agent-picker-trigger[aria-expanded="true"] {
   border-color: transparent;
   background: var(--agent-row-hover-surface);
-  color: var(--agent-text);
+  color: var(--desktop-titlebar-text, var(--po-text));
 }
 
 .desktop-agent-picker-popover {

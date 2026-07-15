@@ -1,6 +1,11 @@
-import { Fragment } from "react";
-import { MessageSquare } from "lucide-react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Eraser, MessageSquare, MoreHorizontal, RotateCcw } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
+import {
+  DesktopMenuItem,
+  DesktopMenuSeparator,
+  DesktopMenuSurface,
+} from "../../components/DesktopMenu";
 import {
   DesktopUpdateTitlebarButton,
   type useDesktopUpdates,
@@ -23,6 +28,8 @@ type DesktopTitlebarActionsProps = {
   agentChatEnabled: boolean;
   agentChatSidebarOpen: boolean;
   onOpenActiveFileExternal: () => void;
+  onClearTerminal: () => void;
+  onResetTerminal: () => void;
   onToggleAgentChat: () => void;
   onToggleTerminal: () => void;
   onUpdateNow: () => void;
@@ -41,6 +48,8 @@ export function DesktopTitlebarActions({
   agentChatEnabled,
   agentChatSidebarOpen,
   onOpenActiveFileExternal,
+  onClearTerminal,
+  onResetTerminal,
   onToggleAgentChat,
   onToggleTerminal,
   onUpdateNow,
@@ -64,27 +73,139 @@ export function DesktopTitlebarActions({
     },
   };
 
+  const titlebarActionItems: Array<{
+    group: "header" | "right-sidebar";
+    id: string;
+    node: ReactNode;
+  }> = getOrderedHeaderElementDefinitions(titlebarActionsSettings.order)
+    .filter((definition) => (
+      titlebarActionsSettings.enabled[definition.id]
+      && definition.isAvailable(headerElementContext)
+    ))
+    .map((definition) => {
+      const element = definition.render(headerElementContext);
+      return {
+        group: definition.linkedRightSidebarToolId ? "right-sidebar" as const : "header" as const,
+        id: definition.id,
+        node: definition.id === "terminal" && terminalSidebarOpen ? (
+          <div className="desktop-titlebar-terminal-cluster">
+            <TerminalTitlebarActionsMenu
+              onClear={onClearTerminal}
+              onReset={onResetTerminal}
+            />
+            {element}
+          </div>
+        ) : element,
+      };
+    });
+
+  if (agentChatEnabled) {
+    titlebarActionItems.push({
+      group: "right-sidebar",
+      id: "agent-chat",
+      node: (
+        <AgentChatTitlebarButton
+          enabled
+          open={agentChatSidebarOpen}
+          onToggle={onToggleAgentChat}
+        />
+      ),
+    });
+  }
+
   return (
     <>
       <DesktopUpdateTitlebarButton
         state={desktopUpdates.state}
         onUpdateNow={onUpdateNow}
       />
-      {getOrderedHeaderElementDefinitions(titlebarActionsSettings.order).map((definition) => {
-        if (!titlebarActionsSettings.enabled[definition.id]) return null;
-        if (!definition.isAvailable(headerElementContext)) return null;
+      {titlebarActionItems.map((item, index) => {
+        const previousItem = titlebarActionItems[index - 1];
         return (
-          <Fragment key={definition.id}>
-            {definition.render(headerElementContext)}
+          <Fragment key={item.id}>
+            {previousItem && previousItem.group !== item.group && (
+              <span className="desktop-titlebar-action-divider" aria-hidden="true" />
+            )}
+            {item.node}
           </Fragment>
         );
       })}
-      <AgentChatTitlebarButton
-        enabled={agentChatEnabled}
-        open={agentChatSidebarOpen}
-        onToggle={onToggleAgentChat}
-      />
     </>
+  );
+}
+
+function TerminalTitlebarActionsMenu({
+  onClear,
+  onReset,
+}: {
+  onClear: () => void;
+  onReset: () => void;
+}) {
+  const { t } = useLocalization();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target instanceof Node ? event.target : null;
+      if (target && rootRef.current?.contains(target)) return;
+      setMenuOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMenuOpen(false);
+      triggerRef.current?.focus();
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [menuOpen]);
+
+  const runAction = (action: () => void) => {
+    setMenuOpen(false);
+    action();
+  };
+
+  return (
+    <div className="desktop-titlebar-terminal-menu-wrap" ref={rootRef}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="desktop-titlebar-action desktop-titlebar-terminal-menu-trigger"
+        title={t("terminal.actions")}
+        aria-label={t("terminal.actions")}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((value) => !value)}
+      >
+        <MoreHorizontal size={14} />
+      </button>
+      {menuOpen && (
+        <DesktopMenuSurface
+          ariaLabel={t("terminal.actions")}
+          className="desktop-titlebar-menu desktop-titlebar-terminal-menu"
+        >
+          <DesktopMenuItem
+            icon={<Eraser size={13} strokeWidth={1.8} />}
+            label={t("terminal.clear")}
+            onClick={() => runAction(onClear)}
+          />
+          <DesktopMenuSeparator />
+          <DesktopMenuItem
+            icon={<RotateCcw size={13} strokeWidth={1.8} />}
+            label={t("terminal.reset")}
+            onClick={() => runAction(onReset)}
+          />
+        </DesktopMenuSurface>
+      )}
+    </div>
   );
 }
 

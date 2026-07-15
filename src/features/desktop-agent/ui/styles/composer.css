@@ -31,7 +31,16 @@
   border-radius: var(--agent-radius-composer);
   background: var(--agent-composer-surface);
   box-shadow: none;
+  cursor: text;
   transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.desktop-agent-composer[data-input-disabled="true"] {
+  cursor: default;
+}
+
+.desktop-agent-composer:hover {
+  background: var(--agent-row-selected-surface);
 }
 
 .desktop-agent-composer:focus-within {

@@ -126,10 +126,36 @@ describe("Desktop Agent renderer surfaces", () => {
     const providerControl = container.querySelector('button[aria-label="Coding agent provider"]') as HTMLElement;
     const modelControl = container.querySelector('button[aria-label="Agent model"]') as HTMLElement;
     const sendControl = container.querySelector('button[aria-label="Send message"]') as HTMLElement;
-    expect(window.getComputedStyle(providerControl).height).toBe("30px");
+    const composerSurface = container.querySelector(".desktop-agent-composer") as HTMLElement;
+    expect(window.getComputedStyle(providerControl).height).toBe("26px");
     expect(window.getComputedStyle(sendControl).width).toBe("30px");
     expect(window.getComputedStyle(sendControl).height).toBe("30px");
     expect(window.getComputedStyle(modelControl).height).toBe("30px");
+    expect(window.getComputedStyle(composerSurface).cursor).toBe("text");
+  });
+
+  it("treats composer whitespace as part of the text input hit target", () => {
+    const container = render(React.createElement(AgentComposer, {
+      draft: "Ready",
+      onDraftChange: vi.fn(),
+      disabled: false,
+      running: false,
+      stopping: false,
+      submitting: false,
+      placeholder: "Ask anything",
+      onSubmit: vi.fn(async () => true),
+      onStop: vi.fn(),
+    }));
+    const composerSurface = container.querySelector(".desktop-agent-composer") as HTMLElement;
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    const sendControl = container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement;
+
+    act(() => composerSurface.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 })));
+    expect(document.activeElement).toBe(textarea);
+
+    act(() => sendControl.focus());
+    act(() => sendControl.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 })));
+    expect(document.activeElement).toBe(sendControl);
   });
 
   it("removes the Agent header region when Minimal Mode supplies no header", () => {

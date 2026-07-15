@@ -13,7 +13,11 @@ import {
 } from "./components/MinimalOnboarding";
 import { AssetLibraryHome } from "./components/AssetLibraryHome";
 import { isDesktopAgentChatEnabled, loadRightAgentPanel } from "./features/desktop-agent/lazy";
-import { isDesktopTerminalEnabled, RightTerminalPanel } from "./features/desktop-terminal";
+import {
+  isDesktopTerminalEnabled,
+  RightTerminalPanel,
+  type RightTerminalPanelHandle,
+} from "./features/desktop-terminal";
 import { useDesktopUpdates } from "./components/DesktopUpdateControls";
 import {
   configureWorkspaceCloudRemote,
@@ -225,6 +229,7 @@ export function App() {
   const [activeDataPath, setActiveDataPath] = useState<string | null>(null);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
   const switcherRef = useRef<HTMLDivElement>(null);
+  const terminalPanelRef = useRef<RightTerminalPanelHandle>(null);
   const cloudBrowserSignInInFlightRef = useRef(false);
   const workspaceIsCloud = isCloudWorkspace(workspace);
   const desktopTerminalEnabled = isDesktopTerminalEnabled({ terminalToolEnabled, workspaceIsCloud });
@@ -1214,6 +1219,8 @@ export function App() {
         setRightSidebarOpen(!terminalIsOpen);
         setSwitcherOpen(false);
       }}
+      onClearTerminal={() => terminalPanelRef.current?.clear()}
+      onResetTerminal={() => terminalPanelRef.current?.reset()}
       onToggleAgentChat={() => {
         if (!desktopAgentChatEnabled) return;
         const chatIsOpen = rightSidebarOpen && rightSidebarSurface === "chat";
@@ -1285,6 +1292,7 @@ export function App() {
                 aria-hidden={rightSidebarSurface !== "terminal"}
               >
                 <RightTerminalPanel
+                  ref={terminalPanelRef}
                   workspace={workspace}
                   active={rightSidebarOpen && rightSidebarSurface === "terminal"}
                 />

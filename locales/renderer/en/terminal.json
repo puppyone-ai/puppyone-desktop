@@ -1,5 +1,6 @@
 {
   "title": "Terminal",
+  "actions": "Terminal actions",
   "clear": "Clear terminal",
   "reset": "Reset terminal",
   "bridgeUnavailable": "Terminal bridge unavailable. Open this workspace in puppyone.",

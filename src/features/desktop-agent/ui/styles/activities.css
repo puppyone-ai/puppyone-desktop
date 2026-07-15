@@ -326,6 +326,20 @@
 }
 .desktop-agent-notice.is-error { border-inline-start-color: var(--po-danger); background: color-mix(in srgb, var(--po-danger) 6%, transparent); }
 .desktop-agent-notice.is-error > svg { color: var(--po-danger); }
+.desktop-agent-notice.is-connection {
+  align-items: center;
+  margin: 0 4px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--agent-border-subtle);
+  border-radius: var(--agent-radius-message);
+  background: var(--agent-composer-surface);
+  color: var(--agent-text-muted);
+  line-height: 1.45;
+}
+.desktop-agent-notice.is-connection > svg {
+  flex: 0 0 auto;
+  color: var(--agent-text-subtle);
+}
 
 .desktop-agent-jump-latest {
   position: absolute;

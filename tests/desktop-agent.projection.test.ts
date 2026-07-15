@@ -175,6 +175,19 @@ describe("Desktop Agent transcript projection", () => {
     expect(projection.parts.find((part) => part.kind === "tool")).toMatchObject({ status: "unknown" });
   });
 
+  it("preserves recoverable provider status metadata for connection-state presentation", () => {
+    const projection = applyAgentEvent(createAgentProjection(), event(1, "provider.warning", {
+      message: "Reconnecting… 2/5",
+      recoverable: true,
+    }, "turn-1", "retry-1"));
+
+    expect(projection.activities[0]).toMatchObject({
+      kind: "warning",
+      label: "Reconnecting… 2/5",
+      detail: { recoverable: true },
+    });
+  });
+
   it("collapses duplicate provider terminal errors for the same turn", () => {
     const projection = applyAgentEvents(createAgentProjection(), [
       event(1, "turn.started", { prompt: "Hello" }, "turn-1"),

@@ -150,11 +150,19 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
 }
 
 .desktop-right-sidebar-inner {
-  width: 100%;
-  max-width: 100%;
-  height: 100%;
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: var(--desktop-right-sidebar-width);
+  min-width: var(--desktop-right-sidebar-width);
+  max-width: none;
   min-height: 0;
   overflow: hidden;
+  pointer-events: none;
+}
+
+.desktop-right-sidebar.is-open .desktop-right-sidebar-inner {
+  pointer-events: auto;
 }
 
 .desktop-right-sidebar-stack {

@@ -1,5 +1,6 @@
 {
   "title": "终端",
+  "actions": "终端操作",
   "clear": "清空终端",
   "reset": "重置终端",
   "bridgeUnavailable": "终端桥接不可用。请在 puppyone 中打开此工作区。",

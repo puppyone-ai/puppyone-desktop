@@ -167,7 +167,10 @@ Capability-gated extensions
   fork
   compact
   approvals and structured questions
-  attachments and context references
+  structured reference inputs
+    workspace files and directories
+    staged images and generic files
+    per-kind transport, MIME and limits
   provider/model/variant selection
   modes, commands, MCP and skills
 ```
@@ -176,6 +179,17 @@ The shared application and UI layers must not branch on concrete backend IDs.
 They consume descriptors, readiness, capabilities, normalized events and
 backend-scoped catalogs. Backend-specific protocol, prompt, history and
 credential code remains under `electron/main/agent/runtimes/<backend>/`.
+
+Reference input is not one portable boolean. A runtime may support workspace
+paths but not immutable file snapshots, images but not PDF, or file resources
+but not directory scopes. Inspection therefore exposes structured
+per-reference-kind capabilities and limits; concrete adapters translate only
+the kinds their native protocol actually accepts. The legacy
+`attachments/contextReferences` booleans may remain as a compatibility
+projection during migration, but UI/application behavior cannot infer a
+transport from them or branch on a concrete backend ID. The normative model is
+[Agent Composer reference ingestion](composer-reference-ingestion.md), tracked
+for implementation by `ISSUE-404`.
 
 ## Backend matrix
 
@@ -306,8 +320,13 @@ React
 
 - Renderer never receives executable paths, environment dumps, internal URLs,
   passwords, tokens or raw native protocol payloads.
-- Main canonicalizes the workspace and validates attachments and context
-  references before the adapter sees them.
+- Main canonicalizes workspace references before the adapter sees them. Raw
+  external paths are rejected; external attachments require a real preload
+  File grant, a main-owned immutable snapshot and an opaque token bound to the
+  owning window/workspace/reference epoch.
+- Snapshot bytes, staging tokens, external absolute paths and data URLs never
+  enter normalized Renderer events, ordinary logs or persistent PuppyOne
+  state. Only bounded reference display metadata may enter the transcript.
 - Every blocking reply correlates window, live bridge session, backend, native
   session, turn and request identity.
 - Runtime processes use absolute validated executables, `shell: false`, bounded
@@ -371,6 +390,13 @@ legacy policy.
 - An unavailable backend stays visible with a bounded diagnostic but cannot be
   selected or silently replaced.
 - Backend-scoped models cannot be selected under another backend.
+- Reference input controls are driven by structured runtime capability; a file
+  picker or drag payload never proves that the selected native adapter accepts
+  that kind.
+- Queue captures complete prompt/reference intents, and unsupported steer
+  references fail visibly instead of being discarded.
+- Renderer/application code contains no concrete-backend branch for reference
+  acquisition or presentation; native input conversion stays in adapters.
 - The Agent selector precedes backend-scoped Provider and Model controls.
 - Only validated presentation selections and a sanitized local discovery DTO
   may be durable PuppyOne Agent state; transcript/session persistence is banned.
