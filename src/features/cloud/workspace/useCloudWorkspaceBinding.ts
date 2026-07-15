@@ -233,7 +233,7 @@ export function useCloudWorkspaceBinding({
           cloudRemote.rawUrl,
           updateCloudSession,
           desktopCloudApiBaseUrl,
-        ).then(async (context) => {
+        ).then((context) => {
           if (cancelled) return;
           if (!canonicalContextMatchesRemote(cloudRemote, context)) {
             apply({
@@ -245,13 +245,7 @@ export function useCloudWorkspaceBinding({
             });
             return;
           }
-          const project = await getCloudProject(
-            activeCloudSession,
-            context.target.project_id,
-            updateCloudSession,
-            desktopCloudApiBaseUrl,
-          );
-          if (cancelled) return;
+          const { project } = context;
           if (project.id !== context.target.project_id) {
             apply({
               projectId: null,
@@ -268,7 +262,7 @@ export function useCloudWorkspaceBinding({
             bindingStatus: "not-bound",
             bindingId: null,
             target: context.target,
-            scopePath: null,
+            scopePath: context.scope_path ?? null,
             capabilities: project.capabilities ?? [],
             cloudLinked: true,
             error: null,

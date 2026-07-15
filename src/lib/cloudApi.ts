@@ -176,6 +176,8 @@ export type DesktopCloudLegacyBindingCandidate = {
 
 export type DesktopCloudCanonicalProjectContext = {
   target: RepositoryTarget;
+  project: DesktopCloudProject;
+  scope_path?: string | null;
 };
 
 export type DesktopCloudOrganization = {

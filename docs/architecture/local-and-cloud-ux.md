@@ -498,10 +498,11 @@ Normalize all PuppyOne fetch and push locators
 
 The server context resolver must validate the trusted Cloud/Git origin, parse
 the canonical grammar, authorize `Project Read` for the current JWT, and—only
-for a scoped target—verify the exact Scope belongs to the Project. Only after
-that response may Desktop fetch Project metadata or navigate to the Project.
-An unauthorized or missing target fails closed and never falls back to a broad
-Project list.
+for a scoped target—verify the exact Scope belongs to the Project. The same
+authorized response contains the target, Project metadata/current capabilities
+and optional Scope path, so Desktop may navigate without a second Project
+lookup. An unauthorized or missing target fails closed and never falls back to
+a broad Project list.
 
 An authorization fact-store or workspace-binding storage outage is different
 from a missing Project, binding, Scope, or grant. The backend must fail closed
@@ -525,13 +526,13 @@ workspace-config read and the first complete Git snapshot; later watcher or
 focus refreshes keep the previous snapshot visible and re-resolve only if an
 identity fact actually changes. Git HEAD/status changes and public session
 status/expiry refreshes are not identity changes and must not repeat binding
-authorization or Project-detail hydration. A successful binding response is already the
-current human authorization decision and must include the current Project
-capabilities, so Desktop may enter the exact Project immediately. Project
-metadata, aggregate details, and Claude/Git readiness hydrate after navigation
-and never hold identity resolution behind `Matching folder`. Readiness affects
-feature availability inside the Project; it is not evidence for Project
-identity and is not part of the resolver's critical path.
+authorization or Project-detail hydration. A successful binding or canonical
+context response is already the current human authorization decision and must
+include the current Project capabilities, so Desktop may enter the exact
+Project immediately. Aggregate details and Claude/Git readiness hydrate after
+navigation and never hold identity resolution behind `Matching folder`.
+Readiness affects feature availability inside the Project; it is not evidence
+for Project identity and is not part of the resolver's critical path.
 
 #### Remote collection and ambiguity
 
@@ -595,17 +596,26 @@ type CanonicalProjectContext = {
   target:
     | { kind: "project_root"; project_id: string }
     | { kind: "scope"; project_id: string; scope_id: string };
+  project: {
+    id: string;
+    name: string;
+    org_id: string;
+    effective_role: "admin" | "editor" | "viewer";
+    grant_source: "org_owner" | "project_member" | "org_visibility";
+    capabilities: string[];
+  };
+  scope_path: string | null;
 };
 ```
 
 Canonical resolution does not require user confirmation because the locator is
 stable and secret-free; the current JWT still decides whether the user may see
-the Project. Project capabilities are fetched through the ordinary Project
-endpoint after the exact target is authorized. Legacy `/git/ap/<secret>.git`
-resolution remains confirmation-
-gated during migration because its path is a credential, not durable identity.
-Neither response returns Git credentials, shared keys, binding credentials, or
-an unfiltered Organization Project list.
+the Project. Project capabilities travel in that same authorized response;
+Desktop does not make a second Project lookup merely to enter the context.
+Legacy `/git/ap/<secret>.git` resolution remains confirmation-gated during
+migration because its path is a credential, not durable identity. Neither
+response returns Git credentials, shared keys, binding credentials, or an
+unfiltered Organization Project list.
 
 #### Persistence and race safety
 

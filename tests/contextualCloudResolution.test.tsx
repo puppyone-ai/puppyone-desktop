@@ -89,11 +89,19 @@ function config(
 function canonicalContext(
   projectId: string,
   scopeId: string | null = null,
+  capabilities: string[] = ["project.read", "content.read"],
 ): DesktopCloudCanonicalProjectContext {
   return {
     target: scopeId
       ? { kind: "scope", project_id: projectId, scope_id: scopeId }
       : { kind: "project_root", project_id: projectId },
+    project: {
+      id: projectId,
+      name: `Project ${projectId}`,
+      org_id: "org-1",
+      capabilities,
+    },
+    scope_path: scopeId ? `docs/${scopeId}` : null,
   };
 }
 
@@ -274,9 +282,11 @@ describe("current Local workspace Cloud context", () => {
       bindingStatus: "not-bound",
       bindingId: null,
       target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
-      scopePath: null,
+      scopePath: "docs/scope-docs",
+      capabilities: ["project.read", "content.read"],
       error: null,
     });
+    expect(cloudApi.getCloudProject).not.toHaveBeenCalled();
     expect(cloudApi.getCloudWorkspaceBinding).not.toHaveBeenCalled();
   });
 
@@ -789,16 +799,8 @@ describe("current Local workspace Cloud context", () => {
       user_email: "second@example.com",
       session_generation: "generation-2",
     } satisfies DesktopCloudSession;
-    const firstContext = canonicalContext("project-1");
-    const secondContext = canonicalContext("project-1");
-    cloudApi.getCloudProject.mockImplementation(
-      async (activeSession: DesktopCloudSession, projectId: string) => ({
-        id: projectId,
-        name: `Project ${projectId}`,
-        org_id: "org-1",
-        capabilities: [activeSession.user_id === "user-1" ? "account-one" : "account-two"],
-      }),
-    );
+    const firstContext = canonicalContext("project-1", null, ["account-one"]);
+    const secondContext = canonicalContext("project-1", null, ["account-two"]);
     cloudApi.resolveCanonicalCloudWorkspaceRemote.mockImplementation(
       (activeSession: DesktopCloudSession) => (
         activeSession.user_id === "user-1" ? first.promise : Promise.resolve(secondContext)
