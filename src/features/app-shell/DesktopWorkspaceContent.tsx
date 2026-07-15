@@ -8,6 +8,7 @@ import {
   DocumentSessionBoundary,
   type AiEditRequest,
   type DataNode,
+  type DataWorkspaceActivePathChangeContext,
   type EditorInteractionPreferences,
   type EditorDocumentSession,
   type FilePreviewBodyContext,
@@ -50,7 +51,11 @@ type DesktopWorkspaceContentProps = {
   desktopUpdates: DesktopUpdatesController;
   git: DesktopGitController;
   minimalMode?: boolean;
-  onActiveDataPathChange: (path: string | null, node?: DataNode | null) => void;
+  onActiveDataPathChange: (
+    path: string | null,
+    node?: DataNode | null,
+    context?: DataWorkspaceActivePathChangeContext,
+  ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;

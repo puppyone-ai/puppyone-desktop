@@ -1,329 +1,344 @@
 # Document Editing and Persistence Architecture
 
-**Status:** Authoritative architecture. The host-owned Document Session is the
-only coordinator for editable documents. Editors own document models and
-snapshots; persistence adapters own storage-specific commits. Viewer Pack v1
-remains read-only and never receives persistence authority.
+**Status:** Authoritative architecture.
+
+PuppyOne standardizes the save lifecycle, not the internal design of every
+editor. A format contribution owns editing and serialization. A small,
+host-owned `DocumentEditingSession` makes the latest snapshot durable and
+prevents navigation from discarding an unsaved document.
+
+This is intentionally not a multi-agent coordinator, operation log, CRDT, or
+format-independent merge engine.
 
 ## 1. Decision
 
-PuppyOne separates four decisions that previously met inside
-`TextEditorFrame`:
-
-1. the **Viewer Router** decides which surface handles a file;
-2. the **Editor Contribution** decides how that file is edited and serialized;
-3. the **Document Session** decides when and in which order revisions commit;
-4. the **Persistence Adapter** decides how a commit reaches its storage system.
-
-The router and editor never call `fs`, Electron IPC, or Cloud HTTP. The
-Document Session never interprets Markdown, CSV, or another file format. A
-persistence adapter never owns editor UI or selection.
-
-```mermaid
-flowchart TB
-    Selection[Explorer selection intent]
-    Commit[Committed preview document]
-    Router[Viewer Router<br/>format + capability only]
-    Boundary[Document Session Boundary<br/>host-owned]
-    Session[Document Session<br/>revision ordering + flush]
-    Editor[Editor Contribution<br/>document model + snapshot]
-    Viewer[Read-only Viewer Contribution]
-    Local[Local FS Persistence Adapter]
-    Cloud[Cloud Persistence Adapter]
-    Main[Electron Main<br/>authorized atomic filesystem write]
-    API[Cloud Content API<br/>version precondition + commit]
-
-    Selection --> Commit --> Router
-    Router -->|editable preset| Boundary
-    Router -->|preview preset / Viewer Pack| Viewer
-    Boundary --> Session
-    Boundary --> Editor
-    Editor -->|revision signal| Session
-    Session -->|snapshot request| Editor
-    Session -->|sourceKind = local| Local --> Main
-    Session -->|sourceKind = cloud| Cloud --> API
-```
-
-The component boundary is immediately after deterministic viewer resolution
-and before a concrete editable renderer. The session object's lifetime is
-host-owned: a file switch detaches the old editor but does not cancel a
-required commit already queued for that document.
-
-## 2. Ownership boundaries
-
-### 2.1 Viewer Router
-
-`resolveFileFormat()` and `PRESET_VIEWER_REGISTRY` remain pure classification.
-They may answer `edit`, `preview`, or `placeholder`, plus source/runtime
-requirements. They must not create timers, queues, storage clients, or file
-handles.
-
-### 2.2 Editor Contribution
-
-An editable contribution owns:
-
-- its in-memory document model and editing transactions;
-- format-specific commands, undo/redo, selection, and rendering;
-- a monotonically changing editor revision identity;
-- a synchronous snapshot port that returns the exact source represented by
-  that revision.
-
-An editor reports ordinary changes as `{ revision, dirty }`. It does not push a
-complete Markdown source string through React on each transaction. A complete
-snapshot is read only at a persistence boundary. Format-specific serialization
-belongs here because only the editor knows how its model becomes canonical
-file content.
-
-An editor does **not** own debounce policy, write retries, persisted-version
-tracking, filesystem access, Cloud requests, or cross-document lifecycle.
-
-### 2.3 Document Session
-
-One session represents one `(workspace, document path)` identity. It owns:
-
-- current, pending, in-flight, and acknowledged revision state;
-- one serialized write pump: at most one commit is in flight;
-- latest-revision coalescing while preserving flush waiters;
-- idle and maximum-dirty scheduling supplied by the active adapter policy;
-- mandatory flushes for manual save, mode switch, file switch, and destroy;
-- `clean`, `dirty`, `saving`, `saved`, and `error` status;
-- the base storage version used for optimistic concurrency;
-- commit acknowledgement and conflict/error delivery to the trusted UI.
-
-It is a framework-independent TypeScript object. React may subscribe to its
-small status snapshot, but React render/effect ordering is not the write queue.
-Destroying an Editor DOM tree cannot reorder, cancel, or directly start a
-second write beside an in-flight write.
-
-### 2.4 Persistence adapters
-
-Persistence is a host capability with separate implementations:
-
-| Concern | Local FS adapter | Cloud adapter |
-| --- | --- | --- |
-| Transport | authorized Electron IPC | authenticated Content API |
-| Version | content fingerprint from read/write | backend commit id |
-| Conflict guard | expected fingerprint before replacement | `base_commit_id` precondition |
-| Commit | same-directory durable temporary write + replace | version-engine transaction |
-| Scheduling | short local idle window | longer network-aware idle window |
-| Retry | user-visible filesystem error; no blind overwrite | classified retry/backoff/offline policy |
-| External changes | workspace watcher + fingerprint reconciliation | collaboration/version events |
-
-The adapter is replaceable because Desktop can open local and Cloud documents,
-but this is an **internal host strategy**, not third-party plugin authority.
-The renderer never imports Node `fs`; Electron Main retains workspace
-authorization and path containment.
-
-## 3. Commit sequence
-
-```mermaid
-sequenceDiagram
-    participant U as User input
-    participant E as Editor Contribution
-    participant S as Document Session
-    participant P as Persistence Adapter
-    participant T as Storage target
-
-    U->>E: edit transaction
-    E->>S: reportRevision(R2, dirty)
-    Note over E,S: no full-source copy on ordinary Markdown input
-    S->>S: schedule policy boundary
-    S->>E: readSnapshot()
-    E-->>S: { revision: R2, content }
-    S->>P: persist(R2, baseVersion, reason)
-    P->>T: conditional commit
-    T-->>P: acknowledgedVersion V2
-    P-->>S: { version: V2 }
-    S-->>E: status only, never replay the saved source
-```
-
-If `R3` arrives while `R2` is in flight, the session retains only the newest
-pending snapshot. It never starts `R3` concurrently. When `R2` completes, the
-same pump commits `R3`. Therefore an older write cannot finish after and
-overwrite a newer one.
-
-## 4. Flush and conflict rules
-
-1. Idle save is an implementation policy, not a product-level “Save” concept.
-2. A maximum-dirty deadline prevents continuous typing from postponing durable
-   persistence forever.
-3. File switch and editor destruction submit an exact final snapshot into the
-   same serialized pump; they never bypass it.
-4. A commit carries the version read with the document. A mismatch is a
-   conflict, not permission to silently overwrite the external revision.
-5. A successful acknowledgement advances the session base version. It may
-   update caches and derived indexes, but must not replace the active node,
-   recreate header actions, or dispatch saved source back into the editor.
-6. Local and Cloud policies may differ without branching inside an Editor.
-7. A normal app/window close is a two-phase operation: Electron Main prevents
-   destruction, the renderer snapshots and drains every active session, and
-   Main closes only after a trusted acknowledgement. Failure and timeout keep
-   the window open by default; an explicit destructive choice is required to
-   close anyway.
-8. Cloud authentication, workspace services, and other persistence
-   dependencies remain live during `before-quit`. General service disposal
-   occurs at `will-quit`, after all window close gates have acknowledged.
-9. If Electron's original app-quit attempt was interrupted by the async close
-   gate, closing the last drained window resumes that quit intent. Choosing to
-   keep a failed window open cancels the intent and leaves the app operational.
-10. The renderer installs an interaction barrier before taking the close
-    snapshot, then drains again if a newer revision arrived during an in-flight
-    commit. A cancelled close removes the barrier and restores focus.
-11. An unmounted session enters a retiring state and remains in the renderer
-    registry until its destroy snapshot is acknowledged. Therefore switching
-    files and immediately quitting still waits for the old document.
-
-```mermaid
-sequenceDiagram
-    participant W as Electron BrowserWindow
-    participant B as Preload bridge
-    participant I as Renderer interaction barrier
-    participant R as Active Session Registry
-    participant S as Document Sessions
-    participant P as Persistence Adapters
-
-    W->>W: close event / preventDefault()
-    W->>B: flush-requested(requestId)
-    B->>I: lock input and retain focus target
-    I->>R: flushActiveDocumentSessions()
-    R->>S: flushCurrent(app-close)
-    S->>P: drain serialized commits
-    P-->>S: durable acknowledgements
-    S-->>R: all settled
-    R-->>B: resolved
-    B-->>W: trusted flush-result(requestId, ok)
-    W->>W: allowClose + close()
-    opt failure or timeout, then Keep Window Open
-        W->>B: close-cancelled(requestId)
-        B->>I: unlock input and restore focus
-    end
-    Note over W,P: failure or timeout keeps the live editor window open by default
-```
-
-## 5. Plugin boundary
-
-There are two extension axes, and only one is a product plugin surface.
-
-```mermaid
-flowchart LR
-    Host[Trusted PuppyOne Host]
-    Router[Viewer Router]
-    Session[Document Session Kernel]
-    Persist[Persistence Adapters]
-    Preset[Built-in Editor / Viewer Contributions]
-    Pack[Sandboxed Viewer Pack v1]
-
-    Host --> Router
-    Host --> Session
-    Host --> Persist
-    Router --> Preset
-    Router -. placeholder local preview only .-> Pack
-    Preset -->|revision + snapshot contract| Session
-    Pack -->|metadata / bounded readRange| Host
-    Pack -.->|no edit, save, FS, Cloud, or session handle| Session
-```
-
-| Layer | Ownership | Extension status |
-| --- | --- | --- |
-| Viewer Router | shared trusted host | not replaceable |
-| Document Session kernel | shared trusted host | not replaceable or subclassable |
-| Local/Cloud persistence adapters | trusted app composition | internal strategy extension only |
-| Built-in Editor Contribution | format implementation | pluggable behind the trusted revision/snapshot contract |
-| Viewer Pack v1 | sandboxed third party | pluggable read-only presentation only |
-| Automation/Docker/runner session | Automation subsystem | separate from editor routing and document persistence |
-
-There is no “Docker Session” inside the editor persistence path. Container,
-sandbox, terminal, and agent runtime sessions belong to Automation. They may
-consume an explicitly granted workspace capability, but they neither implement
-an Editor Contribution nor replace a Document Session.
-
-### Shared, non-pluggable kernel
-
-- Document Session state machine and serialized write pump;
-- dirty/status semantics and flush reasons;
-- workspace/document identity and version checks;
-- Local/Cloud adapter selection and security policy;
-- conflict UX and cache/index acknowledgement routing.
-
-Third-party code cannot replace or subclass this kernel. Otherwise a plugin
-could reorder writes, bypass a version precondition, retain a session after
-revocation, or acquire storage authority indirectly.
-
-### Contribution extension point
-
-Built-in format surfaces are immutable `PresetViewerContribution`s. An
-editable built-in contribution plugs in below the Document Session Boundary
-and implements only the editor-side revision/snapshot contract.
-
-Viewer Pack v1 remains a separate, sandboxed, **read-only presentation**
-adapter. It activates only for placeholder-grade local documents and receives
-metadata and explicitly granted bounded resource reads. It cannot receive an
-`EditorDocumentSession`, call a persistence adapter, access Cloud, or write a
-workspace file.
-
-A future editable-pack API, if separately approved, must expose a narrow
-host-mediated edit transaction capability—not the Document Session object,
-raw `fs`, or a Cloud client. The host would validate edits, advance the trusted
-revision, and retain all commit/version authority. No such capability exists
-in Viewer API v1.
-
-### Internal strategy extension point
-
-`LocalFsPersistenceAdapter` and `CloudPersistenceAdapter` implement the same
-host port but are not marketplace plugins. New trusted storage sources may add
-another adapter only in the app composition layer. They do not alter Editor
-Contribution contracts.
-
-## 6. Implementation placement
+The stable boundary is:
 
 ```text
-packages/shared-ui/src/editor/document-session/
-  DocumentEditingSession.ts       # framework-independent session kernel
-  DocumentSessionBoundary.tsx     # trusted React composition/status bridge
-  activeDocumentSessions.ts       # active/retiring close-drain registry
-  types.ts                         # revision/snapshot/session contracts
-
-packages/shared-ui/src/editor/
-  PuppyoneEditorHost.tsx           # route, then attach editable session
-  viewers/*                        # format contribution only
-
-src/lib/
-  localFiles.ts                    # Local FS persistence adapter
-  cloudDataPort.ts                 # Cloud persistence adapter
-
-electron/main + local-api/
-  workspace write IPC              # authorization + conditional atomic write
-
-electron/main/document-session-close-coordinator.mjs
-                                   # BrowserWindow close gate + trusted handshake
-
-electron/preload.cjs + src/main.tsx
-                                   # narrow close-drain IPC + interaction barrier
+Explorer / DataWorkspace
+          |
+          v
+EditorHost + Viewer Router
+          |
+          +----> read-only Viewer Contribution
+          |
+          `----> editable Editor Contribution
+                       |
+                       | revision change + readSnapshot()
+                       v
+              DocumentEditingSession
+                       |
+                       | path + content + baseVersion
+                       v
+              DocumentPersistencePort
+                       |
+                 +-----+-----+
+                 |           |
+                 v           v
+             Local FS      Cloud
 ```
 
-`DataWorkspace` binds persistence to the **committed preview document**, never
-to the newest Explorer selection. It consumes successful commit
-acknowledgements for the bounded content cache and Markdown link index; it does
-not own the write queue.
+The responsibilities are deliberately narrow:
 
-## 7. Invariants and audit gates
+1. The **Viewer Router** chooses a contribution.
+2. The **Editor Contribution** owns the format, UI, document model, undo/redo,
+   validation, and serialization.
+3. The **DocumentEditingSession** owns dirty/save state, one serialized write
+   path, and flush-before-navigation.
+4. The **Persistence Port** owns storage-specific reads and writes.
 
-- The Viewer Router is deterministic and side-effect free.
-- Editable contributions receive a host-owned session, never a storage client.
-- Viewer Pack v1 remains `editable: false` and cannot obtain a session.
-- One document has at most one in-flight commit per session.
-- Destroy/file-switch flushes join the queue; no direct write bypass exists.
-- Unmounted sessions remain close-drain participants until their last queued
-  write succeeds; StrictMode cleanup/setup probes cannot unregister a live one.
-- Normal BrowserWindow close is blocked until all active sessions acknowledge
-  an `app-close` drain; the renderer is interaction-locked across the final
-  snapshot, and timeout/failure never silently destroys the window.
-- A commit acknowledgement is identified by editor revision and storage
-  version.
-- Local writes are path-authorized, version-checked, and replacement-safe.
-- Cloud writes carry a backend version precondition when one was read.
-- Ordinary Markdown input does not stringify the full document.
-- Successful persistence does not replace the active tree node or cause
-  unrelated header/icon refreshes.
-- Focused session ordering, conflict, local FS, Cloud request, and Markdown
-  snapshot tests are required before merging persistence changes.
+The router never writes files. An editor never imports Electron, Node `fs`, or
+a Cloud client. The session never parses Markdown, CSV, JSON, or PuppyFlow.
+
+## 2. Editor contribution contract
+
+An editable contribution may use any internal model:
+
+- CodeMirror or Monaco state for text;
+- React state for a form editor;
+- rows and cells for CSV;
+- nodes and edges for PuppyFlow;
+- another reviewed model appropriate to its format.
+
+It must expose only the small source boundary required by the host:
+
+```text
+initial content + storage version
+              |
+              v
+        format-specific Editor
+              |
+              +----> reportRevision({ revision, dirty })
+              |
+              `----> readSnapshot() -> { revision, content }
+```
+
+The contribution owns `parse()` and `serialize()` when it uses a structured
+model. The snapshot is the complete canonical file representation that should
+be persisted at that revision.
+
+The contribution does not own:
+
+- autosave timers or write queues;
+- file-switch, workspace-switch, or window-close behavior;
+- filesystem or Cloud transport;
+- storage-version advancement;
+- retry policy or save-status presentation.
+
+An embedded third-party editor may be wrapped without changing its internals.
+Its adapter reports changes and reads the editor's current value. If the
+embedded editor has its own filesystem autosave, that path must be disabled so
+the file does not have two independent writers.
+
+## 3. Thin DocumentEditingSession
+
+There is one `DocumentEditingSession` for each open editable document. It is a
+small save-lifecycle object, not a global document model and not an exclusive
+editing lock.
+
+It owns only:
+
+- `currentRevision` and `persistedRevision`;
+- `clean`, `dirty`, `saving`, `saved`, and `error` status;
+- the latest exact source snapshot;
+- the storage version read with the document;
+- at most one in-flight persistence request for that document;
+- the newest pending snapshot when edits arrive during a write;
+- `requestSave()` and `flushCurrent()`.
+
+It does not own:
+
+- `actorId` or `operationId`;
+- format-specific mutations;
+- paragraph, cell, node, or edge merging;
+- automatic rebase;
+- CRDT or OT state;
+- cross-document agent scheduling.
+
+The current auto-save mode makes a changed revision eligible for persistence
+without requiring every contribution to implement its own timer. Physical
+writes remain single-flight: if another edit arrives during a write, the
+session keeps the newest pending snapshot and writes it after the current
+request finishes.
+
+```text
+edit R11 ----> write R11 starts
+edit R12 --+
+edit R13 --+----> pending becomes R13
+                       |
+R11 acknowledged -----+
+                       |
+                       `----> write R13
+```
+
+This serialization protects the storage path. It does not prevent the user
+from continuing to type and does not block other documents.
+
+## 4. Persistence boundary
+
+Every editable contribution uses the same host-owned port:
+
+```text
+DocumentEditingSession
+          |
+          | persist({ path, content, baseVersion, reason })
+          v
+DocumentPersistencePort
+          |
+          +----> Local DataPort
+          |        |
+          |        v
+          |     Electron preload
+          |        |
+          |        v
+          |     workspace:write-file
+          |        |
+          |        v
+          |     authorized atomic writer
+          |        |
+          |        v
+          |     workspace file
+          |
+          `----> Cloud DataPort -> versioned Cloud commit
+```
+
+Local writes remain authorized, version-checked, and replacement-safe. The
+renderer supplies the expected storage version; Electron Main validates the
+workspace root and performs the atomic write. A successful response returns a
+new storage version to the session.
+
+Local and Cloud ports may use different transports. That difference must not
+appear inside Markdown, CSV, or another editor contribution.
+
+## 5. Navigation and close
+
+React cleanup is an emergency safety net, not the primary save command.
+Anything that can remove an editable surface must wait for the relevant
+session before changing destructive navigation state.
+
+```text
+file switch / leave editor / workspace switch / window close
+                              |
+                              v
+                  flushActiveDocumentSessions()
+                              |
+                    +---------+---------+
+                    |                   |
+                    v                   v
+               all succeeded       any failed
+                    |                   |
+                    v                   v
+              allow navigation     keep Editor mounted
+                                    show save error
+                                    allow retry
+```
+
+`activeDocumentSessions` is only a registry used by these navigation gates. It
+does not merge content or coordinate agents.
+
+The saved state means the newest editor revision has been acknowledged by
+storage. Dispatching a request or starting a timer is not success.
+
+## 6. External changes and agents
+
+The initial concurrency policy is conservative and file-based, similar to a
+traditional local editor:
+
+```text
+Agent or another program changes the workspace file
+                       |
+                       v
+                 workspace watcher
+                       |
+             +---------+---------+
+             |                   |
+             v                   v
+       Editor is clean      Editor is dirty
+             |                   |
+             v                   v
+       reload new file      do not overwrite
+                            report external-change conflict
+                            offer compare / reload / keep current
+```
+
+The storage version precondition is the final guard: a dirty editor may not
+blindly overwrite a file that changed after it was read.
+
+PuppyOne does not currently promise simultaneous paragraph-level editing by a
+human and multiple agents. If that product requirement becomes real,
+format-specific merge support belongs behind the relevant contribution:
+
+```text
+Markdown Contribution -> optional text diff / three-way merge
+CSV Contribution      -> optional cell-aware merge
+PuppyFlow Contribution -> optional node-id-aware merge
+```
+
+It must not turn the shared `DocumentEditingSession` into a universal mutation
+engine. CRDT, OT, and operation logs require a separate product and architecture
+decision.
+
+## 7. Adding a new editor
+
+For a normal single-file editor, the integration footprint is:
+
+```text
+new-editor/
+  EditorComponent.tsx       # format-specific UI and model
+  contribution.ts           # match, capability, render/load registration
+  sourceAdapter.ts          # reportRevision + readSnapshot
+  EditorComponent.test.tsx  # format and round-trip behavior
+```
+
+Adding it should require:
+
+1. declaring the supported format/viewer contribution;
+2. rendering the editor from initial content;
+3. reporting a changed revision;
+4. returning the exact serialized snapshot;
+5. passing the shared editable-contribution conformance tests.
+
+It should not require changes to `DataWorkspace`, `EditorHost`,
+`DocumentEditingSession`, Local/Cloud ports, Electron IPC, or window-close
+coordination.
+
+The expected cost by editor type is:
+
+| Editor type | Integration cost | Shared architecture change |
+| --- | --- | --- |
+| Read-only viewer | very low | none; no session |
+| Text-backed single file | low | none |
+| Structured model serialized to one text file | low to medium | none |
+| Binary editor | medium | add a reviewed binary persistence capability once |
+| One edit spanning multiple files | high | separate multi-file transaction design |
+
+Do not generalize the common contract for binary or multi-file cases until a
+real editor requires that capability.
+
+## 8. Extension and security boundary
+
+Built-in editable contributions receive the trusted revision/snapshot bridge.
+Viewer Pack v1 remains read-only and receives no session or persistence port.
+A future editable third-party API would require a separately reviewed,
+host-mediated capability; it must not expose raw `fs`, Electron IPC, Cloud
+clients, or the session object itself.
+
+Automation, containers, terminals, and agents are separate subsystems. They
+may modify workspace files through an authorized capability, but they do not
+replace the editor's save lifecycle.
+
+## 9. Implementation placement
+
+```text
+packages/shared-ui/src/editor/
+  PuppyoneEditorHost.tsx           # route and attach editable boundary
+  viewers/*                        # format-specific contributions
+
+packages/shared-ui/src/editor/document-session/
+  DocumentEditingSession.ts        # thin save lifecycle
+  DocumentSessionBoundary.tsx      # React lifetime/status bridge
+  activeDocumentSessions.ts        # navigation/close flush registry
+  types.ts                         # revision, snapshot, persistence contracts
+
+packages/shared-ui/src/data/
+  DataWorkspace.tsx                # committed preview + file-switch gate
+
+src/lib/
+  localFiles.ts                    # Local persistence port
+  cloudDataPort.ts                 # Cloud persistence port
+
+electron/main + local-api/
+  workspace write IPC              # authorization + atomic local write
+
+src/App.tsx + src/main.tsx
+  editor/workspace/window navigation gates
+```
+
+## 10. Required invariants
+
+- Viewer routing is deterministic and has no persistence side effects.
+- A format contribution owns its model and canonical serialization.
+- An editable contribution exposes revision changes and an exact snapshot; it
+  does not write storage directly.
+- `DocumentEditingSession` stays format-agnostic and small.
+- One document has at most one persistence request in flight per session.
+- File, editor-surface, workspace, and normal window close await pending saves.
+- A failed save keeps the document dirty and visible; errors are not swallowed.
+- A storage-version mismatch never becomes a blind overwrite.
+- External changes reload a clean editor or produce an explicit conflict for a
+  dirty editor.
+- Read-only Viewer Packs receive no editing or persistence authority.
+- Adding a normal text-backed or structured single-file editor does not require
+  changes to the shared save or storage layers.
+
+The shared conformance suite for every editable contribution should prove:
+
+1. an edit produces a new revision and exact snapshot;
+2. a successful save advances the acknowledged storage version;
+3. a failed save remains visible and retryable;
+4. file/workspace/window navigation waits for the latest snapshot;
+5. an external storage-version mismatch does not overwrite either side.
+
+Crash recovery drafts, automatic format-specific merge, CRDT, and multi-file
+transactions are explicit future capabilities. They are not requirements of
+the current Editor architecture.

@@ -19,6 +19,13 @@ local filesystem location alone never authorizes scripts or application
 access. Sections 12–14 of `architecture.md` record implementation status and
 the remaining acceptance gaps without weakening this contract.
 
+Markdown participates in the same small editable-contribution contract as
+other single-file editors. CodeMirror owns the canonical in-memory source,
+reports a changed revision, and exposes an exact `readSnapshot()` result. The
+shared `DocumentEditingSession` owns save status, write serialization, and
+flush-before-navigation. Markdown does not implement filesystem, Cloud, or
+window-close behavior.
+
 ## Authoritative documents
 
 Read these documents in this order:
@@ -30,10 +37,16 @@ Read these documents in this order:
    - Product source of truth for rendered-first behavior, syntax reveal,
      composing and commit, caret and selection semantics, and element-specific
      editing behavior.
+3. [Document Editing and Persistence](../document-editing-persistence.md)
+   - Persistence source of truth for the thin revision/snapshot adapter,
+     shared save lifecycle, navigation/close flush, and external-change
+     conflict behavior.
 
-The architecture document answers **how the system is structured**. The UX
-document answers **what the user experiences**. Neither document may redefine
-the other's contract; cross-layer changes must update both when necessary.
+The architecture document answers **how the Markdown system is structured**.
+The UX document answers **what the user experiences**. The persistence
+document answers **when an edited revision becomes durable**. None may
+redefine another's contract; cross-layer changes must update every affected
+document.
 
 ## Architecture diagram guide
 
@@ -64,6 +77,9 @@ diffs, code review, and Markdown renderers without diagram support:
   viewer plugins.
 - [Smooth Preview Transitions](../smooth-preview-transitions.md) owns file
   selection, committed preview documents, and editor mount lifecycle.
+- [Document Editing and Persistence](../document-editing-persistence.md) owns
+  Session lifetime, acknowledgement, navigation gating, and persistence
+  failures. React cleanup is never the primary save transaction.
 
 ## Document lifecycle
 

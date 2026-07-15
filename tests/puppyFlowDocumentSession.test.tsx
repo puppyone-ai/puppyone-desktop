@@ -31,7 +31,6 @@ describe("PuppyFlow Document Session integration", () => {
       saveMode: "manual",
       persistence: {
         kind: "local-fs",
-        policy: { idleDelayMs: 350, maxDelayMs: 2000 },
         persist,
       },
     });

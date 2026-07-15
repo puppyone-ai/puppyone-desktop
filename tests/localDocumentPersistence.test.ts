@@ -15,7 +15,6 @@ describe("local document persistence adapter", () => {
     const persistence = createLocalDataPort("/workspace").documentPersistence;
     expect(persistence).toMatchObject({
       kind: "local-fs",
-      policy: { idleDelayMs: 350, maxDelayMs: 2000 },
     });
 
     await expect(persistence?.persist({
@@ -23,7 +22,7 @@ describe("local document persistence adapter", () => {
       content: "updated",
       revision: "editor:r2",
       baseVersion: "sha256:old",
-      reason: "idle",
+      reason: "edit",
     })).resolves.toEqual({ version: "sha256:new" });
 
     expect(writeFile).toHaveBeenCalledWith({

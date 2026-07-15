@@ -40,6 +40,7 @@ export type {
   MarkdownLinkIndexRequest,
 } from "./editor/markdown/linkIndex";
 export type {
+  DataWorkspaceActivePathChangeContext,
   DataWorkspaceFolderExpansionStrategy,
   DataWorkspaceProps,
   DataWorkspaceState,
@@ -75,6 +76,7 @@ export {
 } from "./editor/document-session";
 export type {
   DocumentEditingSessionOptions,
+  DocumentSessionDrainReason,
   DocumentSessionError,
   DocumentSessionErrorCode,
   DocumentPersistedCommit,

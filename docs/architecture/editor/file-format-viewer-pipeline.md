@@ -266,9 +266,12 @@ Cross-cutting bars that apply to **every** viewer:
   dedicated contract in
   [Markdown Live Preview Editing UX](markdown/live-preview-ux.md);
   byte-perfect round-trip; wiki links + backlinks; relative asset URLs
-  resolved through the data port; manual and autosave modes; AI-edit
-  review decorations.
-- Status: met (governed by its own document).
+  resolved through the data port; the shared revision/snapshot save contract;
+  awaited close/navigation; visible save conflicts; AI-edit review decorations.
+- Status: the editor supplies exact Markdown snapshots and uses the shared
+  `DocumentEditingSession`. Save scheduling, failure presentation, and
+  file/editor-surface/workspace navigation are host concerns rather than
+  Markdown-specific implementations.
 
 **Plain text and code** (`.txt`, `.log`, config files, all registered
 source-code extensions)

@@ -1,4 +1,4 @@
-import type { EditorDocumentSession } from "./types";
+import type { DocumentSessionDrainReason, EditorDocumentSession } from "./types";
 
 type SessionRegistration = {
   tokens: Set<symbol>;
@@ -33,13 +33,16 @@ export function registerActiveDocumentSession(session: EditorDocumentSession): (
 
 /**
  * Snapshot and drain every active or retiring session owned by this renderer
- * window. The main process awaits this promise before BrowserWindow teardown.
+ * window. In-app navigation awaits it before unmount; Electron Main also
+ * awaits it before BrowserWindow teardown.
  */
-export async function flushActiveDocumentSessions(): Promise<void> {
+export async function flushActiveDocumentSessions(
+  reason: DocumentSessionDrainReason = "app-close",
+): Promise<void> {
   const sessions = [...registeredDocumentSessions.keys()];
   const results = await Promise.allSettled(
     sessions.map((session) => Promise.resolve().then(
-      () => session.flushCurrent("app-close"),
+      () => session.flushCurrent(reason),
     )),
   );
   const failures = results.flatMap((result) => (

@@ -5,6 +5,7 @@ import {
   DataWorkspace,
   type AiEditRequest,
   type DataNode,
+  type DataWorkspaceActivePathChangeContext,
   type Workspace,
 } from "@puppyone/shared-ui";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
@@ -58,7 +59,11 @@ export type DesktopDataWorkspaceSurfaceProps = {
     onNavigate: (view: DesktopView) => void;
     onOpenSettings: () => void;
   };
-  onActiveDataPathChange: (path: string | null, node?: DataNode | null) => void;
+  onActiveDataPathChange: (
+    path: string | null,
+    node?: DataNode | null,
+    context?: DataWorkspaceActivePathChangeContext,
+  ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onNodeActionMenu: (node: DataNode, anchorRect: DOMRect, selectedNodes?: readonly DataNode[]) => void;

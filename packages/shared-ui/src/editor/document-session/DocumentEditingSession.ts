@@ -11,6 +11,7 @@ import type { EditorSaveMode } from "../viewerTypes";
 import type {
   DocumentEditingSessionOptions,
   DocumentPersistedCommit,
+  DocumentSessionDrainReason,
   DocumentSessionError,
   DocumentSessionState,
   EditorDocumentSession,
@@ -29,16 +30,19 @@ type CommitWaiter = {
   reject: (error: unknown) => void;
 };
 
+type DrainReason = DocumentSessionDrainReason;
+
 const SAVED_STATUS_DURATION_MS = 1200;
 
 const REASON_PRIORITY: Record<DocumentPersistenceReason, number> = {
-  idle: 0,
-  "max-delay": 1,
+  edit: 0,
   manual: 2,
   "mode-switch": 3,
-  "document-switch": 4,
-  destroy: 5,
-  "app-close": 6,
+  "document-close": 4,
+  "document-switch": 5,
+  "workspace-switch": 6,
+  destroy: 7,
+  "app-close": 8,
 };
 
 /**
@@ -60,13 +64,14 @@ export class DocumentEditingSession implements EditorDocumentSession {
   private dirty = false;
   private state: DocumentSessionState;
   private readonly listeners = new Set<() => void>();
-  private idleTimer: ReturnType<typeof setTimeout> | null = null;
-  private maxDelayTimer: ReturnType<typeof setTimeout> | null = null;
+  private immediateCommitScheduled = false;
+  private immediateCommitGeneration = 0;
   private savedStatusTimer: ReturnType<typeof setTimeout> | null = null;
   private pending: CommitCandidate | null = null;
   private inFlight: CommitCandidate | null = null;
   private nextSequence = 0;
   private readonly waiters: CommitWaiter[] = [];
+  private readonly activeDrainReasons = new Map<DrainReason, number>();
   private disposed = false;
 
   constructor(options: DocumentEditingSessionOptions) {
@@ -100,7 +105,7 @@ export class DocumentEditingSession implements EditorDocumentSession {
 
     if (!revision.dirty) {
       if (!this.hasActiveCommit()) {
-        this.clearAutomaticTimers();
+        this.cancelImmediateCommit();
         this.dirty = false;
         this.persistedRevision = revision.revision;
         this.publish("clean", null);
@@ -117,7 +122,7 @@ export class DocumentEditingSession implements EditorDocumentSession {
 
     this.dirty = true;
     this.publish(this.inFlight ? "saving" : "dirty", null);
-    if (this.saveMode === "auto") this.scheduleAutomaticCommit();
+    if (this.saveMode === "auto") this.scheduleImmediateCommit();
   };
 
   requestSave = async (
@@ -130,36 +135,49 @@ export class DocumentEditingSession implements EditorDocumentSession {
 
   flushSnapshot = async (
     snapshot: EditorSourceSnapshot,
-    reason: Extract<DocumentPersistenceReason, "document-switch" | "destroy">,
+    reason: Extract<
+      DocumentPersistenceReason,
+      "document-close" | "document-switch" | "workspace-switch" | "destroy"
+    >,
   ): Promise<void> => {
     await this.enqueue(snapshot, reason);
   };
 
   flushCurrent = async (
-    reason: Extract<DocumentPersistenceReason, "app-close" | "destroy"> = "app-close",
+    reason: DrainReason = "app-close",
   ): Promise<void> => {
-    // A revision may arrive while the first close write is in flight. Keep
-    // snapshotting the attached source until the acknowledged revision is the
-    // newest one, rather than treating the first completed write as the drain.
-    while (true) {
-      const source = this.source;
-      if (source) {
-        await this.enqueue(source.readSnapshot(), reason);
-      } else if (this.pending) {
-        // A source can detach after submitting its final snapshot. Drain the
-        // exact candidate already owned by the session.
-        this.pending.reason = higherPriorityReason(this.pending.reason, reason);
-        await this.waitFor(this.pending.sequence);
-      } else if (this.inFlight) {
-        await this.waitFor(this.inFlight.sequence);
-      } else if (this.hasUnpersistedChanges()) {
-        throw new Error(
-          this.state.error?.detail
-          ?? `Unable to flush ${this.documentId}: its editor source is unavailable.`,
-        );
-      }
+    this.enterDrain(reason);
+    try {
+      // A revision may arrive while the first close write is in flight. Keep
+      // snapshotting the attached source until the acknowledged revision is
+      // the newest one, rather than treating the first completed write as the
+      // drain. Immediate edit commits inherit the strongest active drain
+      // reason so they cannot race around a close/navigation barrier.
+      while (true) {
+        const source = this.source;
+        if (source) {
+          await this.enqueue(source.readSnapshot(), this.strongestDrainReason() ?? reason);
+        } else if (this.pending) {
+          // A source can detach after submitting its final snapshot. Drain the
+          // exact candidate already owned by the session.
+          this.pending.reason = higherPriorityReason(
+            this.pending.reason,
+            this.strongestDrainReason() ?? reason,
+          );
+          await this.waitFor(this.pending.sequence);
+        } else if (this.inFlight) {
+          await this.waitFor(this.inFlight.sequence);
+        } else if (this.hasUnpersistedChanges()) {
+          throw new Error(
+            this.state.error?.detail
+            ?? `Unable to flush ${this.documentId}: its editor source is unavailable.`,
+          );
+        }
 
-      if (!this.hasUnpersistedChanges()) return;
+        if (!this.hasUnpersistedChanges()) return;
+      }
+    } finally {
+      this.leaveDrain(reason);
     }
   };
 
@@ -208,14 +226,14 @@ export class DocumentEditingSession implements EditorDocumentSession {
   setSaveMode(saveMode: EditorSaveMode): void {
     if (this.saveMode === saveMode) return;
     this.saveMode = saveMode;
-    if (saveMode === "auto" && this.dirty) this.scheduleAutomaticCommit();
-    if (saveMode === "manual") this.clearAutomaticTimers();
+    if (saveMode === "auto" && this.dirty) this.scheduleImmediateCommit();
+    if (saveMode === "manual") this.cancelImmediateCommit();
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.clearAutomaticTimers();
+    this.cancelImmediateCommit();
     this.clearSavedStatusTimer();
 
     const source = this.source;
@@ -226,30 +244,63 @@ export class DocumentEditingSession implements EditorDocumentSession {
     this.listeners.clear();
   }
 
-  private scheduleAutomaticCommit(): void {
-    if (this.disposed) return;
-    this.clearIdleTimer();
-    this.idleTimer = setTimeout(() => {
-      this.idleTimer = null;
-      void this.requestAutomaticSave("idle").catch(() => undefined);
-    }, normalizeDelay(this.persistence.policy.idleDelayMs));
-
-    if (this.maxDelayTimer === null) {
-      this.maxDelayTimer = setTimeout(() => {
-        this.maxDelayTimer = null;
-        void this.requestAutomaticSave("max-delay").catch(() => undefined);
-      }, normalizeDelay(this.persistence.policy.maxDelayMs));
-    }
+  /**
+   * Coalesce only transactions produced in the same JavaScript turn. This is
+   * deliberately a microtask rather than a timer: the first dirty revision is
+   * eligible for persistence immediately and never waits for typing to stop.
+   */
+  private scheduleImmediateCommit(): void {
+    if (this.disposed || this.immediateCommitScheduled) return;
+    this.immediateCommitScheduled = true;
+    const generation = ++this.immediateCommitGeneration;
+    queueMicrotask(() => {
+      if (
+        generation !== this.immediateCommitGeneration
+        || !this.immediateCommitScheduled
+      ) return;
+      this.immediateCommitScheduled = false;
+      if (this.disposed || this.saveMode !== "auto" || !this.dirty) return;
+      void this.requestImmediateSave().catch(() => {
+        // enqueue records the error in observable Session state. Consuming the
+        // scheduling Promise prevents an unhandled rejection; it does not hide
+        // the failure from the subscribed UI or later close drain.
+      });
+    });
   }
 
-  private async requestAutomaticSave(reason: Extract<DocumentPersistenceReason, "idle" | "max-delay">) {
+  private cancelImmediateCommit(): void {
+    this.immediateCommitScheduled = false;
+    this.immediateCommitGeneration += 1;
+  }
+
+  private async requestImmediateSave(): Promise<void> {
     const source = this.source;
     if (!source) return;
-    await this.enqueue(source.readSnapshot(), reason);
+    await this.enqueue(source.readSnapshot(), this.strongestDrainReason() ?? "edit");
+  }
+
+  private enterDrain(reason: DrainReason): void {
+    this.activeDrainReasons.set(reason, (this.activeDrainReasons.get(reason) ?? 0) + 1);
+  }
+
+  private leaveDrain(reason: DrainReason): void {
+    const count = this.activeDrainReasons.get(reason) ?? 0;
+    if (count <= 1) this.activeDrainReasons.delete(reason);
+    else this.activeDrainReasons.set(reason, count - 1);
+  }
+
+  private strongestDrainReason(): DrainReason | null {
+    let strongest: DrainReason | null = null;
+    for (const reason of this.activeDrainReasons.keys()) {
+      if (!strongest || REASON_PRIORITY[reason] > REASON_PRIORITY[strongest]) {
+        strongest = reason;
+      }
+    }
+    return strongest;
   }
 
   private enqueue(snapshot: EditorSourceSnapshot, reason: DocumentPersistenceReason): Promise<void> {
-    this.clearAutomaticTimers();
+    this.cancelImmediateCommit();
 
     if (snapshot.content === this.persistedContent && !this.hasActiveCommit()) {
       this.currentRevision = snapshot.revision;
@@ -307,7 +358,7 @@ export class DocumentEditingSession implements EditorDocumentSession {
       this.resolveWaitersThrough(candidate.sequence);
       this.publish(this.dirty ? "dirty" : "clean", null);
       if (this.dirty && this.saveMode === "auto" && !this.disposed) {
-        this.scheduleAutomaticCommit();
+        this.scheduleImmediateCommit();
       }
       return;
     }
@@ -351,7 +402,7 @@ export class DocumentEditingSession implements EditorDocumentSession {
     if (!failure && this.currentRevision !== this.persistedRevision) {
       this.dirty = true;
       this.publish("dirty", null);
-      if (this.saveMode === "auto" && !this.disposed) this.scheduleAutomaticCommit();
+      if (this.saveMode === "auto" && !this.disposed) this.scheduleImmediateCommit();
     }
   }
 
@@ -433,20 +484,6 @@ export class DocumentEditingSession implements EditorDocumentSession {
     return this.pending !== null || this.inFlight !== null;
   }
 
-  private clearAutomaticTimers(): void {
-    this.clearIdleTimer();
-    if (this.maxDelayTimer !== null) {
-      clearTimeout(this.maxDelayTimer);
-      this.maxDelayTimer = null;
-    }
-  }
-
-  private clearIdleTimer(): void {
-    if (this.idleTimer === null) return;
-    clearTimeout(this.idleTimer);
-    this.idleTimer = null;
-  }
-
   private clearSavedStatusTimer(): void {
     if (this.savedStatusTimer === null) return;
     clearTimeout(this.savedStatusTimer);
@@ -466,10 +503,6 @@ function higherPriorityReason(
   right: DocumentPersistenceReason,
 ): DocumentPersistenceReason {
   return REASON_PRIORITY[right] > REASON_PRIORITY[left] ? right : left;
-}
-
-function normalizeDelay(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 }
 
 function toErrorMessage(error: unknown): string {

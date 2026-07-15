@@ -90,9 +90,10 @@ export function TextEditorFrame({
     detachSourceRef.current = null;
     snapshotPortRef.current = null;
     if (previousSession && previousSnapshot) {
-      void previousSession
-        .flushSnapshot(previousSnapshot, "document-switch")
-        .catch(() => undefined);
+      observeSessionOperation(
+        previousSession.flushSnapshot(previousSnapshot, "document-switch"),
+        "emergency document-switch snapshot",
+      );
     }
 
     documentIdRef.current = documentId;
@@ -173,7 +174,10 @@ export function TextEditorFrame({
     detachSourceRef.current?.();
     detachSourceRef.current = null;
     if (session && snapshot) {
-      void session.flushSnapshot(snapshot, "destroy").catch(() => undefined);
+      observeSessionOperation(
+        session.flushSnapshot(snapshot, "destroy"),
+        "emergency editor cleanup snapshot",
+      );
     }
   }, [sourceSnapshotMode]);
 
@@ -211,7 +215,12 @@ export function TextEditorFrame({
     detachSourceRef.current?.();
     detachSourceRef.current = null;
     snapshotPortRef.current = null;
-    if (session) void session.flushSnapshot(snapshot, "destroy").catch(() => undefined);
+    if (session) {
+      observeSessionOperation(
+        session.flushSnapshot(snapshot, "destroy"),
+        "editor destruction snapshot",
+      );
+    }
   };
 
   const controls: TextEditorControls = {
@@ -229,16 +238,22 @@ export function TextEditorFrame({
       if (snapshot) setEditorValue(snapshot.content);
     }
     setMode(nextMode);
-    void documentSession?.requestSave("mode-switch").catch(() => undefined);
+    if (documentSession) {
+      observeSessionOperation(documentSession.requestSave("mode-switch"), "mode-switch save");
+    }
   };
 
   return (
     <section className="editor-host">
-      {saveMode === "manual" && documentSession && (
+      {documentSession && (
         <div className="editor-save-overlay">
           <EditorSaveButton
             status={sessionState.status}
-            onSave={() => void documentSession.requestSave("manual").catch(() => undefined)}
+            manual={saveMode === "manual"}
+            onSave={() => observeSessionOperation(
+              documentSession.requestSave("manual"),
+              "manual save",
+            )}
           />
         </div>
       )}
@@ -290,6 +305,15 @@ export function TextEditorFrame({
 
 function createDraftRevision(documentId: string, sequence: number): string {
   return `draft:${documentId}:${sequence}`;
+}
+
+function observeSessionOperation(operation: Promise<void>, label: string): void {
+  void operation.catch((error) => {
+    // The Session has already published this failure to subscribed UI and the
+    // active/retiring registry. Logging preserves diagnostics while consuming
+    // the Promise rejection at the event/effect boundary.
+    console.warn(`Document Session ${label} failed:`, error);
+  });
 }
 
 function readCurrentSnapshot(

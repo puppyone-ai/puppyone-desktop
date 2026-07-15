@@ -51,10 +51,8 @@
   align-items: center;
   align-self: stretch;
   width: auto;
-  
   max-width: none;
   min-width: 0;
-  -webkit-app-region: no-drag;
 }
 
 .desktop-titlebar-context {
@@ -107,6 +105,7 @@
   flex: 1 1 auto;
   min-width: 0;
   align-self: stretch;
+  -webkit-app-region: drag;
 }
 
 .desktop-titlebar-actions {
@@ -115,7 +114,6 @@
   align-items: center;
   gap: 3px;
   height: var(--desktop-titlebar-control-height);
-  -webkit-app-region: no-drag;
 }
 
 .desktop-titlebar-action-divider {

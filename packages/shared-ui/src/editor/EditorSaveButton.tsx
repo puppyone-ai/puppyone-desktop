@@ -7,10 +7,11 @@ export type SaveStatus = "clean" | "dirty" | "saving" | "saved" | "error";
 
 export type EditorSaveButtonProps = {
   status: SaveStatus;
+  manual: boolean;
   onSave: () => void;
 };
 
-export function EditorSaveButton({ status, onSave }: EditorSaveButtonProps) {
+export function EditorSaveButton({ status, manual, onSave }: EditorSaveButtonProps) {
   const { t } = useLocalization();
   const [shortcutHint, setShortcutHint] = useState("Ctrl+S");
 
@@ -19,7 +20,7 @@ export function EditorSaveButton({ status, onSave }: EditorSaveButtonProps) {
     setShortcutHint(/Mac/i.test(navigator.platform) ? "Cmd+S" : "Ctrl+S");
   }, []);
 
-  if (status === "clean") return null;
+  if (status === "clean" || (status === "dirty" && !manual)) return null;
 
   if (status === "saving") {
     return (

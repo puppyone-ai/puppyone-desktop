@@ -9,6 +9,7 @@ export { formatDocumentSessionError } from "./formatDocumentSessionError";
 export type { DocumentSessionBoundaryProps } from "./DocumentSessionBoundary";
 export type {
   DocumentEditingSessionOptions,
+  DocumentSessionDrainReason,
   DocumentSessionError,
   DocumentSessionErrorCode,
   DocumentPersistedCommit,

@@ -1,5 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type DataNode } from "@puppyone/shared-ui";
+import {
+  flushActiveDocumentSessions,
+  type DataNode,
+  type DataWorkspaceActivePathChangeContext,
+} from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import { DesktopCloudShell, type DesktopView } from "./components/DesktopCloudShell";
 import type { SettingsSection } from "./features/settings";
@@ -228,6 +232,19 @@ export function App() {
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
   const [activeDataPath, setActiveDataPath] = useState<string | null>(null);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
+  const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
+  const documentNavigationRequestRef = useRef(0);
+  const desktopViewNavigationRequestRef = useRef(0);
+  const drainWorkspaceNavigation = useCallback(async (): Promise<boolean> => {
+    try {
+      await flushActiveDocumentSessions("workspace-switch");
+      setDocumentNavigationError(null);
+      return true;
+    } catch (error) {
+      setDocumentNavigationError(error instanceof Error ? error.message : String(error));
+      return false;
+    }
+  }, []);
   const switcherRef = useRef<HTMLDivElement>(null);
   const terminalPanelRef = useRef<RightTerminalPanelHandle>(null);
   const cloudBrowserSignInInFlightRef = useRef(false);
@@ -496,37 +513,42 @@ export function App() {
       return;
     }
 
-    if (item.kind === "cloud") {
-      const projectId = getCloudProjectIdFromWorkspace(item.workspace);
-      if (!projectId) {
-        activateWorkspace(item.workspace);
+    void (async () => {
+      if (!await drainWorkspaceNavigation()) return;
+
+      if (item.kind === "cloud") {
+        const projectId = getCloudProjectIdFromWorkspace(item.workspace);
+        if (!projectId) {
+          activateWorkspace(item.workspace);
+          return;
+        }
+
+        await openWorkspaceTarget({
+          kind: "cloud-project",
+          projectId,
+          name: item.workspace.name,
+        }).then(handleWorkspaceOpenResult);
         return;
       }
 
-      void openWorkspaceTarget({
-        kind: "cloud-project",
-        projectId,
-        name: item.workspace.name,
-      })
-        .then(handleWorkspaceOpenResult)
-        .catch((error) => {
-          setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
-        });
-      return;
-    }
-
-    void openWorkspaceTarget({
-      kind: "local",
-      path: item.workspace.path,
-    })
-      .then(handleWorkspaceOpenResult)
-      .catch((error) => {
-        setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
-      });
-  }, [activateWorkspace, handleWorkspaceOpenResult, setRestoreWorkspaceError, workspace?.id]);
+      await openWorkspaceTarget({
+        kind: "local",
+        path: item.workspace.path,
+      }).then(handleWorkspaceOpenResult);
+    })().catch((error) => {
+      setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
+    });
+  }, [
+    activateWorkspace,
+    drainWorkspaceNavigation,
+    handleWorkspaceOpenResult,
+    setRestoreWorkspaceError,
+    workspace?.id,
+  ]);
 
   const openOrActivateCloudWorkspace = useCallback(async (project: DesktopCloudProject) => {
     if (workspace) {
+      if (!await drainWorkspaceNavigation()) return;
       const result = await openWorkspaceTarget({
         kind: "cloud-project",
         projectId: project.id,
@@ -537,7 +559,7 @@ export function App() {
     }
 
     activateWorkspace(createCloudWorkspace(project));
-  }, [activateWorkspace, handleWorkspaceOpenResult, workspace]);
+  }, [activateWorkspace, drainWorkspaceNavigation, handleWorkspaceOpenResult, workspace]);
 
   const autoRefreshProjectCatalog = shouldLoadCloudProjectCatalog({
     hasOpenWorkspace: Boolean(workspace),
@@ -616,6 +638,7 @@ export function App() {
 
   const goToHomepage = useCallback(async () => {
     try {
+      if (!await drainWorkspaceNavigation()) return;
       await showHomepage();
       clearWorkspace();
       setSwitcherOpen(false);
@@ -633,6 +656,7 @@ export function App() {
     }
   }, [
     clearWorkspace,
+    drainWorkspaceNavigation,
     refreshHomeCloudProjects,
     refreshRecentWorkspaceList,
     resetDataNodeActions,
@@ -642,63 +666,90 @@ export function App() {
   ]);
 
   const navigateDesktopView = useCallback((view: DesktopView) => {
-    if (view === "plugins" && (workspaceIsCloud || !experimentalSettings.enableViewerPlugins)) {
-      setActiveView("data");
-      setSidebarCollapsed(false);
-      setSwitcherOpen(false);
-      return;
-    }
+    const requestId = ++desktopViewNavigationRequestRef.current;
+    const routesToData = (
+      (view === "plugins" && (workspaceIsCloud || !experimentalSettings.enableViewerPlugins))
+      || (workspaceIsCloud && view === "cloud")
+      || (!workspaceIsCloud && (view === "access" || view === "automation"))
+      || (view === "cloud" && !cloudEnabled)
+      || ((view === "access" || view === "automation") && !cloudEnabled)
+    );
 
-    if (workspaceIsCloud && view === "cloud") {
-      setActiveView("data");
-      setSidebarCollapsed(false);
-      setSwitcherOpen(false);
-      return;
-    }
+    const commitNavigation = async () => {
+      if (activeView === "data" && view !== "data" && !routesToData) {
+        try {
+          await flushActiveDocumentSessions("document-close");
+        } catch (error) {
+          if (requestId === desktopViewNavigationRequestRef.current) {
+            setDocumentNavigationError(error instanceof Error ? error.message : String(error));
+          }
+          return;
+        }
+      }
+      if (requestId !== desktopViewNavigationRequestRef.current) return;
+      setDocumentNavigationError(null);
 
-    if (!workspaceIsCloud && (view === "access" || view === "automation")) {
-      setActiveView("data");
-      setSidebarCollapsed(false);
-      setSwitcherOpen(false);
-      return;
-    }
-
-    if (view === "cloud" && !cloudEnabled) {
-      setActiveView("data");
-      setSidebarCollapsed(false);
-      setSwitcherOpen(false);
-      return;
-    }
-
-    if ((view === "access" || view === "automation") && !cloudEnabled) {
-      setActiveView("data");
-      setSidebarCollapsed(false);
-      setSwitcherOpen(false);
-      return;
-    }
-
-    if (view === "cloud") {
-      if (cloudSessionRestoring && !cloudWorkspaceAvailable) {
-        setActiveView("cloud");
+      if (view === "plugins" && (workspaceIsCloud || !experimentalSettings.enableViewerPlugins)) {
+        setActiveView("data");
         setSidebarCollapsed(false);
         setSwitcherOpen(false);
         return;
       }
-      setActiveView("cloud");
-      setActiveCloudSection(
-        resolvedCloudProjectId
-          ? "contents"
-          : "overview",
-      );
+
+      if (workspaceIsCloud && view === "cloud") {
+        setActiveView("data");
+        setSidebarCollapsed(false);
+        setSwitcherOpen(false);
+        return;
+      }
+
+      if (!workspaceIsCloud && (view === "access" || view === "automation")) {
+        setActiveView("data");
+        setSidebarCollapsed(false);
+        setSwitcherOpen(false);
+        return;
+      }
+
+      if (view === "cloud" && !cloudEnabled) {
+        setActiveView("data");
+        setSidebarCollapsed(false);
+        setSwitcherOpen(false);
+        return;
+      }
+
+      if ((view === "access" || view === "automation") && !cloudEnabled) {
+        setActiveView("data");
+        setSidebarCollapsed(false);
+        setSwitcherOpen(false);
+        return;
+      }
+
+      if (view === "cloud") {
+        if (cloudSessionRestoring && !cloudWorkspaceAvailable) {
+          setActiveView("cloud");
+          setSidebarCollapsed(false);
+          setSwitcherOpen(false);
+          return;
+        }
+        setActiveView("cloud");
+        setActiveCloudSection(
+          resolvedCloudProjectId
+            ? "contents"
+            : "overview",
+        );
+        setSidebarCollapsed(false);
+        setSwitcherOpen(false);
+        return;
+      }
+
+      setActiveView(view);
       setSidebarCollapsed(false);
       setSwitcherOpen(false);
-      return;
-    }
+    };
 
-    setActiveView(view);
-    setSidebarCollapsed(false);
-    setSwitcherOpen(false);
+    void commitNavigation();
   }, [
+    activeView,
     cloudEnabled,
     cloudSessionRestoring,
     cloudWorkspaceAvailable,
@@ -708,10 +759,27 @@ export function App() {
     workspaceIsCloud,
   ]);
 
-  const handleActiveDataPathChange = useCallback((path: string | null, node: DataNode | null = null) => {
+  const handleActiveDataPathChange = useCallback(async (
+    path: string | null,
+    node: DataNode | null = null,
+    context?: DataWorkspaceActivePathChangeContext,
+  ) => {
+    const requestId = ++documentNavigationRequestRef.current;
+    if (path !== activeDataPath && !context?.documentSessionsDrained) {
+      try {
+        await flushActiveDocumentSessions("document-switch");
+      } catch (error) {
+        if (requestId === documentNavigationRequestRef.current) {
+          setDocumentNavigationError(error instanceof Error ? error.message : String(error));
+        }
+        throw error;
+      }
+    }
+    if (requestId !== documentNavigationRequestRef.current) return;
+    setDocumentNavigationError(null);
     setActiveDataPath(path);
     setActiveDataNode(node);
-  }, []);
+  }, [activeDataPath]);
   const handleActiveDataNodeChange = useCallback((node: DataNode | null) => {
     setActiveDataNode((current) => (
       hasSameActiveDataNodeIdentity(current, node) ? current : node
@@ -1049,6 +1117,7 @@ export function App() {
     : null;
 
   const unlinkCurrentWorkspace = useCallback(async () => {
+    if (!await drainWorkspaceNavigation()) return;
     await forgetActiveWorkspace({ workspaceIsCloud });
     setSwitcherOpen(false);
     setBranchSwitcherOpen(false);
@@ -1056,6 +1125,7 @@ export function App() {
     resetDataNodeActions();
     setHomeOperationStatus(null);
   }, [
+    drainWorkspaceNavigation,
     forgetActiveWorkspace,
     resetDataNodeActions,
     setBranchSwitcherOpen,
@@ -1377,7 +1447,8 @@ export function App() {
           puppyoneConfigSaving={puppyoneConfigSaving}
           settingsSection={activeSettingsSection}
           workspace={workspace}
-          workspaceSurfaceError={workspaceSurfaceDialogOpen ? null : workspaceSurfaceError}
+          workspaceSurfaceError={documentNavigationError
+            ?? (workspaceSurfaceDialogOpen ? null : workspaceSurfaceError)}
           workspaceSurfaceAction={workspaceSurfaceAction}
           workspaceKind={workspaceIsCloud ? "cloud" : "local"}
           workspaceKey={workspaceKey}

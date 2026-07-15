@@ -47,6 +47,11 @@ export type DocumentEditingSessionOptions = {
 
 export type ExternalBaselineResult = "acknowledged" | "applied" | "conflict";
 
+export type DocumentSessionDrainReason = Extract<
+  DocumentPersistenceReason,
+  "document-close" | "document-switch" | "workspace-switch" | "app-close" | "destroy"
+>;
+
 /** Trusted host contract consumed by editable built-in contributions. */
 export type EditorDocumentSession = {
   readonly documentId: string;
@@ -55,12 +60,13 @@ export type EditorDocumentSession = {
   requestSave: (reason?: Extract<DocumentPersistenceReason, "manual" | "mode-switch">) => Promise<void>;
   flushSnapshot: (
     snapshot: EditorSourceSnapshot,
-    reason: Extract<DocumentPersistenceReason, "document-switch" | "destroy">,
+    reason: Extract<
+      DocumentPersistenceReason,
+      "document-close" | "document-switch" | "workspace-switch" | "destroy"
+    >,
   ) => Promise<void>;
-  /** Read and durably drain the current source before the host closes. */
-  flushCurrent: (
-    reason?: Extract<DocumentPersistenceReason, "app-close" | "destroy">,
-  ) => Promise<void>;
+  /** Read and durably drain the current source before navigation or host close. */
+  flushCurrent: (reason?: DocumentSessionDrainReason) => Promise<void>;
   reconcileExternalBaseline: (content: string, version?: string | null) => ExternalBaselineResult;
   getPersistedContent: () => string;
   hasUnpersistedChanges: () => boolean;

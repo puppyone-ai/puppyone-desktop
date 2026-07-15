@@ -46,11 +46,6 @@ type CloudNodeType = "json" | "markdown" | "file";
 
 const CLOUD_WORKSPACE_ID_PREFIX = "cloud:";
 const CLOUD_WORKSPACE_PATH_PREFIX = "cloud://";
-const CLOUD_DOCUMENT_PERSISTENCE_POLICY = Object.freeze({
-  idleDelayMs: 1000,
-  maxDelayMs: 5000,
-});
-
 export function isCloudWorkspace(workspace: Workspace | null | undefined): boolean {
   return Boolean(
     workspace &&
@@ -119,7 +114,6 @@ export function createCloudDataPort({
     }),
     documentPersistence: {
       kind: "cloud",
-      policy: CLOUD_DOCUMENT_PERSISTENCE_POLICY,
       persist: async ({ path, content, baseVersion }) => {
         const response = await writeCloudFile({
           projectId,

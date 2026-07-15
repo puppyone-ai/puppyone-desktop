@@ -45,7 +45,6 @@ describe("Cloud document persistence adapter", () => {
     expect(opened?.version).toBe("head-1");
     expect(port.documentPersistence).toMatchObject({
       kind: "cloud",
-      policy: { idleDelayMs: 1000, maxDelayMs: 5000 },
     });
 
     const result = await port.documentPersistence?.persist({
@@ -53,7 +52,7 @@ describe("Cloud document persistence adapter", () => {
       content: "two",
       revision: "editor-r2",
       baseVersion: opened?.version,
-      reason: "idle",
+      reason: "edit",
     });
 
     expect(result).toEqual({ version: "head-2" });

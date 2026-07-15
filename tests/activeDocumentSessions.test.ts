@@ -16,8 +16,8 @@ describe("active Document Session registry", () => {
     await Promise.resolve();
 
     try {
-      await flushActiveDocumentSessions();
-      expect(first.flushCurrent).toHaveBeenCalledWith("app-close");
+      await flushActiveDocumentSessions("document-switch");
+      expect(first.flushCurrent).toHaveBeenCalledWith("document-switch");
       expect(unmounted.flushCurrent).not.toHaveBeenCalled();
     } finally {
       unregisterFirst();
@@ -73,7 +73,6 @@ describe("active Document Session registry", () => {
       saveMode: "auto",
       persistence: {
         kind: "local-fs",
-        policy: { idleDelayMs: 400, maxDelayMs: 2_000 },
         persist,
       },
     });

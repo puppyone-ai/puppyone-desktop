@@ -50,6 +50,131 @@ describe("Markdown source snapshot boundary", () => {
     expect(toStringSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("starts frontend Markdown persistence immediately after an edit transaction", async () => {
+    const persist = vi.fn(async () => ({ version: "v2" }));
+    const documentSession = new DocumentEditingSession({
+      documentId: "instant.md",
+      initialContent: "alpha",
+      initialVersion: "v1",
+      saveMode: "auto",
+      persistence: {
+        kind: "local-fs",
+        persist,
+      },
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(withTestLocalization(
+        <TextEditorFrame
+          documentId="instant.md"
+          content="alpha"
+          nodeName="instant.md"
+          defaultMode="live"
+          canEdit
+          documentSession={documentSession}
+          hideSourceView
+          saveMode="auto"
+          sourceSnapshotMode
+          renderLive={(value, controls) => (
+            <MarkdownCodeMirrorEditor
+              value={value}
+              readOnly={false}
+              livePreview={false}
+              documentPath="instant.md"
+              onSourceRevisionChange={controls.onSourceRevisionChange}
+              onSnapshotPortChange={controls.onSnapshotPortChange}
+              onBeforeDestroy={controls.onBeforeDestroy}
+            />
+          )}
+        />,
+      ));
+    });
+    const view = getEditorView(container);
+
+    act(() => view.dispatch({
+      changes: { from: 5, insert: " beta" },
+      userEvent: "input.type",
+    }));
+    expect(persist).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledWith(expect.objectContaining({
+      path: "instant.md",
+      content: "alpha beta",
+      reason: "edit",
+    }));
+    expect(documentSession.getState()).toMatchObject({
+      persistedRevision: documentSession.getState().currentRevision,
+      storageVersion: "v2",
+    });
+  });
+
+  it("keeps an immediate-save failure visible and retryable in auto mode", async () => {
+    const persist = vi.fn(async () => {
+      throw new Error("disk unavailable");
+    });
+    const documentSession = new DocumentEditingSession({
+      documentId: "failure.md",
+      initialContent: "alpha",
+      initialVersion: "v1",
+      saveMode: "auto",
+      persistence: { kind: "local-fs", persist },
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(withTestLocalization(
+        <TextEditorFrame
+          documentId="failure.md"
+          content="alpha"
+          nodeName="failure.md"
+          defaultMode="live"
+          canEdit
+          documentSession={documentSession}
+          hideSourceView
+          saveMode="auto"
+          sourceSnapshotMode
+          renderLive={(value, controls) => (
+            <MarkdownCodeMirrorEditor
+              value={value}
+              readOnly={false}
+              livePreview={false}
+              documentPath="failure.md"
+              onSourceRevisionChange={controls.onSourceRevisionChange}
+              onSnapshotPortChange={controls.onSnapshotPortChange}
+              onBeforeDestroy={controls.onBeforeDestroy}
+            />
+          )}
+        />,
+      ));
+    });
+
+    act(() => getEditorView(container).dispatch({
+      changes: { from: 5, insert: " beta" },
+      userEvent: "input.type",
+    }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(documentSession.getState()).toMatchObject({
+      status: "error",
+      error: { code: "persistence-failed", detail: "disk unavailable" },
+    });
+    expect(container.querySelector(".editor-inline-error")).not.toBeNull();
+    expect(container.querySelector(".editor-save-chip.error")).not.toBeNull();
+  });
+
   it("flushes the canonical EditorView snapshot before destruction", async () => {
     const persist = vi.fn(async () => ({ version: "v2" }));
     const documentSession = new DocumentEditingSession({
@@ -59,7 +184,6 @@ describe("Markdown source snapshot boundary", () => {
       saveMode: "manual",
       persistence: {
         kind: "local-fs",
-        policy: { idleDelayMs: 400, maxDelayMs: 2000 },
         persist,
       },
     });

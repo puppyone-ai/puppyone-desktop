@@ -94,8 +94,9 @@ the document content and editor instance are ready.
   - resets by `documentId` without forcing a React remount
 
 - `packages/shared-ui/src/editor/document-session/DocumentEditingSession.ts`
-  - owns dirty/save status, scheduling, version state, and serialized writes
-  - flushes the exact rendered document on switch/destroy through one queue
+  - owns the thin dirty/save lifecycle, version state, and serialized writes
+  - flushes the exact rendered document before destructive navigation; destroy
+    cleanup is emergency-only
 
 - `packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor.tsx`
   - owns the CodeMirror `EditorView`

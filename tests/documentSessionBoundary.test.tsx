@@ -27,7 +27,6 @@ describe("DocumentSessionBoundary", () => {
     const write = deferred<{ version: string }>();
     const persistence = {
       kind: "local-fs" as const,
-      policy: { idleDelayMs: 100, maxDelayMs: 500 },
       persist: vi.fn(() => write.promise),
     };
     const onPersistedA = vi.fn<(commit: DocumentPersistedCommit) => void>();

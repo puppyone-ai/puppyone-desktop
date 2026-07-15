@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   DocumentPersistencePort,
   DocumentPersistenceRequest,
@@ -6,17 +6,12 @@ import type {
 import { DocumentEditingSession } from "../packages/shared-ui/src/editor/document-session/DocumentEditingSession";
 import type { EditorSourceSnapshot } from "../packages/shared-ui/src/editor/sourceSnapshot";
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
 describe("DocumentEditingSession", () => {
-  it("keeps the editor hot path revision-only and snapshots at the adapter policy boundary", async () => {
-    vi.useFakeTimers();
+  it("starts persistence in the next microtask without waiting for a timer or typing pause", async () => {
     let snapshotReads = 0;
     let snapshot: EditorSourceSnapshot = { revision: "r1", content: "one" };
     const persist = vi.fn(async () => ({ version: "v2" }));
-    const session = createSession(persist, { idleDelayMs: 40, maxDelayMs: 200 });
+    const session = createSession(persist);
     session.attachSource({
       readRevision: () => snapshot.revision,
       readSnapshot: () => {
@@ -31,9 +26,7 @@ describe("DocumentEditingSession", () => {
 
     expect(snapshotReads).toBe(0);
     expect(persist).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(39);
-    expect(snapshotReads).toBe(0);
-    await vi.advanceTimersByTimeAsync(1);
+    await nextMicrotask();
 
     expect(snapshotReads).toBe(1);
     expect(persist).toHaveBeenCalledWith(expect.objectContaining({
@@ -41,9 +34,77 @@ describe("DocumentEditingSession", () => {
       content: "two",
       revision: "r2",
       baseVersion: "v1",
-      reason: "idle",
+      reason: "edit",
     }));
     expect(session.getState().storageVersion).toBe("v2");
+  });
+
+  it("coalesces synchronous edit transactions to the newest immediate snapshot", async () => {
+    let snapshot: EditorSourceSnapshot = { revision: "r1", content: "one" };
+    const persist = vi.fn(async () => ({ version: "v2" }));
+    const session = createSession(persist);
+    session.attachSource({
+      readRevision: () => snapshot.revision,
+      readSnapshot: () => snapshot,
+    });
+    session.reportRevision({ revision: "r1", dirty: false });
+
+    snapshot = { revision: "r2", content: "two" };
+    session.reportRevision({ revision: "r2", dirty: true });
+    snapshot = { revision: "r3", content: "three" };
+    session.reportRevision({ revision: "r3", dirty: true });
+
+    await nextMicrotask();
+
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledWith(expect.objectContaining({
+      revision: "r3",
+      content: "three",
+      reason: "edit",
+    }));
+  });
+
+  it("keeps one automatic write in flight and follows it with only the newest edit", async () => {
+    const first = deferred<{ version: string }>();
+    const second = deferred<{ version: string }>();
+    const requests: DocumentPersistenceRequest[] = [];
+    const persist = vi.fn((request: DocumentPersistenceRequest) => {
+      requests.push(request);
+      return requests.length === 1 ? first.promise : second.promise;
+    });
+    let snapshot: EditorSourceSnapshot = { revision: "r1", content: "one" };
+    const session = createSession(persist);
+    session.attachSource({
+      readRevision: () => snapshot.revision,
+      readSnapshot: () => snapshot,
+    });
+    session.reportRevision({ revision: "r1", dirty: false });
+
+    snapshot = { revision: "r2", content: "two" };
+    session.reportRevision({ revision: "r2", dirty: true });
+    await nextMicrotask();
+    expect(requests.map(({ revision }) => revision)).toEqual(["r2"]);
+
+    snapshot = { revision: "r3", content: "three" };
+    session.reportRevision({ revision: "r3", dirty: true });
+    snapshot = { revision: "r4", content: "four" };
+    session.reportRevision({ revision: "r4", dirty: true });
+    await nextMicrotask();
+    expect(requests.map(({ revision }) => revision)).toEqual(["r2"]);
+
+    first.resolve({ version: "v2" });
+    await nextMicrotask();
+    expect(requests.map(({ revision }) => revision)).toEqual(["r2", "r4"]);
+    expect(requests[1]).toMatchObject({
+      content: "four",
+      baseVersion: "v2",
+      reason: "edit",
+    });
+
+    second.resolve({ version: "v3" });
+    await session.flushCurrent("document-close");
+    expect(session.getPersistedContent()).toBe("four");
+    expect(session.hasUnpersistedChanges()).toBe(false);
   });
 
   it("serializes writes and coalesces an in-flight edit to the newest revision", async () => {
@@ -291,7 +352,6 @@ describe("DocumentEditingSession", () => {
 
 function createSession(
   persist: DocumentPersistencePort["persist"],
-  policy = { idleDelayMs: 400, maxDelayMs: 2000 },
 ) {
   return new DocumentEditingSession({
     documentId: "notes.md",
@@ -300,7 +360,6 @@ function createSession(
     saveMode: "auto",
     persistence: {
       kind: "local-fs",
-      policy,
       persist,
     },
   });

@@ -46,6 +46,15 @@ const sessionSource = readFileSync(sessionKernel, "utf8");
 if (/from\s+["'][^"']*(?:electron|localFiles|cloudDataPort|node:fs)[^"']*["']/.test(sessionSource)) {
   errors.push(`${relative(sessionKernel)} imports a storage implementation`);
 }
+if (!/queueMicrotask\s*\(/.test(sessionSource)) {
+  errors.push(`${relative(sessionKernel)} does not schedule immediate edit persistence in a microtask`);
+}
+if (/\b(?:idleDelayMs|maxDelayMs|scheduleAutomaticCommit)\b/.test(sessionSource)) {
+  errors.push(`${relative(sessionKernel)} still owns a delayed/idle autosave policy`);
+}
+if (!/readSnapshot\(\),\s*this\.strongestDrainReason\(\)\s*\?\?\s*["']edit["']/.test(sessionSource)) {
+  errors.push(`${relative(sessionKernel)} does not enqueue the latest editor snapshot with the edit reason`);
+}
 
 const externalAdapterPath = path.join(sharedEditorRoot, "viewerHostAdapters.ts");
 const externalAdapterSource = readFileSync(externalAdapterPath, "utf8");
@@ -71,6 +80,48 @@ const coreTypesPath = path.join(repoRoot, "packages/shared-ui/src/core/types.ts"
 const coreTypesSource = readFileSync(coreTypesPath, "utf8");
 if (/\bwriteFile\??\s*:/.test(coreTypesSource)) {
   errors.push(`${relative(coreTypesPath)} exposes the legacy direct writeFile port`);
+}
+if (/\b(?:idleDelayMs|maxDelayMs)\b/.test(coreTypesSource)) {
+  errors.push(`${relative(coreTypesPath)} exposes delayed autosave policy to persistence adapters`);
+}
+
+const markdownSnapshotTestPath = path.join(repoRoot, "tests/markdownSourceSnapshot.test.tsx");
+const markdownSnapshotTestSource = readFileSync(markdownSnapshotTestPath, "utf8");
+if (!/starts frontend Markdown persistence immediately after an edit transaction/.test(markdownSnapshotTestSource)) {
+  errors.push(`${relative(markdownSnapshotTestPath)} does not cover immediate frontend Markdown persistence`);
+}
+if (!/keeps an immediate-save failure visible and retryable in auto mode/.test(markdownSnapshotTestSource)) {
+  errors.push(`${relative(markdownSnapshotTestPath)} does not cover visible immediate-save failure state`);
+}
+
+const dataWorkspacePath = path.join(repoRoot, "packages/shared-ui/src/data/DataWorkspace.tsx");
+const dataWorkspaceSource = readFileSync(dataWorkspacePath, "utf8");
+if (!/await flushActiveDocumentSessions\("document-switch"\)[\s\S]*await onActivePathChange/.test(dataWorkspaceSource)) {
+  errors.push(`${relative(dataWorkspacePath)} does not await the Document Session drain before changing files`);
+}
+if (/flushSnapshot\([^;]+\)\.catch\(\(\)\s*=>\s*undefined\)/.test(textFrameSource)) {
+  errors.push(`${relative(textFramePath)} silently consumes an emergency snapshot failure`);
+}
+
+const desktopAppPath = path.join(repoRoot, "src/App.tsx");
+const desktopAppSource = readFileSync(desktopAppPath, "utf8");
+if (!/flushActiveDocumentSessions\("document-close"\)/.test(desktopAppSource)) {
+  errors.push(`${relative(desktopAppPath)} does not await sessions before leaving the editor surface`);
+}
+if (!/flushActiveDocumentSessions\("workspace-switch"\)/.test(desktopAppSource)) {
+  errors.push(`${relative(desktopAppPath)} does not await sessions before workspace navigation`);
+}
+
+const localMarkdownPersistenceTestPath = path.join(
+  repoRoot,
+  "tests/localMarkdownEditorPersistence.test.tsx",
+);
+const localMarkdownPersistenceTestSource = readFileSync(localMarkdownPersistenceTestPath, "utf8");
+if (!/persists a real CodeMirror edit through DataWorkspace and the local desktop bridge/.test(localMarkdownPersistenceTestSource)) {
+  errors.push(`${relative(localMarkdownPersistenceTestPath)} does not cover the complete local Markdown write path`);
+}
+if (!/keeps the local editor mounted when its pre-navigation save fails/.test(localMarkdownPersistenceTestSource)) {
+  errors.push(`${relative(localMarkdownPersistenceTestPath)} does not cover failed local navigation drain`);
 }
 
 const closeDrainSources = [

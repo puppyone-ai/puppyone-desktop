@@ -16,27 +16,28 @@ Format registry
         v
 Preset Viewer Registry
         |
-        +........ dormant external adapter (default off)
-        |
+        | format + capability + source requirement
         v
 Content / resource acquisition
         |
         v
 Committed preview document
         |
-        +----> Document Session Boundary ----> Local FS / Cloud adapter
-        |                |
-        |                +----> Markdown editor
+        v
+EditorHost + PresetViewerRenderer
         |
-        |                +----> Text / code editor
+        +----> read-only Viewer Contribution
+        |        HTML / Office / image / PDF / media
         |
-        |                +----> CSV table editor
-        |
-        +----> HTML viewer
-        |
-        +----> Office preview
-        |
-        +----> Image / PDF / audio / video viewer
+        `----> editable Editor Contribution
+                 Markdown / text / code / CSV / PuppyFlow
+                          |
+                          | revision change + readSnapshot()
+                          v
+                 DocumentEditingSession
+                          |
+                          v
+                 Local FS / Cloud persistence port
 ```
 
 The Explorer owns selection, not rendering. The format and viewer registries
@@ -52,6 +53,8 @@ This subsystem owns:
 - loading, error, unsupported, and committed-preview states;
 - editable versus read-only capability decisions;
 - the versioned, immutable preset Viewer Contribution contract and registry;
+- the small editable-contribution revision/snapshot boundary;
+- the shared save lifecycle and navigation/close flush contract;
 - format-specific preview and editing architecture;
 - the dormant, capability-gated external Viewer Pack adapter boundary.
 
@@ -72,8 +75,9 @@ architecture documents one level above this directory.
      capability, its security boundary, and the reserved future distribution
      adapter. It is not a marketplace commitment.
 4. [Document Editing and Persistence](document-editing-persistence.md)
-   - The host-owned Document Session, Local/Cloud persistence adapters,
-     revision ordering, flush behavior, and the exact plugin boundary.
+   - The intentionally thin `DocumentEditingSession`, the editor-side
+     revision/snapshot adapter, Local/Cloud persistence ports, navigation/close
+     flush behavior, and the conservative external-change policy.
 5. [Markdown Editor](markdown/README.md)
    - The format-specific source-first architecture and Live Preview UX contract
      for Markdown files.
@@ -84,9 +88,27 @@ architecture documents one level above this directory.
 
 ## Adding a format-specific editor
 
-A format-specific editor belongs under this directory when it has durable
-architecture beyond the shared viewer pipeline. Use a focused subdirectory,
-for example:
+A new editor must fit the shared boundary, not copy the shared save stack:
+
+```text
+format-specific model and UI
+          |
+          +----> reportRevision({ revision, dirty })
+          `----> readSnapshot() -> canonical file content
+                              |
+                              v
+                   DocumentEditingSession
+```
+
+For a normal text-backed or structured single-file editor, adding the
+contribution must not require changes to `DataWorkspace`, `EditorHost`,
+`DocumentEditingSession`, persistence ports, Electron IPC, or window-close
+coordination. The new format supplies its component, contribution registration,
+source adapter, serializer when needed, and focused tests.
+
+A format-specific architecture package belongs under this directory only when
+the format has durable architecture beyond that shared contract. Use a focused
+subdirectory, for example:
 
 ```text
 editor/
@@ -99,6 +121,10 @@ Do not create a folder merely because a viewer component exists. The shared
 pipeline document remains the source of truth until a format has enough unique
 editing, rendering, security, or round-trip rules to justify its own
 architecture package.
+
+Binary editing and one operation spanning multiple files are separate
+capabilities. Do not enlarge the common text-snapshot contract until a real
+editor requires one of them.
 
 ## Reading order
 
@@ -124,3 +150,10 @@ model.
    package capability metadata. Catalog, publisher, marketplace, and concrete
    third-party Pack delivery remain uncommitted work and require a separate
    issue.
+4. Built-in editable contributions share the host-owned
+   `DocumentEditingSession` and Local/Cloud persistence ports. Markdown and
+   text use the revision/snapshot attachment path. Remaining conformance work
+   is to remove format components that call save methods directly and to finish
+   the watcher-driven clean-reload versus dirty-conflict UX. Multi-agent merge,
+   CRDT, binary editing, and multi-file transactions are not part of the
+   current Editor contract.

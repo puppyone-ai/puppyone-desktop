@@ -153,12 +153,17 @@ matching projection paints.
 
 Ordinary CodeMirror input reports only `{revision, dirty}`. It does not call
 `doc.toString()` or propagate a full source string through React. An
-`EditorSourceSnapshotPort` reads the canonical source at explicit save,
-debounced autosave, mode switch, file switch, and destroy boundaries. External
-source updates carry an annotation so they cannot form a writeback loop.
+`EditorSourceSnapshotPort` reads the canonical source when the Document Session
+starts an immediate write and at explicit mode, document-navigation, workspace,
+and application-close flush boundaries. An optional microtask may combine
+multiple synchronous transactions from one input event, but no idle debounce
+or stop-typing delay is permitted. External source updates carry an annotation
+so they cannot form a writeback loop.
 
-Destroy is a mandatory flush boundary. The snapshot is taken before
-`EditorView.destroy()`, and persistence receives the exact revision snapshot.
+User-visible close/navigation is an awaited application-shell transaction.
+Destroy still captures an exact emergency snapshot before
+`EditorView.destroy()`, but cleanup is not the primary persistence mechanism
+and must not silently consume a failure.
 
 ## File and index cancellation
 

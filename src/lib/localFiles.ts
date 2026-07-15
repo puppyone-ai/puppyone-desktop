@@ -25,11 +25,6 @@ export type FileNode = DataNode;
 
 let gitStatusRequestSequence = 0;
 
-const LOCAL_DOCUMENT_PERSISTENCE_POLICY = Object.freeze({
-  idleDelayMs: 350,
-  maxDelayMs: 2000,
-});
-
 export function createLocalDataPort(rootPath: string): DataPort {
   return {
     listChildren: (folderPath) => loadFolderChildren(rootPath, folderPath),
@@ -86,7 +81,6 @@ export function createLocalDataPort(rootPath: string): DataPort {
     },
     documentPersistence: {
       kind: "local-fs",
-      policy: LOCAL_DOCUMENT_PERSISTENCE_POLICY,
       persist: ({ path, content, baseVersion }) => getDesktopBridge().writeFile({
         rootPath,
         path,

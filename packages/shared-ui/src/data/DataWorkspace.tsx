@@ -1,4 +1,5 @@
 import { Link2, MoreVertical, Plus } from "lucide-react";
+import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import {
   useCallback,
@@ -41,6 +42,7 @@ import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
 import { getAiEditFileForPath } from "../editor/ai-edits/diff";
 import type { AiEditRequest } from "../editor/ai-edits/types";
 import type { DocumentPersistedCommit } from "../editor/document-session/types";
+import { flushActiveDocumentSessions } from "../editor/document-session/activeDocumentSessions";
 import type { FileIconThemeId } from "../file/fileIcons";
 import { usePaneResizeDrag } from "../primitives/usePaneResizeDrag";
 import { getRendererPerformanceTracker } from "../performance/rendererPerformance";
@@ -88,6 +90,13 @@ export type DataWorkspaceSlot = ReactNode | ((state: DataWorkspaceState) => Reac
 export type DataWorkspaceFolderSlot = ReactNode | ((state: DataWorkspaceState, folder: DataNode) => ReactNode);
 export type DataWorkspaceNodeSlot = ReactNode | ((state: DataWorkspaceState, node: DataNode) => ReactNode);
 export type DataWorkspaceFolderExpansionStrategy = "load-before-expand" | "optimistic";
+export type DataWorkspaceActivePathChangeContext = Readonly<{
+  documentSessionsDrained: true;
+}>;
+
+const DRAINED_ACTIVE_PATH_CHANGE: DataWorkspaceActivePathChangeContext = Object.freeze({
+  documentSessionsDrained: true,
+});
 
 export type DataWorkspaceProps = {
   workspace: Workspace;
@@ -136,7 +145,11 @@ export type DataWorkspaceProps = {
   refreshKey?: unknown;
   onExplorerWidthChange?: (width: number) => void;
   onExplorerCollapsedChange?: (collapsed: boolean) => void;
-  onActivePathChange?: (path: string | null, node: DataNode | null) => void;
+  onActivePathChange?: (
+    path: string | null,
+    node: DataNode | null,
+    context?: DataWorkspaceActivePathChangeContext,
+  ) => void | Promise<void>;
   onActiveNodeChange?: (node: DataNode | null) => void;
   onExplorerRootClick?: (state: DataWorkspaceState, event: ReactMouseEvent<HTMLElement>) => void;
   onExplorerRootContextMenu?: (state: DataWorkspaceState, event: ReactMouseEvent<HTMLDivElement>) => void;
@@ -254,6 +267,7 @@ export function DataWorkspace({
   const [fileUrlPath, setFileUrlPath] = useState<string | null>(null);
   const [fileUrlLoading, setFileUrlLoading] = useState(false);
   const [fileUrlError, setFileUrlError] = useState<string | null>(null);
+  const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
   const [markdownLinkIndexing, setMarkdownLinkIndexing] = useState(false);
   const [markdownLinkIndexBuilding, setMarkdownLinkIndexBuilding] = useState(false);
   const [markdownLinkIndex, setMarkdownLinkIndex] = useState<MarkdownLinkGraphIndexSnapshot>(
@@ -270,6 +284,7 @@ export function DataWorkspace({
   const markdownLinkIndexCoordinatorRef = useRef<MarkdownLinkIndexCoordinator | null>(null);
   markdownLinkIndexCoordinatorRef.current ??= new MarkdownLinkIndexCoordinator();
   const suppressSelectionSyncRef = useRef(false);
+  const documentNavigationRequestRef = useRef(0);
   const activePathHydrationAttemptRef = useRef<{ path: string; refreshKey: unknown } | null>(null);
   const [internalExplorerWidth, setInternalExplorerWidth] = useState(() => (
     clampNumber(defaultExplorerWidth, minExplorerWidth, maxExplorerWidth)
@@ -364,6 +379,8 @@ export function DataWorkspace({
     setFileUrlPath(null);
     setFileUrlError(null);
     setFileUrlLoading(false);
+    setDocumentNavigationError(null);
+    documentNavigationRequestRef.current += 1;
     setMarkdownLinkIndexing(false);
     setMarkdownLinkIndexBuilding(false);
     setMarkdownLinkIndex(EMPTY_MARKDOWN_LINK_GRAPH_INDEX);
@@ -563,47 +580,74 @@ export function DataWorkspace({
     setSelectionAnchorPath(resolvedActivePath);
   }, [resolvedActivePath]);
 
+  const requestActiveNodeChange = useCallback(async (
+    node: DataNode | null,
+    nextPath: string | null = node?.path ?? null,
+  ): Promise<boolean> => {
+    const requestId = ++documentNavigationRequestRef.current;
+
+    try {
+      if (nextPath !== resolvedActivePath) {
+        // Navigation is a persistence transaction. Keep the current editor
+        // mounted until every active or retiring session has durably drained.
+        await flushActiveDocumentSessions("document-switch");
+      }
+      if (requestId !== documentNavigationRequestRef.current) return false;
+
+      await onActivePathChange?.(nextPath, node, DRAINED_ACTIVE_PATH_CHANGE);
+      if (requestId !== documentNavigationRequestRef.current) return false;
+
+      if (activePath === undefined) setInternalActivePath(nextPath);
+      setDocumentNavigationError(null);
+      return true;
+    } catch (error) {
+      if (requestId === documentNavigationRequestRef.current) {
+        setDocumentNavigationError(error instanceof Error ? error.message : String(error));
+      }
+      return false;
+    }
+  }, [activePath, onActivePathChange, resolvedActivePath]);
+
   const activateNode = useCallback(
     (node: DataNode | null, intent: { additive?: boolean; range?: boolean } = {}) => {
       const nextPath = node?.path ?? null;
-      if (node && node.type !== "folder" && fileOpenTraceRef.current?.documentId !== node.path) {
-        const id = rendererPerformance.beginFileSelection(node.path);
-        fileOpenTraceRef.current = { id, documentId: node.path };
-      } else if (!node || node.type === "folder") {
-        if (fileOpenTraceRef.current) rendererPerformance.cancel(fileOpenTraceRef.current.id);
-        fileOpenTraceRef.current = null;
-      }
-      setSelectedNodePaths((current) => {
-        if (!nextPath) return current.size === 0 ? current : new Set();
-        if (intent.range) {
-          const visiblePaths = visibleDataNodes.map((item) => item.path);
-          const anchorPath = selectionAnchorPath && visiblePaths.includes(selectionAnchorPath)
-            ? selectionAnchorPath
-            : resolvedActivePath && visiblePaths.includes(resolvedActivePath)
-              ? resolvedActivePath
-              : nextPath;
-          const rangePaths = getPathRange(visiblePaths, anchorPath, nextPath);
-          if (intent.additive) return addSetValues(current, rangePaths);
-          return new Set(rangePaths);
+      void requestActiveNodeChange(node).then((navigationAccepted) => {
+        if (!navigationAccepted) return;
+        if (node && node.type !== "folder" && fileOpenTraceRef.current?.documentId !== node.path) {
+          const id = rendererPerformance.beginFileSelection(node.path);
+          fileOpenTraceRef.current = { id, documentId: node.path };
+        } else if (!node || node.type === "folder") {
+          if (fileOpenTraceRef.current) rendererPerformance.cancel(fileOpenTraceRef.current.id);
+          fileOpenTraceRef.current = null;
         }
-        if (intent.additive) {
-          const next = new Set(current);
-          if (next.has(nextPath)) next.delete(nextPath);
-          else next.add(nextPath);
-          return next;
-        }
-        return new Set([nextPath]);
+        setSelectedNodePaths((current) => {
+          if (!nextPath) return current.size === 0 ? current : new Set();
+          if (intent.range) {
+            const visiblePaths = visibleDataNodes.map((item) => item.path);
+            const anchorPath = selectionAnchorPath && visiblePaths.includes(selectionAnchorPath)
+              ? selectionAnchorPath
+              : resolvedActivePath && visiblePaths.includes(resolvedActivePath)
+                ? resolvedActivePath
+                : nextPath;
+            const rangePaths = getPathRange(visiblePaths, anchorPath, nextPath);
+            if (intent.additive) return addSetValues(current, rangePaths);
+            return new Set(rangePaths);
+          }
+          if (intent.additive) {
+            const next = new Set(current);
+            if (next.has(nextPath)) next.delete(nextPath);
+            else next.add(nextPath);
+            return next;
+          }
+          return new Set([nextPath]);
+        });
+        if (nextPath && !intent.range) setSelectionAnchorPath(nextPath);
+        if (nextPath && intent.range && !selectionAnchorPath) setSelectionAnchorPath(nextPath);
+        if (nextPath !== resolvedActivePath) suppressSelectionSyncRef.current = true;
+        if (!node) void loadFolder(null);
       });
-      if (nextPath && !intent.range) setSelectionAnchorPath(nextPath);
-      if (nextPath && intent.range && !selectionAnchorPath) setSelectionAnchorPath(nextPath);
-      if (nextPath !== resolvedActivePath) suppressSelectionSyncRef.current = true;
-      if (activePath === undefined) setInternalActivePath(nextPath);
-      onActivePathChange?.(nextPath, node);
-      if (!node) {
-        void loadFolder(null);
-      }
     },
-    [activePath, loadFolder, onActivePathChange, resolvedActivePath, selectionAnchorPath, visibleDataNodes],
+    [loadFolder, requestActiveNodeChange, resolvedActivePath, selectionAnchorPath, visibleDataNodes],
   );
   const loadLinkedPathNode = useCallback(
     async (path: string): Promise<DataNode | null> => {
@@ -696,15 +740,15 @@ export function DataWorkspace({
         const node = findDataNode(tree, path) ?? await loadLinkedPathNode(path);
         if (!node) continue;
 
-        if (activePath === undefined) setInternalActivePath(node.path);
-        onActivePathChange?.(node.path, node);
+        const navigationAccepted = await requestActiveNodeChange(node);
+        if (!navigationAccepted) return;
         if (node.type === "folder") {
           void loadFolder(node.path);
         }
         return;
       }
     },
-    [activePath, loadFolder, loadLinkedPathNode, onActivePathChange, tree],
+    [loadFolder, loadLinkedPathNode, requestActiveNodeChange, tree],
   );
   const markdownLinkWorkspaceIndex = useStableMarkdownLinkWorkspaceIndex(tree);
   const markdownLinkMetadataDocuments = markdownLinkWorkspaceIndex.metadataDocuments;
@@ -1056,8 +1100,8 @@ export function DataWorkspace({
           .find((node): node is DataNode => node !== null) ?? null;
         if (!importedNode) return;
 
-        if (activePath === undefined) setInternalActivePath(importedNode.path);
-        onActivePathChange?.(importedNode.path, importedNode);
+        const navigationAccepted = await requestActiveNodeChange(importedNode);
+        if (!navigationAccepted) return;
         if (importedNode.type === "folder") {
           void loadFolder(importedNode.path);
         }
@@ -1071,7 +1115,7 @@ export function DataWorkspace({
         }
       }
     },
-    [activePath, dataPort, loadFolder, onActivePathChange, setFolderLoading],
+    [dataPort, loadFolder, requestActiveNodeChange, setFolderLoading],
   );
 
   const moveNodes = useCallback(
@@ -1098,6 +1142,17 @@ export function DataWorkspace({
       if (operations.length === 0) return;
 
       setLoadError(null);
+
+      const nextActivePath = rebasePathByMoveOperations(resolvedActivePath, operations);
+      if (nextActivePath !== resolvedActivePath) {
+        try {
+          await flushActiveDocumentSessions("document-switch");
+          setDocumentNavigationError(null);
+        } catch (error) {
+          setDocumentNavigationError(error instanceof Error ? error.message : String(error));
+          return;
+        }
+      }
 
       try {
         for (const operation of operations) {
@@ -1129,7 +1184,6 @@ export function DataWorkspace({
       setSelectedNodePaths((current) => rebasePathSetByMoveOperations(current, operations));
       setSelectionAnchorPath((current) => rebasePathByMoveOperations(current, operations));
 
-      const nextActivePath = rebasePathByMoveOperations(resolvedActivePath, operations);
       if (nextActivePath !== resolvedActivePath) {
         const nextActiveNode = activeNode
           ? operations.reduce(
@@ -1137,8 +1191,7 @@ export function DataWorkspace({
             activeNode,
           )
           : null;
-        if (activePath === undefined) setInternalActivePath(nextActivePath);
-        onActivePathChange?.(nextActivePath, nextActiveNode);
+        await requestActiveNodeChange(nextActiveNode, nextActivePath);
       }
 
       const foldersToRefresh = new Set<string | null>(operations.map((operation) => operation.previousParentPath));
@@ -1149,10 +1202,9 @@ export function DataWorkspace({
     },
     [
       activeNode,
-      activePath,
       dataPort,
       loadFolder,
-      onActivePathChange,
+      requestActiveNodeChange,
       resolvedActivePath,
       resolvedCapabilities.move,
     ],
@@ -1342,6 +1394,13 @@ export function DataWorkspace({
         )}
 
         <main className="browser-column desktop-editor-panel">
+          {documentNavigationError && (
+            <div className="editor-inline-error" role="alert" dir="auto">
+              {t("editor.session.saveFailedDetail", {
+                detail: bidiIsolate(documentNavigationError),
+              })}
+            </div>
+          )}
           <div className="data-main-view-frame" data-view-mode={mainSlot ? "custom" : "files"}>
             {mainSlot ? (
               renderWorkspaceSlot(mainSlot, workspaceState)

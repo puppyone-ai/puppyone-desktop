@@ -10,11 +10,12 @@ with a single `createPrincipalFromView` helper, `DocumentTrustContext` +
 `AuthorizationGrant` gating of local active HTML, revision-bound
 `ExecutionSession`s, recoverable code/Mermaid/table drafts, revision-scoped
 Electron WebEmbed sessions, typed feature registries, and atomic table
-interaction/focus coordination are landed on the migration branch. The remaining
-acceptance gaps are full document-plan convergence for the isolated table-cell
-preview, a broader visual regression suite, and browser-backed (real renderer)
-lifecycle/IME/sandbox coverage beyond the shipped oversized-table production
-smoke —
+interaction/focus coordination are landed on the migration branch. Markdown
+also uses the shared editable-contribution revision/snapshot boundary and the
+host-owned save lifecycle. The remaining acceptance gaps are full document-plan
+convergence for the isolated table-cell preview, a broader visual regression
+suite, and browser-backed (real renderer) lifecycle/IME/sandbox coverage beyond
+the shipped oversized-table production smoke —
 not product polish. These are enumerated honestly in §12 and Phase 4–6 below.
 
 This document defines the durable technical architecture for PuppyOne's
@@ -27,6 +28,9 @@ Markdown editor. It complements, but does not replace, the product behavior in
   and commit work, and how the caret and selection behave.
 - The file-format pipeline owns routing a `.md` file into the Markdown viewer;
   see [File Format and Viewer Pipeline](../file-format-viewer-pipeline.md).
+- [Document Editing and Persistence](../document-editing-persistence.md) owns
+  the thin save lifecycle, storage acknowledgement, navigation/close flush,
+  and external-change conflict behavior.
 
 ---
 
@@ -51,6 +55,9 @@ PuppyOne uses a **Markdown-source-first, semantic-model-driven live preview**.
    default. Safe presentation does not require document trust; trust gates
    active execution and broader resource capabilities, not whether a harmless
    `<span style="color: ...">` can render.
+8. A committed source transaction reports a new revision and remains available
+   through the exact source snapshot port. The shared
+   `DocumentEditingSession`, not Markdown, owns save scheduling and storage.
 
 The end-to-end Markdown data flow is:
 
@@ -138,6 +145,15 @@ Consequences:
 - Typing, paste, toolbar commands, task toggles, table edits, and AI edits all
   dispatch source transactions.
 - Widgets do not maintain an authoritative copy of their content.
+- Ordinary input reports revision state without copying the complete source
+  through React. The host reads the exact source from a synchronous snapshot
+  port at a save boundary.
+- Persistence acknowledgement, not request dispatch, determines whether the
+  current revision is saved.
+- Document close and navigation await the shared save session before unmounting;
+  destroy cleanup is an emergency snapshot path, not the primary save path.
+- A failed write remains observable and retryable. It cannot be swallowed by a
+  component cleanup or converted into an apparently successful close.
 - Saving does not serialize the rendered DOM.
 - Opening and saving a document without an explicit edit does not normalize or
   rewrite its Markdown.
@@ -1735,6 +1751,10 @@ The 2026-07-10 migration now enforces these shipped invariants:
    reversible relocation effect. The editor owns one measured overlay rather
    than one handle per block, and the host can remove the complete interaction
    compartment through its Experimental feature gate.
+10. Markdown reports committed source revisions and exposes the exact
+    CodeMirror source through the shared snapshot adapter. The host-owned
+    `DocumentEditingSession` handles saving and keeps failures visible and
+    retryable; Markdown contains no filesystem or Cloud write path.
 
 The remaining acceptance gaps are explicit rather than hidden behind passing
 unit tests:
@@ -1756,6 +1776,11 @@ unit tests:
 - Happy-DOM and main-process fixtures cover policy, conflicts, remount drafts,
   async cancellation, ownership and sandbox request rules. Real Chromium
   visual regression, viewport reuse, IME and sandbox tests are still required.
+- The shared save session and explicit pre-unmount
+  file/editor-surface/workspace coordination are shipped. Failed drains retain
+  the current editor and expose the save error. Crash recovery and automatic
+  external-change merging are separate future capabilities, not Markdown
+  architecture requirements.
   Mermaid remains protected by conservative source/item ceilings and stale
   result suppression in the renderer; raising those ceilings requires moving
   non-cooperatively interruptible rendering to an isolated execution surface.
@@ -1901,6 +1926,15 @@ The migration is complete when:
 
 - Markdown source remains the only canonical, committed, and persisted document
   model; mutable embedded drafts remain ephemeral editor interaction state.
+- A committed Markdown transaction reports a new revision and the snapshot
+  adapter returns the exact source represented by that revision.
+- Markdown uses the shared `DocumentEditingSession`; it does not implement its
+  own persistence queue, filesystem transport, or Cloud transport.
+- `Saved` is shown only when the current revision is durably acknowledged and
+  no pending/in-flight revision remains.
+- Document close, file switch, workspace switch, and application close await
+  the latest revision or retain the editor with a visible error. React cleanup
+  never silently consumes the error.
 - Parser context, not line-start heuristics, owns block/inline classification.
 - Every supported construct has one normalized semantic representation.
 - Every semantic element compiles to one typed render plan or an explicit

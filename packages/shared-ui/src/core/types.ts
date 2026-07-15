@@ -138,18 +138,14 @@ export type DataReadOptions = {
 export type DocumentPersistenceKind = "local-fs" | "cloud";
 
 export type DocumentPersistenceReason =
-  | "idle"
-  | "max-delay"
+  | "edit"
   | "manual"
   | "mode-switch"
+  | "document-close"
   | "document-switch"
+  | "workspace-switch"
   | "app-close"
   | "destroy";
-
-export type DocumentPersistencePolicy = {
-  idleDelayMs: number;
-  maxDelayMs: number;
-};
 
 export type DocumentPersistenceRequest = {
   path: string;
@@ -169,7 +165,6 @@ export type DocumentPersistenceResult = {
  */
 export type DocumentPersistencePort = {
   kind: DocumentPersistenceKind;
-  policy: DocumentPersistencePolicy;
   persist: (request: DocumentPersistenceRequest) => Promise<DocumentPersistenceResult | void>;
 };
 

@@ -159,7 +159,6 @@ describe("preset viewer host composition", () => {
       },
       documentPersistence: {
         kind: "local-fs",
-        policy: { idleDelayMs: 1, maxDelayMs: 2 },
         persist,
       },
       viewerExtensionAdapter: { snapshot, renderSurface },
