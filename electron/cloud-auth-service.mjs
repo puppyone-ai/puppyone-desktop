@@ -247,6 +247,7 @@ export function createCloudAuthService({
     if (!session || !isFreshSession(session, now())) {
       session = await refreshSessionSingleflight(normalizedApiBase);
     }
+    const requestActorId = session.user_id;
 
     await initializeCurrentSessionBestEffort(normalizedApiBase, session);
 
@@ -263,7 +264,12 @@ export function createCloudAuthService({
       return result;
     } catch (error) {
       if (error?.code === "SESSION_CHANGED" && isSafeSessionRetry(apiPath, init)) {
-        return retrySessionApiWithCurrentGeneration(normalizedApiBase, apiPath, init);
+        return retrySessionApiWithCurrentGeneration(
+          normalizedApiBase,
+          apiPath,
+          init,
+          requestActorId,
+        );
       }
       if (!isAccessTokenFailure(error)) {
         if (isNetworkFailure(error)) setAuthStatus("offline-authenticated");
@@ -288,14 +294,19 @@ export function createCloudAuthService({
         );
       } catch (retryError) {
         if (retryError?.code === "SESSION_CHANGED" && isSafeSessionRetry(apiPath, init)) {
-          return retrySessionApiWithCurrentGeneration(normalizedApiBase, apiPath, init);
+          return retrySessionApiWithCurrentGeneration(
+            normalizedApiBase,
+            apiPath,
+            init,
+            requestActorId,
+          );
         }
         throw retryError;
       }
     }
   }
 
-  async function retrySessionApiWithCurrentGeneration(apiBase, apiPath, init) {
+  async function retrySessionApiWithCurrentGeneration(apiBase, apiPath, init, expectedUserId) {
     if (authStatus === "signing-out") throw createSessionChangedError();
     await ensureCredentialLoaded();
     if (!credential || !isSessionForApiBase(credential, apiBase)) {
@@ -304,6 +315,9 @@ export function createCloudAuthService({
     const session = runtimeSession && isFreshSession(runtimeSession, now())
       ? runtimeSession
       : await refreshSessionSingleflight(apiBase);
+    if (session.user_id !== expectedUserId || credential.user_id !== expectedUserId) {
+      throw createSessionChangedError();
+    }
     const retryGeneration = sessionGeneration;
     await initializeCurrentSessionBestEffort(apiBase, session);
     return performAuthenticatedRequest(apiBase, apiPath, init, session, retryGeneration);
@@ -701,8 +715,24 @@ function isSafeSessionRetry(apiPath, init) {
   if (["GET", "HEAD", "OPTIONS"].includes(method)) return true;
   // Repository-context POST is a read-only ProjectGrant lookup. Replaying it
   // cannot create, rotate, or revoke Cloud state.
-  return method === "POST"
-    && /^\/projects\/[^/]+\/repository-context$/.test(apiPath);
+  if (method === "POST" && /^\/projects\/[^/]+\/repository-context$/.test(apiPath)) return true;
+
+  // These main-owned mutations use a canonical UUIDv4 idempotency key and an
+  // immutable request body persisted before the first attempt. They are safe
+  // to replay once when a newer authenticated session generation wins.
+  const idempotencyKey = Object.entries(normalizeRequestHeaders(init?.headers))
+    .find(([key]) => key.toLowerCase() === "idempotency-key")?.[1]
+    ?.trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey ?? "")) {
+    return false;
+  }
+  if (method === "POST") {
+    return apiPath === "/projects/"
+      || /^\/projects\/[^/]+\/git-credentials$/.test(apiPath)
+      || /^\/projects\/[^/]+\/initialization\/abandon$/.test(apiPath);
+  }
+  return method === "DELETE"
+    && /^\/projects\/[^/]+\/git-credentials\/[^/]+$/.test(apiPath);
 }
 
 function createSignedOutError(apiBase) {

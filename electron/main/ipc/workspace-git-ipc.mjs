@@ -3,7 +3,6 @@ import {
   checkoutWorkspaceGitBranch,
   commitAndCheckoutWorkspaceGitBranch,
   commitWorkspaceGit,
-  configureWorkspaceCloudRemote,
   createWorkspaceGitBranch,
   discardAllWorkspaceGitChanges,
   discardWorkspaceGitPaths,
@@ -34,12 +33,17 @@ import {
   worktreeLockKey,
 } from "../git-operation-coordinator.mjs";
 import { createGitDiffResourceBroker } from "../git-diff-resource-broker.mjs";
+import { createCloudGitOperationLease } from "../cloud-git-operation-lease.mjs";
+import { createCloudPublishGitCredentialManager } from "../cloud-publish-git-credentials.mjs";
+import { inspectCloudRemote } from "../cloud-publish-git.mjs";
 
 export function registerWorkspaceGitIpcHandlers({
   ipcMain,
   BrowserWindow,
   dialog,
   authorizeWorkspaceRoot,
+  cloudGitCredentialManager = createCloudPublishGitCredentialManager(),
+  cloudGitOperationLease = createCloudGitOperationLease(),
   gitOperationCoordinator = createGitOperationCoordinator(),
   gitDiffResourceBroker = createGitDiffResourceBroker(),
   t = defaultTranslate,
@@ -171,29 +175,24 @@ export function registerWorkspaceGitIpcHandlers({
     initializeWorkspaceGitRepository(rootPath)
   )));
 
-  ipcMain.handle("workspace:git-configure-cloud-remote", withAuthorizedRepositoryMutation((rootPath, request) => {
-    const remoteUrl = request?.remoteUrl;
+  ipcMain.handle("workspace:git-remove-remote", withAuthorizedRepositoryMutation(async (rootPath, request) => {
     const remoteName = request?.remoteName ?? "puppyone";
-    const credential = request?.credential ?? null;
-    const username = request?.username ?? "x-puppyone-token";
-    if (typeof remoteUrl !== "string" || remoteUrl.trim().length === 0) {
-      throw new Error("Cloud remote URL is required.");
+    if (remoteName !== "puppyone") return removeWorkspaceGitRemote(rootPath, remoteName);
+    const lease = await cloudGitOperationLease.acquire(rootPath);
+    try {
+      const remote = await inspectCloudRemote(rootPath);
+      if (remote.kind === "exact") {
+        await cloudGitCredentialManager.detachManaged(rootPath, remote.url);
+      } else if (remote.kind === "conflict") {
+        throw new Error(
+          "The PuppyOne Git remote is ambiguous. Repair its fetch/push URLs before detaching it.",
+        );
+      }
+      return await removeWorkspaceGitRemote(rootPath, remoteName);
+    } finally {
+      await lease.release();
     }
-    if (credential !== null && (typeof credential !== "string" || credential.trim().length === 0)) {
-      throw new Error("Cloud Git credential is invalid.");
-    }
-    return configureWorkspaceCloudRemote(
-      rootPath,
-      remoteUrl,
-      remoteName,
-      credential,
-      username,
-    );
   }));
-
-  ipcMain.handle("workspace:git-remove-remote", withAuthorizedRepositoryMutation((rootPath, request) => (
-    removeWorkspaceGitRemote(rootPath, request?.remoteName ?? "puppyone")
-  )));
 
   ipcMain.handle("workspace:puppyone-config-read", withAuthorizedRoot((rootPath) => (
     readPuppyoneWorkspaceConfig(rootPath)

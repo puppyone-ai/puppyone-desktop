@@ -8,6 +8,5 @@ export type { CloudWorkspaceContextState } from "./cloudWorkspaceContextTypes";
 export { useCloudWorkspaceContext } from "./useCloudWorkspaceContext";
 export {
   cloudOriginFromApiBase,
-  issueWorkspaceGitRemote,
   sameCloudOrigin,
 } from "./workspaceGitRemote";

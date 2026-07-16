@@ -1,10 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import type { DesktopCloudProject, DesktopCloudSession } from "../src/lib/cloudApi";
 import {
   assertCloudRemoteNameAvailable,
   assertExpectedGitRepositoryState,
-  issueWorkspaceGitRemote,
 } from "../src/features/cloud/workspace/workspaceGitRemote";
 import {
   describePuppyoneRemoteCandidates,
@@ -13,31 +11,6 @@ import {
   resolvePuppyoneRemotes,
 } from "../src/features/source-control/remotes";
 import { shouldLoadCloudProjectCatalog } from "../src/features/cloud/workspace/cloudProjectResolution";
-
-const getCloudProject = vi.fn();
-const issueCloudGitCredential = vi.fn();
-
-vi.mock("../src/lib/cloudApi", async () => {
-  const actual = await vi.importActual<typeof import("../src/lib/cloudApi")>("../src/lib/cloudApi");
-  return {
-    ...actual,
-    getCloudProject: (...args: unknown[]) => getCloudProject(...args),
-    issueCloudGitCredential: (...args: unknown[]) => issueCloudGitCredential(...args),
-  };
-});
-
-const session = {
-  user_id: "user-1",
-  user_email: "dev@example.com",
-  api_base_url: "https://cloud.example/api/v1",
-  session_generation: "generation-1",
-} as DesktopCloudSession;
-
-const project: DesktopCloudProject = {
-  id: "project-1",
-  name: "Notes",
-  capabilities: ["content.write"],
-};
 
 describe("Project catalog policy", () => {
   it("never scans the Organization catalog from an open Local workspace", () => {
@@ -56,159 +29,6 @@ describe("Project catalog policy", () => {
     expect(shouldLoadCloudProjectCatalog({ hasOpenWorkspace: false, workspaceIsCloud: false })).toBe(true);
     expect(shouldLoadCloudProjectCatalog({ hasOpenWorkspace: true, workspaceIsCloud: false })).toBe(false);
     expect(shouldLoadCloudProjectCatalog({ hasOpenWorkspace: true, workspaceIsCloud: true })).toBe(true);
-  });
-});
-
-describe("user-owned Git credentials", () => {
-  beforeEach(() => {
-    getCloudProject.mockReset();
-    issueCloudGitCredential.mockReset();
-  });
-
-  it("issues a credential for the exact Project-root target without local identity", async () => {
-    issueCloudGitCredential.mockResolvedValue({
-      id: "credential-1",
-      credential: "git_secret",
-      remote: {
-        url: "https://cloud.example/git/project-1.git",
-        username: "x-puppyone-token",
-        target: { kind: "project_root", project_id: "project-1" },
-      },
-    });
-
-    const result = await issueWorkspaceGitRemote({
-      session,
-      apiBaseUrl: session.api_base_url,
-      project,
-      projectId: project.id,
-      onSessionChange: vi.fn(),
-    });
-
-    expect(issueCloudGitCredential).toHaveBeenCalledWith(
-      session,
-      "project-1",
-      {
-        target: { kind: "project_root", project_id: "project-1" },
-        mode: "rw",
-      },
-      expect.any(Function),
-      session.api_base_url,
-    );
-    expect(result.remoteUrl).toBe("https://cloud.example/git/project-1.git");
-    expect(result.credentialId).toBe("credential-1");
-    expect(result.credential).toBe("git_secret");
-    expect(JSON.stringify(issueCloudGitCredential.mock.calls[0])).not.toMatch(/workspace|device|checkout|path/i);
-  });
-
-  it("uses read-only mode without content.write and rejects a target from another Project", async () => {
-    await expect(issueWorkspaceGitRemote({
-      session,
-      apiBaseUrl: session.api_base_url,
-      project: { ...project, capabilities: ["content.read"] },
-      projectId: project.id,
-      target: { kind: "scope", project_id: "other-project", scope_id: "scope-docs" },
-      onSessionChange: vi.fn(),
-    })).rejects.toThrow("does not belong to the selected Cloud Project");
-    expect(issueCloudGitCredential).not.toHaveBeenCalled();
-
-    issueCloudGitCredential.mockResolvedValue({
-      id: "credential-2",
-      credential: "read_secret",
-      remote: {
-        url: "https://cloud.example/git/project-1/scopes/scope-docs.git",
-        username: "x-puppyone-token",
-        target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
-      },
-    });
-    await issueWorkspaceGitRemote({
-      session,
-      apiBaseUrl: session.api_base_url,
-      project: { ...project, capabilities: ["content.read"] },
-      projectId: project.id,
-      target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
-      onSessionChange: vi.fn(),
-    });
-    expect(issueCloudGitCredential.mock.calls[0][2]).toEqual({
-      target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
-      mode: "r",
-    });
-  });
-
-  it("rejects a credential response for another host or repository target", async () => {
-    issueCloudGitCredential.mockResolvedValue({
-      id: "credential-3",
-      credential: "git_secret",
-      remote: {
-        url: "https://wrong.example/git/project-1.git",
-        username: "x-puppyone-token",
-        target: { kind: "project_root", project_id: "project-1" },
-      },
-    });
-    await expect(issueWorkspaceGitRemote({
-      session,
-      apiBaseUrl: session.api_base_url,
-      project,
-      projectId: project.id,
-      onSessionChange: vi.fn(),
-    })).rejects.toThrow("invalid Git credential response");
-  });
-
-  it("fails a write-required issue before credential mutation when Project write access is absent", async () => {
-    await expect(issueWorkspaceGitRemote({
-      session,
-      apiBaseUrl: session.api_base_url,
-      project: { ...project, capabilities: ["content.read"] },
-      projectId: project.id,
-      requireWrite: true,
-      onSessionChange: vi.fn(),
-    })).rejects.toThrow("Write access to the Cloud Project is required");
-
-    expect(issueCloudGitCredential).not.toHaveBeenCalled();
-  });
-
-  it("requires the service to return an rw credential for a write-required issue", async () => {
-    issueCloudGitCredential.mockResolvedValue({
-      id: "credential-read-only",
-      credential: "read_secret",
-      mode: "r",
-      remote: {
-        url: "https://cloud.example/git/project-1.git",
-        username: "x-puppyone-token",
-        target: { kind: "project_root", project_id: "project-1" },
-      },
-    });
-
-    await expect(issueWorkspaceGitRemote({
-      session,
-      apiBaseUrl: session.api_base_url,
-      project,
-      projectId: project.id,
-      requireWrite: true,
-      onSessionChange: vi.fn(),
-    })).rejects.toThrow("invalid Git credential response");
-    expect(issueCloudGitCredential.mock.calls[0][2]).toMatchObject({ mode: "rw" });
-  });
-
-  it("accepts an rw credential for a write-required issue", async () => {
-    issueCloudGitCredential.mockResolvedValue({
-      id: "credential-write",
-      credential: "write_secret",
-      mode: "rw",
-      remote: {
-        url: "https://cloud.example/git/project-1.git",
-        username: "x-puppyone-token",
-        target: { kind: "project_root", project_id: "project-1" },
-      },
-    });
-
-    await expect(issueWorkspaceGitRemote({
-      session,
-      apiBaseUrl: session.api_base_url,
-      project,
-      projectId: project.id,
-      requireWrite: true,
-      onSessionChange: vi.fn(),
-    })).resolves.toMatchObject({ credentialId: "credential-write" });
   });
 });
 
@@ -372,30 +192,21 @@ describe("repository-context architecture", () => {
     expect(resolverSource).toContain("getCloudRepositoryContext");
     expect(resolverSource).not.toContain("remote_url");
     expect(combined).not.toMatch(/WorkspaceBinding|workspaceBinding|workspace_binding|cloudBinding|bindingId/);
-    expect(appSource).toContain("issueWorkspaceGitRemote");
+    expect(appSource).toContain("connectWorkspaceCloudProject");
+    expect(appSource).not.toMatch(/issueWorkspaceGitRemote|issueCloudGitCredential|configureGitCloudRemote/);
     expect(appSource).not.toMatch(/revokeCloudWorkspace|workspaceInstanceId/);
   });
 
-  it("keeps Initialize remote configuration transactional and separate from workspace preferences", () => {
+  it("routes canonical remote mutation through the typed main-owned coordinator", () => {
     const appSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
     const collisionPreflight = appSource.indexOf("assertCloudRemoteNameAvailable(freshStatus)");
     const firstGitStateGuard = appSource.indexOf("configuredStatus = await readAndValidateFreshStatus()");
-    const credentialIssue = appSource.indexOf("issued = await issueWorkspaceGitRemote");
-    const secondGitStateGuard = appSource.indexOf(
-      "configuredStatus = await readAndValidateFreshStatus()",
-      firstGitStateGuard + 1,
-    );
-    const workspacePreferenceMutation = appSource.indexOf("if (options.persistWorkspacePreferences !== false)");
-    const remoteMutation = appSource.indexOf("configuredStatus = await configureWorkspaceCloudRemote");
+    const remoteMutation = appSource.indexOf("const connected = await connectWorkspaceCloudProject");
 
     expect(collisionPreflight).toBeGreaterThan(-1);
-    expect(collisionPreflight).toBeLessThan(credentialIssue);
-    expect(firstGitStateGuard).toBeLessThan(credentialIssue);
-    expect(credentialIssue).toBeLessThan(secondGitStateGuard);
-    expect(secondGitStateGuard).toBeLessThan(workspacePreferenceMutation);
-    expect(credentialIssue).toBeLessThan(remoteMutation);
-    expect(appSource).toContain("if (options.persistWorkspacePreferences !== false)");
-    expect(appSource).toContain("requireWrite: options.requireWrite");
+    expect(collisionPreflight).toBeLessThan(remoteMutation);
+    expect(firstGitStateGuard).toBeLessThan(remoteMutation);
+    expect(appSource).not.toMatch(/credential\s*[:=]|configureWorkspaceCloudRemote/);
     expect(appSource).toContain("headCommitId: options.expectedHeadCommitId");
     expect(appSource).toContain("branch: options.expectedBranch");
     expect(appSource).toContain("if (!options.deferStatusPublication)");

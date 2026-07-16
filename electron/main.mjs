@@ -56,6 +56,9 @@ import { createGitMetadataWatchService } from "./main/git-metadata-watch-service
 import { createGitOperationCoordinator } from "./main/git-operation-coordinator.mjs";
 import { createCloudPublishCoordinator } from "./main/cloud-publish-coordinator.mjs";
 import { createCloudPublishSecretVault } from "./main/cloud-publish-secret-vault.mjs";
+import { createCloudGitConnectCoordinator } from "./main/cloud-git-connect-coordinator.mjs";
+import { createCloudGitOperationLease } from "./main/cloud-git-operation-lease.mjs";
+import { createCloudPublishGitCredentialManager } from "./main/cloud-publish-git-credentials.mjs";
 import {
   getViewerPackPrivilegedSchemes,
   loadViewerPackRuntime,
@@ -187,9 +190,20 @@ const cloudPublishSecretVault = createCloudPublishSecretVault({
   baseDirectory: path.join(app.getPath("userData"), "cloud-publish-secrets-v1"),
   secureStorage: safeStorage,
 });
+const cloudGitOperationLease = createCloudGitOperationLease();
+const cloudGitCredentialManager = createCloudPublishGitCredentialManager();
 const cloudPublishCoordinator = createCloudPublishCoordinator({
   cloudAuthService,
+  gitCredentialManager: cloudGitCredentialManager,
   gitOperationCoordinator,
+  operationLease: cloudGitOperationLease,
+  secretVault: cloudPublishSecretVault,
+});
+const cloudGitConnectCoordinator = createCloudGitConnectCoordinator({
+  cloudAuthService,
+  gitCredentialManager: cloudGitCredentialManager,
+  gitOperationCoordinator,
+  operationLease: cloudGitOperationLease,
   secretVault: cloudPublishSecretVault,
 });
 
@@ -571,6 +585,7 @@ function registerIpcHandlers() {
   registerCloudPublishIpcHandlers({
     ipcMain: trustedIpcMain,
     authorizeWorkspaceRoot,
+    cloudGitConnectCoordinator,
     cloudPublishCoordinator,
   });
   registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell, setDockIcon });
@@ -618,6 +633,8 @@ function registerIpcHandlers() {
     BrowserWindow,
     dialog,
     authorizeWorkspaceRoot,
+    cloudGitCredentialManager,
+    cloudGitOperationLease,
     gitOperationCoordinator,
     t: (messageId, values) => localeService.t(messageId, values),
   });

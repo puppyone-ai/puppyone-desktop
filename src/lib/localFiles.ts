@@ -4,6 +4,9 @@ import type {
   CloudPublishIdentityRequest,
   CloudPublishResult,
   CloudPublishStartRequest,
+  CloudGitConnectAbandonRequest,
+  CloudGitConnectRequest,
+  CloudGitConnectResult,
   GitCommitDetail,
   GitBranchGraphSnapshot,
   GitRepositoryInvalidatedEvent,
@@ -286,6 +289,18 @@ export async function abandonWorkspaceCloudPublish(
   return getDesktopBridge().cloudPublishAbandon(request);
 }
 
+export async function connectWorkspaceCloudProject(
+  request: CloudGitConnectRequest,
+): Promise<CloudGitConnectResult> {
+  return getDesktopBridge().cloudGitConnectProject(request);
+}
+
+export async function abandonWorkspaceCloudProjectConnection(
+  request: CloudGitConnectAbandonRequest,
+): Promise<CloudGitConnectResult> {
+  return getDesktopBridge().cloudGitAbandonConnect(request);
+}
+
 function createGitStatusAbortError(): DOMException {
   return new DOMException("Git status request was cancelled.", "AbortError");
 }
@@ -353,22 +368,6 @@ export function toWorkspaceGitBranchGraphSnapshot(status: GitStatusSnapshot | Gi
 
 export async function initializeWorkspaceGitRepository(rootPath: string): Promise<GitStatusSnapshot> {
   return getDesktopBridge().initGitRepository({ rootPath });
-}
-
-export async function configureWorkspaceCloudRemote(
-  rootPath: string,
-  remoteUrl: string,
-  remoteName = "puppyone",
-  credential?: string | null,
-  username = "x-puppyone-token",
-): Promise<GitStatusSnapshot> {
-  return getDesktopBridge().configureGitCloudRemote({
-    rootPath,
-    remoteUrl,
-    remoteName,
-    credential,
-    username,
-  });
 }
 
 export async function removeWorkspaceGitRemote(

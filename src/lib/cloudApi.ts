@@ -7,14 +7,20 @@ import {
   resolveCloudApiBaseUrl,
   sameCloudApiBaseUrl,
 } from "../../shared/cloudEndpoint.js";
+import {
+  REPOSITORY_TARGET_CONTRACT_HEADER,
+  REPOSITORY_TARGET_CONTRACT_VERSION,
+} from "../../shared/repositoryContract.js";
 import { invalidateCloudCacheForMutation } from "../features/cloud/cache/cloudCache";
 import { createCloudAutomationApi } from "./cloud/automationApi";
 import type { RepositoryTarget } from "../features/cloud/repositoryTarget";
 
 export type { RepositoryTarget } from "../features/cloud/repositoryTarget";
 
-export const REPOSITORY_TARGET_CONTRACT_HEADER = "X-PuppyOne-Repository-Contract";
-export const REPOSITORY_TARGET_CONTRACT_VERSION = "2";
+export {
+  REPOSITORY_TARGET_CONTRACT_HEADER,
+  REPOSITORY_TARGET_CONTRACT_VERSION,
+};
 
 type ApiEnvelope<T> = {
   code?: number;
@@ -133,22 +139,6 @@ export type DesktopCloudProjectReadiness = {
       | string
     >;
   };
-};
-
-export type DesktopCloudGitCredential = {
-  id: string;
-  credential: string;
-  mode: "r" | "rw";
-  remote: {
-    url: string;
-    target: RepositoryTarget;
-    username: string;
-  };
-};
-
-export type DesktopCloudGitCredentialIssue = {
-  target: RepositoryTarget;
-  mode: "r" | "rw";
 };
 
 export type DesktopCloudRepositoryContext = {
@@ -840,38 +830,6 @@ export function getCloudProjectReadiness(
     session,
     onSessionChange,
     {},
-    apiBaseUrl,
-  );
-}
-
-export function issueCloudGitCredential(
-  session: DesktopCloudSession,
-  projectId: string,
-  payload: DesktopCloudGitCredentialIssue,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudGitCredential> {
-  return cloudApiRequest<DesktopCloudGitCredential>(
-    `/projects/${encodeURIComponent(projectId)}/git-credentials`,
-    session,
-    onSessionChange,
-    { method: "POST", body: JSON.stringify(payload) },
-    apiBaseUrl,
-  );
-}
-
-export function revokeCloudGitCredential(
-  session: DesktopCloudSession,
-  projectId: string,
-  credentialId: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<{ id: string; revoked: true }> {
-  return cloudApiRequest<{ id: string; revoked: true }>(
-    `/projects/${encodeURIComponent(projectId)}/git-credentials/${encodeURIComponent(credentialId)}`,
-    session,
-    onSessionChange,
-    { method: "DELETE" },
     apiBaseUrl,
   );
 }

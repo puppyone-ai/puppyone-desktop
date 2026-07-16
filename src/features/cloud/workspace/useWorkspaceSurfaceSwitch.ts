@@ -11,28 +11,24 @@ import { useLocalization } from "@puppyone/localization";
 import type { RecentWorkspaceHomeItem, OnboardingOperationStatus } from "../../../components/MinimalOnboarding";
 import {
   getCloudProject,
-  revokeCloudGitCredential,
   type DesktopCloudProject,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
 import {
-  configureWorkspaceCloudRemote,
-  readPuppyoneWorkspaceConfig,
-  writePuppyoneWorkspaceConfig,
+  connectWorkspaceCloudProject,
 } from "../../../lib/localFiles";
 import {
   openWorkspaceTarget,
   selectLocalWorkspaceFolder,
 } from "../../../lib/workspaceOpening";
-import type { PuppyoneWorkspaceConfig, WorkspaceOpenResult } from "../../../types/electron";
-import { mergePuppyoneWorkspaceConfig } from "../../app-shell/preferences";
+import type { WorkspaceOpenResult } from "../../../types/electron";
 import type { DesktopWorkspaceSurfaceAction } from "../../app-shell/navigation";
 import {
   CLOUD_PROJECT_UNRESOLVABLE_MESSAGE,
   type RecentWorkspaceCloudContext,
 } from "./cloudProjectResolution";
 import { findRecentLocalWorkspaceForCloudProject } from "../../app-shell/workspaceHomeModel";
-import { issueWorkspaceGitRemote } from "./workspaceGitRemote";
+import { projectRootTarget } from "../repositoryTarget";
 import { formatCloudMessage } from "../cloudPresentation";
 
 type WorkspaceSurfaceFeedback =
@@ -167,9 +163,6 @@ export function useWorkspaceSurfaceSwitch({
 
       const openedWorkspace = result.workspace;
       if (openedWorkspace) {
-        let previousConfig: PuppyoneWorkspaceConfig | null = null;
-        let configUpdated = false;
-        let issued: Awaited<ReturnType<typeof issueWorkspaceGitRemote>> | null = null;
         try {
           if (!activeCloudSession) {
             throw new Error(t("cloud.workspaceSurface.signInToConfigureRemote"));
@@ -181,36 +174,17 @@ export function useWorkspaceSurfaceSwitch({
               updateCloudSession,
               desktopCloudApiBaseUrl,
             );
-          issued = await issueWorkspaceGitRemote({
-            session: activeCloudSession,
-            apiBaseUrl: desktopCloudApiBaseUrl,
-            project,
-            projectId: cloudProjectId,
-            onSessionChange: updateCloudSession,
+          const apiBaseUrl = desktopCloudApiBaseUrl ?? activeCloudSession.api_base_url;
+          const connected = await connectWorkspaceCloudProject({
+            rootPath: openedWorkspace.path,
+            apiBaseUrl,
+            userId: activeCloudSession.user_id,
+            projectId: project.id,
           });
-          previousConfig = await readPuppyoneWorkspaceConfig(openedWorkspace.path);
-          const nextConfig = mergePuppyoneWorkspaceConfig(previousConfig, {
-            sync: {
-              sourceOfTruth: { service: "puppyone", remote: "puppyone", branch: null },
-            },
-            backup: {
-              enabled: true,
-              service: "puppyone",
-              remote: "puppyone",
-              branch: null,
-            },
-            git: { primaryRemote: "puppyone", watchedBranch: null },
-          });
-          await writePuppyoneWorkspaceConfig(openedWorkspace.path, nextConfig);
-          configUpdated = true;
-          await configureWorkspaceCloudRemote(
-            openedWorkspace.path,
-            issued.remoteUrl,
-            "puppyone",
-            issued.credential,
-            issued.username,
-          );
-          const configuredTarget = issued.target;
+          if (!connected.ok) {
+            throw new Error(connected.error.message || connected.error.code);
+          }
+          const configuredTarget = projectRootTarget(project.id);
           setRecentWorkspaceCloudContexts((current) => ({
             ...current,
             [openedWorkspace.id]: {
@@ -222,18 +196,6 @@ export function useWorkspaceSurfaceSwitch({
             },
           }));
         } catch (error) {
-          if (issued && activeCloudSession) {
-            await revokeCloudGitCredential(
-              activeCloudSession,
-              issued.project.id,
-              issued.credentialId,
-              updateCloudSession,
-              desktopCloudApiBaseUrl,
-            ).catch(() => undefined);
-          }
-          if (configUpdated && previousConfig) {
-            await writePuppyoneWorkspaceConfig(openedWorkspace.path, previousConfig).catch(() => undefined);
-          }
           console.warn("Unable to configure the local PuppyOne Git remote:", error);
           setWorkspaceSurfaceError(error instanceof Error ? error.message : String(error));
         }

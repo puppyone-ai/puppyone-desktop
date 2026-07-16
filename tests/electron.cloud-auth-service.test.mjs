@@ -337,7 +337,92 @@ describe("main-owned Cloud Auth Broker", () => {
     await expect(pending).resolves.toEqual({ project: { id: "project-1" } });
     expect(contextRequests).toBe(2);
   });
+
+  it("replays a keyed main-owned mutation once when only the same user's generation changes", async () => {
+    const operation = await projectMutationAcrossOAuth({ replacementUserId: "user-123" });
+
+    await expect(operation.pending).resolves.toEqual({ id: "project-1" });
+    expect(operation.projectRequests()).toBe(2);
+    expect(operation.projectHeaders()).toEqual([
+      expect.objectContaining({ "Idempotency-Key": operation.operationId }),
+      expect.objectContaining({ "Idempotency-Key": operation.operationId }),
+    ]);
+  });
+
+  it("never replays an idempotent mutation under a different Cloud actor", async () => {
+    const operation = await projectMutationAcrossOAuth({ replacementUserId: "user-other" });
+
+    await expect(operation.pending).rejects.toMatchObject({ code: "SESSION_CHANGED" });
+    expect(operation.projectRequests()).toBe(1);
+  });
+
+  it("does not replay a main-owned mutation without a canonical idempotency key", async () => {
+    const operation = await projectMutationAcrossOAuth({
+      replacementUserId: "user-123",
+      includeIdempotencyKey: false,
+    });
+
+    await expect(operation.pending).rejects.toMatchObject({ code: "SESSION_CHANGED" });
+    expect(operation.projectRequests()).toBe(1);
+  });
 });
+
+async function projectMutationAcrossOAuth({ replacementUserId, includeIdempotencyKey = true }) {
+  const fixture = createFixture();
+  const operationId = "11111111-1111-4111-8111-111111111111";
+  let onCallback = null;
+  let resolveFirstProject;
+  const projectCalls = [];
+  fixture.startCallbackServer.mockImplementation(async ({ onCallback: callback }) => {
+    onCallback = callback;
+    return {
+      redirectUri: "http://127.0.0.1:43123/auth/callback",
+      close: vi.fn(async () => {}),
+    };
+  });
+  fixture.requestCloudApi.mockImplementation(async (_base, path, init) => {
+    if (path === "/auth/refresh") {
+      return authResponse({ accessToken: jwtFor("user-123", "initial") });
+    }
+    if (path === "/auth/initialize") return { ok: true };
+    if (path === "/auth/desktop/start") {
+      return { state: "replacement-state", login_url: "https://app.puppyone.ai/login" };
+    }
+    if (path === "/auth/desktop/exchange") {
+      return authResponse({
+        accessToken: jwtFor(replacementUserId, "replacement"),
+        refreshToken: "replacement-refresh",
+      });
+    }
+    if (path === "/projects/") {
+      projectCalls.push(init);
+      if (projectCalls.length === 1) {
+        return new Promise((resolve) => { resolveFirstProject = resolve; });
+      }
+      return { id: "project-1" };
+    }
+    throw new Error(`unexpected path ${path}`);
+  });
+
+  await fixture.service.restoreSession(API);
+  const pending = fixture.service.requestSessionApi(API, "/projects/", {
+    method: "POST",
+    headers: includeIdempotencyKey ? { "Idempotency-Key": operationId } : {},
+    body: JSON.stringify({ org_id: "org-1", name: "Project", description: null }),
+  });
+  await vi.waitFor(() => expect(resolveFirstProject).toBeTypeOf("function"));
+  await fixture.service.startOAuth({ apiBase: API, provider: "github" });
+  await onCallback(
+    "http://127.0.0.1:43123/auth/callback?state=replacement-state&code=replacement-code",
+  );
+  resolveFirstProject({ stale: true });
+  return {
+    operationId,
+    pending,
+    projectRequests: () => projectCalls.length,
+    projectHeaders: () => projectCalls.map((call) => call.headers),
+  };
+}
 
 function createFixture({
   credential = createCredential(),

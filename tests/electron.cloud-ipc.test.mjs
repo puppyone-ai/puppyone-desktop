@@ -32,9 +32,9 @@ describe("Cloud IPC structured error transport", () => {
   });
 
   it("preserves status and code without parsing Electron rejection text", async () => {
-    const error = Object.assign(new Error("Project authorization is temporarily unavailable"), {
-      status: 503,
-      code: "AUTHORIZATION_UNAVAILABLE",
+    const error = Object.assign(new Error("The Project already accepted its first push"), {
+      status: 409,
+      code: "initialization_not_abandonable",
     });
     const handlers = register({ requestSessionApi: vi.fn().mockRejectedValue(error) });
 
@@ -49,9 +49,9 @@ describe("Cloud IPC structured error transport", () => {
       transport: "puppyone-cloud-ipc-v1",
       ok: false,
       error: {
-        status: 503,
-        code: "AUTHORIZATION_UNAVAILABLE",
-        message: "Project authorization is temporarily unavailable",
+        status: 409,
+        code: "initialization_not_abandonable",
+        message: "The Project already accepted its first push",
       },
     });
   });

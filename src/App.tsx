@@ -24,7 +24,7 @@ import {
 } from "./features/desktop-terminal";
 import { useDesktopUpdates } from "./components/DesktopUpdateControls";
 import {
-  configureWorkspaceCloudRemote,
+  connectWorkspaceCloudProject,
   createLocalDataPort,
   getWorkspaceGitStatus,
   readPuppyoneWorkspaceConfig,
@@ -34,9 +34,7 @@ import {
 import { openWorkspaceTarget } from "./lib/workspaceOpening";
 import {
   getDesktopCloudApiBaseUrl,
-  getCloudProject,
   isCloudSessionForApiBase,
-  revokeCloudGitCredential,
   type DesktopCloudProject,
   type DesktopCloudSession,
 } from "./lib/cloudApi";
@@ -101,8 +99,8 @@ import { shouldLoadCloudProjectCatalog } from "./features/cloud/workspace/cloudP
 import {
   assertCloudRemoteNameAvailable,
   assertExpectedGitRepositoryState,
-  issueWorkspaceGitRemote,
 } from "./features/cloud/workspace/workspaceGitRemote";
+import { projectRootTarget } from "./features/cloud/repositoryTarget";
 import type { CloudGitRemoteOptions } from "./features/cloud/types";
 import { formatCloudMessage } from "./features/cloud/cloudPresentation";
 import {
@@ -891,103 +889,34 @@ export function App() {
     if (!activeCloudSession) {
       throw new Error("Sign in before configuring the Cloud Git remote.");
     }
-    let previousConfig: PuppyoneWorkspaceConfig | null = null;
-    let configUpdated = false;
-    let issued: Awaited<ReturnType<typeof issueWorkspaceGitRemote>> | null = null;
     let configuredStatus = activeGitStatus;
-    try {
-      const requiresFreshStatus = options.rejectRemoteNameCollision
-        || options.expectedHeadCommitId !== undefined
-        || options.expectedBranch !== undefined;
-      const readAndValidateFreshStatus = async () => {
-        const freshStatus = await getWorkspaceGitStatus(context.rootPath);
-        if (
-          options.expectedHeadCommitId !== undefined
-          || options.expectedBranch !== undefined
-        ) {
-          assertExpectedGitRepositoryState(freshStatus, {
-            headCommitId: options.expectedHeadCommitId,
-            branch: options.expectedBranch,
-          });
-        }
-        if (options.rejectRemoteNameCollision) {
-          assertCloudRemoteNameAvailable(freshStatus);
-        }
-        return freshStatus;
-      };
-      if (requiresFreshStatus) {
-        configuredStatus = await readAndValidateFreshStatus();
-      }
-      const project = homeCloudProjects.find((entry) => entry.id === nextProjectId)
-        ?? await getCloudProject(
-          activeCloudSession,
-          nextProjectId,
-          updateCloudSession,
-          desktopCloudApiBaseUrl,
-        );
-      issued = await issueWorkspaceGitRemote({
-        session: activeCloudSession,
-        apiBaseUrl: desktopCloudApiBaseUrl,
-        project,
-        projectId: nextProjectId,
-        target: options.target,
-        requireWrite: options.requireWrite,
-        onSessionChange: updateCloudSession,
-      });
-      if (requiresFreshStatus) {
-        configuredStatus = await readAndValidateFreshStatus();
-      }
-      if (options.persistWorkspacePreferences !== false) {
-        previousConfig = puppyoneConfig
-          ?? await readPuppyoneWorkspaceConfig(context.rootPath);
-        const nextConfig = mergePuppyoneWorkspaceConfig(previousConfig, {
-          sync: {
-            sourceOfTruth: {
-              service: "puppyone",
-              remote: "puppyone",
-              branch: null,
-            },
-          },
-          backup: {
-            enabled: true,
-            service: "puppyone",
-            remote: "puppyone",
-            branch: null,
-          },
-          git: {
-            primaryRemote: "puppyone",
-            watchedBranch: null,
-          },
+    const requiresFreshStatus = options.rejectRemoteNameCollision
+      || options.expectedHeadCommitId !== undefined
+      || options.expectedBranch !== undefined;
+    const readAndValidateFreshStatus = async () => {
+      const freshStatus = await getWorkspaceGitStatus(context.rootPath);
+      if (options.expectedHeadCommitId !== undefined || options.expectedBranch !== undefined) {
+        assertExpectedGitRepositoryState(freshStatus, {
+          headCommitId: options.expectedHeadCommitId,
+          branch: options.expectedBranch,
         });
-        const savedConfig = await handlePuppyoneConfigChange(nextConfig);
-        if (!savedConfig) {
-          throw new Error("Unable to persist the local Git sync settings for this workspace.");
-        }
-        configUpdated = true;
       }
-      configuredStatus = await configureWorkspaceCloudRemote(
-        context.rootPath,
-        issued.remoteUrl,
-        "puppyone",
-        issued.credential,
-        issued.username,
-      );
-    } catch (error) {
-      if (issued) {
-        await revokeCloudGitCredential(
-          activeCloudSession,
-          issued.project.id,
-          issued.credentialId,
-          updateCloudSession,
-          desktopCloudApiBaseUrl,
-        ).catch(() => undefined);
-      }
-      if (configUpdated && previousConfig) {
-        await handlePuppyoneConfigChange(previousConfig).catch(() => undefined);
-      }
-      throw error;
+      if (options.rejectRemoteNameCollision) assertCloudRemoteNameAvailable(freshStatus);
+      return freshStatus;
+    };
+    if (requiresFreshStatus) configuredStatus = await readAndValidateFreshStatus();
+    if (options.target && options.target.kind !== "project_root") {
+      throw new Error("Desktop Cloud connections use the canonical Project repository, not a Scope view.");
     }
-    if (!issued || !configuredStatus) {
+    const connected = await connectWorkspaceCloudProject({
+      rootPath: context.rootPath,
+      apiBaseUrl: desktopCloudApiBaseUrl ?? activeCloudSession.api_base_url,
+      userId: activeCloudSession.user_id,
+      projectId: nextProjectId,
+    });
+    if (!connected.ok) throw new Error(connected.error.message || connected.error.code);
+    configuredStatus = connected.gitStatus;
+    if (!configuredStatus) {
       throw new Error("Cloud Git remote configuration did not return a Git status.");
     }
     if (!options.deferStatusPublication) {
@@ -995,7 +924,7 @@ export function App() {
         ...current,
         [workspace.id]: {
           projectId: nextProjectId,
-          target: issued.target,
+          target: projectRootTarget(nextProjectId),
           hasCloudRemote: true,
           error: null,
           reason: null,
@@ -1017,12 +946,8 @@ export function App() {
     captureGitRepositoryContext,
     cloudEnabled,
     desktopCloudApiBaseUrl,
-    handlePuppyoneConfigChange,
-    homeCloudProjects,
-    puppyoneConfig,
     refreshWorkspaceContent,
     setRecentWorkspaceCloudContexts,
-    updateCloudSession,
     workspace,
     workspaceIsCloud,
   ]);

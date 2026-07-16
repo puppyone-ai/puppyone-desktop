@@ -18,6 +18,7 @@ import {
   checkoutWorkspaceGitBranch,
   getWorkspaceGitFileDiff,
   configureWorkspaceCloudRemote,
+  pushWorkspaceGit,
   pushWorkspaceGitCommitToRemote,
   parsePuppyoneRemoteInfo,
   createWorkspaceEntry,
@@ -574,6 +575,48 @@ describe("explicit immutable Cloud initialization push", { timeout: 20_000 }, ()
       })).rejects.toThrow(/no longer has a HEAD commit/i);
     } finally {
       await rm(remoteRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ordinary Push after PuppyOne initialization", { timeout: 20_000 }, () => {
+  it("keeps feature -> puppyone/main as source of truth even when origin also exists", async () => {
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "tracked.txt", kind: "file", content: "one\n" });
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "initial");
+    execFileSync("git", ["-C", root, "branch", "-m", "feature/cloud"]);
+    const puppyone = await mkdtemp(path.join(os.tmpdir(), "puppyone-ordinary-push-"));
+    const origin = await mkdtemp(path.join(os.tmpdir(), "origin-ordinary-push-"));
+    try {
+      execFileSync("git", ["init", "--bare", puppyone]);
+      execFileSync("git", ["init", "--bare", origin]);
+      execFileSync("git", ["-C", root, "remote", "add", "origin", origin]);
+      execFileSync("git", ["-C", root, "remote", "add", "puppyone", puppyone]);
+      execFileSync("git", ["-C", root, "push", "puppyone", "HEAD:refs/heads/main"]);
+      const initial = execFileSync("git", ["-C", root, "rev-parse", "HEAD"]).toString().trim();
+      execFileSync("git", ["-C", root, "update-ref", "refs/remotes/puppyone/main", initial]);
+      execFileSync("git", ["-C", root, "branch", "--set-upstream-to=puppyone/main", "feature/cloud"]);
+
+      await writeWorkspaceTextFile(root, "tracked.txt", "two\n");
+      await stageAllWorkspaceGitChanges(root);
+      const committed = await commitWorkspaceGit(root, "second");
+      await pushWorkspaceGit(root);
+
+      expect(execFileSync("git", ["--git-dir", puppyone, "rev-parse", "refs/heads/main"]).toString().trim())
+        .toBe(committed.headCommitId);
+      expect(() => execFileSync(
+        "git",
+        ["--git-dir", origin, "rev-parse", "--verify", "refs/heads/main"],
+        { stdio: "pipe" },
+      )).toThrow();
+      expect(execFileSync(
+        "git",
+        ["-C", root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+      ).toString().trim()).toBe("puppyone/main");
+    } finally {
+      await rm(puppyone, { recursive: true, force: true });
+      await rm(origin, { recursive: true, force: true });
     }
   });
 });

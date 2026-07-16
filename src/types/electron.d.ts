@@ -351,6 +351,28 @@ export type CloudPublishAbandonRequest = CloudPublishIdentityRequest & {
   operationId: string;
 };
 
+export type CloudGitConnectRequest = CloudPublishIdentityRequest & {
+  projectId: string;
+};
+
+export type CloudGitConnectAbandonRequest = CloudGitConnectRequest & {
+  operationId: string;
+};
+
+export type CloudGitConnectResult =
+  | {
+    ok: true;
+    gitStatus: GitStatusSnapshot;
+    projectId: string;
+    target: { kind: "project_root"; project_id: string };
+  }
+  | {
+    ok: false;
+    operationId: string | null;
+    state: null;
+    error: { code: CloudPublishErrorCode; retryable: boolean; message?: string };
+  };
+
 export type GitBranchGraphSnapshot = {
   isRepo: boolean;
   branch: string | null;
@@ -704,6 +726,8 @@ declare global {
       cloudPublishGetState: (request: CloudPublishIdentityRequest) => Promise<CloudPublishResult>;
       cloudPublishStartOrResume: (request: CloudPublishStartRequest) => Promise<CloudPublishResult>;
       cloudPublishAbandon: (request: CloudPublishAbandonRequest) => Promise<CloudPublishResult>;
+      cloudGitConnectProject: (request: CloudGitConnectRequest) => Promise<CloudGitConnectResult>;
+      cloudGitAbandonConnect: (request: CloudGitConnectAbandonRequest) => Promise<CloudGitConnectResult>;
       listCloudAccessPointDirectory: (request: {
         accessKey: string;
         path?: string;
@@ -877,13 +901,6 @@ declare global {
       }) => Promise<{ ok: boolean }>;
       initGitRepository: (request: {
         rootPath: string;
-      }) => Promise<GitStatusSnapshot>;
-      configureGitCloudRemote: (request: {
-        rootPath: string;
-        remoteUrl: string;
-        remoteName?: string;
-        credential?: string | null;
-        username?: string;
       }) => Promise<GitStatusSnapshot>;
       removeGitRemote: (request: {
         rootPath: string;

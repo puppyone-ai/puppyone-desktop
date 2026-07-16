@@ -29,4 +29,25 @@ describe("Electron Cloud API error transport", () => {
       status: 503,
     });
   });
+
+  it("preserves a safe backend data.code instead of classifying every 409 alike", async () => {
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      message: "The Project already accepted its first push.",
+      data: { code: "initialization_not_abandonable" },
+    }), {
+      status: 409,
+      headers: { "Content-Type": "application/json" },
+    }));
+
+    const error = await requestCloudApi(
+      "http://localhost:9090/api/v1",
+      "/projects/project-1/initialization/abandon",
+      { method: "POST" },
+    ).then(() => null, (reason) => reason);
+
+    expect(error).toMatchObject({
+      status: 409,
+      code: "initialization_not_abandonable",
+    });
+  });
 });

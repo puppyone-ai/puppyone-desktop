@@ -33,6 +33,11 @@ import { resolveGitRevisionPair } from "./git/revision-pair.mjs";
 import { deriveGitRevisionSpecs } from "./git/revision-specs.mjs";
 import { parseGitPorcelainV2Status } from "./git/porcelain-v2.mjs";
 import {
+  createGitSyncTargetPolicy,
+  normalizeCurrentBranchName,
+  splitRemoteBranchName,
+} from "./git/sync-target.mjs";
+import {
   buildGitSourceControlSnapshot,
   getDiscardableResources,
   getResourceGitPaths,
@@ -80,6 +85,16 @@ const GIT_DETAIL_MAX_TOTAL_DIFF_LINES = 4000;
 const GIT_DETAIL_MAX_FILE_DIFF_LINES = 900;
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
 const execFileAsync = promisify(execFile);
+const {
+  chooseGitSyncTarget,
+  choosePuppyoneRemoteName,
+  getConfiguredSyncBranch,
+  hasEffectivePuppyoneHostingTarget,
+  isPuppyoneHostingConfig,
+} = createGitSyncTargetPolicy({
+  defaultBranch: PUPPYONE_CLOUD_DEFAULT_BRANCH,
+  isPuppyoneRemote,
+});
 const {
   configureWorkspaceCloudRemote,
   removeWorkspaceGitRemote,
@@ -2145,12 +2160,14 @@ async function chooseDefaultPushRemote(rootPath, requestedRemoteName = null) {
     throw new Error(`Unable to push changes: remote '${normalizedRemoteName}' is not configured.`);
   }
   const config = await readPuppyoneWorkspaceConfig(rootPath).catch(() => null);
+  // A canonical PuppyOne Project remote is the hosted source of truth even
+  // when this repository also keeps a GitHub `origin`. Initialization maps any
+  // local branch to puppyone/main; later ordinary Push must preserve that same
+  // contract instead of silently selecting origin by name precedence.
+  const puppyoneRemote = choosePuppyoneRemoteName(remotes, config);
+  if (puppyoneRemote) return puppyoneRemote;
   const preferredRemoteName = config?.sync?.sourceOfTruth?.remote ?? config?.git?.primaryRemote ?? config?.backup?.remote;
   if (preferredRemoteName && remotes.some((remote) => remote.name === preferredRemoteName)) return preferredRemoteName;
-  if (isPuppyoneHostingConfig(config)) {
-    const puppyoneRemote = choosePuppyoneRemoteName(remotes, config);
-    if (puppyoneRemote) return puppyoneRemote;
-  }
   if (remotes.some((remote) => remote.name === "origin")) return "origin";
   if (remotes.some((remote) => remote.name === "puppyone")) return "puppyone";
   const firstRemote = remotes[0]?.name;
@@ -2496,130 +2513,6 @@ function buildRemoteHosting({ kind, remote, branchName, ref, reason }) {
   };
 }
 
-function chooseGitSyncTarget(remotes, branches, currentBranchName, config) {
-  const configuredRemoteName = config?.sync?.sourceOfTruth?.remote ?? config?.git?.primaryRemote ?? config?.backup?.remote;
-  const configuredBranchName = config?.sync?.sourceOfTruth?.branch ?? config?.git?.watchedBranch ?? config?.backup?.branch;
-  const remoteNames = new Set(remotes.map((remote) => remote.name));
-  const currentBranchNameSafe = normalizeCurrentBranchName(currentBranchName);
-  const currentBranch = branches.find((branch) => branch.current && !branch.remote);
-
-  if (isPuppyoneHostingConfig(config)) {
-    const puppyoneRemote = choosePuppyoneRemoteName(remotes, config);
-    if (puppyoneRemote) {
-      return {
-        remote: puppyoneRemote,
-        branch: getConfiguredSyncBranch(config, PUPPYONE_CLOUD_DEFAULT_BRANCH, true),
-      };
-    }
-  }
-
-  if (configuredBranchName) {
-    const remote = configuredRemoteName && remoteNames.has(configuredRemoteName)
-      ? configuredRemoteName
-      : findRemoteForBranch(branches, configuredBranchName)
-        ?? preferExistingRemote(remotes, "origin")
-        ?? preferExistingRemote(remotes, "puppyone")
-        ?? remotes[0]?.name
-        ?? null;
-    return {
-      remote,
-      branch: configuredBranchName,
-    };
-  }
-
-  if (configuredRemoteName) {
-    const remote = remoteNames.has(configuredRemoteName)
-      ? configuredRemoteName
-      : preferExistingRemote(remotes, "origin")
-        ?? preferExistingRemote(remotes, "puppyone")
-        ?? remotes[0]?.name
-        ?? null;
-
-    if (!remote) {
-      return { remote: null, branch: currentBranchNameSafe };
-    }
-
-    if (currentBranch?.upstream) {
-      const upstreamTarget = splitRemoteBranchName(currentBranch.upstream);
-      if (upstreamTarget?.remote === remote) return upstreamTarget;
-    }
-
-    if (currentBranchNameSafe) {
-      const matchingCurrentBranch = findRemoteBranch(branches, remote, currentBranchNameSafe);
-      if (matchingCurrentBranch) return matchingCurrentBranch;
-      return { remote, branch: currentBranchNameSafe };
-    }
-
-    return {
-      remote,
-      branch: findDefaultBranchForRemote(branches, remote),
-    };
-  }
-
-  if (currentBranch?.upstream) {
-    const upstreamTarget = splitRemoteBranchName(currentBranch.upstream);
-    if (upstreamTarget) return upstreamTarget;
-  }
-
-  const originMain = findRemoteBranch(branches, "origin", "main");
-  if (originMain) return originMain;
-
-  const puppyoneMain = findRemoteBranch(branches, "puppyone", "main");
-  if (puppyoneMain) return puppyoneMain;
-
-  if (currentBranchNameSafe) {
-    const originCurrent = findRemoteBranch(branches, "origin", currentBranchNameSafe);
-    if (originCurrent) return originCurrent;
-    const puppyoneCurrent = findRemoteBranch(branches, "puppyone", currentBranchNameSafe);
-    if (puppyoneCurrent) return puppyoneCurrent;
-  }
-
-  const fallbackRemote = preferExistingRemote(remotes, "origin")
-    ?? preferExistingRemote(remotes, "puppyone")
-    ?? remotes[0]?.name
-    ?? null;
-
-  return {
-    remote: fallbackRemote,
-    branch: findDefaultBranchForRemote(branches, fallbackRemote)
-      ?? currentBranchNameSafe
-      ?? null,
-  };
-}
-
-function isPuppyoneHostingConfig(config) {
-  return config?.sync?.sourceOfTruth?.service === "puppyone";
-}
-
-function hasEffectivePuppyoneHostingTarget(remotes, config) {
-  if (!isPuppyoneHostingConfig(config)) return false;
-  return Boolean(choosePuppyoneRemoteName(remotes, config));
-}
-
-function getConfiguredSyncBranch(config, fallbackBranch = PUPPYONE_CLOUD_DEFAULT_BRANCH, puppyoneHostingActive = isPuppyoneHostingConfig(config)) {
-  if (puppyoneHostingActive) {
-    return PUPPYONE_CLOUD_DEFAULT_BRANCH;
-  }
-
-  return config?.sync?.sourceOfTruth?.branch
-    ?? config?.backup?.branch
-    ?? config?.git?.watchedBranch
-    ?? fallbackBranch
-    ?? null;
-}
-
-function choosePuppyoneRemoteName(remotes, config) {
-  const configuredRemoteName = config?.sync?.sourceOfTruth?.remote ?? config?.git?.primaryRemote ?? config?.backup?.remote;
-  const configuredRemote = configuredRemoteName
-    ? remotes.find((remote) => remote.name === configuredRemoteName) ?? null
-    : null;
-  if (configuredRemote && isPuppyoneRemote(configuredRemote)) return configuredRemote.name;
-  const puppyoneUrlRemote = remotes.find(isPuppyoneRemote);
-  if (puppyoneUrlRemote) return puppyoneUrlRemote.name;
-  return remotes.find((remote) => remote.name.toLowerCase() === "puppyone")?.name
-    ?? null;
-}
-
 function getRemoteUrl(remote) {
   return remote?.fetchUrl ?? remote?.pushUrl ?? null;
 }
@@ -2757,44 +2650,6 @@ export function parsePuppyoneRemoteInfo(rawUrl) {
 function maskSecret(value) {
   if (value.length <= 8) return "****";
   return `${value.slice(0, 4)}...${value.slice(-4)}`;
-}
-
-function findRemoteBranch(branches, remoteName, branchName) {
-  if (!remoteName || !branchName) return null;
-  return branches.some((branch) => branch.remote && branch.name === `${remoteName}/${branchName}`)
-    ? { remote: remoteName, branch: branchName }
-    : null;
-}
-
-function findRemoteForBranch(branches, branchName) {
-  if (!branchName) return null;
-  const remoteBranch = branches.find((branch) => branch.remote && branch.name.endsWith(`/${branchName}`));
-  return remoteBranch ? splitRemoteBranchName(remoteBranch.name)?.remote ?? null : null;
-}
-
-function findDefaultBranchForRemote(branches, remoteName) {
-  if (!remoteName) return null;
-  if (findRemoteBranch(branches, remoteName, "main")) return "main";
-  if (findRemoteBranch(branches, remoteName, "master")) return "master";
-  const firstRemoteBranch = branches.find((branch) => branch.remote && branch.name.startsWith(`${remoteName}/`));
-  return firstRemoteBranch ? firstRemoteBranch.name.slice(remoteName.length + 1) : null;
-}
-
-function preferExistingRemote(remotes, remoteName) {
-  return remotes.some((remote) => remote.name === remoteName) ? remoteName : null;
-}
-
-function normalizeCurrentBranchName(branchName) {
-  return branchName && branchName !== "detached" ? branchName : null;
-}
-
-function splitRemoteBranchName(value) {
-  const slashIndex = value.indexOf("/");
-  if (slashIndex <= 0 || slashIndex >= value.length - 1) return null;
-  return {
-    remote: value.slice(0, slashIndex),
-    branch: value.slice(slashIndex + 1),
-  };
 }
 
 function parseGitAheadBehindCounts(output) {

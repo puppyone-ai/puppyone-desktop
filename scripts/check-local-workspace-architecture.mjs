@@ -31,6 +31,10 @@ const requiredBoundaries = [
     exports: ["createWorkspaceCloudRemoteActions"],
   },
   {
+    path: "local-api/git/sync-target.mjs",
+    exports: ["createGitSyncTargetPolicy", "normalizeCurrentBranchName", "splitRemoteBranchName"],
+  },
+  {
     path: "local-api/workspace-config.mjs",
     exports: ["readPuppyoneWorkspaceConfig", "writePuppyoneWorkspaceConfig"],
   },
@@ -56,6 +60,10 @@ const retiredFacadeImplementations = [
   "function buildGitSourceControlSnapshot",
   "async function configureWorkspaceCloudRemote",
   "async function removeWorkspaceGitRemote",
+  "function chooseGitSyncTarget",
+  "function choosePuppyoneRemoteName",
+  "function getConfiguredSyncBranch",
+  "function hasEffectivePuppyoneHostingTarget",
   "function normalizePuppyoneWorkspaceConfig",
   "const mimeTypeByExtension",
   "const GIT_RESOURCE_GROUPS",
@@ -72,6 +80,7 @@ for (const requiredImport of [
   'from "./files/path-policy.mjs"',
   'from "./git/source-control-model.mjs"',
   'from "./git/cloud-remote.mjs"',
+  'from "./git/sync-target.mjs"',
   'from "./workspace-config.mjs"',
 ]) {
   if (!workspaceFacade.includes(requiredImport)) {
@@ -164,6 +173,85 @@ for (const forbiddenIdentityToken of [
 }
 if (/resolveLegacyCloudRepositoryRemote|remote_url|resolve-legacy-remote/.test(read("src/lib/cloudApi.ts"))) {
   errors.push("Cloud context APIs must accept Project targets, never local remote URLs or legacy credentials");
+}
+
+const cloudGitModules = [
+  "electron/main/cloud-publish-coordinator.mjs",
+  "electron/main/cloud-publish-contract.mjs",
+  "electron/main/cloud-publish-api.mjs",
+  "electron/main/cloud-publish-git.mjs",
+  "electron/main/cloud-publish-git-credentials.mjs",
+  "electron/main/cloud-publish-journal.mjs",
+  "electron/main/cloud-git-connect-coordinator.mjs",
+  "electron/main/cloud-git-connect-journal.mjs",
+  "electron/main/cloud-git-operation-lease.mjs",
+];
+for (const relativePath of cloudGitModules) {
+  const source = read(relativePath);
+  if (countLines(source) > 500) {
+    errors.push(`${relativePath} exceeds the 500-line focused Cloud Git module budget`);
+  }
+}
+
+const publishCoordinator = read("electron/main/cloud-publish-coordinator.mjs");
+for (const requiredModule of [
+  'from "./cloud-publish-api.mjs"',
+  'from "./cloud-publish-contract.mjs"',
+  'from "./cloud-publish-git.mjs"',
+]) {
+  if (!publishCoordinator.includes(requiredModule)) {
+    errors.push(`the publish coordinator must delegate through ${requiredModule}`);
+  }
+}
+const publishApi = read("electron/main/cloud-publish-api.mjs");
+if (
+  !publishApi.includes('from "../../shared/repositoryContract.js"')
+  || !publishApi.includes("REPOSITORY_TARGET_CONTRACT_VERSION")
+) {
+  errors.push("main-owned Git credential issue/revoke must send shared repository contract v2");
+}
+if (/\bseed\b|template_id|template_config/.test(
+  publishCoordinator
+  + publishApi
+  + read("electron/main/cloud-publish-contract.mjs")
+  + read("electron/main/cloud-publish-journal.mjs"),
+)) {
+  errors.push("strict Desktop Project creation must not send seed/template fields");
+}
+
+const rendererCredentialSurfaces = [
+  read("electron/preload.cjs"),
+  read("src/types/electron.d.ts"),
+  read("src/lib/localFiles.ts"),
+  read("src/lib/cloudApi.ts"),
+  read("src/features/cloud/workspace/workspaceGitRemote.ts"),
+];
+for (const forbiddenCredentialSurface of [
+  "configureGitCloudRemote",
+  "issueCloudGitCredential",
+  "issueWorkspaceGitRemote",
+  "workspace:git-configure-cloud-remote",
+]) {
+  if (rendererCredentialSurfaces.some((source) => source.includes(forbiddenCredentialSurface))) {
+    errors.push(`renderer/preload reintroduced raw Cloud Git credential surface ${forbiddenCredentialSurface}`);
+  }
+}
+
+const cloudGitService = read("electron/main/cloud-publish-git.mjs");
+if (/\["push",\s*CLOUD_REMOTE_NAME|\["ls-remote"[^\]]*CLOUD_REMOTE_NAME/.test(cloudGitService)) {
+  errors.push("publish network side effects must use the journaled canonical URL literal, not a mutable remote name");
+}
+const cloudGitLease = read("electron/main/cloud-git-operation-lease.mjs");
+if (!cloudGitLease.includes("identity.commonDir") || cloudGitLease.includes("path.join(identity.gitDir")) {
+  errors.push("Cloud Git saga lease must serialize linked worktrees through Git commonDir");
+}
+const cloudGitCredentials = read("electron/main/cloud-publish-git-credentials.mjs");
+if (
+  !cloudGitCredentials.includes("puppyonemanaged")
+  || !cloudGitCredentials.includes("puppyonesnapshot")
+  || !cloudGitCredentials.includes("detachManaged")
+) {
+  errors.push("Cloud Git credentials require durable URL-scoped exact cleanup for Abandon and Detach");
 }
 
 if (errors.length > 0) {

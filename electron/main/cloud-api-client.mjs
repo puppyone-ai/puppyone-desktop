@@ -99,10 +99,24 @@ export async function requestCloudApi(apiBase, apiPath, init) {
     const detail = getCloudApiErrorMessage(payload, "Cloud request failed.");
     const error = new Error(`Request failed (${response.status}): ${detail}`);
     error.status = response.status;
+    const businessCode = getCloudApiBusinessErrorCode(payload);
+    if (businessCode) error.code = businessCode;
     throw error;
   }
 
   return payload && Object.prototype.hasOwnProperty.call(payload, "data") ? payload.data : payload;
+}
+
+export function getCloudApiBusinessErrorCode(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  const candidates = [payload?.data?.code, payload?.detail?.code];
+  for (const candidate of candidates) {
+    if (
+      typeof candidate === "string"
+      && /^[a-z][a-z0-9_.-]{0,99}$/i.test(candidate)
+    ) return candidate;
+  }
+  return null;
 }
 
 export function getCloudApiErrorMessage(payload, fallback) {
