@@ -9,6 +9,10 @@ Architecture docs record durable product and frontend decisions. Start with
 directly:
 
 - [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
+- [Cloud Project Publish Coordinator](architecture/cloud-publish-coordinator.md)
+  - Durable `Initialize and Push`, explicit Organization ownership,
+    idempotency, main-only credentials, crash recovery, and the frozen Version
+    Engine boundary.
 - [Local and Cloud UX](architecture/local-and-cloud-ux.md)
   - One Projects entry, one Project shell, and the Local Only, Local + Cloud,
     and Cloud Only capability states.
