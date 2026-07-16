@@ -114,6 +114,8 @@
   "experimental.minimalMode.title": "Mode minimal",
   "experimental.viewerPlugins.title": "Plugins de visualisation",
   "experimental.viewerPlugins.detail": "Activez la page expérimentale des plugins locaux uniquement et son raccourci de navigation facultatif.",
+  "experimental.editorSaveStatus.title": "État d’enregistrement de l’éditeur",
+  "experimental.editorSaveStatus.detail": "Affiche la commande d’enregistrement et le diagnostic d’état en haut à droite. Les fichiers continuent d’être enregistrés normalement lorsqu’ils sont masqués.",
   "experimental.projectsHome.title": "Page d’accueil des projets",
   "experimental.projectsHome.detail": "Essayez la disposition expérimentale des cartes unifiées pour les projets cloud et locaux.",
   "experimental.agentChat.title": "Discussion avec les agents",

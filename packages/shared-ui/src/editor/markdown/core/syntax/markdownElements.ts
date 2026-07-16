@@ -1,74 +1,31 @@
 import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
-import { getMarkdownHtmlBlock } from "../../features/html/htmlBlockModel";
-import type { MarkdownHtmlBlockMetrics } from "../../features/html/htmlBlockModel";
 import {
-  getMarkdownCodeBlock,
-  type MarkdownCodeSourceReference,
-} from "../../features/code-block/codeBlockModel";
-import {
-  getMarkdownTableBlock,
-  type MarkdownTableAlignment,
-  type MarkdownTableRow,
-} from "../../features/table/tableModel";
+  markdownFeatureCompositionFacet,
+  type MarkdownFeatureComposition,
+  type MarkdownFeatureSourceLine,
+} from "../features/markdownFeatureContract";
 import { getMarkdownTaskLine } from "../rendering/taskModel";
-import { findMarkdownImageTokens } from "../../features/image/markdownImageModel";
 import { findMarkdownLinkTokens } from "../links/markdownLinkModel";
 import { findWikiLinkTokens } from "../links/wikiLinkModel";
+import { isEscapedInlineToken } from "../../shared/inlineTokenScan";
 import {
-  getMarkdownInlineHtmlInRange,
-  type MarkdownInlineHtml,
-} from "../../features/html/inlineHtmlModel";
+  type MarkdownElement,
+  type MarkdownElementKind,
+  type MarkdownMarkerRange,
+  type MarkdownPlainElement,
+} from "./markdownElementTypes";
 
-/**
- * Typed block data carried on elements collected from the document.
- * Consumed by the plan compiler to emit blockAtom plans without re-parsing.
- */
-export type MarkdownElementBlockData =
-  | {
-      kind: "fence";
-      language: string;
-      sourceReference: MarkdownCodeSourceReference | null;
-      code: string;
-    }
-  | {
-      kind: "htmlBlock";
-      tagName: string | null;
-      closed: boolean;
-      source: string;
-      metrics: MarkdownHtmlBlockMetrics;
-    }
-  | {
-      kind: "table";
-      alignments: readonly MarkdownTableAlignment[];
-      rows: readonly MarkdownTableRow[];
-      rowCount: number;
-      cellCount: number;
-      sourceBytes: number;
-      modelComplete: boolean;
-    }
-  | { kind: "task"; checked: boolean }
-  | { kind: "image"; alt: string; href: string; title: string | null };
-
-export type MarkdownElementKind =
-  | "blockquote"
-  | "emphasis"
-  | "escape"
-  | "fence"
-  | "heading"
-  | "htmlBlock"
-  | "image"
-  | "inlineHtml"
-  | "inlineCode"
-  | "link"
-  | "list"
-  | "rule"
-  | "strike"
-  | "strong"
-  | "table"
-  | "task"
-  | "wikiLink";
+export type {
+  MarkdownElement,
+  MarkdownElementBase,
+  MarkdownElementBlockData,
+  MarkdownElementKind,
+  MarkdownElementOf,
+  MarkdownInlineHtmlElement,
+  MarkdownMarkerRange,
+} from "./markdownElementTypes";
 
 type MarkdownElementCapabilities = {
   inlineDecoration: boolean;
@@ -93,46 +50,15 @@ const MARKDOWN_ELEMENT_CAPABILITIES = {
   strong: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
   table: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
   task: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
+  video: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
   wikiLink: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
 } satisfies Record<MarkdownElementKind, MarkdownElementCapabilities>;
 
-export type MarkdownMarkerRange = {
-  from: number;
-  to: number;
-};
-
-type MarkdownElementBase = {
-  from: number;
-  to: number;
-  markerRanges: MarkdownMarkerRange[];
-  contentRange?: MarkdownMarkerRange;
-  lineFrom?: number;
-  lineTo?: number;
-  level?: number;
-  blockData?: MarkdownElementBlockData;
-};
-
-export type MarkdownInlineHtmlElement = MarkdownElementBase & {
-  kind: "inlineHtml";
-  inlineHtml: MarkdownInlineHtml;
-};
-
-export type MarkdownStandardElement = MarkdownElementBase & {
-  kind: Exclude<MarkdownElementKind, "inlineHtml">;
-  inlineHtml?: never;
-};
-
-export type MarkdownElement = MarkdownInlineHtmlElement | MarkdownStandardElement;
-
-type LineSource = {
-  from: number;
-  to: number;
-  number: number;
-  text: string;
-};
+type LineSource = MarkdownFeatureSourceLine;
 
 type MarkdownElementsCacheEntry = {
   tree: ReturnType<typeof syntaxTree>;
+  composition: MarkdownFeatureComposition | null;
   elements: MarkdownElement[];
 };
 
@@ -140,10 +66,11 @@ const markdownElementsCache = new WeakMap<object, MarkdownElementsCacheEntry>();
 
 export function getMarkdownElements(state: EditorState): MarkdownElement[] {
   const tree = syntaxTree(state);
+  const composition = state.facet(markdownFeatureCompositionFacet);
   const cached = markdownElementsCache.get(state.doc);
-  if (cached?.tree === tree) return cached.elements;
+  if (cached?.tree === tree && cached.composition === composition) return cached.elements;
   const elements = collectMarkdownElements(state, 0, state.doc.length);
-  markdownElementsCache.set(state.doc, { tree, elements });
+  markdownElementsCache.set(state.doc, { tree, composition, elements });
   return elements;
 }
 
@@ -156,6 +83,7 @@ export function getMarkdownElementsInRange(state: EditorState, from: number, to:
 function collectMarkdownElements(state: EditorState, from: number, to: number): MarkdownElement[] {
   const elements: MarkdownElement[] = [];
   const tree = syntaxTree(state);
+  const composition = state.facet(markdownFeatureCompositionFacet);
 
   tree.iterate({
     from,
@@ -200,10 +128,6 @@ function collectMarkdownElements(state: EditorState, from: number, to: number): 
         case "Autolink":
           elements.push(createAutolinkElement(node));
           return true;
-        case "Image":
-        case "ObsidianImageEmbed":
-          elements.push(createMarkedInlineElement("image", node, ["LinkMark", "ObsidianImageMark"]));
-          return true;
         case "HorizontalRule":
           elements.push({
             kind: "rule",
@@ -220,23 +144,11 @@ function collectMarkdownElements(state: EditorState, from: number, to: number): 
     },
   });
 
-  for (const inlineHtml of getMarkdownInlineHtmlInRange(state, from, to)) {
-    elements.push({
-      kind: "inlineHtml",
-      from: inlineHtml.from,
-      to: inlineHtml.to,
-      markerRanges: [
-        inlineHtml.openingMarker,
-        ...(inlineHtml.closingMarker ? [inlineHtml.closingMarker] : []),
-      ],
-      contentRange: inlineHtml.contentRange ?? undefined,
-      inlineHtml,
-    });
-  }
+  if (composition) elements.push(...composition.collectRangeElements(state, from, to));
 
   const fromLine = state.doc.lineAt(from);
   const toLine = state.doc.lineAt(to);
-  addExtendedLineElements(state, elements, fromLine.number, toLine.number);
+  addExtendedLineElements(state, elements, fromLine.number, toLine.number, composition);
   elements.sort((left, right) => left.from - right.from || left.to - right.to || left.kind.localeCompare(right.kind));
   return dedupeElements(elements);
 }
@@ -380,10 +292,10 @@ function createBlockquoteMarkerRanges(line: LineSource): MarkdownMarkerRange[] {
 }
 
 function createMarkedInlineElement(
-  kind: "emphasis" | "image" | "inlineCode" | "strong",
+  kind: "emphasis" | "inlineCode" | "strong",
   node: SyntaxNode,
   markerNames: string | readonly string[],
-): MarkdownElement {
+): MarkdownPlainElement<"emphasis" | "inlineCode" | "strong"> {
   const markerRanges = directChildRanges(node, markerNames);
   const contentFrom = markerRanges[0]?.to ?? node.from;
   const contentTo = markerRanges[markerRanges.length - 1]?.from ?? node.to;
@@ -437,71 +349,15 @@ function addExtendedLineElements(
   elements: MarkdownElement[],
   fromLineNumber: number,
   toLineNumber: number,
+  composition: MarkdownFeatureComposition | null,
 ) {
   for (let lineNumber = fromLineNumber; lineNumber <= toLineNumber; lineNumber += 1) {
     const line = state.doc.line(lineNumber);
 
-    const codeBlock = getMarkdownCodeBlock(state, lineNumber);
-    if (codeBlock && codeBlock.from === line.from) {
-      elements.push({
-        kind: "fence",
-        from: codeBlock.from,
-        to: codeBlock.to,
-        markerRanges: [{ from: codeBlock.from, to: codeBlock.to }],
-        lineFrom: line.from,
-        lineTo: codeBlock.to,
-        blockData: {
-          kind: "fence",
-          language: codeBlock.language,
-          sourceReference: codeBlock.sourceReference,
-          code: codeBlock.code,
-        },
-      });
-      lineNumber = codeBlock.nextLineNumber - 1;
-      continue;
-    }
-
-    const htmlBlock = getMarkdownHtmlBlock(state, line.number);
-    if (htmlBlock?.from === line.from) {
-      elements.push({
-        kind: "htmlBlock",
-        from: htmlBlock.from,
-        to: htmlBlock.to,
-        markerRanges: [{ from: htmlBlock.from, to: htmlBlock.to }],
-        lineFrom: line.from,
-        lineTo: state.doc.line(htmlBlock.nextLineNumber - 1).to,
-        blockData: {
-          kind: "htmlBlock",
-          tagName: htmlBlock.tagName,
-          closed: htmlBlock.closed,
-          source: htmlBlock.source,
-          metrics: htmlBlock.metrics,
-        },
-      });
-      lineNumber = htmlBlock.nextLineNumber - 1;
-      continue;
-    }
-
-    const tableBlock = getMarkdownTableBlock(state, lineNumber);
-    if (tableBlock && tableBlock.from === line.from) {
-      elements.push({
-        kind: "table",
-        from: tableBlock.from,
-        to: tableBlock.to,
-        markerRanges: [{ from: tableBlock.from, to: tableBlock.to }],
-        lineFrom: line.from,
-        lineTo: tableBlock.to,
-        blockData: {
-          kind: "table",
-          alignments: tableBlock.alignments,
-          rows: tableBlock.rows,
-          rowCount: tableBlock.rowCount,
-          cellCount: tableBlock.cellCount,
-          sourceBytes: tableBlock.sourceBytes,
-          modelComplete: tableBlock.modelComplete,
-        },
-      });
-      lineNumber = tableBlock.nextLineNumber - 1;
+    const blockMatch = composition?.collectBlockElement(state, line) ?? null;
+    if (blockMatch) {
+      elements.push(blockMatch.element);
+      lineNumber = blockMatch.nextLineNumber - 1;
       continue;
     }
 
@@ -523,6 +379,15 @@ function addExtendedLineElements(
     }
 
     for (const token of findWikiLinkTokens(line.text)) {
+      // `![[...]]` is an embed envelope, not a wiki-link label. A recognized
+      // image/video feature owns the complete range; an unsupported or
+      // context-invalid embed stays exact visible source instead of becoming
+      // a misleading literal `!` followed by a collapsed link.
+      if (
+        token.from > 0
+        && line.text[token.from - 1] === "!"
+        && !isEscapedInlineToken(line.text, token.from - 1)
+      ) continue;
       const from = line.from + token.from;
       const to = line.from + token.to;
       const visibleFrom = line.from + (token.aliasFrom ?? token.targetFrom);
@@ -539,16 +404,7 @@ function addExtendedLineElements(
       });
     }
 
-    for (const token of findMarkdownImageTokens(line.text)) {
-      elements.push({
-        kind: "image",
-        from: line.from + token.from,
-        to: line.from + token.to,
-        markerRanges: [{ from: line.from + token.from, to: line.from + token.to }],
-        contentRange: { from: line.from + token.from, to: line.from + token.to },
-        blockData: { kind: "image", alt: token.alt, href: token.href, title: token.title },
-      });
-    }
+    if (composition) elements.push(...composition.collectLineElements(line));
 
     addStrikeElements(line, elements);
   }
@@ -607,14 +463,8 @@ function dedupeElements(elements: MarkdownElement[]): MarkdownElement[] {
     const key = `${element.kind}:${element.from}:${element.to}`;
     const existingIndex = seen.get(key);
     if (existingIndex != null) {
-      // Parser nodes own classification, while a scoped tokenizer may enrich
-      // the exact same semantic range with payload the grammar does not expose
-      // (for example image alt/href/title). Preserve that payload instead of
-      // letting stable-sort order silently keep the incomplete duplicate.
-      const existing = result[existingIndex];
-      if (!existing.blockData && element.blockData) {
-        result[existingIndex] = { ...existing, blockData: element.blockData } as MarkdownElement;
-      }
+      // A semantic range has one owner. Feature payload refinement happens in
+      // its collector, never as a second element merged here.
       continue;
     }
     seen.set(key, result.length);

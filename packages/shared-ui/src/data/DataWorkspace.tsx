@@ -135,7 +135,6 @@ export type DataWorkspaceProps = {
   editorSaveMode?: EditorSaveMode;
   htmlTrustMode?: MarkdownHtmlTrustMode;
   previewActionSlot?: FilePreviewProps["actionSlot"];
-  renderPreviewBody?: FilePreviewProps["renderBody"];
   previewAccessorySlot?: DataWorkspaceSlot;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   documentSourceKind?: DocumentSourceKind;
@@ -217,7 +216,6 @@ export function DataWorkspace({
   editorSaveMode = "manual",
   htmlTrustMode = "safe",
   previewActionSlot,
-  renderPreviewBody,
   previewAccessorySlot,
   viewerExtensionAdapter = null,
   documentSourceKind,
@@ -505,9 +503,16 @@ export function DataWorkspace({
   const selectedFileContentPending = Boolean(
     selectedFileNeedsFullContent && selectedFile && !selectedFileContent && !selectedFileError,
   );
-  const selectedFileUrl = fileUrlPath === selectedFile?.path ? fileUrl : null;
-  const selectedFileUrlLoading = fileUrlPath === selectedFile?.path ? fileUrlLoading : false;
-  const selectedFileUrlError = fileUrlPath === selectedFile?.path ? fileUrlError : null;
+  const selectedFileUrlMatchesPath = Boolean(selectedFile && fileUrlPath === selectedFile.path);
+  const selectedFileUrl = selectedFileUrlMatchesPath ? fileUrl : null;
+  const selectedFileUrlLoading = Boolean(
+    selectedFileNeedsResourceUrl
+    && selectedFile
+    && (!selectedFileUrlMatchesPath || fileUrlLoading),
+  );
+  const selectedFileUrlError = selectedFileUrlMatchesPath ? fileUrlError : null;
+  const selectedFileResourcePending = selectedFileUrlLoading;
+  const selectedFilePreviewPending = selectedFileContentPending || selectedFileResourcePending;
   const selectedPreviewDocument = useMemo<CommittedPreviewDocument | null>(() => (
     selectedFile
       ? {
@@ -520,13 +525,13 @@ export function DataWorkspace({
         }
       : null
   ), [selectedFile, selectedFileContent, selectedFileError, selectedFileUrl, selectedFileUrlError, selectedFileUrlLoading]);
-  const renderedPreviewDocument = selectedFileContentPending && committedPreviewDocument
+  const renderedPreviewDocument = selectedFilePreviewPending && committedPreviewDocument
     ? committedPreviewDocument
     : selectedPreviewDocument;
   const renderedPreviewIsSelectedFile = renderedPreviewDocument?.node.path === selectedFile?.path;
   const renderedPreviewLoading = renderedPreviewIsSelectedFile
     ? fileLoading || selectedFileContentPending
-    : selectedFileContentPending;
+    : false;
   const renderedPreviewError = renderedPreviewIsSelectedFile ? selectedFileError : null;
   const renderedPreviewUrlLoading = renderedPreviewIsSelectedFile
     ? selectedFileUrlLoading
@@ -890,9 +895,9 @@ export function DataWorkspace({
       return;
     }
 
-    if (selectedFileContentPending) return;
+    if (selectedFilePreviewPending) return;
     setCommittedPreviewDocument(selectedPreviewDocument);
-  }, [selectedPreviewDocument, selectedFileContentPending]);
+  }, [selectedPreviewDocument, selectedFilePreviewPending]);
 
   useEffect(() => {
     if (!selectedFile) {
@@ -1437,7 +1442,6 @@ export function DataWorkspace({
                   documentSourceKind={documentSourceKind ?? resolvedDocumentSourceKind}
                   emptySlot={emptySlot}
                   actionSlot={previewActionSlot}
-                  renderBody={renderPreviewBody}
                   documentPersistence={dataPort.documentPersistence ?? null}
                   onDocumentPersisted={dataPort.documentPersistence && renderedPreviewDocument
                     ? (commit) => applyPersistedFileContent(renderedPreviewDocument.node, commit)

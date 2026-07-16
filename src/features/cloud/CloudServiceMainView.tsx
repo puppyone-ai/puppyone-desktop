@@ -39,7 +39,6 @@ export function CloudServiceMainView({
   onRefresh,
   onOpenDetails,
   onOpenGitSettings,
-  onReviewChanges,
 }: CloudServiceMainViewProps) {
   const { t } = useLocalization();
   const cloudEnvironment = useMemo(
@@ -108,7 +107,7 @@ export function CloudServiceMainView({
   if (localOnlyContext) {
     if (error) {
       return (
-        <main className="desktop-cloud-main-view">
+        <main className="desktop-cloud-main-view desktop-cloud-initialize-main-view">
           <div className="desktop-cloud-page-shell">
             <CloudLocalGitStatusError error={error} loading={loading} onRetry={onRefresh} />
           </div>
@@ -118,7 +117,7 @@ export function CloudServiceMainView({
 
     if (!status) {
       return (
-        <main className="desktop-cloud-main-view">
+        <main className="desktop-cloud-main-view desktop-cloud-initialize-main-view">
           <div className="desktop-cloud-page-shell">
             <CloudWorkspaceLoadingState label={t("cloud.initialize.loadingRepository")} />
           </div>
@@ -127,7 +126,7 @@ export function CloudServiceMainView({
     }
 
     return (
-      <main className="desktop-cloud-main-view">
+      <main className="desktop-cloud-main-view desktop-cloud-initialize-main-view">
         <div className="desktop-cloud-page-shell">
           <CloudLocalOnlyWorkspace
             workspace={workspace}
@@ -145,7 +144,6 @@ export function CloudServiceMainView({
             publishError={cloudBackupError}
             publishCanRetry={cloudBackupCanRetry}
             projectInitialized={cloudBackupProjectInitialized}
-            onReviewChanges={onReviewChanges}
             onPublishWorkspace={onStartPuppyoneBackup}
           />
         </div>

@@ -11,8 +11,9 @@
         "application/vnd.puppyone.puppyflow+json"
       ],
       "category": "data",
-      "defaultViewer": "monaco-code",
+      "defaultViewer": "puppyflow-editor",
       "availableViewers": [
+        "puppyflow-editor",
         "monaco-code"
       ],
       "editable": true,

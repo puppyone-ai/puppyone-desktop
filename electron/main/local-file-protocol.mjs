@@ -1,6 +1,10 @@
+import { Readable } from "node:stream";
+
 export function registerLocalFileProtocol({
   protocol,
   readWorkspaceFile,
+  openWorkspaceFileRangeStream,
+  statWorkspaceFile,
   getMimeType,
   canonicalizeWorkspacePath,
   isOpenWorkspaceRoot,
@@ -9,7 +13,7 @@ export function registerLocalFileProtocol({
 }) {
   protocol.handle("puppyone-local", async (request) => {
     try {
-      if (request.method && request.method !== "GET") {
+      if (request.method && request.method !== "GET" && request.method !== "HEAD") {
         return new Response("Method not allowed", { status: 405 });
       }
       const corsOrigin = getTrustedCorsOrigin(request, applicationUrl);
@@ -36,7 +40,53 @@ export function registerLocalFileProtocol({
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
       };
+      if (request.method === "HEAD") {
+        if (typeof statWorkspaceFile !== "function") {
+          return new Response("Method not implemented", { status: 501 });
+        }
+        const metadata = await statWorkspaceFile(canonicalRoot, relativePath);
+        return new Response(null, {
+          status: 200,
+          headers: {
+            "Content-Type": contentType,
+            "Content-Length": String(metadata.size),
+            "Accept-Ranges": "bytes",
+            ...securityHeaders,
+            ...corsHeaders,
+          },
+        });
+      }
       const rangeHeader = request.headers.get("range");
+      if (rangeHeader && typeof openWorkspaceFileRangeStream === "function") {
+        const fileResult = await openWorkspaceFileRangeStream(
+          canonicalRoot,
+          relativePath,
+          rangeHeader,
+        );
+        if (fileResult.unsatisfiable || !fileResult.stream) {
+          return new Response(null, {
+            status: 416,
+            headers: {
+              "Content-Range": `bytes */${fileResult.size}`,
+              "Accept-Ranges": "bytes",
+              ...securityHeaders,
+              ...corsHeaders,
+            },
+          });
+        }
+
+        return new Response(Readable.toWeb(fileResult.stream), {
+          status: 206,
+          headers: {
+            "Content-Type": contentType,
+            "Content-Length": String(fileResult.end - fileResult.start + 1),
+            "Content-Range": `bytes ${fileResult.start}-${fileResult.end}/${fileResult.size}`,
+            "Accept-Ranges": "bytes",
+            ...securityHeaders,
+            ...corsHeaders,
+          },
+        });
+      }
       const fileResult = await readWorkspaceFile(canonicalRoot, relativePath, { rangeHeader });
       if (fileResult?.unsatisfiable) {
         return new Response(null, {

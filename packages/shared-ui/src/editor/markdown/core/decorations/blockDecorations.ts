@@ -1,14 +1,19 @@
 import type { EditorState } from "@codemirror/state";
 import { Decoration } from "@codemirror/view";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../../../viewerTypes";
-import { createMarkdownBlockFeatureWidget } from "../../features/blockFeatureRegistry";
+import {
+  markdownFeatureCompositionFacet,
+  type MarkdownFeatureComposition,
+} from "../features/markdownFeatureContract";
 import { getMarkdownPlansInRange, type IndexedMarkdownPlan } from "../plans/markdownPlanIndex";
-import type { MarkdownElementPlan } from "../plans/markdownPlanTypes";
-import { isMarkdownTableSourceLine } from "../../features/table/tableModel";
+import type {
+  MarkdownBlockAtomPlan,
+  MarkdownInlineAtomPlan,
+} from "../plans/markdownPlanTypes";
 import { getMarkdownTaskLine, type MarkdownTaskLine } from "../rendering/taskModel";
 import type { ComposingBlockLine } from "../state/composingBlockLine";
-import type { ExpandedImageRange } from "../state/expandedImage";
-import { TaskCheckboxWidget } from "../widgets/inlineWidgets";
+import type { MarkdownRevealedSourceRange } from "../state/revealedSource";
+import { HorizontalRuleWidget, TaskCheckboxWidget } from "../widgets/inlineWidgets";
 import {
   addReplacementDecoration,
   addSourceSyntaxDecoration,
@@ -17,9 +22,7 @@ import {
 } from "./decorationPrimitives";
 import { addInlineMarkdownDecorations } from "./inlineDecorations";
 
-type TaskCheckboxPlan = Extract<MarkdownElementPlan, { presentation: "inlineAtom" }> & {
-  atom: { kind: "taskCheckbox"; checked: boolean };
-};
+type TaskCheckboxPlan = MarkdownInlineAtomPlan<"taskCheckbox">;
 
 const markdownDecorationDiagnostics = {
   rangeBuilds: 0,
@@ -31,7 +34,7 @@ export function addMarkdownBlockAndLineDecorations(
   state: EditorState,
   builders: MarkdownDecorationBuilders,
   inlineRevealRange: InlineRevealRange | null,
-  expandedImageRange: ExpandedImageRange | null,
+  revealedSourceRange: MarkdownRevealedSourceRange | null,
   composingLine: ComposingBlockLine | null,
   htmlTrustMode: MarkdownHtmlTrustMode,
   markdownLinkGraph: MarkdownLinkGraph | null,
@@ -46,6 +49,7 @@ export function addMarkdownBlockAndLineDecorations(
   const lastLine = state.doc.lineAt(rangeTo);
   const plans = getMarkdownPlansInRange(state, firstLine.from, lastLine.to);
   const planLookup = createLinePlanLookup(state, plans);
+  const featureComposition = state.facet(markdownFeatureCompositionFacet);
   markdownDecorationDiagnostics.rangeBuilds += 1;
   markdownDecorationDiagnostics.linesScanned += lastLine.number - firstLine.number + 1;
   if (firstLine.from === 0 && lastLine.to === state.doc.length) {
@@ -54,7 +58,12 @@ export function addMarkdownBlockAndLineDecorations(
 
   for (let lineNumber = firstLine.number; lineNumber <= lastLine.number;) {
     const line = state.doc.line(lineNumber);
-    if (composingLine?.from === line.from) {
+    const explicitlyRevealedBlockLine = (
+      revealedSourceRange?.presentation === "block"
+      && line.from <= revealedSourceRange.to
+      && line.to >= revealedSourceRange.from
+    );
+    if (composingLine?.from === line.from || explicitlyRevealedBlockLine) {
       builders.decorations.push(
         Decoration.line({
           class: "cm-md-source-line",
@@ -66,27 +75,31 @@ export function addMarkdownBlockAndLineDecorations(
 
     const blockPlan = planLookup.blockAtomsByLineFrom.get(line.from) ?? null;
     if (blockPlan) {
-      const widget = createMarkdownBlockFeatureWidget(blockPlan, {
-        htmlTrustMode,
-        markdownLinkGraph,
-        documentPath,
-        markdownAssetUrlResolver,
-      });
-      addReplacementDecoration(
-        builders,
-        Decoration.replace({
-          widget,
-          block: true,
-        }),
-        blockPlan.sourceRange.from,
-        blockPlan.sourceRange.to,
-      );
-      const lastCovered = Math.min(
-        Math.max(blockPlan.sourceRange.to - 1, blockPlan.sourceRange.from),
-        state.doc.length,
-      );
-      lineNumber = state.doc.lineAt(lastCovered).number + 1;
-      continue;
+      const widget = blockPlan.embed.kind === "horizontalRule"
+        ? new HorizontalRuleWidget(blockPlan.layout.estimatedHeight)
+        : featureComposition?.createBlockWidget(blockPlan, {
+            htmlTrustMode,
+            markdownLinkGraph,
+            documentPath,
+            markdownAssetUrlResolver,
+          }) ?? null;
+      if (widget) {
+        addReplacementDecoration(
+          builders,
+          Decoration.replace({
+            widget,
+            block: true,
+          }),
+          blockPlan.sourceRange.from,
+          blockPlan.sourceRange.to,
+        );
+        const lastCovered = Math.min(
+          Math.max(blockPlan.sourceRange.to - 1, blockPlan.sourceRange.from),
+          state.doc.length,
+        );
+        lineNumber = state.doc.lineAt(lastCovered).number + 1;
+        continue;
+      }
     }
 
     decorateMarkdownLine(
@@ -96,7 +109,8 @@ export function addMarkdownBlockAndLineDecorations(
       line.text,
       builders,
       inlineRevealRange,
-      expandedImageRange,
+      revealedSourceRange,
+      htmlTrustMode,
       markdownLinkGraph,
       documentPath,
       markdownAssetUrlResolver,
@@ -112,10 +126,10 @@ function createLinePlanLookup(
   state: EditorState,
   plans: readonly IndexedMarkdownPlan[],
 ): {
-  blockAtomsByLineFrom: ReadonlyMap<number, Extract<MarkdownElementPlan, { presentation: "blockAtom" }>>;
+  blockAtomsByLineFrom: ReadonlyMap<number, MarkdownBlockAtomPlan>;
   plansByLineFrom: ReadonlyMap<number, readonly IndexedMarkdownPlan[]>;
 } {
-  const blockAtomsByLineFrom = new Map<number, Extract<MarkdownElementPlan, { presentation: "blockAtom" }>>();
+  const blockAtomsByLineFrom = new Map<number, MarkdownBlockAtomPlan>();
   const plansByLineFrom = new Map<number, IndexedMarkdownPlan[]>();
   for (const entry of plans) {
     if (entry.plan.presentation === "blockAtom") {
@@ -137,7 +151,8 @@ function decorateMarkdownLine(
   text: string,
   builders: MarkdownDecorationBuilders,
   inlineRevealRange: InlineRevealRange | null,
-  expandedImageRange: ExpandedImageRange | null,
+  revealedSourceRange: MarkdownRevealedSourceRange | null,
+  htmlTrustMode: MarkdownHtmlTrustMode,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
@@ -149,7 +164,10 @@ function decorateMarkdownLine(
     ? { ...parsedTaskLine, checked: taskPlan?.atom.checked ?? parsedTaskLine.checked }
     : null;
   const listMatch = taskLine ? null : /^(\s*)([-*+]|\d+[.)])\s+/.exec(text);
-  const lineClasses = getMarkdownLineClasses(text);
+  const lineClasses = getMarkdownLineClasses(
+    text,
+    state.facet(markdownFeatureCompositionFacet),
+  );
   if (lineClasses) {
     builders.decorations.push(
       Decoration.line({
@@ -183,7 +201,8 @@ function decorateMarkdownLine(
       text,
       builders,
       inlineRevealRange,
-      expandedImageRange,
+      revealedSourceRange,
+      htmlTrustMode,
       markdownLinkGraph,
       documentPath,
       markdownAssetUrlResolver,
@@ -203,7 +222,8 @@ function decorateMarkdownLine(
     text,
     builders,
     inlineRevealRange,
-    expandedImageRange,
+    revealedSourceRange,
+    htmlTrustMode,
     markdownLinkGraph,
     documentPath,
     markdownAssetUrlResolver,
@@ -251,7 +271,10 @@ function cssString(value: string): string {
   return JSON.stringify(value);
 }
 
-function getMarkdownLineClasses(text: string): string {
+function getMarkdownLineClasses(
+  text: string,
+  featureComposition: MarkdownFeatureComposition | null,
+): string {
   const classes: string[] = [];
 
   const headingMatch = /^(#{1,6})(?:\s|$)/.exec(text);
@@ -265,7 +288,7 @@ function getMarkdownLineClasses(text: string): string {
   if (/^\s*(?:[-*+]|\d+[.)])\s+\[[xX]\]/.test(text)) classes.push("cm-md-task-checked");
   if (/^\s*(`{3,}|~{3,})/.test(text)) classes.push("cm-md-code-fence");
   if (/^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/.test(text)) classes.push("cm-md-hr");
-  if (isMarkdownTableSourceLine(text)) classes.push("cm-md-table-line");
+  if (featureComposition) classes.push(...featureComposition.getLineClasses(text));
 
   return classes.join(" ");
 }

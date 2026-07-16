@@ -70,12 +70,20 @@ initial content + storage version
               |
               +----> reportRevision({ revision, dirty })
               |
-              `----> readSnapshot() -> { revision, content }
+              +----> readSnapshot() -> { revision, content }
+              |
+              `----> replaceContent(content) # accepted external version
 ```
 
 The contribution owns `parse()` and `serialize()` when it uses a structured
 model. The snapshot is the complete canonical file representation that should
 be persisted at that revision.
+
+Built-in contributions obtain this boundary through
+`useEditableDocumentSource()`. That hook deliberately exposes only
+`attachSource`, `reportRevision`, and external-baseline reconciliation. The
+session's save commands, status store, queue, and persistence port are not part
+of a contribution's API.
 
 The contribution does not own:
 
@@ -120,6 +128,12 @@ without requiring every contribution to implement its own timer. Physical
 writes remain single-flight: if another edit arrives during a write, the
 session keeps the newest pending snapshot and writes it after the current
 request finishes.
+
+Save-status chrome is presentation, not part of the persistence protocol. The
+Desktop app hides normal save controls and `saving` / `saved` diagnostics by
+default; the `enableEditorSaveStatus` experimental preference may expose them
+for testing. A persistence failure remains visible and retryable, and external
+conflict actions remain visible, regardless of that preference.
 
 ```text
 edit R11 ----> write R11 starts
@@ -172,9 +186,16 @@ appear inside Markdown, CSV, or another editor contribution.
 
 ## 5. Navigation and close
 
-React cleanup is an emergency safety net, not the primary save command.
-Anything that can remove an editable surface must wait for the relevant
-session before changing destructive navigation state.
+React cleanup synchronously detaches the source and captures its final
+snapshot while the editor model is still alive; it does not start an
+untracked async write. Anything that can remove an editable surface must wait
+for the relevant session before changing destructive navigation state.
+
+The active-session registry defers permanent Session disposal until the next
+microtask confirms that no replacement registration exists. This distinguishes
+a real editor unmount from React StrictMode's development-only cleanup/setup
+probe; a probe must never leave the still-mounted editor attached to a disposed
+Session.
 
 ```text
 file switch / leave editor / workspace switch / window close
@@ -205,6 +226,41 @@ The initial concurrency policy is conservative and file-based, similar to a
 traditional local editor:
 
 ```text
+PuppyOne window A saves
+          |
+          v
+authorized atomic writer ----> successful write acknowledgement to A
+          |
+          v
+workspace watcher
+          |
+          +----> window A: suppress the correlated self-write echo
+          |
+          `----> windows B...N: deliver a normal external-change event
+```
+
+The Main process keeps one short-lived entry per written path:
+
+```text
+internalWrites[path] = { resultingVersion, writerWindow }
+```
+
+When the debounced filesystem event arrives, Main fingerprints the final file.
+If that version matches the entry, it suppresses the echo only for the writer;
+other PuppyOne windows still receive the event. If it differs, every window is
+notified because another writer has already superseded the save. There is no
+event log, operation history, or timing-order state.
+
+As a race-safety fallback, the Session also recognizes bytes that exactly
+match its in-flight snapshot as its own acknowledgement; it does not discard a
+newer pending revision or manufacture an external conflict. This
+transport-level loop suppression is shared by every editor format and is not a
+merge coordinator.
+
+Events that do not correlate with the current window's write continue through
+the normal external-change path:
+
+```text
 Agent or another program changes the workspace file
                        |
                        v
@@ -218,11 +274,18 @@ Agent or another program changes the workspace file
              v                   v
        reload new file      do not overwrite
                             report external-change conflict
-                            offer compare / reload / keep current
+                            preserve the local editor snapshot
+                            offer explicit reload / keep-local choices
 ```
 
 The storage version precondition is the final guard: a dirty editor may not
 blindly overwrite a file that changed after it was read.
+
+The current UI preserves both sides and offers two explicit resolutions:
+loading the external version without a write, or keeping the local snapshot
+and saving it conditionally against the newest external version. A retry is
+never reinterpreted as consent to overwrite. Side-by-side comparison and
+format-aware merge remain follow-up capabilities.
 
 PuppyOne does not currently promise simultaneous paragraph-level editing by a
 human and multiple agents. If that product requirement becomes real,
@@ -245,9 +308,10 @@ For a normal single-file editor, the integration footprint is:
 ```text
 new-editor/
   EditorComponent.tsx       # format-specific UI and model
-  contribution.ts           # match, capability, render/load registration
-  sourceAdapter.ts          # reportRevision + readSnapshot
+  sourceAdapter.ts          # reportRevision + readSnapshot + replaceContent
   EditorComponent.test.tsx  # format and round-trip behavior
+
+viewer registry + manifest  # one reviewed route/capability entry
 ```
 
 Adding it should require:
@@ -256,7 +320,8 @@ Adding it should require:
 2. rendering the editor from initial content;
 3. reporting a changed revision;
 4. returning the exact serialized snapshot;
-5. passing the shared editable-contribution conformance tests.
+5. applying an accepted external replacement through its own parser/model;
+6. passing the shared editable-contribution conformance tests.
 
 It should not require changes to `DataWorkspace`, `EditorHost`,
 `DocumentEditingSession`, Local/Cloud ports, Electron IPC, or window-close
@@ -292,13 +357,15 @@ replace the editor's save lifecycle.
 ```text
 packages/shared-ui/src/editor/
   PuppyoneEditorHost.tsx           # route and attach editable boundary
-  viewers/*                        # format-specific contributions
+  viewers/*                        # text/Markdown/CSV contributions
+  puppyflow/*                      # structured PuppyFlow contribution
 
 packages/shared-ui/src/editor/document-session/
   DocumentEditingSession.ts        # thin save lifecycle
   DocumentSessionBoundary.tsx      # React lifetime/status bridge
+  EditableDocumentSourceContext.tsx # narrow contribution-facing bridge
   activeDocumentSessions.ts        # navigation/close flush registry
-  types.ts                         # revision, snapshot, persistence contracts
+  types.ts                         # source/session lifecycle contracts
 
 packages/shared-ui/src/data/
   DataWorkspace.tsx                # committed preview + file-switch gate
@@ -318,8 +385,8 @@ src/App.tsx + src/main.tsx
 
 - Viewer routing is deterministic and has no persistence side effects.
 - A format contribution owns its model and canonical serialization.
-- An editable contribution exposes revision changes and an exact snapshot; it
-  does not write storage directly.
+- An editable contribution exposes revision changes, an exact snapshot, and a
+  format-aware external replacement; it does not write storage directly.
 - `DocumentEditingSession` stays format-agnostic and small.
 - One document has at most one persistence request in flight per session.
 - File, editor-surface, workspace, and normal window close await pending saves.

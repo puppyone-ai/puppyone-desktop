@@ -1,12 +1,8 @@
 import type { EditorState } from "@codemirror/state";
 import { Decoration } from "@codemirror/view";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
-import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../viewerTypes";
-import { createMarkdownImageFeatureWidget } from "../../features/inlineFeatureRegistry";
-import {
-  findMarkdownImageTokens,
-  type MarkdownImageToken,
-} from "../../features/image/markdownImageModel";
+import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../../../viewerTypes";
+import { markdownFeatureCompositionFacet } from "../features/markdownFeatureContract";
 import {
   findMarkdownLinkTokens,
   isExternalMarkdownHref,
@@ -16,7 +12,7 @@ import { findWikiLinkTokens, type MarkdownWikiLinkToken } from "../links/wikiLin
 import type { MarkdownElementPlan } from "../plans/markdownPlanTypes";
 import type { IndexedMarkdownPlan } from "../plans/markdownPlanIndex";
 import { isSafeHref } from "../../platform/policy/markdownHtmlSanitizerPolicy";
-import type { ExpandedImageRange } from "../state/expandedImage";
+import type { MarkdownRevealedSourceRange } from "../state/revealedSource";
 import { isInlineDecorationKind, type MarkdownElement } from "../syntax/markdownElements";
 import { InlineHtmlLineBreakWidget } from "../widgets/inlineWidgets";
 import {
@@ -36,7 +32,8 @@ export function addInlineMarkdownDecorations(
   text: string,
   builders: MarkdownDecorationBuilders,
   inlineRevealRange: InlineRevealRange | null,
-  expandedImageRange: ExpandedImageRange | null,
+  revealedSourceRange: MarkdownRevealedSourceRange | null,
+  htmlTrustMode: MarkdownHtmlTrustMode,
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
@@ -44,6 +41,7 @@ export function addInlineMarkdownDecorations(
   initialOccupied: OccupiedRange[] = [],
 ) {
   const t = state.facet(markdownLocalizationFacet).t;
+  const featureComposition = state.facet(markdownFeatureCompositionFacet);
   const occupied = [...initialOccupied];
   const lineTo = lineFrom + text.length;
   const entries = linePlans
@@ -65,19 +63,40 @@ export function addInlineMarkdownDecorations(
       addInlineHtmlElementDecoration(element, plan, builders, inlineRevealRange);
       continue;
     }
+
+    const expandedFeatureAtom = (
+      plan.presentation === "inlineAtom"
+      && plan.atom.kind === "image"
+      && revealedSourceRange?.presentation === "inline"
+      && revealedSourceRange.from === plan.sourceRange.from
+      && revealedSourceRange.to === plan.sourceRange.to
+    );
+    const featureWidget = plan.presentation === "inlineAtom" && !expandedFeatureAtom
+      ? featureComposition?.createInlineWidget(plan, {
+          htmlTrustMode,
+          markdownLinkGraph,
+          documentPath,
+          markdownAssetUrlResolver,
+        }) ?? null
+      : null;
+    if (featureWidget) {
+      if (!reserveRange(occupied, plan.sourceRange.from, plan.sourceRange.to)) continue;
+      addReplacementDecoration(
+        builders,
+        Decoration.replace({ widget: featureWidget, inclusive: false }),
+        plan.sourceRange.from,
+        plan.sourceRange.to,
+      );
+      continue;
+    }
+    if (expandedFeatureAtom) continue;
+
     const overlapsExclusiveRange = occupied.some((range) => (
       element.from < range.to && element.to > range.from
     ));
-    if (element.kind === "image") {
-      if (!reserveRange(occupied, element.from, element.to)) continue;
-    } else if (overlapsExclusiveRange) {
-      continue;
-    }
+    if (overlapsExclusiveRange) continue;
 
     switch (element.kind) {
-      case "image":
-        addImageElementDecoration(element, lineFrom, tokenLookup, builders, expandedImageRange, documentPath, markdownAssetUrlResolver);
-        break;
       case "wikiLink":
         addWikiLinkElementDecoration(element, lineFrom, tokenLookup, builders, inlineRevealRange, markdownLinkGraph, documentPath, t);
         break;
@@ -106,7 +125,6 @@ export function addInlineMarkdownDecorations(
 }
 
 type InlineTokenLookup = {
-  imagesByFrom: ReadonlyMap<number, MarkdownImageToken>;
   linksByFrom: ReadonlyMap<number, MarkdownLinkToken>;
   wikiLinksByFrom: ReadonlyMap<number, MarkdownWikiLinkToken>;
 };
@@ -117,9 +135,6 @@ function createInlineTokenLookup(
 ): InlineTokenLookup {
   const kinds = new Set(elements.map((element) => element.kind));
   return {
-    imagesByFrom: kinds.has("image")
-      ? new Map(findMarkdownImageTokens(text).map((token) => [token.from, token]))
-      : new Map(),
     linksByFrom: kinds.has("link")
       ? new Map(findMarkdownLinkTokens(text).map((token) => [token.from, token]))
       : new Map(),
@@ -241,39 +256,6 @@ function addEscapeElementDecoration(element: MarkdownElement, builders: Markdown
   for (const markerRange of element.markerRanges) {
     addSourceSyntaxDecoration(builders, markerRange.from, markerRange.to, "escape", false);
   }
-}
-
-function addImageElementDecoration(
-  element: MarkdownElement,
-  lineFrom: number,
-  tokenLookup: InlineTokenLookup,
-  builders: MarkdownDecorationBuilders,
-  expandedImageRange: ExpandedImageRange | null,
-  documentPath: string,
-  markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
-) {
-  if (expandedImageRange?.from === element.from && expandedImageRange.to === element.to) return;
-
-  const candidate = tokenLookup.imagesByFrom.get(element.from - lineFrom);
-  const token = candidate && lineFrom + candidate.to === element.to ? candidate : null;
-  if (!token) return;
-
-  addReplacementDecoration(
-    builders,
-    Decoration.replace({
-      widget: createMarkdownImageFeatureWidget({
-        from: element.from,
-        to: element.to,
-        alt: token.alt,
-        source: token.href,
-        title: token.title,
-        documentPath,
-      }),
-      inclusive: false,
-    }),
-    element.from,
-    element.to,
-  );
 }
 
 function addWikiLinkElementDecoration(

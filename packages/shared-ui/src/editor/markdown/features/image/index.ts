@@ -1,7 +1,8 @@
 export { compileImageElementPlan } from "./imagePlan";
 export {
   findMarkdownImageTokens,
+  findStandardMarkdownImageTokens,
   parseMarkdownImageTokenAt,
-  resolveMarkdownAssetPath,
   type MarkdownImageToken,
 } from "./markdownImageModel";
+export { imageFeature } from "./imageFeature";

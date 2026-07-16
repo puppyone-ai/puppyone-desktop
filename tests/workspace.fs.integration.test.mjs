@@ -10,12 +10,14 @@ import path from "node:path";
 import {
   workspaceFromPath,
   listFolderChildren,
+  openWorkspaceFileRangeStream,
   readWorkspaceFile,
   readWorkspaceTextFile,
   convertWorkspaceOfficeDocumentToDocx,
   writeWorkspaceTextFile,
   createWorkspaceEntry,
   renameWorkspaceEntry,
+  resolveExistingWorkspaceDisplayPath,
   moveWorkspaceEntry,
   copyWorkspaceEntry,
   deleteWorkspaceEntry,
@@ -217,6 +219,47 @@ describe("read / write round-trips", () => {
     expect(out.end).toBe(5);
     expect(out.size).toBe(26);
     expect(out.bytes.toString("utf8")).toBe("cdef");
+  });
+
+  it("resolves one unique Unicode-space display alias but keeps exact names authoritative", async () => {
+    await mkdir(path.join(root, "asserts"));
+    const asciiName = "Screenshot 10.07.43 PM.png";
+    const narrowName = "Screenshot 10.25.51\u202fPM.png";
+    await writeFile(path.join(root, "asserts", asciiName), "ascii");
+    await writeFile(path.join(root, "asserts", narrowName), "narrow");
+
+    await expect(resolveExistingWorkspaceDisplayPath(
+      root,
+      "asserts/Screenshot 10.25.51 PM.png",
+    )).resolves.toBe(await realpath(path.join(root, "asserts", narrowName)));
+    await expect(resolveExistingWorkspaceDisplayPath(
+      root,
+      `asserts/${asciiName}`,
+    )).resolves.toBe(await realpath(path.join(root, "asserts", asciiName)));
+
+    const ambiguousAscii = "Screenshot ambiguous PM.png";
+    const ambiguousNarrow = "Screenshot ambiguous\u202fPM.png";
+    await writeFile(path.join(root, "asserts", ambiguousAscii), "ascii");
+    await writeFile(path.join(root, "asserts", ambiguousNarrow), "narrow");
+    await expect(resolveExistingWorkspaceDisplayPath(
+      root,
+      "asserts/Screenshot ambiguous\u2009PM.png",
+    )).rejects.toThrow(/ambiguous/i);
+  });
+
+  it("streams an exact open-ended media range without buffering the file", async () => {
+    const bytes = Buffer.from("0123456789abcdefghijklmnopqrstuvwxyz");
+    await writeFile(path.join(root, "video.mp4"), bytes);
+
+    const result = await openWorkspaceFileRangeStream(root, "video.mp4", "bytes=10-");
+    expect(result.partial).toBe(true);
+    expect(result.start).toBe(10);
+    expect(result.end).toBe(bytes.length - 1);
+    expect(result.size).toBe(bytes.length);
+
+    const chunks = [];
+    for await (const chunk of result.stream) chunks.push(chunk);
+    expect(Buffer.concat(chunks).toString("utf8")).toBe(bytes.subarray(10).toString("utf8"));
   });
 
   it("readWorkspaceFile (puppyone-local protocol path) rejects a directory and traversal", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import type { DocumentSessionState, EditorDocumentSession } from "./types";
+import type { DocumentEditingSessionHandle, DocumentSessionState } from "./types";
 
 const EMPTY_DOCUMENT_SESSION_STATE: DocumentSessionState = Object.freeze({
   documentId: "",
@@ -13,7 +13,7 @@ const EMPTY_DOCUMENT_SESSION_STATE: DocumentSessionState = Object.freeze({
 });
 
 export function useDocumentSessionState(
-  session: EditorDocumentSession | null | undefined,
+  session: DocumentEditingSessionHandle | null | undefined,
 ): DocumentSessionState {
   const subscribe = useCallback(
     (listener: () => void) => session?.subscribe(listener) ?? (() => undefined),

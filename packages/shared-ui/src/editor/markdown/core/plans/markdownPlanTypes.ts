@@ -1,5 +1,10 @@
-import type { MarkdownTableAlignment, MarkdownTableRow } from "../../features/table/tableModel";
-import type { MarkdownCodeSourceReference } from "../../features/code-block/codeBlockModel";
+import type {
+  MarkdownCodeSourceReference,
+  MarkdownMediaReferenceKind,
+  MarkdownTableAlignment,
+  MarkdownTableRow,
+  MarkdownVideoModel,
+} from "../features/markdownFeatureData";
 import type {
   MarkdownBlockComplexity,
   MarkdownMountedBlockExecution,
@@ -43,7 +48,13 @@ export type TypedContentMark = {
 
 export type InlineAtomModel =
   | { kind: "lineBreak" }
-  | { kind: "image"; alt: string; href: string; title: string | null }
+  | {
+      kind: "image";
+      alt: string;
+      href: string;
+      title: string | null;
+      referenceKind: MarkdownMediaReferenceKind;
+    }
   | { kind: "taskCheckbox"; checked: boolean }
   | { kind: "escape" };
 
@@ -66,43 +77,64 @@ export type BlockEmbedModel =
       rows: readonly MarkdownTableRow[];
       renderKey: string;
     }
+  | { kind: "video"; model: MarkdownVideoModel }
   | { kind: "htmlBlock"; tagName: string | null; closed: boolean; source: string }
   | { kind: "horizontalRule" };
 
-export type MarkdownElementPlan =
-  | {
-      presentation: "visibleSource";
-      sourceRange: SourceRange;
-      diagnostics: readonly MarkdownDiagnostic[];
-      capabilities: { reveal: false; atomic: false; deleteUnits: readonly [] };
-    }
-  | {
-      presentation: "inlineMark";
-      sourceRange: SourceRange;
-      contentRange: SourceRange;
-      markerRanges: readonly SourceRange[];
-      mark: TypedContentMark;
-      diagnostics: readonly MarkdownDiagnostic[];
-      capabilities: InlineMarkCapabilities;
-    }
-  | {
+export type VisibleSourcePlan = {
+  presentation: "visibleSource";
+  sourceRange: SourceRange;
+  diagnostics: readonly MarkdownDiagnostic[];
+  capabilities: { reveal: false; atomic: false; deleteUnits: readonly [] };
+};
+
+export type InlineMarkPlan = {
+  presentation: "inlineMark";
+  sourceRange: SourceRange;
+  contentRange: SourceRange;
+  markerRanges: readonly SourceRange[];
+  mark: TypedContentMark;
+  diagnostics: readonly MarkdownDiagnostic[];
+  capabilities: InlineMarkCapabilities;
+};
+
+type DistributedInlineAtomPlan<Atom extends InlineAtomModel> = Atom extends InlineAtomModel
+  ? {
       presentation: "inlineAtom";
       sourceRange: SourceRange;
-      atom: InlineAtomModel;
+      atom: Atom;
       layout: { lineBreaks: number; estimatedHeight?: number };
       diagnostics: readonly MarkdownDiagnostic[];
       capabilities: AtomicInlineCapabilities;
     }
-  | {
+  : never;
+
+type DistributedBlockAtomPlan<Embed extends BlockEmbedModel> = Embed extends BlockEmbedModel
+  ? {
       presentation: "blockAtom";
       sourceRange: SourceRange;
-      embed: BlockEmbedModel;
+      embed: Embed;
       complexity: MarkdownBlockComplexity;
       execution: MarkdownMountedBlockExecution;
       layout: { estimatedHeight: number };
       diagnostics: readonly MarkdownDiagnostic[];
       capabilities: BlockEmbedCapabilities;
-    };
+    }
+  : never;
+
+export type MarkdownInlineAtomPlan<
+  K extends InlineAtomModel["kind"] = InlineAtomModel["kind"],
+> = Extract<DistributedInlineAtomPlan<InlineAtomModel>, { atom: { kind: K } }>;
+
+export type MarkdownBlockAtomPlan<
+  K extends BlockEmbedModel["kind"] = BlockEmbedModel["kind"],
+> = Extract<DistributedBlockAtomPlan<BlockEmbedModel>, { embed: { kind: K } }>;
+
+export type MarkdownElementPlan =
+  | VisibleSourcePlan
+  | InlineMarkPlan
+  | DistributedInlineAtomPlan<InlineAtomModel>
+  | DistributedBlockAtomPlan<BlockEmbedModel>;
 
 export function planHasCollapsedMarkerDeletion(plan: MarkdownElementPlan): boolean {
   return plan.capabilities.deleteUnits.length > 0;

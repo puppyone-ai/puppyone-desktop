@@ -3,7 +3,7 @@ import type { EditorView } from "@codemirror/view";
 import type { MarkdownLinkGraph } from "../../../viewerTypes";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { requestMarkdownTableFocus } from "./tableFocusState";
-import { renderMarkdownInlineFromSharedPolicy } from "../../core/preview/markdownInlinePlanAdapter";
+import type { MarkdownInlinePreviewRenderer } from "../../shared/preview/markdownInlinePreviewPort";
 import { createPrincipalFromView, openMarkdownHref } from "../../core/editor/markdownLivePreviewContext";
 import {
   sanitizeMarkdownTableCell,
@@ -35,6 +35,7 @@ export type MarkdownTableCellEditorContext = {
   rowCount: number;
   rowIndex: number;
   rows: readonly MarkdownTableRow[];
+  renderInlinePreview: MarkdownInlinePreviewRenderer;
   tableFrom: number;
   tableTo: number;
   view: EditorView;
@@ -59,6 +60,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
     rowCount,
     rowIndex,
     rows,
+    renderInlinePreview,
     tableFrom,
     tableTo,
     view,
@@ -94,6 +96,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
     const signal = previewAbort.signal;
     return host.assets
       .resolve({
+        kind: "image",
         principal: createPrincipalFromView(view, "asset-read"),
         sourcePath,
         href,
@@ -109,7 +112,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
   };
   const renderPreview = (source: string) => {
     resetPreviewAssets();
-    renderTableCellPreview(content, source, markdownLinkGraph, documentPath, view, resolvePreviewAsset, () => {
+    renderTableCellPreview(content, source, markdownLinkGraph, documentPath, view, renderInlinePreview, resolvePreviewAsset, () => {
       host.requestMeasure();
     });
   };
@@ -442,6 +445,7 @@ function renderTableCellPreview(
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
   view: EditorView,
+  renderInlinePreview: MarkdownInlinePreviewRenderer,
   resolveAssetUrl: (sourcePath: string, href: string, signal?: AbortSignal) => Promise<string | null>,
   onLayoutChange: () => void,
 ) {
@@ -449,7 +453,7 @@ function renderTableCellPreview(
   // and broker-backed image/link wrappers. This is not the full document plan
   // adapter, and no raw asset resolver reaches this path.
   content.replaceChildren();
-  renderMarkdownInlineFromSharedPolicy(content, source, {
+  renderInlinePreview(content, source, {
     t: getMarkdownMessageFormatter(view),
     markdownLinkGraph,
     resolveAssetUrl,

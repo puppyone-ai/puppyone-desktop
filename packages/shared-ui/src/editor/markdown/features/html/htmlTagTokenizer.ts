@@ -1,3 +1,7 @@
+import type { MarkdownHtmlAttribute } from "../../core/features/markdownFeatureData";
+
+export type { MarkdownHtmlAttribute } from "../../core/features/markdownFeatureData";
+
 export const MARKDOWN_HTML_VOID_TAGS = new Set([
   "area",
   "base",
@@ -13,13 +17,6 @@ export const MARKDOWN_HTML_VOID_TAGS = new Set([
   "track",
   "wbr",
 ]);
-
-export type MarkdownHtmlAttribute = {
-  name: string;
-  value: string | null;
-  from: number;
-  to: number;
-};
 
 export type MarkdownHtmlTagToken = {
   from: number;

@@ -1,8 +1,5 @@
 import type { MarkdownElement } from "../syntax/markdownElements";
-import { compileCodeBlockElementPlan } from "../../features/code-block/codeBlockPlan";
-import { compileHtmlBlockElementPlan, compileInlineHtmlElementPlan } from "../../features/html/htmlPlan";
-import { compileImageElementPlan } from "../../features/image/imagePlan";
-import { compileTableElementPlan } from "../../features/table/tablePlan";
+import type { MarkdownFeatureComposition } from "../features/markdownFeatureContract";
 import type { MarkdownElementPlan } from "./markdownPlanTypes";
 import { BLOCK_EMBED_CAPABILITIES, cloneRange, rangeOf, visibleSourcePlan } from "./planPrimitives";
 import {
@@ -13,10 +10,12 @@ import {
 
 export type MarkdownPlanCompileContext = Readonly<{
   documentProfile: MarkdownDocumentProfile;
+  featureComposition: MarkdownFeatureComposition | null;
 }>;
 
 const DEFAULT_COMPILE_CONTEXT: MarkdownPlanCompileContext = Object.freeze({
   documentProfile: "normal",
+  featureComposition: null,
 });
 
 /**
@@ -28,9 +27,12 @@ export function compileMarkdownElementPlan(
   element: MarkdownElement,
   context: MarkdownPlanCompileContext = DEFAULT_COMPILE_CONTEXT,
 ): MarkdownElementPlan {
+  const featurePlan = context.featureComposition?.compileElement(element, {
+    documentProfile: context.documentProfile,
+  }) ?? null;
+  if (featurePlan) return featurePlan;
+
   switch (element.kind) {
-    case "inlineHtml":
-      return compileInlineHtmlElementPlan(element);
     case "strong":
       return compileDelimitedInlineMarkPlan(element, "strong", "cm-md-syntax-strong");
     case "emphasis":
@@ -42,8 +44,6 @@ export function compileMarkdownElementPlan(
     case "link":
     case "wikiLink":
       return compileLinkLikePlan(element);
-    case "image":
-      return compileImageElementPlan(element);
     case "escape":
       return {
         presentation: "inlineAtom",
@@ -58,12 +58,6 @@ export function compileMarkdownElementPlan(
           expand: false,
         },
       };
-    case "fence":
-      return compileCodeBlockElementPlan(element, context.documentProfile);
-    case "table":
-      return compileTableElementPlan(element, context.documentProfile);
-    case "htmlBlock":
-      return compileHtmlBlockElementPlan(element, context.documentProfile);
     case "rule":
       return compileHorizontalRuleAtomPlan(element, context.documentProfile);
     case "task":

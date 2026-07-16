@@ -15,6 +15,9 @@
 /* Generic document preview + CSV table editor */
 @import "./editor/document-preview.css";
 
+/* Structured PuppyFlow editor */
+@import "./editor/puppyflow-editor.css";
+
 /* Editor chrome: live surface, save overlay, mode toggle, plain text editor */
 @import "./editor/editor-chrome.css";
 

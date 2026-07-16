@@ -8,9 +8,7 @@ type CsvViewerProps = Pick<
   | "document"
   | "content"
   | "canEdit"
-  | "documentSession"
   | "hideSourceView"
-  | "saveMode"
 >;
 
 export function CsvViewer(context: CsvViewerProps) {
@@ -22,9 +20,7 @@ export function CsvViewer(context: CsvViewerProps) {
       nodeName={context.document.name}
       defaultMode="live"
       canEdit={context.canEdit}
-      documentSession={context.documentSession}
       hideSourceView={context.hideSourceView}
-      saveMode={context.saveMode}
       renderLive={(value, controls) => (
         <CsvTableEditor
           documentId={context.document.path}

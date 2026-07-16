@@ -9,23 +9,68 @@ import type { PresetViewerRenderContext } from "../viewerTypes";
 type ResourceViewerProps = Pick<
   PresetViewerRenderContext,
   | "document"
-  | "content"
   | "fileUrl"
   | "fileUrlLoading"
   | "fileUrlError"
   | "fileIconTheme"
 >;
 
-export function ImageResourceViewer({ document, content, fileUrl, fileUrlLoading, fileUrlError }: ResourceViewerProps) {
-  const imageSource = fileUrl || content || document.preview || null;
+export function ImageResourceViewer({ document, fileUrl, fileUrlLoading, fileUrlError }: ResourceViewerProps) {
   return (
-    <ResourcePreviewState fileUrl={imageSource} loading={fileUrlLoading} error={fileUrlError} kind="image">
+    <ResourcePreviewState fileUrl={fileUrl} loading={fileUrlLoading} error={fileUrlError} kind="image">
       {(url) => (
-        <div className="native-preview native-preview-centered">
-          <img className="native-image-preview" src={url} alt={document.name} />
-        </div>
+        <ImagePreviewSurface url={url} name={document.name} />
       )}
     </ResourcePreviewState>
+  );
+}
+
+function ImagePreviewSurface({ url, name }: { url: string; name: string }) {
+  const { t } = useLocalization();
+  const [readyUrl, setReadyUrl] = useState<string | null>(null);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const ready = readyUrl === url;
+  const failed = failedUrl === url;
+
+  if (failed) {
+    return (
+      <div className="editor-state danger">
+        {t("editor.resource.unavailable", { kind: t("editor.resource.kind.image") })}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="native-preview native-preview-centered native-image-preview-shell"
+      data-preview-state={ready ? "ready" : "loading"}
+      aria-busy={!ready}
+    >
+      {!ready && (
+        <div className="native-image-preview-state" role="status">
+          {t("editor.preview.loading")}
+        </div>
+      )}
+      <img
+        key={url}
+        className="native-image-preview"
+        src={url}
+        alt={name}
+        decoding="async"
+        hidden={!ready}
+        aria-hidden={!ready}
+        onLoad={(event) => {
+          const image = event.currentTarget;
+          const markReady = () => setReadyUrl(url);
+          if (typeof image.decode !== "function") {
+            markReady();
+            return;
+          }
+          void image.decode().catch(() => undefined).then(markReady);
+        }}
+        onError={() => setFailedUrl(url)}
+      />
+    </div>
   );
 }
 

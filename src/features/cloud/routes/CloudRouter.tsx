@@ -245,7 +245,6 @@ export function CloudRouter({
         hasHeadCommit={Boolean(status?.headCommitId)}
         hasCurrentBranch={Boolean(status?.branch && status.branch !== "HEAD")}
         publishLoading={cloudBackupLoading}
-        onReviewChanges={onOpenGitSettings}
         onPublishWorkspace={onBackupWorkspace}
       />
     );

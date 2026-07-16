@@ -15,7 +15,7 @@ const logicalUiStyles = [
   "../src/features/desktop-agent/ui/styles/composer.css",
   "../src/features/desktop-agent/ui/styles/transcript.css",
   "../src/features/plugins/plugins.css",
-  "../src/features/puppyflow/puppyflow.css",
+  "../packages/shared-ui/src/styles/editor/puppyflow-editor.css",
   "../src/styles/settings-controls.css",
   "../src/styles/settings-view.css",
   "../src/styles/settings.css",

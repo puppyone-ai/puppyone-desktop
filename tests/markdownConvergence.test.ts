@@ -6,7 +6,7 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { EditorView } from "@codemirror/view";
 import { describe, expect, it, vi } from "vitest";
 import { bindInlineHtmlDomInteractions } from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlDomAdapter";
-import { renderMarkdownInlineFromSharedPolicy } from "../packages/shared-ui/src/editor/markdown/core/preview/markdownInlinePlanAdapter";
+import { renderMarkdownInlineFromSharedPolicy } from "../packages/shared-ui/src/editor/markdown/composition/preview/markdownInlinePlanAdapter";
 import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
@@ -20,12 +20,18 @@ import {
   renderMermaidDiagram,
   sanitizeMermaidSvg,
 } from "../packages/shared-ui/src/editor/markdown/features/mermaid/mermaidRenderer";
-import { puppyMarkdownParserExtensions } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
+import {
+  puppyMarkdownFeatureCompositionExtension,
+  puppyMarkdownParserExtensions,
+} from "../packages/shared-ui/src/editor/markdown/composition/markdownFeatureComposition";
 
 function createMarkdownState(source: string) {
   return EditorState.create({
     doc: source,
-    extensions: [markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions })],
+    extensions: [
+      puppyMarkdownFeatureCompositionExtension,
+      markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
+    ],
   });
 }
 
@@ -36,7 +42,7 @@ async function flushAsyncRendering() {
 }
 
 describe("Markdown semantic-plan convergence", () => {
-  it("keeps parser marker ranges while enriching image plans with token payload", () => {
+  it("compiles one complete image semantic payload into the image plan", () => {
     const plans = getMarkdownPlanIndex(createMarkdownState('![diagram](assets/a.png "Architecture")'));
     const image = plans.find(({ plan }) => plan.presentation === "inlineAtom" && plan.atom.kind === "image");
     expect(image?.plan.presentation).toBe("inlineAtom");
@@ -46,6 +52,7 @@ describe("Markdown semantic-plan convergence", () => {
         alt: "diagram",
         href: "assets/a.png",
         title: "Architecture",
+        referenceKind: "markdown-path",
       });
       expect(image.plan.diagnostics).toEqual([]);
     }
@@ -92,6 +99,10 @@ describe("Markdown HTML profile convergence", () => {
     expect(isTagAllowedInProfile("img", "inline")).toBe(false);
     expect(isTagAllowedInProfile("img", "block")).toBe(false);
     expect(isTagAllowedInProfile("img", "inline", { brokeredMedia: true })).toBe(true);
+    expect(isTagAllowedInProfile("video", "block")).toBe(false);
+    expect(isTagAllowedInProfile("source", "block")).toBe(false);
+    expect(isTagAllowedInProfile("video", "block", { deferredMedia: true })).toBe(true);
+    expect(isTagAllowedInProfile("source", "block", { deferredMedia: true })).toBe(true);
     expect(isTagAllowedInProfile("audio", "inline", { brokeredMedia: true })).toBe(false);
   });
 

@@ -11,3 +11,4 @@ export {
   type MarkdownTableRow,
   type MarkdownTableStructureOperation,
 } from "./tableModel";
+export { createTableFeature } from "./tableFeature";

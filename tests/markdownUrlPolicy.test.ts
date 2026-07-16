@@ -8,12 +8,18 @@ import {
 } from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownUrlPolicy";
 import { compileInlineHtmlRenderPlan } from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlPolicy";
 import { getMarkdownInlineHtml } from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlModel";
-import { puppyMarkdownParserExtensions } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
+import {
+  puppyMarkdownFeatureCompositionExtension,
+  puppyMarkdownParserExtensions,
+} from "../packages/shared-ui/src/editor/markdown/composition/markdownFeatureComposition";
 
 function createMarkdownState(source: string) {
   return EditorState.create({
     doc: source,
-    extensions: [markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions })],
+    extensions: [
+      puppyMarkdownFeatureCompositionExtension,
+      markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
+    ],
   });
 }
 

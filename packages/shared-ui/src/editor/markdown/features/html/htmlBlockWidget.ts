@@ -1,3 +1,4 @@
+import { EditorSelection } from "@codemirror/state";
 import { EditorView, WidgetType } from "@codemirror/view";
 import { bidiIsolate } from "@puppyone/localization/core";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode } from "../../../viewerTypes";
@@ -6,8 +7,8 @@ import { disposeWidgetSessionDom } from "../../platform/codemirror/widgetSession
 import { bindInlineHtmlDomInteractions } from "./inlineHtmlDomAdapter";
 import {
   resolveMarkdownImageSrcset,
-  type BrokeredMarkdownAssetUrlResolver,
 } from "../image/markdownImageModel";
+import type { BrokeredMarkdownMediaUrlResolver } from "../media/markdownMediaReference";
 import type { MarkdownHtmlBlock } from "./htmlBlockModel";
 import { createSanitizedBlockHtmlFragment } from "./sanitizeHtml";
 import type { AssetBrokerHandle } from "../../platform/brokers/assetBroker";
@@ -28,7 +29,9 @@ import {
   MARKDOWN_RICH_BLOCK_EXECUTION,
   type MarkdownMountedBlockExecution,
 } from "../../core/plans/markdownBlockExecution";
+import { markdownRevealedSourceEffect } from "../../core/state/revealedSource";
 import { isBrokerSafeResolvedAssetUrl } from "../../platform/policy/markdownAssetPolicy";
+import { getMappedWidgetSourceRange } from "../../shared/widgets/widgetDom";
 
 const HTML_MEDIA_RESOLUTION_CONCURRENCY = 6;
 
@@ -91,7 +94,6 @@ export class HtmlBlockWidget extends WidgetType {
     shell.dir = direction;
     const measure = new MarkdownWidgetMeasureController(host.layout);
     let previewVersion = 0;
-    let showingSource = false;
     let activated = this.execution.mode !== "deferred";
     let webEmbedId: string | null = null;
     const activeAssetHandles = new Set<AssetBrokerHandle>();
@@ -206,14 +208,14 @@ export class HtmlBlockWidget extends WidgetType {
 
     /**
      * Build an asset resolver that routes through the host's asset broker so
-     * all image loads are tracked under a capability principal and can be
+     * all media loads are tracked under a capability principal and can be
      * revoked on session dispose.
      */
-    const buildBrokerAssetResolver = (version: number): BrokeredMarkdownAssetUrlResolver | null => {
+    const buildBrokerAssetResolver = (version: number): BrokeredMarkdownMediaUrlResolver | null => {
       if (!this.markdownAssetUrlResolver) return null;
       const principal = createPrincipalFromView(view, "asset-read");
-      return (docPath, href, signal) =>
-        host.assets.resolve({ principal, sourcePath: docPath, href, signal })
+      return (docPath, href, kind, signal) =>
+        host.assets.resolve({ kind, principal, sourcePath: docPath, href, signal })
           .then((handle) => {
             if (!handle) return null;
             if (signal?.aborted || !isPreviewVersionCurrent(version)) {
@@ -304,24 +306,27 @@ export class HtmlBlockWidget extends WidgetType {
     const render = () => {
       clearPreviewLifecycle();
       const version = nextPreviewVersion();
-      content.replaceChildren(
-        showingSource ? createHtmlSourceBlock(this.block.source) : createPreviewBlock(version),
-      );
-      toggleButton.replaceChildren(createHtmlWidgetIcon(showingSource ? "preview" : "source"));
-      const toggleLabel = showingSource
-        ? t("editor.markdown.html.showPreview")
-        : t("editor.markdown.html.showSource");
+      content.replaceChildren(createPreviewBlock(version));
+      toggleButton.replaceChildren(createHtmlSourceIcon());
+      const toggleLabel = t("editor.markdown.html.showSource");
       toggleButton.title = toggleLabel;
       toggleButton.setAttribute("aria-label", toggleLabel);
-      toggleButton.classList.toggle("active", showingSource);
       measure.schedule();
     };
 
     toggleButton.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      showingSource = !showingSource;
-      render();
+      const range = getMappedWidgetSourceRange(view, shell, this.block.source.length);
+      if (!range) return;
+      view.dispatch({
+        effects: markdownRevealedSourceEffect.of({ ...range, presentation: "block" }),
+        selection: EditorSelection.cursor(Math.min(range.to, range.from + 1)),
+        scrollIntoView: true,
+      });
+      queueMicrotask(() => {
+        if (view.dom.isConnected) view.focus();
+      });
     });
 
     render();
@@ -345,18 +350,6 @@ export class HtmlBlockWidget extends WidgetType {
   ignoreEvent() {
     return true;
   }
-}
-
-function createHtmlSourceBlock(source: string): HTMLElement {
-  const pre = document.createElement("pre");
-  pre.className = "cm-md-html-source-block";
-  pre.dir = "ltr";
-
-  const code = document.createElement("code");
-  code.textContent = source;
-  pre.appendChild(code);
-
-  return pre;
 }
 
 function createSanitizedHtmlPreviewBlock(
@@ -395,7 +388,7 @@ function hydrateDeferredHtmlMedia({
 }: {
   root: HTMLElement;
   documentPath: string;
-  resolver: BrokeredMarkdownAssetUrlResolver;
+  resolver: BrokeredMarkdownMediaUrlResolver;
   signal: AbortSignal;
   isCurrent: () => boolean;
   onLayoutChange: () => void;
@@ -424,7 +417,7 @@ function hydrateDeferredHtmlMedia({
     if (source) {
       tasks.push(async () => {
         try {
-          const resolved = await resolver(documentPath, source, signal);
+          const resolved = await resolver(documentPath, source, "image", signal);
           if (signal.aborted || !isCurrent() || !image.isConnected) return;
           if (resolved && isBrokerSafeResolvedAssetUrl(resolved)) image.src = resolved;
         } catch {
@@ -438,7 +431,12 @@ function hydrateDeferredHtmlMedia({
     if (sourceSet) {
       tasks.push(async () => {
         try {
-          const resolved = await resolveMarkdownImageSrcset(sourceSet, documentPath, resolver, signal);
+          const resolved = await resolveMarkdownImageSrcset(
+            sourceSet,
+            documentPath,
+            (sourcePath, href, nextSignal) => resolver(sourcePath, href, "image", nextSignal),
+            signal,
+          );
           if (signal.aborted || !isCurrent() || !image.isConnected) return;
           if (resolved) image.srcset = resolved;
         } catch {
@@ -448,6 +446,69 @@ function hydrateDeferredHtmlMedia({
         }
       });
     }
+  }
+
+  for (const video of root.querySelectorAll<HTMLVideoElement>("video")) {
+    const directSource = video.dataset.mdAssetSrc ?? null;
+    const posterSource = video.dataset.mdAssetPoster ?? null;
+    const sourceElements = Array.from(video.querySelectorAll<HTMLSourceElement>("source"))
+      .map((source) => ({ source, href: source.dataset.mdAssetSrc ?? null }))
+      .filter((entry): entry is { source: HTMLSourceElement; href: string } => Boolean(entry.href));
+    if (!directSource && !posterSource && sourceElements.length === 0) continue;
+
+    video.controls = true;
+    video.autoplay = false;
+    video.preload = video.preload === "none" ? "none" : "metadata";
+    video.addEventListener("loadedmetadata", onLayoutChange, { once: true });
+    video.addEventListener("error", onLayoutChange, { once: true });
+
+    tasks.push(async () => {
+      try {
+        const [resolvedDirect, resolvedPoster, resolvedChildren] = await Promise.all([
+          directSource
+            ? resolver(documentPath, directSource, "video", signal)
+            : Promise.resolve(null),
+          posterSource
+            ? resolver(documentPath, posterSource, "image", signal)
+            : Promise.resolve(null),
+          Promise.all(sourceElements.map(({ href }) => resolver(documentPath, href, "video", signal))),
+        ]);
+        if (signal.aborted || !isCurrent() || !video.isConnected) return;
+
+        if (resolvedDirect && isBrokerSafeResolvedAssetUrl(resolvedDirect, "video")) {
+          video.setAttribute("src", resolvedDirect);
+        }
+        if (resolvedPoster && isBrokerSafeResolvedAssetUrl(resolvedPoster, "image")) {
+          video.setAttribute("poster", resolvedPoster);
+        }
+        for (let index = 0; index < sourceElements.length; index += 1) {
+          const resolved = resolvedChildren[index];
+          const element = sourceElements[index]?.source;
+          if (resolved && element && isBrokerSafeResolvedAssetUrl(resolved, "video")) {
+            element.setAttribute("src", resolved);
+          }
+        }
+        try {
+          video.load();
+        } catch {
+          // Chromium owns media decode errors; the sanitized element remains
+          // an honest, inert playback surface.
+        }
+      } catch {
+        // Unresolved media never receives an ambient source URL.
+      } finally {
+        if (!signal.aborted && isCurrent() && video.isConnected) {
+          delete video.dataset.mdAssetSrc;
+          delete video.dataset.mdAssetPoster;
+          for (const { source } of sourceElements) {
+            delete source.dataset.mdAssetSrc;
+            source.removeAttribute("aria-busy");
+          }
+          video.removeAttribute("aria-busy");
+          onLayoutChange();
+        }
+      }
+    });
   }
   void runDeferredMediaTasks(tasks, signal);
 }
@@ -534,7 +595,7 @@ function createDeferredHtmlPlaceholder(onActivate: () => void): HTMLElement {
   return placeholder;
 }
 
-function createHtmlWidgetIcon(kind: "preview" | "source"): SVGElement {
+function createHtmlSourceIcon(): SVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("width", "13");
   svg.setAttribute("height", "13");
@@ -546,29 +607,14 @@ function createHtmlWidgetIcon(kind: "preview" | "source"): SVGElement {
   svg.setAttribute("stroke-linejoin", "round");
   svg.setAttribute("aria-hidden", "true");
 
-  const paths = kind === "preview"
-    ? [
-        ["path", "M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"],
-        ["circle", "M12 12", "3"],
-      ] as const
-    : [
-        ["polyline", "16 18 22 12 16 6"],
-        ["polyline", "8 6 2 12 8 18"],
-      ] as const;
+  const paths = [
+    ["polyline", "16 18 22 12 16 6"],
+    ["polyline", "8 6 2 12 8 18"],
+  ] as const;
 
   for (const item of paths) {
-    if (item[0] === "circle") {
-      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      circle.setAttribute("cx", "12");
-      circle.setAttribute("cy", "12");
-      circle.setAttribute("r", item[2]);
-      svg.appendChild(circle);
-      continue;
-    }
-
     const element = document.createElementNS("http://www.w3.org/2000/svg", item[0]);
-    if (item[0] === "path") element.setAttribute("d", item[1]);
-    else element.setAttribute("points", item[1]);
+    element.setAttribute("points", item[1]);
     svg.appendChild(element);
   }
 

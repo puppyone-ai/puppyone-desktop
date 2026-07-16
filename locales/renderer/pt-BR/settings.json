@@ -114,6 +114,8 @@
   "experimental.minimalMode.title": "Modo mínimo",
   "experimental.viewerPlugins.title": "Plugins de visualização",
   "experimental.viewerPlugins.detail": "Ative a página experimental de Plugins somente local e seu atalho de navegação opcional.",
+  "experimental.editorSaveStatus.title": "Status de salvamento do editor",
+  "experimental.editorSaveStatus.detail": "Mostra o controle de salvamento e o diagnóstico de status no canto superior direito. Os arquivos continuam sendo salvos normalmente quando isso está oculto.",
   "experimental.projectsHome.title": "Página inicial de projetos",
   "experimental.projectsHome.detail": "Experimente o layout unificado de cartões para projetos da Cloud e locais.",
   "experimental.agentChat.title": "Chat do agente",

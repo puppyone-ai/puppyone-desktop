@@ -4,7 +4,10 @@ import {
   getCollapsedMarkerDeletionUnit,
   getExpandableInlineAtomAtSelection,
 } from "../plans/markdownPlanIndex";
-import { markdownExpandedImageEffect } from "../state/expandedImage";
+import {
+  markdownRevealedSourceEffect,
+  markdownRevealedSourceField,
+} from "../state/revealedSource";
 import { isSelectionInComposingBlockLine, markdownComposingBlockLineField } from "../state/composingBlockLine";
 import {
   getBlockMarkerAtVisibleStart,
@@ -24,6 +27,7 @@ import {
 import { toggleMarkdownInline, wrapMarkdownLink } from "./markdownInlineCommands";
 
 export const markdownEditingKeymap: readonly KeyBinding[] = [
+  { key: "Escape", run: collapseMarkdownRevealedSource },
   { key: "Backspace", run: deleteMarkdownMarkerBackward },
   { key: "Delete", run: deleteMarkdownMarkerForward },
   { key: "Enter", run: handleMarkdownEnter },
@@ -49,6 +53,16 @@ export const markdownEditingKeymap: readonly KeyBinding[] = [
   { key: "Mod-Shift-x", run: toggleMarkdownInline("~~"), preventDefault: true },
   { key: "Mod-k", run: wrapMarkdownLink, preventDefault: true },
 ];
+
+function collapseMarkdownRevealedSource(view: EditorView): boolean {
+  const revealed = view.state.field(markdownRevealedSourceField, false);
+  if (!revealed) return false;
+  view.dispatch({
+    effects: markdownRevealedSourceEffect.of(null),
+    selection: EditorSelection.cursor(revealed.to),
+  });
+  return true;
+}
 
 function moveMarkdownCaretLeftAcrossHiddenBlockMarker(view: EditorView): boolean {
   const { state } = view;
@@ -146,9 +160,10 @@ function expandSelectedInlineAtom(view: EditorView): boolean {
 
   if (entry.plan.atom.kind === "image") {
     view.dispatch({
-      effects: markdownExpandedImageEffect.of({
+      effects: markdownRevealedSourceEffect.of({
         from: entry.plan.sourceRange.from,
         to: entry.plan.sourceRange.to,
+        presentation: "inline",
       }),
       selection: EditorSelection.cursor(entry.plan.sourceRange.from + 2),
     });

@@ -1,17 +1,13 @@
 import {
-  useCallback,
   useMemo,
   type ComponentProps,
 } from "react";
 import {
   DataWorkspace,
-  DocumentSessionBoundary,
   type AiEditRequest,
   type DataNode,
   type DataWorkspaceActivePathChangeContext,
   type EditorInteractionPreferences,
-  type EditorDocumentSession,
-  type FilePreviewBodyContext,
   type Workspace,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
@@ -26,8 +22,6 @@ import {
 } from "../data-workspace/useFileClipboard";
 import type { PuppyoneWorkspaceConfig } from "../../types/electron";
 import type { DesktopCreateEntryAnchorInput } from "../data-workspace/nodeActions";
-import { PuppyFlowEditor } from "../puppyflow/PuppyFlowEditor";
-import { isPuppyFlowFile } from "../puppyflow/puppyflowModel";
 import { isViewerPluginsEnabled } from "../plugins";
 import type { DesktopPreferencesController } from "./useDesktopPreferences";
 import type { DesktopWorkspaceSurfaceAction } from "./navigation";
@@ -119,35 +113,6 @@ export function DesktopWorkspaceContent({
     settings: preferences.experimentalSettings,
     workspaceIsCloud: cloudWorkspace,
   });
-  const renderPreviewBody = useCallback((node: DataNode, context: FilePreviewBodyContext) => {
-    if (!isPuppyFlowFile(node.name, node.type)) return undefined;
-
-    const editor = (documentSession: EditorDocumentSession | null = null) => (
-      <PuppyFlowEditor
-        node={node}
-        fileContent={context.fileContent}
-        workspacePath={workspace?.path ?? null}
-        loading={context.loading}
-        error={context.error}
-        documentSession={documentSession}
-      />
-    );
-
-    if (!context.documentPersistence) return editor();
-    return (
-      <DocumentSessionBoundary
-        documentId={node.path}
-        initialContent={context.fileContent?.content ?? ""}
-        initialVersion={context.fileContent?.version ?? null}
-        saveMode="auto"
-        persistence={context.documentPersistence}
-        onPersisted={context.onDocumentPersisted}
-      >
-        {editor}
-      </DocumentSessionBoundary>
-    );
-  }, [workspace?.path]);
-
   const {
     adapter: viewerExtensionAdapter,
     hostAvailable: externalViewerPacksEnabled,
@@ -160,8 +125,12 @@ export function DesktopWorkspaceContent({
     workspacePath: workspace.path,
   });
   const editorInteractionPreferences = useMemo<EditorInteractionPreferences>(() => ({
+    showSaveStatus: preferences.experimentalSettings.enableEditorSaveStatus,
     markdownBlockDragEnabled: preferences.experimentalSettings.enableMarkdownBlockDrag,
-  }), [preferences.experimentalSettings.enableMarkdownBlockDrag]);
+  }), [
+    preferences.experimentalSettings.enableEditorSaveStatus,
+    preferences.experimentalSettings.enableMarkdownBlockDrag,
+  ]);
   const {
     availableSurfaceIds,
     cloudHubNavigationEnabled,
@@ -234,7 +203,6 @@ export function DesktopWorkspaceContent({
       onCreateEntryMenu={onCreateEntryMenu}
       onNodeActionMenu={onNodeActionMenu}
       preferences={preferences}
-      renderPreviewBody={renderPreviewBody}
       resolvedSurface={resolvedSurface}
       viewerExtensionAdapter={viewerExtensionAdapter}
       workspace={workspace}

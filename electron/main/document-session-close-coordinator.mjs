@@ -72,12 +72,18 @@ export function createDocumentSessionCloseCoordinator({
     }
     if (windowStates.has(window)) return () => undefined;
 
+    // BrowserWindow.webContents must not be dereferenced from the `closed`
+    // event: Electron has already destroyed the BrowserWindow by then and its
+    // native-backed property getter can throw "Object has been destroyed".
+    const webContents = window.webContents;
+
     const state = {
       allowClose: false,
       closeInProgress: false,
       rendererReady: false,
       requestId: null,
     };
+    let cleanedUp = false;
     windowStates.set(window, state);
 
     const markRendererReady = () => {
@@ -94,12 +100,12 @@ export function createDocumentSessionCloseCoordinator({
       if (isMainFrame && !isSameDocument) state.rendererReady = false;
     };
     const handleClose = (event) => {
-      if (state.allowClose || !state.rendererReady || window.webContents.isDestroyed()) return;
+      if (state.allowClose || !state.rendererReady || webContents.isDestroyed()) return;
       event.preventDefault();
       if (state.closeInProgress) return;
 
       state.closeInProgress = true;
-      void finishInterceptedClose(window, state).catch((error) => {
+      void finishInterceptedClose(window, webContents, state).catch((error) => {
         state.closeInProgress = false;
         onCloseCancelled(window);
         logger.error?.("Unable to coordinate document flush before closing:", error);
@@ -110,25 +116,29 @@ export function createDocumentSessionCloseCoordinator({
       cleanup();
     };
     const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
       window.removeListener?.("close", handleClose);
       window.removeListener?.("closed", handleClosed);
-      window.webContents.removeListener?.("did-finish-load", markRendererReady);
-      window.webContents.removeListener?.("did-start-navigation", markRendererLoading);
-      window.webContents.removeListener?.("render-process-gone", markRendererUnavailable);
+      if (!webContents.isDestroyed()) {
+        webContents.removeListener?.("did-finish-load", markRendererReady);
+        webContents.removeListener?.("did-start-navigation", markRendererLoading);
+        webContents.removeListener?.("render-process-gone", markRendererUnavailable);
+      }
       windowStates.delete(window);
     };
 
-    window.webContents.on("did-finish-load", markRendererReady);
-    window.webContents.on("did-start-navigation", markRendererLoading);
-    window.webContents.on("render-process-gone", markRendererUnavailable);
+    webContents.on("did-finish-load", markRendererReady);
+    webContents.on("did-start-navigation", markRendererLoading);
+    webContents.on("render-process-gone", markRendererUnavailable);
     window.on("close", handleClose);
     window.on("closed", handleClosed);
 
     return cleanup;
   }
 
-  async function finishInterceptedClose(window, state) {
-    const result = await requestRendererFlush(window, state);
+  async function finishInterceptedClose(window, webContents, state) {
+    const result = await requestRendererFlush(webContents, state);
     if (result.ok) {
       state.allowClose = true;
       if (!window.isDestroyed()) window.close();
@@ -154,7 +164,7 @@ export function createDocumentSessionCloseCoordinator({
         detail: t("native.documentClose.detail"),
       });
     } catch (error) {
-      notifyRendererCloseCancelled(window, result.requestId);
+      notifyRendererCloseCancelled(window, webContents, result.requestId);
       throw error;
     }
     if (choice.response === 1) {
@@ -162,12 +172,12 @@ export function createDocumentSessionCloseCoordinator({
       if (!window.isDestroyed()) window.close();
       return;
     }
-    notifyRendererCloseCancelled(window, result.requestId);
+    notifyRendererCloseCancelled(window, webContents, result.requestId);
     state.closeInProgress = false;
     onCloseCancelled(window);
   }
 
-  function requestRendererFlush(window, state) {
+  function requestRendererFlush(webContents, state) {
     const requestId = randomUUID();
     state.requestId = requestId;
 
@@ -182,7 +192,7 @@ export function createDocumentSessionCloseCoordinator({
         });
       }, normalizeTimeout(timeoutMs));
       pendingRequests.set(requestId, {
-        webContentsId: window.webContents.id,
+        webContentsId: webContents.id,
         timer,
         resolve: (result) => {
           if (state.requestId === requestId) state.requestId = null;
@@ -191,7 +201,7 @@ export function createDocumentSessionCloseCoordinator({
       });
 
       try {
-        window.webContents.send(DOCUMENT_SESSION_FLUSH_REQUEST_CHANNEL, { requestId });
+        webContents.send(DOCUMENT_SESSION_FLUSH_REQUEST_CHANNEL, { requestId });
       } catch (error) {
         const pending = pendingRequests.get(requestId);
         if (!pending) return;
@@ -217,10 +227,10 @@ export function createDocumentSessionCloseCoordinator({
   return Object.freeze({ attachWindow, registerIpc });
 }
 
-function notifyRendererCloseCancelled(window, requestId) {
-  if (!requestId || window.isDestroyed() || window.webContents.isDestroyed()) return;
+function notifyRendererCloseCancelled(window, webContents, requestId) {
+  if (!requestId || window.isDestroyed() || webContents.isDestroyed()) return;
   try {
-    window.webContents.send(DOCUMENT_SESSION_CLOSE_CANCELLED_CHANNEL, { requestId });
+    webContents.send(DOCUMENT_SESSION_CLOSE_CANCELLED_CHANNEL, { requestId });
   } catch {
     // The window stays open by default; a missing renderer needs no further action.
   }

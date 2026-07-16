@@ -4,7 +4,6 @@ import type {
 } from "../../core/types";
 import type {
   EditorSourceRevision,
-  EditorSourceSnapshot,
   EditorSourceSnapshotPort,
 } from "../sourceSnapshot";
 import type { EditorSaveMode } from "../viewerTypes";
@@ -46,30 +45,33 @@ export type DocumentEditingSessionOptions = {
 };
 
 export type ExternalBaselineResult = "acknowledged" | "applied" | "conflict";
+export type ExternalConflictResolution = "reload-external" | "keep-local";
 
 export type DocumentSessionDrainReason = Extract<
   DocumentPersistenceReason,
   "document-close" | "document-switch" | "workspace-switch" | "app-close" | "destroy"
 >;
 
-/** Trusted host contract consumed by editable built-in contributions. */
-export type EditorDocumentSession = {
-  readonly documentId: string;
+/**
+ * The only Document Session surface visible to a format editor. A contribution
+ * owns its model and serialization; the host owns every save decision.
+ */
+export type EditableDocumentSource = {
   attachSource: (source: EditorSourceSnapshotPort) => () => void;
   reportRevision: (revision: EditorSourceRevision) => void;
-  requestSave: (reason?: Extract<DocumentPersistenceReason, "manual" | "mode-switch">) => Promise<void>;
-  flushSnapshot: (
-    snapshot: EditorSourceSnapshot,
-    reason: Extract<
-      DocumentPersistenceReason,
-      "document-close" | "document-switch" | "workspace-switch" | "destroy"
-    >,
-  ) => Promise<void>;
+  reconcileExternalBaseline: (content: string, version?: string | null) => ExternalBaselineResult;
+};
+
+/** Host-only lifecycle handle used by the boundary and close registry. */
+export type DocumentEditingSessionHandle = EditableDocumentSource & {
+  readonly documentId: string;
+  requestSave: () => Promise<void>;
+  resolveExternalConflict: (resolution: ExternalConflictResolution) => Promise<void>;
   /** Read and durably drain the current source before navigation or host close. */
   flushCurrent: (reason?: DocumentSessionDrainReason) => Promise<void>;
-  reconcileExternalBaseline: (content: string, version?: string | null) => ExternalBaselineResult;
-  getPersistedContent: () => string;
   hasUnpersistedChanges: () => boolean;
   getState: () => DocumentSessionState;
   subscribe: (listener: () => void) => () => void;
+  /** Permanently freeze editor input after the registry confirms real retirement. */
+  dispose: () => void;
 };

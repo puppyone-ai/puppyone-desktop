@@ -199,16 +199,6 @@ export function GitRemotePrompt({
     <section className="desktop-git-backup-card">
       <div className="desktop-git-backup-copy"><span>{t("source-control.backup.reminder")}</span></div>
       <button
-        className="desktop-git-backup-action"
-        type="button"
-        aria-busy={cloudBackupLoading || undefined}
-        disabled={disabled || cloudBackupLoading}
-        onClick={onStartPuppyoneBackup}
-      >
-        {cloudBackupLoading ? <SourceControlDots /> : <Cloud size={13} />}
-        <span>{t("source-control.backup.getCloud")}</span>
-      </button>
-      <button
         className="desktop-git-backup-dismiss"
         type="button"
         aria-label={t("source-control.backup.dismissAriaLabel")}
@@ -217,6 +207,16 @@ export function GitRemotePrompt({
         onClick={onDismiss}
       >
         <X size={13} />
+      </button>
+      <button
+        className="desktop-git-backup-action"
+        type="button"
+        aria-busy={cloudBackupLoading || undefined}
+        disabled={disabled || cloudBackupLoading}
+        onClick={onStartPuppyoneBackup}
+      >
+        {cloudBackupLoading ? <SourceControlDots /> : <Cloud size={13} />}
+        <span>{t("source-control.backup.getCloud")}</span>
       </button>
       {cloudBackupError && <div className="desktop-git-backup-error">{cloudBackupError}</div>}
     </section>

@@ -8,13 +8,17 @@ import {
   getMarkdownElements,
   getMarkdownElementsInRange,
 } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownElements";
-import { puppyMarkdownParserExtensions } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
+import {
+  puppyMarkdownFeatureCompositionExtension,
+  puppyMarkdownParserExtensions,
+} from "../packages/shared-ui/src/editor/markdown/composition/markdownFeatureComposition";
 import { findMarkdownLinkTokens } from "../packages/shared-ui/src/editor/markdown/core/links/markdownLinkModel";
 
 function createMarkdownState(source: string) {
   return EditorState.create({
     doc: source,
     extensions: [
+      puppyMarkdownFeatureCompositionExtension,
       markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
     ],
   });

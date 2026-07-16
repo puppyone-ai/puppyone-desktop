@@ -8,10 +8,16 @@ export type SaveStatus = "clean" | "dirty" | "saving" | "saved" | "error";
 export type EditorSaveButtonProps = {
   status: SaveStatus;
   manual: boolean;
+  retryable?: boolean;
   onSave: () => void;
 };
 
-export function EditorSaveButton({ status, manual, onSave }: EditorSaveButtonProps) {
+export function EditorSaveButton({
+  status,
+  manual,
+  retryable = true,
+  onSave,
+}: EditorSaveButtonProps) {
   const { t } = useLocalization();
   const [shortcutHint, setShortcutHint] = useState("Ctrl+S");
 
@@ -41,6 +47,7 @@ export function EditorSaveButton({ status, manual, onSave }: EditorSaveButtonPro
   }
 
   if (status === "error") {
+    if (!retryable) return null;
     return (
       <ChipButton tone="error" onClick={onSave} title={t("editor.save.retryHint", { shortcut: shortcutHint })}>
         <AlertIcon />

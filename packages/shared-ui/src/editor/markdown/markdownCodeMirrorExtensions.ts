@@ -6,7 +6,6 @@ import {
   EditorView,
   ViewPlugin,
   dropCursor,
-  highlightActiveLine,
   highlightSpecialChars,
   keymap,
 } from "@codemirror/view";
@@ -22,9 +21,8 @@ import {
 import { markdownEditingKeymap } from "./core/commands/markdownEditingKeymap";
 import { markdownLivePreviewContextExtension } from "./core/editor/markdownLivePreviewContext";
 import { markdownComposingBlockLineField, markdownInputCompositionExtension } from "./core/state/composingBlockLine";
-import { markdownExpandedImageField } from "./core/state/expandedImage";
+import { markdownRevealedSourceField } from "./core/state/revealedSource";
 import { markdownLivePreviewFocusExtension } from "./core/state/livePreviewFocus";
-import { markdownTableFocusExtension } from "./features/table/tableFocus";
 import { markdownAssetUrlResolverFacet, markdownWorkspaceRootFacet } from "./core/editor/markdownLivePreviewContext";
 import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "./platform/codemirror/embedHost";
 import { getDocRevision } from "./platform/brokers/transactionBroker";
@@ -32,7 +30,10 @@ import {
   markdownHiddenMarkerSelectionNormalizer,
   trailingLineWhitespaceSelectionExtension,
 } from "./core/state/selectionBehavior";
-import { puppyMarkdownParserExtensions } from "./core/syntax/markdownParserExtensions";
+import {
+  markdownFeatureComposition,
+  puppyMarkdownFeatureCompositionExtension,
+} from "./composition/markdownFeatureComposition";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
 
 export function markdownCodeMirrorBaseExtensions(readOnly: boolean): Extension[] {
@@ -61,7 +62,10 @@ export function markdownCodeMirrorUrgentExtensions(readOnly: boolean): Extension
       autocorrect: "off",
       autocapitalize: "off",
     }),
-    highlightActiveLine(),
+    // Do not install highlightActiveLine(). Its changing line decoration
+    // rebuilds inline replacement widgets when a pointer selection crosses
+    // lines. Markdown intentionally has no active-line background, and the
+    // rebuild would restart image asset/decode lifecycles for no visible gain.
     keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
     puppyMarkdownEditorTheme,
   ];
@@ -70,7 +74,8 @@ export function markdownCodeMirrorUrgentExtensions(readOnly: boolean): Extension
 /** Language parsing and source highlighting are installed after first paint. */
 export function markdownCodeMirrorLanguageExtension(): Extension {
   return [
-    markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
+    puppyMarkdownFeatureCompositionExtension,
+    markdown({ base: markdownLanguage, extensions: markdownFeatureComposition.parserExtensions }),
     syntaxHighlighting(puppyMarkdownHighlightStyle),
   ];
 }
@@ -103,8 +108,8 @@ export function markdownLivePreviewCoreExtension(): Extension {
     markdownLivePreviewFocusExtension,
     markdownInputCompositionExtension,
     markdownComposingBlockLineField,
-    markdownExpandedImageField,
-    markdownTableFocusExtension,
+    markdownRevealedSourceField,
+    ...markdownFeatureComposition.livePreviewExtensions,
     // History inversion stays in the live-preview core even when the
     // experimental interaction is disabled, so an earlier move can still
     // undo and redo embedded-session relocation safely.
@@ -148,10 +153,12 @@ const markdownEmbedHostLifecycle = ViewPlugin.fromClass(class {
         host.editSessions.mapRanges((pos, assoc) => transaction.changes.mapPos(pos, assoc));
       }
     }
-    // A source revision change destroys revision-bound execution sessions,
-    // aborts their jobs, and revokes their principal-scoped asset handles.
+    // Executable and native web-embed capabilities are revision-bound. Static
+    // asset handles are instead owned by their mounted widget session: an
+    // unrelated text edit must not invalidate still-mounted media. The
+    // widget's AbortController revokes the handle when its semantic source is
+    // replaced or when the view is disposed.
     host.executionSessions.destroyForRevisionChange(previousRevision, nextRevision);
-    host.assets.revokeStaleRevision(host.viewId, nextRevision);
     host.webEmbeds.destroyStaleRevision(host.viewId, nextRevision);
   }
 

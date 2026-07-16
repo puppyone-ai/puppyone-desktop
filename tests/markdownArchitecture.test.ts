@@ -3,7 +3,11 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { describe, expect, it } from "vitest";
 import { createWidgetSessionRegistry } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/widgetSession";
 import { createEmbeddedEditSessionStore } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/embeddedEditSession";
-import { compileMarkdownElementPlan } from "../packages/shared-ui/src/editor/markdown/core/plans/markdownPlanCompiler";
+import {
+  compilePuppyMarkdownElementPlan,
+  puppyMarkdownFeatureCompositionExtension,
+  puppyMarkdownParserExtensions,
+} from "../packages/shared-ui/src/editor/markdown/composition/markdownFeatureComposition";
 import {
   getCollapsedMarkerDeletionUnit,
   getMarkdownPlanIndex,
@@ -20,12 +24,12 @@ import {
 } from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownTrustPolicy";
 import { createTransactionBroker, getDocRevision } from "../packages/shared-ui/src/editor/markdown/platform/brokers/transactionBroker";
 import { getMarkdownElements } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownElements";
-import { puppyMarkdownParserExtensions } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
 
 function createMarkdownState(source: string) {
   return EditorState.create({
     doc: source,
     extensions: [
+      puppyMarkdownFeatureCompositionExtension,
       markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
     ],
   });
@@ -36,7 +40,7 @@ describe("Markdown render-plan compiler", () => {
     const source = '- <span style="color: #B45309;">screenshot</span>';
     const element = getMarkdownElements(createMarkdownState(source)).find((candidate) => candidate.kind === "inlineHtml");
     expect(element).toBeDefined();
-    const plan = compileMarkdownElementPlan(element!);
+    const plan = compilePuppyMarkdownElementPlan(element!);
     expect(plan.presentation).toBe("inlineMark");
     if (plan.presentation === "inlineMark") {
       expect(plan.mark.tagName).toBe("span");
@@ -51,7 +55,7 @@ describe("Markdown render-plan compiler", () => {
     const element = getMarkdownElements(createMarkdownState(source)).find((candidate) => (
       candidate.kind === "inlineHtml" && candidate.inlineHtml.tagName === "br"
     ));
-    const plan = compileMarkdownElementPlan(element!);
+    const plan = compilePuppyMarkdownElementPlan(element!);
     expect(plan).toMatchObject({
       presentation: "inlineAtom",
       atom: { kind: "lineBreak" },
@@ -63,7 +67,7 @@ describe("Markdown render-plan compiler", () => {
   it("keeps incomplete inline HTML as visibleSource without deletion units", () => {
     const source = "Text <span>unfinished";
     const element = getMarkdownElements(createMarkdownState(source)).find((candidate) => candidate.kind === "inlineHtml");
-    const plan = compileMarkdownElementPlan(element!);
+    const plan = compilePuppyMarkdownElementPlan(element!);
     expect(plan.presentation).toBe("visibleSource");
     expect(plan.capabilities.deleteUnits).toEqual([]);
     expect(getCollapsedMarkerDeletionUnit(createMarkdownState(source), source.length, "backward")).toBeNull();

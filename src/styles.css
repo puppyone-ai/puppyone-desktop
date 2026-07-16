@@ -24,7 +24,6 @@
 @import "./styles/onboarding.css";
 @import "./styles/asset-library-home.css";
 @import "./features/data-workspace/browser.css" layer(features);
-@import "./features/puppyflow/puppyflow.css";
 @import "./features/plugins/plugins.css" layer(features);
 @import "./ai-edits/ai-edits.css";
 @import "./features/changes/changes.css";

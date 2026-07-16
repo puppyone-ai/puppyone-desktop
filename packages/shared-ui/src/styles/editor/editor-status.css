@@ -206,6 +206,28 @@
   font-size: 12px;
 }
 
+.editor-conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.editor-conflict-actions button {
+  min-height: 26px;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--po-danger) 30%, var(--po-border));
+  border-radius: 5px;
+  background: var(--po-control);
+  color: var(--po-text);
+  font: inherit;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.editor-conflict-actions button:hover {
+  background: var(--po-control-hover);
+}
+
 .editor-inline-error {
   position: absolute;
   z-index: 21;

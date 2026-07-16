@@ -11,7 +11,8 @@ export type MarkdownBlockFeatureId =
   | "htmlBlock"
   | "horizontalRule"
   | "mermaid"
-  | "table";
+  | "table"
+  | "video";
 
 export type MarkdownBlockComplexity = Readonly<{
   sourceBytes: number;
@@ -107,6 +108,7 @@ const diagnostics = {
     horizontalRule: 0,
     mermaid: 0,
     table: 0,
+    video: 0,
   } satisfies Record<MarkdownBlockFeatureId, number>,
 };
 
@@ -202,6 +204,7 @@ function decide(
 ): MarkdownBlockExecution {
   switch (featureId) {
     case "horizontalRule":
+    case "video":
       return rich();
     case "table":
       if (

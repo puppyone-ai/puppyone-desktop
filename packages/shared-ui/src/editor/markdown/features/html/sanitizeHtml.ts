@@ -105,6 +105,12 @@ function appendSanitizedNode(target: Node, node: ChildNode, context: SanitizeCon
 
   const element = document.createElement(tagName);
   copySafeAttributes(element, node, tagName, context);
+  if (tagName === "video") {
+    // Safe Markdown video is always user-controlled and never auto-starts.
+    element.setAttribute("controls", "");
+    element.setAttribute("preload", element.getAttribute("preload") ?? "metadata");
+    element.removeAttribute("autoplay");
+  }
 
   if (isVoidHtmlTag(tagName)) {
     target.appendChild(element);
@@ -163,6 +169,30 @@ function copySafeAttributes(target: HTMLElement, source: HTMLElement, tagName: s
       continue;
     }
 
+    if ((tagName === "video" || tagName === "source") && name === "src") {
+      if (context.capabilities.brokeredMedia && isBrokerSafeResolvedAssetUrl(value, "video")) {
+        target.setAttribute("src", value.trim());
+      } else if (context.capabilities.deferredMedia) {
+        target.setAttribute("data-md-asset-src", value);
+        target.setAttribute("aria-busy", "true");
+      } else {
+        markUnsupported(context, "video source was not resolved by AssetBroker");
+      }
+      continue;
+    }
+
+    if (tagName === "video" && name === "poster") {
+      if (context.capabilities.brokeredMedia && isBrokerSafeResolvedAssetUrl(value, "image")) {
+        target.setAttribute("poster", value.trim());
+      } else if (context.capabilities.deferredMedia) {
+        target.setAttribute("data-md-asset-poster", value);
+        target.setAttribute("aria-busy", "true");
+      } else {
+        markUnsupported(context, "video poster was not resolved by AssetBroker");
+      }
+      continue;
+    }
+
     if (tagName === "img" && name === "srcset") {
       if (context.capabilities.brokeredMedia && isBrokerSafeImageSrcset(value)) {
         target.setAttribute("srcset", value.trim());
@@ -190,6 +220,29 @@ function copySafeAttributes(target: HTMLElement, source: HTMLElement, tagName: s
     if (tagName === "img" && (name === "width" || name === "height")) {
       if (/^[1-9]\d{0,3}$/.test(value.trim())) target.setAttribute(name, value.trim());
       else markUnsupported(context, `${name} value was omitted`, { fatal: false });
+      continue;
+    }
+
+    if (tagName === "video" && (name === "width" || name === "height")) {
+      if (/^[1-9]\d{0,3}$/.test(value.trim())) target.setAttribute(name, value.trim());
+      else markUnsupported(context, `${name} value was omitted`, { fatal: false });
+      continue;
+    }
+
+    if (tagName === "video" && name === "preload") {
+      const preload = value.trim().toLowerCase();
+      if (preload === "none" || preload === "metadata") target.setAttribute("preload", preload);
+      else {
+        target.setAttribute("preload", "metadata");
+        markUnsupported(context, "video preload value was reduced to metadata", { fatal: false });
+      }
+      continue;
+    }
+
+    if (tagName === "source" && name === "type") {
+      const type = value.trim().toLowerCase();
+      if (/^video\/[a-z0-9.+-]+$/.test(type)) target.setAttribute("type", type);
+      else markUnsupported(context, "video source type was omitted", { fatal: false });
       continue;
     }
 

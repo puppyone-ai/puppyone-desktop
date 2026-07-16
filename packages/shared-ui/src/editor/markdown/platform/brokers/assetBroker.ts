@@ -4,9 +4,11 @@ import {
   isBrokerSafeResolvedAssetUrl,
   MARKDOWN_ASSET_MAX_IN_FLIGHT,
   type MarkdownAssetPolicyContext,
+  type MarkdownAssetKind,
 } from "../policy/markdownAssetPolicy";
 
 export type AssetBrokerRequest = {
+  kind: MarkdownAssetKind;
   principal: CapabilityPrincipal;
   sourcePath: string;
   href: string;
@@ -19,6 +21,7 @@ export type AssetBrokerHandle = {
   id: string;
   url: string;
   mimeType: string | null;
+  kind: MarkdownAssetKind;
   principal: CapabilityPrincipal;
   revoke(): void;
 };
@@ -118,11 +121,17 @@ export function createAssetBroker(
         workspaceRoot: request.workspaceRoot ?? defaultWorkspaceRoot,
         allowRemoteHttp: request.allowRemoteHttp === true,
       };
-      const policy = evaluateMarkdownAssetHref(request.href, policyContext);
+      const policy = evaluateMarkdownAssetHref(request.href, policyContext, request.kind);
       if (!policy.ok) return null;
 
       if (policy.kind === "safe-direct" || policy.kind === "data-image") {
-        return registerHandle(policy.url, policy.mimeType, request.principal, request.signal);
+        return registerHandle(
+          policy.url,
+          policy.mimeType,
+          request.kind,
+          request.principal,
+          request.signal,
+        );
       }
 
       if (!resolveAssetUrl) return null;
@@ -152,13 +161,14 @@ export function createAssetBroker(
             return null;
           }
           const resolvedUrl = typeof resolved === "string" ? resolved : resolved.url;
-          if (!isBrokerSafeResolvedAssetUrl(resolvedUrl)) {
+          if (!isBrokerSafeResolvedAssetUrl(resolvedUrl, request.kind)) {
             revokeResolvedAsset(resolved);
             return null;
           }
           return registerHandle(
             resolvedUrl,
             policy.mimeType,
+            request.kind,
             request.principal,
             request.signal,
             typeof resolved === "string" ? undefined : resolved.revoke,
@@ -188,18 +198,6 @@ export function createAssetBroker(
       }
     },
 
-    revokeStaleRevision(editorViewId: string, currentRevision: string) {
-      for (const [id, handle] of Array.from(handles.entries())) {
-        if (
-          handle.principal.editorViewId === editorViewId &&
-          handle.principal.documentRevision !== currentRevision
-        ) {
-          handle.revoke();
-          handles.delete(id);
-        }
-      }
-    },
-
     disposeAll() {
       disposed = true;
       for (const waiter of queue.splice(0)) {
@@ -214,6 +212,7 @@ export function createAssetBroker(
   function registerHandle(
     url: string,
     mimeType: string | null,
+    kind: MarkdownAssetKind,
     principal: CapabilityPrincipal,
     signal?: AbortSignal,
     revokeResolved?: () => void | Promise<void>,
@@ -224,6 +223,7 @@ export function createAssetBroker(
       id,
       url,
       mimeType,
+      kind,
       principal,
       revoke() {
         if (!handles.has(id)) return;

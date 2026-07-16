@@ -1,4 +1,4 @@
-import type { DocumentSessionDrainReason, EditorDocumentSession } from "./types";
+import type { DocumentEditingSessionHandle, DocumentSessionDrainReason } from "./types";
 
 type SessionRegistration = {
   tokens: Set<symbol>;
@@ -6,10 +6,10 @@ type SessionRegistration = {
 
 // Empty-token entries are retiring sessions whose final unmount snapshot has
 // not yet been acknowledged. They remain part of an app-close drain.
-const registeredDocumentSessions = new Map<EditorDocumentSession, SessionRegistration>();
+const registeredDocumentSessions = new Map<DocumentEditingSessionHandle, SessionRegistration>();
 
 /** Register a host-owned session for the lifetime of its React boundary. */
-export function registerActiveDocumentSession(session: EditorDocumentSession): () => void {
+export function registerActiveDocumentSession(session: DocumentEditingSessionHandle): () => void {
   let registration = registeredDocumentSessions.get(session);
   if (!registration) {
     registration = { tokens: new Set() };
@@ -68,12 +68,18 @@ export async function flushActiveDocumentSessions(
 }
 
 async function retireRegistration(
-  session: EditorDocumentSession,
+  session: DocumentEditingSessionHandle,
   registration: SessionRegistration,
 ): Promise<void> {
   if (registeredDocumentSessions.get(session) !== registration || registration.tokens.size > 0) {
     return;
   }
+
+  // Disposal is intentionally deferred until the token check above. React
+  // StrictMode runs effect cleanup/setup as a development probe while keeping
+  // the same component state. Disposing in the Boundary cleanup would leave
+  // that still-mounted Session permanently unable to accept an editor source.
+  session.dispose();
   if (!session.hasUnpersistedChanges()) {
     registeredDocumentSessions.delete(session);
     return;
@@ -89,7 +95,7 @@ async function retireRegistration(
   pruneRetiredSession(session);
 }
 
-function pruneRetiredSession(session: EditorDocumentSession): void {
+function pruneRetiredSession(session: DocumentEditingSessionHandle): void {
   const registration = registeredDocumentSessions.get(session);
   if (
     registration

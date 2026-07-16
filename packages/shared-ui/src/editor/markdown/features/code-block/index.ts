@@ -11,3 +11,4 @@ export {
   type MarkdownCodeSourceReference,
 } from "./codeBlockModel";
 export { compileCodeBlockElementPlan } from "./codeBlockPlan";
+export { codeBlockFeature } from "./codeBlockFeature";

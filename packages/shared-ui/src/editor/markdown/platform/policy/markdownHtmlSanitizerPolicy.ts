@@ -30,6 +30,7 @@ export const MARKDOWN_HTML_POLICY = {
     get byTag() { return getSafeBlockProfile().attributes.byTag; },
     boolean: new Map<string, Set<string>>([
       ["details", new Set(["open"])],
+      ["video", new Set(["controls", "loop", "muted", "playsinline"])],
     ]),
     numeric: new Map<string, Set<string>>([
       ["td", new Set(["colspan", "rowspan"])],

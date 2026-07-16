@@ -114,6 +114,31 @@ describe("source-control visual architecture", () => {
     );
   });
 
+  it("keeps the Cloud publish reminder in reading and action order", () => {
+    const card = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-backup-card",
+    ));
+    const action = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-backup-action",
+    ));
+    const dismiss = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-backup-dismiss",
+    ));
+
+    expect(card).toContain('grid-template-areas: "copy copy" "dismiss action";');
+    expect(card).toContain(
+      "grid-template-columns: var(--git-action-size) minmax(0, 1fr);",
+    );
+    expect(action).toContain("grid-area: action;");
+    expect(action).toContain("justify-self: end;");
+    expect(dismiss).toContain("grid-area: dismiss;");
+    expect(dismiss).toContain("align-self: center;");
+    expect(dismiss).toContain("justify-self: start;");
+  });
+
   it("aligns every Git section empty state with its section label", () => {
     const sectionTitle = compact(readCssBlock(
       sidebarResourcesCss,
@@ -244,7 +269,8 @@ describe("source-control visual architecture", () => {
     expect(body).toContain("place-items: center;");
     expect(body).toContain("height: 100%;");
     expect(cloudMain).toContain("padding: 0;");
-    expect(cloudPage).toContain("height: 100%;");
+    expect(cloudPage).toContain("min-height: 100%;");
+    expect(cloudPage).toContain("flex: 1 1 auto;");
   });
 
   it("reuses the canonical navigation icon in the Cloud-sized entry footprint", () => {

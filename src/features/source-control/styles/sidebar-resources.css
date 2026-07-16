@@ -232,8 +232,8 @@ body.desktop-git-sidebar-resizing {
   display: grid;
   grid-template-areas:
     "copy copy"
-    "action dismiss";
-  grid-template-columns: minmax(0, 1fr) var(--git-action-size);
+    "dismiss action";
+  grid-template-columns: var(--git-action-size) minmax(0, 1fr);
   gap: 8px 6px;
   align-items: start;
   width: var(--git-sidebar-control-width);
@@ -265,7 +265,7 @@ body.desktop-git-sidebar-resizing {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  justify-self: start;
+  justify-self: end;
   gap: 5px;
   height: var(--git-action-size);
   min-width: 82px;
@@ -297,6 +297,8 @@ body.desktop-git-sidebar-resizing {
   height: var(--git-action-size);
   align-items: center;
   justify-content: center;
+  align-self: center;
+  justify-self: start;
   border: 0;
   border-radius: var(--git-action-radius);
   background: transparent;

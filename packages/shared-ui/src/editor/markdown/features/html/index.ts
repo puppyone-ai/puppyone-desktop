@@ -14,3 +14,4 @@ export {
   type MarkdownInlineHtmlDiagnostics,
 } from "./inlineHtmlModel";
 export { createSanitizedBlockHtmlFragment } from "./sanitizeHtml";
+export { htmlFeature } from "./htmlFeature";

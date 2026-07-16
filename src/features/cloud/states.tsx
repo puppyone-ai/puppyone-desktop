@@ -1,16 +1,16 @@
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowRight,
-  Cloud,
   FilePenLine,
-  Folder,
   GitBranch,
   GitCommitHorizontal,
   RefreshCw,
 } from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
+import {
+  CloudPublishCloudMark,
+  CloudPublishFolderMark,
+} from "./components/CloudPublishHeroMarks";
 import {
   CloudWebEmpty,
   CloudWebPage,
@@ -37,7 +37,6 @@ export function CloudLocalOnlyWorkspace({
   publishError = null,
   publishCanRetry = false,
   projectInitialized = false,
-  onReviewChanges,
   onPublishWorkspace,
 }: {
   workspace: Workspace;
@@ -55,7 +54,6 @@ export function CloudLocalOnlyWorkspace({
   publishError?: string | null;
   publishCanRetry?: boolean;
   projectInitialized?: boolean;
-  onReviewChanges: () => void;
   onPublishWorkspace: () => void;
 }) {
   const { t } = useLocalization();
@@ -103,84 +101,108 @@ export function CloudLocalOnlyWorkspace({
           {publishError}
         </div>
       )}
-      <section className="desktop-cloud-publish-card" aria-labelledby="desktop-cloud-initialize-title">
-        <header className="desktop-cloud-publish-header">
-          <h1 id="desktop-cloud-initialize-title">{t("cloud.initialize.title")}</h1>
-          <p>{t("cloud.initialize.description")}</p>
-        </header>
-
-        <div className="desktop-cloud-publish-flow">
-          <article className="desktop-cloud-publish-node local">
-            <span className="desktop-cloud-publish-node-icon" aria-hidden="true">
-              <Folder size={30} strokeWidth={1.65} />
-            </span>
-            <strong>{t(isGitRepository ? "cloud.initialize.localRepository" : "cloud.initialize.localFolder")}</strong>
-            <b title={workspace.path} dir="auto">{workspace.name}</b>
-            <div className="desktop-cloud-publish-node-meta">
-              <span><GitBranch size={15} aria-hidden="true" /><bdi>{branchName}</bdi></span>
-              <span><GitCommitHorizontal size={15} aria-hidden="true" />{t("cloud.branches.commitCount", { count: totalCommits })}</span>
-              <span className={localChangeCount > 0 ? "warning" : undefined}>
-                <FilePenLine size={15} aria-hidden="true" />
-                {t(
-                  localChangeCountIsMinimum
-                    ? "cloud.initialize.localChangeCountAtLeast"
-                    : "cloud.initialize.localChangeCount",
-                  { count: localChangeCount },
-                )}
-              </span>
+      <section className="desktop-cloud-publish-card" aria-label={t("cloud.initialize.title")}>
+        <div className="desktop-cloud-publish-hero">
+          <div
+            className="desktop-cloud-publish-symbol local"
+            aria-label={t(isGitRepository ? "cloud.initialize.localRepository" : "cloud.initialize.localFolder")}
+          >
+            <div className="desktop-cloud-publish-symbol-mark">
+              <CloudPublishFolderMark className="desktop-cloud-publish-symbol-icon" />
             </div>
-          </article>
-
-          <div className="desktop-cloud-publish-arrow" aria-label={t("cloud.initialize.push")}>
-            <strong>{t("cloud.initialize.push")}</strong>
-            <ArrowRight className="desktop-cloud-publish-arrow-horizontal po-directional-icon" size={42} strokeWidth={1.6} aria-hidden="true" />
-            <ArrowDown className="desktop-cloud-publish-arrow-vertical" size={36} strokeWidth={1.6} aria-hidden="true" />
+            <div className="desktop-cloud-publish-details local">
+              <p className="desktop-cloud-publish-project" title={workspace.path} dir="auto">
+                {workspace.name}
+              </p>
+              <ul className="desktop-cloud-publish-meta">
+                <li>
+                  <GitBranch size={13} aria-hidden="true" />
+                  <bdi>{branchName}</bdi>
+                </li>
+                <li>
+                  <GitCommitHorizontal size={13} aria-hidden="true" />
+                  <span>{t("cloud.branches.commitCount", { count: totalCommits })}</span>
+                </li>
+                <li className={localChangeCount > 0 ? "warning" : undefined}>
+                  <FilePenLine size={13} aria-hidden="true" />
+                  <span>
+                    {t(
+                      localChangeCountIsMinimum
+                        ? "cloud.initialize.localChangeCountAtLeast"
+                        : "cloud.initialize.localChangeCount",
+                      { count: localChangeCount },
+                    )}
+                  </span>
+                </li>
+              </ul>
+            </div>
           </div>
 
-          <article className="desktop-cloud-publish-node cloud">
-            <span className="desktop-cloud-publish-node-icon" aria-hidden="true">
-              <Cloud size={30} strokeWidth={1.65} />
-            </span>
-            <strong>PuppyOne Cloud</strong>
-            <b>{t("cloud.initialize.newCloudProject")}</b>
-            <div className="desktop-cloud-publish-node-meta">
-              <span className="status">{cloudStatus}</span>
-              <span><GitBranch size={15} aria-hidden="true" /><bdi>{destinationBranchName}</bdi></span>
+          <div className="desktop-cloud-publish-arrow" aria-label={t("cloud.initialize.push")}>
+            <svg
+              className="desktop-cloud-publish-arrow-horizontal"
+              viewBox="0 0 240 24"
+              preserveAspectRatio="none"
+              focusable="false"
+              aria-hidden="true"
+            >
+              <path
+                d="M1 12 H228 M216 4 L228 12 L216 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+            <svg
+              className="desktop-cloud-publish-arrow-vertical"
+              viewBox="0 0 24 96"
+              preserveAspectRatio="none"
+              focusable="false"
+              aria-hidden="true"
+            >
+              <path
+                d="M12 1 V84 M4 72 L12 84 L20 72"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          </div>
+
+          <div className="desktop-cloud-publish-symbol cloud" aria-label="PuppyOne Cloud">
+            <div className="desktop-cloud-publish-symbol-mark">
+              <CloudPublishCloudMark className="desktop-cloud-publish-symbol-icon" />
             </div>
-          </article>
+            <div className="desktop-cloud-publish-details cloud">
+              <p className="desktop-cloud-publish-project">
+                {t("cloud.initialize.newCloudProject")}
+              </p>
+              <ul className="desktop-cloud-publish-meta">
+                <li>
+                  <span className="desktop-cloud-publish-status">{cloudStatus}</span>
+                </li>
+                <li>
+                  <GitBranch size={13} aria-hidden="true" />
+                  <bdi>{destinationBranchName}</bdi>
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
 
-        <div className={`desktop-cloud-publish-summary ${readinessMessage ? "blocked" : ""}`} role={readinessMessage ? "alert" : undefined}>
-          {readyToPush ? (
-            <>
-              <strong>{t(
-                branchName === destinationBranchName
-                  ? "cloud.initialize.pushSummary"
-                  : "cloud.initialize.pushMappedSummary",
-                { branch: branchName, destination: destinationBranchName, count: totalCommits },
-              )}</strong>
-              <p>{t(
-                localChangeCountIsMinimum
-                  ? "cloud.initialize.changesStayLocalAtLeast"
-                  : "cloud.initialize.changesStayLocal",
-                { count: localChangeCount },
-              )}</p>
-              {!accountEmail && <small>{t("cloud.initialize.signInNote")}</small>}
-            </>
-          ) : (
+        {readinessMessage && (
+          <div className="desktop-cloud-publish-summary blocked" role="alert">
             <strong>{readinessMessage}</strong>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="desktop-cloud-publish-actions">
-          <button
-            className="desktop-cloud-row-action desktop-cloud-publish-review"
-            type="button"
-            disabled={publishBusy}
-            onClick={onReviewChanges}
-          >
-            {t("cloud.git.reviewChanges")}
-          </button>
           <button
             className="desktop-cloud-row-action primary desktop-cloud-publish-primary"
             type="button"

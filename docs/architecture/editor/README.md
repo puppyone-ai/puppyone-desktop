@@ -94,7 +94,8 @@ A new editor must fit the shared boundary, not copy the shared save stack:
 format-specific model and UI
           |
           +----> reportRevision({ revision, dirty })
-          `----> readSnapshot() -> canonical file content
+          +----> readSnapshot() -> canonical file content
+          `----> replaceContent() for an accepted external version
                               |
                               v
                    DocumentEditingSession
@@ -140,7 +141,8 @@ model.
    is the single source of truth for capability, source, and runtime metadata;
    the registry binds reviewed React implementations without repeating those
    authority fields. Existing Markdown, text/code, CSV, HTML, Office, image,
-   PDF, audio, video, and placeholder viewers are built-in contributions.
+   PDF, audio, video, PuppyFlow, and placeholder viewers are built-in
+   contributions.
 2. The external Viewer Pack Host has an experimental implementation and
    security coverage, but the signed default product uses the
    `preset-viewers-only` profile. That profile does not register Pack schemes,
@@ -152,8 +154,10 @@ model.
    issue.
 4. Built-in editable contributions share the host-owned
    `DocumentEditingSession` and Local/Cloud persistence ports. Markdown and
-   text use the revision/snapshot attachment path. Remaining conformance work
-   is to remove format components that call save methods directly and to finish
-   the watcher-driven clean-reload versus dirty-conflict UX. Multi-agent merge,
-   CRDT, binary editing, and multi-file transactions are not part of the
-   current Editor contract.
+   text/code, CSV, and PuppyFlow use the same narrow revision/snapshot
+   attachment path. Format components no longer receive or call session save
+   methods. Watcher-driven clean reload, dirty conflict preservation, and
+   explicit reload/keep-local resolution are active; side-by-side comparison
+   and format-aware merge remain follow-up UX. Multi-agent merge, CRDT, binary
+   editing, and multi-file transactions are not part of the current Editor
+   contract.

@@ -31,7 +31,7 @@ import type {
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
 import { DocumentSessionBoundary } from "./document-session/DocumentSessionBoundary";
-import type { DocumentPersistedCommit, EditorDocumentSession } from "./document-session/types";
+import type { DocumentPersistedCommit } from "./document-session/types";
 
 export type { EditorDocument, EditorDocumentKind, EditorSaveMode, MarkdownHtmlTrustMode } from "./viewerTypes";
 
@@ -160,7 +160,7 @@ export function PuppyoneEditorHost({
     );
   }
 
-  const renderPresetViewer = (documentSession: EditorDocumentSession | null) => (
+  const presetViewer = (
     <PresetViewerRenderer
       viewer={viewer}
       context={{
@@ -178,7 +178,6 @@ export function PuppyoneEditorHost({
         hideSourceView,
         fileIconTheme,
         editorInteractionPreferences,
-        saveMode,
         htmlTrustMode,
         workspaceId,
         workspaceRoot,
@@ -187,7 +186,6 @@ export function PuppyoneEditorHost({
         appPreview,
         openExternalFile,
         convertOfficeDocumentToDocx,
-        documentSession,
       }}
     />
   );
@@ -201,13 +199,14 @@ export function PuppyoneEditorHost({
         saveMode={saveMode}
         persistence={documentPersistence}
         onPersisted={onDocumentPersisted}
+        showSaveStatus={editorInteractionPreferences.showSaveStatus}
       >
-        {renderPresetViewer}
+        {presetViewer}
       </DocumentSessionBoundary>
     );
   }
 
-  return renderPresetViewer(null);
+  return presetViewer;
 }
 
 function ExternalViewerChooser({

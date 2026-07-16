@@ -17,6 +17,13 @@
       "runtime": "lazy"
     },
     {
+      "id": "puppyflow",
+      "formatViewerIds": ["puppyflow-editor"],
+      "capability": "edit",
+      "source": "content",
+      "runtime": "lazy"
+    },
+    {
       "id": "json",
       "formatViewerIds": [],
       "capability": "edit",

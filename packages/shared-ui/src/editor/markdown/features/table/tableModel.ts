@@ -1,4 +1,14 @@
 import type { EditorState } from "@codemirror/state";
+import type {
+  MarkdownTableAlignment,
+  MarkdownTableCell,
+  MarkdownTableRow,
+} from "../../core/features/markdownFeatureData";
+export type {
+  MarkdownTableAlignment,
+  MarkdownTableCell,
+  MarkdownTableRow,
+} from "../../core/features/markdownFeatureData";
 import {
   MARKDOWN_TABLE_MODEL_CELL_LIMIT,
   MARKDOWN_TABLE_MODEL_COLUMN_LIMIT,
@@ -7,8 +17,6 @@ import {
   MARKDOWN_TABLE_MODEL_SOURCE_BYTE_LIMIT,
   getUtf8ByteLength,
 } from "../../core/plans/markdownBlockExecution";
-
-export type MarkdownTableAlignment = "left" | "center" | "right" | null;
 
 export type MarkdownTableBlock = {
   from: number;
@@ -20,19 +28,6 @@ export type MarkdownTableBlock = {
   cellCount: number;
   sourceBytes: number;
   modelComplete: boolean;
-};
-
-export type MarkdownTableCell = {
-  text: string;
-  from: number;
-  to: number;
-  editable: boolean;
-};
-
-export type MarkdownTableRow = {
-  cells: MarkdownTableCell[];
-  header: boolean;
-  lineTo: number;
 };
 
 export type MarkdownTableFocusTarget = {

@@ -1,11 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import type { DocumentPersistencePort } from "../../core/types";
+import { EditorSaveButton } from "../EditorSaveButton";
 import type { EditorSaveMode } from "../viewerTypes";
 import { registerActiveDocumentSession } from "./activeDocumentSessions";
 import { DocumentEditingSession } from "./DocumentEditingSession";
-import type { DocumentPersistedCommit, EditorDocumentSession } from "./types";
+import { EditableDocumentSourceProvider } from "./EditableDocumentSourceContext";
+import { formatDocumentSessionError } from "./formatDocumentSessionError";
+import type { DocumentPersistedCommit } from "./types";
+import { useDocumentSessionState } from "./useDocumentSessionState";
 
 export type DocumentSessionBoundaryProps = {
   documentId: string;
@@ -14,7 +25,8 @@ export type DocumentSessionBoundaryProps = {
   saveMode: EditorSaveMode;
   persistence: DocumentPersistencePort;
   onPersisted?: (commit: DocumentPersistedCommit) => void;
-  children: (session: EditorDocumentSession) => ReactNode;
+  showSaveStatus?: boolean;
+  children: ReactNode;
 };
 
 /** Trusted composition boundary between routing and a concrete editor. */
@@ -25,8 +37,10 @@ export function DocumentSessionBoundary({
   saveMode,
   persistence,
   onPersisted,
+  showSaveStatus = false,
   children,
 }: DocumentSessionBoundaryProps) {
+  const { t } = useLocalization();
   // Baseline, callback, and policy changes reconcile into this document's
   // existing session. Only document/storage identity creates a new queue.
   const binding = useMemo(() => {
@@ -49,20 +63,83 @@ export function DocumentSessionBoundary({
   }, [documentId, persistence]);
   binding.onPersistedRef.current = onPersisted;
   const { session } = binding;
+  const sessionState = useDocumentSessionState(session);
+  const sessionError = formatDocumentSessionError(sessionState.error, t);
 
   useEffect(() => {
     session.setSaveMode(saveMode);
   }, [saveMode, session]);
 
   useEffect(() => {
-    const unregister = registerActiveDocumentSession(session);
-    return () => {
-      // Dispose submits the editor's last attached snapshot. Registration
-      // retires only after that queued commit is durably acknowledged.
-      session.dispose();
-      unregister();
-    };
+    // The registry defers permanent disposal until it can distinguish a real
+    // unmount from React StrictMode's cleanup/setup development probe. Child
+    // detachment still captures the final editor snapshot synchronously.
+    return registerActiveDocumentSession(session);
   }, [session]);
 
-  return <>{children(session)}</>;
+  const saveBlocked = sessionState.error?.code === "external-conflict";
+  const showSaveChrome = showSaveStatus
+    || (sessionState.status === "error" && !saveBlocked);
+  const save = useCallback(() => {
+    if (saveBlocked) return;
+    observeSessionOperation(session.requestSave(), "manual save");
+  }, [saveBlocked, session]);
+  const resolveExternalConflict = useCallback((keepLocal: boolean) => {
+    observeSessionOperation(
+      session.resolveExternalConflict(keepLocal ? "keep-local" : "reload-external"),
+      "external conflict resolution",
+    );
+  }, [session]);
+
+  const handleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (
+      event.key.toLowerCase() !== "s"
+      || (!event.metaKey && !event.ctrlKey)
+      || event.altKey
+      || event.shiftKey
+    ) return;
+    event.preventDefault();
+    save();
+  }, [save]);
+
+  return (
+    <EditableDocumentSourceProvider source={session}>
+      <div className="editor-document-session-boundary" onKeyDownCapture={handleKeyDown}>
+        {showSaveChrome && (
+          <div className="editor-save-overlay">
+            <EditorSaveButton
+              status={sessionState.status}
+              manual={saveMode === "manual"}
+              retryable={!saveBlocked}
+              onSave={save}
+            />
+          </div>
+        )}
+        {sessionError && (
+          <div className="editor-inline-error" role="alert" dir="auto">
+            <span>{sessionError}</span>
+            {saveBlocked && (
+              <div className="editor-conflict-actions">
+                <button type="button" onClick={() => resolveExternalConflict(false)}>
+                  {t("editor.session.reloadExternal")}
+                </button>
+                <button type="button" onClick={() => resolveExternalConflict(true)}>
+                  {t("editor.session.keepLocal")}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {children}
+      </div>
+    </EditableDocumentSourceProvider>
+  );
+}
+
+function observeSessionOperation(operation: Promise<void>, label: string): void {
+  void operation.catch((error) => {
+    // The Session has already published the failure to the boundary and close
+    // registry. Keep diagnostics without creating an unhandled rejection.
+    console.warn(`Document Session ${label} failed:`, error);
+  });
 }

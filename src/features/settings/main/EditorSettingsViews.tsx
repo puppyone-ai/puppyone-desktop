@@ -80,6 +80,7 @@ export function ExperimentalSettingsView({
   }> = [
     { messageKey: "minimalMode", settingKey: "enableMinimalMode" },
     { messageKey: "viewerPlugins", settingKey: "enableViewerPlugins" },
+    { messageKey: "editorSaveStatus", settingKey: "enableEditorSaveStatus" },
     { messageKey: "markdownBlockDrag", settingKey: "enableMarkdownBlockDrag" },
     ...(assetLibraryHomeAvailable
       ? [{ messageKey: "projectsHome", settingKey: "enableAssetLibraryHome" as const }]

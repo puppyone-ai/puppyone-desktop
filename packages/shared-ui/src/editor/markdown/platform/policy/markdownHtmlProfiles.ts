@@ -2,7 +2,7 @@
  * Versioned broad-safe HTML profiles (architecture §6.4).
  * Profiles are non-escalating: a surface receives only its selected profile.
  */
-export const MARKDOWN_HTML_PROFILE_VERSION = "2026-07-11.1" as const;
+export const MARKDOWN_HTML_PROFILE_VERSION = "2026-07-15.1" as const;
 
 export type MarkdownHtmlProfileId =
   | "inline-editable"
@@ -73,11 +73,10 @@ const SAFE_BLOCK_TAGS = [
 ] as const;
 
 // Only media that has a shipped, broker-backed DOM adapter belongs in this
-// profile. Audio/video/source can be added when they have the same typed asset
-// resolution contract as images; declaring them here before that point would
-// make the profile advertise ambient browser loading that the product does not
-// actually mediate.
-const SAFE_MEDIA_TAGS = ["img"] as const;
+// profile. Every network-capable sink below has a shipped broker-backed DOM
+// adapter; declaring a tag here without one would advertise ambient browser
+// loading that the product does not actually mediate.
+const SAFE_MEDIA_TAGS = ["img", "source", "video"] as const;
 
 const BLOCKED_EXECUTABLE_TAGS = [
   "base",
@@ -187,11 +186,28 @@ export const MARKDOWN_HTML_PROFILES = {
   "safe-media": {
     id: "safe-media" as const,
     tags: new Set<string>(SAFE_MEDIA_TAGS),
-    voidTags: new Set<string>(["img"]),
+    voidTags: new Set<string>(["img", "source"]),
     attributes: {
       global: new Set(["aria-label", "class", "dir", "id", "lang", "style", "title"]),
       byTag: new Map<string, Set<string>>([
         ["img", new Set(["alt", "aria-label", "class", "height", "id", "loading", "src", "srcset", "style", "title", "width"])],
+        ["source", new Set(["src", "type"])],
+        ["video", new Set([
+          "aria-label",
+          "class",
+          "controls",
+          "height",
+          "id",
+          "loop",
+          "muted",
+          "playsinline",
+          "poster",
+          "preload",
+          "src",
+          "style",
+          "title",
+          "width",
+        ])],
       ]),
     },
     styleProperties: new Set<string>(INLINE_STYLE_PROPERTIES),

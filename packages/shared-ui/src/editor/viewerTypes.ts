@@ -6,7 +6,6 @@ import type { AiEditFile } from "./ai-edits/types";
 import type { PresetViewerSource } from "./viewerContract";
 import type { DocumentSourceKind } from "./documentSource";
 import type { PresetViewerDefinition } from "./presetViewerManifest";
-import type { EditorDocumentSession } from "./document-session/types";
 
 export type { DocumentSourceKind } from "./documentSource";
 
@@ -48,9 +47,11 @@ export type EditorDocument = {
 export type EditorMode = "live" | "source";
 export type EditorSaveMode = "manual" | "auto";
 export type EditorInteractionPreferences = Readonly<{
+  showSaveStatus: boolean;
   markdownBlockDragEnabled: boolean;
 }>;
 export const DEFAULT_EDITOR_INTERACTION_PREFERENCES: EditorInteractionPreferences = {
+  showSaveStatus: false,
   markdownBlockDragEnabled: false,
 };
 export type EditorSourceRequirement = PresetViewerSource;
@@ -126,7 +127,6 @@ export type PresetViewerRenderContext = EditorViewerMatch & {
   hideSourceView: boolean;
   fileIconTheme: FileIconThemeId;
   editorInteractionPreferences: EditorInteractionPreferences;
-  saveMode: EditorSaveMode;
   htmlTrustMode: MarkdownHtmlTrustMode;
   workspaceId?: string;
   workspaceRoot?: string | null;
@@ -135,7 +135,6 @@ export type PresetViewerRenderContext = EditorViewerMatch & {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
-  documentSession?: EditorDocumentSession | null;
 };
 
 /** @deprecated Prefer PresetViewerRenderContext. */

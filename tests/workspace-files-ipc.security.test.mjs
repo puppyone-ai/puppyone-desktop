@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import { EventEmitter } from "node:events";
-import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -76,6 +76,26 @@ describe("workspace file IPC authorization", () => {
     }
   });
 
+  it("attributes a successful editor write to its originating window", async () => {
+    const workspaceWatchService = { noteInternalWrite: vi.fn() };
+    const { handlers } = createHarness(() => root, { workspaceWatchService });
+    const notePath = path.join(root, "note.txt");
+    await writeFile(notePath, "before");
+
+    const result = await handlers.get("workspace:write-file")(
+      { sender: { id: 80 } },
+      { rootPath: root, path: "note.txt", content: "after" },
+    );
+
+    expect(await readFile(notePath, "utf8")).toBe("after");
+    expect(workspaceWatchService.noteInternalWrite).toHaveBeenCalledWith({
+      rootPath: await fs.promises.realpath(root),
+      path: "note.txt",
+      senderId: 80,
+      version: result.version,
+    });
+  });
+
   it("issues a sender-owned URL capability scoped to the exact file", async () => {
     const { handlers, localFileCapabilities } = createHarness(() => root);
     await writeFile(path.join(root, "note.txt"), "inside");
@@ -120,6 +140,30 @@ describe("workspace file IPC authorization", () => {
     expect(localFileCapabilities.resolve(parseLocalFileUrl(second.url))).toEqual({
       rootPath: await fs.promises.realpath(root),
       relativePath: "image.png",
+    });
+  });
+
+  it("resolves a unique macOS screenshot-space alias only for Markdown assets", async () => {
+    const { handlers, localFileCapabilities } = createHarness(() => root);
+    await mkdir(path.join(root, "asserts"));
+    const actualName = "Screenshot 2026-07-15 at 10.07.43\u202fPM.png";
+    await writeFile(path.join(root, "asserts", actualName), "png");
+    const authoredPath = "asserts/Screenshot 2026-07-15 at 10.07.43 PM.png";
+    const event = { sender: { id: 84 } };
+
+    await expect(handlers.get("workspace:get-file-url")(
+      event,
+      { rootPath: root, path: authoredPath, purpose: "file-preview" },
+    )).rejects.toThrow(/unable to resolve workspace entry/i);
+
+    const result = await handlers.get("workspace:get-file-url")(
+      event,
+      { rootPath: root, path: authoredPath, purpose: "markdown-asset" },
+    );
+    const parsed = parseLocalFileUrl(result.url);
+    expect(localFileCapabilities.resolve(parsed)).toEqual({
+      rootPath: await fs.promises.realpath(root),
+      relativePath: `asserts/${actualName}`,
     });
   });
 
@@ -295,7 +339,10 @@ describe("workspace file IPC authorization", () => {
   });
 });
 
-function createHarness(getWorkspaceRootForSender, { convertOfficeDocument, dialog } = {}) {
+function createHarness(
+  getWorkspaceRootForSender,
+  { convertOfficeDocument, dialog, workspaceWatchService } = {},
+) {
   const handlers = new Map();
   const ipcMain = {
     handle: (channel, handler) => handlers.set(channel, handler),
@@ -318,6 +365,7 @@ function createHarness(getWorkspaceRootForSender, { convertOfficeDocument, dialo
       fsModule: fs,
     }),
     localFileCapabilities,
+    workspaceWatchService,
     convertOfficeDocument,
   });
 

@@ -57,7 +57,7 @@ export type {
   RendererPerformanceTrace,
 } from "./performance/rendererPerformance";
 export { FilePreview } from "./data/FilePreview";
-export type { FilePreviewBodyContext, FilePreviewProps } from "./data/FilePreview";
+export type { FilePreviewProps } from "./data/FilePreview";
 export { ProjectsHeader as WorkspaceHeader } from "./data/ProjectsHeader";
 export type {
   BreadcrumbSegment,
@@ -66,26 +66,10 @@ export type {
 
 export { EditorHost } from "./editor/EditorHost";
 export type { EditorHostProps } from "./editor/EditorHost";
-export {
-  DocumentEditingSession,
-  DocumentSessionBoundary,
-  flushActiveDocumentSessions,
-  formatDocumentSessionError,
-  registerActiveDocumentSession,
-  useDocumentSessionState,
-} from "./editor/document-session";
-export type {
-  DocumentEditingSessionOptions,
-  DocumentSessionDrainReason,
-  DocumentSessionError,
-  DocumentSessionErrorCode,
-  DocumentPersistedCommit,
-  DocumentSessionBoundaryProps,
-  DocumentSessionState,
-  DocumentSessionStatus,
-  EditorDocumentSession,
-  ExternalBaselineResult,
-} from "./editor/document-session";
+// The app shell may request a durability barrier, but the session object and
+// editable-source bridge remain private to the trusted Editor host.
+export { flushActiveDocumentSessions } from "./editor/document-session";
+export type { DocumentPersistedCommit } from "./editor/document-session";
 export {
   classifyEditorViewerCapability,
   createPresetViewerRegistry,
@@ -100,6 +84,25 @@ export {
 export type {
   PresetViewerRegistry,
 } from "./editor/viewerRegistry";
+export {
+  compilePuppyFlowRun,
+  createDefaultPuppyFlowDocument,
+  createPuppyFlowStep,
+  extractPuppyFlowMentions,
+  getPuppyFlowAgent,
+  isPuppyFlowFile,
+  parsePuppyFlowDocument,
+  PUPPYFLOW_AGENT_OPTIONS,
+  serializePuppyFlowDocument,
+} from "./editor/puppyflow/puppyflowModel";
+export type {
+  PuppyFlowAgentId,
+  PuppyFlowAgentOption,
+  PuppyFlowDocument,
+  PuppyFlowDocumentDefaults,
+  PuppyFlowParseResult,
+  PuppyFlowStep,
+} from "./editor/puppyflow/puppyflowModel";
 export {
   coreViewerCapability,
   getPresetViewerDefinition,

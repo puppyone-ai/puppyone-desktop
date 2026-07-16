@@ -387,7 +387,6 @@ export function useWorkspaceSurfaceContent({
         onRefresh={git.refreshGitStatus}
         onOpenDetails={cloud.onOpenDetails}
         onOpenGitSettings={cloud.onOpenGitSettings}
-        onReviewChanges={() => onNavigate("git")}
       />
     ),
   };

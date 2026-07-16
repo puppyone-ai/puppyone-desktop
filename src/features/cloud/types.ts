@@ -78,5 +78,4 @@ export type CloudServiceMainViewProps = {
   onRefresh: () => void;
   onOpenDetails: () => void;
   onOpenGitSettings: () => void;
-  onReviewChanges: () => void;
 };

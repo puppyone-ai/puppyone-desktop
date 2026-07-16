@@ -283,11 +283,20 @@ source-code extensions)
 - Status: met, except the over-cap state currently surfaces as a raw
   read error rather than a designed state (remaining in Part 2 §9).
 
-**JSON / JSONL** (`.json`, `.jsonl`, `.json5`, `.jsonc`, `.puppyflow`)
+**JSON / JSONL** (`.json`, `.jsonl`, `.json5`, `.jsonc`)
 
 - Bar: pretty-printed on open (`normalizeContent`); full edit + save;
   invalid JSON must still open as raw text without crashing.
 - Status: met.
+
+**PuppyFlow** (`.puppyflow`, `.puppyflow.json`)
+
+- Bar: the dedicated structured step editor is selected by the Preset Viewer
+  Registry; its model owns parse/normalize/serialize and exposes only the
+  shared revision/snapshot source boundary. Invalid source remains byte-for-byte
+  untouched until the user explicitly resets or edits it.
+- Status: met. PuppyFlow uses the same host-owned save lifecycle as Markdown,
+  code, and CSV; there is no app-shell route or persistence special case.
 
 **CSV / TSV** (`.csv`, `.tsv`)
 

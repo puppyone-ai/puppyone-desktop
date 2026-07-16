@@ -439,6 +439,7 @@ ranges are hidden and atomic.
 | `[label](url)` | link-styled label | URL part hidden; see click rules below |
 | `[[target]]` / `[[t\|alias]]` | wiki-link label | resolved/missing/ambiguous styling kept |
 | `![alt](src)` | inline image | atomic; see below |
+| `![[image.png]]` | Obsidian-style image embed | workspace-link resolution; atomic |
 | `<https://…>` / bare URL | link text | brackets hidden |
 | common safe inline HTML, including `<span style="color: …">text</span>` | sanitized semantic/styled content | tags reveal per element; blocked capabilities are diagnosed and omitted when structure remains honest, otherwise source stays visible |
 | `\*` escapes | the escaped char | backslash hidden |
@@ -466,9 +467,43 @@ Links and images:
 - Plain click on a link label places the caret (revealing if it lands
   inside); ⌘-click (or Ctrl-click) opens the target. Rationale: this is an
   editor first; click-to-open misfires while editing.
-- An image is atomic. Click selects it; Backspace deletes the whole
-  `![alt](src)` range; Return with the image selected (or a second click)
-  expands it to source for editing.
+- An image is atomic. A single click focuses the mounted image without creating
+  a CodeMirror document selection, so the replacement DOM and decoded resource
+  stay mounted. Backspace/Delete while focused removes the whole
+  `![alt](src)` range; Enter or double-click deliberately expands it to source
+  for editing.
+- Editing unrelated text, including text before the image, does not blank,
+  reload, or re-decode an already rendered image. Only a change to that image's
+  semantic source/context or removal of its owning view replaces the mounted
+  preview.
+- A complete raw HTML `<img ...>` that owns its physical line renders through
+  the same safe-media broker, including `alt`, bounded `width`/`height`, and
+  local workspace sources. Mixed prose plus inline `<img>` remains source.
+- A rendered HTML block's source action reveals that block's canonical range
+  in the main CodeMirror document; it never creates a nested textarea,
+  `contenteditable`, or second source draft inside the widget. Normal typing,
+  IME, history, persistence, and external-change handling therefore keep using
+  the document's single transaction path. Moving the caret outside the range
+  or pressing Escape restores the rendered block.
+
+Video embeds:
+
+- A supported full-line `![[clip.mp4]]` / `![[clip.webm]]` target renders as a
+  block video with native controls, no autoplay, inline playback, and metadata-
+  only preload. `![[clip.mp4|Demo]]` supplies a title;
+  `![[clip.mp4|720x405]]` supplies bounded display geometry.
+- Video targets use the same workspace wiki-link resolution and brokered local
+  asset transport as Obsidian image embeds. Ambiguous or unresolved targets
+  stay honest as a fallback instead of loading an arbitrary same-named file.
+- Editing unrelated text preserves the mounted video element, playback time,
+  buffered state, and capability lease. Changing the video source or removing
+  its owning view disposes that session.
+- Safe raw HTML `<video>` / `<source>` follows the same resource policy. The
+  editor forces controls, strips autoplay, brokers every source/poster, and
+  keeps unsupported executable behavior out of the document DOM. A complete
+  `<video>...</video>` root may occupy one physical line or a normal Markdown
+  HTML block; mixed prose plus inline `<video>` remains source rather than being
+  guessed into a block.
 
 Typing completion: typing the closing delimiter renders the element
 instantly (caret ends at `to`, which is outside per the strict predicate).
@@ -646,7 +681,8 @@ CodeMirror text editing)
 - [x] Link click places the caret; ⌘-click opens; read-only click opens;
       Cmd/Ctrl+Enter follows the link under the caret; pointer cursor appears
       only while the open modifier is down.
-- [x] Image atomic selection; Return / second click expands to source.
+- [x] Stable image focus; Enter / double-click expands to source, while
+      Backspace/Delete removes the complete image range.
 - [x] Fence code block arrow-key exit and empty-block Backspace delete; Home
       targets; caret geometry (`coordsAt`) around hidden markers.
 - [x] Table arrow-key entry/exit and Tab / Shift-Tab cell movement.
@@ -698,9 +734,8 @@ New work:
       source-over-preview split; keeps the last successful SVG through
       invalid intermediate states with an inline error strip; read-only
       shows the diagram only.
-- [x] Detection branch in `addMarkdownBlockAndLineDecorations`:
-      `language === "mermaid"` → `MermaidBlockWidget` instead of
-      `CodeBlockWidget`.
+- [x] `codeBlockFeature` compiles a Mermaid fence to a typed `mermaid` embed;
+      the separately registered `mermaidFeature` owns its Widget factory.
 - [x] Widget CSS: container, toolbar, error strip, fit-to-width SVG.
 
 **Phase 8 — table structure editing** (additive feature on the same
@@ -852,8 +887,9 @@ Current building blocks that stay:
   ViewPlugin, so geometry is known before the view measures).
 - `Decoration.replace` with zero-width widgets for hidden syntax, with
   `coordsAt` overrides so the caret has geometry next to widgets.
-- Widget `eq()` identity to avoid DOM rebuild churn; `estimatedHeight` for
-  scroll stability.
+- Widget `eq()` uses semantic render identity—not mapped absolute offsets—to
+  avoid DOM rebuild churn; event handlers resolve the current source range from
+  CodeMirror. `estimatedHeight` provides scroll stability.
 
 Changes required by Part 1:
 
@@ -943,35 +979,46 @@ Changes required by Part 1:
    strips, pointer drag) call the same feature command and model functions —
    the UI layers own no table-mutation logic. Column-width resizing is
    explicitly out of scope: GFM has no syntax to persist it.
-10. **Module layout (Phase 9, superseded by the vertical-feature migration).**
-    The editor is a hybrid modular monolith: stable machinery is layered, while
-    complex capabilities keep model, plan, interaction, and widget code
-    together. Public assembly remains thin:
+10. **Final module layout and Feature Composition.** Stable machinery is
+    layered, while complex capabilities keep model, plan, interaction, and
+    Widget code together. Public assembly installs one immutable Feature
+    Composition through a CodeMirror Facet:
 
     ```text
     editor/markdown/
       markdownCodeMirrorExtensions.ts   assembly: extension factories, theme
-      core/                             syntax, plans, commands, decorations
+      composition/
+        markdownFeatureComposition.ts   only built-in registration point
+        preview/                         isolated-string compatibility adapter
+      core/                             generic syntax/plans/commands/adapters
+        features/                       pure data + composition port/Facet
         commands/                       view → transaction commands
         syntax/                         Lezer-backed semantic projection
         plans/                          typed plan contract + compiler
         state/                          generic StateFields/effects
         decorations/                    plan → CodeMirror decorations
       features/
-        blockFeatureRegistry.ts         typed block composition boundary
-        inlineFeatureRegistry.ts        typed inline composition boundary
-        table/                          model/plan/commands/focus/widget/drag
-        html/                           tokenizer/model/plan/policy/widget
-        code-block/                     model/plan/widget
-        mermaid/                        renderer/widget
-        image/                          model/plan/widget
+        table/                          tableFeature + model/plan/commands/widget
+        html/                           htmlFeature + tokenizer/model/plan/widget
+        code-block/                     codeBlockFeature + model/plan/widget
+        mermaid/                        mermaidFeature + renderer/widget
+        image/                          imageFeature + model/plan/widget
+        video/                          videoFeature + model/plan/playback widget
+        media/                          syntax feature + shared mechanisms
       platform/                         security, policy, brokers, sessions
-      shared/                           feature-agnostic DOM/measure helpers
+      shared/
+        preview/                        isolated-preview leaf port
+        widgets/                        feature-agnostic DOM/measure helpers
     ```
 
-    `scripts/check-markdown-architecture.mjs` rejects legacy horizontal
-    directories, platform-to-feature dependencies, shared upward dependencies,
-    DOM-backed plans, and core imports of concrete feature widgets.
+    Detection, plan compilation, Widget creation, and Feature-owned editor
+    extensions are indexed from that one frozen list. Main Feature decorations
+    consume `plan.atom` / `plan.embed` without retokenizing feature media. The
+    table-cell adapter is the explicit isolated-string exception.
+    `scripts/check-markdown-architecture.mjs`
+    rejects the deleted block/inline registries, concrete-feature imports from
+    the generic collector/compiler/decorations, platform-to-feature
+    dependencies, shared upward dependencies, and DOM-backed plans.
 
     `styles/editor.css` is an ordered `@import` list over
     `styles/editor/*.css` section files (preview surfaces, code editor,
@@ -1036,9 +1083,10 @@ Changes required by Part 1:
     (`is-doc-selected`) remains for document-level selections that
     cover the table source range; it is never the result of an in-cell
     click. Entering a cell collapses any covering block selection so
-    the two chromes never stack. (An earlier "first click selects the
-    table" model was wrong for tables — that pattern fits atomic media
-    like images, not grids whose primary unit is the cell.)
+    the two chromes never stack. An earlier "first click creates a document
+    selection" model was also removed from images: focus is the stable
+    single-click state for an atomic widget, while explicit source expansion
+    owns the document-selection transition.
 
 ## 14. Background: architecture research
 

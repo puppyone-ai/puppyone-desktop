@@ -121,6 +121,7 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(JSON.stringify({ enableAgentChat: true }))).toMatchObject({
       enableAgentChat: true,
       enableAssetLibraryHome: false,
+      enableEditorSaveStatus: false,
       enableMarkdownBlockDrag: false,
       enableMinimalMode: false,
       enablePuppyoneAppFiles: false,
@@ -128,6 +129,13 @@ describe("experimental preferences", () => {
       enableViewerPlugins: false,
     });
     expect(parseExperimentalSettings(JSON.stringify({ enableAgentCompanion: true })).enableAgentChat).toBe(true);
+  });
+
+  it("keeps the editor save status hidden unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableEditorSaveStatus).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableEditorSaveStatus).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableEditorSaveStatus: false })).enableEditorSaveStatus).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableEditorSaveStatus: true })).enableEditorSaveStatus).toBe(true);
   });
 
   it("keeps Minimal Mode off unless the user explicitly opts in", () => {
