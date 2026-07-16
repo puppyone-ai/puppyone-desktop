@@ -107,7 +107,6 @@ import {
   useTypographyRuntime,
 } from "./features/typography";
 
-const CLOUD_BROWSER_SIGN_IN_COOLDOWN_MS = 1500;
 const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMinimalModeDock").then((module) => ({
   default: module.DesktopMinimalModeDock,
 })));
@@ -243,7 +242,7 @@ export function App() {
   }, []);
   const switcherRef = useRef<HTMLDivElement>(null);
   const terminalPanelRef = useRef<RightTerminalPanelHandle>(null);
-  const cloudBrowserSignInInFlightRef = useRef(false);
+  const cloudBrowserSignInInFlightRef = useRef<Promise<boolean> | null>(null);
   const workspaceIsCloud = isCloudWorkspace(workspace);
   const desktopTerminalEnabled = isDesktopTerminalEnabled({ terminalToolEnabled, workspaceIsCloud });
   const desktopAgentChatEnabled = isDesktopAgentChatEnabled({
@@ -278,24 +277,32 @@ export function App() {
   useEffect(() => {
     if (workspace && homeOperationStatus) setHomeOperationStatus(null);
   }, [homeOperationStatus, workspace]);
-  const startCloudBrowserSignIn = useCallback(async () => {
-    if (!cloudEnabled) return;
+  const startCloudBrowserSignIn = useCallback((): Promise<boolean> => {
+    if (!cloudEnabled) return Promise.resolve(false);
     if (cloudAuthStatus === "signing-in") {
       showBrowserSignInStatus("A secure Puppyone Cloud sign-in is already open in your browser.");
-      return;
+      return Promise.resolve(true);
     }
-    if (cloudBrowserSignInInFlightRef.current) return;
-    cloudBrowserSignInInFlightRef.current = true;
-    try {
-      await startDesktopCloudOAuth(getDesktopCloudApiBaseUrl());
-    } catch (error) {
-      setHomeOperationStatus(null);
-      setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
-    } finally {
-      window.setTimeout(() => {
-        cloudBrowserSignInInFlightRef.current = false;
-      }, CLOUD_BROWSER_SIGN_IN_COOLDOWN_MS);
-    }
+    const inFlight = cloudBrowserSignInInFlightRef.current;
+    if (inFlight) return inFlight;
+
+    const request = (async () => {
+      try {
+        await startDesktopCloudOAuth(getDesktopCloudApiBaseUrl());
+        return true;
+      } catch (error) {
+        setHomeOperationStatus(null);
+        setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
+        return false;
+      }
+    })();
+    cloudBrowserSignInInFlightRef.current = request;
+    void request.finally(() => {
+      if (cloudBrowserSignInInFlightRef.current === request) {
+        cloudBrowserSignInInFlightRef.current = null;
+      }
+    });
+    return request;
   }, [cloudAuthStatus, cloudEnabled, setRestoreWorkspaceError, showBrowserSignInStatus]);
   const handleCloudDataSessionChange = useCallback((session: DesktopCloudSession | null) => {
     updateCloudSession(session);
@@ -1041,6 +1048,7 @@ export function App() {
     cloudBackupError,
     cloudBackupLoading,
     handleStartPuppyoneBackup,
+    pendingCloudBackupSetup,
   } = usePuppyoneCloudBackup({
     activeCloudSession,
     activeGitStatus,
@@ -1058,6 +1066,7 @@ export function App() {
     setGitOperationLoading,
     setSidebarCollapsed,
     setSwitcherOpen,
+    startCloudBrowserSignIn,
     workspace,
     workspaceIsCloud,
   });
@@ -1353,6 +1362,7 @@ export function App() {
             projectContext: workspaceIsCloud ? null : projectCloudContext,
             backupError: cloudBackupErrorMessage,
             backupLoading: cloudBackupLoading,
+            backupPending: pendingCloudBackupSetup,
             cloudApiBaseUrl: desktopCloudApiBaseUrl,
             cloudSession: activeCloudSession,
             storedCloudSession: cloudSession,

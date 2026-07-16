@@ -60,7 +60,7 @@ export function useCloudProjectHome({
   setHomeOperationStatus: Dispatch<SetStateAction<OnboardingOperationStatus | null>>;
   setRestoreWorkspaceError: (error: string | null) => void;
   showBrowserSignInStatus: (detail: string) => void;
-  startCloudBrowserSignIn: () => Promise<void>;
+  startCloudBrowserSignIn: () => Promise<boolean>;
   updateCloudSession: (session: DesktopCloudSession | null) => void;
 }) {
   const { t } = useLocalization();

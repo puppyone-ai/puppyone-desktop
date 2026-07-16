@@ -16,32 +16,56 @@ export function CloudLocalOnlyWorkspace({
   accountEmail,
   branchName,
   localChangeCount,
-  backupLoading,
+  publishLoading,
+  publishPending = false,
+  publishError = null,
   cloudRemote,
-  onBackupWorkspace,
+  onPublishWorkspace,
 }: {
   workspace: Workspace;
   accountEmail: string | null;
   branchName: string;
   localChangeCount: number;
-  backupLoading: boolean;
+  publishLoading: boolean;
+  publishPending?: boolean;
+  publishError?: string | null;
   cloudRemote: ReturnType<typeof getPuppyoneRemote>;
-  onBackupWorkspace: () => void;
+  onPublishWorkspace: () => void;
 }) {
   const { formatNumber, t } = useLocalization();
+  const publishBusy = publishLoading || publishPending;
+  const waitingForSignIn = publishPending && !accountEmail && !publishLoading;
+  const publishing = publishLoading || (publishPending && Boolean(accountEmail));
   return (
     <>
+      {waitingForSignIn && (
+        <div className="desktop-cloud-main-alert info" role="status">
+          {t("cloud.state.publishSignInPending")}
+        </div>
+      )}
+      {publishError && (
+        <div className="desktop-cloud-main-alert" role="alert">
+          {publishError}
+        </div>
+      )}
       <CloudMainSection
         title={t("cloud.state.localWorkspace")}
-        count={t(cloudRemote ? "cloud.state.remoteNotMatched" : "cloud.state.notBackedUp")}
+        count={t(cloudRemote ? "cloud.state.remoteNotMatched" : "cloud.state.localOnly")}
         action={(
           <button
             className="desktop-cloud-row-action primary"
             type="button"
-            disabled={backupLoading}
-            onClick={onBackupWorkspace}
+            aria-busy={publishBusy || undefined}
+            disabled={publishBusy}
+            onClick={onPublishWorkspace}
           >
-            {t(backupLoading ? "cloud.project.addingRemote" : "cloud.state.backupAndAddRemote")}
+            {t(
+              publishing
+                ? "cloud.state.publishing"
+                : waitingForSignIn
+                  ? "cloud.state.waitingForSignIn"
+                  : "cloud.state.publishToCloud",
+            )}
           </button>
         )}
       >
@@ -52,7 +76,11 @@ export function CloudLocalOnlyWorkspace({
             <p>{t("cloud.state.localOnlyDescription")}</p>
           </div>
           <div className="desktop-cloud-sync-summary">
-            <CloudMainMetric label={t("cloud.common.account")} value={accountEmail ?? t("cloud.state.accountNotRequired")} tone="ready" />
+            <CloudMainMetric
+              label={t("cloud.common.account")}
+              value={accountEmail ?? t("cloud.state.signInToPublish")}
+              tone={accountEmail ? "ready" : undefined}
+            />
             <CloudMainMetric label={t("cloud.git.branch")} value={branchName} />
             <CloudMainMetric label={t("cloud.git.localChanges")} value={formatNumber(localChangeCount)} tone={localChangeCount > 0 ? "warning" : undefined} />
           </div>

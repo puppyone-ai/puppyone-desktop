@@ -100,8 +100,10 @@ an Offline banner.
 
 ## UI states
 
-- No canonical remote: show the local-only explanation and an explicit action
-  to add a Cloud Git remote. Do not show an error banner.
+- No canonical remote: show the local-only explanation and one primary
+  `Publish to PuppyOne Cloud` action. Do not show an error banner and do not
+  initiate a workspace-specific session restore until the user invokes that
+  action. A separately restored global account session may still be reused.
 - Resolved context: show Project content.
 - Remote missing after a previous display hint: the actual current state wins;
   show local-only.
@@ -111,13 +113,28 @@ an Offline banner.
 
 ## Mutations
 
-Adding a Cloud Git remote is an explicit operation:
+Publishing a local project is one explicit user operation:
 
-1. choose a Project/root-or-Scope target;
-2. issue a one-time user Git credential;
-3. write secret-free workspace sync preferences;
-4. configure the canonical remote and OS credential helper;
-5. if local setup fails, best-effort revoke the just-issued credential.
+1. record publish intent without performing any passive Cloud request;
+2. authenticate in the browser when there is no current Cloud session;
+3. materialize a Git commit when the working tree has unpublished changes;
+4. create the Cloud Project and obtain its stable Project ID;
+5. issue a one-time user Git credential;
+6. write secret-free workspace sync preferences;
+7. configure the canonical `puppyone` remote and OS credential helper;
+8. push the current branch and enter the new Cloud Project;
+9. if local setup fails, best-effort revoke the just-issued credential and
+   keep the local repository usable.
+
+The UI describes this as publishing, not as adding a remote. Project creation,
+credential issuance, remote configuration, and Git push are implementation
+steps behind the single product action. Waiting for browser sign-in,
+publishing, and failure are visible states; a click must never degrade into a
+navigation no-op.
+
+Configuring a local checkout for an existing Cloud Project remains a separate
+explicit operation that selects a Project/root-or-Scope target before issuing
+the credential.
 
 Removing Cloud access from a folder removes the local remote and related local
 sync preferences. It is not a server-side folder operation. Credential

@@ -60,6 +60,7 @@ export type DesktopWorkspaceCloudSurfaceController = {
   projectContext?: ProjectCloudContext | null;
   backupError: string | null;
   backupLoading: boolean;
+  backupPending: boolean;
   cloudApiBaseUrl: string | null;
   cloudSession: DesktopCloudSession | null;
   storedCloudSession: DesktopCloudSession | null;
@@ -202,7 +203,7 @@ export function useWorkspaceSurfaceContent({
     gitDisplayMode: preferences.gitDisplayMode,
     fileIconTheme: preferences.fileIconTheme,
     cloudBackup: {
-      loading: cloud.backupLoading,
+      loading: cloud.backupLoading || cloud.backupPending,
       error: cloud.backupError,
       enabled: cloud.enabled,
       start: cloud.onStartPuppyoneBackup,
@@ -369,6 +370,7 @@ export function useWorkspaceSurfaceContent({
         loading={git.gitStatusLoading}
         error={git.gitStatusError}
         cloudBackupLoading={cloud.backupLoading}
+        cloudBackupPending={cloud.backupPending}
         cloudBackupError={cloud.backupError}
         onStartPuppyoneBackup={cloud.onStartPuppyoneBackup}
         onRemoveCloudRemote={cloud.onRemoveCloudRemote}

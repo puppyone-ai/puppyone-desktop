@@ -18,6 +18,7 @@ import { CloudHistorySection } from "../src/features/cloud/sections/HistorySecti
 import { CloudAutomationRouteSection } from "../src/features/cloud/sections/AutomationRouteSection";
 import { CloudServiceSidebar } from "../src/features/cloud/CloudServiceSidebar";
 import { CloudServiceMainView } from "../src/features/cloud/CloudServiceMainView";
+import { CloudLocalOnlyWorkspace } from "../src/features/cloud/states";
 import { useCloudAuthController } from "../src/features/cloud/hooks/useCloudAuthController";
 import { useCloudProjectHome } from "../src/features/cloud/hooks/useCloudProjectHome";
 import { CloudProjectBrowser } from "../src/features/cloud/components/ProjectBrowser";
@@ -691,8 +692,8 @@ describe("CloudRouter local context", () => {
     });
 
     expect(getCloudHistory).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("This workspace is local only");
-    expect(container.textContent).toContain("Back up and add Git remote");
+    expect(container.textContent).toContain("This project is not published to PuppyOne Cloud");
+    expect(container.textContent).toContain("Publish to PuppyOne Cloud");
     expect(container.textContent).not.toContain("Preview Project");
     expect(container.textContent).not.toContain("Repository Git remote");
   });
@@ -739,6 +740,33 @@ describe("Cloud Project selection actions", () => {
 });
 
 describe("Local-only Cloud page", () => {
+  it("shows explicit browser sign-in feedback while a publish intent is pending", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudLocalOnlyWorkspace
+          workspace={{ id: "local-pending", name: "Local Notes", path: "/tmp/local-notes" }}
+          accountEmail={null}
+          branchName="main"
+          localChangeCount={1}
+          publishLoading={false}
+          publishPending
+          publishError={null}
+          cloudRemote={null}
+          onPublishWorkspace={vi.fn()}
+        />,
+      );
+      await flushPromises();
+    });
+
+    expect(container.textContent).toContain("Finish signing in in your browser");
+    expect(container.textContent).toContain("Waiting for sign-in…");
+    expect(container.querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
+  });
+
   it("does not infer a Cloud Project or show an error when the repository has no PuppyOne remote", async () => {
     const localSession = {
       ...session,
@@ -774,6 +802,7 @@ describe("Local-only Cloud page", () => {
           loading={false}
           error={null}
           cloudBackupLoading={false}
+          cloudBackupPending={false}
           cloudBackupError={null}
           onStartPuppyoneBackup={vi.fn()}
           onSelectSection={vi.fn()}
@@ -785,16 +814,17 @@ describe("Local-only Cloud page", () => {
       await flushPromises();
     });
 
-    expect(container.textContent).toContain("This workspace is local only");
-    expect(container.textContent).toContain("Back up and add Git remote");
+    expect(container.textContent).toContain("This project is not published to PuppyOne Cloud");
+    expect(container.textContent).toContain("Publish to PuppyOne Cloud");
     expect(container.textContent).not.toContain("Unable to verify");
     expect(container.querySelector(".desktop-cloud-main-alert")).toBeNull();
     expect(getCloudProject).not.toHaveBeenCalled();
   });
 
-  it("stays local-only while signed out and does not restore a Cloud session", async () => {
+  it("stays passive while signed out, then forwards an explicit publish intent", async () => {
     const restoreCloudSession = vi.fn().mockResolvedValue(null);
     const onOpenDetails = vi.fn();
+    const onStartPuppyoneBackup = vi.fn();
     const previousBridge = window.puppyoneDesktop;
     Object.defineProperty(window, "puppyoneDesktop", {
       configurable: true,
@@ -830,8 +860,9 @@ describe("Local-only Cloud page", () => {
           loading={false}
           error="This must not be rendered"
           cloudBackupLoading={false}
-          cloudBackupError="This must not be rendered either"
-          onStartPuppyoneBackup={vi.fn()}
+          cloudBackupPending={false}
+          cloudBackupError={null}
+          onStartPuppyoneBackup={onStartPuppyoneBackup}
           onSelectSection={vi.fn()}
           onRefresh={vi.fn()}
           onOpenDetails={onOpenDetails}
@@ -841,9 +872,9 @@ describe("Local-only Cloud page", () => {
       await flushPromises();
     });
 
-    expect(container.textContent).toContain("This workspace is local only");
-    expect(container.textContent).toContain("Back up and add Git remote");
-    expect(container.textContent).not.toContain("Sign in");
+    expect(container.textContent).toContain("This project is not published to PuppyOne Cloud");
+    expect(container.textContent).toContain("Publish to PuppyOne Cloud");
+    expect(container.textContent).toContain("Sign in to publish");
     expect(container.querySelector(".desktop-cloud-main-alert")).toBeNull();
     expect(restoreCloudSession).not.toHaveBeenCalled();
     expect(getCloudProject).not.toHaveBeenCalled();
@@ -851,7 +882,8 @@ describe("Local-only Cloud page", () => {
     await act(async () => {
       container.querySelector<HTMLButtonElement>("button")?.click();
     });
-    expect(onOpenDetails).toHaveBeenCalledOnce();
+    expect(onStartPuppyoneBackup).toHaveBeenCalledOnce();
+    expect(onOpenDetails).not.toHaveBeenCalled();
 
     Object.defineProperty(window, "puppyoneDesktop", {
       configurable: true,
@@ -1523,7 +1555,7 @@ describe("Local repository Cloud context integration", () => {
     expect(container.textContent).toContain("Retry");
     expect(container.textContent).toContain("Use another account");
     expect(container.textContent).toContain("Git sync details");
-    expect(container.textContent).not.toContain("Back up current folder");
+    expect(container.textContent).not.toContain("Publish this project");
     expect(container.textContent).not.toContain("root scope");
   });
 });

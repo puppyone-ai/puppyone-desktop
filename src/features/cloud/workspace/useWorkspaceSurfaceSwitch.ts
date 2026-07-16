@@ -72,7 +72,7 @@ export function useWorkspaceSurfaceSwitch({
   setHomeOperationStatus: Dispatch<SetStateAction<OnboardingOperationStatus | null>>;
   setRecentWorkspaceCloudContexts: Dispatch<SetStateAction<Record<string, RecentWorkspaceCloudContext>>>;
   showBrowserSignInStatus: (detail: string) => void;
-  startCloudBrowserSignIn: () => Promise<void>;
+  startCloudBrowserSignIn: () => Promise<boolean>;
   updateCloudSession: (session: DesktopCloudSession | null) => void;
   workspace: Workspace | null;
   workspaceIsCloud: boolean;

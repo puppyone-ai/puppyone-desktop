@@ -28,6 +28,7 @@ export function CloudServiceMainView({
   loading,
   error,
   cloudBackupLoading,
+  cloudBackupPending,
   cloudBackupError,
   onStartPuppyoneBackup,
   onRemoveCloudRemote,
@@ -106,12 +107,11 @@ export function CloudServiceMainView({
             accountEmail={accountEmail}
             branchName={branchName}
             localChangeCount={localChangeCount}
-            backupLoading={cloudBackupLoading}
+            publishLoading={cloudBackupLoading}
+            publishPending={cloudBackupPending}
+            publishError={cloudBackupError}
             cloudRemote={cloudRemote}
-            onBackupWorkspace={() => {
-              if (effectiveCloudSession) onStartPuppyoneBackup();
-              else onOpenDetails();
-            }}
+            onPublishWorkspace={onStartPuppyoneBackup}
           />
         </div>
       </main>

@@ -499,6 +499,12 @@
   color: var(--po-warning);
 }
 
+.desktop-cloud-main-alert.info {
+  border-color: color-mix(in srgb, var(--po-info) 28%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-info) 9%, var(--po-panel));
+  color: color-mix(in srgb, var(--po-info) 72%, var(--po-text));
+}
+
 .desktop-cloud-main-alert.warning > span {
   min-width: 0;
   overflow-wrap: anywhere;
