@@ -904,6 +904,13 @@ declare global {
         rootPath: string;
         showNativeErrorDialog?: boolean;
       }) => Promise<GitStatusSnapshot>;
+      pushGitCommitToRemote: (request: {
+        rootPath: string;
+        remoteName: string;
+        destinationBranch: string;
+        expectedHeadCommitId: string;
+        expectedBranch: string;
+      }) => Promise<GitStatusSnapshot>;
       publishGitBranch: (request: {
         rootPath: string;
         remoteName?: string | null;

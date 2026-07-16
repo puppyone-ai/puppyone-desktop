@@ -61,6 +61,8 @@ export type DesktopWorkspaceCloudSurfaceController = {
   backupError: string | null;
   backupLoading: boolean;
   backupPending: boolean;
+  backupCanRetry?: boolean;
+  backupProjectInitialized?: boolean;
   cloudApiBaseUrl: string | null;
   cloudSession: DesktopCloudSession | null;
   storedCloudSession: DesktopCloudSession | null;
@@ -351,7 +353,11 @@ export function useWorkspaceSurfaceContent({
         activeSection={cloud.activeSection}
         projectContext={cloudNavigationContext.projectContext}
         localWorkspaceContext={cloudNavigationContext.localWorkspaceContext && !cloudWorkspace}
-        localOnlyWorkspaceContext={projectContext.status === "local-only" && !cloudWorkspace}
+        localOnlyWorkspaceContext={!cloudWorkspace && (
+          projectContext.status === "local-only"
+          || cloud.backupProjectInitialized === true
+          || (cloud.activeSection === "initialize" && git.activeGitStatus === null)
+        )}
         projectCapabilities={projectContext.status === "resolved"
           ? projectContext.capabilities ?? []
           : []}
@@ -373,6 +379,8 @@ export function useWorkspaceSurfaceContent({
         cloudBackupLoading={cloud.backupLoading}
         cloudBackupPending={cloud.backupPending}
         cloudBackupError={cloud.backupError}
+        cloudBackupCanRetry={cloud.backupCanRetry}
+        cloudBackupProjectInitialized={cloud.backupProjectInitialized}
         onStartPuppyoneBackup={cloud.onStartPuppyoneBackup}
         onRemoveCloudRemote={cloud.onRemoveCloudRemote}
         onSelectSection={cloud.onSelectSection}

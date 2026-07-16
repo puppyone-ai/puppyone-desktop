@@ -33,6 +33,7 @@ export function CloudProjectBrowser({
   onSelectProject,
   onConfigureProjectRemote,
   onOpenCloudProjects,
+  showRepositoryActions = true,
 }: {
   projects: DesktopCloudProject[];
   loading: boolean;
@@ -46,6 +47,8 @@ export function CloudProjectBrowser({
   onSelectProject: (project: DesktopCloudProject) => void;
   onConfigureProjectRemote: (project: DesktopCloudProject) => void;
   onOpenCloudProjects: () => void;
+  /** Catalog-only mode keeps browsing separate from the open Local repository. */
+  showRepositoryActions?: boolean;
 }) {
   const { getCollator, t } = useLocalization();
   const collator = getCollator({ sensitivity: "base", numeric: true });
@@ -56,7 +59,7 @@ export function CloudProjectBrowser({
     const rightTime = right.updated_at ? new Date(right.updated_at).getTime() : 0;
     return rightTime - leftTime || collator.compare(left.name, right.name);
   });
-  const showBackupCard = !currentRepositoryProjectId;
+  const showBackupCard = showRepositoryActions && !currentRepositoryProjectId;
   const actionInProgress = cloudAction.kind !== null || backupLoading;
 
   return (
@@ -88,7 +91,7 @@ export function CloudProjectBrowser({
               remoteDisabled={actionInProgress}
               onSessionChange={onSessionChange}
               onSelectProject={onSelectProject}
-              onConfigureProjectRemote={onConfigureProjectRemote}
+              onConfigureProjectRemote={showRepositoryActions ? onConfigureProjectRemote : undefined}
             />
           ))
         )}
@@ -177,7 +180,7 @@ function CloudProjectCard({
   remoteDisabled: boolean;
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onSelectProject: (project: DesktopCloudProject) => void;
-  onConfigureProjectRemote: (project: DesktopCloudProject) => void;
+  onConfigureProjectRemote?: (project: DesktopCloudProject) => void;
 }) {
   const localization = useLocalization();
   const { t } = localization;
@@ -216,7 +219,7 @@ function CloudProjectCard({
         updatedLabel: updatedLabel || t("cloud.project.recentlyUpdated"),
         connectionCount,
       }}
-      actions={!currentRepositoryProject ? (
+      actions={!currentRepositoryProject && onConfigureProjectRemote ? (
         <button
           type="button"
           className="desktop-project-folder-card-action"

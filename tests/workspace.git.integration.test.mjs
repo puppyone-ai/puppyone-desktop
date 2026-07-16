@@ -18,6 +18,7 @@ import {
   checkoutWorkspaceGitBranch,
   getWorkspaceGitFileDiff,
   configureWorkspaceCloudRemote,
+  pushWorkspaceGitCommitToRemote,
   parsePuppyoneRemoteInfo,
   createWorkspaceEntry,
   writeWorkspaceTextFile,
@@ -461,6 +462,119 @@ describe("cloud remote configuration (端 → 云 link)", { timeout: 20_000 }, (
     await expect(
       configureWorkspaceCloudRemote(root, "https://api.puppyone.ai/git/x.git", "-evil"),
     ).rejects.toThrow(/Remote name is invalid/i);
+  });
+});
+
+describe("explicit immutable Cloud initialization push", { timeout: 20_000 }, () => {
+  it("pushes exactly the expected commit to puppyone/main and leaves local changes untouched", async () => {
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "tracked.txt", kind: "file", content: "committed\n" });
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "initial commit");
+    execFileSync("git", ["-C", root, "branch", "-m", "feature/local-source"]);
+    const committedStatus = await getWorkspaceGitStatus(root);
+    await writeWorkspaceTextFile(root, "tracked.txt", "committed\nlocal draft\n");
+    await createWorkspaceEntry(root, { parentPath: null, name: "staged.txt", kind: "file", content: "staged draft\n" });
+    await stageWorkspaceGitPaths(root, ["staged.txt"]);
+    await createWorkspaceEntry(root, { parentPath: null, name: "untracked.txt", kind: "file", content: "untracked draft\n" });
+    const beforeWorktreeDiff = execFileSync("git", ["-C", root, "diff", "--binary"]);
+    const beforeIndexDiff = execFileSync("git", ["-C", root, "diff", "--cached", "--binary"]);
+    const beforePorcelain = execFileSync("git", ["-C", root, "status", "--porcelain=v1", "-z", "--untracked-files=all"]);
+
+    const remoteRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-explicit-push-"));
+    try {
+      execFileSync("git", ["init", "--bare", remoteRoot]);
+      execFileSync("git", ["-C", root, "remote", "add", "puppyone", remoteRoot]);
+
+      const status = await pushWorkspaceGitCommitToRemote(root, {
+        remoteName: "puppyone",
+        destinationBranch: "main",
+        expectedHeadCommitId: committedStatus.headCommitId,
+        expectedBranch: committedStatus.branch,
+      });
+
+      const remoteMain = execFileSync(
+        "git",
+        ["--git-dir", remoteRoot, "rev-parse", "refs/heads/main"],
+      ).toString().trim();
+      expect(committedStatus.branch).toBe("feature/local-source");
+      expect(remoteMain).toBe(committedStatus.headCommitId);
+      expect(status.headCommitId).toBe(committedStatus.headCommitId);
+      expect(status.entries.some((entry) => entry.path === "tracked.txt")).toBe(true);
+      expect(execFileSync("git", ["-C", root, "diff", "--binary"])).toEqual(beforeWorktreeDiff);
+      expect(execFileSync("git", ["-C", root, "diff", "--cached", "--binary"])).toEqual(beforeIndexDiff);
+      expect(execFileSync(
+        "git",
+        ["-C", root, "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+      )).toEqual(beforePorcelain);
+      expect(execFileSync(
+        "git",
+        ["-C", root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+      ).toString().trim()).toBe("puppyone/main");
+    } finally {
+      await rm(remoteRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects when HEAD changes and does not create the destination ref", async () => {
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "first.txt", kind: "file", content: "one\n" });
+    await stageAllWorkspaceGitChanges(root);
+    const expected = await commitWorkspaceGit(root, "first");
+    await createWorkspaceEntry(root, { parentPath: null, name: "second.txt", kind: "file", content: "two\n" });
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "second");
+
+    const remoteRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-explicit-push-"));
+    try {
+      execFileSync("git", ["init", "--bare", remoteRoot]);
+      execFileSync("git", ["-C", root, "remote", "add", "puppyone", remoteRoot]);
+
+      await expect(pushWorkspaceGitCommitToRemote(root, {
+        remoteName: "puppyone",
+        destinationBranch: "main",
+        expectedHeadCommitId: expected.headCommitId,
+        expectedBranch: expected.branch,
+      })).rejects.toThrow(/HEAD changed before push/i);
+      expect(() => execFileSync(
+        "git",
+        ["--git-dir", remoteRoot, "rev-parse", "--verify", "refs/heads/main"],
+        { stdio: "pipe" },
+      )).toThrow();
+    } finally {
+      await rm(remoteRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a detached or missing HEAD before invoking push", async () => {
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "first.txt", kind: "file", content: "one\n" });
+    await stageAllWorkspaceGitChanges(root);
+    const expected = await commitWorkspaceGit(root, "first");
+    const remoteRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-explicit-push-"));
+    try {
+      execFileSync("git", ["init", "--bare", remoteRoot]);
+      execFileSync("git", ["-C", root, "remote", "add", "puppyone", remoteRoot]);
+      execFileSync("git", ["-C", root, "checkout", "--detach", expected.headCommitId]);
+
+      await expect(pushWorkspaceGitCommitToRemote(root, {
+        remoteName: "puppyone",
+        destinationBranch: "main",
+        expectedHeadCommitId: expected.headCommitId,
+        expectedBranch: expected.branch,
+      })).rejects.toThrow(/current branch changed before push/i);
+
+      execFileSync("git", ["-C", root, "checkout", expected.branch]);
+      execFileSync("git", ["-C", root, "update-ref", "-d", `refs/heads/${expected.branch}`]);
+      await expect(pushWorkspaceGitCommitToRemote(root, {
+        remoteName: "puppyone",
+        destinationBranch: "main",
+        expectedHeadCommitId: expected.headCommitId,
+        expectedBranch: expected.branch,
+      })).rejects.toThrow(/no longer has a HEAD commit/i);
+    } finally {
+      await rm(remoteRoot, { recursive: true, force: true });
+    }
   });
 });
 

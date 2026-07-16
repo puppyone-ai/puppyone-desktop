@@ -19,6 +19,7 @@ import type { CloudWorkspaceSection } from "../types";
 import { CloudGlobalBillingPage } from "../components/CloudBillingPage";
 import { CloudGlobalTeamPage } from "../components/CloudGlobalPages";
 import { CloudTemplateStore } from "../components/CloudTemplateStore";
+import { CloudProjectBrowser } from "../components/ProjectBrowser";
 import { CloudWorkspaceLoadingState } from "../components/shared";
 import { CloudAutomationRouteSection } from "../sections/AutomationRouteSection";
 import { CloudBranchesSection } from "../sections/BranchesSection";
@@ -38,6 +39,7 @@ import { formatCloudMessage, type CloudMessageDescriptor } from "../cloudPresent
 import { useFeatureFlag } from "../../flags";
 import { getCloudScopeRows, scopeMatchesMcpEndpoint } from "../utils";
 import { repositoryTargetKey, type RepositoryTarget } from "../repositoryTarget";
+import { getCloudPublishReadiness } from "../workspace/cloudPublishReadiness";
 
 export type CloudActionState = {
   kind: "backup" | "configure-remote" | "copy" | null;
@@ -99,6 +101,26 @@ export function CloudRouter({
     ?? cloudData.contextProjectId;
   const contextProject = cloudData.contextProject;
   const activeProject = cloudData.activeProject;
+
+  if (activeSection === "overview") {
+    return (
+      <CloudProjectBrowser
+        projects={cloudData.projects}
+        loading={cloudData.loading}
+        session={cloudSession}
+        apiBaseUrl={cloudApiBaseUrl}
+        currentRepositoryProjectId={contextProjectId}
+        backupLoading={false}
+        cloudAction={{ kind: null, projectId: null }}
+        onSessionChange={onSessionChange}
+        onBackupWorkspace={onBackupWorkspace}
+        onSelectProject={(project) => onOpenProject(project.id, "contents")}
+        onConfigureProjectRemote={() => undefined}
+        onOpenCloudProjects={() => openCloudApp(getCloudRouteWebPath("overview"))}
+        showRepositoryActions={false}
+      />
+    );
+  }
 
   // 1) Account routes first
   if (activeSection === "cloud-team") {
@@ -209,7 +231,7 @@ export function CloudRouter({
     });
   }
 
-  if (!projectContext || projectContext.status === "local-only") {
+  if ((!projectContext || projectContext.status === "local-only") && activeSection === "initialize") {
     return (
       <CloudLocalOnlyWorkspace
         workspace={workspace}
@@ -217,6 +239,8 @@ export function CloudRouter({
         branchName={branchName}
         totalCommits={status?.totalCommits ?? 0}
         localChangeCount={localChangeCount}
+        localChangeCountIsMinimum={status?.didHitStatusLimit === true}
+        publishReadiness={status ? getCloudPublishReadiness(status) : undefined}
         isGitRepository={status?.isRepo === true}
         hasHeadCommit={Boolean(status?.headCommitId)}
         hasCurrentBranch={Boolean(status?.branch && status.branch !== "HEAD")}
@@ -227,7 +251,7 @@ export function CloudRouter({
     );
   }
 
-  return <CloudWorkspaceLoadingState label={t("cloud.loading.project")} />;
+  return <CloudWorkspaceLoadingState label={t("cloud.state.sectionNeedsProject")} />;
 }
 
 function renderProjectContextSection({
@@ -291,7 +315,7 @@ function renderProjectContextSection({
     );
   }
 
-  if (activeSection === "overview" || activeSection === "contents") {
+  if (activeSection === "contents") {
     return (
       <CloudRepositoryOverview
         workspace={workspace}

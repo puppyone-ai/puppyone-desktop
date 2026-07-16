@@ -698,6 +698,14 @@
 }
 
 /* Local repository -> PuppyOne Cloud initialization */
+.desktop-cloud-publish-container {
+  container: cloud-publish / inline-size;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  align-self: stretch;
+}
+
 .desktop-cloud-publish-card {
   display: grid;
   width: min(100%, 1000px);
@@ -718,6 +726,25 @@
   box-shadow:
     0 1px 2px color-mix(in srgb, var(--po-text) 5%, transparent),
     0 18px 52px color-mix(in srgb, var(--po-text) 4%, transparent);
+}
+
+.desktop-cloud-publish-status-error {
+  display: grid;
+  width: min(100%, 760px);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  margin: clamp(24px, 5vh, 56px) auto 0;
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--po-danger) 26%, var(--po-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--po-danger) 6%, var(--po-panel));
+}
+
+.desktop-cloud-publish-status-error .desktop-cloud-empty-state {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .desktop-cloud-main-alert + .desktop-cloud-publish-card {
@@ -1018,7 +1045,7 @@
   box-shadow: none;
 }
 
-@media (max-width: 720px) {
+@container cloud-publish (max-width: 720px) {
   .desktop-cloud-publish-card {
     gap: 22px;
     margin-top: 8px;
@@ -1083,6 +1110,14 @@
 
   .desktop-cloud-publish-primary {
     grid-row: 1;
+  }
+
+  .desktop-cloud-publish-status-error {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .desktop-cloud-publish-status-error .desktop-cloud-row-action {
+    width: 100%;
   }
 }
 

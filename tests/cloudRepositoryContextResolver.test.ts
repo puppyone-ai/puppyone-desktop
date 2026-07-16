@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import type { DesktopCloudProject, DesktopCloudSession } from "../src/lib/cloudApi";
-import { issueWorkspaceGitRemote } from "../src/features/cloud/workspace/workspaceGitRemote";
+import {
+  assertCloudRemoteNameAvailable,
+  assertExpectedGitRepositoryState,
+  issueWorkspaceGitRemote,
+} from "../src/features/cloud/workspace/workspaceGitRemote";
 import {
   describePuppyoneRemoteCandidates,
   parsePuppyoneRemote,
@@ -148,6 +152,112 @@ describe("user-owned Git credentials", () => {
       onSessionChange: vi.fn(),
     })).rejects.toThrow("invalid Git credential response");
   });
+
+  it("fails a write-required issue before credential mutation when Project write access is absent", async () => {
+    await expect(issueWorkspaceGitRemote({
+      session,
+      apiBaseUrl: session.api_base_url,
+      project: { ...project, capabilities: ["content.read"] },
+      projectId: project.id,
+      requireWrite: true,
+      onSessionChange: vi.fn(),
+    })).rejects.toThrow("Write access to the Cloud Project is required");
+
+    expect(issueCloudGitCredential).not.toHaveBeenCalled();
+  });
+
+  it("requires the service to return an rw credential for a write-required issue", async () => {
+    issueCloudGitCredential.mockResolvedValue({
+      id: "credential-read-only",
+      credential: "read_secret",
+      mode: "r",
+      remote: {
+        url: "https://cloud.example/git/project-1.git",
+        username: "x-puppyone-token",
+        target: { kind: "project_root", project_id: "project-1" },
+      },
+    });
+
+    await expect(issueWorkspaceGitRemote({
+      session,
+      apiBaseUrl: session.api_base_url,
+      project,
+      projectId: project.id,
+      requireWrite: true,
+      onSessionChange: vi.fn(),
+    })).rejects.toThrow("invalid Git credential response");
+    expect(issueCloudGitCredential.mock.calls[0][2]).toMatchObject({ mode: "rw" });
+  });
+
+  it("accepts an rw credential for a write-required issue", async () => {
+    issueCloudGitCredential.mockResolvedValue({
+      id: "credential-write",
+      credential: "write_secret",
+      mode: "rw",
+      remote: {
+        url: "https://cloud.example/git/project-1.git",
+        username: "x-puppyone-token",
+        target: { kind: "project_root", project_id: "project-1" },
+      },
+    });
+
+    await expect(issueWorkspaceGitRemote({
+      session,
+      apiBaseUrl: session.api_base_url,
+      project,
+      projectId: project.id,
+      requireWrite: true,
+      onSessionChange: vi.fn(),
+    })).resolves.toMatchObject({ credentialId: "credential-write" });
+  });
+});
+
+describe("Initialize remote collision policy", () => {
+  it("refuses to repoint an existing canonical remote", () => {
+    expect(() => assertCloudRemoteNameAvailable({
+      remotes: [{ name: "PuppyOne" }],
+    } as never)).toThrow('A Git remote named "puppyone" already exists');
+  });
+
+  it("ignores unrelated remotes", () => {
+    expect(() => assertCloudRemoteNameAvailable({
+      remotes: [{ name: "origin" }],
+    } as never)).not.toThrow();
+  });
+});
+
+describe("Initialize Git state race guard", () => {
+  const reviewedStatus = {
+    isRepo: true,
+    headCommitId: "commit-reviewed",
+    branch: "main",
+    remotes: [],
+  } as never;
+
+  it("accepts the exact attached branch and HEAD reviewed by the caller", () => {
+    expect(() => assertExpectedGitRepositoryState(reviewedStatus, {
+      headCommitId: "commit-reviewed",
+      branch: "main",
+    })).not.toThrow();
+  });
+
+  it.each([
+    ["repository disappeared", { isRepo: false }],
+    ["HEAD disappeared", { headCommitId: null }],
+    ["branch disappeared", { branch: null }],
+    ["repository reported HEAD", { branch: "HEAD" }],
+    ["repository became detached", { branch: "DeTaChEd" }],
+    ["HEAD changed", { headCommitId: "commit-new" }],
+    ["branch changed", { branch: "feature/new" }],
+  ])("rejects when the %s", (_label, change) => {
+    expect(() => assertExpectedGitRepositoryState({
+      ...reviewedStatus,
+      ...change,
+    }, {
+      headCommitId: "commit-reviewed",
+      branch: "main",
+    })).toThrow("local Git branch or HEAD changed");
+  });
 });
 
 describe("canonical Git locator discovery", () => {
@@ -251,12 +361,43 @@ describe("repository-context architecture", () => {
     const appSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
     const combined = `${resolverSource}\n${appSource}`;
 
-    expect(dataSource).not.toContain("listCloudProjects");
+    // The global Cloud Projects route may explicitly request the catalog, but
+    // repository identity resolution must never consult it. Exact local
+    // context continues to come only from the canonical Git locator.
+    expect(dataSource).toContain("loadProjectCatalog = false");
+    expect(dataSource).toContain("if (!activeProjectId)");
+    expect(resolverSource).not.toContain("listCloudProjects");
+    expect(appSource).not.toContain("listCloudProjects");
     expect(resolverSource).toContain("resolveCanonicalPuppyoneRemotes");
     expect(resolverSource).toContain("getCloudRepositoryContext");
     expect(resolverSource).not.toContain("remote_url");
     expect(combined).not.toMatch(/WorkspaceBinding|workspaceBinding|workspace_binding|cloudBinding|bindingId/);
     expect(appSource).toContain("issueWorkspaceGitRemote");
     expect(appSource).not.toMatch(/revokeCloudWorkspace|workspaceInstanceId/);
+  });
+
+  it("keeps Initialize remote configuration transactional and separate from workspace preferences", () => {
+    const appSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+    const collisionPreflight = appSource.indexOf("assertCloudRemoteNameAvailable(freshStatus)");
+    const firstGitStateGuard = appSource.indexOf("configuredStatus = await readAndValidateFreshStatus()");
+    const credentialIssue = appSource.indexOf("issued = await issueWorkspaceGitRemote");
+    const secondGitStateGuard = appSource.indexOf(
+      "configuredStatus = await readAndValidateFreshStatus()",
+      firstGitStateGuard + 1,
+    );
+    const workspacePreferenceMutation = appSource.indexOf("if (options.persistWorkspacePreferences !== false)");
+    const remoteMutation = appSource.indexOf("configuredStatus = await configureWorkspaceCloudRemote");
+
+    expect(collisionPreflight).toBeGreaterThan(-1);
+    expect(collisionPreflight).toBeLessThan(credentialIssue);
+    expect(firstGitStateGuard).toBeLessThan(credentialIssue);
+    expect(credentialIssue).toBeLessThan(secondGitStateGuard);
+    expect(secondGitStateGuard).toBeLessThan(workspacePreferenceMutation);
+    expect(credentialIssue).toBeLessThan(remoteMutation);
+    expect(appSource).toContain("if (options.persistWorkspacePreferences !== false)");
+    expect(appSource).toContain("requireWrite: options.requireWrite");
+    expect(appSource).toContain("headCommitId: options.expectedHeadCommitId");
+    expect(appSource).toContain("branch: options.expectedBranch");
+    expect(appSource).toContain("if (!options.deferStatusPublication)");
   });
 });

@@ -98,7 +98,11 @@ import { useCloudWorkspaceContext } from "./features/cloud/workspace/useCloudWor
 import { shouldBlockWorkspaceCloudResolution } from "./features/cloud/workspace/workspaceCloudResolutionKey";
 import { usePuppyoneCloudBackup } from "./features/cloud/workspace/usePuppyoneCloudBackup";
 import { shouldLoadCloudProjectCatalog } from "./features/cloud/workspace/cloudProjectResolution";
-import { issueWorkspaceGitRemote } from "./features/cloud/workspace/workspaceGitRemote";
+import {
+  assertCloudRemoteNameAvailable,
+  assertExpectedGitRepositoryState,
+  issueWorkspaceGitRemote,
+} from "./features/cloud/workspace/workspaceGitRemote";
 import type { CloudGitRemoteOptions } from "./features/cloud/types";
 import { formatCloudMessage } from "./features/cloud/cloudPresentation";
 import {
@@ -131,7 +135,7 @@ export function App() {
     cloudSessionRestoring,
     handleCloudSessionChange: updateCloudSession,
   } = useDesktopCloudSession(cloudEnabled);
-  const [activeCloudSection, setActiveCloudSection] = useState<CloudWorkspaceSection>("overview");
+  const [activeCloudSection, setActiveCloudSection] = useState<CloudWorkspaceSection>("initialize");
   const [cloudPanelOpen, setCloudPanelOpen] = useState(false);
   const [homeOperationStatus, setHomeOperationStatus] = useState<OnboardingOperationStatus | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -457,7 +461,7 @@ export function App() {
       (activeView === "plugins" && (workspaceIsCloud || !experimentalSettings.enableViewerPlugins))
     ) {
       setActiveView("data");
-      setActiveCloudSection("overview");
+      setActiveCloudSection("initialize");
     }
   }, [activeView, cloudEnabled, experimentalSettings.enableViewerPlugins, workspaceIsCloud]);
 
@@ -735,7 +739,7 @@ export function App() {
         setActiveCloudSection(
           resolvedCloudProjectId
             ? "contents"
-            : "overview",
+            : "initialize",
         );
         setSidebarCollapsed(false);
         setSwitcherOpen(false);
@@ -865,7 +869,7 @@ export function App() {
         return;
       }
       setActiveView(workspaceIsCloud ? "data" : "cloud");
-      setActiveCloudSection("overview");
+      setActiveCloudSection("initialize");
       setSidebarCollapsed(false);
       setSwitcherOpen(false);
     }
@@ -892,6 +896,28 @@ export function App() {
     let issued: Awaited<ReturnType<typeof issueWorkspaceGitRemote>> | null = null;
     let configuredStatus = activeGitStatus;
     try {
+      const requiresFreshStatus = options.rejectRemoteNameCollision
+        || options.expectedHeadCommitId !== undefined
+        || options.expectedBranch !== undefined;
+      const readAndValidateFreshStatus = async () => {
+        const freshStatus = await getWorkspaceGitStatus(context.rootPath);
+        if (
+          options.expectedHeadCommitId !== undefined
+          || options.expectedBranch !== undefined
+        ) {
+          assertExpectedGitRepositoryState(freshStatus, {
+            headCommitId: options.expectedHeadCommitId,
+            branch: options.expectedBranch,
+          });
+        }
+        if (options.rejectRemoteNameCollision) {
+          assertCloudRemoteNameAvailable(freshStatus);
+        }
+        return freshStatus;
+      };
+      if (requiresFreshStatus) {
+        configuredStatus = await readAndValidateFreshStatus();
+      }
       const project = homeCloudProjects.find((entry) => entry.id === nextProjectId)
         ?? await getCloudProject(
           activeCloudSession,
@@ -905,34 +931,40 @@ export function App() {
         project,
         projectId: nextProjectId,
         target: options.target,
+        requireWrite: options.requireWrite,
         onSessionChange: updateCloudSession,
       });
-      previousConfig = puppyoneConfig
-        ?? await readPuppyoneWorkspaceConfig(context.rootPath);
-      const nextConfig = mergePuppyoneWorkspaceConfig(previousConfig, {
-        sync: {
-          sourceOfTruth: {
+      if (requiresFreshStatus) {
+        configuredStatus = await readAndValidateFreshStatus();
+      }
+      if (options.persistWorkspacePreferences !== false) {
+        previousConfig = puppyoneConfig
+          ?? await readPuppyoneWorkspaceConfig(context.rootPath);
+        const nextConfig = mergePuppyoneWorkspaceConfig(previousConfig, {
+          sync: {
+            sourceOfTruth: {
+              service: "puppyone",
+              remote: "puppyone",
+              branch: null,
+            },
+          },
+          backup: {
+            enabled: true,
             service: "puppyone",
             remote: "puppyone",
             branch: null,
           },
-        },
-        backup: {
-          enabled: true,
-          service: "puppyone",
-          remote: "puppyone",
-          branch: null,
-        },
-        git: {
-          primaryRemote: "puppyone",
-          watchedBranch: null,
-        },
-      });
-      const savedConfig = await handlePuppyoneConfigChange(nextConfig);
-      if (!savedConfig) {
-        throw new Error("Unable to persist the local Git sync settings for this workspace.");
+          git: {
+            primaryRemote: "puppyone",
+            watchedBranch: null,
+          },
+        });
+        const savedConfig = await handlePuppyoneConfigChange(nextConfig);
+        if (!savedConfig) {
+          throw new Error("Unable to persist the local Git sync settings for this workspace.");
+        }
+        configUpdated = true;
       }
-      configUpdated = true;
       configuredStatus = await configureWorkspaceCloudRemote(
         context.rootPath,
         issued.remoteUrl,
@@ -958,22 +990,24 @@ export function App() {
     if (!issued || !configuredStatus) {
       throw new Error("Cloud Git remote configuration did not return a Git status.");
     }
-    setRecentWorkspaceCloudContexts((current) => ({
-      ...current,
-      [workspace.id]: {
-        projectId: nextProjectId,
-        target: issued.target,
-        hasCloudRemote: true,
-        error: null,
-        reason: null,
-      },
-    }));
-    if (applyGitStatus(
-      configuredStatus,
-      context,
-      createRepositoryRefreshReason("configure-remote", "mutation"),
-    )) {
-      refreshWorkspaceContent();
+    if (!options.deferStatusPublication) {
+      setRecentWorkspaceCloudContexts((current) => ({
+        ...current,
+        [workspace.id]: {
+          projectId: nextProjectId,
+          target: issued.target,
+          hasCloudRemote: true,
+          error: null,
+          reason: null,
+        },
+      }));
+      if (applyGitStatus(
+        configuredStatus,
+        context,
+        createRepositoryRefreshReason("configure-remote", "mutation"),
+      )) {
+        refreshWorkspaceContent();
+      }
     }
     return configuredStatus;
   }, [
@@ -996,24 +1030,36 @@ export function App() {
   const handleRemoveCloudRemote = useCallback(async () => {
     if (!workspace || workspaceIsCloud) return;
     const refreshedStatus = await removeWorkspaceGitRemote(workspace.path, "puppyone");
-    const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
-      sync: {
-        sourceOfTruth: { service: "puppyone", remote: null, branch: null },
-      },
-      backup: {
-        enabled: false,
-        service: "puppyone",
-        remote: null,
-        branch: null,
-      },
-      git: {
-        primaryRemote: null,
-        watchedBranch: null,
-      },
-    });
-    const savedConfig = await handlePuppyoneConfigChange(nextConfig);
-    if (!savedConfig) {
-      throw new Error("The PuppyOne Git remote was removed, but Desktop could not update the local sync settings.");
+    const currentConfig = puppyoneConfig
+      ?? await readPuppyoneWorkspaceConfig(workspace.path);
+    const configReferencesPuppyone = currentConfig.sync.sourceOfTruth.service === "puppyone"
+      || currentConfig.sync.sourceOfTruth.remote === "puppyone"
+      || currentConfig.backup.service === "puppyone"
+      || currentConfig.backup.remote === "puppyone"
+      || currentConfig.git.primaryRemote === "puppyone";
+    // Initialize and Push intentionally keeps Cloud identity in Git. If this
+    // workspace never opted into legacy sync preferences, removing the remote
+    // must not create a new `.puppyone/config.json` file as a side effect.
+    if (configReferencesPuppyone) {
+      const nextConfig = mergePuppyoneWorkspaceConfig(currentConfig, {
+        sync: {
+          sourceOfTruth: { service: "github", remote: null, branch: null },
+        },
+        backup: {
+          enabled: false,
+          service: "github",
+          remote: null,
+          branch: null,
+        },
+        git: {
+          primaryRemote: null,
+          watchedBranch: null,
+        },
+      });
+      const savedConfig = await handlePuppyoneConfigChange(nextConfig);
+      if (!savedConfig) {
+        throw new Error("The PuppyOne Git remote was removed, but Desktop could not update the local sync settings.");
+      }
     }
     setRecentWorkspaceCloudContexts((current) => ({
       ...current,
@@ -1032,7 +1078,7 @@ export function App() {
     )) {
       refreshWorkspaceContent();
     }
-    setActiveCloudSection("overview");
+    setActiveCloudSection("initialize");
   }, [
     applyGitStatus,
     captureGitRepositoryContext,
@@ -1045,6 +1091,8 @@ export function App() {
   ]);
 
   const {
+    cloudBackupCanRetry,
+    cloudBackupContinuation,
     cloudBackupError,
     cloudBackupLoading,
     handleStartPuppyoneBackup,
@@ -1361,8 +1409,10 @@ export function App() {
             activeSection: activeCloudSection,
             projectContext: workspaceIsCloud ? null : projectCloudContext,
             backupError: cloudBackupErrorMessage,
+            backupCanRetry: cloudBackupCanRetry,
             backupLoading: cloudBackupLoading,
             backupPending: pendingCloudBackupSetup,
+            backupProjectInitialized: cloudBackupContinuation !== null,
             cloudApiBaseUrl: desktopCloudApiBaseUrl,
             cloudSession: activeCloudSession,
             storedCloudSession: cloudSession,

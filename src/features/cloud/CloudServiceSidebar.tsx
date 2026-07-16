@@ -1,4 +1,4 @@
-import { ArrowLeft, Cloud } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { SidebarRoot, SidebarRow, SidebarScrollArea } from "@puppyone/shared-ui";
@@ -10,6 +10,7 @@ import {
   CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES,
   CLOUD_GLOBAL_SIDEBAR_ROUTES,
   CLOUD_PROJECT_SIDEBAR_ROUTES,
+  getCloudRoute,
   normalizeCloudSection,
   type CloudRouteDescriptor,
 } from "./routes/cloudRoutes";
@@ -40,11 +41,11 @@ const SIGNED_OUT_CLOUD_SIDEBAR_ROUTES: CloudSidebarNavEntry[] = [
 
 const LOCAL_ONLY_CLOUD_SIDEBAR_ROUTES: CloudSidebarNavEntry[] = [
   {
-    id: "overview",
+    ...getCloudRoute("initialize"),
+    id: "initialize",
     labelId: "cloud.initialize.sidebarLabel",
-    icon: Cloud,
-    context: "project",
   },
+  ...CLOUD_GLOBAL_SIDEBAR_ROUTES,
 ];
 
 export function CloudServiceSidebar({
@@ -71,7 +72,7 @@ export function CloudServiceSidebar({
   const accountEmail = effectiveCloudSession?.user_email ?? null;
   const signedIn = Boolean(effectiveCloudSession);
   // Project context comes from an authorized resolver / explicit route — never from route alone.
-  const inProjectContext = signedIn && projectContext;
+  const inProjectContext = signedIn && projectContext && !localOnlyWorkspaceContext;
   const baseNavItems: CloudSidebarNavEntry[] = localOnlyWorkspaceContext
     ? LOCAL_ONLY_CLOUD_SIDEBAR_ROUTES
     : !signedIn
@@ -128,7 +129,7 @@ export function CloudServiceSidebar({
                     item={item}
                     active={
                       !item.locked && (
-                        (localOnlyWorkspaceContext && item.id === "overview")
+                        (localOnlyWorkspaceContext && normalizedActiveSection === item.id)
                         || (signedIn && (
                           normalizedActiveSection === item.id
                           || (inProjectContext && localWorkspaceContext && item.id === "contents" && normalizedActiveSection === "overview")

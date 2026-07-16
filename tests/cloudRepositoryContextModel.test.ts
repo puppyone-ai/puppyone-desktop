@@ -179,12 +179,17 @@ describe("Project Cloud repository context", () => {
       currentSection: "overview",
       hasProjectContext: true,
       workspaceChanged: false,
-    })).toBe("contents");
+    })).toBe("overview");
+    expect(resolveCloudHubSectionAfterContextChange({
+      currentSection: "initialize",
+      hasProjectContext: true,
+      workspaceChanged: false,
+    })).toBe("initialize");
     expect(resolveCloudHubSectionAfterContextChange({
       currentSection: "claude",
       hasProjectContext: false,
       workspaceChanged: false,
-    })).toBe("overview");
+    })).toBe("initialize");
   });
 });
 

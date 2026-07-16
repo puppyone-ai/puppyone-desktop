@@ -203,6 +203,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   fetchGit: (request) => ipcRenderer.invoke("workspace:git-fetch", request),
   pullGit: (request) => ipcRenderer.invoke("workspace:git-pull", request),
   pushGit: (request) => ipcRenderer.invoke("workspace:git-push", request),
+  pushGitCommitToRemote: (request) => ipcRenderer.invoke("workspace:git-push-commit-to-remote", request),
   publishGitBranch: (request) => ipcRenderer.invoke("workspace:git-publish-branch", request),
   syncGit: (request) => ipcRenderer.invoke("workspace:git-sync", request),
   getUpdateState: () => ipcRenderer.invoke("updates:get-state"),

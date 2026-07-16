@@ -13,7 +13,7 @@ const localFiles = vi.hoisted(() => ({
   commitWorkspaceGit: vi.fn(),
   getWorkspaceGitStatus: vi.fn(),
   initializeWorkspaceGitRepository: vi.fn(),
-  pushWorkspaceGit: vi.fn(),
+  pushWorkspaceGitCommitToRemote: vi.fn(),
   stageAllWorkspaceGitChanges: vi.fn(),
 }));
 
@@ -77,7 +77,7 @@ const publishedStatus = {
     pushUrl: "https://cloud.example/git/project-1.git",
     branches: [],
   }],
-  headCommitId: "head-after-publish",
+  headCommitId: "head-before-publish",
 } as GitStatusSnapshot;
 
 const repositoryContext = {
@@ -143,6 +143,9 @@ function PublishHarness({
         data-loading={String(publish.cloudBackupLoading)}
         data-error={publish.cloudBackupError?.code ?? ""}
         data-error-detail={publish.cloudBackupError?.detail ?? ""}
+        data-continuation-project={publish.cloudBackupContinuation?.projectId ?? ""}
+        data-continuation-phase={publish.cloudBackupContinuation?.phase ?? ""}
+        data-can-retry={String(publish.cloudBackupCanRetry)}
       />
     </>
   );
@@ -156,7 +159,8 @@ describe("explicit PuppyOne Cloud publish flow", () => {
     vi.clearAllMocks();
     cloudSession.authErrorListener = null;
     cloudApi.createCloudProject.mockResolvedValue({ id: "project-1", name: "Local Notes" });
-    localFiles.pushWorkspaceGit.mockResolvedValue(publishedStatus);
+    localFiles.getWorkspaceGitStatus.mockResolvedValue(initialStatus);
+    localFiles.pushWorkspaceGitCommitToRemote.mockResolvedValue(publishedStatus);
     actions.applyGitStatus.mockReturnValue(true);
     actions.captureGitRepositoryContext.mockReturnValue(repositoryContext);
     actions.isGitRepositoryContextCurrent.mockReturnValue(true);
@@ -195,8 +199,21 @@ describe("explicit PuppyOne Cloud publish flow", () => {
       "Local Notes",
       actions.handleCloudSessionChange,
     );
-    expect(actions.onConfigureCloudRemote).toHaveBeenCalledWith("project-1");
-    expect(localFiles.pushWorkspaceGit).toHaveBeenCalledWith(repositoryContext.rootPath);
+    expect(actions.onConfigureCloudRemote).toHaveBeenCalledWith("project-1", {
+      persistWorkspacePreferences: false,
+      requireWrite: true,
+      deferStatusPublication: true,
+      rejectRemoteNameCollision: true,
+      expectedHeadCommitId: initialStatus.headCommitId,
+      expectedBranch: initialStatus.branch,
+    });
+    expect(localFiles.pushWorkspaceGitCommitToRemote).toHaveBeenCalledWith(repositoryContext.rootPath, {
+      remoteName: "puppyone",
+      destinationBranch: "main",
+      expectedHeadCommitId: initialStatus.headCommitId,
+      expectedBranch: initialStatus.branch,
+    });
+    expect(localFiles.getWorkspaceGitStatus).toHaveBeenCalledTimes(3);
     expect(actions.applyGitStatus).toHaveBeenCalledWith(
       publishedStatus,
       repositoryContext,
@@ -219,6 +236,7 @@ describe("explicit PuppyOne Cloud publish flow", () => {
       untrackedEntries: [{ path: "notes.txt", oldPath: null, staged: null, unstaged: "?", status: "?" }],
     } as GitStatusSnapshot;
     const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
+    localFiles.getWorkspaceGitStatus.mockResolvedValue(dirtyStatus);
 
     await render(
       <PublishHarness
@@ -240,8 +258,14 @@ describe("explicit PuppyOne Cloud publish flow", () => {
       "Local Notes",
       actions.handleCloudSessionChange,
     );
-    expect(actions.onConfigureCloudRemote).toHaveBeenCalledWith("project-1");
-    expect(localFiles.pushWorkspaceGit).toHaveBeenCalledWith(repositoryContext.rootPath);
+    expect(actions.onConfigureCloudRemote).toHaveBeenCalledWith("project-1", expect.objectContaining({
+      expectedHeadCommitId: dirtyStatus.headCommitId,
+      expectedBranch: dirtyStatus.branch,
+    }));
+    expect(localFiles.pushWorkspaceGitCommitToRemote).toHaveBeenCalledWith(
+      repositoryContext.rootPath,
+      expect.objectContaining({ expectedHeadCommitId: dirtyStatus.headCommitId }),
+    );
     expect(readOutput().dataset.error).toBe("");
   });
 
@@ -252,6 +276,7 @@ describe("explicit PuppyOne Cloud publish flow", () => {
       totalCommits: 0,
     } as GitStatusSnapshot;
     const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
+    localFiles.getWorkspaceGitStatus.mockResolvedValue(noHeadStatus);
 
     await render(
       <PublishHarness
@@ -270,11 +295,12 @@ describe("explicit PuppyOne Cloud publish flow", () => {
     expect(readOutput().dataset.error).toBe("project-publish-commit-required");
     expect(cloudApi.createCloudProject).not.toHaveBeenCalled();
     expect(actions.onConfigureCloudRemote).not.toHaveBeenCalled();
-    expect(localFiles.pushWorkspaceGit).not.toHaveBeenCalled();
+    expect(localFiles.pushWorkspaceGitCommitToRemote).not.toHaveBeenCalled();
   });
 
   it.each([
     ["detached HEAD", "HEAD"],
+    ["the normalized detached marker", "detached"],
     ["a missing current branch", null],
   ] as const)("rejects %s before mutating the Cloud project", async (_label, branch) => {
     const detachedStatus = {
@@ -282,6 +308,7 @@ describe("explicit PuppyOne Cloud publish flow", () => {
       branch,
     } as GitStatusSnapshot;
     const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
+    localFiles.getWorkspaceGitStatus.mockResolvedValue(detachedStatus);
 
     await render(
       <PublishHarness
@@ -300,7 +327,7 @@ describe("explicit PuppyOne Cloud publish flow", () => {
     expect(readOutput().dataset.error).toBe("project-publish-branch-required");
     expect(cloudApi.createCloudProject).not.toHaveBeenCalled();
     expect(actions.onConfigureCloudRemote).not.toHaveBeenCalled();
-    expect(localFiles.pushWorkspaceGit).not.toHaveBeenCalled();
+    expect(localFiles.pushWorkspaceGitCommitToRemote).not.toHaveBeenCalled();
   });
 
   it("clears the pending state when browser sign-in cannot start", async () => {
@@ -369,7 +396,85 @@ describe("explicit PuppyOne Cloud publish flow", () => {
     expect(cloudApi.createCloudProject).not.toHaveBeenCalled();
   });
 
-  it("settles the publish intent when applying the published Git state is rejected", async () => {
+  it("rejects a same-name puppyone remote before creating a Cloud project", async () => {
+    localFiles.getWorkspaceGitStatus.mockResolvedValue({
+      ...initialStatus,
+      remotes: [{
+        name: "PuppyOne",
+        fetchUrl: "https://example.com/already-used.git",
+        pushUrl: "https://example.com/already-used.git",
+        branches: [],
+      }],
+    });
+    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
+    await render(<PublishHarness activeSession={session} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    await flushPromises();
+
+    expect(cloudApi.createCloudProject).not.toHaveBeenCalled();
+    expect(actions.onConfigureCloudRemote).not.toHaveBeenCalled();
+    expect(localFiles.pushWorkspaceGitCommitToRemote).not.toHaveBeenCalled();
+    expect(readOutput().dataset.errorDetail).toMatch(/remote named 'puppyone'/i);
+  });
+
+  it("records the created Project and reuses it when remote configuration is retried", async () => {
+    actions.onConfigureCloudRemote
+      .mockRejectedValueOnce(new Error("temporary credential service failure"))
+      .mockResolvedValueOnce(publishedStatus);
+    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
+    await render(<PublishHarness activeSession={session} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    await flushPromises();
+
+    expect(cloudApi.createCloudProject).toHaveBeenCalledOnce();
+    expect(readOutput().dataset.continuationProject).toBe("project-1");
+    expect(readOutput().dataset.continuationPhase).toBe("project-created");
+    expect(readOutput().dataset.canRetry).toBe("true");
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    await flushPromises();
+
+    expect(cloudApi.createCloudProject).toHaveBeenCalledOnce();
+    expect(actions.onConfigureCloudRemote).toHaveBeenCalledTimes(2);
+    expect(localFiles.pushWorkspaceGitCommitToRemote).toHaveBeenCalledOnce();
+    expect(readOutput().dataset.continuationProject).toBe("");
+    expect(readOutput().dataset.canRetry).toBe("false");
+  });
+
+  it("rechecks HEAD after remote configuration and never pushes a changed revision", async () => {
+    const changedStatus = {
+      ...initialStatus,
+      headCommitId: "different-head",
+    } as GitStatusSnapshot;
+    localFiles.getWorkspaceGitStatus
+      .mockResolvedValueOnce(initialStatus)
+      .mockResolvedValueOnce(initialStatus)
+      .mockResolvedValue(changedStatus);
+    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
+    await render(<PublishHarness activeSession={session} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    await flushPromises();
+
+    expect(cloudApi.createCloudProject).toHaveBeenCalledOnce();
+    expect(actions.onConfigureCloudRemote).toHaveBeenCalledOnce();
+    expect(localFiles.pushWorkspaceGitCommitToRemote).not.toHaveBeenCalled();
+    expect(readOutput().dataset.continuationPhase).toBe("remote-configured");
+    expect(readOutput().dataset.canRetry).toBe("true");
+    expect(readOutput().dataset.errorDetail).toMatch(/branch or HEAD changed/i);
+  });
+
+  it("reconciles a completed push without recreating or repushing when renderer publication is retried", async () => {
     actions.applyGitStatus.mockReturnValue(false);
     const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
     await render(<PublishHarness activeSession={session} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
@@ -383,6 +488,21 @@ describe("explicit PuppyOne Cloud publish flow", () => {
     expect(readOutput().dataset.loading).toBe("false");
     expect(readOutput().dataset.error).toBe("project-publish-failed");
     expect(cloudApi.createCloudProject).toHaveBeenCalledOnce();
+    expect(localFiles.pushWorkspaceGitCommitToRemote).toHaveBeenCalledOnce();
+    expect(readOutput().dataset.continuationPhase).toBe("pushed");
+    expect(readOutput().dataset.canRetry).toBe("true");
+
+    actions.applyGitStatus.mockReturnValue(true);
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    await flushPromises();
+
+    expect(cloudApi.createCloudProject).toHaveBeenCalledOnce();
+    expect(actions.onConfigureCloudRemote).toHaveBeenCalledOnce();
+    expect(localFiles.pushWorkspaceGitCommitToRemote).toHaveBeenCalledOnce();
+    expect(readOutput().dataset.error).toBe("");
+    expect(readOutput().dataset.continuationPhase).toBe("");
   });
 
   async function render(element: React.ReactNode) {

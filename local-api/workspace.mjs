@@ -1838,6 +1838,89 @@ export async function pushWorkspaceGit(rootPath) {
   return getWorkspaceGitStatus(root);
 }
 
+/**
+ * Push one immutable, preflighted commit to an explicit remote branch.
+ *
+ * This is deliberately separate from the interactive `pushWorkspaceGit`
+ * operation: Cloud initialization must not infer a remote, read workspace
+ * sync preferences, or resolve `HEAD` after the renderer has authorized a
+ * different revision. The identity guard is repeated in the main process
+ * under the repository mutation lock, then the refspec names the expected
+ * object id directly. A concurrent external checkout therefore cannot make us
+ * upload a different commit.
+ */
+export async function pushWorkspaceGitCommitToRemote(rootPath, request = {}) {
+  const root = resolveWorkspacePath(rootPath, null);
+  const remoteName = normalizeGitRemoteName(request.remoteName);
+  const destinationBranch = await normalizeGitBranchName(root, request.destinationBranch);
+  const expectedBranch = await normalizeGitBranchName(root, request.expectedBranch);
+  const expectedHeadCommitId = request.expectedHeadCommitId;
+  assertSafeCommitId(expectedHeadCommitId);
+
+  const [currentBranchResult, currentHeadResult, remoteUrl] = await Promise.all([
+    execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], { optionalLocks: false })
+      .catch(() => ({ stdout: "" })),
+    execGit(root, ["rev-parse", "--verify", "HEAD^{commit}"], { optionalLocks: false })
+      .catch(() => ({ stdout: "" })),
+    execGit(root, ["remote", "get-url", remoteName], { optionalLocks: false })
+      .then((result) => result.stdout.trim())
+      .catch(() => ""),
+  ]);
+  const currentBranch = currentBranchResult.stdout.trim();
+  const currentHeadCommitId = currentHeadResult.stdout.trim();
+
+  if (!currentHeadCommitId) {
+    throw new Error("Unable to initialize Cloud project: the repository no longer has a HEAD commit.");
+  }
+  if (!currentBranch || currentBranch !== expectedBranch) {
+    throw new Error("Unable to initialize Cloud project: the current branch changed before push.");
+  }
+  if (currentHeadCommitId.toLowerCase() !== expectedHeadCommitId.toLowerCase()) {
+    throw new Error("Unable to initialize Cloud project: HEAD changed before push.");
+  }
+  if (!remoteUrl) {
+    throw new Error(`Unable to initialize Cloud project: remote '${remoteName}' is not configured.`);
+  }
+
+  const destinationRef = `refs/heads/${destinationBranch}`;
+  await execGit(
+    root,
+    ["push", remoteName, `${expectedHeadCommitId}:${destinationRef}`],
+    { timeout: GIT_NETWORK_TIMEOUT_MS },
+  ).catch((error) => {
+    throw new Error(`Unable to push Cloud project: ${getGitErrorOutput(error)}`);
+  });
+
+  // Establish the normal Git relationship used by later Push/Pull operations,
+  // but only if the checkout still matches the identity authorized above.
+  // This mutates repository config only; it never stages or rewrites files.
+  const [branchAfterPushResult, headAfterPushResult] = await Promise.all([
+    execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], { optionalLocks: false })
+      .catch(() => ({ stdout: "" })),
+    execGit(root, ["rev-parse", "--verify", "HEAD^{commit}"], { optionalLocks: false })
+      .catch(() => ({ stdout: "" })),
+  ]);
+  const branchAfterPush = branchAfterPushResult.stdout.trim();
+  const headAfterPush = headAfterPushResult.stdout.trim();
+  if (!headAfterPush) {
+    throw new Error("Unable to finish Cloud initialization: the repository no longer has a HEAD commit.");
+  }
+  if (branchAfterPush !== expectedBranch) {
+    throw new Error("Unable to finish Cloud initialization: the current branch changed after push.");
+  }
+  if (headAfterPush.toLowerCase() !== expectedHeadCommitId.toLowerCase()) {
+    throw new Error("Unable to finish Cloud initialization: HEAD changed after push.");
+  }
+  await execGit(root, [
+    "branch",
+    `--set-upstream-to=${remoteName}/${destinationBranch}`,
+    expectedBranch,
+  ], { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
+    throw new Error(`Unable to configure the Cloud branch upstream: ${getGitErrorOutput(error)}`);
+  });
+  return getWorkspaceGitStatus(root);
+}
+
 export async function publishWorkspaceGitBranch(rootPath, remoteName = null) {
   const root = resolveWorkspacePath(rootPath, null);
   await pushWorkspaceGitWithDefaultUpstream(root, remoteName);

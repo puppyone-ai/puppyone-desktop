@@ -521,6 +521,18 @@ export async function pushWorkspaceGit(
   return getDesktopBridge().pushGit({ rootPath, showNativeErrorDialog: options.showNativeErrorDialog });
 }
 
+export async function pushWorkspaceGitCommitToRemote(
+  rootPath: string,
+  request: {
+    remoteName: string;
+    destinationBranch: string;
+    expectedHeadCommitId: string;
+    expectedBranch: string;
+  },
+): Promise<GitStatusSnapshot> {
+  return getDesktopBridge().pushGitCommitToRemote({ rootPath, ...request });
+}
+
 export async function publishWorkspaceGitBranch(rootPath: string, remoteName?: string | null): Promise<GitStatusSnapshot> {
   return getDesktopBridge().publishGitBranch({ rootPath, remoteName });
 }

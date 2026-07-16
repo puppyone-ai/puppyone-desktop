@@ -10,6 +10,7 @@ import {
   sameRepositoryTarget,
   type RepositoryTarget,
 } from "../repositoryTarget";
+import type { GitStatusSnapshot } from "../../../types/electron";
 
 type MutableSessionHandler = (session: DesktopCloudSession | null) => void | Promise<void>;
 
@@ -65,6 +66,7 @@ export async function issueWorkspaceGitRemote({
   project,
   projectId,
   target,
+  requireWrite = false,
   onSessionChange,
 }: {
   session: DesktopCloudSession;
@@ -72,6 +74,7 @@ export async function issueWorkspaceGitRemote({
   project?: DesktopCloudProject | null;
   projectId: string;
   target?: RepositoryTarget;
+  requireWrite?: boolean;
   onSessionChange: MutableSessionHandler;
 }): Promise<{
   credentialId: string;
@@ -88,6 +91,9 @@ export async function issueWorkspaceGitRemote({
   const resolvedProject = project?.id === projectId
     ? project
     : await getCloudProject(session, projectId, onSessionChange, apiBaseUrl);
+  if (requireWrite && !projectAllows(resolvedProject, "content.write")) {
+    throw new Error("Write access to the Cloud Project is required to initialize its Git repository.");
+  }
   const mode = projectAllows(resolvedProject, "content.write") ? "rw" : "r";
   const issued = await issueCloudGitCredential(
     session,
@@ -101,6 +107,7 @@ export async function issueWorkspaceGitRemote({
     !issued.id?.trim()
     || !issued.credential?.trim()
     || !remoteUrl
+    || (requireWrite && issued.mode !== "rw")
     || !sameRepositoryTarget(issued.remote.target, resolvedTarget)
     || !isTrustedCloudGitOrigin(remoteUrl, apiBaseUrl ?? session.api_base_url)
   ) {
@@ -114,4 +121,48 @@ export async function issueWorkspaceGitRemote({
     target: resolvedTarget,
     project: resolvedProject,
   };
+}
+
+/**
+ * Initialization is allowed to create the canonical remote, never to repoint an
+ * existing one. Callers must use a freshly-read snapshot for this preflight.
+ */
+export function assertCloudRemoteNameAvailable(
+  status: GitStatusSnapshot,
+  remoteName = "puppyone",
+): void {
+  const normalizedRemoteName = remoteName.toLowerCase();
+  if (status.remotes.some((remote) => remote.name.toLowerCase() === normalizedRemoteName)) {
+    throw new Error(
+      `A Git remote named "${remoteName}" already exists. Remove or rename it before initializing this project on PuppyOne Cloud.`,
+    );
+  }
+}
+
+/**
+ * Protect the asynchronous Initialize flow from publishing a different local
+ * history than the one the user reviewed when the operation started.
+ */
+export function assertExpectedGitRepositoryState(
+  status: GitStatusSnapshot,
+  expected: {
+    headCommitId?: string;
+    branch?: string;
+  },
+): void {
+  const actualBranch = status.branch;
+  const normalizedBranch = actualBranch?.toLowerCase();
+  if (
+    !status.isRepo
+    || !status.headCommitId
+    || !actualBranch
+    || normalizedBranch === "head"
+    || normalizedBranch === "detached"
+    || (expected.headCommitId !== undefined && status.headCommitId !== expected.headCommitId)
+    || (expected.branch !== undefined && actualBranch !== expected.branch)
+  ) {
+    throw new Error(
+      "The local Git branch or HEAD changed while PuppyOne Cloud initialization was starting. Review the current branch and try again.",
+    );
+  }
 }

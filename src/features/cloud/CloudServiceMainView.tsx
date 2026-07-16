@@ -10,11 +10,12 @@ import { useDesktopCloudData } from "./data";
 import { resolveCloudEnvironment } from "./environment";
 import { CloudWorkspaceLoadingState } from "./components/shared";
 import { CloudProjectBrowserSignedOut } from "./components/ProjectBrowser";
-import { CloudLocalOnlyWorkspace } from "./states";
+import { CloudLocalGitStatusError, CloudLocalOnlyWorkspace } from "./states";
 import { CloudRouter } from "./routes/CloudRouter";
 import type { CloudActionState } from "./routes/CloudRouter";
 import { getCloudRouteWebPath, isCloudAccountSection, normalizeCloudSection } from "./routes/cloudRoutes";
 import { cloudMessage, formatCloudMessage } from "./cloudPresentation";
+import { getCloudPublishReadiness } from "./workspace/cloudPublishReadiness";
 
 export function CloudServiceMainView({
   workspace,
@@ -30,6 +31,8 @@ export function CloudServiceMainView({
   cloudBackupLoading,
   cloudBackupPending,
   cloudBackupError,
+  cloudBackupCanRetry = false,
+  cloudBackupProjectInitialized = false,
   onStartPuppyoneBackup,
   onRemoveCloudRemote,
   onSelectSection,
@@ -45,10 +48,15 @@ export function CloudServiceMainView({
   );
   const cloudRemote = cloudEnvironment.cloudRemote;
   const cloudApiBaseUrl = cloudEnvironment.apiBaseUrl;
-  const inCloudGlobalAccountSection = isCloudAccountSection(activeSection)
-    || activeSection === "templates";
-  const localOnlyContext = projectContext?.status === "local-only"
-    && !inCloudGlobalAccountSection;
+  const inCloudGlobalSection = isCloudAccountSection(activeSection)
+    || activeSection === "templates"
+    || activeSection === "overview";
+  const localOnlyContext = activeSection === "initialize"
+    && (
+      projectContext?.status === "local-only"
+      || cloudBackupProjectInitialized
+      || (projectContext?.status === "resolving" && status === null)
+    );
   const cloudAuthState = useCloudSessionForEnvironment({
     cloudSession,
     sessionRestoring,
@@ -67,6 +75,7 @@ export function CloudServiceMainView({
     onSessionChange: onCloudSessionChange,
     workspaceRevisionKey: status?.headCommitId ?? null,
     loadProjectDetails: loadAggregateProjectDetails,
+    loadProjectCatalog: activeSection === "overview",
   });
   const [cloudAction, setCloudAction] = useState<CloudActionState>({
     kind: null,
@@ -92,12 +101,31 @@ export function CloudServiceMainView({
     }
   }, [activeSection, onSelectSection]);
 
-  const currentBranch = status?.branches.find((branch) => branch.current) ?? null;
-  const currentBranchName = currentBranch?.name ?? status?.branch ?? null;
+  const currentBranchName = status?.branch ?? null;
   const localChangeCount = status?.entries.length ?? 0;
   const branchName = currentBranchName ?? t("cloud.git.noBranch");
 
   if (localOnlyContext) {
+    if (error) {
+      return (
+        <main className="desktop-cloud-main-view">
+          <div className="desktop-cloud-page-shell">
+            <CloudLocalGitStatusError error={error} loading={loading} onRetry={onRefresh} />
+          </div>
+        </main>
+      );
+    }
+
+    if (!status) {
+      return (
+        <main className="desktop-cloud-main-view">
+          <div className="desktop-cloud-page-shell">
+            <CloudWorkspaceLoadingState label={t("cloud.initialize.loadingRepository")} />
+          </div>
+        </main>
+      );
+    }
+
     return (
       <main className="desktop-cloud-main-view">
         <div className="desktop-cloud-page-shell">
@@ -107,12 +135,16 @@ export function CloudServiceMainView({
             branchName={branchName}
             totalCommits={status?.totalCommits ?? 0}
             localChangeCount={localChangeCount}
+            localChangeCountIsMinimum={status.didHitStatusLimit}
+            publishReadiness={getCloudPublishReadiness(status)}
             isGitRepository={status?.isRepo === true}
             hasHeadCommit={Boolean(status?.headCommitId)}
-            hasCurrentBranch={Boolean(currentBranchName && currentBranchName !== "HEAD")}
+            hasCurrentBranch={getCloudPublishReadiness(status) !== "branch-required"}
             publishLoading={cloudBackupLoading}
             publishPending={cloudBackupPending}
             publishError={cloudBackupError}
+            publishCanRetry={cloudBackupCanRetry}
+            projectInitialized={cloudBackupProjectInitialized}
             onReviewChanges={onReviewChanges}
             onPublishWorkspace={onStartPuppyoneBackup}
           />
@@ -212,12 +244,12 @@ export function CloudServiceMainView({
             <span>{formatCloudMessage(projectContext.warning, t)}</span>
           </div>
         )}
-        {!inCloudGlobalAccountSection && error && <div className="desktop-cloud-main-alert">{error}</div>}
-        {!inCloudGlobalAccountSection && cloudData.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.error, t)}</div>}
-        {!inCloudGlobalAccountSection && cloudData.warning && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.warning, t)}</div>}
-        {!inCloudGlobalAccountSection && cloudBackupError && <div className="desktop-cloud-main-alert">{cloudBackupError}</div>}
-        {!inCloudGlobalAccountSection && cloudAction.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudAction.error, t)}</div>}
-        {!inCloudGlobalAccountSection && cloudAction.notice && <div className="desktop-cloud-main-alert success">{formatCloudMessage(cloudAction.notice, t)}</div>}
+        {!inCloudGlobalSection && error && <div className="desktop-cloud-main-alert">{error}</div>}
+        {(!inCloudGlobalSection || activeSection === "overview") && cloudData.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.error, t)}</div>}
+        {!inCloudGlobalSection && cloudData.warning && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.warning, t)}</div>}
+        {!inCloudGlobalSection && cloudBackupError && <div className="desktop-cloud-main-alert">{cloudBackupError}</div>}
+        {!inCloudGlobalSection && cloudAction.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudAction.error, t)}</div>}
+        {!inCloudGlobalSection && cloudAction.notice && <div className="desktop-cloud-main-alert success">{formatCloudMessage(cloudAction.notice, t)}</div>}
 
         <CloudRouter
           workspace={workspace}
@@ -253,8 +285,7 @@ export function CloudServiceMainView({
 
 function shouldLoadAggregateProjectDetails(section: CloudWorkspaceSection): boolean {
   // History uses a dedicated route-scoped history hook; skip aggregate details reload there.
-  return section === "overview"
-    || section === "contents"
+  return section === "contents"
     || section === "claude"
     || section === "access"
     || section === "automation"

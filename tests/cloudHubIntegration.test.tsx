@@ -272,12 +272,12 @@ describe("Project Cloud repository context semantics", () => {
       projectId: "a",
       target: { kind: "project_root", project_id: "a" },
     })).toBe("contents");
-    expect(resolveCloudHubSectionForContext({ status: "local-only", projectId: null })).toBe("overview");
+    expect(resolveCloudHubSectionForContext({ status: "local-only", projectId: null })).toBe("initialize");
     expect(resolveCloudHubSectionForContext({
       status: "error",
       projectId: null,
       message: "boom",
-    })).toBe("overview");
+    })).toBe("initialize");
   });
 
   it("keeps an already resolved Project in project navigation", () => {
@@ -301,20 +301,25 @@ describe("Project Cloud repository context semantics", () => {
       workspaceChanged: false,
     })).toBe("access");
     expect(resolveCloudHubSectionAfterContextChange({
-      currentSection: "overview",
+      currentSection: "initialize",
       hasProjectContext: true,
       workspaceChanged: false,
-    })).toBe("contents");
+    })).toBe("initialize");
     expect(resolveCloudHubSectionAfterContextChange({
       currentSection: "history",
       hasProjectContext: false,
       workspaceChanged: false,
-    })).toBe("overview");
+    })).toBe("initialize");
+    expect(resolveCloudHubSectionAfterContextChange({
+      currentSection: "templates",
+      hasProjectContext: false,
+      workspaceChanged: false,
+    })).toBe("templates");
   });
 });
 
 describe("CloudServiceSidebar project context", () => {
-  it("shows one active Initialize destination for a local-only workspace", () => {
+  it("shows Initialize plus usable global Cloud destinations for a local-only workspace", () => {
     const onSelectSection = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -324,19 +329,28 @@ describe("CloudServiceSidebar project context", () => {
       <CloudServiceSidebar
         status={null}
         cloudSession={null}
-        activeSection="overview"
+        activeSection="initialize"
         localOnlyWorkspaceContext
         onSelectSection={onSelectSection}
       />,
     ));
 
     const rows = Array.from(container.querySelectorAll<HTMLButtonElement>(".desktop-cloud-sidebar-nav-row"));
-    expect(rows.map((row) => row.textContent)).toEqual(["Initialize"]);
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "Initialize",
+      "Cloud Projects",
+      "Templates",
+      "Team",
+      "Billing",
+    ]);
     expect(rows[0]?.getAttribute("aria-current")).toBe("page");
     expect(rows[0]?.getAttribute("aria-disabled")).toBeNull();
 
     act(() => rows[0]?.click());
-    expect(onSelectSection).toHaveBeenCalledWith("overview");
+    expect(onSelectSection).toHaveBeenCalledWith("initialize");
+
+    act(() => rows[1]?.click());
+    expect(onSelectSection).toHaveBeenLastCalledWith("overview");
   });
 
   it("previews the project workspace navigation while signed out", () => {
@@ -698,7 +712,7 @@ describe("CloudRouter local context", () => {
             activeProjectId: "proj-preview",
             activeProject: { id: "proj-preview", name: "Preview Project" },
           })}
-          activeSection="history"
+          activeSection="initialize"
           accountEmail={session.user_email}
           accountConnected
           branchName="main"
@@ -722,6 +736,58 @@ describe("CloudRouter local context", () => {
     expect(container.textContent).not.toContain("Preview Project");
     expect(container.textContent).not.toContain("Repository Git remote");
   });
+
+  it("keeps Cloud Projects as a browse-only global route beside Initialize", async () => {
+    listCloudRoot.mockResolvedValue({ entries: [] });
+    const onOpenProject = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudRouter
+          workspace={{ id: "local-1", name: "Local Notes", path: "/tmp/local-notes" }}
+          status={null}
+          cloudSession={session}
+          cloudApiBaseUrl="https://cloud.example"
+          cloudRemote={null}
+          cloudData={createAggregateCloudData(vi.fn(async () => undefined), {
+            projects: [{ id: "proj-preview", name: "Preview Project" }],
+            contextProjectId: null,
+            contextProject: null,
+            activeProjectId: null,
+            activeProject: null,
+          })}
+          projectContext={{ status: "local-only", projectId: null }}
+          activeSection="overview"
+          accountEmail={session.user_email}
+          accountConnected
+          branchName="main"
+          localChangeCount={0}
+          loading={false}
+          cloudBackupLoading={false}
+          onSessionChange={vi.fn()}
+          onBackupWorkspace={vi.fn()}
+          onOpenProject={onOpenProject}
+          onOpenGitSettings={vi.fn()}
+          onSelectSection={vi.fn()}
+        />,
+      );
+      await flushPromises();
+    });
+
+    expect(container.textContent).toContain("Preview Project");
+    expect(container.textContent).not.toContain("Initialize this project");
+    expect(container.querySelector(".desktop-project-folder-new-card")).toBeNull();
+    expect(container.querySelector(".desktop-project-folder-card-action")).toBeNull();
+
+    const projectCard = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
+      .find((button) => button.textContent?.includes("Preview Project"));
+    act(() => projectCard?.click());
+    expect(onOpenProject).toHaveBeenCalledWith("proj-preview", "contents");
+  });
+
 });
 
 describe("Cloud Project selection actions", () => {
@@ -827,6 +893,161 @@ describe("Local-only Cloud page", () => {
     expect(container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-review")?.disabled).toBe(true);
   });
 
+  it("marks truncated Git status counts as minimums in both the node and summary", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <CloudLocalOnlyWorkspace
+        workspace={{ id: "local-many", name: "Large Repo", path: "/tmp/large-repo" }}
+        accountEmail="owner@example.com"
+        branchName="main"
+        totalCommits={12}
+        localChangeCount={1000}
+        localChangeCountIsMinimum
+        isGitRepository
+        hasHeadCommit
+        hasCurrentBranch
+        publishLoading={false}
+        onReviewChanges={vi.fn()}
+        onPublishWorkspace={vi.fn()}
+      />,
+    ));
+
+    expect(container.textContent).toContain("At least 1,000 local changes");
+    expect(container.querySelector(".desktop-cloud-publish-summary")?.textContent)
+      .toContain("At least 1,000 uncommitted changes stay local.");
+  });
+
+  it("keeps an interrupted initialized project visible and retries its push", () => {
+    const onPublishWorkspace = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <CloudLocalOnlyWorkspace
+        workspace={{ id: "local-retry", name: "Retry Repo", path: "/tmp/retry-repo" }}
+        accountEmail="owner@example.com"
+        branchName="main"
+        totalCommits={2}
+        localChangeCount={0}
+        isGitRepository
+        hasHeadCommit
+        hasCurrentBranch
+        publishLoading={false}
+        publishError="The push was interrupted."
+        publishCanRetry
+        projectInitialized
+        onReviewChanges={vi.fn()}
+        onPublishWorkspace={onPublishWorkspace}
+      />,
+    ));
+
+    expect(container.textContent).toContain("Initialized · Push incomplete");
+    const retry = container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary");
+    expect(retry?.textContent).toBe("Retry Push");
+    act(() => retry?.click());
+    expect(onPublishWorkspace).toHaveBeenCalledOnce();
+  });
+
+  it("shows Git status loading and real failures instead of treating an unknown status as a folder", async () => {
+    const onRefresh = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const commonProps = {
+      workspace: { id: "local-loading", name: "Loading Repo", path: "/tmp/loading-repo" },
+      cloudApiBaseUrl: "http://localhost:9090",
+      cloudSession: null,
+      projectContext: { status: "resolving" as const, projectId: null },
+      onCloudSessionChange: vi.fn(),
+      activeSection: "initialize" as const,
+      cloudBackupLoading: false,
+      cloudBackupPending: false,
+      cloudBackupError: null,
+      onStartPuppyoneBackup: vi.fn(),
+      onSelectSection: vi.fn(),
+      onRefresh,
+      onOpenDetails: vi.fn(),
+      onOpenGitSettings: vi.fn(),
+      onReviewChanges: vi.fn(),
+    };
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudServiceMainView {...commonProps} status={null} loading error={null} />,
+      );
+      await flushPromises();
+    });
+    expect(container.textContent).toContain("Reading Git repository…");
+    expect(container.textContent).not.toContain("Local folder");
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudServiceMainView
+          {...commonProps}
+          status={null}
+          projectContext={{ status: "local-only", projectId: null }}
+          loading={false}
+          error="fatal: cannot read repository"
+        />,
+      );
+      await flushPromises();
+    });
+    expect(container.textContent).toContain("Unable to read this Git repository");
+    expect(container.textContent).toContain("fatal: cannot read repository");
+    const retry = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("Retry"));
+    act(() => retry?.click());
+    expect(onRefresh).toHaveBeenCalledOnce();
+  });
+
+  it.each([null, "HEAD", "detached"])("blocks initialize for detached branch marker %s", (branch) => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <CloudServiceMainView
+        workspace={{ id: "local-detached", name: "Detached Repo", path: "/tmp/detached-repo" }}
+        status={{
+          isRepo: true,
+          branch,
+          headCommitId: "head-1",
+          totalCommits: 1,
+          entries: [],
+          branches: [],
+          stagedEntries: [],
+          unstagedEntries: [],
+          untrackedEntries: [],
+          remotes: [],
+          didHitStatusLimit: false,
+        } as unknown as GitStatusSnapshot}
+        cloudApiBaseUrl="http://localhost:9090"
+        cloudSession={null}
+        projectContext={{ status: "local-only", projectId: null }}
+        onCloudSessionChange={vi.fn()}
+        activeSection="initialize"
+        loading={false}
+        error={null}
+        cloudBackupLoading={false}
+        cloudBackupPending={false}
+        cloudBackupError={null}
+        onStartPuppyoneBackup={vi.fn()}
+        onSelectSection={vi.fn()}
+        onRefresh={vi.fn()}
+        onOpenDetails={vi.fn()}
+        onOpenGitSettings={vi.fn()}
+        onReviewChanges={vi.fn()}
+      />,
+    ));
+
+    expect(container.textContent).toContain("Check out a branch before pushing to Cloud.");
+    expect(container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary")?.disabled).toBe(true);
+  });
+
   it("renders the Initialize/Push flow from live Git state without inferring a Cloud Project", async () => {
     const localSession = {
       ...session,
@@ -863,12 +1084,13 @@ describe("Local-only Cloud page", () => {
             unstagedEntries: [],
             untrackedEntries: [],
             remotes: [],
+            didHitStatusLimit: true,
           } as unknown as GitStatusSnapshot}
           cloudApiBaseUrl="http://localhost:9090"
           cloudSession={localSession}
           projectContext={{ status: "local-only", projectId: null }}
           onCloudSessionChange={vi.fn()}
-          activeSection="contents"
+          activeSection="initialize"
           loading={false}
           error={null}
           cloudBackupLoading={false}
@@ -889,7 +1111,9 @@ describe("Local-only Cloud page", () => {
     expect(container.textContent).toContain("Local Git repository");
     expect(container.textContent).toContain("Local Notes");
     expect(container.textContent).toContain("18 commits");
-    expect(container.textContent).toContain("5 local changes");
+    expect(container.textContent).toContain("At least 5 local changes");
+    expect(container.querySelector(".desktop-cloud-publish-summary")?.textContent)
+      .toContain("At least 5 uncommitted changes stay local.");
     expect(container.textContent).toContain("New Cloud project");
     expect(container.textContent).toContain("Not initialized");
     expect(container.textContent).toContain("Initialize and Push");
@@ -944,9 +1168,9 @@ describe("Local-only Cloud page", () => {
           cloudSession={null}
           projectContext={{ status: "local-only", projectId: null }}
           onCloudSessionChange={vi.fn()}
-          activeSection="contents"
+          activeSection="initialize"
           loading={false}
-          error="This must not be rendered"
+          error={null}
           cloudBackupLoading={false}
           cloudBackupPending={false}
           cloudBackupError={null}
@@ -1188,6 +1412,29 @@ describe("useDesktopCloudData request lifecycle", () => {
     expect(getCloudDashboard).not.toHaveBeenCalled();
   });
 
+  it("loads the organization Project catalog only when a global route requests it", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    let latest: DesktopCloudDataState | null = null;
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudDataProbe
+          explicitProjectId={null}
+          environment={cloudEnvironment}
+          loadProjectCatalog
+          onData={(data) => { latest = data; }}
+        />,
+      );
+      await flushPromises();
+    });
+
+    expect(listCloudProjects).toHaveBeenCalledOnce();
+    expect(latest?.projects.map((project) => project.id)).toEqual(["proj-a", "proj-b"]);
+    expect(getCloudProject).not.toHaveBeenCalled();
+  });
+
   it("clears the previous project's payload as soon as browse context changes", async () => {
     const secondProject = deferred<(typeof projects)[number]>();
     getCloudProject
@@ -1427,6 +1674,7 @@ function CloudDataProbe({
   environment,
   onData,
   loadProjectDetails = true,
+  loadProjectCatalog = false,
   repositoryProjectId = null,
   sessionOverride = session,
 }: {
@@ -1434,6 +1682,7 @@ function CloudDataProbe({
   environment: CloudEnvironment;
   onData?: (data: DesktopCloudDataState) => void;
   loadProjectDetails?: boolean;
+  loadProjectCatalog?: boolean;
   repositoryProjectId?: string | null;
   sessionOverride?: DesktopCloudSession;
 }) {
@@ -1445,6 +1694,7 @@ function CloudDataProbe({
     repositoryProjectId,
     onSessionChange,
     loadProjectDetails,
+    loadProjectCatalog,
   });
   onData?.(data);
   return (
@@ -1617,7 +1867,7 @@ describe("Local repository Cloud context integration", () => {
             projectId: "proj-secret",
             message: cloudMessage("remote-not-authorized"),
           }}
-          activeSection="overview"
+          activeSection="initialize"
           accountEmail={session.user_email}
           accountConnected
           branchName="main"

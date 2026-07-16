@@ -138,8 +138,8 @@ export function resolveProjectCloudContext({
 
 export function resolveCloudHubSectionForContext(
   context: ProjectCloudContext,
-): "overview" | "contents" {
-  return cloudContextHasProject(context) ? "contents" : "overview";
+): "initialize" | "contents" {
+  return cloudContextHasProject(context) ? "contents" : "initialize";
 }
 
 export function resolveCloudProjectNavigationContext(
@@ -158,7 +158,19 @@ export function resolveCloudHubSectionAfterContextChange({
   hasProjectContext: boolean;
   workspaceChanged: boolean;
 }): CloudWorkspaceSection {
-  if (workspaceChanged) return hasProjectContext ? "contents" : "overview";
-  if (!hasProjectContext) return "overview";
-  return currentSection === "overview" ? "contents" : currentSection;
+  if (workspaceChanged) return hasProjectContext ? "contents" : "initialize";
+  if (!hasProjectContext) {
+    return isCloudGlobalSection(currentSection) ? currentSection : "initialize";
+  }
+  // Initialization owns its transition to `contents` after the push succeeds.
+  // A newly resolvable remote can be an interrupted, retryable attempt and must
+  // not pull the user away from the Initialize screen prematurely.
+  return currentSection;
+}
+
+function isCloudGlobalSection(section: CloudWorkspaceSection): boolean {
+  return section === "overview"
+    || section === "templates"
+    || section === "cloud-team"
+    || section === "cloud-billing";
 }

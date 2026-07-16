@@ -9,6 +9,18 @@ export type { CloudWorkspaceSection } from "./routes/cloudRouteIds";
 
 export type CloudGitRemoteOptions = {
   target?: RepositoryTarget;
+  /** HEAD observed by the caller before an asynchronous Initialize operation began. */
+  expectedHeadCommitId?: string;
+  /** Attached branch observed by the caller before an asynchronous Initialize operation began. */
+  expectedBranch?: string;
+  /** Skip reading and writing the workspace-owned `.puppyone/config.json`. */
+  persistWorkspacePreferences?: boolean;
+  /** Require a write-capable Project and an `rw` credential. */
+  requireWrite?: boolean;
+  /** Leave status/context publication to the operation that consumes the configured remote. */
+  deferStatusPublication?: boolean;
+  /** Fail instead of replacing an existing canonical `puppyone` remote. */
+  rejectRemoteNameCollision?: boolean;
 };
 
 export type CloudServiceSidebarProps = {
@@ -56,6 +68,10 @@ export type CloudServiceMainViewProps = {
   cloudBackupLoading: boolean;
   cloudBackupPending: boolean;
   cloudBackupError: string | null;
+  /** A Cloud Project already exists for an interrupted initialize attempt. */
+  cloudBackupProjectInitialized?: boolean;
+  /** The interrupted attempt can resume by pushing to the existing Cloud Project. */
+  cloudBackupCanRetry?: boolean;
   onStartPuppyoneBackup: () => void;
   onRemoveCloudRemote?: () => Promise<void>;
   onSelectSection: (section: CloudWorkspaceSection) => void;

@@ -19,6 +19,16 @@ export type CloudRouteDescriptor = {
 
 export const CLOUD_ROUTES = [
   {
+    id: "initialize",
+    labelId: "cloud.route.initialize.label",
+    titleId: "cloud.route.initialize.title",
+    descriptionId: "cloud.route.initialize.description",
+    icon: Cloud,
+    context: "projects",
+    showInSidebar: false,
+    webPath: () => "/projects",
+  },
+  {
     id: "overview",
     labelId: "cloud.route.overview.label",
     titleId: "cloud.route.overview.title",

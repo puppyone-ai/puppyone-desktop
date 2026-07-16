@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowRight,
   Cloud,
@@ -6,6 +7,7 @@ import {
   Folder,
   GitBranch,
   GitCommitHorizontal,
+  RefreshCw,
 } from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
@@ -13,6 +15,7 @@ import {
   CloudWebEmpty,
   CloudWebPage,
 } from "./components/shared";
+import type { CloudPublishReadiness } from "./workspace/cloudPublishReadiness";
 
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
 
@@ -24,12 +27,16 @@ export function CloudLocalOnlyWorkspace({
   branchName,
   totalCommits,
   localChangeCount,
+  localChangeCountIsMinimum = false,
+  publishReadiness,
   isGitRepository,
   hasHeadCommit,
   hasCurrentBranch,
   publishLoading,
   publishPending = false,
   publishError = null,
+  publishCanRetry = false,
+  projectInitialized = false,
   onReviewChanges,
   onPublishWorkspace,
 }: {
@@ -38,12 +45,16 @@ export function CloudLocalOnlyWorkspace({
   branchName: string;
   totalCommits: number;
   localChangeCount: number;
+  localChangeCountIsMinimum?: boolean;
+  publishReadiness?: CloudPublishReadiness;
   isGitRepository: boolean;
   hasHeadCommit: boolean;
   hasCurrentBranch: boolean;
   publishLoading: boolean;
   publishPending?: boolean;
   publishError?: string | null;
+  publishCanRetry?: boolean;
+  projectInitialized?: boolean;
   onReviewChanges: () => void;
   onPublishWorkspace: () => void;
 }) {
@@ -51,24 +62,37 @@ export function CloudLocalOnlyWorkspace({
   const publishBusy = publishLoading || publishPending;
   const waitingForSignIn = publishPending && !accountEmail && !publishLoading;
   const publishing = publishLoading || (publishPending && Boolean(accountEmail));
-  const readinessMessage = !isGitRepository
+  const resolvedReadiness = publishReadiness ?? (
+    !isGitRepository
+      ? "repository-required"
+      : !hasHeadCommit
+        ? "commit-required"
+        : !hasCurrentBranch
+          ? "branch-required"
+          : "ready"
+  );
+  const readinessMessage = resolvedReadiness === "repository-required"
     ? t("cloud.initialize.repositoryRequired")
-    : !hasHeadCommit
+    : resolvedReadiness === "commit-required"
       ? t("cloud.initialize.commitRequired")
-      : !hasCurrentBranch
+      : resolvedReadiness === "branch-required"
         ? t("cloud.initialize.branchRequired")
         : null;
   const readyToPush = readinessMessage === null;
   const destinationBranchName = PUPPYONE_CLOUD_DEFAULT_BRANCH;
   const cloudStatus = t(
-    waitingForSignIn
+    projectInitialized && publishing
+      ? "cloud.initialize.pushing"
+      : projectInitialized
+        ? "cloud.initialize.initializedPushIncomplete"
+        : waitingForSignIn
       ? "cloud.initialize.waitingForSignIn"
       : publishing
         ? "cloud.initialize.initializing"
         : "cloud.initialize.notInitialized",
   );
   return (
-    <>
+    <div className="desktop-cloud-publish-container">
       {waitingForSignIn && (
         <div className="desktop-cloud-main-alert info" role="status">
           {t("cloud.state.publishSignInPending")}
@@ -97,7 +121,12 @@ export function CloudLocalOnlyWorkspace({
               <span><GitCommitHorizontal size={15} aria-hidden="true" />{t("cloud.branches.commitCount", { count: totalCommits })}</span>
               <span className={localChangeCount > 0 ? "warning" : undefined}>
                 <FilePenLine size={15} aria-hidden="true" />
-                {t("cloud.initialize.localChangeCount", { count: localChangeCount })}
+                {t(
+                  localChangeCountIsMinimum
+                    ? "cloud.initialize.localChangeCountAtLeast"
+                    : "cloud.initialize.localChangeCount",
+                  { count: localChangeCount },
+                )}
               </span>
             </div>
           </article>
@@ -130,7 +159,12 @@ export function CloudLocalOnlyWorkspace({
                   : "cloud.initialize.pushMappedSummary",
                 { branch: branchName, destination: destinationBranchName, count: totalCommits },
               )}</strong>
-              <p>{t("cloud.initialize.changesStayLocal", { count: localChangeCount })}</p>
+              <p>{t(
+                localChangeCountIsMinimum
+                  ? "cloud.initialize.changesStayLocalAtLeast"
+                  : "cloud.initialize.changesStayLocal",
+                { count: localChangeCount },
+              )}</p>
               {!accountEmail && <small>{t("cloud.initialize.signInNote")}</small>}
             </>
           ) : (
@@ -159,12 +193,43 @@ export function CloudLocalOnlyWorkspace({
                 ? "cloud.initialize.initializingAndPushing"
                 : waitingForSignIn
                   ? "cloud.initialize.waitingForSignIn"
-                  : "cloud.initialize.initializeAndPush",
+                  : publishCanRetry
+                    ? "cloud.initialize.retryPush"
+                    : "cloud.initialize.initializeAndPush",
             )}
           </button>
         </div>
       </section>
-    </>
+    </div>
+  );
+}
+
+export function CloudLocalGitStatusError({
+  error,
+  loading,
+  onRetry,
+}: {
+  error: string;
+  loading: boolean;
+  onRetry: () => void;
+}) {
+  const { t } = useLocalization();
+  return (
+    <div className="desktop-cloud-publish-container">
+      <section className="desktop-cloud-publish-status-error" role="alert">
+        <div className="desktop-cloud-empty-state">
+          <span aria-hidden="true"><AlertTriangle size={22} /></span>
+          <div>
+            <strong>{t("cloud.initialize.gitStatusErrorTitle")}</strong>
+            <p>{error}</p>
+          </div>
+        </div>
+        <button className="desktop-cloud-row-action" type="button" disabled={loading} onClick={onRetry}>
+          <RefreshCw size={13} className={loading ? "spin" : undefined} aria-hidden="true" />
+          <span>{t("cloud.common.retry")}</span>
+        </button>
+      </section>
+    </div>
   );
 }
 

@@ -16,6 +16,7 @@ import {
   pullWorkspaceGit,
   publishWorkspaceGitBranch,
   pushWorkspaceGit,
+  pushWorkspaceGitCommitToRemote,
   readPuppyoneWorkspaceConfig,
   removeWorkspaceGitRemote,
   resolveGitRepositoryIdentity,
@@ -356,6 +357,15 @@ export function registerWorkspaceGitIpcHandlers({
     runWorkspaceGitIpcOperation({ BrowserWindow, dialog, t }, event, request, "push", () => (
       pushWorkspaceGit(rootPath)
     ))
+  )));
+
+  ipcMain.handle("workspace:git-push-commit-to-remote", withAuthorizedRepositoryMutation((rootPath, request) => (
+    pushWorkspaceGitCommitToRemote(rootPath, {
+      remoteName: request?.remoteName,
+      destinationBranch: request?.destinationBranch,
+      expectedHeadCommitId: request?.expectedHeadCommitId,
+      expectedBranch: request?.expectedBranch,
+    })
   )));
 
   ipcMain.handle("workspace:git-publish-branch", withAuthorizedRepositoryMutation((rootPath, request) => (
