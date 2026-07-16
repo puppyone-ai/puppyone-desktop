@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import {
   commitWorkspaceGit,
@@ -11,6 +11,7 @@ import {
   createCloudProject,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
+import { onDesktopCloudAuthError } from "../../../lib/cloudSession";
 import type { DesktopView } from "../../../components/DesktopCloudShell";
 import type { CloudWorkspaceSection } from "../types";
 import type { GitStatusSnapshot } from "../../../types/electron";
@@ -39,6 +40,7 @@ export function usePuppyoneCloudBackup({
   setGitOperationLoading,
   setSidebarCollapsed,
   setSwitcherOpen,
+  startCloudBrowserSignIn,
   workspace,
   workspaceIsCloud,
 }: {
@@ -62,20 +64,42 @@ export function usePuppyoneCloudBackup({
   setGitOperationLoading: (loading: string | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSwitcherOpen: (open: boolean) => void;
+  startCloudBrowserSignIn: () => Promise<boolean>;
   workspace: Workspace | null;
   workspaceIsCloud: boolean;
 }) {
   const [pendingCloudBackupSetup, setPendingCloudBackupSetup] = useState(false);
   const [cloudBackupLoading, setCloudBackupLoading] = useState(false);
   const [cloudBackupError, setCloudBackupError] = useState<CloudMessageDescriptor | null>(null);
+  const publishAttemptRef = useRef<symbol | null>(null);
+  const publishRequestRef = useRef<symbol | null>(null);
 
-  const createPuppyoneCloudBackup = useCallback(async (session: DesktopCloudSession) => {
-    if (!cloudEnabled) return false;
-    if (!workspace) return false;
-    if (workspaceIsCloud) return false;
+  const failPublishAttempt = useCallback((
+    attempt: symbol,
+    error: CloudMessageDescriptor,
+  ) => {
+    if (publishAttemptRef.current !== attempt) return;
+    publishAttemptRef.current = null;
+    setPendingCloudBackupSetup(false);
+    setCloudBackupError(error);
+  }, []);
+
+  const createPuppyoneCloudBackup = useCallback(async (
+    session: DesktopCloudSession,
+    attempt: symbol,
+  ) => {
+    if (publishAttemptRef.current !== attempt || publishRequestRef.current) return false;
+    if (!cloudEnabled || !workspace || workspaceIsCloud) {
+      failPublishAttempt(attempt, cloudMessage("project-publish-failed"));
+      return false;
+    }
     const context = captureGitRepositoryContext(workspace.path);
-    if (!context) return false;
+    if (!context) {
+      failPublishAttempt(attempt, cloudMessage("project-publish-failed"));
+      return false;
+    }
 
+    publishRequestRef.current = attempt;
     setCloudBackupLoading(true);
     setCloudBackupError(null);
     setGitOperationLoading("cloud-backup");
@@ -103,6 +127,14 @@ export function usePuppyoneCloudBackup({
         }
       }
 
+      if (
+        publishAttemptRef.current !== attempt
+        || !isGitRepositoryContextCurrent(context)
+      ) {
+        failPublishAttempt(attempt, cloudMessage("project-publish-failed"));
+        return false;
+      }
+
       const project = await createCloudProject(session, workspace.name, handleCloudSessionChange);
       nextStatus = await onConfigureCloudRemote(project.id)
         ?? await getWorkspaceGitStatus(context.rootPath);
@@ -111,12 +143,20 @@ export function usePuppyoneCloudBackup({
         nextStatus = await pushWorkspaceGit(context.rootPath);
       }
 
-      if (!applyGitStatus(
-        nextStatus,
-        context,
-        createRepositoryRefreshReason("cloud-backup", "mutation"),
-      )) return false;
+      if (
+        publishAttemptRef.current !== attempt
+        || !isGitRepositoryContextCurrent(context)
+        || !applyGitStatus(
+          nextStatus,
+          context,
+          createRepositoryRefreshReason("cloud-backup", "mutation"),
+        )
+      ) {
+        failPublishAttempt(attempt, cloudMessage("project-publish-failed"));
+        return false;
+      }
       refreshWorkspaceContent();
+      publishAttemptRef.current = null;
       setPendingCloudBackupSetup(false);
       clearGitSelection();
       setActiveCloudSection("contents");
@@ -125,15 +165,19 @@ export function usePuppyoneCloudBackup({
       setSwitcherOpen(false);
       return true;
     } catch (error) {
-      if (!isGitRepositoryContextCurrent(context)) return false;
       const message = error instanceof Error ? error.message : String(error);
-      setCloudBackupError(cloudMessage("backup-create-failed", undefined, message || undefined));
-      setGitOperationError(createGitOperationErrorState(error, "cloud-backup", context.rootPath));
-      setPendingCloudBackupSetup(false);
-      setActiveView("cloud");
+      failPublishAttempt(
+        attempt,
+        cloudMessage("project-publish-failed", undefined, message || undefined),
+      );
+      if (isGitRepositoryContextCurrent(context)) {
+        setGitOperationError(createGitOperationErrorState(error, "cloud-backup", context.rootPath));
+        setActiveView("cloud");
+      }
       return false;
     } finally {
-      if (isGitRepositoryContextCurrent(context)) {
+      if (publishRequestRef.current === attempt) {
+        publishRequestRef.current = null;
         setCloudBackupLoading(false);
         setGitOperationLoading(null);
       }
@@ -144,6 +188,7 @@ export function usePuppyoneCloudBackup({
     captureGitRepositoryContext,
     clearGitSelection,
     cloudEnabled,
+    failPublishAttempt,
     handleCloudSessionChange,
     onConfigureCloudRemote,
     isGitRepositoryContextCurrent,
@@ -160,8 +205,12 @@ export function usePuppyoneCloudBackup({
 
   const handleStartPuppyoneBackup = useCallback(() => {
     if (!cloudEnabled) return;
+    if (!workspace) return;
     if (workspaceIsCloud) return;
+    if (publishAttemptRef.current || publishRequestRef.current) return;
 
+    const attempt = Symbol("publish-project");
+    publishAttemptRef.current = attempt;
     setPendingCloudBackupSetup(true);
     setCloudBackupError(null);
     setGitOperationError(null);
@@ -171,22 +220,43 @@ export function usePuppyoneCloudBackup({
       setActiveCloudSection("overview");
       setSidebarCollapsed(false);
       setSwitcherOpen(false);
+      void startCloudBrowserSignIn().then((started) => {
+        if (started || publishAttemptRef.current !== attempt) return;
+        failPublishAttempt(attempt, cloudMessage("auth-start-failed"));
+      });
     }
   }, [
     activeCloudSession,
     cloudEnabled,
+    failPublishAttempt,
     setActiveCloudSection,
     setActiveView,
     setGitOperationError,
     setSidebarCollapsed,
     setSwitcherOpen,
+    startCloudBrowserSignIn,
+    workspace,
     workspaceIsCloud,
   ]);
 
   useEffect(() => {
+    if (!pendingCloudBackupSetup || cloudBackupLoading) return undefined;
+    return onDesktopCloudAuthError((message) => {
+      const attempt = publishAttemptRef.current;
+      if (!attempt) return;
+      failPublishAttempt(
+        attempt,
+        cloudMessage("auth-start-failed", undefined, message),
+      );
+    });
+  }, [cloudBackupLoading, failPublishAttempt, pendingCloudBackupSetup]);
+
+  useEffect(() => {
     if (!cloudEnabled) return;
     if (!pendingCloudBackupSetup || !activeCloudSession || cloudBackupLoading) return;
-    void createPuppyoneCloudBackup(activeCloudSession);
+    const attempt = publishAttemptRef.current;
+    if (!attempt) return;
+    void createPuppyoneCloudBackup(activeCloudSession, attempt);
   }, [
     activeCloudSession,
     cloudBackupLoading,
@@ -196,6 +266,8 @@ export function usePuppyoneCloudBackup({
   ]);
 
   useEffect(() => {
+    publishAttemptRef.current = null;
+    publishRequestRef.current = null;
     setPendingCloudBackupSetup(false);
     setCloudBackupLoading(false);
     setCloudBackupError(null);

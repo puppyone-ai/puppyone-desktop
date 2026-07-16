@@ -74,6 +74,8 @@ const catalog: DesktopBillingCatalog = {
   },
 };
 
+const billingTestNow = Date.parse("2026-07-15T12:00:00Z");
+
 function summary(orgId: string, revision = 1): DesktopBillingSummary {
   return {
     org_id: orgId,
@@ -205,7 +207,7 @@ function dependencies(): CloudBillingControllerDependencies {
     openExternalUrl: vi.fn().mockResolvedValue(undefined),
     createIdempotencyKey: vi.fn()
       .mockImplementation((scope: string) => `desktop:${scope}:${crypto.randomUUID()}`),
-    now: () => Date.now(),
+    now: () => billingTestNow,
   };
 }
 

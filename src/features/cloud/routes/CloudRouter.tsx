@@ -216,9 +216,9 @@ export function CloudRouter({
         accountEmail={accountEmail}
         branchName={branchName}
         localChangeCount={localChangeCount}
-        backupLoading={cloudBackupLoading}
+        publishLoading={cloudBackupLoading}
         cloudRemote={cloudRemote}
-        onBackupWorkspace={onBackupWorkspace}
+        onPublishWorkspace={onBackupWorkspace}
       />
     );
   }

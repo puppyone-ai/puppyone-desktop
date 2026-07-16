@@ -52,6 +52,7 @@ export type CloudServiceMainViewProps = {
   loading: boolean;
   error: string | null;
   cloudBackupLoading: boolean;
+  cloudBackupPending: boolean;
   cloudBackupError: string | null;
   onStartPuppyoneBackup: () => void;
   onRemoveCloudRemote?: () => Promise<void>;

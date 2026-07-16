@@ -247,7 +247,7 @@ function CloudProjectNewCard({
   const { t } = useLocalization();
   return (
     <ProjectFolderNewCard
-      label={t(loading ? "cloud.project.creatingBackup" : "cloud.project.backupCurrentFolder")}
+      label={t(loading ? "cloud.project.publishingProject" : "cloud.project.publishCurrentProject")}
       loading={loading}
       disabled={disabled}
       onClick={onClick}

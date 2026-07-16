@@ -134,6 +134,7 @@ export function createCloudAuthService({
         const timeout = setTimeout(() => {
           clearPendingOAuthState(state);
           restoreStatusAfterOAuth(previousStatus);
+          broadcastAuthError("Cloud sign-in expired. Please try again.");
           broadcastPublicState();
         }, OAUTH_STATE_TTL_MS);
         timeout.unref?.();

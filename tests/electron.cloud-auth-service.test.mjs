@@ -184,6 +184,38 @@ describe("main-owned Cloud Auth Broker", () => {
       .toHaveLength(1);
   });
 
+  it("broadcasts an actionable error when browser sign-in expires", async () => {
+    vi.useFakeTimers();
+    const fixture = createFixture({ credential: null });
+    const close = vi.fn(async () => {});
+    fixture.startCallbackServer.mockResolvedValue({
+      redirectUri: "http://127.0.0.1:43123/auth/callback",
+      close,
+    });
+    fixture.requestCloudApi.mockResolvedValue({
+      state: "oauth-state-timeout",
+      login_url: "https://app.puppyone.ai/login",
+    });
+
+    try {
+      await fixture.service.startOAuth({ apiBase: API, provider: "github" });
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+      expect(fixture.messages).toContainEqual([
+        "cloud-auth:error",
+        { message: "Cloud sign-in expired. Please try again." },
+      ]);
+      expect(close).toHaveBeenCalledOnce();
+      await expect(fixture.service.readState()).resolves.toMatchObject({
+        status: "signed-out",
+        session: null,
+      });
+    } finally {
+      fixture.service.dispose();
+      vi.useRealTimers();
+    }
+  });
+
   it("does not open a blank browser when the local login page is unavailable", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error("connection refused"));
     const fixture = createFixture({ credential: null, fetchImpl });
