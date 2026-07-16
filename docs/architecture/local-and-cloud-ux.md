@@ -45,10 +45,12 @@ one commit:
 explicit Initialize and Push intent
   -> verify Git repository + named branch + existing HEAD
   -> sign in when required
-  -> create Cloud Project
-  -> issue user-owned Git credential
-  -> add canonical puppyone remote
-  -> push current HEAD to the canonical Cloud main branch
+  -> select the owning Organization explicitly
+  -> main process records a durable publish operation
+  -> idempotently create Cloud Project + operation credential
+  -> add canonical puppyone remote without repointing an existing remote
+  -> push captured HEAD SHA to the canonical Cloud main branch
+  -> reconcile remote state and complete the operation
   -> open the hosted Project
 ```
 
@@ -58,12 +60,21 @@ history is pushed. A repository without a commit or a checkout without a named
 branch is stopped before any Cloud Project is created and directs the user to
 Source Control.
 
-The page shows waiting-for-sign-in, initializing/pushing, and failure states.
+The page shows waiting-for-sign-in, Organization selection,
+initializing/pushing, and failure states. An interrupted operation shows
+phase-specific Resume and Abandon actions after a window reload or process
+restart. Abandon is available only before Cloud accepts content and never
+deletes user commits or working-tree changes.
 It does not expose Project creation, credential issuance, or remote setup as
 separate first-run tasks, and clicking Initialize and Push must never be
 implemented as navigation back to the page that is already open. The flow
 arrow is labelled `Push`, not `Git push`; Git is the implementation mechanism,
 not an extra user decision.
+
+Electron main owns the operation state, idempotency key, Git mutations, and
+raw credential. The Renderer only supplies the selected Organization and
+renders the public coordinator state. See
+[Cloud Project Publish Coordinator](cloud-publish-coordinator.md).
 
 ## Local + Cloud
 
@@ -149,7 +160,9 @@ Internal exception strings, Electron rejection wrappers, and
 ## Security and persistence invariants
 
 - Cloud session secrets stay in Electron main.
-- Git secrets stay out of URLs, workspace JSON, renderer persistence, and logs.
+- Git secrets stay in a main-only OS-backed secret vault and out of URLs,
+  plaintext operation journals, workspace JSON, Renderer memory/persistence,
+  and logs.
 - Shared workspace config contains no Cloud authorization, Project ID, server
   checkout ID, device ID, or folder identity.
 - `workspaceInstanceId` is local-only and exists for window/cache identity.
@@ -177,3 +190,11 @@ Internal exception strings, Electron rejection wrappers, and
     creating a Cloud Project.
 11. Downgrade a user role: existing Git credential becomes read-only on the next
    request.
+12. Lose the Project-create response, restart Desktop, and Resume: reuse the
+    same Project and credential; do not create duplicates.
+13. Lose the Push response after the server accepts it: reconcile the exact
+    remote SHA and finish without pushing a second Project.
+14. Add or repoint `puppyone` concurrently: stop with a remote conflict and do
+    not overwrite the remote or push to an unexpected target.
+15. Start from a feature branch, publish it to Cloud `main`, commit again, and
+    use ordinary Desktop Push: update `puppyone/main` successfully.

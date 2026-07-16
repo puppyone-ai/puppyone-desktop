@@ -117,18 +117,20 @@ an Offline banner.
 
 Initializing a local project on PuppyOne Cloud is one explicit user operation:
 
-1. record Initialize and Push intent without performing any passive Cloud request;
-2. verify that the repository has a named branch and an existing HEAD; abort
-   before server mutation otherwise;
-3. authenticate in the browser when there is no current Cloud session;
-4. create the Cloud Project and obtain its stable Project ID;
-5. issue a one-time user Git credential;
-6. write secret-free workspace sync preferences;
-7. configure the canonical `puppyone` remote and OS credential helper;
-8. push current HEAD to the canonical Cloud `main` branch and enter the new
-   Cloud Project;
-9. if local setup fails, best-effort revoke the just-issued credential and
-   keep the local repository usable.
+1. verify that the repository has a named branch, an existing HEAD, no remote
+   conflict, and no known immutable server-policy violation;
+2. authenticate in the browser when there is no current Cloud session;
+3. choose the owning Organization explicitly (auto-select only when exactly
+   one is available);
+4. have Electron main durably record the operation before any Cloud mutation;
+5. idempotently create the Cloud Project and operation-owned Git credential;
+6. configure the canonical `puppyone` remote add-only while holding the
+   repository mutation lock;
+7. push the captured immutable HEAD SHA to the canonical Cloud `main` branch;
+8. reconcile uncertain transport outcomes against the remote ref, configure
+   upstream, and enter the new Cloud Project; and
+9. remove the journal on completion, or expose Resume/Abandon for a durable
+   incomplete operation.
 
 The operation does not stage, commit, amend, stash, or discard user changes.
 Only existing commits are pushed; staged, unstaged, and untracked changes stay
@@ -138,13 +140,19 @@ and Git transport are implementation steps behind the single product action.
 Waiting for browser sign-in, initializing/pushing, and failure are visible
 states; a click must never degrade into a navigation no-op.
 
+The complete phase, idempotency, credential, crash-recovery, and compensation
+contract is defined in
+[Cloud Project Publish Coordinator](cloud-publish-coordinator.md).
+
 Configuring a local checkout for an existing Cloud Project remains a separate
 explicit operation that selects a Project/root-or-Scope target before issuing
 the credential.
 
 Removing Cloud access from a folder removes the local remote and related local
 sync preferences. It is not a server-side folder operation. Credential
-revocation is an independent explicit action.
+revocation is normally an independent explicit action; abandoning an unfinished
+publish is the narrow exception and may revoke only that operation's credential
+and delete only its still-empty Project.
 
 ## Architecture guard
 
