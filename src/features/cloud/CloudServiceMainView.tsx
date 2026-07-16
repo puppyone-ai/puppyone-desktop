@@ -36,6 +36,7 @@ export function CloudServiceMainView({
   onRefresh,
   onOpenDetails,
   onOpenGitSettings,
+  onReviewChanges,
 }: CloudServiceMainViewProps) {
   const { t } = useLocalization();
   const cloudEnvironment = useMemo(
@@ -92,11 +93,9 @@ export function CloudServiceMainView({
   }, [activeSection, onSelectSection]);
 
   const currentBranch = status?.branches.find((branch) => branch.current) ?? null;
-  const localChangeCount =
-    (status?.stagedEntries.length ?? 0) +
-    (status?.unstagedEntries.length ?? 0) +
-    (status?.untrackedEntries.length ?? 0);
-  const branchName = currentBranch?.name ?? status?.branch ?? t("cloud.git.noBranch");
+  const currentBranchName = currentBranch?.name ?? status?.branch ?? null;
+  const localChangeCount = status?.entries.length ?? 0;
+  const branchName = currentBranchName ?? t("cloud.git.noBranch");
 
   if (localOnlyContext) {
     return (
@@ -106,11 +105,15 @@ export function CloudServiceMainView({
             workspace={workspace}
             accountEmail={accountEmail}
             branchName={branchName}
+            totalCommits={status?.totalCommits ?? 0}
             localChangeCount={localChangeCount}
+            isGitRepository={status?.isRepo === true}
+            hasHeadCommit={Boolean(status?.headCommitId)}
+            hasCurrentBranch={Boolean(currentBranchName && currentBranchName !== "HEAD")}
             publishLoading={cloudBackupLoading}
             publishPending={cloudBackupPending}
             publishError={cloudBackupError}
-            cloudRemote={cloudRemote}
+            onReviewChanges={onReviewChanges}
             onPublishWorkspace={onStartPuppyoneBackup}
           />
         </div>

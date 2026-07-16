@@ -23,35 +23,47 @@ When actual Git state contains no canonical PuppyOne remote:
 
 - explain that the project is not yet published to PuppyOne Cloud (it may
   already have another Git host);
-- offer one primary “Publish to PuppyOne Cloud” action;
+- present the local repository and the not-yet-initialized Cloud destination as
+  one explicit `Push` flow;
+- offer one primary `Initialize and Push` action;
 - do not call repository-context APIs;
 - do not initiate a workspace-specific session restore until the user chooses
-  Publish; a separately restored global account session may be reused;
+  Initialize and Push; a separately restored global account session may be reused;
 - do not display Offline, permission, missing-Project, or repair errors;
 - ignore stale historical Cloud-shaped config because it is not authority.
 
 A GitHub-only repository and a repository with only a legacy secret-bearing
 PuppyOne URL are both local-only for Cloud navigation.
 
-## Publish to PuppyOne Cloud
+## Initialize and Push to PuppyOne Cloud
 
-Publishing is a single product action backed by a Git workflow:
+First-time Cloud initialization is a single product action backed by a Git
+workflow. The local repository must already have a named branch and at least
+one commit:
 
 ```text
-explicit Publish intent
+explicit Initialize and Push intent
+  -> verify Git repository + named branch + existing HEAD
   -> sign in when required
-  -> create an initial/current Git snapshot when required
   -> create Cloud Project
   -> issue user-owned Git credential
   -> add canonical puppyone remote
-  -> push current branch
+  -> push current HEAD to the canonical Cloud main branch
   -> open the hosted Project
 ```
 
-The page shows waiting-for-sign-in, publishing, and failure states. It does not
-expose Project creation, credential issuance, or remote setup as separate
-first-run tasks, and clicking Publish must never be implemented as navigation
-back to the page that is already open.
+The operation never stages files or creates a commit on the user's behalf.
+Staged, unstaged, and untracked changes remain local; only the existing commit
+history is pushed. A repository without a commit or a checkout without a named
+branch is stopped before any Cloud Project is created and directs the user to
+Source Control.
+
+The page shows waiting-for-sign-in, initializing/pushing, and failure states.
+It does not expose Project creation, credential issuance, or remote setup as
+separate first-run tasks, and clicking Initialize and Push must never be
+implemented as navigation back to the page that is already open. The flow
+arrow is labelled `Push`, not `Git push`; Git is the implementation mechanism,
+not an extra user decision.
 
 ## Local + Cloud
 
@@ -156,7 +168,12 @@ Internal exception strings, Electron rejection wrappers, and
 6. Rotate session during resolution: request retries; no internal text appears.
 7. Configure a remote and force local setup failure: newly issued credential is
    compensated by best-effort revocation.
-8. Open a signed-out Local Only project: no passive Cloud request; click Publish
-   once, complete browser sign-in, then create/configure/push automatically.
-9. Downgrade a user role: existing Git credential becomes read-only on the next
+8. Open a signed-out Local Only project: no passive Cloud request; click
+   Initialize and Push once, complete browser sign-in, then
+   create/configure/push automatically.
+9. Initialize a repository with dirty working-tree state: push the existing
+   HEAD while leaving staged, unstaged, and untracked changes untouched.
+10. Attempt initialization without HEAD or from detached HEAD: stop before
+    creating a Cloud Project.
+11. Downgrade a user role: existing Git credential becomes read-only on the next
    request.

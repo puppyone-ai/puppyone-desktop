@@ -20,6 +20,8 @@ export type CloudServiceSidebarProps = {
   projectContext?: boolean;
   /** True when the Project context belongs to the currently open Local workspace. */
   localWorkspaceContext?: boolean;
+  /** True when the current Local workspace has not been initialized on PuppyOne Cloud. */
+  localOnlyWorkspaceContext?: boolean;
   projectCapabilities?: readonly string[];
   onSelectSection: (section: CloudWorkspaceSection) => void;
   /** Leave an explicit global Project route and return to its parent surface. */
@@ -60,4 +62,5 @@ export type CloudServiceMainViewProps = {
   onRefresh: () => void;
   onOpenDetails: () => void;
   onOpenGitSettings: () => void;
+  onReviewChanges: () => void;
 };

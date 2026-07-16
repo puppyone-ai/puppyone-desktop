@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import {
-  commitWorkspaceGit,
   getWorkspaceGitStatus,
-  initializeWorkspaceGitRepository,
   pushWorkspaceGit,
-  stageAllWorkspaceGitChanges,
 } from "../../../lib/localFiles";
 import {
   createCloudProject,
@@ -111,20 +108,13 @@ export function usePuppyoneCloudBackup({
         nextStatus = await getWorkspaceGitStatus(context.rootPath);
       }
 
-      if (!nextStatus.isRepo) {
-        nextStatus = await initializeWorkspaceGitRepository(context.rootPath);
+      if (!nextStatus.isRepo || !nextStatus.headCommitId) {
+        failPublishAttempt(attempt, cloudMessage("project-publish-commit-required"));
+        return false;
       }
-
-      const localChangeCount =
-        nextStatus.stagedEntries.length +
-        nextStatus.unstagedEntries.length +
-        nextStatus.untrackedEntries.length;
-
-      if (localChangeCount > 0) {
-        nextStatus = await stageAllWorkspaceGitChanges(context.rootPath);
-        if (nextStatus.stagedEntries.length > 0) {
-          nextStatus = await commitWorkspaceGit(context.rootPath, "");
-        }
+      if (!nextStatus.branch || nextStatus.branch === "HEAD") {
+        failPublishAttempt(attempt, cloudMessage("project-publish-branch-required"));
+        return false;
       }
 
       if (

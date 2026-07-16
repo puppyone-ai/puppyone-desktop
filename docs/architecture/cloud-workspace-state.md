@@ -101,7 +101,9 @@ an Offline banner.
 ## UI states
 
 - No canonical remote: show the local-only explanation and one primary
-  `Publish to PuppyOne Cloud` action. Do not show an error banner and do not
+  `Initialize and Push` action. Show `Local repository -> Push -> PuppyOne
+  Cloud`, with the destination marked `Not initialized`. Do not show an error
+  banner and do not
   initiate a workspace-specific session restore until the user invokes that
   action. A separately restored global account session may still be reused.
 - Resolved context: show Project content.
@@ -113,24 +115,28 @@ an Offline banner.
 
 ## Mutations
 
-Publishing a local project is one explicit user operation:
+Initializing a local project on PuppyOne Cloud is one explicit user operation:
 
-1. record publish intent without performing any passive Cloud request;
-2. authenticate in the browser when there is no current Cloud session;
-3. materialize a Git commit when the working tree has unpublished changes;
+1. record Initialize and Push intent without performing any passive Cloud request;
+2. verify that the repository has a named branch and an existing HEAD; abort
+   before server mutation otherwise;
+3. authenticate in the browser when there is no current Cloud session;
 4. create the Cloud Project and obtain its stable Project ID;
 5. issue a one-time user Git credential;
 6. write secret-free workspace sync preferences;
 7. configure the canonical `puppyone` remote and OS credential helper;
-8. push the current branch and enter the new Cloud Project;
+8. push current HEAD to the canonical Cloud `main` branch and enter the new
+   Cloud Project;
 9. if local setup fails, best-effort revoke the just-issued credential and
    keep the local repository usable.
 
-The UI describes this as publishing, not as adding a remote. Project creation,
-credential issuance, remote configuration, and Git push are implementation
-steps behind the single product action. Waiting for browser sign-in,
-publishing, and failure are visible states; a click must never degrade into a
-navigation no-op.
+The operation does not stage, commit, amend, stash, or discard user changes.
+Only existing commits are pushed; staged, unstaged, and untracked changes stay
+local. The UI describes the first-time action as initialization plus Push, not
+as adding a remote. Project creation, credential issuance, remote configuration,
+and Git transport are implementation steps behind the single product action.
+Waiting for browser sign-in, initializing/pushing, and failure are visible
+states; a click must never degrade into a navigation no-op.
 
 Configuring a local checkout for an existing Cloud Project remains a separate
 explicit operation that selects a Project/root-or-Scope target before issuing

@@ -215,9 +215,13 @@ export function CloudRouter({
         workspace={workspace}
         accountEmail={accountEmail}
         branchName={branchName}
+        totalCommits={status?.totalCommits ?? 0}
         localChangeCount={localChangeCount}
+        isGitRepository={status?.isRepo === true}
+        hasHeadCommit={Boolean(status?.headCommitId)}
+        hasCurrentBranch={Boolean(status?.branch && status.branch !== "HEAD")}
         publishLoading={cloudBackupLoading}
-        cloudRemote={cloudRemote}
+        onReviewChanges={onOpenGitSettings}
         onPublishWorkspace={onBackupWorkspace}
       />
     );

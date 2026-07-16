@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Cloud } from "lucide-react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { SidebarRoot, SidebarRow, SidebarScrollArea } from "@puppyone/shared-ui";
@@ -38,6 +38,15 @@ const SIGNED_OUT_CLOUD_SIDEBAR_ROUTES: CloudSidebarNavEntry[] = [
   })),
 ];
 
+const LOCAL_ONLY_CLOUD_SIDEBAR_ROUTES: CloudSidebarNavEntry[] = [
+  {
+    id: "overview",
+    labelId: "cloud.initialize.sidebarLabel",
+    icon: Cloud,
+    context: "project",
+  },
+];
+
 export function CloudServiceSidebar({
   status,
   cloudSession,
@@ -45,6 +54,7 @@ export function CloudServiceSidebar({
   activeSection,
   projectContext = false,
   localWorkspaceContext = false,
+  localOnlyWorkspaceContext = false,
   projectCapabilities = [],
   onSelectSection,
   onBackToProjects,
@@ -62,13 +72,15 @@ export function CloudServiceSidebar({
   const signedIn = Boolean(effectiveCloudSession);
   // Project context comes from an authorized resolver / explicit route — never from route alone.
   const inProjectContext = signedIn && projectContext;
-  const baseNavItems: CloudSidebarNavEntry[] = !signedIn
-    ? SIGNED_OUT_CLOUD_SIDEBAR_ROUTES
-    : inProjectContext && localWorkspaceContext
-      ? CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES
-      : inProjectContext
-        ? CLOUD_PROJECT_SIDEBAR_ROUTES
-        : CLOUD_GLOBAL_SIDEBAR_ROUTES;
+  const baseNavItems: CloudSidebarNavEntry[] = localOnlyWorkspaceContext
+    ? LOCAL_ONLY_CLOUD_SIDEBAR_ROUTES
+    : !signedIn
+      ? SIGNED_OUT_CLOUD_SIDEBAR_ROUTES
+      : inProjectContext && localWorkspaceContext
+        ? CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES
+        : inProjectContext
+          ? CLOUD_PROJECT_SIDEBAR_ROUTES
+          : CLOUD_GLOBAL_SIDEBAR_ROUTES;
   const navItems = baseNavItems.filter((item) => (
     item.id !== "cloud-billing" || billingEnabled
   )).filter((item) => (
@@ -115,9 +127,12 @@ export function CloudServiceSidebar({
                     key={item.id}
                     item={item}
                     active={
-                      signedIn && !item.locked && (
-                        normalizedActiveSection === item.id
-                        || (inProjectContext && localWorkspaceContext && item.id === "contents" && normalizedActiveSection === "overview")
+                      !item.locked && (
+                        (localOnlyWorkspaceContext && item.id === "overview")
+                        || (signedIn && (
+                          normalizedActiveSection === item.id
+                          || (inProjectContext && localWorkspaceContext && item.id === "contents" && normalizedActiveSection === "overview")
+                        ))
                       )
                     }
                     onSelect={(section) => {

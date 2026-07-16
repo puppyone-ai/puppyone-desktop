@@ -351,6 +351,7 @@ export function useWorkspaceSurfaceContent({
         activeSection={cloud.activeSection}
         projectContext={cloudNavigationContext.projectContext}
         localWorkspaceContext={cloudNavigationContext.localWorkspaceContext && !cloudWorkspace}
+        localOnlyWorkspaceContext={projectContext.status === "local-only" && !cloudWorkspace}
         projectCapabilities={projectContext.status === "resolved"
           ? projectContext.capabilities ?? []
           : []}
@@ -378,6 +379,7 @@ export function useWorkspaceSurfaceContent({
         onRefresh={git.refreshGitStatus}
         onOpenDetails={cloud.onOpenDetails}
         onOpenGitSettings={cloud.onOpenGitSettings}
+        onReviewChanges={() => onNavigate("git")}
       />
     ),
   };

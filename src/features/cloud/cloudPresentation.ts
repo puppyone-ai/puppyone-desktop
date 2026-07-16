@@ -46,6 +46,8 @@ export type CloudMessageCode =
   | "remote-locator-conflict"
   | "remote-not-found"
   | "project-publish-failed"
+  | "project-publish-commit-required"
+  | "project-publish-branch-required"
   | "project-list-load-failed"
   | "project-open-failed";
 

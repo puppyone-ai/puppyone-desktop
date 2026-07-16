@@ -59,6 +59,8 @@ const session = {
 const initialStatus = {
   isRepo: true,
   branch: "main",
+  totalCommits: 1,
+  entries: [],
   branches: [],
   stagedEntries: [],
   unstagedEntries: [],
@@ -100,14 +102,16 @@ const actions = {
 
 function PublishHarness({
   activeSession,
+  activeStatus = initialStatus,
   startCloudBrowserSignIn,
 }: {
   activeSession: DesktopCloudSession | null;
+  activeStatus?: GitStatusSnapshot;
   startCloudBrowserSignIn: () => Promise<boolean>;
 }) {
   const publish = usePuppyoneCloudBackup({
     activeCloudSession: activeSession,
-    activeGitStatus: initialStatus,
+    activeGitStatus: activeStatus,
     applyGitStatus: actions.applyGitStatus,
     captureGitRepositoryContext: actions.captureGitRepositoryContext,
     clearGitSelection: actions.clearGitSelection,
@@ -200,6 +204,103 @@ describe("explicit PuppyOne Cloud publish flow", () => {
     );
     expect(readOutput().dataset.pending).toBe("false");
     expect(readOutput().dataset.loading).toBe("false");
+  });
+
+  it("pushes an existing dirty HEAD without staging or creating a commit", async () => {
+    const dirtyStatus = {
+      ...initialStatus,
+      entries: [
+        { path: "README.md", oldPath: null, staged: "M", unstaged: null, status: "M" },
+        { path: "src/draft.ts", oldPath: null, staged: null, unstaged: "M", status: "M" },
+        { path: "notes.txt", oldPath: null, staged: null, unstaged: "?", status: "?" },
+      ],
+      stagedEntries: [{ path: "README.md", oldPath: null, staged: "M", unstaged: null, status: "M" }],
+      unstagedEntries: [{ path: "src/draft.ts", oldPath: null, staged: null, unstaged: "M", status: "M" }],
+      untrackedEntries: [{ path: "notes.txt", oldPath: null, staged: null, unstaged: "?", status: "?" }],
+    } as GitStatusSnapshot;
+    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
+
+    await render(
+      <PublishHarness
+        activeSession={session}
+        activeStatus={dirtyStatus}
+        startCloudBrowserSignIn={startCloudBrowserSignIn}
+      />,
+    );
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    await flushPromises();
+
+    expect(localFiles.initializeWorkspaceGitRepository).not.toHaveBeenCalled();
+    expect(localFiles.stageAllWorkspaceGitChanges).not.toHaveBeenCalled();
+    expect(localFiles.commitWorkspaceGit).not.toHaveBeenCalled();
+    expect(cloudApi.createCloudProject).toHaveBeenCalledWith(
+      session,
+      "Local Notes",
+      actions.handleCloudSessionChange,
+    );
+    expect(actions.onConfigureCloudRemote).toHaveBeenCalledWith("project-1");
+    expect(localFiles.pushWorkspaceGit).toHaveBeenCalledWith(repositoryContext.rootPath);
+    expect(readOutput().dataset.error).toBe("");
+  });
+
+  it("rejects a repository without a HEAD before mutating the Cloud project", async () => {
+    const noHeadStatus = {
+      ...initialStatus,
+      headCommitId: null,
+      totalCommits: 0,
+    } as GitStatusSnapshot;
+    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
+
+    await render(
+      <PublishHarness
+        activeSession={session}
+        activeStatus={noHeadStatus}
+        startCloudBrowserSignIn={startCloudBrowserSignIn}
+      />,
+    );
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    await flushPromises();
+
+    expect(readOutput().dataset.pending).toBe("false");
+    expect(readOutput().dataset.loading).toBe("false");
+    expect(readOutput().dataset.error).toBe("project-publish-commit-required");
+    expect(cloudApi.createCloudProject).not.toHaveBeenCalled();
+    expect(actions.onConfigureCloudRemote).not.toHaveBeenCalled();
+    expect(localFiles.pushWorkspaceGit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["detached HEAD", "HEAD"],
+    ["a missing current branch", null],
+  ] as const)("rejects %s before mutating the Cloud project", async (_label, branch) => {
+    const detachedStatus = {
+      ...initialStatus,
+      branch,
+    } as GitStatusSnapshot;
+    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
+
+    await render(
+      <PublishHarness
+        activeSession={session}
+        activeStatus={detachedStatus}
+        startCloudBrowserSignIn={startCloudBrowserSignIn}
+      />,
+    );
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    await flushPromises();
+
+    expect(readOutput().dataset.pending).toBe("false");
+    expect(readOutput().dataset.loading).toBe("false");
+    expect(readOutput().dataset.error).toBe("project-publish-branch-required");
+    expect(cloudApi.createCloudProject).not.toHaveBeenCalled();
+    expect(actions.onConfigureCloudRemote).not.toHaveBeenCalled();
+    expect(localFiles.pushWorkspaceGit).not.toHaveBeenCalled();
   });
 
   it("clears the pending state when browser sign-in cannot start", async () => {
