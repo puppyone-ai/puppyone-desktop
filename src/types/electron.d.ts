@@ -274,6 +274,83 @@ export type GitStatusSnapshot = {
   didHitStatusLimit: boolean;
 };
 
+export type CloudPublishPhase =
+  | "prepared"
+  | "project-created"
+  | "credential-issued"
+  | "remote-configured"
+  | "pushed"
+  | "compensation-pending"
+  | "completed";
+
+export type CloudPublishErrorCode =
+  | "SESSION_REQUIRED"
+  | "IDENTITY_MISMATCH"
+  | "ORGANIZATION_REQUIRED"
+  | "REPOSITORY_REQUIRED"
+  | "COMMIT_REQUIRED"
+  | "BRANCH_REQUIRED"
+  | "MERGE_TIP_UNSUPPORTED"
+  | "LFS_UNSUPPORTED"
+  | "REMOTE_CONFLICT"
+  | "PROJECT_CREATE_FAILED"
+  | "CREDENTIAL_FAILED"
+  | "REMOTE_CONFIG_FAILED"
+  | "PUSH_FAILED"
+  | "COMPENSATION_FAILED"
+  | "JOURNAL_CORRUPT"
+  | "JOURNAL_IO_FAILED"
+  | "PERMISSION_DENIED"
+  | "UNKNOWN";
+
+export type CloudPublishState = {
+  operationId: string;
+  phase: CloudPublishPhase;
+  projectId: string | null;
+  projectName: string;
+  organizationId: string;
+  expectedHeadCommitId: string;
+  expectedBranch: string;
+  destinationBranch: "main";
+  createdAt: string;
+  updatedAt: string;
+  canResume: boolean;
+  canAbandon: boolean;
+};
+
+export type CloudPublishResult =
+  | {
+    ok: true;
+    state: CloudPublishState | null;
+    gitStatus?: GitStatusSnapshot;
+  }
+  | {
+    ok: false;
+    state: CloudPublishState | null;
+    error: {
+      code: CloudPublishErrorCode;
+      retryable: boolean;
+      message?: string;
+    };
+  };
+
+export type CloudPublishIdentityRequest = {
+  rootPath: string;
+  apiBaseUrl: string;
+  userId: string;
+};
+
+export type CloudPublishStartRequest = CloudPublishIdentityRequest & {
+  organizationId: string;
+  projectName: string;
+  expectedHeadCommitId: string;
+  expectedBranch: string;
+};
+
+export type CloudPublishAbandonRequest = CloudPublishIdentityRequest & {
+  operationId: string;
+};
+
 export type GitBranchGraphSnapshot = {
   isRepo: boolean;
   branch: string | null;
@@ -624,6 +701,9 @@ declare global {
         headers?: Record<string, string>;
         body?: string;
       }) => Promise<DesktopCloudIpcEnvelope<unknown>>;
+      cloudPublishGetState: (request: CloudPublishIdentityRequest) => Promise<CloudPublishResult>;
+      cloudPublishStartOrResume: (request: CloudPublishStartRequest) => Promise<CloudPublishResult>;
+      cloudPublishAbandon: (request: CloudPublishAbandonRequest) => Promise<CloudPublishResult>;
       listCloudAccessPointDirectory: (request: {
         accessKey: string;
         path?: string;

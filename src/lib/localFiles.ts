@@ -1,5 +1,9 @@
 import type { AiEditRequest, DataNode, DataNodeKind, DataPort, Workspace } from "@puppyone/shared-ui";
 import type {
+  CloudPublishAbandonRequest,
+  CloudPublishIdentityRequest,
+  CloudPublishResult,
+  CloudPublishStartRequest,
   GitCommitDetail,
   GitBranchGraphSnapshot,
   GitRepositoryInvalidatedEvent,
@@ -262,6 +266,24 @@ export async function getWorkspaceGitStatus(
   } finally {
     signal?.removeEventListener("abort", cancel);
   }
+}
+
+export async function getWorkspaceCloudPublishState(
+  request: CloudPublishIdentityRequest,
+): Promise<CloudPublishResult> {
+  return getDesktopBridge().cloudPublishGetState(request);
+}
+
+export async function startOrResumeWorkspaceCloudPublish(
+  request: CloudPublishStartRequest,
+): Promise<CloudPublishResult> {
+  return getDesktopBridge().cloudPublishStartOrResume(request);
+}
+
+export async function abandonWorkspaceCloudPublish(
+  request: CloudPublishAbandonRequest,
+): Promise<CloudPublishResult> {
+  return getDesktopBridge().cloudPublishAbandon(request);
 }
 
 function createGitStatusAbortError(): DOMException {

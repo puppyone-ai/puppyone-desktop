@@ -32,6 +32,7 @@ import {
 import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
+import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mjs";
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
 import { registerLocalizationIpcHandlers } from "./main/ipc/localization-ipc.mjs";
 import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
@@ -52,6 +53,9 @@ import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import { createDesktopLocaleService } from "./main/localization/desktop-locale-service.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
+import { createGitOperationCoordinator } from "./main/git-operation-coordinator.mjs";
+import { createCloudPublishCoordinator } from "./main/cloud-publish-coordinator.mjs";
+import { createCloudPublishSecretVault } from "./main/cloud-publish-secret-vault.mjs";
 import {
   getViewerPackPrivilegedSchemes,
   loadViewerPackRuntime,
@@ -177,6 +181,16 @@ const cloudAuthService = createCloudAuthService({
   localCloudWebUrl: process.env.VITE_DESKTOP_CLOUD_WEB_URL,
   getWindows: () => BrowserWindow.getAllWindows(),
   revealWindow: revealLastFocusedWindow,
+});
+const gitOperationCoordinator = createGitOperationCoordinator();
+const cloudPublishSecretVault = createCloudPublishSecretVault({
+  baseDirectory: path.join(app.getPath("userData"), "cloud-publish-secrets-v1"),
+  secureStorage: safeStorage,
+});
+const cloudPublishCoordinator = createCloudPublishCoordinator({
+  cloudAuthService,
+  gitOperationCoordinator,
+  secretVault: cloudPublishSecretVault,
 });
 
 app.setName(appName);
@@ -554,6 +568,11 @@ function registerIpcHandlers() {
     selectWorkspaceForNewWindow,
   });
   registerCloudIpcHandlers({ ipcMain: trustedIpcMain, cloudAuthService });
+  registerCloudPublishIpcHandlers({
+    ipcMain: trustedIpcMain,
+    authorizeWorkspaceRoot,
+    cloudPublishCoordinator,
+  });
   registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell, setDockIcon });
   registerMarkdownWebEmbedIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -599,6 +618,7 @@ function registerIpcHandlers() {
     BrowserWindow,
     dialog,
     authorizeWorkspaceRoot,
+    gitOperationCoordinator,
     t: (messageId, values) => localeService.t(messageId, values),
   });
   registerTerminalIpcHandlers({
