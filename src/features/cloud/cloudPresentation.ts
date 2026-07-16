@@ -5,6 +5,7 @@ import type {
   CloudBranchGraphLabel,
   CloudBranchGraphRow,
 } from "./graph/model";
+import type { CloudPublishErrorCode } from "../../types/electron";
 import { normalizeProviderKey } from "./utils";
 
 export type CloudMessageCode =
@@ -75,6 +76,25 @@ export function formatCloudMessage(message: CloudMessageDescriptor, t: MessageFo
     : undefined;
   const productMessage = t(`cloud.message.${message.code}`, values);
   return message.detail ? `${productMessage} ${bidiIsolate(message.detail)}` : productMessage;
+}
+
+export function formatCloudPublishFailure(
+  error: { code: CloudPublishErrorCode; retryable: boolean },
+  t: MessageFormatter,
+): string {
+  if (error.code === "SESSION_REQUIRED") return t("cloud.initialize.signInNote");
+  if (error.code === "ORGANIZATION_REQUIRED") return t("cloud.initialize.organizationRequired");
+  if (error.code === "REPOSITORY_REQUIRED" || error.code === "COMMIT_REQUIRED") {
+    return t("cloud.message.project-publish-commit-required");
+  }
+  if (error.code === "BRANCH_REQUIRED") return t("cloud.message.project-publish-branch-required");
+  if (error.code === "IDENTITY_MISMATCH") return t("cloud.initialize.identityMismatch");
+  if (error.code === "REMOTE_CONFLICT") return t("cloud.initialize.remoteConflict");
+  if (error.code === "PERMISSION_DENIED") return t("cloud.initialize.permissionDenied");
+  if (error.code === "JOURNAL_CORRUPT" || error.code === "JOURNAL_IO_FAILED") {
+    return t("cloud.initialize.localRecoveryFailed");
+  }
+  return t("cloud.message.project-publish-failed");
 }
 
 export function formatCloudAccessSurfaceTitle(surface: CloudAccessSurface, t: MessageFormatter) {

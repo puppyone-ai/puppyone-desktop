@@ -1,28 +1,29 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import {
   openCloudApp,
 } from "../../lib/cloudApi";
 import type { CloudServiceMainViewProps, CloudWorkspaceSection } from "./types";
 import { getResolvedCloudProjectId } from "./context";
-import { getCloudAuthEmail, getCloudAuthSession, isCloudAuthBlocking, useCloudSessionForEnvironment } from "./auth";
+import { getCloudAuthEmail, getCloudAuthSession, isCloudAuthBlocking } from "./auth";
 import { useDesktopCloudData } from "./data";
-import { resolveCloudEnvironment } from "./environment";
+import type { CloudProjectDetailResource } from "./data/cloudProjectDetails";
+import { useCloudProjectCatalog } from "./data/useCloudProjectCatalog";
 import { CloudWorkspaceLoadingState } from "./components/shared";
-import { CloudProjectBrowserSignedOut } from "./components/ProjectBrowser";
+import { CloudProjectBrowser, CloudProjectBrowserSignedOut } from "./components/ProjectBrowser";
+import { useCloudOrganizationData } from "./components/CloudGlobalPages";
 import { CloudLocalGitStatusError, CloudLocalOnlyWorkspace } from "./states";
 import { CloudRouter } from "./routes/CloudRouter";
 import type { CloudActionState } from "./routes/CloudRouter";
 import { getCloudRouteWebPath, isCloudAccountSection, normalizeCloudSection } from "./routes/cloudRoutes";
-import { cloudMessage, formatCloudMessage } from "./cloudPresentation";
+import { cloudMessage, formatCloudMessage, formatCloudPublishFailure } from "./cloudPresentation";
 import { getCloudPublishReadiness } from "./workspace/cloudPublishReadiness";
 
 export function CloudServiceMainView({
   workspace,
   status,
-  cloudApiBaseUrl: desktopApiBaseUrl,
-  cloudSession,
-  sessionRestoring = false,
+  cloudEnvironment,
+  cloudAuthState,
   projectContext = null,
   onCloudSessionChange,
   activeSection,
@@ -30,52 +31,50 @@ export function CloudServiceMainView({
   error,
   cloudBackupLoading,
   cloudBackupPending,
-  cloudBackupError,
-  cloudBackupCanRetry = false,
-  cloudBackupProjectInitialized = false,
+  cloudPublishError,
+  cloudPublishNotice,
+  cloudPublishState,
+  cloudPublishStateLoading,
+  onAbandonPuppyoneBackup,
   onStartPuppyoneBackup,
   onRemoveCloudRemote,
   onSelectSection,
   onRefresh,
-  onOpenDetails,
   onOpenGitSettings,
   onReviewChanges,
 }: CloudServiceMainViewProps) {
   const { t } = useLocalization();
-  const cloudEnvironment = useMemo(
-    () => resolveCloudEnvironment({ status, desktopApiBaseUrl }),
-    [desktopApiBaseUrl, status],
-  );
   const cloudRemote = cloudEnvironment.cloudRemote;
   const cloudApiBaseUrl = cloudEnvironment.apiBaseUrl;
-  const inCloudGlobalSection = isCloudAccountSection(activeSection)
-    || activeSection === "templates"
-    || activeSection === "overview";
+  const routedSection = normalizeCloudSection(activeSection);
+  const inCloudGlobalSection = isCloudAccountSection(routedSection)
+    || routedSection === "templates"
+    || routedSection === "projects";
   const localOnlyContext = activeSection === "initialize"
     && (
       projectContext?.status === "local-only"
-      || cloudBackupProjectInitialized
+      || cloudPublishState !== null
+      || cloudPublishStateLoading
       || (projectContext?.status === "resolving" && status === null)
     );
-  const cloudAuthState = useCloudSessionForEnvironment({
-    cloudSession,
-    sessionRestoring,
-    restoreEnabled: !localOnlyContext,
-    environment: cloudEnvironment,
-    onCloudSessionChange,
-  });
   const effectiveCloudSession = getCloudAuthSession(cloudAuthState);
-  const loadAggregateProjectDetails = shouldLoadAggregateProjectDetails(activeSection);
+  const projectDetailResources = getCloudProjectDetailResources(routedSection);
   const contextProjectId = projectContext ? getResolvedCloudProjectId(projectContext) : null;
   const cloudData = useDesktopCloudData({
     session: effectiveCloudSession,
     cloudEnvironment,
     explicitProjectId: null,
-    repositoryProjectId: contextProjectId,
+    repositoryProjectId: inCloudGlobalSection ? null : contextProjectId,
     onSessionChange: onCloudSessionChange,
     workspaceRevisionKey: status?.headCommitId ?? null,
-    loadProjectDetails: loadAggregateProjectDetails,
-    loadProjectCatalog: activeSection === "overview",
+    loadProjectDetails: projectDetailResources.length > 0,
+    projectDetailResources,
+  });
+  const projectCatalog = useCloudProjectCatalog({
+    enabled: routedSection === "projects",
+    session: effectiveCloudSession,
+    apiBaseUrl: cloudApiBaseUrl,
+    onSessionChange: onCloudSessionChange,
   });
   const [cloudAction, setCloudAction] = useState<CloudActionState>({
     kind: null,
@@ -104,6 +103,28 @@ export function CloudServiceMainView({
   const currentBranchName = status?.branch ?? null;
   const localChangeCount = status?.entries.length ?? 0;
   const branchName = currentBranchName ?? t("cloud.git.noBranch");
+  const cloudPublishErrorMessage = cloudPublishError
+    ? formatCloudPublishFailure(cloudPublishError, t)
+    : null;
+
+  useEffect(() => {
+    if (
+      routedSection === "initialize"
+      && projectContext?.status === "resolved"
+      && !cloudPublishStateLoading
+      && !cloudPublishState
+      && !cloudBackupLoading
+    ) {
+      onSelectSection("contents");
+    }
+  }, [
+    cloudBackupLoading,
+    cloudPublishState,
+    cloudPublishStateLoading,
+    onSelectSection,
+    projectContext?.status,
+    routedSection,
+  ]);
 
   if (localOnlyContext) {
     if (error) {
@@ -129,25 +150,74 @@ export function CloudServiceMainView({
     return (
       <main className="desktop-cloud-main-view">
         <div className="desktop-cloud-page-shell">
-          <CloudLocalOnlyWorkspace
-            workspace={workspace}
-            accountEmail={accountEmail}
-            branchName={branchName}
-            totalCommits={status?.totalCommits ?? 0}
-            localChangeCount={localChangeCount}
-            localChangeCountIsMinimum={status.didHitStatusLimit}
-            publishReadiness={getCloudPublishReadiness(status)}
-            isGitRepository={status?.isRepo === true}
-            hasHeadCommit={Boolean(status?.headCommitId)}
-            hasCurrentBranch={getCloudPublishReadiness(status) !== "branch-required"}
-            publishLoading={cloudBackupLoading}
-            publishPending={cloudBackupPending}
-            publishError={cloudBackupError}
-            publishCanRetry={cloudBackupCanRetry}
-            projectInitialized={cloudBackupProjectInitialized}
-            onReviewChanges={onReviewChanges}
-            onPublishWorkspace={onStartPuppyoneBackup}
-          />
+          {cloudAction.notice && (
+            <div className="desktop-cloud-main-alert success" role="status">
+              {formatCloudMessage(cloudAction.notice, t)}
+            </div>
+          )}
+          {cloudPublishNotice === "abandoned" && (
+            <div className="desktop-cloud-main-alert success" role="status">
+              {t("cloud.initialize.abandoned")}
+            </div>
+          )}
+          {cloudPublishState || cloudPublishStateLoading ? (
+            <CloudLocalOnlyWorkspace
+              workspace={workspace}
+              accountEmail={accountEmail}
+              branchName={branchName}
+              totalCommits={status.totalCommits ?? 0}
+              localChangeCount={localChangeCount}
+              localChangeCountIsMinimum={status.didHitStatusLimit}
+              publishReadiness={getCloudPublishReadiness(status)}
+              isGitRepository={status.isRepo === true}
+              hasHeadCommit={Boolean(status.headCommitId)}
+              hasCurrentBranch={getCloudPublishReadiness(status) !== "branch-required"}
+              publishLoading={cloudBackupLoading}
+              publishPending={cloudBackupPending}
+              publishError={cloudPublishError}
+              publishState={cloudPublishState}
+              publishStateLoading={cloudPublishStateLoading}
+              onAbandonPublish={onAbandonPuppyoneBackup}
+              onReviewChanges={onReviewChanges}
+              onPublishWorkspace={onStartPuppyoneBackup}
+            />
+          ) : effectiveCloudSession ? (
+            <AuthenticatedCloudInitialize
+              workspace={workspace}
+              status={status}
+              session={effectiveCloudSession}
+              apiBaseUrl={cloudApiBaseUrl}
+              accountEmail={accountEmail}
+              branchName={branchName}
+              localChangeCount={localChangeCount}
+              publishLoading={cloudBackupLoading}
+              publishPending={cloudBackupPending}
+              publishError={cloudPublishError}
+              onSessionChange={onCloudSessionChange}
+              onReviewChanges={onReviewChanges}
+              onPublishWorkspace={onStartPuppyoneBackup}
+              onAbandonPublish={onAbandonPuppyoneBackup}
+            />
+          ) : (
+            <CloudLocalOnlyWorkspace
+              workspace={workspace}
+              accountEmail={accountEmail}
+              branchName={branchName}
+              totalCommits={status.totalCommits ?? 0}
+              localChangeCount={localChangeCount}
+              localChangeCountIsMinimum={status.didHitStatusLimit}
+              publishReadiness={getCloudPublishReadiness(status)}
+              isGitRepository={status.isRepo === true}
+              hasHeadCommit={Boolean(status.headCommitId)}
+              hasCurrentBranch={getCloudPublishReadiness(status) !== "branch-required"}
+              publishLoading={cloudBackupLoading}
+              publishPending={cloudBackupPending}
+              publishError={cloudPublishError}
+              onReviewChanges={onReviewChanges}
+              onPublishWorkspace={onStartPuppyoneBackup}
+              onAbandonPublish={onAbandonPuppyoneBackup}
+            />
+          )}
         </div>
       </main>
     );
@@ -167,17 +237,6 @@ export function CloudServiceMainView({
     openCloudApp(getCloudRouteWebPath(section, projectId));
   };
 
-  const handleBackupWorkspace = async () => {
-    if (actionRequestRef.current || cloudBackupLoading) return;
-    if (!effectiveCloudSession) {
-      onOpenDetails();
-      return;
-    }
-
-    setCloudAction({ kind: null, projectId: null, notice: null, error: null });
-    onStartPuppyoneBackup();
-  };
-
   const handleRemoveCloudRemote = async () => {
     if (!onRemoveCloudRemote || actionRequestRef.current) return;
     const request = Symbol("remove-cloud-git-remote");
@@ -191,7 +250,6 @@ export function CloudServiceMainView({
         notice: cloudMessage("cloud-remote-removed"),
         error: null,
       });
-      onSelectSection("overview");
     } catch (actionError) {
       setCloudAction({
         kind: null,
@@ -245,50 +303,162 @@ export function CloudServiceMainView({
           </div>
         )}
         {!inCloudGlobalSection && error && <div className="desktop-cloud-main-alert">{error}</div>}
-        {(!inCloudGlobalSection || activeSection === "overview") && cloudData.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.error, t)}</div>}
+        {!inCloudGlobalSection && cloudData.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.error, t)}</div>}
+        {routedSection === "projects" && projectCatalog.error && (
+          <div className="desktop-cloud-main-alert">{formatCloudMessage(projectCatalog.error, t)}</div>
+        )}
         {!inCloudGlobalSection && cloudData.warning && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.warning, t)}</div>}
-        {!inCloudGlobalSection && cloudBackupError && <div className="desktop-cloud-main-alert">{cloudBackupError}</div>}
+        {!inCloudGlobalSection && cloudPublishErrorMessage && <div className="desktop-cloud-main-alert">{cloudPublishErrorMessage}</div>}
         {!inCloudGlobalSection && cloudAction.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudAction.error, t)}</div>}
         {!inCloudGlobalSection && cloudAction.notice && <div className="desktop-cloud-main-alert success">{formatCloudMessage(cloudAction.notice, t)}</div>}
 
-        <CloudRouter
-          workspace={workspace}
-          status={status}
-          cloudSession={effectiveCloudSession}
-          cloudApiBaseUrl={cloudApiBaseUrl}
-          cloudRemote={cloudRemote}
-          cloudData={cloudData}
-          projectContext={projectContext}
-          activeSection={activeSection}
-          accountEmail={accountEmail}
-          accountConnected={accountConnected}
-          branchName={branchName}
-          localChangeCount={localChangeCount}
-          loading={loading}
-          cloudBackupLoading={cloudBackupLoading}
-          onSessionChange={onCloudSessionChange}
-          onBackupWorkspace={handleBackupWorkspace}
-          onOpenProject={handleOpenProject}
-          onOpenGitSettings={onOpenGitSettings}
-          onSelectSection={onSelectSection}
-          onRetryContext={() => {
-            void cloudData.reload();
-            onRefresh();
-          }}
-          onUseAnotherAccount={() => onCloudSessionChange(null)}
-          onRemoveCloudRemote={onRemoveCloudRemote ? () => void handleRemoveCloudRemote() : undefined}
-        />
+        {routedSection === "projects" ? (
+          <CloudProjectBrowser
+            projects={projectCatalog.projects}
+            loading={projectCatalog.loading}
+            session={effectiveCloudSession}
+            apiBaseUrl={cloudApiBaseUrl}
+            currentRepositoryProjectId={null}
+            backupLoading={false}
+            cloudAction={{ kind: null, projectId: null }}
+            onSessionChange={onCloudSessionChange}
+            onBackupWorkspace={() => undefined}
+            onSelectProject={(project) => handleOpenProject(project.id, "contents")}
+            onConfigureProjectRemote={() => undefined}
+            onOpenCloudProjects={() => openCloudApp(getCloudRouteWebPath("projects"))}
+            showRepositoryActions={false}
+          />
+        ) : (
+          <CloudRouter
+            workspace={workspace}
+            status={status}
+            cloudSession={effectiveCloudSession}
+            cloudApiBaseUrl={cloudApiBaseUrl}
+            cloudRemote={cloudRemote}
+            cloudData={cloudData}
+            projectContext={projectContext}
+            activeSection={routedSection}
+            accountEmail={accountEmail}
+            accountConnected={accountConnected}
+            loading={loading}
+            onSessionChange={onCloudSessionChange}
+            onOpenProject={handleOpenProject}
+            onOpenGitSettings={onOpenGitSettings}
+            onSelectSection={onSelectSection}
+            onRetryContext={() => {
+              void cloudData.reload();
+              onRefresh();
+            }}
+            onUseAnotherAccount={() => onCloudSessionChange(null)}
+            onRemoveCloudRemote={onRemoveCloudRemote ? () => void handleRemoveCloudRemote() : undefined}
+          />
+        )}
       </div>
     </main>
   );
 }
 
-function shouldLoadAggregateProjectDetails(section: CloudWorkspaceSection): boolean {
-  // History uses a dedicated route-scoped history hook; skip aggregate details reload there.
-  return section === "contents"
-    || section === "claude"
-    || section === "access"
-    || section === "automation"
-    || section === "mcp-cli"
-    || section === "git-sync";
+function AuthenticatedCloudInitialize({
+  workspace,
+  status,
+  session,
+  apiBaseUrl,
+  accountEmail,
+  branchName,
+  localChangeCount,
+  publishLoading,
+  publishPending,
+  publishError,
+  onSessionChange,
+  onReviewChanges,
+  onPublishWorkspace,
+  onAbandonPublish,
+}: {
+  workspace: CloudServiceMainViewProps["workspace"];
+  status: NonNullable<CloudServiceMainViewProps["status"]>;
+  session: NonNullable<ReturnType<typeof getCloudAuthSession>>;
+  apiBaseUrl: string | null;
+  accountEmail: string | null;
+  branchName: string;
+  localChangeCount: number;
+  publishLoading: boolean;
+  publishPending: boolean;
+  publishError: CloudServiceMainViewProps["cloudPublishError"];
+  onSessionChange: CloudServiceMainViewProps["onCloudSessionChange"];
+  onReviewChanges: () => void;
+  onPublishWorkspace: CloudServiceMainViewProps["onStartPuppyoneBackup"];
+  onAbandonPublish: () => void;
+}) {
+  const { t } = useLocalization();
+  const autoStartedOrganizationRef = useRef<string | null>(null);
+  const organizationData = useCloudOrganizationData(
+    session,
+    apiBaseUrl,
+    onSessionChange,
+    { loadTeamDetails: false, selectionPolicy: "explicit" },
+  );
+  const organizationError = organizationData.error
+    ? formatCloudMessage(organizationData.error, t)
+    : null;
+  useEffect(() => {
+    const organizationId = organizationData.selectedOrganizationId;
+    if (
+      !publishPending
+      || publishLoading
+      || organizationData.status !== "ready"
+      || organizationData.organizations.length !== 1
+      || !organizationId
+      || autoStartedOrganizationRef.current === organizationId
+    ) return;
+    autoStartedOrganizationRef.current = organizationId;
+    onPublishWorkspace(organizationId);
+  }, [
+    onPublishWorkspace,
+    organizationData.organizations.length,
+    organizationData.selectedOrganizationId,
+    organizationData.status,
+    publishLoading,
+    publishPending,
+  ]);
+  return (
+    <CloudLocalOnlyWorkspace
+      workspace={workspace}
+      accountEmail={accountEmail}
+      branchName={branchName}
+      totalCommits={status.totalCommits ?? 0}
+      localChangeCount={localChangeCount}
+      localChangeCountIsMinimum={status.didHitStatusLimit}
+      publishReadiness={getCloudPublishReadiness(status)}
+      isGitRepository={status.isRepo === true}
+      hasHeadCommit={Boolean(status.headCommitId)}
+      hasCurrentBranch={getCloudPublishReadiness(status) !== "branch-required"}
+      publishLoading={publishLoading}
+      publishPending={publishPending}
+      publishError={publishError}
+      onAbandonPublish={onAbandonPublish}
+      organizations={organizationData.organizations}
+      selectedOrganizationId={organizationData.selectedOrganizationId}
+      organizationStatus={organizationData.status === "partial" ? "ready" : organizationData.status}
+      organizationError={organizationError}
+      onSelectOrganization={organizationData.selectOrganization}
+      onRetryOrganizations={organizationData.refresh}
+      onReviewChanges={onReviewChanges}
+      onPublishWorkspace={onPublishWorkspace}
+    />
+  );
+}
+
+function getCloudProjectDetailResources(
+  section: CloudWorkspaceSection,
+): readonly CloudProjectDetailResource[] {
+  if (section === "contents") {
+    return ["dashboard", "tree", "history", "scopes", "connectors", "mcp-endpoints", "identity"];
+  }
+  if (section === "claude") return ["identity", "readiness"];
+  if (section === "access" || section === "automation" || section === "mcp-cli") {
+    return ["scopes", "connectors", "mcp-endpoints", "identity"];
+  }
+  if (section === "git-sync") return ["identity"];
+  // History and global routes own dedicated loaders.
+  return [];
 }

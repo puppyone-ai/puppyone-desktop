@@ -77,11 +77,18 @@ function entitlements(orgId: string) {
   };
 }
 
-function Probe({ session = baseSession }: { session?: DesktopCloudSession }) {
+function Probe({
+  session = baseSession,
+  selectionPolicy = "remembered",
+}: {
+  session?: DesktopCloudSession;
+  selectionPolicy?: "remembered" | "explicit";
+}) {
   const organization = useCloudOrganizationData(
     session,
     session.api_base_url,
     React.useCallback(() => undefined, []),
+    { selectionPolicy },
   );
   return (
     <div
@@ -128,6 +135,25 @@ afterEach(() => {
 });
 
 describe("useCloudOrganizationData", () => {
+  it("ignores remembered ownership when a create flow requires an explicit organization", async () => {
+    api.listCloudOrganizations.mockResolvedValueOnce(organizations);
+    await act(async () => root?.render(<Probe />));
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-status"))
+      .toBe("selection-required"));
+    await act(async () => container.querySelector<HTMLButtonElement>("button")?.click());
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-organization"))
+      .toBe("org-b"));
+
+    act(() => root?.unmount());
+    api.listCloudOrganizations.mockResolvedValueOnce(organizations);
+    root = createRoot(container);
+    await act(async () => root?.render(<Probe selectionPolicy="explicit" />));
+    await vi.waitFor(() => expect(container.firstElementChild?.getAttribute("data-status"))
+      .toBe("selection-required"));
+
+    expect(container.firstElementChild?.getAttribute("data-organization")).toBe("");
+  });
+
   it("requires an explicit choice for multiple organizations and loads only the selected one", async () => {
     api.listCloudOrganizations.mockResolvedValueOnce(organizations);
 

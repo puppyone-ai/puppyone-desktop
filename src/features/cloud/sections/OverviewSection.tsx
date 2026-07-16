@@ -140,7 +140,7 @@ export function CloudRepositoryOverview({
             </button>
           )}
           {projectId && (
-            <button className="desktop-cloud-row-action" type="button" onClick={() => onOpenProject(projectId, "overview")}>
+            <button className="desktop-cloud-row-action" type="button" onClick={() => onOpenProject(projectId, "access")}>
               <ExternalLink size={13} />
               <span>{t("cloud.common.openWeb")}</span>
             </button>

@@ -1612,15 +1612,35 @@ export async function openCloudBillingExternalUrl(href: string): Promise<void> {
   if (!opened) throw new Error("The billing page could not be opened.");
 }
 
+export type CreateCloudProjectInput = {
+  name: string;
+  description?: string | null;
+  org_id: string;
+};
+
 export function createCloudProject(
   session: DesktopCloudSession,
-  name: string,
+  input: CreateCloudProjectInput,
+  idempotencyKey: string,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
 ): Promise<DesktopCloudProject> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(idempotencyKey)) {
+    throw new Error("Cloud Project create requires a canonical UUIDv4 idempotency key.");
+  }
+  const organizationId = input.org_id.trim();
+  const name = input.name.trim();
+  if (!organizationId || !name) {
+    throw new Error("Cloud Project create requires an organization and name.");
+  }
   return cloudApiRequest<DesktopCloudProject>("/projects/", session, onSessionChange, {
     method: "POST",
-    body: JSON.stringify({ name, seed: false }),
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({
+      name,
+      description: input.description ?? null,
+      org_id: organizationId,
+    }),
   }, apiBaseUrl);
 }
 

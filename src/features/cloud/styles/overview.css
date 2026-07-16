@@ -920,6 +920,29 @@
   font-weight: 680;
 }
 
+.desktop-cloud-publish-organization {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--po-divider) 72%, transparent);
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-cloud-publish-organization .desktop-cloud-organization-selector,
+.desktop-cloud-publish-organization .desktop-cloud-organization-selector select {
+  width: 100%;
+  min-width: 0;
+}
+
+.desktop-cloud-publish-organization .warning,
+.desktop-cloud-publish-summary .warning {
+  color: var(--po-warning);
+}
+
 .desktop-cloud-publish-arrow {
   display: grid;
   min-width: 0;

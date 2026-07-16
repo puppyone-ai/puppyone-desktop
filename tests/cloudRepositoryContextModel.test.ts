@@ -176,10 +176,10 @@ describe("Project Cloud repository context", () => {
       workspaceChanged: false,
     })).toBe("access");
     expect(resolveCloudHubSectionAfterContextChange({
-      currentSection: "overview",
+      currentSection: "projects",
       hasProjectContext: true,
       workspaceChanged: false,
-    })).toBe("overview");
+    })).toBe("projects");
     expect(resolveCloudHubSectionAfterContextChange({
       currentSection: "initialize",
       hasProjectContext: true,

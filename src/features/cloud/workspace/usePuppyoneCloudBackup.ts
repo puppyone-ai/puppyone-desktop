@@ -1,50 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import {
+  abandonWorkspaceCloudPublish,
+  getWorkspaceCloudPublishState,
   getWorkspaceGitStatus,
-  pushWorkspaceGitCommitToRemote,
+  startOrResumeWorkspaceCloudPublish,
 } from "../../../lib/localFiles";
-import {
-  createCloudProject,
-  type DesktopCloudSession,
-} from "../../../lib/cloudApi";
 import { onDesktopCloudAuthError } from "../../../lib/cloudSession";
+import type { DesktopCloudSession } from "../../../lib/cloudApi";
+import type {
+  CloudPublishErrorCode,
+  CloudPublishResult,
+  CloudPublishState,
+  GitStatusSnapshot,
+} from "../../../types/electron";
 import type { DesktopView } from "../../../components/DesktopCloudShell";
 import type { CloudWorkspaceSection } from "../types";
-import type { GitStatusSnapshot } from "../../../types/electron";
-import {
-  createGitOperationErrorState,
-  type GitOperationErrorState,
-} from "../../source-control/operationDialogs";
 import { createRepositoryRefreshReason } from "../../source-control/repositoryRefreshPolicy";
 import type { GitRefreshReason, GitRepositoryContext } from "../../source-control/gitRefreshScheduler";
-import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
-import {
-  getCloudPublishReadiness,
-  matchesCloudPublishExpectedIdentity,
-} from "./cloudPublishReadiness";
 
-export type CloudBackupContinuationPhase = "project-created" | "remote-configured" | "pushed";
-
-export type CloudBackupContinuation = {
-  projectId: string;
-  phase: CloudBackupContinuationPhase;
-  remoteConfigured: boolean;
-  expectedHeadCommitId: string;
-  expectedBranch: string;
+export type CloudPublishFailure = {
+  code: CloudPublishErrorCode;
+  retryable: boolean;
 };
 
-type ConfigureCloudRemoteForPublishOptions = {
-  persistWorkspacePreferences: false;
-  requireWrite: true;
-  deferStatusPublication: true;
-  rejectRemoteNameCollision: true;
-  expectedHeadCommitId: string;
-  expectedBranch: string;
-};
-
-const CLOUD_REMOTE_NAME = "puppyone";
-const CLOUD_DESTINATION_BRANCH = "main";
+export type CloudPublishNotice = "abandoned" | null;
 
 export function usePuppyoneCloudBackup({
   activeCloudSession,
@@ -52,14 +32,11 @@ export function usePuppyoneCloudBackup({
   captureGitRepositoryContext,
   clearGitSelection,
   cloudEnabled,
-  handleCloudSessionChange,
-  onConfigureCloudRemote,
+  desktopCloudApiBaseUrl,
   isGitRepositoryContextCurrent,
   refreshWorkspaceContent,
   setActiveCloudSection,
   setActiveView,
-  setGitOperationError,
-  setGitOperationLoading,
   setSidebarCollapsed,
   setSwitcherOpen,
   startCloudBrowserSignIn,
@@ -67,7 +44,6 @@ export function usePuppyoneCloudBackup({
   workspaceIsCloud,
 }: {
   activeCloudSession: DesktopCloudSession | null;
-  activeGitStatus: GitStatusSnapshot | null;
   applyGitStatus: (
     status: GitStatusSnapshot,
     context: GitRepositoryContext,
@@ -76,284 +52,217 @@ export function usePuppyoneCloudBackup({
   captureGitRepositoryContext: (expectedRootPath?: string) => GitRepositoryContext | null;
   clearGitSelection: () => void;
   cloudEnabled: boolean;
-  handleCloudSessionChange: (session: DesktopCloudSession | null) => void;
-  onConfigureCloudRemote: (
-    projectId: string,
-    options: ConfigureCloudRemoteForPublishOptions,
-  ) => Promise<GitStatusSnapshot | null>;
+  desktopCloudApiBaseUrl: string | null;
   isGitRepositoryContextCurrent: (context: GitRepositoryContext) => boolean;
   refreshWorkspaceContent: () => void;
   setActiveCloudSection: (section: CloudWorkspaceSection) => void;
   setActiveView: (view: DesktopView) => void;
-  setGitOperationError: (error: GitOperationErrorState | null) => void;
-  setGitOperationLoading: (loading: string | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSwitcherOpen: (open: boolean) => void;
   startCloudBrowserSignIn: () => Promise<boolean>;
   workspace: Workspace | null;
   workspaceIsCloud: boolean;
 }) {
-  const [pendingCloudBackupSetup, setPendingCloudBackupSetup] = useState(false);
+  const [cloudPublishState, setCloudPublishState] = useState<CloudPublishState | null>(null);
+  const [cloudPublishError, setCloudPublishError] = useState<CloudPublishFailure | null>(null);
+  const [cloudPublishNotice, setCloudPublishNotice] = useState<CloudPublishNotice>(null);
+  const [cloudPublishStateLoading, setCloudPublishStateLoading] = useState(false);
   const [cloudBackupLoading, setCloudBackupLoading] = useState(false);
-  const [cloudBackupError, setCloudBackupError] = useState<CloudMessageDescriptor | null>(null);
-  const [cloudBackupContinuation, setCloudBackupContinuation] = useState<CloudBackupContinuation | null>(null);
-  const publishAttemptRef = useRef<symbol | null>(null);
-  const publishRequestRef = useRef<symbol | null>(null);
-  const cloudBackupContinuationRef = useRef<CloudBackupContinuation | null>(null);
+  const [pendingCloudBackupSetup, setPendingCloudBackupSetup] = useState(false);
+  const actionRef = useRef<symbol | null>(null);
+  const stateRequestRef = useRef<symbol | null>(null);
+  const pendingIntentWorkspaceRef = useRef<string | null>(null);
 
-  const saveCloudBackupContinuation = useCallback((continuation: CloudBackupContinuation | null) => {
-    cloudBackupContinuationRef.current = continuation;
-    setCloudBackupContinuation(continuation);
-  }, []);
-
-  const failPublishAttempt = useCallback((
-    attempt: symbol,
-    error: CloudMessageDescriptor,
-  ) => {
-    if (publishAttemptRef.current !== attempt) return;
-    publishAttemptRef.current = null;
-    setPendingCloudBackupSetup(false);
-    setCloudBackupError(error);
-  }, []);
-
-  const createPuppyoneCloudBackup = useCallback(async (
-    session: DesktopCloudSession,
-    attempt: symbol,
-  ) => {
-    if (publishAttemptRef.current !== attempt || publishRequestRef.current) return false;
-    if (!cloudEnabled || !workspace || workspaceIsCloud) {
-      failPublishAttempt(attempt, cloudMessage("project-publish-failed"));
-      return false;
-    }
-    const context = captureGitRepositoryContext(workspace.path);
-    if (!context) {
-      failPublishAttempt(attempt, cloudMessage("project-publish-failed"));
-      return false;
-    }
-
-    publishRequestRef.current = attempt;
-    setCloudBackupLoading(true);
-    setCloudBackupError(null);
-    setGitOperationLoading("cloud-backup");
-    setGitOperationError(null);
-
-    try {
-      let continuation = cloudBackupContinuationRef.current;
-
-      if (!continuation) {
-        // Never trust the renderer's cached status for a publish preflight. This
-        // snapshot is intentionally taken immediately before the first server
-        // mutation so a stale HEAD, detached checkout, or remote collision
-        // cannot create an orphan Cloud project.
-        const preflightStatus = await getWorkspaceGitStatus(context.rootPath);
-        const preflightError = validatePublishStatus(preflightStatus);
-        if (preflightError) {
-          failPublishAttempt(attempt, preflightError);
-          return false;
-        }
-        if (preflightStatus.remotes.some(
-          (remote) => remote.name.toLowerCase() === CLOUD_REMOTE_NAME,
-        )) {
-          failPublishAttempt(
-            attempt,
-            cloudMessage(
-              "project-publish-failed",
-              undefined,
-              "A Git remote named 'puppyone' already exists. Rename or remove it before initializing this project on PuppyOne Cloud.",
-            ),
-          );
-          return false;
-        }
-        if (
-          publishAttemptRef.current !== attempt
-          || !isGitRepositoryContextCurrent(context)
-        ) {
-          failPublishAttempt(attempt, cloudMessage("project-publish-failed"));
-          return false;
-        }
-
-        const project = await createCloudProject(session, workspace.name, handleCloudSessionChange);
-        continuation = {
-          projectId: project.id,
-          phase: "project-created",
-          remoteConfigured: false,
-          expectedHeadCommitId: preflightStatus.headCommitId!,
-          expectedBranch: preflightStatus.branch!,
-        };
-        // Persist the continuation as soon as the Project id exists. Any later
-        // failure resumes this exact Project rather than creating a duplicate.
-        saveCloudBackupContinuation(continuation);
-      }
-
-      if (continuation.phase === "project-created") {
-        const statusBeforeRemote = await getWorkspaceGitStatus(context.rootPath);
-        const identityError = validateExpectedPublishStatus(statusBeforeRemote, continuation);
-        if (identityError) {
-          failPublishAttempt(attempt, identityError);
-          return false;
-        }
-        if (
-          publishAttemptRef.current !== attempt
-          || !isGitRepositoryContextCurrent(context)
-        ) {
-          failPublishAttempt(attempt, cloudMessage("project-publish-failed"));
-          return false;
-        }
-
-        await onConfigureCloudRemote(continuation.projectId, {
-          persistWorkspacePreferences: false,
-          requireWrite: true,
-          deferStatusPublication: true,
-          rejectRemoteNameCollision: true,
-          expectedHeadCommitId: continuation.expectedHeadCommitId,
-          expectedBranch: continuation.expectedBranch,
-        });
-        continuation = {
-          ...continuation,
-          phase: "remote-configured",
-          remoteConfigured: true,
-        };
-        saveCloudBackupContinuation(continuation);
-      }
-
-      let nextStatus: GitStatusSnapshot;
-      if (continuation.phase === "remote-configured") {
-        // Re-read immediately before the network push. The main process also
-        // verifies this identity under the repository mutation lock, and the
-        // refspec names the immutable expected commit rather than HEAD.
-        const statusBeforePush = await getWorkspaceGitStatus(context.rootPath);
-        const identityError = validateExpectedPublishStatus(statusBeforePush, continuation);
-        if (identityError) {
-          failPublishAttempt(attempt, identityError);
-          return false;
-        }
-        if (
-          publishAttemptRef.current !== attempt
-          || !isGitRepositoryContextCurrent(context)
-        ) {
-          failPublishAttempt(attempt, cloudMessage("project-publish-failed"));
-          return false;
-        }
-
-        nextStatus = await pushWorkspaceGitCommitToRemote(context.rootPath, {
-          remoteName: CLOUD_REMOTE_NAME,
-          destinationBranch: CLOUD_DESTINATION_BRANCH,
-          expectedHeadCommitId: continuation.expectedHeadCommitId,
-          expectedBranch: continuation.expectedBranch,
-        });
-        continuation = {
-          ...continuation,
-          phase: "pushed",
-          remoteConfigured: true,
-        };
-        saveCloudBackupContinuation(continuation);
-
-        const pushedIdentityError = validateExpectedPublishStatus(nextStatus, continuation);
-        if (pushedIdentityError) {
-          failPublishAttempt(attempt, pushedIdentityError);
-          return false;
-        }
-      } else {
-        // A previous attempt completed the server push but failed while
-        // publishing renderer state. Retry only the local reconciliation.
-        nextStatus = await getWorkspaceGitStatus(context.rootPath);
-        const identityError = validateExpectedPublishStatus(nextStatus, continuation);
-        if (identityError) {
-          failPublishAttempt(attempt, identityError);
-          return false;
-        }
-      }
-
-      if (
-        publishAttemptRef.current !== attempt
-        || !isGitRepositoryContextCurrent(context)
-        || !applyGitStatus(
-          nextStatus,
-          context,
-          createRepositoryRefreshReason("cloud-backup", "mutation"),
-        )
-      ) {
-        failPublishAttempt(attempt, cloudMessage("project-publish-failed"));
-        return false;
-      }
-      refreshWorkspaceContent();
-      publishAttemptRef.current = null;
-      setPendingCloudBackupSetup(false);
-      saveCloudBackupContinuation(null);
-      clearGitSelection();
-      setActiveCloudSection("contents");
-      setActiveView("cloud");
-      setSidebarCollapsed(false);
-      setSwitcherOpen(false);
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      failPublishAttempt(
-        attempt,
-        cloudMessage("project-publish-failed", undefined, message || undefined),
-      );
-      if (isGitRepositoryContextCurrent(context)) {
-        setGitOperationError(createGitOperationErrorState(error, "cloud-backup", context.rootPath));
-        setActiveView("cloud");
-      }
-      return false;
-    } finally {
-      if (publishRequestRef.current === attempt) {
-        publishRequestRef.current = null;
-        setCloudBackupLoading(false);
-        setGitOperationLoading(null);
-      }
-    }
-  }, [
-    applyGitStatus,
-    captureGitRepositoryContext,
-    clearGitSelection,
-    cloudEnabled,
-    failPublishAttempt,
-    handleCloudSessionChange,
-    onConfigureCloudRemote,
-    isGitRepositoryContextCurrent,
-    refreshWorkspaceContent,
-    setActiveCloudSection,
-    setActiveView,
-    setGitOperationError,
-    setGitOperationLoading,
-    setSidebarCollapsed,
-    setSwitcherOpen,
-    saveCloudBackupContinuation,
+  const publishIdentity = getPublishIdentity({
+    session: activeCloudSession,
+    apiBaseUrl: desktopCloudApiBaseUrl,
     workspace,
+    cloudEnabled,
     workspaceIsCloud,
-  ]);
+  });
+  const publishIdentityKey = publishIdentity
+    ? [
+        publishIdentity.rootPath,
+        publishIdentity.apiBaseUrl,
+        publishIdentity.userId,
+        activeCloudSession?.session_generation ?? "",
+      ].join("\n")
+    : null;
 
-  const handleStartPuppyoneBackup = useCallback(() => {
-    if (!cloudEnabled) return;
-    if (!workspace) return;
-    if (workspaceIsCloud) return;
-    if (publishAttemptRef.current || publishRequestRef.current) return;
+  const reconcileGitStatus = useCallback((
+    status: GitStatusSnapshot | undefined,
+    context: GitRepositoryContext,
+  ) => {
+    if (!status || !isGitRepositoryContextCurrent(context)) return false;
+    if (!applyGitStatus(
+      status,
+      context,
+      createRepositoryRefreshReason("cloud-backup", "mutation"),
+    )) return false;
+    refreshWorkspaceContent();
+    return true;
+  }, [applyGitStatus, isGitRepositoryContextCurrent, refreshWorkspaceContent]);
 
-    const attempt = Symbol("publish-project");
-    publishAttemptRef.current = attempt;
-    setPendingCloudBackupSetup(true);
-    setCloudBackupError(null);
-    setGitOperationError(null);
+  useEffect(() => {
+    stateRequestRef.current = null;
+    actionRef.current = null;
+    setCloudPublishState(null);
+    setCloudPublishError(null);
+    setCloudPublishNotice(null);
+    setCloudBackupLoading(false);
+    if (!publishIdentity || !publishIdentityKey) {
+      if (!workspace || workspaceIsCloud || !cloudEnabled) {
+        pendingIntentWorkspaceRef.current = null;
+        setPendingCloudBackupSetup(false);
+      }
+      setCloudPublishStateLoading(false);
+      return undefined;
+    }
 
+    if (pendingIntentWorkspaceRef.current !== publishIdentity.rootPath) {
+      pendingIntentWorkspaceRef.current = null;
+      setPendingCloudBackupSetup(false);
+    }
+
+    const request = Symbol("load-cloud-publish-state");
+    stateRequestRef.current = request;
+    setCloudPublishStateLoading(true);
+    const context = captureGitRepositoryContext(publishIdentity.rootPath);
+    void getWorkspaceCloudPublishState(publishIdentity)
+      .then((result) => {
+        if (stateRequestRef.current !== request) return;
+        setCloudPublishState(result.state?.phase === "completed" ? null : result.state);
+        if (!result.ok) {
+          setCloudPublishError(toPublicFailure(result));
+          return;
+        }
+        setCloudPublishError(null);
+        if (context && result.gitStatus) reconcileGitStatus(result.gitStatus, context);
+        if (result.state?.phase === "completed") {
+          clearGitSelection();
+          setActiveCloudSection("contents");
+        }
+      })
+      .catch(() => {
+        if (stateRequestRef.current === request) {
+          setCloudPublishError({ code: "UNKNOWN", retryable: true });
+        }
+      })
+      .finally(() => {
+        if (stateRequestRef.current === request) {
+          stateRequestRef.current = null;
+          setCloudPublishStateLoading(false);
+        }
+      });
+
+    return () => {
+      if (stateRequestRef.current === request) stateRequestRef.current = null;
+    };
+  // The string is the complete authority boundary. Object identity must not restart recovery reads.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishIdentityKey]);
+
+  const finishSuccessfulPublish = useCallback((
+    result: Extract<CloudPublishResult, { ok: true }>,
+    context: GitRepositoryContext,
+  ) => {
+    if (result.gitStatus && !reconcileGitStatus(result.gitStatus, context)) return false;
+    setCloudPublishState(result.state?.phase === "completed" ? null : result.state);
+    setCloudPublishError(null);
+    setCloudPublishNotice(null);
+    if (result.state?.phase !== "completed") return true;
+    clearGitSelection();
+    setActiveCloudSection("contents");
+    setActiveView("cloud");
+    setSidebarCollapsed(false);
+    setSwitcherOpen(false);
+    return true;
+  }, [clearGitSelection, reconcileGitStatus, setActiveCloudSection, setActiveView, setSidebarCollapsed, setSwitcherOpen]);
+
+  const runStartOrResume = useCallback(async (organizationId?: string) => {
+    if (!cloudEnabled || !workspace || workspaceIsCloud || actionRef.current) return;
     if (!activeCloudSession) {
+      pendingIntentWorkspaceRef.current = workspace.path;
+      setPendingCloudBackupSetup(true);
+      setCloudPublishError(null);
       setActiveView("cloud");
       setActiveCloudSection("initialize");
       setSidebarCollapsed(false);
       setSwitcherOpen(false);
-      void startCloudBrowserSignIn().then((started) => {
-        if (started || publishAttemptRef.current !== attempt) return;
-        failPublishAttempt(attempt, cloudMessage("auth-start-failed"));
+      const started = await startCloudBrowserSignIn();
+      if (!started) {
+        pendingIntentWorkspaceRef.current = null;
+        setPendingCloudBackupSetup(false);
+        setCloudPublishError({ code: "SESSION_REQUIRED", retryable: true });
+      }
+      return;
+    }
+
+    const identity = getPublishIdentity({
+      session: activeCloudSession,
+      apiBaseUrl: desktopCloudApiBaseUrl,
+      workspace,
+      cloudEnabled,
+      workspaceIsCloud,
+    });
+    const context = captureGitRepositoryContext(workspace.path);
+    if (!identity || !context) {
+      setCloudPublishError({ code: "REPOSITORY_REQUIRED", retryable: false });
+      return;
+    }
+    const request = Symbol("start-or-resume-cloud-publish");
+    stateRequestRef.current = null;
+    setCloudPublishStateLoading(false);
+    actionRef.current = request;
+    setCloudBackupLoading(true);
+    setCloudPublishError(null);
+    setCloudPublishNotice(null);
+    try {
+      const pending = cloudPublishState;
+      const freshStatus = pending ? null : await getWorkspaceGitStatus(workspace.path);
+      const selectedOrganizationId = pending?.organizationId ?? organizationId?.trim() ?? "";
+      const expectedHeadCommitId = pending?.expectedHeadCommitId ?? freshStatus?.headCommitId ?? "";
+      const expectedBranch = pending?.expectedBranch ?? normalizePublishBranch(freshStatus?.branch);
+      if (!selectedOrganizationId) {
+        setCloudPublishError({ code: "ORGANIZATION_REQUIRED", retryable: false });
+        return;
+      }
+      const result = await startOrResumeWorkspaceCloudPublish({
+        ...identity,
+        organizationId: selectedOrganizationId,
+        projectName: pending?.projectName ?? workspace.name,
+        expectedHeadCommitId,
+        expectedBranch,
       });
+      if (actionRef.current !== request || !isGitRepositoryContextCurrent(context)) return;
+      setCloudPublishState(result.state);
+      if (!result.ok) {
+        setCloudPublishError(toPublicFailure(result));
+        return;
+      }
+      finishSuccessfulPublish(result, context);
+    } catch {
+      if (actionRef.current === request) {
+        setCloudPublishError({ code: "UNKNOWN", retryable: true });
+      }
+    } finally {
+      if (actionRef.current === request) {
+        actionRef.current = null;
+        setCloudBackupLoading(false);
+        pendingIntentWorkspaceRef.current = null;
+        setPendingCloudBackupSetup(false);
+      }
     }
   }, [
     activeCloudSession,
+    captureGitRepositoryContext,
     cloudEnabled,
-    failPublishAttempt,
+    cloudPublishState,
+    desktopCloudApiBaseUrl,
+    finishSuccessfulPublish,
+    isGitRepositoryContextCurrent,
     setActiveCloudSection,
     setActiveView,
-    setGitOperationError,
     setSidebarCollapsed,
     setSwitcherOpen,
     startCloudBrowserSignIn,
@@ -361,78 +270,101 @@ export function usePuppyoneCloudBackup({
     workspaceIsCloud,
   ]);
 
-  useEffect(() => {
-    if (!pendingCloudBackupSetup || cloudBackupLoading) return undefined;
-    return onDesktopCloudAuthError((message) => {
-      const attempt = publishAttemptRef.current;
-      if (!attempt) return;
-      failPublishAttempt(
-        attempt,
-        cloudMessage("auth-start-failed", undefined, message),
-      );
-    });
-  }, [cloudBackupLoading, failPublishAttempt, pendingCloudBackupSetup]);
-
-  useEffect(() => {
-    if (!cloudEnabled) return;
-    if (!pendingCloudBackupSetup || !activeCloudSession || cloudBackupLoading) return;
-    const attempt = publishAttemptRef.current;
-    if (!attempt) return;
-    void createPuppyoneCloudBackup(activeCloudSession, attempt);
+  const handleAbandonPuppyoneBackup = useCallback(async () => {
+    if (!publishIdentity || !cloudPublishState?.canAbandon || actionRef.current) return;
+    const context = captureGitRepositoryContext(publishIdentity.rootPath);
+    if (!context) return;
+    const request = Symbol("abandon-cloud-publish");
+    actionRef.current = request;
+    setCloudBackupLoading(true);
+    setCloudPublishError(null);
+    setCloudPublishNotice(null);
+    try {
+      const result = await abandonWorkspaceCloudPublish({
+        ...publishIdentity,
+        operationId: cloudPublishState.operationId,
+      });
+      if (actionRef.current !== request || !isGitRepositoryContextCurrent(context)) return;
+      setCloudPublishState(result.state);
+      if (!result.ok) {
+        setCloudPublishError(toPublicFailure(result));
+        return;
+      }
+      reconcileGitStatus(result.gitStatus, context);
+      setCloudPublishState(null);
+      setCloudPublishNotice("abandoned");
+      setActiveCloudSection("initialize");
+      setActiveView("cloud");
+    } catch {
+      if (actionRef.current === request) {
+        setCloudPublishError({ code: "UNKNOWN", retryable: true });
+      }
+    } finally {
+      if (actionRef.current === request) {
+        actionRef.current = null;
+        setCloudBackupLoading(false);
+      }
+    }
   }, [
-    activeCloudSession,
-    cloudBackupLoading,
-    cloudEnabled,
-    createPuppyoneCloudBackup,
-    pendingCloudBackupSetup,
+    captureGitRepositoryContext,
+    cloudPublishState,
+    isGitRepositoryContextCurrent,
+    publishIdentity,
+    reconcileGitStatus,
+    setActiveCloudSection,
+    setActiveView,
   ]);
 
   useEffect(() => {
-    publishAttemptRef.current = null;
-    publishRequestRef.current = null;
-    cloudBackupContinuationRef.current = null;
-    setPendingCloudBackupSetup(false);
-    setCloudBackupLoading(false);
-    setCloudBackupError(null);
-    setCloudBackupContinuation(null);
-  }, [workspace?.path]);
+    if (!pendingCloudBackupSetup || activeCloudSession) return undefined;
+    return onDesktopCloudAuthError(() => {
+      pendingIntentWorkspaceRef.current = null;
+      setPendingCloudBackupSetup(false);
+      setCloudPublishError({ code: "SESSION_REQUIRED", retryable: true });
+    });
+  }, [activeCloudSession, pendingCloudBackupSetup]);
 
   return {
-    cloudBackupCanRetry: cloudBackupContinuation !== null && !cloudBackupLoading,
-    cloudBackupContinuation,
-    cloudBackupError,
     cloudBackupLoading,
-    handleStartPuppyoneBackup,
+    cloudPublishError,
+    cloudPublishNotice,
+    cloudPublishState,
+    cloudPublishStateLoading,
+    handleAbandonPuppyoneBackup,
+    handleStartPuppyoneBackup: runStartOrResume,
     pendingCloudBackupSetup,
   };
 }
 
-function validatePublishStatus(status: GitStatusSnapshot): CloudMessageDescriptor | null {
-  const readiness = getCloudPublishReadiness(status);
-  if (readiness === "repository-required" || readiness === "commit-required") {
-    return cloudMessage("project-publish-commit-required");
-  }
-  if (readiness === "branch-required") {
-    return cloudMessage("project-publish-branch-required");
-  }
-  return null;
+function getPublishIdentity({
+  session,
+  apiBaseUrl,
+  workspace,
+  cloudEnabled,
+  workspaceIsCloud,
+}: {
+  session: DesktopCloudSession | null;
+  apiBaseUrl: string | null;
+  workspace: Workspace | null;
+  cloudEnabled: boolean;
+  workspaceIsCloud: boolean;
+}) {
+  if (!session || !workspace || !cloudEnabled || workspaceIsCloud) return null;
+  const resolvedApiBaseUrl = (apiBaseUrl ?? session.api_base_url).trim().replace(/\/+$/, "");
+  const userId = session.user_id.trim();
+  if (!resolvedApiBaseUrl || !userId) return null;
+  return { rootPath: workspace.path, apiBaseUrl: resolvedApiBaseUrl, userId };
 }
 
-function validateExpectedPublishStatus(
-  status: GitStatusSnapshot,
-  continuation: CloudBackupContinuation,
-): CloudMessageDescriptor | null {
-  const basicError = validatePublishStatus(status);
-  if (basicError) return basicError;
-  if (!matchesCloudPublishExpectedIdentity(status, {
-    headCommitId: continuation.expectedHeadCommitId,
-    branch: continuation.expectedBranch,
-  })) {
-    return cloudMessage(
-      "project-publish-failed",
-      undefined,
-      "The current branch or HEAD changed while this project was being initialized. Restore the original branch and commit, then retry.",
-    );
-  }
-  return null;
+function normalizePublishBranch(branch: string | null | undefined): string {
+  const normalized = branch?.trim() ?? "";
+  return normalized.toLowerCase() === "head" || normalized.toLowerCase() === "detached"
+    ? ""
+    : normalized;
+}
+
+function toPublicFailure(
+  result: Extract<CloudPublishResult, { ok: false }>,
+): CloudPublishFailure {
+  return { code: result.error.code, retryable: result.error.retryable };
 }

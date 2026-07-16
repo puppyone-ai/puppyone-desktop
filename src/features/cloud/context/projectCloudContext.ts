@@ -1,4 +1,5 @@
 import type { CloudWorkspaceSection } from "../routes/cloudRouteIds";
+import { normalizeCloudSection } from "../routes/cloudRoutes";
 import type { DesktopCloudProjectReadiness } from "../../../lib/cloudApi";
 import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 import type { RepositoryTarget } from "../repositoryTarget";
@@ -169,8 +170,9 @@ export function resolveCloudHubSectionAfterContextChange({
 }
 
 function isCloudGlobalSection(section: CloudWorkspaceSection): boolean {
-  return section === "overview"
-    || section === "templates"
-    || section === "cloud-team"
-    || section === "cloud-billing";
+  const normalized = normalizeCloudSection(section);
+  return normalized === "projects"
+    || normalized === "templates"
+    || normalized === "cloud-team"
+    || normalized === "cloud-billing";
 }

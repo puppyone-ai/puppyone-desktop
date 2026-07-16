@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getCloudProject,
-  listCloudProjects,
   type DesktopCloudConnector,
   type DesktopCloudDashboard,
   type DesktopCloudMcpEndpoint,
@@ -14,7 +13,11 @@ import {
 } from "../../../lib/cloudApi";
 import type { DesktopCloudHistory } from "../../../lib/cloudHistoryApi";
 import type { CloudEnvironment } from "../environment";
-import { loadCloudProjectDetails } from "./cloudProjectDetails";
+import {
+  CLOUD_PROJECT_DETAIL_RESOURCES,
+  loadCloudProjectDetails,
+  type CloudProjectDetailResource,
+} from "./cloudProjectDetails";
 import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
 
@@ -51,7 +54,7 @@ export function useDesktopCloudData({
   onSessionChange,
   workspaceRevisionKey = null,
   loadProjectDetails = true,
-  loadProjectCatalog = false,
+  projectDetailResources = CLOUD_PROJECT_DETAIL_RESOURCES,
 }: {
   session: DesktopCloudSession | null;
   cloudEnvironment: CloudEnvironment;
@@ -62,17 +65,18 @@ export function useDesktopCloudData({
   onSessionChange: (session: DesktopCloudSession | null) => void;
   workspaceRevisionKey?: string | null;
   loadProjectDetails?: boolean;
-  /** Load the organization Project catalog when no exact Project context exists. */
-  loadProjectCatalog?: boolean;
+  /** Route-owned resource plan; omitted resources do not issue requests. */
+  projectDetailResources?: readonly CloudProjectDetailResource[];
 }): DesktopCloudDataState {
   const cloudApiBaseUrl = cloudEnvironment.apiBaseUrl;
   const normalizedRepositoryProjectId = repositoryProjectId?.trim() || null;
+  const projectDetailResourceKey = [...new Set(projectDetailResources)].sort().join(",");
   const contextKey = createCloudDataContextKey({
     session,
     cloudEnvironment,
     explicitProjectId,
     repositoryProjectId: normalizedRepositoryProjectId,
-    loadProjectCatalog,
+    projectDetailResourceKey,
   });
   const [state, setState] = useState<DesktopCloudDataInternalState>(() => createCloudDataState());
   const activeRequestRef = useRef(0);
@@ -85,12 +89,10 @@ export function useDesktopCloudData({
   const load = useCallback(async () => {
     const requestId = activeRequestRef.current + 1;
     activeRequestRef.current = requestId;
-    const activeProjectId = loadProjectCatalog
-      ? null
-      : explicitProjectId?.trim() || normalizedRepositoryProjectId;
+    const activeProjectId = explicitProjectId?.trim() || normalizedRepositoryProjectId;
 
     const activeSession = sessionRef.current;
-    if (!activeSession || (!activeProjectId && !loadProjectCatalog)) {
+    if (!activeSession || !activeProjectId) {
       setState(createCloudDataState({
         contextProjectId: normalizedRepositoryProjectId,
         activeProjectId,
@@ -120,26 +122,6 @@ export function useDesktopCloudData({
     ));
 
     try {
-      if (!activeProjectId) {
-        const projects = await listCloudProjects(
-          activeSession,
-          onSessionChangeRef.current,
-          cloudApiBaseUrl,
-        );
-        if (activeRequestRef.current !== requestId) return;
-        setState(createCloudDataState({
-          projects,
-          contextProjectId: normalizedRepositoryProjectId,
-          contextProject: normalizedRepositoryProjectId
-            ? projects.find((project) => project.id === normalizedRepositoryProjectId) ?? null
-            : null,
-          initializing: false,
-          loading: false,
-          contextKey,
-        }));
-        return;
-      }
-
       const project = await getCloudProject(
         activeSession,
         activeProjectId,
@@ -175,6 +157,9 @@ export function useDesktopCloudData({
         projects,
         onSessionChange: onSessionChangeRef.current,
         cloudApiBaseUrl,
+        resources: projectDetailResourceKey
+          ? projectDetailResourceKey.split(",") as CloudProjectDetailResource[]
+          : [],
       });
       if (activeRequestRef.current !== requestId) return;
 
@@ -207,7 +192,7 @@ export function useDesktopCloudData({
               initializing: false,
               loading: false,
               error: cloudMessage(
-                activeProjectId ? "cloud-data-load-failed" : "project-list-load-failed",
+                "cloud-data-load-failed",
                 undefined,
                 loadError instanceof Error ? loadError.message : undefined,
               ),
@@ -217,7 +202,7 @@ export function useDesktopCloudData({
               initializing: false,
               loading: false,
               error: cloudMessage(
-                activeProjectId ? "cloud-data-load-failed" : "project-list-load-failed",
+                "cloud-data-load-failed",
                 undefined,
                 loadError instanceof Error ? loadError.message : undefined,
               ),
@@ -228,8 +213,8 @@ export function useDesktopCloudData({
   }, [
     cloudApiBaseUrl,
     contextKey,
-    loadProjectCatalog,
     loadProjectDetails,
+    projectDetailResourceKey,
     normalizedRepositoryProjectId,
     explicitProjectId,
   ]);
@@ -261,13 +246,13 @@ function createCloudDataContextKey({
   cloudEnvironment,
   explicitProjectId,
   repositoryProjectId,
-  loadProjectCatalog,
+  projectDetailResourceKey,
 }: {
   session: DesktopCloudSession | null;
   cloudEnvironment: CloudEnvironment;
   explicitProjectId: string | null;
   repositoryProjectId: string | null;
-  loadProjectCatalog: boolean;
+  projectDetailResourceKey: string;
 }): string {
   if (!session) return "signed-out";
   return [
@@ -278,7 +263,7 @@ function createCloudDataContextKey({
     cloudEnvironment.cloudRemote?.rawUrl ?? "",
     repositoryProjectId ?? "",
     explicitProjectId ?? "",
-    loadProjectCatalog ? "catalog" : "project",
+    projectDetailResourceKey,
   ].join("\n");
 }
 

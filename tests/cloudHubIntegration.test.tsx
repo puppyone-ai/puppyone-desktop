@@ -27,6 +27,7 @@ import {
   useDesktopCloudData,
   type DesktopCloudDataState,
 } from "../src/features/cloud/data/useDesktopCloudData";
+import { useCloudProjectCatalog } from "../src/features/cloud/data/useCloudProjectCatalog";
 import { useDesktopCloudAccessData } from "../src/features/cloud/data/useDesktopCloudAccessData";
 import { resolveCloudEnvironment, type CloudEnvironment } from "../src/features/cloud/environment";
 import { cloudMessage } from "../src/features/cloud/cloudPresentation";
@@ -69,6 +70,10 @@ const getCloudDashboard = vi.fn();
 const listCloudRoot = vi.fn();
 const listCloudProjects = vi.fn();
 const getCloudProject = vi.fn();
+const createCloudProject = vi.fn();
+const listCloudOrganizations = vi.fn().mockResolvedValue([
+  { id: "org-1", name: "Example Org", slug: "example", plan: "free", seat_limit: 1, created_at: "2026-01-01" },
+]);
 
 function historyPage(overrides: Partial<DesktopCloudHistory> = {}): DesktopCloudHistory {
   return {
@@ -119,6 +124,8 @@ vi.mock("../src/lib/cloudApi", async () => {
     listCloudRoot: (...args: unknown[]) => listCloudRoot(...args),
     listCloudProjects: (...args: unknown[]) => listCloudProjects(...args),
     getCloudProject: (...args: unknown[]) => getCloudProject(...args),
+    createCloudProject: (...args: unknown[]) => createCloudProject(...args),
+    listCloudOrganizations: (...args: unknown[]) => listCloudOrganizations(...args),
     openCloudApp: vi.fn(),
   };
 });
@@ -159,6 +166,28 @@ const session = {
   api_base_url: "https://cloud.example",
   session_generation: 1,
 } as DesktopCloudSession;
+
+function testCloudAuthState(value: DesktopCloudSession | null) {
+  return value
+    ? { status: "signed-in" as const, apiBaseUrl: value.api_base_url, session: value }
+    : { status: "signed-out" as const, apiBaseUrl: null };
+}
+
+function testCloudEnvironment(apiBaseUrl: string | null): CloudEnvironment {
+  return resolveCloudEnvironment({ status: null, desktopApiBaseUrl: apiBaseUrl });
+}
+
+function testCloudMainState(value: DesktopCloudSession | null, apiBaseUrl: string | null) {
+  return {
+    cloudEnvironment: testCloudEnvironment(apiBaseUrl),
+    cloudAuthState: testCloudAuthState(value),
+    cloudPublishError: null,
+    cloudPublishNotice: null as const,
+    cloudPublishState: null,
+    cloudPublishStateLoading: false,
+    onAbandonPuppyoneBackup: vi.fn(),
+  };
+}
 
 describe("Cloud environment endpoint precedence", () => {
   it("keeps the configured API but ignores a legacy access-key remote as Cloud context", () => {
@@ -327,8 +356,7 @@ describe("CloudServiceSidebar project context", () => {
 
     act(() => renderWithTestLocalization(root,
       <CloudServiceSidebar
-        status={null}
-        cloudSession={null}
+        cloudAuthState={testCloudAuthState(null)}
         activeSection="initialize"
         localOnlyWorkspaceContext
         onSelectSection={onSelectSection}
@@ -350,7 +378,7 @@ describe("CloudServiceSidebar project context", () => {
     expect(onSelectSection).toHaveBeenCalledWith("initialize");
 
     act(() => rows[1]?.click());
-    expect(onSelectSection).toHaveBeenLastCalledWith("overview");
+    expect(onSelectSection).toHaveBeenLastCalledWith("projects");
   });
 
   it("previews the project workspace navigation while signed out", () => {
@@ -361,9 +389,8 @@ describe("CloudServiceSidebar project context", () => {
 
     act(() => renderWithTestLocalization(root,
       <CloudServiceSidebar
-        status={null}
-        cloudSession={null}
-        activeSection="overview"
+        cloudAuthState={testCloudAuthState(null)}
+        activeSection="projects"
         onSelectSection={onSelectSection}
       />,
     ));
@@ -415,8 +442,7 @@ describe("CloudServiceSidebar project context", () => {
 
     act(() => renderWithTestLocalization(root,
       <CloudServiceSidebar
-        status={null}
-        cloudSession={session}
+        cloudAuthState={testCloudAuthState(session)}
         activeSection="history"
         projectContext={false}
         localWorkspaceContext={false}
@@ -437,8 +463,7 @@ describe("CloudServiceSidebar project context", () => {
 
     act(() => renderWithTestLocalization(root,
       <CloudServiceSidebar
-        status={null}
-        cloudSession={session}
+        cloudAuthState={testCloudAuthState(session)}
         activeSection="history"
         projectContext
         localWorkspaceContext
@@ -462,8 +487,7 @@ describe("CloudServiceSidebar project context", () => {
 
     act(() => renderWithTestLocalization(root,
       <CloudServiceSidebar
-        status={null}
-        cloudSession={session}
+        cloudAuthState={testCloudAuthState(session)}
         activeSection="contents"
         projectContext
         localWorkspaceContext
@@ -476,8 +500,7 @@ describe("CloudServiceSidebar project context", () => {
 
     act(() => renderWithTestLocalization(root,
       <CloudServiceSidebar
-        status={null}
-        cloudSession={session}
+        cloudAuthState={testCloudAuthState(session)}
         activeSection="contents"
         projectContext
         localWorkspaceContext
@@ -497,8 +520,7 @@ describe("CloudServiceSidebar project context", () => {
 
     act(() => renderWithTestLocalization(root,
       <CloudServiceSidebar
-        status={null}
-        cloudSession={session}
+        cloudAuthState={testCloudAuthState(session)}
         activeSection="contents"
         projectContext
         localWorkspaceContext={false}
@@ -523,8 +545,7 @@ describe("CloudServiceSidebar project context", () => {
 
     act(() => renderWithTestLocalization(root,
       <CloudServiceSidebar
-        status={null}
-        cloudSession={session}
+        cloudAuthState={testCloudAuthState(session)}
         activeSection="contents"
         projectContext
         localWorkspaceContext={false}
@@ -535,9 +556,8 @@ describe("CloudServiceSidebar project context", () => {
 
     act(() => renderWithTestLocalization(root,
       <CloudServiceSidebar
-        status={null}
-        cloudSession={session}
-        activeSection="overview"
+        cloudAuthState={testCloudAuthState(session)}
+        activeSection="projects"
         projectContext={false}
         localWorkspaceContext={false}
         onSelectSection={vi.fn()}
@@ -690,7 +710,7 @@ describe("Cloud History route", () => {
 });
 
 describe("CloudRouter local context", () => {
-  it("does not promote aggregate project data in an open local-only workspace", async () => {
+  it("leaves the local-only Initialize screen to its single MainView owner", async () => {
     getCloudHistory.mockReset();
     getCloudHistory.mockResolvedValue(historyPage({ project_id: "proj-browse" }));
     const container = document.createElement("div");
@@ -731,47 +751,37 @@ describe("CloudRouter local context", () => {
     });
 
     expect(getCloudHistory).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("Initialize this project on PuppyOne Cloud");
-    expect(container.textContent).toContain("Initialize and Push");
+    expect(container.textContent).toContain("Select a Cloud project to open this section.");
+    expect(container.textContent).not.toContain("Initialize this project on PuppyOne Cloud");
     expect(container.textContent).not.toContain("Preview Project");
     expect(container.textContent).not.toContain("Repository Git remote");
   });
 
   it("keeps Cloud Projects as a browse-only global route beside Initialize", async () => {
     listCloudRoot.mockResolvedValue({ entries: [] });
-    const onOpenProject = vi.fn();
+    listCloudProjects.mockResolvedValue([{ id: "proj-preview", name: "Preview Project" }]);
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
 
     await act(async () => {
       renderWithTestLocalization(root,
-        <CloudRouter
+        <CloudServiceMainView
+          {...testCloudMainState(session, "https://cloud.example")}
           workspace={{ id: "local-1", name: "Local Notes", path: "/tmp/local-notes" }}
           status={null}
-          cloudSession={session}
-          cloudApiBaseUrl="https://cloud.example"
-          cloudRemote={null}
-          cloudData={createAggregateCloudData(vi.fn(async () => undefined), {
-            projects: [{ id: "proj-preview", name: "Preview Project" }],
-            contextProjectId: null,
-            contextProject: null,
-            activeProjectId: null,
-            activeProject: null,
-          })}
           projectContext={{ status: "local-only", projectId: null }}
-          activeSection="overview"
-          accountEmail={session.user_email}
-          accountConnected
-          branchName="main"
-          localChangeCount={0}
+          onCloudSessionChange={vi.fn()}
+          activeSection="projects"
           loading={false}
+          error={null}
           cloudBackupLoading={false}
-          onSessionChange={vi.fn()}
-          onBackupWorkspace={vi.fn()}
-          onOpenProject={onOpenProject}
+          cloudBackupPending={false}
+          onStartPuppyoneBackup={vi.fn()}
           onOpenGitSettings={vi.fn()}
           onSelectSection={vi.fn()}
+          onRefresh={vi.fn()}
+          onReviewChanges={vi.fn()}
         />,
       );
       await flushPromises();
@@ -782,15 +792,63 @@ describe("CloudRouter local context", () => {
     expect(container.querySelector(".desktop-project-folder-new-card")).toBeNull();
     expect(container.querySelector(".desktop-project-folder-card-action")).toBeNull();
 
-    const projectCard = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
-      .find((button) => button.textContent?.includes("Preview Project"));
-    act(() => projectCard?.click());
-    expect(onOpenProject).toHaveBeenCalledWith("proj-preview", "contents");
   });
 
 });
 
 describe("Cloud Project selection actions", () => {
+  it("keeps catalog previews while limiting tree reads to three concurrent requests", async () => {
+    const projects = Array.from({ length: 7 }, (_, index) => ({
+      id: `concurrency-project-${index}`,
+      name: `Project ${index}`,
+      updated_at: `2026-07-16T00:00:0${index}Z`,
+    }));
+    const gates = new Map(projects.map((project) => [project.id, deferred<void>()]));
+    let active = 0;
+    let maxActive = 0;
+    listCloudRoot.mockImplementation(async (_session: unknown, projectId: string) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await gates.get(projectId)?.promise;
+      active -= 1;
+      return { entries: [] };
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudProjectBrowser
+          projects={projects}
+          loading={false}
+          session={session}
+          apiBaseUrl="https://cloud.example"
+          currentRepositoryProjectId={null}
+          backupLoading={false}
+          cloudAction={{ kind: null, projectId: null }}
+          onSessionChange={vi.fn()}
+          onBackupWorkspace={vi.fn()}
+          onSelectProject={vi.fn()}
+          onConfigureProjectRemote={vi.fn()}
+          onOpenCloudProjects={vi.fn()}
+          showRepositoryActions={false}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    await vi.waitFor(() => expect(listCloudRoot).toHaveBeenCalledTimes(3));
+    expect(maxActive).toBe(3);
+
+    await act(async () => {
+      gates.forEach((gate) => gate.resolve());
+      await flushPromises();
+    });
+    await vi.waitFor(() => expect(listCloudRoot).toHaveBeenCalledTimes(7));
+    expect(maxActive).toBe(3);
+  });
+
   it("disables every competing remote/create action while one remote is being configured", async () => {
     listCloudRoot.mockReset();
     listCloudRoot.mockResolvedValue({ entries: [] });
@@ -831,6 +889,111 @@ describe("Cloud Project selection actions", () => {
 });
 
 describe("Local-only Cloud page", () => {
+  it("automatically continues a signed-out publish intent when the account has one organization", async () => {
+    const onStartPuppyoneBackup = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudServiceMainView
+          {...testCloudMainState(session, "https://cloud.example")}
+          workspace={{ id: "local-one-org", name: "Local Notes", path: "/tmp/local-one-org" }}
+          status={{
+            isRepo: true,
+            branch: "main",
+            headCommitId: "head-1",
+            totalCommits: 1,
+            entries: [],
+            branches: [],
+            stagedEntries: [],
+            unstagedEntries: [],
+            untrackedEntries: [],
+            remotes: [],
+          } as unknown as GitStatusSnapshot}
+          projectContext={{ status: "local-only", projectId: null }}
+          onCloudSessionChange={vi.fn()}
+          activeSection="initialize"
+          loading={false}
+          error={null}
+          cloudBackupLoading={false}
+          cloudBackupPending
+          onStartPuppyoneBackup={onStartPuppyoneBackup}
+          onSelectSection={vi.fn()}
+          onRefresh={vi.fn()}
+          onOpenGitSettings={vi.fn()}
+          onReviewChanges={vi.fn()}
+        />,
+      );
+      await flushPromises();
+    });
+
+    await vi.waitFor(() => expect(onStartPuppyoneBackup).toHaveBeenCalledWith("org-1"));
+  });
+
+  it("requires an explicit organization before continuing a multi-organization publish intent", async () => {
+    listCloudOrganizations.mockResolvedValueOnce([
+      { id: "org-1", name: "First Org", slug: "first", plan: "free", seat_limit: 1, created_at: "2026-01-01" },
+      { id: "org-2", name: "Second Org", slug: "second", plan: "free", seat_limit: 1, created_at: "2026-01-01" },
+    ]);
+    const onStartPuppyoneBackup = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudServiceMainView
+          {...testCloudMainState(session, "https://cloud.example")}
+          workspace={{ id: "local-multi-org", name: "Local Notes", path: "/tmp/local-multi-org" }}
+          status={{
+            isRepo: true,
+            branch: "main",
+            headCommitId: "head-1",
+            totalCommits: 1,
+            entries: [],
+            branches: [],
+            stagedEntries: [],
+            unstagedEntries: [],
+            untrackedEntries: [],
+            remotes: [],
+          } as unknown as GitStatusSnapshot}
+          projectContext={{ status: "local-only", projectId: null }}
+          onCloudSessionChange={vi.fn()}
+          activeSection="initialize"
+          loading={false}
+          error={null}
+          cloudBackupLoading={false}
+          cloudBackupPending
+          onStartPuppyoneBackup={onStartPuppyoneBackup}
+          onSelectSection={vi.fn()}
+          onRefresh={vi.fn()}
+          onOpenGitSettings={vi.fn()}
+          onReviewChanges={vi.fn()}
+        />,
+      );
+      await flushPromises();
+    });
+
+    await vi.waitFor(() => expect(container.querySelector("select")).not.toBeNull());
+    expect(onStartPuppyoneBackup).not.toHaveBeenCalled();
+    expect(container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary")?.disabled).toBe(true);
+
+    await act(async () => {
+      const selector = container.querySelector<HTMLSelectElement>("select");
+      if (selector) {
+        selector.value = "org-2";
+        selector.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary")?.click();
+    });
+    expect(onStartPuppyoneBackup).toHaveBeenCalledWith("org-2");
+  });
+
   it("shows the canonical Cloud main destination when the local branch has another name", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -920,7 +1083,7 @@ describe("Local-only Cloud page", () => {
       .toContain("At least 1,000 uncommitted changes stay local.");
   });
 
-  it("keeps an interrupted initialized project visible and retries its push", () => {
+  it("renders coordinator state and resumes the same interrupted publish", () => {
     const onPublishWorkspace = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -937,17 +1100,30 @@ describe("Local-only Cloud page", () => {
         hasHeadCommit
         hasCurrentBranch
         publishLoading={false}
-        publishError="The push was interrupted."
-        publishCanRetry
-        projectInitialized
+        publishError={{ code: "PUSH_FAILED", retryable: true }}
+        publishState={{
+          operationId: "11111111-1111-4111-8111-111111111111",
+          phase: "remote-configured",
+          projectId: "proj-retry",
+          projectName: "Retry Repo",
+          organizationId: "org-1",
+          expectedHeadCommitId: "head-1",
+          expectedBranch: "main",
+          destinationBranch: "main",
+          createdAt: "2026-07-16T00:00:00Z",
+          updatedAt: "2026-07-16T00:01:00Z",
+          canResume: true,
+          canAbandon: true,
+        }}
+        onAbandonPublish={vi.fn()}
         onReviewChanges={vi.fn()}
         onPublishWorkspace={onPublishWorkspace}
       />,
     ));
 
-    expect(container.textContent).toContain("Initialized · Push incomplete");
+    expect(container.textContent).toContain("Git remote configured");
     const retry = container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary");
-    expect(retry?.textContent).toBe("Retry Push");
+    expect(retry?.textContent).toBe("Resume");
     act(() => retry?.click());
     expect(onPublishWorkspace).toHaveBeenCalledOnce();
   });
@@ -958,6 +1134,7 @@ describe("Local-only Cloud page", () => {
     document.body.appendChild(container);
     root = createRoot(container);
     const commonProps = {
+      ...testCloudMainState(null, "http://localhost:9090"),
       workspace: { id: "local-loading", name: "Loading Repo", path: "/tmp/loading-repo" },
       cloudApiBaseUrl: "http://localhost:9090",
       cloudSession: null,
@@ -970,7 +1147,6 @@ describe("Local-only Cloud page", () => {
       onStartPuppyoneBackup: vi.fn(),
       onSelectSection: vi.fn(),
       onRefresh,
-      onOpenDetails: vi.fn(),
       onOpenGitSettings: vi.fn(),
       onReviewChanges: vi.fn(),
     };
@@ -1011,6 +1187,7 @@ describe("Local-only Cloud page", () => {
 
     act(() => renderWithTestLocalization(root,
       <CloudServiceMainView
+        {...testCloudMainState(null, "http://localhost:9090")}
         workspace={{ id: "local-detached", name: "Detached Repo", path: "/tmp/detached-repo" }}
         status={{
           isRepo: true,
@@ -1038,7 +1215,6 @@ describe("Local-only Cloud page", () => {
         onStartPuppyoneBackup={vi.fn()}
         onSelectSection={vi.fn()}
         onRefresh={vi.fn()}
-        onOpenDetails={vi.fn()}
         onOpenGitSettings={vi.fn()}
         onReviewChanges={vi.fn()}
       />,
@@ -1061,6 +1237,7 @@ describe("Local-only Cloud page", () => {
     await act(async () => {
       renderWithTestLocalization(root,
         <CloudServiceMainView
+          {...testCloudMainState(localSession, "http://localhost:9090")}
           workspace={{
             id: "local-1",
             name: "Local Notes",
@@ -1099,7 +1276,6 @@ describe("Local-only Cloud page", () => {
           onStartPuppyoneBackup={vi.fn()}
           onSelectSection={vi.fn()}
           onRefresh={vi.fn()}
-          onOpenDetails={vi.fn()}
           onOpenGitSettings={vi.fn()}
           onReviewChanges={onReviewChanges}
         />,
@@ -1132,7 +1308,6 @@ describe("Local-only Cloud page", () => {
 
   it("stays passive while signed out, then forwards an explicit publish intent", async () => {
     const restoreCloudSession = vi.fn().mockResolvedValue(null);
-    const onOpenDetails = vi.fn();
     const onStartPuppyoneBackup = vi.fn();
     const previousBridge = window.puppyoneDesktop;
     Object.defineProperty(window, "puppyoneDesktop", {
@@ -1146,6 +1321,7 @@ describe("Local-only Cloud page", () => {
     await act(async () => {
       renderWithTestLocalization(root,
         <CloudServiceMainView
+          {...testCloudMainState(null, "http://localhost:9090")}
           workspace={{
             id: "local-signed-out",
             name: "Local Notes",
@@ -1177,7 +1353,6 @@ describe("Local-only Cloud page", () => {
           onStartPuppyoneBackup={onStartPuppyoneBackup}
           onSelectSection={vi.fn()}
           onRefresh={vi.fn()}
-          onOpenDetails={onOpenDetails}
           onOpenGitSettings={vi.fn()}
           onReviewChanges={vi.fn()}
         />,
@@ -1186,7 +1361,7 @@ describe("Local-only Cloud page", () => {
     });
 
     expect(container.textContent).toContain("Initialize this project on PuppyOne Cloud");
-    expect(container.textContent).toContain("Initialize and Push");
+    expect(container.textContent).toContain("Sign in to Initialize");
     expect(container.querySelector(".desktop-cloud-main-alert")).toBeNull();
     expect(restoreCloudSession).not.toHaveBeenCalled();
     expect(getCloudProject).not.toHaveBeenCalled();
@@ -1195,7 +1370,6 @@ describe("Local-only Cloud page", () => {
       container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary")?.click();
     });
     expect(onStartPuppyoneBackup).toHaveBeenCalledOnce();
-    expect(onOpenDetails).not.toHaveBeenCalled();
 
     Object.defineProperty(window, "puppyoneDesktop", {
       configurable: true,
@@ -1328,6 +1502,37 @@ describe("History partial failure in aggregate details", () => {
     expect(details.history).toBeNull();
     expect(details.warning).toMatchObject({ code: "project-details-partial" });
   });
+
+  it("loads only the identity and readiness resources required by the Claude route", async () => {
+    const identity = { project_id: "proj-1", remote_url: "https://cloud.example/git/proj-1.git" };
+    const readiness = {
+      project_id: "proj-1",
+      git: { state: "ready" },
+      claude: { ready: true, blockers: [] },
+    };
+    getCloudRepoIdentity.mockResolvedValue(identity);
+    getCloudProjectReadiness.mockResolvedValue(readiness);
+
+    const details = await loadCloudProjectDetails({
+      session,
+      projectId: "proj-1",
+      projects: [{ id: "proj-1", name: "Demo" }],
+      onSessionChange: vi.fn(),
+      cloudApiBaseUrl: "https://cloud.example",
+      resources: ["identity", "readiness"],
+    });
+
+    expect(details.identity).toBe(identity);
+    expect(details.readiness).toBe(readiness);
+    expect(getCloudRepoIdentity).toHaveBeenCalledOnce();
+    expect(getCloudProjectReadiness).toHaveBeenCalledOnce();
+    expect(getCloudDashboard).not.toHaveBeenCalled();
+    expect(listCloudRoot).not.toHaveBeenCalled();
+    expect(getCloudHistory).not.toHaveBeenCalled();
+    expect(listCloudScopes).not.toHaveBeenCalled();
+    expect(listCloudConnectors).not.toHaveBeenCalled();
+    expect(listCloudMcpEndpoints).not.toHaveBeenCalled();
+  });
 });
 
 describe("global Project catalog ownership", () => {
@@ -1348,6 +1553,51 @@ describe("global Project catalog ownership", () => {
       "https://cloud.example",
     );
     expect(container.querySelector("output")?.getAttribute("data-project-count")).toBe("1");
+  });
+
+  it("reuses the same Project-create idempotency key after a retry", async () => {
+    createCloudProject
+      .mockRejectedValueOnce(new Error("temporary create failure"))
+      .mockResolvedValueOnce({ id: "project-created", name: "Untitled Project" });
+    const onOpen = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root, <HomeCreateProbe onOpen={onOpen} />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-action="open-create"]')?.click();
+      await Promise.resolve();
+    });
+    expect(container.firstElementChild?.getAttribute("data-dialog-open")).toBe("true");
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-action="submit-create"]')?.click();
+      await flushPromises();
+    });
+    expect(container.firstElementChild?.getAttribute("data-dialog-open")).toBe("true");
+    expect(container.firstElementChild?.getAttribute("data-error")).toContain("temporary create failure");
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-action="submit-create"]')?.click();
+      await flushPromises();
+    });
+
+    expect(createCloudProject).toHaveBeenCalledTimes(2);
+    expect(createCloudProject.mock.calls[0]?.[1]).toEqual({
+      name: "Untitled Project",
+      description: null,
+      org_id: "org-1",
+    });
+    expect(createCloudProject.mock.calls[0]?.[2]).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(createCloudProject.mock.calls[1]?.[2]).toBe(createCloudProject.mock.calls[0]?.[2]);
+    expect(onOpen).toHaveBeenCalledWith({ id: "project-created", name: "Untitled Project" });
+    expect(container.firstElementChild?.getAttribute("data-dialog-open")).toBe("false");
   });
 });
 
@@ -1412,26 +1662,18 @@ describe("useDesktopCloudData request lifecycle", () => {
     expect(getCloudDashboard).not.toHaveBeenCalled();
   });
 
-  it("loads the organization Project catalog only when a global route requests it", async () => {
+  it("loads the organization Project catalog only through its global owner", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
-    let latest: DesktopCloudDataState | null = null;
 
     await act(async () => {
-      renderWithTestLocalization(root,
-        <CloudDataProbe
-          explicitProjectId={null}
-          environment={cloudEnvironment}
-          loadProjectCatalog
-          onData={(data) => { latest = data; }}
-        />,
-      );
+      renderWithTestLocalization(root, <CloudCatalogProbe />);
       await flushPromises();
     });
 
     expect(listCloudProjects).toHaveBeenCalledOnce();
-    expect(latest?.projects.map((project) => project.id)).toEqual(["proj-a", "proj-b"]);
+    expect(container.querySelector("output")?.getAttribute("data-project-count")).toBe("2");
     expect(getCloudProject).not.toHaveBeenCalled();
   });
 
@@ -1674,7 +1916,6 @@ function CloudDataProbe({
   environment,
   onData,
   loadProjectDetails = true,
-  loadProjectCatalog = false,
   repositoryProjectId = null,
   sessionOverride = session,
 }: {
@@ -1682,7 +1923,6 @@ function CloudDataProbe({
   environment: CloudEnvironment;
   onData?: (data: DesktopCloudDataState) => void;
   loadProjectDetails?: boolean;
-  loadProjectCatalog?: boolean;
   repositoryProjectId?: string | null;
   sessionOverride?: DesktopCloudSession;
 }) {
@@ -1694,7 +1934,6 @@ function CloudDataProbe({
     repositoryProjectId,
     onSessionChange,
     loadProjectDetails,
-    loadProjectCatalog,
   });
   onData?.(data);
   return (
@@ -1709,10 +1948,20 @@ function CloudDataProbe({
   );
 }
 
+function CloudCatalogProbe() {
+  const onSessionChange = React.useCallback(() => undefined, []);
+  const data = useCloudProjectCatalog({
+    enabled: true,
+    session,
+    apiBaseUrl: "https://cloud.example",
+    onSessionChange,
+  });
+  return <output data-project-count={String(data.projects.length)} data-loading={String(data.loading)} />;
+}
+
 function HomeCatalogProbe() {
   const updateSession = React.useCallback(() => undefined, []);
   const setOperationStatus = React.useCallback(() => undefined, []);
-  const setRestoreError = React.useCallback(() => undefined, []);
   const noop = React.useCallback(() => undefined, []);
   const asyncNoop = React.useCallback(async () => undefined, []);
   const recentWorkspaceItems = React.useMemo(() => [], []);
@@ -1725,12 +1974,48 @@ function HomeCatalogProbe() {
     onOpenCloudProject: noop,
     recentWorkspaceItems,
     setHomeOperationStatus: setOperationStatus,
-    setRestoreWorkspaceError: setRestoreError,
     showBrowserSignInStatus: noop,
     startCloudBrowserSignIn: asyncNoop,
     updateCloudSession: updateSession,
   });
   return <output data-project-count={String(home.homeCloudProjects.length)} />;
+}
+
+function HomeCreateProbe({ onOpen }: { onOpen: (project: { id: string; name: string }) => void }) {
+  const updateSession = React.useCallback(() => undefined, []);
+  const noop = React.useCallback(() => undefined, []);
+  const asyncNoop = React.useCallback(async () => true, []);
+  const recentWorkspaceItems = React.useMemo(() => [], []);
+  const [operationStatus, setOperationStatus] = React.useState<unknown>(null);
+  const home = useCloudProjectHome({
+    activeCloudSession: session,
+    autoRefreshProjectCatalog: false,
+    autoResolveRecentWorkspaceContexts: false,
+    cloudEnabled: true,
+    desktopCloudApiBaseUrl: "https://cloud.example",
+    includeUnboundCloudProjects: true,
+    onOpenCloudProject: onOpen as never,
+    recentWorkspaceItems,
+    setHomeOperationStatus: setOperationStatus as never,
+    showBrowserSignInStatus: noop,
+    startCloudBrowserSignIn: asyncNoop,
+    updateCloudSession: updateSession,
+  });
+  return (
+    <div
+      data-dialog-open={String(home.homeCloudProjectCreateDialogOpen)}
+      data-submitting={String(home.homeCloudProjectCreateSubmitting)}
+      data-error={home.homeCloudProjectCreateError ?? ""}
+      data-operation={String(Boolean(operationStatus))}
+    >
+      <button type="button" data-action="open-create" onClick={() => void home.createCloudProjectFromHomepage()}>
+        Open create
+      </button>
+      <button type="button" data-action="submit-create" onClick={() => void home.submitHomeCloudProjectCreate("org-1")}>
+        Submit create
+      </button>
+    </div>
+  );
 }
 
 function CloudAccessDataProbe({ projectId }: { projectId: string | null }) {
@@ -1776,8 +2061,7 @@ describe("Local repository Cloud context integration", () => {
       renderWithTestLocalization(root,
         <>
           <CloudServiceSidebar
-            status={null}
-            cloudSession={session}
+            cloudAuthState={testCloudAuthState(session)}
             activeSection="contents"
             projectContext
             localWorkspaceContext

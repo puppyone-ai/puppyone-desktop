@@ -11,11 +11,13 @@ import {
 } from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
+import type { CloudPublishErrorCode, CloudPublishState } from "../../types/electron";
 import {
   CloudWebEmpty,
   CloudWebPage,
 } from "./components/shared";
 import type { CloudPublishReadiness } from "./workspace/cloudPublishReadiness";
+import { formatCloudPublishFailure } from "./cloudPresentation";
 
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
 
@@ -35,8 +37,15 @@ export function CloudLocalOnlyWorkspace({
   publishLoading,
   publishPending = false,
   publishError = null,
-  publishCanRetry = false,
-  projectInitialized = false,
+  publishState = null,
+  publishStateLoading = false,
+  organizations = [],
+  selectedOrganizationId = null,
+  organizationStatus = "signed-out",
+  organizationError = null,
+  onSelectOrganization,
+  onRetryOrganizations,
+  onAbandonPublish,
   onReviewChanges,
   onPublishWorkspace,
 }: {
@@ -52,16 +61,25 @@ export function CloudLocalOnlyWorkspace({
   hasCurrentBranch: boolean;
   publishLoading: boolean;
   publishPending?: boolean;
-  publishError?: string | null;
-  publishCanRetry?: boolean;
-  projectInitialized?: boolean;
+  publishError?: { code: CloudPublishErrorCode; retryable: boolean } | null;
+  publishState?: CloudPublishState | null;
+  publishStateLoading?: boolean;
+  organizations?: readonly { id: string; name: string }[];
+  selectedOrganizationId?: string | null;
+  organizationStatus?: "signed-out" | "loading" | "selection-required" | "ready" | "none" | "error";
+  organizationError?: string | null;
+  onSelectOrganization?: (organizationId: string) => void;
+  onRetryOrganizations?: () => void;
+  onAbandonPublish?: () => void;
   onReviewChanges: () => void;
-  onPublishWorkspace: () => void;
+  onPublishWorkspace: (organizationId?: string) => void;
 }) {
   const { t } = useLocalization();
-  const publishBusy = publishLoading || publishPending;
+  const publishBusy = publishLoading
+    || publishStateLoading
+    || (publishPending && !accountEmail);
   const waitingForSignIn = publishPending && !accountEmail && !publishLoading;
-  const publishing = publishLoading || (publishPending && Boolean(accountEmail));
+  const publishing = publishLoading;
   const resolvedReadiness = publishReadiness ?? (
     !isGitRepository
       ? "repository-required"
@@ -79,18 +97,18 @@ export function CloudLocalOnlyWorkspace({
         ? t("cloud.initialize.branchRequired")
         : null;
   const readyToPush = readinessMessage === null;
+  const organizationReady = organizationStatus === "signed-out" || organizationStatus === "ready";
+  const publishEnabled = publishState
+    ? publishState.canResume
+    : readyToPush && organizationReady;
   const destinationBranchName = PUPPYONE_CLOUD_DEFAULT_BRANCH;
-  const cloudStatus = t(
-    projectInitialized && publishing
-      ? "cloud.initialize.pushing"
-      : projectInitialized
-        ? "cloud.initialize.initializedPushIncomplete"
-        : waitingForSignIn
+  const cloudStatus = publishState
+    ? getCloudPublishPhaseLabel(publishState.phase, t)
+    : t(waitingForSignIn
       ? "cloud.initialize.waitingForSignIn"
       : publishing
         ? "cloud.initialize.initializing"
-        : "cloud.initialize.notInitialized",
-  );
+        : "cloud.initialize.notInitialized");
   return (
     <div className="desktop-cloud-publish-container">
       {waitingForSignIn && (
@@ -100,7 +118,7 @@ export function CloudLocalOnlyWorkspace({
       )}
       {publishError && (
         <div className="desktop-cloud-main-alert" role="alert">
-          {publishError}
+          {formatCloudPublishFailure(publishError, t)}
         </div>
       )}
       <section className="desktop-cloud-publish-card" aria-labelledby="desktop-cloud-initialize-title">
@@ -147,11 +165,45 @@ export function CloudLocalOnlyWorkspace({
               <span className="status">{cloudStatus}</span>
               <span><GitBranch size={15} aria-hidden="true" /><bdi>{destinationBranchName}</bdi></span>
             </div>
+            {organizationStatus !== "signed-out" && (
+              <div className="desktop-cloud-publish-organization">
+                {organizationStatus === "loading" ? (
+                  <span>{t("cloud.common.loading")}</span>
+                ) : organizationStatus === "none" ? (
+                  <span className="warning">{t("cloud.initialize.noOrganization")}</span>
+                ) : organizationStatus === "error" ? (
+                  <button type="button" className="desktop-cloud-row-action" onClick={onRetryOrganizations}>
+                    {t("cloud.common.retry")}
+                  </button>
+                ) : organizations.length > 1 ? (
+                  <label className="desktop-cloud-organization-selector">
+                    <span>{t("cloud.organization.selectLabel")}</span>
+                    <select
+                      aria-label={t("cloud.organization.selectLabel")}
+                      value={selectedOrganizationId ?? ""}
+                      onChange={(event) => onSelectOrganization?.(event.target.value)}
+                    >
+                      <option value="" disabled>{t("cloud.organization.selectPlaceholder")}</option>
+                      {organizations.map((organization) => (
+                        <option value={organization.id} key={organization.id}>{organization.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <span>{organizations[0]?.name}</span>
+                )}
+              </div>
+            )}
           </article>
         </div>
 
         <div className={`desktop-cloud-publish-summary ${readinessMessage ? "blocked" : ""}`} role={readinessMessage ? "alert" : undefined}>
-          {readyToPush ? (
+          {publishState ? (
+            <>
+              <strong>{getCloudPublishPhaseLabel(publishState.phase, t)}</strong>
+              <p>{t("cloud.initialize.resumeDescription", { project: publishState.projectName })}</p>
+            </>
+          ) : readyToPush ? (
             <>
               <strong>{t(
                 branchName === destinationBranchName
@@ -166,6 +218,10 @@ export function CloudLocalOnlyWorkspace({
                 { count: localChangeCount },
               )}</p>
               {!accountEmail && <small>{t("cloud.initialize.signInNote")}</small>}
+              {organizationStatus === "selection-required" && (
+                <small>{t("cloud.initialize.organizationRequired")}</small>
+              )}
+              {organizationError && <small className="warning">{organizationError}</small>}
             </>
           ) : (
             <strong>{readinessMessage}</strong>
@@ -185,23 +241,44 @@ export function CloudLocalOnlyWorkspace({
             className="desktop-cloud-row-action primary desktop-cloud-publish-primary"
             type="button"
             aria-busy={publishBusy || undefined}
-            disabled={publishBusy || !readyToPush}
-            onClick={onPublishWorkspace}
+            disabled={publishBusy || !publishEnabled}
+            onClick={() => onPublishWorkspace(selectedOrganizationId ?? undefined)}
           >
             {t(
               publishing
                 ? "cloud.initialize.initializingAndPushing"
+                : publishState
+                  ? "cloud.initialize.resume"
                 : waitingForSignIn
                   ? "cloud.initialize.waitingForSignIn"
-                  : publishCanRetry
-                    ? "cloud.initialize.retryPush"
+                  : !accountEmail
+                    ? "cloud.initialize.signInToInitialize"
                     : "cloud.initialize.initializeAndPush",
             )}
           </button>
+          {publishState?.canAbandon && onAbandonPublish && (
+            <button
+              className="desktop-cloud-row-action desktop-cloud-publish-abandon"
+              type="button"
+              disabled={publishBusy}
+              onClick={onAbandonPublish}
+            >
+              {t(publishState.phase === "compensation-pending"
+                ? "cloud.initialize.retryAbandon"
+                : "cloud.initialize.abandon")}
+            </button>
+          )}
         </div>
       </section>
     </div>
   );
+}
+
+function getCloudPublishPhaseLabel(
+  phase: CloudPublishState["phase"],
+  t: ReturnType<typeof useLocalization>["t"],
+): string {
+  return t(`cloud.initialize.phase.${phase}`);
 }
 
 export function CloudLocalGitStatusError({

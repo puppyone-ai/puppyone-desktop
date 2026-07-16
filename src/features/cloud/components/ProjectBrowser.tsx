@@ -34,6 +34,7 @@ export function CloudProjectBrowser({
   onConfigureProjectRemote,
   onOpenCloudProjects,
   showRepositoryActions = true,
+  loadProjectPreviews = true,
 }: {
   projects: DesktopCloudProject[];
   loading: boolean;
@@ -49,6 +50,8 @@ export function CloudProjectBrowser({
   onOpenCloudProjects: () => void;
   /** Catalog-only mode keeps browsing separate from the open Local repository. */
   showRepositoryActions?: boolean;
+  /** Useful for tests or constrained surfaces; catalog previews are enabled by default. */
+  loadProjectPreviews?: boolean;
 }) {
   const { getCollator, t } = useLocalization();
   const collator = getCollator({ sensitivity: "base", numeric: true });
@@ -92,6 +95,7 @@ export function CloudProjectBrowser({
               onSessionChange={onSessionChange}
               onSelectProject={onSelectProject}
               onConfigureProjectRemote={showRepositoryActions ? onConfigureProjectRemote : undefined}
+              loadPreview={loadProjectPreviews}
             />
           ))
         )}
@@ -171,6 +175,7 @@ function CloudProjectCard({
   onSessionChange,
   onSelectProject,
   onConfigureProjectRemote,
+  loadPreview,
 }: {
   project: DesktopCloudProject;
   session: DesktopCloudSession;
@@ -181,10 +186,12 @@ function CloudProjectCard({
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onSelectProject: (project: DesktopCloudProject) => void;
   onConfigureProjectRemote?: (project: DesktopCloudProject) => void;
+  loadPreview: boolean;
 }) {
   const localization = useLocalization();
   const { t } = localization;
   const preview = useCloudProjectPreview({
+    enabled: loadPreview,
     session,
     projectId: project.id,
     projectRevision: project.updated_at,

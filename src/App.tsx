@@ -24,9 +24,7 @@ import {
 } from "./features/desktop-terminal";
 import { useDesktopUpdates } from "./components/DesktopUpdateControls";
 import {
-  connectWorkspaceCloudProject,
   createLocalDataPort,
-  getWorkspaceGitStatus,
   readPuppyoneWorkspaceConfig,
   removeWorkspaceGitRemote,
   showHomepage,
@@ -91,18 +89,12 @@ import {
 import { useDesktopGitController } from "./features/source-control/useDesktopGitController";
 import { createRepositoryRefreshReason } from "./features/source-control/repositoryRefreshPolicy";
 import { CloudProjectResolveDialog } from "./features/cloud/workspace/CloudProjectResolveDialog";
+import { CloudProjectCreateDialog } from "./features/cloud/components/CloudProjectCreateDialog";
 import { useWorkspaceSurfaceSwitch } from "./features/cloud/workspace/useWorkspaceSurfaceSwitch";
 import { useCloudWorkspaceContext } from "./features/cloud/workspace/useCloudWorkspaceContext";
 import { shouldBlockWorkspaceCloudResolution } from "./features/cloud/workspace/workspaceCloudResolutionKey";
 import { usePuppyoneCloudBackup } from "./features/cloud/workspace/usePuppyoneCloudBackup";
 import { shouldLoadCloudProjectCatalog } from "./features/cloud/workspace/cloudProjectResolution";
-import {
-  assertCloudRemoteNameAvailable,
-  assertExpectedGitRepositoryState,
-} from "./features/cloud/workspace/workspaceGitRemote";
-import { projectRootTarget } from "./features/cloud/repositoryTarget";
-import type { CloudGitRemoteOptions } from "./features/cloud/types";
-import { formatCloudMessage } from "./features/cloud/cloudPresentation";
 import {
   createTypographyRootProps,
   useTypographyCatalog,
@@ -572,10 +564,14 @@ export function App() {
   });
 
   const {
+    cancelHomeCloudProjectCreate,
     createCloudProjectFromHomepage,
     homeCloudProjects,
     homeCloudProjectsError,
     homeCloudProjectsLoading,
+    homeCloudProjectCreateDialogOpen,
+    homeCloudProjectCreateError,
+    homeCloudProjectCreateSubmitting,
     homeProjectItems,
     openCloudProjectFromHomepage,
     pendingCloudProjectCreate,
@@ -585,6 +581,7 @@ export function App() {
     setHomeCloudProjectsError,
     setPendingCloudProjectCreate,
     setRecentWorkspaceCloudContexts,
+    submitHomeCloudProjectCreate,
   } = useCloudProjectHome({
     activeCloudSession,
     autoRefreshProjectCatalog,
@@ -598,7 +595,6 @@ export function App() {
     }, []),
     recentWorkspaceItems,
     setHomeOperationStatus,
-    setRestoreWorkspaceError,
     showBrowserSignInStatus,
     startCloudBrowserSignIn,
     updateCloudSession,
@@ -873,85 +869,6 @@ export function App() {
     }
   }, [activeView, cloudEnabled, setSidebarCollapsed, updateCloudSession, workspaceIsCloud]);
 
-  const handleConfigureCloudRemote = useCallback(async (
-    projectId?: string | null,
-    options: CloudGitRemoteOptions = {},
-  ) => {
-    if (!cloudEnabled) return null;
-    if (!workspace) return null;
-    if (workspaceIsCloud) return null;
-    const context = captureGitRepositoryContext(workspace.path);
-    if (!context) return null;
-    const nextProjectId = projectId?.trim() || null;
-    if (!nextProjectId) {
-      throw new Error("Choose a Cloud Project before configuring its Git remote.");
-    }
-    if (!activeCloudSession) {
-      throw new Error("Sign in before configuring the Cloud Git remote.");
-    }
-    let configuredStatus = activeGitStatus;
-    const requiresFreshStatus = options.rejectRemoteNameCollision
-      || options.expectedHeadCommitId !== undefined
-      || options.expectedBranch !== undefined;
-    const readAndValidateFreshStatus = async () => {
-      const freshStatus = await getWorkspaceGitStatus(context.rootPath);
-      if (options.expectedHeadCommitId !== undefined || options.expectedBranch !== undefined) {
-        assertExpectedGitRepositoryState(freshStatus, {
-          headCommitId: options.expectedHeadCommitId,
-          branch: options.expectedBranch,
-        });
-      }
-      if (options.rejectRemoteNameCollision) assertCloudRemoteNameAvailable(freshStatus);
-      return freshStatus;
-    };
-    if (requiresFreshStatus) configuredStatus = await readAndValidateFreshStatus();
-    if (options.target && options.target.kind !== "project_root") {
-      throw new Error("Desktop Cloud connections use the canonical Project repository, not a Scope view.");
-    }
-    const connected = await connectWorkspaceCloudProject({
-      rootPath: context.rootPath,
-      apiBaseUrl: desktopCloudApiBaseUrl ?? activeCloudSession.api_base_url,
-      userId: activeCloudSession.user_id,
-      projectId: nextProjectId,
-    });
-    if (!connected.ok) throw new Error(connected.error.message || connected.error.code);
-    configuredStatus = connected.gitStatus;
-    if (!configuredStatus) {
-      throw new Error("Cloud Git remote configuration did not return a Git status.");
-    }
-    if (!options.deferStatusPublication) {
-      setRecentWorkspaceCloudContexts((current) => ({
-        ...current,
-        [workspace.id]: {
-          projectId: nextProjectId,
-          target: projectRootTarget(nextProjectId),
-          hasCloudRemote: true,
-          error: null,
-          reason: null,
-        },
-      }));
-      if (applyGitStatus(
-        configuredStatus,
-        context,
-        createRepositoryRefreshReason("configure-remote", "mutation"),
-      )) {
-        refreshWorkspaceContent();
-      }
-    }
-    return configuredStatus;
-  }, [
-    applyGitStatus,
-    activeGitStatus,
-    activeCloudSession,
-    captureGitRepositoryContext,
-    cloudEnabled,
-    desktopCloudApiBaseUrl,
-    refreshWorkspaceContent,
-    setRecentWorkspaceCloudContexts,
-    workspace,
-    workspaceIsCloud,
-  ]);
-
   const handleRemoveCloudRemote = useCallback(async () => {
     if (!workspace || workspaceIsCloud) return;
     const refreshedStatus = await removeWorkspaceGitRemote(workspace.path, "puppyone");
@@ -1016,36 +933,31 @@ export function App() {
   ]);
 
   const {
-    cloudBackupCanRetry,
-    cloudBackupContinuation,
-    cloudBackupError,
     cloudBackupLoading,
+    cloudPublishError,
+    cloudPublishNotice,
+    cloudPublishState,
+    cloudPublishStateLoading,
+    handleAbandonPuppyoneBackup,
     handleStartPuppyoneBackup,
     pendingCloudBackupSetup,
   } = usePuppyoneCloudBackup({
     activeCloudSession,
-    activeGitStatus,
     applyGitStatus,
     captureGitRepositoryContext,
     clearGitSelection,
     cloudEnabled,
-    handleCloudSessionChange,
-    onConfigureCloudRemote: handleConfigureCloudRemote,
+    desktopCloudApiBaseUrl,
     isGitRepositoryContextCurrent,
     refreshWorkspaceContent,
     setActiveCloudSection,
     setActiveView,
-    setGitOperationError,
-    setGitOperationLoading,
     setSidebarCollapsed,
     setSwitcherOpen,
     startCloudBrowserSignIn,
     workspace,
     workspaceIsCloud,
   });
-  const cloudBackupErrorMessage = cloudBackupError
-    ? formatCloudMessage(cloudBackupError, t)
-    : null;
 
   const unlinkCurrentWorkspace = useCallback(async () => {
     if (!await drainWorkspaceNavigation()) return;
@@ -1160,6 +1072,17 @@ export function App() {
             }}
             onOpenGitSettings={() => setCloudPanelOpen(false)}
           />
+          {homeCloudProjectCreateDialogOpen && activeCloudSession && (
+            <CloudProjectCreateDialog
+              session={activeCloudSession}
+              apiBaseUrl={desktopCloudApiBaseUrl}
+              submitting={homeCloudProjectCreateSubmitting}
+              submitError={homeCloudProjectCreateError}
+              onSessionChange={updateCloudSession}
+              onCancel={cancelHomeCloudProjectCreate}
+              onSubmit={(organizationId) => void submitHomeCloudProjectCreate(organizationId)}
+            />
+          )}
         </DesktopOverlayPortal>
       </>
     );
@@ -1333,11 +1256,12 @@ export function App() {
           cloud={{
             activeSection: activeCloudSection,
             projectContext: workspaceIsCloud ? null : projectCloudContext,
-            backupError: cloudBackupErrorMessage,
-            backupCanRetry: cloudBackupCanRetry,
             backupLoading: cloudBackupLoading,
             backupPending: pendingCloudBackupSetup,
-            backupProjectInitialized: cloudBackupContinuation !== null,
+            publishError: cloudPublishError,
+            publishNotice: cloudPublishNotice,
+            publishState: cloudPublishState,
+            publishStateLoading: cloudPublishStateLoading,
             cloudApiBaseUrl: desktopCloudApiBaseUrl,
             cloudSession: activeCloudSession,
             storedCloudSession: cloudSession,
@@ -1345,11 +1269,8 @@ export function App() {
             projectId: effectiveCloudProjectId,
             sessionRestoring: cloudSessionRestoring,
             onCloudSessionChange: handleCloudSessionChange,
+            onAbandonPuppyoneBackup: handleAbandonPuppyoneBackup,
             onRemoveCloudRemote: handleRemoveCloudRemote,
-            onOpenDetails: () => {
-              if (!cloudEnabled) return;
-              navigateDesktopView("cloud");
-            },
             onOpenGitSettings: () => {
               setActiveSettingsSection("git");
               navigateDesktopView("settings");
@@ -1516,6 +1437,17 @@ export function App() {
                 setWorkspaceSurfaceDialogOpen(false);
                 setWorkspaceSurfaceError(null);
               }}
+            />
+          )}
+          {homeCloudProjectCreateDialogOpen && activeCloudSession && (
+            <CloudProjectCreateDialog
+              session={activeCloudSession}
+              apiBaseUrl={desktopCloudApiBaseUrl}
+              submitting={homeCloudProjectCreateSubmitting}
+              submitError={homeCloudProjectCreateError}
+              onSessionChange={updateCloudSession}
+              onCancel={cancelHomeCloudProjectCreate}
+              onSubmit={(organizationId) => void submitHomeCloudProjectCreate(organizationId)}
             />
           )}
         </>

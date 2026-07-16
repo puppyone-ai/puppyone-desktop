@@ -4,8 +4,7 @@ import { useLocalization } from "@puppyone/localization/react";
 import { SidebarRoot, SidebarRow, SidebarScrollArea } from "@puppyone/shared-ui";
 import { SidebarGroup } from "../../components/sidebar";
 import type { CloudServiceSidebarProps, CloudWorkspaceSection } from "./types";
-import { getCloudAuthSession, resolveCloudAuthState } from "./auth";
-import { resolveCloudEnvironment } from "./environment";
+import { getCloudAuthSession } from "./auth";
 import {
   CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES,
   CLOUD_GLOBAL_SIDEBAR_ROUTES,
@@ -49,9 +48,7 @@ const LOCAL_ONLY_CLOUD_SIDEBAR_ROUTES: CloudSidebarNavEntry[] = [
 ];
 
 export function CloudServiceSidebar({
-  status,
-  cloudSession,
-  cloudApiBaseUrl,
+  cloudAuthState,
   activeSection,
   projectContext = false,
   localWorkspaceContext = false,
@@ -63,11 +60,6 @@ export function CloudServiceSidebar({
   const { t } = useLocalization();
   const billingEnabled = useFeatureFlag("cloudBilling");
   const normalizedActiveSection = normalizeCloudSection(activeSection);
-  const cloudEnvironment = resolveCloudEnvironment({ status, desktopApiBaseUrl: cloudApiBaseUrl });
-  const cloudAuthState = resolveCloudAuthState({
-    cloudSession,
-    environment: cloudEnvironment,
-  });
   const effectiveCloudSession = getCloudAuthSession(cloudAuthState);
   const accountEmail = effectiveCloudSession?.user_email ?? null;
   const signedIn = Boolean(effectiveCloudSession);
@@ -104,7 +96,7 @@ export function CloudServiceSidebar({
                 onBackToProjects();
                 return;
               }
-              onSelectSection("overview");
+              onSelectSection("projects");
             }}
           >
             <ArrowLeft className="po-directional-icon" size={14} />
@@ -132,17 +124,10 @@ export function CloudServiceSidebar({
                         (localOnlyWorkspaceContext && normalizedActiveSection === item.id)
                         || (signedIn && (
                           normalizedActiveSection === item.id
-                          || (inProjectContext && localWorkspaceContext && item.id === "contents" && normalizedActiveSection === "overview")
                         ))
                       )
                     }
-                    onSelect={(section) => {
-                      if (localWorkspaceContext && section === "overview") {
-                        onSelectSection("contents");
-                        return;
-                      }
-                      onSelectSection(section);
-                    }}
+                    onSelect={onSelectSection}
                   />
                 ))}
               </SidebarGroup>

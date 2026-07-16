@@ -1,6 +1,12 @@
 import type { Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
-import type { GitStatusSnapshot } from "../../types/electron";
+import type {
+  CloudPublishErrorCode,
+  CloudPublishState,
+  GitStatusSnapshot,
+} from "../../types/electron";
+import type { CloudAuthState } from "./auth";
+import type { CloudEnvironment } from "./environment";
 import type { ProjectCloudContext } from "./context";
 import type { RepositoryTarget } from "./repositoryTarget";
 import type { CloudWorkspaceSection } from "./routes/cloudRouteIds";
@@ -24,9 +30,7 @@ export type CloudGitRemoteOptions = {
 };
 
 export type CloudServiceSidebarProps = {
-  status: GitStatusSnapshot | null;
-  cloudSession: DesktopCloudSession | null;
-  cloudApiBaseUrl?: string | null;
+  cloudAuthState: CloudAuthState;
   activeSection: CloudWorkspaceSection;
   /** True when an authorized Cloud Project context is active — never derived from route alone. */
   projectContext?: boolean;
@@ -57,9 +61,8 @@ export type CloudServicePanelProps = {
 export type CloudServiceMainViewProps = {
   workspace: Workspace;
   status: GitStatusSnapshot | null;
-  cloudApiBaseUrl: string | null;
-  cloudSession: DesktopCloudSession | null;
-  sessionRestoring?: boolean;
+  cloudEnvironment: CloudEnvironment;
+  cloudAuthState: CloudAuthState;
   projectContext?: ProjectCloudContext | null;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   activeSection: CloudWorkspaceSection;
@@ -67,16 +70,15 @@ export type CloudServiceMainViewProps = {
   error: string | null;
   cloudBackupLoading: boolean;
   cloudBackupPending: boolean;
-  cloudBackupError: string | null;
-  /** A Cloud Project already exists for an interrupted initialize attempt. */
-  cloudBackupProjectInitialized?: boolean;
-  /** The interrupted attempt can resume by pushing to the existing Cloud Project. */
-  cloudBackupCanRetry?: boolean;
-  onStartPuppyoneBackup: () => void;
+  cloudPublishError: { code: CloudPublishErrorCode; retryable: boolean } | null;
+  cloudPublishNotice: "abandoned" | null;
+  cloudPublishState: CloudPublishState | null;
+  cloudPublishStateLoading: boolean;
+  onAbandonPuppyoneBackup: () => void;
+  onStartPuppyoneBackup: (organizationId?: string) => void;
   onRemoveCloudRemote?: () => Promise<void>;
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onRefresh: () => void;
-  onOpenDetails: () => void;
   onOpenGitSettings: () => void;
   onReviewChanges: () => void;
 };

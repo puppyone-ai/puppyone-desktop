@@ -27,7 +27,8 @@ export type CloudGlobalPageProps = {
   accountEmail: string | null;
   session: DesktopCloudSession;
   apiBaseUrl: string | null;
-  projects: DesktopCloudProject[];
+  /** Present only when the catalog was intentionally loaded for this route. */
+  projects?: DesktopCloudProject[];
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onOpen: () => void;
 };
@@ -161,7 +162,7 @@ export function CloudGlobalTeamPage({
         )}
 
         <div className="desktop-cloud-org-card-footer">
-          <span>{t("cloud.project.sessionCount", { count: projects.length })}</span>
+          {projects && <span>{t("cloud.project.sessionCount", { count: projects.length })}</span>}
           <button type="button" onClick={onOpen}>{t("cloud.team.openFullPage")}</button>
         </div>
       </div>
@@ -200,7 +201,14 @@ export function useCloudOrganizationData(
   session: DesktopCloudSession,
   apiBaseUrl: string | null,
   onSessionChange: (session: DesktopCloudSession | null) => void,
-  { loadTeamDetails = true }: { loadTeamDetails?: boolean } = {},
+  {
+    loadTeamDetails = true,
+    selectionPolicy = "remembered",
+  }: {
+    loadTeamDetails?: boolean;
+    /** Initialize requires a fresh, explicit choice when more than one org is available. */
+    selectionPolicy?: "remembered" | "explicit";
+  } = {},
 ) {
   const contextKey = createCloudOrganizationContextKey(session, apiBaseUrl);
   const preferenceKey = createCloudOrganizationPreferenceKey(session, apiBaseUrl);
@@ -243,7 +251,9 @@ export function useCloudOrganizationData(
           });
           return;
         }
-        const storedSelection = readOrganizationSelection(preferenceKey);
+        const storedSelection = selectionPolicy === "remembered"
+          ? readOrganizationSelection(preferenceKey)
+          : null;
         const [onlyOrganization] = organizations;
         const selectedOrganizationId = organizations.length === 1
           ? onlyOrganization?.id ?? null
@@ -283,7 +293,7 @@ export function useCloudOrganizationData(
         organizationRequestEpoch.current += 1;
       }
     };
-  }, [contextKey, loadTeamDetails, preferenceKey, reloadRevision]);
+  }, [contextKey, loadTeamDetails, preferenceKey, reloadRevision, selectionPolicy]);
 
   useEffect(() => {
     if (!loadTeamDetails || state.contextKey !== contextKey || !state.organization) return;
@@ -348,7 +358,9 @@ export function useCloudOrganizationData(
     );
     if (!organization || effectiveState.organization?.id === organization.id) return;
     detailsRequestEpoch.current += 1;
-    writeOrganizationSelection(preferenceKey, organization.id);
+    if (selectionPolicy === "remembered") {
+      writeOrganizationSelection(preferenceKey, organization.id);
+    }
     setState({
       ...emptyOrganizationState(contextKey),
       organizations: effectiveState.organizations,
@@ -358,7 +370,7 @@ export function useCloudOrganizationData(
       membersStatus: loadTeamDetails ? "loading" : "idle",
       loading: loadTeamDetails,
     });
-  }, [contextKey, effectiveState, loadTeamDetails, preferenceKey]);
+  }, [contextKey, effectiveState, loadTeamDetails, preferenceKey, selectionPolicy]);
 
   const refresh = useCallback(() => {
     setReloadRevision((revision) => revision + 1);

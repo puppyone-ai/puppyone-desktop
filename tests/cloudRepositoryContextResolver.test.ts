@@ -178,37 +178,50 @@ describe("repository-context architecture", () => {
       new URL("../src/features/cloud/workspace/useCloudWorkspaceContext.ts", import.meta.url),
       "utf8",
     );
+    const catalogSource = readFileSync(
+      new URL("../src/features/cloud/data/useCloudProjectCatalog.ts", import.meta.url),
+      "utf8",
+    );
+    const publishHookSource = readFileSync(
+      new URL("../src/features/cloud/workspace/usePuppyoneCloudBackup.ts", import.meta.url),
+      "utf8",
+    );
     const appSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
     const combined = `${resolverSource}\n${appSource}`;
 
-    // The global Cloud Projects route may explicitly request the catalog, but
-    // repository identity resolution must never consult it. Exact local
-    // context continues to come only from the canonical Git locator.
-    expect(dataSource).toContain("loadProjectCatalog = false");
-    expect(dataSource).toContain("if (!activeProjectId)");
+    expect(dataSource).not.toContain("listCloudProjects");
+    expect(dataSource).not.toContain("loadProjectCatalog");
+    expect(catalogSource).toContain("listCloudProjects");
     expect(resolverSource).not.toContain("listCloudProjects");
     expect(appSource).not.toContain("listCloudProjects");
     expect(resolverSource).toContain("resolveCanonicalPuppyoneRemotes");
     expect(resolverSource).toContain("getCloudRepositoryContext");
     expect(resolverSource).not.toContain("remote_url");
     expect(combined).not.toMatch(/WorkspaceBinding|workspaceBinding|workspace_binding|cloudBinding|bindingId/);
-    expect(appSource).toContain("connectWorkspaceCloudProject");
-    expect(appSource).not.toMatch(/issueWorkspaceGitRemote|issueCloudGitCredential|configureGitCloudRemote/);
+    expect(publishHookSource).toContain("startOrResumeWorkspaceCloudPublish");
+    expect(publishHookSource).not.toContain("issueWorkspaceGitRemote");
+    expect(publishHookSource).not.toContain("configureWorkspaceCloudRemote");
     expect(appSource).not.toMatch(/revokeCloudWorkspace|workspaceInstanceId/);
   });
 
-  it("routes canonical remote mutation through the typed main-owned coordinator", () => {
-    const appSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
-    const collisionPreflight = appSource.indexOf("assertCloudRemoteNameAvailable(freshStatus)");
-    const firstGitStateGuard = appSource.indexOf("configuredStatus = await readAndValidateFreshStatus()");
-    const remoteMutation = appSource.indexOf("const connected = await connectWorkspaceCloudProject");
+  it("keeps Initialize remote mutation inside the durable main-process transaction", () => {
+    const coordinatorSource = readFileSync(
+      new URL("../electron/main/cloud-publish-coordinator.mjs", import.meta.url),
+      "utf8",
+    );
+    const transactionStart = coordinatorSource.indexOf("async function runPublishUnderLock");
+    const transactionEnd = coordinatorSource.indexOf("async function runAbandonUnderLock");
+    const transaction = coordinatorSource.slice(transactionStart, transactionEnd);
 
-    expect(collisionPreflight).toBeGreaterThan(-1);
-    expect(collisionPreflight).toBeLessThan(remoteMutation);
-    expect(firstGitStateGuard).toBeLessThan(remoteMutation);
-    expect(appSource).not.toMatch(/credential\s*[:=]|configureWorkspaceCloudRemote/);
-    expect(appSource).toContain("headCommitId: options.expectedHeadCommitId");
-    expect(appSource).toContain("branch: options.expectedBranch");
-    expect(appSource).toContain("if (!options.deferStatusPublication)");
+    expect(transactionStart).toBeGreaterThan(-1);
+    expect(transaction).toContain("assertFreshPublishStatus(status, base)");
+    expect(transaction).toContain("gitService.assertNoRemote(base.rootPath)");
+    expect(transaction).toContain("durableJournal.write(base.rootPath, record, { createOnly: true })");
+    expect(transaction).toContain("cloudApi.createProject(record)");
+    expect(transaction).toContain("cloudApi.issueCredential(record, secret.value)");
+    expect(transaction).toContain("gitService.configureCanonicalRemote(");
+    expect(transaction).toContain("gitService.pushExpectedCommit(");
+    expect(coordinatorSource).toContain("repositoryLockKey(context.identity.commonDir)");
+    expect(coordinatorSource).toContain("secretVault.clear(record.secret_ref)");
   });
 });

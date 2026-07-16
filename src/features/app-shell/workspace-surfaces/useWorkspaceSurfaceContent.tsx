@@ -5,7 +5,12 @@ import type { DesktopView } from "../../../components/DesktopCloudShell";
 import type { useDesktopUpdates } from "../../../components/DesktopUpdateControls";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import type { FilesVisibilitySettings } from "../../../preferences";
-import type { PuppyoneWorkspaceConfig, GitStatusSnapshot } from "../../../types/electron";
+import type {
+  CloudPublishErrorCode,
+  CloudPublishState,
+  PuppyoneWorkspaceConfig,
+  GitStatusSnapshot,
+} from "../../../types/electron";
 import {
   CloudProjectHistorySidebar,
   CloudProjectHistoryView,
@@ -14,14 +19,17 @@ import {
   DesktopCloudAccessSidebar,
   DesktopCloudAccessView,
   formatCloudMessage,
+  resolveCloudEnvironment,
   isCloudAccessNavigationResource,
   resolveCloudProjectNavigationContext,
   shouldLoadDesktopCloudAccessData,
+  useCloudSessionForEnvironment,
   useCloudHistoryController,
   useDesktopCloudAccessData,
   type CloudWorkspaceSection,
   type ProjectCloudContext,
 } from "../../cloud";
+import { formatCloudPublishFailure } from "../../cloud/cloudPresentation";
 import { createSourceControlWorkspaceSurface, getGitHostingMode, type DesktopGitController } from "../../source-control";
 import { createSettingsWorkspaceSurface, type SettingsSection } from "../../settings";
 import {
@@ -58,11 +66,12 @@ type DesktopUpdatesController = ReturnType<typeof useDesktopUpdates>;
 export type DesktopWorkspaceCloudSurfaceController = {
   activeSection: CloudWorkspaceSection;
   projectContext?: ProjectCloudContext | null;
-  backupError: string | null;
   backupLoading: boolean;
   backupPending: boolean;
-  backupCanRetry?: boolean;
-  backupProjectInitialized?: boolean;
+  publishError: { code: CloudPublishErrorCode; retryable: boolean } | null;
+  publishNotice: "abandoned" | null;
+  publishState: CloudPublishState | null;
+  publishStateLoading: boolean;
   cloudApiBaseUrl: string | null;
   cloudSession: DesktopCloudSession | null;
   storedCloudSession: DesktopCloudSession | null;
@@ -71,10 +80,10 @@ export type DesktopWorkspaceCloudSurfaceController = {
   sessionRestoring: boolean;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onRemoveCloudRemote?: () => Promise<void>;
-  onOpenDetails: () => void;
+  onAbandonPuppyoneBackup: () => void;
   onOpenGitSettings: () => void;
   onSelectSection: (section: CloudWorkspaceSection) => void;
-  onStartPuppyoneBackup: () => void;
+  onStartPuppyoneBackup: (organizationId?: string) => void;
 };
 
 export type WorkspaceSurfaceContentResult = {
@@ -164,6 +173,26 @@ export function useWorkspaceSurfaceContent({
   const cloudToolsNavigationEnabled = cloud.enabled && cloudWorkspace && Boolean(cloud.projectId);
   const projectContext = cloud.projectContext ?? { status: "local-only" as const, projectId: null };
   const cloudNavigationContext = resolveCloudProjectNavigationContext(projectContext);
+  const localOnlyWorkspaceContext = !cloudWorkspace && (
+    projectContext.status === "local-only"
+    || cloud.publishState !== null
+    || cloud.publishStateLoading
+    || (cloud.activeSection === "initialize" && git.activeGitStatus === null)
+  );
+  const cloudEnvironment = useMemo(
+    () => resolveCloudEnvironment({
+      status: git.activeGitStatus,
+      desktopApiBaseUrl: cloud.cloudApiBaseUrl,
+    }),
+    [cloud.cloudApiBaseUrl, git.activeGitStatus],
+  );
+  const cloudAuthState = useCloudSessionForEnvironment({
+    cloudSession: cloud.storedCloudSession,
+    sessionRestoring: cloud.sessionRestoring,
+    restoreEnabled: !localOnlyWorkspaceContext,
+    environment: cloudEnvironment,
+    onCloudSessionChange: cloud.onCloudSessionChange,
+  });
   const needsCloudAccessData = shouldLoadDesktopCloudAccessData({
     workspaceKind,
     activeView: resolvedActiveView,
@@ -187,6 +216,9 @@ export function useWorkspaceSurfaceContent({
   });
   const cloudHistoryError = cloudHistory.error ? formatCloudMessage(cloudHistory.error, t) : null;
   const cloudHistoryWarning = cloudHistory.warning ? formatCloudMessage(cloudHistory.warning, t) : null;
+  const cloudPublishErrorMessage = cloud.publishError
+    ? formatCloudPublishFailure(cloud.publishError, t)
+    : null;
 
   useEffect(() => {
     const accessRows = cloudAccessData.accessRows.filter(isCloudAccessNavigationResource);
@@ -206,7 +238,7 @@ export function useWorkspaceSurfaceContent({
     fileIconTheme: preferences.fileIconTheme,
     cloudBackup: {
       loading: cloud.backupLoading || cloud.backupPending,
-      error: cloud.backupError,
+      error: cloudPublishErrorMessage,
       enabled: cloud.enabled,
       start: cloud.onStartPuppyoneBackup,
     },
@@ -347,17 +379,11 @@ export function useWorkspaceSurfaceContent({
   const cloudServiceSurface = {
     sidebar: (
       <CloudServiceSidebar
-        status={git.activeGitStatus}
-        cloudSession={cloud.storedCloudSession}
-        cloudApiBaseUrl={cloud.cloudApiBaseUrl}
+        cloudAuthState={cloudAuthState}
         activeSection={cloud.activeSection}
         projectContext={cloudNavigationContext.projectContext}
         localWorkspaceContext={cloudNavigationContext.localWorkspaceContext && !cloudWorkspace}
-        localOnlyWorkspaceContext={!cloudWorkspace && (
-          projectContext.status === "local-only"
-          || cloud.backupProjectInitialized === true
-          || (cloud.activeSection === "initialize" && git.activeGitStatus === null)
-        )}
+        localOnlyWorkspaceContext={localOnlyWorkspaceContext}
         projectCapabilities={projectContext.status === "resolved"
           ? projectContext.capabilities ?? []
           : []}
@@ -368,9 +394,8 @@ export function useWorkspaceSurfaceContent({
       <CloudServiceMainView
         workspace={workspace}
         status={git.activeGitStatus}
-        cloudApiBaseUrl={cloud.cloudApiBaseUrl}
-        cloudSession={cloud.storedCloudSession}
-        sessionRestoring={cloud.sessionRestoring}
+        cloudEnvironment={cloudEnvironment}
+        cloudAuthState={cloudAuthState}
         projectContext={cloudWorkspace ? null : projectContext}
         onCloudSessionChange={cloud.onCloudSessionChange}
         activeSection={cloud.activeSection}
@@ -378,14 +403,15 @@ export function useWorkspaceSurfaceContent({
         error={git.gitStatusError}
         cloudBackupLoading={cloud.backupLoading}
         cloudBackupPending={cloud.backupPending}
-        cloudBackupError={cloud.backupError}
-        cloudBackupCanRetry={cloud.backupCanRetry}
-        cloudBackupProjectInitialized={cloud.backupProjectInitialized}
+        cloudPublishError={cloud.publishError}
+        cloudPublishNotice={cloud.publishNotice}
+        cloudPublishState={cloud.publishState}
+        cloudPublishStateLoading={cloud.publishStateLoading}
+        onAbandonPuppyoneBackup={cloud.onAbandonPuppyoneBackup}
         onStartPuppyoneBackup={cloud.onStartPuppyoneBackup}
         onRemoveCloudRemote={cloud.onRemoveCloudRemote}
         onSelectSection={cloud.onSelectSection}
         onRefresh={git.refreshGitStatus}
-        onOpenDetails={cloud.onOpenDetails}
         onOpenGitSettings={cloud.onOpenGitSettings}
         onReviewChanges={() => onNavigate("git")}
       />

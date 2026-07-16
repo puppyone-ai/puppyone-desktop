@@ -8,6 +8,7 @@ import {
   applyCloudBillingPlanChange,
   applyCloudBillingSeatChange,
   cloudApiRequest,
+  createCloudProject,
   createCloudBillingCheckout,
   getCloudTemplate,
   getCloudAutomationOauthAuthorizeUrl,
@@ -59,6 +60,39 @@ afterEach(() => {
 });
 
 describe("cloud API client delegation", () => {
+  it("creates an unseeded Project for an explicit organization with a UUIDv4 retry key", async () => {
+    bridge.mockResolvedValueOnce({ id: "project-1", name: "Local Notes" });
+    const idempotencyKey = "123e4567-e89b-42d3-a456-426614174000";
+
+    await expect(createCloudProject(
+      session,
+      {
+        name: "  Local Notes  ",
+        description: null,
+        org_id: "  org-1  ",
+      },
+      idempotencyKey,
+      undefined,
+      API,
+    )).resolves.toEqual({ id: "project-1", name: "Local Notes" });
+
+    expect(bridge).toHaveBeenCalledWith(expect.objectContaining({
+      path: "/projects/",
+      method: "POST",
+      headers: expect.objectContaining({ "Idempotency-Key": idempotencyKey }),
+      body: JSON.stringify({
+        name: "Local Notes",
+        description: null,
+        org_id: "org-1",
+      }),
+    }));
+    expect(() => createCloudProject(
+      session,
+      { name: "Local Notes", description: null, org_id: "org-1" },
+      "not-a-uuid",
+    )).toThrow(/UUIDv4 idempotency key/);
+  });
+
   it("reads capability-derived seat usage without trusting or mis-encoding organization ids", async () => {
     bridge.mockResolvedValueOnce({ billable_seat_quantity: 2 });
 

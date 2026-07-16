@@ -29,7 +29,7 @@ export const CLOUD_ROUTES = [
     webPath: () => "/projects",
   },
   {
-    id: "overview",
+    id: "projects",
     labelId: "cloud.route.overview.label",
     titleId: "cloud.route.overview.title",
     descriptionId: "cloud.route.overview.description",
@@ -192,16 +192,16 @@ export const CLOUD_GLOBAL_SIDEBAR_ROUTES = [
 ];
 
 export function normalizeCloudSection(
-  section: CloudWorkspaceSection | "cloud-settings" | "integrations",
+  section: CloudWorkspaceSection | "cloud-settings" | "integrations" | "overview",
 ): CloudWorkspaceSection {
-  if (section === "cloud-settings") return "overview";
+  if (section === "cloud-settings" || section === "overview") return "projects";
   if (section === "integrations") return "automation";
   if (section === "mcp-cli" || section === "git-sync") return "access";
   return section;
 }
 
 export function getCloudRoute(section: CloudWorkspaceSection): CloudRouteDescriptor {
-  return CLOUD_ROUTE_BY_ID[section] ?? CLOUD_ROUTE_BY_ID.overview;
+  return CLOUD_ROUTE_BY_ID[section] ?? CLOUD_ROUTE_BY_ID.projects;
 }
 
 export function getCloudSectionDescriptor(section: CloudWorkspaceSection, t: MessageFormatter) {
