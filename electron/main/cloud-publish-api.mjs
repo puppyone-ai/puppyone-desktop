@@ -176,12 +176,14 @@ function validateCreatedProject(value, record) {
   if (!projectId || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(projectId)) {
     throw createPublishError("PROJECT_CREATE_FAILED", "Cloud returned an invalid Project identity.", false);
   }
-  if (value.org_id !== undefined && value.org_id !== record.organization_id) {
+  if (value.org_id !== record.organization_id) {
     throw createPublishError("PROJECT_CREATE_FAILED", "Cloud returned a Project in a different organization.", false);
   }
-  if (value.name !== undefined && value.name !== record.project_name) {
-    throw createPublishError("PROJECT_CREATE_FAILED", "Cloud returned a different Project name.", false);
-  }
+  // The control plane may atomically allocate a collision-free default name
+  // (for example, "Untitled Project 2"). Repository identity is the returned
+  // Project id inside the exact requested Organization; a display-name rewrite
+  // is not an identity mismatch and must not strand an idempotently-created
+  // Project before its id has been journaled.
   return projectId;
 }
 

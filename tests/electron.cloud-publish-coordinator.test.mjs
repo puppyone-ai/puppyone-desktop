@@ -186,6 +186,36 @@ describe("Cloud publish coordinator", () => {
     expect(creates[0].body).toEqual(creates[1].body);
   });
 
+  it("accepts a server-allocated display name without losing the durable Project identity", async () => {
+    const fixture = await createFixture("main");
+    fixture.cloud.projectName = "Untitled Project 2";
+
+    const result = await createCoordinator(fixture).startOrResume({
+      ...fixture.request,
+      projectName: "Untitled Project",
+    });
+
+    expect(result).toMatchObject({ ok: true, state: { phase: "completed" } });
+    expect(fixture.cloud.requests.find((entry) => entry.path === "/projects/")?.body.name)
+      .toBe("Untitled Project");
+    expect(fixture.cloud.requests.filter((entry) => entry.path.endsWith("/git-credentials")))
+      .toHaveLength(1);
+  });
+
+  it("rejects a Project response that omits the explicitly requested Organization", async () => {
+    const fixture = await createFixture("main");
+    fixture.cloud.omitProjectOrganization = true;
+
+    const result = await createCoordinator(fixture).startOrResume(fixture.request);
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "PROJECT_CREATE_FAILED", retryable: false },
+    });
+    expect(fixture.cloud.requests.filter((entry) => entry.path.endsWith("/git-credentials")))
+      .toHaveLength(0);
+  });
+
   it("reconciles a crash after the push side effect without creating another Project", async () => {
     const fixture = await createFixture("main");
     const crash = Object.assign(new Error("crash after push"), { simulateCrash: true });
@@ -371,7 +401,11 @@ function createCloud(_root, _bare) {
       requests.push({ path: requestPath, init, body });
       if (requestPath === "/projects/") {
         if (cloud.projectGate) await cloud.projectGate;
-        return { id: "project-1", org_id: body.org_id, name: body.name };
+        return {
+          id: "project-1",
+          ...(cloud.omitProjectOrganization ? {} : { org_id: body.org_id }),
+          name: cloud.projectName ?? body.name,
+        };
       }
       if (requestPath === "/projects/project-1/git-credentials") {
         return {
