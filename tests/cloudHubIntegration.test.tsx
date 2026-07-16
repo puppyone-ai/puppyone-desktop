@@ -1128,6 +1128,51 @@ describe("Local-only Cloud page", () => {
     expect(onPublishWorkspace).toHaveBeenCalledOnce();
   });
 
+  it("renders a publish failure exactly once on the Initialize page", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudServiceMainView
+          {...testCloudMainState(session, "https://cloud.example")}
+          cloudPublishError={{ code: "PUSH_FAILED", retryable: true }}
+          workspace={{ id: "local-error", name: "Local Error", path: "/tmp/local-error" }}
+          status={{
+            isRepo: true,
+            branch: "main",
+            headCommitId: "head-1",
+            totalCommits: 1,
+            entries: [],
+            branches: [],
+            stagedEntries: [],
+            unstagedEntries: [],
+            untrackedEntries: [],
+            remotes: [],
+          } as unknown as GitStatusSnapshot}
+          projectContext={{ status: "local-only", projectId: null }}
+          onCloudSessionChange={vi.fn()}
+          activeSection="initialize"
+          loading={false}
+          error={null}
+          cloudBackupLoading={false}
+          cloudBackupPending={false}
+          onStartPuppyoneBackup={vi.fn()}
+          onSelectSection={vi.fn()}
+          onRefresh={vi.fn()}
+          onOpenGitSettings={vi.fn()}
+          onReviewChanges={vi.fn()}
+        />,
+      );
+      await flushPromises();
+    });
+
+    const publishFailure = "Unable to publish this project to PuppyOne Cloud.";
+    expect(Array.from(container.querySelectorAll(".desktop-cloud-main-alert"))
+      .filter((alert) => alert.textContent === publishFailure)).toHaveLength(1);
+  });
+
   it("shows Git status loading and real failures instead of treating an unknown status as a folder", async () => {
     const onRefresh = vi.fn();
     const container = document.createElement("div");
