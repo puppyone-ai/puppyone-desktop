@@ -7,6 +7,22 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const errors = [];
 
+const publishContract = JSON.parse(read("contracts/cloud-project-publish-v1.json"));
+if (
+  publishContract.contract !== "puppyone.cloud-project-publish"
+  || publishContract.version !== 1
+  || publishContract.identity?.local_binding !== false
+  || publishContract.identity?.device_registration !== false
+  || publishContract.identity?.repository_target !== "project_root"
+  || publishContract.operations?.create_empty_project?.additional_properties !== false
+  || publishContract.operations?.issue_project_root_credential?.response_echoes_credential !== false
+  || publishContract.operations?.abandon_empty_initialization?.server_confirmation_precedes_local_cleanup !== true
+  || publishContract.git?.network_target_source !== "journaled canonical remote URL"
+  || publishContract.git?.force_push !== false
+) {
+  errors.push("the cross-repository Cloud Project publish contract is incomplete or incompatible");
+}
+
 const workspaceFacade = read("local-api/workspace.mjs");
 const workspaceLines = countLines(workspaceFacade);
 if (workspaceLines > 3_400) {

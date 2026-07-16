@@ -32,7 +32,7 @@ content path.
 |---|---|
 | Organization choice | explicit user choice; auto-selection is allowed only when exactly one Organization is available |
 | Project identity | Cloud control-plane response, keyed by the publish operation |
-| Local repository identity | worktree-specific Git common-dir/git-dir identity resolved by Electron main |
+| Local repository identity | Git common-dir plus worktree git-dir identity resolved by Electron main |
 | Cloud repository locator | exact canonical Project-root Git URL |
 | Human authorization | current Cloud session and server-side `ProjectGrant` |
 | Git authorization | operation-owned Git credential and server-side `RuntimeGrant` |
@@ -55,12 +55,16 @@ worktree-specific Git administrative directory and is bound to:
 - captured branch and commit SHA;
 - created Project and canonical remote, once known;
 - opaque secret-vault reference and credential ID, never plaintext secret;
-- current phase and last typed recoverable error.
+- current phase and monotonic journal revision.
 
 Writes use a mode-`0600` temporary file, file sync, atomic rename, and parent
-directory sync. A completed or successfully abandoned operation removes both
-the journal and operation secret. Shared `.puppyone/config.json` contains none
-of this state.
+directory sync. The worktree-specific journal is protected by a repository-wide
+cross-process lease stored under the Git common-dir, so linked worktrees and
+multiple Desktop processes cannot mutate the shared remote/config concurrently.
+A live owner PID is never displaced merely because the machine slept or its
+event loop stalled; stale takeover uses a token-fenced lock to prevent ABA.
+A completed or successfully abandoned operation removes both the journal and
+operation secret. Shared `.puppyone/config.json` contains none of this state.
 
 This record must never become a durable checkout inventory. Cloud never sees a
 local path, worktree identity, journal ID distinct from the mutation's
@@ -91,8 +95,11 @@ Every forward step is idempotent:
   payload and rejects key reuse with a different payload.
 - Remote creation is add-only. Resume accepts an existing remote only when its
   URL exactly equals the journal's canonical URL.
-- Push validates the expected remote URL, branch, and SHA while holding the
-  repository mutation lock.
+- Before any secret read or network Git command, Resume revalidates the
+  journaled URL against the exact Project path and trusted Cloud origin.
+- Every network command uses the validated canonical URL literal, not the
+  mutable remote name, and validates the expected branch and SHA while holding
+  both the process-local repository lock and cross-process lease.
 - An uncertain push result is reconciled with `ls-remote`. Matching expected
   SHA means success; a different remote head is a conflict and is never force
   overwritten.
@@ -131,6 +138,15 @@ protected through an OS-backed secret-vault abstraction. The journal stores
 only an opaque reference; the Renderer, logs, error payloads, workspace config,
 and Git remote URL never contain the secret.
 
+Main selects only an allowlisted OS credential helper, snapshots the exact
+pre-existing URL-scoped Git credential config, and installs managed values in a
+crash-recoverable order. Credential approve/reject and every saga network
+command also receive a command-scoped helper reset, so concurrently changed
+repository or global helper config cannot receive the secret. The durable
+URL-scoped snapshot remains after a successful publish solely so Detach can
+remove the credential and restore the exact prior config; it is not a Cloud
+checkout or device record.
+
 Abandon revokes only the credential owned by the publish operation. It removes
 the local remote only if its current URL still exactly matches the
 operation-owned canonical URL. It never edits, stages, commits, resets, stashes,
@@ -147,7 +163,14 @@ or discards user files.
 - Abandon not allowed because Cloud already accepted content: keep the Project
   and offer normal repair/open actions.
 - Session generation changes: retry internally and never show
-  `SESSION_CHANGED`.
+  `SESSION_CHANGED`; a retry is permitted only for the same authenticated
+  actor and an exact read or idempotency-keyed mutation.
+
+Configuring an existing Project remote uses the same main-owned journal,
+secret-vault, lease, URL validation, helper isolation, and compensation
+primitives. It does not create a Project or push content. If its success
+response is lost after cleanup, an exact canonical remote plus a fresh
+ProjectGrant check reconstructs success idempotently.
 
 ## Non-negotiable invariants
 

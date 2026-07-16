@@ -145,8 +145,9 @@ contract is defined in
 [Cloud Project Publish Coordinator](cloud-publish-coordinator.md).
 
 Configuring a local checkout for an existing Cloud Project remains a separate
-explicit operation that selects a Project/root-or-Scope target before issuing
-the credential.
+explicit operation, but Desktop always connects the canonical Project-root
+repository. A future specialized scoped Git view is a different product
+surface; it must not silently replace the root repository used by Desktop.
 
 Removing Cloud access from a folder removes the local remote and related local
 sync preferences. It is not a server-side folder operation. Credential

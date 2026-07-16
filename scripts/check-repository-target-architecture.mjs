@@ -56,7 +56,13 @@ for (const required of [
 }
 
 const cloudApi = read("src/lib/cloudApi.ts");
-if (!cloudApi.includes('REPOSITORY_TARGET_CONTRACT_VERSION = "2"')) {
+const repositoryContract = read("shared/repositoryContract.js");
+if (
+  !repositoryContract.includes('REPOSITORY_TARGET_CONTRACT_HEADER = "X-PuppyOne-Repository-Contract"')
+  || !repositoryContract.includes('REPOSITORY_TARGET_CONTRACT_VERSION = "2"')
+  || !cloudApi.includes('from "../../shared/repositoryContract.js"')
+  || !cloudApi.includes("[REPOSITORY_TARGET_CONTRACT_HEADER]: REPOSITORY_TARGET_CONTRACT_VERSION")
+) {
   errors.push("Desktop Cloud requests must advertise repository-target contract v2");
 }
 if (!cloudApi.includes("getCloudRepositoryContext") || cloudApi.includes("remote_url")) {
