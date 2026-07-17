@@ -1,7 +1,7 @@
 .desktop-ai-edit-review-floating {
   position: absolute;
   top: 12px;
-  right: 14px;
+  inset-inline-end: 14px;
   z-index: 65;
   width: min(360px, calc(100% - 28px));
   pointer-events: none;
@@ -81,7 +81,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--po-text);
-  text-align: left;
+  text-align: start;
 }
 
 .mini-change-row:hover {
@@ -187,7 +187,7 @@
 .ai-edit-review-popover {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;
+  inset-inline-end: 0;
   display: flex;
   width: min(520px, calc(100vw - 36px));
   max-height: min(520px, calc(100vh - 132px));

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Readable } from "node:stream";
 import {
   buildLocalFileCapabilityUrl,
   createLocalFileCapabilityStore,
@@ -135,6 +136,58 @@ describe("puppyone-local protocol capability enforcement", () => {
     expect((await handler(createRequest(url.replace(token, "invalid"), "null"))).status).toBe(403);
   });
 
+  it("serves bounded video ranges and metadata-only HEAD requests", async () => {
+    const store = createLocalFileCapabilityStore();
+    const token = store.issue({
+      senderId: 9,
+      rootPath: ROOT,
+      relativePath: "media/demo.mp4",
+      purpose: "markdown-asset",
+    });
+    const url = buildLocalFileCapabilityUrl({
+      relativePath: "media/demo.mp4",
+      token,
+      purpose: "markdown-asset",
+    });
+    const {
+      handler,
+      openWorkspaceFileRangeStream,
+      readWorkspaceFile,
+      statWorkspaceFile,
+    } = createProtocolHarness(store);
+    openWorkspaceFileRangeStream.mockResolvedValueOnce({
+      stream: Readable.from([Buffer.from([3, 4, 5])]),
+      size: 10,
+      start: 2,
+      end: 4,
+      partial: true,
+      unsatisfiable: false,
+    });
+    statWorkspaceFile.mockResolvedValueOnce({ size: 10 });
+
+    const ranged = await handler(createRequest(url, "null", { Range: "bytes=2-4" }));
+    expect(ranged.status).toBe(206);
+    expect(ranged.headers.get("accept-ranges")).toBe("bytes");
+    expect(ranged.headers.get("content-range")).toBe("bytes 2-4/10");
+    expect(ranged.headers.get("content-length")).toBe("3");
+    expect(openWorkspaceFileRangeStream).toHaveBeenCalledWith(
+      ROOT,
+      "media/demo.mp4",
+      "bytes=2-4",
+    );
+    expect(readWorkspaceFile).not.toHaveBeenCalled();
+
+    const head = await handler({
+      ...createRequest(url, "null"),
+      method: "HEAD",
+    });
+    expect(head.status).toBe(200);
+    expect(head.headers.get("content-length")).toBe("10");
+    expect(head.headers.get("accept-ranges")).toBe("bytes");
+    expect(statWorkspaceFile).toHaveBeenCalledWith(ROOT, "media/demo.mp4");
+    expect(readWorkspaceFile).not.toHaveBeenCalled();
+  });
+
   it("rejects an external web origin even when it presents a valid token", async () => {
     const store = createLocalFileCapabilityStore();
     const token = store.issue({ senderId: 9, rootPath: ROOT, relativePath: "report.xlsx" });
@@ -184,9 +237,13 @@ function createProtocolHarness(store) {
     }),
   };
   const readWorkspaceFile = vi.fn(async () => Buffer.from([1, 2, 3]));
+  const openWorkspaceFileRangeStream = vi.fn();
+  const statWorkspaceFile = vi.fn(async () => ({ size: 3 }));
   registerLocalFileProtocol({
     protocol,
     readWorkspaceFile,
+    openWorkspaceFileRangeStream,
+    statWorkspaceFile,
     getMimeType: () => "application/octet-stream",
     canonicalizeWorkspacePath: async (value) => value,
     isOpenWorkspaceRoot: () => true,
@@ -194,13 +251,18 @@ function createProtocolHarness(store) {
     applicationUrl: "file:///Applications/puppyone/dist/index.html",
   });
   if (!handler) throw new Error("Protocol handler was not registered.");
-  return { handler, readWorkspaceFile };
+  return {
+    handler,
+    openWorkspaceFileRangeStream,
+    readWorkspaceFile,
+    statWorkspaceFile,
+  };
 }
 
-function createRequest(url, origin) {
+function createRequest(url, origin, headers = {}) {
   return {
     url,
     method: "GET",
-    headers: new Headers(origin ? { Origin: origin } : {}),
+    headers: new Headers({ ...(origin ? { Origin: origin } : {}), ...headers }),
   };
 }

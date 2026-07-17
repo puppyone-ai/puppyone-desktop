@@ -1,0 +1,19 @@
+{
+  "loading": "正在加载…",
+  "explorer.root": "根目录",
+  "explorer.emptyFolder": "空文件夹",
+  "explorer.loadingWorkspace": "正在加载工作区…",
+  "explorer.create": "新建",
+  "explorer.more": "更多",
+  "explorer.access": "访问",
+  "explorer.resizeSidebar": "调整侧边栏大小",
+  "explorer.cutLabel": "{name}，已剪切",
+  "navigation.back": "返回",
+  "preview.selectFile": "请选择要预览的文件",
+  "preview.crashed": "无法呈现此编辑器。",
+  "status.clean": "无更改",
+  "status.modified": "已修改",
+  "status.created": "已创建",
+  "status.deleted": "已删除",
+  "status.moved": "已移动"
+}

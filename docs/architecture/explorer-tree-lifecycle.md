@@ -1,8 +1,8 @@
 # Explorer Tree Lifecycle
 
 This document records the lifecycle boundary for the files explorer tree:
-loading folders, expanding folders, rendering subtree motion, and drawing guide
-lines.
+loading folders, expanding folders, rendering bounded virtual motion, and
+drawing guide lines.
 
 For the outer Data, Git, Cloud, and Settings sidebar view stack, see
 [Desktop Sidebar View Stack](desktop-sidebar-view-stack.md).
@@ -16,20 +16,22 @@ The desktop explorer sidebar lazy-loads folder children and can display the file
 tree inside a sidebar column that also hosts custom surfaces for Git, Cloud, and
 Settings.
 
-Two unstable behaviors can appear if data state, view lifecycle, and animation
-presence are all coupled in one component:
+Three unstable behaviors can appear if data state, view lifecycle,
+virtualization, and animation presence are coupled in one component:
 
 1. A folder's first expansion animates to a single loading row, then jumps to the
    final multi-row height after children arrive.
 2. Switching from another desktop tab back to the data view replays expansion
    animations for folders that were already open.
+3. Replacing recursive subtrees with a flat virtual list removes the old height
+   transition entirely, or attempts to restore it by mounting/measuring the full
+   subtree and loses the renderer-performance bound.
 
-The first behavior is owned by the explorer-tree lifecycle. The second behavior
-is owned by the sidebar view stack. Both are architecture problems, not
-animation-tuning problems. The tree cannot infer whether a visible subtree is a
-fresh user expand, a restored already-open subtree, or a lazy-load completion if
-data state, view lifecycle, and animation presence are all coupled in one
-component.
+The first and third behaviors are owned by the explorer-tree lifecycle. The
+second is owned by the sidebar view stack. All are architecture problems, not
+animation-tuning problems. The tree cannot infer whether visible descendants
+represent a fresh user expand, restored state, lazy-load completion, or virtual
+row recycling if these concepts are coupled in one component.
 
 ## Design Goal
 
@@ -40,22 +42,24 @@ The sidebar file tree must behave as a stable controlled view:
   height.
 - User-initiated expand/collapse still animates.
 - Returning to the data tab does not replay existing expansion animations.
-- Tree guide lines are rendered at subtree scope so each indentation level
-  extends through its full child group.
+- Expansion motion never mounts or measures the complete subtree.
+- Current rows plus exit visuals never exceed the 100-row DOM budget.
+- Guide segments move with their virtual row and remain visually continuous.
 - File-tree rows keep symmetric visual horizontal gutters whether or not the
   native sidebar scrollbar is present.
 
 ## Final Architecture
 
-The explorer path uses four separate concepts:
+The explorer path uses five separate concepts:
 
 - Data loading state: which folders have children loaded and which folders are
   currently loading.
 - Expansion state: which folder paths are logically expanded.
 - View lifecycle: whether the files sidebar surface or a custom sidebar surface
   is currently active.
-- Motion lifecycle: whether a subtree is initially present or is transitioning
-  because expansion changed after mount.
+- Visible model: the complete flattened row order and path/index lookup maps.
+- Motion lifecycle: a short-lived FLIP plan for only the currently mounted
+  virtual rows after expansion changed.
 
 `DataWorkspace` owns data loading and expansion state. `ExplorerTree` receives
 `expandedPaths` and `loadingPaths` as controlled props and renders rows from
@@ -66,15 +70,17 @@ or Settings sidebars are active. That outer lifecycle is documented in
 [Desktop Sidebar View Stack](desktop-sidebar-view-stack.md). The tree lifecycle
 assumes tab switching will not unmount the file tree subtree.
 
-Subtree animation is split into a presence layer and a motion layer:
+`explorerVisibleModel.ts` owns full-tree flattening. The virtual window owns the
+mounted slice and hard 100-row limit. `explorerMotionPlan.ts` compares the
+previous and next visible models and emits compositor-only instructions for
+that slice: new rows enter, surviving rows move by their inverse index delta,
+and removed rows become inert exit ghosts only when spare DOM capacity exists.
+`useExplorerMotion.ts` owns plan generation, timeout cleanup, and cancellation
+when the virtual window scrolls.
 
-- `ExplorerSubtreePresence` decides whether a subtree should remain mounted
-  during enter/exit.
-- `ExplorerSubtreeMotion` animates only transitions that occur after initial
-  presence has committed.
-
-This is equivalent to the common motion rule `initial={false}`: initial render
-represents current state; subsequent state changes animate.
+This keeps the UX equivalent to the common motion rule `initial={false}`:
+initial/restored state is already settled; only a post-mount expansion change
+animates. It does so without recreating recursive subtree DOM.
 
 ## Implementation Rules
 
@@ -88,9 +94,8 @@ represents current state; subsequent state changes animate.
 
    For folders without loaded children, `DataWorkspace` must call
    `dataPort.listChildren(folderPath)` and attach the children before adding the
-   folder path to `expandedFolderPaths`. This prevents expansion animation from
-   measuring a temporary one-row loading placeholder and then stretching to the
-   real content height.
+   folder path to `expandedFolderPaths`. This prevents motion from first
+   animating a temporary loading row and then replaying for the real children.
 
 3. Treat root loading separately from empty root state.
 
@@ -98,31 +103,45 @@ represents current state; subsequent state changes animate.
    `tree.length`. Use explicit root-loaded state so an empty root can be a stable
    loaded state.
 
-4. Keep presence and motion separate.
+4. Keep the visible model, virtual window, and motion plan separate.
 
    Row rendering should not guess whether an expansion is a user action, a tab
-   restore, or an initial render. Presence owns mount/exit retention; motion
-   owns height measurement and animation.
+   restore, or an initial render. The controlled expansion set produces a pure
+   visible model. The virtual window chooses the mounted slice. Motion compares
+   committed models only after mount and never changes canonical row state.
 
-5. Initial subtree presence must not animate.
+5. Initial or recycled rows must not animate.
 
-   If a subtree is already expanded when it first appears in the mounted tree,
-   render it at `height: auto`. Only expansion or collapse after that mounted
-   presence should animate.
+   If a folder is already expanded on first render or tab return, its rows are
+   settled immediately. If scrolling changes the virtual window while the full
+   visible model is unchanged, cancel motion so recycled rows cannot appear to
+   enter. Respect `prefers-reduced-motion` for both row and disclosure motion.
 
-6. Draw indentation guides at subtree scope.
+6. Animate with compositor properties and a strict row cap.
 
-   Per-row guide lines create broken vertical guides. The guide for a level
-   belongs to the subtree content wrapper so it can extend through all rendered
-   descendants.
+   Do not measure `scrollHeight` or animate height/top for an expanded subtree.
+   Current rows use FLIP translate transforms; entering/exiting rows may also
+   use opacity and a very small scale. Exit ghosts are `aria-hidden`, inert,
+   pointer-free, short-lived, and admitted only while current rows plus ghosts
+   stay at or below 100.
 
-7. Keep tab-return behavior delegated to the sidebar view stack.
+7. Keep guide geometry inside the motion shell.
+
+   A virtual list has no mounted subtree wrapper. Each mounted row therefore
+   draws every ancestor guide column implied by its depth. One depth-bounded,
+   horizontally repeating background layer belongs to the inner motion shell;
+   it renders all columns without adding one DOM node per ancestor and
+   translates with the row instead of lagging behind it. Adjacent fixed-height
+   segments form continuous guides, including the outer columns of deeply
+   nested rows.
+
+8. Keep tab-return behavior delegated to the sidebar view stack.
 
    The tree should not special-case Git, Cloud, or Settings. It should receive a
    stable mounted lifecycle from the sidebar stack and focus only on controlled
    tree state.
 
-8. Follow the shared sidebar scroll-list layout contract.
+9. Follow the shared sidebar scroll-list layout contract.
 
    The files explorer follows
    [Desktop Sidebar Scroll Lists](desktop-sidebar-scroll-lists.md): the scroll
@@ -132,7 +151,7 @@ represents current state; subsequent state changes animate.
    right content insets are both `12px`; on the right that is the reserved
    `6px` gutter plus `6px` list padding.
 
-9. Keep root-level creation available without a root command row.
+10. Keep root-level creation available without a root command row.
 
    The desktop files sidebar should not repeat the project name already shown in
    the titlebar. It also does not need a persistent root command row when that
@@ -153,27 +172,43 @@ represents current state; subsequent state changes animate.
 
 ## Current Code Boundaries
 
-- `vendor/shared-ui/src/data/DataWorkspace.tsx`
+- `packages/shared-ui/src/data/DataWorkspace.tsx`
   - owns `expandedFolderPaths`
   - owns `loadingFolderPaths`
   - owns root loaded state and load generation
   - loads folder children before expanding unloaded folders
   - renders the keep-alive explorer view stack
 
-- `vendor/shared-ui/src/data/ExplorerTree.tsx`
+- `packages/shared-ui/src/data/ExplorerTree.tsx`
   - receives `expandedPaths` and `loadingPaths`
-  - renders the controlled tree
+  - renders the controlled, virtualized tree
   - owns transient drag/drop UI state only
   - exposes root and node context-menu hooks without owning desktop menu UI
-  - contains subtree presence and motion helpers
+  - applies Web Animations to the bounded FLIP plan
 
-- `vendor/shared-ui/src/styles/data-workspace.css`
-  - defines subtree-level guide lines
+- `packages/shared-ui/src/data/explorer/explorerVisibleModel.ts`
+  - produces the complete stable row order and navigation maps
+
+- `packages/shared-ui/src/data/explorer/explorerRowInteraction.ts`
+  - derives primitive mounted-row interaction state without render-time store
+    mutation; the memoized row comparator limits selection re-rendering
+
+- `packages/shared-ui/src/data/explorer/useExplorerVirtualWindow.ts`
+  - owns overscan, scroll-to-active, and the hard 100-row mounted limit
+
+- `packages/shared-ui/src/data/explorer/explorerMotionPlan.ts`
+  - computes pure enter/move/exit instructions bounded to mounted rows
+
+- `packages/shared-ui/src/data/explorer/useExplorerMotion.ts`
+  - compares committed layouts and owns plan cleanup/scroll cancellation
+
+- `packages/shared-ui/src/styles/data-workspace.css`
+  - defines virtual-row motion shells and aligned guide segments
   - defines the explorer WebKit scrollbar styling, the reserved scrollbar
     gutter, and the gutter-compensated list padding
   - preserves inactive frame layout through the sidebar view-stack styles
 
-These files live in `vendor/shared-ui` — the canonical copy in this standalone
+These files live in `packages/shared-ui` — the canonical copy in this standalone
 repo (ISSUE-021). Edit them in place; there is no upstream to sync from.
 
 ## Verification
@@ -190,10 +225,14 @@ Manual verification should cover:
 
 - expanding a never-loaded folder with multiple children
 - expanding and collapsing an already-loaded folder
+- expanding/collapsing a folder near the top of a 1,000-row tree and confirming
+  the rows below move smoothly without mounting the intervening tree
 - switching from Data to Git and back after several folders are expanded
 - switching from Data to Cloud and Settings and back
 - selecting a deep file path that auto-expands ancestor folders
-- verifying subtree guide lines are continuous through nested folders
+- verifying guide segments remain aligned during enter, move, and exit
+- verifying reduced-motion disables row and disclosure transitions
+- verifying current rows plus exit ghosts never exceed 100
 - verifying explorer row backgrounds keep `12px` visual left and right gutters
   inside the scrollport, and that row width stays identical between short
   (non-scrolling) and long (scrolling) trees
@@ -220,8 +259,13 @@ These invariants should remain true after future changes:
   attached.
 - The files explorer remains mounted across desktop sidebar tab switches.
 - Inactive explorer frames preserve layout geometry.
-- Initial subtree presence does not animate; post-mount expansion/collapse does.
-- Tree guide lines are subtree-scoped, not row-scoped.
+- Initial/tab-restored state and scroll recycling do not animate;
+  post-mount expansion/collapse does.
+- Motion work and DOM presence are bounded by the virtual window; current rows
+  plus exit ghosts never exceed 100.
+- Expansion uses transform/opacity only and never measures a full subtree.
+- Every ancestor guide column lives in one depth-bounded layer inside the row
+  motion shell and moves with it; nested depth must not increase DOM count.
 - Explorer rows keep the same geometry in short and long lists. The scroll
   container reserves the scrollbar gutter; rows never compensate for scrollbar
   width in their own spacing.

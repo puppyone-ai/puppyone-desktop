@@ -1,7 +1,10 @@
 import { createRequire } from "node:module";
+import { capabilityForCoreViewer } from "./preset-viewer-manifest.mjs";
+
+export { capabilityForCoreViewer } from "./preset-viewer-manifest.mjs";
 
 const require = createRequire(import.meta.url);
-const registryJson = require("../../../vendor/shared-ui/src/core/fileFormats.json");
+const registryJson = require("../../../packages/shared-ui/src/core/fileFormats.json");
 
 /**
  * Main-process mirror of the core file-format policy, backed by the same JSON
@@ -9,16 +12,12 @@ const registryJson = require("../../../vendor/shared-ui/src/core/fileFormats.jso
  * activation time; the renderer's route is only a presentation hint.
  */
 
-const EDIT_VIEWERS = new Set([
-  "markdown-editor",
-  "plain-text",
-  "monaco-code",
-  "csv-table",
-  "json-table",
-]);
-const PLACEHOLDER_VIEWERS = new Set(["binary-placeholder"]);
 const formats = Array.isArray(registryJson.formats) ? registryJson.formats : [];
 const unknownFormat = registryJson.unknownFormat ?? { defaultViewer: "binary-placeholder" };
+
+for (const format of [...formats, unknownFormat]) {
+  capabilityForCoreViewer(format.defaultViewer ?? "binary-placeholder");
+}
 
 const filenameIndex = new Map();
 const mimeIndex = new Map();
@@ -50,13 +49,21 @@ export function resolveCoreFormatPolicy({ name, mimeType = null }) {
   const mime = normalizeMime(mimeType);
   if (!format && mime) format = mimeIndex.get(mime) ?? null;
   if (!format && mime.startsWith("image/")) {
-    return { formatId: "image-unknown", viewerId: "image-preview", capability: "preview" };
+    return {
+      formatId: "image-unknown",
+      viewerId: "image-preview",
+      capability: capabilityForCoreViewer("image-preview"),
+    };
   }
   if (
     !format &&
     (mime.startsWith("text/") || mime === "application/javascript" || mime === "application/typescript")
   ) {
-    return { formatId: "text-unknown", viewerId: "plain-text", capability: "edit" };
+    return {
+      formatId: "text-unknown",
+      viewerId: "plain-text",
+      capability: capabilityForCoreViewer("plain-text"),
+    };
   }
 
   const resolved = format ?? unknownFormat;
@@ -66,12 +73,6 @@ export function resolveCoreFormatPolicy({ name, mimeType = null }) {
     viewerId,
     capability: capabilityForCoreViewer(viewerId),
   };
-}
-
-export function capabilityForCoreViewer(viewerId) {
-  if (EDIT_VIEWERS.has(viewerId)) return "edit";
-  if (PLACEHOLDER_VIEWERS.has(viewerId)) return "placeholder";
-  return "preview";
 }
 
 function normalizeMime(value) {

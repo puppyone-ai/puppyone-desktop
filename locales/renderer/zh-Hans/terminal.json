@@ -1,0 +1,11 @@
+{
+  "title": "终端",
+  "actions": "终端操作",
+  "clear": "清空终端",
+  "reset": "重置终端",
+  "bridgeUnavailable": "终端桥接不可用。请在 puppyone 中打开此工作区。",
+  "processExitedSignal": "进程因信号 {signal} 退出。",
+  "processExitedCode": "进程已退出，退出码为 {code}。",
+  "runtimeRestartRequired": "终端运行时已更新。请重启一次 puppyone，以便加载原生桥接。",
+  "errorDetail": "终端错误：{detail}"
+}

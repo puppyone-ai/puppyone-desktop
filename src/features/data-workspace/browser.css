@@ -35,7 +35,8 @@
 
 .file-list-head {
   height: 28px;
-  padding: 0 18px 0 46px;
+  padding-block: 0;
+  padding-inline: 46px 18px;
   color: var(--po-text-disabled);
   font-size: 11px;
   font-weight: 700;
@@ -51,7 +52,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--po-text);
-  text-align: left;
+  text-align: start;
 }
 
 .file-row:hover,
@@ -69,7 +70,7 @@
 
 .file-kind-icon {
   position: absolute;
-  left: 13px;
+  inset-inline-start: 13px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -80,7 +81,7 @@
 .file-name {
   display: grid;
   min-width: 0;
-  padding-left: 26px;
+  padding-inline-start: 26px;
   gap: 2px;
 }
 
@@ -146,7 +147,7 @@
   flex-direction: column;
   gap: 0;
   background: var(--po-panel);
-  border-left: 1px solid var(--po-divider);
+  border-inline-start: 1px solid var(--po-divider);
 }
 
 .file-preview-shell {
@@ -274,7 +275,7 @@
   border: 1px solid var(--po-divider);
   background: var(--po-canvas);
   color: var(--po-text);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-data-workspace-wrap {
@@ -285,7 +286,10 @@
   --po-tree-row-radius: var(--desktop-sidebar-row-radius);
   --po-tree-row-content-left: var(--desktop-sidebar-row-content-left);
   --po-tree-row-content-right: var(--desktop-sidebar-row-content-right);
-  --po-tree-row-icon-label-gap: 4px;
+  --po-tree-row-icon-label-gap: var(--desktop-sidebar-icon-label-gap);
+  --po-tree-row-font-size: var(--desktop-sidebar-font-size);
+  --po-tree-row-font-weight: var(--desktop-sidebar-font-weight);
+  --po-tree-row-line-height: var(--desktop-sidebar-line-height);
   --po-tree-root-top-gap: var(--desktop-sidebar-section-top-gap);
   --po-tree-no-root-top-gap: var(--desktop-sidebar-list-padding-block);
   --po-tree-list-bottom-gap: var(--desktop-sidebar-list-padding-block);
@@ -329,7 +333,7 @@
   --po-active: rgba(211, 208, 197, 0.11);
   --po-selected: rgba(211, 208, 197, 0.14);
   --po-control-hover: rgba(211, 208, 197, 0.12);
-  --po-tree-guide: rgba(185, 182, 174, 0.18);
+  --po-tree-guide: rgba(185, 182, 174, 0.15);
   --po-file-icon-body: #24231f;
   --po-file-icon-fold: #2d2a25;
   --po-file-icon-stroke: rgba(185, 182, 174, 0.62);
@@ -338,7 +342,7 @@
 }
 
 .desktop-data-workspace-wrap .tree-row.root .tree-label {
-  font-size: 13px;
+  font-size: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));
   font-weight: 600;
-  line-height: 18px;
+  line-height: var(--desktop-sidebar-line-height, 18px);
 }

@@ -6,7 +6,7 @@ import {
   inferCodeLanguageFromPath,
   parseMarkdownCodeFenceInfo,
   serializeMarkdownCodeBlock,
-} from "../vendor/shared-ui/src/editor/markdown/features/code-block/codeBlockModel";
+} from "../packages/shared-ui/src/editor/markdown/features/code-block/codeBlockModel";
 
 describe("Markdown code-fence metadata", () => {
   it("recognizes legacy line-range filenames and infers the language", () => {

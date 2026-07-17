@@ -1,5 +1,6 @@
 import { Check, FileText } from "lucide-react";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useLocalization } from "@puppyone/localization/react";
 import { PageLoading } from "../../../../components/loading";
 import type {
   DesktopCloudSession,
@@ -30,6 +31,7 @@ export function CreateAccessFolderTree({
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onSelect: (path: string) => void;
 }) {
+  const { t } = useLocalization();
   const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(
     () => new Set(["", ...ancestorPaths(initialExpandedPath ?? "")]),
   );
@@ -58,7 +60,7 @@ export function CreateAccessFolderTree({
 
   return (
     <section className="desktop-cloud-create-access-tree">
-      <header>Choose from Files</header>
+      <header>{t("cloud.access.create.chooseFromFiles")}</header>
       <div className="desktop-cloud-create-access-tree-body">
         <TreeRootRow />
         <FolderChildren
@@ -83,7 +85,7 @@ export function CreateAccessFolderTree({
 export function TreeDisclosureMarker({ expanded = false, size = 12 }: { expanded?: boolean; size?: number }) {
   return (
     <svg
-      className="desktop-cloud-create-access-disclosure"
+      className={`desktop-cloud-create-access-disclosure ${expanded ? "expanded" : ""}`}
       width={size}
       height={size}
       viewBox="0 0 12 12"
@@ -93,7 +95,6 @@ export function TreeDisclosureMarker({ expanded = false, size = 12 }: { expanded
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
     >
       <path d="M4 2.5 7.5 6 4 9.5" />
     </svg>
@@ -101,12 +102,13 @@ export function TreeDisclosureMarker({ expanded = false, size = 12 }: { expanded
 }
 
 function TreeRootRow() {
+  const { t } = useLocalization();
   return (
     <div className="desktop-cloud-create-access-tree-row root">
       <span className="desktop-cloud-create-access-tree-marker">
         <TreeDisclosureMarker expanded />
       </span>
-      <span className="desktop-cloud-create-access-tree-name">Root</span>
+      <span className="desktop-cloud-create-access-tree-name">{t("cloud.common.root")}</span>
       <AccessStatusText />
     </div>
   );
@@ -139,6 +141,7 @@ function FolderChildren({
   onSelect: (path: string) => void;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
 }) {
+  const { t } = useLocalization();
   const { entries, loading, error } = useCreateAccessFolderEntries({
     projectId,
     cloudSession,
@@ -150,12 +153,12 @@ function FolderChildren({
   if (loading) {
     return (
       <TreeMessage depth={depth}>
-        <PageLoading label="Loading" size="xs" variant="fill" style={{ minHeight: 0, width: "auto", height: "auto" }} />
+        <PageLoading label={t("cloud.common.loading")} size="xs" variant="fill" style={{ minHeight: 0, width: "auto", height: "auto" }} />
       </TreeMessage>
     );
   }
-  if (error) return <TreeMessage depth={depth}>Could not load this folder.</TreeMessage>;
-  if (entries.length === 0) return <TreeMessage depth={depth}>Empty folder</TreeMessage>;
+  if (error) return <TreeMessage depth={depth}>{t("cloud.access.create.folderLoadFailed")}</TreeMessage>;
+  if (entries.length === 0) return <TreeMessage depth={depth}>{t("cloud.access.create.emptyFolder")}</TreeMessage>;
 
   return (
     <>
@@ -231,20 +234,21 @@ function FolderRow({
   onToggle: () => void;
   onSelect: () => void;
 }) {
+  const { t } = useLocalization();
   return (
     <div className="desktop-cloud-create-access-tree-row-wrap">
       <TreeGuides depth={depth} isLastSibling={isLastSibling} ancestorLastSiblings={ancestorLastSiblings} />
       <button
         className={`desktop-cloud-create-access-tree-row folder ${selected ? "selected" : ""}`}
         type="button"
-        title={`${expanded ? "Collapse" : "Expand"} ${formatTreePath(entry.path)}`}
-        style={{ paddingLeft: 8 + depth * 16 }}
+        title={t(expanded ? "cloud.access.create.collapseFolder" : "cloud.access.create.expandFolder", { path: formatTreePath(entry.path, t) })}
+        style={{ paddingInlineStart: 8 + depth * 16 }}
         onClick={onToggle}
       >
         <span className="desktop-cloud-create-access-tree-marker">
           <TreeDisclosureMarker expanded={expanded} />
         </span>
-        <span className="desktop-cloud-create-access-tree-name">{entry.name}</span>
+        <span className="desktop-cloud-create-access-tree-name" dir="auto">{entry.name}</span>
         <FolderRowStatus selected={selected} alreadyExists={alreadyExists} onSelect={onSelect} />
       </button>
     </div>
@@ -262,18 +266,19 @@ function FileRow({
   isLastSibling: boolean;
   ancestorLastSiblings: readonly boolean[];
 }) {
+  const { t } = useLocalization();
   return (
     <div className="desktop-cloud-create-access-tree-row-wrap">
       <TreeGuides depth={depth} isLastSibling={isLastSibling} ancestorLastSiblings={ancestorLastSiblings} />
       <div
         className="desktop-cloud-create-access-tree-row file"
-        title={formatTreePath(entry.path)}
+        title={formatTreePath(entry.path, t)}
         aria-disabled="true"
-        style={{ paddingLeft: 8 + depth * 16 }}
+        style={{ paddingInlineStart: 8 + depth * 16 }}
       >
         <span className="desktop-cloud-create-access-tree-marker" />
         <FileText size={15} />
-        <span className="desktop-cloud-create-access-tree-name">{entry.name}</span>
+        <span className="desktop-cloud-create-access-tree-name" dir="auto">{entry.name}</span>
       </div>
     </div>
   );
@@ -288,18 +293,19 @@ function FolderRowStatus({
   alreadyExists: boolean;
   onSelect: () => void;
 }) {
+  const { t } = useLocalization();
   if (alreadyExists) return <AccessStatusText onSelect={onSelect} />;
   return (
     <button
       className={`desktop-cloud-create-access-tree-status action ${selected ? "selected" : ""}`}
       type="button"
-      title={selected ? "Selected folder" : "Select this folder"}
+      title={t(selected ? "cloud.access.create.selectedFolder" : "cloud.access.create.selectFolder")}
       onClick={(event) => {
         event.stopPropagation();
         onSelect();
       }}
     >
-      <span>{selected ? "Selected" : "Select"}</span>
+      <span>{t(selected ? "cloud.common.selected" : "cloud.common.select")}</span>
       <span aria-hidden="true">
         {selected ? <Check size={13} strokeWidth={2.6} /> : null}
       </span>
@@ -308,27 +314,28 @@ function FolderRowStatus({
 }
 
 function AccessStatusText({ onSelect }: { onSelect?: () => void }) {
+  const { t } = useLocalization();
   if (!onSelect) {
-    return <span className="desktop-cloud-create-access-tree-status">Has access</span>;
+    return <span className="desktop-cloud-create-access-tree-status">{t("cloud.access.create.hasAccess")}</span>;
   }
   return (
     <button
       className="desktop-cloud-create-access-tree-status existing"
       type="button"
-      title="Open this access"
+      title={t("cloud.access.create.openThisAccess")}
       onClick={(event) => {
         event.stopPropagation();
         onSelect();
       }}
     >
-      Has access
+      {t("cloud.access.create.hasAccess")}
     </button>
   );
 }
 
 function TreeMessage({ depth, children }: { depth: number; children: ReactNode }) {
   return (
-    <div className="desktop-cloud-create-access-tree-message" style={{ paddingLeft: 8 + depth * 16 + 24 }}>
+    <div className="desktop-cloud-create-access-tree-message" style={{ paddingInlineStart: 8 + depth * 16 + 24 }}>
       {children}
     </div>
   );

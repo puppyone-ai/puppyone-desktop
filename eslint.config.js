@@ -33,12 +33,17 @@ const coreBugRules = {
 export default [
   {
     ignores: [
-      "dist/**", "release/**", "node_modules/**", "vendor/**",
+      "dist/**", "release/**", "node_modules/**",
+      "vendor/claudian/**", "vendor/opencode/**",
       "src-tauri/**", "build/**", "public/**", "**/*.d.ts", "eslint.config.js",
     ],
   },
   {
-    files: ["src/**/*.{ts,tsx}"],
+    files: [
+      "src/**/*.{ts,tsx}",
+      "shared/agent-contract/**/*.ts",
+      "packages/shared-ui/src/**/*.{ts,tsx}",
+    ],
     languageOptions: {
       parser: tsParser,
       parserOptions: { ecmaVersion: 2023, sourceType: "module", ecmaFeatures: { jsx: true } },
@@ -52,7 +57,21 @@ export default [
     },
   },
   {
-    files: ["electron/**/*.mjs", "local-api/**/*.mjs", "shared/**/*.js", "scripts/**/*.mjs", "tests/**/*.mjs"],
+    files: ["tests/**/*.{ts,tsx}"],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: { ecmaVersion: 2023, sourceType: "module", ecmaFeatures: { jsx: true } },
+      globals: { ...globals.browser, ...globals.node },
+    },
+    plugins: { "react-hooks": reactHooks },
+    rules: {
+      ...coreBugRules,
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+    },
+  },
+  {
+    files: ["electron/**/*.mjs", "local-api/**/*.mjs", "shared/**/*.{js,mjs}", "scripts/**/*.mjs", "tests/**/*.mjs"],
     languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: { ...globals.node } },
     rules: coreBugRules,
   },

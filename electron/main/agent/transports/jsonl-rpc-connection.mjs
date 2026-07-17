@@ -1,0 +1,302 @@
+import { EventEmitter } from "node:events";
+import { spawn as nodeSpawn } from "node:child_process";
+import path from "node:path";
+import { redactSecretText } from "../agent-events.mjs";
+
+const DEFAULT_MAX_LINE_BYTES = 1024 * 1024;
+const DEFAULT_MAX_STDERR_BYTES = 64 * 1024;
+const DEFAULT_MAX_PENDING = 128;
+const DEFAULT_FORCE_KILL_TIMEOUT_MS = 2_000;
+
+export class JsonlRpcRequestTimeoutError extends Error {
+  constructor(method) {
+    super(`JSONL-RPC request timed out: ${method}`);
+    this.name = "JsonlRpcRequestTimeoutError";
+    this.code = "JSONL_RPC_TIMEOUT";
+    this.method = method;
+  }
+}
+
+export class JsonlRpcErrorResponse extends Error {
+  constructor(method, code, message, data = undefined) {
+    super(message);
+    this.name = "JsonlRpcErrorResponse";
+    this.code = Number.isFinite(code) ? Number(code) : -32603;
+    this.method = method;
+    this.data = data;
+  }
+}
+
+export class JsonlRpcConnection extends EventEmitter {
+  constructor({
+    executablePath,
+    args,
+    cwd,
+    env,
+    spawn = nodeSpawn,
+    maxLineBytes = DEFAULT_MAX_LINE_BYTES,
+    maxStderrBytes = DEFAULT_MAX_STDERR_BYTES,
+    maxPending = DEFAULT_MAX_PENDING,
+    forceKillTimeoutMs = DEFAULT_FORCE_KILL_TIMEOUT_MS,
+  }) {
+    super();
+    if (
+      typeof executablePath !== "string"
+      || !path.isAbsolute(executablePath)
+      || executablePath.length > 4_096
+      || /[\r\n\0]/u.test(executablePath)
+    ) {
+      throw new TypeError("An absolute JSONL-RPC executable path is required.");
+    }
+    if (!Array.isArray(args) || args.some((argument) => (
+      typeof argument !== "string" || argument.length > 4_096 || /[\r\n\0]/u.test(argument)
+    ))) {
+      throw new TypeError("JSONL-RPC process arguments are invalid.");
+    }
+    if (typeof cwd !== "string" || !path.isAbsolute(cwd) || /[\r\n\0]/u.test(cwd)) {
+      throw new TypeError("An absolute JSONL-RPC working directory is required.");
+    }
+    this.maxLineBytes = maxLineBytes;
+    this.maxStderrBytes = maxStderrBytes;
+    this.maxPending = maxPending;
+    this.forceKillTimeoutMs = forceKillTimeoutMs;
+    this.nextRequestId = 1;
+    this.pending = new Map();
+    this.seenResponseIds = new Set();
+    this.stdoutBuffer = "";
+    this.stderrBuffer = "";
+    this.closed = false;
+    this.exitInfo = null;
+    this.exitExpected = false;
+    this.closeReason = null;
+    this.forceKillTimer = null;
+    this.child = spawn(executablePath, args, {
+      cwd,
+      env,
+      shell: false,
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    this.child.stdout?.setEncoding?.("utf8");
+    this.child.stderr?.setEncoding?.("utf8");
+    this.child.stdout?.on("data", (chunk) => this.#receiveStdout(chunk));
+    this.child.stderr?.on("data", (chunk) => this.#receiveStderr(chunk));
+    this.child.once("error", (error) => this.#handleExit(null, null, error));
+    this.child.once("close", (code, signal) => this.#handleExit(code, signal, null));
+  }
+
+  request(method, params, { timeoutMs = 20_000 } = {}) {
+    if (this.closed) return Promise.reject(new Error("The JSONL-RPC process is not connected."));
+    if (this.pending.size >= this.maxPending) {
+      return Promise.reject(new Error("Too many pending JSONL-RPC requests."));
+    }
+    const id = this.nextRequestId++;
+    return new Promise((resolve, reject) => {
+      const timer = timeoutMs > 0
+        ? setTimeout(() => {
+          this.pending.delete(String(id));
+          const error = new JsonlRpcRequestTimeoutError(method);
+          reject(error);
+          // A timed-out JSON-RPC request has an ambiguous result, especially for
+          // mutating methods such as turn/start. Retrying on the same connection
+          // could submit the mutation twice, so retire the provider immediately.
+          this.dispose(error.message, { expected: false });
+        }, timeoutMs)
+        : null;
+      timer?.unref?.();
+      this.pending.set(String(id), { method, resolve, reject, timer });
+      try {
+        this.#write({ method, id, params });
+      } catch (error) {
+        if (timer) clearTimeout(timer);
+        this.pending.delete(String(id));
+        reject(error);
+      }
+    });
+  }
+
+  notify(method, params) {
+    this.#write(params === undefined ? { method } : { method, params });
+  }
+
+  respond(id, result) {
+    this.#write({ id, result });
+  }
+
+  respondError(id, code, message) {
+    this.#write({ id, error: { code, message: redactSecretText(message) } });
+  }
+
+  getDiagnostics() {
+    return redactSecretText(this.stderrBuffer.slice(-this.maxStderrBytes));
+  }
+
+  dispose(reason = "JSONL-RPC connection closed.", { expected = true } = {}) {
+    if (this.closed) return;
+    this.closed = true;
+    this.exitExpected = Boolean(expected);
+    this.closeReason = redactSecretText(reason);
+    this.#rejectPending(new Error(reason));
+    try {
+      this.child.stdin?.end?.();
+    } catch {
+      // Provider stdin may already be closed.
+    }
+    try {
+      this.child.kill();
+    } catch {
+      // Provider may already have exited.
+    }
+    if (!this.exitInfo && this.forceKillTimeoutMs > 0) {
+      this.forceKillTimer = setTimeout(() => {
+        this.forceKillTimer = null;
+        if (this.exitInfo) return;
+        try {
+          this.child.kill("SIGKILL");
+        } catch {
+          // The process may have exited between the check and forced kill.
+        }
+      }, this.forceKillTimeoutMs);
+      this.forceKillTimer.unref?.();
+    }
+  }
+
+  #write(message) {
+    if (this.closed || !this.child.stdin?.writable) {
+      throw new Error("JSONL-RPC process stdin is unavailable.");
+    }
+    // Codex tolerates the compact shape, but ACP implementations use a strict
+    // JSON-RPC 2.0 decoder. Always emit the protocol discriminator so the
+    // shared transport is standards-compliant for every native runtime.
+    const line = `${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`;
+    if (Buffer.byteLength(line, "utf8") > this.maxLineBytes) {
+      throw new Error("JSONL-RPC request exceeded the safety limit.");
+    }
+    this.child.stdin.write(line, "utf8");
+  }
+
+  #receiveStdout(chunk) {
+    if (this.closed) return;
+    this.stdoutBuffer += String(chunk);
+    if (Buffer.byteLength(this.stdoutBuffer, "utf8") > this.maxLineBytes && !this.stdoutBuffer.includes("\n")) {
+      this.#protocolFailure("The JSONL-RPC process emitted a line larger than the safety limit.");
+      return;
+    }
+    let newlineIndex = this.stdoutBuffer.indexOf("\n");
+    while (newlineIndex >= 0 && !this.closed) {
+      const line = this.stdoutBuffer.slice(0, newlineIndex).replace(/\r$/, "");
+      this.stdoutBuffer = this.stdoutBuffer.slice(newlineIndex + 1);
+      if (Buffer.byteLength(line, "utf8") > this.maxLineBytes) {
+        this.#protocolFailure("The JSONL-RPC process emitted a line larger than the safety limit.");
+        return;
+      }
+      if (line.trim()) this.#receiveLine(line);
+      newlineIndex = this.stdoutBuffer.indexOf("\n");
+    }
+  }
+
+  #receiveLine(line) {
+    let message;
+    try {
+      message = JSON.parse(line);
+    } catch {
+      this.#protocolFailure("The JSONL-RPC process emitted malformed protocol data.");
+      return;
+    }
+    if (!message || typeof message !== "object" || Array.isArray(message)) {
+      this.#protocolFailure("The JSONL-RPC process emitted an invalid message.");
+      return;
+    }
+    const hasId = Object.prototype.hasOwnProperty.call(message, "id");
+    const hasMethod = typeof message.method === "string" && message.method.length > 0;
+    if (hasMethod && hasId) {
+      this.emit("request", message);
+      return;
+    }
+    if (hasMethod) {
+      this.emit("notification", message);
+      return;
+    }
+    if (hasId) {
+      this.#receiveResponse(message);
+      return;
+    }
+    this.#protocolFailure("The JSONL-RPC process emitted an unclassifiable message.");
+  }
+
+  #receiveResponse(message) {
+    const id = String(message.id);
+    if (this.seenResponseIds.has(id)) {
+      this.#protocolFailure(`The JSONL-RPC process emitted a duplicate response id: ${id}`);
+      return;
+    }
+    const pending = this.pending.get(id);
+    if (!pending) {
+      this.#protocolFailure(`The JSONL-RPC process emitted an unknown response id: ${id}`);
+      return;
+    }
+    this.pending.delete(id);
+    if (pending.timer) clearTimeout(pending.timer);
+    this.seenResponseIds.add(id);
+    if (this.seenResponseIds.size > 512) {
+      this.seenResponseIds.delete(this.seenResponseIds.values().next().value);
+    }
+    if (message.error) {
+      const detail = typeof message.error.message === "string"
+        ? redactSecretText(message.error.message)
+        : "Unknown JSON-RPC error";
+      pending.reject(new JsonlRpcErrorResponse(
+        pending.method,
+        message.error?.code,
+        `${pending.method}: ${detail}`,
+        message.error?.data,
+      ));
+    } else {
+      pending.resolve(message.result);
+    }
+  }
+
+  #receiveStderr(chunk) {
+    if (this.closed) return;
+    this.stderrBuffer += String(chunk);
+    const bytes = Buffer.from(this.stderrBuffer, "utf8");
+    if (bytes.length > this.maxStderrBytes) {
+      this.stderrBuffer = bytes.subarray(bytes.length - this.maxStderrBytes).toString("utf8").replace(/^\uFFFD/, "");
+    }
+  }
+
+  #protocolFailure(message) {
+    const error = new Error(message);
+    this.emit("protocolError", error);
+    this.dispose(message, { expected: false });
+  }
+
+  #handleExit(code, signal, error) {
+    if (this.exitInfo) return;
+    if (this.forceKillTimer) {
+      clearTimeout(this.forceKillTimer);
+      this.forceKillTimer = null;
+    }
+    this.exitInfo = {
+      code: Number.isInteger(code) ? code : null,
+      signal: signal ? String(signal) : null,
+      error: error
+        ? redactSecretText(error.message || String(error))
+        : this.exitExpected
+          ? null
+          : this.closeReason,
+      diagnostics: this.getDiagnostics(),
+    };
+    this.closed = true;
+    this.#rejectPending(new Error(error?.message || `JSONL-RPC process exited${code === null ? "" : ` with code ${code}`}.`));
+    this.emit("exit", { ...this.exitInfo, expected: this.exitExpected });
+  }
+
+  #rejectPending(error) {
+    for (const pending of this.pending.values()) {
+      if (pending.timer) clearTimeout(pending.timer);
+      pending.reject(error);
+    }
+    this.pending.clear();
+  }
+}

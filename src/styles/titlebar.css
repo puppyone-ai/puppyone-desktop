@@ -1,4 +1,12 @@
 .desktop-titlebar {
+  --desktop-titlebar-bg: var(--po-header);
+  --desktop-titlebar-text: var(--po-text);
+  --desktop-titlebar-text-muted: var(--po-text-muted);
+  --desktop-titlebar-text-disabled: var(--po-text-disabled);
+  --desktop-titlebar-hover: var(--po-hover);
+  --desktop-titlebar-active: var(--po-selected);
+  --desktop-titlebar-focus: var(--po-focus-ring);
+  --desktop-titlebar-divider: var(--po-header-divider);
   position: relative;
   z-index: 40;
   display: flex;
@@ -7,13 +15,34 @@
   gap: 6px;
   height: var(--desktop-chrome-height);
   min-height: var(--desktop-chrome-height);
-  padding: 4px 6px 4px 86px;
-  border-bottom: 1px solid var(--po-header-divider);
-  /* Header belongs to the content region: same surface as the editor
-     (unified-toolbar convention); only sidebars keep the chrome tint. */
-  background: var(--po-header);
+  padding: 4px 6px 5px 86px;
+  border-bottom: 0;
+  background: var(--desktop-titlebar-bg);
+  color: var(--desktop-titlebar-text);
   -webkit-app-region: drag;
   user-select: none;
+}
+
+/* Keep the app-owned divider out of the native window frame's edge pixels. */
+.desktop-titlebar::after {
+  position: absolute;
+  inset-inline: 1px;
+  inset-block-end: 0;
+  height: 1px;
+  background: var(--desktop-titlebar-divider);
+  content: "";
+  pointer-events: none;
+}
+
+.desktop-titlebar[data-workspace-kind="cloud"] {
+  --desktop-titlebar-bg: var(--po-cloud-titlebar-bg);
+  --desktop-titlebar-text: var(--po-cloud-titlebar-text);
+  --desktop-titlebar-text-muted: var(--po-cloud-titlebar-text-muted);
+  --desktop-titlebar-text-disabled: var(--po-cloud-titlebar-text-disabled);
+  --desktop-titlebar-hover: var(--po-cloud-titlebar-hover);
+  --desktop-titlebar-active: var(--po-cloud-titlebar-active);
+  --desktop-titlebar-focus: var(--po-cloud-titlebar-focus);
+  --desktop-titlebar-divider: var(--po-cloud-titlebar-divider);
 }
 
 .desktop-titlebar-left {
@@ -22,10 +51,8 @@
   align-items: center;
   align-self: stretch;
   width: auto;
-  
   max-width: none;
   min-width: 0;
-  -webkit-app-region: no-drag;
 }
 
 .desktop-titlebar-context {
@@ -34,25 +61,25 @@
   height: 100%;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: 0;
 }
 
 .desktop-titlebar-context-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: var(--desktop-chrome-control-size);
+  height: var(--desktop-titlebar-control-height);
   max-width: none;
   min-width: 0;
   padding: 0 6px;
   border-radius: var(--desktop-control-radius);
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
   pointer-events: none;
 }
 
 .desktop-titlebar-context-item svg {
   flex: 0 0 auto;
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
 }
 
 .desktop-titlebar-context-mark {
@@ -78,6 +105,7 @@
   flex: 1 1 auto;
   min-width: 0;
   align-self: stretch;
+  -webkit-app-region: drag;
 }
 
 .desktop-titlebar-actions {
@@ -85,8 +113,16 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 3px;
-  height: var(--desktop-chrome-control-size);
-  -webkit-app-region: no-drag;
+  height: var(--desktop-titlebar-control-height);
+  overflow: visible;
+}
+
+.desktop-titlebar-action-divider {
+  width: 1px;
+  height: 18px;
+  flex: 0 0 1px;
+  margin-inline: 3px;
+  background: var(--desktop-titlebar-divider);
 }
 
 .desktop-titlebar-action {
@@ -96,31 +132,67 @@
   align-items: center;
   justify-content: center;
   width: var(--desktop-chrome-control-size);
-  height: var(--desktop-chrome-control-size);
+  height: var(--desktop-titlebar-control-height);
   border: 0;
-  border-radius: var(--desktop-control-radius);
+  border-radius: var(--desktop-toolbar-action-radius);
   background: transparent;
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
   outline: 0;
   box-shadow: none;
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 
+.desktop-titlebar-external-open {
+  width: var(--desktop-titlebar-control-height);
+}
+
+.desktop-titlebar-actions .desktop-titlebar-terminal,
+.desktop-titlebar-actions .desktop-titlebar-agent-chat {
+  width: var(--desktop-titlebar-tool-action-width);
+}
+
+.desktop-titlebar-terminal-menu-wrap {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  overflow: visible;
+}
+
+/* Standalone square ⋯ button, separate from the Terminal control. */
+.desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger {
+  width: var(--desktop-titlebar-control-height);
+  height: var(--desktop-titlebar-control-height);
+  flex: 0 0 var(--desktop-titlebar-control-height);
+  box-sizing: border-box;
+  border-radius: var(--desktop-toolbar-action-radius);
+  background: var(--desktop-titlebar-hover);
+  color: var(--desktop-titlebar-text-muted);
+}
+
+.desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger:hover,
+.desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger:focus-visible,
+.desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger[aria-expanded="true"] {
+  background: var(--desktop-titlebar-active);
+  box-shadow: none;
+  color: var(--desktop-titlebar-text);
+}
+
 .desktop-titlebar-action:hover {
-  background: var(--po-hover);
-  color: var(--po-text);
+  background: var(--desktop-titlebar-hover);
+  color: var(--desktop-titlebar-text-muted);
 }
 
 .desktop-titlebar-action:focus-visible {
-  background: var(--po-hover);
-  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
-  color: var(--po-text);
+  background: var(--desktop-titlebar-hover);
+  box-shadow: inset 0 0 0 1px var(--desktop-titlebar-focus);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-action.active,
 .desktop-titlebar-action[aria-pressed="true"] {
-  background: var(--po-selected);
-  color: var(--po-text);
+  background: var(--desktop-titlebar-active);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-action:disabled {
@@ -145,10 +217,10 @@
 .desktop-update-dot {
   position: absolute;
   top: 6px;
-  right: 6px;
+  inset-inline-end: 6px;
   width: 6px;
   height: 6px;
-  border: 1px solid var(--po-header);
+  border: 1px solid var(--desktop-titlebar-bg);
   border-radius: 999px;
   background: var(--po-accent);
   pointer-events: none;
@@ -168,17 +240,17 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  justify-content: flex-start;
+  justify-content: start;
   width: auto;
   max-width: 100%;
-  height: var(--desktop-chrome-control-size);
+  height: var(--desktop-titlebar-control-height);
   min-width: 0;
   padding: 0 6px;
   border: 0;
-  border-radius: var(--desktop-control-radius);
+  border-radius: var(--desktop-toolbar-action-radius);
   background: transparent;
-  color: var(--po-text-muted);
-  text-align: left;
+  color: var(--desktop-titlebar-text-muted);
+  text-align: start;
   box-shadow: none;
   -webkit-app-region: no-drag;
   outline: 0;
@@ -187,20 +259,8 @@
 
 .desktop-titlebar-workspace-button:hover,
 .desktop-titlebar-workspace-button[aria-expanded="true"] {
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
-/* Keep the active execution context visible at a glance. Cloud projects use a
-   persistent sky-blue treatment; local projects retain the neutral chrome. */
-.desktop-titlebar-workspace-button.cloud {
-  --desktop-cloud-pigment: color-mix(in oklab, var(--po-info) 78%, var(--po-accent));
-  background: color-mix(in srgb, var(--desktop-cloud-pigment) 8%, transparent);
-}
-
-.desktop-titlebar-workspace-button.cloud:hover,
-.desktop-titlebar-workspace-button.cloud[aria-expanded="true"] {
-  background: color-mix(in srgb, var(--desktop-cloud-pigment) 14%, transparent);
+  background: var(--desktop-titlebar-hover);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-workspace-mark {
@@ -211,29 +271,17 @@
   height: 20px;
   flex: 0 0 auto;
   background: transparent;
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
   transition: color 0.12s ease;
 }
 
 .desktop-titlebar-workspace-button:hover .desktop-titlebar-workspace-mark,
 .desktop-titlebar-workspace-button[aria-expanded="true"] .desktop-titlebar-workspace-mark {
-  color: var(--po-text);
-}
-
-.desktop-titlebar-workspace-button.cloud .desktop-titlebar-workspace-mark,
-.desktop-titlebar-workspace-button.cloud .desktop-titlebar-workspace-name {
-  color: color-mix(in srgb, var(--desktop-cloud-pigment) 88%, var(--po-text) 12%);
-}
-
-.desktop-titlebar-workspace-button.cloud:hover .desktop-titlebar-workspace-mark,
-.desktop-titlebar-workspace-button.cloud:hover .desktop-titlebar-workspace-name,
-.desktop-titlebar-workspace-button.cloud[aria-expanded="true"] .desktop-titlebar-workspace-mark,
-.desktop-titlebar-workspace-button.cloud[aria-expanded="true"] .desktop-titlebar-workspace-name {
-  color: var(--desktop-cloud-pigment);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-workspace-button:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
+  box-shadow: inset 0 0 0 1px var(--desktop-titlebar-focus);
 }
 
 .desktop-titlebar-context-icon-button {
@@ -243,11 +291,11 @@
   align-items: center;
   justify-content: center;
   width: var(--desktop-chrome-control-size);
-  height: var(--desktop-chrome-control-size);
+  height: var(--desktop-titlebar-control-height);
   border: 0;
-  border-radius: var(--desktop-control-radius);
+  border-radius: var(--desktop-toolbar-action-radius);
   background: transparent;
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
   outline: 0;
   -webkit-app-region: no-drag;
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
@@ -255,20 +303,21 @@
 
 .desktop-titlebar-context-icon-button:hover,
 .desktop-titlebar-context-icon-button.active {
-  color: var(--po-text);
+  background: var(--desktop-titlebar-hover);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-context-icon-button:focus-visible {
-  background: var(--po-hover);
-  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
-  color: var(--po-text);
+  background: var(--desktop-titlebar-hover);
+  box-shadow: inset 0 0 0 1px var(--desktop-titlebar-focus);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-workspace-name {
   max-width: none;
   min-width: 0;
   overflow: hidden;
-  color: var(--po-text-muted);
+  color: var(--desktop-titlebar-text-muted);
   font-size: var(--po-font-size-chrome, 13px);
   font-weight: var(--po-font-weight-chrome, 500);
   line-height: 18px;
@@ -278,14 +327,14 @@
 
 .desktop-titlebar-workspace-button:hover .desktop-titlebar-workspace-name,
 .desktop-titlebar-workspace-button[aria-expanded="true"] .desktop-titlebar-workspace-name {
-  color: var(--po-text);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-menu {
   position: absolute;
   z-index: 80;
   top: calc(100% + 4px);
-  left: 0;
+  inset-inline-start: 0;
   width: min(360px, calc(100vw - 32px));
   padding: 8px;
   border: 1px solid var(--po-menu-border);
@@ -295,33 +344,13 @@
   -webkit-app-region: no-drag;
 }
 
-.desktop-titlebar-external-open {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  height: var(--desktop-chrome-control-size);
-  border-radius: var(--desktop-control-radius);
-}
-
-.desktop-titlebar-external-open:has(.desktop-titlebar-external-open-menu-button[aria-expanded="true"]) {
-  background: var(--po-hover);
-}
-
-.desktop-titlebar-external-open-main {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.desktop-titlebar-external-open-menu-button {
-  width: 17px;
-  margin-left: -2px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-.desktop-titlebar-external-open-menu-button[aria-expanded="true"] {
-  background: var(--po-hover);
-  color: var(--po-text);
+/* Keep the shared titlebar-menu treatment; only reverse its anchor near the window edge. */
+.desktop-titlebar-terminal-menu {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+  display: grid;
+  gap: 2px;
+  width: min(200px, calc(100vw - 32px));
 }
 
 .desktop-titlebar-external-app-icon {
@@ -362,55 +391,6 @@
   object-fit: contain;
 }
 
-.desktop-titlebar-external-open-menu {
-  right: 0;
-  left: auto;
-  width: 260px;
-}
-
-.desktop-titlebar-external-open-row {
-  text-align: left;
-}
-
-.desktop-titlebar-terminal {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  height: var(--desktop-chrome-control-size);
-  border-radius: var(--desktop-control-radius);
-}
-
-.desktop-titlebar-terminal.has-menu:has(.desktop-titlebar-terminal-menu-button[aria-expanded="true"]) {
-  background: var(--po-hover);
-}
-
-.desktop-titlebar-terminal.has-menu .desktop-titlebar-terminal-main {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.desktop-titlebar-terminal-menu-button {
-  width: 17px;
-  margin-left: -2px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-.desktop-titlebar-terminal-menu-button[aria-expanded="true"] {
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
-.desktop-titlebar-terminal-menu {
-  right: 0;
-  left: auto;
-  width: 190px;
-}
-
-.desktop-titlebar-terminal-menu-row {
-  text-align: left;
-}
-
 .desktop-titlebar-branch-wrap {
   position: relative;
   display: flex;
@@ -425,17 +405,17 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  justify-content: flex-start;
+  justify-content: start;
   width: auto;
   max-width: 100%;
-  height: var(--desktop-chrome-control-size);
+  height: var(--desktop-titlebar-control-height);
   min-width: 0;
   padding: 0 6px;
   border: 0;
-  border-radius: var(--desktop-control-radius);
+  border-radius: var(--desktop-toolbar-action-radius);
   background: transparent;
-  color: var(--po-text-muted);
-  text-align: left;
+  color: var(--desktop-titlebar-text-muted);
+  text-align: start;
   outline: 0;
   -webkit-app-region: no-drag;
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
@@ -443,22 +423,22 @@
 
 .desktop-titlebar-branch-button:hover,
 .desktop-titlebar-branch-button[aria-expanded="true"] {
-  background: var(--po-hover);
-  color: var(--po-text);
+  background: var(--desktop-titlebar-hover);
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-branch-button:disabled {
   cursor: default;
-  color: var(--po-text-disabled);
+  color: var(--desktop-titlebar-text-disabled);
 }
 
 .desktop-titlebar-branch-button:disabled:hover {
   background: transparent;
-  color: var(--po-text-disabled);
+  color: var(--desktop-titlebar-text-disabled);
 }
 
 .desktop-titlebar-branch-button:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
+  box-shadow: inset 0 0 0 1px var(--desktop-titlebar-focus);
 }
 
 .desktop-titlebar-branch-button span {

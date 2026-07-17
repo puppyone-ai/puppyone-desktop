@@ -114,6 +114,29 @@ Both modes must derive from the same snapshot and view model.
 The navigation badge and titlebar branch indicator also consume the active
 snapshot. A stale snapshot therefore affects more than the visible Git sidebar.
 
+### Version-control opt-in setup state
+
+For a local folder without version control, the renderer uses the dedicated
+`VersionControlSetupState` instead of a generic empty-state branch. It has one
+job: help the user opt in without teaching implementation details. The titlebar
+and quiet sidebar label read `No Version Control`; the main view uses a centered
+setup stage with a thin version-control mark, a short product-level description,
+and exactly one primary action: `Enable Version Control`.
+
+```text
+No Version Control
+  -> VersionControlSetupState
+  -> Enable Version Control
+  -> authorized initialize operation
+  -> fresh GitStatusSnapshot
+  -> normal Source Control workspace
+```
+
+The setup component is presentational. It does not execute commands or own
+repository state; the existing controller and authorized IPC path remain the
+only mutation boundary. Loading replaces the action label in place, and a real
+operation error appears below the action without adding a second recovery path.
+
 ## Operation Lifecycle
 
 Application-initiated Git mutations route through controller handlers and the
@@ -150,6 +173,21 @@ Working-file selection maps to one of these scopes:
 The controller requests the corresponding diff only while the selection is
 active. Commit selection similarly requests commit detail by commit id.
 
+Incoming and committed/outgoing resource lists represent a **net comparison**,
+not a concatenation of per-commit path events. Trusted local Git code resolves
+the remote comparison once and uses `git diff --name-status` over the same
+merge-base range used by the opened patch. `git log --name-status` is not a
+valid source for these lists: a file added in one local commit and modified in a
+later commit is still `Added` relative to the upstream base, while a temporary
+file added and deleted within the range has no net change and must not appear.
+
+Working-file detail is format-aware. Main derives an authorized immutable
+before/after pair for the selected scope, then the renderer's ordered Diff
+Registry chooses unified text, DOCX semantic redline, or the total metadata
+fallback through canonical format resolution. The complete authority, resource
+handle, cancellation, worker, cache, and extension contracts live in
+[Format-Aware Diff Pipeline](format-aware-diff-pipeline.md).
+
 The long-term refresh architecture separates frequent working-tree status from
 history pagination. See
 [Repository Status Refresh Lifecycle](status-refresh-lifecycle.md); history must
@@ -158,22 +196,38 @@ not be reloaded in full after every filesystem event.
 ### Working-file presentation contract
 
 The Changes detail is a developer-tool surface, not a dashboard or marketing
-card. The selected path is compact context text rather than a page headline;
-file actions use low-emphasis toolbar controls, with destructive color becoming
-prominent on interaction instead of through a persistent tinted button.
+card. File actions use low-emphasis toolbar controls, with destructive color
+becoming prominent on interaction instead of through a persistent tinted
+button.
 
-For a single selected file, the detail header owns path, status, statistics,
-and actions. The diff block omits its duplicate file header. Multi-file commit
-and history diffs retain per-file headers because those labels disambiguate the
-blocks. The code surface stays one tonal step above the deepest inset so it
-does not become a black slab. Diff rows use soft full-line backgrounds and
-gently tinted muted foregrounds; color is a change signal, not the primary
-reading color. Raw unified-diff hunk coordinates such as `@@ -67,12 +68,11 @@`
-remain in the data model but are not rendered as user-facing copy. File status,
-file-level addition/deletion totals, line numbers, and a quiet separator carry
-the useful context without exposing patch syntax.
+Changes and History render every file through the same canonical
+`GitFileDiffSurface`. Its header has one stable information hierarchy. The left
+fact cluster contains the canonical file format, net change kind, and
+addition/deletion totals, in that order. The right identity cluster contains
+the filename and then its quieter directory. Both clusters derive from the same
+resolved Diff Registry result used by the renderer; the header must not grow a
+second extension switch.
 
-The Changes detail is a fixed unified three-column review: one relevant line
+Focused Changes does not add a persistent `OUTGOING`, `INCOMING`, or baseline
+explanation banner above a selected file. The sidebar section and selection
+already establish that scope, while the data contract guarantees that the
+preview status and opened patch use the same comparison. Repeating scope copy
+would displace the file facts users need to review. Mutable local selections
+may add a separate low-emphasis action toolbar; committed and remote selections
+render the canonical file surface directly. This keeps a file visually
+identical to its History counterpart while preserving the underlying semantic
+difference: History is one commit relative to its parent, while
+outgoing/incoming is the net merge-base range.
+
+The code surface stays one tonal step above the deepest inset so it does not
+become a black slab. Diff rows use soft full-line backgrounds and gently tinted
+muted foregrounds; color is a change signal, not the primary reading color.
+Raw unified-diff hunk coordinates such as `@@ -67,12 +68,11 @@` remain in the
+data model but are not rendered as user-facing copy. File status, file-level
+addition/deletion totals, line numbers, and a quiet separator carry the useful
+context without exposing patch syntax.
+
+Text Changes detail is a fixed unified three-column review: one relevant line
 number, one always-visible `+/-` marker, and the content. Removed rows show the
 old-file line number; added and context rows show the new-file line number.
 The original old/new coordinates remain attached to the row as data, but the
@@ -183,8 +237,12 @@ two narrow editors wrap more aggressively than a single unified stream.
 
 Keep these responsibilities separate:
 
-- the detail header owns selection context and file-level actions;
-- the diff container owns file boundaries and hunk structure;
+- the sidebar selection establishes comparison scope, without repeating a
+  visible scope banner in file detail;
+- the canonical file surface owns canonical format, net change kind,
+  statistics, path identity, file boundaries, and the format-aware renderer;
+- the focused-detail toolbar owns only local file actions and is absent for
+  read-only comparisons;
 - diff rows own line-level add/remove signals;
 - the Source Control sidebar owns bulk and section-level operations.
 
@@ -203,18 +261,25 @@ not shrink row hit areas or body typography.
 
 Only one available workflow action receives solid primary emphasis at a time.
 The priority is staged Commit, incoming Pull or Download, outgoing Push or
-Publish, then the simple-mode combined Stage & Commit action. Other available
-operations remain ghost controls; unavailable operations stay muted. This is a
-state-machine decision expressed by the `is-primary` class, not a label-based
-CSS exception.
+Publish, then the simple-mode combined Stage & Commit action. Non-primary
+operation buttons (including Push when Commit owns primary) use neutral gray
+control chrome (`--po-control`); only `is-primary` uses the accent fill.
+Unavailable operations stay muted. This is a state-machine decision expressed
+by the `is-primary` class, not a label-based CSS exception. The Unstaged
+Changes bulk Stage-all control is also not a workflow primary: it uses the
+same neutral gray chrome so it stays visible without competing with Commit.
 
-The sidebar uses a deliberately quiet type hierarchy: primary row content is
-`13px`, metadata is `12px`, ordinary content uses the global regular weight,
-and section or selected-row emphasis uses the global medium weight. File-type
-glyphs are neutral in the Git list; change letters retain semantic color.
-Persistent secondary and destructive detail actions remain ghost controls and
-only gain a surface on interaction. Diff add/remove fills stay low-chroma so
-large changed blocks do not compete with their text.
+The sidebar shares the desktop file-list typography contract with Data:
+primary row content is `--desktop-sidebar-font-size` (`13px` by default) at
+`--desktop-sidebar-font-weight` (`500`) and `--desktop-sidebar-line-height`
+(`18px`); metadata and section headers stay one step below at
+`--desktop-sidebar-font-size-meta` (`12px`) with the same medium weight.
+Section hierarchy comes from muted color (`--po-text-subtle`), not a heavier
+weight — do not restyle Git group titles like the Data explorer toolbar.
+File-type glyphs are neutral in the Git list; change letters retain semantic
+color. Persistent secondary and destructive detail actions remain ghost
+controls and only gain a surface on interaction. Diff add/remove fills stay
+low-chroma so large changed blocks do not compete with their text.
 
 ## Current Refresh Boundary
 
@@ -239,7 +304,12 @@ history lazily. See
 - `src/features/source-control/SourceControlSidebar.tsx`
   - composes the sidebar surface
 - `src/features/source-control/GitStatusView.tsx`
-  - renders overview, history, commit detail, and working-file detail
+  - composes overview, history, and commit detail without owning file-diff chrome
+- `src/features/source-control/WorkingFileDetail.tsx`
+  - composes local file actions and canonical file surfaces
+- `src/features/source-control/diff/GitFileDiffSurface.tsx`
+  - owns the shared History/Changes fact-first file header and reuses the Diff
+    Registry result at the format-aware renderer boundary
 - `src/features/app-shell/navigation.tsx`
   - derives Git navigation badges from the active snapshot
 - `src/lib/localFiles.ts`
@@ -247,14 +317,23 @@ history lazily. See
 - `electron/preload.cjs`
   - context-isolated IPC exposure
 - `electron/main/ipc/workspace-git-ipc.mjs`
-  - authorized Git IPC handlers
+  - authorized Git IPC handlers, cancellable diff requests, and revision reads
+- `electron/main/git-diff-resource-broker.mjs`
+  - audience/session/revision-bound, bounded, revocable rich-diff resources
 - `local-api/workspace.mjs`
-  - Git execution, parsing, snapshots, diffs, history, and mutations
+  - Git execution, parsing, snapshots, trusted revision pairs, history, and mutations
+- `local-api/git/diff-comparison.mjs`
+  - resolves trusted incoming/outgoing ranges and reads bounded net-change previews
+- `src/features/source-control/diff/core/`
+  - ordered registry, generic async lifecycle, and weighted TTL cache primitive
+- `src/features/source-control/diff/contributions/`
+  - vertical text, DOCX, and metadata comparison capabilities
 
 ## Verification
 
 Existing real-repository tests cover repository detection, stage/commit,
-working-tree status, diffs, branches, and remote configuration in
+working-tree status, all revision-pair scopes, remote divergence, diffs,
+branches, and remote configuration in
 `tests/workspace.git.integration.test.mjs`. IPC authorization coverage lives in
 `tests/electron.workspace-authorization.test.mjs`.
 
@@ -271,27 +350,39 @@ watcher recovery, and refresh ordering belong to the lifecycle test matrix in
   authority.
 - Application-initiated mutations reconcile status as part of operation
   completion.
+- Incoming/outgoing sidebar resources and their opened patches use the same net
+  comparison strategy; commit-log path events must not label aggregate diffs.
 - Selection is cleared when its file or commit no longer exists in the active
   snapshot.
 - Shared sidebar lifecycle and layout rules are not duplicated in this feature
   document.
 - Working-file actions remain compact, low-emphasis controls; the view must not
   promote every file operation into a persistent CTA.
-- A single-file Changes detail does not repeat the same path and status in a
-  second diff header.
-- Working-file header actions place navigation first and destructive mutation
+- Changes and History use one canonical file-diff surface; a focused detail
+  must not fork or hide its fact-first file header or prepend redundant scope
+  copy.
+- Working-file context actions place navigation first and destructive mutation
   last; `Discard` must remain to the right of `Stage`.
 - Source Control operation buttons share the `24px` action-size contract; do
   not reintroduce feature-local `28px` or `30px` operation controls.
 - Source Control metadata must remain one typography step below primary row
   content; do not map `--git-font-small` back to the sidebar body size.
+- Source Control primary row typography must track the shared desktop sidebar
+  contract (`--desktop-sidebar-font-*`) used by the Data explorer; do not
+  reintroduce a quieter `400` weight or a selected-row weight bump that makes
+  Git file names diverge from Data.
+- Git section headers stay at the metadata size/weight; do not borrow the Data
+  explorer toolbar's `650` emphasis for collapsible group titles.
 - File glyph color, persistent button fills, and diff fills must not all act as
   simultaneous emphasis channels; reserve semantic color for change state.
-- At most one Source Control workflow operation may carry `is-primary`; keep
-  regular Stage and Unstage actions ghosted and Discard semantically red.
+- At most one Source Control workflow operation may carry `is-primary` with the
+  accent fill; non-primary operation buttons (Push, Stage & Commit, …) and the
+  Unstaged Stage-all icon use neutral gray `--po-control` chrome. Keep Discard
+  semantically red.
 - Do not expose raw unified-diff hunk coordinates in the detail UI. Preserve
   them in the model for patch semantics, but use file totals and line numbers
   for the visible reading context.
-- Git Changes always uses the unified `line / +/- / content` structure. Do not
-  restore two visible line-number gutters or let the compact-review marker
-  preference hide Git's structural symbols.
+- Text Git Changes always uses the unified `line / +/- / content` structure.
+  Rich binary formats resolve through the Diff Registry; do not restore two
+  visible line-number gutters, hide Git's structural symbols, or put extension
+  conditionals back into `GitStatusView`.

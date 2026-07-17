@@ -8,6 +8,22 @@
   background: var(--po-canvas);
 }
 
+/*
+ * Give the native macOS window edge one continuous backing layer. Without
+ * this, independently painted sidebar and content surfaces can make the
+ * system-composited bottom hairline change brightness at their junction.
+ */
+.app-shell::after {
+  position: absolute;
+  z-index: 100;
+  inset-inline: 0;
+  inset-block-end: 0;
+  height: 1px;
+  background: var(--po-canvas);
+  content: "";
+  pointer-events: none;
+}
+
 .app-shell.minimal {
   min-width: 640px;
 }

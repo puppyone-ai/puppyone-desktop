@@ -1,0 +1,17 @@
+{
+  "messageUnavailable": "このテキストは利用できません。",
+  "action.cancel": "キャンセル",
+  "action.close": "閉じる",
+  "action.confirm": "確認",
+  "action.retry": "再試行",
+  "action.apply": "適用",
+  "action.reset": "リセット",
+  "action.refresh": "更新",
+  "action.copy": "コピー",
+  "action.clear": "クリア",
+  "action.copied": "コピー済み",
+  "action.change": "変更",
+  "action.chooseApp": "アプリを選択",
+  "action.save": "保存",
+  "status.loading": "読み込み中…"
+}

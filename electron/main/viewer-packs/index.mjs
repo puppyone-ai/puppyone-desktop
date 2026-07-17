@@ -284,6 +284,7 @@ export function registerViewerPackAppIpcHandlers({
   authorizeWorkspaceRoot,
   dialog,
   getDialogOwnerWindow = () => undefined,
+  t = defaultTranslate,
 }) {
   ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.getSnapshot, async () => host.getSnapshot());
 
@@ -291,9 +292,12 @@ export function registerViewerPackAppIpcHandlers({
     if (!dialog?.showOpenDialog) throw new Error("Viewer Pack file picker is unavailable.");
     const owner = getDialogOwnerWindow(event.sender);
     const options = {
-      title: "Install local Viewer Pack",
+      title: t("native.viewerPack.install.title"),
       properties: ["openFile", "multiSelections"],
-      filters: [{ name: "Viewer Pack and signature", extensions: ["puppyplugin", "sig"] }],
+      filters: [{
+        name: t("native.viewerPack.install.filter"),
+        extensions: ["puppyplugin", "sig"],
+      }],
     };
     const selected = owner
       ? await dialog.showOpenDialog(owner, options)
@@ -319,13 +323,16 @@ export function registerViewerPackAppIpcHandlers({
     const owner = getDialogOwnerWindow(event.sender);
     const options = {
       type: "warning",
-      buttons: ["Uninstall", "Cancel"],
+      buttons: [
+        t("native.viewerPack.uninstall.confirm"),
+        t("native.viewerPack.uninstall.cancel"),
+      ],
       defaultId: 1,
       cancelId: 1,
       noLink: true,
-      title: "Uninstall Viewer Pack",
-      message: "Uninstall this Viewer Pack?",
-      detail: "The pack will be removed from this computer. Your workspace files are not changed.",
+      title: t("native.viewerPack.uninstall.title"),
+      message: t("native.viewerPack.uninstall.message"),
+      detail: t("native.viewerPack.uninstall.detail"),
     };
     const decision = owner
       ? await dialog.showMessageBox(owner, options)
@@ -352,6 +359,19 @@ export function registerViewerPackAppIpcHandlers({
     host.sessions.setBounds(request?.sessionId, request?.bounds, event.sender.id));
   ipcMain.handle(VIEWER_PACK_APP_IPC_CHANNELS.destroySession, async (event, request) =>
     host.sessions.destroy(request?.sessionId, event.sender.id));
+}
+
+function defaultTranslate(messageId) {
+  const messages = {
+    "native.viewerPack.install.title": "Install local Viewer Pack",
+    "native.viewerPack.install.filter": "Viewer Pack and signature",
+    "native.viewerPack.uninstall.confirm": "Uninstall",
+    "native.viewerPack.uninstall.cancel": "Cancel",
+    "native.viewerPack.uninstall.title": "Uninstall Viewer Pack",
+    "native.viewerPack.uninstall.message": "Uninstall this Viewer Pack?",
+    "native.viewerPack.uninstall.detail": "The pack will be removed from this computer. Your workspace files are not changed.",
+  };
+  return messages[messageId] ?? "";
 }
 
 export function registerViewerPackPluginIpcHandlers({

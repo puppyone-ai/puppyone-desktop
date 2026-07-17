@@ -1,0 +1,19 @@
+{
+  "loading": "Chargement…",
+  "explorer.root": "Racine",
+  "explorer.emptyFolder": "Dossier vide",
+  "explorer.loadingWorkspace": "Chargement de l’espace de travail…",
+  "explorer.create": "Créer",
+  "explorer.more": "Plus",
+  "explorer.access": "Accès",
+  "explorer.resizeSidebar": "Redimensionner la barre latérale",
+  "explorer.cutLabel": "{name}, coupé",
+  "navigation.back": "Retour",
+  "preview.selectFile": "Sélectionnez un fichier à prévisualiser",
+  "preview.crashed": "Impossible de restituer cet éditeur.",
+  "status.clean": "Propre",
+  "status.modified": "Modifié",
+  "status.created": "Créé",
+  "status.deleted": "Supprimé",
+  "status.moved": "Déplacé"
+}

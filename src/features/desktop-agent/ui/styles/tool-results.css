@@ -1,0 +1,39 @@
+.desktop-agent-tool-empty {
+  color: var(--agent-text-subtle);
+  font-size: var(--agent-font-size-meta);
+  font-style: italic;
+}
+
+.desktop-agent-search-results {
+  display: grid;
+  min-width: 0;
+  max-height: 260px;
+  overflow: auto;
+  font-family: var(--po-font-mono);
+  font-size: var(--agent-code-font-size);
+  line-height: 1.45;
+}
+
+.desktop-agent-search-results > span,
+.desktop-agent-search-results > button {
+  min-width: 0;
+  overflow: hidden;
+  padding: 2px 5px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--agent-text-muted);
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.desktop-agent-search-results > button { cursor: var(--po-clickable-cursor, pointer); }
+.desktop-agent-search-results > button:hover { background: var(--po-hover); color: var(--agent-text); }
+.desktop-agent-search-results > small {
+  padding: 5px;
+  color: var(--agent-text-subtle);
+  font-family: var(--po-font-sans);
+  font-size: var(--agent-font-size-meta);
+}

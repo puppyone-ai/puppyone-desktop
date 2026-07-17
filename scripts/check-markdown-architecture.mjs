@@ -3,8 +3,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const sharedUiSourceRoot = path.join(repoRoot, "vendor", "shared-ui", "src");
-const markdownRoot = path.join(repoRoot, "vendor", "shared-ui", "src", "editor", "markdown");
+const sharedUiSourceRoot = path.join(repoRoot, "packages", "shared-ui", "src");
+const markdownRoot = path.join(repoRoot, "packages", "shared-ui", "src", "editor", "markdown");
+const compositionRoot = path.join(markdownRoot, "composition");
 const coreRoot = path.join(markdownRoot, "core");
 const featuresRoot = path.join(markdownRoot, "features");
 const platformRoot = path.join(markdownRoot, "platform");
@@ -26,6 +27,17 @@ const legacyDirectories = [
 const importPattern = /\b(?:import|export)\s+(?:type\s+)?(?:[^'";]*?\s+from\s+)?["']([^"']+)["']/g;
 const dynamicImportPattern = /\bimport\(\s*["']([^"']+)["']\s*\)/g;
 const errors = [];
+const removedArchitectureFiles = [
+  path.join(coreRoot, "syntax", "markdownParserExtensions.ts"),
+  path.join(featuresRoot, "blockFeatureRegistry.ts"),
+  path.join(featuresRoot, "inlineFeatureRegistry.ts"),
+];
+
+for (const removedFile of removedArchitectureFiles) {
+  if (existsSync(removedFile)) {
+    errors.push(`${relative(removedFile)} was removed; register the feature once in composition`);
+  }
+}
 
 for (const directory of legacyDirectories) {
   const legacyPath = path.join(markdownRoot, directory);
@@ -41,22 +53,28 @@ for (const filePath of walkTypeScript(markdownRoot)) {
     if (!target) continue;
 
     if (isInside(filePath, sharedRoot) && (
-      isInside(target, coreRoot) || isInside(target, featuresRoot) || isInside(target, platformRoot)
+      isInside(target, compositionRoot) ||
+      isInside(target, coreRoot) ||
+      isInside(target, featuresRoot) ||
+      isInside(target, platformRoot)
     )) {
       errors.push(`${relative(filePath)} imports ${relative(target)}; shared is the dependency floor`);
     }
 
-    if (isInside(filePath, platformRoot) && isInside(target, featuresRoot)) {
-      errors.push(`${relative(filePath)} imports ${relative(target)}; platform cannot depend on a feature`);
+    if (isInside(filePath, platformRoot) && (
+      isInside(target, compositionRoot) || isInside(target, featuresRoot)
+    )) {
+      errors.push(`${relative(filePath)} imports ${relative(target)}; platform cannot depend on composition or a feature`);
     }
 
-    if (
-      isInside(filePath, coreRoot) &&
-      isInside(target, featuresRoot) &&
-      /(?:widget|drag|contextmenu|cellEditor|focusState|menuState|commands)\.tsx?$/i.test(target) &&
-      !/FeatureRegistry\.ts$/i.test(target)
-    ) {
-      errors.push(`${relative(filePath)} imports concrete feature UI ${relative(target)}; use a feature registry`);
+    if (isInside(filePath, coreRoot) && (
+      isInside(target, compositionRoot) || isInside(target, featuresRoot)
+    )) {
+      errors.push(`${relative(filePath)} imports ${relative(target)}; core must use the injected Feature Composition contract`);
+    }
+
+    if (isInside(filePath, featuresRoot) && isInside(target, compositionRoot)) {
+      errors.push(`${relative(filePath)} imports ${relative(target)}; inject a leaf port instead of depending on composition`);
     }
   }
 
@@ -78,6 +96,7 @@ for (const filePath of walkTypeScript(sharedUiSourceRoot)) {
     if (!target) continue;
     if (
       isInside(target, coreRoot) ||
+      isInside(target, compositionRoot) ||
       isInside(target, featuresRoot) ||
       isInside(target, platformRoot) ||
       isInside(target, sharedRoot)

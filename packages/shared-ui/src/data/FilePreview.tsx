@@ -1,0 +1,201 @@
+import { Component, type ErrorInfo, type ReactNode } from "react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
+import type {
+  AppPreviewController,
+  DataNode,
+  DocumentPersistencePort,
+  FileContent,
+  OfficeDocumentConverter,
+} from "../core/types";
+import { EditorHost } from "../editor/EditorHost";
+import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
+import type {
+  DocumentSourceKind,
+  EditorInteractionPreferences,
+  MarkdownAssetUrlResolver,
+  MarkdownHtmlTrustMode,
+  MarkdownLinkGraph,
+} from "../editor/viewerTypes";
+import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
+import type { AiEditFile } from "../editor/ai-edits/types";
+import { FilePreviewIcon, type FileIconThemeId } from "../file/fileIcons";
+import type { DocumentPersistedCommit } from "../editor/document-session/types";
+
+export type FilePreviewProps = {
+  node: DataNode | null;
+  fileContent?: FileContent | null;
+  fileUrl?: string | null;
+  fileUrlLoading?: boolean;
+  fileUrlError?: string | null;
+  loading?: boolean;
+  error?: string | null;
+  aiEditFile?: AiEditFile | null;
+  showHeader?: boolean;
+  emptySlot?: ReactNode;
+  actionSlot?: ReactNode | ((node: DataNode) => ReactNode);
+  documentPersistence?: DocumentPersistencePort | null;
+  onDocumentPersisted?: (commit: DocumentPersistedCommit) => void;
+  hideSourceView?: boolean;
+  fileIconTheme?: FileIconThemeId;
+  editorInteractionPreferences?: EditorInteractionPreferences;
+  editorSaveMode?: EditorSaveMode;
+  htmlTrustMode?: MarkdownHtmlTrustMode;
+  workspaceId?: string;
+  workspaceRoot?: string | null;
+  markdownLinkGraph?: MarkdownLinkGraph | null;
+  markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  appPreview?: AppPreviewController | null;
+  openExternalFile?: (path: string) => Promise<void>;
+  convertOfficeDocumentToDocx?: OfficeDocumentConverter;
+  viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
+  documentSourceKind?: DocumentSourceKind;
+};
+
+export function FilePreview({
+  node,
+  fileContent,
+  fileUrl = null,
+  fileUrlLoading = false,
+  fileUrlError = null,
+  loading = false,
+  error = null,
+  aiEditFile = null,
+  showHeader = true,
+  emptySlot,
+  actionSlot,
+  documentPersistence = null,
+  onDocumentPersisted,
+  hideSourceView = false,
+  fileIconTheme = "default",
+  editorInteractionPreferences,
+  editorSaveMode = "manual",
+  htmlTrustMode = "safe",
+  workspaceId = "",
+  workspaceRoot = null,
+  markdownLinkGraph = null,
+  markdownAssetUrlResolver = null,
+  appPreview = null,
+  openExternalFile,
+  convertOfficeDocumentToDocx,
+  viewerExtensionAdapter = null,
+  documentSourceKind = "local",
+}: FilePreviewProps) {
+  const { t } = useLocalization();
+  if (!node) {
+    if (emptySlot) return <>{emptySlot}</>;
+
+    return (
+      <div className="empty-preview">
+        <span>{t("shared-ui.preview.selectFile")}</span>
+      </div>
+    );
+  }
+
+  const actions = typeof actionSlot === "function" ? actionSlot(node) : actionSlot;
+  const deferFallbackContent = loading && !fileContent;
+
+  return (
+    <div className={`file-preview-shell ${showHeader ? "" : "without-header"}`}>
+      {showHeader && (
+        <div className="file-preview-header">
+          <div className="file-preview-title">
+            <FilePreviewIcon
+              name={node.name}
+              type={node.type}
+              size={36}
+              snippet={node.preview}
+              childrenCount={node.children?.length}
+              theme={fileIconTheme}
+            />
+            <div>
+              <h2 dir="auto">{node.name}</h2>
+              <span dir="ltr">{node.path}</span>
+            </div>
+          </div>
+          <div className="file-preview-actions">
+            {node.status && node.status !== "clean" && (
+              <span className={`status-pill ${node.status}`}>
+                {t(`shared-ui.status.${node.status}`, { name: bidiIsolate(node.name) })}
+              </span>
+            )}
+            {actions}
+          </div>
+        </div>
+      )}
+
+      <div className="file-preview-body">
+        <EditorPreviewBoundary
+          key={node.path}
+          failureTitle={t("shared-ui.preview.crashed")}
+        >
+          <EditorHost
+            node={node}
+            fileContent={fileContent}
+            fileUrl={fileUrl}
+            fileUrlLoading={fileUrlLoading}
+            fileUrlError={fileUrlError}
+            loading={loading}
+            error={error}
+            aiEditFile={aiEditFile}
+            documentPersistence={documentPersistence}
+            onDocumentPersisted={onDocumentPersisted}
+            hideSourceView={hideSourceView}
+            fileIconTheme={fileIconTheme}
+            editorInteractionPreferences={editorInteractionPreferences}
+            saveMode={editorSaveMode}
+            htmlTrustMode={htmlTrustMode}
+            workspaceId={workspaceId}
+            workspaceRoot={workspaceRoot}
+            markdownLinkGraph={markdownLinkGraph}
+            markdownAssetUrlResolver={markdownAssetUrlResolver}
+            appPreview={appPreview}
+            openExternalFile={openExternalFile}
+            convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
+            deferFallbackContent={deferFallbackContent}
+            viewerExtensionAdapter={viewerExtensionAdapter}
+            documentSourceKind={documentSourceKind}
+          />
+        </EditorPreviewBoundary>
+      </div>
+    </div>
+  );
+}
+
+type EditorPreviewBoundaryProps = {
+  children: ReactNode;
+  failureTitle: string;
+};
+
+type EditorPreviewBoundaryState = {
+  error: string | null;
+};
+
+class EditorPreviewBoundary extends Component<EditorPreviewBoundaryProps, EditorPreviewBoundaryState> {
+  state: EditorPreviewBoundaryState = {
+    error: null,
+  };
+
+  static getDerivedStateFromError(error: unknown): EditorPreviewBoundaryState {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  componentDidCatch(error: unknown, info: ErrorInfo) {
+    console.warn("Editor preview crashed:", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="editor-crash-state">
+          <strong>{this.props.failureTitle}</strong>
+          <span dir="ltr">{this.state.error}</span>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}

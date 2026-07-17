@@ -1,19 +1,22 @@
 # Markdown Editor Architecture
 
-Status: **Adopted architecture; core and vertical-feature migration landed as
-of 2026-07-11.** URL/sanitizer closure, plan-backed block widgets, the
+Status: **Adopted architecture; static Feature Composition and vertical-feature
+migration landed as of 2026-07-16.** URL/sanitizer closure, plan-backed block widgets, the
 policy-converged isolated preview adapter for table cells, a dedicated
 `markdownAssetPolicy` +
 hardened `AssetBroker` (policy-before-resolver, concurrency limit, principal
 handle revocation, no raw `file://`), host-injected workspace identity facets
 with a single `createPrincipalFromView` helper, `DocumentTrustContext` +
 `AuthorizationGrant` gating of local active HTML, revision-bound
-`ExecutionSession`s, recoverable code/Mermaid/table drafts, revision-scoped
-Electron WebEmbed sessions, typed feature registries, and atomic table
-interaction/focus coordination are landed on the migration branch. The remaining
-acceptance gaps are full document-plan convergence for the isolated table-cell
-preview, a visual regression suite, incremental large-document decoration
-updates, and browser-backed (real renderer) lifecycle/IME/sandbox coverage —
+`ExecutionSession`s, typed image/video media slices, recoverable
+code/Mermaid/table drafts, revision-scoped
+Electron WebEmbed sessions, one immutable typed Feature Composition, and atomic table
+interaction/focus coordination are landed on the migration branch. Markdown
+also uses the shared editable-contribution revision/snapshot boundary and the
+host-owned save lifecycle. The remaining acceptance gaps are full document-plan
+convergence for the isolated table-cell preview, a broader visual regression
+suite, and browser-backed (real renderer) lifecycle/IME/sandbox coverage beyond
+the shipped oversized-table production smoke —
 not product polish. These are enumerated honestly in §12 and Phase 4–6 below.
 
 This document defines the durable technical architecture for PuppyOne's
@@ -26,6 +29,9 @@ Markdown editor. It complements, but does not replace, the product behavior in
   and commit work, and how the caret and selection behave.
 - The file-format pipeline owns routing a `.md` file into the Markdown viewer;
   see [File Format and Viewer Pipeline](../file-format-viewer-pipeline.md).
+- [Document Editing and Persistence](../document-editing-persistence.md) owns
+  the thin save lifecycle, storage acknowledgement, navigation/close flush,
+  and external-change conflict behavior.
 
 ---
 
@@ -50,6 +56,9 @@ PuppyOne uses a **Markdown-source-first, semantic-model-driven live preview**.
    default. Safe presentation does not require document trust; trust gates
    active execution and broader resource capabilities, not whether a harmless
    `<span style="color: ...">` can render.
+8. A committed source transaction reports a new revision and remains available
+   through the exact source snapshot port. The shared
+   `DocumentEditingSession`, not Markdown, owns save scheduling and storage.
 
 The end-to-end Markdown data flow is:
 
@@ -137,6 +146,15 @@ Consequences:
 - Typing, paste, toolbar commands, task toggles, table edits, and AI edits all
   dispatch source transactions.
 - Widgets do not maintain an authoritative copy of their content.
+- Ordinary input reports revision state without copying the complete source
+  through React. The host reads the exact source from a synchronous snapshot
+  port at a save boundary.
+- Persistence acknowledgement, not request dispatch, determines whether the
+  current revision is saved.
+- Document close and navigation await the shared save session before unmounting;
+  destroy cleanup is an emergency snapshot path, not the primary save path.
+- A failed write remains observable and retryable. It cannot be swallowed by a
+  component cleanup or converted into an apparently successful close.
 - Saving does not serialize the rendered DOM.
 - Opening and saving a document without an explicit edit does not normalize or
   rewrite its Markdown.
@@ -240,7 +258,8 @@ Responsibilities:
 - CommonMark/GFM block and inline structure;
 - syntax tree nodes and source offsets;
 - incremental reparsing after changes;
-- registered extensions such as wiki links or Obsidian-style image embeds.
+- registered extensions such as wiki links and Obsidian-style image/video
+  embeds.
 
 The supported dialect must be explicit. A syntax extension is not complete
 when only a tokenizer exists; it must join the feature contract in section 5.
@@ -271,6 +290,8 @@ type MarkdownSemanticElement =
   | MarkdownHtmlBlock
   | MarkdownTable
   | MarkdownCodeBlock
+  | MarkdownImage
+  | MarkdownVideo
   | MarkdownUnsupported;
 
 type MarkdownInlineHtml = {
@@ -300,7 +321,7 @@ Responsibilities:
 - versioned broad-safe HTML tag, attribute, CSS, media, and embed profiles;
 - per-surface CSS property/value validation and containment;
 - safe link protocols and controlled link activation;
-- image source validation and workspace asset resolution;
+- typed image/video source validation and workspace asset resolution;
 - provenance-based `DocumentTrustContext` evaluation and explicit capability
   grants;
 - block-versus-inline execution boundary;
@@ -379,129 +400,278 @@ Responsibilities:
 Interaction state refers to semantic element ranges. It must not infer element
 identity from CSS classes or rendered DOM ancestry.
 
+#### Same-document block relocation
+
+Block rearrangement is an editor interaction over canonical Markdown source,
+not a rich-text document model. The parser resolves a transient movable block
+reference at the pointer or caret; no persistent block IDs are written into the
+file.
+
+- A root block may move only among direct `Document` children. A list item may
+  move only among sibling items in the same list. Moving into or out of lists,
+  blockquotes, tables, embedded editors, or another document is out of scope.
+- A move preserves the exact source slice and its adjacent separator. Direct
+  ordered-list markers are the only normalization: they are renumbered inside
+  that list so source and rendered order stay aligned. The command issues one
+  CodeMirror transaction; it never parses and serializes the entire document.
+- Selection inside the moved slice relocates by its relative offset. Other
+  selections use CodeMirror change mapping. The transaction is one undo unit
+  and carries the `move.drop` user event plus a typed, history-invertible
+  old/new range effect.
+- Pointer interaction uses one editor-scoped overlay handle and one drop line,
+  a movement threshold, pointer capture, edge autoscroll, and Escape cancel.
+  Keyboard commands expose the same operation without relying on the visual
+  overlay.
+- The default-off block-drag experiment is host-owned. When disabled, the host removes the
+  complete CodeMirror extension compartment: no handle, pointer listeners,
+  autoscroll loop, or block-move keymap remains registered.
+- A move is rejected while read-only, while IME composition is active, when
+  the source revision changed during the gesture, or when source/target no
+  longer share the same structural parent.
+
+The visual overlay is derived and disposable. It must not be inserted into
+CodeMirror's editable `contentDOM`, and it must not become an alternate source
+of block identity.
+
 ### 3.7 Source layout and feature composition
 
-The implementation is a hybrid modular monolith. Stable editor machinery is
-organized by layer; complex Markdown capabilities are vertical features:
+The implementation is a modular monolith: stable editor machinery is layered,
+while each complex Markdown capability is a vertical feature. Detection,
+compilation, and Widget creation are wired once rather than maintained in
+separate switches.
+
+Final architecture overview (plain text, not Mermaid):
+
+```text
+┌──────────────────────────── PuppyOne Desktop host ────────────────────────────┐
+│ Explorer / DataWorkspace                                                     │
+│          │                                                                   │
+│          v                                                                   │
+│ File-format Router ───────────────> MarkdownCodeMirrorEditor                  │
+│                                            │                                 │
+│                                            v                                 │
+│                              CodeMirror EditorState                          │
+│                         canonical in-memory Markdown source                  │
+└────────────────────────────────────────────┬─────────────────────────────────┘
+                                             │
+                         ┌───────────────────┴───────────────────┐
+                         │                                       │
+                         │ derived render path                   │ durability path
+                         v                                       v
+┌───────────────────────────────────────────┐     revision + readSnapshot()
+│ Static, immutable Feature Composition     │                   │
+│                                           │                   v
+│ media syntax   image       video          │       ┌─────────────────────────┐
+│ HTML           table       code block     │       │ DocumentEditingSession  │
+│ Mermaid                                   │       │                         │
+│                                           │       │ dirty/save state        │
+│ each Feature may contribute:              │       │ at most one in-flight   │
+│ collect / compile / Widget factory /      │       │ write per document      │
+│ live-preview extensions                   │       │ keep newest pending     │
+└──────────────────────┬────────────────────┘       │ snapshot                │
+                       │ installed through Facet    │ close/navigation flush  │
+                       v                            └────────────┬────────────┘
+┌───────────────────────────────────────────┐                    │
+│ Generic Markdown Core                    │                    v
+│                                           │       DocumentPersistencePort
+│ parser nodes + Feature collectors         │                    │
+│                 │                         │             ┌──────┴──────┐
+│                 v                         │             v             v
+│ complete discriminated MarkdownElement   │         Local FS        Cloud
+│                 │                         │             │
+│                 v                         │             v
+│ typed MarkdownElementPlan                 │       durable Markdown file
+│                 │                         │             ▲
+│        ┌────────┴────────┐                │             │
+│        v                 v                │      Agent / other process
+│ inline Widget       block Widget          │      may write independently
+│        └────────┬────────┘                │             │
+│                 v                         │             v
+│ CodeMirror Decorations / mounted sessions│      workspace file watcher
+└───────────────────────────────────────────┘             │
+                                                          v
+                                               external-version conflict gate
+                                               load external / keep local+save
+
+Table cell isolated preview (no EditorState of its own):
+
+composition/preview adapter ──implements──> shared preview port
+                                              ▲
+                                              │ injected dependency
+                                              │
+                                         table Feature
+```
+
+The two right-hand writers are intentionally not hidden behind a CRDT or a
+global coordinator. A human edit is serialized only at the storage request
+boundary; an agent may still edit another range or the whole file through the
+filesystem. Version checking and the external-change gate prevent silent
+overwrite. Automatic paragraph-level merging is a separate collaboration
+feature, not a responsibility of the Markdown renderer or save session.
 
 ```text
 editor/markdown/
   MarkdownCodeMirrorEditor.tsx         public editor surface
   markdownCodeMirrorExtensions.ts      public CodeMirror assembly
-  core/                                source, syntax, plans, commands, adapters
+  composition/
+    markdownFeatureComposition.ts      one static, frozen built-in feature list
+    preview/
+      markdownInlinePlanAdapter.ts      isolated-string adapter implementation
+      markdownInlineRenderer.ts         bounded compatibility tokenizer/renderer
+  core/
+    features/
+      markdownFeatureData.ts           pure built-in semantic data contracts
+      markdownFeatureContract.ts       definition/composition contract + Facet
+    syntax/                             generic Lezer projection + element types
+    plans/                              generic plan compiler/index/contracts
+    commands/                           source transaction commands
+    decorations/                        plan-to-CodeMirror adapters
   features/
-    blockFeatureRegistry.ts            block-widget composition boundary
-    inlineFeatureRegistry.ts           inline-widget composition boundary
-    table/                              model + plan + commands + focus + widget
-    html/                               tokenizer + model + plan + policy + widget
-    code-block/                         model + plan + widget
-    mermaid/                            renderer + widget
-    image/                              model + plan + widget
+    table/                              tableFeature + model/plan/commands/widget
+    html/                               htmlFeature + tokenizer/model/plan/widget
+    code-block/                         codeBlockFeature + model/plan/widget
+    mermaid/                            mermaidFeature + renderer/widget
+    image/                              imageFeature + model/plan/widget
+    video/                              videoFeature + model/plan/playback widget
+    media/                              syntax feature + shared media mechanisms
   platform/                            policy, brokers, sessions, CM host adapters
-  shared/                              feature-agnostic DOM/measure primitives
+  shared/
+    preview/                            isolated-preview leaf port
+    widgets/                            feature-agnostic DOM/measure primitives
 ```
 
-The core may consume a feature's pure model or plan compiler, but it constructs
-concrete feature widgets only through the typed registries. `platform/` never
-imports a feature, and `shared/` imports none of `core/`, `features/`, or
-`platform/`. `scripts/check-markdown-architecture.mjs` enforces these durable
-boundaries in CI.
+The composition module is the only built-in registration point. It imports the
+small `*Feature.ts` definitions, validates duplicate feature IDs and capability
+owners, constructs ordered detector arrays, Feature-owned live-preview
+extensions, and kind-indexed compiler/widget maps once, then freezes the
+result. It is not a mutable registry, service locator, or dynamic plug-in
+runtime.
+
+The public CodeMirror assembly installs that immutable value through
+`markdownFeatureCompositionFacet`. Core collectors, plan indexes, and
+decorations consume only the leaf composition contract. Therefore core does
+not import the concrete image, video, HTML, table, code-block, or Mermaid
+implementation, and a fixture may inject a deliberately smaller composition.
+
+Runtime data flow:
+
+```text
+Markdown source (only committed truth)
+                  |
+                  v
+CodeMirror EditorState + injected Feature Composition
+                  |
+        +---------+----------+
+        |                    |
+        v                    v
+CommonMark nodes      ordered feature collectors
+        |                    |
+        +---------+----------+
+                  v
+       discriminated MarkdownElement
+                  |
+          compilerByElementKind
+                  v
+          typed MarkdownElementPlan
+                  |
+        +---------+----------+
+        |                    |
+        v                    v
+ inlineWidgetByKind   blockWidgetByKind
+        |                    |
+        +---------+----------+
+                  v
+        CodeMirror Decoration / Widget
+```
+
+An inline Feature Widget receives `plan.atom`; a block Feature Widget receives
+`plan.embed`. The main Feature decoration path and Widget factories do not
+reparse the source line. This is especially important for images: `alt`,
+`href`, `title`, and reference kind are normalized into one complete semantic
+element, compiled once, and cannot drift from the mounted Widget. Core styling
+for ordinary links/line chrome remains separate, and the explicitly isolated
+table-cell preview has its own bounded string tokenizer because it has no
+EditorState or document ranges.
+
+The table Feature consumes that isolated renderer through a leaf port in
+`shared/preview`; composition injects the adapter while constructing the table
+definition. The Feature never imports composition, so the dependency remains
+one-way.
+
+Persistence is deliberately a parallel host path, not another Feature:
+
+```text
+CodeMirror transaction
+        |
+        +----> semantic plans / Widgets (derived UI)
+        |
+        +----> changed revision + synchronous readSnapshot port
+                                   |
+                                   v
+                         DocumentEditingSession
+                         single in-flight write
+                         latest revision coalescing
+                         close/navigation flush barrier
+                                   |
+                                   v
+                         local-fs / cloud adapter
+                                   |
+                                   v
+                                durable file
+```
 
 A feature widget is a rendering adapter, not a controller. Widget construction
 must not dispatch. Event handlers call feature commands; commands issue one
 atomic CodeMirror transaction; editor-scoped coordinators perform DOM work only
 after CodeMirror has committed its view update.
 
-### 3.8 Dependency direction: current state and target
-
-The physical folders are intentionally clearer than the old horizontal layout,
-but `core/` still contains both stable contracts and application composition.
-That creates a **folder-level two-way dependency**:
+### 3.8 Dependency direction — adopted
 
 ```text
-Current transitional dependency
+Public editor assembly
+       |                         |
+       | imports                 | installs through Facet
+       v                         v
+Composition ----------------> Core composition port
+       |                         ^
+       | imports definitions     | implemented by
+       v                         |
+Vertical Features --------------+
+       |             |
+       v             v
+Core leaf contracts  Platform capability ports
+       ^             ^
+       |             |
+       +------ Shared primitives
 
-       +---------------------------------------+
-       | core/                                 |
-       | contracts + compiler + decorations    |
-       +---------------------------------------+
-                    |                 ^
-                    | imports         | imports contracts
-                    v                 |
-       +---------------------------------------+
-       | features/                             |
-       | feature plans + commands + widgets    |
-       +---------------------------------------+
+Composition preview adapter ----> Shared preview port <---- Table Feature
+             (implements)                              (consumes)
 ```
 
-For example, `core/plans/markdownPlanCompiler.ts` imports the table, HTML,
-image, and code-block plan compilers, while those feature plan compilers import
-`core/plans/markdownPlanTypes.ts` and plan primitives. This is not currently a
-dangerous runtime module cycle: most edges back to core are types or leaf
-helpers. It does mean that the directory named `core` is not yet an independent
-kernel and that moving or testing it in isolation remains harder than necessary.
+Allowed ownership rules:
 
-The long-term one-way dependency should be:
+- public assembly knows the concrete built-in composition;
+- composition knows all `*Feature.ts` definitions;
+- Feature-owned CodeMirror fields/plugins/keymaps are declared by the Feature
+  and aggregated as `livePreviewExtensions`; public assembly does not import
+  the table, Mermaid, image, or other concrete Feature directly;
+- core collectors, compiler, plan index, and decorations know only the
+  composition port and pure semantic/plan contracts;
+- features may consume core leaf contracts, platform capabilities, and shared
+  primitives, but never the composition singleton;
+- platform never imports a concrete feature;
+- shared remains the dependency floor;
+- persistence is outside every Markdown feature and remains owned by the host
+  `DocumentEditingSession`.
 
-```text
-                         +-----------------------+
-                         | Public assembly       |
-                         +-----------------------+
-                                    |
-                                    v
-                         +-----------------------+
-                         | Composition           |
-                         | knows all features    |
-                         +-----------------------+
-                           |        |         |
-                           v        v         v
-                    +----------+ +----------+ +----------+
-                    | Adapters | | Features | | Platform |
-                    +----------+ +----------+ +----------+
-                         |        /    |    \       |
-                         |       /     |     \      |
-                         v      v      v      v     v
-                    +----------------+   +----------------+
-                    | Kernel         |   | Shared         |
-                    | contracts only |   | primitives     |
-                    +----------------+   +----------------+
-
-Allowed dependency direction:
-
-  Public assembly  ----> Composition
-  Composition      ----> Adapters / Features / Platform / Kernel
-  Adapters         ----> Features / Platform / Kernel / Shared
-  Features         ----> Platform ports / Kernel / Shared
-  Platform         ----> Kernel contracts only
-  Kernel           ----> no outer layer
-  Shared           ----> no outer layer
-```
-
-The important rule is not that features know nothing about shared contracts.
-They must know the contracts they implement. The rule is that the kernel never
-imports a concrete table, HTML, image, or Mermaid implementation. A dedicated
-composition layer imports both sides and connects them.
+The architecture checker rejects the deleted block/inline registries, every
+core-to-concrete-Feature or Feature-to-composition import, upward
+platform/shared dependencies, external imports of Markdown internals, and DOM
+ownership in pure plan modules.
 
 ### 3.9 Type constraints and impossible states
 
-The current semantic model ties `kind` and `blockData` only by convention:
-
-```text
-MarkdownStandardElement
-  |
-  +---- kind: table | image | fence | task | ...
-  |
-  +---- blockData?: TableData | ImageData | FenceData | TaskData | ...
-
-TypeScript therefore cannot prevent:
-
-  kind: table  +  blockData: ImageData
-  kind: image  +  blockData: FenceData
-  kind: fence  +  blockData: undefined
-```
-
-Feature plan compilers defend against those combinations at runtime, but the
-stronger target is a fully discriminated union:
+The semantic model is a distributed discriminated union:
 
 ```text
 MarkdownElement
@@ -519,9 +689,18 @@ MarkdownElement
           blockData: FenceData
 ```
 
-With that model, invalid combinations fail during compilation instead of
-requiring repeated `blockData.kind` checks in every feature. This is what
-"type constraints can still be strengthened" means in the architecture review.
+Feature collectors emit complete semantic objects; there is no parser-created
+half-image that a later pass mutates or merges. The outer kind fixes the only
+legal payload kind. `kind: image` without image payload, or with table payload,
+is not representable. Malformed/incomplete source does not become a feature
+element and therefore stays honest visible source.
+
+Inline-atom and block-atom plans are distributed the same way. Therefore
+`MarkdownInlineAtomPlan<"image">` exposes an image atom directly, and
+`MarkdownBlockAtomPlan<"video">` exposes a video embed directly. Each leaf
+Feature factory is strongly typed. The composition boundary is the only place
+where handler variance and dynamic map lookups erase TypeScript correlation;
+that erasure does not leak into collectors, compilers, decorations, or Widgets.
 
 ### 3.10 Transaction and widget lifecycle
 
@@ -571,10 +750,29 @@ Widget.toDOM()
 `WidgetType` values are immutable descriptors. Timers, observers, listeners,
 abort controllers, asset handles, edit sessions, and execution sessions belong
 to the mounted widget session and have deterministic disposal. Revision-bound
-async work cannot commit into a newer source revision. This does not mean every
-widget operation is already optimal—for example, table descriptor equality can
-still become cheaper—but the transaction timing and resource ownership model is
-the correct one.
+async work cannot commit into a newer source revision. Table descriptors use a
+precompiled semantic render key, rather than serializing every row during
+`eq()`, so descriptor comparison remains constant-time.
+
+Source position and render identity are separate axes:
+
+```text
+canonical source range ----> CodeMirror decoration mapping ----> current range
+
+semantic render key  ------> WidgetType.eq() ------------------> DOM reuse
+                                      |
+                                      v
+                              mounted WidgetSession
+                              listeners / measure / asset lease
+```
+
+For a passive embed such as `![alt](src)`, absolute `from`/`to` offsets are not
+part of render identity. Inserting text before the image maps its decoration but
+does not create a new image. A pointer handler reads the current mapped range
+from the mounted widget DOM. A source, document, policy, or render-key change
+replaces the session. Revision-bound executable content remains a separate
+case: its execution session is invalidated or restarted explicitly without
+turning every static asset into a whole-document revision dependency.
 
 ---
 
@@ -674,6 +872,14 @@ The host is an adapter runtime, not a second document model. It owns ephemeral
 DOM and asynchronous state while all committed edits still become CodeMirror
 transactions against Markdown source.
 
+The shipped live adapter currently puts the complete layout-sensitive
+projection in the direct `StateField` set. That includes block replacements,
+line classes, collapsed markers, inline atoms, and atomic ranges because each
+can change wrapping or height. The viewport-presentation branch above is a
+reserved extension point; it must stay empty until a decoration is proven
+geometry-neutral. Scrolling therefore changes only CodeMirror's DOM viewport
+and never dispatches a projection transaction.
+
 Embed isolation is also a compiled decision, not a widget convention:
 
 - ordinary images, controls, and policy-approved marks use typed host DOM;
@@ -705,12 +911,23 @@ Consequences:
 - `ResizeObserver`, event subscriptions, timers, `AbortController`, async
   generation counters, theme listeners, and edit drafts may not be owned only
   by descriptor instance fields.
+- Widget sessions register geometry with the host's single layout coordinator;
+  the coordinator owns one `ResizeObserver`, applies a sub-pixel delta
+  threshold, and coalesces one keyed `requestMeasure()` per `EditorView`.
 - `toDOM()` mounts a DOM-owned `WidgetSession`, registered by DOM element or by
   the per-view host. `destroy(dom)` disposes the session associated with that
   exact DOM node, even if the descriptor instance has changed.
-- `eq()` compares immutable plan identity. `updateDOM()` may update that
-  widget's own DOM, but may not inspect surrounding CodeMirror DOM as a source
-  of semantic state.
+- `eq()` compares immutable semantic/render identity and required policy
+  context, not absolute offsets that merely moved through a transaction.
+  CodeMirror owns decoration mapping. A non-editing handler may ask CodeMirror
+  for the mounted widget's current range; an interactive embed uses its
+  editor-scoped mapped edit session. `updateDOM()` may update that widget's own
+  DOM, but may not inspect surrounding CodeMirror DOM as a source of semantic
+  content.
+- Static display-asset leases belong to the mounted Widget session. They are
+  revoked when that semantic widget is replaced, the view/sender is disposed,
+  or authorization is revoked—not merely because unrelated document text
+  produced a new revision.
 - Mount, DOM reuse, viewport removal, remount, reconfiguration, and editor
   destruction must each have deterministic cleanup behavior.
 
@@ -763,6 +980,10 @@ type EmbeddedEditSession = {
 - Ranges map through transactions. A commit verifies that the current source
   still matches the session's base source or performs an explicit rebase or
   conflict flow.
+- A block-relocation transaction maps sessions wholly contained in the moved
+  block by relative offset into its annotated destination range. Sessions
+  outside the block use ordinary change mapping; a partial overlap is marked
+  conflicted instead of silently attaching a draft to unrelated source.
 - The commit builder dispatches the source change and the selection mapped into
   the new document in one transaction. DOM callbacks do not dispatch a change
   and then reuse stale pre-change offsets.
@@ -796,7 +1017,10 @@ or Electron authority:
   aliases, rejects path traversal, escaping symlinks, directories, devices,
   sockets, and other special files, opens the file itself, and revalidates the
   opened handle before streaming so validate-then-swap cannot escape the root.
-  Real filesystem paths are never exposed to document content.
+  Real filesystem paths are never exposed to document content. A passive asset
+  handle is a mounted-renderer lease: the principal records the revision at
+  issuance for audit and request validation, but an unrelated later revision
+  does not blanket-revoke still-mounted, semantically unchanged media.
 - Asset response policy revalidates redirect targets, verifies actual MIME and
   sink compatibility, streams through a hard byte limit even without a
   trustworthy `Content-Length`, limits concurrency and lifetime, and supports
@@ -832,9 +1056,73 @@ be cached or deduplicated across principals. Only authority-free pure results,
 such as a validated Mermaid SVG, may be shared when its key includes source,
 sanitizer, policy, and renderer versions. Authorization revocation destroys all
 derived execution sessions and handles. Revision change or session disposal
-destroys only the affected revision-bound sessions, aborts their jobs, revokes
-their handles, and evicts their principal-scoped cache entries immediately; it
-does not revoke the user's persistent authorization grant.
+destroys only capabilities explicitly declared revision-bound, such as
+execution and native web-embed sessions. Widget replacement or session disposal
+aborts passive asset work and revokes its mounted leases. Both paths evict their
+affected principal-scoped cache entries immediately; neither revokes the user's
+persistent authorization grant.
+
+#### 4.4.1 Media vertical slices
+
+Media shares only the mechanisms that are truly common: authored-reference
+classification, workspace-link resolution, asset policy, revocable leases, and
+the local byte transport. Rendering and interaction remain format-owned.
+
+```text
+Markdown source
+  |
+  +-- ![alt](path.png) ------------------------> Image model/plan/widget
+  |
+  +-- ![[target.png]] --+
+  |                     +-- media scanner ----> Image model/plan/widget
+  +-- ![[target.mp4]] --+                  \--> Video model/plan/widget
+  |
+  +-- safe HTML <img>/<video>/<source> --------> HTML sanitizer + media hydration
+                                                    |
+                                                    v
+                            media-reference resolver (markdown-path | wiki-target)
+                                                    |
+                                                    v
+                              AssetBroker(kind: image | video)
+                                                    |
+                                                    v
+                    opaque puppyone-local lease + streaming GET Range / HEAD
+```
+
+This is deliberately not one universal `MediaWidget`. An image owns decode,
+focus, expansion, and alt-text fallback. A video owns controls, playback state,
+source selection, metadata readiness, and seeking. Both use the same narrow
+broker and mounted-session disposal rules, so a future audio or image-editor
+feature can reuse the platform without inheriting unrelated UI behavior.
+
+Syntax and resolution rules:
+
+- Standard `![alt](path)` remains an image construct and resolves relative to
+  the containing Markdown document.
+- Obsidian-style `![[target.ext]]` is classified by a supported extension.
+  Image targets become image atoms; supported video targets become full-line
+  block atoms. Wiki targets resolve through `MarkdownLinkGraph` and then become
+  explicit workspace-root asset references. Ambiguous targets fail closed.
+- A video alias is its accessible title. A numeric alias such as `|720x405`
+  is bounded display geometry.
+- Raw `<img>` / `<video>` / `<source>` is allowed only through the composed `safe-media`
+  profile. Every `src` and `poster` stays inert until the typed broker resolves
+  it. Controls are forced on, autoplay is removed, and preload is capped at
+  `none` or `metadata`. In addition to CommonMark HTML blocks, one complete
+  `<img>` or closed `<video>...</video>` root that owns a physical line is
+  recognized as an explicit PuppyOne media block; arbitrary inline HTML is not
+  promoted.
+- Local authored media paths use exact filesystem identity first. When an exact
+  entry is absent, visually equivalent Unicode-space variants (for example the
+  narrow no-break space in macOS screenshot names) may resolve only to one
+  unique directory entry. Ambiguous aliases fail closed.
+- Widget equality uses semantic media identity, not absolute source offsets.
+  Editing an unrelated paragraph therefore preserves the same decoded image or
+  playback session and lease.
+- The local capability transport serves the exact requested byte range through
+  a backpressured file stream and supports metadata-only `HEAD`. Large video
+  playback therefore neither buffers the whole file in main-process memory nor
+  exposes a raw filesystem path to the renderer.
 
 ### 4.5 StateField and ViewPlugin ownership
 
@@ -858,25 +1146,173 @@ View plugins and the embed host own view-local behavior:
   coalesced `requestMeasure()` calls;
 - no canonical content and no unique copy of an uncommitted draft.
 
+### 4.6 Complexity budgets and oversized-block execution
+
+Document viewport virtualization is necessary but not sufficient. CodeMirror
+mounts only visible document ranges, but one visible range may contain a table
+with thousands of rows, a very large HTML subtree, a long code fence, or an
+expensive diagram. Such a construct is one document block and can still create
+unbounded synchronous work and DOM when its outer widget enters the viewport.
+
+Oversized handling is therefore a compile-time policy decision followed by a
+view-local execution strategy. Individual widgets may not invent private size
+thresholds or silently render a cheaper interpretation.
+
+```ts
+type MarkdownBlockComplexity = Readonly<{
+  sourceBytes: number;
+  sourceLines: number;
+  logicalItems: number;
+  estimatedDomNodes: number;
+  nestingDepth: number;
+  assetCount: number;
+  maximumItemBreadth: number;
+}>;
+
+type MarkdownBlockExecution =
+  | { mode: "rich" }
+  | { mode: "windowed"; overscanItems: number }
+  | { mode: "deferred"; reason: MarkdownBudgetReason }
+  | { mode: "visibleSource"; reason: MarkdownBudgetReason };
+
+type MarkdownRenderBudgetPolicy = Readonly<{
+  version: string;
+  documentProfile: "normal" | "large" | "extreme";
+  decide(
+    featureId: string,
+    complexity: MarkdownBlockComplexity,
+  ): MarkdownBlockExecution;
+}>;
+```
+
+The exact thresholds are centralized, versioned, benchmark-derived product
+configuration. They are not part of parser semantics, are not duplicated in
+adapters, and may differ by feature because ten thousand plain lines do not
+have the same cost as ten thousand interactive cells. A decision is stable for
+the same source revision, feature version, and budget-policy version; scrolling
+or a transient slow frame must not flip a block between representations.
+
+The host currently derives `documentProfile` once from source units and line
+count, using the same policy for local and cloud files. Per-block byte, line,
+breadth, nesting, asset, and logical-item metrics then refine the decision.
+A large document may still render ordinary blocks richly while applying tighter
+async and DOM budgets. The profile is disposable derived state, is never
+persisted into Markdown, and does not replace the separate filesystem/network
+byte limits. Additional aggregate metrics may be added only inside the same
+versioned policy. Transport limits may be raised only after the corresponding
+large-file profiles pass the production harness.
+
+The four strategies have distinct contracts:
+
+| Strategy | Use | Contract |
+| --- | --- | --- |
+| `rich` | Bounded ordinary block | Mount the complete typed widget. |
+| `windowed` | Large, independently addressable repeated items | Keep total geometry, but mount only the visible item range plus bounded overscan. |
+| `deferred` | Expensive work that can be initiated safely | Mount a stable-height, honest summary and run cancellable work only after viewport proximity or explicit activation. |
+| `visibleSource` | Unvirtualizable or hard-over-budget content | Preserve exact editable source; never freeze the editor attempting a rich representation. |
+
+`deferred` is not a hidden automatic retry loop. Its activation is
+session-scoped, cancellable, revision-bound, and subject to hard resource and
+security ceilings. “Render anyway” may raise a soft presentation budget for
+one block, but it cannot bypass sanitizer, byte, process, or capability limits.
+
+#### Feature-specific execution rules
+
+- **Tables:** use the editor scroller as the single vertical scrolling owner;
+  do not add a nested scrollbar merely to make virtualization easier. A large
+  table uses stable row keys derived from mapped source ranges, a prefix-size
+  index, estimated row heights, bounded overscan, and top/bottom space. Only
+  mounted rows own cell DOM. The focused, selected, pointer-captured, or
+  IME-composing row remains pinned until the interaction ends. Measured height
+  corrections are coalesced through the editor layout coordinator and preserve
+  the visible row as the scroll anchor. A table too irregular to virtualize
+  honestly falls back to source instead of mounting every cell. The current
+  policy bounds the collected semantic model at 5,000 logical rows, 50,000
+  cells, 64 columns, 64 KiB per row, and 4 MiB total table source; exceeding
+  any hard breadth/model ceiling preserves the exact source without
+  constructing the discarded row model or a widget.
+- **HTML blocks:** sanitize and compute complexity before mounting host DOM.
+  Independent, sanitized top-level children may be chunked when their layout
+  cannot escape the block. Arbitrary HTML cannot be split at guessed string or
+  DOM boundaries because CSS flow, tables, lists, and accessibility relations
+  can cross them. `content-visibility` and intrinsic-size containment may
+  reduce style/layout work for already-created safe chunks, but do not count as
+  DOM virtualization. An over-budget indivisible subtree becomes deferred or
+  visible source.
+- **Code fences:** an oversized fence remains canonical source in the outer
+  CodeMirror view or uses a viewport-aware nested editor. It must not create a
+  full-height textarea or duplicate the complete source into one DOM control.
+  Syntax highlighting and diagnostics are time-sliced and may lag behind text;
+  typing, selection, copy, and undo remain available.
+- **Mermaid and future computed embeds:** source bytes plus a cheap semantic
+  item estimate (currently non-empty Mermaid source lines) are bounded before
+  rendering. Work goes through the async-render
+  broker with cancellation, revision checks, timeout/watchdog, and an isolated
+  execution surface when rendering cannot be made cooperatively interruptible
+  in the main renderer. Only sanitized, authority-free output may enter a
+  shared cache. Timeout or budget exhaustion produces an honest typed fallback.
+- **Images and media:** resolve and decode per asset near the viewport rather
+  than waiting for every asset in a compound block. Reserve dimensions from
+  trusted metadata or a bounded estimate, commit each decoded result
+  independently, and cancel/revoke handles when the owning semantic widget is
+  replaced or unmounted. An unrelated document revision maps the range and
+  preserves the mounted asset. The HTML adapter uses a six-task resolution
+  queue and rejects a `srcset` above 16 candidates before starting broker work.
+
+The nested virtualizer is view state, not document state. Its mounted range,
+measurements, and overscan belong to the block's `WidgetSession`; semantic row
+models and drafts remain source-mapped editor state. Unmounting a widget may
+discard DOM and measurement caches, but never canonical source or the only copy
+of an active draft.
+
+Layout invariants are non-negotiable:
+
+- the render plan remains the offscreen total-height authority;
+- scrolling does not dispatch a document or projection transaction;
+- mounted DOM is proportional to the visible item range, not total block size;
+- one coordinator batches measurements and scroll-anchor corrections;
+- a correction above the viewport is deferred while the user is actively
+  scrolling and applied as one anchored adjustment after scrolling settles;
+- accessibility exposes logical row/column counts and positions even when only
+  a window of rows is mounted.
+
 ---
 
 ## 5. Markdown feature contract
 
-Every supported Markdown construct is delivered as a complete feature bundle.
-The exact TypeScript API may differ, but the ownership must be explicit:
+Every non-core complex Markdown capability is delivered as a complete vertical
+feature. A syntax-only helper such as the shared media grammar may intentionally
+own parser nodes while image/video definitions own semantics and rendering.
+The shipped static definition has optional capability groups around one
+required identity/ownership declaration:
 
 ```ts
-interface MarkdownFeature<Semantic, Plan extends MarkdownElementPlan> {
+interface MarkdownFeatureDefinition<
+  ElementKind extends MarkdownElementKind,
+  InlineWidgetKind extends InlineAtomKind,
+  BlockWidgetKind extends BlockEmbedKind,
+> {
   id: string;
-  syntax?: readonly MarkdownConfig[];
-  normalize: MarkdownSemanticNormalizer<Semantic>;
-  compile: MarkdownPlanCompiler<Semantic, Plan>;
-  live: MarkdownLiveAdapter<Plan>;
-  preview: MarkdownPreviewAdapter<Plan>;
-  commands?: MarkdownCommandAdapter<Plan>;
-  fixtures: readonly MarkdownFixture[];
+  semanticKinds: readonly ElementKind[];
+  inlineWidgetKinds: readonly InlineWidgetKind[];
+  blockWidgetKinds: readonly BlockWidgetKind[];
+
+  parserExtensions?: readonly MarkdownConfig[];
+  livePreviewExtensions?: readonly Extension[];
+  collectRange?: MarkdownRangeCollector<ElementKind>;
+  collectBlock?: MarkdownBlockCollector<ElementKind>;
+  collectLine?: MarkdownLineCollector<ElementKind>;
+  compile?: MarkdownFeatureCompiler<ElementKind>;
+  createInlineWidget?: MarkdownInlineWidgetFactory<InlineWidgetKind>;
+  createBlockWidget?: MarkdownBlockWidgetFactory<BlockWidgetKind>;
+  lineClasses?: MarkdownFeatureLineClassProvider;
 }
 ```
+
+Every leaf definition is type-checked before its handler variance is erased.
+`createMarkdownFeatureComposition()` then validates unique IDs and unique
+semantic/inline-widget/block-widget ownership, prebuilds immutable maps, and
+freezes the public composition. No registration API exists after module load.
 
 A feature is not complete merely because the parser recognizes it. Completion
 requires:
@@ -888,17 +1324,19 @@ requires:
 5. edit behavior where applicable;
 6. security and capability policy where applicable;
 7. DOM/runtime lifecycle behavior for embedded content;
-8. fixtures proving cross-context consistency.
+8. a cheap structural complexity estimate, budget decision, and honest
+   oversized fallback;
+9. fixtures proving cross-context consistency.
 
-The semantic union and renderers should use exhaustive TypeScript switches or
-an equivalent registry check. Adding a new semantic kind without assigning a
-renderer must fail a test or type check instead of silently becoming plain
-source in one surface.
+The semantic union, distributed Plan types, composition builder, and manifest
+tests are one exhaustive chain. Adding a semantic kind without a compiler, or
+an atom/embed Widget kind without exactly one factory, fails type checking,
+composition construction, or the Feature Composition contract suite instead
+of silently becoming plain source in one surface.
 
-Feature bundles are an ownership discipline, not necessarily a runtime plugin
-system. Built-in features should use a static, exhaustively checked registry;
-they may remain statically imported. Dynamic third-party plugin loading is a
-separate product decision and is not required to obtain these boundaries.
+Feature bundles are an ownership discipline, not a runtime plugin system.
+Dynamic third-party loading, mutable registration, service lookup, and feature
+owned persistence are deliberately outside this architecture.
 
 ---
 
@@ -1037,11 +1475,12 @@ The broad-safe family contains:
 - `safe-block`: common document structure such as paragraphs, sections,
   headings, lists, blockquotes, `div`, `details`/`summary`, figures, preformatted
   content, and tables;
-- `safe-media`: currently only images, compiled to typed atoms whose every
-  `src`/`srcset` candidate resolves through `AssetBroker`. Audio/video/source
-  join this profile only after equivalent typed resource and lifecycle
-  adapters ship; autoplay, capture, scriptable fallback, and unsanctioned
-  remote loads are not baseline capabilities;
+- `safe-media`: images plus video/source, compiled or hydrated through typed
+  adapters whose every `src`, `srcset`, and `poster` candidate resolves through
+  `AssetBroker` with an explicit image/video kind. Video always exposes user
+  controls; autoplay, capture, scriptable fallback, and unsanctioned remote
+  loads are not baseline capabilities. Audio remains outside this profile
+  until its own typed interaction and lifecycle adapter ships;
 
 Adjacent capability-specific profiles are:
 
@@ -1289,12 +1728,21 @@ keystroke.
   invalidation signal.
 - Rebuild semantic projections only for changed blocks plus structural
   neighbors when possible.
+- Keep a source-mapped block-range index beside the decoration set. If an edit
+  invalidates the middle or end of a table/fence/embed, patch the complete old
+  structural range as well as the new changed range so stale replacements
+  cannot survive a block becoming malformed or shorter.
 - Cache by document identity, syntax-tree identity, and explicit context
   inputs, never by mutable DOM.
 - Use viewport-only computation only for decorations proven not to affect glyph
   metrics, wrapping, line height, block geometry, or viewport measurement.
 - Provide block replacements that affect layout directly to CodeMirror so
   viewport measurement remains correct.
+- Build the complete direct decoration `RangeSet` before viewport calculation.
+  This is full-document metadata, not full-document DOM: CodeMirror still
+  mounts only visible lines and widgets.
+- Never dispatch projection work from `viewportChanged` or scroll handlers.
+  Scroll is a consumer of the height map, not an invalidation source for it.
 - Debounce expensive asynchronous renders such as Mermaid, but keep the source
   transaction synchronous.
 - Version asynchronous results so stale asset, Mermaid, or HTML results cannot
@@ -1306,16 +1754,37 @@ keystroke.
   authorization-grant identity where applicable, exact execution revision, and
   capability principal. Deduplicate across principals only for authority-free
   validated results; abort work when its DOM/execution session is disposed, its
-  authorization is revoked, or its revision changes.
+  authorization is revoked, or—only for work declared revision-bound—its
+  revision changes.
 - Keep direct structural decorations separate from viewport presentation marks
   so large documents do not rebuild every cosmetic decoration when one syntax
   tree fragment advances.
 - Maintain a range index for semantic elements and plans; repeated per-line
   queries must not filter the complete element collection for every line.
+- Treat render-plan `layout.estimatedHeight` as the single offscreen-height
+  authority. A windowed table reserves content-aware proportional space within
+  the centralized logical-item and platform scroll-range ceilings; mounted
+  rows then converge through CodeMirror's measured height map. A block beyond
+  those hard ceilings uses the typed fallback instead of saturating geometry.
+- A range-named query must be range-bounded in construction as well as lookup.
+  It may not rebuild a whole-document HTML, link, asset, or plan index merely
+  to answer one changed-range patch.
+- Derive block complexity from source and normalized semantic data before DOM
+  mount. Complexity estimation must be cheaper than the rich renderer it
+  protects and must not parse the same content through a second parser.
+- For a `windowed` block, synchronous mount work and live DOM are proportional
+  to visible items plus bounded overscan. The complete logical item collection
+  may remain as immutable semantic data, but it is not mirrored into DOM.
+- CSS containment and `content-visibility` are supplemental rendering hints,
+  not substitutes for item virtualization or hard resource budgets: they do
+  not avoid parsing or creating an oversized DOM subtree.
+- Widgets consume the centralized render-budget decision. Feature-local magic
+  numbers and timing-triggered representation changes are forbidden.
 
 Correctness comes before incremental optimization. A full semantic rebuild is
-an acceptable first implementation if its contract allows later incremental
-replacement and documents the file-size boundary.
+an acceptable bounded implementation only inside the documented normal-file
+profile. Large and extreme profiles require incremental indexes, feature
+budgets, and explicit fallback rather than an unbounded rebuild.
 
 ---
 
@@ -1377,78 +1846,145 @@ Tests should be split into:
 4. editor interaction tests;
 5. a small visual regression suite for layout and theme behavior.
 
+Oversized-block conformance adds threshold-edge and adversarial fixtures for:
+
+- a table with thousands of rows, a very wide table, variable-height cells,
+  keyboard navigation, active cell editing, IME, selection, and row mutation;
+- one large HTML subtree, many independent top-level HTML children, deep
+  nesting, large safe-media sets, and an indivisible over-budget subtree;
+- large code fences, a huge single line, and diagnostics/highlighting that are
+  intentionally incomplete while editing remains responsive;
+- Mermaid sources just below and above byte, node/edge, timeout, and output
+  limits, including cancellation on edit and viewport removal;
+- mixed large blocks above and below the viewport while heights converge.
+
+The suite asserts asymptotic behavior, not only screenshots: mounted row and
+DOM-node counts remain bounded by the viewport plus overscan; no block mount
+creates an unbudgeted long task; async work is cancellable; active drafts and
+focus survive row recycling; and height correction does not repeatedly move
+the user's scroll anchor. Concrete latency, memory, and DOM ceilings live in
+the production renderer performance baseline and are measured on reference
+hardware.
+
 ---
 
-## 11. Proposed module boundaries
+## 11. Adopted module boundaries
 
-The target organization is conceptual; migration should avoid a large-bang
-rename.
+The final organization keeps stable machinery layered and complex capabilities
+vertical. It intentionally avoids both a single giant renderer and a directory
+for every trivial Markdown token.
 
 ```text
-vendor/shared-ui/src/editor/markdown/
-  parser/
-    markdownParserExtensions.ts
-    markdownDialect.ts
-  semantic/
-    markdownSemanticDocument.ts
-    markdownSemanticTypes.ts
-    inlineHtmlModel.ts
-    htmlTagTokenizer.ts
-  policy/
-    markdownHtmlPolicy.ts
-    markdownHtmlProfiles.ts
-    markdownCssPolicy.ts
-    markdownUrlPolicy.ts
-    markdownAssetPolicy.ts
-    markdownEmbedPolicy.ts
-    markdownTrustPolicy.ts
-  plans/
-    markdownPlanTypes.ts
-    markdownPlanCompiler.ts
-    markdownPlanIndex.ts
-  features/
-    headings/
-    lists/
-    links/
-    images/
-    inline-html/
-    html-blocks/
-    tables/
-    code-blocks/
-    mermaid/
-  adapters/
-    codemirror/
-      livePreviewDecorations.ts
-      interactionState.ts
-      editingCommands.ts
-      embedHost.ts
-      embeddedEditSession.ts
-      widgetSession.ts
+packages/shared-ui/src/editor/markdown/
+  MarkdownCodeMirrorEditor.tsx
+  markdownCodeMirrorExtensions.ts
+  index.ts
+
+  composition/
+    markdownFeatureComposition.ts
     preview/
-      markdownPreviewRenderer.ts
+      markdownInlinePlanAdapter.ts
+      markdownInlineRenderer.ts
+
+  core/
+    features/
+      markdownFeatureData.ts
+      markdownFeatureContract.ts
+    syntax/
+      markdownElementTypes.ts
+      markdownElements.ts
+    plans/
+      markdownPlanTypes.ts
+      markdownPlanCompiler.ts
+      markdownPlanIndex.ts
+      markdownBlockExecution.ts
+    commands/
+    decorations/
+    editor/
+    interaction/
+    projection/
+    state/
+    widgets/
+
+  features/
+    code-block/
+      codeBlockFeature.ts
+      codeBlockModel.ts
+      codeBlockPlan.ts
+      codeBlockWidget.ts
+    html/
+      htmlFeature.ts
+      htmlBlockModel.ts
+      htmlPlan.ts
+      htmlBlockWidget.ts
+      ...
+    image/
+      imageFeature.ts
+      markdownImageModel.ts
+      imagePlan.ts
+      imagePreviewWidget.ts
+    table/
+      tableFeature.ts
+      tableModel.ts
+      tablePlan.ts
+      tableCommands.ts
+      tableWidget.ts
+      ...
+    video/
+      videoFeature.ts
+      markdownVideoModel.ts
+      videoPlan.ts
+      videoPreviewWidget.ts
+    mermaid/
+      mermaidFeature.ts
+      mermaidBlockWidget.ts
+      mermaidRenderer.ts
+    media/
+      mediaSyntaxFeature.ts
+      markdownMediaParserExtension.ts
+      markdownMediaSyntaxNode.ts
+      obsidianMediaEmbed.ts
+      markdownMediaReference.ts
+
+  platform/
+    brokers/
+    codemirror/
+      embedHost.ts
     indexing/
-      markdownLinkGraph.ts
-  services/
-    asyncRenderBroker.ts
-    assetBroker.ts
-    linkBroker.ts
-    transactionBroker.ts
-    webEmbedBroker.ts
-  tests/
-    fixtures/
-    editor-view/
+    policy/
     security/
+    sessions/
+
+  shared/
+    inlineTokenScan.ts
+    preview/
+      markdownInlinePreviewPort.ts
+    widgets/
 ```
 
-Existing modules should move only when a migration step materially clarifies
-ownership. The architecture can first be enforced through APIs and tests while
-files remain in their current directories.
+File granularity follows responsibility, not ceremony:
+
+- a trivial built-in such as a horizontal rule may stay in core;
+- a normal embedded feature usually has model, plan, `*Feature.ts`, and Widget;
+- an interaction-heavy feature such as table may additionally own commands,
+  focus state, menus, drag behavior, and virtualization;
+- a DOM child or CSS class does not receive its own module unless it has an
+  independent lifecycle, policy boundary, or focused test surface.
+
+Adding a new complex built-in means creating one vertical directory, exporting
+one definition, registering it once in the static composition array, and adding
+fixtures. Its collectors, compiler, Widget factory, and Feature-owned editor
+extensions stay in that definition. A genuinely new semantic/atom/embed kind
+also extends the two closed central discriminated unions and the semantic
+capability table; this explicit type update is intentional exhaustiveness, not
+a second runtime registration. The generic collector/compiler/decoration
+dispatch, persistence path, and platform brokers do not change.
 
 ---
 
 ## 12. Current implementation state
 
-The 2026-07-10 migration now enforces these shipped invariants:
+The 2026-07-16 implementation enforces these shipped invariants:
 
 1. CodeMirror Markdown text is the only committed document truth. A compiled,
    range-indexed semantic/plan projection drives block widgets, inline HTML,
@@ -1465,8 +2001,9 @@ The 2026-07-10 migration now enforces these shipped invariants:
    `data-md-href`, never ambient external `href` or `window.open` authority.
    Mermaid SVG anchors follow the same route rather than retaining live SVG
    navigation.
-4. Every Markdown/HTML image load reaches `AssetBroker` before a sink. Remote
-   images default to denied; `file:`, replayed blob/custom-protocol URLs,
+4. Every Markdown/HTML image or video load reaches `AssetBroker` before a sink,
+   with MIME/extension compatibility checked against the requested media kind.
+   Remote media defaults to denied; `file:`, replayed blob/custom-protocol URLs,
    malformed escapes, traversal, SVG data, oversized data, wrong purpose, and
    cross-document principal reuse fail closed. Workspace paths have one parser,
    and broker handles are tied to view/document/revision/execution lifecycle.
@@ -1494,23 +2031,57 @@ The 2026-07-10 migration now enforces these shipped invariants:
    single-flights repeated activation, enforces pending+active quotas, and
    destroys on revision/owner/load/runtime failure. There is no focused-window
    fallback.
-8. Inline-HTML range queries and compiled plans use interval indexes; nested
+8. Compiled plans and Inline-HTML lookup results use interval indexes; nested
    Markdown marks compose instead of being dropped by an outer reserved range.
+9. Same-document block movement resolves transient structural ranges from the
+   Lezer tree, preserves source slices and separators, normalizes direct
+   ordered-list markers, and commits deletion, insertion, selection relocation,
+   history, and embedded-session relocation as one transaction with a
+   reversible relocation effect. The editor owns one measured overlay rather
+   than one handle per block, and the host can remove the complete interaction
+   compartment through its Experimental feature gate.
+10. Markdown reports committed source revisions and exposes the exact
+    CodeMirror source through the shared snapshot adapter. The host-owned
+    `DocumentEditingSession` handles saving and keeps failures visible and
+    retryable; Markdown contains no filesystem or Cloud write path.
+11. Built-in Feature definitions, including Feature-owned live-preview
+    extensions, are aggregated once. Core has no concrete Feature import;
+    Features have no composition import; the architecture checker enforces
+    both directions and rejects resurrection of the deleted registries.
+12. Standard Markdown images are normalized by the image collector, Obsidian
+    image/video payloads are refined from parser-owned media nodes, and each
+    semantic range produces one complete element and one compiled plan. The
+    main decoration/Widget path consumes that plan payload without image/video
+    retokenization.
 
 The remaining acceptance gaps are explicit rather than hidden behind passing
 unit tests:
 
-- The table-cell preview is an intentionally isolated string adapter that
-  shares policy/token helpers; it is not yet the full document Lezer semantic
-  plan. HTML-block plans also still carry raw source for the widget's final
-  profile/trust decision.
-- Inline HTML queries no longer add an O(lines × HTML-elements) scan, but the
-  live-decoration StateField still rebuilds the whole document after ordinary
-  non-composition edits. Incremental changed-range invalidation and profiling
-  remain required for large files.
+- The table-cell preview is an intentionally isolated string adapter, injected
+  through a leaf preview port, that shares policy/token helpers; it is not the
+  full document Lezer semantic plan. HTML-block plans also still carry raw
+  source for the widget's final profile/trust decision.
+- Direct layout decorations map through ordinary transactions and rebuild only
+  changed stable block ranges. Inline-HTML range construction now finds only
+  intersecting paragraph/heading containers, pairs the complete selected
+  container for cross-line correctness, and caches those container results
+  without forcing a whole-document HTML index.
+- Table, HTML, code-fence, and Mermaid plans consume the same versioned
+  complexity decision. Large tables use the outer EditorView scroller with a
+  variable-height prefix index and bounded row DOM; HTML and Mermaid expose
+  explicit deferred activation; oversized code and hard-over-budget content
+  remain exact visible source; compound HTML media resolves independently.
 - Happy-DOM and main-process fixtures cover policy, conflicts, remount drafts,
   async cancellation, ownership and sandbox request rules. Real Chromium
   visual regression, viewport reuse, IME and sandbox tests are still required.
+- The shared save session and explicit pre-unmount
+  file/editor-surface/workspace coordination are shipped. Failed drains retain
+  the current editor and expose the save error. Crash recovery and automatic
+  external-change merging are separate future capabilities, not Markdown
+  architecture requirements.
+  Mermaid remains protected by conservative source/item ceilings and stale
+  result suppression in the renderer; raising those ceilings requires moving
+  non-cooperatively interruptible rendering to an isolated execution surface.
 
 The target architecture is therefore adopted and its shipped paths are
 closed; the bullets above are the bounded Phase 6 work, not permission to add a
@@ -1558,7 +2129,7 @@ remain part of phases 5 and 6.
 ### Phase 4 — converge render plans and policy — complete for shipped surfaces
 
 - `MarkdownElementPlan` union + range-indexed compiler/index.
-- Versioned `inline-editable` / `safe-block` / image-only `safe-media`
+- Versioned `inline-editable` / `safe-block` / typed image-and-video `safe-media`
   profiles with explicit composition and capability reduction (no automatic
   profile escalation and no inventing union capabilities).
 - Keymaps consume plan deletion/expand capabilities.
@@ -1577,7 +2148,7 @@ remain part of phases 5 and 6.
 
 - Per-`EditorView` `MarkdownEmbedHost` with widget session registry,
   `EmbeddedEditSessionStore`, and revision-bound `ExecutionSessionStore`.
-- Code / image / Mermaid / HTML / table widgets are immutable descriptors;
+- Code / image / video / Mermaid / HTML / table widgets are immutable descriptors;
   mounted resources live in DOM-owned sessions with `disposeWidgetSessionDom`.
 - Editor-scoped table focus uses one atomic source/selection/focus transaction;
   a feature-owned ViewPlugin restores focus only after CodeMirror commits the
@@ -1610,9 +2181,35 @@ remain part of phases 5 and 6.
   popup, download and login denial; deterministic failure/owner cleanup.
 - Adversarial URL/asset policy fixtures (control chars, entities, `file://`,
   traversal, data size/SVG).
-- **Remaining acceptance gaps:** visual regression, full table-cell document
-  plan convergence, changed-range decoration updates with large-document
-  profiling, and fuller IME/DOM-reuse EditorView coverage in a real renderer.
+- Changed-range direct-decoration updates, document-level structural
+  projection, source snapshot boundaries, and large-document production
+  renderer profiling are implemented
+  under the [Desktop Renderer Performance](../../desktop-renderer-performance.md)
+  contract. Initial source-exposure regression is covered by the atomic Preview
+  readiness gate and production renderer smoke. **Remaining acceptance gaps:**
+  broader feature-level visual regression, full table-cell document plan
+  convergence, fuller IME/DOM-reuse EditorView coverage in a real renderer,
+  and an isolated Mermaid execution surface before any hard render ceiling is
+  raised.
+
+The oversized-block implementation was completed in this order to avoid
+feature-local patches:
+
+1. shared complexity types, a versioned budget policy, diagnostics, and
+   counters were added in `markdownBlockExecution.ts`;
+2. the table became the first `windowed` vertical slice, including the outer
+   scroller, variable-height prefix sums, row pinning, one-batch anchor
+   correction, accessibility indices, and bounded-DOM tests;
+3. HTML, code fences, Mermaid, and compound media were routed through the same
+   decision and typed fallback/deferred contracts;
+4. Inline-HTML changed-range construction became semantic-container bounded;
+5. normal and threshold/adversarial unit profiles plus repeatable performance
+   benches were added;
+6. first-open plan normalization and geometry-sensitive projection installation
+   were split across cancellable renderer tasks. The revision/tree-scoped plan
+   cache joins them without exposing partial source or combining both phases in
+   one Long Task. The production Electron harness remains the authority before
+   any local/cloud transport or hard render limit is raised.
 
 The shipped foundation preserves source round-trip and has semantic, policy,
 decoration, type, broker, trust, and boundary checks. Phase 6 acceptance
@@ -1627,6 +2224,15 @@ The migration is complete when:
 
 - Markdown source remains the only canonical, committed, and persisted document
   model; mutable embedded drafts remain ephemeral editor interaction state.
+- A committed Markdown transaction reports a new revision and the snapshot
+  adapter returns the exact source represented by that revision.
+- Markdown uses the shared `DocumentEditingSession`; it does not implement its
+  own persistence queue, filesystem transport, or Cloud transport.
+- `Saved` is shown only when the current revision is durably acknowledged and
+  no pending/in-flight revision remains.
+- Document close, file switch, workspace switch, and application close await
+  the latest revision or retain the editor with a visible error. React cleanup
+  never silently consumes the error.
 - Parser context, not line-start heuristics, owns block/inline classification.
 - Every supported construct has one normalized semantic representation.
 - Every semantic element compiles to one typed render plan or an explicit
@@ -1675,6 +2281,15 @@ The migration is complete when:
   sandboxed web contents, a temporary partition, no Node/preload, an isolated
   renderer process, host-enforceable byte/time/resource limits, and a killable
   watchdog.
+- Every complex block publishes a cheap structural complexity estimate and
+  consumes the centralized, versioned render-budget policy. Oversized blocks
+  choose `windowed`, `deferred`, or `visibleSource` explicitly; a widget may not
+  silently mount unbounded DOM or keep an uninterruptible main-renderer job.
+- Large tables use bounded row DOM with stable source-mapped keys, retained
+  active edit/IME rows, measured height caching, and anchored correction through
+  the per-view layout coordinator. Arbitrary HTML that cannot be split without
+  semantic or layout changes falls back honestly rather than being naively
+  chunked.
 - Malformed, ambiguous, and unrenderable syntax remains visible and editable.
 - Nested Markdown and inline HTML render without discarding either mark.
 - Source is unchanged unless the user, Agent, or explicit command edits it.
@@ -1682,7 +2297,8 @@ The migration is complete when:
   remains satisfied.
 - Real EditorView and Electron tests cover background parsing, DOM reuse,
   viewport virtualization, layout measurement, IME, edit-session conflicts,
-  async cancellation, and sandbox behavior.
+  async cancellation, sandbox behavior, threshold-edge oversized blocks,
+  bounded mounted-DOM counts, and stable scrolling while measurements converge.
 
 ---
 
@@ -1721,8 +2337,10 @@ The migration is complete when:
 10. Embed drafts and focus must become editor-scoped, range-mapped interaction
     state; module-global pending state and stale captured offsets are not
     accepted.
-11. Built-in Markdown features must converge on a static typed registry and a
-    shared plan compiler. A dynamic third-party plugin runtime is not required.
+11. Built-in Markdown features use one static, frozen, typed Feature
+    Composition and the shared plan compiler. IDs and semantic/Widget owners
+    are unique; the core receives the composition through a Facet. A dynamic
+    third-party plugin runtime is not part of this design.
 12. Local filesystem location does not imply active-content trust, but harmless
     sanitized formatting must not require a trust grant. Trust controls local
     executable content and elevated ambient capabilities, not basic HTML
@@ -1747,6 +2365,11 @@ The migration is complete when:
     policy version. A separate `ExecutionSession` is bound to an exact revision;
     revision changes restart the session under a still-valid grant instead of
     repeatedly asking the user for trust.
+17. Document viewport virtualization and oversized-block execution are separate
+    layers. CodeMirror owns document DOM windowing; a centralized complexity
+    policy selects rich, nested-windowed, deferred, or visible-source execution
+    for each complex block. CSS containment alone is not considered
+    virtualization.
 
 ---
 
@@ -1756,6 +2379,7 @@ The migration is complete when:
 - [GitHub Flavored Markdown specification](https://github.github.com/gfm/)
 - [CodeMirror decorations](https://codemirror.net/examples/decoration/)
 - [CodeMirror reference manual](https://codemirror.net/docs/ref/)
+- [CodeMirror huge document example](https://codemirror.net/examples/million/)
 - [Mermaid usage and security levels](https://mermaid.js.org/config/usage)
 - [Electron security checklist](https://www.electronjs.org/docs/latest/tutorial/security)
 - [Obsidian HTML content](https://obsidian.md/help/html)
@@ -1763,6 +2387,9 @@ The migration is complete when:
 - [Obsidian plugin security](https://obsidian.md/help/plugin-security)
 - [Obsidian Cure53 client audit](https://obsidian.md/files/security/2023-11-Obsidian-Cure53-Audit-Full.pdf)
 - [Obsidian editor extensions and decorations](https://docs.obsidian.md/Plugins/Editor/Decorations)
+- [Obsidian editor viewport](https://docs.obsidian.md/Plugins/Editor/Viewport)
+- [TanStack Virtual virtualizer contract](https://tanstack.com/virtual/latest/docs/api/virtualizer)
+- [web.dev `content-visibility`](https://web.dev/articles/content-visibility)
 - [Typora HTML support](https://support.typora.io/HTML/)
 - [VS Code Markdown preview security](https://code.visualstudio.com/docs/languages/markdown#_markdown-preview-security)
 - [VS Code Workspace Trust](https://code.visualstudio.com/docs/editing/workspaces/workspace-trust)

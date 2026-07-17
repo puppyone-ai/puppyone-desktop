@@ -7,14 +7,18 @@ import {
   getInlineRevealElement,
   getMarkdownElements,
   getMarkdownElementsInRange,
-} from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownElements";
-import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
-import { findMarkdownLinkTokens } from "../vendor/shared-ui/src/editor/markdown/core/links/markdownLinkModel";
+} from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownElements";
+import {
+  puppyMarkdownFeatureCompositionExtension,
+  puppyMarkdownParserExtensions,
+} from "../packages/shared-ui/src/editor/markdown/composition/markdownFeatureComposition";
+import { findMarkdownLinkTokens } from "../packages/shared-ui/src/editor/markdown/core/links/markdownLinkModel";
 
 function createMarkdownState(source: string) {
   return EditorState.create({
     doc: source,
     extensions: [
+      puppyMarkdownFeatureCompositionExtension,
       markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
     ],
   });

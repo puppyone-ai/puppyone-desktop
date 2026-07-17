@@ -1,22 +1,27 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+
+const WORKSPACE_REGISTRY_VERSION = 4;
+const RECENT_WORKSPACE_LIMIT = 20;
+const HYDRATION_CONCURRENCY = 4;
 
 export function createWorkspaceStateStore({
   app,
   filename,
   canonicalizeWorkspacePath,
   workspaceFromPath,
+  resolveWorkspaceIdentity = null,
   logger = console,
+  fsApi = fs.promises,
+  now = () => Date.now(),
 }) {
+  let mutationQueue = Promise.resolve();
+  let recoveryError = null;
+
   async function getLastWorkspaceResult() {
     const folderPath = await readLastActiveWorkspacePath();
-    if (!folderPath) {
-      return {
-        path: null,
-        workspace: null,
-        error: null,
-      };
-    }
+    if (!folderPath) return { path: null, workspace: null, error: null };
 
     try {
       return {
@@ -35,64 +40,102 @@ export function createWorkspaceStateStore({
 
   async function getRecentWorkspacesResult() {
     const state = normalizeWorkspaceState(await readWorkspaceState());
-    const items = [];
-    const workspaces = [];
-    const errors = [];
-    for (const record of state.recentWorkspaceRecords) {
-      try {
-        const workspace = await workspaceFromPath(record.path);
-        items.push({
-          workspace,
-          lastOpenedAt: record.lastOpenedAt,
-        });
-        workspaces.push(workspace);
-      } catch (error) {
-        errors.push({
-          path: record.path,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-    return { workspaces, items, errors };
+    const items = state.recentWorkspaceRecords.map((record) => ({
+      workspace: lightweightWorkspaceFromRecord(record),
+      lastOpenedAt: record.lastOpenedAt,
+    }));
+    return {
+      workspaces: items.map((item) => item.workspace),
+      items,
+      errors: recoveryError ? [recoveryError] : [],
+      hydrated: false,
+    };
+  }
+
+  async function hydrateRecentWorkspacesResult() {
+    const state = normalizeWorkspaceState(await readWorkspaceState());
+    const results = new Array(state.recentWorkspaceRecords.length);
+    let cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(HYDRATION_CONCURRENCY, state.recentWorkspaceRecords.length) },
+      async () => {
+        while (cursor < state.recentWorkspaceRecords.length) {
+          const index = cursor;
+          cursor += 1;
+          const record = state.recentWorkspaceRecords[index];
+          try {
+            const workspace = await workspaceFromPath(record.path);
+            results[index] = {
+              item: { workspace, lastOpenedAt: record.lastOpenedAt },
+              error: null,
+            };
+          } catch (error) {
+            results[index] = {
+              item: {
+                workspace: {
+                  ...lightweightWorkspaceFromRecord(record),
+                  hydrationState: "error",
+                },
+                lastOpenedAt: record.lastOpenedAt,
+              },
+              error: {
+                path: record.path,
+                error: error instanceof Error ? error.message : String(error),
+              },
+            };
+          }
+        }
+      },
+    );
+    await Promise.all(workers);
+    const items = results.filter(Boolean).map((result) => result.item);
+    return {
+      workspaces: items.map((item) => item.workspace),
+      items,
+      errors: [
+        ...(recoveryError ? [recoveryError] : []),
+        ...results.filter((result) => result?.error).map((result) => result.error),
+      ],
+      hydrated: true,
+    };
   }
 
   async function readLastActiveWorkspacePath() {
     const state = normalizeWorkspaceState(await readWorkspaceState());
     const candidates = [
       state.lastActiveWorkspacePath,
-      state.recentWorkspacePaths[0],
+      state.recentWorkspaceRecords[0]?.path,
     ];
-
     for (const candidate of candidates) {
-      if (typeof candidate === "string" && candidate.trim().length > 0) {
-        return path.resolve(candidate);
-      }
+      if (typeof candidate === "string" && candidate.trim()) return path.resolve(candidate);
     }
     return null;
   }
 
-  async function rememberRecentWorkspacePath(folderPath) {
+  async function rememberRecentWorkspacePath(folderPath, knownWorkspace = null) {
     const canonicalPath = await canonicalizeWorkspacePath(folderPath);
-    const state = normalizeWorkspaceState(await readWorkspaceState());
-    const recentWorkspaceRecords = [
-      {
+    const identity = await resolveIdentity(canonicalPath, knownWorkspace);
+    return enqueueMutation(async () => {
+      const state = normalizeWorkspaceState(await readWorkspaceState());
+      const record = {
+        workspaceInstanceId: identity.workspaceInstanceId,
+        puppyoneGitRemote: normalizePuppyoneGitRemote(identity.puppyoneGitRemote),
+        fsIdentity: identity.fsIdentity,
         path: canonicalPath,
-        lastOpenedAt: new Date().toISOString(),
-      },
-      ...state.recentWorkspaceRecords.filter((item) => item.path !== canonicalPath),
-    ].slice(0, 20);
-    await writeWorkspaceState({
-      lastActiveWorkspacePath: canonicalPath,
-      recentWorkspacePaths: recentWorkspaceRecords.map((record) => record.path),
-      recentWorkspaces: recentWorkspaceRecords,
+        name: identity.name ?? (path.basename(canonicalPath) || canonicalPath),
+        lastOpenedAt: new Date(now()).toISOString(),
+      };
+      const recentWorkspaceRecords = [
+        record,
+        ...state.recentWorkspaceRecords.filter((item) => !isSameWorkspaceRecord(item, record)),
+      ].slice(0, RECENT_WORKSPACE_LIMIT);
+      await writeWorkspaceState(createPersistedState(recentWorkspaceRecords));
+      return record;
     });
   }
 
   async function requireRecentWorkspacePath(folderPath) {
-    if (typeof folderPath !== "string" || folderPath.trim().length === 0) {
-      throw new Error("Folder path is required.");
-    }
-    const requestedPath = await canonicalizeWorkspacePath(folderPath);
+    const requestedPath = await canonicalizeRequiredPath(folderPath);
     const state = normalizeWorkspaceState(await readWorkspaceState());
     for (const record of state.recentWorkspaceRecords) {
       const persistedPath = await canonicalizeWorkspacePath(record.path);
@@ -103,39 +146,114 @@ export function createWorkspaceStateStore({
 
   async function removeRecentWorkspacePath(folderPath) {
     const canonicalPath = await canonicalizeWorkspacePath(folderPath);
-    const state = normalizeWorkspaceState(await readWorkspaceState());
-    const recentWorkspaceRecords = state.recentWorkspaceRecords.filter((item) => item.path !== canonicalPath);
-    await writeWorkspaceState({
-      lastActiveWorkspacePath: recentWorkspaceRecords[0]?.path ?? null,
-      recentWorkspacePaths: recentWorkspaceRecords.map((record) => record.path),
-      recentWorkspaces: recentWorkspaceRecords,
+    return enqueueMutation(async () => {
+      const state = normalizeWorkspaceState(await readWorkspaceState());
+      const recentWorkspaceRecords = state.recentWorkspaceRecords.filter((item) => item.path !== canonicalPath);
+      await writeWorkspaceState(createPersistedState(recentWorkspaceRecords));
     });
   }
 
-  async function forgetLastWorkspacePath() {
-    await fs.promises.rm(getWorkspaceStatePath(), { force: true });
+  function forgetLastWorkspacePath() {
+    return enqueueMutation(async () => {
+      await fsApi.rm(getWorkspaceStatePath(), { force: true });
+      recoveryError = null;
+    });
   }
 
   async function readWorkspaceState() {
     try {
-      const raw = await fs.promises.readFile(getWorkspaceStatePath(), "utf8");
+      const raw = await fsApi.readFile(getWorkspaceStatePath(), "utf8");
       const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === "object" ? parsed : {};
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Workspace registry root is invalid.");
+      }
+      return parsed;
     } catch (error) {
-      if (error?.code !== "ENOENT") {
-        logger.warn("Unable to read puppyone workspace state:", error);
+      if (error?.code === "ENOENT") return {};
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn?.("Unable to read PuppyOne workspace registry; quarantining it.", message);
+      const statePath = getWorkspaceStatePath();
+      const quarantinePath = `${statePath}.corrupt.${now()}`;
+      try {
+        await fsApi.rename(statePath, quarantinePath);
+        recoveryError = {
+          path: statePath,
+          error: `Workspace registry was corrupt and moved to ${path.basename(quarantinePath)}.`,
+        };
+      } catch (renameError) {
+        if (renameError?.code !== "ENOENT") {
+          recoveryError = { path: statePath, error: `Workspace registry is unreadable: ${message}` };
+        }
       }
       return {};
     }
   }
 
   async function writeWorkspaceState(state) {
-    await fs.promises.mkdir(path.dirname(getWorkspaceStatePath()), { recursive: true });
-    await fs.promises.writeFile(
-      getWorkspaceStatePath(),
-      JSON.stringify(state, null, 2),
-      "utf8",
+    const statePath = getWorkspaceStatePath();
+    const directory = path.dirname(statePath);
+    await fsApi.mkdir(directory, { recursive: true });
+    const temporaryPath = path.join(
+      directory,
+      `.${path.basename(statePath)}.${process.pid}.${now()}.${Math.random().toString(16).slice(2)}.tmp`,
     );
+    let handle = null;
+    try {
+      handle = await fsApi.open(temporaryPath, "wx", 0o600);
+      await handle.writeFile(`${JSON.stringify(state, null, 2)}\n`, "utf8");
+      await handle.sync();
+      await handle.close();
+      handle = null;
+      await fsApi.rename(temporaryPath, statePath);
+      await fsApi.chmod(statePath, 0o600).catch(() => undefined);
+      await syncDirectoryBestEffort(directory, fsApi);
+      recoveryError = null;
+    } finally {
+      if (handle) await handle.close().catch(() => undefined);
+      await fsApi.rm(temporaryPath, { force: true }).catch(() => undefined);
+    }
+  }
+
+  async function resolveIdentity(canonicalPath, knownWorkspace) {
+    if (knownWorkspace?.workspaceInstanceId) {
+      return {
+        workspaceInstanceId: knownWorkspace.workspaceInstanceId,
+        puppyoneGitRemote: normalizePuppyoneGitRemote(knownWorkspace.puppyoneGitRemote),
+        fsIdentity: normalizeOptionalString(knownWorkspace.fsIdentity),
+        name: normalizeOptionalString(knownWorkspace.name),
+      };
+    }
+    if (resolveWorkspaceIdentity) {
+      const identity = await resolveWorkspaceIdentity(canonicalPath);
+      return {
+        workspaceInstanceId: normalizeOptionalString(identity.workspaceInstanceId)
+          ?? workspaceInstanceIdFromPath(canonicalPath),
+        puppyoneGitRemote: normalizePuppyoneGitRemote(identity.puppyoneGitRemote),
+        fsIdentity: normalizeOptionalString(identity.fsIdentity),
+        name: path.basename(identity.canonicalPath ?? canonicalPath) || canonicalPath,
+      };
+    }
+    const workspace = await workspaceFromPath(canonicalPath, { includeGitMetadata: false });
+    return {
+      workspaceInstanceId: normalizeOptionalString(workspace.workspaceInstanceId)
+        ?? workspaceInstanceIdFromPath(canonicalPath),
+      puppyoneGitRemote: normalizePuppyoneGitRemote(workspace.puppyoneGitRemote),
+      fsIdentity: normalizeOptionalString(workspace.fsIdentity),
+      name: normalizeOptionalString(workspace.name),
+    };
+  }
+
+  async function canonicalizeRequiredPath(folderPath) {
+    if (typeof folderPath !== "string" || !folderPath.trim()) {
+      throw new Error("Folder path is required.");
+    }
+    return canonicalizeWorkspacePath(folderPath);
+  }
+
+  function enqueueMutation(operation) {
+    const next = mutationQueue.then(operation, operation);
+    mutationQueue = next.catch(() => undefined);
+    return next;
   }
 
   function getWorkspaceStatePath() {
@@ -145,6 +263,7 @@ export function createWorkspaceStateStore({
   return {
     getLastWorkspaceResult,
     getRecentWorkspacesResult,
+    hydrateRecentWorkspacesResult,
     readLastActiveWorkspacePath,
     rememberRecentWorkspacePath,
     requireRecentWorkspacePath,
@@ -153,60 +272,138 @@ export function createWorkspaceStateStore({
   };
 }
 
-function normalizeWorkspaceTimestamp(value) {
-  if (typeof value !== "string" || value.trim().length === 0) return null;
-  const timestamp = new Date(value);
-  if (Number.isNaN(timestamp.getTime())) return null;
-  return timestamp.toISOString();
-}
-
-function normalizeWorkspaceRecord(value) {
-  if (typeof value === "string") {
-    return {
-      path: value,
-      lastOpenedAt: null,
-    };
-  }
-  if (!value || typeof value !== "object") return null;
-  return {
-    path: value.path,
-    lastOpenedAt: normalizeWorkspaceTimestamp(value.lastOpenedAt),
-  };
-}
-
 function normalizeWorkspaceState(state) {
-  const recentWorkspaceRecords = [];
-  const addPath = (value, lastOpenedAt = null) => {
-    if (typeof value !== "string" || value.trim().length === 0) return;
-    const resolvedPath = path.resolve(value);
-    const normalizedLastOpenedAt = normalizeWorkspaceTimestamp(lastOpenedAt);
-    const existing = recentWorkspaceRecords.find((record) => record.path === resolvedPath);
+  const records = [];
+  const addRecord = (value, fallbackTimestamp = null) => {
+    const record = normalizeWorkspaceRecord(value, fallbackTimestamp);
+    if (!record) return;
+    const existing = records.find((item) => isSameWorkspaceRecord(item, record));
     if (existing) {
-      if (normalizedLastOpenedAt) existing.lastOpenedAt = normalizedLastOpenedAt;
+      if (record.lastOpenedAt) existing.lastOpenedAt = record.lastOpenedAt;
+      if (Object.hasOwn(record, "puppyoneGitRemote")) {
+        existing.puppyoneGitRemote = record.puppyoneGitRemote;
+      }
+      if (record.fsIdentity) existing.fsIdentity = record.fsIdentity;
       return;
     }
-    recentWorkspaceRecords.push({
-      path: resolvedPath,
-      lastOpenedAt: normalizedLastOpenedAt,
-    });
+    records.push(record);
   };
 
-  addPath(state?.lastActiveWorkspacePath);
   if (Array.isArray(state?.recentWorkspaces)) {
-    for (const item of state.recentWorkspaces) {
-      const record = normalizeWorkspaceRecord(item);
-      if (record) addPath(record.path, record.lastOpenedAt);
-    }
+    for (const item of state.recentWorkspaces) addRecord(item);
   }
   if (Array.isArray(state?.recentWorkspacePaths)) {
-    for (const item of state.recentWorkspacePaths) addPath(item);
+    for (const item of state.recentWorkspacePaths) addRecord(item);
   }
-  addPath(state?.lastWorkspacePath);
-  const recentWorkspacePaths = recentWorkspaceRecords.map((record) => record.path);
+  addRecord(state?.lastActiveWorkspacePath);
+  addRecord(state?.lastWorkspacePath);
 
   return {
-    lastActiveWorkspacePath: recentWorkspacePaths[0] ?? null,
-    recentWorkspacePaths,
-    recentWorkspaceRecords,
+    version: WORKSPACE_REGISTRY_VERSION,
+    lastActiveWorkspacePath: normalizeOptionalString(state?.lastActiveWorkspacePath)
+      ?? records[0]?.path
+      ?? null,
+    recentWorkspaceRecords: records.slice(0, RECENT_WORKSPACE_LIMIT),
   };
+}
+
+function normalizeWorkspaceRecord(value, fallbackTimestamp = null) {
+  if (typeof value === "string") {
+    const resolvedPath = path.resolve(value);
+    return {
+      workspaceInstanceId: workspaceInstanceIdFromPath(resolvedPath),
+      fsIdentity: null,
+      path: resolvedPath,
+      name: path.basename(resolvedPath) || resolvedPath,
+      lastOpenedAt: normalizeWorkspaceTimestamp(fallbackTimestamp),
+    };
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rawPath = normalizeOptionalString(value.path);
+  if (!rawPath) return null;
+  const resolvedPath = path.resolve(rawPath);
+  return {
+    workspaceInstanceId: normalizeOptionalString(value.workspaceInstanceId)
+      ?? workspaceInstanceIdFromPath(resolvedPath),
+    puppyoneGitRemote: normalizePuppyoneGitRemote(value.puppyoneGitRemote),
+    fsIdentity: normalizeOptionalString(value.fsIdentity),
+    path: resolvedPath,
+    name: normalizeOptionalString(value.name) ?? (path.basename(resolvedPath) || resolvedPath),
+    lastOpenedAt: normalizeWorkspaceTimestamp(value.lastOpenedAt ?? fallbackTimestamp),
+  };
+}
+
+function createPersistedState(records) {
+  return {
+    version: WORKSPACE_REGISTRY_VERSION,
+    lastActiveWorkspaceInstanceId: records[0]?.workspaceInstanceId ?? null,
+    lastActiveWorkspacePath: records[0]?.path ?? null,
+    // Keep the path array during the v1→v2 rollout for downgrade-safe reads.
+    recentWorkspacePaths: records.map((record) => record.path),
+    recentWorkspaces: records,
+  };
+}
+
+function lightweightWorkspaceFromRecord(record) {
+  return {
+    id: `local:${record.workspaceInstanceId}`,
+    name: record.name,
+    path: record.path,
+    status: "protected",
+    cloudState: "local",
+    puppyoneGitRemote: record.puppyoneGitRemote,
+    workspaceInstanceId: record.workspaceInstanceId,
+    ...(record.fsIdentity ? { fsIdentity: record.fsIdentity } : {}),
+    hydrationState: "metadata",
+  };
+}
+
+function isSameWorkspaceRecord(left, right) {
+  if (left.workspaceInstanceId && right.workspaceInstanceId
+    && left.workspaceInstanceId === right.workspaceInstanceId) return true;
+  if (left.fsIdentity && right.fsIdentity && left.fsIdentity === right.fsIdentity) return true;
+  return left.path === right.path;
+}
+
+function workspaceInstanceIdFromPath(folderPath) {
+  return `legacy_${crypto.createHash("sha256").update(folderPath).digest("base64url").slice(0, 24)}`;
+}
+
+function normalizePuppyoneGitRemote(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const origin = normalizeOptionalString(value.origin);
+  const projectId = normalizeOptionalString(value.projectId);
+  const scopeId = normalizeOptionalString(value.scopeId);
+  if (!origin || !projectId) return null;
+  try {
+    const parsed = new URL(origin);
+    if (!['http:', 'https:'].includes(parsed.protocol)
+      || parsed.username || parsed.password || parsed.pathname !== '/'
+      || parsed.search || parsed.hash) return null;
+    return { origin: parsed.origin.toLowerCase(), projectId, scopeId };
+  } catch {
+    return null;
+  }
+}
+
+async function syncDirectoryBestEffort(directory, fsApi) {
+  let handle = null;
+  try {
+    handle = await fsApi.open(directory, "r");
+    await handle.sync();
+  } catch {
+    // Directory fsync is unavailable on some platforms and filesystems.
+  } finally {
+    if (handle) await handle.close().catch(() => undefined);
+  }
+}
+
+function normalizeWorkspaceTimestamp(value) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const timestamp = new Date(value);
+  return Number.isNaN(timestamp.getTime()) ? null : timestamp.toISOString();
+}
+
+function normalizeOptionalString(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }

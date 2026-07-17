@@ -1,0 +1,11 @@
+{
+  "title": "Terminal",
+  "actions": "Actions du terminal",
+  "clear": "Effacer le terminal",
+  "reset": "Réinitialiser le terminal",
+  "bridgeUnavailable": "Pont du terminal indisponible. Ouvrez cet espace de travail dans PuppyOne.",
+  "processExitedSignal": "Processus terminé avec le signal {signal}.",
+  "processExitedCode": "Processus terminé avec le code {code}.",
+  "runtimeRestartRequired": "L’environnement d’exécution du terminal a été mis à jour. Redémarrez PuppyOne pour charger le pont natif.",
+  "errorDetail": "Erreur de terminal : {detail}"
+}

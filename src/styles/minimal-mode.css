@@ -1,0 +1,234 @@
+.desktop-shell.is-minimal-mode {
+  position: relative;
+}
+
+.desktop-minimal-mode-drag-region {
+  position: absolute;
+  z-index: 68;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 12px;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.desktop-minimal-mode-dock {
+  --desktop-titlebar-bg: var(--po-header);
+  --desktop-titlebar-text: var(--po-text);
+  --desktop-titlebar-text-muted: var(--po-text-muted);
+  --desktop-titlebar-text-disabled: var(--po-text-disabled);
+  --desktop-titlebar-hover: var(--po-hover);
+  --desktop-titlebar-active: var(--po-selected);
+  --desktop-titlebar-focus: var(--po-focus-ring);
+  --desktop-titlebar-control-height: var(--desktop-chrome-control-size);
+
+  position: absolute;
+  z-index: 90;
+  top: 5px;
+  left: 50%;
+  display: inline-flex;
+  min-width: 0;
+  height: 34px;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--po-menu-border) 82%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--po-menu-bg) 94%, transparent);
+  box-shadow:
+    0 8px 26px color-mix(in srgb, var(--po-shadow) 22%, transparent),
+    0 1px 3px color-mix(in srgb, var(--po-shadow) 14%, transparent);
+  color: var(--po-text);
+  -webkit-app-region: no-drag;
+  backdrop-filter: blur(18px) saturate(1.08);
+  transform: translateX(-50%);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.desktop-minimal-mode-dock:hover,
+.desktop-minimal-mode-dock:focus-within,
+.desktop-minimal-mode-dock[data-expanded="true"] {
+  border-color: var(--po-menu-border);
+  background: var(--po-menu-bg);
+  box-shadow:
+    0 12px 34px color-mix(in srgb, var(--po-shadow) 28%, transparent),
+    0 2px 7px color-mix(in srgb, var(--po-shadow) 18%, transparent);
+}
+
+.desktop-minimal-mode-logo,
+.desktop-minimal-mode-action {
+  appearance: none;
+  display: inline-grid;
+  width: var(--desktop-chrome-control-size);
+  height: var(--desktop-chrome-control-size);
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--desktop-control-radius);
+  background: transparent;
+  color: var(--po-text-muted);
+  outline: 0;
+}
+
+.desktop-minimal-mode-logo {
+  position: relative;
+  z-index: 1;
+}
+
+.desktop-minimal-mode-logo img {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  object-fit: cover;
+  opacity: 0.72;
+  filter: saturate(0.62);
+  transition: filter 120ms ease, opacity 120ms ease;
+}
+
+.desktop-minimal-mode-dock:hover .desktop-minimal-mode-logo img,
+.desktop-minimal-mode-dock:focus-within .desktop-minimal-mode-logo img,
+.desktop-minimal-mode-dock[data-expanded="true"] .desktop-minimal-mode-logo img {
+  opacity: 1;
+  filter: none;
+}
+
+.desktop-minimal-mode-logo:hover,
+.desktop-minimal-mode-action:hover:not(:disabled),
+.desktop-minimal-mode-action.active,
+.desktop-minimal-mode-action[aria-current="page"] {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-minimal-mode-logo:focus-visible,
+.desktop-minimal-mode-action:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
+  color: var(--po-text);
+}
+
+.desktop-minimal-mode-action:disabled {
+  opacity: 0.38;
+}
+
+.desktop-minimal-mode-controls {
+  display: none;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.desktop-minimal-mode-dock:hover .desktop-minimal-mode-controls,
+.desktop-minimal-mode-dock:focus-within .desktop-minimal-mode-controls,
+.desktop-minimal-mode-dock[data-expanded="true"] .desktop-minimal-mode-controls {
+  display: inline-flex;
+}
+
+.desktop-minimal-mode-context,
+.desktop-minimal-mode-titlebar-actions,
+.desktop-minimal-mode-surface-icon {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.desktop-minimal-mode-context .desktop-titlebar-context {
+  height: var(--desktop-chrome-control-size);
+  gap: 2px;
+}
+
+.desktop-minimal-mode-context .desktop-titlebar-workspace-wrap,
+.desktop-minimal-mode-context .desktop-titlebar-branch-wrap {
+  height: var(--desktop-chrome-control-size);
+}
+
+.desktop-minimal-mode-context .desktop-titlebar-workspace-button,
+.desktop-minimal-mode-context .desktop-titlebar-branch-button {
+  width: var(--desktop-chrome-control-size);
+  height: var(--desktop-chrome-control-size);
+  justify-content: center;
+  padding: 0;
+}
+
+.desktop-minimal-mode-context .desktop-titlebar-workspace-name,
+.desktop-minimal-mode-context .desktop-titlebar-branch-button > span {
+  display: none;
+}
+
+.desktop-minimal-mode-context .desktop-titlebar-workspace-mark {
+  width: 18px;
+  height: 18px;
+}
+
+.desktop-minimal-mode-dock .desktop-titlebar-menu {
+  top: calc(100% + 8px);
+}
+
+.desktop-minimal-mode-titlebar-actions {
+  gap: 2px;
+}
+
+.desktop-minimal-mode-titlebar-actions .desktop-titlebar-action {
+  color: var(--po-text-muted);
+}
+
+.desktop-minimal-mode-titlebar-actions .desktop-titlebar-action:hover,
+.desktop-minimal-mode-titlebar-actions .desktop-titlebar-action[aria-pressed="true"] {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-minimal-mode-separator {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--po-divider);
+}
+
+.desktop-minimal-mode-surface-icon {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  justify-content: center;
+}
+
+.desktop-minimal-mode-surface-icon svg:last-child {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  padding: 1px;
+  border-radius: 50%;
+  background: var(--po-menu-bg);
+}
+
+.desktop-data-workspace-wrap[data-minimal-mode="true"] .data-explorer-pane {
+  padding-top: 42px;
+}
+
+.desktop-data-workspace-wrap[data-minimal-mode="true"] {
+  --po-tree-no-root-top-gap: var(--desktop-sidebar-list-padding-block);
+}
+
+@media (max-width: 1080px) {
+  .desktop-minimal-mode-dock {
+    max-width: calc(100vw - 118px);
+  }
+
+  .desktop-minimal-mode-controls {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .desktop-minimal-mode-controls::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-minimal-mode-dock,
+  .desktop-minimal-mode-logo img {
+    transition: none;
+  }
+}

@@ -3,7 +3,6 @@ import {
   checkoutWorkspaceGitBranch,
   commitAndCheckoutWorkspaceGitBranch,
   commitWorkspaceGit,
-  configureWorkspaceCloudRemote,
   createWorkspaceGitBranch,
   discardAllWorkspaceGitChanges,
   discardWorkspaceGitPaths,
@@ -16,7 +15,9 @@ import {
   pullWorkspaceGit,
   publishWorkspaceGitBranch,
   pushWorkspaceGit,
+  pushWorkspaceGitCommitToRemote,
   readPuppyoneWorkspaceConfig,
+  removeWorkspaceGitRemote,
   resolveGitRepositoryIdentity,
   stageAllWorkspaceGitChanges,
   stageWorkspaceGitPaths,
@@ -31,18 +32,29 @@ import {
   repositoryLockKey,
   worktreeLockKey,
 } from "../git-operation-coordinator.mjs";
+import { createGitDiffResourceBroker } from "../git-diff-resource-broker.mjs";
+import { createCloudGitOperationLease } from "../cloud-git-operation-lease.mjs";
+import { createCloudPublishGitCredentialManager } from "../cloud-publish-git-credentials.mjs";
+import { inspectCloudRemote } from "../cloud-publish-git.mjs";
 
 export function registerWorkspaceGitIpcHandlers({
   ipcMain,
   BrowserWindow,
   dialog,
   authorizeWorkspaceRoot,
+  cloudGitCredentialManager = createCloudPublishGitCredentialManager(),
+  cloudGitOperationLease = createCloudGitOperationLease(),
   gitOperationCoordinator = createGitOperationCoordinator(),
+  gitDiffResourceBroker = createGitDiffResourceBroker(),
+  t = defaultTranslate,
 }) {
   const statusControllers = new Map();
   const cancelledStatusRequests = new Set();
   const graphControllers = new Map();
   const cancelledGraphRequests = new Set();
+  const diffControllers = new Map();
+  const cancelledDiffRequests = new Set();
+  const observedDiffSenders = new WeakSet();
 
   const withAuthorizedRoot = (handler) => async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
@@ -163,13 +175,23 @@ export function registerWorkspaceGitIpcHandlers({
     initializeWorkspaceGitRepository(rootPath)
   )));
 
-  ipcMain.handle("workspace:git-configure-cloud-remote", withAuthorizedRepositoryMutation((rootPath, request) => {
-    const remoteUrl = request?.remoteUrl;
+  ipcMain.handle("workspace:git-remove-remote", withAuthorizedRepositoryMutation(async (rootPath, request) => {
     const remoteName = request?.remoteName ?? "puppyone";
-    if (typeof remoteUrl !== "string" || remoteUrl.trim().length === 0) {
-      throw new Error("Cloud remote URL is required.");
+    if (remoteName !== "puppyone") return removeWorkspaceGitRemote(rootPath, remoteName);
+    const lease = await cloudGitOperationLease.acquire(rootPath);
+    try {
+      const remote = await inspectCloudRemote(rootPath);
+      if (remote.kind === "exact") {
+        await cloudGitCredentialManager.detachManaged(rootPath, remote.url);
+      } else if (remote.kind === "conflict") {
+        throw new Error(
+          "The PuppyOne Git remote is ambiguous. Repair its fetch/push URLs before detaching it.",
+        );
+      }
+      return await removeWorkspaceGitRemote(rootPath, remoteName);
+    } finally {
+      await lease.release();
     }
-    return configureWorkspaceCloudRemote(rootPath, remoteUrl, remoteName);
   }));
 
   ipcMain.handle("workspace:puppyone-config-read", withAuthorizedRoot((rootPath) => (
@@ -188,12 +210,86 @@ export function registerWorkspaceGitIpcHandlers({
     return getWorkspaceGitCommitDetail(rootPath, commitId);
   }));
 
-  ipcMain.handle("workspace:git-file-diff", withAuthorizedIdleRead((rootPath, request) => {
+  ipcMain.handle("workspace:git-file-diff", withAuthorizedRoot(async (rootPath, request, event) => {
     const filePath = request?.path;
     if (typeof filePath !== "string" || filePath.trim().length === 0) {
       throw new Error("File path is required.");
     }
-    return getWorkspaceGitFileDiff(rootPath, filePath, request?.scope);
+    const requestId = normalizeGitStatusRequestId(request?.requestId);
+    const sessionId = normalizeGitDiffSessionId(request?.sessionId)
+      ?? gitDiffResourceBroker.createSessionId();
+    const key = requestId ? `${event.sender.id}:diff:${requestId}` : null;
+    const controller = new AbortController();
+    const onDestroyed = () => controller.abort();
+
+    if (!observedDiffSenders.has(event.sender)) {
+      observedDiffSenders.add(event.sender);
+      event.sender.once?.("destroyed", () => gitDiffResourceBroker.revokeOwner(event.sender.id));
+    }
+    if (key) {
+      diffControllers.get(key)?.abort();
+      diffControllers.set(key, controller);
+      if (cancelledDiffRequests.delete(key)) controller.abort();
+    }
+    event.sender.once?.("destroyed", onDestroyed);
+
+    try {
+      const { worktreeKey, repoKey } = await resolveLockKeys(rootPath);
+      await gitOperationCoordinator.whenIdleAll([worktreeKey, repoKey], { signal: controller.signal });
+      const detail = await getWorkspaceGitFileDiff(rootPath, filePath, request?.scope, {
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) throw createGitDiffAbortError();
+      return gitDiffResourceBroker.issueDetail(detail, {
+        ownerWebContentsId: event.sender.id,
+        sessionId,
+      });
+    } finally {
+      if (key && diffControllers.get(key) === controller) diffControllers.delete(key);
+      event.sender.removeListener?.("destroyed", onDestroyed);
+    }
+  }));
+
+  ipcMain.handle("workspace:git-file-diff-cancel", async (event, request) => {
+    const requestId = normalizeGitStatusRequestId(request?.requestId);
+    const sessionId = normalizeGitDiffSessionId(request?.sessionId);
+    if (requestId) {
+      const key = `${event.sender.id}:diff:${requestId}`;
+      const controller = diffControllers.get(key);
+      if (controller) {
+        controller.abort();
+      } else {
+        cancelledDiffRequests.add(key);
+        const cleanup = setTimeout(() => cancelledDiffRequests.delete(key), 30_000);
+        cleanup.unref?.();
+      }
+    }
+    if (sessionId) {
+      gitDiffResourceBroker.revokeSession(sessionId, {
+        ownerWebContentsId: event.sender.id,
+        ignoreMissing: true,
+      });
+    }
+    return { ok: true };
+  });
+
+  ipcMain.handle("workspace:git-diff-resource-read", async (event, request) => (
+    gitDiffResourceBroker.read({
+      handle: request?.handle,
+      ownerWebContentsId: event.sender.id,
+      sessionId: request?.sessionId,
+      selectionIdentity: request?.selectionIdentity,
+      revisionIdentity: request?.revisionIdentity,
+      offset: request?.offset,
+      length: request?.length,
+    })
+  ));
+
+  ipcMain.handle("workspace:git-diff-resource-release", async (event, request) => ({
+    ok: gitDiffResourceBroker.revokeSession(request?.sessionId, {
+      ownerWebContentsId: event.sender.id,
+      ignoreMissing: true,
+    }),
   }));
 
   ipcMain.handle("workspace:git-stage", withAuthorizedWorktreeMutation((rootPath, request) => (
@@ -251,15 +347,24 @@ export function registerWorkspaceGitIpcHandlers({
   )));
 
   ipcMain.handle("workspace:git-pull", withAuthorizedRepositoryMutation((rootPath, request, event) => (
-    runWorkspaceGitIpcOperation({ BrowserWindow, dialog }, event, request, "pull", () => (
+    runWorkspaceGitIpcOperation({ BrowserWindow, dialog, t }, event, request, "pull", () => (
       pullWorkspaceGit(rootPath)
     ))
   )));
 
   ipcMain.handle("workspace:git-push", withAuthorizedRepositoryMutation((rootPath, request, event) => (
-    runWorkspaceGitIpcOperation({ BrowserWindow, dialog }, event, request, "push", () => (
+    runWorkspaceGitIpcOperation({ BrowserWindow, dialog, t }, event, request, "push", () => (
       pushWorkspaceGit(rootPath)
     ))
+  )));
+
+  ipcMain.handle("workspace:git-push-commit-to-remote", withAuthorizedRepositoryMutation((rootPath, request) => (
+    pushWorkspaceGitCommitToRemote(rootPath, {
+      remoteName: request?.remoteName,
+      destinationBranch: request?.destinationBranch,
+      expectedHeadCommitId: request?.expectedHeadCommitId,
+      expectedBranch: request?.expectedBranch,
+    })
   )));
 
   ipcMain.handle("workspace:git-publish-branch", withAuthorizedRepositoryMutation((rootPath, request) => (
@@ -278,6 +383,19 @@ function normalizeGitStatusRequestId(value) {
   return normalized;
 }
 
+function normalizeGitDiffSessionId(value) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!/^[a-zA-Z0-9._:-]{8,256}$/.test(normalized)) return null;
+  return normalized;
+}
+
+function createGitDiffAbortError() {
+  const error = new Error("Git diff request was aborted.");
+  error.name = "AbortError";
+  return error;
+}
+
 async function runWorkspaceGitIpcOperation(electron, event, request, operation, handler) {
   try {
     return await handler();
@@ -289,26 +407,30 @@ async function runWorkspaceGitIpcOperation(electron, event, request, operation, 
   }
 }
 
-async function showWorkspaceGitErrorDialog({ BrowserWindow, dialog }, sender, operation, error) {
+async function showWorkspaceGitErrorDialog({ BrowserWindow, dialog, t }, sender, operation, error) {
   const owner = BrowserWindow.fromWebContents(sender);
   const detail = error instanceof Error ? error.message : String(error);
-  const operationLabel = operation === "pull" ? "Pull" : operation === "push" ? "Push" : "Git Operation";
-  const message = operation === "pull"
-    ? "Cannot pull remote changes."
+  const titleId = operation === "pull"
+    ? "native.git.pull.error.title"
     : operation === "push"
-      ? "Cannot push local commits."
-      : "Git operation failed.";
+      ? "native.git.push.error.title"
+      : "native.git.operation.error.title";
+  const messageId = operation === "pull"
+    ? "native.git.pull.error.message"
+    : operation === "push"
+      ? "native.git.push.error.message"
+      : "native.git.operation.error.message";
 
   try {
     const options = {
       type: "error",
-      buttons: ["OK"],
+      buttons: [t("native.git.error.ok")],
       defaultId: 0,
       cancelId: 0,
       noLink: true,
-      title: `${operationLabel} Failed`,
-      message,
-      detail: detail.trim() || "No Git error output was captured.",
+      title: t(titleId),
+      message: t(messageId),
+      detail: detail.trim() || t("native.git.error.noOutput"),
     };
     if (owner && !owner.isDestroyed()) {
       await dialog.showMessageBox(owner, options);
@@ -318,4 +440,18 @@ async function showWorkspaceGitErrorDialog({ BrowserWindow, dialog }, sender, op
   } catch (dialogError) {
     console.warn("Unable to show Git operation error dialog:", dialogError);
   }
+}
+
+function defaultTranslate(messageId) {
+  const messages = {
+    "native.git.error.ok": "OK",
+    "native.git.pull.error.title": "Pull Failed",
+    "native.git.push.error.title": "Push Failed",
+    "native.git.operation.error.title": "Git Operation Failed",
+    "native.git.pull.error.message": "Cannot pull remote changes.",
+    "native.git.push.error.message": "Cannot push local commits.",
+    "native.git.operation.error.message": "Git operation failed.",
+    "native.git.error.noOutput": "No Git error output was captured.",
+  };
+  return messages[messageId] ?? "";
 }

@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
-import type { DesktopCloudRepoIdentity, DesktopCloudScope } from "../../../../lib/cloudApi";
+import { useLocalization } from "@puppyone/localization/react";
+import type { DesktopCloudRepoIdentity, DesktopCloudRepositoryView } from "../../../../lib/cloudApi";
 import { openCloudApp } from "../../../../lib/cloudApi";
 import type { getPuppyoneRemote } from "../../../source-control/remotes";
 import { CloudSourceDock } from "../../components/shared";
@@ -11,21 +12,22 @@ export function CloudAccessPointAccessSection({
   branchName,
   cloudRemote,
 }: {
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   identity: DesktopCloudRepoIdentity;
   branchName: string;
   cloudRemote: NonNullable<ReturnType<typeof getPuppyoneRemote>>;
 }) {
+  const { formatNumber, t } = useLocalization();
   return (
     <section className="desktop-cloud-access-page">
       <div className="desktop-cloud-access-header">
         <div>
-          <span>Access</span>
-          <small>1</small>
+          <span>{t("cloud.route.access.title")}</span>
+          <small>{formatNumber(1)}</small>
         </div>
         <button className="desktop-cloud-row-action" type="button" onClick={() => openCloudApp("/projects")}>
           <ExternalLink size={14} />
-          <span>Open Cloud</span>
+          <span>{t("cloud.common.openCloud")}</span>
         </button>
       </div>
       <div className="desktop-cloud-access-body">
@@ -34,13 +36,13 @@ export function CloudAccessPointAccessSection({
             <button className="desktop-cloud-scope-row active" type="button">
               <div>
                 <span className="desktop-cloud-web-status-dot ready" aria-hidden="true" />
-                <strong>Cloud source</strong>
+                <strong>{t("cloud.common.cloudSource")}</strong>
               </div>
               <div>
                 <code>/</code>
                 <span className="desktop-cloud-scope-signals">
-                  <em title="Access key">CLI</em>
-                  <em title="Git remote">Git</em>
+                  <em title={t("cloud.common.accessKey")}>CLI</em>
+                  <em title={t("cloud.git.remote")}>Git</em>
                 </span>
               </div>
             </button>

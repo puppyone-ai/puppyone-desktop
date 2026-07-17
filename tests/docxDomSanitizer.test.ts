@@ -5,7 +5,7 @@ import {
   containsUnsafeDocxCss,
   DocxDomLimitError,
   isSafeDocxResourceUrl,
-} from "../vendor/shared-ui/src/editor/security/docxDomSanitizer";
+} from "../packages/shared-ui/src/editor/security/docxDomSanitizer";
 
 describe("assertDocxDomWithinBudget", () => {
   it("accepts a rendered tree within both budgets", () => {

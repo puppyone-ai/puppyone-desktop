@@ -1,10 +1,23 @@
-import { constants as fsConstants, readFileSync } from "node:fs";
+import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
+import crypto from "node:crypto";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+import {
+  classifyLocalFile,
+  getMimeType,
+  isLocalFilePreviewable,
+  resolveCopyNameExtension,
+} from "./files/file-format-policy.mjs";
+import { parseSingleByteRange } from "./files/byte-range.mjs";
+import {
+  isSameOrInsidePath,
+  normalizeRelativePath,
+  resolveExistingWorkspacePath,
+  resolveWorkspacePath,
+} from "./files/path-policy.mjs";
 import {
   GIT_DEFAULT_TIMEOUT_MS,
   GIT_MUTATION_TIMEOUT_MS,
@@ -12,8 +25,44 @@ import {
   execGit,
   execGitStreaming,
 } from "./git/runner.mjs";
+import { createWorkspaceCloudRemoteActions } from "./git/cloud-remote.mjs";
+import {
+  readGitComparisonPreview,
+  resolveGitRemoteDiffComparisons,
+} from "./git/diff-comparison.mjs";
+import { resolveGitRevisionPair } from "./git/revision-pair.mjs";
+import { deriveGitRevisionSpecs } from "./git/revision-specs.mjs";
 import { parseGitPorcelainV2Status } from "./git/porcelain-v2.mjs";
+import {
+  createGitSyncTargetPolicy,
+  normalizeCurrentBranchName,
+  splitRemoteBranchName,
+} from "./git/sync-target.mjs";
+import {
+  buildGitSourceControlSnapshot,
+  getDiscardableResources,
+  getResourceGitPaths,
+  gitStatusLabelToLetter,
+  hasStagedStatus,
+  hasUnstagedStatus,
+  uniqueGitPaths,
+} from "./git/source-control-model.mjs";
+import {
+  readPuppyoneWorkspaceConfig,
+  writePuppyoneWorkspaceConfig,
+} from "./workspace-config.mjs";
 export { getGitEnvironmentForTests } from "./git/runner.mjs";
+export { getMimeType } from "./files/file-format-policy.mjs";
+export {
+  resolveExistingWorkspaceDisplayPath,
+  resolveExistingWorkspacePath,
+  resolveWorkspacePath,
+} from "./files/path-policy.mjs";
+export { openWorkspaceFileRangeStream } from "./files/workspace-file-stream.mjs";
+export {
+  readPuppyoneWorkspaceConfig,
+  writePuppyoneWorkspaceConfig,
+} from "./workspace-config.mjs";
 
 /** Cache totalCommits by (root, HEAD) so working-tree refreshes skip rev-list. */
 const totalCommitsByHead = new Map();
@@ -24,7 +73,8 @@ const MAX_EDITOR_BYTES = 1024 * 1024;
 // Cap for whole-file reads served over the puppyone-local:// protocol (media
 // preview). Bounds main-process memory so a huge file can't OOM the app.
 const MAX_LOCAL_FILE_BYTES = 100 * 1024 * 1024;
-// Maximum length of a single bounded Range read (media protocol + viewer packs).
+// Maximum length of one buffered random-access read. Media protocol responses
+// use the separate backpressured stream path below.
 const MAX_RANGE_READ_BYTES = 8 * 1024 * 1024;
 const MAX_OFFICE_CONVERSION_INPUT_BYTES = 25 * 1024 * 1024;
 const MAX_OFFICE_CONVERSION_OUTPUT_BYTES = 8 * 1024 * 1024;
@@ -34,201 +84,41 @@ const GIT_ALL_BRANCH_HISTORY_LIMIT = 320;
 const GIT_REMOTE_PREVIEW_LIMIT = 12;
 export const GIT_STATUS_ENTRY_LIMIT = 10_000;
 const GIT_STATUS_RECORD_LIMIT = (GIT_STATUS_ENTRY_LIMIT * 2) + 32;
+const workspaceTextWriteTails = new Map();
 const GIT_DETAIL_MAX_TOTAL_DIFF_LINES = 4000;
 const GIT_DETAIL_MAX_FILE_DIFF_LINES = 900;
-const GIT_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
-const PUPPYONE_CONFIG_DIR = ".puppyone";
-const PUPPYONE_CONFIG_FILE = "config.json";
-const GIT_RESOURCE_GROUPS = Object.freeze([
-  { id: "merge", label: "Merge Changes" },
-  { id: "index", label: "Staged Changes" },
-  { id: "workingTree", label: "Changes" },
-  { id: "untracked", label: "Untracked Changes" },
-]);
-const DEFAULT_PUPPYONE_WORKSPACE_CONFIG = Object.freeze({
-  version: 1,
-  sync: {
-    sourceOfTruth: {
-      service: "github",
-      remote: null,
-      branch: null,
-    },
-  },
-  git: {
-    primaryRemote: null,
-    watchedBranch: null,
-  },
-  backup: {
-    enabled: false,
-    service: "github",
-    remote: null,
-    branch: null,
-  },
-  cloud: {
-    projectId: null,
-  },
-});
 const execFileAsync = promisify(execFile);
-const localApiDir = path.dirname(fileURLToPath(import.meta.url));
-const fileFormatRegistry = loadFileFormatRegistry();
-const unknownFormat = fileFormatRegistry.unknownFormat;
-const mimeTypeByExtension = new Map(Object.entries({
-  "3g2": "video/3gpp2",
-  "3gp": "video/3gpp",
-  "3gpp": "video/3gpp",
-  "7z": "application/x-7z-compressed",
-  aac: "audio/aac",
-  aif: "audio/aiff",
-  aifc: "audio/aiff",
-  aiff: "audio/aiff",
-  apng: "image/apng",
-  avi: "video/x-msvideo",
-  avif: "image/avif",
-  azw: "application/x-mobipocket-ebook",
-  azw3: "application/x-mobipocket-ebook",
-  bmp: "image/bmp",
-  bz: "application/x-bzip2",
-  bz2: "application/x-bzip2",
-  cer: "application/pkix-cert",
-  cr2: "image/x-canon-cr2",
-  crt: "application/x-x509-ca-cert",
-  css: "text/css",
-  csv: "text/csv",
-  db: "application/vnd.sqlite3",
-  db3: "application/vnd.sqlite3",
-  der: "application/pkix-cert",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  eot: "application/vnd.ms-fontobject",
-  epub: "application/epub+zip",
-  flac: "audio/flac",
-  flv: "video/x-flv",
-  gif: "image/gif",
-  glb: "model/gltf-binary",
-  gltf: "model/gltf+json",
-  gz: "application/gzip",
-  heic: "image/heic",
-  heif: "image/heif",
-  htm: "text/html",
-  html: "text/html",
-  ico: "image/x-icon",
-  img: "application/x-iso9660-image",
-  ipynb: "application/x-ipynb+json",
-  iso: "application/x-iso9660-image",
-  jpe: "image/jpeg",
-  jpeg: "image/jpeg",
-  jfif: "image/jpeg",
-  jpg: "image/jpeg",
-  js: "application/javascript",
-  json: "application/json",
-  json5: "application/json",
-  jsonc: "application/json",
-  jsonl: "application/x-ndjson",
-  key: "application/x-pem-file",
-  lzma: "application/x-lzma",
-  m2v: "video/mpeg",
-  m4a: "audio/mp4",
-  m4b: "audio/mp4",
-  m4v: "video/mp4",
-  md: "text/markdown",
-  markdown: "text/markdown",
-  mdx: "text/markdown",
-  mid: "audio/midi",
-  midi: "audio/midi",
-  mkv: "video/x-matroska",
-  mobi: "application/x-mobipocket-ebook",
-  mov: "video/quicktime",
-  mp3: "audio/mpeg",
-  mp4: "video/mp4",
-  mpe: "video/mpeg",
-  mpeg: "video/mpeg",
-  mpg: "video/mpeg",
-  ndjson: "application/x-ndjson",
-  oga: "audio/ogg",
-  ogg: "audio/ogg",
-  ogv: "video/ogg",
-  opus: "audio/opus",
-  otf: "font/otf",
-  p12: "application/x-pkcs12",
-  pdf: "application/pdf",
-  pem: "application/x-pem-file",
-  pfx: "application/x-pkcs12",
-  pjp: "image/jpeg",
-  pjpeg: "image/jpeg",
-  png: "image/png",
-  ppt: "application/vnd.ms-powerpoint",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  puppyflow: "application/vnd.puppyone.puppyflow+json",
-  "puppyflow.json": "application/vnd.puppyone.puppyflow+json",
-  psd: "image/vnd.adobe.photoshop",
-  qt: "video/quicktime",
-  rar: "application/vnd.rar",
-  rtf: "application/rtf",
-  sqlite: "application/vnd.sqlite3",
-  sqlite3: "application/vnd.sqlite3",
-  stl: "model/stl",
-  svg: "image/svg+xml",
-  tar: "application/x-tar",
-  "tar.bz2": "application/x-bzip2",
-  "tar.gz": "application/gzip",
-  "tar.xz": "application/x-xz",
-  tbz: "application/x-bzip2",
-  tbz2: "application/x-bzip2",
-  tgz: "application/gzip",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-  tsv: "text/tab-separated-values",
-  ttc: "font/ttf",
-  ttf: "font/ttf",
-  txz: "application/x-xz",
-  wav: "audio/wav",
-  wave: "audio/wav",
-  weba: "audio/webm",
-  webm: "video/webm",
-  webp: "image/webp",
-  wma: "audio/x-ms-wma",
-  wmv: "video/x-ms-wmv",
-  woff: "font/woff",
-  woff2: "font/woff2",
-  xhtml: "text/html",
-  xls: "application/vnd.ms-excel",
-  xlsb: "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
-  xlsm: "application/vnd.ms-excel.sheet.macroEnabled.12",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  xml: "application/xml",
-  xz: "application/x-xz",
-  zip: "application/zip",
-}));
-const mimeOverrideExtensions = [...mimeTypeByExtension.keys()].sort((left, right) => right.length - left.length);
-const filenameIndex = new Map();
-const extensionIndex = new Map();
-const mimeIndex = new Map();
-const filenamePatterns = [];
+const {
+  chooseGitSyncTarget,
+  choosePuppyoneRemoteName,
+  getConfiguredSyncBranch,
+  hasEffectivePuppyoneHostingTarget,
+  isPuppyoneHostingConfig,
+} = createGitSyncTargetPolicy({
+  defaultBranch: PUPPYONE_CLOUD_DEFAULT_BRANCH,
+  isPuppyoneRemote,
+});
+const {
+  configureWorkspaceCloudRemote,
+  removeWorkspaceGitRemote,
+} = createWorkspaceCloudRemoteActions({
+  execGit,
+  getGitErrorOutput,
+  getWorkspaceGitStatus,
+  mutationTimeoutMs: GIT_MUTATION_TIMEOUT_MS,
+  normalizeGitRemoteName,
+  normalizeGitRemoteUrl,
+  resolveWorkspacePath,
+});
+export { configureWorkspaceCloudRemote, removeWorkspaceGitRemote };
 
-for (const format of fileFormatRegistry.formats) {
-  for (const filename of format.filenames ?? []) {
-    filenameIndex.set(filename.toLowerCase(), format);
-  }
-  for (const pattern of format.filenamePatterns ?? []) {
-    filenamePatterns.push({
-      regex: globPatternToRegExp(pattern.toLowerCase()),
-      format,
-    });
-  }
-  for (const extension of format.extensions ?? []) {
-    extensionIndex.set(extension.toLowerCase(), format);
-  }
-  for (const mimeType of format.mimeTypes ?? []) {
-    mimeIndex.set(mimeType.toLowerCase(), format);
-  }
-}
-
-const copyNameExtensions = [...extensionIndex.keys()].sort((left, right) => right.length - left.length);
-
-export async function workspaceFromPath(folderPath) {
+export async function resolveLocalWorkspaceIdentity(folderPath) {
   const resolvedPath = path.resolve(folderPath);
-  const metadata = await fs.stat(resolvedPath).catch((error) => {
+  const canonicalPath = await fs.realpath(resolvedPath).catch((error) => {
+    throw new Error(`Unable to open folder: ${error.message}`);
+  });
+  const metadata = await fs.stat(canonicalPath).catch((error) => {
     throw new Error(`Unable to open folder: ${error.message}`);
   });
 
@@ -236,13 +126,77 @@ export async function workspaceFromPath(folderPath) {
     throw new Error("Selected path is not a folder.");
   }
 
+  const fsIdentity = createFileSystemIdentity(metadata, canonicalPath);
+  let configError = null;
+  try {
+    await readPuppyoneWorkspaceConfig(canonicalPath);
+  } catch (error) {
+    // Invalid project metadata must not prevent a local-first folder from
+    // opening. The config surface reports the recoverable error separately.
+    configError = error instanceof Error ? error.message : String(error);
+  }
+
+  const workspaceInstanceId = createWorkspaceInstanceId(fsIdentity);
   return {
-    id: stableWorkspaceId(resolvedPath),
-    name: path.basename(resolvedPath) || resolvedPath,
-    path: resolvedPath,
+    canonicalPath,
+    fsIdentity,
+    workspaceInstanceId,
+    configError,
+  };
+}
+
+export async function workspaceFromPath(folderPath, options = {}) {
+  const identity = await resolveLocalWorkspaceIdentity(folderPath);
+  const includeGitMetadata = options.includeGitMetadata !== false;
+  const gitMetadata = includeGitMetadata
+    ? await Promise.all([
+      getWorkspaceCommitCount(identity.canonicalPath),
+      readWorkspacePuppyoneRemoteMetadata(identity.canonicalPath),
+    ])
+    : null;
+
+  return {
+    id: `local:${identity.workspaceInstanceId}`,
+    name: path.basename(identity.canonicalPath) || identity.canonicalPath,
+    path: identity.canonicalPath,
     status: "protected",
-    commitCount: await getWorkspaceCommitCount(resolvedPath),
+    ...(gitMetadata
+      ? {
+        commitCount: gitMetadata[0],
+        puppyoneGitRemote: gitMetadata[1].puppyoneGitRemote,
+        hydrationState: "ready",
+      }
+      : { hydrationState: "metadata" }),
     cloudState: "local",
+    workspaceInstanceId: identity.workspaceInstanceId,
+    fsIdentity: identity.fsIdentity,
+    ...(identity.configError ? { configError: identity.configError } : {}),
+  };
+}
+
+async function readWorkspacePuppyoneRemoteMetadata(rootPath) {
+  const remotes = await readGitRemotes(rootPath).catch(() => []);
+  const candidates = remotes.flatMap((remote) => [remote?.fetchUrl, remote?.pushUrl])
+    .map((url) => parsePuppyoneRemoteInfo(url))
+    .filter(Boolean);
+  if (candidates.length === 0) {
+    return { puppyoneGitRemote: null };
+  }
+  const canonical = candidates.filter((candidate) => candidate.kind !== "access-point");
+  const identities = new Map(canonical.map((candidate) => [
+    `${candidate.origin}\n${candidate.projectId}\n${candidate.scopeId ?? ""}`,
+    candidate,
+  ]));
+  if (identities.size !== 1) {
+    return { puppyoneGitRemote: null };
+  }
+  const [candidate] = identities.values();
+  return {
+    puppyoneGitRemote: {
+      origin: candidate.origin,
+      projectId: candidate.projectId,
+      scopeId: candidate.scopeId ?? null,
+    },
   };
 }
 
@@ -293,7 +247,7 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
     // Bounded Range consumers (including Viewer Pack resource brokers) may
     // address files larger than the whole-file media cap. Whole-file reads
     // below still enforce MAX_LOCAL_FILE_BYTES.
-    const range = parseByteRange(options.rangeHeader, metadata.size);
+    const range = parseSingleByteRange(options.rangeHeader, metadata.size);
     if (range?.unsatisfiable) {
       return {
         bytes: Buffer.alloc(0),
@@ -306,9 +260,9 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
     }
 
     if (range) {
-      const span = range.end - range.start + 1;
-      if (span > MAX_RANGE_READ_BYTES) {
-        throw new Error("Range length exceeds host maximum.");
+      const length = range.end - range.start + 1;
+      if (length > MAX_RANGE_READ_BYTES) {
+        throw new Error(`Requested range (${length} bytes) exceeds the ${formatFileSize(MAX_RANGE_READ_BYTES)} per-read limit.`);
       }
       const bytes = await readFileSlice(filePath, range.start, range.end);
       return {
@@ -340,9 +294,6 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
   }
   return fs.readFile(filePath);
 }
-
-// Bounded Range reads for viewer packs and media use MAX_RANGE_READ_BYTES
-// (declared with the other size caps above).
 
 /**
  * Metadata for a workspace file without reading its body. Unlike the media
@@ -455,6 +406,7 @@ export async function readWorkspaceTextFile(rootPath, relativePath) {
       content: null,
       mimeType: getMimeType(filePath),
       size: formatFileSize(metadata.size),
+      version: getWorkspaceTextVersion(bytes),
     };
   }
 
@@ -465,6 +417,7 @@ export async function readWorkspaceTextFile(rootPath, relativePath) {
     content: bytes.toString("utf8"),
     mimeType: getMimeType(filePath) ?? "text/plain; charset=utf-8",
     size: formatFileSize(metadata.size),
+    version: getWorkspaceTextVersion(bytes),
   };
 }
 
@@ -542,42 +495,6 @@ export async function convertWorkspaceOfficeDocumentToDocx(rootPath, relativePat
   }
 }
 
-function parseByteRange(rangeHeader, size) {
-  if (typeof rangeHeader !== "string" || rangeHeader.trim().length === 0) return null;
-
-  const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
-  if (!match || size <= 0) return { unsatisfiable: true };
-
-  const [, startValue, endValue] = match;
-  if (!startValue && !endValue) return { unsatisfiable: true };
-
-  if (!startValue) {
-    const suffixLength = Number(endValue);
-    if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0) return { unsatisfiable: true };
-    return {
-      start: Math.max(size - suffixLength, 0),
-      end: size - 1,
-    };
-  }
-
-  const start = Number(startValue);
-  const end = endValue ? Number(endValue) : size - 1;
-  if (
-    !Number.isSafeInteger(start) ||
-    !Number.isSafeInteger(end) ||
-    start < 0 ||
-    end < start ||
-    start >= size
-  ) {
-    return { unsatisfiable: true };
-  }
-
-  return {
-    start,
-    end: Math.min(end, size - 1),
-  };
-}
-
 async function readFileSlice(filePath, start, end) {
   const length = end - start + 1;
   const handle = await fs.open(filePath, "r");
@@ -590,37 +507,105 @@ async function readFileSlice(filePath, start, end) {
   }
 }
 
-export function getMimeType(filePath) {
-  const format = resolveLocalFileFormat({ name: filePath });
-  const mimeType = getRegistryMimeTypeForName(format, filePath)
-    ?? getMimeTypeOverride(filePath)
-    ?? format.mimeTypes?.[0]
-    ?? null;
-  if (!mimeType) return null;
-  return shouldUseUtf8Mime(format, mimeType) ? `${mimeType}; charset=utf-8` : mimeType;
-}
-
-function getRegistryMimeTypeForName(format, name) {
-  const lowerName = path.basename(name).toLowerCase();
-  const extension = [...(format.extensions ?? [])]
-    .map((value) => value.toLowerCase())
-    .sort((left, right) => right.length - left.length)
-    .find((value) => lowerName.endsWith(value));
-  return extension ? format.mimeTypesByExtension?.[extension] ?? null : null;
-}
-
-export async function writeWorkspaceTextFile(rootPath, relativePath, content) {
+export async function writeWorkspaceTextFile(rootPath, relativePath, content, options = undefined) {
   if (typeof content !== "string") {
     throw new Error("File content must be text.");
   }
   const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
-  const metadata = await fs.stat(filePath).catch((error) => {
-    throw new Error(`Unable to write file: ${error.message}`);
-  });
-  if (metadata.isDirectory()) {
-    throw new Error("Selected path is a folder.");
+  const contentBytes = Buffer.from(content, "utf8");
+  if (contentBytes.byteLength > MAX_EDITOR_BYTES) {
+    throw new Error("File is too large to edit in PuppyOne Desktop.");
   }
-  await fs.writeFile(filePath, content, "utf8");
+  const expectedVersion = normalizeExpectedWorkspaceVersion(options?.expectedVersion);
+
+  return serializeWorkspaceTextWrite(filePath, async () => {
+    const metadata = await fs.stat(filePath).catch((error) => {
+      throw new Error(`Unable to write file: ${error.message}`);
+    });
+    if (metadata.isDirectory()) throw new Error("Selected path is a folder.");
+    if (!metadata.isFile()) throw new Error("Selected path is not a regular file.");
+
+    if (expectedVersion !== null) {
+      await assertWorkspaceTextVersion(filePath, expectedVersion);
+    }
+
+    await writeWorkspaceFileAtomic(filePath, contentBytes, metadata.mode, expectedVersion);
+    return { version: getWorkspaceTextVersion(contentBytes) };
+  });
+}
+
+async function serializeWorkspaceTextWrite(filePath, operation) {
+  const previous = workspaceTextWriteTails.get(filePath) ?? Promise.resolve();
+  const result = previous.catch(() => undefined).then(operation);
+  const tail = result.then(() => undefined, () => undefined);
+  workspaceTextWriteTails.set(filePath, tail);
+  try {
+    return await result;
+  } finally {
+    if (workspaceTextWriteTails.get(filePath) === tail) {
+      workspaceTextWriteTails.delete(filePath);
+    }
+  }
+}
+
+async function writeWorkspaceFileAtomic(filePath, contentBytes, sourceMode, expectedVersion) {
+  const directory = path.dirname(filePath);
+  const temporaryPath = path.join(
+    directory,
+    `.${path.basename(filePath)}.puppyone-${process.pid}-${crypto.randomUUID()}.tmp`,
+  );
+  let handle = null;
+  try {
+    handle = await fs.open(temporaryPath, "wx", sourceMode & 0o777);
+    // open(2) applies the process umask; restore the source mode explicitly so
+    // an atomic inode replacement does not silently tighten user permissions.
+    await handle.chmod(sourceMode & 0o777);
+    await handle.writeFile(contentBytes);
+    await handle.sync();
+    await handle.close();
+    handle = null;
+
+    // Recheck immediately before replacement. The in-process per-path queue
+    // covers every PuppyOne window; this second check also narrows the race
+    // with external editors to the atomic rename boundary itself.
+    if (expectedVersion !== null) {
+      await assertWorkspaceTextVersion(filePath, expectedVersion);
+    }
+    await fs.rename(temporaryPath, filePath);
+
+    const directoryHandle = await fs.open(directory, "r").catch(() => null);
+    if (directoryHandle) {
+      try {
+        await directoryHandle.sync().catch(() => undefined);
+      } finally {
+        await directoryHandle.close();
+      }
+    }
+  } finally {
+    await handle?.close().catch(() => undefined);
+    await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+  }
+}
+
+async function assertWorkspaceTextVersion(filePath, expectedVersion) {
+  const currentBytes = await fs.readFile(filePath).catch((error) => {
+    throw new Error(`Unable to verify file version: ${error.message}`);
+  });
+  if (getWorkspaceTextVersion(currentBytes) !== expectedVersion) {
+    throw new Error("File changed outside PuppyOne; reload it before saving your edits.");
+  }
+}
+
+function normalizeExpectedWorkspaceVersion(value) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || !/^sha256:[0-9a-f]{64}$/.test(value)) {
+    throw new Error("Expected file version is invalid.");
+  }
+  return value;
+}
+
+export function getWorkspaceTextVersion(bytes) {
+  return `sha256:${crypto.createHash("sha256").update(bytes).digest("hex")}`;
 }
 
 export async function createWorkspaceEntry(rootPath, request) {
@@ -845,19 +830,6 @@ function parseKeepBothCopySuffix(stem) {
   const copyNumber = match[2] ? Number.parseInt(match[2], 10) : 1;
   if (!Number.isSafeInteger(copyNumber) || copyNumber < 1) return null;
   return { stem: match[1], copyNumber };
-}
-
-function resolveCopyNameExtension(name) {
-  const lowerName = name.toLowerCase();
-  const registeredExtension = copyNameExtensions.find((extension) => (
-    lowerName.endsWith(extension) && name.length > extension.length
-  ));
-  if (registeredExtension) {
-    return name.slice(-registeredExtension.length);
-  }
-
-  const lastDot = name.lastIndexOf(".");
-  return lastDot > 0 ? name.slice(lastDot) : "";
 }
 
 function isCopyTargetConflict(error) {
@@ -1439,119 +1411,6 @@ export async function initializeWorkspaceGitRepository(rootPath) {
   return getWorkspaceGitStatus(root);
 }
 
-export async function configureWorkspaceCloudRemote(rootPath, remoteUrl, remoteName = "puppyone") {
-  const root = resolveWorkspacePath(rootPath, null);
-  const normalizedRemoteName = normalizeGitRemoteName(remoteName);
-  const normalizedRemoteUrl = normalizeGitRemoteUrl(remoteUrl);
-  const isRepo = await execGit(root, ["rev-parse", "--is-inside-work-tree"])
-    .then((result) => result.stdout.trim() === "true")
-    .catch(() => false);
-
-  if (!isRepo) {
-    await execGit(root, ["init"], { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
-      throw new Error(`Unable to initialize repository: ${getGitErrorOutput(error)}`);
-    });
-  }
-
-  const remoteExists = await execGit(root, ["remote", "get-url", normalizedRemoteName])
-    .then(() => true)
-    .catch(() => false);
-  const args = remoteExists
-    ? ["remote", "set-url", normalizedRemoteName, normalizedRemoteUrl]
-    : ["remote", "add", normalizedRemoteName, normalizedRemoteUrl];
-
-  await execGit(root, args, { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
-    throw new Error(`Unable to configure Cloud remote: ${getGitErrorOutput(error)}`);
-  });
-
-  return getWorkspaceGitStatus(root);
-}
-
-export async function readPuppyoneWorkspaceConfig(rootPath) {
-  const root = await resolveExistingWorkspacePath(rootPath, null);
-  const configDir = path.join(root, PUPPYONE_CONFIG_DIR);
-  const configPath = path.join(root, PUPPYONE_CONFIG_DIR, PUPPYONE_CONFIG_FILE);
-  const configDirMetadata = await fs.lstat(configDir).catch((error) => {
-    if (error?.code === "ENOENT") return null;
-    throw new Error(`Unable to inspect PuppyOne config directory: ${error.message}`);
-  });
-  if (!configDirMetadata) return normalizePuppyoneWorkspaceConfig(null);
-  if (configDirMetadata.isSymbolicLink() || !configDirMetadata.isDirectory()) {
-    throw new Error("PuppyOne config directory must be a real directory inside the workspace.");
-  }
-  const configMetadata = await fs.lstat(configPath).catch((error) => {
-    if (error?.code === "ENOENT") return null;
-    throw new Error(`Unable to inspect PuppyOne config: ${error.message}`);
-  });
-  if (!configMetadata) return normalizePuppyoneWorkspaceConfig(null);
-  if (configMetadata.isSymbolicLink() || !configMetadata.isFile()) {
-    throw new Error("PuppyOne config must be a regular file inside the workspace.");
-  }
-  const rawConfig = await fs.readFile(configPath, "utf8").catch((error) => {
-    if (error?.code === "ENOENT") return null;
-    throw new Error(`Unable to read PuppyOne config: ${error.message}`);
-  });
-
-  if (!rawConfig) return normalizePuppyoneWorkspaceConfig(null);
-
-  try {
-    return normalizePuppyoneWorkspaceConfig(JSON.parse(rawConfig));
-  } catch (error) {
-    throw new Error(`Unable to parse PuppyOne config: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
-
-export async function writePuppyoneWorkspaceConfig(rootPath, config) {
-  const root = await resolveExistingWorkspacePath(rootPath, null);
-  const configDir = path.join(root, PUPPYONE_CONFIG_DIR);
-  const normalizedConfig = normalizePuppyoneWorkspaceConfig(config, {
-    updatedAt: new Date().toISOString(),
-  });
-
-  await fs.mkdir(configDir, { recursive: false }).catch((error) => {
-    if (error?.code === "EEXIST") return;
-    throw new Error(`Unable to create PuppyOne config directory: ${error.message}`);
-  });
-  const configDirMetadata = await fs.lstat(configDir).catch((error) => {
-    throw new Error(`Unable to inspect PuppyOne config directory: ${error.message}`);
-  });
-  if (configDirMetadata.isSymbolicLink() || !configDirMetadata.isDirectory()) {
-    throw new Error("PuppyOne config directory must be a real directory inside the workspace.");
-  }
-  const canonicalConfigDir = await fs.realpath(configDir);
-  if (!isSameOrInsidePath(root, canonicalConfigDir)) {
-    throw new Error("PuppyOne config directory resolves outside the workspace.");
-  }
-
-  const configPath = path.join(canonicalConfigDir, PUPPYONE_CONFIG_FILE);
-  const existingMetadata = await fs.lstat(configPath).catch((error) => {
-    if (error?.code === "ENOENT") return null;
-    throw new Error(`Unable to inspect PuppyOne config: ${error.message}`);
-  });
-  if (existingMetadata?.isSymbolicLink() || (existingMetadata && !existingMetadata.isFile())) {
-    throw new Error("PuppyOne config must be a regular file inside the workspace.");
-  }
-
-  const temporaryPath = path.join(
-    canonicalConfigDir,
-    `.config.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`,
-  );
-  try {
-    await fs.writeFile(
-      temporaryPath,
-      `${JSON.stringify(normalizedConfig, null, 2)}\n`,
-      { encoding: "utf8", flag: "wx", mode: 0o600 },
-    );
-    await fs.rename(temporaryPath, configPath);
-  } catch (error) {
-    throw new Error(`Unable to write PuppyOne config: ${error.message}`);
-  } finally {
-    await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
-  }
-
-  return normalizedConfig;
-}
-
 export async function getWorkspaceGitCommitDetail(rootPath, commitId) {
   const root = resolveWorkspacePath(rootPath, null);
   assertSafeCommitId(commitId);
@@ -1574,72 +1433,82 @@ export async function getWorkspaceGitCommitDetail(rootPath, commitId) {
   };
 }
 
-export async function getWorkspaceGitFileDiff(rootPath, relativePath, scope = "unstaged") {
+export async function getWorkspaceGitFileDiff(rootPath, relativePath, scope = "unstaged", options = {}) {
   const root = resolveWorkspacePath(rootPath, null);
   const normalizedPath = normalizeRelativePath(relativePath);
+  const signal = options.signal;
   if (!normalizedPath) throw new Error("File path is required.");
 
   if (scope === "untracked") {
-    return {
+    const detail = {
       commit_id: "working-tree",
-      files: [await buildUntrackedFileDiff(root, normalizedPath)],
+      files: [await buildUntrackedFileDiff(root, normalizedPath, { signal })],
     };
+    return attachGitRevisionPairs(root, scope, detail, { signal });
   }
 
   if (scope === "remote") {
-    const status = await getWorkspaceGitStatus(root);
+    const status = await getWorkspaceGitStatus(root, { signal });
     const target = status.sourceControl.remote.target;
     if (!target?.remote || !target.branch || target.exists !== true) {
       throw new Error("Remote branch is not available.");
     }
 
     const remoteRef = `refs/remotes/${target.remote}/${target.branch}`;
-    const diffRange = await resolveGitRemoteDiffRange(root, "incoming", remoteRef);
+    const comparison = (
+      await resolveGitRemoteDiffComparisons(root, remoteRef, { signal })
+    ).incoming;
+    const selectionPaths = resolveGitDiffSelectionPaths(status, scope, normalizedPath);
     const patchResult = await execGit(root, [
       "diff",
       "--find-renames",
       "--patch",
       "--unified=3",
       "--no-ext-diff",
-      diffRange,
+      comparison.range,
       "--",
-      normalizedPath,
-    ]).catch((error) => {
+      ...selectionPaths,
+    ], { signal }).catch((error) => {
       throw new Error(formatGitFileDiffError("remote", error));
     });
 
-    return {
+    const detail = {
       commit_id: target.ref ?? remoteRef,
       files: parseGitPatch(patchResult.stdout),
     };
+    return attachGitRevisionPairs(root, scope, detail, { comparison, signal });
   }
 
   if (scope === "committed") {
-    const status = await getWorkspaceGitStatus(root);
+    const status = await getWorkspaceGitStatus(root, { signal });
     const target = status.sourceControl.remote.target;
     if (!target?.remote || !target.branch || target.exists !== true) {
       throw new Error("Remote branch is not available.");
     }
 
     const remoteRef = `refs/remotes/${target.remote}/${target.branch}`;
-    const diffRange = await resolveGitRemoteDiffRange(root, "outgoing", remoteRef);
+    const comparison = (
+      await resolveGitRemoteDiffComparisons(root, remoteRef, { signal })
+    ).outgoing;
+    const selectionPaths = resolveGitDiffSelectionPaths(status, scope, normalizedPath);
     const patchResult = await execGit(root, [
       "diff",
       "--find-renames",
       "--patch",
       "--unified=3",
       "--no-ext-diff",
-      diffRange,
+      comparison.range,
       "--",
-      normalizedPath,
-    ]).catch((error) => {
+      ...selectionPaths,
+    ], { signal }).catch((error) => {
       throw new Error(formatGitFileDiffError("committed", error));
     });
 
-    return {
+    const detail = {
       commit_id: "local-commits",
       files: parseGitPatch(patchResult.stdout),
     };
+    return attachGitRevisionPairs(root, scope, detail, { comparison, signal });
   }
 
   const args = [
@@ -1650,16 +1519,36 @@ export async function getWorkspaceGitFileDiff(rootPath, relativePath, scope = "u
     "--no-ext-diff",
   ];
   if (scope === "staged") args.push("--cached");
-  args.push("--", normalizedPath);
+  const selectionStatus = await getWorkspaceGitStatus(root, { signal });
+  args.push("--", ...resolveGitDiffSelectionPaths(selectionStatus, scope, normalizedPath));
 
-  const patchResult = await execGit(root, args).catch((error) => {
+  const patchResult = await execGit(root, args, { signal }).catch((error) => {
     throw new Error(`Unable to read git file diff: ${error.message}`);
   });
 
-  return {
+  const detail = {
     commit_id: "working-tree",
     files: parseGitPatch(patchResult.stdout),
   };
+  return attachGitRevisionPairs(root, scope, detail, { signal });
+}
+
+function resolveGitDiffSelectionPaths(status, scope, selectedPath) {
+  let resources = [];
+  if (scope === "remote") {
+    resources = status?.sourceControl?.remote?.incomingPreview ?? [];
+  } else if (scope === "committed") {
+    resources = status?.sourceControl?.remote?.outgoingPreview ?? [];
+  } else {
+    const wantedGroups = scope === "staged" ? new Set(["index"]) : new Set(["workingTree", "merge"]);
+    resources = (status?.sourceControl?.groups ?? [])
+      .filter((group) => wantedGroups.has(group.id))
+      .flatMap((group) => group.resources ?? []);
+  }
+  const selected = resources.find((resource) => (
+    resource.path === selectedPath || resource.oldPath === selectedPath
+  ));
+  return [...new Set([selected?.oldPath, selected?.path, selectedPath].filter(Boolean))];
 }
 
 export async function stageWorkspaceGitPaths(rootPath, paths) {
@@ -1929,6 +1818,89 @@ export async function pushWorkspaceGit(rootPath) {
   return getWorkspaceGitStatus(root);
 }
 
+/**
+ * Push one immutable, preflighted commit to an explicit remote branch.
+ *
+ * This is deliberately separate from the interactive `pushWorkspaceGit`
+ * operation: Cloud initialization must not infer a remote, read workspace
+ * sync preferences, or resolve `HEAD` after the renderer has authorized a
+ * different revision. The identity guard is repeated in the main process
+ * under the repository mutation lock, then the refspec names the expected
+ * object id directly. A concurrent external checkout therefore cannot make us
+ * upload a different commit.
+ */
+export async function pushWorkspaceGitCommitToRemote(rootPath, request = {}) {
+  const root = resolveWorkspacePath(rootPath, null);
+  const remoteName = normalizeGitRemoteName(request.remoteName);
+  const destinationBranch = await normalizeGitBranchName(root, request.destinationBranch);
+  const expectedBranch = await normalizeGitBranchName(root, request.expectedBranch);
+  const expectedHeadCommitId = request.expectedHeadCommitId;
+  assertSafeCommitId(expectedHeadCommitId);
+
+  const [currentBranchResult, currentHeadResult, remoteUrl] = await Promise.all([
+    execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], { optionalLocks: false })
+      .catch(() => ({ stdout: "" })),
+    execGit(root, ["rev-parse", "--verify", "HEAD^{commit}"], { optionalLocks: false })
+      .catch(() => ({ stdout: "" })),
+    execGit(root, ["remote", "get-url", remoteName], { optionalLocks: false })
+      .then((result) => result.stdout.trim())
+      .catch(() => ""),
+  ]);
+  const currentBranch = currentBranchResult.stdout.trim();
+  const currentHeadCommitId = currentHeadResult.stdout.trim();
+
+  if (!currentHeadCommitId) {
+    throw new Error("Unable to initialize Cloud project: the repository no longer has a HEAD commit.");
+  }
+  if (!currentBranch || currentBranch !== expectedBranch) {
+    throw new Error("Unable to initialize Cloud project: the current branch changed before push.");
+  }
+  if (currentHeadCommitId.toLowerCase() !== expectedHeadCommitId.toLowerCase()) {
+    throw new Error("Unable to initialize Cloud project: HEAD changed before push.");
+  }
+  if (!remoteUrl) {
+    throw new Error(`Unable to initialize Cloud project: remote '${remoteName}' is not configured.`);
+  }
+
+  const destinationRef = `refs/heads/${destinationBranch}`;
+  await execGit(
+    root,
+    ["push", remoteName, `${expectedHeadCommitId}:${destinationRef}`],
+    { timeout: GIT_NETWORK_TIMEOUT_MS },
+  ).catch((error) => {
+    throw new Error(`Unable to push Cloud project: ${getGitErrorOutput(error)}`);
+  });
+
+  // Establish the normal Git relationship used by later Push/Pull operations,
+  // but only if the checkout still matches the identity authorized above.
+  // This mutates repository config only; it never stages or rewrites files.
+  const [branchAfterPushResult, headAfterPushResult] = await Promise.all([
+    execGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], { optionalLocks: false })
+      .catch(() => ({ stdout: "" })),
+    execGit(root, ["rev-parse", "--verify", "HEAD^{commit}"], { optionalLocks: false })
+      .catch(() => ({ stdout: "" })),
+  ]);
+  const branchAfterPush = branchAfterPushResult.stdout.trim();
+  const headAfterPush = headAfterPushResult.stdout.trim();
+  if (!headAfterPush) {
+    throw new Error("Unable to finish Cloud initialization: the repository no longer has a HEAD commit.");
+  }
+  if (branchAfterPush !== expectedBranch) {
+    throw new Error("Unable to finish Cloud initialization: the current branch changed after push.");
+  }
+  if (headAfterPush.toLowerCase() !== expectedHeadCommitId.toLowerCase()) {
+    throw new Error("Unable to finish Cloud initialization: HEAD changed after push.");
+  }
+  await execGit(root, [
+    "branch",
+    `--set-upstream-to=${remoteName}/${destinationBranch}`,
+    expectedBranch,
+  ], { timeout: GIT_MUTATION_TIMEOUT_MS }).catch((error) => {
+    throw new Error(`Unable to configure the Cloud branch upstream: ${getGitErrorOutput(error)}`);
+  });
+  return getWorkspaceGitStatus(root);
+}
+
 export async function publishWorkspaceGitBranch(rootPath, remoteName = null) {
   const root = resolveWorkspacePath(rootPath, null);
   await pushWorkspaceGitWithDefaultUpstream(root, remoteName);
@@ -1995,65 +1967,6 @@ async function nodeFromEntry(folder, entry, parentRelative) {
   };
 }
 
-export function resolveWorkspacePath(rootPath, relativePath) {
-  const root = path.resolve(rootPath);
-  const normalizedRelative = normalizeRelativePath(relativePath);
-  const resolved = normalizedRelative ? path.resolve(root, normalizedRelative) : root;
-  if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
-    throw new Error("Folder path is outside the selected workspace.");
-  }
-  return resolved;
-}
-
-export async function resolveExistingWorkspacePath(rootPath, relativePath) {
-  const resolvedRoot = path.resolve(rootPath);
-  const canonicalRoot = await fs.realpath(resolvedRoot).catch((error) => {
-    throw new Error(`Unable to resolve workspace root: ${error.message}`);
-  });
-  const candidatePath = resolveWorkspacePath(canonicalRoot, relativePath);
-  const candidateMetadata = await fs.lstat(candidatePath).catch((error) => {
-    throw new Error(`Unable to resolve workspace entry: ${error.message}`);
-  });
-
-  if (candidatePath !== canonicalRoot && candidateMetadata.isSymbolicLink()) {
-    throw new Error("Symbolic links cannot be accessed through workspace file operations.");
-  }
-
-  const canonicalCandidate = await fs.realpath(candidatePath).catch((error) => {
-    throw new Error(`Unable to resolve workspace entry: ${error.message}`);
-  });
-  if (!isSameOrInsidePath(canonicalRoot, canonicalCandidate)) {
-    throw new Error("Workspace entry resolves outside the selected workspace.");
-  }
-
-  return canonicalCandidate;
-}
-
-function isSameOrInsidePath(parentPath, candidatePath) {
-  const parent = path.resolve(parentPath);
-  const candidate = path.resolve(candidatePath);
-  if (candidate === parent) return true;
-
-  const relativePath = path.relative(parent, candidate);
-  return Boolean(relativePath && !relativePath.startsWith("..") && !path.isAbsolute(relativePath));
-}
-
-function normalizeRelativePath(value) {
-  if (value == null || value === "") return "";
-  if (typeof value !== "string") {
-    throw new Error("Folder path must be a string.");
-  }
-  if (path.isAbsolute(value)) {
-    throw new Error("Folder path is outside the selected workspace.");
-  }
-  const normalized = path.normalize(value).replaceAll("\\", "/");
-  if (normalized === "." || normalized === "") return "";
-  if (normalized.startsWith("../") || normalized === ".." || normalized.includes("/../")) {
-    throw new Error("Folder path is outside the selected workspace.");
-  }
-  return normalized;
-}
-
 function normalizeNewEntryName(value) {
   if (typeof value !== "string") {
     throw new Error("Name is required.");
@@ -2077,7 +1990,7 @@ function joinRelativePath(parent, name) {
 }
 
 function classifyFile(name) {
-  return getSemanticKindForFormat(resolveLocalFileFormat({ name }));
+  return classifyLocalFile(name);
 }
 
 async function readPreview(filePath, size) {
@@ -2103,221 +2016,7 @@ async function readPreview(filePath, size) {
 }
 
 function isPreviewable(filePath) {
-  return isTextLikeFormat(resolveLocalFileFormat({ name: filePath }));
-}
-
-function loadFileFormatRegistry() {
-  // vendor/shared-ui is the canonical copy in this standalone repo (ISSUE-021).
-  // The former "../../frontend/shared-ui" fallback assumed a sibling monorepo
-  // checkout that does not exist in CI / packaged builds / other machines and
-  // resolved to nothing — it has been removed.
-  const registryPath = path.resolve(localApiDir, "../vendor/shared-ui/src/core/fileFormats.json");
-  try {
-    return JSON.parse(readFileSync(registryPath, "utf8"));
-  } catch (error) {
-    throw new Error(
-      `Unable to load PuppyOne file format registry from ${registryPath}: ${error.message}`,
-    );
-  }
-}
-
-function resolveLocalFileFormat({ name, mimeType }) {
-  if (name) {
-    const base = path.basename(name).toLowerCase();
-    const byName = filenameIndex.get(base);
-    if (byName) return byName;
-
-    const byExtension = matchExtension(name);
-    if (byExtension) return byExtension;
-
-    const byPattern = matchFilenamePattern(name);
-    if (byPattern) return byPattern;
-  }
-
-  if (mimeType) {
-    const normalizedMime = mimeType.toLowerCase().split(";")[0].trim();
-    const byMime = mimeIndex.get(normalizedMime);
-    if (byMime) return byMime;
-
-    if (normalizedMime.startsWith("image/")) {
-      return {
-        ...unknownFormat,
-        id: "image-unknown",
-        label: "Image",
-        category: "image",
-        defaultViewer: "image-preview",
-      };
-    }
-
-    if (
-      normalizedMime.startsWith("text/") ||
-      normalizedMime === "application/javascript" ||
-      normalizedMime === "application/typescript"
-    ) {
-      return {
-        ...unknownFormat,
-        id: "text-unknown",
-        label: "Text",
-        category: "text",
-        defaultViewer: "plain-text",
-        monacoLanguage: "plaintext",
-      };
-    }
-  }
-
-  return unknownFormat;
-}
-
-function matchExtension(name) {
-  const lower = path.basename(name).toLowerCase();
-  const lastDot = lower.lastIndexOf(".");
-  if (lastDot < 0) return null;
-
-  const secondLastDot = lower.lastIndexOf(".", lastDot - 1);
-  if (secondLastDot >= 0) {
-    const compound = lower.slice(secondLastDot);
-    const compoundMatch = extensionIndex.get(compound);
-    if (compoundMatch) return compoundMatch;
-  }
-
-  return extensionIndex.get(lower.slice(lastDot)) ?? null;
-}
-
-function matchFilenamePattern(name) {
-  const normalized = String(name).replace(/\\/g, "/").toLowerCase();
-  const base = path.basename(normalized);
-
-  for (const { regex, format } of filenamePatterns) {
-    if (regex.test(normalized) || regex.test(base)) return format;
-  }
-
-  return null;
-}
-
-function globPatternToRegExp(pattern) {
-  let source = "^";
-
-  for (let index = 0; index < pattern.length; index += 1) {
-    const char = pattern[index];
-    const next = pattern[index + 1];
-    const afterNext = pattern[index + 2];
-
-    if (char === "*" && next === "*" && afterNext === "/") {
-      source += "(?:.*/)?";
-      index += 2;
-      continue;
-    }
-
-    if (char === "*" && next === "*") {
-      source += ".*";
-      index += 1;
-      continue;
-    }
-
-    if (char === "*") {
-      source += "[^/]*";
-      continue;
-    }
-
-    if (char === "?") {
-      source += "[^/]";
-      continue;
-    }
-
-    source += escapeRegExp(char);
-  }
-
-  return new RegExp(`${source}$`);
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
-}
-
-function getMimeTypeOverride(name) {
-  const lower = path.basename(name).toLowerCase();
-  for (const extension of mimeOverrideExtensions) {
-    if (lower.endsWith(`.${extension}`)) {
-      return mimeTypeByExtension.get(extension) ?? null;
-    }
-  }
-  return null;
-}
-
-function getSemanticKindForFormat(format) {
-  if (format.id === "puppyflow") return "workflow";
-  if (format.id === "json" || format.id === "jsonl") return "json";
-
-  switch (format.defaultViewer) {
-    case "markdown-editor":
-      return "markdown";
-    case "html-artifact":
-      return "html";
-    case "app-preview":
-      return "app";
-    case "image-preview":
-      return "image";
-    case "audio-preview":
-      return "audio";
-    case "video-preview":
-      return "video";
-    case "pdf-preview":
-      return "pdf";
-    case "csv-table":
-      return "spreadsheet";
-    default:
-      break;
-  }
-
-  switch (format.category) {
-    case "markdown":
-      return "markdown";
-    case "app":
-      return "app";
-    case "image":
-      return "image";
-    case "audio":
-      return "audio";
-    case "video":
-      return "video";
-    case "archive":
-      return "archive";
-    case "document":
-      return format.id === "xlsx" ? "spreadsheet" : "document";
-    case "binary":
-      return "binary";
-    case "text":
-      return "text";
-    case "code":
-    case "data":
-      return "code";
-    default:
-      return "file";
-  }
-}
-
-function isTextLikeFormat(format) {
-  return (
-    format.category === "markdown" ||
-    format.category === "text" ||
-    format.category === "code" ||
-    format.defaultViewer === "csv-table" ||
-    (format.category === "data" && format.defaultViewer === "monaco-code")
-  );
-}
-
-function shouldUseUtf8Mime(format, mimeType) {
-  return (
-    mimeType.startsWith("text/") ||
-    format.category === "markdown" ||
-    format.category === "text" ||
-    format.category === "code" ||
-    format.category === "data" ||
-    format.defaultViewer === "html-artifact" ||
-    format.defaultViewer === "monaco-code" ||
-    format.defaultViewer === "csv-table" ||
-    format.defaultViewer === "plain-text"
-  );
+  return isLocalFilePreviewable(filePath);
 }
 
 function formatFileSize(bytes) {
@@ -2331,8 +2030,19 @@ function formatFileSize(bytes) {
   return `${bytes} B`;
 }
 
-function stableWorkspaceId(folderPath) {
-  return `local:${Buffer.from(folderPath).toString("base64url")}`;
+function createFileSystemIdentity(metadata, canonicalPath) {
+  const device = Number(metadata.dev);
+  const inode = Number(metadata.ino);
+  if (Number.isFinite(device) && Number.isFinite(inode) && inode > 0) {
+    return `fs:${device}:${inode}`;
+  }
+  // Some virtual/network filesystems do not expose a stable inode. Keep the
+  // fallback explicit; it remains a local workspace-instance concern only.
+  return `path:${canonicalPath}`;
+}
+
+function createWorkspaceInstanceId(fsIdentity) {
+  return `wsi_${crypto.createHash("sha256").update(fsIdentity).digest("base64url").slice(0, 24)}`;
 }
 
 function getGitErrorOutput(error) {
@@ -2415,15 +2125,14 @@ async function chooseDefaultPushRemote(rootPath, requestedRemoteName = null) {
     throw new Error(`Unable to push changes: remote '${normalizedRemoteName}' is not configured.`);
   }
   const config = await readPuppyoneWorkspaceConfig(rootPath).catch(() => null);
+  // A canonical PuppyOne Project remote is the hosted source of truth even
+  // when this repository also keeps a GitHub `origin`. Initialization maps any
+  // local branch to puppyone/main; later ordinary Push must preserve that same
+  // contract instead of silently selecting origin by name precedence.
+  const puppyoneRemote = choosePuppyoneRemoteName(remotes, config);
+  if (puppyoneRemote) return puppyoneRemote;
   const preferredRemoteName = config?.sync?.sourceOfTruth?.remote ?? config?.git?.primaryRemote ?? config?.backup?.remote;
   if (preferredRemoteName && remotes.some((remote) => remote.name === preferredRemoteName)) return preferredRemoteName;
-  if (isPuppyoneHostingConfig(config)) {
-    const puppyoneRemote = choosePuppyoneRemoteName(remotes, config);
-    if (puppyoneRemote) return puppyoneRemote;
-    if (config?.cloud?.projectId) {
-      throw new Error("Unable to push changes: PuppyOne Cloud remote is not configured.");
-    }
-  }
   if (remotes.some((remote) => remote.name === "origin")) return "origin";
   if (remotes.some((remote) => remote.name === "puppyone")) return "puppyone";
   const firstRemote = remotes[0]?.name;
@@ -2591,12 +2300,26 @@ async function readGitSyncTarget(
   const counts = headCommitId
     ? await readGitAheadBehindCounts(rootPath, remoteRef, { signal })
     : { ahead: 0, behind: 0 };
-  const incomingPreview = counts.behind > 0
-    ? await readGitRemoteChangePreview(rootPath, `HEAD..${remoteRef}`, { signal })
-    : [];
-  const outgoingPreview = counts.ahead > 0
-    ? await readGitOutgoingChangePreview(rootPath, `${remoteRef}..HEAD`, { signal })
-    : [];
+  const comparisons = counts.ahead > 0 || counts.behind > 0
+    ? await resolveGitRemoteDiffComparisons(rootPath, remoteRef, {
+      signal,
+      hasHead: Boolean(headCommitId),
+    })
+    : null;
+  const [incomingPreview, outgoingPreview] = await Promise.all([
+    counts.behind > 0
+      ? readGitComparisonPreview(rootPath, comparisons.incoming, "remote", {
+        signal,
+        limit: GIT_REMOTE_PREVIEW_LIMIT,
+      })
+      : [],
+    counts.ahead > 0
+      ? readGitComparisonPreview(rootPath, comparisons.outgoing, "committed", {
+        signal,
+        limit: GIT_REMOTE_PREVIEW_LIMIT,
+      })
+      : [],
+  ]);
 
   return {
     remote: remoteName,
@@ -2644,7 +2367,7 @@ function resolveGitEffectiveHosting({ remotes, branches, currentBranchName, sync
   if (isPuppyoneHostingConfig(config)) {
     const puppyoneRemoteName = choosePuppyoneRemoteName(remotes, config);
     const puppyoneRemote = puppyoneRemoteName ? remotes.find((remote) => remote.name === puppyoneRemoteName) ?? null : null;
-    if (puppyoneRemote || config?.cloud?.projectId) {
+    if (puppyoneRemote) {
       return {
         kind: "puppyone-cloud",
         remoteName: puppyoneRemote?.name ?? null,
@@ -2652,7 +2375,7 @@ function resolveGitEffectiveHosting({ remotes, branches, currentBranchName, sync
         ref: puppyoneRemote?.name ? ref ?? `${puppyoneRemote.name}/${branchName ?? PUPPYONE_CLOUD_DEFAULT_BRANCH}` : null,
         ready: Boolean(puppyoneRemote),
         reason: puppyoneRemote ? "configured" : "missing-remote",
-        identity: buildPuppyoneHostingIdentity(puppyoneRemote, config),
+        identity: buildPuppyoneHostingIdentity(puppyoneRemote),
       };
     }
   }
@@ -2750,133 +2473,9 @@ function buildRemoteHosting({ kind, remote, branchName, ref, reason }) {
     identity: kind === "github"
       ? buildGithubHostingIdentity(remote)
       : kind === "puppyone-cloud"
-        ? buildPuppyoneHostingIdentity(remote, null)
+        ? buildPuppyoneHostingIdentity(remote)
         : null,
   };
-}
-
-function chooseGitSyncTarget(remotes, branches, currentBranchName, config) {
-  const configuredRemoteName = config?.sync?.sourceOfTruth?.remote ?? config?.git?.primaryRemote ?? config?.backup?.remote;
-  const configuredBranchName = config?.sync?.sourceOfTruth?.branch ?? config?.git?.watchedBranch ?? config?.backup?.branch;
-  const remoteNames = new Set(remotes.map((remote) => remote.name));
-  const currentBranchNameSafe = normalizeCurrentBranchName(currentBranchName);
-  const currentBranch = branches.find((branch) => branch.current && !branch.remote);
-
-  if (isPuppyoneHostingConfig(config)) {
-    const puppyoneRemote = choosePuppyoneRemoteName(remotes, config);
-    if (puppyoneRemote || config?.cloud?.projectId) {
-      return {
-        remote: puppyoneRemote,
-        branch: getConfiguredSyncBranch(config, PUPPYONE_CLOUD_DEFAULT_BRANCH, true),
-      };
-    }
-  }
-
-  if (configuredBranchName) {
-    const remote = configuredRemoteName && remoteNames.has(configuredRemoteName)
-      ? configuredRemoteName
-      : findRemoteForBranch(branches, configuredBranchName)
-        ?? preferExistingRemote(remotes, "origin")
-        ?? preferExistingRemote(remotes, "puppyone")
-        ?? remotes[0]?.name
-        ?? null;
-    return {
-      remote,
-      branch: configuredBranchName,
-    };
-  }
-
-  if (configuredRemoteName) {
-    const remote = remoteNames.has(configuredRemoteName)
-      ? configuredRemoteName
-      : preferExistingRemote(remotes, "origin")
-        ?? preferExistingRemote(remotes, "puppyone")
-        ?? remotes[0]?.name
-        ?? null;
-
-    if (!remote) {
-      return { remote: null, branch: currentBranchNameSafe };
-    }
-
-    if (currentBranch?.upstream) {
-      const upstreamTarget = splitRemoteBranchName(currentBranch.upstream);
-      if (upstreamTarget?.remote === remote) return upstreamTarget;
-    }
-
-    if (currentBranchNameSafe) {
-      const matchingCurrentBranch = findRemoteBranch(branches, remote, currentBranchNameSafe);
-      if (matchingCurrentBranch) return matchingCurrentBranch;
-      return { remote, branch: currentBranchNameSafe };
-    }
-
-    return {
-      remote,
-      branch: findDefaultBranchForRemote(branches, remote),
-    };
-  }
-
-  if (currentBranch?.upstream) {
-    const upstreamTarget = splitRemoteBranchName(currentBranch.upstream);
-    if (upstreamTarget) return upstreamTarget;
-  }
-
-  const originMain = findRemoteBranch(branches, "origin", "main");
-  if (originMain) return originMain;
-
-  const puppyoneMain = findRemoteBranch(branches, "puppyone", "main");
-  if (puppyoneMain) return puppyoneMain;
-
-  if (currentBranchNameSafe) {
-    const originCurrent = findRemoteBranch(branches, "origin", currentBranchNameSafe);
-    if (originCurrent) return originCurrent;
-    const puppyoneCurrent = findRemoteBranch(branches, "puppyone", currentBranchNameSafe);
-    if (puppyoneCurrent) return puppyoneCurrent;
-  }
-
-  const fallbackRemote = preferExistingRemote(remotes, "origin")
-    ?? preferExistingRemote(remotes, "puppyone")
-    ?? remotes[0]?.name
-    ?? null;
-
-  return {
-    remote: fallbackRemote,
-    branch: findDefaultBranchForRemote(branches, fallbackRemote)
-      ?? currentBranchNameSafe
-      ?? null,
-  };
-}
-
-function isPuppyoneHostingConfig(config) {
-  return config?.sync?.sourceOfTruth?.service === "puppyone";
-}
-
-function hasEffectivePuppyoneHostingTarget(remotes, config) {
-  if (!isPuppyoneHostingConfig(config)) return false;
-  return Boolean(choosePuppyoneRemoteName(remotes, config) || config?.cloud?.projectId);
-}
-
-function getConfiguredSyncBranch(config, fallbackBranch = PUPPYONE_CLOUD_DEFAULT_BRANCH, puppyoneHostingActive = isPuppyoneHostingConfig(config)) {
-  if (puppyoneHostingActive) {
-    return PUPPYONE_CLOUD_DEFAULT_BRANCH;
-  }
-
-  return config?.sync?.sourceOfTruth?.branch
-    ?? config?.backup?.branch
-    ?? config?.git?.watchedBranch
-    ?? fallbackBranch
-    ?? null;
-}
-
-function choosePuppyoneRemoteName(remotes, config) {
-  const configuredRemoteName = config?.sync?.sourceOfTruth?.remote ?? config?.git?.primaryRemote ?? config?.backup?.remote;
-  const configuredRemote = configuredRemoteName
-    ? remotes.find((remote) => remote.name === configuredRemoteName) ?? null
-    : null;
-  if (configuredRemote && isPuppyoneRemote(configuredRemote)) return configuredRemote.name;
-  const puppyoneUrlRemote = remotes.find(isPuppyoneRemote);
-  if (puppyoneUrlRemote) return puppyoneUrlRemote.name;
-  return remotes.find((remote) => remote.name.toLowerCase() === "puppyone")?.name
-    ?? null;
 }
 
 function getRemoteUrl(remote) {
@@ -2897,8 +2496,7 @@ function isPuppyoneRemote(remote) {
 }
 
 function isPuppyoneRemoteUrl(rawUrl) {
-  if (!rawUrl) return false;
-  return /(^|[/:@])api\.puppyone\.ai([/:]|$)/i.test(rawUrl) || /\/git\/(ap\/)?[^/]+\.git$/i.test(rawUrl);
+  return Boolean(parsePuppyoneRemoteInfo(rawUrl));
 }
 
 function buildGithubHostingIdentity(remote) {
@@ -2945,38 +2543,64 @@ function formatGithubRepoIdentity(owner, repo) {
   };
 }
 
-function buildPuppyoneHostingIdentity(remote, config) {
+function buildPuppyoneHostingIdentity(remote) {
   const info = parsePuppyoneRemoteInfo(getRemoteUrl(remote));
-  const projectId = config?.cloud?.projectId;
   return {
     provider: "puppyone-cloud",
-    label: info?.displayId ?? projectId ?? remote?.name ?? "Puppyone Cloud",
+    label: info?.displayId ?? remote?.name ?? "Puppyone Cloud",
     href: null,
   };
 }
 
-function parsePuppyoneRemoteInfo(rawUrl) {
+export function parsePuppyoneRemoteInfo(rawUrl) {
   if (!rawUrl) return null;
 
   try {
     const url = new URL(rawUrl);
+    if (
+      !["http:", "https:"].includes(url.protocol)
+      || !url.host
+      || url.username
+      || url.password
+      || url.search
+      || url.hash
+    ) {
+      return null;
+    }
     const accessPointMatch = url.pathname.match(/^\/git\/ap\/([^/]+)\.git$/);
     const accessKey = accessPointMatch?.[1];
     if (accessPointMatch) {
       return {
         kind: "access-point",
         host: url.host,
+        origin: url.origin.toLowerCase(),
         displayId: accessKey ? maskSecret(accessKey) : "access point",
         accessKey,
       };
     }
 
-    const projectMatch = url.pathname.match(/^\/git\/([^/]+)\.git$/);
+    const id = "[A-Za-z0-9][A-Za-z0-9_-]{0,199}";
+    const scopedMatch = url.pathname.match(
+      new RegExp(`^/git/(${id})/scopes/(${id})\\.git$`),
+    );
+    if (scopedMatch) {
+      return {
+        kind: "scope",
+        host: url.host,
+        origin: url.origin.toLowerCase(),
+        displayId: `${scopedMatch[1]}/${scopedMatch[2]}`,
+        projectId: scopedMatch[1],
+        scopeId: scopedMatch[2],
+      };
+    }
+
+    const projectMatch = url.pathname.match(new RegExp(`^/git/(${id})\\.git$`));
     const projectId = projectMatch?.[1];
     if (projectMatch) {
       return {
         kind: "project",
         host: url.host,
+        origin: url.origin.toLowerCase(),
         displayId: projectId ?? "project",
         projectId,
       };
@@ -2991,44 +2615,6 @@ function parsePuppyoneRemoteInfo(rawUrl) {
 function maskSecret(value) {
   if (value.length <= 8) return "****";
   return `${value.slice(0, 4)}...${value.slice(-4)}`;
-}
-
-function findRemoteBranch(branches, remoteName, branchName) {
-  if (!remoteName || !branchName) return null;
-  return branches.some((branch) => branch.remote && branch.name === `${remoteName}/${branchName}`)
-    ? { remote: remoteName, branch: branchName }
-    : null;
-}
-
-function findRemoteForBranch(branches, branchName) {
-  if (!branchName) return null;
-  const remoteBranch = branches.find((branch) => branch.remote && branch.name.endsWith(`/${branchName}`));
-  return remoteBranch ? splitRemoteBranchName(remoteBranch.name)?.remote ?? null : null;
-}
-
-function findDefaultBranchForRemote(branches, remoteName) {
-  if (!remoteName) return null;
-  if (findRemoteBranch(branches, remoteName, "main")) return "main";
-  if (findRemoteBranch(branches, remoteName, "master")) return "master";
-  const firstRemoteBranch = branches.find((branch) => branch.remote && branch.name.startsWith(`${remoteName}/`));
-  return firstRemoteBranch ? firstRemoteBranch.name.slice(remoteName.length + 1) : null;
-}
-
-function preferExistingRemote(remotes, remoteName) {
-  return remotes.some((remote) => remote.name === remoteName) ? remoteName : null;
-}
-
-function normalizeCurrentBranchName(branchName) {
-  return branchName && branchName !== "detached" ? branchName : null;
-}
-
-function splitRemoteBranchName(value) {
-  const slashIndex = value.indexOf("/");
-  if (slashIndex <= 0 || slashIndex >= value.length - 1) return null;
-  return {
-    remote: value.slice(0, slashIndex),
-    branch: value.slice(slashIndex + 1),
-  };
 }
 
 function parseGitAheadBehindCounts(output) {
@@ -3072,25 +2658,44 @@ async function readGitAheadBehindCounts(rootPath, remoteRef, options = {}) {
   };
 }
 
-async function resolveGitRemoteDiffRange(rootPath, direction, remoteRef) {
-  const hasHead = await execGit(rootPath, ["rev-parse", "--verify", "--quiet", "HEAD"])
-    .then((result) => Boolean(result.stdout.trim()))
-    .catch(() => false);
+async function attachGitRevisionPairs(rootPath, scope, detail, { comparison = null, signal } = {}) {
+  if (!Array.isArray(detail.files) || detail.files.length === 0) return detail;
+  const hasHead = scope === "staged"
+    ? await execGit(rootPath, ["rev-parse", "--verify", "--quiet", "HEAD"], { signal })
+      .then((result) => Boolean(result.stdout.trim()))
+      .catch(() => {
+        throwIfGitStatusAborted(signal);
+        return false;
+      })
+    : true;
 
-  if (!hasHead) {
-    return direction === "incoming" ? `${GIT_EMPTY_TREE}..${remoteRef}` : `${remoteRef}..${GIT_EMPTY_TREE}`;
-  }
-
-  const mergeBase = await execGit(rootPath, ["merge-base", "HEAD", remoteRef])
-    .then((result) => result.stdout.trim())
-    .catch(() => "");
-
-  if (mergeBase) {
-    return direction === "incoming" ? `${mergeBase}..${remoteRef}` : `${mergeBase}..HEAD`;
-  }
-
-  return direction === "incoming" ? `HEAD..${remoteRef}` : `${remoteRef}..HEAD`;
+  const files = await Promise.all(detail.files.map(async (file) => {
+    const specs = deriveGitRevisionSpecs({
+      scope,
+      file,
+      comparison,
+      hasHead,
+      getMimeType,
+    });
+    const revisionPair = await resolveGitRevisionPair({
+      rootPath,
+      scope,
+      path: file.path,
+      oldPath: file.oldPath,
+      status: file.status,
+      before: specs.before,
+      after: specs.after,
+      signal,
+    });
+    return {
+      ...file,
+      mimeType: getMimeType(file.path) ?? getMimeType(file.oldPath ?? ""),
+      revisionPair,
+    };
+  }));
+  return { ...detail, files };
 }
+
 
 function formatGitFileDiffError(scope, error) {
   const message = getGitErrorOutput(error);
@@ -3105,121 +2710,6 @@ function formatGitFileDiffError(scope, error) {
   return scope === "remote"
     ? `Unable to preview remote change: ${message}`
     : `Unable to preview committed change: ${message}`;
-}
-
-async function readGitRemoteChangePreview(rootPath, range, options = {}) {
-  const signal = options.signal;
-  const result = await execGit(rootPath, [
-    "log",
-    "--name-status",
-    "--format=",
-    "-z",
-    "--find-renames",
-    range,
-  ], { optionalLocks: false, signal }).catch(() => {
-    throwIfGitStatusAborted(signal);
-    return { stdout: "" };
-  });
-
-  return uniqueGitPreviewResources(
-    parseGitNameStatusPreview(result.stdout, "remote", GIT_REMOTE_PREVIEW_LIMIT * 4),
-    GIT_REMOTE_PREVIEW_LIMIT,
-  );
-}
-
-async function readGitOutgoingChangePreview(rootPath, range, options = {}) {
-  const signal = options.signal;
-  const result = await execGit(rootPath, [
-    "log",
-    "--name-status",
-    "--format=",
-    "-z",
-    "--find-renames",
-    range,
-  ], { optionalLocks: false, signal }).catch(() => {
-    throwIfGitStatusAborted(signal);
-    return { stdout: "" };
-  });
-
-  return uniqueGitPreviewResources(
-    parseGitNameStatusPreview(result.stdout, "committed", GIT_REMOTE_PREVIEW_LIMIT * 4),
-    GIT_REMOTE_PREVIEW_LIMIT,
-  );
-}
-
-function uniqueGitPreviewResources(resources, limit) {
-  const seen = new Set();
-  const unique = [];
-
-  for (const resource of resources) {
-    const key = `${resource.oldPath ?? ""}\0${resource.path}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(resource);
-    if (unique.length >= limit) break;
-  }
-
-  return unique;
-}
-
-function parseGitNameStatusPreview(output, group, limit) {
-  const tokens = output.split("\0").filter(Boolean);
-  const resources = [];
-
-  for (let index = 0; index < tokens.length && resources.length < limit; index += 1) {
-    const code = tokens[index] ?? "";
-    const statusCode = code[0] ?? "";
-    if (!statusCode) continue;
-
-    if (statusCode === "R" || statusCode === "C") {
-      const oldPath = tokens[index + 1] ?? null;
-      const nextPath = tokens[index + 2] ?? oldPath;
-      index += 2;
-      if (nextPath) {
-        resources.push(buildGitPreviewResource({
-          path: nextPath,
-          oldPath,
-          status: statusCode === "R" ? "renamed" : "copied",
-          group,
-        }));
-      }
-      continue;
-    }
-
-    const filePath = tokens[index + 1] ?? null;
-    index += 1;
-    if (!filePath) continue;
-    resources.push(buildGitPreviewResource({
-      path: filePath,
-      oldPath: null,
-      status: gitNameStatusCodeToLabel(statusCode),
-      group,
-    }));
-  }
-
-  return resources;
-}
-
-function buildGitPreviewResource({ path: filePath, oldPath, status, group }) {
-  return {
-    id: `${group}:${oldPath ?? ""}:${filePath}:${status}`,
-    group: "workingTree",
-    path: filePath,
-    oldPath: oldPath ?? null,
-    status,
-    staged: false,
-    conflict: false,
-    letter: gitStatusLabelToLetter(status),
-  };
-}
-
-function gitNameStatusCodeToLabel(statusCode) {
-  if (statusCode === "A") return "added";
-  if (statusCode === "D") return "deleted";
-  if (statusCode === "R") return "renamed";
-  if (statusCode === "C") return "copied";
-  if (statusCode === "M") return "modified";
-  return "changed";
 }
 
 function parseGitBranchLine(line) {
@@ -3288,69 +2778,6 @@ async function readGitRemotes(rootPath, options = {}) {
   }
 
   return [...remotes.values()];
-}
-
-function normalizePuppyoneWorkspaceConfig(value, options = {}) {
-  const source = value && typeof value === "object" ? value : {};
-  const sync = source.sync && typeof source.sync === "object" ? source.sync : {};
-  const sourceOfTruth = sync.sourceOfTruth && typeof sync.sourceOfTruth === "object" ? sync.sourceOfTruth : {};
-  const git = source.git && typeof source.git === "object" ? source.git : {};
-  const backup = source.backup && typeof source.backup === "object" ? source.backup : {};
-  const cloud = source.cloud && typeof source.cloud === "object" ? source.cloud : {};
-  const primaryRemote = normalizeOptionalConfigText(git.primaryRemote);
-  const watchedBranch = normalizeOptionalConfigText(git.watchedBranch);
-  const sourceOfTruthService = normalizeBackendService(sourceOfTruth.service ?? backup.service);
-  const isPuppyoneSource = sourceOfTruthService === "puppyone";
-  const sourceOfTruthRemote =
-    normalizeOptionalConfigText(sourceOfTruth.remote)
-    ?? primaryRemote
-    ?? normalizeOptionalConfigText(backup.remote);
-  const sourceOfTruthBranch = isPuppyoneSource
-    ? null
-    : normalizeOptionalConfigText(sourceOfTruth.branch)
-      ?? watchedBranch
-      ?? normalizeOptionalConfigText(backup.branch);
-  const updatedAt = typeof options.updatedAt === "string"
-    ? options.updatedAt
-    : typeof source.updatedAt === "string"
-      ? source.updatedAt
-      : undefined;
-
-  return {
-    ...DEFAULT_PUPPYONE_WORKSPACE_CONFIG,
-    version: 1,
-    sync: {
-      sourceOfTruth: {
-        service: sourceOfTruthService,
-        remote: sourceOfTruthRemote,
-        branch: sourceOfTruthBranch,
-      },
-    },
-    git: {
-      primaryRemote: primaryRemote ?? sourceOfTruthRemote,
-      watchedBranch: isPuppyoneSource ? null : watchedBranch ?? sourceOfTruthBranch,
-    },
-    backup: {
-      enabled: backup.enabled === true || cloud.backupEnabled === true,
-      service: normalizeBackendService(backup.service ?? sourceOfTruthService),
-      remote: normalizeOptionalConfigText(backup.remote) ?? sourceOfTruthRemote,
-      branch: normalizeOptionalConfigText(backup.branch) ?? (isPuppyoneSource ? null : sourceOfTruthBranch),
-    },
-    cloud: {
-      projectId: normalizeOptionalConfigText(cloud.projectId),
-    },
-    ...(updatedAt ? { updatedAt } : {}),
-  };
-}
-
-function normalizeBackendService(value) {
-  return value === "github" || value === "custom" || value === "puppyone" ? value : "github";
-}
-
-function normalizeOptionalConfigText(value) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
 }
 
 async function readGitHistory(rootPath, limit, options = {}) {
@@ -3711,7 +3138,7 @@ function assertSafeCommitId(commitId) {
   }
 }
 
-async function buildUntrackedFileDiff(rootPath, relativePath) {
+async function buildUntrackedFileDiff(rootPath, relativePath, options = {}) {
   const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
   const metadata = await fs.stat(filePath).catch((error) => {
     throw new Error(`Unable to read untracked file: ${error.message}`);
@@ -3741,7 +3168,7 @@ async function buildUntrackedFileDiff(rootPath, relativePath) {
     };
   }
 
-  const bytes = await fs.readFile(filePath).catch((error) => {
+  const bytes = await fs.readFile(filePath, { signal: options.signal }).catch((error) => {
     throw new Error(`Unable to read untracked file: ${error.message}`);
   });
   if (bytes.includes(0)) {
@@ -3850,185 +3277,13 @@ function normalizeGitRemoteUrl(remoteUrl) {
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error("Remote URL must use http or https.");
   }
-  if (!/^\/git\/(?:ap\/)?[^/]+\.git$/.test(url.pathname)) {
+  if (url.username || url.password || url.search || url.hash) {
+    throw new Error("Remote URL must not contain credentials or query data.");
+  }
+  const id = "[A-Za-z0-9][A-Za-z0-9_-]{0,199}";
+  const canonicalPath = new RegExp(`^/git/(?:${id}\\.git|${id}/scopes/${id}\\.git)$`);
+  if (!canonicalPath.test(url.pathname)) {
     throw new Error("Remote URL is not a PuppyOne Git endpoint.");
   }
-  return normalized;
-}
-
-function buildGitSourceControlSnapshot({ entries, branchName, syncTarget, currentBranch, headCommitId }) {
-  const resourcesByGroup = new Map(GIT_RESOURCE_GROUPS.map((group) => [group.id, []]));
-
-  for (const entry of entries) {
-    for (const resource of buildGitSourceControlResourcesForEntry(entry)) {
-      resourcesByGroup.get(resource.group)?.push(resource);
-    }
-  }
-
-  const groups = GIT_RESOURCE_GROUPS
-    .map((group) => ({
-      ...group,
-      resources: resourcesByGroup.get(group.id) ?? [],
-    }))
-    .filter((group) => group.resources.length > 0 || group.id === "index" || group.id === "workingTree");
-  const stagedCount = resourcesByGroup.get("index")?.length ?? 0;
-  const workingCount = (resourcesByGroup.get("workingTree")?.length ?? 0) + (resourcesByGroup.get("untracked")?.length ?? 0);
-  const mergeCount = resourcesByGroup.get("merge")?.length ?? 0;
-
-  return {
-    input: {
-      placeholder: branchName && branchName !== "detached"
-        ? `Message (⌘↩ to commit on ${branchName})`
-        : "Message (⌘↩ to commit)",
-      defaultMessage: buildDefaultCommitMessageFromResources(resourcesByGroup.get("index") ?? []),
-    },
-    groups,
-    remote: buildGitSourceControlRemoteSummary({ branchName, syncTarget, currentBranch, headCommitId }),
-    actions: {
-      canStageAll: workingCount > 0 || mergeCount > 0,
-      canUnstageAll: stagedCount > 0,
-      canDiscardAll: workingCount > 0 || mergeCount > 0,
-      canCommit: stagedCount > 0 && mergeCount === 0,
-    },
-  };
-}
-
-function buildGitSourceControlResourcesForEntry(entry) {
-  if (entry.conflict || entry.status === "conflict" || isConflictStatus(entry.staged, entry.unstaged)) {
-    return [buildGitSourceControlResource(entry, "merge", "conflict")];
-  }
-
-  const resources = [];
-  if (entry.status === "untracked") {
-    resources.push(buildGitSourceControlResource(entry, "untracked", "untracked"));
-    return resources;
-  }
-
-  const stagedStatus = gitStatusCodeToLabel(entry.staged);
-  if (stagedStatus) {
-    resources.push(buildGitSourceControlResource(entry, "index", stagedStatus));
-  }
-
-  const unstagedStatus = gitStatusCodeToLabel(entry.unstaged);
-  if (unstagedStatus) {
-    resources.push(buildGitSourceControlResource(entry, "workingTree", unstagedStatus));
-  }
-
-  return resources;
-}
-
-function buildGitSourceControlResource(entry, group, status) {
-  return {
-    id: `${group}:${entry.oldPath ?? ""}:${entry.path}:${status}`,
-    group,
-    path: entry.path,
-    oldPath: entry.oldPath ?? null,
-    status,
-    staged: group === "index",
-    conflict: group === "merge",
-    letter: gitStatusLabelToLetter(status),
-  };
-}
-
-function buildGitSourceControlRemoteSummary({ branchName, syncTarget, currentBranch, headCommitId }) {
-  const ahead = syncTarget?.ahead ?? currentBranch?.ahead ?? 0;
-  const behind = syncTarget?.behind ?? currentBranch?.behind ?? 0;
-  const hasBranch = Boolean(branchName && branchName !== "detached");
-  const hasTarget = Boolean(syncTarget?.remote && syncTarget?.branch);
-  const remoteExists = syncTarget?.exists === true;
-  const upstream = syncTarget?.ref ?? currentBranch?.upstream ?? null;
-  const canPublish = hasBranch && hasTarget && !remoteExists && Boolean(headCommitId);
-  const canPull = remoteExists && behind > 0;
-  const canPush = remoteExists && ahead > 0;
-  const canSync = canPublish || (remoteExists && (ahead > 0 || behind > 0));
-
-  let state = "synced";
-  if (branchName == null && !headCommitId && !syncTarget) {
-    state = "no-repository";
-  } else if (!hasBranch) {
-    state = "no-branch";
-  } else if (!hasTarget) {
-    state = "no-remote";
-  } else if (!remoteExists) {
-    state = "publish";
-  } else if (ahead > 0 && behind > 0) {
-    state = "diverged";
-  } else if (behind > 0) {
-    state = "incoming";
-  } else if (ahead > 0) {
-    state = "outgoing";
-  }
-
-  return {
-    target: syncTarget,
-    currentBranch: branchName ?? null,
-    upstream,
-    ahead,
-    behind,
-    incomingPreview: syncTarget?.incomingPreview ?? [],
-    outgoingPreview: syncTarget?.outgoingPreview ?? [],
-    canPull,
-    canPush,
-    canSync,
-    canPublish,
-    state,
-  };
-}
-
-function buildDefaultCommitMessageFromResources(resources) {
-  if (resources.length === 1) {
-    return `Update ${path.basename(resources[0].path) || resources[0].path}`;
-  }
-  if (resources.length > 1) return `Update ${resources.length} files`;
-  return "Update workspace";
-}
-
-function getDiscardableResources(sourceControl) {
-  return (sourceControl?.groups ?? [])
-    .filter((group) => group.id === "workingTree" || group.id === "untracked" || group.id === "merge")
-    .flatMap((group) => group.resources);
-}
-
-function getResourceGitPaths(resource) {
-  return resource.oldPath && resource.oldPath !== resource.path
-    ? [resource.oldPath, resource.path]
-    : [resource.path];
-}
-
-function uniqueGitPaths(paths) {
-  return [...new Set(paths.map((value) => normalizeRelativePath(value)).filter(Boolean))];
-}
-
-function isConflictStatus(staged, unstaged) {
-  const code = `${staged ?? " "}${unstaged ?? " "}`;
-  return code.includes("U") || ["DD", "AA"].includes(code);
-}
-
-function gitStatusCodeToLabel(code) {
-  if (!code || code === " " || code === "." || code === "?") return null;
-  if (code === "M") return "modified";
-  if (code === "A") return "added";
-  if (code === "D") return "deleted";
-  if (code === "R") return "renamed";
-  if (code === "C") return "copied";
-  if (code === "U") return "conflict";
-  return "changed";
-}
-
-function gitStatusLabelToLetter(status) {
-  if (status === "untracked") return "U";
-  if (status === "added") return "A";
-  if (status === "deleted") return "D";
-  if (status === "renamed") return "R";
-  if (status === "copied") return "C";
-  if (status === "conflict") return "!";
-  return "M";
-}
-
-function hasStagedStatus(entry) {
-  return Boolean(entry.staged && entry.staged !== "?" && entry.staged !== ".");
-}
-
-function hasUnstagedStatus(entry) {
-  return entry.status !== "untracked" && Boolean(entry.unstaged && entry.unstaged !== "?" && entry.unstaged !== ".");
+  return url.toString();
 }

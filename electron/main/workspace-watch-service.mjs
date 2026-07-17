@@ -7,9 +7,11 @@ import {
   initializeWorkspaceEditReview,
   noteWorkspaceEditReviewPath,
 } from "../../local-api/edit-review.mjs";
+import { getWorkspaceTextVersion } from "../../local-api/workspace.mjs";
 
 export const WORKSPACE_WATCH_REARM_MIN_DELAY_MS = 250;
 export const WORKSPACE_WATCH_REARM_MAX_DELAY_MS = 30_000;
+const WORKSPACE_INTERNAL_WRITE_TTL_MS = 2_000;
 
 let workspaceWatchSubscriptionSequence = 0;
 
@@ -74,11 +76,40 @@ export function createWorkspaceWatchService({ logger = console, fsModule = fs } 
     subscriptions.clear();
   }
 
+  function noteInternalWrite(request) {
+    const rootPath = request?.rootPath;
+    const relativePath = normalizeWorkspaceRelativePath(request?.path);
+    const senderId = request?.senderId;
+    const version = normalizeWorkspaceTextVersion(request?.version);
+    if (
+      typeof rootPath !== "string"
+      || !relativePath
+      || !version
+      || !Number.isSafeInteger(senderId)
+      || senderId <= 0
+    ) {
+      return { tracked: false };
+    }
+
+    const entry = watchers.get(path.resolve(rootPath));
+    if (!entry || entry.disposed) return { tracked: false };
+
+    const now = Date.now();
+    pruneExpiredInternalWrites(entry, now);
+    entry.internalWrites.set(relativePath, {
+      senderId,
+      version,
+      expiresAt: now + WORKSPACE_INTERNAL_WRITE_TTL_MS,
+    });
+    return { tracked: true };
+  }
+
   return {
     start,
     stop,
     stopForWindow,
     closeAll,
+    noteInternalWrite,
     getWatcherCount: () => watchers.size,
   };
 }
@@ -90,6 +121,7 @@ function createWatcher(rootPath, logger, fsModule) {
     debounceTimer: null,
     editReviewTimer: null,
     lastEvent: null,
+    internalWrites: new Map(),
     watcher: null,
     rearmTimer: null,
     rearmDelay: WORKSPACE_WATCH_REARM_MIN_DELAY_MS,
@@ -126,12 +158,13 @@ function armWorkspaceWatcher(entry) {
       if (entry.disposed) return;
       if (shouldIgnoreWorkspaceChange(filename)) return;
 
+      const eventPath = typeof filename === "string" ? filename : null;
       entry.lastEvent = {
         rootPath: entry.rootPath,
         eventType: eventType ?? "change",
-        path: typeof filename === "string" ? filename : null,
+        path: eventPath,
       };
-      noteWorkspaceEditReviewPath(entry.rootPath, typeof filename === "string" ? filename : null);
+      noteWorkspaceEditReviewPath(entry.rootPath, eventPath);
       scheduleWorkspaceEditReviewFlush(entry);
       clearTimeout(entry.debounceTimer);
       entry.debounceTimer = setTimeout(() => {
@@ -204,6 +237,7 @@ function disposeWatcher(entry, rootPath) {
   entry.debounceTimer = null;
   entry.editReviewTimer = null;
   entry.rearmTimer = null;
+  entry.internalWrites.clear();
   if (entry.watcher) {
     try {
       entry.watcher.close();
@@ -234,17 +268,72 @@ function scheduleWorkspaceEditReviewFlush(entry) {
 function broadcastWorkspaceChange(entry) {
   if (!entry.lastEvent) return;
 
+  const event = entry.lastEvent;
+  const eventPath = normalizeWorkspaceRelativePath(event.path);
+  const internalWrite = eventPath
+    ? findInternalWrite(entry, eventPath, Date.now())
+    : null;
+  if (!internalWrite) {
+    deliverWorkspaceChange(entry, event, null);
+    return;
+  }
+
+  void internalWriteMatchesDisk(entry, eventPath, internalWrite)
+    .then((matches) => {
+      if (!matches && entry.internalWrites.get(eventPath) === internalWrite) {
+        entry.internalWrites.delete(eventPath);
+      }
+      deliverWorkspaceChange(entry, event, matches ? internalWrite.senderId : null);
+    })
+    .catch(() => {
+      if (entry.internalWrites.get(eventPath) === internalWrite) {
+        entry.internalWrites.delete(eventPath);
+      }
+      deliverWorkspaceChange(entry, event, null);
+    });
+}
+
+function deliverWorkspaceChange(entry, event, suppressedSenderId) {
+  if (entry.disposed) return;
   for (const [id, sender] of entry.clients.entries()) {
     if (typeof sender.isDestroyed === "function" && sender.isDestroyed()) {
       entry.clients.delete(id);
       continue;
     }
+    if (sender.id === suppressedSenderId) continue;
     try {
-      sender.send("workspace:changed", entry.lastEvent);
+      sender.send("workspace:changed", event);
     } catch {
       entry.clients.delete(id);
     }
   }
+}
+
+function findInternalWrite(entry, relativePath, now) {
+  pruneExpiredInternalWrites(entry, now);
+  return entry.internalWrites.get(relativePath) ?? null;
+}
+
+function pruneExpiredInternalWrites(entry, now) {
+  for (const [relativePath, internalWrite] of entry.internalWrites.entries()) {
+    if (internalWrite.expiresAt < now) entry.internalWrites.delete(relativePath);
+  }
+}
+
+async function internalWriteMatchesDisk(entry, relativePath, internalWrite) {
+  const readFile = entry.fsModule.promises?.readFile;
+  if (typeof readFile !== "function") return false;
+
+  const absolutePath = path.resolve(
+    entry.rootPath,
+    relativePath.split("/").join(path.sep),
+  );
+  const pathFromRoot = path.relative(entry.rootPath, absolutePath);
+  if (pathFromRoot.startsWith("..") || path.isAbsolute(pathFromRoot)) return false;
+
+  const bytes = await readFile.call(entry.fsModule.promises, absolutePath);
+  const version = getWorkspaceTextVersion(bytes);
+  return version === internalWrite.version;
 }
 
 function broadcastWorkspaceEditReviewChange(entry, rootPath, request) {
@@ -267,5 +356,21 @@ function broadcastWorkspaceEditReviewChange(entry, rootPath, request) {
 function shouldIgnoreWorkspaceChange(filename) {
   if (!filename) return false;
   const normalized = String(filename).replaceAll("\\", "/");
-  return normalized === ".git" || normalized.startsWith(".git/");
+  return (
+    normalized === ".git"
+    || normalized.startsWith(".git/")
+    || /(^|\/)\.[^/]+\.puppyone-\d+-[0-9a-f-]+\.tmp$/i.test(normalized)
+  );
+}
+
+function normalizeWorkspaceRelativePath(value) {
+  if (typeof value !== "string" || value.length === 0) return null;
+  const normalized = path.posix.normalize(value.replaceAll("\\", "/")).replace(/^\.\//, "");
+  return normalized && normalized !== "." ? normalized : null;
+}
+
+function normalizeWorkspaceTextVersion(value) {
+  return typeof value === "string" && /^sha256:[0-9a-f]{64}$/.test(value)
+    ? value
+    : null;
 }

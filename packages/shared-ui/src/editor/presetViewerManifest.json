@@ -1,0 +1,97 @@
+{
+  "contractVersion": 2,
+  "fallbackViewerId": "document-placeholder",
+  "viewers": [
+    {
+      "id": "app-preview",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "content",
+      "runtime": "eager"
+    },
+    {
+      "id": "markdown",
+      "formatViewerIds": ["markdown-editor"],
+      "capability": "edit",
+      "source": "content",
+      "runtime": "lazy"
+    },
+    {
+      "id": "puppyflow",
+      "formatViewerIds": ["puppyflow-editor"],
+      "capability": "edit",
+      "source": "content",
+      "runtime": "lazy"
+    },
+    {
+      "id": "json",
+      "formatViewerIds": [],
+      "capability": "edit",
+      "source": "content",
+      "runtime": "eager"
+    },
+    {
+      "id": "csv-table",
+      "formatViewerIds": [],
+      "capability": "edit",
+      "source": "content",
+      "runtime": "eager"
+    },
+    {
+      "id": "html-artifact",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "content-and-resource",
+      "runtime": "eager"
+    },
+    {
+      "id": "image-preview",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "resource",
+      "runtime": "eager"
+    },
+    {
+      "id": "pdf-preview",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "resource",
+      "runtime": "eager"
+    },
+    {
+      "id": "office-preview",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "resource",
+      "runtime": "lazy"
+    },
+    {
+      "id": "audio-preview",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "resource",
+      "runtime": "eager"
+    },
+    {
+      "id": "video-preview",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "resource",
+      "runtime": "eager"
+    },
+    {
+      "id": "text",
+      "formatViewerIds": ["plain-text", "monaco-code"],
+      "capability": "edit",
+      "source": "content",
+      "runtime": "eager"
+    },
+    {
+      "id": "document-placeholder",
+      "formatViewerIds": ["binary-placeholder"],
+      "capability": "placeholder",
+      "source": "none",
+      "runtime": "eager"
+    }
+  ]
+}

@@ -30,6 +30,8 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       R2_BUCKET: puppyone-desktop
+      VITE_DESKTOP_CLOUD_API_URL: https://api.puppyone.ai/api/v1
+      VITE_DESKTOP_CLOUD_WEB_URL: https://app.puppyone.ai
 
     steps:
       - name: Checkout
@@ -43,6 +45,18 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Stage pinned OpenCode runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLATFORM_KEY="darwin-$(node -p 'process.arch')"
+          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('vendor/opencode/runtime-manifest.json', 'utf8')).runtimeRelease.version")"
+          ARCHIVE="$(node -e "const m=require('./vendor/opencode/runtime-manifest.json'); const a=m.artifacts[process.argv[1]]; if(!a) process.exit(2); process.stdout.write(a.archive)" "${PLATFORM_KEY}")"
+          DOWNLOAD="${RUNNER_TEMP}/${ARCHIVE}"
+          curl --fail --location --retry 3 --output "${DOWNLOAD}" \
+            "https://github.com/anomalyco/opencode/releases/download/v${VERSION}/${ARCHIVE}"
+          npm run stage:opencode-runtime -- "${DOWNLOAD}"
 
       - name: Build unsigned macOS package
         run: npm run dist:mac

@@ -11,9 +11,56 @@
     var(--desktop-utility-page-padding-inline)
     var(--desktop-utility-page-padding-bottom);
 }
+.desktop-language-setting-row {
+  align-items: flex-start;
+  padding-block: 7px;
+}
 
-.desktop-settings-sidebar-divider {
-  height: 1px;
-  margin: 7px var(--desktop-sidebar-row-right-gap) 7px var(--desktop-sidebar-row-left-gap);
-  background: var(--po-divider);
+.desktop-language-setting-row > span:first-child {
+  line-height: 28px;
+}
+
+.desktop-language-setting-control {
+  display: grid;
+  width: min(100%, 220px);
+  min-width: 0;
+  gap: 6px;
+}
+
+.desktop-language-setting-select {
+  width: 100%;
+}
+
+.desktop-language-setting-status,
+.desktop-language-setting-error {
+  max-width: 220px;
+  color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 520;
+  line-height: 1.35;
+}
+
+.desktop-language-setting-error {
+  color: var(--po-danger-text, #a53b35);
+}
+
+@media (max-width: 720px) {
+  .desktop-language-setting-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .desktop-language-setting-row > span:first-child {
+    line-height: 18px;
+  }
+
+  .desktop-language-setting-control {
+    width: 100%;
+  }
+
+  .desktop-language-setting-status,
+  .desktop-language-setting-error {
+    max-width: none;
+  }
 }

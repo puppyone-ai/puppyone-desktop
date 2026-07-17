@@ -1,364 +1,346 @@
-import { Cloud, ExternalLink, FolderOpen, GitBranch, RefreshCw, Settings, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  Cloud,
+  FilePenLine,
+  GitBranch,
+  GitCommitHorizontal,
+  RefreshCw,
+} from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
-import type {
-  DesktopCloudProject,
-  DesktopCloudRepoIdentity,
-  DesktopCloudScope,
-} from "../../lib/cloudApi";
-import { openCloudApp } from "../../lib/cloudApi";
-import type { getPuppyoneRemote } from "../source-control/remotes";
+import { useLocalization } from "@puppyone/localization/react";
+import type { CloudPublishErrorCode, CloudPublishState } from "../../types/electron";
 import {
-  buildCloudAccessPointIdentity,
-  buildCloudAccessPointScope,
-  formatSidebarAccount,
-} from "./utils";
-import type { CloudWorkspaceSection } from "./types";
-import { getCloudSectionDescriptor } from "./navigation";
+  CloudPublishCloudMark,
+  CloudPublishFolderMark,
+} from "./components/CloudPublishHeroMarks";
 import {
-  CloudInlineEmpty,
-  CloudMainMetric,
-  CloudMainSection,
-  CloudProjectRow,
   CloudWebEmpty,
   CloudWebPage,
 } from "./components/shared";
-import { CloudAccessPointAccessSection } from "./sections/access/AccessPointSection";
-import { CloudGitSyncSection } from "./sections/GitSyncSection";
-import { CloudMcpCliSection } from "./sections/McpCliSection";
+import type { CloudPublishReadiness } from "./workspace/cloudPublishReadiness";
+import { formatCloudPublishFailure } from "./cloudPresentation";
 
-export function CloudSignedOutState({
+const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
+
+export { CloudProjectRecoveryState } from "./states/CloudProjectRecoveryState";
+
+export function CloudLocalOnlyWorkspace({
   workspace,
-  onOpenDetails,
-}: {
-  workspace: Workspace;
-  onOpenDetails: () => void;
-}) {
-  return (
-    <CloudMainSection
-      title="Puppyone Cloud"
-      count="Sign in required"
-      action={<button className="desktop-cloud-row-action primary" type="button" onClick={onOpenDetails}>Sign in</button>}
-    >
-      <div className="desktop-cloud-empty-state">
-        <span><Cloud size={22} /></span>
-        <div>
-          <strong>{workspace.name} is local only</strong>
-          <p>Sign in before switching this folder to Cloud. After sign-in, you can back up this folder or open an existing Cloud project.</p>
-        </div>
-      </div>
-    </CloudMainSection>
-  );
-}
-
-export function CloudRemoteConnectedWorkspace({
-  workspace,
-  activeSection,
-  branchName,
-  localChangeCount,
-  cloudRemote,
-  loading,
-  userEmail,
-  onRefresh,
-  onOpenGitSettings,
-}: {
-  workspace: Workspace;
-  activeSection: CloudWorkspaceSection;
-  branchName: string;
-  localChangeCount: number;
-  cloudRemote: NonNullable<ReturnType<typeof getPuppyoneRemote>>;
-  loading: boolean;
-  userEmail: string | null;
-  onRefresh: () => Promise<void>;
-  onOpenGitSettings: () => void;
-}) {
-  const section = getCloudSectionDescriptor(activeSection);
-
-  if (cloudRemote.info.kind === "access-point" && cloudRemote.info.accessKey) {
-    const accessPointScope = buildCloudAccessPointScope(cloudRemote.info.accessKey);
-    const accessPointIdentity = buildCloudAccessPointIdentity(cloudRemote);
-
-    if (activeSection === "access") {
-      return (
-        <CloudAccessPointAccessSection
-          scope={accessPointScope}
-          identity={accessPointIdentity}
-          branchName={branchName}
-          cloudRemote={cloudRemote}
-        />
-      );
-    }
-
-    if (activeSection === "mcp-cli") {
-      return (
-        <CloudMcpCliSection
-          projectId=""
-          identity={accessPointIdentity}
-          scopes={[accessPointScope]}
-          mcpEndpoints={[]}
-          loading={loading}
-          onOpenProject={() => openCloudApp("/projects")}
-        />
-      );
-    }
-
-    if (activeSection === "git-sync") {
-      return (
-        <CloudGitSyncSection
-          workspace={workspace}
-          status={null}
-          identity={accessPointIdentity}
-          cloudRemote={cloudRemote}
-          accountConnected={Boolean(userEmail)}
-          onOpenGitSettings={onOpenGitSettings}
-          onRefresh={onRefresh}
-        />
-      );
-    }
-  }
-
-  const Icon = activeSection === "overview" ? Cloud : section.icon;
-
-  return (
-    <>
-      <CloudMainSection
-        title={activeSection === "overview" ? "Cloud source" : section.title}
-        count={loading ? "Resolving" : "Connected"}
-        action={(
-          <>
-            <button className="desktop-cloud-row-action" type="button" onClick={() => void onRefresh()}>
-              <RefreshCw size={13} className={loading ? "spin" : undefined} />
-              <span>Refresh</span>
-            </button>
-            <button className="desktop-cloud-row-action" type="button" onClick={onOpenGitSettings}>
-              <GitBranch size={13} />
-              <span>Git Sync</span>
-            </button>
-          </>
-        )}
-      >
-        <div className="desktop-cloud-project-overview">
-          <div>
-            <span>Hosted Git remote</span>
-            <strong title={cloudRemote.rawUrl}>{workspace.name}</strong>
-            <p>
-              This workspace is already initialized because its Git remote points to Puppyone Cloud.
-              Desktop is resolving the Cloud project metadata for project-level {activeSection === "overview" ? "sections" : section.title.toLowerCase()}.
-            </p>
-          </div>
-          <div className="desktop-cloud-sync-summary">
-            <CloudMainMetric label="Source" value="Puppyone Cloud" tone="ready" />
-            <CloudMainMetric label="Remote" value={cloudRemote.info.displayId} tone="ready" mono />
-            <CloudMainMetric label="Branch" value={branchName} />
-          </div>
-        </div>
-      </CloudMainSection>
-
-      <CloudMainSection
-        title={section.title}
-        count={loading ? "Resolving" : "Remote connected"}
-        action={<button className="desktop-cloud-row-action" type="button" onClick={() => openCloudApp("/projects")}>Open Cloud</button>}
-      >
-        <div className="desktop-cloud-empty-state">
-          <span><Icon size={22} /></span>
-          <div>
-            <strong>{loading ? "Resolving project metadata" : "Puppyone Git remote is connected"}</strong>
-            <p>
-              Remote {cloudRemote.info.displayId} is the source of truth. Project-level access, MCP, branches, team, and settings appear after the Cloud API maps this access point to a project.
-              {localChangeCount > 0 ? ` ${localChangeCount} local change${localChangeCount === 1 ? "" : "s"} are waiting in this working copy.` : ""}
-            </p>
-          </div>
-        </div>
-      </CloudMainSection>
-    </>
-  );
-}
-
-export function CloudUnmappedWorkspace({
-  workspace,
-  activeSection,
   accountEmail,
   branchName,
+  totalCommits,
   localChangeCount,
-  projects,
-  loading,
-  backupLoading,
-  cloudRemote,
-  action,
-  onBackupWorkspace,
-  onConnectProject,
-  onCopyCloneCommand,
-  onOpenProject,
+  localChangeCountIsMinimum = false,
+  publishReadiness,
+  isGitRepository,
+  hasHeadCommit,
+  hasCurrentBranch,
+  publishLoading,
+  publishPending = false,
+  publishError = null,
+  publishState = null,
+  publishStateLoading = false,
+  organizations = [],
+  selectedOrganizationId = null,
+  organizationStatus = "signed-out",
+  organizationError = null,
+  onSelectOrganization,
+  onRetryOrganizations,
+  onAbandonPublish,
+  onPublishWorkspace,
 }: {
   workspace: Workspace;
-  activeSection: CloudWorkspaceSection;
   accountEmail: string | null;
   branchName: string;
+  totalCommits: number;
   localChangeCount: number;
-  projects: DesktopCloudProject[];
-  loading: boolean;
-  backupLoading: boolean;
-  cloudRemote: ReturnType<typeof getPuppyoneRemote>;
-  action: { kind: "backup" | "connect" | "copy" | null; projectId: string | null };
-  onBackupWorkspace: () => void;
-  onConnectProject: (project: DesktopCloudProject) => void;
-  onCopyCloneCommand: (project: DesktopCloudProject) => void;
-  onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
+  localChangeCountIsMinimum?: boolean;
+  publishReadiness?: CloudPublishReadiness;
+  isGitRepository: boolean;
+  hasHeadCommit: boolean;
+  hasCurrentBranch: boolean;
+  publishLoading: boolean;
+  publishPending?: boolean;
+  publishError?: { code: CloudPublishErrorCode; retryable: boolean } | null;
+  publishState?: CloudPublishState | null;
+  publishStateLoading?: boolean;
+  organizations?: readonly { id: string; name: string }[];
+  selectedOrganizationId?: string | null;
+  organizationStatus?: "signed-out" | "loading" | "selection-required" | "ready" | "none" | "error";
+  organizationError?: string | null;
+  onSelectOrganization?: (organizationId: string) => void;
+  onRetryOrganizations?: () => void;
+  onAbandonPublish?: () => void;
+  onPublishWorkspace: (organizationId?: string) => void;
 }) {
-  if (activeSection !== "overview") {
-    return (
-      <CloudUnmappedSection
-        workspace={workspace}
-        activeSection={activeSection}
-        projects={projects}
-        loading={loading}
-        backupLoading={backupLoading}
-        cloudRemote={cloudRemote}
-        action={action}
-        onBackupWorkspace={onBackupWorkspace}
-        onConnectProject={onConnectProject}
-        onCopyCloneCommand={onCopyCloneCommand}
-        onOpenProject={onOpenProject}
-      />
-    );
-  }
-
+  const { t } = useLocalization();
+  const publishBusy = publishLoading
+    || publishStateLoading
+    || (publishPending && !accountEmail);
+  const waitingForSignIn = publishPending && !accountEmail && !publishLoading;
+  const publishing = publishLoading;
+  const resolvedReadiness = publishReadiness ?? (
+    !isGitRepository
+      ? "repository-required"
+      : !hasHeadCommit
+        ? "commit-required"
+        : !hasCurrentBranch
+          ? "branch-required"
+          : "ready"
+  );
+  const readinessMessage = resolvedReadiness === "repository-required"
+    ? t("cloud.initialize.repositoryRequired")
+    : resolvedReadiness === "commit-required"
+      ? t("cloud.initialize.commitRequired")
+      : resolvedReadiness === "branch-required"
+        ? t("cloud.initialize.branchRequired")
+        : null;
+  const readyToPush = readinessMessage === null;
+  const organizationReady = organizationStatus === "signed-out" || organizationStatus === "ready";
+  const publishEnabled = publishState
+    ? publishState.canResume
+    : readyToPush && organizationReady;
+  const showPublishSummary = Boolean(
+    publishState
+    || readinessMessage
+    || organizationStatus === "selection-required"
+    || organizationError,
+  );
+  const destinationBranchName = PUPPYONE_CLOUD_DEFAULT_BRANCH;
+  const cloudStatus = publishState
+    ? getCloudPublishPhaseLabel(publishState.phase, t)
+    : t(waitingForSignIn
+      ? "cloud.initialize.waitingForSignIn"
+      : publishing
+        ? "cloud.initialize.initializing"
+        : "cloud.initialize.notInitialized");
   return (
-    <>
-      <CloudMainSection
-        title="Local workspace"
-        count={cloudRemote ? "Remote not matched" : "Not backed up"}
-        action={(
-          <button
-            className="desktop-cloud-row-action primary"
-            type="button"
-            disabled={backupLoading}
-            onClick={onBackupWorkspace}
+    <div className="desktop-cloud-publish-container">
+      {waitingForSignIn && (
+        <div className="desktop-cloud-main-alert info" role="status">
+          {t("cloud.state.publishSignInPending")}
+        </div>
+      )}
+      {publishError && (
+        <div className="desktop-cloud-main-alert" role="alert">
+          {formatCloudPublishFailure(publishError, t)}
+        </div>
+      )}
+      <section className="desktop-cloud-publish-card" aria-label={t("cloud.initialize.title")}>
+        <div className="desktop-cloud-publish-hero">
+          <div
+            className="desktop-cloud-publish-symbol local"
+            aria-label={t(isGitRepository ? "cloud.initialize.localRepository" : "cloud.initialize.localFolder")}
           >
-            {backupLoading ? "Connecting..." : "Back up and connect"}
-          </button>
-        )}
-      >
-        <div className="desktop-cloud-project-overview">
-          <div>
-            <span>Local working copy</span>
-            <strong title={workspace.path}>{workspace.name}</strong>
-            <p>This folder is local only. Back it up to create a hosted Cloud repo, make Cloud the source of truth, and keep this desktop workspace as a Git working copy.</p>
+            <div className="desktop-cloud-publish-symbol-mark">
+              <CloudPublishFolderMark className="desktop-cloud-publish-symbol-icon" />
+            </div>
+            <div className="desktop-cloud-publish-details local">
+              <p className="desktop-cloud-publish-project" title={workspace.path} dir="auto">
+                {workspace.name}
+              </p>
+              <ul className="desktop-cloud-publish-meta">
+                <li>
+                  <GitBranch size={13} aria-hidden="true" />
+                  <bdi>{branchName}</bdi>
+                </li>
+                <li>
+                  <GitCommitHorizontal size={13} aria-hidden="true" />
+                  <span>{t("cloud.branches.commitCount", { count: totalCommits })}</span>
+                </li>
+                <li className={localChangeCount > 0 ? "warning" : undefined}>
+                  <FilePenLine size={13} aria-hidden="true" />
+                  <span>
+                    {t(
+                      localChangeCountIsMinimum
+                        ? "cloud.initialize.localChangeCountAtLeast"
+                        : "cloud.initialize.localChangeCount",
+                      { count: localChangeCount },
+                    )}
+                  </span>
+                </li>
+              </ul>
+            </div>
           </div>
-          <div className="desktop-cloud-sync-summary">
-            <CloudMainMetric label="Account" value={accountEmail ?? "Signed in"} tone="ready" />
-            <CloudMainMetric label="Branch" value={branchName} />
-            <CloudMainMetric label="Local changes" value={String(localChangeCount)} tone={localChangeCount > 0 ? "warning" : undefined} />
+
+          <div className="desktop-cloud-publish-arrow" aria-label={t("cloud.initialize.push")}>
+            <svg
+              className="desktop-cloud-publish-arrow-horizontal"
+              viewBox="0 0 240 24"
+              preserveAspectRatio="none"
+              focusable="false"
+              aria-hidden="true"
+            >
+              <path
+                d="M1 12 H228 M216 4 L228 12 L216 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+            <svg
+              className="desktop-cloud-publish-arrow-vertical"
+              viewBox="0 0 24 96"
+              preserveAspectRatio="none"
+              focusable="false"
+              aria-hidden="true"
+            >
+              <path
+                d="M12 1 V84 M4 72 L12 84 L20 72"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          </div>
+
+          <div className="desktop-cloud-publish-symbol cloud" aria-label="PuppyOne Cloud">
+            <div className="desktop-cloud-publish-symbol-mark">
+              <CloudPublishCloudMark className="desktop-cloud-publish-symbol-icon" />
+            </div>
+            <div className="desktop-cloud-publish-details cloud">
+              <p className="desktop-cloud-publish-project">
+                {t("cloud.initialize.newCloudProject")}
+              </p>
+              <ul className="desktop-cloud-publish-meta">
+                <li>
+                  <span className="desktop-cloud-publish-status">{cloudStatus}</span>
+                </li>
+                <li>
+                  <GitBranch size={13} aria-hidden="true" />
+                  <bdi>{destinationBranchName}</bdi>
+                </li>
+              </ul>
+              {organizationStatus !== "signed-out" && (
+                <div className="desktop-cloud-publish-organization">
+                  {organizationStatus === "loading" ? (
+                    <span>{t("cloud.common.loading")}</span>
+                  ) : organizationStatus === "none" ? (
+                    <span className="warning">{t("cloud.initialize.noOrganization")}</span>
+                  ) : organizationStatus === "error" ? (
+                    <button type="button" className="desktop-cloud-row-action" onClick={onRetryOrganizations}>
+                      {t("cloud.common.retry")}
+                    </button>
+                  ) : organizations.length > 1 ? (
+                    <label className="desktop-cloud-organization-selector">
+                      <span>{t("cloud.organization.selectLabel")}</span>
+                      <select
+                        aria-label={t("cloud.organization.selectLabel")}
+                        value={selectedOrganizationId ?? ""}
+                        onChange={(event) => onSelectOrganization?.(event.target.value)}
+                      >
+                        <option value="" disabled>{t("cloud.organization.selectPlaceholder")}</option>
+                        {organizations.map((organization) => (
+                          <option value={organization.id} key={organization.id}>{organization.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <span>{organizations[0]?.name}</span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </CloudMainSection>
 
-      <CloudMainSection
-        title="Open existing Cloud project"
-        count={loading ? "Loading" : projects.length}
-        action={<button className="desktop-cloud-row-action" type="button" onClick={() => openCloudApp("/projects")}>Open Cloud</button>}
-      >
-        <div className="desktop-cloud-project-list">
-          {loading ? (
-            <CloudInlineEmpty icon={RefreshCw} title="Loading projects" detail="Reading your Cloud projects from the API." />
-          ) : projects.length === 0 ? (
-            <CloudInlineEmpty icon={FolderOpen} title="No Cloud projects yet" detail="Create a backup from this folder to start a Cloud project." />
-          ) : (
-            projects.map((project) => (
-              <CloudProjectRow
-                key={project.id}
-                project={project}
-                action={action}
-                onOpenProject={onOpenProject}
-                onConnectProject={onConnectProject}
-                onCopyCloneCommand={onCopyCloneCommand}
-              />
-            ))
+        {showPublishSummary && (
+          <div className={`desktop-cloud-publish-summary ${readinessMessage ? "blocked" : ""}`} role={readinessMessage ? "alert" : undefined}>
+            {publishState ? (
+              <>
+                <strong>{getCloudPublishPhaseLabel(publishState.phase, t)}</strong>
+                <p>{t("cloud.initialize.resumeDescription", { project: publishState.projectName })}</p>
+              </>
+            ) : readinessMessage ? (
+              <strong>{readinessMessage}</strong>
+            ) : (
+              <>
+                {organizationStatus === "selection-required" && (
+                  <small>{t("cloud.initialize.organizationRequired")}</small>
+                )}
+                {organizationError && <small className="warning">{organizationError}</small>}
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="desktop-cloud-publish-actions">
+          <button
+            className="desktop-cloud-row-action primary desktop-cloud-publish-primary"
+            type="button"
+            aria-busy={publishBusy || undefined}
+            disabled={publishBusy || !publishEnabled}
+            onClick={() => onPublishWorkspace(selectedOrganizationId ?? undefined)}
+          >
+            {t(
+              publishing
+                ? "cloud.initialize.initializingAndPushing"
+                : publishState
+                  ? "cloud.initialize.resume"
+                : waitingForSignIn
+                  ? "cloud.initialize.waitingForSignIn"
+                  : !accountEmail
+                    ? "cloud.initialize.signInToInitialize"
+                    : "cloud.initialize.initializeAndPush",
+            )}
+          </button>
+          {publishState?.canAbandon && onAbandonPublish && (
+            <button
+              className="desktop-cloud-row-action desktop-cloud-publish-abandon"
+              type="button"
+              disabled={publishBusy}
+              onClick={onAbandonPublish}
+            >
+              {t(publishState.phase === "compensation-pending"
+                ? "cloud.initialize.retryAbandon"
+                : "cloud.initialize.abandon")}
+            </button>
           )}
         </div>
-      </CloudMainSection>
-    </>
+      </section>
+    </div>
   );
 }
 
-export function CloudUnmappedSection({
-  workspace,
-  activeSection,
-  projects,
-  loading,
-  backupLoading,
-  cloudRemote,
-  action,
-  onBackupWorkspace,
-  onConnectProject,
-  onCopyCloneCommand,
-  onOpenProject,
-}: {
-  workspace: Workspace;
-  activeSection: CloudWorkspaceSection;
-  projects: DesktopCloudProject[];
-  loading: boolean;
-  backupLoading: boolean;
-  cloudRemote: ReturnType<typeof getPuppyoneRemote>;
-  action: { kind: "backup" | "connect" | "copy" | null; projectId: string | null };
-  onBackupWorkspace: () => void;
-  onConnectProject: (project: DesktopCloudProject) => void;
-  onCopyCloneCommand: (project: DesktopCloudProject) => void;
-  onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
-}) {
-  const section = getCloudSectionDescriptor(activeSection);
-  const remoteLabel = cloudRemote?.info.displayId ?? "No Puppyone remote";
-  const Icon = section.icon;
+function getCloudPublishPhaseLabel(
+  phase: CloudPublishState["phase"],
+  t: ReturnType<typeof useLocalization>["t"],
+): string {
+  return t(`cloud.initialize.phase.${phase}`);
+}
 
+export function CloudLocalGitStatusError({
+  error,
+  loading,
+  onRetry,
+}: {
+  error: string;
+  loading: boolean;
+  onRetry: () => void;
+}) {
+  const { t } = useLocalization();
   return (
-    <>
-      <CloudMainSection
-        title={section.title}
-        count="Project required"
-        action={(
-          <button
-            className="desktop-cloud-row-action primary"
-            type="button"
-            disabled={backupLoading}
-            onClick={onBackupWorkspace}
-          >
-            {backupLoading ? "Connecting..." : "Back up and connect"}
-          </button>
-        )}
-      >
+    <div className="desktop-cloud-publish-container">
+      <section className="desktop-cloud-publish-status-error" role="alert">
         <div className="desktop-cloud-empty-state">
-          <span><Icon size={22} /></span>
+          <span aria-hidden="true"><AlertTriangle size={22} /></span>
           <div>
-            <strong>{section.title} needs a mapped Cloud project</strong>
-            <p>{section.description} Connect {workspace.name} to a Cloud project first. Current remote: {remoteLabel}.</p>
+            <strong>{t("cloud.initialize.gitStatusErrorTitle")}</strong>
+            <p>{error}</p>
           </div>
         </div>
-      </CloudMainSection>
-
-      <CloudMainSection
-        title="Available Cloud projects"
-        count={loading ? "Loading" : projects.length}
-        action={<button className="desktop-cloud-row-action" type="button" onClick={() => openCloudApp("/projects")}>Open Cloud</button>}
-      >
-        <div className="desktop-cloud-project-list">
-          {loading ? (
-            <CloudInlineEmpty icon={RefreshCw} title="Loading projects" detail="Reading your Cloud projects from the API." />
-          ) : projects.length === 0 ? (
-            <CloudInlineEmpty icon={FolderOpen} title="No Cloud projects yet" detail="Back up this workspace to create the Cloud project mapping." />
-          ) : (
-            projects.map((project) => (
-              <CloudProjectRow
-                key={project.id}
-                project={project}
-                action={action}
-                onOpenProject={onOpenProject}
-                onConnectProject={onConnectProject}
-                onCopyCloneCommand={onCopyCloneCommand}
-              />
-            ))
-          )}
-        </div>
-      </CloudMainSection>
-    </>
+        <button className="desktop-cloud-row-action" type="button" disabled={loading} onClick={onRetry}>
+          <RefreshCw size={13} className={loading ? "spin" : undefined} aria-hidden="true" />
+          <span>{t("cloud.common.retry")}</span>
+        </button>
+      </section>
+    </div>
   );
 }
 
@@ -376,10 +358,11 @@ export function CloudProjectWebSection({
   primaryLabel: string;
   onOpen: () => void;
 }) {
+  const { t } = useLocalization();
   return (
     <CloudWebPage
       title={title}
-      count="Web"
+      count={t("cloud.common.web")}
       action={<button className="desktop-cloud-row-action primary" type="button" onClick={onOpen}>{primaryLabel}</button>}
     >
       <CloudWebEmpty icon={Icon} title={title} detail={description} />

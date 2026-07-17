@@ -4,15 +4,15 @@ import {
   isBrokerSafeResolvedAssetUrl,
   isPathInsideWorkspaceRoot,
   resolveWorkspaceRelativePath,
-} from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownAssetPolicy";
-import { createAssetBroker } from "../vendor/shared-ui/src/editor/markdown/platform/brokers/assetBroker";
-import { createCapabilityPrincipal } from "../vendor/shared-ui/src/editor/markdown/platform/security/capabilityPrincipal";
+} from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownAssetPolicy";
+import { createAssetBroker } from "../packages/shared-ui/src/editor/markdown/platform/brokers/assetBroker";
+import { createCapabilityPrincipal } from "../packages/shared-ui/src/editor/markdown/platform/security/capabilityPrincipal";
 import {
   allowsLocalActiveHtml,
   createDocumentTrustContext,
   evaluateAuthorizationGrant,
-} from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownTrustPolicy";
-import { createExecutionSessionStore } from "../vendor/shared-ui/src/editor/markdown/platform/sessions/executionSession";
+} from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownTrustPolicy";
+import { createExecutionSessionStore } from "../packages/shared-ui/src/editor/markdown/platform/sessions/executionSession";
 
 describe("markdownAssetPolicy", () => {
   it("denies file:// and executable schemes", () => {
@@ -75,6 +75,17 @@ describe("markdownAssetPolicy", () => {
     expect(isBrokerSafeResolvedAssetUrl("file:///tmp/x.png")).toBe(false);
     expect(isBrokerSafeResolvedAssetUrl("blob:https://x/1")).toBe(true);
   });
+
+  it("keeps image and video policy capabilities distinct", () => {
+    expect(evaluateMarkdownAssetHref("assets/clip.mp4", { documentPath: "notes/a.md" }, "video"))
+      .toMatchObject({ ok: true, kind: "workspace-relative", mimeType: "video/mp4" });
+    expect(evaluateMarkdownAssetHref("assets/clip.mp4", { documentPath: "notes/a.md" }, "image"))
+      .toEqual({ ok: false, reason: "media-kind-mismatch" });
+    expect(evaluateMarkdownAssetHref("assets/poster.png", { documentPath: "notes/a.md" }, "video"))
+      .toEqual({ ok: false, reason: "media-kind-mismatch" });
+    expect(evaluateMarkdownAssetHref("data:video/mp4;base64,AAAA", { documentPath: "a.md" }, "video"))
+      .toEqual({ ok: false, reason: "data-media-kind-denied" });
+  });
 });
 
 describe("AssetBroker policy gate", () => {
@@ -92,6 +103,7 @@ describe("AssetBroker policy gate", () => {
       purpose: "asset-read",
     });
     const handle = await broker.resolve({
+      kind: "image",
       principal,
       sourcePath: "a.md",
       href: "file:///tmp/x.png",
@@ -110,6 +122,7 @@ describe("AssetBroker policy gate", () => {
       purpose: "asset-read",
     });
     const handle = await broker.resolve({
+      kind: "image",
       principal,
       sourcePath: "a.md",
       href: "./x.png",
@@ -131,8 +144,9 @@ describe("AssetBroker policy gate", () => {
       documentRevision: "rev-1",
       purpose: "link-open",
     });
-    expect(await broker.resolve({ principal, sourcePath: "a.md", href: "./x.png" })).toBeNull();
+    expect(await broker.resolve({ kind: "image", principal, sourcePath: "a.md", href: "./x.png" })).toBeNull();
     expect(await broker.resolve({
+      kind: "image",
       principal: { ...principal, purpose: "asset-read" },
       sourcePath: "other.md",
       href: "./x.png",
@@ -156,6 +170,7 @@ describe("AssetBroker policy gate", () => {
       purpose: "asset-read",
     });
     const handle = await broker.resolve({
+      kind: "image",
       principal,
       sourcePath: "notes/a.md",
       href: "../images/a.png",
@@ -184,7 +199,12 @@ describe("AssetBroker policy gate", () => {
       purpose: "asset-read",
     });
 
-    expect(await broker.resolve({ principal, sourcePath: "a.md", href: "./unsafe.png" })).toBeNull();
+    expect(await broker.resolve({
+      kind: "image",
+      principal,
+      sourcePath: "a.md",
+      href: "./unsafe.png",
+    })).toBeNull();
     await Promise.resolve();
     expect(revoked).toBe(1);
   });

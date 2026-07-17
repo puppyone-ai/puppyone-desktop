@@ -1,4 +1,5 @@
-import { Cloud, ExternalLink, Server, SquareTerminal, Users } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   DesktopCloudProject,
   DesktopCloudSession,
@@ -10,12 +11,12 @@ import {
   ProjectFolderNewCard,
   type ProjectFolderPreviewItem,
 } from "../../../components/project-folder-card";
+import { DesktopEntryState } from "../../../components/DesktopEntryState";
 import { formatRelativeTime } from "../utils";
 import { CloudFilePreviewIcon } from "./shared";
 import { useCloudProjectPreview } from "../hooks/useCloudProjectPreview";
 import { useCloudAuthController } from "../hooks/useCloudAuthController";
-import { CloudAuthCard, CloudLoginFeatureRow, CloudProductMark } from "../CloudServicePanel";
-import type { CloudLoginFeature } from "../model";
+import { CloudAuthCard, CloudProductMark } from "../CloudServicePanel";
 
 const PROJECT_CARD_SKELETON_COUNT = 3;
 
@@ -24,42 +25,55 @@ export function CloudProjectBrowser({
   loading,
   session,
   apiBaseUrl,
-  mappedProjectId,
+  currentRepositoryProjectId,
   backupLoading,
+  cloudAction,
   onSessionChange,
   onBackupWorkspace,
   onSelectProject,
+  onConfigureProjectRemote,
   onOpenCloudProjects,
+  showRepositoryActions = true,
+  loadProjectPreviews = true,
 }: {
   projects: DesktopCloudProject[];
   loading: boolean;
   session: DesktopCloudSession;
   apiBaseUrl: string | null;
-  mappedProjectId: string | null;
+  currentRepositoryProjectId: string | null;
   backupLoading: boolean;
+  cloudAction: { kind: "backup" | "configure-remote" | "copy" | null; projectId: string | null };
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onBackupWorkspace: () => void;
   onSelectProject: (project: DesktopCloudProject) => void;
+  onConfigureProjectRemote: (project: DesktopCloudProject) => void;
   onOpenCloudProjects: () => void;
+  /** Catalog-only mode keeps browsing separate from the open Local repository. */
+  showRepositoryActions?: boolean;
+  /** Useful for tests or constrained surfaces; catalog previews are enabled by default. */
+  loadProjectPreviews?: boolean;
 }) {
+  const { getCollator, t } = useLocalization();
+  const collator = getCollator({ sensitivity: "base", numeric: true });
   const sortedProjects = [...projects].sort((left, right) => {
-    if (left.id === mappedProjectId) return -1;
-    if (right.id === mappedProjectId) return 1;
+    if (left.id === currentRepositoryProjectId) return -1;
+    if (right.id === currentRepositoryProjectId) return 1;
     const leftTime = left.updated_at ? new Date(left.updated_at).getTime() : 0;
     const rightTime = right.updated_at ? new Date(right.updated_at).getTime() : 0;
-    return rightTime - leftTime || left.name.localeCompare(right.name);
+    return rightTime - leftTime || collator.compare(left.name, right.name);
   });
-  const showBackupCard = !mappedProjectId;
+  const showBackupCard = showRepositoryActions && !currentRepositoryProjectId;
+  const actionInProgress = cloudAction.kind !== null || backupLoading;
 
   return (
-    <section className="desktop-cloud-project-browser" aria-label="Cloud projects">
+    <section className="desktop-cloud-project-browser" aria-label={t("cloud.project.projects")}>
       <div className="desktop-cloud-project-browser-header">
         <div>
-          <h1>Cloud Projects</h1>
+          <h1>{t("cloud.project.projects")}</h1>
         </div>
         <button className="desktop-cloud-project-browser-link" type="button" onClick={onOpenCloudProjects}>
           <ExternalLink size={14} />
-          <span>Open Cloud</span>
+          <span>{t("cloud.common.openCloud")}</span>
         </button>
       </div>
 
@@ -75,9 +89,13 @@ export function CloudProjectBrowser({
               project={project}
               session={session}
               apiBaseUrl={apiBaseUrl}
-              mapped={project.id === mappedProjectId}
+              currentRepositoryProject={project.id === currentRepositoryProjectId}
+              remoteBusy={cloudAction.kind === "configure-remote" && cloudAction.projectId === project.id}
+              remoteDisabled={actionInProgress}
               onSessionChange={onSessionChange}
               onSelectProject={onSelectProject}
+              onConfigureProjectRemote={showRepositoryActions ? onConfigureProjectRemote : undefined}
+              loadPreview={loadProjectPreviews}
             />
           ))
         )}
@@ -85,6 +103,7 @@ export function CloudProjectBrowser({
         {showBackupCard && (
           <CloudProjectNewCard
             loading={backupLoading}
+            disabled={actionInProgress}
             onClick={onBackupWorkspace}
           />
         )}
@@ -106,6 +125,7 @@ export function CloudProjectBrowserSignedOut({
   onSignedOut: () => void;
   onRefresh: () => void | Promise<void>;
 }) {
+  const { t } = useLocalization();
   const auth = useCloudAuthController({
     cloudApiBaseUrl: apiBaseUrl,
     accountEmail,
@@ -113,66 +133,35 @@ export function CloudProjectBrowserSignedOut({
     onSignedOut,
     onRefresh,
   });
-  const cloudFeatures: CloudLoginFeature[] = [
-    {
-      label: "Team collaboration",
-      icon: Users,
-    },
-    {
-      label: "Cloud backup",
-      icon: Cloud,
-    },
-    {
-      label: "MCP / CLI supported",
-      icon: SquareTerminal,
-    },
-    {
-      label: "24/7 online",
-      icon: Server,
-    },
-  ];
+  const signedIn = Boolean(auth.signedInEmail);
 
   return (
-    <section className="desktop-cloud-project-auth-stage" aria-label="Sign in to Puppyone Cloud">
-      <section className="desktop-cloud-panel locked desktop-cloud-project-auth-panel" aria-label="Puppyone Cloud sign in">
-        <div className="desktop-cloud-panel-body">
-          <section className="desktop-cloud-login-layout">
-            <div className="desktop-cloud-login-copy">
-              <div className="desktop-cloud-login-copy-content">
-                <div className="desktop-cloud-login-identity">
-                  <div className="desktop-cloud-login-logo" aria-hidden="true">
-                    <CloudProductMark />
-                  </div>
-                  <div className="desktop-cloud-login-copy-stack">
-                    <h3>Get Puppyone Cloud</h3>
-                    <p>Back up this workspace. Keep agents, teammates, MCP, and CLI connected.</p>
-                  </div>
-                </div>
-                <div className="desktop-cloud-login-feature-list">
-                  {cloudFeatures.map((feature) => (
-                    <CloudLoginFeatureRow key={feature.label} feature={feature} />
-                  ))}
-                </div>
-              </div>
-            </div>
-            <aside className="desktop-cloud-login-card">
-              <CloudAuthCard
-                view={auth.signedInEmail ? "signedIn" : auth.view}
-                signedInEmail={auth.signedInEmail}
-                loading={auth.loading}
-                signingOut={auth.signingOut}
-                error={auth.error}
-                message={auth.message}
-                onProviderLogin={auth.startProviderLogin}
-                onOpenCloud={() => openCloudApp("/projects")}
-                onRefresh={onRefresh}
-                onSignOut={auth.handleSignOut}
-              />
-            </aside>
-          </section>
+    <DesktopEntryState
+      className="desktop-cloud-project-auth-entry"
+      ariaLabel={t("cloud.auth.signInToCloud")}
+      visual={(
+        <div className="desktop-cloud-login-logo">
+          <CloudProductMark />
         </div>
-      </section>
-    </section>
+      )}
+      title={t("cloud.productName")}
+      description={t("cloud.auth.description")}
+      action={(
+        <CloudAuthCard
+          view={signedIn ? "signedIn" : auth.view}
+          signedInEmail={auth.signedInEmail}
+          signInLabel={t("cloud.auth.signIn")}
+          loading={auth.loading}
+          signingOut={auth.signingOut}
+          error={auth.error}
+          message={auth.message}
+          onProviderLogin={auth.startProviderLogin}
+          onOpenCloud={() => openCloudApp("/projects")}
+          onRefresh={onRefresh}
+          onSignOut={auth.handleSignOut}
+        />
+      )}
+    />
   );
 }
 
@@ -180,25 +169,37 @@ function CloudProjectCard({
   project,
   session,
   apiBaseUrl,
-  mapped,
+  currentRepositoryProject,
+  remoteBusy,
+  remoteDisabled,
   onSessionChange,
   onSelectProject,
+  onConfigureProjectRemote,
+  loadPreview,
 }: {
   project: DesktopCloudProject;
   session: DesktopCloudSession;
   apiBaseUrl: string | null;
-  mapped: boolean;
+  currentRepositoryProject: boolean;
+  remoteBusy: boolean;
+  remoteDisabled: boolean;
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onSelectProject: (project: DesktopCloudProject) => void;
+  onConfigureProjectRemote?: (project: DesktopCloudProject) => void;
+  loadPreview: boolean;
 }) {
+  const localization = useLocalization();
+  const { t } = localization;
   const preview = useCloudProjectPreview({
+    enabled: loadPreview,
     session,
     projectId: project.id,
+    projectRevision: project.updated_at,
     apiBaseUrl,
     onSessionChange,
   });
   const connectionCount = project.access_point_count ?? 0;
-  const updatedLabel = project.updated_at ? formatRelativeTime(project.updated_at) : "";
+  const updatedLabel = project.updated_at ? formatRelativeTime(project.updated_at, localization) : "";
   const previewItems: ProjectFolderPreviewItem[] = preview.entries.map((entry) => ({
     id: entry.path || entry.name,
     name: entry.name || entry.path,
@@ -215,16 +216,30 @@ function CloudProjectCard({
   return (
     <ProjectFolderCard
       title={project.name}
-      badge={mapped ? "Linked" : null}
+      badge={currentRepositoryProject ? t("cloud.project.currentRemote") : null}
       previewItems={previewItems}
       previewLoading={preview.loading}
       previewError={preview.error}
-      emptyLabel={project.description || "Empty project"}
+      emptyLabel={project.description || t("cloud.project.empty")}
       footer={{
         statusConnected: connectionCount > 0,
-        updatedLabel: updatedLabel || "Recently updated",
+        updatedLabel: updatedLabel || t("cloud.project.recentlyUpdated"),
         connectionCount,
       }}
+      actions={!currentRepositoryProject && onConfigureProjectRemote ? (
+        <button
+          type="button"
+          className="desktop-project-folder-card-action"
+          disabled={remoteDisabled}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onConfigureProjectRemote(project);
+          }}
+        >
+          {t(remoteBusy ? "cloud.project.addingRemote" : "cloud.project.addRemote")}
+        </button>
+      ) : null}
       onSelect={() => onSelectProject(project)}
     />
   );
@@ -232,15 +247,19 @@ function CloudProjectCard({
 
 function CloudProjectNewCard({
   loading,
+  disabled,
   onClick,
 }: {
   loading: boolean;
+  disabled: boolean;
   onClick: () => void;
 }) {
+  const { t } = useLocalization();
   return (
     <ProjectFolderNewCard
-      label={loading ? "Connecting..." : "Back up current folder"}
+      label={t(loading ? "cloud.project.publishingProject" : "cloud.project.publishCurrentProject")}
       loading={loading}
+      disabled={disabled}
       onClick={onClick}
     />
   );

@@ -29,6 +29,15 @@ described as current behavior before its implementation and verification land.
   - **Implemented**.
   - Owns Git topology, ref markers, graph continuation rows, and Cloud Branches
     rendering rules.
+- [Cloud Project History](cloud-project-history.md)
+  - **Implemented**.
+  - Owns the Cloud project History surfaces: all-branches commit tree,
+    topology/cursor data contract, VS Code Source Control Graph UX baseline,
+    and the local-vs-cloud linearity decision.
+- [Format-Aware Diff Pipeline](format-aware-diff-pipeline.md)
+  - **Implemented** for text, DOCX, and metadata fallback.
+  - Owns revision-pair authority, the built-in Diff Registry, resource-handle
+    security, semantic provider lifecycle, and rich-diff extension rules.
 
 ## Code Map
 
@@ -59,8 +68,14 @@ described as current behavior before its implementation and verification land.
 - `electron/main/git-operation-coordinator.mjs`
   - per-repository serialization for application-owned Git mutations and
     idle-gated reads
+- `electron/main/git-diff-resource-broker.mjs`
+  - audience/session/revision-bound immutable bytes for rich diff providers
 - `local-api/workspace.mjs`
   - workspace-facing Git status, history, parsing, and mutations
+- `local-api/git/diff-comparison.mjs`
+  - trusted merge-base comparisons and bounded incoming/outgoing net-file previews
+- `local-api/git/revision-specs.mjs` and `local-api/git/revision-pair.mjs`
+  - trusted scope/status derivation and bounded before/after revision reads
 - `local-api/git/runner.mjs`
   - bounded/cancellable Git CLI execution and streaming output policy
 - `local-api/git/porcelain-v2.mjs`
@@ -76,7 +91,8 @@ described as current behavior before its implementation and verification land.
 - `tests/electron.git-metadata-watch.integration.test.mjs`
   - real-repository metadata watcher and external Git freshness coverage
 - `tests/workspace.git.integration.test.mjs`
-  - real-repository integration coverage for the local Git engine
+  - real-repository integration coverage for the local Git engine, including
+    sidebar/detail aggregate-diff consistency
 
 ## Cross-Domain Boundaries
 

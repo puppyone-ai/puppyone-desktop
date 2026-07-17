@@ -1,6 +1,11 @@
 import type { Workspace } from "@puppyone/shared-ui";
+import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
 import { AlertTriangle, Cloud, Folder, FolderOpen, Monitor } from "lucide-react";
 import type { DragEvent } from "react";
+import {
+  createTypographyRootProps,
+  type ResolvedTypography,
+} from "../features/typography";
 import { useEffect, useMemo, useState } from "react";
 import type { DarkThemePreset, DiffMarkers, LightThemePreset, TextSize, ThemeMode } from "../preferences";
 import { InlineLoading } from "./loading";
@@ -53,6 +58,7 @@ export type MinimalOnboardingProps = {
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
   textSize: TextSize;
+  typography: ResolvedTypography;
   pointerCursors: boolean;
   diffMarkers: DiffMarkers;
   resolvedTheme: "light" | "dark";
@@ -75,10 +81,12 @@ export function MinimalOnboarding({
   lightThemePreset,
   darkThemePreset,
   textSize,
+  typography,
   pointerCursors,
   diffMarkers,
   resolvedTheme,
 }: MinimalOnboardingProps) {
+  const { t, formatRelativeTime } = useLocalization();
   const [error, setError] = useState<string | null>(initialError);
   const [dragging, setDragging] = useState(false);
   const [openingPath, setOpeningPath] = useState<string | null>(null);
@@ -90,7 +98,7 @@ export function MinimalOnboarding({
   );
   const showCloudProjectsState = cloudSignedIn && (cloudProjectsLoading || Boolean(cloudProjectsError) || visibleProjectItems.some(isCloudProjectItem));
   const showProjectsList = visibleProjectItems.length > 0 || showCloudProjectsState;
-  const localOperationStatus = getLocalOperationStatus(openingPath);
+  const localOperationStatus = getLocalOperationStatus(openingPath, t);
   const activeOperationStatus = operationStatus ?? localOperationStatus;
   const folderOperationStatus = operationStatus ?? (
     openingPath === "__cloud__" || openingPath === "__new__"
@@ -110,7 +118,7 @@ export function MinimalOnboarding({
     setError(null);
     const nextPath = path.trim();
     if (!nextPath.startsWith("/")) {
-      setError("Drop a local folder or click to choose one.");
+      setError(t("onboarding.error.dropLocalFolder"));
       return;
     }
 
@@ -141,7 +149,7 @@ export function MinimalOnboarding({
     setOpeningPath("__cloud__");
     try {
       if (!onCreateCloudProject) {
-        throw new Error("Cloud project creation is not available.");
+        throw new Error(t("onboarding.error.cloudCreationUnavailable"));
       }
       await onCreateCloudProject();
     } catch (error) {
@@ -170,7 +178,7 @@ export function MinimalOnboarding({
     setOpeningPath(`cloud:${projectId}`);
     try {
       if (!onOpenCloudProject) {
-        throw new Error("Cloud project opening is not available.");
+        throw new Error(t("onboarding.error.cloudOpeningUnavailable"));
       }
       await onOpenCloudProject(projectId);
     } catch (error) {
@@ -208,7 +216,7 @@ export function MinimalOnboarding({
       : null;
 
     if (!droppedPath) {
-      setError("Could not read that folder path. Click the folder box to choose it instead.");
+      setError(t("onboarding.error.folderPathUnreadable"));
       return;
     }
 
@@ -224,6 +232,7 @@ export function MinimalOnboarding({
       data-text-size={textSize}
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
+      {...createTypographyRootProps(typography)}
       onDragEnter={() => setDragging(true)}
       onDragOver={(event) => {
         event.preventDefault();
@@ -233,7 +242,7 @@ export function MinimalOnboarding({
       onDrop={handleDrop}
     >
       <div className="onboarding-titlebar" aria-hidden="true" />
-      <section className="onboarding-homepage" aria-label="Projects">
+      <section className="onboarding-homepage" aria-label={t("onboarding.projects.title")}>
         <div className="onboarding-primary-area">
           <div className="onboarding-folder-action-wrap">
             <div
@@ -290,7 +299,7 @@ export function MinimalOnboarding({
                 type="button"
                 disabled={openingPath !== null}
                 aria-busy={openingPath === (cloudMode ? "__cloud__" : "__new__") || undefined}
-                aria-label={cloudMode ? "Create cloud project" : "Open local folder"}
+                aria-label={t(cloudMode ? "onboarding.action.createCloudProject" : "onboarding.action.openLocalFolder")}
                 onClick={() => void (cloudMode ? createCloudProject() : chooseFolder())}
               />
               <span className="folder-drop-body">
@@ -307,7 +316,11 @@ export function MinimalOnboarding({
                   <FolderOpen size={25} strokeWidth={1.75} className="folder-drop-icon" aria-hidden="true" />
                 )}
                 <span className="folder-drop-copy">
-                  <strong>{folderOperationStatus?.title ?? (cloudMode ? "Create cloud project" : "Open local folder")}</strong>
+                  <strong>
+                    {folderOperationStatus?.title ?? t(
+                      cloudMode ? "onboarding.action.createCloudProject" : "onboarding.action.openLocalFolder",
+                    )}
+                  </strong>
                 </span>
               </span>
             </div>
@@ -316,13 +329,13 @@ export function MinimalOnboarding({
                 className="onboarding-mode-switch"
                 type="button"
                 disabled={openingPath !== null}
-                aria-label={cloudMode ? "Switch to local project" : "Switch to cloud project"}
+                aria-label={t(cloudMode ? "onboarding.action.switchToLocal" : "onboarding.action.switchToCloud")}
                 aria-pressed={cloudMode}
-                title={cloudMode ? "Switch to local project" : "Switch to cloud project"}
+                title={t(cloudMode ? "onboarding.action.switchToLocal" : "onboarding.action.switchToCloud")}
                 onClick={() => setCloudMode((value) => !value)}
               >
-                <span>switch to</span>
-                <strong>{cloudMode ? "Local" : "Cloud"}</strong>
+                <span>{t("onboarding.action.switchTo")}</span>
+                <strong>{t(cloudMode ? "onboarding.location.local" : "onboarding.location.cloud")}</strong>
                 {cloudMode ? (
                   <Monitor size={15} strokeWidth={1.85} aria-hidden="true" />
                 ) : (
@@ -341,7 +354,7 @@ export function MinimalOnboarding({
 
         {showProjectsList && (
           <div className="onboarding-recent-projects">
-            <div className="onboarding-recent-heading">Projects</div>
+            <div className="onboarding-recent-heading">{t("onboarding.projects.title")}</div>
             <div className="onboarding-project-list">
               {visibleProjectItems.map((item) => {
                 const itemOpening = openingPath === getProjectOpeningKey(item);
@@ -352,20 +365,24 @@ export function MinimalOnboarding({
                     type="button"
                     disabled={openingPath !== null || Boolean(operationStatus)}
                     aria-busy={itemOpening || undefined}
-                    aria-label={`Open ${item.label}`}
-                    title={getProjectItemTitle(item)}
+                    aria-label={t("onboarding.projects.open", { project: bidiIsolate(item.label) })}
+                    title={getProjectItemTitle(item, t)}
                     onClick={() => void openProjectItem(item)}
                   >
                     <ProjectRowIcon kind={item.kind} />
                     <span className="onboarding-project-row-main">
-                      <span className="onboarding-project-row-title">{formatProjectItemLabel(item)}</span>
+                      <bdi className="onboarding-project-row-title">{formatProjectItemLabel(item, t)}</bdi>
                     </span>
                     <span className="onboarding-project-row-meta">
                       <span className="onboarding-project-row-time">
                         {itemOpening ? (
-                          <InlineLoading label="Opening" size="xs" tone="neutral" />
+                          <InlineLoading label={t("onboarding.status.opening")} size="xs" tone="neutral" />
                         ) : (
-                          formatRecentWorkspaceTime(item.lastOpenedAt ?? item.updatedAt)
+                          formatRecentWorkspaceTime(
+                            item.lastOpenedAt ?? item.updatedAt,
+                            t,
+                            formatRelativeTime,
+                          )
                         )}
                       </span>
                     </span>
@@ -378,7 +395,7 @@ export function MinimalOnboarding({
                     <Cloud size={14} strokeWidth={1.85} />
                   </span>
                   <span className="onboarding-project-row-path">
-                    <span>Loading cloud projects</span>
+                    <span>{t("onboarding.status.loadingCloudProjects")}</span>
                   </span>
                   <span className="onboarding-project-row-time"> </span>
                 </div>
@@ -389,7 +406,7 @@ export function MinimalOnboarding({
                     <Cloud size={14} strokeWidth={1.85} />
                   </span>
                   <span className="onboarding-project-row-path">
-                    <span>Cloud projects unavailable</span>
+                    <span>{t("onboarding.status.cloudProjectsUnavailable")}</span>
                   </span>
                   <span className="onboarding-project-row-time"> </span>
                 </div>
@@ -461,43 +478,46 @@ function isCloudProjectItem(item: ProjectHomeItem) {
   return item.kind === "cloud" || item.kind === "cloud-local" || item.kind === "cloud-linked";
 }
 
-function formatProjectItemLabel(item: ProjectHomeItem) {
+function formatProjectItemLabel(item: ProjectHomeItem, t: MessageFormatter) {
   if (item.localPath) return formatWorkspaceLocator(item.localPath);
-  return formatWorkspaceLocator(item.label || "Untitled Project");
+  return formatWorkspaceLocator(item.label || t("onboarding.projects.untitled"));
 }
 
 function getProjectOpeningKey(item: ProjectHomeItem) {
   return item.localPath ?? (item.cloudProjectId ? `cloud:${item.cloudProjectId}` : item.id);
 }
 
-function getLocalOperationStatus(openingPath: string | null): OnboardingOperationStatus | null {
+function getLocalOperationStatus(
+  openingPath: string | null,
+  t: MessageFormatter,
+): OnboardingOperationStatus | null {
   if (!openingPath) return null;
   if (openingPath === "__cloud__") {
     return {
-      title: "Creating cloud project",
-      detail: "Preparing a new Puppyone Cloud workspace.",
+      title: t("onboarding.operation.creatingCloud.title"),
+      detail: t("onboarding.operation.creatingCloud.detail"),
     };
   }
   if (openingPath === "__new__") {
     return {
-      title: "Opening local folder",
-      detail: "Waiting for folder selection.",
+      title: t("onboarding.operation.choosingFolder.title"),
+      detail: t("onboarding.operation.choosingFolder.detail"),
     };
   }
   if (openingPath.startsWith("cloud:")) {
     return {
-      title: "Opening cloud project",
-      detail: "Loading the project workspace.",
+      title: t("onboarding.operation.openingCloud.title"),
+      detail: t("onboarding.operation.openingCloud.detail"),
     };
   }
   return {
-    title: "Opening local folder",
-    detail: "Loading the selected workspace.",
+    title: t("onboarding.operation.openingLocal.title"),
+    detail: t("onboarding.operation.openingLocal.detail"),
   };
 }
 
-function getProjectItemTitle(item: ProjectHomeItem) {
-  const label = formatProjectItemLabel(item);
+function getProjectItemTitle(item: ProjectHomeItem, t: MessageFormatter) {
+  const label = formatProjectItemLabel(item, t);
   const detail = item.detail && item.detail !== item.label ? item.detail : item.description;
   return detail ? `${label} - ${detail}` : label;
 }
@@ -511,10 +531,18 @@ function formatWorkspaceLocator(workspacePath: string) {
   return `~/${rest.join("/")}`;
 }
 
-function formatRecentWorkspaceTime(value?: string | null) {
-  if (!value) return "Previously opened";
+function formatRecentWorkspaceTime(
+  value: string | null | undefined,
+  t: MessageFormatter,
+  formatRelativeTime: (
+    value: number,
+    unit: Intl.RelativeTimeFormatUnit,
+    options?: Intl.RelativeTimeFormatOptions,
+  ) => string,
+) {
+  if (!value) return t("onboarding.time.previouslyOpened");
   const openedAt = new Date(value).getTime();
-  if (Number.isNaN(openedAt)) return "Previously opened";
+  if (Number.isNaN(openedAt)) return t("onboarding.time.previouslyOpened");
 
   const elapsedMs = Math.max(0, Date.now() - openedAt);
   const minute = 60 * 1000;
@@ -523,11 +551,11 @@ function formatRecentWorkspaceTime(value?: string | null) {
   const week = 7 * day;
   const month = 30 * day;
 
-  if (elapsedMs < minute) return "Just now";
+  if (elapsedMs < minute) return t("onboarding.time.justNow");
 
-  const formatUnit = (unitMs: number, label: string) => {
+  const formatUnit = (unitMs: number, unit: Intl.RelativeTimeFormatUnit) => {
     const count = Math.max(1, Math.floor(elapsedMs / unitMs));
-    return `${count} ${label}${count === 1 ? "" : "s"} ago`;
+    return formatRelativeTime(-count, unit, { numeric: "always" });
   };
 
   if (elapsedMs < hour) return formatUnit(minute, "minute");

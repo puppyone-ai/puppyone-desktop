@@ -1,17 +1,18 @@
-import {
-  useCallback,
-  type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
-} from "react";
-import { usePaneResizeDrag } from "@puppyone/shared-ui";
+import type { ReactNode } from "react";
+import { AuxiliaryPanelHost } from "../features/app-shell/auxiliary";
 
-export type DesktopView = "data" | "git" | "cloud" | "access" | "integrations" | "settings";
+import type { WorkspaceSurfaceId } from "../features/app-shell/workspace-surfaces";
+
+export type DesktopView = WorkspaceSurfaceId;
+export type DesktopWorkspaceKind = "local" | "cloud";
 
 type DesktopCloudShellProps = {
   children: ReactNode;
+  workspaceKind: DesktopWorkspaceKind;
   titlebarSlot?: ReactNode;
   titlebarActions?: ReactNode;
+  minimalMode?: boolean;
+  minimalModeDock?: ReactNode;
   rightSidebar?: ReactNode;
   rightSidebarOpen?: boolean;
   rightSidebarWidth?: number;
@@ -23,8 +24,11 @@ type DesktopCloudShellProps = {
 
 export function DesktopCloudShell({
   children,
+  workspaceKind,
   titlebarSlot,
   titlebarActions,
+  minimalMode = false,
+  minimalModeDock,
   rightSidebar,
   rightSidebarOpen = false,
   rightSidebarWidth,
@@ -33,104 +37,44 @@ export function DesktopCloudShell({
   resizableRightSidebar = false,
   onRightSidebarWidthChange,
 }: DesktopCloudShellProps) {
-  const beginRightSidebarResize = usePaneResizeDrag({
-    enabled: resizableRightSidebar && Boolean(onRightSidebarWidthChange),
-    bodyClassName: "desktop-right-sidebar-resizing",
-    onDragStart: (event) => {
-      if (!onRightSidebarWidthChange) return null;
-
-      const startX = event.clientX;
-      const startWidth = rightSidebarWidth ?? 560;
-
-      return {
-        onMove: (point) => {
-          const nextWidth = clamp(
-            startWidth + startX - point.clientX,
-            minRightSidebarWidth,
-            maxRightSidebarWidth,
-          );
-          onRightSidebarWidthChange(nextWidth);
-        },
-      };
-    },
-  });
-
-  const rightSidebarStyle = rightSidebarWidth
-    ? ({ "--desktop-right-sidebar-width": `${rightSidebarWidth}px` } as CSSProperties)
-    : undefined;
-
-  const nudgeRightSidebarWidth = useCallback(
-    (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      if (!resizableRightSidebar || !onRightSidebarWidthChange) return;
-
-      const currentWidth = rightSidebarWidth ?? 560;
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        onRightSidebarWidthChange(clamp(currentWidth + (event.shiftKey ? 24 : 12), minRightSidebarWidth, maxRightSidebarWidth));
-      } else if (event.key === "ArrowRight") {
-        event.preventDefault();
-        onRightSidebarWidthChange(clamp(currentWidth - (event.shiftKey ? 24 : 12), minRightSidebarWidth, maxRightSidebarWidth));
-      } else if (event.key === "Home") {
-        event.preventDefault();
-        onRightSidebarWidthChange(minRightSidebarWidth);
-      } else if (event.key === "End") {
-        event.preventDefault();
-        onRightSidebarWidthChange(maxRightSidebarWidth);
-      }
-    },
-    [
-      maxRightSidebarWidth,
-      minRightSidebarWidth,
-      onRightSidebarWidthChange,
-      resizableRightSidebar,
-      rightSidebarWidth,
-    ],
-  );
-
   return (
-    <div className="desktop-shell">
-      <header className="desktop-titlebar">
-        <div className="desktop-titlebar-left">
-          {titlebarSlot}
-        </div>
-        <div className="desktop-titlebar-drag-fill" aria-hidden="true" />
-        {titlebarActions && (
-          <div className="desktop-titlebar-actions">
-            {titlebarActions}
+    <div className={`desktop-shell ${minimalMode ? "is-minimal-mode" : ""}`}>
+      {minimalMode ? (
+        <>
+          <div className="desktop-minimal-mode-drag-region" aria-hidden="true" />
+          {minimalModeDock}
+        </>
+      ) : (
+        <header className="desktop-titlebar" data-workspace-kind={workspaceKind}>
+          <div className="desktop-titlebar-left">
+            {titlebarSlot}
           </div>
-        )}
-      </header>
+          <div className="desktop-titlebar-drag-fill" aria-hidden="true" />
+          {titlebarActions && (
+            <div className="desktop-titlebar-actions">
+              {titlebarActions}
+            </div>
+          )}
+        </header>
+      )}
 
       <div className="desktop-shell-body">
         <main className="desktop-surface">
           {children}
         </main>
         {rightSidebar && (
-          <aside
-            className={`desktop-right-sidebar ${rightSidebarOpen ? "is-open" : ""}`}
-            style={rightSidebarStyle}
+          <AuxiliaryPanelHost
+            open={rightSidebarOpen}
+            width={rightSidebarWidth}
+            minWidth={minRightSidebarWidth}
+            maxWidth={maxRightSidebarWidth}
+            resizable={resizableRightSidebar}
+            onWidthChange={onRightSidebarWidthChange}
           >
-            {resizableRightSidebar && rightSidebarOpen && (
-              <div
-                className="desktop-right-sidebar-resizer"
-                role="separator"
-                aria-orientation="vertical"
-                aria-label="Resize right sidebar"
-                tabIndex={0}
-                onPointerDown={beginRightSidebarResize}
-                onKeyDown={nudgeRightSidebarWidth}
-              />
-            )}
-            <div className="desktop-right-sidebar-inner">
-              {rightSidebar}
-            </div>
-          </aside>
+            {rightSidebar}
+          </AuxiliaryPanelHost>
         )}
       </div>
     </div>
   );
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
 }

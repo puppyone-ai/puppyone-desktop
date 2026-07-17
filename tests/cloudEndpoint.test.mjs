@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  DEFAULT_CLOUD_API_BASE_URL,
   cloudApiBaseUrlFromRemote,
   normalizeCloudApiBaseUrl,
   normalizeCloudApiPath,
@@ -30,10 +29,9 @@ describe("normalizeCloudApiBaseUrl", () => {
     );
   });
 
-  it("forces https and default path for the canonical cloud host", () => {
-    expect(normalizeCloudApiBaseUrl("http://api.puppyone.ai")).toBe(
-      "https://api.puppyone.ai/api/v1",
-    );
+  it("does not silently rewrite an insecure or incomplete production endpoint", () => {
+    expect(normalizeCloudApiBaseUrl("http://api.puppyone.ai")).toBeNull();
+    expect(normalizeCloudApiBaseUrl("https://api.puppyone.ai")).toBe("https://api.puppyone.ai");
   });
 
   it("SSRF guard: rejects non-PuppyOne hosts and internal/metadata targets", () => {
@@ -52,9 +50,10 @@ describe("normalizeCloudApiBaseUrl", () => {
 });
 
 describe("resolveCloudApiBaseUrl", () => {
-  it("falls back to the default when input is invalid", () => {
-    expect(resolveCloudApiBaseUrl("")).toBe(DEFAULT_CLOUD_API_BASE_URL);
-    expect(resolveCloudApiBaseUrl("garbage")).toBe(DEFAULT_CLOUD_API_BASE_URL);
+  it("requires an explicit endpoint or explicit fallback", () => {
+    expect(() => resolveCloudApiBaseUrl("")).toThrow("Cloud API base URL is not configured");
+    expect(resolveCloudApiBaseUrl("garbage", "https://api.puppyone.ai/api/v1"))
+      .toBe("https://api.puppyone.ai/api/v1");
   });
 });
 

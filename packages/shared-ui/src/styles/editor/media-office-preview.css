@@ -1,0 +1,490 @@
+.native-image-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.native-image-preview-shell {
+  position: relative;
+}
+
+.native-image-preview-shell[data-preview-state="loading"] .native-image-preview {
+  opacity: 0;
+}
+
+.native-image-preview-state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--po-text-subtle);
+  font-size: 12px;
+}
+
+.native-video-preview {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 6px;
+  background: var(--po-inset);
+}
+
+.native-media-card {
+  display: grid;
+  width: min(560px, 100%);
+  justify-items: center;
+  gap: 14px;
+  color: var(--po-text-muted);
+}
+
+.native-media-card strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.native-media-card audio {
+  width: 100%;
+}
+
+.office-preview {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--po-editor-bg);
+  color: var(--po-text);
+}
+
+.office-preview__note {
+  color: var(--po-text-muted);
+  font-size: 11px;
+}
+
+.office-preview__body {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.office-document-preview,
+.office-presentation-preview {
+  box-sizing: border-box;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 18px 18px 42px;
+}
+
+.office-document-preview {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.office-document-preview--docx {
+  align-items: stretch;
+}
+
+.office-docx-host {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.office-docx-host[data-rendering="true"] {
+  min-height: 120px;
+}
+
+.office-docx-render-state {
+  display: grid;
+  min-height: 120px;
+  place-items: center;
+  color: var(--po-text-muted);
+  font-size: 12px;
+}
+
+.office-warning-note {
+  box-sizing: border-box;
+  width: min(780px, 100%);
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--po-warning) 34%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--po-warning) 10%, var(--po-panel));
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.office-warning-note__summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.office-warning-note strong {
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.office-warning-note__actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.office-warning-note button,
+.office-preview-empty button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: var(--desktop-control-radius, 6px);
+  background: var(--po-control);
+  color: var(--po-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.office-warning-note button:hover,
+.office-preview-empty button:hover {
+  background: var(--po-control-hover);
+}
+
+.office-warning-note ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.office-warning-note li + li {
+  margin-top: 4px;
+}
+
+.office-document-page {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  align-self: center;
+  width: min(780px, 100%);
+  min-height: 900px;
+  padding: 46px 54px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 6px;
+  background: var(--po-panel-raised);
+  color: var(--po-text);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--po-shadow) 10%, transparent);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.office-document-page h1,
+.office-document-page h2,
+.office-document-page h3 {
+  margin: 0 0 12px;
+  color: var(--po-text);
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.office-document-page h1 {
+  font-size: 22px;
+}
+
+.office-document-page h2 {
+  font-size: 18px;
+}
+
+.office-document-page h3 {
+  font-size: 15px;
+}
+
+.office-document-page p,
+.office-document-page ul,
+.office-document-page ol,
+.office-document-page table {
+  margin: 0 0 12px;
+}
+
+.office-document-page table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.office-document-page td,
+.office-document-page th {
+  padding: 6px 8px;
+  border: 1px solid var(--po-border-subtle);
+  vertical-align: top;
+}
+
+.office-spreadsheet-preview {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.office-spreadsheet-tabs {
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  overflow-x: auto;
+  height: var(--desktop-sidebar-nav-height, 38px);
+  min-height: var(--desktop-sidebar-nav-height, 38px);
+  align-items: center;
+  padding: 4px 12px;
+  background: var(--po-editor-bg);
+  box-shadow: inset 0 -1px 0 var(--po-border-subtle);
+}
+
+.office-spreadsheet-tabs button {
+  display: inline-flex;
+  height: var(--desktop-chrome-control-size, 30px);
+  max-width: 180px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 9px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--desktop-control-radius, 6px);
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 18px;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.office-spreadsheet-tabs button:hover {
+  background: color-mix(in srgb, var(--po-panel) 44%, transparent);
+  color: var(--po-text);
+}
+
+.office-spreadsheet-tabs button[aria-selected="true"] {
+  background: var(--po-control);
+  color: var(--po-text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-border) 74%, transparent);
+}
+
+.office-spreadsheet-grid-wrap {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.office-spreadsheet-grid {
+  min-width: max-content;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--po-text);
+  font-size: 12px;
+  table-layout: fixed;
+}
+
+.office-spreadsheet-grid__row-header-col {
+  width: 42px;
+}
+
+.office-spreadsheet-grid th,
+.office-spreadsheet-grid td {
+  box-sizing: border-box;
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px;
+  overflow: hidden;
+  border-right: 1px solid var(--po-border-subtle);
+  border-bottom: 1px solid var(--po-border-subtle);
+  line-height: 18px;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.office-spreadsheet-grid th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 42px;
+  background: var(--po-panel);
+  color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.office-spreadsheet-grid td {
+  background: var(--po-editor-bg);
+}
+
+.office-spreadsheet-grid tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--po-panel) 22%, var(--po-editor-bg));
+}
+
+.office-spreadsheet-grid__spacer td {
+  padding: 0;
+  border: 0;
+  background: transparent !important;
+}
+
+.office-preview__note {
+  align-self: stretch;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-top: 1px solid var(--po-border-subtle);
+  background: var(--po-panel);
+}
+
+.office-presentation-preview {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.office-pptx-render-preview {
+  position: relative;
+  display: flex;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.office-pptx-render-host {
+  box-sizing: border-box;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 18px;
+}
+
+.office-pptx-render-host[data-rendering="true"] {
+  min-height: 160px;
+}
+
+.office-pptx-render-state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.office-slide-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  width: min(760px, 100%);
+  padding: 14px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 6px;
+  background: var(--po-panel-raised);
+}
+
+.office-slide-card__number {
+  display: inline-flex;
+  width: 30px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: var(--po-control);
+  color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.office-slide-card__content {
+  min-width: 0;
+}
+
+.office-slide-card h2 {
+  margin: 0 0 8px;
+  color: var(--po-text);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.office-slide-card ul,
+.office-slide-card p {
+  margin: 0;
+  color: var(--po-text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.office-slide-card ul {
+  padding-left: 18px;
+}
+
+.office-preview-empty {
+  display: grid;
+  width: min(360px, 100%);
+  margin: auto;
+  gap: 6px;
+  padding: 18px;
+  color: var(--po-text-muted);
+  text-align: center;
+}
+
+.office-preview-empty strong {
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.office-preview-empty span {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.office-preview-empty button {
+  justify-self: center;
+  margin-top: 8px;
+}

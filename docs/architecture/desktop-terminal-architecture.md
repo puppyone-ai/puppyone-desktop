@@ -30,26 +30,30 @@ shape VS Code, Hyper, and Tabby use):
 ```text
 renderer (React)                       main process (Node)
 ┌──────────────────────────────┐      ┌──────────────────────────────┐
-│ RightTerminalPanel.tsx       │ IPC  │ ipc/terminal-ipc.mjs         │
-│  xterm.js Terminal + addons  │◄────►│  terminal-service.mjs        │
-│  fit / resize orchestration  │      │   node-pty sessions          │
-│  theme from CSS variables    │      │   (login shell per session)  │
+│ features/desktop-terminal    │ IPC  │ ipc/terminal-ipc.mjs         │
+│  RightTerminalPanel          │◄────►│  terminal-service.mjs        │
+│  TerminalSurfaceHeader       │      │   node-pty sessions          │
+│  fit / resize orchestration  │      │   (login shell per session)  │
+│  theme from CSS variables    │      │                              │
 └──────────────────────────────┘      └──────────────────────────────┘
-        styles: src/styles/layout.css (.desktop-terminal-*)
+        styles: src/features/desktop-terminal/ui/desktop-terminal.css
         bridge: electron/preload.cjs (window.puppyoneDesktop)
 ```
 
 No terminal state lives outside these files. The renderer owns geometry
 and rendering; the main process owns processes; the preload bridge is a
-dumb pipe.
+dumb pipe. Application chrome (titlebar) only toggles surface visibility —
+Clear/Reset and PTY session reset belong to the terminal surface itself.
 
 ## 2. Layer responsibilities
 
-**Renderer — `src/components/RightTerminalPanel.tsx`.** Owns the xterm.js
-instance and everything visual: creating/disposing the `Terminal`,
-loading addons, fitting the grid to the container, forwarding keystrokes
-to the PTY and PTY output to xterm, drag-and-drop of file paths (shell
-quoted), theme resolution from CSS variables, and focus management.
+**Renderer — `src/features/desktop-terminal/ui/`.**
+`RightTerminalPanel` is the composition root: it owns the xterm.js instance,
+lazy PTY lifecycle, fit/resize orchestration, drag-and-drop of file paths,
+theme resolution, and focus management. `TerminalSurfaceHeader` is the
+presentational chrome for Clear and Reset. Reset increments an internal
+`sessionGeneration` so the panel recreates the PTY without App remounting
+the tree.
 
 **Bridge — `electron/preload.cjs`.** Exposes exactly six calls:
 `createTerminal` / `closeTerminal` (invoke), `writeTerminal` /
@@ -64,14 +68,17 @@ app-identifying env vars. Confines `cwd` to the workspace root, clamps
 cols/rows (20–400 / 8–120), kills sessions when their window closes, and
 reports exit code/signal back to the renderer.
 
-**Styles — `src/styles/layout.css`.** `.desktop-terminal-*` rules and the
-`.xterm` overrides: the panel is `overflow: hidden`, the outer terminal
-body carries the visual padding (`14px 0 16px 16px`), the xterm geometry
-container remains padding-free, and scrollbars use the product scrollbar
-tokens (`--po-scrollbar-*`) with a terminal-specific xterm adapter.
+**Styles — `src/features/desktop-terminal/ui/desktop-terminal.css`.**
+Co-located `.desktop-terminal-*` rules and `.xterm` overrides: the panel is
+`overflow: hidden`, the outer terminal body carries the visual padding
+(`14px 0 16px 16px`), the xterm geometry container remains padding-free, and
+scrollbars use the product scrollbar tokens (`--po-scrollbar-*`) with a
+terminal-specific xterm adapter. Global `layout.css` must not own terminal
+presentation classes.
 
-This split is correct and stays. Changes in Part 2 are confined to the
-renderer layer and CSS; the IPC contract and PTY service do not change.
+**Titlebar — `src/features/app-shell/`.** The Terminal icon is a stable
+visibility toggle only. It must not morph into a split/dropdown control and
+must not host Clear/Reset.
 
 ## 3. The width invariant (why terminals clip or drift)
 
@@ -244,9 +251,10 @@ npm; do not pin invented versions).
 **Phase 1 — stop the clipping (one CSS rule):**
 
 - [ ] Add `text-spacing-trim: space-all;` to the `.desktop-terminal-xterm
-      .xterm` block in `src/styles/layout.css`, with a comment explaining
-      the measurement-parity requirement (Part 1 §4). This alone removes
-      the visible CJK truncation under the DOM renderer.
+      .xterm` block in
+      `src/features/desktop-terminal/ui/desktop-terminal.css`, with a comment
+      explaining the measurement-parity requirement (Part 1 §4). This alone
+      removes the visible CJK truncation under the DOM renderer.
 
 **Phase 2 — GPU renderer with graceful fallback:**
 
@@ -293,8 +301,8 @@ npm; do not pin invented versions).
 
 | File | Change |
 | --- | --- |
-| `src/styles/layout.css` | Phase 1 CSS rule on `.desktop-terminal-xterm .xterm` |
-| `src/components/RightTerminalPanel.tsx` | Phases 2–4: addon imports, load/fallback/dispose wiring, unicode activation, fonts-ready refit |
+| `src/features/desktop-terminal/ui/desktop-terminal.css` | Phase 1 CSS rule on `.desktop-terminal-xterm .xterm` |
+| `src/features/desktop-terminal/ui/RightTerminalPanel.tsx` | Phases 2–4: addon imports, load/fallback/dispose wiring, unicode activation, fonts-ready refit |
 | `package.json` | Add `@xterm/addon-webgl`, `@xterm/addon-unicode11` |
 
 Everything else (preload bridge, terminal IPC, PTY service, panel layout)

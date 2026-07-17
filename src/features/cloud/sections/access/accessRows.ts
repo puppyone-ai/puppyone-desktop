@@ -2,14 +2,11 @@ import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
   DesktopCloudRepoIdentity,
-  DesktopCloudScope,
+  DesktopCloudRepositoryView,
 } from "../../../../lib/cloudApi";
 import type { CloudAccessFilter } from "../../accessFilters";
 import type { CloudAccessSurface } from "../../model";
-import {
-  isCloudIntegrationConnector,
-  normalizeProviderKey,
-} from "../../utils";
+import { normalizeProviderKey } from "../../utils";
 import {
   buildDesktopCloudAccessSurfacesForScope,
   isCliAccessSurface,
@@ -20,7 +17,7 @@ import {
 
 export type CloudAccessSurfaceRow = {
   id: string;
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   surface: CloudAccessSurface;
 };
 
@@ -32,7 +29,7 @@ export function buildDesktopCloudAccessRows({
   apiBaseUrl,
   includePlaceholders = false,
 }: {
-  scopeRows: DesktopCloudScope[];
+  scopeRows: DesktopCloudRepositoryView[];
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;
@@ -73,17 +70,5 @@ export function cloudAccessRowMatchesFilter(row: CloudAccessSurfaceRow, filter: 
   if (filter === "cli") return provider === "cli";
   if (filter === "git") return provider === "filesystem" || provider === "git" || provider === "git_remote";
   if (filter === "mcp") return provider === "mcp" || provider === "mcp_endpoint";
-  if (filter === "integrations") {
-    return !!row.surface.connector && isCloudIntegrationConnector(row.surface.connector);
-  }
   return true;
-}
-
-export function cloudAccessRowMatchesIntegrationProvider(
-  row: CloudAccessSurfaceRow,
-  providerFilter: string | null,
-): boolean {
-  if (!providerFilter) return true;
-  const rowProvider = normalizeProviderKey(row.surface.connector?.provider ?? row.surface.provider);
-  return rowProvider === normalizeProviderKey(providerFilter);
 }

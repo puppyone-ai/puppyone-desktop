@@ -16,7 +16,7 @@
   height: 100%;
   min-width: 47px;
   background: var(--po-sidebar);
-  border-right: 1px solid var(--po-divider);
+  border-inline-end: 1px solid var(--po-divider);
   transition: width 160ms ease;
 }
 
@@ -60,7 +60,7 @@
   border-radius: 6px;
   color: var(--po-text);
   background: transparent;
-  text-align: left;
+  text-align: start;
 }
 
 .workspace-switcher-trigger:hover {
@@ -145,7 +145,7 @@
   position: absolute;
   z-index: 20;
   top: 38px;
-  left: 0;
+  inset-inline-start: 0;
   width: 260px;
   padding: 6px;
   border: 1px solid var(--po-border);
@@ -166,7 +166,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--po-text);
-  text-align: left;
+  text-align: start;
 }
 
 .workspace-option:hover,
@@ -249,7 +249,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--po-text-muted);
-  text-align: left;
+  text-align: start;
 }
 
 .cloud-sidebar.is-collapsed .cloud-nav-row {

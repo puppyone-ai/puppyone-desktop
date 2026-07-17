@@ -5,9 +5,16 @@ import { createElement, StrictMode } from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterAll, bench, describe } from "vitest";
-import { ExplorerTree } from "../../vendor/shared-ui/src/data/ExplorerTree";
-import { MarkdownCodeMirrorEditor } from "../../vendor/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor";
-import { makeExplorerNodes, makeMarkdown, readRepositoryTextFile } from "./fixtures";
+import { ExplorerTree } from "../../packages/shared-ui/src/data/ExplorerTree";
+import { FileOpenRequestCoordinator } from "../../packages/shared-ui/src/data/file-open/fileOpenRequestCoordinator";
+import { MarkdownCodeMirrorEditor } from "../../packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor";
+import {
+  makeExplorerNodes,
+  makeFeatureHeavyMarkdown,
+  makeMarkdown,
+  readRepositoryTextFile,
+} from "./fixtures";
+import { withBenchmarkLocalization } from "./localizationHarness";
 
 const BENCHMARK_OPTIONS = {
   iterations: 3,
@@ -22,6 +29,7 @@ const markdownDocuments = new Map(
 const repositoryArchitectureDocument = readRepositoryTextFile(
   "docs/architecture/editor/markdown/architecture.md",
 );
+const featureHeavyDocument = makeFeatureHeavyMarkdown(180);
 const explorerHarnesses = new Map(
   [100, 250, 500, 1_000].map((rowCount) => [rowCount, createExplorerHarness(rowCount)]),
 );
@@ -33,23 +41,29 @@ afterAll(() => {
 describe("Markdown React mount and disposal", () => {
   bench(
     `repository architecture.md · ${repositoryArchitectureDocument.split("\n").length} lines · ${formatBytes(repositoryArchitectureDocument)}`,
-    () => {
-      mountAndDisposeMarkdownEditor(repositoryArchitectureDocument, false);
+    async () => {
+      await mountAndDisposeMarkdownEditor(repositoryArchitectureDocument, false);
     },
     BENCHMARK_OPTIONS,
   );
 
   for (const lineCount of [1_000, 3_000, 6_000, 10_000]) {
     const source = markdownDocuments.get(lineCount) ?? "";
-    bench(`live preview · ${lineCount} lines · ${formatBytes(source)}`, () => {
-      mountAndDisposeMarkdownEditor(source, false);
+    bench(`live preview · ${lineCount} lines · ${formatBytes(source)}`, async () => {
+      await mountAndDisposeMarkdownEditor(source, false);
     }, BENCHMARK_OPTIONS);
   }
 
   const strictModeSource = markdownDocuments.get(6_000) ?? "";
-  bench(`development StrictMode · 6000 lines · ${formatBytes(strictModeSource)}`, () => {
-    mountAndDisposeMarkdownEditor(strictModeSource, true);
+  bench(`development StrictMode · 6000 lines · ${formatBytes(strictModeSource)}`, async () => {
+    await mountAndDisposeMarkdownEditor(strictModeSource, true);
   }, BENCHMARK_OPTIONS);
+
+  bench(
+    `table/html/mermaid-heavy live preview · ${featureHeavyDocument.split("\n").length} lines`,
+    async () => mountAndDisposeMarkdownEditor(featureHeavyDocument, false),
+    BENCHMARK_OPTIONS,
+  );
 });
 
 describe("Explorer selection update", () => {
@@ -60,22 +74,52 @@ describe("Explorer selection update", () => {
   }
 });
 
-function mountAndDisposeMarkdownEditor(source: string, strictMode: boolean) {
+describe("Revision-bound file switching", () => {
+  const harness = createFileSwitchHarness();
+  bench("continuous A/B switch + cancellation", () => {
+    harness.switchFile();
+  }, BENCHMARK_OPTIONS);
+});
+
+async function mountAndDisposeMarkdownEditor(source: string, strictMode: boolean) {
   const parent = document.createElement("div");
   document.body.appendChild(parent);
   const root = createRoot(parent);
-  const editor = createElement(MarkdownCodeMirrorEditor, {
+  const editor = withBenchmarkLocalization(createElement(MarkdownCodeMirrorEditor, {
     value: source,
     readOnly: false,
     livePreview: true,
     documentPath: "bench.md",
-  });
+  }));
 
   flushSync(() => {
     root.render(strictMode ? createElement(StrictMode, null, editor) : editor);
   });
+  await nextAnimationFrame();
+  await nextAnimationFrame();
   flushSync(() => root.unmount());
   parent.remove();
+}
+
+function createFileSwitchHarness() {
+  const coordinator = new FileOpenRequestCoordinator();
+  let current = "A.md";
+  let previous = coordinator.begin(current);
+  return {
+    switchFile() {
+      current = current === "A.md" ? "B.md" : "A.md";
+      const next = coordinator.begin(current);
+      previous.commit(() => {
+        throw new Error("A stale file-open request committed.");
+      });
+      next.commit(() => undefined);
+      previous = next;
+    },
+  };
+}
+
+function nextAnimationFrame(): Promise<void> {
+  return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
 type ExplorerHarness = {
@@ -92,7 +136,7 @@ function createExplorerHarness(rowCount: number): ExplorerHarness {
 
   const render = () => {
     const activePath = nodes[activeIndex]?.path ?? null;
-    root.render(createElement(ExplorerTree, {
+    root.render(withBenchmarkLocalization(createElement(ExplorerTree, {
       nodes,
       activePath,
       selectedPaths: new Set(activePath ? [activePath] : []),
@@ -100,7 +144,7 @@ function createExplorerHarness(rowCount: number): ExplorerHarness {
       showRoot: false,
       onSelectNode: () => undefined,
       renderNodeActions: () => createElement("span", null, "…"),
-    }));
+    })));
   };
 
   flushSync(render);

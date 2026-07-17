@@ -13,6 +13,9 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    env:
+      VITE_DESKTOP_CLOUD_API_URL: https://api.puppyone.ai/api/v1
+      VITE_DESKTOP_CLOUD_WEB_URL: https://app.puppyone.ai
 
     steps:
       - name: Checkout

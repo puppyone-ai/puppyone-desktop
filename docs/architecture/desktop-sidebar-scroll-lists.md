@@ -5,6 +5,11 @@ the files explorer, Git working tree, Git history, cloud sidebar lists, and
 future sidebar list surfaces. It also records the app-wide scrollbar styling
 rule that the contract depends on.
 
+For the complete sidebar composition, ownership, registry, file layout, CSS,
+performance, and testing architecture, see
+[Desktop Sidebar Architecture](desktop-sidebar-architecture.md). This document
+is the focused scroll-geometry contract beneath that architecture.
+
 Git status semantics and Source Control state ownership are documented in
 [Local Source Control Sidebar](git/local-source-control-sidebar.md).
 
@@ -137,13 +142,16 @@ so its section rows and nested scroll lists own the inline edge instead.
    Use `--desktop-sidebar-row-left-gap`, `--desktop-sidebar-row-right-gap`,
    `--desktop-sidebar-scroll-right-gap`,
    `--desktop-sidebar-scrollbar-width`, `--desktop-sidebar-row-height`,
-   `--desktop-sidebar-row-radius`, and content inset tokens.
-   Feature-specific aliases are acceptable, but they must not reintroduce
-   row-level scrollbar compensation.
+   `--desktop-sidebar-row-radius`, content inset tokens, and the shared
+   typography tokens (`--desktop-sidebar-font-size`,
+   `--desktop-sidebar-font-weight`, `--desktop-sidebar-line-height`,
+   `--desktop-sidebar-icon-label-gap`). Feature-specific aliases are
+   acceptable, but they must not reintroduce row-level scrollbar compensation
+   or a quieter primary-row weight than Data.
 
 6. Share visual contracts, not incidental shorthands.
 
-   Data, Git, Settings, Cloud, Access, Integrations, and Changes must resolve
+   Data, Git, Settings, Cloud, Access, Automation, and Changes must resolve
    to the same outer edge rhythm even though their scroll ownership differs. Use
    `--desktop-sidebar-list-padding-block` for the `8px` list edge and the
    shared row gap tokens for the `12px` inline edge. Use logical
@@ -160,14 +168,26 @@ so its section rows and nested scroll lists own the inline edge instead.
   - `--po-scrollbar-size`, `--desktop-sidebar-scrollbar-width`,
     `--desktop-sidebar-scroll-right-gap`, and
     `--desktop-sidebar-list-padding-block`
+- `packages/shared-ui/src/sidebar/SidebarScrollArea.tsx`,
+  `SidebarList.tsx`, `SidebarRow.tsx`
+  - process-neutral semantic components for scroll/list/row ownership
+- `packages/shared-ui/src/styles/sidebar-primitives.css`
+  - canonical `.po-sidebar-*` root, scroll, list, row, action, resize, and
+    virtual-list geometry in the `primitives` cascade layer
+- `packages/shared-ui/src/sidebar/VirtualSidebarList.tsx`,
+  `useVirtualSidebarWindow.ts`, `virtualizationPolicy.ts`
+  - native-list virtual window, 200-row activation threshold, and 120 mounted
+    row budget
+- `src/components/sidebar/`, `src/styles/sidebar/patterns.css`
+  - Desktop-only group/header/status/surface patterns in the `patterns` layer
 - `src/features/data-workspace/browser.css`
   - maps the shared sidebar edge tokens into the shared explorer tree contract
-- `vendor/shared-ui/src/styles/data-workspace.css`
+- `packages/shared-ui/src/styles/data-workspace.css`
   - files explorer scroll area (`.explorer-tree-scroll`, reserved gutter),
     list padding compensation (`.explorer-tree-list`), tree row geometry
 - `src/features/source-control/styles/sidebar-base.css`
-  - generic tool sidebar scroll list (`.desktop-tool-sidebar-list`) and
-    sidebar row model
+  - Source Control-scoped semantic accents only; it no longer owns shared
+    root/list/row/action geometry
 - `src/features/source-control/styles/sidebar-layout.css`
   - `.desktop-git-sidebar-list` gutter opt-out and outer block edge
 - `src/features/source-control/styles/sidebar-resources.css`
@@ -180,14 +200,18 @@ so its section rows and nested scroll lists own the inline edge instead.
   - Settings-specific separators; list edges inherit the shared tool-sidebar
     contract
 - `src/features/cloud/styles/sidebar-shell.css`
-  - Cloud and Integrations sidebar list edges (token-override compensation)
+  - Cloud and Automation sidebar list edges (token-override compensation)
 - `src/features/cloud/styles/access/scope-sidebar.css`,
   `src/features/cloud/styles/access/service-sidebar.css`
   - Access scope list edges and service-shell scrollbar ownership
 - `src/features/changes/changes.css`
   - legacy Changes review-list edge mapping
-- `vendor/shared-ui/src/primitives/useScrollableClass.ts`
+- `packages/shared-ui/src/primitives/useScrollableClass.ts`
   - scrollability detection and `is-scrollable` class assignment
+- `src/features/source-control/sidebar/SourceControlResourceLists.tsx`,
+  `src/features/source-control/GitStatusView.tsx`,
+  `src/features/cloud/history/CloudHistorySidebar.tsx`
+  - current scalable-list consumers of the shared virtualization policy
 
 ## Invariants
 

@@ -2,7 +2,7 @@ import {
   createCloudMcpEndpoint,
   createCloudScope,
   type DesktopCloudMcpEndpoint,
-  type DesktopCloudScope,
+  type DesktopCloudRepositoryView,
   type DesktopCloudSession,
 } from "../../../../lib/cloudApi";
 import {
@@ -11,6 +11,7 @@ import {
   type CreateAccessIntent,
   type OptionalAccessProvider,
 } from "./createAccessModel";
+import { repositoryScopeView } from "../../repositoryTarget";
 
 type CreateAccessFlowInput = {
   projectId: string;
@@ -19,7 +20,7 @@ type CreateAccessFlowInput = {
   path: string;
   name: string;
   mode: "r" | "rw";
-  existingScope: DesktopCloudScope | null;
+  existingScope: DesktopCloudRepositoryView | null;
   optionalProvidersToCreate: OptionalAccessProvider[];
   intent: CreateAccessIntent;
   existingMcpEndpoints: DesktopCloudMcpEndpoint[];
@@ -27,7 +28,7 @@ type CreateAccessFlowInput = {
 };
 
 export type CreateAccessFlowResult = {
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   preferredRowId: string;
 };
 
@@ -44,17 +45,19 @@ export async function createDesktopCloudAccess({
   existingMcpEndpoints,
   onCloudSessionChange,
 }: CreateAccessFlowInput): Promise<CreateAccessFlowResult> {
-  const scope = existingScope ?? await createCloudScope(
-    cloudSession,
-    projectId,
-    {
-      name,
-      path,
-      mode,
-      exclude: [],
-    },
-    onCloudSessionChange,
-    apiBaseUrl,
+  const scope = existingScope ?? repositoryScopeView(
+    await createCloudScope(
+      cloudSession,
+      projectId,
+      {
+        name,
+        path,
+        max_mode: mode,
+        exclude: [],
+      },
+      onCloudSessionChange,
+      apiBaseUrl,
+    ),
   );
 
   const createdMcpEndpoints = await Promise.all(optionalProvidersToCreate.map((provider) => {
@@ -65,7 +68,7 @@ export async function createDesktopCloudAccess({
         project_id: projectId,
         path: scope.path,
         name: "MCP Server",
-        accesses: [{ path: scope.path, json_path: "", readonly: scope.mode !== "rw" }],
+        accesses: [{ path: scope.path, json_path: "", readonly: scope.max_mode !== "rw" }],
       },
       onCloudSessionChange,
       apiBaseUrl,
@@ -89,7 +92,7 @@ function getPreferredCreatedAccessRowId({
   createdMcpEndpoint,
   existingMcpEndpoint,
 }: {
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   intent: CreateAccessIntent;
   createdMcpEndpoint: DesktopCloudMcpEndpoint | null;
   existingMcpEndpoint: DesktopCloudMcpEndpoint | null;

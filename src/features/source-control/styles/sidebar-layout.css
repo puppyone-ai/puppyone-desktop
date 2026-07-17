@@ -5,7 +5,7 @@
   padding-block: var(--desktop-sidebar-list-padding-block) 0;
   padding-inline: 0;
   /* Not a scrolling surface: opt out of the reserved gutter inherited from
-     .desktop-tool-sidebar-list (stable reserves space even on hidden). */
+     .po-sidebar-scroll-area (stable reserves space even on hidden). */
   scrollbar-gutter: auto;
 }
 

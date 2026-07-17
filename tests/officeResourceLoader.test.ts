@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchOfficeArrayBuffer,
   OfficeResourceLimitError,
-} from "../vendor/shared-ui/src/editor/viewers/officeResourceLoader";
+} from "../packages/shared-ui/src/editor/viewers/officeResourceLoader";
 
 afterEach(() => {
   vi.unstubAllGlobals();

@@ -1,23 +1,30 @@
 import type { AiEditRequest, AppPreviewResult, DataNode, FileContent, Workspace } from "@puppyone/shared-ui";
+import type { AppLanguagePreference, LocaleState } from "@puppyone/localization/core";
 import type {
   AgentAccountReadRequest,
   AgentAccountState,
   AgentApprovalResolution,
   AgentEvent,
+  AgentLocalConnectionsRequest,
+  AgentLocalConnectionsSnapshot,
   AgentModel,
   AgentModelsListRequest,
   AgentProviderInspection,
   AgentQuestionResolution,
   AgentReplayRequest,
+  AgentRuntimeRequest,
   AgentSessionCloseRequest,
   AgentSessionCreateRequest,
   AgentSessionExitEvent,
+  AgentSessionListItem,
+  AgentSessionMutationRequest,
   AgentSessionResumeRequest,
   AgentSessionSnapshot,
+  AgentSessionsListRequest,
   AgentTurnInterruptRequest,
   AgentTurnStartRequest,
   AgentTurnSteerRequest,
-} from "../features/desktop-agent/agentTypes";
+} from "../../shared/agent-contract/types";
 
 export type GitStatusEntry = {
   path: string;
@@ -86,8 +93,61 @@ export type GitDiffLine = {
   newLine?: number;
 };
 
+export type GitRevisionMissingSide = {
+  kind: "missing";
+  identity: string;
+  size: 0;
+  mimeType: null;
+  reason: string;
+};
+
+export type GitRevisionTextSide = {
+  kind: "text";
+  identity: string;
+  size: number;
+  mimeType: string | null;
+  content: string;
+};
+
+export type GitRevisionResourceSide = {
+  kind: "resource";
+  identity: string;
+  size: number;
+  mimeType: string | null;
+  handle: string;
+};
+
+export type GitRevisionUnavailableSide = {
+  kind: "unavailable";
+  identity: string;
+  size: number | null;
+  mimeType: string | null;
+  reason: string;
+  message: string;
+};
+
+export type GitRevisionSide =
+  | GitRevisionMissingSide
+  | GitRevisionTextSide
+  | GitRevisionResourceSide
+  | GitRevisionUnavailableSide;
+
+export type GitRevisionPair = {
+  repositoryIdentity: string;
+  selectionIdentity: string;
+  sessionId: string;
+  scope: GitWorkingDiffScope;
+  path: string;
+  oldPath: string | null;
+  status: GitCommitChangeStatus | "untracked";
+  before: GitRevisionSide;
+  after: GitRevisionSide;
+};
+
 export type GitFileDiff = GitCommitChange & {
   binary: boolean;
+  mimeType?: string | null;
+  revisionPair?: GitRevisionPair;
   lines: GitDiffLine[];
   truncated?: boolean;
   omittedLines?: number;
@@ -213,6 +273,105 @@ export type GitStatusSnapshot = {
   statusLimit: number;
   didHitStatusLimit: boolean;
 };
+
+export type CloudPublishPhase =
+  | "prepared"
+  | "project-created"
+  | "credential-issued"
+  | "remote-configured"
+  | "pushed"
+  | "compensation-pending"
+  | "completed";
+
+export type CloudPublishErrorCode =
+  | "SESSION_REQUIRED"
+  | "IDENTITY_MISMATCH"
+  | "ORGANIZATION_REQUIRED"
+  | "REPOSITORY_REQUIRED"
+  | "COMMIT_REQUIRED"
+  | "BRANCH_REQUIRED"
+  | "MERGE_TIP_UNSUPPORTED"
+  | "LFS_UNSUPPORTED"
+  | "REMOTE_CONFLICT"
+  | "PROJECT_CREATE_FAILED"
+  | "CREDENTIAL_FAILED"
+  | "REMOTE_CONFIG_FAILED"
+  | "PUSH_FAILED"
+  | "COMPENSATION_FAILED"
+  | "JOURNAL_CORRUPT"
+  | "JOURNAL_IO_FAILED"
+  | "PERMISSION_DENIED"
+  | "UNKNOWN";
+
+export type CloudPublishState = {
+  operationId: string;
+  phase: CloudPublishPhase;
+  projectId: string | null;
+  projectName: string;
+  organizationId: string;
+  expectedHeadCommitId: string;
+  expectedBranch: string;
+  destinationBranch: "main";
+  createdAt: string;
+  updatedAt: string;
+  canResume: boolean;
+  canAbandon: boolean;
+};
+
+export type CloudPublishResult =
+  | {
+    ok: true;
+    state: CloudPublishState | null;
+    gitStatus?: GitStatusSnapshot;
+  }
+  | {
+    ok: false;
+    state: CloudPublishState | null;
+    error: {
+      code: CloudPublishErrorCode;
+      retryable: boolean;
+      message?: string;
+    };
+  };
+
+export type CloudPublishIdentityRequest = {
+  rootPath: string;
+  apiBaseUrl: string;
+  userId: string;
+};
+
+export type CloudPublishStartRequest = CloudPublishIdentityRequest & {
+  organizationId: string;
+  projectName: string;
+  expectedHeadCommitId: string;
+  expectedBranch: string;
+};
+
+export type CloudPublishAbandonRequest = CloudPublishIdentityRequest & {
+  operationId: string;
+};
+
+export type CloudGitConnectRequest = CloudPublishIdentityRequest & {
+  projectId: string;
+};
+
+export type CloudGitConnectAbandonRequest = CloudGitConnectRequest & {
+  operationId: string;
+};
+
+export type CloudGitConnectResult =
+  | {
+    ok: true;
+    gitStatus: GitStatusSnapshot;
+    projectId: string;
+    target: { kind: "project_root"; project_id: string };
+  }
+  | {
+    ok: false;
+    operationId: string | null;
+    state: null;
+    error: { code: CloudPublishErrorCode; retryable: boolean; message?: string };
+  };
 
 export type GitBranchGraphSnapshot = {
   isRepo: boolean;
@@ -351,6 +510,7 @@ export type RecentWorkspacesResult = {
     path: string;
     error: string;
   }>;
+  hydrated?: boolean;
 };
 
 export type WorkspaceOpenResult = {
@@ -462,16 +622,42 @@ export type WorkspaceChooseExternalAppRequest = {
 };
 
 export type DesktopStoredCloudSession = {
-  expires_in?: number;
-  expires_at?: number;
+  expires_in: number;
+  expires_at: number;
+  user_id: string;
   user_email: string;
-  api_base_url?: string;
+  api_base_url: string;
+  session_generation: string;
+  status: DesktopCloudAuthStatus;
 };
+
+export type DesktopCloudAuthStatus =
+  | "restoring"
+  | "signing-in"
+  | "authenticated"
+  | "refreshing"
+  | "offline-authenticated"
+  | "signing-out"
+  | "expired"
+  | "signed-out";
+
+export type DesktopCloudAuthStateSnapshot = {
+  status: DesktopCloudAuthStatus;
+  session: DesktopStoredCloudSession | null;
+};
+
+export type DesktopCloudIpcEnvelope<T> =
+  | { transport: "puppyone-cloud-ipc-v1"; ok: true; data: T }
+  | {
+      transport: "puppyone-cloud-ipc-v1";
+      ok: false;
+      error: { message: string; status?: number; code?: string };
+    };
 
 export type PuppyoneBackendService = "puppyone" | "github" | "custom";
 
 export type PuppyoneWorkspaceConfig = {
-  version: 1;
+  version: 3;
   sync: {
     sourceOfTruth: {
       service: PuppyoneBackendService;
@@ -489,16 +675,23 @@ export type PuppyoneWorkspaceConfig = {
     remote: string | null;
     branch: string | null;
   };
-  cloud: {
-    projectId: string | null;
-  };
   updatedAt?: string;
 };
 
 declare global {
   interface Window {
     puppyoneDesktop?: {
+      getLocalizationBootstrap: () => Promise<LocaleState>;
+      setLanguagePreference: (preference: AppLanguagePreference) => Promise<LocaleState>;
+      onLocaleChanged: (callback: (state: LocaleState) => void) => () => void;
+      onDocumentSessionFlushRequested: (
+        callback: (request: { requestId: string }) => void | Promise<void>,
+      ) => () => void;
+      onDocumentSessionCloseCancelled: (
+        callback: (request: { requestId: string }) => void,
+      ) => () => void;
       readCloudSession: () => Promise<DesktopStoredCloudSession | null>;
+      readCloudAuthState: () => Promise<DesktopCloudAuthStateSnapshot>;
       restoreCloudSession: (request: {
         apiBaseUrl?: string | null;
       }) => Promise<DesktopStoredCloudSession | null>;
@@ -510,6 +703,9 @@ declare global {
       onCloudSessionChanged: (
         callback: (session: DesktopStoredCloudSession | null) => void,
       ) => () => void;
+      onCloudAuthStateChanged: (
+        callback: (state: DesktopCloudAuthStateSnapshot) => void,
+      ) => () => void;
       onCloudAuthError: (
         callback: (payload: { message?: string }) => void,
       ) => () => void;
@@ -519,14 +715,19 @@ declare global {
         method?: string;
         headers?: Record<string, string>;
         body?: string;
-      }) => Promise<unknown>;
+      }) => Promise<DesktopCloudIpcEnvelope<unknown>>;
       requestCloudSessionApi: (request: {
         apiBaseUrl: string;
         path: string;
         method?: string;
         headers?: Record<string, string>;
         body?: string;
-      }) => Promise<unknown>;
+      }) => Promise<DesktopCloudIpcEnvelope<unknown>>;
+      cloudPublishGetState: (request: CloudPublishIdentityRequest) => Promise<CloudPublishResult>;
+      cloudPublishStartOrResume: (request: CloudPublishStartRequest) => Promise<CloudPublishResult>;
+      cloudPublishAbandon: (request: CloudPublishAbandonRequest) => Promise<CloudPublishResult>;
+      cloudGitConnectProject: (request: CloudGitConnectRequest) => Promise<CloudGitConnectResult>;
+      cloudGitAbandonConnect: (request: CloudGitConnectAbandonRequest) => Promise<CloudGitConnectResult>;
       listCloudAccessPointDirectory: (request: {
         accessKey: string;
         path?: string;
@@ -593,6 +794,7 @@ declare global {
       getInitialWorkspace: () => Promise<LastWorkspaceResult>;
       getLastWorkspace: () => Promise<LastWorkspaceResult>;
       getRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
+      hydrateRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
       forgetLastWorkspace: () => Promise<void>;
       showHomepage: () => Promise<{ ok: boolean }>;
       openWorkspaceInCurrentWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
@@ -625,7 +827,8 @@ declare global {
         rootPath: string;
         path: string;
         content: string;
-      }) => Promise<void>;
+        expectedVersion?: string | null;
+      }) => Promise<{ version: string }>;
       createEntry: (request: WorkspaceCreateEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       renameEntry: (request: WorkspaceRenameEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       moveEntry: (request: WorkspaceMoveEntryRequest) => Promise<WorkspaceCreateEntryResult>;
@@ -699,9 +902,8 @@ declare global {
       initGitRepository: (request: {
         rootPath: string;
       }) => Promise<GitStatusSnapshot>;
-      configureGitCloudRemote: (request: {
+      removeGitRemote: (request: {
         rootPath: string;
-        remoteUrl: string;
         remoteName?: string;
       }) => Promise<GitStatusSnapshot>;
       readPuppyoneConfig: (request: {
@@ -719,7 +921,31 @@ declare global {
         rootPath: string;
         path: string;
         scope: GitWorkingDiffScope;
+        requestId?: string;
+        sessionId?: string;
       }) => Promise<GitCommitDetail>;
+      cancelGitFileDiff?: (request: {
+        requestId: string;
+        sessionId: string;
+      }) => Promise<{ ok: boolean }>;
+      readGitDiffResource: (request: {
+        handle: string;
+        sessionId: string;
+        selectionIdentity: string;
+        revisionIdentity: string;
+        offset: number;
+        length: number;
+      }) => Promise<{
+        bytes: Uint8Array;
+        offset: number;
+        size: number;
+        done: boolean;
+        selectionIdentity: string;
+        revisionIdentity: string;
+      }>;
+      releaseGitDiffResources: (request: {
+        sessionId: string;
+      }) => Promise<{ ok: boolean }>;
       stageGitPaths: (request: {
         rootPath: string;
         paths: string[];
@@ -775,6 +1001,13 @@ declare global {
         rootPath: string;
         showNativeErrorDialog?: boolean;
       }) => Promise<GitStatusSnapshot>;
+      pushGitCommitToRemote: (request: {
+        rootPath: string;
+        remoteName: string;
+        destinationBranch: string;
+        expectedHeadCommitId: string;
+        expectedBranch: string;
+      }) => Promise<GitStatusSnapshot>;
       publishGitBranch: (request: {
         rootPath: string;
         remoteName?: string | null;
@@ -790,12 +1023,17 @@ declare global {
       onUpdateStateChanged: (
         callback: (state: DesktopUpdateState) => void,
       ) => () => void;
-      discoverAgentProviders: (request?: { refresh?: boolean }) => Promise<AgentProviderInspection>;
+      discoverAgentProviders: (request?: AgentRuntimeRequest) => Promise<AgentProviderInspection>;
+      discoverLocalAgentConnections: (request?: AgentLocalConnectionsRequest) => Promise<AgentLocalConnectionsSnapshot>;
       listAgentModels: (request?: AgentModelsListRequest) => Promise<AgentModel[]>;
       readAgentAccount: (request?: AgentAccountReadRequest) => Promise<AgentAccountState | null>;
       createAgentSession: (request: AgentSessionCreateRequest) => Promise<AgentSessionSnapshot>;
       resumeAgentSession: (request: AgentSessionResumeRequest) => Promise<AgentSessionSnapshot | null>;
       replayAgentSession: (request: AgentReplayRequest) => Promise<AgentSessionSnapshot>;
+      listAgentSessions: (request: AgentSessionsListRequest) => Promise<AgentSessionListItem[]>;
+      forkAgentSession: (request: AgentSessionMutationRequest) => Promise<AgentSessionSnapshot>;
+      archiveAgentSession: (request: AgentSessionMutationRequest) => Promise<{ sessionId: string; archived: boolean }>;
+      deleteAgentSession: (request: AgentSessionMutationRequest) => Promise<{ sessionId: string; deleted: boolean; nativeDeleted: boolean }>;
       closeAgentSession: (request: AgentSessionCloseRequest) => Promise<{ sessionId: string; closed: boolean }>;
       startAgentTurn: (request: AgentTurnStartRequest) => Promise<{ sessionId: string; turnId: string }>;
       steerAgentTurn: (request: AgentTurnSteerRequest) => Promise<{
@@ -808,6 +1046,7 @@ declare global {
         turnId: string;
         interruptRequested: boolean;
       }>;
+      compactAgentSession: (request: { rootPath: string; sessionId: string }) => Promise<{ sessionId: string; compacted: boolean }>;
       resolveAgentApproval: (request: AgentApprovalResolution) => Promise<{
         sessionId: string;
         requestId: string;
@@ -819,7 +1058,7 @@ declare global {
       }>;
       onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
       onAgentSessionExit: (callback: (event: AgentSessionExitEvent) => void) => () => void;
-      viewerPacks: {
+      viewerPacks?: {
         getSnapshot: () => Promise<import("@puppyone/shared-ui").ViewerPackSnapshot>;
         installLocal: () => Promise<
           | { canceled: true }

@@ -1,5 +1,7 @@
 import type { RefObject } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
+import { GitBranch } from "lucide-react";
+import { bidiIsolate, useLocalization } from "@puppyone/localization";
 import { DesktopMenuItem, DesktopMenuSurface } from "../../components/DesktopMenu";
 import type { GitBranchSummary, GitStatusSnapshot } from "../../types/electron";
 import { BranchMenuGroup } from "../source-control/operationDialogs";
@@ -7,12 +9,12 @@ import {
   DesktopWorkspaceSwitcher,
   type DesktopWorkspaceSwitcherItem,
 } from "./DesktopWorkspaceSwitcher";
-import { PuppyGitIcon } from "./navigation";
 
 export function DesktopTitlebarContext({
   activeGitStatus,
   branchSwitcherOpen,
   branchSwitcherRef,
+  compact,
   gitStatusLoading,
   gitOperationLoading,
   localBranches,
@@ -32,14 +34,20 @@ export function DesktopTitlebarContext({
   onToggleBranchSwitcher,
   onToggleWorkspaceSwitcher,
 }: DesktopTitlebarContextProps) {
+  const { t } = useLocalization();
   const workspaceTitlebarLabel = workspace.name.trim() || workspace.name;
   const branchReady = !workspaceIsCloud && activeGitStatus?.isRepo === true;
-  const branchLabel = branchReady ? (activeGitStatus.branch ?? "detached") : gitStatusLoading ? "Loading" : "No Git";
+  const branchLabel = branchReady
+    ? (activeGitStatus.branch ?? t("shell.branch.detached"))
+    : gitStatusLoading
+      ? t("shell.branch.loading")
+      : t("shell.branch.noGit");
   const branchTitlebarLabel = branchLabel.trim() || branchLabel;
 
   return (
     <div className="desktop-titlebar-context">
       <DesktopWorkspaceSwitcher
+        compact={compact}
         open={workspaceSwitcherOpen}
         refObject={workspaceSwitcherRef}
         titlebarLabel={workspaceTitlebarLabel}
@@ -76,6 +84,7 @@ type DesktopTitlebarContextProps = {
   activeGitStatus: GitStatusSnapshot | null;
   branchSwitcherOpen: boolean;
   branchSwitcherRef: RefObject<HTMLDivElement>;
+  compact: boolean;
   gitStatusLoading: boolean;
   gitOperationLoading: string | null;
   localBranches: GitBranchSummary[];
@@ -123,6 +132,7 @@ function DesktopBranchSwitcher({
   onDone: () => void;
   onToggle: () => void;
 }) {
+  const { t } = useLocalization();
   const hasBranches = localBranches.length > 0 || remoteBranches.length > 0;
 
   return (
@@ -130,14 +140,16 @@ function DesktopBranchSwitcher({
       <button
         className="desktop-titlebar-branch-button"
         type="button"
-        aria-label={`Switch branch: ${branchLabel}`}
+        aria-label={t("shell.branch.switch", { branch: bidiIsolate(branchLabel) })}
         aria-expanded={open}
         aria-haspopup="menu"
         disabled={disabled}
-        title={branchLabel}
+        title={disabled
+          ? branchLabel
+          : t("shell.branch.title", { branch: bidiIsolate(branchLabel) })}
         onClick={onToggle}
       >
-        <PuppyGitIcon size={13} />
+        <GitBranch size={13} strokeWidth={1.8} aria-hidden="true" />
         <span>{titlebarLabel}</span>
       </button>
 
@@ -147,20 +159,20 @@ function DesktopBranchSwitcher({
             <DesktopMenuItem
               className="desktop-branch-menu-row"
               disabled
-              icon={<PuppyGitIcon size={13} />}
-              label="Loading branches"
+              icon={<GitBranch size={13} strokeWidth={1.8} />}
+              label={t("shell.branch.loadingBranches")}
             />
           ) : hasBranches ? (
             <>
               <BranchMenuGroup
-                title="Local branches"
+                title={t("shell.branch.localBranches")}
                 branches={localBranches}
                 operationLoading={operationLoading}
                 onCheckout={onCheckout}
                 onDone={onDone}
               />
               <BranchMenuGroup
-                title="Remote branches"
+                title={t("shell.branch.remoteBranches")}
                 branches={remoteBranches}
                 operationLoading={operationLoading}
                 onCheckout={onCheckout}
@@ -171,8 +183,8 @@ function DesktopBranchSwitcher({
             <DesktopMenuItem
               className="desktop-branch-menu-row"
               disabled
-              icon={<PuppyGitIcon size={13} />}
-              label="No branches"
+              icon={<GitBranch size={13} strokeWidth={1.8} />}
+              label={t("shell.branch.noBranches")}
             />
           )}
         </DesktopMenuSurface>

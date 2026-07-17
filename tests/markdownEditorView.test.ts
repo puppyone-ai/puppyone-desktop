@@ -1,20 +1,21 @@
 /**
  * @vitest-environment happy-dom
  */
-import { EditorState } from "@codemirror/state";
+import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it } from "vitest";
-import { disposeWidgetSessionDom } from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/widgetSession";
-import { createWidgetSessionRegistry } from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/widgetSession";
-import { createDomFromInlineHtmlSource } from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlDomAdapter";
+import { disposeWidgetSessionDom } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/widgetSession";
+import { createWidgetSessionRegistry } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/widgetSession";
+import { createDomFromInlineHtmlSource } from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlDomAdapter";
 import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
-} from "../vendor/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
-import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/embedHost";
-import { createSanitizedBlockHtmlFragment } from "../vendor/shared-ui/src/editor/markdown/features/html/sanitizeHtml";
-import { createPrincipalFromView } from "../vendor/shared-ui/src/editor/markdown/core/editor/markdownLivePreviewContext";
-import { renderMarkdownInlineFromSharedPolicy } from "../vendor/shared-ui/src/editor/markdown/core/preview/markdownInlinePlanAdapter";
+} from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
+import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/embedHost";
+import { createSanitizedBlockHtmlFragment } from "../packages/shared-ui/src/editor/markdown/features/html/sanitizeHtml";
+import { createPrincipalFromView } from "../packages/shared-ui/src/editor/markdown/core/editor/markdownLivePreviewContext";
+import { renderMarkdownInlineFromSharedPolicy } from "../packages/shared-ui/src/editor/markdown/composition/preview/markdownInlinePlanAdapter";
+import { markdownRevealedSourceField } from "../packages/shared-ui/src/editor/markdown/core/state/revealedSource";
 
 const views: EditorView[] = [];
 
@@ -92,6 +93,71 @@ describe("Markdown EditorView lifecycle", () => {
     expect(view.state.doc.toString()).toContain("あ");
     view.contentDOM.dispatchEvent(new CompositionEvent("compositionend"));
   });
+
+  it("edits an HTML block in the canonical CodeMirror source and restores its preview", async () => {
+    const initial = "intro\n\n<div>old</div>\n\noutro";
+    const view = createView(initial);
+    const shellBefore = view.dom.querySelector<HTMLElement>(".cm-md-html-widget");
+    if (!shellBefore) throw new Error("HTML preview did not mount.");
+
+    // Keep the mounted widget while its current document position moves. The
+    // source button must resolve the mapped DOM range, not a constructor-time
+    // offset.
+    view.dispatch({ changes: { from: 0, insert: "shifted\n" } });
+    const shellAfterShift = view.dom.querySelector<HTMLElement>(".cm-md-html-widget");
+    expect(shellAfterShift).toBe(shellBefore);
+    const sourceButton = shellAfterShift?.querySelector<HTMLButtonElement>(".cm-md-html-source-toggle");
+    if (!sourceButton) throw new Error("HTML source button did not mount.");
+
+    sourceButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+
+    const currentSource = view.state.doc.toString();
+    const blockFrom = currentSource.indexOf("<div>old</div>");
+    const blockTo = blockFrom + "<div>old</div>".length;
+    expect(view.state.field(markdownRevealedSourceField)).toEqual({
+      from: blockFrom,
+      to: blockTo,
+      presentation: "block",
+    });
+    expect(view.state.selection.main.head).toBe(blockFrom + 1);
+    expect(view.dom.querySelector(".cm-md-html-widget")).toBeNull();
+    expect(view.dom.querySelector(".cm-md-html-source-block")).toBeNull();
+    expect(view.contentDOM.textContent).toContain("<div>old</div>");
+
+    const oldFrom = view.state.doc.toString().indexOf("old", blockFrom);
+    view.dispatch({
+      changes: { from: oldFrom, to: oldFrom + 3, insert: "edited" },
+      selection: EditorSelection.cursor(oldFrom + "edited".length),
+      userEvent: "input.type",
+    });
+    expect(view.state.doc.toString()).toContain("<div>edited</div>");
+    expect(view.dom.querySelector(".cm-md-html-widget")).toBeNull();
+
+    view.dispatch({ selection: EditorSelection.cursor(0) });
+    expect(view.state.field(markdownRevealedSourceField)).toBeNull();
+    expect(view.dom.querySelector(".cm-md-html-rendered-surface")?.textContent).toBe("edited");
+  });
+
+  it("collapses a revealed HTML source block with Escape", async () => {
+    const source = "<div>only block</div>";
+    const view = createView(source);
+    const button = view.dom.querySelector<HTMLButtonElement>(".cm-md-html-source-toggle");
+    if (!button) throw new Error("HTML source button did not mount.");
+
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    expect(view.state.field(markdownRevealedSourceField)?.presentation).toBe("block");
+
+    view.contentDOM.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    }));
+    expect(view.state.field(markdownRevealedSourceField)).toBeNull();
+    expect(view.state.selection.main.head).toBe(source.length);
+    expect(view.dom.querySelector(".cm-md-html-widget")).not.toBeNull();
+  });
 });
 
 describe("Markdown preview/policy convergence", () => {
@@ -149,6 +215,13 @@ describe("Markdown table plan adapter", () => {
     expect(resolverCalls).toBe(1);
     const img = target.querySelector("img");
     expect(img?.getAttribute("src")).toBe("blob:https://app/pic");
+    expect(img?.hidden).toBe(true);
+    expect(target.querySelector(".cm-md-image-placeholder")).not.toBeNull();
+    if (!img) throw new Error("Brokered table image did not mount.");
+    Object.defineProperty(img, "decode", { configurable: true, value: undefined });
+    img.dispatchEvent(new Event("load"));
+    expect(img.hidden).toBe(false);
+    expect(target.querySelector(".cm-md-image-placeholder")).toBeNull();
     target.remove();
   });
 

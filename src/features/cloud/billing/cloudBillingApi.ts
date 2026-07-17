@@ -1,0 +1,98 @@
+import {
+  applyCloudBillingPlanChange,
+  applyCloudBillingSeatChange,
+  createCloudBillingCheckout,
+  createCloudBillingPortal,
+  createDesktopBillingIdempotencyKey,
+  getCloudBillingCatalog,
+  getCloudBillingOperation,
+  getCloudBillingSummary,
+  getCloudBillingUsage,
+  listCloudBillingOperations,
+  openCloudBillingExternalUrl,
+  quoteCloudBillingPlan,
+  quoteCloudBillingSeats,
+  type DesktopBillingCatalog,
+  type DesktopBillingOperation,
+  type DesktopBillingQuote,
+  type DesktopBillingSummary,
+  type DesktopBillingUsage,
+  type DesktopCloudSession,
+} from "../../../lib/cloudApi";
+
+export type SessionChangeHandler = (session: DesktopCloudSession | null) => void;
+
+export type CloudBillingControllerDependencies = {
+  getCatalog: (
+    session: DesktopCloudSession,
+    onSessionChange?: SessionChangeHandler,
+    apiBaseUrl?: string | null,
+  ) => Promise<DesktopBillingCatalog>;
+  getSummary: (
+    session: DesktopCloudSession,
+    orgId: string,
+    onSessionChange?: SessionChangeHandler,
+    apiBaseUrl?: string | null,
+  ) => Promise<DesktopBillingSummary>;
+  getUsage: (
+    session: DesktopCloudSession,
+    orgId: string,
+    onSessionChange?: SessionChangeHandler,
+    apiBaseUrl?: string | null,
+  ) => Promise<DesktopBillingUsage>;
+  listOperations: (
+    session: DesktopCloudSession,
+    orgId: string,
+    onSessionChange?: SessionChangeHandler,
+    apiBaseUrl?: string | null,
+  ) => Promise<DesktopBillingOperation[]>;
+  getOperation: (
+    session: DesktopCloudSession,
+    orgId: string,
+    operationId: string,
+    onSessionChange?: SessionChangeHandler,
+    apiBaseUrl?: string | null,
+  ) => Promise<DesktopBillingOperation>;
+  quotePlan: (
+    session: DesktopCloudSession,
+    orgId: string,
+    targetPlanId: string,
+    seatQuantity: number,
+    idempotencyKey: string,
+    onSessionChange?: SessionChangeHandler,
+    apiBaseUrl?: string | null,
+  ) => Promise<DesktopBillingQuote>;
+  quoteSeats: (
+    session: DesktopCloudSession,
+    orgId: string,
+    seatQuantity: number,
+    idempotencyKey: string,
+    operationId?: string | null,
+    onSessionChange?: SessionChangeHandler,
+    apiBaseUrl?: string | null,
+  ) => Promise<DesktopBillingQuote>;
+  createCheckout: typeof createCloudBillingCheckout;
+  applyPlanChange: typeof applyCloudBillingPlanChange;
+  applySeatChange: typeof applyCloudBillingSeatChange;
+  createPortal: typeof createCloudBillingPortal;
+  openExternalUrl: typeof openCloudBillingExternalUrl;
+  createIdempotencyKey: typeof createDesktopBillingIdempotencyKey;
+  now: () => number;
+};
+
+export const DEFAULT_CLOUD_BILLING_DEPENDENCIES: CloudBillingControllerDependencies = {
+  getCatalog: getCloudBillingCatalog,
+  getSummary: getCloudBillingSummary,
+  getUsage: getCloudBillingUsage,
+  listOperations: listCloudBillingOperations,
+  getOperation: getCloudBillingOperation,
+  quotePlan: quoteCloudBillingPlan,
+  quoteSeats: quoteCloudBillingSeats,
+  createCheckout: createCloudBillingCheckout,
+  applyPlanChange: applyCloudBillingPlanChange,
+  applySeatChange: applyCloudBillingSeatChange,
+  createPortal: createCloudBillingPortal,
+  openExternalUrl: openCloudBillingExternalUrl,
+  createIdempotencyKey: createDesktopBillingIdempotencyKey,
+  now: () => Date.now(),
+};

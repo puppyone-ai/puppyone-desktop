@@ -5,27 +5,33 @@ import { EditorState } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { EditorView } from "@codemirror/view";
 import { describe, expect, it, vi } from "vitest";
-import { bindInlineHtmlDomInteractions } from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlDomAdapter";
-import { renderMarkdownInlineFromSharedPolicy } from "../vendor/shared-ui/src/editor/markdown/core/preview/markdownInlinePlanAdapter";
+import { bindInlineHtmlDomInteractions } from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlDomAdapter";
+import { renderMarkdownInlineFromSharedPolicy } from "../packages/shared-ui/src/editor/markdown/composition/preview/markdownInlinePlanAdapter";
 import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
-} from "../vendor/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
-import { getMarkdownPlanIndex } from "../vendor/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
-import { isTagAllowedInProfile } from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownHtmlProfiles";
-import { createSanitizedBlockHtmlFragment } from "../vendor/shared-ui/src/editor/markdown/features/html/sanitizeHtml";
-import { isSafeStyleValue } from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownHtmlSanitizerPolicy";
+} from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
+import { getMarkdownPlanIndex } from "../packages/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
+import { isTagAllowedInProfile } from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownHtmlProfiles";
+import { createSanitizedBlockHtmlFragment } from "../packages/shared-ui/src/editor/markdown/features/html/sanitizeHtml";
+import { isSafeStyleValue } from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownHtmlSanitizerPolicy";
 import {
   MERMAID_MAX_SOURCE_BYTES,
   renderMermaidDiagram,
   sanitizeMermaidSvg,
-} from "../vendor/shared-ui/src/editor/markdown/features/mermaid/mermaidRenderer";
-import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
+} from "../packages/shared-ui/src/editor/markdown/features/mermaid/mermaidRenderer";
+import {
+  puppyMarkdownFeatureCompositionExtension,
+  puppyMarkdownParserExtensions,
+} from "../packages/shared-ui/src/editor/markdown/composition/markdownFeatureComposition";
 
 function createMarkdownState(source: string) {
   return EditorState.create({
     doc: source,
-    extensions: [markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions })],
+    extensions: [
+      puppyMarkdownFeatureCompositionExtension,
+      markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
+    ],
   });
 }
 
@@ -36,7 +42,7 @@ async function flushAsyncRendering() {
 }
 
 describe("Markdown semantic-plan convergence", () => {
-  it("keeps parser marker ranges while enriching image plans with token payload", () => {
+  it("compiles one complete image semantic payload into the image plan", () => {
     const plans = getMarkdownPlanIndex(createMarkdownState('![diagram](assets/a.png "Architecture")'));
     const image = plans.find(({ plan }) => plan.presentation === "inlineAtom" && plan.atom.kind === "image");
     expect(image?.plan.presentation).toBe("inlineAtom");
@@ -46,6 +52,7 @@ describe("Markdown semantic-plan convergence", () => {
         alt: "diagram",
         href: "assets/a.png",
         title: "Architecture",
+        referenceKind: "markdown-path",
       });
       expect(image.plan.diagnostics).toEqual([]);
     }
@@ -77,7 +84,11 @@ describe("Markdown semantic-plan convergence", () => {
       }),
     });
     expect(view.dom.querySelector(".cm-md-hr-widget")).not.toBeNull();
-    expect(view.dom.querySelector(".cm-md-task-checkbox")?.getAttribute("aria-checked")).toBe("true");
+    const checkbox = view.dom.querySelector<HTMLButtonElement>(".cm-md-task-checkbox-widget");
+    expect(checkbox).toBeInstanceOf(HTMLButtonElement);
+    expect(checkbox?.type).toBe("button");
+    expect(checkbox?.getAttribute("role")).toBe("checkbox");
+    expect(checkbox?.getAttribute("aria-checked")).toBe("true");
     view.destroy();
     parent.remove();
   });
@@ -88,6 +99,10 @@ describe("Markdown HTML profile convergence", () => {
     expect(isTagAllowedInProfile("img", "inline")).toBe(false);
     expect(isTagAllowedInProfile("img", "block")).toBe(false);
     expect(isTagAllowedInProfile("img", "inline", { brokeredMedia: true })).toBe(true);
+    expect(isTagAllowedInProfile("video", "block")).toBe(false);
+    expect(isTagAllowedInProfile("source", "block")).toBe(false);
+    expect(isTagAllowedInProfile("video", "block", { deferredMedia: true })).toBe(true);
+    expect(isTagAllowedInProfile("source", "block", { deferredMedia: true })).toBe(true);
     expect(isTagAllowedInProfile("audio", "inline", { brokeredMedia: true })).toBe(false);
   });
 

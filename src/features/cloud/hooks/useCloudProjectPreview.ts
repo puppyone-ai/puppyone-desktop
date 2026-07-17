@@ -1,131 +1,134 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   listCloudRoot,
   type DesktopCloudSession,
   type DesktopCloudTreeEntry,
 } from "../../../lib/cloudApi";
+import {
+  loadCloudCache,
+  readCloudCache,
+  type CloudCacheContext,
+} from "../cache/cloudCache";
 
 const CLOUD_PROJECT_PREVIEW_LIMIT = 8;
-const CLOUD_PROJECT_PREVIEW_CACHE_LIMIT = 120;
+const CLOUD_PROJECT_PREVIEW_TTL_MS = 30_000;
+const CLOUD_PROJECT_PREVIEW_MAX_CONCURRENCY = 3;
 
-const previewCache = new Map<string, DesktopCloudTreeEntry[]>();
-const previewRequests = new Map<string, Promise<DesktopCloudTreeEntry[]>>();
+type PreviewQueueEntry = {
+  run: () => Promise<unknown>;
+  resolve: (value: unknown) => void;
+  reject: (reason?: unknown) => void;
+};
+
+const previewQueue: PreviewQueueEntry[] = [];
+let activePreviewRequests = 0;
 
 type CloudProjectPreviewState = {
   entries: DesktopCloudTreeEntry[];
   loading: boolean;
-  error: string | null;
+  error: boolean;
 };
 
 export function useCloudProjectPreview({
+  enabled = true,
   session,
   projectId,
+  projectRevision,
   apiBaseUrl,
   onSessionChange,
 }: {
+  enabled?: boolean;
   session: DesktopCloudSession | null;
   projectId: string;
+  projectRevision?: string | null;
   apiBaseUrl: string | null;
   onSessionChange: (session: DesktopCloudSession | null) => void;
 }): CloudProjectPreviewState {
-  const cacheKey = session
-    ? [session.user_email, apiBaseUrl ?? session.api_base_url ?? "", projectId].join("\n")
-    : null;
-  const cachedEntries = cacheKey ? previewCache.get(cacheKey) : undefined;
+  const cacheContext = useMemo<CloudCacheContext | null>(() => enabled && session ? ({
+    session,
+    projectId,
+    revision: projectRevision?.trim() || "mutable-latest",
+    resource: "project-preview",
+    path: "",
+  }) : null, [enabled, projectId, projectRevision, session]);
+  const cachedEntries = cacheContext
+    ? readCloudCache<DesktopCloudTreeEntry[]>(cacheContext)
+    : undefined;
   const [state, setState] = useState<CloudProjectPreviewState>({
     entries: cachedEntries ?? [],
-    loading: Boolean(session && !cachedEntries),
-    error: null,
+    loading: Boolean(enabled && session && !cachedEntries),
+    error: false,
   });
 
   useEffect(() => {
-    if (!session || !projectId || !cacheKey) {
-      setState({ entries: [], loading: false, error: null });
+    if (!enabled || !session || !projectId || !cacheContext) {
+      setState({ entries: [], loading: false, error: false });
       return undefined;
     }
 
-    const cached = previewCache.get(cacheKey);
+    const cached = readCloudCache<DesktopCloudTreeEntry[]>(cacheContext);
     if (cached) {
-      setState({ entries: cached, loading: false, error: null });
+      setState({ entries: cached, loading: false, error: false });
       return undefined;
     }
 
     let cancelled = false;
-    setState((current) => ({
-      entries: current.entries,
-      loading: true,
-      error: null,
-    }));
-
-    const request = getPreviewRequest(cacheKey, () => (
-      listCloudRoot(
-        session,
-        projectId,
-        (nextSession) => {
-          if (nextSession) onSessionChange(nextSession);
-        },
-        apiBaseUrl,
-      ).then((tree) => sortPreviewEntries(tree.entries).slice(0, CLOUD_PROJECT_PREVIEW_LIMIT))
-    ));
-
-    request
+    setState((current) => ({ ...current, loading: true, error: false }));
+    void loadCloudCache(
+      cacheContext,
+      () => scheduleProjectPreview(() => listCloudRoot(
+          session,
+          projectId,
+          (nextSession) => {
+            if (nextSession) onSessionChange(nextSession);
+          },
+          apiBaseUrl,
+        ).then((tree) => sortPreviewEntries(tree.entries).slice(0, CLOUD_PROJECT_PREVIEW_LIMIT))),
+      { ttlMs: CLOUD_PROJECT_PREVIEW_TTL_MS },
+    )
       .then((entries) => {
-        if (cancelled) return;
-        setState({
-          entries,
-          loading: false,
-          error: null,
-        });
+        if (!cancelled) setState({ entries, loading: false, error: false });
       })
-      .catch((error) => {
-        if (cancelled) return;
-        setState({
-          entries: [],
-          loading: false,
-          error: error instanceof Error ? error.message : "Unable to load project preview.",
-        });
+      .catch(() => {
+        if (!cancelled) {
+          setState({
+            entries: [],
+            loading: false,
+            error: true,
+          });
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [
-    apiBaseUrl,
-    cacheKey,
-    onSessionChange,
-    projectId,
-    session,
-  ]);
+  }, [apiBaseUrl, cacheContext, enabled, onSessionChange, projectId, session]);
 
   return state;
 }
 
-function getPreviewRequest(
-  cacheKey: string,
-  load: () => Promise<DesktopCloudTreeEntry[]>,
-) {
-  const existing = previewRequests.get(cacheKey);
-  if (existing) return existing;
-
-  const request = load()
-    .then((entries) => {
-      previewCache.set(cacheKey, entries);
-      trimPreviewCache();
-      return entries;
-    })
-    .finally(() => {
-      previewRequests.delete(cacheKey);
+function scheduleProjectPreview<T>(run: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    previewQueue.push({
+      run,
+      resolve: (value) => resolve(value as T),
+      reject,
     });
-
-  previewRequests.set(cacheKey, request);
-  return request;
+    drainProjectPreviewQueue();
+  });
 }
 
-function trimPreviewCache() {
-  while (previewCache.size > CLOUD_PROJECT_PREVIEW_CACHE_LIMIT) {
-    const oldestKey = previewCache.keys().next().value;
-    if (!oldestKey) return;
-    previewCache.delete(oldestKey);
+function drainProjectPreviewQueue(): void {
+  while (activePreviewRequests < CLOUD_PROJECT_PREVIEW_MAX_CONCURRENCY && previewQueue.length > 0) {
+    const entry = previewQueue.shift();
+    if (!entry) return;
+    activePreviewRequests += 1;
+    void entry.run()
+      .then(entry.resolve, entry.reject)
+      .finally(() => {
+        activePreviewRequests -= 1;
+        drainProjectPreviewQueue();
+      });
   }
 }
 

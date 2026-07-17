@@ -1,0 +1,11 @@
+{
+  "title": "Terminal",
+  "actions": "Terminal actions",
+  "clear": "Clear terminal",
+  "reset": "Reset terminal",
+  "bridgeUnavailable": "Terminal bridge unavailable. Open this workspace in puppyone.",
+  "processExitedSignal": "Process exited with signal {signal}.",
+  "processExitedCode": "Process exited with code {code}.",
+  "runtimeRestartRequired": "The terminal runtime was updated. Restart puppyone once so the native bridge can load.",
+  "errorDetail": "Terminal error: {detail}"
+}

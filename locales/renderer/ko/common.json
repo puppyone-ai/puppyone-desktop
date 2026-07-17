@@ -1,0 +1,17 @@
+{
+  "messageUnavailable": "이 텍스트를 사용할 수 없습니다.",
+  "action.cancel": "취소",
+  "action.close": "닫기",
+  "action.confirm": "확인",
+  "action.retry": "다시 시도",
+  "action.apply": "적용",
+  "action.reset": "재설정",
+  "action.refresh": "새로 고침",
+  "action.copy": "복사",
+  "action.clear": "지우기",
+  "action.copied": "복사됨",
+  "action.change": "변경",
+  "action.chooseApp": "앱 선택",
+  "action.save": "저장",
+  "status.loading": "불러오는 중…"
+}

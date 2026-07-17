@@ -1,0 +1,49 @@
+{
+  "schema": "puppyone-renderer-performance-evidence/v1",
+  "environment": {
+    "capturedAt": "2026-07-13",
+    "platform": "darwin-arm64",
+    "cpu": "Apple M2 Pro",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "electron": "41.10.1",
+    "chromium": "146.0.7680.216",
+    "build": "production"
+  },
+  "presentationContract": {
+    "livePreviewSourceVisibleAtEditorBaseReady": false,
+    "livePreviewVisibleAfterMatchingRevisionCommit": true,
+    "pendingEditorRemainsMeasurable": true,
+    "sourceModeBypassesReadinessGate": true,
+    "rapidSwitchStalePreviewCommits": 0,
+    "verification": "Production Electron smoke checks the computed visibility at editor_base_ready and after preview_ready; lifecycle tests cover revision changes, A-to-B supersession, and Source Mode cleanup."
+  },
+  "warmProductionElectron30SampleSummary": {
+    "completedSamples": 30,
+    "staleCommitCount": 0,
+    "longTasksOver50ms": 0,
+    "stagesMs": {
+      "previewShellCommitted": { "p50": 1.3, "p95": 1.8 },
+      "contentReady": { "p50": 13, "p95": 17.6 },
+      "editorBaseReady": { "p50": 3.2, "p95": 5.2 },
+      "markdownLanguageReady": { "p50": 6.9, "p95": 9.8 },
+      "previewReady": { "p50": 18.5, "p95": 24.6 },
+      "inputTransaction10000": { "p50": 0.7, "p95": 1.3 }
+    }
+  },
+  "coldFirstOpenWithLinkIndex": {
+    "previewShellCommittedMs": 5.7,
+    "contentReadyMs": 19.3,
+    "editorBaseReadyMs": 46.5,
+    "markdownLanguageReadyMs": 64.8,
+    "previewReadyMs": 94.5,
+    "inputTransactionMs": 3.2,
+    "staleCommitCount": 0,
+    "longTasksOver50ms": 0
+  },
+  "commands": {
+    "warm": "npm run build && ./node_modules/.bin/electron scripts/smoke-renderer-performance.mjs --outputJson /tmp/puppyone-markdown-readiness-renderer-smoke.json",
+    "cold": "./node_modules/.bin/electron scripts/smoke-renderer-performance.mjs --cold --visible --with-link-index --outputJson /tmp/puppyone-markdown-readiness-cold-smoke.json",
+    "benchmark": "npm run bench:performance -- --outputJson /tmp/puppyone-markdown-readiness-benchmark.json"
+  }
+}

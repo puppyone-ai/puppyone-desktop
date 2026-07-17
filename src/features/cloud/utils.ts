@@ -1,54 +1,65 @@
 import { Bot, Cloud, Database, GitBranch, Link, Server, SquareTerminal } from "lucide-react";
+import type { LocaleFormatters, MessageFormatter } from "@puppyone/localization/core";
 import type {
   DesktopCloudConnector,
-  DesktopCloudHistory,
   DesktopCloudMcpEndpoint,
   DesktopCloudRepoIdentity,
+  DesktopCloudRepositoryView,
   DesktopCloudScope,
   DesktopCloudTreeEntry,
 } from "../../lib/cloudApi";
+import type { DesktopCloudHistory } from "../../lib/cloudHistoryApi";
 import type { GitCommitSummary } from "../../types/electron";
-import type { getPuppyoneRemote } from "../source-control/remotes";
+import { projectRootRepositoryView, repositoryScopeView } from "./repositoryTarget";
+
+export type CloudPresentationContext = Pick<
+  LocaleFormatters,
+  "formatNumber" | "formatDate" | "formatRelativeTime"
+> & { t: MessageFormatter };
 
 export function unwrapSettled<T>(result: PromiseSettledResult<T>): T | null {
   return result.status === "fulfilled" ? result.value : null;
 }
 
-export function formatCloudTreeEntryDetail(entry: DesktopCloudTreeEntry) {
+export function formatCloudTreeEntryDetail(entry: DesktopCloudTreeEntry, context: CloudPresentationContext) {
   if (entry.type === "folder") {
     const count = entry.children_count ?? 0;
-    return count === 1 ? "1 child" : `${count} children`;
+    return context.t("cloud.tree.children", { count });
   }
-  return [entry.type, formatBytes(entry.size_bytes)].filter(Boolean).join(" - ");
+  return [entry.type, formatBytes(entry.size_bytes, context)].filter(Boolean).join(" · ");
 }
 
 export function normalizeCloudEntryPath(path: string) {
   return path.replace(/^\/+/, "").replace(/\/+$/, "");
 }
 
-export function formatBytes(bytes: number | null | undefined) {
+export function formatBytes(bytes: number | null | undefined, context: Pick<CloudPresentationContext, "formatNumber" | "t">) {
   if (typeof bytes !== "number" || !Number.isFinite(bytes)) return "";
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${bytes} B`;
+  if (bytes >= 1024 * 1024) {
+    return context.t("cloud.size.megabytes", {
+      value: context.formatNumber(bytes / 1024 / 1024, { maximumFractionDigits: 1 }),
+    });
+  }
+  if (bytes >= 1024) {
+    return context.t("cloud.size.kilobytes", {
+      value: context.formatNumber(bytes / 1024, { maximumFractionDigits: 1 }),
+    });
+  }
+  return context.t("cloud.size.bytes", { value: context.formatNumber(bytes) });
 }
 
-export function formatInteger(value: number) {
-  return Number.isFinite(value) ? value.toLocaleString() : "0";
+export function formatInteger(value: number, formatNumber: LocaleFormatters["formatNumber"]) {
+  return formatNumber(Number.isFinite(value) ? value : 0);
 }
 
-export function formatPlural(count: number, singular: string) {
-  return `${formatInteger(count)} ${singular}${count === 1 ? "" : "s"}`;
-}
-
-export function formatCommitChangeCount(changes: DesktopCloudHistory["commits"][number]["changes"]) {
+export function formatCommitChangeCount(changes: DesktopCloudHistory["commits"][number]["changes"], t: MessageFormatter) {
   const count = changes?.length ?? 0;
-  return count === 0 ? "No file changes recorded" : `${count} file${count === 1 ? "" : "s"} changed`;
+  return t("cloud.history.fileChangeCount", { count });
 }
 
-export function formatGitCommitChangeCount(changes: GitCommitSummary["changes"]) {
+export function formatGitCommitChangeCount(changes: GitCommitSummary["changes"], t: MessageFormatter) {
   const count = changes?.length ?? 0;
-  return count === 0 ? "No file changes recorded" : `${count} file${count === 1 ? "" : "s"} changed`;
+  return t("cloud.history.fileChangeCount", { count });
 }
 
 export function providerIcon(provider: string) {
@@ -62,23 +73,6 @@ export function providerIcon(provider: string) {
 
 export function normalizeProviderKey(provider: string) {
   return provider.trim().toLowerCase().replace(/-/g, "_");
-}
-
-export function isCloudIntegrationConnector(connector: DesktopCloudConnector) {
-  const provider = normalizeProviderKey(connector.provider);
-  return ![
-    "",
-    "agent",
-    "cli",
-    "filesystem",
-    "git",
-    "git_remote",
-    "mcp",
-    "mcp_endpoint",
-    "sandbox",
-    "sandbox_endpoint",
-    "sync",
-  ].includes(provider);
 }
 
 export function getCloudProviderIconUrl(provider: string) {
@@ -99,39 +93,40 @@ export function getCloudProviderIconUrl(provider: string) {
       return "/icons/linear.svg";
     case "supabase":
       return "/icons/supabase-icon.png";
+    case "slack":
+      return "/icons/Slack_icon_2019.svg.png";
     default:
       return "";
   }
 }
 
-export function formatProviderLabel(provider: string) {
-  return provider
-    .replace(/_/g, " ")
-    .replace(/-/g, " ")
-    .split(" ")
-    .filter(Boolean)
-    .map((part: string) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
-    .join(" ");
+export function formatProviderLabel(provider: string, t: MessageFormatter) {
+  const normalized = normalizeProviderKey(provider);
+  if (normalized === "cli") return t("cloud.access.surface.cli.title");
+  if (normalized === "filesystem" || normalized === "git" || normalized === "git_remote") {
+    return t("cloud.access.surface.git.title");
+  }
+  if (normalized === "mcp" || normalized === "mcp_endpoint") return t("cloud.access.surface.mcp.title");
+  if (normalized === "vm" || normalized === "remote_workspace" || normalized === "sandbox") {
+    return t("cloud.access.surface.vm.title");
+  }
+  return humanizeIdentifier(provider);
 }
 
-export function formatStatusLabel(status: string) {
-  return status
-    .replace(/_/g, " ")
-    .replace(/-/g, " ")
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
-    .join(" ") || "Unknown";
+export function formatStatusLabel(status: string | null | undefined, t: MessageFormatter) {
+  const normalized = normalizeProviderKey(status ?? "");
+  const known = new Set([
+    "active", "added", "allowed", "blocked", "changed", "copied", "deleted", "diverged",
+    "error", "incoming", "manual", "missing", "modified", "needs_key", "off", "outgoing", "paused", "ready",
+    "renamed", "required", "revoked", "staged", "syncing", "synced", "unknown", "unstaged", "untracked",
+  ]);
+  return known.has(normalized)
+    ? t(`cloud.status.${normalized.replace(/_/g, "-")}`)
+    : humanizeIdentifier(status ?? "") || t("cloud.status.unknown");
 }
 
-export function statusLabel(status: string) {
-  if (status === "untracked") return "Untracked";
-  if (status === "added") return "Added";
-  if (status === "deleted") return "Deleted";
-  if (status === "renamed") return "Renamed";
-  if (status === "copied") return "Copied";
-  if (status === "modified") return "Modified";
-  return "Changed";
+export function statusLabel(status: string, t: MessageFormatter) {
+  return formatStatusLabel(status || "changed", t);
 }
 
 export function getApiBaseFromGitUrl(gitUrl: string) {
@@ -154,62 +149,45 @@ export async function copyText(value: string) {
 export function getCloudScopeRows(
   scopes: DesktopCloudScope[],
   identity: DesktopCloudRepoIdentity | null,
-): DesktopCloudScope[] {
-  if (scopes.length > 0) return scopes;
-  return (identity?.scopes ?? []).map((scope) => ({
-    id: scope.id,
-    project_id: identity?.project_id ?? "",
-    name: scope.name,
-    path: scope.path,
-    exclude: [],
-    mode: "rw",
-    is_root: scope.is_root,
-    access_key: scope.access_key,
-  }));
+): DesktopCloudRepositoryView[] {
+  const projectId = identity?.project_id ?? scopes[0]?.project_id ?? null;
+  if (!projectId) return [];
+  return [
+    projectRootRepositoryView(projectId),
+    ...scopes.map(repositoryScopeView),
+  ];
 }
 
-export function buildCloudAccessPointScope(accessKey: string): DesktopCloudScope {
-  return {
-    id: `access-point:${accessKey}`,
-    project_id: "",
-    name: "Cloud source",
-    path: "",
-    exclude: [],
-    mode: "rw",
-    is_root: true,
-    access_key: accessKey,
-  };
+export function getCanonicalGitUrlForView(
+  identity: DesktopCloudRepoIdentity | null,
+  scope: DesktopCloudRepositoryView | null,
+  apiBase = "",
+): string {
+  if (!identity) return "";
+  if (!scope || scope.target.kind === "project_root") return identity.url ?? "";
+  const identityScope = identity.scopes.find((entry) => entry.id === scope.id);
+  if (identityScope?.git_url) return identityScope.git_url;
+  const base = apiBase || getApiBaseFromGitUrl(identity.url);
+  return base && identity.project_id
+    ? `${base.replace(/\/+$/, "")}/git/${encodeURIComponent(identity.project_id)}/scopes/${encodeURIComponent(scope.id)}.git`
+    : "";
 }
 
-export function buildCloudAccessPointIdentity(
-  cloudRemote: NonNullable<ReturnType<typeof getPuppyoneRemote>>,
-): DesktopCloudRepoIdentity {
-  const accessKey = cloudRemote.info.kind === "access-point" ? cloudRemote.info.accessKey : null;
-  const scope = accessKey ? buildCloudAccessPointScope(accessKey) : null;
-  return {
-    project_id: "",
-    url: cloudRemote.rawUrl,
-    content_initialized: true,
-    scopes: scope
-      ? [{
-          id: scope.id,
-          name: scope.name,
-          path: scope.path,
-          is_root: scope.is_root,
-          access_key: scope.access_key,
-        }]
-      : [],
-  };
-}
-
-export function getScopeDisplayName(scope: DesktopCloudScope) {
+export function getScopeDisplayName(scope: DesktopCloudRepositoryView, t: MessageFormatter) {
   if (scope.name?.trim()) return scope.name.trim();
-  if (scope.is_root || !normalizeCloudEntryPath(scope.path)) return "Workspace root";
+  if (scope.target.kind === "project_root") return t("cloud.scope.workspaceRoot");
   const parts = normalizeCloudEntryPath(scope.path).split("/");
   return parts[parts.length - 1] || scope.path;
 }
 
-export function getScopePathLabel(scope: DesktopCloudScope) {
+/** Locale-neutral value for command/profile identifiers. */
+export function getScopeIdentifierName(scope: DesktopCloudRepositoryView) {
+  if (scope.name?.trim()) return scope.name.trim();
+  const parts = normalizeCloudEntryPath(scope.path).split("/").filter(Boolean);
+  return parts[parts.length - 1] || "root";
+}
+
+export function getScopePathLabel(scope: DesktopCloudRepositoryView) {
   const path = normalizeCloudEntryPath(scope.path);
   return path ? `/${path}` : "/";
 }
@@ -219,38 +197,39 @@ export function isConnectorActiveStatus(status: string | null | undefined) {
 }
 
 export function isScopeActive(
-  scope: DesktopCloudScope,
+  scope: DesktopCloudRepositoryView,
   connectors: DesktopCloudConnector[],
   endpointCount: number,
 ) {
   return Boolean(
-    (scope.access_key && !scope.access_key_revoked) ||
     endpointCount > 0 ||
     connectors.some((connector) => isConnectorActiveStatus(connector.status)),
   );
 }
 
 export function countScopeAccessSurfaces(
-  scope: DesktopCloudScope,
+  scope: DesktopCloudRepositoryView,
   connectors: DesktopCloudConnector[],
   endpointCount: number,
 ) {
   void scope;
-  const thirdPartyCount = connectors.filter(isCloudIntegrationConnector).length;
-  return 2 + Math.max(1, endpointCount) + thirdPartyCount;
+  void connectors;
+  return 2 + Math.max(1, endpointCount);
 }
 
-export function scopeMatchesMcpEndpoint(scope: DesktopCloudScope, endpoint: DesktopCloudMcpEndpoint) {
+export function scopeMatchesMcpEndpoint(scope: DesktopCloudRepositoryView, endpoint: DesktopCloudMcpEndpoint) {
   const scopePath = normalizeCloudEntryPath(scope.path);
   const endpointAccesses = endpoint.accesses ?? [];
   if (endpointAccesses.length > 0) {
     return endpointAccesses.some((access) => {
       const accessPath = normalizeCloudEntryPath(access.path || "");
-      return scope.is_root ? accessPath === "" || accessPath === scopePath : accessPath === scopePath;
+      return scope.target.kind === "project_root"
+        ? accessPath === ""
+        : accessPath === scopePath;
     });
   }
   const endpointPath = normalizeCloudEntryPath(endpoint.path ?? "");
-  if (scope.is_root && !endpointPath) return true;
+  if (scope.target.kind === "project_root" && !endpointPath) return true;
   return endpointPath === scopePath;
 }
 
@@ -263,26 +242,10 @@ export function profileSlug(value: string) {
   return slug || "root";
 }
 
-export function formatGitSyncState(state: string) {
-  switch (state) {
-    case "synced":
-      return "Synced";
-    case "incoming":
-      return "Incoming";
-    case "outgoing":
-      return "Outgoing";
-    case "diverged":
-      return "Diverged";
-    case "publish":
-      return "Publish";
-    case "no-repository":
-      return "No repository";
-    case "no-branch":
-      return "No branch";
-    case "no-remote":
-    default:
-      return "No remote";
-  }
+export function formatGitSyncState(state: string, t: MessageFormatter) {
+  const known = new Set(["synced", "incoming", "outgoing", "diverged", "publish", "no-repository", "no-branch", "no-remote"]);
+  const code = known.has(state) ? state : "no-remote";
+  return t(`cloud.git.state.${code}`);
 }
 
 export function getAccountInitial(email: string | null) {
@@ -291,8 +254,8 @@ export function getAccountInitial(email: string | null) {
   return value[0]?.toUpperCase() ?? "P";
 }
 
-export function formatSidebarAccount(email: string | null) {
-  if (!email) return "Not signed in";
+export function formatSidebarAccount(email: string | null, t: MessageFormatter) {
+  if (!email) return t("cloud.account.notSignedIn");
   const [name, domain] = email.split("@");
   if (!name || !domain) return email;
   const shortName = name.length > 12 ? `${name.slice(0, 10)}...` : name;
@@ -303,38 +266,37 @@ export function shortCommit(commitId: string) {
   return commitId.slice(0, 8);
 }
 
-export function formatRelativeTime(iso: string | null | undefined) {
-  if (!iso) return "";
-  const date = new Date(iso);
-  const diffMs = Date.now() - date.getTime();
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return "now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: date.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
-  });
-}
-
-export function formatCloudDate(iso: string | null | undefined) {
+export function formatRelativeTime(iso: string | null | undefined, context: CloudPresentationContext) {
   if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString(undefined, {
+  const deltaMs = date.getTime() - Date.now();
+  const absoluteMs = Math.abs(deltaMs);
+  if (absoluteMs < 60_000) return context.formatRelativeTime(0, "second", { numeric: "auto" });
+  if (absoluteMs < 3_600_000) return context.formatRelativeTime(Math.round(deltaMs / 60_000), "minute", { numeric: "auto" });
+  if (absoluteMs < 86_400_000) return context.formatRelativeTime(Math.round(deltaMs / 3_600_000), "hour", { numeric: "auto" });
+  if (absoluteMs < 604_800_000) return context.formatRelativeTime(Math.round(deltaMs / 86_400_000), "day", { numeric: "auto" });
+  return context.formatDate(date, {
     month: "short",
     day: "numeric",
     year: date.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
   });
 }
 
-export function formatFullTime(iso: string | null | undefined) {
+export function formatCloudDate(iso: string | null | undefined, formatDate: LocaleFormatters["formatDate"]) {
   if (!iso) return "";
-  return new Date(iso).toLocaleString(undefined, {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return formatDate(date, {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
+  });
+}
+
+export function formatFullTime(iso: string | null | undefined, formatDate: LocaleFormatters["formatDate"]) {
+  if (!iso) return "";
+  return formatDate(new Date(iso), {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -342,4 +304,14 @@ export function formatFullTime(iso: string | null | undefined) {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function humanizeIdentifier(value: string) {
+  return value
+    .replace(/_/g, " ")
+    .replace(/-/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
+    .join(" ");
 }

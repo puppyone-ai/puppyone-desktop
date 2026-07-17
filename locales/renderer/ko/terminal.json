@@ -1,0 +1,11 @@
+{
+  "title": "터미널",
+  "actions": "터미널 작업",
+  "clear": "터미널 지우기",
+  "reset": "터미널 재설정",
+  "bridgeUnavailable": "터미널 브리지를 사용할 수 없습니다. 이 작업 영역을 puppyone에서 여세요.",
+  "processExitedSignal": "프로세스가 신호 {signal}(으)로 종료되었습니다.",
+  "processExitedCode": "프로세스가 코드 {code}(으)로 종료되었습니다.",
+  "runtimeRestartRequired": "터미널 런타임이 업데이트되었습니다. 네이티브 브리지를 불러오도록 puppyone을 한 번 다시 시작하세요.",
+  "errorDetail": "터미널 오류: {detail}"
+}

@@ -1,4 +1,5 @@
-import type { DesktopCloudScope } from "../../../../lib/cloudApi";
+import type { DesktopCloudRepositoryView } from "../../../../lib/cloudApi";
+import type { MessageFormatter } from "@puppyone/localization/core";
 import { normalizeCloudEntryPath } from "../../utils";
 
 export type OptionalAccessProvider = "mcp" | "sandbox";
@@ -7,57 +8,58 @@ export type CreateAccessIntent = "remote_workspace" | "git_remote" | "cli" | "ai
 export const OPTIONAL_ACCESS_METHODS: Array<{
   provider: OptionalAccessProvider;
   direction: "inbound";
-  description: string;
+  descriptionId: string;
   supported: boolean;
 }> = [
   {
     provider: "mcp",
     direction: "inbound",
-    description: "External AI tools connect through MCP.",
+    descriptionId: "cloud.access.create.method.mcpDescription",
     supported: true,
   },
   {
     provider: "sandbox",
     direction: "inbound",
-    description: "Run tools with this folder mounted.",
+    descriptionId: "cloud.access.create.method.sandboxDescription",
     supported: false,
   },
 ];
 
 export const CREATE_ACCESS_INTENT_OPTIONS: Array<{
   id: CreateAccessIntent;
-  label: string;
+  labelId: string;
   provider: string;
-  preview: string;
-  chips: string[];
+  preview?: string;
+  previewId?: string;
+  chipIds: string[];
 }> = [
   {
     id: "remote_workspace",
-    label: "Open editor",
+    labelId: "cloud.access.create.intent.editor.label",
     provider: "sandbox",
-    preview: "Cursor opens a ready Git workspace",
-    chips: ["Editor", "Git ready", "No clone"],
+    previewId: "cloud.access.create.intent.editor.preview",
+    chipIds: ["cloud.access.create.chip.editor", "cloud.access.create.chip.gitReady", "cloud.access.create.chip.noClone"],
   },
   {
     id: "git_remote",
-    label: "Clone repo",
+    labelId: "cloud.access.create.intent.git.label",
     provider: "git_remote",
     preview: "git clone https://.../access.git",
-    chips: ["Local files", "Git flow"],
+    chipIds: ["cloud.access.create.chip.localFiles", "cloud.access.create.chip.gitFlow"],
   },
   {
     id: "cli",
-    label: "Use shell",
+    labelId: "cloud.access.create.intent.cli.label",
     provider: "cli",
     preview: "puppyone fs ls /company/sales",
-    chips: ["No clone", "Scriptable"],
+    chipIds: ["cloud.access.create.chip.noClone", "cloud.access.create.chip.scriptable"],
   },
   {
     id: "ai_agent",
-    label: "Connect AI agent",
+    labelId: "cloud.access.create.intent.agent.label",
     provider: "mcp",
-    preview: "Agent calls approved file tools",
-    chips: ["AI agent", "Tool calls"],
+    previewId: "cloud.access.create.intent.agent.preview",
+    chipIds: ["cloud.access.create.chip.aiAgent", "cloud.access.create.chip.toolCalls"],
   },
 ];
 
@@ -65,37 +67,36 @@ export function normalizeAccessPath(path: string) {
   return normalizeCloudEntryPath(path).replace(/\/+/g, "/");
 }
 
-export function formatAccessPath(path: string) {
+export function formatAccessPath(path: string, t: MessageFormatter) {
   const parts = normalizeAccessPath(path).split("/").filter(Boolean);
-  return parts.length === 0 ? "Root" : ["Root", ...parts].join(" / ");
+  return parts.length === 0 ? t("cloud.common.root") : [t("cloud.common.root"), ...parts].join(" / ");
 }
 
-export function formatTreePath(path: string) {
+export function formatTreePath(path: string, t: MessageFormatter) {
   const normalized = normalizeAccessPath(path);
-  return normalized ? `/${normalized}` : "Project files";
+  return normalized ? `/${normalized}` : t("cloud.access.create.projectFiles");
 }
 
 export function defaultScopeName(path: string) {
-  if (!path) return "Project files";
+  if (!path) return "root";
   const parts = path.split("/").filter(Boolean);
   const last = parts.length > 0 ? parts[parts.length - 1] : path;
   return last
     .replace(/[-_]+/g, " ")
     .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (ch: string) => ch.toUpperCase());
+    .trim();
 }
 
 export function normalizeAccessProviderKey(provider: string) {
   return provider.trim().toLowerCase().replace(/-/g, "_");
 }
 
-export function getAccessProviderLabel(provider: string) {
+export function getAccessProviderLabel(provider: string, t: MessageFormatter) {
   const normalized = normalizeAccessProviderKey(provider);
-  if (normalized === "cli") return "Context Drive CLI";
-  if (normalized === "git" || normalized === "git_remote" || normalized === "filesystem") return "Git Remote";
-  if (normalized === "mcp" || normalized === "mcp_endpoint") return "MCP Server";
-  if (normalized === "sandbox" || normalized === "vm" || normalized === "remote_workspace") return "Remote Workspace";
+  if (normalized === "cli") return t("cloud.access.method.cli.title");
+  if (normalized === "git" || normalized === "git_remote" || normalized === "filesystem") return t("cloud.access.surface.git.title");
+  if (normalized === "mcp" || normalized === "mcp_endpoint") return t("cloud.access.surface.mcp.title");
+  if (normalized === "sandbox" || normalized === "vm" || normalized === "remote_workspace") return t("cloud.access.surface.vm.title");
   return provider
     .replace(/_/g, " ")
     .replace(/-/g, " ")
@@ -113,10 +114,10 @@ export function getCreateAccessTileProvider(provider: string) {
   return "default";
 }
 
-export function getCliAccessRowId(scope: DesktopCloudScope) {
+export function getCliAccessRowId(scope: DesktopCloudRepositoryView) {
   return `${scope.id}:builtin:cli:${scope.id}`;
 }
 
-export function getGitAccessRowId(scope: DesktopCloudScope) {
+export function getGitAccessRowId(scope: DesktopCloudRepositoryView) {
   return `${scope.id}:builtin:git:${scope.id}`;
 }

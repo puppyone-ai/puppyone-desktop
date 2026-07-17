@@ -4,12 +4,14 @@ import {
   type DesktopCloudSession,
   type DesktopCloudTreeEntry,
 } from "../../../../lib/cloudApi";
+import {
+  loadCloudCache,
+  readCloudCache,
+  type CloudCacheContext,
+} from "../../cache/cloudCache";
 import { normalizeAccessPath } from "./createAccessModel";
 
-const FOLDER_CACHE_LIMIT = 240;
-
-const folderCache = new Map<string, DesktopCloudTreeEntry[]>();
-const folderRequests = new Map<string, Promise<DesktopCloudTreeEntry[]>>();
+const FOLDER_CACHE_TTL_MS = 15_000;
 
 export function useCreateAccessFolderEntries({
   projectId,
@@ -24,103 +26,58 @@ export function useCreateAccessFolderEntries({
   path: string;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
 }) {
-  const cacheKey = useMemo(() => getFolderCacheKey({
+  const cacheContext = useMemo<CloudCacheContext>(() => ({
+    session: cloudSession,
     projectId,
-    cloudSession,
-    apiBaseUrl,
-    path,
-  }), [apiBaseUrl, cloudSession, path, projectId]);
-  const cachedEntries = folderCache.get(cacheKey);
+    revision: "mutable-latest",
+    resource: "access-folder-entries",
+    path: normalizeAccessPath(path),
+  }), [cloudSession, path, projectId]);
+  const cachedEntries = readCloudCache<DesktopCloudTreeEntry[]>(cacheContext);
   const [state, setState] = useState<{
     entries: DesktopCloudTreeEntry[];
     loading: boolean;
-    error: string | null;
+    error: boolean;
   }>({
     entries: cachedEntries ?? [],
     loading: !cachedEntries,
-    error: null,
+    error: false,
   });
 
   useEffect(() => {
-    const cached = folderCache.get(cacheKey);
+    const cached = readCloudCache<DesktopCloudTreeEntry[]>(cacheContext);
     if (cached) {
-      setState({ entries: cached, loading: false, error: null });
+      setState({ entries: cached, loading: false, error: false });
       return undefined;
     }
 
     let cancelled = false;
-    setState((current) => ({ entries: current.entries, loading: true, error: null }));
-
-    const request = getFolderRequest(cacheKey, () => (
-      listCloudDirectory(cloudSession, projectId, path, onCloudSessionChange, apiBaseUrl)
-        .then((tree) => sortTreeEntries(tree.entries))
-    ));
-
-    request
+    setState((current) => ({ ...current, loading: true, error: false }));
+    void loadCloudCache(
+      cacheContext,
+      () => listCloudDirectory(cloudSession, projectId, path, onCloudSessionChange, apiBaseUrl)
+        .then((tree) => sortTreeEntries(tree.entries)),
+      { ttlMs: FOLDER_CACHE_TTL_MS },
+    )
       .then((entries) => {
-        if (cancelled) return;
-        setState({ entries, loading: false, error: null });
+        if (!cancelled) setState({ entries, loading: false, error: false });
       })
-      .catch((loadError) => {
-        if (cancelled) return;
-        setState({
-          entries: [],
-          loading: false,
-          error: loadError instanceof Error ? loadError.message : "Unable to load folder.",
-        });
+      .catch(() => {
+        if (!cancelled) {
+          setState({
+            entries: [],
+            loading: false,
+            error: true,
+          });
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, cacheKey, cloudSession, onCloudSessionChange, path, projectId]);
+  }, [apiBaseUrl, cacheContext, cloudSession, onCloudSessionChange, path, projectId]);
 
   return state;
-}
-
-function getFolderRequest(cacheKey: string, load: () => Promise<DesktopCloudTreeEntry[]>) {
-  const existing = folderRequests.get(cacheKey);
-  if (existing) return existing;
-
-  const request = load()
-    .then((entries) => {
-      folderCache.set(cacheKey, entries);
-      trimFolderCache();
-      return entries;
-    })
-    .finally(() => {
-      folderRequests.delete(cacheKey);
-    });
-
-  folderRequests.set(cacheKey, request);
-  return request;
-}
-
-function getFolderCacheKey({
-  projectId,
-  cloudSession,
-  apiBaseUrl,
-  path,
-}: {
-  projectId: string;
-  cloudSession: DesktopCloudSession;
-  apiBaseUrl: string | null;
-  path: string;
-}) {
-  return [
-    cloudSession.user_email,
-    apiBaseUrl ?? cloudSession.api_base_url ?? "",
-    projectId,
-    normalizeAccessPath(path),
-  ].join("\n");
-}
-
-function trimFolderCache() {
-  while (folderCache.size > FOLDER_CACHE_LIMIT) {
-    const oldestKey = folderCache.keys().next().value;
-    if (!oldestKey) return;
-    folderCache.delete(oldestKey);
-  }
 }
 
 function sortTreeEntries(entries: DesktopCloudTreeEntry[]) {

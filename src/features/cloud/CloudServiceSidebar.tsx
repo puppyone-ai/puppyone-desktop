@@ -1,108 +1,188 @@
-import { ArrowLeft, Cloud } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
+import { SidebarRoot, SidebarRow, SidebarScrollArea } from "@puppyone/shared-ui";
+import { SidebarGroup } from "../../components/sidebar";
 import type { CloudServiceSidebarProps, CloudWorkspaceSection } from "./types";
-import { getCloudAuthSession, resolveCloudAuthState } from "./auth";
-import { resolveCloudEnvironment } from "./environment";
+import { getCloudAuthSession } from "./auth";
 import {
+  CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES,
   CLOUD_GLOBAL_SIDEBAR_ROUTES,
   CLOUD_PROJECT_SIDEBAR_ROUTES,
-  CLOUD_PROJECTS_SIDEBAR_ROUTES,
-  isCloudProjectSection,
   normalizeCloudSection,
+  type CloudRouteDescriptor,
 } from "./routes/cloudRoutes";
 import { getAccountInitial } from "./utils";
+import { useFeatureFlag } from "../flags";
 
 type CloudSidebarNavEntry = {
   id: CloudWorkspaceSection;
-  label: string;
-  icon: typeof Cloud;
-  groupEnd?: boolean;
+  labelId: string;
+  icon: CloudRouteDescriptor["icon"];
+  context: CloudRouteDescriptor["context"];
+  requiredCapability?: string;
+  locked?: boolean;
 };
 
+type CloudSidebarNavGroup = {
+  id: "project" | "organization";
+  labelId: "cloud.sidebar.projectGroup" | "cloud.sidebar.organizationGroup";
+  items: CloudSidebarNavEntry[];
+};
+
+/** Preview of project sections while Cloud is unavailable (signed out or not initialized). */
+const LOCKED_PROJECT_PREVIEW_SIDEBAR_ROUTES: CloudSidebarNavEntry[] = [
+  ...CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES.map((route) => ({
+    ...route,
+    locked: true,
+  })),
+];
+
 export function CloudServiceSidebar({
-  status,
-  cloudSession,
+  cloudAuthState,
   activeSection,
+  projectContext = false,
+  localWorkspaceContext = false,
+  localOnlyWorkspaceContext = false,
+  projectCapabilities = [],
   onSelectSection,
+  onBackToProjects,
 }: CloudServiceSidebarProps) {
+  const { t } = useLocalization();
+  const billingEnabled = useFeatureFlag("cloudBilling");
   const normalizedActiveSection = normalizeCloudSection(activeSection);
-  const cloudEnvironment = resolveCloudEnvironment({ status });
-  const cloudAuthState = resolveCloudAuthState({
-    cloudSession,
-    environment: cloudEnvironment,
-  });
   const effectiveCloudSession = getCloudAuthSession(cloudAuthState);
   const accountEmail = effectiveCloudSession?.user_email ?? null;
   const signedIn = Boolean(effectiveCloudSession);
-  const inProjectContext = signedIn && isCloudProjectSection(normalizedActiveSection);
-  const navItems: CloudSidebarNavEntry[] = !signedIn
-    ? CLOUD_PROJECTS_SIDEBAR_ROUTES
-    : inProjectContext
-      ? CLOUD_PROJECT_SIDEBAR_ROUTES
-      : CLOUD_GLOBAL_SIDEBAR_ROUTES;
+  // Project context comes from an authorized resolver / explicit route — never from route alone.
+  const inProjectContext = signedIn && projectContext && !localOnlyWorkspaceContext;
+  const baseNavItems: CloudSidebarNavEntry[] = localOnlyWorkspaceContext || !signedIn
+    ? LOCKED_PROJECT_PREVIEW_SIDEBAR_ROUTES
+    : inProjectContext && localWorkspaceContext
+      ? CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES
+      : inProjectContext
+        ? CLOUD_PROJECT_SIDEBAR_ROUTES
+        : CLOUD_GLOBAL_SIDEBAR_ROUTES;
+  const navItems = baseNavItems.filter((item) => (
+    item.id !== "cloud-billing" || billingEnabled
+  )).filter((item) => (
+    // Keep locked preview rows visible even before Project capabilities exist.
+    item.locked
+      || !signedIn
+      || !item.requiredCapability
+      || projectCapabilities.includes(item.requiredCapability)
+  ));
+  const navGroups = buildCloudSidebarNavGroups(navItems);
 
   return (
-    <section className="desktop-tool-sidebar desktop-cloud-service-sidebar">
-      {inProjectContext && (
+    <SidebarRoot className="desktop-cloud-service-sidebar">
+      {inProjectContext && !localWorkspaceContext && (
         <div className="desktop-cloud-sidebar-context">
           <button
             className="desktop-cloud-sidebar-context-back"
             type="button"
-            onClick={() => onSelectSection("overview")}
+            onClick={() => {
+              if (onBackToProjects) {
+                onBackToProjects();
+                return;
+              }
+              onSelectSection("projects");
+            }}
           >
-            <ArrowLeft size={14} />
-            <span>Cloud Projects</span>
+            <ArrowLeft className="po-directional-icon" size={14} />
+            <span>{t("cloud.route.overview.label")}</span>
           </button>
         </div>
       )}
 
-      <div className="desktop-tool-sidebar-list desktop-cloud-sidebar-list">
-        <nav className="desktop-cloud-sidebar-nav" aria-label={inProjectContext ? "Cloud project sections" : "Cloud sections"}>
-          {navItems.map((item) => (
-            <CloudSidebarNavItem
-              key={item.id}
-              item={item}
-              active={normalizedActiveSection === item.id || (!signedIn && item.id === "overview")}
-              onSelect={onSelectSection}
-            />
-          ))}
+      <SidebarScrollArea className="desktop-cloud-sidebar-list">
+        <nav className="desktop-cloud-sidebar-nav" aria-label={t(inProjectContext ? "cloud.sidebar.projectSections" : "cloud.sidebar.sections")}>
+          {navGroups.map((group) => {
+            const disabled = group.items.every((item) => item.locked);
+            return (
+              <SidebarGroup
+                title={t(group.labelId)}
+                disabled={disabled}
+                key={group.id}
+              >
+                {group.items.map((item) => (
+                  <CloudSidebarNavItem
+                    key={item.id}
+                    item={item}
+                    lockedReason={localOnlyWorkspaceContext ? "initialize" : "sign-in"}
+                    active={
+                      !item.locked && signedIn && (
+                        normalizedActiveSection === item.id
+                      )
+                    }
+                    onSelect={onSelectSection}
+                  />
+                ))}
+              </SidebarGroup>
+            );
+          })}
         </nav>
-      </div>
+      </SidebarScrollArea>
 
       {signedIn && (
         <div className="desktop-cloud-sidebar-footer">
-          <div className="desktop-cloud-sidebar-footer-avatar" role="img" title={accountEmail ?? "Signed in"} aria-label="Cloud account">
+          <div className="desktop-cloud-sidebar-footer-avatar" role="img" title={accountEmail ? bidiIsolate(accountEmail) : t("cloud.account.signedIn")} aria-label={t("cloud.account.ariaLabel")}>
             {getAccountInitial(accountEmail)}
           </div>
         </div>
       )}
-    </section>
+    </SidebarRoot>
   );
 }
 
 export function CloudSidebarNavItem({
   item,
   active,
+  lockedReason = "sign-in",
   onSelect,
 }: {
   item: CloudSidebarNavEntry;
   active: boolean;
+  lockedReason?: "sign-in" | "initialize";
   onSelect: (section: CloudWorkspaceSection) => void;
 }) {
+  const { t } = useLocalization();
   const Icon = item.icon;
+  const label = t(item.labelId);
+  const lockedTitle = item.locked
+    ? t(lockedReason === "initialize" ? "cloud.sidebar.initializeToUse" : "cloud.sidebar.signInToUse")
+    : undefined;
 
   return (
-    <>
-      <button
-        className={`desktop-tool-sidebar-row desktop-cloud-sidebar-nav-row ${active ? "active" : ""}`}
-        type="button"
-        onClick={() => onSelect(item.id)}
-      >
-        <span className="desktop-cloud-sidebar-nav-icon">
-          <Icon size={15} />
-        </span>
-        <span className="desktop-cloud-sidebar-nav-label">{item.label}</span>
-      </button>
-      {item.groupEnd && <div className="desktop-cloud-sidebar-separator" />}
-    </>
+    <SidebarRow
+      className={`desktop-cloud-sidebar-nav-row ${item.locked ? "locked" : ""}`}
+      active={active}
+      aria-disabled={item.locked || undefined}
+      title={lockedTitle}
+      onClick={() => {
+        if (!item.locked) onSelect(item.id);
+      }}
+      icon={<span className="desktop-cloud-sidebar-nav-icon">
+        <Icon size={15} />
+      </span>}
+      label={<span className="desktop-cloud-sidebar-nav-label">{label}</span>}
+    />
   );
+}
+
+function buildCloudSidebarNavGroups(items: readonly CloudSidebarNavEntry[]): CloudSidebarNavGroup[] {
+  const groups: CloudSidebarNavGroup[] = [
+    {
+      id: "project",
+      labelId: "cloud.sidebar.projectGroup",
+      items: items.filter((item) => item.context !== "account"),
+    },
+    {
+      id: "organization",
+      labelId: "cloud.sidebar.organizationGroup",
+      items: items.filter((item) => item.context === "account"),
+    },
+  ];
+
+  return groups.filter((group) => group.items.length > 0);
 }

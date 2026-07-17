@@ -1,9 +1,11 @@
-import { Cloud, ExternalLink, RefreshCw } from "lucide-react";
+import { Cloud, ExternalLink, RefreshCw, Unlink } from "lucide-react";
+import { useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
+import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import type {
   DesktopCloudConnector,
   DesktopCloudDashboard,
-  DesktopCloudHistory,
   DesktopCloudMcpEndpoint,
   DesktopCloudProject,
   DesktopCloudRepoIdentity,
@@ -11,11 +13,12 @@ import type {
   DesktopCloudTree,
   DesktopCloudTreeEntry,
 } from "../../../lib/cloudApi";
+import type { DesktopCloudHistory } from "../../../lib/cloudHistoryApi";
 import {
   ProjectFolderCard,
   type ProjectFolderPreviewItem,
 } from "../../../components/project-folder-card";
-import type { getPuppyoneRemote } from "../../source-control/remotes";
+import { isCloudAutomationConnector } from "../../automation/automationDomain";
 import type { CloudWorkspaceSection } from "../types";
 import {
   CloudFilePreviewIcon,
@@ -27,10 +30,9 @@ import {
   formatProviderLabel,
   formatRelativeTime,
   getCloudProviderIconUrl,
-  isCloudIntegrationConnector,
 } from "../utils";
 
-export function CloudMappedOverview({
+export function CloudRepositoryOverview({
   workspace,
   project,
   dashboard,
@@ -40,8 +42,9 @@ export function CloudMappedOverview({
   connectors,
   mcpEndpoints,
   identity,
-  cloudRemote,
+  matchesRepositoryRemote,
   loading,
+  removeRemoteAction = null,
   onSelectSection,
   onOpenProject,
   onRefresh,
@@ -55,66 +58,91 @@ export function CloudMappedOverview({
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;
-  cloudRemote: ReturnType<typeof getPuppyoneRemote>;
+  matchesRepositoryRemote: boolean;
   loading: boolean;
+  removeRemoteAction?: {
+    busy?: boolean;
+    onRemove: () => void;
+  } | null;
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
   onRefresh: () => Promise<void>;
 }) {
+  const localization = useLocalization();
+  const { formatDate, formatNumber, t } = localization;
   const projectId = project?.id ?? dashboard?.project.id ?? identity?.project_id ?? "";
   const projectName = project?.name ?? dashboard?.project.name ?? workspace.name;
   const rootEntries = tree?.entries ?? [];
   const latestCommit = getLatestCloudHistoryCommit(history);
   const accessCount = scopes.length + mcpEndpoints.length;
-  const accessDetail = formatAccessSummary(scopes.length, mcpEndpoints.length);
-  const integrationConnectors = connectors.filter(isCloudIntegrationConnector);
+  const accessDetail = formatAccessSummary(scopes.length, mcpEndpoints.length, t);
+  const automationConnectors = connectors.filter(isCloudAutomationConnector);
   const latestChangeLabel = latestCommit?.created_at
-    ? formatRelativeTime(latestCommit.created_at)
+    ? formatRelativeTime(latestCommit.created_at, localization)
     : history?.head_commit_id
-      ? "Synced"
-      : "No changes";
+      ? t("cloud.status.synced")
+      : t("cloud.git.noChanges");
   const latestChangeDate = latestCommit?.created_at
-    ? formatCloudDate(latestCommit.created_at)
+    ? formatCloudDate(latestCommit.created_at, formatDate)
     : history?.head_commit_id
-      ? "Synced"
-      : "No changes";
+      ? t("cloud.status.synced")
+      : t("cloud.git.noChanges");
   const hasOverviewData = Boolean(dashboard || tree || history || identity);
-  const localMapped = Boolean(cloudRemote);
-  const localMappingValue = localMapped ? workspace.path : identity?.url ?? "";
+  const repositoryRemoteValue = matchesRepositoryRemote ? workspace.path : identity?.url ?? "";
+  const [confirmRemoveRemote, setConfirmRemoveRemote] = useState(false);
 
   if (loading && !hasOverviewData) {
-    return <CloudWorkspaceLoadingState label="Loading Cloud project" />;
+    return <CloudWorkspaceLoadingState label={t("cloud.loading.project")} />;
   }
 
   return (
-    <section className="desktop-cloud-overview-focus" aria-label="Cloud project overview">
+    <section className="desktop-cloud-overview-focus" aria-label={t("cloud.overview.ariaLabel")}>
       <div className="desktop-cloud-overview-header">
         <div className="desktop-cloud-overview-heading">
           <div className="desktop-cloud-overview-title-row">
-            <h1>{projectName}</h1>
+            <h1 dir="auto">{projectName}</h1>
             <span className="desktop-cloud-source-pill">
               <Cloud size={13} />
-              <span>Cloud source</span>
+              <span>{t("cloud.common.cloudSource")}</span>
             </span>
           </div>
           {project?.description || dashboard?.project.description ? (
-            <p>{project?.description ?? dashboard?.project.description}</p>
+            <p dir="auto">{project?.description ?? dashboard?.project.description}</p>
           ) : null}
           {projectId && (
             <code className="desktop-cloud-project-id" title={projectId}>
-              Project ID {projectId}
+              {t("cloud.project.id", { id: bidiIsolate(projectId) })}
             </code>
           )}
         </div>
         <div className="desktop-cloud-repo-actions">
           <button className="desktop-cloud-row-action" type="button" onClick={() => void onRefresh()}>
             <RefreshCw size={13} className={loading ? "spin" : undefined} />
-            <span>Refresh</span>
+            <span>{t("cloud.common.refresh")}</span>
           </button>
+          {removeRemoteAction && (
+            <button
+              className="desktop-cloud-row-action"
+              type="button"
+              disabled={removeRemoteAction.busy}
+              onBlur={() => setConfirmRemoveRemote(false)}
+              onClick={() => {
+                if (!confirmRemoveRemote) {
+                  setConfirmRemoveRemote(true);
+                  return;
+                }
+                setConfirmRemoveRemote(false);
+                removeRemoteAction.onRemove();
+              }}
+            >
+              <Unlink size={13} />
+              <span>{t(removeRemoteAction.busy ? "cloud.project.removingRemote" : confirmRemoveRemote ? "cloud.project.confirmRemoveRemote" : "cloud.project.removeRemote")}</span>
+            </button>
+          )}
           {projectId && (
-            <button className="desktop-cloud-row-action" type="button" onClick={() => onOpenProject(projectId, "overview")}>
+            <button className="desktop-cloud-row-action" type="button" onClick={() => onOpenProject(projectId, "access")}>
               <ExternalLink size={13} />
-              <span>Open Web</span>
+              <span>{t("cloud.common.openWeb")}</span>
             </button>
           )}
         </div>
@@ -127,7 +155,7 @@ export function CloudMappedOverview({
             entries={rootEntries}
             loading={loading}
             updatedLabel={latestChangeLabel}
-            statusConnected={localMapped}
+            statusConnected={matchesRepositoryRemote}
             onSelect={() => onSelectSection("contents")}
           />
         </div>
@@ -135,22 +163,22 @@ export function CloudMappedOverview({
         <div className="desktop-cloud-overview-side">
           <div className="desktop-cloud-overview-doc">
             <CloudOverviewMetricCard
-              label="Last change"
+              label={t("cloud.overview.lastChange")}
               value={latestChangeDate}
               variant="date"
             />
             <CloudOverviewMetricCard
-              label="Access"
-              value={formatInteger(accessCount)}
+              label={t("cloud.route.access.title")}
+              value={formatInteger(accessCount, formatNumber)}
               detail={accessDetail}
               tone={accessCount > 0 ? "ready" : undefined}
             />
-            <CloudIntegrationsCard connectors={integrationConnectors} />
+            <CloudAutomationCard connectors={automationConnectors} />
           </div>
 
-          <CloudLocalMappingPanel
-            mapped={localMapped}
-            value={localMappingValue}
+          <CloudRepositoryRemotePanel
+            hasRepositoryRemote={matchesRepositoryRemote}
+            value={repositoryRemoteValue}
           />
         </div>
       </div>
@@ -158,18 +186,19 @@ export function CloudMappedOverview({
   );
 }
 
-export function CloudLocalMappingPanel({
-  mapped,
+export function CloudRepositoryRemotePanel({
+  hasRepositoryRemote,
   value,
 }: {
-  mapped: boolean;
+  hasRepositoryRemote: boolean;
   value: string;
 }) {
+  const { t } = useLocalization();
   return (
-    <div className={`desktop-cloud-local-map ${mapped ? "mapped" : "unmapped"}`}>
+    <div className={`desktop-cloud-local-map ${hasRepositoryRemote ? "has-remote" : "no-remote"}`}>
       <div className="desktop-cloud-local-map-main">
-        <span>{mapped ? "Local mapping" : "Cloud URL"}</span>
-        <code title={value}>{value || "Not linked locally"}</code>
+        <span>{t(hasRepositoryRemote ? "cloud.overview.repositoryRemote" : "cloud.overview.cloudUrl")}</span>
+        <code title={value} dir="auto">{value || t("cloud.overview.noRepositoryRemote")}</code>
       </div>
     </div>
   );
@@ -201,30 +230,34 @@ export function CloudOverviewMetricCard({
   );
 }
 
-export function CloudIntegrationsCard({
+export function CloudAutomationCard({
   connectors,
 }: {
   connectors: DesktopCloudConnector[];
 }) {
+  const { formatNumber, t } = useLocalization();
   return (
-    <div className="desktop-cloud-integrations-card">
-      <div className="desktop-cloud-integrations-heading">
-        <span>Integrations</span>
+    <div className="desktop-cloud-automation-card">
+      <div className="desktop-cloud-automation-heading">
+        <span>{t("cloud.route.automation.title")}</span>
       </div>
-      <div className="desktop-cloud-integrations-value">
+      <div className="desktop-cloud-automation-value">
         {connectors.length > 0 ? (
           <>
-            <span className="desktop-cloud-integrations-icons" aria-label={`${connectors.length} integrations`}>
+            <span
+              className="desktop-cloud-automation-icons"
+              aria-label={t("cloud.overview.automationConnectionCount", { count: connectors.length })}
+            >
               {connectors.map((connector) => (
                 <CloudProviderTile key={connector.id} provider={connector.provider} />
               ))}
             </span>
-            <small>{formatInteger(connectors.length)} connected</small>
+            <small>{t("cloud.overview.connectedCount", { count: connectors.length })}</small>
           </>
         ) : (
           <>
-            <strong>0</strong>
-            <small>connected</small>
+            <strong>{formatNumber(0)}</strong>
+            <small>{t("cloud.status.connected")}</small>
           </>
         )}
       </div>
@@ -237,8 +270,9 @@ export function CloudProviderTile({
 }: {
   provider: string;
 }) {
+  const { t } = useLocalization();
   const iconUrl = getCloudProviderIconUrl(provider);
-  const label = formatProviderLabel(provider);
+  const label = formatProviderLabel(provider, t);
   const fallback = label[0]?.toUpperCase() || "I";
 
   return (
@@ -263,6 +297,7 @@ export function CloudProjectFolderPreview({
   statusConnected: boolean;
   onSelect: () => void;
 }) {
+  const { t } = useLocalization();
   const previewItems: ProjectFolderPreviewItem[] = entries.slice(0, 8).map((entry) => ({
     id: entry.path || entry.name,
     name: entry.name || entry.path,
@@ -282,7 +317,7 @@ export function CloudProjectFolderPreview({
       badge={null}
       previewItems={previewItems}
       previewLoading={loading}
-      emptyLabel="Empty source"
+      emptyLabel={t("cloud.overview.emptySource")}
       footer={{
         statusConnected,
         updatedLabel,
@@ -294,12 +329,14 @@ export function CloudProjectFolderPreview({
 
 export function getLatestCloudHistoryCommit(history: DesktopCloudHistory | null): DesktopCloudHistory["commits"][number] | null {
   const commits = history?.commits ?? [];
-  return commits.length > 0 ? commits[commits.length - 1] : null;
+  if (commits.length === 0) return null;
+  return commits.find((commit) => commit.commit_id === history?.head_commit_id) ?? commits[0];
 }
 
-function formatAccessSummary(scopeCount: number, endpointCount: number) {
-  if (endpointCount <= 0) return scopeCount === 1 ? "scope" : "scopes";
-  const scopesLabel = `${formatInteger(scopeCount)} scope${scopeCount === 1 ? "" : "s"}`;
-  const endpointsLabel = `${formatInteger(endpointCount)} endpoint${endpointCount === 1 ? "" : "s"}`;
-  return `${scopesLabel} · ${endpointsLabel}`;
+function formatAccessSummary(scopeCount: number, endpointCount: number, t: MessageFormatter) {
+  if (endpointCount <= 0) return t("cloud.overview.scopeCount", { count: scopeCount });
+  return t("cloud.overview.accessSummary", {
+    scopes: scopeCount,
+    connections: endpointCount,
+  });
 }

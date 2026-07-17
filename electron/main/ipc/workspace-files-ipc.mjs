@@ -10,6 +10,7 @@ import {
   moveWorkspaceEntry,
   readWorkspaceTextFile,
   renameWorkspaceEntry,
+  resolveExistingWorkspaceDisplayPath,
   resolveExistingWorkspacePath,
   writeWorkspaceTextFile,
 } from "../../../local-api/workspace.mjs";
@@ -26,6 +27,19 @@ import { buildLocalFileCapabilityUrl } from "../local-file-capabilities.mjs";
 import { parseLocalFileUrl } from "../local-file-protocol.mjs";
 
 const MAX_OFFICE_CONVERSIONS_PER_WINDOW = 2;
+const DEFAULT_NATIVE_MESSAGES = Object.freeze({
+  "native.executable.open.confirm": "Open",
+  "native.executable.open.cancel": "Cancel",
+  "native.executable.open.title": "Open executable file?",
+  "native.executable.open.detail": "This file type may run code or install software. Only open it if you trust this workspace.",
+});
+
+function defaultTranslate(messageId, values = {}) {
+  if (messageId === "native.executable.open.message") {
+    return `Open “${values.fileName}” in another app?`;
+  }
+  return DEFAULT_NATIVE_MESSAGES[messageId] ?? "";
+}
 
 export function registerWorkspaceFileIpcHandlers({
   app,
@@ -36,7 +50,9 @@ export function registerWorkspaceFileIpcHandlers({
   shell,
   authorizeWorkspaceRoot,
   localFileCapabilities,
+  workspaceWatchService = null,
   convertOfficeDocument = convertWorkspaceOfficeDocumentToDocx,
+  t = defaultTranslate,
 }) {
   const officeConversionSessionsBySender = new Map();
 
@@ -61,14 +77,16 @@ export function registerWorkspaceFileIpcHandlers({
     if (typeof filePath !== "string" || filePath.trim().length === 0) {
       throw new Error("File path is required.");
     }
-    const canonicalFilePath = await resolveExistingWorkspacePath(rootPath, filePath);
+    const purpose = requireLocalFileCapabilityPurpose(request?.purpose);
+    const canonicalFilePath = purpose === "markdown-asset"
+      ? await resolveExistingWorkspaceDisplayPath(rootPath, filePath)
+      : await resolveExistingWorkspacePath(rootPath, filePath);
     const metadata = await fs.promises.stat(canonicalFilePath).catch((error) => {
       throw new Error(`Unable to resolve local file resource: ${error.message}`);
     });
     if (!metadata.isFile()) throw new Error("Local file resource must be a regular file.");
 
     const relativePath = path.relative(rootPath, canonicalFilePath).split(path.sep).join("/");
-    const purpose = requireLocalFileCapabilityPurpose(request?.purpose);
     const scope = purpose === "file-preview" && getMimeType(canonicalFilePath)?.toLowerCase().startsWith("text/html")
       ? "directory"
       : "exact";
@@ -159,8 +177,25 @@ export function registerWorkspaceFileIpcHandlers({
     if (typeof filePath !== "string" || filePath.trim().length === 0) {
       throw new Error("File path is required.");
     }
-    await writeWorkspaceTextFile(rootPath, filePath, content);
+    const senderId = requireIpcSenderId(event);
+    const result = await writeWorkspaceTextFile(rootPath, filePath, content, {
+      expectedVersion: request?.expectedVersion ?? null,
+    });
+    try {
+      workspaceWatchService?.noteInternalWrite?.({
+        rootPath,
+        path: filePath,
+        senderId,
+        version: result?.version ?? null,
+      });
+    } catch (error) {
+      // Watcher-loop suppression is an optimization. Once the atomic write
+      // succeeds, attribution bookkeeping must never turn that durability
+      // acknowledgement into a failed save.
+      console.warn("Unable to attribute internal workspace write:", error);
+    }
     await absorbWorkspaceEditReviewPath(rootPath, filePath);
+    return result;
   });
 
   ipcMain.handle("workspace:create-entry", async (event, request) => {
@@ -250,12 +285,15 @@ export function registerWorkspaceFileIpcHandlers({
       const window = BrowserWindow.fromWebContents(event.sender);
       const confirmOptions = {
         type: "warning",
-        buttons: ["Open", "Cancel"],
+        buttons: [
+          t("native.executable.open.confirm"),
+          t("native.executable.open.cancel"),
+        ],
         defaultId: 1,
         cancelId: 1,
-        title: "Open executable file?",
-        message: `Open "${path.basename(targetPath)}" in another app?`,
-        detail: "This file type may run code or install software. Only open it if you trust this workspace.",
+        title: t("native.executable.open.title"),
+        message: t("native.executable.open.message", { fileName: path.basename(targetPath) }),
+        detail: t("native.executable.open.detail"),
       };
       const result = window
         ? await dialog.showMessageBox(window, confirmOptions)
@@ -352,6 +390,7 @@ export function registerWorkspaceFileIpcHandlers({
       dialog,
       ownerWindow: BrowserWindow.fromWebContents(event.sender),
       extension,
+      t,
     });
   });
 }

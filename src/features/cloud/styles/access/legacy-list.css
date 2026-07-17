@@ -106,23 +106,17 @@
   display: grid;
   min-width: 0;
   gap: 2px;
-  padding-left: 18px;
+  padding-inline-start: 18px;
 }
 
 .desktop-cloud-access-nav-child {
   min-height: 30px;
-  padding-left: 9px;
+  padding-inline-start: 9px;
   color: var(--po-text-muted);
 }
 
 .desktop-cloud-access-nav-child .desktop-cloud-sidebar-nav-icon {
   width: 22px;
-}
-
-.desktop-cloud-access-nav-integrations {
-  margin-top: 8px;
-  border-top: 1px solid var(--po-divider);
-  padding-top: 9px;
 }
 
 .desktop-cloud-sidebar-nav-count {
@@ -132,7 +126,7 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  margin-left: auto;
+  margin-inline-start: auto;
   padding: 0 6px;
   border-radius: 999px;
   background: var(--po-border-subtle);
@@ -147,324 +141,6 @@
   width: 15px;
   height: 15px;
   object-fit: contain;
-}
-
-.desktop-cloud-integrations-nav-group {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-  margin-top: 4px;
-  padding-left: 18px;
-}
-
-.desktop-cloud-integrations-provider-row {
-  min-height: 30px;
-  padding-left: 9px;
-  color: var(--po-text-muted);
-}
-
-.desktop-cloud-integrations-provider-row .desktop-cloud-sidebar-nav-icon {
-  width: 22px;
-}
-
-.desktop-cloud-integrations-nav-empty {
-  display: flex;
-  min-height: 30px;
-  align-items: center;
-  margin: 1px var(--desktop-sidebar-row-right-gap) 1px calc(var(--desktop-sidebar-row-left-gap) + 27px);
-  padding: 0 var(--desktop-sidebar-row-content-right) 0 9px;
-  color: var(--po-text-subtle);
-  font-size: 12px;
-  font-weight: 540;
-  line-height: 1.25;
-}
-
-.desktop-cloud-integrations-list {
-  display: grid;
-  min-width: 0;
-  max-width: 900px;
-  gap: 28px;
-}
-
-.desktop-cloud-integration-provider-group {
-  display: grid;
-  min-width: 0;
-  gap: 20px;
-}
-
-.desktop-cloud-integration-provider-group + .desktop-cloud-integration-provider-group {
-  padding-top: 26px;
-  border-top: 1px solid var(--po-border-subtle);
-}
-
-.desktop-cloud-integration-provider-header {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 8px;
-}
-
-.desktop-cloud-integration-provider-header h2 {
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  color: var(--po-text);
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 24px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-cloud-integration-provider-header > span {
-  display: inline-flex;
-  min-width: 20px;
-  height: 18px;
-  align-items: center;
-  justify-content: center;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--po-border-subtle);
-  color: var(--po-text-muted);
-  font-size: 11px;
-  font-weight: 650;
-  line-height: 1;
-}
-
-.desktop-cloud-integration-provider-body {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: 220px minmax(0, 620px);
-  gap: 28px;
-  align-items: start;
-}
-
-.desktop-cloud-integration-provider-summary {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-}
-
-.desktop-cloud-integration-provider-hero {
-  display: inline-flex;
-  width: 156px;
-  height: 96px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--po-border-subtle) 72%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--po-panel) 54%, transparent);
-  color: var(--po-text-muted);
-}
-
-.desktop-cloud-integration-provider-hero img {
-  width: 52px;
-  height: 52px;
-  object-fit: contain;
-}
-
-.desktop-cloud-integration-connection-list {
-  display: grid;
-  width: 100%;
-  max-width: 620px;
-  min-width: 0;
-  gap: 7px;
-}
-
-.desktop-cloud-integration-connection-card {
-  display: grid;
-  min-width: 0;
-  min-height: 44px;
-  grid-template-columns: minmax(0, 1fr) 270px;
-  grid-template-areas:
-    "route right"
-    "error error";
-  align-items: center;
-  column-gap: 14px;
-  row-gap: 4px;
-  padding: 7px 8px 7px 11px;
-  border: 1px solid var(--po-border-subtle);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--po-panel) 42%, transparent);
-  color: inherit;
-  font-size: 13px;
-  line-height: 18px;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
-}
-
-.desktop-cloud-integration-connection-card:hover {
-  border-color: var(--po-border);
-  background: color-mix(in srgb, var(--po-panel) 62%, transparent);
-}
-
-.desktop-cloud-integration-connection-card.selected {
-  border-color: var(--po-border-strong, var(--po-border));
-  background: color-mix(in srgb, var(--po-panel) 62%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-border) 70%, transparent);
-}
-
-.desktop-cloud-integration-route {
-  grid-area: route;
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 8px;
-  color: var(--po-text);
-}
-
-.desktop-cloud-integration-source-config {
-  display: inline-flex;
-  max-width: 128px;
-  min-width: 0;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-  color: var(--po-text);
-}
-
-.desktop-cloud-integration-source-config img {
-  width: 16px;
-  height: 16px;
-  object-fit: contain;
-}
-
-.desktop-cloud-integration-source-config span,
-.desktop-cloud-integration-path-trail span,
-.desktop-cloud-integration-meta > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-cloud-integration-source-config span,
-.desktop-cloud-integration-path-trail span {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 18px;
-}
-
-.desktop-cloud-integration-route > svg {
-  flex-shrink: 0;
-  color: var(--po-text-muted);
-}
-
-.desktop-cloud-integration-path-trail {
-  display: inline-flex;
-  min-width: 0;
-  flex: 1;
-  align-items: center;
-  gap: 8px;
-  color: var(--po-text);
-}
-
-.desktop-cloud-integration-path-trail img {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  object-fit: contain;
-}
-
-.desktop-cloud-integration-right {
-  grid-area: right;
-  display: grid;
-  min-width: 0;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  align-items: center;
-  gap: 14px;
-}
-
-.desktop-cloud-integration-meta {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 7px;
-  color: var(--po-text-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
-}
-
-.desktop-cloud-integration-status-meta {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-  color: var(--po-text-disabled);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 18px;
-  text-transform: capitalize;
-  white-space: nowrap;
-}
-
-.desktop-cloud-integration-status-meta.success {
-  color: var(--po-success);
-  font-weight: 500;
-}
-
-.desktop-cloud-integration-status-meta.accent {
-  color: var(--po-accent);
-}
-
-.desktop-cloud-integration-status-meta.warning {
-  color: var(--po-warning);
-}
-
-.desktop-cloud-integration-status-meta.danger {
-  color: var(--po-danger);
-}
-
-.desktop-cloud-integration-status-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  flex-shrink: 0;
-  border-radius: 1.5px;
-  background: currentColor;
-}
-
-.desktop-cloud-integration-meta > span:not(:first-child)::before {
-  content: "·";
-  padding-right: 7px;
-  color: var(--po-text-disabled, var(--po-text-subtle));
-}
-
-.desktop-cloud-integration-manage {
-  display: inline-flex;
-  height: 26px;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 0 8px 0 9px;
-  border: 1px solid var(--po-border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--po-text-muted);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.desktop-cloud-integration-connection-card:hover .desktop-cloud-integration-manage {
-  border-color: var(--po-border-strong, var(--po-border));
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
-.desktop-cloud-integration-error {
-  grid-area: error;
-  overflow: hidden;
-  color: var(--po-danger);
-  font-size: 12px;
-  font-weight: 560;
-  line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .desktop-cloud-access-folder-section {
@@ -535,7 +211,7 @@
   outline: none;
   background: transparent;
   color: inherit;
-  text-align: left;
+  text-align: start;
 }
 
 .desktop-cloud-access-folder-row.header {
@@ -556,7 +232,7 @@
 }
 
 button.desktop-cloud-access-folder-row {
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 button.desktop-cloud-access-folder-row:hover,

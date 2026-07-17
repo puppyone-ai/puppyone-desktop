@@ -18,6 +18,9 @@ import {
   checkoutWorkspaceGitBranch,
   getWorkspaceGitFileDiff,
   configureWorkspaceCloudRemote,
+  pushWorkspaceGit,
+  pushWorkspaceGitCommitToRemote,
+  parsePuppyoneRemoteInfo,
   createWorkspaceEntry,
   writeWorkspaceTextFile,
 } from "../local-api/workspace.mjs";
@@ -118,6 +121,13 @@ describe("diffs", { timeout: 20_000 }, () => {
     expect(diff.commit_id).toBe("working-tree");
     expect(diff.files.length).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(diff.files)).toContain("const x = 2");
+    expect(diff.files[0].revisionPair).toMatchObject({
+      scope: "unstaged",
+      before: { kind: "text", content: "const x = 1\n" },
+      after: { kind: "text", content: "const x = 2\n" },
+    });
+    expect(diff.files[0].revisionPair.before.identity).toMatch(/^git:/);
+    expect(diff.files[0].revisionPair.after.identity).toMatch(/^worktree:/);
   });
 
   it("produces an untracked-file diff", async () => {
@@ -126,6 +136,68 @@ describe("diffs", { timeout: 20_000 }, () => {
     const diff = await getWorkspaceGitFileDiff(root, "new.txt", "untracked");
     expect(diff.files.length).toBe(1);
     expect(JSON.stringify(diff.files)).toContain("brand new line");
+    expect(diff.files[0].revisionPair).toMatchObject({
+      before: { kind: "missing" },
+      after: { kind: "text", content: "brand new line\n" },
+    });
+  });
+
+  it("models staged deletions and renames with immutable Git identities", { timeout: 60_000 }, async () => {
+    await initRepoWithIdentity();
+    await writeFile(path.join(root, "old.txt"), "old value\n");
+    await writeFile(path.join(root, "delete.txt"), "remove me\n");
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "base");
+
+    execFileSync("git", ["-C", root, "mv", "old.txt", "next.txt"]);
+    await rm(path.join(root, "delete.txt"));
+    await stageAllWorkspaceGitChanges(root);
+
+    const renamed = await getWorkspaceGitFileDiff(root, "next.txt", "staged");
+    expect(renamed.files[0]).toMatchObject({ status: "renamed", oldPath: "old.txt", path: "next.txt" });
+    expect(renamed.files[0].revisionPair).toMatchObject({
+      before: { kind: "text", content: "old value\n" },
+      after: { kind: "text", content: "old value\n" },
+    });
+    expect(renamed.files[0].revisionPair.before.identity).toMatch(/^git:/);
+    expect(renamed.files[0].revisionPair.after.identity).toMatch(/^git:/);
+
+    const deleted = await getWorkspaceGitFileDiff(root, "delete.txt", "staged");
+    expect(deleted.files[0].revisionPair).toMatchObject({
+      before: { kind: "text", content: "remove me\n" },
+      after: { kind: "missing" },
+    });
+  });
+
+  it("returns an honest unavailable side for over-budget binary resources and honors cancellation", async () => {
+    await initRepoWithIdentity();
+    await writeFile(path.join(root, "large.bin"), Buffer.alloc((25 * 1024 * 1024) + 1, 7));
+    const detail = await getWorkspaceGitFileDiff(root, "large.bin", "untracked");
+    expect(detail.files[0].revisionPair.after).toMatchObject({
+      kind: "unavailable",
+      reason: "size-limit",
+    });
+
+    const controller = new AbortController();
+    controller.abort();
+    await expect(getWorkspaceGitFileDiff(root, "large.bin", "untracked", {
+      signal: controller.signal,
+    })).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("materializes a small binary revision as bounded internal resource bytes", async () => {
+    await initRepoWithIdentity();
+    const bytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff, 0x01]);
+    await writeFile(path.join(root, "report.docx"), bytes);
+    const detail = await getWorkspaceGitFileDiff(root, "report.docx", "untracked");
+    expect(detail.files[0].revisionPair.before).toMatchObject({ kind: "missing" });
+    expect(detail.files[0].revisionPair.after).toMatchObject({
+      kind: "resource",
+      size: bytes.length,
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    expect(detail.files[0].revisionPair.after.identity).toMatch(/^worktree:/);
+    expect(detail.files[0].revisionPair.after.bytes).toEqual(bytes);
   });
 
   it("refuses to read an untracked symbolic link outside the workspace", async () => {
@@ -139,6 +211,130 @@ describe("diffs", { timeout: 20_000 }, () => {
         .rejects.toThrow(/symbolic links|workspace entry/i);
     } finally {
       await rm(external, { recursive: true, force: true });
+    }
+  });
+
+  it("derives committed and remote revision pairs from trusted refs", { timeout: 60_000 }, async () => {
+    await initRepoWithIdentity();
+    await writeFile(path.join(root, "shared.txt"), "base\n");
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "base");
+
+    const remoteRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-remote-"));
+    const peerRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-peer-"));
+    try {
+      execFileSync("git", ["init", "--bare", remoteRoot]);
+      execFileSync("git", ["-C", root, "remote", "add", "origin", remoteRoot]);
+      const branch = execFileSync("git", ["-C", root, "branch", "--show-current"]).toString().trim();
+      execFileSync("git", ["-C", root, "push", "-u", "origin", branch]);
+
+      execFileSync("git", ["clone", "--branch", branch, remoteRoot, peerRoot]);
+      execFileSync("git", ["-C", peerRoot, "config", "user.email", "peer@puppyone.test"]);
+      execFileSync("git", ["-C", peerRoot, "config", "user.name", "PuppyOne Peer"]);
+      await writeFile(path.join(peerRoot, "shared.txt"), "remote revision\n");
+      execFileSync("git", ["-C", peerRoot, "add", "shared.txt"]);
+      execFileSync("git", ["-C", peerRoot, "commit", "-m", "remote change"]);
+      execFileSync("git", ["-C", peerRoot, "push", "origin", branch]);
+
+      await writeFile(path.join(root, "shared.txt"), "local revision\n");
+      await stageAllWorkspaceGitChanges(root);
+      await commitWorkspaceGit(root, "local change");
+      execFileSync("git", ["-C", root, "fetch", "origin"]);
+
+      const committed = await getWorkspaceGitFileDiff(root, "shared.txt", "committed");
+      expect(committed.files[0].revisionPair).toMatchObject({
+        scope: "committed",
+        before: { kind: "text", content: "base\n" },
+        after: { kind: "text", content: "local revision\n" },
+      });
+      expect(committed.files[0].revisionPair.before.identity).toMatch(/^git:/);
+      expect(committed.files[0].revisionPair.after.identity).toMatch(/^git:/);
+
+      const remote = await getWorkspaceGitFileDiff(root, "shared.txt", "remote");
+      expect(remote.files[0].revisionPair).toMatchObject({
+        scope: "remote",
+        before: { kind: "text", content: "base\n" },
+        after: { kind: "text", content: "remote revision\n" },
+      });
+      expect(remote.files[0].revisionPair.selectionIdentity)
+        .not.toBe(committed.files[0].revisionPair.selectionIdentity);
+    } finally {
+      await rm(peerRoot, { recursive: true, force: true });
+      await rm(remoteRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps incoming and outgoing sidebar status aligned with aggregate opened diffs", { timeout: 60_000 }, async () => {
+    await initRepoWithIdentity();
+    await writeFile(path.join(root, "base.txt"), "base\n");
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "base");
+
+    const remoteRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-remote-"));
+    const peerRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-peer-"));
+    try {
+      execFileSync("git", ["init", "--bare", remoteRoot]);
+      execFileSync("git", ["-C", root, "remote", "add", "origin", remoteRoot]);
+      const branch = execFileSync("git", ["-C", root, "branch", "--show-current"]).toString().trim();
+      execFileSync("git", ["-C", root, "push", "-u", "origin", branch]);
+      execFileSync("git", ["clone", "--branch", branch, remoteRoot, peerRoot]);
+      execFileSync("git", ["-C", peerRoot, "config", "user.email", "peer@puppyone.test"]);
+      execFileSync("git", ["-C", peerRoot, "config", "user.name", "PuppyOne Peer"]);
+
+      await writeFile(path.join(root, "multi-commit.md"), "first\n");
+      await stageAllWorkspaceGitChanges(root);
+      await commitWorkspaceGit(root, "add aggregate file");
+      await writeFile(path.join(root, "multi-commit.md"), "first\nsecond\n");
+      await stageAllWorkspaceGitChanges(root);
+      await commitWorkspaceGit(root, "edit aggregate file");
+
+      await writeFile(path.join(root, "cancelled.txt"), "temporary\n");
+      await stageAllWorkspaceGitChanges(root);
+      await commitWorkspaceGit(root, "add temporary file");
+      await rm(path.join(root, "cancelled.txt"));
+      await stageAllWorkspaceGitChanges(root);
+      await commitWorkspaceGit(root, "remove temporary file");
+
+      await writeFile(path.join(peerRoot, "remote-multi.md"), "remote first\n");
+      execFileSync("git", ["-C", peerRoot, "add", "remote-multi.md"]);
+      execFileSync("git", ["-C", peerRoot, "commit", "-m", "add remote aggregate file"]);
+      await writeFile(path.join(peerRoot, "remote-multi.md"), "remote first\nremote second\n");
+      execFileSync("git", ["-C", peerRoot, "add", "remote-multi.md"]);
+      execFileSync("git", ["-C", peerRoot, "commit", "-m", "edit remote aggregate file"]);
+      execFileSync("git", ["-C", peerRoot, "push", "origin", branch]);
+      execFileSync("git", ["-C", root, "fetch", "origin"]);
+
+      const status = await getWorkspaceGitStatus(root);
+      const outgoingPreview = status.sourceControl.remote.outgoingPreview;
+      expect(outgoingPreview).toContainEqual(expect.objectContaining({
+        path: "multi-commit.md",
+        status: "added",
+        letter: "A",
+      }));
+      expect(outgoingPreview.some((file) => file.path === "cancelled.txt")).toBe(false);
+      expect(status.sourceControl.remote.incomingPreview).toContainEqual(expect.objectContaining({
+        path: "remote-multi.md",
+        status: "added",
+        letter: "A",
+      }));
+
+      const detail = await getWorkspaceGitFileDiff(root, "multi-commit.md", "committed");
+      expect(detail.files).toContainEqual(expect.objectContaining({
+        path: "multi-commit.md",
+        status: "added",
+        additions: 2,
+        deletions: 0,
+      }));
+      const incomingDetail = await getWorkspaceGitFileDiff(root, "remote-multi.md", "remote");
+      expect(incomingDetail.files).toContainEqual(expect.objectContaining({
+        path: "remote-multi.md",
+        status: "added",
+        additions: 2,
+        deletions: 0,
+      }));
+    } finally {
+      await rm(peerRoot, { recursive: true, force: true });
+      await rm(remoteRoot, { recursive: true, force: true });
     }
   });
 });
@@ -168,6 +364,28 @@ describe("branches", { timeout: 20_000 }, () => {
 });
 
 describe("cloud remote configuration (端 → 云 link)", { timeout: 20_000 }, () => {
+  it("recognizes exact canonical root/scoped locators and bounded legacy locators", () => {
+    expect(parsePuppyoneRemoteInfo(
+      "https://api.puppyone.ai/git/project-1/scopes/docs-scope.git",
+    )).toMatchObject({
+      kind: "scope",
+      projectId: "project-1",
+      scopeId: "docs-scope",
+    });
+    expect(parsePuppyoneRemoteInfo(
+      "https://api.puppyone.ai/not-a-git-remote",
+    )).toBeNull();
+    expect(parsePuppyoneRemoteInfo(
+      "https://user:secret@api.puppyone.ai/git/project-1.git",
+    )).toBeNull();
+    expect(parsePuppyoneRemoteInfo(
+      "ssh://api.puppyone.ai/git/project-1.git",
+    )).toBeNull();
+    expect(parsePuppyoneRemoteInfo(
+      "https://api.puppyone.ai/git/ap/legacy-secret.git",
+    )).toMatchObject({ kind: "access-point" });
+  });
+
   it("configures a PuppyOne-shaped git remote", async () => {
     await initRepoWithIdentity();
     const status = await configureWorkspaceCloudRemote(
@@ -178,6 +396,20 @@ describe("cloud remote configuration (端 → 云 link)", { timeout: 20_000 }, (
     expect(status.remotes.some((r) => r.name === "puppyone")).toBe(true);
     const url = execFileSync("git", ["-C", root, "remote", "get-url", "puppyone"]).toString().trim();
     expect(url).toBe("https://api.puppyone.ai/git/my-project.git");
+  });
+
+  it("configures a canonical scoped remote without credentials in the URL", async () => {
+    await initRepoWithIdentity();
+    await configureWorkspaceCloudRemote(
+      root,
+      "https://api.puppyone.ai/git/my-project/scopes/docs-scope.git",
+      "puppyone",
+    );
+    const url = execFileSync(
+      "git",
+      ["-C", root, "remote", "get-url", "puppyone"],
+    ).toString().trim();
+    expect(url).toBe("https://api.puppyone.ai/git/my-project/scopes/docs-scope.git");
   });
 
   it("updates the URL when the remote already exists (set-url)", async () => {
@@ -202,11 +434,190 @@ describe("cloud remote configuration (端 → 云 link)", { timeout: 20_000 }, (
     ).rejects.toThrow(/http or https/i);
   });
 
+  it("rejects URL credentials, query tokens, and legacy key-in-path remotes", async () => {
+    await initRepoWithIdentity();
+    await expect(configureWorkspaceCloudRemote(
+      root,
+      "https://user:secret@api.puppyone.ai/git/x.git",
+      "puppyone",
+    )).rejects.toThrow(/must not contain credentials/i);
+    await expect(configureWorkspaceCloudRemote(
+      root,
+      "https://api.puppyone.ai/git/x.git?token=secret",
+      "puppyone",
+    )).rejects.toThrow(/must not contain credentials/i);
+    await expect(configureWorkspaceCloudRemote(
+      root,
+      "https://api.puppyone.ai/git/ap/legacy-secret.git",
+      "puppyone",
+    )).rejects.toThrow(/PuppyOne Git endpoint/i);
+    await expect(configureWorkspaceCloudRemote(
+      root,
+      "https://api.puppyone.ai/git/x/scopes/scope%2Fchild.git",
+      "puppyone",
+    )).rejects.toThrow(/PuppyOne Git endpoint/i);
+  });
+
   it("rejects an invalid remote name (leading dash)", async () => {
     await initRepoWithIdentity();
     await expect(
       configureWorkspaceCloudRemote(root, "https://api.puppyone.ai/git/x.git", "-evil"),
     ).rejects.toThrow(/Remote name is invalid/i);
+  });
+});
+
+describe("explicit immutable Cloud initialization push", { timeout: 20_000 }, () => {
+  it("pushes exactly the expected commit to puppyone/main and leaves local changes untouched", async () => {
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "tracked.txt", kind: "file", content: "committed\n" });
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "initial commit");
+    execFileSync("git", ["-C", root, "branch", "-m", "feature/local-source"]);
+    const committedStatus = await getWorkspaceGitStatus(root);
+    await writeWorkspaceTextFile(root, "tracked.txt", "committed\nlocal draft\n");
+    await createWorkspaceEntry(root, { parentPath: null, name: "staged.txt", kind: "file", content: "staged draft\n" });
+    await stageWorkspaceGitPaths(root, ["staged.txt"]);
+    await createWorkspaceEntry(root, { parentPath: null, name: "untracked.txt", kind: "file", content: "untracked draft\n" });
+    const beforeWorktreeDiff = execFileSync("git", ["-C", root, "diff", "--binary"]);
+    const beforeIndexDiff = execFileSync("git", ["-C", root, "diff", "--cached", "--binary"]);
+    const beforePorcelain = execFileSync("git", ["-C", root, "status", "--porcelain=v1", "-z", "--untracked-files=all"]);
+
+    const remoteRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-explicit-push-"));
+    try {
+      execFileSync("git", ["init", "--bare", remoteRoot]);
+      execFileSync("git", ["-C", root, "remote", "add", "puppyone", remoteRoot]);
+
+      const status = await pushWorkspaceGitCommitToRemote(root, {
+        remoteName: "puppyone",
+        destinationBranch: "main",
+        expectedHeadCommitId: committedStatus.headCommitId,
+        expectedBranch: committedStatus.branch,
+      });
+
+      const remoteMain = execFileSync(
+        "git",
+        ["--git-dir", remoteRoot, "rev-parse", "refs/heads/main"],
+      ).toString().trim();
+      expect(committedStatus.branch).toBe("feature/local-source");
+      expect(remoteMain).toBe(committedStatus.headCommitId);
+      expect(status.headCommitId).toBe(committedStatus.headCommitId);
+      expect(status.entries.some((entry) => entry.path === "tracked.txt")).toBe(true);
+      expect(execFileSync("git", ["-C", root, "diff", "--binary"])).toEqual(beforeWorktreeDiff);
+      expect(execFileSync("git", ["-C", root, "diff", "--cached", "--binary"])).toEqual(beforeIndexDiff);
+      expect(execFileSync(
+        "git",
+        ["-C", root, "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+      )).toEqual(beforePorcelain);
+      expect(execFileSync(
+        "git",
+        ["-C", root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+      ).toString().trim()).toBe("puppyone/main");
+    } finally {
+      await rm(remoteRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects when HEAD changes and does not create the destination ref", async () => {
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "first.txt", kind: "file", content: "one\n" });
+    await stageAllWorkspaceGitChanges(root);
+    const expected = await commitWorkspaceGit(root, "first");
+    await createWorkspaceEntry(root, { parentPath: null, name: "second.txt", kind: "file", content: "two\n" });
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "second");
+
+    const remoteRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-explicit-push-"));
+    try {
+      execFileSync("git", ["init", "--bare", remoteRoot]);
+      execFileSync("git", ["-C", root, "remote", "add", "puppyone", remoteRoot]);
+
+      await expect(pushWorkspaceGitCommitToRemote(root, {
+        remoteName: "puppyone",
+        destinationBranch: "main",
+        expectedHeadCommitId: expected.headCommitId,
+        expectedBranch: expected.branch,
+      })).rejects.toThrow(/HEAD changed before push/i);
+      expect(() => execFileSync(
+        "git",
+        ["--git-dir", remoteRoot, "rev-parse", "--verify", "refs/heads/main"],
+        { stdio: "pipe" },
+      )).toThrow();
+    } finally {
+      await rm(remoteRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a detached or missing HEAD before invoking push", async () => {
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "first.txt", kind: "file", content: "one\n" });
+    await stageAllWorkspaceGitChanges(root);
+    const expected = await commitWorkspaceGit(root, "first");
+    const remoteRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-explicit-push-"));
+    try {
+      execFileSync("git", ["init", "--bare", remoteRoot]);
+      execFileSync("git", ["-C", root, "remote", "add", "puppyone", remoteRoot]);
+      execFileSync("git", ["-C", root, "checkout", "--detach", expected.headCommitId]);
+
+      await expect(pushWorkspaceGitCommitToRemote(root, {
+        remoteName: "puppyone",
+        destinationBranch: "main",
+        expectedHeadCommitId: expected.headCommitId,
+        expectedBranch: expected.branch,
+      })).rejects.toThrow(/current branch changed before push/i);
+
+      execFileSync("git", ["-C", root, "checkout", expected.branch]);
+      execFileSync("git", ["-C", root, "update-ref", "-d", `refs/heads/${expected.branch}`]);
+      await expect(pushWorkspaceGitCommitToRemote(root, {
+        remoteName: "puppyone",
+        destinationBranch: "main",
+        expectedHeadCommitId: expected.headCommitId,
+        expectedBranch: expected.branch,
+      })).rejects.toThrow(/no longer has a HEAD commit/i);
+    } finally {
+      await rm(remoteRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ordinary Push after PuppyOne initialization", { timeout: 20_000 }, () => {
+  it("keeps feature -> puppyone/main as source of truth even when origin also exists", async () => {
+    await initRepoWithIdentity();
+    await createWorkspaceEntry(root, { parentPath: null, name: "tracked.txt", kind: "file", content: "one\n" });
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "initial");
+    execFileSync("git", ["-C", root, "branch", "-m", "feature/cloud"]);
+    const puppyone = await mkdtemp(path.join(os.tmpdir(), "puppyone-ordinary-push-"));
+    const origin = await mkdtemp(path.join(os.tmpdir(), "origin-ordinary-push-"));
+    try {
+      execFileSync("git", ["init", "--bare", puppyone]);
+      execFileSync("git", ["init", "--bare", origin]);
+      execFileSync("git", ["-C", root, "remote", "add", "origin", origin]);
+      execFileSync("git", ["-C", root, "remote", "add", "puppyone", puppyone]);
+      execFileSync("git", ["-C", root, "push", "puppyone", "HEAD:refs/heads/main"]);
+      const initial = execFileSync("git", ["-C", root, "rev-parse", "HEAD"]).toString().trim();
+      execFileSync("git", ["-C", root, "update-ref", "refs/remotes/puppyone/main", initial]);
+      execFileSync("git", ["-C", root, "branch", "--set-upstream-to=puppyone/main", "feature/cloud"]);
+
+      await writeWorkspaceTextFile(root, "tracked.txt", "two\n");
+      await stageAllWorkspaceGitChanges(root);
+      const committed = await commitWorkspaceGit(root, "second");
+      await pushWorkspaceGit(root);
+
+      expect(execFileSync("git", ["--git-dir", puppyone, "rev-parse", "refs/heads/main"]).toString().trim())
+        .toBe(committed.headCommitId);
+      expect(() => execFileSync(
+        "git",
+        ["--git-dir", origin, "rev-parse", "--verify", "refs/heads/main"],
+        { stdio: "pipe" },
+      )).toThrow();
+      expect(execFileSync(
+        "git",
+        ["-C", root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+      ).toString().trim()).toBe("puppyone/main");
+    } finally {
+      await rm(puppyone, { recursive: true, force: true });
+      await rm(origin, { recursive: true, force: true });
+    }
   });
 });
 

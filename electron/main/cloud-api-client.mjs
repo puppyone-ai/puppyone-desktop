@@ -93,12 +93,30 @@ export async function requestCloudApi(apiBase, apiPath, init) {
   }
 
   if (!response.ok) {
-    const error = new Error(getCloudApiErrorMessage(payload, `Request failed (${response.status})`));
+    // Electron's invoke bridge serializes Error.message but drops custom
+    // properties such as `error.status`. Keep the status in a stable transport
+    // prefix as well so the renderer can recover HTTP semantics after IPC.
+    const detail = getCloudApiErrorMessage(payload, "Cloud request failed.");
+    const error = new Error(`Request failed (${response.status}): ${detail}`);
     error.status = response.status;
+    const businessCode = getCloudApiBusinessErrorCode(payload);
+    if (businessCode) error.code = businessCode;
     throw error;
   }
 
   return payload && Object.prototype.hasOwnProperty.call(payload, "data") ? payload.data : payload;
+}
+
+export function getCloudApiBusinessErrorCode(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  const candidates = [payload?.data?.code, payload?.detail?.code];
+  for (const candidate of candidates) {
+    if (
+      typeof candidate === "string"
+      && /^[a-z][a-z0-9_.-]{0,99}$/i.test(candidate)
+    ) return candidate;
+  }
+  return null;
 }
 
 export function getCloudApiErrorMessage(payload, fallback) {

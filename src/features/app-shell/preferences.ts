@@ -17,7 +17,9 @@ import {
   POINTER_CURSORS_STORAGE_KEY,
   RIGHT_SIDEBAR_TOOLS_STORAGE_KEY,
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
+  SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY,
   TEXT_SIZE_STORAGE_KEY,
+  TYPOGRAPHY_STORAGE_KEY,
   THEME_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
   parseAiEditAssistEnabled,
@@ -32,8 +34,10 @@ import {
   parsePointerCursors,
   parseRightSidebarToolsSettings,
   parseSidebarNavigationLayout,
+  parseSidebarNavigationVisibilitySettings,
   parseThemeMode,
   parseTextSize,
+  parseTypography,
   parseTitlebarActionsSettings,
   type DarkThemePreset,
   type DiffMarkers,
@@ -45,8 +49,10 @@ import {
   type LightThemePreset,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
+  type SidebarNavigationVisibilitySettings,
   type ThemeMode,
   type TextSize,
+  type TypographyPreferences,
   type TitlebarActionsSettings,
 } from "../../preferences";
 
@@ -54,6 +60,7 @@ export const EXPLORER_WIDTH_STORAGE_KEY = "puppyone.desktop.explorerWidth";
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = "puppyone.desktop.sidebarCollapsed";
 export const RIGHT_SIDEBAR_WIDTH_STORAGE_KEY = "puppyone.desktop.rightSidebarWidth";
 export const RIGHT_SIDEBAR_SURFACE_STORAGE_KEY = "puppyone.desktop.rightSidebarSurface";
+export const AGENT_PREFERRED_RUNTIME_STORAGE_KEY = "puppyone.desktop.agentPreferredRuntime";
 export const AGENT_PREFERRED_MODEL_STORAGE_KEY = "puppyone.desktop.agentPreferredModel";
 export type RightSidebarSurface = "chat" | "terminal";
 export const DEFAULT_EXPLORER_WIDTH = 320;
@@ -87,6 +94,11 @@ export function readInitialTextSize(): TextSize {
   return parseTextSize(window.localStorage.getItem(TEXT_SIZE_STORAGE_KEY));
 }
 
+export function readInitialTypographyPreferences(): TypographyPreferences {
+  if (typeof window === "undefined") return parseTypography(null);
+  return parseTypography(window.localStorage.getItem(TYPOGRAPHY_STORAGE_KEY));
+}
+
 export function readInitialPointerCursors(): boolean {
   if (typeof window === "undefined") return parsePointerCursors(null);
   return parsePointerCursors(window.localStorage.getItem(POINTER_CURSORS_STORAGE_KEY));
@@ -111,6 +123,13 @@ export function readInitialFileIconTheme(): FileIconThemeId {
 export function readInitialSidebarNavigationLayout(): SidebarNavigationLayout {
   if (typeof window === "undefined") return DEFAULT_SIDEBAR_NAVIGATION_LAYOUT;
   return parseSidebarNavigationLayout(window.localStorage.getItem(SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY));
+}
+
+export function readInitialSidebarNavigationVisibilitySettings(): SidebarNavigationVisibilitySettings {
+  if (typeof window === "undefined") return parseSidebarNavigationVisibilitySettings(null);
+  return parseSidebarNavigationVisibilitySettings(
+    window.localStorage.getItem(SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY),
+  );
 }
 
 export function readInitialGitDisplayMode(): GitDisplayMode {
@@ -146,7 +165,6 @@ export function mergePuppyoneWorkspaceConfig(
     };
     backup: Partial<PuppyoneWorkspaceConfig["backup"]>;
     git: Partial<PuppyoneWorkspaceConfig["git"]>;
-    cloud: Partial<PuppyoneWorkspaceConfig["cloud"]>;
   }>,
 ): PuppyoneWorkspaceConfig {
   const currentSourceOfTruth = current?.sync?.sourceOfTruth;
@@ -181,16 +199,12 @@ export function mergePuppyoneWorkspaceConfig(
   }
 
   return {
-    version: 1,
+    version: 3,
     sync: {
       sourceOfTruth,
     },
     git,
     backup,
-    cloud: {
-      projectId: current?.cloud?.projectId ?? null,
-      ...patch.cloud,
-    },
     ...(current?.updatedAt ? { updatedAt: current.updatedAt } : {}),
   };
 }
@@ -233,6 +247,12 @@ export function readInitialAgentPreferredModel(): string | null {
   if (typeof window === "undefined") return null;
   const stored = window.localStorage.getItem(AGENT_PREFERRED_MODEL_STORAGE_KEY);
   return typeof stored === "string" && stored.trim().length > 0 ? stored.trim().slice(0, 200) : null;
+}
+
+export function readInitialAgentPreferredRuntime(): string | null {
+  if (typeof window === "undefined") return null;
+  const stored = window.localStorage.getItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY)?.trim() ?? "";
+  return /^[a-z][a-z0-9-]{1,39}$/.test(stored) ? stored : null;
 }
 
 export function readSystemDarkMode(): boolean {

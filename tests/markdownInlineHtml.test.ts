@@ -2,31 +2,42 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
-import { addInlineMarkdownDecorations } from "../vendor/shared-ui/src/editor/markdown/core/decorations/inlineDecorations";
-import { markdownLivePreviewDecorations } from "../vendor/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
+import { addInlineMarkdownDecorations } from "../packages/shared-ui/src/editor/markdown/core/decorations/inlineDecorations";
+import {
+  markdownLivePreviewDecorations,
+  requestMarkdownProjectionRange,
+} from "../packages/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
 import {
   markdownCodeMirrorBaseExtensions,
   markdownLivePreviewExtension,
-} from "../vendor/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
-import { getMarkdownHtmlBlock } from "../vendor/shared-ui/src/editor/markdown/features/html/htmlBlockModel";
-import { compileInlineHtmlRenderPlan } from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlPolicy";
-import { isAllowedStyleProperty } from "../vendor/shared-ui/src/editor/markdown/platform/policy/markdownHtmlSanitizerPolicy";
+} from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
+import { getMarkdownHtmlBlock } from "../packages/shared-ui/src/editor/markdown/features/html/htmlBlockModel";
+import { compileInlineHtmlRenderPlan } from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlPolicy";
+import { isAllowedStyleProperty } from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownHtmlSanitizerPolicy";
 import {
   getMarkdownInlineHtml,
+  getMarkdownInlineHtmlDiagnostics,
+  getMarkdownInlineHtmlInRange,
+  resetMarkdownInlineHtmlDiagnostics,
   type MarkdownInlineHtml,
-} from "../vendor/shared-ui/src/editor/markdown/features/html/inlineHtmlModel";
+} from "../packages/shared-ui/src/editor/markdown/features/html/inlineHtmlModel";
 import {
   parseMarkdownHtmlTagToken,
   scanMarkdownHtmlTagTokens,
-} from "../vendor/shared-ui/src/editor/markdown/features/html/htmlTagTokenizer";
-import { puppyMarkdownParserExtensions } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
-import { getInlineRevealElement } from "../vendor/shared-ui/src/editor/markdown/core/syntax/markdownElements";
-import { InlineHtmlLineBreakWidget } from "../vendor/shared-ui/src/editor/markdown/core/widgets/inlineWidgets";
+} from "../packages/shared-ui/src/editor/markdown/features/html/htmlTagTokenizer";
+import {
+  puppyMarkdownFeatureCompositionExtension,
+  puppyMarkdownParserExtensions,
+} from "../packages/shared-ui/src/editor/markdown/composition/markdownFeatureComposition";
+import { getInlineRevealElement } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownElements";
+import { InlineHtmlLineBreakWidget } from "../packages/shared-ui/src/editor/markdown/core/widgets/inlineWidgets";
+import { getMarkdownPlansInRange } from "../packages/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
 
 function createMarkdownState(source: string) {
   return EditorState.create({
     doc: source,
     extensions: [
+      puppyMarkdownFeatureCompositionExtension,
       markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
     ],
   });
@@ -55,9 +66,11 @@ function buildInlineDecorations(source: string, reveal: { from: number; to: numb
     builders,
     reveal,
     null,
+    "safe",
     null,
     "",
     null,
+    getMarkdownPlansInRange(state, line.from, line.to),
   );
   return builders;
 }
@@ -128,6 +141,41 @@ describe("Markdown inline HTML semantic model", () => {
     });
   });
 
+  it("pairs a whole semantic container while constructing only the requested range", () => {
+    const source = "Text <span>one\ntwo</span> end";
+    const state = createMarkdownState(source);
+    const secondLine = state.doc.line(2);
+
+    const [element] = getMarkdownInlineHtmlInRange(state, secondLine.from, secondLine.to);
+
+    expect(element).toMatchObject({
+      from: source.indexOf("<span>"),
+      to: source.indexOf("</span>") + "</span>".length,
+      status: "complete",
+    });
+  });
+
+  it("keeps an HTML-heavy 10,000-line range query bounded to its paragraph", () => {
+    const source = Array.from({ length: 5_000 }, (_, index) => (
+      `<span data-index="${index}">paragraph ${index}</span>\n`
+    )).join("\n");
+    const state = createMarkdownState(source);
+    const targetLine = state.doc.line(101);
+    expect(ensureSyntaxTree(state, targetLine.to, 3_000)).not.toBeNull();
+    resetMarkdownInlineHtmlDiagnostics();
+
+    const elements = getMarkdownInlineHtmlInRange(state, targetLine.from, targetLine.to);
+
+    expect(elements).toHaveLength(1);
+    expect(elements[0]?.status).toBe("complete");
+    expect(getMarkdownInlineHtmlDiagnostics()).toMatchObject({
+      fullDocumentScans: 0,
+      rangeScans: 1,
+      containersScanned: 1,
+      tokensScanned: 2,
+    });
+  });
+
   it("renders the motivating styled strong label instead of exposing its tags", () => {
     const source = '<strong style="color: #92400E;">团队待提供：</strong>';
     const builders = buildInlineDecorations(source);
@@ -174,7 +222,7 @@ describe("Markdown inline HTML semantic model", () => {
     ]);
   });
 
-  it("invalidates semantic and decoration caches when background parsing advances", () => {
+  it("invalidates semantic caches and projects a newly parsed viewport", () => {
     const early = '<span style="color: red">early</span>';
     const late = '<span style="color: blue">late</span>';
     const filler = Array.from({ length: 2_500 }, (_, index) => (
@@ -199,7 +247,14 @@ describe("Markdown inline HTML semantic model", () => {
     expect(parsedState.doc).toBe(initialState.doc);
     expect(syntaxTree(parsedState).length).toBe(parsedState.doc.length);
     expect(getMarkdownInlineHtml(parsedState).some((element) => element.from === source.indexOf(late))).toBe(true);
-    expect(getInlineHtmlDecorationRanges(parsedState)).toHaveLength(2);
+    const projectedState = parsedState.update({
+      effects: requestMarkdownProjectionRange(
+        parsedState,
+        source.indexOf(late),
+        source.indexOf(late) + late.length,
+      ),
+    }).state;
+    expect(getInlineHtmlDecorationRanges(projectedState)).toHaveLength(2);
   });
 });
 

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CodexAppServerAdapter,
   normalizeCodexNotification,
-} from "../electron/main/agent/adapters/codex-app-server-adapter.mjs";
+} from "../electron/main/agent/runtimes/codex/codex-app-server-adapter.mjs";
 
 describe("Codex app-server normalization", () => {
   it("keeps the tested Codex 0.144.1 generated-schema fixture compatible", () => {
@@ -36,9 +36,30 @@ describe("Codex app-server normalization", () => {
     })]);
 
     expect(normalizeCodexNotification({
+      method: "item/reasoning/summaryPartAdded",
+      params: { threadId: "thread-1", turnId: "turn-1", itemId: "reasoning-1", summaryIndex: 1 },
+    })).toEqual([expect.objectContaining({
+      type: "reasoning.summary.delta",
+      payload: { delta: "", summaryIndex: 1, boundary: true },
+    })]);
+
+    expect(normalizeCodexNotification({
       method: "turn/completed",
       params: { threadId: "thread-1", turn: { id: "turn-1", status: "interrupted" } },
     })[0]).toMatchObject({ type: "turn.interrupted", payload: { status: "interrupted" } });
+
+    expect(normalizeCodexNotification({
+      method: "thread/status/changed",
+      params: { threadId: "thread-1", status: { type: "systemError" } },
+    })).toEqual([]);
+
+    expect(normalizeCodexNotification({
+      method: "turn/completed",
+      params: { threadId: "thread-1", turn: { id: "turn-1", status: "failed", error: { message: "Actionable failure" } } },
+    })).toEqual([
+      expect.objectContaining({ type: "turn.failed", payload: expect.objectContaining({ message: "Actionable failure" }) }),
+      expect.objectContaining({ type: "provider.error", payload: { message: "Actionable failure", recoverable: true } }),
+    ]);
 
     expect(normalizeCodexNotification({
       method: "item/fileChange/patchUpdated",
@@ -54,12 +75,98 @@ describe("Codex app-server normalization", () => {
     });
 
     expect(normalizeCodexNotification({
+      method: "item/started",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        item: { id: "command-1", type: "commandExecution", command: "rg -n needle src", cwd: "/workspace", status: "inProgress" },
+      },
+    })[0]).toMatchObject({
+      type: "tool.started",
+      payload: { kind: "command", tool: "bash", input: { command: "rg -n needle src", cwd: "/workspace" } },
+    });
+
+    expect(normalizeCodexNotification({
+      method: "item/started",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        item: { id: "change-1", type: "fileChange", changes: [{ path: "src/App.tsx", kind: "update", diff: "+one\n-two" }], status: "inProgress" },
+      },
+    })[0]).toMatchObject({
+      type: "tool.started",
+      payload: { kind: "file-change", tool: "edit", path: "src/App.tsx" },
+    });
+
+    expect(normalizeCodexNotification({
       method: "configWarning",
       params: { summary: "Invalid config", details: "Unknown key", path: "/workspace/.codex/config.toml" },
     })[0]).toMatchObject({
       type: "provider.warning",
       payload: { message: "Invalid config Unknown key (/workspace/.codex/config.toml)" },
     });
+
+    expect(normalizeCodexNotification({
+      method: "error",
+      params: {
+        error: {
+          message: JSON.stringify({
+            type: "error",
+            error: { message: "Invalid value: 'max'. Use 'xhigh'.", param: "reasoning.effort" },
+            status: 400,
+          }),
+        },
+        willRetry: false,
+      },
+    })[0]).toMatchObject({
+      type: "provider.error",
+      payload: { message: "Invalid value: 'max'. Use 'xhigh'." },
+    });
+  });
+
+  it("normalizes legacy reasoning effort and reuses one thread across follow-up turns", async () => {
+    const connection = new FakeConnection();
+    connection.results.set("account/read", { account: { type: "chatgpt" }, requiresOpenaiAuth: false });
+    connection.results.set("model/list", {
+      data: [{
+        id: "gpt-5.5",
+        model: "gpt-5.5",
+        displayName: "GPT-5.5",
+        defaultReasoningEffort: "max",
+        supportedReasoningEfforts: ["low", "max", "unsupported", "xhigh"].map((reasoningEffort) => ({
+          reasoningEffort,
+          description: reasoningEffort,
+        })),
+      }],
+    });
+    connection.results.set("thread/start", { thread: { id: "thread-1", preview: "Session", createdAt: 1, updatedAt: 1 } });
+    connection.results.set("turn/start", { turn: { id: "turn-1" } });
+    const adapter = new CodexAppServerAdapter({
+      executablePath: "/usr/local/bin/codex",
+      environment: {},
+      workspaceRoot: "/workspace",
+      appVersion: "test",
+      connectionFactory: () => connection,
+    });
+
+    const inspection = await adapter.inspect();
+    expect(inspection.models[0]).toMatchObject({
+      model: "gpt-5.5",
+      variants: ["low", "xhigh"],
+      defaultVariant: "xhigh",
+    });
+    await adapter.createSession({ model: "gpt-5.5" });
+    await adapter.startTurn({ prompt: "hello", model: "gpt-5.5" });
+    await adapter.startTurn({ prompt: "follow up", model: "gpt-5.5" });
+    expect(connection.requests.find((request) => request.method === "turn/start")).toMatchObject({
+      params: { threadId: "thread-1", model: "gpt-5.5", effort: "xhigh" },
+    });
+    expect(connection.requests.filter((request) => request.method === "initialize")).toHaveLength(1);
+    expect(connection.requests.filter((request) => request.method === "thread/start")).toHaveLength(1);
+    expect(connection.requests.filter((request) => request.method === "thread/resume")).toHaveLength(0);
+    expect(connection.requests.filter((request) => request.method === "turn/start")).toHaveLength(2);
+    expect(JSON.stringify(connection.requests)).not.toContain('"effort":"max"');
+    adapter.dispose();
   });
 
   it("offers only explicit durable decisions and fails unsupported requests closed", async () => {
@@ -226,11 +333,13 @@ class FakeConnection extends EventEmitter {
     this.closed = false;
     this.responses = [];
     this.errors = [];
+    this.requests = [];
     this.results = new Map([["initialize", { userAgent: "codex" }]]);
     this.failures = new Map();
   }
 
-  request(method) {
+  request(method, params) {
+    this.requests.push({ method, params });
     if (this.failures.has(method)) return Promise.reject(this.failures.get(method));
     return Promise.resolve(this.results.get(method) ?? {});
   }

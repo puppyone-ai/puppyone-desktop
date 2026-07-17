@@ -1,13 +1,15 @@
 import { Fragment, type CSSProperties } from "react";
 import { ExternalLink, GitBranch, RefreshCw } from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
+import { useLocalization } from "@puppyone/localization/react";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import type { GitStatusSnapshot } from "../../../types/electron";
 import { PageLoading } from "../../../components/loading";
 import { openCloudApp } from "../../../lib/cloudApi";
 import type { CloudWorkspaceSection } from "../types";
 import { CloudWebEmpty } from "../components/shared";
-import { useCloudBranchesData, useCloudBranchesGitStatus } from "../data";
+import { useCloudBranchesGitStatus } from "../data";
+import { useCloudHistoryData } from "../history/useCloudHistoryData";
 import {
   buildCloudBranchGraphRows,
   getCloudBranchGraphDiagnostics,
@@ -15,8 +17,15 @@ import {
   type CloudBranchGraphRefMarker,
   type CloudBranchGraphRow,
   type CloudBranchGraphStats,
-} from "../model";
+} from "../graph/model";
 import { formatRelativeTime, shortCommit } from "../utils";
+import {
+  formatCloudGraphAuthor,
+  formatCloudGraphLabel,
+  formatCloudGraphRowMessage,
+  formatCloudGraphWarning,
+  formatCloudMessage,
+} from "../cloudPresentation";
 
 const GRAPH_LANE_WIDTH = 16;
 const GRAPH_LEFT_PAD = 10;
@@ -44,6 +53,7 @@ export function CloudBranchesSection({
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
 }) {
+  const { formatNumber, t } = useLocalization();
   const gitGraphStatus = useCloudBranchesGitStatus({
     rootPath: workspace.path,
     fallbackStatus: status,
@@ -51,7 +61,7 @@ export function CloudBranchesSection({
   const effectiveStatus = gitGraphStatus.status ?? status;
   const localCommits = effectiveStatus?.allCommits?.length ? effectiveStatus.allCommits : effectiveStatus?.commits ?? [];
   const hasLocalGraph = localCommits.length > 0;
-  const branchData = useCloudBranchesData({
+  const branchData = useCloudHistoryData({
     session: cloudSession,
     projectId,
     apiBaseUrl,
@@ -59,8 +69,15 @@ export function CloudBranchesSection({
     revisionKey: effectiveStatus?.headCommitId ?? null,
     onSessionChange: onCloudSessionChange,
   });
-  const graphRows = buildCloudBranchGraphRows(effectiveStatus, branchData.history);
-  const diagnostics = getCloudBranchGraphDiagnostics(effectiveStatus, graphRows);
+  const graphRows = buildCloudBranchGraphRows({
+    status: effectiveStatus,
+    history: branchData.history,
+  });
+  const diagnostics = getCloudBranchGraphDiagnostics(
+    effectiveStatus,
+    graphRows,
+    branchData.history,
+  );
   const branches = effectiveStatus?.branches ?? [];
   const branchCount = branches.length || (graphRows.length > 0 ? 1 : 0);
   const localBranchCount = branches.filter((branch) => !branch.remote).length;
@@ -79,14 +96,18 @@ export function CloudBranchesSection({
   );
   const graphWidth = GRAPH_LEFT_PAD + graphLaneCount * GRAPH_LANE_WIDTH + GRAPH_RIGHT_PAD;
   const graphLoading = loading || (gitGraphStatus.loading && graphRows.length === 0) || (branchData.loading && graphRows.length === 0);
-  const branchError = gitGraphStatus.error ?? branchData.error ?? diagnostics.warning;
+  const branchError = gitGraphStatus.error
+    ? formatCloudMessage(gitGraphStatus.error, t)
+    : branchData.error
+      ? formatCloudMessage(branchData.error, t)
+      : formatCloudGraphWarning(diagnostics, t);
 
   return (
     <section className="desktop-cloud-branches-page">
       <header className="desktop-cloud-branches-header">
         <div>
-          <span>Branches</span>
-          <small>{graphLoading ? "Loading" : branchCount}</small>
+          <span>{t("cloud.route.branches.title")}</span>
+          <small>{graphLoading ? t("cloud.common.loading") : formatNumber(branchCount)}</small>
         </div>
         <div className="desktop-cloud-branches-toolbar">
           {currentBranchName && (
@@ -94,48 +115,48 @@ export function CloudBranchesSection({
               {currentBranchName}
             </span>
           )}
-          <span className="desktop-cloud-branches-token">{commitCount} commits</span>
-          {localBranchCount > 0 && <span className="desktop-cloud-branches-token local">{localBranchCount} local</span>}
-          {remoteBranchCount > 0 && <span className="desktop-cloud-branches-token remote">{remoteBranchCount} remote</span>}
-          {refOnlyCount > 0 && <span className="desktop-cloud-branches-token muted">{refOnlyCount} ref-only</span>}
-          {diagnostics.source === "git-topology" && <span className="desktop-cloud-branches-token ready">Git topology</span>}
-          {diagnostics.source === "missing-topology" && <span className="desktop-cloud-branches-token warning">Linear fallback</span>}
+          <span className="desktop-cloud-branches-token">{t("cloud.branches.commitCount", { count: commitCount })}</span>
+          {localBranchCount > 0 && <span className="desktop-cloud-branches-token local">{t("cloud.branches.localCount", { count: localBranchCount })}</span>}
+          {remoteBranchCount > 0 && <span className="desktop-cloud-branches-token remote">{t("cloud.branches.remoteCount", { count: remoteBranchCount })}</span>}
+          {refOnlyCount > 0 && <span className="desktop-cloud-branches-token muted">{t("cloud.branches.refOnlyCount", { count: refOnlyCount })}</span>}
+          {diagnostics.source === "git-topology" && <span className="desktop-cloud-branches-token ready">{t("cloud.branches.gitTopology")}</span>}
+          {diagnostics.source === "missing-topology" && <span className="desktop-cloud-branches-token warning">{t("cloud.branches.linearFallback")}</span>}
           <button
             className="desktop-cloud-row-action"
             type="button"
             onClick={() => void (hasLocalGraph ? gitGraphStatus.reload() : branchData.reload())}
             disabled={gitGraphStatus.loading || branchData.loading}
-            title={hasLocalGraph ? "Refresh local Git topology." : "Refresh Cloud history."}
+            title={t(hasLocalGraph ? "cloud.branches.refreshLocal" : "cloud.branches.refreshCloud")}
           >
             <RefreshCw size={13} className={(gitGraphStatus.loading || branchData.loading) ? "spin" : undefined} />
-            <span>Refresh</span>
+            <span>{t("cloud.common.refresh")}</span>
           </button>
           <button className="desktop-cloud-row-action" type="button" onClick={() => onOpenProject(projectId, "branches")}>
             <ExternalLink size={13} />
-            <span>Open Web</span>
+            <span>{t("cloud.common.openWeb")}</span>
           </button>
         </div>
       </header>
 
       <div className="desktop-cloud-branches-body">
         {graphLoading ? (
-          <PageLoading variant="fill" label="Loading" className="desktop-cloud-web-loading" />
+          <PageLoading variant="fill" label={t("cloud.common.loading")} className="desktop-cloud-web-loading" />
         ) : branchError && graphRows.length === 0 ? (
           <CloudWebEmpty
             icon={GitBranch}
-            title="Branches unavailable"
+            title={t("cloud.branches.unavailable")}
             detail={branchError}
           />
         ) : graphRows.length === 0 ? (
           <CloudWebEmpty
             icon={GitBranch}
-            title="No branches yet"
-            detail="No local or remote Git branches are available for this workspace yet."
+            title={t("cloud.branches.none")}
+            detail={t("cloud.branches.noneDetail")}
           />
         ) : (
           <>
             {branchError && <div className="desktop-cloud-branches-warning">{branchError}</div>}
-            <div className="desktop-cloud-branches-graph" role="list" aria-label="All branch history">
+            <div className="desktop-cloud-branches-graph" role="list" aria-label={t("cloud.branches.allHistory")}>
               {graphRows.map((row) => (
                 <Fragment key={row.id}>
                   <BranchGraphRow
@@ -169,10 +190,14 @@ function BranchGraphRow({
   row: CloudBranchGraphRow;
   graphWidth: number;
 }) {
+  const localization = useLocalization();
+  const { t } = localization;
   const isCurrentHead = row.labels.some((label) => label.current);
+  const message = formatCloudGraphRowMessage(row, t);
+  const author = formatCloudGraphAuthor(row, t);
   const content = (
     <>
-      <span className="desktop-cloud-branch-graph-cell" style={{ width: graphWidth }} aria-hidden="true">
+      <span className="desktop-cloud-branch-graph-cell" style={{ width: graphWidth }} aria-hidden="true" dir="ltr">
         <BranchGraphVisual
           graphWidth={graphWidth}
           height={GRAPH_ROW_HEIGHT}
@@ -189,21 +214,21 @@ function BranchGraphRow({
       </span>
 
       <span className="desktop-cloud-branch-graph-message">
-        <strong>{row.message}</strong>
+        <strong dir="auto">{message}</strong>
         {row.kind === "commit" && (
-          <code className="desktop-cloud-branch-graph-sha">{shortCommit(row.id)}</code>
+          <code className="desktop-cloud-branch-graph-sha" dir="ltr">{shortCommit(row.id)}</code>
         )}
         {row.labels.map((label) => (
           <span
             className={`desktop-cloud-branch-label ${label.kind} ${label.current ? "current" : ""}`}
-            key={`${row.id}:${label.name}`}
+            key={`${row.id}:${label.kind}:${label.nameCode ?? label.name}`}
           >
-            {label.name}
+            <bdi>{formatCloudGraphLabel(label, t)}</bdi>
           </span>
         ))}
         {row.stats && <BranchGraphStats stats={row.stats} />}
-        <span className="desktop-cloud-branch-graph-author" title={row.authorName}>{row.authorName}</span>
-        <time className="desktop-cloud-branch-graph-date">{row.createdAt ? formatRelativeTime(row.createdAt) : "unknown"}</time>
+        <span className="desktop-cloud-branch-graph-author" title={author} dir="auto">{author}</span>
+        <time className="desktop-cloud-branch-graph-date">{row.createdAt ? formatRelativeTime(row.createdAt, localization) : t("cloud.status.unknown")}</time>
       </span>
     </>
   );
@@ -213,7 +238,7 @@ function BranchGraphRow({
       <div
         className="desktop-cloud-branch-graph-row ref-only"
         role="listitem"
-        title={row.message}
+        title={message}
       >
         {content}
       </div>
@@ -225,7 +250,7 @@ function BranchGraphRow({
       className="desktop-cloud-branch-graph-row"
       type="button"
       role="listitem"
-      title={`${row.message} (${shortCommit(row.id)})`}
+      title={`${message} (${shortCommit(row.id)})`}
       onClick={() => openCloudApp(`/projects/${projectId}/changes?commit=${encodeURIComponent(row.id)}`)}
     >
       {content}
@@ -242,7 +267,7 @@ function BranchGraphContinuationLine({
 }) {
   return (
     <div className="desktop-cloud-branch-graph-continuation" aria-hidden="true">
-      <span className="desktop-cloud-branch-graph-cell" style={{ width: graphWidth }}>
+      <span className="desktop-cloud-branch-graph-cell" style={{ width: graphWidth }} dir="ltr">
         <BranchGraphVisual
           graphWidth={graphWidth}
           height={GRAPH_CONTINUATION_HEIGHT}
@@ -271,7 +296,7 @@ function BranchGraphVisual({
   const middleY = height / 2;
 
   return (
-    <span className="desktop-cloud-branch-graph-visual" style={{ width: graphWidth, height }}>
+    <span className="desktop-cloud-branch-graph-visual" dir="ltr" style={{ width: graphWidth, height }}>
       <svg
         className="desktop-cloud-branch-graph-svg"
         width={graphWidth}
@@ -372,19 +397,20 @@ function buildGraphSegmentPath(segment: CloudBranchGraphLine["segments"][number]
 }
 
 function BranchGraphStats({ stats }: { stats: CloudBranchGraphStats }) {
+  const { formatNumber, t } = useLocalization();
   if (stats.files === 0) {
-    return <span className="desktop-cloud-branch-graph-stats muted">No changes</span>;
+    return <span className="desktop-cloud-branch-graph-stats muted">{t("cloud.git.noChanges")}</span>;
   }
 
   return (
     <span className="desktop-cloud-branch-graph-stats">
-      <span>{stats.files} file{stats.files === 1 ? "" : "s"}</span>
-      {stats.addedFiles > 0 && <span className="added">+{stats.addedFiles}</span>}
-      {stats.deletedFiles > 0 && <span className="deleted">-{stats.deletedFiles}</span>}
+      <span>{t("cloud.history.fileCount", { count: stats.files })}</span>
+      {stats.addedFiles > 0 && <span className="added" dir="ltr">+{formatNumber(stats.addedFiles)}</span>}
+      {stats.deletedFiles > 0 && <span className="deleted" dir="ltr">-{formatNumber(stats.deletedFiles)}</span>}
       {(stats.additions > 0 || stats.deletions > 0) && (
         <span className="lines">
-          {stats.additions > 0 && <em>+{stats.additions}</em>}
-          {stats.deletions > 0 && <em>-{stats.deletions}</em>}
+          {stats.additions > 0 && <em dir="ltr">+{formatNumber(stats.additions)}</em>}
+          {stats.deletions > 0 && <em dir="ltr">-{formatNumber(stats.deletions)}</em>}
         </span>
       )}
     </span>

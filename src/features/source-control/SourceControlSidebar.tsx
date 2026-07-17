@@ -1,23 +1,16 @@
-import { ArrowDown, ArrowUp, ArrowUpRight, Clock3, Cloud, Github, Minus, Plus, Undo2, X } from "lucide-react";
-import { useScrollableDescendantClasses, type FileIconThemeId } from "@puppyone/shared-ui";
+import { Plus, Undo2 } from "lucide-react";
 import {
-  Fragment,
-  useCallback,
-  useRef,
-  useState,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from "react";
-import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import type { GitDisplayMode } from "../../preferences";
-import { openExternalUrl } from "../../lib/localFiles";
+  SidebarEmptyState,
+  SidebarIconButton,
+  SidebarRoot,
+  SidebarScrollArea,
+} from "@puppyone/shared-ui";
+import { Fragment, useMemo, useState } from "react";
+import { useLocalization } from "@puppyone/localization";
 import {
   SourceControlPreviewResourceList,
   SourceControlSectionHeader,
-  SourceControlWorkingTreeRow,
 } from "./components";
-import type { GitActionIconKind, GitHostingIdentity, GitMainPanel, GitSyncState, GitWorkingSelection } from "./types";
 import {
   buildSourceControlSidebarModel,
   getGitHostingIdentity,
@@ -26,73 +19,24 @@ import {
   getSourceControlPrimaryActionSlot,
   getGitSyncState,
 } from "./viewModel";
-
-export type GitSidebarProps = {
-  status: GitStatusSnapshot | null;
-  puppyoneConfig: PuppyoneWorkspaceConfig | null;
-  gitDisplayMode: GitDisplayMode;
-  fileIconTheme: FileIconThemeId;
-  activePanel: GitMainPanel;
-  selectedWorkingFile: GitWorkingSelection | null;
-  operationLoading: string | null;
-  operationError: string | null;
-  loading: boolean;
-  error: string | null;
-  onSelectPanel: (panel: GitMainPanel) => void;
-  onSelectWorkingFile: (selection: GitWorkingSelection) => void;
-  onStagePaths: (paths: string[]) => Promise<boolean>;
-  onStageAll: () => Promise<boolean>;
-  onUnstagePaths: (paths: string[]) => Promise<boolean>;
-  onUnstageAll: () => Promise<boolean>;
-  onDiscardPaths: (paths: string[]) => Promise<boolean>;
-  onDiscardAll: () => Promise<boolean>;
-  onStageAndCommit: () => Promise<boolean>;
-  onCommit: () => Promise<boolean>;
-  onCommitAndPush: () => Promise<boolean>;
-  onPull: () => Promise<boolean>;
-  onPush: () => Promise<boolean>;
-  onPublish: () => Promise<boolean>;
-  cloudBackupLoading: boolean;
-  cloudBackupError: string | null;
-  cloudEnabled?: boolean;
-  onStartPuppyoneBackup: () => void;
-  onInitializeRepository: () => Promise<boolean>;
-};
-
-type GitSidebarPanelId = "remote" | "merge" | "committed" | "staged" | "unstaged";
-
-type GitSidebarPanel = {
-  id: GitSidebarPanelId;
-  className: string;
-  grow: number;
-  expanded: boolean;
-  bodyRows: number;
-  content: ReactNode;
-};
-
-const GIT_SIDEBAR_PANEL_MAX_VISIBLE_ROWS = 9;
-const GIT_SIDEBAR_PANEL_EMPTY_BODY_ROWS = 1.5;
-const GIT_SIDEBAR_ROW_VERTICAL_MARGIN_PX = 2;
-const GIT_SCROLLABLE_LIST_SELECTOR = [
-  ".desktop-working-tree-list",
-  ".desktop-git-remote-preview",
-  ".desktop-history-list",
-  ".desktop-git-changes-scroll",
-  ".desktop-git-history-scroll",
-].join(",");
-const GIT_SIDEBAR_PANEL_MIN_HEIGHT: Record<GitSidebarPanelId, number> = {
-  remote: 72,
-  merge: 72,
-  committed: 72,
-  staged: 72,
-  unstaged: 72,
-};
-
-function getPanelBodyRows(resourceCount: number, hasBodyPlaceholder = false) {
-  if (resourceCount > 0) return resourceCount;
-  return hasBodyPlaceholder ? GIT_SIDEBAR_PANEL_EMPTY_BODY_ROWS : 0;
-}
-
+import {
+  getGitSidebarPanelBodyRows,
+  useGitSidebarPanelLayout,
+} from "./sidebar/useGitSidebarPanelLayout";
+import {
+  GitHistoryShortcut,
+  GitHostingIdentityRow,
+  GitOperationButton,
+  GitRemotePrompt,
+  GitScmSyncRow,
+  GitSectionCollapse,
+  GitSidebarSectionResizer,
+  PuppyoneCloudProviderSection,
+  getCommittedSummary,
+} from "./sidebar/SourceControlSidebarSections";
+import { SourceControlWorkingResourceList } from "./sidebar/SourceControlResourceLists";
+import type { GitSidebarPanel, GitSidebarProps } from "./sidebar/sourceControlSidebarTypes";
+export type { GitSidebarProps } from "./sidebar/sourceControlSidebarTypes";
 export function GitSidebar({
   status,
   puppyoneConfig,
@@ -109,7 +53,6 @@ export function GitSidebar({
   onStagePaths,
   onStageAll,
   onUnstagePaths,
-  onUnstageAll,
   onDiscardPaths,
   onDiscardAll,
   onStageAndCommit,
@@ -122,22 +65,18 @@ export function GitSidebar({
   cloudBackupError,
   cloudEnabled = true,
   onStartPuppyoneBackup,
-  onInitializeRepository,
 }: GitSidebarProps) {
+  const { t, formatNumber } = useLocalization();
   const [backupCardDismissed, setBackupCardDismissed] = useState(false);
   const [remoteExpanded, setRemoteExpanded] = useState(true);
   const [mergeExpanded, setMergeExpanded] = useState(true);
   const [committedExpanded, setCommittedExpanded] = useState(true);
   const [stagedExpanded, setStagedExpanded] = useState(true);
   const [workingExpanded, setWorkingExpanded] = useState(true);
-  const [panelHeights, setPanelHeights] = useState<Partial<Record<GitSidebarPanelId, number>>>({});
-  const [activeResizeSplit, setActiveResizeSplit] = useState<string | null>(null);
-  const sidebarListRef = useRef<HTMLDivElement | null>(null);
-  const panelRefs = useRef<Partial<Record<GitSidebarPanelId, HTMLDivElement | null>>>({});
   const sourceControl = status?.sourceControl ?? null;
   const historyCommits = status?.allCommits ?? status?.commits ?? [];
   const currentBranch = status?.branches.find((branch) => branch.current) ?? null;
-  const syncState = getGitSyncState(status, currentBranch, puppyoneConfig);
+  const syncState = getGitSyncState(status, currentBranch, puppyoneConfig, t);
   const hostingMode = getGitHostingMode(status, puppyoneConfig);
   const hostingIdentity = getGitHostingIdentity(status, puppyoneConfig);
   const showRemoteSyncSection = hostingMode === "generic-git";
@@ -162,8 +101,9 @@ export function GitSidebar({
     syncState,
     displayMode: professionalDisplayMode ? "professional" : gitDisplayMode,
     canCommit,
+    t,
   });
-  const remoteSection = showRemoteSyncSection && !syncState.setupRequired ? getGitScmSyncSection(status, syncState) : null;
+  const remoteSection = showRemoteSyncSection && !syncState.setupRequired ? getGitScmSyncSection(status, syncState, t) : null;
   const cloudSyncActionAvailable = hostingMode === "puppyone-cloud"
     && status?.sourceControl.remote?.canPull === true
     && mergeResources.length === 0;
@@ -189,95 +129,31 @@ export function GitSidebar({
     <GitHostingIdentityRow identity={hostingIdentity} />
   ) : null;
 
-  const setPanelRef = useCallback((id: GitSidebarPanelId, node: HTMLDivElement | null) => {
-    panelRefs.current[id] = node;
-  }, []);
-
-  const beginPanelResize = useCallback((
-    event: ReactPointerEvent<HTMLDivElement>,
-    previous: GitSidebarPanelId,
-    next: GitSidebarPanelId,
-  ) => {
-    if (event.button !== 0) return;
-    const previousNode = panelRefs.current[previous];
-    const nextNode = panelRefs.current[next];
-    if (!previousNode || !nextNode) return;
-
-    const previousStart = previousNode.getBoundingClientRect().height;
-    const nextStart = nextNode.getBoundingClientRect().height;
-    const totalHeight = previousStart + nextStart;
-    const previousMin = getPanelComputedMinHeight(previousNode, GIT_SIDEBAR_PANEL_MIN_HEIGHT[previous]);
-    const nextMin = getPanelComputedMinHeight(nextNode, GIT_SIDEBAR_PANEL_MIN_HEIGHT[next]);
-    if (totalHeight < previousMin + nextMin) return;
-
-    const startY = event.clientY;
-    const splitId = `${previous}:${next}`;
-    event.preventDefault();
-    setActiveResizeSplit(splitId);
-    document.body.classList.add("desktop-git-sidebar-resizing");
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      const delta = moveEvent.clientY - startY;
-      const previousMax = getPanelComputedMaxHeight(previousNode, previousStart);
-      const nextMax = getPanelComputedMaxHeight(nextNode, nextStart);
-      const previousLowerBound = Math.max(previousMin, totalHeight - nextMax);
-      const previousUpperBound = Math.min(previousMax, totalHeight - nextMin);
-      if (previousLowerBound > previousUpperBound) return;
-
-      const nextPreviousHeight = clampNumber(previousStart + delta, previousLowerBound, previousUpperBound);
-      const nextNextHeight = totalHeight - nextPreviousHeight;
-      setPanelHeights((current) => ({
-        ...current,
-        [previous]: Math.round(nextPreviousHeight),
-        [next]: Math.round(nextNextHeight),
-      }));
-    };
-
-    const stopResize = () => {
-      setActiveResizeSplit(null);
-      document.body.classList.remove("desktop-git-sidebar-resizing");
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", stopResize);
-      window.removeEventListener("pointercancel", stopResize);
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", stopResize);
-    window.addEventListener("pointercancel", stopResize);
-  }, []);
-
-  const getPanelStyle = useCallback((panel: GitSidebarPanel): CSSProperties => {
-    if (!panel.expanded) {
-      return {
-        flex: "0 0 var(--desktop-sidebar-row-height)",
-        maxHeight: "var(--desktop-sidebar-row-height)",
-        minHeight: "var(--desktop-sidebar-row-height)",
-      };
-    }
-    const visibleBodyRows = clampNumber(panel.bodyRows, 0, GIT_SIDEBAR_PANEL_MAX_VISIBLE_ROWS);
-    const maxHeight = visibleBodyRows > 0
-      ? `calc(var(--desktop-sidebar-row-height) * ${visibleBodyRows + 1} + var(--git-section-body-top-gap) + ${visibleBodyRows * GIT_SIDEBAR_ROW_VERTICAL_MARGIN_PX}px)`
-      : "var(--desktop-sidebar-row-height)";
-    const minHeight = `min(${GIT_SIDEBAR_PANEL_MIN_HEIGHT[panel.id]}px, ${maxHeight})`;
-    const height = panelHeights[panel.id];
-    if (typeof height === "number") {
-      return {
-        flex: `0 1 ${height}px`,
-        maxHeight,
-        minHeight,
-      };
-    }
-    return {
-      flexGrow: panel.grow,
-      maxHeight,
-      minHeight,
-    };
-  }, [panelHeights]);
-
-  useScrollableDescendantClasses(sidebarListRef, {
-    dependencies: [status, loading, remoteExpanded, mergeExpanded, committedExpanded, stagedExpanded, workingExpanded, panelHeights],
-    selector: GIT_SCROLLABLE_LIST_SELECTOR,
-  });
+  const scrollableContentRevision = useMemo(() => ({
+    committedExpanded,
+    loading,
+    mergeExpanded,
+    remoteExpanded,
+    stagedExpanded,
+    status,
+    workingExpanded,
+  }), [
+    committedExpanded,
+    loading,
+    mergeExpanded,
+    remoteExpanded,
+    stagedExpanded,
+    status,
+    workingExpanded,
+  ]);
+  const {
+    activeResizeSplit,
+    beginPanelResize,
+    getPanelStyle,
+    resizePanelsByKeyboard,
+    setPanelRef,
+    sidebarListRef,
+  } = useGitSidebarPanelLayout(scrollableContentRevision);
 
   const panels: GitSidebarPanel[] = [];
 
@@ -287,7 +163,7 @@ export function GitSidebar({
       className: "remote",
       grow: 1.05,
       expanded: remoteExpanded,
-      bodyRows: getPanelBodyRows(remoteSection?.previewResources.length ?? 0, Boolean(remoteSection?.fallbackSummary)),
+      bodyRows: getGitSidebarPanelBodyRows(remoteSection?.previewResources.length ?? 0, Boolean(remoteSection?.fallbackSummary)),
       content: (
         <GitScmSyncRow
           status={status}
@@ -314,31 +190,26 @@ export function GitSidebar({
       className: "merge",
       grow: 0.9,
       expanded: mergeExpanded,
-      bodyRows: getPanelBodyRows(mergeResources.length),
+      bodyRows: getGitSidebarPanelBodyRows(mergeResources.length),
       content: (
         <>
           <SourceControlSectionHeader
-            title="Merge Changes"
+            title={t("source-control.section.merge")}
             count={mergeResources.length}
             expanded={mergeExpanded}
             onToggle={() => setMergeExpanded((expanded) => !expanded)}
           />
           <GitSectionCollapse expanded={mergeExpanded}>
-            <div className="desktop-working-tree-list">
-              {mergeResources.map((resource) => (
-                <SourceControlWorkingTreeRow
-                  resource={resource}
-                  key={resource.id}
-                  selected={selectedWorkingFile?.path === resource.path && selectedWorkingFile.staged === resource.staged}
-                  operationLoading={operationLoading}
-                  fileIconTheme={fileIconTheme}
-                  onSelect={onSelectWorkingFile}
-                  onStagePaths={onStagePaths}
-                  onUnstagePaths={onUnstagePaths}
-                  onDiscardPaths={onDiscardPaths}
-                />
-              ))}
-            </div>
+            <SourceControlWorkingResourceList
+              resources={mergeResources}
+              selectedWorkingFile={selectedWorkingFile}
+              operationLoading={operationLoading}
+              fileIconTheme={fileIconTheme}
+              onSelectWorkingFile={onSelectWorkingFile}
+              onStagePaths={onStagePaths}
+              onUnstagePaths={onUnstagePaths}
+              onDiscardPaths={onDiscardPaths}
+            />
           </GitSectionCollapse>
         </>
       ),
@@ -351,11 +222,11 @@ export function GitSidebar({
       className: "committed",
       grow: 1.05,
       expanded: committedExpanded,
-      bodyRows: getPanelBodyRows(committedResources.length, true),
+      bodyRows: getGitSidebarPanelBodyRows(committedResources.length, true),
       content: (
         <>
           <SourceControlSectionHeader
-            title="Committed Changes"
+            title={t("source-control.section.committed")}
             count={committedCount}
             highlightCount={committedCount > 0}
             expanded={committedExpanded}
@@ -380,19 +251,19 @@ export function GitSidebar({
           />
           <GitSectionCollapse expanded={committedExpanded}>
             {committedCount === 0 ? (
-              <div className="desktop-tool-sidebar-empty compact desktop-git-empty-committed">Empty</div>
+              <SidebarEmptyState compact className="desktop-git-section-empty">{t("source-control.status.empty")}</SidebarEmptyState>
             ) : committedResources.length > 0 ? (
               <SourceControlPreviewResourceList
                 resources={committedResources}
                 fileIconTheme={fileIconTheme}
                 selectedWorkingFile={selectedWorkingFile}
                 origin="committed"
-                ariaLabel="Committed change preview"
+                ariaLabel={t("source-control.preview.committed")}
                 onSelectWorkingFile={onSelectWorkingFile}
               />
             ) : (
               <div className="desktop-git-committed-summary">
-                {getCommittedSummary(committedCount, committedPrimaryAction?.label ?? syncState.pushLabel)}
+                {getCommittedSummary(committedCount, committedPrimaryAction?.label ?? syncState.pushLabel, t)}
               </div>
             )}
           </GitSectionCollapse>
@@ -407,28 +278,16 @@ export function GitSidebar({
       className: "staged",
       grow: 0.9,
       expanded: stagedExpanded,
-      bodyRows: getPanelBodyRows(stagedResources.length, true),
+      bodyRows: getGitSidebarPanelBodyRows(stagedResources.length, true),
       content: (
         <>
           <SourceControlSectionHeader
-            title="Staged Changes"
+            title={t("source-control.section.staged")}
             count={stagedResources.length}
             expanded={stagedExpanded}
             onToggle={() => setStagedExpanded((expanded) => !expanded)}
             action={stagedPrimaryAction ? (
               <div className="desktop-git-section-actions">
-                {stagedResources.length > 0 && (
-                  <button
-                    className="desktop-tool-sidebar-icon"
-                    type="button"
-                    title="Unstage all"
-                    aria-label="Unstage all"
-                    disabled={disabled}
-                    onClick={() => void onUnstageAll()}
-                  >
-                    <Minus size={13} />
-                  </button>
-                )}
                 <GitOperationButton
                   className="desktop-git-commit-push-action"
                   title={stagedPrimaryAction.title}
@@ -451,23 +310,18 @@ export function GitSidebar({
           />
           <GitSectionCollapse expanded={stagedExpanded}>
             {stagedResources.length === 0 ? (
-              <div className="desktop-tool-sidebar-empty compact desktop-git-empty-stage">Empty</div>
+              <SidebarEmptyState compact className="desktop-git-section-empty">{t("source-control.status.empty")}</SidebarEmptyState>
             ) : (
-              <div className="desktop-working-tree-list">
-                {stagedResources.map((resource) => (
-                  <SourceControlWorkingTreeRow
-                    resource={resource}
-                    key={resource.id}
-                    selected={selectedWorkingFile?.staged === true && selectedWorkingFile.path === resource.path}
-                    operationLoading={operationLoading}
-                    fileIconTheme={fileIconTheme}
-                    onSelect={onSelectWorkingFile}
-                    onStagePaths={onStagePaths}
-                    onUnstagePaths={onUnstagePaths}
-                    onDiscardPaths={onDiscardPaths}
-                  />
-                ))}
-              </div>
+              <SourceControlWorkingResourceList
+                resources={stagedResources}
+                selectedWorkingFile={selectedWorkingFile}
+                operationLoading={operationLoading}
+                fileIconTheme={fileIconTheme}
+                onSelectWorkingFile={onSelectWorkingFile}
+                onStagePaths={onStagePaths}
+                onUnstagePaths={onUnstagePaths}
+                onDiscardPaths={onDiscardPaths}
+              />
             )}
           </GitSectionCollapse>
         </>
@@ -480,61 +334,54 @@ export function GitSidebar({
     className: "unstaged",
     grow: 1.15,
     expanded: workingExpanded,
-    bodyRows: getPanelBodyRows(localChangeResources.length, true),
+    bodyRows: getGitSidebarPanelBodyRows(localChangeResources.length, true),
     content: (
       <>
         <SourceControlSectionHeader
-          title="Unstaged Changes"
+          title={t("source-control.section.unstaged")}
           count={localChangeResources.length}
           expanded={workingExpanded}
           onToggle={() => setWorkingExpanded((expanded) => !expanded)}
           action={professionalMode ? (
             workingResources.length > 0 ? (
               <div className="desktop-git-section-actions">
-                <button
-                  className="desktop-tool-sidebar-icon danger"
-                  type="button"
-                  title="Discard all"
-                  aria-label="Discard all"
+                <SidebarIconButton
+                  className="desktop-working-tree-revert-action"
+                  tone="danger"
+                  label={t("source-control.action.discardAll")}
                   disabled={disabled}
                   onClick={() => void onDiscardAll()}
-                >
-                  <Undo2 size={13} />
-                </button>
-                <button
-                  className="desktop-tool-sidebar-icon primary"
-                  type="button"
-                  title="Stage all"
-                  aria-label="Stage all"
+                  icon={<Undo2 size={13} />}
+                />
+                <SidebarIconButton
+                  className="desktop-git-stage-all-action"
+                  label={t("source-control.action.stageAll")}
                   disabled={disabled}
                   onClick={() => void onStageAll()}
-                >
-                  <Plus size={13} />
-                </button>
+                  icon={<Plus size={13} />}
+                />
               </div>
             ) : null
           ) : showSimpleChangeAction ? (
             <div className="desktop-git-section-actions">
               {workingResources.length > 0 && (
-                <button
-                  className="desktop-tool-sidebar-icon danger"
-                  type="button"
-                  title="Discard all"
-                  aria-label="Discard all"
+                <SidebarIconButton
+                  className="desktop-working-tree-revert-action"
+                  tone="danger"
+                  label={t("source-control.action.discardAll")}
                   disabled={disabled}
                   onClick={() => void onDiscardAll()}
-                >
-                  <Undo2 size={13} />
-                </button>
+                  icon={<Undo2 size={13} />}
+                />
               )}
               <GitOperationButton
                 className="desktop-git-commit-push-action desktop-git-stage-commit-action"
-                title="Stage all local changes and commit them."
+                title={t("source-control.action.stageCommitTitle")}
                 disabled={disabled}
                 icon="plus"
-                label="Stage & Commit"
+                label={t("source-control.action.stageCommit")}
                 loadingKey="stage-commit"
-                loadingLabel="Committing..."
+                loadingLabel={t("source-control.action.committing")}
                 operationLoading={operationLoading}
                 primary={primaryActionSlot === "simple"}
                 onClick={() => void onStageAndCommit()}
@@ -544,23 +391,18 @@ export function GitSidebar({
         />
         <GitSectionCollapse expanded={workingExpanded}>
           {localChangeResources.length === 0 ? (
-            <div className="desktop-tool-sidebar-empty compact desktop-git-empty-changes">Empty</div>
+            <SidebarEmptyState compact className="desktop-git-section-empty">{t("source-control.status.empty")}</SidebarEmptyState>
           ) : (
-            <div className="desktop-working-tree-list">
-              {localChangeResources.map((resource) => (
-                <SourceControlWorkingTreeRow
-                  resource={resource}
-                  key={resource.id}
-                  selected={selectedWorkingFile?.staged === (resource.group === "index") && selectedWorkingFile.path === resource.path}
-                  operationLoading={operationLoading}
-                  fileIconTheme={fileIconTheme}
-                  onSelect={onSelectWorkingFile}
-                  onStagePaths={onStagePaths}
-                  onUnstagePaths={onUnstagePaths}
-                  onDiscardPaths={onDiscardPaths}
-                />
-              ))}
-            </div>
+            <SourceControlWorkingResourceList
+              resources={localChangeResources}
+              selectedWorkingFile={selectedWorkingFile}
+              operationLoading={operationLoading}
+              fileIconTheme={fileIconTheme}
+              onSelectWorkingFile={onSelectWorkingFile}
+              onStagePaths={onStagePaths}
+              onUnstagePaths={onUnstagePaths}
+              onDiscardPaths={onDiscardPaths}
+            />
           )}
         </GitSectionCollapse>
       </>
@@ -568,25 +410,17 @@ export function GitSidebar({
   });
 
   return (
-    <section className="desktop-tool-sidebar desktop-git-sidebar">
-      <div ref={sidebarListRef} className="desktop-tool-sidebar-list desktop-git-sidebar-list">
+    <SidebarRoot className="desktop-git-sidebar">
+      <SidebarScrollArea ref={sidebarListRef} className="desktop-git-sidebar-list">
         {error ? (
-          <div className="desktop-tool-sidebar-empty danger">{error}</div>
+          <SidebarEmptyState tone="danger">{error}</SidebarEmptyState>
         ) : status && !status.isRepo ? (
-          <div className="desktop-tool-sidebar-empty vertical">
-            <span>No repository</span>
-            {operationError && <small className="desktop-tool-sidebar-error-text">{operationError}</small>}
-            <button
-              className="desktop-tool-sidebar-action"
-              type="button"
-              disabled={Boolean(operationLoading)}
-              onClick={() => void onInitializeRepository()}
-            >
-              Initialize Repository
-            </button>
-          </div>
+          <SidebarEmptyState layout={operationError ? "vertical" : "inline"}>
+            <span>{t("source-control.status.noRepository")}</span>
+            {operationError && <small className="po-sidebar-error-text">{operationError}</small>}
+          </SidebarEmptyState>
         ) : loading && !status ? (
-          <div className="desktop-tool-sidebar-empty">Reading Git...</div>
+          <SidebarEmptyState>{t("source-control.status.readingGit")}</SidebarEmptyState>
         ) : (
           <>
             <div className="desktop-git-fixed-region">
@@ -610,7 +444,7 @@ export function GitSidebar({
               )}
               {status?.didHitStatusLimit && (
                 <div className="desktop-git-status-limit-warning" role="status">
-                  Showing the first {status.statusLimit.toLocaleString()} changes. Refine ignored files or open a smaller workspace for complete results.
+                  {t("source-control.status.limit", { count: formatNumber(status.statusLimit) })}
                 </div>
               )}
             </div>
@@ -624,6 +458,7 @@ export function GitSidebar({
                       next={panel.id}
                       active={activeResizeSplit === `${panels[index - 1].id}:${panel.id}`}
                       onPointerDown={beginPanelResize}
+                      onKeyboardResize={resizePanelsByKeyboard}
                     />
                   )}
                   <div
@@ -644,408 +479,7 @@ export function GitSidebar({
             />
           </>
         )}
-      </div>
-    </section>
-  );
-}
-
-function GitSectionCollapse({
-  expanded,
-  children,
-}: {
-  expanded: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className={`desktop-git-section-collapse ${expanded ? "expanded" : "collapsed"}`}>
-      <div className="desktop-git-section-collapse-inner">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function PuppyoneCloudProviderSection({
-  status,
-  mergeCount,
-  fileIconTheme,
-  selectedWorkingFile,
-  disabled,
-  operationLoading,
-  primaryAction,
-  onSelectWorkingFile,
-  onPull,
-}: {
-  status: GitStatusSnapshot | null;
-  mergeCount: number;
-  fileIconTheme: FileIconThemeId;
-  selectedWorkingFile: GitWorkingSelection | null;
-  disabled: boolean;
-  operationLoading: string | null;
-  primaryAction: boolean;
-  onSelectWorkingFile: (selection: GitWorkingSelection) => void;
-  onPull: () => Promise<boolean>;
-}) {
-  const remote = status?.sourceControl.remote ?? null;
-  const cloudUpdateCount = remote?.behind ?? 0;
-  const cloudPreviewResources = cloudUpdateCount > 0 ? remote?.incomingPreview ?? [] : [];
-  const downloadBlockedByConflicts = mergeCount > 0;
-  const canDownload = Boolean(remote?.canPull) && !downloadBlockedByConflicts;
-  const downloadTitle = downloadBlockedByConflicts
-    ? "Resolve local conflicts before downloading cloud changes."
-    : canDownload
-      ? "Download latest changes from Puppyone Cloud. Local edits are preserved automatically."
-      : "Cloud is already up to date.";
-
-  return (
-    <section className="desktop-git-cloud-provider-section">
-      <SourceControlSectionHeader
-        title="Puppyone Cloud"
-        count={cloudUpdateCount}
-        highlightCount={cloudUpdateCount > 0}
-        leadingIcon={<Cloud size={14} strokeWidth={2} />}
-        action={(
-          <GitOperationButton
-            className="desktop-git-commit-push-action"
-            title={downloadTitle}
-            disabled={disabled || !canDownload}
-            icon="download"
-            label="Download"
-            loadingKey="pull"
-            loadingLabel="Downloading..."
-            operationLoading={operationLoading}
-            primary={primaryAction}
-            onClick={() => void onPull()}
-          />
-        )}
-      />
-      <div className="desktop-git-cloud-provider-body">
-        {cloudPreviewResources.length > 0 ? (
-          <SourceControlPreviewResourceList
-            resources={cloudPreviewResources}
-            fileIconTheme={fileIconTheme}
-            selectedWorkingFile={selectedWorkingFile}
-            origin="remote"
-            ariaLabel="Cloud change preview"
-            onSelectWorkingFile={onSelectWorkingFile}
-          />
-        ) : (
-          <div className="desktop-tool-sidebar-empty compact desktop-git-empty-remote">
-            {cloudUpdateCount > 0
-              ? `${cloudUpdateCount} update${cloudUpdateCount === 1 ? "" : "s"} available`
-              : "Empty"}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function getCommittedSummary(count: number, actionLabel: string) {
-  const normalizedAction = actionLabel.toLowerCase();
-  if (count === 1) return `1 local commit is ready to ${normalizedAction}.`;
-  return `${count} local commits are ready to ${normalizedAction}.`;
-}
-
-function GitHostingIdentityRow({ identity }: { identity: GitHostingIdentity }) {
-  const label = identity.label;
-  const href = identity.href;
-  return (
-    <div className="desktop-git-section-row desktop-git-hosting-identity-row" aria-label="Cloud hosting repository">
-      {href ? (
-        <a
-          className="desktop-git-section-title desktop-git-hosting-identity-link"
-          href={href}
-          title={href}
-          onClick={(event) => {
-            event.preventDefault();
-            void openExternalUrl(href).catch((error) => {
-              console.warn("Unable to open GitHub repository:", error);
-            });
-          }}
-        >
-          <span className="desktop-git-section-leading-icon">
-            <Github size={14} strokeWidth={2} aria-hidden="true" />
-          </span>
-          <span>{label}</span>
-          <ArrowUpRight size={12} aria-hidden="true" />
-        </a>
-      ) : (
-        <div className="desktop-git-section-title desktop-git-hosting-identity-text">
-          <span className="desktop-git-section-leading-icon">
-            <Github size={14} strokeWidth={2} aria-hidden="true" />
-          </span>
-          <span>{label}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function GitSidebarSectionResizer({
-  previous,
-  next,
-  active,
-  onPointerDown,
-}: {
-  previous: GitSidebarPanelId;
-  next: GitSidebarPanelId;
-  active: boolean;
-  onPointerDown: (
-    event: ReactPointerEvent<HTMLDivElement>,
-    previous: GitSidebarPanelId,
-    next: GitSidebarPanelId,
-  ) => void;
-}) {
-  return (
-    <div
-      className={`desktop-git-section-resizer ${active ? "active" : ""}`}
-      role="separator"
-      aria-orientation="horizontal"
-      aria-label="Resize Git sidebar sections"
-      onPointerDown={(event) => onPointerDown(event, previous, next)}
-    />
-  );
-}
-
-function clampNumber(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function getPanelComputedMaxHeight(node: HTMLElement, fallback: number) {
-  const computedMaxHeight = window.getComputedStyle(node).maxHeight;
-  if (!computedMaxHeight || computedMaxHeight === "none") return Number.POSITIVE_INFINITY;
-  const parsed = Number.parseFloat(computedMaxHeight);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function getPanelComputedMinHeight(node: HTMLElement, fallback: number) {
-  const computedMinHeight = window.getComputedStyle(node).minHeight;
-  if (!computedMinHeight || computedMinHeight === "auto") return fallback;
-  const parsed = Number.parseFloat(computedMinHeight);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function GitRemotePrompt({
-  state,
-  disabled,
-  cloudBackupLoading,
-  cloudBackupError,
-  dismissed,
-  cloudEnabled,
-  onDismiss,
-  onStartPuppyoneBackup,
-}: {
-  state: GitSyncState;
-  disabled: boolean;
-  cloudBackupLoading: boolean;
-  cloudBackupError: string | null;
-  dismissed: boolean;
-  cloudEnabled: boolean;
-  onDismiss: () => void;
-  onStartPuppyoneBackup: () => void;
-}) {
-  if (!cloudEnabled) return null;
-
-  if (state.setupRequired) {
-    if (dismissed && !cloudBackupError) return null;
-
-    return (
-      <section className="desktop-git-backup-card">
-        <div className="desktop-git-backup-copy">
-          <span>This workspace is not backed up to Puppyone Cloud.</span>
-        </div>
-        <button
-          className="desktop-git-backup-action"
-          type="button"
-          aria-busy={cloudBackupLoading || undefined}
-          disabled={disabled || cloudBackupLoading}
-          onClick={onStartPuppyoneBackup}
-        >
-          {cloudBackupLoading ? <SourceControlDots /> : <Cloud size={13} />}
-          <span>Get Cloud</span>
-        </button>
-        <button
-          className="desktop-git-backup-dismiss"
-          type="button"
-          aria-label="Dismiss backup reminder"
-          title="Dismiss"
-          disabled={cloudBackupLoading}
-          onClick={onDismiss}
-        >
-          <X size={13} />
-        </button>
-        {cloudBackupError && <div className="desktop-git-backup-error">{cloudBackupError}</div>}
-      </section>
-    );
-  }
-
-  return null;
-}
-
-function GitScmSyncRow({
-  status,
-  state,
-  fileIconTheme,
-  expanded,
-  selectedWorkingFile,
-  disabled,
-  operationLoading,
-  primaryAction,
-  onToggleExpanded,
-  onSelectWorkingFile,
-  onPull,
-  onPush,
-  onPublish,
-}: {
-  status: GitStatusSnapshot | null;
-  state: GitSyncState;
-  fileIconTheme: FileIconThemeId;
-  expanded: boolean;
-  selectedWorkingFile: GitWorkingSelection | null;
-  disabled: boolean;
-  operationLoading: string | null;
-  primaryAction: boolean;
-  onToggleExpanded: () => void;
-  onSelectWorkingFile: (selection: GitWorkingSelection) => void;
-  onPull: () => Promise<boolean>;
-  onPush: () => Promise<boolean>;
-  onPublish: () => Promise<boolean>;
-}) {
-  const section = getGitScmSyncSection(status, state);
-
-  return (
-    <section className={`desktop-git-remote-status desktop-git-scm-sync ${section.copy.tone}`}>
-      <SourceControlSectionHeader
-        title={section.copy.title}
-        count={section.copy.count}
-        highlightCount={section.copy.count > 0}
-        expanded={expanded}
-        onToggle={onToggleExpanded}
-        action={section.action ? (
-          <GitOperationButton
-            className="desktop-git-remote-action"
-            disabled={disabled || section.action.disabled}
-            title={section.action.title}
-            icon={section.action.icon}
-            label={section.action.label}
-            loadingKey={section.action.kind}
-            loadingLabel={section.action.loadingLabel}
-            operationLoading={operationLoading}
-            primary={primaryAction}
-            onClick={() => {
-              if (section.action?.kind === "pull") void onPull();
-              if (section.action?.kind === "push") void onPush();
-              if (section.action?.kind === "publish") void onPublish();
-            }}
-          />
-        ) : null}
-      />
-      {section.previewResources.length > 0 && (
-        <GitSectionCollapse expanded={expanded}>
-          <SourceControlPreviewResourceList
-            resources={section.previewResources}
-            fileIconTheme={fileIconTheme}
-            selectedWorkingFile={selectedWorkingFile}
-            origin="remote"
-            ariaLabel="Remote change preview"
-            onSelectWorkingFile={onSelectWorkingFile}
-          />
-        </GitSectionCollapse>
-      )}
-      {section.previewResources.length === 0 && section.fallbackSummary && (
-        <GitSectionCollapse expanded={expanded}>
-          <div className="desktop-git-preview-summary">{section.fallbackSummary}</div>
-        </GitSectionCollapse>
-      )}
-    </section>
-  );
-}
-
-function GitOperationButton({
-  className,
-  title,
-  disabled,
-  icon,
-  label,
-  loadingKey,
-  loadingLabel,
-  operationLoading,
-  primary = false,
-  onClick,
-}: {
-  className: string;
-  title: string;
-  disabled: boolean;
-  icon: GitActionIconKind;
-  label: string;
-  loadingKey: string;
-  loadingLabel: string;
-  operationLoading: string | null;
-  primary?: boolean;
-  onClick: () => void;
-}) {
-  const loading = operationLoading === loadingKey;
-  const buttonClassName = [
-    "desktop-git-operation-button",
-    className,
-    primary ? "is-primary" : "",
-    loading ? "is-loading" : "",
-  ].filter(Boolean).join(" ");
-
-  return (
-    <button
-      className={buttonClassName}
-      type="button"
-      title={title}
-      aria-label={loading ? loadingLabel : label}
-      aria-busy={loading || undefined}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {loading ? <SourceControlDots /> : renderGitActionIcon(icon)}
-      <span className="desktop-git-operation-label">{loading ? loadingLabel : label}</span>
-    </button>
-  );
-}
-
-function SourceControlDots() {
-  return (
-    <span className="desktop-git-loading-dots" data-puppy-loader="dots" role="status" aria-label="Loading">
-      {[0, 1, 2].map((index) => (
-        <span key={index} style={{ animationDelay: `${index * 0.16}s` }} />
-      ))}
-    </span>
-  );
-}
-
-function renderGitActionIcon(icon: GitActionIconKind) {
-  if (icon === "plus") return <Plus size={15} strokeWidth={2.25} aria-hidden="true" />;
-  const Icon = icon === "upload" ? ArrowUp : ArrowDown;
-  return <Icon className="desktop-git-action-arrow" size={15} strokeWidth={2.25} aria-hidden="true" />;
-}
-
-function GitHistoryShortcut({
-  active,
-  count,
-  onSelect,
-}: {
-  active: boolean;
-  count: number;
-  onSelect: () => void;
-}) {
-  return (
-    <section className="desktop-git-history-drawer">
-      <button
-        className={`desktop-git-history-drawer-header ${active ? "active" : ""}`}
-        type="button"
-        aria-pressed={active}
-        onClick={onSelect}
-      >
-        <Clock3 size={13} />
-        <span>History</span>
-        <small>{count}</small>
-      </button>
-    </section>
+      </SidebarScrollArea>
+    </SidebarRoot>
   );
 }

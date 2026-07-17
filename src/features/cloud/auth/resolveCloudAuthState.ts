@@ -25,6 +25,21 @@ export function resolveCloudAuthState({
   }
 
   if (effectiveSession) {
+    if (effectiveSession.status === "refreshing") {
+      return { status: "refreshing", apiBaseUrl: environment.apiBaseUrl, session: effectiveSession };
+    }
+    if (effectiveSession.status === "offline-authenticated") {
+      return { status: "offline-authenticated", apiBaseUrl: environment.apiBaseUrl, session: effectiveSession };
+    }
+    if (effectiveSession.status === "signing-out") {
+      return { status: "signing-out", apiBaseUrl: environment.apiBaseUrl, session: effectiveSession };
+    }
+    if (effectiveSession.status === "signing-in") {
+      return { status: "signing-in", apiBaseUrl: environment.apiBaseUrl, session: effectiveSession };
+    }
+    if (effectiveSession.status === "expired") {
+      return { status: "expired", apiBaseUrl: environment.apiBaseUrl };
+    }
     return {
       status: "signed-in",
       apiBaseUrl: environment.apiBaseUrl,

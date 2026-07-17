@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { DataNode } from "../../vendor/shared-ui/src/core/types";
-import type { MarkdownLinkGraphDocument } from "../../vendor/shared-ui/src/editor/markdown/core/links/markdownLinkGraph";
+import type { DataNode } from "../../packages/shared-ui/src/core/types";
+import type { MarkdownLinkGraphDocument } from "../../packages/shared-ui/src/editor/markdown/core/links/markdownLinkGraph";
 
 const EXCLUDED_REPOSITORY_DIRECTORIES = new Set([
   ".git",
@@ -22,6 +22,29 @@ export function makeMarkdown(lineCount: number): string {
     else lines.push(`Paragraph ${index} with **bold**, _emphasis_, [link](note-${index % 30}.md), and \`code\`.`);
   }
   return lines.join("\n");
+}
+
+export function makeFeatureHeavyMarkdown(sectionCount: number): string {
+  const sections: string[] = [];
+  for (let index = 0; index < sectionCount; index += 1) {
+    sections.push(
+      `## Feature section ${index}`,
+      "| Name | Value | Status |",
+      "| --- | ---: | --- |",
+      `| row ${index} | ${index} | **ready** |`,
+      "",
+      "```mermaid",
+      "flowchart LR",
+      `  A${index}[Source] --> B${index}[Projection]`,
+      "```",
+      "",
+      `<section data-index="${index}"><strong>Trusted text ${index}</strong></section>`,
+      "",
+      `Paragraph with ![asset](image-${index}.png), [[Note ${index}]], and [link](note-${index}.md).`,
+      "",
+    );
+  }
+  return sections.join("\n");
 }
 
 export function makeExplorerNodes(count: number): DataNode[] {

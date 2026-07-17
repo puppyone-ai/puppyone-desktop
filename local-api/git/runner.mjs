@@ -26,6 +26,25 @@ export function execGit(rootPath, args, options = {}) {
     maxBuffer: options.maxBuffer ?? GIT_MAX_BUFFER,
     signal: options.signal,
     env: buildGitEnvironment({ optionalLocks: options.optionalLocks }),
+    input: options.input,
+  }).catch((error) => {
+    annotateGitError(error, args, timeout);
+    throw error;
+  });
+}
+
+/**
+ * Bounded binary-safe Git read. Callers must provide a domain-specific
+ * maxBuffer; the default deliberately stays at the ordinary Git output cap.
+ */
+export function execGitBuffer(rootPath, args, options = {}) {
+  const timeout = options.timeout ?? GIT_READ_TIMEOUT_MS;
+  return execFileAsync("git", ["-C", rootPath, "-c", "core.quotePath=false", ...args], {
+    encoding: null,
+    timeout,
+    maxBuffer: options.maxBuffer ?? GIT_MAX_BUFFER,
+    signal: options.signal,
+    env: buildGitEnvironment({ optionalLocks: options.optionalLocks }),
   }).catch((error) => {
     annotateGitError(error, args, timeout);
     throw error;

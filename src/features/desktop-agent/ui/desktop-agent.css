@@ -1,0 +1,13 @@
+/*
+ * Desktop Agent owns its complete visual boundary. Every imported module uses
+ * semantic PuppyOne tokens. Third-party source provenance and license records
+ * live outside runtime styles in the repository's audited notice ledger.
+ */
+@import "./styles/foundation.css";
+@import "./styles/transcript.css";
+@import "./styles/activities.css";
+@import "./styles/tool-results.css";
+@import "./styles/blocking.css";
+@import "./styles/composer.css";
+@import "./styles/pickers.css";
+@import "./styles/responsive.css";

@@ -1,0 +1,19 @@
+{
+  "loading": "Loading…",
+  "explorer.root": "Root",
+  "explorer.emptyFolder": "Empty folder",
+  "explorer.loadingWorkspace": "Loading workspace…",
+  "explorer.create": "Create",
+  "explorer.more": "More",
+  "explorer.access": "Access",
+  "explorer.resizeSidebar": "Resize sidebar",
+  "explorer.cutLabel": "{name}, cut",
+  "navigation.back": "Back",
+  "preview.selectFile": "Select a file to preview",
+  "preview.crashed": "Unable to render this editor.",
+  "status.clean": "Clean",
+  "status.modified": "Modified",
+  "status.created": "Created",
+  "status.deleted": "Deleted",
+  "status.moved": "Moved"
+}

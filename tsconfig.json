@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["DOM", "DOM.Iterable", "ES2020"],
+    "lib": ["DOM", "DOM.Iterable", "ES2020", "ES2021.Intl"],
     "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -13,7 +13,9 @@
     "moduleResolution": "Node",
     "baseUrl": ".",
     "paths": {
-      "@puppyone/shared-ui": ["vendor/shared-ui/src/index.ts"],
+      "@puppyone/localization": ["packages/localization/src/index.ts"],
+      "@puppyone/localization/*": ["packages/localization/src/*"],
+      "@puppyone/shared-ui": ["packages/shared-ui/src/index.ts"],
       "lucide-react": ["node_modules/lucide-react/dist/lucide-react.d.ts"],
       "react": ["node_modules/@types/react/index.d.ts"],
       "react/jsx-runtime": ["node_modules/@types/react/jsx-runtime.d.ts"]
@@ -23,6 +25,6 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "vendor/shared-ui/src"],
+  "include": ["src", "shared/agent-contract/**/*.ts", "packages/localization/src", "packages/shared-ui/src"],
   "references": []
 }

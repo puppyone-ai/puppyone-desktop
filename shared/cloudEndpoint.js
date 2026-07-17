@@ -1,7 +1,4 @@
 export const CLOUD_API_BASE_URL_STORAGE_KEY = "puppyone.desktop.cloudApiBaseUrl";
-export const PUPPYONE_CLOUD_API_HOST = "api.puppyone.ai";
-export const PUPPYONE_CLOUD_WEB_HOST = "app.puppyone.ai";
-export const DEFAULT_CLOUD_API_BASE_URL = `https://${PUPPYONE_CLOUD_API_HOST}/api/v1`;
 
 export function normalizeCloudApiBaseUrl(apiBaseUrl) {
   if (typeof apiBaseUrl !== "string" || !apiBaseUrl.trim()) return null;
@@ -20,13 +17,8 @@ export function normalizeCloudApiBaseUrl(apiBaseUrl) {
       host === "localhost" ||
       host === "127.0.0.1";
     if (!allowedHost) return null;
-
-    if (url.hostname === PUPPYONE_CLOUD_API_HOST) {
-      url.protocol = "https:";
-      if (!url.pathname || url.pathname === "/") {
-        url.pathname = "/api/v1";
-      }
-    }
+    const loopback = host === "localhost" || host === "127.0.0.1";
+    if (!loopback && url.protocol !== "https:") return null;
 
     url.hash = "";
     url.search = "";
@@ -36,8 +28,10 @@ export function normalizeCloudApiBaseUrl(apiBaseUrl) {
   }
 }
 
-export function resolveCloudApiBaseUrl(apiBaseUrl, fallback = DEFAULT_CLOUD_API_BASE_URL) {
-  return normalizeCloudApiBaseUrl(apiBaseUrl) ?? normalizeCloudApiBaseUrl(fallback) ?? DEFAULT_CLOUD_API_BASE_URL;
+export function resolveCloudApiBaseUrl(apiBaseUrl, fallback = null) {
+  const resolved = normalizeCloudApiBaseUrl(apiBaseUrl) ?? normalizeCloudApiBaseUrl(fallback);
+  if (!resolved) throw new Error("Cloud API base URL is not configured.");
+  return resolved;
 }
 
 export function cloudApiBaseUrlFromRemote(remoteUrl) {

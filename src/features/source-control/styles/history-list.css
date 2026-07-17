@@ -19,12 +19,13 @@
   width: 100%;
   height: var(--desktop-sidebar-row-height);
   margin: 1px 0;
-  padding: 0 var(--git-sidebar-content-right) 0 var(--git-sidebar-content-left);
+  padding-block: 0;
+  padding-inline: var(--git-sidebar-content-left) var(--git-sidebar-content-right);
   border: 0;
   border-radius: var(--git-row-radius);
   background: transparent;
   color: var(--po-text-subtle);
-  text-align: left;
+  text-align: start;
 }
 
 .desktop-git-history-drawer-header:hover {
@@ -49,8 +50,9 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  font-size: 12px;
-  font-weight: 560;
+  font-size: var(--desktop-sidebar-section-title-font-size, var(--git-font-small));
+  font-weight: var(--desktop-sidebar-section-title-font-weight, var(--git-weight-regular));
+  line-height: var(--desktop-sidebar-section-title-line-height, var(--git-line-height));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -68,7 +70,7 @@
   overflow-x: hidden;
   padding-bottom: 4px;
   /* Compensate the drawer's right padding for the reserved gutter. */
-  margin-right: calc(-1 * var(--git-sidebar-scrollbar-width));
+  margin-inline-end: calc(-1 * var(--git-sidebar-scrollbar-width));
   scrollbar-gutter: stable;
 }
 
@@ -79,6 +81,16 @@
   padding-bottom: 6px;
 }
 
+.desktop-history-virtual-list {
+  display: block;
+  min-height: 0;
+  overflow: auto;
+}
+
+.desktop-history-virtual-list .po-sidebar-virtual-row {
+  width: 100%;
+}
+
 .desktop-history-row {
   position: relative;
   display: flex;
@@ -87,12 +99,13 @@
   height: var(--desktop-sidebar-row-height);
   min-height: var(--desktop-sidebar-row-height);
   margin: 1px 0;
+  overflow: hidden;
   padding: 0;
   border: 0;
   border-radius: var(--git-row-radius);
   background: transparent;
   color: var(--po-text-muted);
-  text-align: left;
+  text-align: start;
   outline: none;
 }
 
@@ -159,9 +172,11 @@
   grid-template-columns: minmax(0, 1fr) 76px;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
   align-items: center;
   gap: 6px;
-  padding: 0 var(--git-sidebar-content-right) 0 0;
+  padding-block: 0;
+  padding-inline: 0 var(--git-sidebar-content-right);
 }
 
 .desktop-history-row-title {
@@ -174,9 +189,12 @@
   color: inherit;
   font-size: 13px;
   font-weight: 520;
+  white-space: nowrap;
 }
 
-.desktop-history-row-title > span:last-child {
+.desktop-history-row-message {
+  display: block;
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -221,46 +239,48 @@
 .desktop-git-sidebar :is(
   button,
   input,
-  .desktop-tool-sidebar-row,
-  .desktop-tool-sidebar-empty,
-  .desktop-tool-sidebar-action,
+  .po-sidebar-row,
+  .po-sidebar-empty,
+  .po-sidebar-icon-button,
   .desktop-git-sidebar-empty-history strong,
   .desktop-git-sidebar-empty-history span,
   .desktop-git-backup-copy span,
   .desktop-git-remote-prompt > div:first-child > span,
   .desktop-git-operation-button,
   .desktop-git-remote-preview-row,
-  .desktop-git-section-title span,
   .desktop-working-tree-main,
   .desktop-working-tree-name,
-  .desktop-git-history-drawer-header span,
   .desktop-history-row-title
 ) {
   font-size: var(--git-font-main);
   font-weight: var(--git-weight-regular);
+  line-height: var(--git-line-height);
 }
 
 .desktop-git-sidebar :is(
   .desktop-git-backup-action,
-  .desktop-git-operation-button,
-  .desktop-tool-sidebar-action,
-  .desktop-git-sidebar-empty-history strong,
-  .desktop-git-section-title span,
-  .desktop-git-history-drawer-header span,
-  .desktop-working-tree-state
+  .desktop-git-sidebar-empty-history strong
 ) {
   font-weight: var(--git-weight-strong);
 }
 
 .desktop-git-sidebar :is(
+  .desktop-git-section-title span,
+  .desktop-git-history-drawer-header span
+) {
+  font-size: var(--desktop-sidebar-section-title-font-size, var(--git-font-small));
+  font-weight: var(--desktop-sidebar-section-title-font-weight, var(--git-weight-regular));
+  line-height: var(--desktop-sidebar-section-title-line-height, var(--git-line-height));
+}
+
+.desktop-git-sidebar :is(
   small,
-  .desktop-tool-sidebar-error-text,
+  .po-sidebar-error-text,
   .desktop-git-operation-error,
   .desktop-git-backup-error,
   .desktop-git-remote-prompt small,
   .desktop-git-remote-detail,
   .desktop-git-section-title small,
-  .desktop-working-tree-dir,
   .desktop-working-tree-state,
   .desktop-git-history-drawer-header small,
   .desktop-history-row-stat,
@@ -271,21 +291,10 @@
 }
 
 .desktop-git-sidebar :is(
-  .desktop-working-tree-state,
-  .desktop-head-badge
-) {
-  font-weight: var(--git-weight-strong);
-}
-
-.desktop-git-sidebar .desktop-working-tree-row.active .desktop-working-tree-name {
-  font-weight: var(--git-weight-strong);
-}
-
-.desktop-git-sidebar :is(
   .desktop-git-backup-action,
   .desktop-git-operation-button,
   .desktop-git-remote-prompt button,
-  .desktop-tool-sidebar-action
+  .po-sidebar-icon-button
 ) {
   font-size: var(--git-action-font-size);
 }

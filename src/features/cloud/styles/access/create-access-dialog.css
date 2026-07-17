@@ -91,9 +91,9 @@
   border-radius: 10px;
   background: transparent;
   color: var(--po-text-muted);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   font-family: var(--po-font-sans);
-  text-align: left;
+  text-align: start;
   transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
@@ -255,7 +255,7 @@
   font-family: var(--po-font-sans);
   font-size: 13px;
   line-height: 18px;
-  text-align: left;
+  text-align: start;
 }
 
 .desktop-cloud-create-access-tree-row.root {
@@ -264,7 +264,7 @@
 }
 
 .desktop-cloud-create-access-tree-row.folder {
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition: background 0.12s ease, color 0.12s ease;
 }
 
@@ -284,8 +284,12 @@
 }
 
 .desktop-cloud-create-access-disclosure {
+  transform: rotate(0deg);
   transition: transform 0.12s ease;
 }
+
+.desktop-cloud-create-access-disclosure.expanded { transform: rotate(90deg); }
+[dir="rtl"] .desktop-cloud-create-access-disclosure:not(.expanded) { transform: rotate(180deg); }
 
 .desktop-cloud-create-access-tree-name {
   min-width: 0;
@@ -314,7 +318,7 @@
   font-size: 12px;
   font-weight: 500;
   line-height: 17px;
-  text-align: right;
+  text-align: end;
 }
 
 .desktop-cloud-create-access-tree-status.existing,
@@ -325,7 +329,7 @@
   gap: 6px;
   border: 0;
   background: transparent;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   font-family: inherit;
 }
 
@@ -356,10 +360,12 @@
 
 .desktop-cloud-create-access-tree-guides {
   position: absolute;
-  left: 0;
+  inset-inline-start: 0;
   pointer-events: none;
   z-index: 0;
 }
+
+[dir="rtl"] .desktop-cloud-create-access-tree-guides { transform: scaleX(-1); }
 
 .desktop-cloud-create-access-tree-message {
   display: flex;
@@ -569,13 +575,13 @@
   border: 1px solid var(--po-switch-border-off);
   border-radius: 999px;
   background: var(--po-switch-track-off);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
 }
 
 .desktop-cloud-create-access-switch span {
   position: absolute;
-  left: 2px;
+  inset-inline-start: 2px;
   width: 11px;
   height: 11px;
   border-radius: 999px;
@@ -591,6 +597,10 @@
 
 .desktop-cloud-create-access-switch.checked span {
   transform: translateX(10px);
+}
+
+[dir="rtl"] .desktop-cloud-create-access-switch.checked span {
+  transform: translateX(-10px);
 }
 
 .desktop-cloud-create-access-switch:disabled {

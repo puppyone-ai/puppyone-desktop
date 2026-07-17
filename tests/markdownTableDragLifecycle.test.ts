@@ -3,7 +3,8 @@
  */
 import type { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createMarkdownTableDragLayer } from "../vendor/shared-ui/src/editor/markdown/features/table/tableDragLayer";
+import { createMarkdownTableDragLayer } from "../packages/shared-ui/src/editor/markdown/features/table/tableDragLayer";
+import { testT } from "./testLocalization";
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -45,7 +46,17 @@ describe("Markdown table drag lifecycle", () => {
       table,
       tableFrom: 0,
       tableTo: 13,
-      view: { state: { readOnly: false } } as unknown as EditorView,
+      view: {
+        state: {
+          readOnly: false,
+          facet: () => ({
+            direction: "ltr",
+            formatNumber: (value: number | bigint) => String(value),
+            locale: "en",
+            t: testT,
+          }),
+        },
+      } as unknown as EditorView,
       wrapper,
     });
     surface.appendChild(dragLayer.element);

@@ -26,7 +26,7 @@
   min-width: 0;
   justify-items: start;
   gap: 8px;
-  text-align: left;
+  text-align: start;
 }
 
 .desktop-cloud-overview-title-row {
@@ -99,7 +99,7 @@
   justify-items: stretch;
   gap: 12px;
   padding-top: 0;
-  text-align: left;
+  text-align: start;
 }
 
 .desktop-cloud-overview-doc {
@@ -123,11 +123,11 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  text-align: left;
+  text-align: start;
 }
 
 .desktop-cloud-overview-metric + .desktop-cloud-overview-metric,
-.desktop-cloud-overview-metric + .desktop-cloud-integrations-card {
+.desktop-cloud-overview-metric + .desktop-cloud-automation-card {
   border-top: 1px solid color-mix(in srgb, var(--po-divider) 60%, transparent);
 }
 
@@ -194,7 +194,7 @@
   color: var(--po-warning);
 }
 
-.desktop-cloud-integrations-card {
+.desktop-cloud-automation-card {
   display: grid;
   min-width: 0;
   grid-template-columns: 1fr;
@@ -206,12 +206,12 @@
   background: transparent;
 }
 
-.desktop-cloud-integrations-heading {
+.desktop-cloud-automation-heading {
   display: block;
   min-width: 0;
 }
 
-.desktop-cloud-integrations-heading span {
+.desktop-cloud-automation-heading span {
   overflow: hidden;
   color: var(--po-text-subtle);
   font-size: 12px;
@@ -221,14 +221,14 @@
   white-space: nowrap;
 }
 
-.desktop-cloud-integrations-heading strong {
+.desktop-cloud-automation-heading strong {
   color: var(--po-text);
   font-size: 14px;
   font-weight: 700;
   line-height: 1.25;
 }
 
-.desktop-cloud-integrations-icons {
+.desktop-cloud-automation-icons {
   display: inline-flex;
   min-width: 0;
   align-items: center;
@@ -237,7 +237,7 @@
   flex-wrap: wrap;
 }
 
-.desktop-cloud-integrations-value {
+.desktop-cloud-automation-value {
   display: inline-flex;
   min-width: 0;
   align-items: center;
@@ -245,14 +245,14 @@
   gap: 8px;
 }
 
-.desktop-cloud-integrations-value strong {
+.desktop-cloud-automation-value strong {
   color: var(--po-text);
   font-size: 14px;
   font-weight: 720;
   line-height: 1.25;
 }
 
-.desktop-cloud-integrations-value small {
+.desktop-cloud-automation-value small {
   min-width: 0;
   overflow: hidden;
   color: var(--po-text-muted);
@@ -299,7 +299,7 @@
   background: transparent;
 }
 
-.desktop-cloud-local-map.mapped {
+.desktop-cloud-local-map.has-remote {
   border-color: transparent;
   background: transparent;
 }
@@ -478,6 +478,7 @@
 }
 
 .desktop-cloud-main-alert {
+  align-self: start;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--po-danger) 18%, var(--po-divider));
   border-radius: 8px;
@@ -485,6 +486,32 @@
   color: var(--po-danger);
   font-size: 13px;
   font-weight: 600;
+}
+
+.desktop-cloud-main-alert.warning {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-color: color-mix(in srgb, var(--po-warning) 28%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-warning) 9%, var(--po-panel));
+  color: var(--po-warning);
+}
+
+.desktop-cloud-main-alert.info {
+  border-color: color-mix(in srgb, var(--po-info) 28%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-info) 9%, var(--po-panel));
+  color: color-mix(in srgb, var(--po-info) 72%, var(--po-text));
+}
+
+.desktop-cloud-main-alert.warning > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.desktop-cloud-main-alert.warning .desktop-cloud-row-action {
+  flex: 0 0 auto;
 }
 
 .desktop-cloud-main-alert.success {
@@ -668,4 +695,526 @@
 
 .desktop-cloud-usage-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Local repository -> PuppyOne Cloud initialization */
+.desktop-cloud-initialize-main-view {
+  min-height: 0;
+}
+
+.desktop-cloud-initialize-main-view .desktop-cloud-page-shell {
+  display: flex;
+  flex: 1 1 auto;
+  width: min(100%, 1040px);
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.desktop-cloud-publish-container {
+  container: cloud-publish / inline-size;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  justify-items: center;
+  gap: 12px;
+}
+
+.desktop-cloud-publish-card {
+  display: grid;
+  width: min(100%, 880px);
+  min-width: 0;
+  justify-self: center;
+  gap: 28px;
+  margin: 0;
+  padding: clamp(20px, 3vw, 32px);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.desktop-cloud-publish-status-error {
+  display: grid;
+  width: min(100%, 760px);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  justify-self: center;
+  gap: 16px;
+  margin: 0;
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--po-danger) 26%, var(--po-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--po-danger) 6%, var(--po-panel));
+}
+
+.desktop-cloud-publish-status-error .desktop-cloud-empty-state {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.desktop-cloud-main-alert + .desktop-cloud-publish-card {
+  margin-top: 0;
+}
+
+.desktop-cloud-publish-header {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.desktop-cloud-publish-header h1 {
+  max-width: 560px;
+  margin: 0;
+  color: var(--po-text);
+  font-size: clamp(20px, 2.2vw, 26px);
+  font-weight: 680;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.desktop-cloud-publish-header p {
+  max-width: 480px;
+  margin: 0;
+  color: var(--po-text-subtle);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.desktop-cloud-publish-hero {
+  --desktop-cloud-publish-symbol-size: 78px;
+  --desktop-cloud-publish-arrow-min-width: 132px;
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(var(--desktop-cloud-publish-arrow-min-width), 168px) auto;
+  align-items: start;
+  justify-content: center;
+  column-gap: 6px;
+  row-gap: 0;
+  padding: 12px 0 4px;
+  animation: desktop-cloud-publish-hero-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.desktop-cloud-publish-symbol {
+  display: grid;
+  width: min(100%, 200px);
+  min-width: 0;
+  justify-items: center;
+  gap: 12px;
+}
+
+.desktop-cloud-publish-symbol.local {
+  justify-self: end;
+}
+
+.desktop-cloud-publish-symbol.cloud {
+  justify-self: start;
+}
+
+.desktop-cloud-publish-symbol-mark {
+  position: relative;
+  display: flex;
+  width: var(--desktop-cloud-publish-symbol-size);
+  height: var(--desktop-cloud-publish-symbol-size);
+  align-items: center;
+  justify-content: center;
+  isolation: isolate;
+}
+
+.desktop-cloud-publish-symbol-mark::before {
+  content: none;
+}
+
+.desktop-cloud-publish-symbol-icon {
+  display: block;
+  width: var(--desktop-cloud-publish-symbol-size);
+  height: calc(var(--desktop-cloud-publish-symbol-size) * 0.9);
+  overflow: visible;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.22));
+  animation: desktop-cloud-publish-symbol-in 640ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.desktop-cloud-publish-symbol.local .desktop-cloud-publish-symbol-icon {
+  animation-delay: 40ms;
+}
+
+.desktop-cloud-publish-symbol.cloud .desktop-cloud-publish-symbol-icon {
+  animation-delay: 160ms;
+}
+
+.desktop-cloud-publish-organization {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--po-divider) 72%, transparent);
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-cloud-publish-organization .desktop-cloud-organization-selector,
+.desktop-cloud-publish-organization .desktop-cloud-organization-selector select {
+  width: 100%;
+  min-width: 0;
+}
+
+.desktop-cloud-publish-organization .warning,
+.desktop-cloud-publish-summary .warning {
+  color: var(--po-warning);
+}
+
+.desktop-cloud-publish-arrow {
+  display: flex;
+  width: 100%;
+  min-width: var(--desktop-cloud-publish-arrow-min-width);
+  height: var(--desktop-cloud-publish-symbol-size);
+  align-items: center;
+  color: color-mix(in srgb, var(--po-text-subtle) 70%, var(--po-accent));
+  opacity: 0.9;
+  filter: drop-shadow(0 1px 0 color-mix(in srgb, #fff 10%, transparent));
+  animation: desktop-cloud-publish-arrow-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 120ms;
+}
+
+.desktop-cloud-publish-arrow-horizontal,
+.desktop-cloud-publish-arrow-vertical {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  color: inherit;
+  overflow: visible;
+}
+
+.desktop-cloud-publish-arrow-horizontal {
+  height: 24px;
+}
+
+.desktop-cloud-publish-arrow-vertical {
+  display: none;
+  width: 24px;
+  height: 72px;
+}
+
+.desktop-cloud-publish-details {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  justify-items: center;
+  gap: 8px;
+  padding-top: 2px;
+  animation: desktop-cloud-publish-details-in 560ms ease-out both;
+  animation-delay: 180ms;
+}
+
+.desktop-cloud-publish-project {
+  margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--po-text-muted);
+  font-size: 14px;
+  font-weight: 620;
+  line-height: 1.35;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-publish-meta {
+  display: grid;
+  width: 100%;
+  justify-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  font-weight: 540;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.desktop-cloud-publish-meta li {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.desktop-cloud-publish-meta li svg {
+  flex: 0 0 auto;
+  opacity: 0.78;
+}
+
+.desktop-cloud-publish-meta li bdi,
+.desktop-cloud-publish-meta li span:not(.desktop-cloud-publish-status) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-publish-meta li.warning {
+  color: var(--po-warning);
+}
+
+.desktop-cloud-publish-status {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--po-text-subtle) 22%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--po-control) 42%, transparent);
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.desktop-cloud-publish-summary {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  text-align: center;
+}
+
+.desktop-cloud-publish-summary strong {
+  color: var(--po-text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.desktop-cloud-publish-summary p,
+.desktop-cloud-publish-summary small {
+  max-width: 520px;
+  margin: 0;
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.desktop-cloud-publish-summary small {
+  color: color-mix(in srgb, var(--po-text-subtle) 88%, transparent);
+}
+
+.desktop-cloud-publish-summary.blocked {
+  padding: 15px 18px;
+  border-color: color-mix(in srgb, var(--po-warning) 28%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-warning) 8%, var(--po-panel));
+}
+
+.desktop-cloud-publish-summary.blocked strong {
+  color: color-mix(in srgb, var(--po-warning) 82%, var(--po-text));
+}
+
+@keyframes desktop-cloud-publish-hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes desktop-cloud-publish-symbol-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes desktop-cloud-publish-arrow-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes desktop-cloud-publish-details-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.desktop-cloud-publish-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.desktop-cloud-publish-actions .desktop-cloud-row-action {
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--po-divider);
+  border-radius: 6px;
+  background: var(--po-control);
+  color: var(--po-text-muted);
+  font-size: var(--desktop-cloud-body-size, var(--po-text-size-body));
+  font-weight: 500;
+  box-shadow: none;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    opacity 0.16s ease;
+}
+
+.desktop-cloud-publish-actions .desktop-cloud-row-action:hover:not(:disabled) {
+  border-color: var(--po-border-strong);
+  background: var(--po-control-hover);
+  color: var(--po-text);
+  transform: none;
+}
+
+/* Quiet fill only — size/radius stay on the shared 30px / 6px control spec. */
+.desktop-cloud-publish-actions .desktop-cloud-row-action.desktop-cloud-publish-primary {
+  min-width: 140px;
+  padding: 0 12px;
+  border-color: color-mix(in srgb, var(--po-text) 16%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-text) 9%, var(--po-control));
+  color: var(--po-text);
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.desktop-cloud-publish-actions .desktop-cloud-row-action.desktop-cloud-publish-primary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--po-text) 26%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-text) 14%, var(--po-control));
+  color: var(--po-text);
+  opacity: 1;
+  box-shadow: none;
+}
+
+.desktop-cloud-publish-actions .desktop-cloud-row-action.desktop-cloud-publish-primary:disabled {
+  border-color: color-mix(in srgb, var(--po-text) 10%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-text) 6%, var(--po-control));
+  color: var(--po-text-muted);
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+@container cloud-publish (max-width: 720px) {
+  .desktop-cloud-publish-card {
+    gap: 24px;
+    padding: 16px;
+  }
+
+  .desktop-cloud-publish-header h1 {
+    font-size: 20px;
+  }
+
+  .desktop-cloud-publish-hero {
+    --desktop-cloud-publish-symbol-size: 64px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding-top: 4px;
+  }
+
+  /* Stack as destination → source: cloud on top, folder below. */
+  .desktop-cloud-publish-symbol.cloud {
+    order: 1;
+    justify-self: center;
+  }
+
+  .desktop-cloud-publish-arrow {
+    order: 2;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    min-height: 64px;
+    justify-content: center;
+    padding: 2px 0;
+  }
+
+  .desktop-cloud-publish-symbol.local {
+    order: 3;
+    justify-self: center;
+  }
+
+  .desktop-cloud-publish-arrow-horizontal {
+    display: none;
+  }
+
+  .desktop-cloud-publish-arrow-vertical {
+    display: block;
+    width: 24px;
+    height: 64px;
+    /* Point up toward cloud when folder sits below. */
+    transform: rotate(180deg);
+  }
+
+  .desktop-cloud-publish-meta {
+    gap: 8px 12px;
+  }
+
+  .desktop-cloud-publish-actions {
+    display: flex;
+    justify-content: center;
+  }
+
+  .desktop-cloud-publish-actions .desktop-cloud-row-action {
+    width: auto;
+    min-width: 140px;
+    height: 30px;
+    justify-self: center;
+  }
+
+  .desktop-cloud-publish-status-error {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .desktop-cloud-publish-status-error .desktop-cloud-row-action {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-cloud-publish-hero,
+  .desktop-cloud-publish-symbol-icon,
+  .desktop-cloud-publish-arrow,
+  .desktop-cloud-publish-details {
+    animation: none;
+  }
+
+  .desktop-cloud-publish-actions .desktop-cloud-row-action {
+    transition: none;
+  }
+
+  .desktop-cloud-publish-actions .desktop-cloud-row-action:hover:not(:disabled) {
+    transform: none;
+  }
 }

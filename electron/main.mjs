@@ -1,30 +1,42 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, session as electronSession, shell, WebContentsView } from "electron";
+import { installBrokenStdioGuards } from "./main/stdio-guard.mjs";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, session as electronSession, shell, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import {
   getMimeType,
+  openWorkspaceFileRangeStream,
   readWorkspaceTextFile,
   readWorkspaceFile,
+  statWorkspaceFile,
+  resolveLocalWorkspaceIdentity,
   resolveWorkspacePath as resolveLocalWorkspacePath,
   workspaceFromPath,
 } from "../local-api/workspace.mjs";
 import { initializeWorkspaceEditReview } from "../local-api/edit-review.mjs";
 import { createUpdateService } from "./update-service.mjs";
 import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
-import { createAgentPersistence } from "./main/agent/agent-persistence.mjs";
+import { createEphemeralAgentSessionCache } from "./main/agent/cache/ephemeral-agent-session-cache.mjs";
 import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
 import { createAgentService } from "./main/agent/agent-service.mjs";
-import { createCodexDiscovery } from "./main/agent/provider-discovery.mjs";
+import { createLocalAgentInventory } from "./main/agent/connections/local-agent-inventory.mjs";
+import { createDefaultAgentRuntimeHost } from "./main/agent/bootstrap/create-agent-runtime-host.mjs";
 import {
   getCloudApiErrorMessage,
   requestCloudApi,
 } from "./main/cloud-api-client.mjs";
 import { createCloudAuthService } from "./cloud-auth-service.mjs";
+import {
+  createApplicationQuitIntent,
+  createDocumentSessionCloseCoordinator,
+} from "./main/document-session-close-coordinator.mjs";
 import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
+import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mjs";
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
+import { registerLocalizationIpcHandlers } from "./main/ipc/localization-ipc.mjs";
 import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
 import { registerTerminalIpcHandlers } from "./main/ipc/terminal-ipc.mjs";
@@ -40,25 +52,41 @@ import { createTerminalService } from "./main/terminal-service.mjs";
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
+import { createDesktopLocaleService } from "./main/localization/desktop-locale-service.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
+import { createGitOperationCoordinator } from "./main/git-operation-coordinator.mjs";
+import { createCloudPublishCoordinator } from "./main/cloud-publish-coordinator.mjs";
+import { createCloudPublishSecretVault } from "./main/cloud-publish-secret-vault.mjs";
+import { createCloudGitConnectCoordinator } from "./main/cloud-git-connect-coordinator.mjs";
+import { createCloudGitOperationLease } from "./main/cloud-git-operation-lease.mjs";
+import { createCloudPublishGitCredentialManager } from "./main/cloud-publish-git-credentials.mjs";
 import {
-  createViewerPackHost,
-  registerViewerPackAppIpcHandlers,
-  registerViewerPackPluginIpcHandlers,
-} from "./main/viewer-packs/index.mjs";
-import { PLUGIN_PROTOCOL_SCHEME } from "./main/viewer-packs/plugin-protocol.mjs";
-import { RESOURCE_PROTOCOL_SCHEME } from "./main/viewer-packs/resource-protocol.mjs";
+  getViewerPackPrivilegedSchemes,
+  loadViewerPackRuntime,
+} from "./main/viewer-packs/bootstrap.mjs";
+import { resolveViewerPackFeatureProfile } from "./main/viewer-packs/feature-profile.mjs";
+
+// Must run before any console.* / IPC replyWithError logging: broken inherited
+// stdout/stderr (Dock launch, detached child, closed terminal) otherwise throws
+// uncaught `write EIO` / `write EPIPE` and Electron shows a fatal dialog.
+installBrokenStdioGuards();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+const packageMetadata = require("../package.json");
 const projectRoot = path.resolve(__dirname, "..");
 const preloadPath = path.join(__dirname, "preload.cjs");
 const rendererDistPath = path.join(projectRoot, "dist", "index.html");
 const appName = "puppyone";
 const devServerUrl = process.env.PUPPYONE_DESKTOP_DEV_URL;
 const rendererApplicationUrl = devServerUrl || pathToFileURL(rendererDistPath).toString();
+const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
+  packageMetadata,
+  environment: process.env,
+  isPackaged: app.isPackaged,
+});
 const workspaceStateFilename = "desktop-workspace-state.json";
-const cloudAuthProtocol = "puppyone";
 const dockIconResources = Object.freeze({
   polished: "logo-square.png",
   light: "dock-icon-light.png",
@@ -73,7 +101,7 @@ const macTitlebarOptions = process.platform === "darwin"
       titleBarStyle: "default",
     };
 
-protocol.registerSchemesAsPrivileged([
+const privilegedSchemes = [
   {
     scheme: "puppyone-local",
     privileges: {
@@ -84,34 +112,19 @@ protocol.registerSchemesAsPrivileged([
       stream: true,
     },
   },
-  {
-    // Viewer Pack asset origin. Bytes only come from an enabled, immutable
-    // version dir whose content hash matches the URL.
-    scheme: PLUGIN_PROTOCOL_SCHEME,
-    privileges: {
-      standard: true,
-      secure: true,
-      supportFetchAPI: true,
-      corsEnabled: false,
-      stream: true,
-    },
-  },
-  {
-    // Session-scoped, audience-bound bounded Range reads for pack documents.
-    scheme: RESOURCE_PROTOCOL_SCHEME,
-    privileges: {
-      standard: true,
-      secure: true,
-      supportFetchAPI: true,
-      corsEnabled: false,
-      stream: true,
-    },
-  },
-]);
+];
+
+privilegedSchemes.push(...getViewerPackPrivilegedSchemes(
+  viewerPackFeatureProfile.externalViewerPacks,
+));
+
+protocol.registerSchemesAsPrivileged(privilegedSchemes);
 
 let updateService = null;
 let appPreviewRuntime = null;
 let viewerPackHost = null;
+let viewerPackRuntime = null;
+let stopLocaleNativeRefresh = null;
 const windowsById = new Map();
 const windowStateById = new Map();
 const workspaceWindowByPath = new Map();
@@ -121,6 +134,17 @@ const trustedIpcMain = createTrustedIpcMain({
   ipcMain,
   applicationUrl: rendererApplicationUrl,
 });
+const localeService = createDesktopLocaleService({
+  app,
+  getWindows: () => BrowserWindow.getAllWindows(),
+});
+const applicationQuitIntent = createApplicationQuitIntent({ app });
+const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
+  dialog,
+  t: (messageId, values) => localeService.t(messageId, values),
+  onCloseCancelled: applicationQuitIntent.cancel,
+});
+documentSessionCloseCoordinator.registerIpc(trustedIpcMain);
 const authorizeWorkspaceRoot = createSenderWorkspaceAuthorization({
   getWorkspaceRootForSender,
 });
@@ -128,11 +152,21 @@ const terminalService = createTerminalService({
   appVersion: app.getVersion(),
   initializeWorkspaceEditReview,
 });
-const agentPersistence = createAgentPersistence({ app });
-const agentService = createAgentService({
+const agentSessionCache = createEphemeralAgentSessionCache({ app });
+const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   appVersion: app.getVersion(),
-  discovery: createCodexDiscovery(),
-  persistence: agentPersistence,
+  appPath: app.getAppPath(),
+  resourcesPath: process.resourcesPath,
+  managedOpenCodeConfigDir: path.join(app.getPath("userData"), "agent-runtime", "opencode", "config"),
+  allowExternalOpenCode: !app.isPackaged && process.env.PUPPYONE_ALLOW_EXTERNAL_OPENCODE === "1",
+});
+const agentService = createAgentService({
+  runtimeRegistry: agentRuntimeRegistry,
+  sessionCache: agentSessionCache,
+});
+const localAgentInventory = createLocalAgentInventory({
+  appVersion: app.getVersion(),
+  cacheFilePath: path.join(app.getPath("userData"), "agent-runtime-inventory.json"),
 });
 const workspaceWatchService = createWorkspaceWatchService();
 const gitMetadataWatchService = createGitMetadataWatchService();
@@ -141,15 +175,38 @@ const workspaceStateStore = createWorkspaceStateStore({
   filename: workspaceStateFilename,
   canonicalizeWorkspacePath,
   workspaceFromPath,
+  resolveWorkspaceIdentity: resolveLocalWorkspaceIdentity,
 });
 const cloudAuthService = createCloudAuthService({
   app,
-  projectRoot,
-  protocol: cloudAuthProtocol,
   requestCloudApi,
   getCloudApiErrorMessage,
+  secureStorage: safeStorage,
+  openExternal: (href) => shell.openExternal(href),
+  localCloudWebUrl: process.env.VITE_DESKTOP_CLOUD_WEB_URL,
   getWindows: () => BrowserWindow.getAllWindows(),
   revealWindow: revealLastFocusedWindow,
+});
+const gitOperationCoordinator = createGitOperationCoordinator();
+const cloudPublishSecretVault = createCloudPublishSecretVault({
+  baseDirectory: path.join(app.getPath("userData"), "cloud-publish-secrets-v1"),
+  secureStorage: safeStorage,
+});
+const cloudGitOperationLease = createCloudGitOperationLease();
+const cloudGitCredentialManager = createCloudPublishGitCredentialManager();
+const cloudPublishCoordinator = createCloudPublishCoordinator({
+  cloudAuthService,
+  gitCredentialManager: cloudGitCredentialManager,
+  gitOperationCoordinator,
+  operationLease: cloudGitOperationLease,
+  secretVault: cloudPublishSecretVault,
+});
+const cloudGitConnectCoordinator = createCloudGitConnectCoordinator({
+  cloudAuthService,
+  gitCredentialManager: cloudGitCredentialManager,
+  gitOperationCoordinator,
+  operationLease: cloudGitOperationLease,
+  secretVault: cloudPublishSecretVault,
 });
 
 app.setName(appName);
@@ -163,6 +220,7 @@ if (!gotSingleInstanceLock) {
 }
 
 async function createWindow(options = {}) {
+  await localeService.refreshSystemLanguages();
   const initialWorkspacePath = typeof options.initialWorkspacePath === "string"
     ? path.resolve(options.initialWorkspacePath)
     : null;
@@ -184,9 +242,11 @@ async function createWindow(options = {}) {
       nodeIntegration: false,
       sandbox: true,
       preload: preloadPath,
+      additionalArguments: viewerPackFeatureProfile.rendererArguments,
     },
   });
   const webContentsId = window.webContents.id;
+  documentSessionCloseCoordinator.attachWindow(window);
   installWindowNavigationSecurity({
     webContents: window.webContents,
     applicationUrl: rendererApplicationUrl,
@@ -383,7 +443,7 @@ function setDockMenu() {
 
   const dockMenu = Menu.buildFromTemplate([
     {
-      label: "New Window",
+      label: localeService.t("native.dock.newWindow"),
       click: () => {
         void createWindow();
       },
@@ -393,23 +453,7 @@ function setDockMenu() {
   app.dock.setMenu(dockMenu);
 }
 
-function registerCloudAuthProtocol() {
-  cloudAuthService.registerProtocol();
-}
-
-function isCloudAuthCallbackUrl(value) {
-  return cloudAuthService.isCallbackUrl(value);
-}
-
-registerCloudAuthProtocol();
-
 app.on("second-instance", (_event, argv) => {
-  const callbackUrl = argv.find(isCloudAuthCallbackUrl);
-  if (callbackUrl) {
-    void cloudAuthService.handleCallback(callbackUrl);
-    return;
-  }
-
   const workspacePath = findWorkspacePathArg(argv);
   if (workspacePath) {
     void openWorkspaceInNewWindow(workspacePath);
@@ -418,13 +462,11 @@ app.on("second-instance", (_event, argv) => {
   createOrRevealWindow();
 });
 
-app.on("open-url", (event, callbackUrl) => {
-  if (!isCloudAuthCallbackUrl(callbackUrl)) return;
-  event.preventDefault();
-  void cloudAuthService.handleCallback(callbackUrl);
-});
-
 app.whenReady().then(async () => {
+  await localeService.initialize();
+  stopLocaleNativeRefresh = localeService.onDidChange(() => {
+    setDockMenu();
+  });
   if (process.platform === "darwin" && app.dock) {
     setDockIcon();
     setDockMenu();
@@ -433,6 +475,8 @@ app.whenReady().then(async () => {
   registerLocalFileProtocol({
     protocol,
     readWorkspaceFile,
+    openWorkspaceFileRangeStream,
+    statWorkspaceFile,
     getMimeType,
     canonicalizeWorkspacePath,
     isOpenWorkspaceRoot,
@@ -451,21 +495,25 @@ app.whenReady().then(async () => {
     shell,
     readWorkspaceTextFile,
     resolveWorkspacePath: resolveLocalWorkspacePath,
+    t: (messageId, values) => localeService.t(messageId, values),
   });
-  viewerPackHost = createViewerPackHost({
-    WebContentsView,
-    sessionFromPartition: (partition, options) => electronSession.fromPartition(partition, options),
-    getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
-    getMimeType,
-    userDataPath: app.getPath("userData"),
-    appVersion: app.getVersion(),
-    isPackaged: app.isPackaged,
-    allowTestKeys: !app.isPackaged && process.env.PUPPYONE_VIEWER_PACK_ALLOW_TEST_KEYS === "1",
-    getThemeSnapshot: () => ({
-      mode: nativeTheme.shouldUseDarkColors ? "dark" : "light",
-      tokens: {},
-    }),
-  });
+  if (viewerPackFeatureProfile.externalViewerPacks) {
+    viewerPackRuntime = await loadViewerPackRuntime(true);
+    viewerPackHost = viewerPackRuntime.createViewerPackHost({
+      WebContentsView,
+      sessionFromPartition: (partition, options) => electronSession.fromPartition(partition, options),
+      getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
+      getMimeType,
+      userDataPath: app.getPath("userData"),
+      appVersion: app.getVersion(),
+      isPackaged: app.isPackaged,
+      allowTestKeys: !app.isPackaged && process.env.PUPPYONE_VIEWER_PACK_ALLOW_TEST_KEYS === "1",
+      getThemeSnapshot: () => ({
+        mode: nativeTheme.shouldUseDarkColors ? "dark" : "light",
+        tokens: {},
+      }),
+    });
+  }
   registerIpcHandlers();
   updateService.start();
   await createWindow({
@@ -473,6 +521,9 @@ app.whenReady().then(async () => {
   });
 
   app.on("activate", () => {
+    void localeService.refreshSystemLanguages().catch((error) => {
+      console.warn("Unable to refresh the system language preference:", error);
+    });
     if (windowsById.size > 0) {
       revealLastFocusedWindow();
       return;
@@ -485,24 +536,42 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  // A prevented BrowserWindow close cancels Electron's original quit attempt.
+  // Resume it after the asynchronous document drain closes the last window.
+  applicationQuitIntent.resumeAfterLastWindowClosed();
 });
+
+// Keep persistence dependencies alive while BrowserWindow close handlers ask
+// renderer Document Sessions to drain. `will-quit` runs only after every
+// window accepted closing, so a failed flush can safely leave the app usable.
+app.on("will-quit", () => {
+  stopLocaleNativeRefresh?.();
+  localeService.dispose();
+  cloudAuthService.dispose();
+  updateService?.dispose();
+  viewerPackHost?.destroyAllSessions();
+  appPreviewRuntime?.closeAll();
+  terminalService.closeAll();
+  localAgentInventory.dispose();
+  workspaceWatchService.closeAll();
+  gitMetadataWatchService.closeAll();
+});
+
+app.on("before-quit", applicationQuitIntent.markRequested);
 
 app.on("before-quit", createAgentQuitCoordinator({
   app,
   agentService,
-  disposeApplicationServices: () => {
-    cloudAuthService.dispose();
-    updateService?.dispose();
-    viewerPackHost?.destroyAllSessions();
-    appPreviewRuntime?.closeAll();
-    terminalService.closeAll();
-    workspaceWatchService.closeAll();
-    gitMetadataWatchService.closeAll();
-  },
+  // Agent runtimes require an asynchronous pre-quit drain. General services
+  // are intentionally disposed in will-quit, after document persistence.
+  disposeApplicationServices: () => undefined,
 }));
 
 function registerIpcHandlers() {
+  registerLocalizationIpcHandlers({
+    ipcMain: trustedIpcMain,
+    localeService,
+  });
   registerWorkspaceNavigationIpcHandlers({
     ipcMain: trustedIpcMain,
     workspaceStateStore,
@@ -517,6 +586,12 @@ function registerIpcHandlers() {
     selectWorkspaceForNewWindow,
   });
   registerCloudIpcHandlers({ ipcMain: trustedIpcMain, cloudAuthService });
+  registerCloudPublishIpcHandlers({
+    ipcMain: trustedIpcMain,
+    authorizeWorkspaceRoot,
+    cloudGitConnectCoordinator,
+    cloudPublishCoordinator,
+  });
   registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell, setDockIcon });
   registerMarkdownWebEmbedIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -538,6 +613,8 @@ function registerIpcHandlers() {
     shell,
     authorizeWorkspaceRoot,
     localFileCapabilities,
+    workspaceWatchService,
+    t: (messageId, values) => localeService.t(messageId, values),
   });
 
   registerAppPreviewIpcHandlers({
@@ -561,6 +638,10 @@ function registerIpcHandlers() {
     BrowserWindow,
     dialog,
     authorizeWorkspaceRoot,
+    cloudGitCredentialManager,
+    cloudGitOperationLease,
+    gitOperationCoordinator,
+    t: (messageId, values) => localeService.t(messageId, values),
   });
   registerTerminalIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -570,23 +651,25 @@ function registerIpcHandlers() {
   registerAgentIpcHandlers({
     ipcMain: trustedIpcMain,
     agentService,
+    localAgentInventory,
     authorizeWorkspaceRoot,
   });
 
-  if (viewerPackHost) {
+  if (viewerPackHost && viewerPackRuntime) {
     // App authority (install/activate/bounds/destroy) is gated to the trusted
     // application frame.
-    registerViewerPackAppIpcHandlers({
+    viewerPackRuntime.registerViewerPackAppIpcHandlers({
       ipcMain: trustedIpcMain,
       host: viewerPackHost,
       authorizeWorkspaceRoot,
       dialog,
       getDialogOwnerWindow,
+      t: (messageId, values) => localeService.t(messageId, values),
     });
     // Plugin bridge (document/resource/ui/host) uses RAW ipcMain because the
     // sandboxed pack frame's URL is never the trusted application URL; each
     // handler validates sender → session before doing anything.
-    registerViewerPackPluginIpcHandlers({ ipcMain, host: viewerPackHost });
+    viewerPackRuntime.registerViewerPackPluginIpcHandlers({ ipcMain, host: viewerPackHost });
   }
 }
 
@@ -595,15 +678,15 @@ function getUpdateRestartBlockers() {
   if (terminalService.getSessionCount() > 0) {
     blockers.push({
       id: "terminal-sessions",
-      label: "Terminal session running",
-      detail: "Close the active terminal session before restarting to update.",
+      label: localeService.t("native.update.blocker.terminal.label"),
+      detail: localeService.t("native.update.blocker.terminal.detail"),
     });
   }
   if (agentService.getSessionCount() > 0) {
     blockers.push({
       id: "agent-sessions",
-      label: "Agent session running",
-      detail: "Close the active Agent session before restarting to update.",
+      label: localeService.t("native.update.blocker.agent.label"),
+      detail: localeService.t("native.update.blocker.agent.detail"),
     });
   }
   return blockers;
@@ -662,7 +745,7 @@ async function getInitialWorkspaceResultForWindow(sender) {
     }
 
     assignWindowWorkspace(window, workspace, canonicalPath, { cleanupPrevious: false });
-    await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath);
+    await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
     return {
       path: canonicalPath,
       workspace,
@@ -694,7 +777,7 @@ async function selectWorkspaceForNewWindow(sender = null) {
 
 async function showWorkspaceOpenDialog(ownerWindow) {
   const options = {
-    title: "Open local puppyone workspace",
+    title: localeService.t("native.workspace.open.title"),
     properties: ["openDirectory", "createDirectory"],
   };
 
@@ -714,7 +797,7 @@ async function openWorkspaceInCurrentWindow(sender, folderPath, options = {}) {
   const existingWindow = getWorkspaceWindow(canonicalPath);
   if (existingWindow && existingWindow !== window) {
     revealWindow(existingWindow);
-      if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath);
+    if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
     return {
       status: "focused-existing",
       path: canonicalPath,
@@ -723,7 +806,7 @@ async function openWorkspaceInCurrentWindow(sender, folderPath, options = {}) {
   }
 
   assignWindowWorkspace(window, workspace, canonicalPath);
-  if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath);
+  if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
   return {
     status: "opened-current",
     path: canonicalPath,
@@ -737,7 +820,7 @@ async function openWorkspaceInNewWindow(folderPath, options = {}) {
   const existingWindow = getWorkspaceWindow(canonicalPath);
   if (existingWindow) {
     revealWindow(existingWindow);
-    if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath);
+    if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
     return {
       status: "focused-existing",
       path: canonicalPath,
@@ -749,7 +832,7 @@ async function openWorkspaceInNewWindow(folderPath, options = {}) {
     initialWorkspacePath: canonicalPath,
   });
   assignWindowWorkspace(window, workspace, canonicalPath, { cleanupPrevious: false });
-  if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath);
+  if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
   return {
     status: "opened-new-window",
     path: canonicalPath,

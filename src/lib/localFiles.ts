@@ -1,5 +1,12 @@
 import type { AiEditRequest, DataNode, DataNodeKind, DataPort, Workspace } from "@puppyone/shared-ui";
 import type {
+  CloudPublishAbandonRequest,
+  CloudPublishIdentityRequest,
+  CloudPublishResult,
+  CloudPublishStartRequest,
+  CloudGitConnectAbandonRequest,
+  CloudGitConnectRequest,
+  CloudGitConnectResult,
   GitCommitDetail,
   GitBranchGraphSnapshot,
   GitRepositoryInvalidatedEvent,
@@ -30,7 +37,12 @@ export function createLocalDataPort(rootPath: string): DataPort {
     listChildren: (folderPath) => loadFolderChildren(rootPath, folderPath),
     // Text/content reads do not mint a browser capability URL. Resource URLs
     // have their own mounted-preview lifecycle and are revoked separately.
-    readFile: (path) => getDesktopBridge().readFile({ rootPath, path }),
+    readFile: async (path, options) => {
+      options?.signal?.throwIfAborted();
+      const result = await getDesktopBridge().readFile({ rootPath, path });
+      options?.signal?.throwIfAborted();
+      return result;
+    },
     getFileUrl: (path, options) => getDesktopBridge()
       .getFileUrl({ rootPath, path, purpose: options?.purpose ?? "file-preview" })
       .then((result) => result.url),
@@ -74,7 +86,15 @@ export function createLocalDataPort(rootPath: string): DataPort {
       getLogs: (path) => getDesktopBridge().getAppPreviewLogs({ rootPath, path }),
       openExternal: (path) => getDesktopBridge().openAppPreviewExternal({ rootPath, path }).then(() => undefined),
     },
-    writeFile: (path, content) => getDesktopBridge().writeFile({ rootPath, path, content }),
+    documentPersistence: {
+      kind: "local-fs",
+      persist: ({ path, content, baseVersion }) => getDesktopBridge().writeFile({
+        rootPath,
+        path,
+        content,
+        expectedVersion: baseVersion ?? null,
+      }),
+    },
     createFolder: (path) => {
       const { parentPath, name } = splitDataPath(path);
       return getDesktopBridge().createEntry({ rootPath, parentPath, name, kind: "folder" }).then(() => undefined);
@@ -127,6 +147,10 @@ export async function getRecentWorkspaces(): Promise<RecentWorkspacesResult> {
   return getDesktopBridge().getRecentWorkspaces();
 }
 
+export async function hydrateRecentWorkspaces(): Promise<RecentWorkspacesResult> {
+  return getDesktopBridge().hydrateRecentWorkspaces();
+}
+
 export async function openExternalUrl(href: string): Promise<void> {
   await getDesktopBridge().openExternalUrl(href);
 }
@@ -145,12 +169,6 @@ export async function resolveWorkspaceExternalOpenTarget(
   request: WorkspaceResolveExternalOpenTargetRequest,
 ): Promise<WorkspaceExternalOpenTarget> {
   return getDesktopBridge().resolveExternalOpenTarget(request);
-}
-
-export async function listWorkspaceExternalOpenTargets(
-  request: WorkspaceResolveExternalOpenTargetRequest,
-): Promise<WorkspaceExternalOpenTarget[]> {
-  return getDesktopBridge().listExternalOpenTargets(request);
 }
 
 export async function chooseWorkspaceExternalApp(
@@ -253,6 +271,36 @@ export async function getWorkspaceGitStatus(
   }
 }
 
+export async function getWorkspaceCloudPublishState(
+  request: CloudPublishIdentityRequest,
+): Promise<CloudPublishResult> {
+  return getDesktopBridge().cloudPublishGetState(request);
+}
+
+export async function startOrResumeWorkspaceCloudPublish(
+  request: CloudPublishStartRequest,
+): Promise<CloudPublishResult> {
+  return getDesktopBridge().cloudPublishStartOrResume(request);
+}
+
+export async function abandonWorkspaceCloudPublish(
+  request: CloudPublishAbandonRequest,
+): Promise<CloudPublishResult> {
+  return getDesktopBridge().cloudPublishAbandon(request);
+}
+
+export async function connectWorkspaceCloudProject(
+  request: CloudGitConnectRequest,
+): Promise<CloudGitConnectResult> {
+  return getDesktopBridge().cloudGitConnectProject(request);
+}
+
+export async function abandonWorkspaceCloudProjectConnection(
+  request: CloudGitConnectAbandonRequest,
+): Promise<CloudGitConnectResult> {
+  return getDesktopBridge().cloudGitAbandonConnect(request);
+}
+
 function createGitStatusAbortError(): DOMException {
   return new DOMException("Git status request was cancelled.", "AbortError");
 }
@@ -322,12 +370,11 @@ export async function initializeWorkspaceGitRepository(rootPath: string): Promis
   return getDesktopBridge().initGitRepository({ rootPath });
 }
 
-export async function configureWorkspaceCloudRemote(
+export async function removeWorkspaceGitRemote(
   rootPath: string,
-  remoteUrl: string,
   remoteName = "puppyone",
 ): Promise<GitStatusSnapshot> {
-  return getDesktopBridge().configureGitCloudRemote({ rootPath, remoteUrl, remoteName });
+  return getDesktopBridge().removeGitRemote({ rootPath, remoteName });
 }
 
 export async function readPuppyoneWorkspaceConfig(rootPath: string): Promise<PuppyoneWorkspaceConfig> {
@@ -349,8 +396,76 @@ export async function getWorkspaceGitFileDiff(
   rootPath: string,
   path: string,
   scope: GitWorkingDiffScope,
+  options: { requestId?: string; sessionId?: string } = {},
 ): Promise<GitCommitDetail> {
-  return getDesktopBridge().getGitFileDiff({ rootPath, path, scope });
+  return getDesktopBridge().getGitFileDiff({ rootPath, path, scope, ...options });
+}
+
+export async function cancelWorkspaceGitFileDiff(requestId: string, sessionId: string): Promise<void> {
+  await getDesktopBridge().cancelGitFileDiff?.({ requestId, sessionId });
+}
+
+export async function readWorkspaceGitDiffResource(request: {
+  handle: string;
+  size: number;
+  sessionId: string;
+  selectionIdentity: string;
+  revisionIdentity: string;
+}, signal?: AbortSignal): Promise<ArrayBuffer> {
+  const maxResourceBytes = 25 * 1024 * 1024;
+  const readChunkBytes = 4 * 1024 * 1024;
+  if (
+    !Number.isSafeInteger(request.size)
+    || request.size < 0
+    || request.size > maxResourceBytes
+  ) {
+    throw new Error("Git diff resource has an invalid or unsupported size.");
+  }
+
+  throwIfGitDiffResourceReadAborted(signal);
+  const bytes = new Uint8Array(request.size);
+  let offset = 0;
+  while (offset < request.size) {
+    throwIfGitDiffResourceReadAborted(signal);
+    const requestedLength = Math.min(readChunkBytes, request.size - offset);
+    const result = await getDesktopBridge().readGitDiffResource({
+      handle: request.handle,
+      sessionId: request.sessionId,
+      selectionIdentity: request.selectionIdentity,
+      revisionIdentity: request.revisionIdentity,
+      offset,
+      length: requestedLength,
+    });
+    throwIfGitDiffResourceReadAborted(signal);
+
+    const expectedLength = Math.min(requestedLength, request.size - offset);
+    const expectedDone = offset + expectedLength === request.size;
+    if (
+      result.selectionIdentity !== request.selectionIdentity
+      || result.revisionIdentity !== request.revisionIdentity
+      || result.offset !== offset
+      || result.size !== request.size
+      || !(result.bytes instanceof Uint8Array)
+      || result.bytes.byteLength !== expectedLength
+      || result.done !== expectedDone
+    ) {
+      throw new Error("Git diff resource identity or range changed while loading.");
+    }
+    bytes.set(result.bytes, offset);
+    offset += result.bytes.byteLength;
+  }
+  return bytes.buffer;
+}
+
+function throwIfGitDiffResourceReadAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  const error = new Error("Git diff resource read was cancelled.");
+  error.name = "AbortError";
+  throw error;
+}
+
+export async function releaseWorkspaceGitDiffResources(sessionId: string): Promise<void> {
+  await getDesktopBridge().releaseGitDiffResources({ sessionId });
 }
 
 export async function stageWorkspaceGitPaths(rootPath: string, paths: string[]): Promise<GitStatusSnapshot> {
@@ -425,6 +540,18 @@ export async function pushWorkspaceGit(
   options: { showNativeErrorDialog?: boolean } = {},
 ): Promise<GitStatusSnapshot> {
   return getDesktopBridge().pushGit({ rootPath, showNativeErrorDialog: options.showNativeErrorDialog });
+}
+
+export async function pushWorkspaceGitCommitToRemote(
+  rootPath: string,
+  request: {
+    remoteName: string;
+    destinationBranch: string;
+    expectedHeadCommitId: string;
+    expectedBranch: string;
+  },
+): Promise<GitStatusSnapshot> {
+  return getDesktopBridge().pushGitCommitToRemote({ rootPath, ...request });
 }
 
 export async function publishWorkspaceGitBranch(rootPath: string, remoteName?: string | null): Promise<GitStatusSnapshot> {

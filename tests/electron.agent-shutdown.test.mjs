@@ -45,7 +45,7 @@ describe("Desktop Agent app-quit coordination", () => {
     const closeAll = vi.fn(async () => {});
     const handler = createAgentQuitCoordinator({
       app: { quit: vi.fn() },
-      agentService: { getSessionCount: () => 0, closeAll },
+      agentService: { getSessionCount: () => 0, hasRuntimeResources: () => false, closeAll },
       disposeApplicationServices: vi.fn(),
     });
 
@@ -53,5 +53,29 @@ describe("Desktop Agent app-quit coordination", () => {
 
     expect(event.preventDefault).not.toHaveBeenCalled();
     expect(closeAll).toHaveBeenCalledOnce();
+  });
+
+  it("waits for an inspected sidecar even when no Agent session was created", async () => {
+    let resolveDrain;
+    const closeAll = vi.fn(() => new Promise((resolve) => { resolveDrain = resolve; }));
+    const app = { quit: vi.fn() };
+    const handler = createAgentQuitCoordinator({
+      app,
+      agentService: {
+        getSessionCount: () => 0,
+        hasRuntimeResources: () => true,
+        closeAll,
+      },
+      disposeApplicationServices: vi.fn(),
+    });
+    const event = { preventDefault: vi.fn() };
+
+    handler(event);
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    resolveDrain();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(app.quit).toHaveBeenCalledOnce();
   });
 });

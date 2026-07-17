@@ -1,26 +1,30 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  listCloudProjects,
+  getCloudProject,
   type DesktopCloudConnector,
   type DesktopCloudDashboard,
-  type DesktopCloudHistory,
   type DesktopCloudMcpEndpoint,
   type DesktopCloudProject,
+  type DesktopCloudProjectReadiness,
   type DesktopCloudRepoIdentity,
   type DesktopCloudScope,
   type DesktopCloudSession,
   type DesktopCloudTree,
 } from "../../../lib/cloudApi";
+import type { DesktopCloudHistory } from "../../../lib/cloudHistoryApi";
 import type { CloudEnvironment } from "../environment";
-import { resolveMappedCloudProjectId } from "../workspace";
-import { loadCloudProjectDetails } from "./cloudProjectDetails";
+import {
+  CLOUD_PROJECT_DETAIL_RESOURCES,
+  loadCloudProjectDetails,
+  type CloudProjectDetailResource,
+} from "./cloudProjectDetails";
+import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
-export { resolveMappedCloudProjectId } from "../workspace";
 
 export type DesktopCloudDataState = {
   projects: DesktopCloudProject[];
-  mappedProjectId: string | null;
-  mappedProject: DesktopCloudProject | null;
+  contextProjectId: string | null;
+  contextProject: DesktopCloudProject | null;
   activeProjectId: string | null;
   activeProject: DesktopCloudProject | null;
   dashboard: DesktopCloudDashboard | null;
@@ -30,10 +34,11 @@ export type DesktopCloudDataState = {
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;
+  readiness: DesktopCloudProjectReadiness | null;
   initializing: boolean;
   loading: boolean;
-  error: string | null;
-  warning: string | null;
+  error: CloudMessageDescriptor | null;
+  warning: CloudMessageDescriptor | null;
   reload: () => Promise<void>;
 };
 
@@ -41,186 +46,224 @@ type DesktopCloudDataInternalState = Omit<DesktopCloudDataState, "reload"> & {
   contextKey: string | null;
 };
 
-export function useDesktopCloudData(
-  session: DesktopCloudSession | null,
-  cloudEnvironment: CloudEnvironment,
-  selectedProjectId: string | null,
-  onSessionChange: (session: DesktopCloudSession | null) => void,
-  workspaceRevisionKey?: string | null,
+export function useDesktopCloudData({
+  session,
+  cloudEnvironment,
+  explicitProjectId,
+  repositoryProjectId = null,
+  onSessionChange,
+  workspaceRevisionKey = null,
   loadProjectDetails = true,
-): DesktopCloudDataState {
-  const cloudRemote = cloudEnvironment.cloudRemote;
+  projectDetailResources = CLOUD_PROJECT_DETAIL_RESOURCES,
+}: {
+  session: DesktopCloudSession | null;
+  cloudEnvironment: CloudEnvironment;
+  /** Exact Project identity owned by an explicit global/Cloud-only route. */
+  explicitProjectId: string | null;
+  /** Exact Project context resolved for the local workspace by the app shell. */
+  repositoryProjectId?: string | null;
+  onSessionChange: (session: DesktopCloudSession | null) => void;
+  workspaceRevisionKey?: string | null;
+  loadProjectDetails?: boolean;
+  /** Route-owned resource plan; omitted resources do not issue requests. */
+  projectDetailResources?: readonly CloudProjectDetailResource[];
+}): DesktopCloudDataState {
   const cloudApiBaseUrl = cloudEnvironment.apiBaseUrl;
-  const configuredProjectId = cloudEnvironment.configuredProjectId;
+  const normalizedRepositoryProjectId = repositoryProjectId?.trim() || null;
+  const projectDetailResourceKey = [...new Set(projectDetailResources)].sort().join(",");
   const contextKey = createCloudDataContextKey({
     session,
     cloudEnvironment,
-    selectedProjectId,
-    loadProjectDetails,
+    explicitProjectId,
+    repositoryProjectId: normalizedRepositoryProjectId,
+    projectDetailResourceKey,
   });
-  const [reloadToken, setReloadToken] = useState(0);
   const [state, setState] = useState<DesktopCloudDataInternalState>(() => createCloudDataState());
+  const activeRequestRef = useRef(0);
+  const sessionRef = useRef(session);
+  const onSessionChangeRef = useRef(onSessionChange);
+  sessionRef.current = session;
+  onSessionChangeRef.current = onSessionChange;
   const hasCurrentContext = state.contextKey === contextKey;
 
-  useEffect(() => {
-    if (!session) {
+  const load = useCallback(async () => {
+    const requestId = activeRequestRef.current + 1;
+    activeRequestRef.current = requestId;
+    const activeProjectId = explicitProjectId?.trim() || normalizedRepositoryProjectId;
+
+    const activeSession = sessionRef.current;
+    if (!activeSession || !activeProjectId) {
       setState(createCloudDataState({
+        contextProjectId: normalizedRepositoryProjectId,
+        activeProjectId,
         initializing: false,
         loading: false,
         contextKey,
       }));
-      return undefined;
+      return;
     }
 
-    let cancelled = false;
-    const load = async () => {
-      setState((current) => ({
-        ...current,
-        initializing: current.contextKey !== contextKey,
-        loading: true,
-        error: null,
-        warning: null,
-        contextKey,
-      }));
-      try {
-        const projects = await listCloudProjects(session, onSessionChange, cloudApiBaseUrl);
-        if (cancelled) return;
-        const mappedProjectId = await resolveMappedCloudProjectId({
-          session,
-          projects,
-          cloudRemote,
-          configuredProjectId,
-          onSessionChange,
-          cloudApiBaseUrl,
-        });
-        if (cancelled) return;
-
-        const mappedProject = mappedProjectId
-          ? projects.find((project) => project.id === mappedProjectId) ?? null
-          : null;
-        const activeProjectId = selectedProjectId || mappedProjectId;
-
-        if (!activeProjectId) {
-          setState(createCloudDataState({
-            projects,
-            mappedProjectId,
-            mappedProject,
-            initializing: false,
-            loading: false,
-            contextKey,
-          }));
-          return;
-        }
-
-        if (!loadProjectDetails) {
-          setState(createCloudDataState({
-            projects,
-            mappedProjectId,
-            mappedProject,
-            activeProjectId,
-            activeProject: projects.find((project) => project.id === activeProjectId) ?? mappedProject,
-            initializing: false,
-            loading: false,
-            contextKey,
-          }));
-          return;
-        }
-
-        const details = await loadCloudProjectDetails({
-          session,
-          projectId: activeProjectId,
-          projects,
-          onSessionChange,
-          cloudApiBaseUrl,
-        });
-        if (cancelled) return;
-
-        setState({
-          projects,
-          mappedProjectId,
-          mappedProject,
-          activeProjectId,
-          activeProject: details.activeProject,
-          dashboard: details.dashboard,
-          tree: details.tree,
-          history: details.history,
-          scopes: details.scopes,
-          connectors: details.connectors,
-          mcpEndpoints: details.mcpEndpoints,
-          identity: details.identity,
-          initializing: false,
-          loading: false,
-          error: null,
-          warning: details.warning,
-          contextKey,
-        });
-      } catch (loadError) {
-        if (!cancelled) {
-          setState((current) => ({
+    setState((current) => (
+      current.contextKey === contextKey
+        ? {
             ...current,
             initializing: false,
-            loading: false,
-            error: loadError instanceof Error ? loadError.message : "Unable to load Cloud workspace.",
+            loading: true,
+            error: null,
             warning: null,
+          }
+        : createCloudDataState({
+            contextProjectId: normalizedRepositoryProjectId,
+            activeProjectId: explicitProjectId || normalizedRepositoryProjectId,
+            initializing: true,
+            loading: true,
             contextKey,
-          }));
-        }
-      }
-    };
+          })
+    ));
 
-    void load();
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const project = await getCloudProject(
+        activeSession,
+        activeProjectId,
+        onSessionChangeRef.current,
+        cloudApiBaseUrl,
+      );
+      const projects = [project];
+      if (activeRequestRef.current !== requestId) return;
+
+      // Repository-context resolution owns identity and authorization. This
+      // hook only loads data for that Project or an explicit global route.
+      const contextProjectId = normalizedRepositoryProjectId;
+      const contextProject = contextProjectId
+        ? projects.find((project) => project.id === contextProjectId) ?? null
+        : null;
+      if (!loadProjectDetails) {
+        setState(createCloudDataState({
+          projects,
+          contextProjectId,
+          contextProject,
+          activeProjectId,
+          activeProject: project,
+          initializing: false,
+          loading: false,
+          contextKey,
+        }));
+        return;
+      }
+
+      const details = await loadCloudProjectDetails({
+        session: activeSession,
+        projectId: activeProjectId,
+        projects,
+        onSessionChange: onSessionChangeRef.current,
+        cloudApiBaseUrl,
+        resources: projectDetailResourceKey
+          ? projectDetailResourceKey.split(",") as CloudProjectDetailResource[]
+          : [],
+      });
+      if (activeRequestRef.current !== requestId) return;
+
+      setState({
+        projects,
+        contextProjectId,
+        contextProject,
+        activeProjectId,
+        activeProject: details.activeProject,
+        dashboard: details.dashboard,
+        tree: details.tree,
+        history: details.history,
+        scopes: details.scopes,
+        connectors: details.connectors,
+        mcpEndpoints: details.mcpEndpoints,
+        identity: details.identity,
+        readiness: details.readiness,
+        initializing: false,
+        loading: false,
+        error: null,
+        warning: details.warning,
+        contextKey,
+      });
+    } catch (loadError) {
+      if (activeRequestRef.current !== requestId) return;
+      setState((current) => (
+        current.contextKey === contextKey
+          ? {
+              ...current,
+              initializing: false,
+              loading: false,
+              error: cloudMessage(
+                "cloud-data-load-failed",
+                undefined,
+                loadError instanceof Error ? loadError.message : undefined,
+              ),
+              warning: null,
+            }
+          : createCloudDataState({
+              initializing: false,
+              loading: false,
+              error: cloudMessage(
+                "cloud-data-load-failed",
+                undefined,
+                loadError instanceof Error ? loadError.message : undefined,
+              ),
+              contextKey,
+            })
+      ));
+    }
   }, [
-    session,
-    onSessionChange,
-    configuredProjectId,
-    selectedProjectId,
-    cloudRemote?.rawUrl,
     cloudApiBaseUrl,
     contextKey,
-    workspaceRevisionKey,
-    reloadToken,
     loadProjectDetails,
+    projectDetailResourceKey,
+    normalizedRepositoryProjectId,
+    explicitProjectId,
   ]);
 
-  const reload = async () => {
-    setReloadToken((token) => token + 1);
-  };
+  useEffect(() => {
+    void load();
+    return () => {
+      activeRequestRef.current += 1;
+    };
+  }, [load, workspaceRevisionKey]);
 
   if (session && !hasCurrentContext) {
     return {
       ...toPublicCloudDataState(createCloudDataState({
+        contextProjectId: normalizedRepositoryProjectId,
+        activeProjectId: explicitProjectId || normalizedRepositoryProjectId,
         initializing: true,
         loading: true,
       })),
-      reload,
+      reload: load,
     };
   }
 
-  return { ...toPublicCloudDataState(state), reload };
+  return { ...toPublicCloudDataState(state), reload: load };
 }
 
 function createCloudDataContextKey({
   session,
   cloudEnvironment,
-  selectedProjectId,
-  loadProjectDetails,
+  explicitProjectId,
+  repositoryProjectId,
+  projectDetailResourceKey,
 }: {
   session: DesktopCloudSession | null;
   cloudEnvironment: CloudEnvironment;
-  selectedProjectId: string | null;
-  loadProjectDetails: boolean;
+  explicitProjectId: string | null;
+  repositoryProjectId: string | null;
+  projectDetailResourceKey: string;
 }): string {
   if (!session) return "signed-out";
   return [
+    session.user_id,
     session.user_email,
+    session.session_generation,
     session.api_base_url ?? "",
     cloudEnvironment.cloudRemote?.rawUrl ?? "",
-    cloudEnvironment.configuredProjectId ?? "",
-    selectedProjectId ?? "",
-    loadProjectDetails ? "details" : "summary",
+    repositoryProjectId ?? "",
+    explicitProjectId ?? "",
+    projectDetailResourceKey,
   ].join("\n");
 }
 
@@ -229,8 +272,8 @@ function createCloudDataState(
 ): DesktopCloudDataInternalState {
   return {
     projects: [],
-    mappedProjectId: null,
-    mappedProject: null,
+    contextProjectId: null,
+    contextProject: null,
     activeProjectId: null,
     activeProject: null,
     dashboard: null,
@@ -240,6 +283,7 @@ function createCloudDataState(
     connectors: [],
     mcpEndpoints: [],
     identity: null,
+    readiness: null,
     initializing: false,
     loading: false,
     error: null,

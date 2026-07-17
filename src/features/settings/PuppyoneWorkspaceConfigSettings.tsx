@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Check, RefreshCw } from "lucide-react";
 import type { GitRemoteSummary, GitStatusSnapshot, PuppyoneBackendService, PuppyoneWorkspaceConfig } from "../../types/electron";
 import { parsePuppyoneRemote } from "../source-control/remotes";
-import { SettingsGroup } from "./components";
+import { useLocalization } from "@puppyone/localization";
+import { SettingsSubsection } from "./components";
 import { remoteKindLabel } from "./utils";
 
 export function PuppyoneWorkspaceConfigSettings({
@@ -26,6 +27,7 @@ export function PuppyoneWorkspaceConfigSettings({
   error: string | null;
   onChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
 }) {
+  const { t } = useLocalization();
   const [draft, setDraft] = useState<PuppyoneWorkspaceConfig>(() => normalizePuppyoneConfigDraft(config, cloudEnabled));
   const [localError, setLocalError] = useState<string | null>(null);
   const branchNames = branches
@@ -54,20 +56,18 @@ export function PuppyoneWorkspaceConfigSettings({
     {
       value: "puppyone",
       label: "Puppyone Cloud",
-      detail: "Simple workspace sync managed by Puppyone.",
+      detail: t("settings.workspaceConfig.service.puppyone.detail"),
       available: cloudEnabled,
     },
     {
       value: "github",
       label: "GitHub",
-      detail: "Use the standard GitHub flow and Git remotes.",
+      detail: t("settings.workspaceConfig.service.github.detail"),
       available: true,
     },
   ];
   const showSourceGitHints = sourceService !== "puppyone";
   const showBackupDetails = draft.backup.enabled;
-  const showCloudProject = cloudEnabled
-    && (sourceService === "puppyone" || (draft.backup.enabled && draft.backup.service === "puppyone"));
 
   useEffect(() => {
     setDraft(normalizePuppyoneConfigDraft(config, cloudEnabled));
@@ -108,19 +108,6 @@ export function PuppyoneWorkspaceConfigSettings({
     });
   };
 
-  const updateCloudConfig = (nextCloud: Partial<PuppyoneWorkspaceConfig["cloud"]>) => {
-    setDraft((current) => {
-      const normalized = normalizePuppyoneConfigDraft(current, cloudEnabled);
-      return {
-        ...normalized,
-        cloud: {
-          ...normalized.cloud,
-          ...nextCloud,
-        },
-      };
-    });
-  };
-
   const selectSourceService = (service: PuppyoneBackendService) => {
     const normalizedService = normalizeBackendServiceDraft(service, cloudEnabled);
     updateSourceOfTruthConfig({
@@ -141,17 +128,17 @@ export function PuppyoneWorkspaceConfigSettings({
   };
 
   return (
-    <SettingsGroup>
+    <SettingsSubsection>
       {loading && !config ? (
-        <div className="desktop-settings-muted-row">Reading Puppyone config...</div>
+        <div className="desktop-settings-muted-row">{t("settings.workspaceConfig.reading")}</div>
       ) : (
         <>
           <div className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row desktop-hosting-service-panel">
             <span className="desktop-settings-label-stack">
-              <strong>Source service</strong>
-              <small>Sync authority for this workspace.</small>
+              <strong>{t("settings.workspaceConfig.sourceService.title")}</strong>
+              <small>{t("settings.workspaceConfig.sourceService.detail")}</small>
             </span>
-            <div className="desktop-hosting-service-options" aria-label="Source service">
+            <div className="desktop-hosting-service-options" aria-label={t("settings.workspaceConfig.sourceService.ariaLabel")}>
               {sourceServiceOptions.filter((option) => option.available).map((option) => (
                 <button
                   className={`desktop-hosting-service-option ${sourceService === option.value ? "active" : ""}`}
@@ -171,8 +158,8 @@ export function PuppyoneWorkspaceConfigSettings({
             <>
               <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
                 <span className="desktop-settings-label-stack">
-                  <strong>Git remote</strong>
-                  <small>Remote used for sync state.</small>
+                  <strong>{t("settings.workspaceConfig.gitRemote.title")}</strong>
+                  <small>{t("settings.workspaceConfig.gitRemote.detail")}</small>
                 </span>
                 <select
                   className="desktop-settings-select"
@@ -180,7 +167,7 @@ export function PuppyoneWorkspaceConfigSettings({
                   disabled={saving}
                   onChange={(event) => updateSourceOfTruthConfig({ remote: normalizeSettingsText(event.target.value) })}
                 >
-                  <option value="">Auto</option>
+                  <option value="">{t("settings.workspaceConfig.auto")}</option>
                   {sourceRemoteNames.map((remoteName) => (
                     <option value={remoteName} key={remoteName}>{remoteName}</option>
                   ))}
@@ -189,14 +176,14 @@ export function PuppyoneWorkspaceConfigSettings({
 
               <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
                 <span className="desktop-settings-label-stack">
-                  <strong>Git branch</strong>
-                  <small>Empty uses the current branch.</small>
+                  <strong>{t("settings.workspaceConfig.gitBranch.title")}</strong>
+                  <small>{t("settings.workspaceConfig.gitBranch.detail")}</small>
                 </span>
                 <input
                   className="desktop-settings-text-input"
                   list={watchedBranchListId}
                   value={draft.sync.sourceOfTruth.branch ?? ""}
-                  placeholder={currentBranchName && currentBranchName !== "detached" ? currentBranchName : "current branch"}
+                  placeholder={currentBranchName && currentBranchName !== "detached" ? currentBranchName : t("settings.workspaceConfig.currentBranch")}
                   disabled={saving}
                   onChange={(event) => updateSourceOfTruthConfig({ branch: normalizeSettingsText(event.target.value) })}
                 />
@@ -211,12 +198,13 @@ export function PuppyoneWorkspaceConfigSettings({
 
           <div className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
             <span className="desktop-settings-label-stack">
-              <strong>Backup enabled</strong>
-              <small>Use a separate backup target.</small>
+              <strong>{t("settings.workspaceConfig.backupEnabled.title")}</strong>
+              <small>{t("settings.workspaceConfig.backupEnabled.detail")}</small>
             </span>
             <label className="desktop-settings-switch">
               <input
                 type="checkbox"
+                aria-label={t("settings.workspaceConfig.backupEnabled.title")}
                 checked={draft.backup.enabled}
                 disabled={saving}
                 onChange={(event) => updateBackupConfig({ enabled: event.target.checked })}
@@ -229,8 +217,8 @@ export function PuppyoneWorkspaceConfigSettings({
             <>
               <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
                 <span className="desktop-settings-label-stack">
-                  <strong>Backup target</strong>
-                  <small>Service used for backup.</small>
+                  <strong>{t("settings.workspaceConfig.backupTarget.title")}</strong>
+                  <small>{t("settings.workspaceConfig.backupTarget.detail")}</small>
                 </span>
                 <select
                   className="desktop-settings-select"
@@ -253,8 +241,8 @@ export function PuppyoneWorkspaceConfigSettings({
                 <>
                   <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
                     <span className="desktop-settings-label-stack">
-                      <strong>Backup Git remote</strong>
-                      <small>Empty chooses automatically.</small>
+                      <strong>{t("settings.workspaceConfig.backupRemote.title")}</strong>
+                      <small>{t("settings.workspaceConfig.backupRemote.detail")}</small>
                     </span>
                     <select
                       className="desktop-settings-select"
@@ -262,7 +250,7 @@ export function PuppyoneWorkspaceConfigSettings({
                       disabled={saving}
                       onChange={(event) => updateBackupConfig({ remote: normalizeSettingsText(event.target.value) })}
                     >
-                      <option value="">Auto</option>
+                      <option value="">{t("settings.workspaceConfig.auto")}</option>
                       {backupRemoteNames.map((remoteName) => (
                         <option value={remoteName} key={remoteName}>{remoteName}</option>
                       ))}
@@ -271,14 +259,14 @@ export function PuppyoneWorkspaceConfigSettings({
 
                   <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
                     <span className="desktop-settings-label-stack">
-                      <strong>Backup Git branch</strong>
-                      <small>Empty uses the current branch.</small>
+                      <strong>{t("settings.workspaceConfig.backupBranch.title")}</strong>
+                      <small>{t("settings.workspaceConfig.backupBranch.detail")}</small>
                     </span>
                     <input
                       className="desktop-settings-text-input"
                       list={backupBranchListId}
                       value={draft.backup.branch ?? ""}
-                      placeholder={currentBranchName && currentBranchName !== "detached" ? currentBranchName : "current branch"}
+                      placeholder={currentBranchName && currentBranchName !== "detached" ? currentBranchName : t("settings.workspaceConfig.currentBranch")}
                       disabled={saving}
                       onChange={(event) => updateBackupConfig({ branch: normalizeSettingsText(event.target.value) })}
                     />
@@ -293,24 +281,8 @@ export function PuppyoneWorkspaceConfigSettings({
             </>
           )}
 
-          {showCloudProject && (
-            <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
-              <span className="desktop-settings-label-stack">
-                <strong>Cloud project id</strong>
-                <small>Project identifier for Puppyone Cloud.</small>
-              </span>
-              <input
-                className="desktop-settings-text-input"
-                value={draft.cloud.projectId ?? ""}
-                placeholder="Not set"
-                disabled={saving}
-                onChange={(event) => updateCloudConfig({ projectId: normalizeSettingsText(event.target.value) })}
-              />
-            </label>
-          )}
-
           <div className="desktop-puppyone-config-footer">
-            <span>{error ?? localError ?? (dirty ? "Unsaved changes" : "Config is up to date")}</span>
+            <span>{error ?? localError ?? t(dirty ? "settings.workspaceConfig.unsaved" : "settings.workspaceConfig.upToDate")}</span>
             <div>
               <button
                 className="desktop-settings-row-action"
@@ -319,7 +291,7 @@ export function PuppyoneWorkspaceConfigSettings({
                 onClick={() => setDraft(savedConfig)}
               >
                 <RefreshCw size={13} />
-                <span>Reset</span>
+                <span>{t("common.action.reset")}</span>
               </button>
               <button
                 className="desktop-settings-row-action desktop-settings-save-action"
@@ -328,13 +300,13 @@ export function PuppyoneWorkspaceConfigSettings({
                 onClick={() => void saveConfig()}
               >
                 <Check size={13} />
-                <span>{saving ? "Saving" : "Save"}</span>
+                <span>{t(saving ? "settings.workspaceConfig.saving" : "common.action.save")}</span>
               </button>
             </div>
           </div>
         </>
       )}
-    </SettingsGroup>
+    </SettingsSubsection>
   );
 }
 
@@ -355,7 +327,7 @@ function normalizePuppyoneConfigDraft(config: PuppyoneWorkspaceConfig | null, cl
       ?? normalizeSettingsText(config?.backup?.branch);
 
   return {
-    version: 1,
+    version: 3,
     sync: {
       sourceOfTruth: {
         service: sourceOfTruthService,
@@ -373,9 +345,6 @@ function normalizePuppyoneConfigDraft(config: PuppyoneWorkspaceConfig | null, cl
       remote: normalizeSettingsText(config?.backup?.remote) ?? sourceOfTruthRemote,
       branch: normalizeSettingsText(config?.backup?.branch) ?? (isPuppyoneSource ? null : sourceOfTruthBranch),
     },
-    cloud: {
-      projectId: normalizeSettingsText(config?.cloud?.projectId),
-    },
     ...(config?.updatedAt ? { updatedAt: config.updatedAt } : {}),
   };
 }
@@ -389,8 +358,7 @@ function samePuppyoneConfig(left: PuppyoneWorkspaceConfig, right: PuppyoneWorksp
     && left.backup.enabled === right.backup.enabled
     && left.backup.service === right.backup.service
     && left.backup.remote === right.backup.remote
-    && left.backup.branch === right.backup.branch
-    && left.cloud.projectId === right.cloud.projectId;
+    && left.backup.branch === right.backup.branch;
 }
 
 function normalizeBackendServiceDraft(value: string | null | undefined, cloudEnabled = true): PuppyoneBackendService {

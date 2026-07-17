@@ -1,54 +1,49 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import {
-  commitWorkspaceGit,
-  configureWorkspaceCloudRemote,
+  abandonWorkspaceCloudPublish,
+  getWorkspaceCloudPublishState,
   getWorkspaceGitStatus,
-  initializeWorkspaceGitRepository,
-  pushWorkspaceGit,
-  stageAllWorkspaceGitChanges,
+  startOrResumeWorkspaceCloudPublish,
 } from "../../../lib/localFiles";
-import {
-  createCloudProject,
-  getCloudRepoIdentity,
-  type DesktopCloudSession,
-} from "../../../lib/cloudApi";
+import { onDesktopCloudAuthError } from "../../../lib/cloudSession";
+import type { DesktopCloudSession } from "../../../lib/cloudApi";
+import type {
+  CloudPublishErrorCode,
+  CloudPublishResult,
+  CloudPublishState,
+  GitStatusSnapshot,
+} from "../../../types/electron";
 import type { DesktopView } from "../../../components/DesktopCloudShell";
 import type { CloudWorkspaceSection } from "../types";
-import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../../types/electron";
-import {
-  mergePuppyoneWorkspaceConfig,
-} from "../../app-shell/preferences";
-import {
-  createGitOperationErrorState,
-  type GitOperationErrorState,
-} from "../../source-control/operationDialogs";
 import { createRepositoryRefreshReason } from "../../source-control/repositoryRefreshPolicy";
 import type { GitRefreshReason, GitRepositoryContext } from "../../source-control/gitRefreshScheduler";
 
+export type CloudPublishFailure = {
+  code: CloudPublishErrorCode;
+  retryable: boolean;
+};
+
+export type CloudPublishNotice = "abandoned" | null;
+
 export function usePuppyoneCloudBackup({
   activeCloudSession,
-  activeGitStatus,
   applyGitStatus,
   captureGitRepositoryContext,
   clearGitSelection,
   cloudEnabled,
-  handleCloudSessionChange,
-  handlePuppyoneConfigChange,
+  desktopCloudApiBaseUrl,
   isGitRepositoryContextCurrent,
-  puppyoneConfig,
   refreshWorkspaceContent,
   setActiveCloudSection,
   setActiveView,
-  setGitOperationError,
-  setGitOperationLoading,
   setSidebarCollapsed,
   setSwitcherOpen,
+  startCloudBrowserSignIn,
   workspace,
   workspaceIsCloud,
 }: {
   activeCloudSession: DesktopCloudSession | null;
-  activeGitStatus: GitStatusSnapshot | null;
   applyGitStatus: (
     status: GitStatusSnapshot,
     context: GitRepositoryContext,
@@ -57,185 +52,319 @@ export function usePuppyoneCloudBackup({
   captureGitRepositoryContext: (expectedRootPath?: string) => GitRepositoryContext | null;
   clearGitSelection: () => void;
   cloudEnabled: boolean;
-  handleCloudSessionChange: (session: DesktopCloudSession | null) => void;
-  handlePuppyoneConfigChange: (nextConfig: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
+  desktopCloudApiBaseUrl: string | null;
   isGitRepositoryContextCurrent: (context: GitRepositoryContext) => boolean;
-  puppyoneConfig: PuppyoneWorkspaceConfig | null;
   refreshWorkspaceContent: () => void;
   setActiveCloudSection: (section: CloudWorkspaceSection) => void;
   setActiveView: (view: DesktopView) => void;
-  setGitOperationError: (error: GitOperationErrorState | null) => void;
-  setGitOperationLoading: (loading: string | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSwitcherOpen: (open: boolean) => void;
+  startCloudBrowserSignIn: () => Promise<boolean>;
   workspace: Workspace | null;
   workspaceIsCloud: boolean;
 }) {
-  const [pendingCloudBackupSetup, setPendingCloudBackupSetup] = useState(false);
+  const [cloudPublishState, setCloudPublishState] = useState<CloudPublishState | null>(null);
+  const [cloudPublishError, setCloudPublishError] = useState<CloudPublishFailure | null>(null);
+  const [cloudPublishNotice, setCloudPublishNotice] = useState<CloudPublishNotice>(null);
+  const [cloudPublishStateLoading, setCloudPublishStateLoading] = useState(false);
   const [cloudBackupLoading, setCloudBackupLoading] = useState(false);
-  const [cloudBackupError, setCloudBackupError] = useState<string | null>(null);
+  const [pendingCloudBackupSetup, setPendingCloudBackupSetup] = useState(false);
+  const actionRef = useRef<symbol | null>(null);
+  const stateRequestRef = useRef<symbol | null>(null);
+  const pendingIntentWorkspaceRef = useRef<string | null>(null);
 
-  const createPuppyoneCloudBackup = useCallback(async (session: DesktopCloudSession) => {
-    if (!cloudEnabled) return false;
-    if (!workspace) return false;
-    if (workspaceIsCloud) return false;
-    const context = captureGitRepositoryContext(workspace.path);
-    if (!context) return false;
+  const publishIdentity = getPublishIdentity({
+    session: activeCloudSession,
+    apiBaseUrl: desktopCloudApiBaseUrl,
+    workspace,
+    cloudEnabled,
+    workspaceIsCloud,
+  });
+  const publishIdentityKey = publishIdentity
+    ? [
+        publishIdentity.rootPath,
+        publishIdentity.apiBaseUrl,
+        publishIdentity.userId,
+        activeCloudSession?.session_generation ?? "",
+      ].join("\n")
+    : null;
 
-    setCloudBackupLoading(true);
-    setCloudBackupError(null);
-    setGitOperationLoading("cloud-backup");
-    setGitOperationError(null);
+  const reconcileGitStatus = useCallback((
+    status: GitStatusSnapshot | undefined,
+    context: GitRepositoryContext,
+  ) => {
+    if (!status || !isGitRepositoryContextCurrent(context)) return false;
+    if (!applyGitStatus(
+      status,
+      context,
+      createRepositoryRefreshReason("cloud-backup", "mutation"),
+    )) return false;
+    refreshWorkspaceContent();
+    return true;
+  }, [applyGitStatus, isGitRepositoryContextCurrent, refreshWorkspaceContent]);
 
-    try {
-      let nextStatus = activeGitStatus;
-      if (!nextStatus) {
-        nextStatus = await getWorkspaceGitStatus(context.rootPath);
+  useEffect(() => {
+    stateRequestRef.current = null;
+    actionRef.current = null;
+    setCloudPublishState(null);
+    setCloudPublishError(null);
+    setCloudPublishNotice(null);
+    setCloudBackupLoading(false);
+    if (!publishIdentity || !publishIdentityKey) {
+      if (!workspace || workspaceIsCloud || !cloudEnabled) {
+        pendingIntentWorkspaceRef.current = null;
+        setPendingCloudBackupSetup(false);
       }
+      setCloudPublishStateLoading(false);
+      return undefined;
+    }
 
-      if (!nextStatus.isRepo) {
-        nextStatus = await initializeWorkspaceGitRepository(context.rootPath);
-      }
-
-      const localChangeCount =
-        nextStatus.stagedEntries.length +
-        nextStatus.unstagedEntries.length +
-        nextStatus.untrackedEntries.length;
-
-      if (localChangeCount > 0) {
-        nextStatus = await stageAllWorkspaceGitChanges(context.rootPath);
-        if (nextStatus.stagedEntries.length > 0) {
-          nextStatus = await commitWorkspaceGit(context.rootPath, "");
-        }
-      }
-
-      const project = await createCloudProject(session, workspace.name, handleCloudSessionChange);
-      const identity = await getCloudRepoIdentity(session, project.id, handleCloudSessionChange);
-      await configureWorkspaceCloudRemote(context.rootPath, identity.url, "puppyone");
-      const nextConfig = mergePuppyoneWorkspaceConfig(puppyoneConfig, {
-        sync: {
-          sourceOfTruth: {
-            service: "puppyone",
-            remote: "puppyone",
-            branch: null,
-          },
-        },
-        backup: {
-          enabled: true,
-          service: "puppyone",
-          remote: "puppyone",
-          branch: null,
-        },
-        git: {
-          primaryRemote: "puppyone",
-          watchedBranch: null,
-        },
-        cloud: {
-          projectId: project.id,
-        },
-      });
-      await handlePuppyoneConfigChange(nextConfig);
-      nextStatus = await getWorkspaceGitStatus(context.rootPath);
-
-      if (nextStatus.headCommitId) {
-        nextStatus = await pushWorkspaceGit(context.rootPath);
-      }
-
-      if (!applyGitStatus(
-        nextStatus,
-        context,
-        createRepositoryRefreshReason("cloud-backup", "mutation"),
-      )) return false;
-      refreshWorkspaceContent();
+    if (pendingIntentWorkspaceRef.current !== publishIdentity.rootPath) {
+      pendingIntentWorkspaceRef.current = null;
       setPendingCloudBackupSetup(false);
-      clearGitSelection();
-      setActiveCloudSection("overview");
+    }
+
+    const request = Symbol("load-cloud-publish-state");
+    stateRequestRef.current = request;
+    setCloudPublishStateLoading(true);
+    const context = captureGitRepositoryContext(publishIdentity.rootPath);
+    void getWorkspaceCloudPublishState(publishIdentity)
+      .then((result) => {
+        if (stateRequestRef.current !== request) return;
+        setCloudPublishState(result.state?.phase === "completed" ? null : result.state);
+        if (!result.ok) {
+          setCloudPublishError(toPublicFailure(result));
+          return;
+        }
+        setCloudPublishError(null);
+        if (context && result.gitStatus) reconcileGitStatus(result.gitStatus, context);
+        if (result.state?.phase === "completed") {
+          clearGitSelection();
+          setActiveCloudSection("contents");
+        }
+      })
+      .catch(() => {
+        if (stateRequestRef.current === request) {
+          setCloudPublishError({ code: "UNKNOWN", retryable: true });
+        }
+      })
+      .finally(() => {
+        if (stateRequestRef.current === request) {
+          stateRequestRef.current = null;
+          setCloudPublishStateLoading(false);
+        }
+      });
+
+    return () => {
+      if (stateRequestRef.current === request) stateRequestRef.current = null;
+    };
+  // The string is the complete authority boundary. Object identity must not restart recovery reads.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishIdentityKey]);
+
+  const finishSuccessfulPublish = useCallback((
+    result: Extract<CloudPublishResult, { ok: true }>,
+    context: GitRepositoryContext,
+  ) => {
+    if (result.gitStatus && !reconcileGitStatus(result.gitStatus, context)) return false;
+    setCloudPublishState(result.state?.phase === "completed" ? null : result.state);
+    setCloudPublishError(null);
+    setCloudPublishNotice(null);
+    if (result.state?.phase !== "completed") return true;
+    clearGitSelection();
+    setActiveCloudSection("contents");
+    setActiveView("cloud");
+    setSidebarCollapsed(false);
+    setSwitcherOpen(false);
+    return true;
+  }, [clearGitSelection, reconcileGitStatus, setActiveCloudSection, setActiveView, setSidebarCollapsed, setSwitcherOpen]);
+
+  const runStartOrResume = useCallback(async (organizationId?: string) => {
+    if (!cloudEnabled || !workspace || workspaceIsCloud || actionRef.current) return;
+    if (!activeCloudSession) {
+      pendingIntentWorkspaceRef.current = workspace.path;
+      setPendingCloudBackupSetup(true);
+      setCloudPublishError(null);
       setActiveView("cloud");
+      setActiveCloudSection("initialize");
       setSidebarCollapsed(false);
       setSwitcherOpen(false);
-      return true;
-    } catch (error) {
-      if (!isGitRepositoryContextCurrent(context)) return false;
-      const message = error instanceof Error ? error.message : String(error);
-      setCloudBackupError(message || "Unable to create PuppyOne Cloud backup.");
-      setGitOperationError(createGitOperationErrorState(error, "cloud-backup", context.rootPath));
-      setPendingCloudBackupSetup(false);
-      setActiveView("cloud");
-      return false;
+      const started = await startCloudBrowserSignIn();
+      if (!started) {
+        pendingIntentWorkspaceRef.current = null;
+        setPendingCloudBackupSetup(false);
+        setCloudPublishError({ code: "SESSION_REQUIRED", retryable: true });
+      }
+      return;
+    }
+
+    const identity = getPublishIdentity({
+      session: activeCloudSession,
+      apiBaseUrl: desktopCloudApiBaseUrl,
+      workspace,
+      cloudEnabled,
+      workspaceIsCloud,
+    });
+    const context = captureGitRepositoryContext(workspace.path);
+    if (!identity || !context) {
+      setCloudPublishError({ code: "REPOSITORY_REQUIRED", retryable: false });
+      return;
+    }
+    const request = Symbol("start-or-resume-cloud-publish");
+    stateRequestRef.current = null;
+    setCloudPublishStateLoading(false);
+    actionRef.current = request;
+    setCloudBackupLoading(true);
+    setCloudPublishError(null);
+    setCloudPublishNotice(null);
+    try {
+      const pending = cloudPublishState;
+      const freshStatus = pending ? null : await getWorkspaceGitStatus(workspace.path);
+      const selectedOrganizationId = pending?.organizationId ?? organizationId?.trim() ?? "";
+      const expectedHeadCommitId = pending?.expectedHeadCommitId ?? freshStatus?.headCommitId ?? "";
+      const expectedBranch = pending?.expectedBranch ?? normalizePublishBranch(freshStatus?.branch);
+      if (!selectedOrganizationId) {
+        setCloudPublishError({ code: "ORGANIZATION_REQUIRED", retryable: false });
+        return;
+      }
+      const result = await startOrResumeWorkspaceCloudPublish({
+        ...identity,
+        organizationId: selectedOrganizationId,
+        projectName: pending?.projectName ?? workspace.name,
+        expectedHeadCommitId,
+        expectedBranch,
+      });
+      if (actionRef.current !== request || !isGitRepositoryContextCurrent(context)) return;
+      setCloudPublishState(result.state);
+      if (!result.ok) {
+        setCloudPublishError(toPublicFailure(result));
+        return;
+      }
+      finishSuccessfulPublish(result, context);
+    } catch {
+      if (actionRef.current === request) {
+        setCloudPublishError({ code: "UNKNOWN", retryable: true });
+      }
     } finally {
-      if (isGitRepositoryContextCurrent(context)) {
+      if (actionRef.current === request) {
+        actionRef.current = null;
         setCloudBackupLoading(false);
-        setGitOperationLoading(null);
+        pendingIntentWorkspaceRef.current = null;
+        setPendingCloudBackupSetup(false);
       }
     }
   }, [
-    activeGitStatus,
-    applyGitStatus,
+    activeCloudSession,
     captureGitRepositoryContext,
-    clearGitSelection,
     cloudEnabled,
-    handleCloudSessionChange,
-    handlePuppyoneConfigChange,
+    cloudPublishState,
+    desktopCloudApiBaseUrl,
+    finishSuccessfulPublish,
     isGitRepositoryContextCurrent,
-    puppyoneConfig,
-    refreshWorkspaceContent,
     setActiveCloudSection,
     setActiveView,
-    setGitOperationError,
-    setGitOperationLoading,
     setSidebarCollapsed,
     setSwitcherOpen,
+    startCloudBrowserSignIn,
     workspace,
     workspaceIsCloud,
   ]);
 
-  const handleStartPuppyoneBackup = useCallback(() => {
-    if (!cloudEnabled) return;
-    if (workspaceIsCloud) return;
-
-    setPendingCloudBackupSetup(true);
-    setCloudBackupError(null);
-    setGitOperationError(null);
-
-    if (!activeCloudSession) {
+  const handleAbandonPuppyoneBackup = useCallback(async () => {
+    if (!publishIdentity || !cloudPublishState?.canAbandon || actionRef.current) return;
+    const context = captureGitRepositoryContext(publishIdentity.rootPath);
+    if (!context) return;
+    const request = Symbol("abandon-cloud-publish");
+    actionRef.current = request;
+    setCloudBackupLoading(true);
+    setCloudPublishError(null);
+    setCloudPublishNotice(null);
+    try {
+      const result = await abandonWorkspaceCloudPublish({
+        ...publishIdentity,
+        operationId: cloudPublishState.operationId,
+      });
+      if (actionRef.current !== request || !isGitRepositoryContextCurrent(context)) return;
+      setCloudPublishState(result.state);
+      if (!result.ok) {
+        setCloudPublishError(toPublicFailure(result));
+        return;
+      }
+      reconcileGitStatus(result.gitStatus, context);
+      setCloudPublishState(null);
+      setCloudPublishNotice("abandoned");
+      setActiveCloudSection("initialize");
       setActiveView("cloud");
-      setActiveCloudSection("overview");
-      setSidebarCollapsed(false);
-      setSwitcherOpen(false);
+    } catch {
+      if (actionRef.current === request) {
+        setCloudPublishError({ code: "UNKNOWN", retryable: true });
+      }
+    } finally {
+      if (actionRef.current === request) {
+        actionRef.current = null;
+        setCloudBackupLoading(false);
+      }
     }
   }, [
-    activeCloudSession,
-    cloudEnabled,
+    captureGitRepositoryContext,
+    cloudPublishState,
+    isGitRepositoryContextCurrent,
+    publishIdentity,
+    reconcileGitStatus,
     setActiveCloudSection,
     setActiveView,
-    setGitOperationError,
-    setSidebarCollapsed,
-    setSwitcherOpen,
-    workspaceIsCloud,
   ]);
 
   useEffect(() => {
-    if (!cloudEnabled) return;
-    if (!pendingCloudBackupSetup || !activeCloudSession || cloudBackupLoading) return;
-    void createPuppyoneCloudBackup(activeCloudSession);
-  }, [
-    activeCloudSession,
-    cloudBackupLoading,
-    cloudEnabled,
-    createPuppyoneCloudBackup,
-    pendingCloudBackupSetup,
-  ]);
-
-  useEffect(() => {
-    setPendingCloudBackupSetup(false);
-    setCloudBackupLoading(false);
-    setCloudBackupError(null);
-  }, [workspace?.path]);
+    if (!pendingCloudBackupSetup || activeCloudSession) return undefined;
+    return onDesktopCloudAuthError(() => {
+      pendingIntentWorkspaceRef.current = null;
+      setPendingCloudBackupSetup(false);
+      setCloudPublishError({ code: "SESSION_REQUIRED", retryable: true });
+    });
+  }, [activeCloudSession, pendingCloudBackupSetup]);
 
   return {
-    cloudBackupError,
     cloudBackupLoading,
-    handleStartPuppyoneBackup,
+    cloudPublishError,
+    cloudPublishNotice,
+    cloudPublishState,
+    cloudPublishStateLoading,
+    handleAbandonPuppyoneBackup,
+    handleStartPuppyoneBackup: runStartOrResume,
     pendingCloudBackupSetup,
   };
+}
+
+function getPublishIdentity({
+  session,
+  apiBaseUrl,
+  workspace,
+  cloudEnabled,
+  workspaceIsCloud,
+}: {
+  session: DesktopCloudSession | null;
+  apiBaseUrl: string | null;
+  workspace: Workspace | null;
+  cloudEnabled: boolean;
+  workspaceIsCloud: boolean;
+}) {
+  if (!session || !workspace || !cloudEnabled || workspaceIsCloud) return null;
+  const resolvedApiBaseUrl = (apiBaseUrl ?? session.api_base_url).trim().replace(/\/+$/, "");
+  const userId = session.user_id.trim();
+  if (!resolvedApiBaseUrl || !userId) return null;
+  return { rootPath: workspace.path, apiBaseUrl: resolvedApiBaseUrl, userId };
+}
+
+function normalizePublishBranch(branch: string | null | undefined): string {
+  const normalized = branch?.trim() ?? "";
+  return normalized.toLowerCase() === "head" || normalized.toLowerCase() === "detached"
+    ? ""
+    : normalized;
+}
+
+function toPublicFailure(
+  result: Extract<CloudPublishResult, { ok: false }>,
+): CloudPublishFailure {
+  return { code: result.error.code, retryable: result.error.retryable };
 }

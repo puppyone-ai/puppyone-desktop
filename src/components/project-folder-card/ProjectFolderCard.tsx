@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import type { KeyboardEvent, ReactNode } from "react";
+import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
 
 export const PROJECT_FOLDER_CARD_MIN_WIDTH = 210;
 export const PROJECT_FOLDER_CARD_MAX_SIZE = 260;
@@ -33,13 +34,14 @@ export function ProjectFolderCard({
   badge?: string | null;
   previewItems: ProjectFolderPreviewItem[];
   previewLoading?: boolean;
-  previewError?: string | null;
+  previewError?: boolean;
   emptyLabel?: string | null;
   selected?: boolean;
   footer?: ProjectFolderCardFooter;
   actions?: ReactNode;
   onSelect: () => void;
 }) {
+  const { t } = useLocalization();
   const handleKeyboardSelect = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -52,7 +54,7 @@ export function ProjectFolderCard({
       className={`desktop-project-folder-card ${selected ? "selected" : ""}`}
       role="button"
       tabIndex={0}
-      aria-label={`Open ${title}`}
+      aria-label={t("cloud.project.open", { project: bidiIsolate(title) })}
       aria-current={selected ? "page" : undefined}
       onClick={onSelect}
       onKeyDown={handleKeyboardSelect}
@@ -71,16 +73,18 @@ export function ProjectFolderCard({
             loading={previewLoading}
             error={previewError}
             emptyLabel={emptyLabel}
+            t={t}
           />
         </div>
 
-        <ProjectFolderCardFooterBar footer={footer} />
+        <ProjectFolderCardFooterBar footer={footer} t={t} />
       </div>
     </article>
   );
 }
 
 export function ProjectFolderCardSkeleton() {
+  const { t } = useLocalization();
   return (
     <div className="desktop-project-folder-card skeleton" aria-hidden="true">
       <div className="desktop-project-folder-card-tab">
@@ -95,7 +99,7 @@ export function ProjectFolderCardSkeleton() {
             </div>
           ))}
         </div>
-        <ProjectFolderCardFooterBar footer={{ updatedLabel: " " }} />
+        <ProjectFolderCardFooterBar footer={{ updatedLabel: " " }} t={t} />
       </div>
     </div>
   );
@@ -104,17 +108,19 @@ export function ProjectFolderCardSkeleton() {
 export function ProjectFolderNewCard({
   label,
   loading,
+  disabled = false,
   onClick,
 }: {
   label: string;
   loading?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       className="desktop-project-folder-new-card"
       type="button"
-      disabled={loading}
+      disabled={loading || disabled}
       aria-busy={loading || undefined}
       onClick={onClick}
     >
@@ -132,11 +138,13 @@ function ProjectFolderPreview({
   loading,
   error,
   emptyLabel,
+  t,
 }: {
   items: ProjectFolderPreviewItem[];
   loading?: boolean;
-  error?: string | null;
+  error?: boolean;
   emptyLabel?: string | null;
+  t: MessageFormatter;
 }) {
   if (items.length > 0) {
     return (
@@ -166,12 +174,18 @@ function ProjectFolderPreview({
 
   return (
     <div className="desktop-project-folder-preview-empty">
-      <p>{error ? "Preview unavailable" : emptyLabel || "Empty project"}</p>
+      <p>{error ? t("cloud.project.previewUnavailable") : emptyLabel || t("cloud.project.empty")}</p>
     </div>
   );
 }
 
-function ProjectFolderCardFooterBar({ footer }: { footer?: ProjectFolderCardFooter }) {
+function ProjectFolderCardFooterBar({
+  footer,
+  t,
+}: {
+  footer?: ProjectFolderCardFooter;
+  t: MessageFormatter;
+}) {
   const connectionCount = footer?.connectionCount ?? 0;
   return (
     <div className="desktop-project-folder-card-footer">
@@ -179,12 +193,11 @@ function ProjectFolderCardFooterBar({ footer }: { footer?: ProjectFolderCardFoot
         className={`desktop-project-folder-status-dot ${footer?.statusConnected ? "connected" : ""}`}
         aria-hidden="true"
       />
-      <span>{footer?.updatedLabel || "Recently updated"}</span>
+      <span>{footer?.updatedLabel || t("cloud.project.recentlyUpdated")}</span>
       {connectionCount > 0 && (
         <>
           <i aria-hidden="true">·</i>
-          <span>{connectionCount}</span>
-          <span>conn</span>
+          <span>{t("cloud.project.connectionCount", { count: connectionCount })}</span>
         </>
       )}
     </div>

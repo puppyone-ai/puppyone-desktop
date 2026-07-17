@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
+import { bidiIsolate, useLocalization } from "@puppyone/localization";
 import {
   checkoutWorkspaceGitBranch,
+  cancelWorkspaceGitFileDiff,
   commitAndCheckoutWorkspaceGitBranch,
   commitWorkspaceGit,
   discardAllWorkspaceGitChanges,
@@ -24,14 +26,16 @@ import type { GitCommitDetail, GitStatusSnapshot } from "../../types/electron";
 import {
   createGitOperationErrorState,
   createGitOperationMessageState,
-  formatGitOperationError,
+  classifyGitOperationError,
+  formatGitOperationErrorState,
   formatGitPreviewError,
   getGitChangeCount,
-  isBranchOverwriteError,
+  isBranchOverwriteErrorCode,
   type GitOperationErrorState,
 } from "./operationDialogs";
 import { createRepositoryRefreshReason } from "./repositoryRefreshPolicy";
 import type { GitMainPanel, GitWorkingSelection } from "./types";
+import { clearFormatAwareDiffCaches } from "./diff/core/cacheControl";
 import { useGitRepositoryLifecycle } from "./useGitRepositoryLifecycle";
 
 export type PendingBranchSwitch = {
@@ -54,6 +58,7 @@ export function useDesktopGitController({
   onWorkspaceContentChanged,
   onEnterGitView,
 }: UseDesktopGitControllerOptions) {
+  const { t } = useLocalization();
   const {
     activeGitStatus,
     gitStatus,
@@ -71,6 +76,7 @@ export function useDesktopGitController({
     reportGitStatusError,
   } = useGitRepositoryLifecycle({ workspace, onWorkspaceContentChanged });
   const historyRequestRef = useRef(0);
+  const workingDiffRequestRef = useRef(0);
   const branchSwitcherRef = useRef<HTMLDivElement>(null);
   const [selectedGitCommitId, setSelectedGitCommitId] = useState<string | null>(null);
   const [selectedGitWorkingFile, setSelectedGitWorkingFile] = useState<GitWorkingSelection | null>(null);
@@ -105,6 +111,7 @@ export function useDesktopGitController({
   }, []);
 
   useEffect(() => {
+    clearFormatAwareDiffCaches();
     setSelectedGitCommitId(null);
     setSelectedGitWorkingFile(null);
     setGitCommitDetail(null);
@@ -238,6 +245,9 @@ export function useDesktopGitController({
     }
 
     let cancelled = false;
+    const sequence = ++workingDiffRequestRef.current;
+    const requestId = `git-file-diff:${Date.now().toString(36)}:${sequence}`;
+    const sessionId = `git-diff-session:${Date.now().toString(36)}:${sequence}`;
     const scope = selectedGitWorkingFile.origin === "remote"
       ? "remote"
       : selectedGitWorkingFile.origin === "committed"
@@ -250,14 +260,17 @@ export function useDesktopGitController({
 
     setGitWorkingFileDiffLoading(true);
     setGitWorkingFileDiffError(null);
-    getWorkspaceGitFileDiff(workspace.path, selectedGitWorkingFile.path, scope)
+    getWorkspaceGitFileDiff(workspace.path, selectedGitWorkingFile.path, scope, {
+      requestId,
+      sessionId,
+    })
       .then((detail) => {
         if (!cancelled) setGitWorkingFileDiff(detail);
       })
       .catch((error) => {
         if (!cancelled) {
           setGitWorkingFileDiff(null);
-          setGitWorkingFileDiffError(formatGitPreviewError(error));
+          setGitWorkingFileDiffError(formatGitPreviewError(error, t));
         }
       })
       .finally(() => {
@@ -266,8 +279,9 @@ export function useDesktopGitController({
 
     return () => {
       cancelled = true;
+      void cancelWorkspaceGitFileDiff(requestId, sessionId).catch(() => undefined);
     };
-  }, [gitViewActive, selectedGitWorkingFile, workspace]);
+  }, [gitViewActive, selectedGitWorkingFile, t, workspace]);
 
   const runGitOperation = useCallback(async (
     label: string,
@@ -392,15 +406,17 @@ export function useDesktopGitController({
 
   const handleDiscardGitPaths = useCallback((paths: string[]) => {
     if (paths.length === 0) {
-      setGitOperationError(createGitOperationMessageState("Select a changed file to discard, or use Discard All.", "discard", workspace?.path ?? null));
+      setGitOperationError(createGitOperationMessageState("discard-selection", "discard", workspace?.path ?? null));
       return Promise.resolve(false);
     }
-    const label = paths.length === 1 ? paths[0] : `${paths.length} files`;
-    if (!window.confirm(`Discard local changes in ${label}? This cannot be undone.`)) {
+    const confirmed = paths.length === 1
+      ? window.confirm(t("source-control.dialog.discard.path", { path: bidiIsolate(paths[0]) }))
+      : window.confirm(t("source-control.dialog.discard.count", { count: paths.length }));
+    if (!confirmed) {
       return Promise.resolve(false);
     }
     return runGitOperation("discard", (rootPath) => discardWorkspaceGitPaths(rootPath, paths));
-  }, [runGitOperation, workspace]);
+  }, [runGitOperation, t, workspace]);
 
   const handleDiscardAllGitChanges = useCallback(() => {
     const discardableCount = activeGitStatus?.sourceControl.groups
@@ -410,11 +426,11 @@ export function useDesktopGitController({
       setGitOperationError(null);
       return Promise.resolve(false);
     }
-    if (!window.confirm(`Discard local changes in ${discardableCount} files? This cannot be undone.`)) {
+    if (!window.confirm(t("source-control.dialog.discard.count", { count: discardableCount }))) {
       return Promise.resolve(false);
     }
     return runGitOperation("discard", (rootPath) => discardAllWorkspaceGitChanges(rootPath));
-  }, [activeGitStatus, runGitOperation]);
+  }, [activeGitStatus, runGitOperation, t]);
 
   const handleCommitGit = useCallback(async () => {
     if (!workspace) return false;
@@ -457,11 +473,11 @@ export function useDesktopGitController({
 
     const remote = activeGitStatus?.sourceControl.remote;
     if (!remote?.target && !remote?.upstream) {
-      setGitOperationError(createGitOperationMessageState("Connect a Git remote before committing and pushing.", "commit-push", workspace.path));
+      setGitOperationError(createGitOperationMessageState("commit-push-no-remote", "commit-push", workspace.path));
       return false;
     }
     if (remote.behind > 0) {
-      setGitOperationError(createGitOperationMessageState("Pull remote changes before committing and pushing.", "commit-push", workspace.path));
+      setGitOperationError(createGitOperationMessageState("commit-push-needs-pull", "commit-push", workspace.path));
       return false;
     }
 
@@ -514,7 +530,7 @@ export function useDesktopGitController({
 
   const handleCheckoutGitBranch = useCallback(async (branchName: string, remote: boolean) => {
     if (!workspace || gitStatusPath !== workspace.path || !activeGitStatus?.isRepo) {
-      setGitOperationError(createGitOperationMessageState("Current workspace is not a Git repository.", "checkout", workspace?.path ?? null));
+      setGitOperationError(createGitOperationMessageState("workspace-not-repository", "checkout", workspace?.path ?? null));
       return false;
     }
     const context = captureGitRepositoryContext(workspace.path);
@@ -536,8 +552,8 @@ export function useDesktopGitController({
       return true;
     } catch (error) {
       if (!isGitRepositoryContextCurrent(context)) return false;
-      const formatted = formatGitOperationError(error, "checkout");
-      if (isBranchOverwriteError(formatted)) {
+      const classified = classifyGitOperationError(error, "checkout");
+      if (isBranchOverwriteErrorCode(classified.code)) {
         setPendingBranchSwitch({
           branchName,
           remote,
@@ -589,7 +605,9 @@ export function useDesktopGitController({
     } catch (error) {
       if (isGitRepositoryContextCurrent(context)) {
         setGitOperationError(createGitOperationErrorState(error, "checkout", context.rootPath));
-        setPendingBranchSwitch((current) => current ? { ...current, error: "Could not stash changes. Review changes and try again." } : current);
+        setPendingBranchSwitch((current) => current
+          ? { ...current, error: t("source-control.dialog.switch.stashFailed") }
+          : current);
       }
       return false;
     } finally {
@@ -602,6 +620,7 @@ export function useDesktopGitController({
     isGitRepositoryContextCurrent,
     onWorkspaceContentChanged,
     pendingBranchSwitch,
+    t,
     workspace,
   ]);
 
@@ -630,9 +649,11 @@ export function useDesktopGitController({
       return true;
     } catch (error) {
       if (!isGitRepositoryContextCurrent(context)) return false;
-      const formatted = formatGitOperationError(error, "commit-switch");
-      setGitOperationError(createGitOperationErrorState(error, "commit-switch", context.rootPath));
-      setPendingBranchSwitch((current) => current ? { ...current, error: formatted || "Could not commit changes." } : current);
+      const errorState = createGitOperationErrorState(error, "commit-switch", context.rootPath);
+      setGitOperationError(errorState);
+      setPendingBranchSwitch((current) => current
+        ? { ...current, error: formatGitOperationErrorState(errorState, t) }
+        : current);
       return false;
     } finally {
       if (isGitRepositoryContextCurrent(context)) setGitOperationLoading(null);
@@ -644,6 +665,7 @@ export function useDesktopGitController({
     isGitRepositoryContextCurrent,
     onWorkspaceContentChanged,
     pendingBranchSwitch,
+    t,
     workspace,
   ]);
 

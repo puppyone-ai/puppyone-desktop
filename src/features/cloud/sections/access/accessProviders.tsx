@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight, Copy, ExternalLink, Monitor, Settings, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import type { MessageFormatter } from "@puppyone/localization/core";
 import type { CloudAccessSurface } from "../../model";
 import { formatProviderLabel, normalizeProviderKey, providerIcon } from "../../utils";
 import { isGitAccessSurface, isVmAccessSurface } from "./accessSurfaceModel";
@@ -15,71 +16,71 @@ export type DesktopCloudAccessMethodMeta = {
 };
 
 type AccessProviderRegistryItem = {
-  tileProvider: "cli" | "git" | "mcp" | "vm" | "integration";
+  tileProvider: "cli" | "git" | "mcp" | "vm" | "automation";
   iconSize: number;
   icon?: LucideIcon;
-  meta: (surface: CloudAccessSurface) => DesktopCloudAccessMethodMeta;
+  meta: (surface: CloudAccessSurface, t: MessageFormatter) => DesktopCloudAccessMethodMeta;
 };
 
 const ACCESS_PROVIDER_REGISTRY: Record<string, AccessProviderRegistryItem> = {
   cli: {
     tileProvider: "cli",
     iconSize: 17,
-    meta: () => ({
-      title: "Context Drive CLI",
-      description: "Use Puppyone's scoped FS CLI to let an agent read and write this cloud drive without cloning it.",
-      actionLabel: "Configure CLI",
-      expandedActionLabel: "Hide config",
+    meta: (_surface, t) => ({
+      title: t("cloud.access.method.cli.title"),
+      description: t("cloud.access.method.cli.description"),
+      actionLabel: t("cloud.access.method.cli.action"),
+      expandedActionLabel: t("cloud.access.method.hideConfig"),
       actionIcon: <Settings size={12} />,
-      previewButtonLabel: "Copy prompt",
+      previewButtonLabel: t("cloud.common.copyPrompt"),
       previewIcon: <Copy size={14} />,
     }),
   },
   git: {
     tileProvider: "git",
     iconSize: 34,
-    meta: () => ({
-      title: "Git Remote",
-      description: "Use a native Git remote for clone, pull, commit, and push workflows.",
-      actionLabel: "View Git remote",
-      expandedActionLabel: "Hide Git remote",
+    meta: (_surface, t) => ({
+      title: t("cloud.access.surface.git.title"),
+      description: t("cloud.access.method.git.description"),
+      actionLabel: t("cloud.access.method.git.action"),
+      expandedActionLabel: t("cloud.access.method.git.hide"),
       actionIcon: <ExternalLink size={12} />,
-      previewButtonLabel: "Copy prompt",
+      previewButtonLabel: t("cloud.common.copyPrompt"),
       previewIcon: <Copy size={14} />,
     }),
   },
   mcp: {
     tileProvider: "mcp",
     iconSize: 19,
-    meta: (surface) => ({
-      title: "MCP Server",
+    meta: (surface, t) => ({
+      title: t("cloud.access.surface.mcp.title"),
       description: surface.status === "missing"
-        ? "Create a scoped Model Context Protocol endpoint for external AI clients."
-        : "Connect an MCP-compatible client to this scoped workspace.",
-      actionLabel: surface.status === "missing" ? "Create endpoint" : "Show config",
-      expandedActionLabel: "Hide config",
+        ? t("cloud.access.surface.mcp.prompt")
+        : t("cloud.access.method.mcp.connectedDescription"),
+      actionLabel: surface.status === "missing" ? t("cloud.access.method.mcp.create") : t("cloud.access.method.showConfig"),
+      expandedActionLabel: t("cloud.access.method.hideConfig"),
       actionIcon: <ChevronDown size={12} />,
-      previewButtonLabel: "View connection",
+      previewButtonLabel: t("cloud.access.method.mcp.viewConnection"),
       previewIcon: <ExternalLink size={14} />,
     }),
   },
   vm: {
     tileProvider: "vm",
     iconSize: 18,
-    meta: () => ({
-      title: "Remote Workspace",
-      description: "Add your SSH public key, then open this scope in Cursor or VS Code over Remote-SSH.",
-      actionLabel: "Add SSH key",
-      expandedActionLabel: "Hide remote",
-      actionIcon: <ChevronRight size={12} />,
-      previewButtonLabel: "Open remote",
+    meta: (_surface, t) => ({
+      title: t("cloud.access.surface.vm.title"),
+      description: t("cloud.access.surface.vm.prompt"),
+      actionLabel: t("cloud.access.method.vm.addSshKey"),
+      expandedActionLabel: t("cloud.access.method.vm.hideRemote"),
+      actionIcon: <ChevronRight className="po-directional-icon" size={12} />,
+      previewButtonLabel: t("cloud.access.method.vm.openRemote"),
       previewIcon: <ExternalLink size={14} />,
     }),
   },
 };
 
-export function getDesktopCloudAccessMethodMeta(surface: CloudAccessSurface): DesktopCloudAccessMethodMeta {
-  return getAccessProviderRegistryItem(surface.provider).meta(surface);
+export function getDesktopCloudAccessMethodMeta(surface: CloudAccessSurface, t: MessageFormatter): DesktopCloudAccessMethodMeta {
+  return getAccessProviderRegistryItem(surface.provider).meta(surface, t);
 }
 
 export function getAccessMethodTileProvider(provider: string) {
@@ -115,15 +116,15 @@ function getAccessProviderRegistryItem(provider: string): AccessProviderRegistry
   if (normalized === "mcp_endpoint") return ACCESS_PROVIDER_REGISTRY.mcp;
   if (normalized === "remote_workspace" || normalized === "sandbox") return ACCESS_PROVIDER_REGISTRY.vm;
   return ACCESS_PROVIDER_REGISTRY[normalized] ?? {
-    tileProvider: "integration",
+    tileProvider: "automation",
     iconSize: 19,
-    meta: (surface) => ({
-      title: surface.title || formatProviderLabel(surface.provider),
-      description: surface.subtitle || `${formatProviderLabel(surface.provider)} access for this scope.`,
-      actionLabel: "Open",
-      expandedActionLabel: "Hide",
-      actionIcon: <ChevronRight size={12} />,
-      previewButtonLabel: "Copy prompt",
+    meta: (surface, t) => ({
+      title: surface.title || formatProviderLabel(surface.provider, t),
+      description: surface.subtitle || t("cloud.access.method.generic.description", { provider: formatProviderLabel(surface.provider, t) }),
+      actionLabel: t("cloud.common.open"),
+      expandedActionLabel: t("cloud.common.hide"),
+      actionIcon: <ChevronRight className="po-directional-icon" size={12} />,
+      previewButtonLabel: t("cloud.common.copyPrompt"),
       previewIcon: <Copy size={14} />,
     }),
   };

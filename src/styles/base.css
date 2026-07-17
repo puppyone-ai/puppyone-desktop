@@ -33,14 +33,50 @@ button {
   font: inherit;
 }
 
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-pointer-cursors="false"]
-  :where(button, a[href], select, summary, [role="button"], input[type="button"], input[type="checkbox"], input[type="radio"], .desktop-settings-switch) {
-  cursor: default !important;
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-pointer-cursors="false"] {
+  --po-clickable-cursor: default;
 }
 
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-pointer-cursors="true"]
-  :where(button, a[href], select, summary, [role="button"], input[type="button"], input[type="checkbox"], input[type="radio"], .desktop-settings-switch) {
-  cursor: pointer !important;
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-pointer-cursors="true"] {
+  --po-clickable-cursor: pointer;
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-pointer-cursors]
+  :where(
+    button:not(:disabled),
+    a[href],
+    select:not(:disabled),
+    summary,
+    input[type="button"]:not(:disabled),
+    input[type="checkbox"]:not(:disabled),
+    input[type="file"]:not(:disabled),
+    input[type="radio"]:not(:disabled),
+    input[type="reset"]:not(:disabled),
+    input[type="submit"]:not(:disabled),
+    [role="button"]:not([aria-disabled="true"]),
+    [role="checkbox"]:not([aria-disabled="true"]),
+    [role="combobox"]:not([aria-disabled="true"]),
+    [role="link"]:not([aria-disabled="true"]),
+    [role="menuitem"]:not([aria-disabled="true"]),
+    [role="menuitemcheckbox"]:not([aria-disabled="true"]),
+    [role="menuitemradio"]:not([aria-disabled="true"]),
+    [role="option"]:not([aria-disabled="true"]),
+    [role="radio"]:not([aria-disabled="true"]),
+    [role="switch"]:not([aria-disabled="true"]),
+    [role="tab"]:not([aria-disabled="true"]),
+    [role="treeitem"]:not([aria-disabled="true"]),
+    .desktop-settings-switch:not(:has(input:disabled))
+  ) {
+  cursor: var(--po-clickable-cursor, default);
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-pointer-cursors]
+  :where(button, input, select, textarea):disabled,
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-pointer-cursors]
+  [aria-disabled="true"],
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-pointer-cursors]
+  .desktop-settings-switch:has(input:disabled) {
+  cursor: default;
 }
 
 button,
@@ -70,4 +106,28 @@ h2 {
   line-height: 1.25;
   font-weight: 650;
   letter-spacing: 0;
+}
+[dir="rtl"] .desktop-right-sidebar::before {
+  background: linear-gradient(270deg, transparent, color-mix(in srgb, var(--po-shadow) 42%, transparent));
+}
+
+[dir="rtl"] .desktop-right-sidebar-resizer {
+  transform: translateX(4px);
+}
+
+[dir="rtl"] .data-explorer-resizer {
+  transform: translateX(-4px);
+}
+
+[dir="rtl"] .po-directional-icon,
+[dir="rtl"] .desktop-cloud-directional-icon {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .po-disclosure-icon:not(.expanded) {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .desktop-cloud-scope-row.active {
+  box-shadow: inset -3px 0 0 var(--po-accent);
 }

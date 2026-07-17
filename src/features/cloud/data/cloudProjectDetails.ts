@@ -1,6 +1,6 @@
 import {
   getCloudDashboard,
-  getCloudHistory,
+  getCloudProjectReadiness,
   getCloudRepoIdentity,
   listCloudConnectors,
   listCloudMcpEndpoints,
@@ -8,15 +8,20 @@ import {
   listCloudScopes,
   type DesktopCloudConnector,
   type DesktopCloudDashboard,
-  type DesktopCloudHistory,
   type DesktopCloudMcpEndpoint,
   type DesktopCloudProject,
+  type DesktopCloudProjectReadiness,
   type DesktopCloudRepoIdentity,
   type DesktopCloudScope,
   type DesktopCloudSession,
   type DesktopCloudTree,
 } from "../../../lib/cloudApi";
+import {
+  getCloudHistory,
+  type DesktopCloudHistory,
+} from "../../../lib/cloudHistoryApi";
 import { unwrapSettled } from "../utils";
+import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
 export type CloudProjectDetailsData = {
   activeProject: DesktopCloudProject | null;
@@ -27,8 +32,22 @@ export type CloudProjectDetailsData = {
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;
-  warning: string | null;
+  readiness: DesktopCloudProjectReadiness | null;
+  warning: CloudMessageDescriptor | null;
 };
+
+export const CLOUD_PROJECT_DETAIL_RESOURCES = [
+  "dashboard",
+  "tree",
+  "history",
+  "scopes",
+  "connectors",
+  "mcp-endpoints",
+  "identity",
+  "readiness",
+] as const;
+
+export type CloudProjectDetailResource = (typeof CLOUD_PROJECT_DETAIL_RESOURCES)[number];
 
 export async function loadCloudProjectDetails({
   session,
@@ -36,13 +55,16 @@ export async function loadCloudProjectDetails({
   projects,
   onSessionChange,
   cloudApiBaseUrl,
+  resources = CLOUD_PROJECT_DETAIL_RESOURCES,
 }: {
   session: DesktopCloudSession;
   projectId: string;
   projects: DesktopCloudProject[];
   onSessionChange: (session: DesktopCloudSession | null) => void;
   cloudApiBaseUrl: string | null;
+  resources?: readonly CloudProjectDetailResource[];
 }): Promise<CloudProjectDetailsData> {
+  const requested = new Set(resources);
   const [
     dashboardResult,
     treeResult,
@@ -51,14 +73,32 @@ export async function loadCloudProjectDetails({
     connectorsResult,
     mcpResult,
     identityResult,
+    readinessResult,
   ] = await Promise.allSettled([
-    getCloudDashboard(session, projectId, onSessionChange, cloudApiBaseUrl),
-    listCloudRoot(session, projectId, onSessionChange, cloudApiBaseUrl),
-    getCloudHistory(session, projectId, 20, onSessionChange, cloudApiBaseUrl),
-    listCloudScopes(session, projectId, onSessionChange, cloudApiBaseUrl),
-    listCloudConnectors(session, projectId, onSessionChange, cloudApiBaseUrl),
-    listCloudMcpEndpoints(session, projectId, onSessionChange, cloudApiBaseUrl),
-    getCloudRepoIdentity(session, projectId, onSessionChange, cloudApiBaseUrl),
+    requested.has("dashboard")
+      ? getCloudDashboard(session, projectId, onSessionChange, cloudApiBaseUrl)
+      : Promise.resolve(null),
+    requested.has("tree")
+      ? listCloudRoot(session, projectId, onSessionChange, cloudApiBaseUrl)
+      : Promise.resolve(null),
+    requested.has("history")
+      ? getCloudHistory(session, projectId, 20, onSessionChange, cloudApiBaseUrl)
+      : Promise.resolve(null),
+    requested.has("scopes")
+      ? listCloudScopes(session, projectId, onSessionChange, cloudApiBaseUrl)
+      : Promise.resolve(null),
+    requested.has("connectors")
+      ? listCloudConnectors(session, projectId, onSessionChange, cloudApiBaseUrl)
+      : Promise.resolve(null),
+    requested.has("mcp-endpoints")
+      ? listCloudMcpEndpoints(session, projectId, onSessionChange, cloudApiBaseUrl)
+      : Promise.resolve(null),
+    requested.has("identity")
+      ? getCloudRepoIdentity(session, projectId, onSessionChange, cloudApiBaseUrl)
+      : Promise.resolve(null),
+    requested.has("readiness")
+      ? getCloudProjectReadiness(session, projectId, onSessionChange, cloudApiBaseUrl)
+      : Promise.resolve(null),
   ]);
 
   const dashboard = unwrapSettled(dashboardResult);
@@ -68,14 +108,16 @@ export async function loadCloudProjectDetails({
       : null
   );
   const sectionErrors = [
-    dashboardResult,
-    treeResult,
-    historyResult,
-    scopesResult,
-    connectorsResult,
-    mcpResult,
-    identityResult,
-  ].filter((result) => result.status === "rejected");
+    ["dashboard", dashboardResult],
+    ["tree", treeResult],
+    ["history", historyResult],
+    ["scopes", scopesResult],
+    ["connectors", connectorsResult],
+    ["mcp-endpoints", mcpResult],
+    ["identity", identityResult],
+    ["readiness", readinessResult],
+  ].filter(([resource, result]) => requested.has(resource as CloudProjectDetailResource)
+    && (result as PromiseSettledResult<unknown>).status === "rejected");
 
   return {
     activeProject,
@@ -86,8 +128,7 @@ export async function loadCloudProjectDetails({
     connectors: unwrapSettled(connectorsResult) ?? [],
     mcpEndpoints: unwrapSettled(mcpResult) ?? [],
     identity: unwrapSettled(identityResult),
-    warning: sectionErrors.length > 0
-      ? "Some Cloud project details could not be loaded. Refresh after checking the backend connection."
-      : null,
+    readiness: unwrapSettled(readinessResult),
+    warning: sectionErrors.length > 0 ? cloudMessage("project-details-partial") : null,
   };
 }

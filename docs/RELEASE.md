@@ -2,9 +2,12 @@
 
 ## Current State
 
-The repository can build unsigned macOS packages for internal testing.
-Production macOS auto-update should wait until the app is Developer ID signed
-and notarized.
+The repository has two deliberately separate macOS paths:
+
+- `npm run dist:mac` creates an explicitly unsigned, non-notarized package for internal testing.
+- the `Desktop Stable Release` workflow accepts an exact `v<package version>` tag, builds with Developer ID and hardened runtime, notarizes the app, verifies Gatekeeper and the stapled ticket, creates the canonical GitHub Release, and only then uploads the verified artifacts to the stable R2 feed.
+
+The stable path fails closed when signing, notarization, version/tag, updater, or R2 configuration is incomplete. Never publish artifacts from the internal path to the stable feed.
 
 ## Release Source Of Truth
 
@@ -70,10 +73,10 @@ desktop/internal/mac/latest
 The stable production updater feed is configured in `package.json` as:
 
 ```text
-https://updates.puppyone.ai/desktop/stable/mac
+https://updates.puppyone.ai/desktop/stable/mac/latest
 ```
 
-Use the stable path only for signed and notarized builds.
+The stable release script enforces that this path receives only signed and notarized builds.
 
 ## Internal Unsigned macOS Build
 
@@ -104,9 +107,9 @@ creating a named internal build.
 Unsigned builds are useful for team testing but are not suitable for public
 macOS auto-update.
 
-## Production macOS Signing
+## Production macOS Release
 
-Before enabling stable releases, add Apple signing and notarization secrets:
+Add these GitHub Actions secrets for Developer ID signing, Apple notarization, and R2 delivery:
 
 ```text
 CSC_LINK
@@ -114,7 +117,35 @@ CSC_KEY_PASSWORD
 APPLE_ID
 APPLE_APP_SPECIFIC_PASSWORD
 APPLE_TEAM_ID
+CLOUDFLARE_ACCOUNT_ID
+R2_ACCESS_KEY_ID
+R2_SECRET_ACCESS_KEY
 ```
 
-Then update the Electron Builder macOS config to sign and notarize production
-builds instead of using the current unsigned internal settings.
+`CSC_LINK` must contain the Developer ID Application certificate and
+`CSC_KEY_PASSWORD` must protect it. The checked-in production config explicitly
+enables hardened runtime, strict signature verification, and notarization. The
+internal build disables those settings only with command-local overrides.
+
+To release, update `package.json` to a stable semantic version, commit it, and
+push the matching tag exactly:
+
+```bash
+git tag v0.1.2
+git push origin v0.1.2
+```
+
+The stable workflow runs these guarded stages in order:
+
+```text
+build + notarize
+→ codesign / Gatekeeper / stapler verification
+→ canonical GitHub Release
+→ immutable desktop/stable/mac/v<version> R2 prefix
+→ desktop/stable/mac/latest R2 prefix
+```
+
+For a provisioned local release machine, `npm run dist:mac:release` builds and
+verifies without uploading. `npm run publish:mac:r2` re-verifies the existing
+artifacts before upload. `npm run dist:mac:publish` composes both commands, but
+the tagged GitHub workflow remains the production source of truth.

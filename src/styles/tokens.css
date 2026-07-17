@@ -18,8 +18,14 @@
   color-scheme: light;
   --font-geist-sans: "Geist Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-geist-mono: "Geist Mono", "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
-  --po-font-sans: var(--font-geist-sans);
-  --po-font-mono: var(--font-geist-mono);
+  --font-terminal-mono: "SF Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --po-font-ui: var(--font-geist-sans);
+  --po-font-content: var(--font-geist-sans);
+  --po-font-code: var(--font-geist-mono);
+  --po-font-terminal: var(--font-terminal-mono);
+  /* Compatibility aliases for feature CSS that has not yet adopted a role. */
+  --po-font-sans: var(--po-font-ui);
+  --po-font-mono: var(--po-font-code);
   --po-text-size-micro: 10px;
   --po-text-size-caption: 11px;
   --po-text-size-meta: 12px;
@@ -41,8 +47,11 @@
   --po-font-size-chrome: var(--po-text-size-body);
   --po-font-weight-chrome: var(--po-text-weight-medium);
   --desktop-control-radius: 6px;
+  --desktop-toolbar-action-radius: 5px;
   --desktop-chrome-height: 38px;
   --desktop-chrome-control-size: 30px;
+  --desktop-titlebar-control-height: 24px;
+  --desktop-titlebar-tool-action-width: 34px;
   --desktop-sidebar-control-size: var(--desktop-chrome-control-size);
   --desktop-sidebar-nav-height: calc(var(--desktop-sidebar-control-size) + 8px);
   --desktop-sidebar-nav-padding: 4px;
@@ -58,12 +67,27 @@
   --desktop-sidebar-navigation-fade-scrollbar-inset: calc(var(--desktop-sidebar-scrollbar-width) + 8px);
   --desktop-sidebar-nav-gap: 4px;
   --desktop-sidebar-toolbar-height: 46px;
-  --desktop-sidebar-toolbar-padding-left: 22px;
-  --desktop-sidebar-toolbar-padding-right: 16px;
+  --desktop-sidebar-toolbar-padding-start: 22px;
+  --desktop-sidebar-toolbar-padding-end: 16px;
   --desktop-sidebar-row-height: 30px;
   --desktop-sidebar-row-radius: 6px;
   --desktop-sidebar-row-left-gap: 12px;
   --desktop-sidebar-row-right-gap: 12px;
+  /*
+   * Shared sidebar list typography. Data explorer rows and Git working-tree
+   * rows both consume these so file-name weight/size/line-height cannot drift.
+   */
+  --desktop-sidebar-font-size: var(--po-text-size-sidebar);
+  --desktop-sidebar-font-size-meta: var(--po-text-size-meta);
+  --desktop-sidebar-section-title-font-size: var(--po-text-size-meta);
+  --desktop-sidebar-section-title-font-weight: var(--po-text-weight-medium);
+  --desktop-sidebar-section-title-line-height: 18px;
+  --desktop-sidebar-section-title-color: var(--po-text-subtle);
+  --desktop-sidebar-section-title-disabled-color: var(--po-text-disabled);
+  --desktop-sidebar-font-weight: var(--po-text-weight-medium);
+  --desktop-sidebar-font-weight-emphasis: 650;
+  --desktop-sidebar-line-height: 18px;
+  --desktop-sidebar-icon-label-gap: 4px;
   --po-scrollbar-size: 6px;
   --po-scrollbar-radius: 3px;
   --po-scrollbar-transition: 0.16s ease;
@@ -212,13 +236,18 @@
  * - Future per-region user customization = overriding exactly these tokens
  *   inline on the shell root, which beats any stylesheet rule.
  *
- * Current design: one unified content material — canvas (tool-view main
- * areas: settings, git, data, cloud pages), header, sidebar, editor, and
- * terminal all share the editor surface. Use --po-inset or explicit mixes
- * where a region needs to read as recessed.
+ * Current design: content surfaces and local-workspace chrome share one quiet
+ * material. Cloud workspaces opt into the dedicated sky-blue titlebar tokens.
+ * Use --po-inset or explicit mixes where a region needs to read as recessed.
  */
 :root,
 :where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface, .dark) {
+  /*
+   * Re-declare aliases at each appearance boundary. The role values can be
+   * supplied inline by the runtime, including future imported FontFace IDs.
+   */
+  --po-font-sans: var(--po-font-ui);
+  --po-font-mono: var(--po-font-code);
   --po-text-size-micro: 10px;
   --po-text-size-caption: 11px;
   --po-text-size-meta: 12px;
@@ -231,6 +260,19 @@
   --po-text-size-display: 24px;
   --po-code-font-size: 13px;
   --po-font-size-chrome: 13px;
+  /*
+   * Re-declare semantic sidebar aliases at the themed shell boundary. Custom
+   * properties are resolved where they are declared, so inheriting only the
+   * :root aliases would freeze them at the default scale instead of following
+   * the shell's data-text-size override.
+   */
+  --desktop-sidebar-font-size: var(--po-text-size-sidebar);
+  --desktop-sidebar-font-size-meta: var(--po-text-size-meta);
+  --desktop-sidebar-section-title-font-size: var(--po-text-size-meta);
+  --desktop-sidebar-section-title-font-weight: var(--po-text-weight-medium);
+  --desktop-sidebar-section-title-line-height: 18px;
+  --desktop-sidebar-section-title-color: var(--po-text-subtle);
+  --desktop-sidebar-section-title-disabled-color: var(--po-text-disabled);
 
   --po-surface-editor: var(--po-surface-panel);
   --po-surface-terminal: var(--po-surface-editor);
@@ -248,7 +290,22 @@
   --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
   --po-terminal-bg: var(--po-surface-terminal);
 
-  --po-header-divider: var(--po-divider);
+  /*
+   * Frame dividers define the application skeleton. Sidebar dividers are the
+   * quieter separators inside that frame. Keep them semantic so feature CSS
+   * never has to choose its own opacity.
+   */
+  --po-shell-divider: color-mix(in srgb, var(--po-text) 10%, transparent);
+  --po-sidebar-divider: color-mix(in srgb, var(--po-text) 7.5%, transparent);
+  --po-header-divider: var(--po-shell-divider);
+  --po-cloud-titlebar-bg: #dbeaf1;
+  --po-cloud-titlebar-text: #263f4b;
+  --po-cloud-titlebar-text-muted: #516b77;
+  --po-cloud-titlebar-text-disabled: #80939b;
+  --po-cloud-titlebar-hover: rgba(255, 255, 255, 0.42);
+  --po-cloud-titlebar-active: rgba(38, 63, 75, 0.09);
+  --po-cloud-titlebar-focus: rgba(58, 124, 153, 0.34);
+  --po-cloud-titlebar-divider: var(--po-shell-divider);
   --po-switch-track-on: var(--po-success);
   --po-switch-track-off: var(--po-control-hover);
   --po-project-card-tab: color-mix(in srgb, var(--po-inset) 58%, var(--po-panel) 42%);
@@ -311,11 +368,18 @@
   --po-text-disabled: #52525b;
   --po-text-inverse: #0a0a0a;
 
+  --po-cloud-titlebar-bg: #263a45;
+  --po-cloud-titlebar-text: #e4edf1;
+  --po-cloud-titlebar-text-muted: #afc1c9;
+  --po-cloud-titlebar-text-disabled: #738991;
+  --po-cloud-titlebar-hover: rgba(255, 255, 255, 0.07);
+  --po-cloud-titlebar-active: rgba(255, 255, 255, 0.12);
+  --po-cloud-titlebar-focus: rgba(119, 186, 217, 0.38);
+
   --po-border: rgba(255, 250, 242, 0.075);
   --po-border-subtle: rgba(255, 250, 242, 0.052);
   --po-border-strong: rgba(255, 250, 242, 0.13);
   --po-divider: rgba(255, 250, 242, 0.075);
-  --po-header-divider: rgba(255, 250, 242, 0.12);
   --po-skeleton-base: rgba(255, 255, 255, 0.055);
   --po-skeleton-shimmer: rgba(255, 255, 255, 0.08);
   --po-skeleton-edge: rgba(255, 255, 255, 0.025);
@@ -599,7 +663,6 @@
   --po-border-subtle: rgba(255, 226, 191, 0.065);
   --po-border-strong: rgba(255, 226, 191, 0.17);
   --po-divider: rgba(255, 226, 191, 0.09);
-  --po-header-divider: rgba(255, 226, 191, 0.13);
   --po-hover: rgba(255, 226, 191, 0.06);
   --po-active: rgba(255, 226, 191, 0.095);
   --po-selected: rgba(255, 226, 191, 0.115);

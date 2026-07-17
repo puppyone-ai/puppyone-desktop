@@ -1,141 +1,70 @@
-import type { Workspace } from "@puppyone/shared-ui";
-import {
-  getWorkspaceGitStatus,
-  readPuppyoneWorkspaceConfig,
-} from "../../../lib/localFiles";
-import type {
-  DesktopCloudProject,
-  DesktopCloudSession,
-} from "../../../lib/cloudApi";
-import type { GitStatusSnapshot } from "../../../types/electron";
-import { getPuppyoneRemote } from "../../source-control/remotes";
-import { resolveMappedCloudProjectId } from "./resolveMappedCloudProjectId";
 import type { RecentWorkspaceHomeItem } from "../../../components/MinimalOnboarding";
+import {
+  getCloudRepositoryContext,
+  getCloudProjectReadiness,
+  type DesktopCloudProject,
+  type DesktopCloudProjectReadiness,
+  type DesktopCloudSession,
+} from "../../../lib/cloudApi";
+import type { RepositoryTarget } from "../repositoryTarget";
+import { repositoryTargetMatchesRemote } from "../repositoryTarget";
+import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
+import { isTrustedCloudGitOrigin } from "./workspaceGitRemote";
 
-export type RecentWorkspaceCloudBinding = {
+export type RecentWorkspaceCloudContext = {
   projectId: string | null;
-  cloudLinked: boolean;
-  error: string | null;
+  resolutionKey?: string;
+  resolutionPending?: boolean;
+  hasCloudRemote: boolean;
+  error: CloudMessageDescriptor | null;
+  reason?:
+    | "not-authorized"
+    | "unresolvable"
+    | "network"
+    | "wrong-account"
+    | "wrong-host"
+    | "locator-conflict"
+    | "not-found"
+    | null;
+  target?: RepositoryTarget | null;
+  scopePath?: string | null;
+  readiness?: DesktopCloudProjectReadiness | null;
+  candidateProjectId?: string | null;
+  capabilities?: string[];
 };
 
-export const CLOUD_PROJECT_MAPPING_ERROR = "This workspace has a Puppyone Cloud Git remote, but Desktop could not match it to a Cloud project root scope.";
+export const CLOUD_PROJECT_NOT_AUTHORIZED_MESSAGE = cloudMessage("remote-not-authorized");
+export const CLOUD_PROJECT_UNRESOLVABLE_MESSAGE = cloudMessage("remote-unresolvable");
+export const CLOUD_PROJECT_MAPPING_ERROR = CLOUD_PROJECT_UNRESOLVABLE_MESSAGE;
 
-function normalizeCloudProjectCandidate(value: string | null | undefined) {
-  return (value ?? "")
-    .trim()
-    .replace(/\.git$/i, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
-}
-
-function basenameFromPath(path: string | null | undefined) {
-  const normalized = (path ?? "").trim().replace(/[\\/]+$/g, "");
-  if (!normalized) return "";
-  return normalized.split(/[\\/]/).pop() ?? "";
-}
-
-function repoNameFromRemoteUrl(rawUrl: string | null | undefined) {
-  const remote = (rawUrl ?? "").trim();
-  if (!remote) return "";
-  try {
-    const url = new URL(remote);
-    return basenameFromPath(url.pathname);
-  } catch {
-    const match = remote.match(/[:/]([^/:]+?)(?:\.git)?$/);
-    return match?.[1] ?? "";
-  }
-}
-
-function getCloudProjectCandidateNames(workspace: Workspace | null, status: GitStatusSnapshot | null) {
-  const candidates = new Set<string>();
-  const add = (value: string | null | undefined) => {
-    const normalized = normalizeCloudProjectCandidate(value);
-    if (normalized) candidates.add(normalized);
-  };
-
-  add(workspace?.name);
-  add(basenameFromPath(workspace?.path));
-  for (const remote of status?.remotes ?? []) {
-    const fetchRepo = repoNameFromRemoteUrl(remote.fetchUrl);
-    const pushRepo = repoNameFromRemoteUrl(remote.pushUrl);
-    if (!fetchRepo.startsWith("cli_")) add(fetchRepo);
-    if (!pushRepo.startsWith("cli_")) add(pushRepo);
-  }
-  return candidates;
-}
-
-function filterCandidateCloudProjects({
-  projects,
-  status,
-  workspace,
+export function shouldLoadCloudProjectCatalog({
+  hasOpenWorkspace,
+  workspaceIsCloud,
+  workspaceRestoring = false,
 }: {
-  projects: DesktopCloudProject[];
-  status: GitStatusSnapshot | null;
-  workspace: Workspace | null;
-}) {
-  const candidateNames = getCloudProjectCandidateNames(workspace, status);
-  if (candidateNames.size === 0) return [];
-  return projects.filter((project) => (
-    candidateNames.has(normalizeCloudProjectCandidate(project.name))
-  ));
+  hasOpenWorkspace: boolean;
+  workspaceIsCloud: boolean;
+  workspaceRestoring?: boolean;
+}): boolean {
+  return !workspaceRestoring && (!hasOpenWorkspace || workspaceIsCloud);
 }
 
-export async function resolveWorkspaceCloudProjectId({
-  activeGitStatus,
-  apiBaseUrl,
-  configuredProjectId,
-  onSessionChange,
-  projects,
-  session,
-  workspace,
-}: {
-  activeGitStatus: GitStatusSnapshot | null;
-  apiBaseUrl: string | null;
-  configuredProjectId: string | null;
-  onSessionChange: (session: DesktopCloudSession | null) => void;
-  projects: DesktopCloudProject[];
-  session: DesktopCloudSession;
-  workspace: Workspace | null;
-}) {
-  const cloudRemote = getPuppyoneRemote(activeGitStatus);
-  if (!cloudRemote) return configuredProjectId;
-
-  const candidateProjects = filterCandidateCloudProjects({
-    projects,
-    status: activeGitStatus,
-    workspace,
-  });
-  const preferredProjects = candidateProjects.length > 0 ? candidateProjects : projects;
-  let projectId = await resolveMappedCloudProjectId({
-    session,
-    projects: preferredProjects,
-    cloudRemote,
-    configuredProjectId,
-    onSessionChange,
-    cloudApiBaseUrl: apiBaseUrl,
-    requireRootScope: true,
-    maxProjectScan: preferredProjects.length,
-  });
-  if (projectId || candidateProjects.length === 0) return projectId;
-
-  projectId = await resolveMappedCloudProjectId({
-    session,
-    projects,
-    cloudRemote,
-    configuredProjectId,
-    onSessionChange,
-    cloudApiBaseUrl: apiBaseUrl,
-    requireRootScope: true,
-    maxProjectScan: projects.length,
-  });
-  return projectId;
+function errorStatus(error: unknown): number | null {
+  return error && typeof error === "object" && "status" in error
+    ? Number((error as { status?: unknown }).status) || null
+    : null;
 }
 
-export async function resolveRecentWorkspaceCloudBinding({
+export function isRetryableCloudFailure(status: number | null): boolean {
+  return status == null || status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+/** Resolve a recent-workspace badge from its secret-free canonical Git hint. */
+export async function resolveRecentWorkspaceCloudContext({
   apiBaseUrl,
   item,
   onSessionChange,
-  projects,
+  projects: _projects,
   session,
 }: {
   apiBaseUrl: string | null;
@@ -143,73 +72,96 @@ export async function resolveRecentWorkspaceCloudBinding({
   onSessionChange: (session: DesktopCloudSession | null) => void;
   projects: DesktopCloudProject[];
   session: DesktopCloudSession | null;
-}): Promise<[string, RecentWorkspaceCloudBinding]> {
-  const rootPath = item.workspace.path;
-  let configuredProjectId: string | null = null;
-  let configError: string | null = null;
-  try {
-    const config = await readPuppyoneWorkspaceConfig(rootPath);
-    configuredProjectId = config.cloud.projectId?.trim() || null;
-  } catch (error) {
-    configError = error instanceof Error ? error.message : String(error);
-  }
-
-  if (configuredProjectId) {
-    return [item.workspace.id, {
-      projectId: configuredProjectId,
-      cloudLinked: true,
-      error: configError,
-    }];
-  }
-
-  const gitStatusResult = await getWorkspaceGitStatus(rootPath).catch(() => null);
-  const cloudRemote = gitStatusResult ? getPuppyoneRemote(gitStatusResult) : null;
-
-  if (!cloudRemote) {
+}): Promise<[string, RecentWorkspaceCloudContext]> {
+  const remote = item.workspace.puppyoneGitRemote ?? null;
+  if (!remote) {
     return [item.workspace.id, {
       projectId: null,
-      cloudLinked: false,
-      error: configError,
+      hasCloudRemote: false,
+      error: null,
+      reason: null,
     }];
   }
 
-  if (session) {
-    try {
-      const projectId = await resolveWorkspaceCloudProjectId({
-        activeGitStatus: gitStatusResult,
-        apiBaseUrl,
-        configuredProjectId,
-        onSessionChange,
-        projects,
-        session,
-        workspace: item.workspace,
-      });
-      return [item.workspace.id, {
-        projectId,
-        cloudLinked: Boolean(projectId),
-        error: null,
-      }];
-    } catch (error) {
-      return [item.workspace.id, {
-        projectId: configuredProjectId,
-        cloudLinked: Boolean(configuredProjectId),
-        error: error instanceof Error ? error.message : String(error),
-      }];
-    }
+  if (!isTrustedCloudGitOrigin(remote.origin, apiBaseUrl ?? session?.api_base_url)) {
+    return [item.workspace.id, {
+      projectId: null,
+      candidateProjectId: remote.projectId,
+      hasCloudRemote: true,
+      error: cloudMessage("remote-wrong-host", { origin: remote.origin }),
+      reason: "wrong-host",
+    }];
+  }
+  if (!session) {
+    return [item.workspace.id, {
+      projectId: null,
+      candidateProjectId: remote.projectId,
+      hasCloudRemote: true,
+      error: cloudMessage("remote-sign-in"),
+      reason: "wrong-account",
+    }];
   }
 
-  const remoteProjectId = cloudRemote.info.kind === "project"
-    ? cloudRemote.info.projectId?.trim() || null
-    : null;
-  return [item.workspace.id, {
-    projectId: remoteProjectId ?? configuredProjectId,
-    cloudLinked: Boolean(remoteProjectId ?? configuredProjectId),
-    error: null,
-  }];
-}
-
-export function getPuppyoneRemoteProjectId(status: GitStatusSnapshot | null): string | null {
-  const cloudRemote = getPuppyoneRemote(status);
-  if (cloudRemote?.info.kind !== "project") return null;
-  return cloudRemote.info.projectId?.trim() || null;
+  const target: RepositoryTarget = remote.scopeId
+    ? { kind: "scope", project_id: remote.projectId, scope_id: remote.scopeId }
+    : { kind: "project_root", project_id: remote.projectId };
+  try {
+    const context = await getCloudRepositoryContext(
+      session, remote.projectId, target, onSessionChange, apiBaseUrl,
+    );
+    if (
+      context.project.id !== remote.projectId
+      || !repositoryTargetMatchesRemote(context.target, {
+        kind: remote.scopeId ? "scope" : "project",
+        projectId: remote.projectId,
+        ...(remote.scopeId ? { scopeId: remote.scopeId } : {}),
+      })
+    ) {
+      return [item.workspace.id, {
+        projectId: null,
+        candidateProjectId: remote.projectId,
+        hasCloudRemote: true,
+        error: cloudMessage("remote-response-mismatch"),
+        reason: "locator-conflict",
+      }];
+    }
+    const readiness = await getCloudProjectReadiness(
+      session, context.project.id, onSessionChange, apiBaseUrl,
+    );
+    return [item.workspace.id, {
+      projectId: context.project.id,
+      target: context.target,
+      scopePath: context.scope_path ?? null,
+      readiness,
+      capabilities: context.project.capabilities ?? [],
+      hasCloudRemote: true,
+      error: null,
+      reason: null,
+    }];
+  } catch (error) {
+    const status = errorStatus(error);
+    return [item.workspace.id, {
+      projectId: null,
+      candidateProjectId: remote.projectId,
+      hasCloudRemote: true,
+      error: status === 401
+        ? cloudMessage("remote-sign-in")
+        : status === 403
+          ? cloudMessage("remote-not-authorized")
+          : status === 404
+            ? cloudMessage("remote-not-found")
+            : cloudMessage(
+                isRetryableCloudFailure(status) ? "remote-network-failed" : "remote-unresolvable",
+                undefined,
+                error instanceof Error ? error.message : String(error),
+              ),
+      reason: status === 401
+        ? "wrong-account"
+        : status === 403
+          ? "not-authorized"
+          : status === 404
+            ? "not-found"
+            : isRetryableCloudFailure(status) ? "network" : "unresolvable",
+    }];
+  }
 }

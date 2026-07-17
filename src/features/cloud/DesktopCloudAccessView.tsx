@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Filter, Search } from "lucide-react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
+import { SidebarRoot, SidebarScrollArea } from "@puppyone/shared-ui";
 import {
   openCloudApp,
-  type DesktopCloudConnector,
   type DesktopCloudSession,
 } from "../../lib/cloudApi";
-import { getCloudAccessFilterDescriptor, type CloudAccessFilter } from "./accessFilters";
+import type { CloudAccessFilter } from "./accessFilters";
 import { CloudProjectBrowserSignedOut } from "./components/ProjectBrowser";
 import { CloudWorkspaceLoadingState } from "./components/shared";
 import type { DesktopCloudAccessDataState } from "./data/useDesktopCloudAccessData";
 import { getCloudRouteWebPath } from "./routes/cloudRoutes";
+import { formatCloudMessage } from "./cloudPresentation";
 import { CloudAccessSection } from "./sections/access/AccessSection";
 import {
   DesktopCloudProviderIcon,
@@ -20,13 +23,9 @@ import {
 import { isCloudAccessNavigationResource, type CloudAccessSurfaceRow } from "./sections/access/accessRows";
 import type { CloudWorkspaceSection } from "./types";
 import {
-  formatProviderLabel,
-  getCloudProviderIconUrl,
   getScopeDisplayName,
   getScopePathLabel,
-  isCloudIntegrationConnector,
   isConnectorActiveStatus,
-  providerIcon,
 } from "./utils";
 
 export function DesktopCloudAccessView({
@@ -35,7 +34,6 @@ export function DesktopCloudAccessView({
   accessData,
   activeFilter,
   activeAccessRowId,
-  activeIntegrationProvider,
   sessionRestoring,
   onCloudSessionChange,
   onRefresh,
@@ -46,12 +44,12 @@ export function DesktopCloudAccessView({
   accessData: DesktopCloudAccessDataState;
   activeFilter: CloudAccessFilter;
   activeAccessRowId: string | null;
-  activeIntegrationProvider?: string | null;
   sessionRestoring: boolean;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onRefresh: () => void | Promise<void>;
   onSelectAccessRow?: (rowId: string | null) => void;
 }) {
+  const { t } = useLocalization();
   const cloudApiBaseUrl = cloudSession?.api_base_url ?? null;
   const accessNavigationRows = accessData.accessRows.filter(isCloudAccessNavigationResource);
   const selectedAccessRowId = activeAccessRowId ?? accessNavigationRows[0]?.id ?? null;
@@ -60,7 +58,7 @@ export function DesktopCloudAccessView({
     return (
       <div className="desktop-cloud-main-view">
         <div className="desktop-cloud-page-shell">
-          <CloudWorkspaceLoadingState label="Loading Cloud session" />
+          <CloudWorkspaceLoadingState label={t("cloud.loading.session")} />
         </div>
       </div>
     );
@@ -86,17 +84,17 @@ export function DesktopCloudAccessView({
     return (
       <div className="desktop-cloud-main-view">
         <div className="desktop-cloud-page-shell">
-          <div className="desktop-cloud-main-alert">No Cloud project is active.</div>
+          <div className="desktop-cloud-main-alert">{t("cloud.project.noneActive")}</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`desktop-cloud-main-view desktop-cloud-access-main-view ${activeFilter === "integrations" ? "desktop-cloud-integrations-main-view" : ""}`}>
-      <div className={`desktop-cloud-page-shell desktop-cloud-access-page-shell ${activeFilter === "integrations" ? "desktop-cloud-integrations-page-shell" : ""}`}>
-        {accessData.error && <div className="desktop-cloud-main-alert">{accessData.error}</div>}
-        {accessData.warning && <div className="desktop-cloud-main-alert">{accessData.warning}</div>}
+    <div className="desktop-cloud-main-view desktop-cloud-access-main-view">
+      <div className="desktop-cloud-page-shell desktop-cloud-access-page-shell">
+        {accessData.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(accessData.error, t)}</div>}
+        {accessData.warning && <div className="desktop-cloud-main-alert">{formatCloudMessage(accessData.warning, t)}</div>}
         <CloudAccessSection
           projectId={projectId}
           cloudSession={cloudSession}
@@ -104,18 +102,16 @@ export function DesktopCloudAccessView({
           identity={accessData.identity}
           scopes={accessData.scopeRows}
           connectors={accessData.connectors}
-          connectorsByScope={accessData.connectorsByScope}
+          connectorsByTarget={accessData.connectorsByTarget}
           mcpEndpoints={accessData.mcpEndpoints}
-          mcpEndpointsByScope={accessData.mcpEndpointsByScope}
+          mcpEndpointsByTarget={accessData.mcpEndpointsByTarget}
           filter={activeFilter}
           activeAccessRowId={selectedAccessRowId}
-          integrationProviderFilter={activeIntegrationProvider ?? null}
           loading={accessData.loading}
           onCloudSessionChange={onCloudSessionChange}
           onRefresh={accessData.reload}
           onSelectAccessRow={onSelectAccessRow}
           onOpenProject={handleOpenProject}
-          onOpenIntegrations={handleOpenIntegrations}
           sidebarOwnsHeader={activeFilter === "all"}
         />
       </div>
@@ -132,6 +128,8 @@ export function DesktopCloudAccessSidebar({
   activeAccessRowId: string | null;
   onSelectAccessRow: (rowId: string | null) => void;
 }) {
+  const localization = useLocalization();
+  const { formatNumber, locale, t } = localization;
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -140,26 +138,26 @@ export function DesktopCloudAccessSidebar({
     [accessData.accessRows],
   );
   const filteredRows = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = query.trim().toLocaleLowerCase(locale);
     return resourceRows.filter((row) => {
-      const meta = getDesktopCloudAccessMethodMeta(row.surface);
+      const meta = getDesktopCloudAccessMethodMeta(row.surface, t);
       const active = isConnectorActiveStatus(row.surface.status);
       if (filter === "active" && !active) return false;
       if (filter === "inactive" && active) return false;
       if (!normalizedQuery) return true;
-      return `${meta.title} ${row.surface.title} ${row.surface.provider} ${getScopeDisplayName(row.scope)} ${getScopePathLabel(row.scope)} ${row.scope.path ?? ""}`
-        .toLowerCase()
+      return `${meta.title} ${row.surface.title} ${row.surface.provider} ${getScopeDisplayName(row.scope, t)} ${getScopePathLabel(row.scope)} ${row.scope.path ?? ""}`
+        .toLocaleLowerCase(locale)
         .includes(normalizedQuery);
     });
-  }, [filter, query, resourceRows]);
+  }, [filter, locale, query, resourceRows, t]);
   const selectedAccessRowId = activeAccessRowId ?? resourceRows[0]?.id ?? null;
 
   return (
-    <section className="desktop-tool-sidebar desktop-cloud-service-sidebar desktop-cloud-access-scope-sidebar">
+    <SidebarRoot className="desktop-cloud-service-sidebar desktop-cloud-access-scope-sidebar">
       <div className="desktop-cloud-access-sidebar-page-header">
         <div className="desktop-cloud-access-page-title-group">
-          <span className="desktop-cloud-access-page-title">Access</span>
-          <span className="desktop-cloud-access-count-badge">{accessData.loading ? 0 : resourceRows.length}</span>
+          <span className="desktop-cloud-access-page-title">{t("cloud.route.access.title")}</span>
+          <span className="desktop-cloud-access-count-badge">{formatNumber(accessData.loading ? 0 : resourceRows.length)}</span>
         </div>
       </div>
       <div className="desktop-cloud-access-scope-sidebar-toolbar">
@@ -168,14 +166,14 @@ export function DesktopCloudAccessSidebar({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search access"
+            placeholder={t("cloud.access.search")}
           />
         </label>
         <div className="desktop-cloud-access-filter-wrap">
           <button
             className={`desktop-cloud-access-filter-button ${filter !== "all" || filterOpen ? "active" : ""}`}
             type="button"
-            aria-label="Filter access"
+            aria-label={t("cloud.access.filterAria")}
             aria-expanded={filterOpen}
             onClick={() => setFilterOpen((open) => !open)}
           >
@@ -193,7 +191,7 @@ export function DesktopCloudAccessSidebar({
                     setFilterOpen(false);
                   }}
                 >
-                  <span>{item === "all" ? "All access" : item === "active" ? "Active" : "Inactive"}</span>
+                  <span>{t(`cloud.access.filterState.${item}`)}</span>
                   {filter === item && <span aria-hidden="true">✓</span>}
                 </button>
               ))}
@@ -201,11 +199,11 @@ export function DesktopCloudAccessSidebar({
           )}
         </div>
       </div>
-      <div className="desktop-tool-sidebar-list desktop-cloud-sidebar-list desktop-cloud-access-scope-list" role="listbox" aria-label="Cloud access resources">
+      <SidebarScrollArea className="desktop-cloud-sidebar-list desktop-cloud-access-scope-list" role="listbox" aria-label={t("cloud.access.resources")}>
         {accessData.loading && filteredRows.length === 0 ? (
-          <div className="desktop-cloud-access-scope-empty">Loading access</div>
+          <div className="desktop-cloud-access-scope-empty">{t("cloud.access.loading")}</div>
         ) : filteredRows.length === 0 ? (
-          <div className="desktop-cloud-access-scope-empty">No matching access.</div>
+          <div className="desktop-cloud-access-scope-empty">{t("cloud.access.noMatches")}</div>
         ) : filteredRows.map((row) => (
           <DesktopCloudAccessResourceRow
             key={row.id}
@@ -214,85 +212,8 @@ export function DesktopCloudAccessSidebar({
             onSelect={() => onSelectAccessRow(row.id)}
           />
         ))}
-      </div>
-    </section>
-  );
-}
-
-export function DesktopCloudIntegrationsSidebar({
-  accessData,
-  activeProvider,
-  onSelectProvider,
-}: {
-  accessData: DesktopCloudAccessDataState;
-  activeProvider: string | null;
-  onSelectProvider: (provider: string | null) => void;
-}) {
-  const integrations = getCloudAccessFilterDescriptor("integrations");
-  const IntegrationsIcon = integrations.icon;
-  const integrationConnectors = accessData.connectors.filter(isCloudIntegrationConnector);
-  const providerGroups = getIntegrationSidebarProviderGroups(integrationConnectors);
-  const providerKey = providerGroups.map((group) => group.provider).join("|");
-
-  useEffect(() => {
-    if (activeProvider && !providerKey.split("|").includes(activeProvider)) {
-      onSelectProvider(null);
-    }
-  }, [activeProvider, onSelectProvider, providerKey]);
-
-  return (
-    <section className="desktop-tool-sidebar desktop-cloud-service-sidebar desktop-cloud-integrations-type-sidebar">
-      <div className="desktop-tool-sidebar-list desktop-cloud-sidebar-list">
-        <nav className="desktop-cloud-sidebar-nav" aria-label="Cloud integrations">
-          <button
-            className={`desktop-tool-sidebar-row desktop-cloud-sidebar-nav-row ${activeProvider ? "" : "active"}`}
-            type="button"
-            aria-current={activeProvider ? undefined : "page"}
-            onClick={() => onSelectProvider(null)}
-          >
-            <span className="desktop-cloud-sidebar-nav-icon">
-              <IntegrationsIcon size={15} />
-            </span>
-            <span className="desktop-cloud-sidebar-nav-label">All Integrations</span>
-            {integrationConnectors.length > 0 && (
-              <span className="desktop-cloud-sidebar-nav-count">{integrationConnectors.length}</span>
-            )}
-          </button>
-          <div className="desktop-cloud-integrations-nav-group">
-            {providerGroups.map((group) => {
-              const Icon = providerIcon(group.provider);
-              const iconUrl = getCloudProviderIconUrl(group.provider);
-              const active = activeProvider === group.provider;
-              return (
-                <button
-                  className={`desktop-tool-sidebar-row desktop-cloud-sidebar-nav-row desktop-cloud-integrations-provider-row ${active ? "active" : ""}`}
-                  key={group.provider}
-                  type="button"
-                  aria-current={active ? "page" : undefined}
-                  title={group.label}
-                  onClick={() => onSelectProvider(group.provider)}
-                >
-                  <span className="desktop-cloud-sidebar-nav-icon">
-                    {iconUrl ? <img src={iconUrl} alt="" /> : <Icon size={14} />}
-                  </span>
-                  <span className="desktop-cloud-sidebar-nav-label">{group.label}</span>
-                  <span className="desktop-cloud-sidebar-nav-count">{group.connectors.length}</span>
-                </button>
-              );
-            })}
-            {accessData.loading && providerGroups.length === 0 && (
-              <div className="desktop-cloud-integrations-nav-empty" role="status">Loading integrations</div>
-            )}
-            {!accessData.loading && accessData.error && (
-              <div className="desktop-cloud-integrations-nav-empty" role="status">{accessData.error}</div>
-            )}
-            {!accessData.loading && !accessData.error && providerGroups.length === 0 && (
-              <div className="desktop-cloud-integrations-nav-empty">No active integrations</div>
-            )}
-          </div>
-        </nav>
-      </div>
-    </section>
+      </SidebarScrollArea>
+    </SidebarRoot>
   );
 }
 
@@ -305,7 +226,8 @@ function DesktopCloudAccessResourceRow({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const meta = getDesktopCloudAccessMethodMeta(row.surface);
+  const { t } = useLocalization();
+  const meta = getDesktopCloudAccessMethodMeta(row.surface, t);
   const scopePath = getScopePathLabel(row.scope);
   const active = isConnectorActiveStatus(row.surface.status);
   const tileProvider = getAccessMethodTileProvider(row.surface.provider);
@@ -317,7 +239,7 @@ function DesktopCloudAccessResourceRow({
       type="button"
       role="option"
       aria-selected={selected}
-      title={`${meta.title} · ${getScopeDisplayName(row.scope)} · ${scopePath}`}
+      title={`${meta.title} · ${bidiIsolate(getScopeDisplayName(row.scope, t))} · ${bidiIsolate(scopePath)}`}
       onClick={onSelect}
     >
       <span className={`desktop-cloud-access-resource-icon ${tileProvider}`} aria-hidden="true">
@@ -334,30 +256,6 @@ function DesktopCloudAccessResourceRow({
   );
 }
 
-function getIntegrationSidebarProviderGroups(connectors: DesktopCloudConnector[]) {
-  const groups = new Map<string, {
-    provider: string;
-    label: string;
-    connectors: DesktopCloudConnector[];
-  }>();
-
-  for (const connector of connectors) {
-    const group = groups.get(connector.provider) ?? {
-      provider: connector.provider,
-      label: formatProviderLabel(connector.provider),
-      connectors: [],
-    };
-    group.connectors.push(connector);
-    groups.set(connector.provider, group);
-  }
-
-  return [...groups.values()].sort((left, right) => left.label.localeCompare(right.label));
-}
-
 function handleOpenProject(projectId: string, section: CloudWorkspaceSection = "access") {
   openCloudApp(getCloudRouteWebPath(section, projectId));
-}
-
-function handleOpenIntegrations(projectId: string) {
-  openCloudApp(`/projects/${encodeURIComponent(projectId)}/workflows`);
 }

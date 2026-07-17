@@ -4,18 +4,20 @@
 // This is the "端" (desktop/local) side of the product: create/read/write/rename/
 // move/copy/delete/import + the path-containment security boundaries.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { chmod, mkdtemp, rm, mkdir, writeFile, readFile, stat, symlink, lstat } from "node:fs/promises";
+import { chmod, mkdtemp, rm, mkdir, writeFile, readFile, stat, symlink, lstat, realpath, rename } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
   workspaceFromPath,
   listFolderChildren,
+  openWorkspaceFileRangeStream,
   readWorkspaceFile,
   readWorkspaceTextFile,
   convertWorkspaceOfficeDocumentToDocx,
   writeWorkspaceTextFile,
   createWorkspaceEntry,
   renameWorkspaceEntry,
+  resolveExistingWorkspaceDisplayPath,
   moveWorkspaceEntry,
   copyWorkspaceEntry,
   deleteWorkspaceEntry,
@@ -40,7 +42,7 @@ afterEach(async () => {
 describe("workspaceFromPath", () => {
   it("returns identity for a real folder", async () => {
     const ws = await workspaceFromPath(root);
-    expect(ws.path).toBe(path.resolve(root));
+    expect(ws.path).toBe(await realpath(root));
     expect(ws.name).toBe(path.basename(root));
     expect(ws.status).toBe("protected");
     expect(ws.cloudState).toBe("local");
@@ -52,6 +54,20 @@ describe("workspaceFromPath", () => {
     const a = await workspaceFromPath(root);
     const b = await workspaceFromPath(root);
     expect(a.id).toBe(b.id);
+  });
+
+  it("does not mutate an uninitialized folder and preserves instance identity across a rename", async () => {
+    const before = await workspaceFromPath(root);
+    await expect(lstat(path.join(root, ".puppyone"))).rejects.toMatchObject({ code: "ENOENT" });
+    const moved = `${root}-moved`;
+    await rename(root, moved);
+    root = moved;
+
+    const after = await workspaceFromPath(root);
+    expect(after.workspaceInstanceId).toBe(before.workspaceInstanceId);
+    expect(after.id).toBe(before.id);
+    expect(after).not.toHaveProperty("projectId");
+    await expect(lstat(path.join(root, ".puppyone"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("rejects a file path (not a folder)", async () => {
@@ -124,8 +140,63 @@ describe("read / write round-trips", () => {
 
   it("updates content via writeWorkspaceTextFile", async () => {
     await createWorkspaceEntry(root, { parentPath: null, name: "c.txt", kind: "file", content: "old" });
-    await writeWorkspaceTextFile(root, "c.txt", "new content");
-    expect((await readWorkspaceTextFile(root, "c.txt")).content).toBe("new content");
+    const before = await readWorkspaceTextFile(root, "c.txt");
+    const result = await writeWorkspaceTextFile(root, "c.txt", "new content", {
+      expectedVersion: before.version,
+    });
+    const after = await readWorkspaceTextFile(root, "c.txt");
+    expect(after.content).toBe("new content");
+    expect(result.version).toBe(after.version);
+    expect(after.version).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  it("rejects a stale conditional write instead of overwriting an external edit", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "conflict.txt", kind: "file", content: "base" });
+    const opened = await readWorkspaceTextFile(root, "conflict.txt");
+    await writeFile(path.join(root, "conflict.txt"), "external", "utf8");
+
+    await expect(writeWorkspaceTextFile(root, "conflict.txt", "stale editor", {
+      expectedVersion: opened.version,
+    })).rejects.toThrow(/changed outside PuppyOne/i);
+    expect(await readFile(path.join(root, "conflict.txt"), "utf8")).toBe("external");
+  });
+
+  it("serializes same-path writers so one stale concurrent commit cannot win", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "concurrent.txt", kind: "file", content: "base" });
+    const opened = await readWorkspaceTextFile(root, "concurrent.txt");
+
+    const first = writeWorkspaceTextFile(root, "concurrent.txt", "first", {
+      expectedVersion: opened.version,
+    });
+    const second = writeWorkspaceTextFile(root, "concurrent.txt", "second", {
+      expectedVersion: opened.version,
+    });
+    const [firstResult, secondResult] = await Promise.allSettled([first, second]);
+
+    const results = [firstResult, secondResult];
+    expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
+    expect(results.filter(({ status }) => status === "rejected")).toHaveLength(1);
+    const rejected = results.find(({ status }) => status === "rejected");
+    if (rejected?.status === "rejected") {
+      expect(String(rejected.reason)).toMatch(/changed outside PuppyOne/i);
+    }
+    const winningContent = firstResult.status === "fulfilled" ? "first" : "second";
+    expect(await readFile(path.join(root, "concurrent.txt"), "utf8")).toBe(winningContent);
+  });
+
+  it("preserves local file mode across atomic replacement", async () => {
+    if (process.platform === "win32") return;
+    await createWorkspaceEntry(root, { parentPath: null, name: "mode.txt", kind: "file", content: "base" });
+    const filePath = path.join(root, "mode.txt");
+    // 0666 is deliberately broader than the common 0022 process umask.
+    await chmod(filePath, 0o666);
+    const opened = await readWorkspaceTextFile(root, "mode.txt");
+
+    await writeWorkspaceTextFile(root, "mode.txt", "updated", {
+      expectedVersion: opened.version,
+    });
+
+    expect((await stat(filePath)).mode & 0o777).toBe(0o666);
   });
 
   it("rejects non-string write content", async () => {
@@ -148,6 +219,47 @@ describe("read / write round-trips", () => {
     expect(out.end).toBe(5);
     expect(out.size).toBe(26);
     expect(out.bytes.toString("utf8")).toBe("cdef");
+  });
+
+  it("resolves one unique Unicode-space display alias but keeps exact names authoritative", async () => {
+    await mkdir(path.join(root, "asserts"));
+    const asciiName = "Screenshot 10.07.43 PM.png";
+    const narrowName = "Screenshot 10.25.51\u202fPM.png";
+    await writeFile(path.join(root, "asserts", asciiName), "ascii");
+    await writeFile(path.join(root, "asserts", narrowName), "narrow");
+
+    await expect(resolveExistingWorkspaceDisplayPath(
+      root,
+      "asserts/Screenshot 10.25.51 PM.png",
+    )).resolves.toBe(await realpath(path.join(root, "asserts", narrowName)));
+    await expect(resolveExistingWorkspaceDisplayPath(
+      root,
+      `asserts/${asciiName}`,
+    )).resolves.toBe(await realpath(path.join(root, "asserts", asciiName)));
+
+    const ambiguousAscii = "Screenshot ambiguous PM.png";
+    const ambiguousNarrow = "Screenshot ambiguous\u202fPM.png";
+    await writeFile(path.join(root, "asserts", ambiguousAscii), "ascii");
+    await writeFile(path.join(root, "asserts", ambiguousNarrow), "narrow");
+    await expect(resolveExistingWorkspaceDisplayPath(
+      root,
+      "asserts/Screenshot ambiguous\u2009PM.png",
+    )).rejects.toThrow(/ambiguous/i);
+  });
+
+  it("streams an exact open-ended media range without buffering the file", async () => {
+    const bytes = Buffer.from("0123456789abcdefghijklmnopqrstuvwxyz");
+    await writeFile(path.join(root, "video.mp4"), bytes);
+
+    const result = await openWorkspaceFileRangeStream(root, "video.mp4", "bytes=10-");
+    expect(result.partial).toBe(true);
+    expect(result.start).toBe(10);
+    expect(result.end).toBe(bytes.length - 1);
+    expect(result.size).toBe(bytes.length);
+
+    const chunks = [];
+    for await (const chunk of result.stream) chunks.push(chunk);
+    expect(Buffer.concat(chunks).toString("utf8")).toBe(bytes.subarray(10).toString("utf8"));
   });
 
   it("readWorkspaceFile (puppyone-local protocol path) rejects a directory and traversal", async () => {
@@ -211,9 +323,32 @@ describe("workspace config containment", () => {
       version: 1,
       cloud: { projectId: "safe-project" },
     });
-    expect(result.cloud.projectId).toBe("safe-project");
+    expect(result.version).toBe(3);
+    expect(result).not.toHaveProperty("project");
+    expect(result).not.toHaveProperty("cloud");
     expect((await lstat(path.join(root, ".puppyone", "config.json"))).isFile()).toBe(true);
-    expect((await readPuppyoneWorkspaceConfig(root)).cloud.projectId).toBe("safe-project");
+    expect(await readPuppyoneWorkspaceConfig(root)).not.toHaveProperty("cloud");
+  });
+
+  it("keeps shared config free of Project identity while assigning each checkout a local instance", async () => {
+    await writePuppyoneWorkspaceConfig(root, {
+      version: 1,
+      project: { id: "01234567-89ab-4def-8123-456789abcdef" },
+      cloud: { projectId: "cloud-project" },
+    });
+    const clone = path.join(external, "clone");
+    await mkdir(path.join(clone, ".puppyone"), { recursive: true });
+    await writeFile(
+      path.join(clone, ".puppyone", "config.json"),
+      await readFile(path.join(root, ".puppyone", "config.json")),
+    );
+
+    const sourceWorkspace = await workspaceFromPath(root, { includeGitMetadata: false });
+    const cloneWorkspace = await workspaceFromPath(clone, { includeGitMetadata: false });
+    expect(sourceWorkspace).not.toHaveProperty("projectId");
+    expect(cloneWorkspace).not.toHaveProperty("projectId");
+    expect(cloneWorkspace.workspaceInstanceId).not.toBe(sourceWorkspace.workspaceInstanceId);
+    expect(await readPuppyoneWorkspaceConfig(clone)).not.toHaveProperty("project");
   });
 
   it("rejects a symlinked config directory instead of reading or writing outside", async () => {

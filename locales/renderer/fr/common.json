@@ -1,0 +1,17 @@
+{
+  "messageUnavailable": "Ce texte n’est pas disponible.",
+  "action.cancel": "Annuler",
+  "action.close": "Fermer",
+  "action.confirm": "Confirmer",
+  "action.retry": "Réessayer",
+  "action.apply": "Appliquer",
+  "action.reset": "Réinitialiser",
+  "action.refresh": "Actualiser",
+  "action.copy": "Copier",
+  "action.clear": "Effacer",
+  "action.copied": "Copié",
+  "action.change": "Modifier",
+  "action.chooseApp": "Choisir l’application",
+  "action.save": "Enregistrer",
+  "status.loading": "Chargement…"
+}

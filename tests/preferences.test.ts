@@ -9,6 +9,7 @@ import {
   parseExternalAppsSettings,
   parseExperimentalSettings,
   parsePointerCursors,
+  parseSidebarNavigationVisibilitySettings,
   parseTextSize,
 } from "../src/preferences";
 
@@ -57,6 +58,10 @@ describe("appearance preferences", () => {
         expect(block).toContain(`${tokenNames[role as keyof typeof tokenNames]}: ${size}px;`);
       }
     }
+
+    expect(css).toMatch(
+      /:root,\s*:where\(\.app-shell, \.onboarding-shell, \.desktop-overlay-root, \.desktop-theme-preview-surface, \.dark\)\s*\{[^}]*--desktop-sidebar-font-size:\s*var\(--po-text-size-sidebar\);[^}]*--desktop-sidebar-font-size-meta:\s*var\(--po-text-size-meta\);/s,
+    );
   });
 
   it("accepts only curated appearance values", () => {
@@ -75,6 +80,7 @@ describe("appearance preferences", () => {
     expect(parsePointerCursors("false")).toBe(false);
     expect(parsePointerCursors(null)).toBe(false);
   });
+
 });
 
 function readCssBlock(css: string, selector: string): string {
@@ -115,15 +121,64 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(JSON.stringify({ enableAgentChat: true }))).toMatchObject({
       enableAgentChat: true,
       enableAssetLibraryHome: false,
+      enableCloudWorkspace: false,
+      enableEditorSaveStatus: false,
+      enableMarkdownBlockDrag: false,
+      enableMinimalMode: false,
       enablePuppyoneAppFiles: false,
       enablePuppyFlowFiles: false,
+      enableViewerPlugins: false,
     });
     expect(parseExperimentalSettings(JSON.stringify({ enableAgentCompanion: true })).enableAgentChat).toBe(true);
+  });
+
+  it("keeps PuppyOne Cloud off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableCloudWorkspace).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableCloudWorkspace).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableCloudWorkspace: false })).enableCloudWorkspace).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableCloudWorkspace: true })).enableCloudWorkspace).toBe(true);
+  });
+
+  it("keeps the editor save status hidden unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableEditorSaveStatus).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableEditorSaveStatus).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableEditorSaveStatus: false })).enableEditorSaveStatus).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableEditorSaveStatus: true })).enableEditorSaveStatus).toBe(true);
+  });
+
+  it("keeps Minimal Mode off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableMinimalMode).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableMinimalMode).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableMinimalMode: false })).enableMinimalMode).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableMinimalMode: true })).enableMinimalMode).toBe(true);
+  });
+
+  it("keeps Markdown block drag handles off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableMarkdownBlockDrag).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableMarkdownBlockDrag).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableMarkdownBlockDrag: false })).enableMarkdownBlockDrag).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableMarkdownBlockDrag: true })).enableMarkdownBlockDrag).toBe(true);
   });
 
   it("keeps the Asset Library homepage off unless the user explicitly opts in", () => {
     expect(parseExperimentalSettings(null).enableAssetLibraryHome).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableAssetLibraryHome: false })).enableAssetLibraryHome).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableAssetLibraryHome: true })).enableAssetLibraryHome).toBe(true);
+  });
+
+  it("keeps Viewer Plugins off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableViewerPlugins).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableViewerPlugins: false })).enableViewerPlugins).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableViewerPlugins: true })).enableViewerPlugins).toBe(true);
+  });
+});
+
+describe("sidebar navigation visibility preferences", () => {
+  it("shows optional shortcuts by default and preserves an explicit hidden choice", () => {
+    expect(parseSidebarNavigationVisibilitySettings(null).enabled.plugins).toBe(true);
+    expect(parseSidebarNavigationVisibilitySettings("not-json").enabled.plugins).toBe(true);
+    expect(parseSidebarNavigationVisibilitySettings(JSON.stringify({
+      enabled: { plugins: false },
+    })).enabled.plugins).toBe(false);
   });
 });

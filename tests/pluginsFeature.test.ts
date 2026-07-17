@@ -1,0 +1,59 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_EXPERIMENTAL_SETTINGS } from "../src/preferences";
+import {
+  DEFAULT_PLUGINS_SECTION,
+  PLUGINS_SIDEBAR_ITEMS,
+  isPluginsNavigationVisible,
+  isViewerPluginsEnabled,
+} from "../src/features/plugins";
+import {
+  getInvalidOfficialViewerCatalogIds,
+  OFFICIAL_VIEWER_CATALOG,
+} from "../src/features/plugins/pluginCatalog";
+
+describe("Viewer Plugins experiment", () => {
+  it("is opt-in and local-workspace only", () => {
+    expect(isViewerPluginsEnabled({
+      settings: DEFAULT_EXPERIMENTAL_SETTINGS,
+      workspaceIsCloud: false,
+    })).toBe(false);
+    expect(isViewerPluginsEnabled({
+      settings: { ...DEFAULT_EXPERIMENTAL_SETTINGS, enableViewerPlugins: true },
+      workspaceIsCloud: false,
+    })).toBe(true);
+    expect(isViewerPluginsEnabled({
+      settings: { ...DEFAULT_EXPERIMENTAL_SETTINGS, enableViewerPlugins: true },
+      workspaceIsCloud: true,
+    })).toBe(false);
+  });
+
+  it("keeps Appearance visibility separate from feature authority", () => {
+    expect(isPluginsNavigationVisible({
+      featureEnabled: true,
+      visibility: { enabled: { plugins: true } },
+    })).toBe(true);
+    expect(isPluginsNavigationVisible({
+      featureEnabled: true,
+      visibility: { enabled: { plugins: false } },
+    })).toBe(false);
+    expect(isPluginsNavigationVisible({
+      featureEnabled: false,
+      visibility: { enabled: { plugins: true } },
+    })).toBe(false);
+  });
+
+  it("keeps every official catalog card backed by an active preset Viewer contract", () => {
+    expect(OFFICIAL_VIEWER_CATALOG.length).toBeGreaterThan(0);
+    expect(getInvalidOfficialViewerCatalogIds()).toEqual([]);
+    expect(OFFICIAL_VIEWER_CATALOG.every((entry) => !("description" in entry))).toBe(true);
+  });
+
+  it("starts with local state and keeps acquisition secondary", () => {
+    expect(DEFAULT_PLUGINS_SECTION).toBe("installed");
+    expect(PLUGINS_SIDEBAR_ITEMS.map((item) => item.id)).toEqual([
+      "installed",
+      "discover",
+      "included",
+    ]);
+  });
+});

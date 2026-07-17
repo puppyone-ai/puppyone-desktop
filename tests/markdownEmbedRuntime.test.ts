@@ -4,22 +4,23 @@
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createEmbeddedEditSessionStore } from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/embeddedEditSession";
+import { createEmbeddedEditSessionStore } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/embeddedEditSession";
 import {
   disposeMarkdownEmbedHost,
   getMarkdownEmbedHost,
-} from "../vendor/shared-ui/src/editor/markdown/platform/codemirror/embedHost";
-import { getMarkdownTableBlock } from "../vendor/shared-ui/src/editor/markdown/features/table/tableModel";
+} from "../packages/shared-ui/src/editor/markdown/platform/codemirror/embedHost";
+import { getMarkdownTableBlock } from "../packages/shared-ui/src/editor/markdown/features/table/tableModel";
 import {
   createTransactionBroker,
   getDocRevision,
-} from "../vendor/shared-ui/src/editor/markdown/platform/brokers/transactionBroker";
-import { CodeBlockWidget } from "../vendor/shared-ui/src/editor/markdown/features/code-block/codeBlockWidget";
-import { MermaidBlockWidget } from "../vendor/shared-ui/src/editor/markdown/features/mermaid/mermaidBlockWidget";
+} from "../packages/shared-ui/src/editor/markdown/platform/brokers/transactionBroker";
+import { CodeBlockWidget } from "../packages/shared-ui/src/editor/markdown/features/code-block/codeBlockWidget";
+import { MermaidBlockWidget } from "../packages/shared-ui/src/editor/markdown/features/mermaid/mermaidBlockWidget";
 import {
   createTableCellEditor,
   disposeTableCellEditor,
-} from "../vendor/shared-ui/src/editor/markdown/features/table/tableCellEditor";
+} from "../packages/shared-ui/src/editor/markdown/features/table/tableCellEditor";
+import type { MarkdownInlinePreviewRenderer } from "../packages/shared-ui/src/editor/markdown/shared/preview/markdownInlinePreviewPort";
 
 const mermaidMocks = vi.hoisted(() => ({
   render: vi.fn(async () => ({
@@ -30,13 +31,16 @@ const mermaidMocks = vi.hoisted(() => ({
   subscribe: vi.fn(() => () => undefined),
 }));
 
-vi.mock("../vendor/shared-ui/src/editor/markdown/features/mermaid/mermaidRenderer", () => ({
+vi.mock("../packages/shared-ui/src/editor/markdown/features/mermaid/mermaidRenderer", () => ({
   getMermaidThemeSnapshot: () => ({ key: "test-theme", config: {} }),
   renderMermaidDiagram: mermaidMocks.render,
   subscribeMermaidThemeChanges: mermaidMocks.subscribe,
 }));
 
 const views: EditorView[] = [];
+const renderInlinePreview: MarkdownInlinePreviewRenderer = (target, source) => {
+  target.textContent = source;
+};
 
 afterEach(() => {
   while (views.length > 0) {
@@ -247,6 +251,7 @@ describe("Markdown embedded runtime", () => {
       rowCount: firstTable.rows.length,
       rowIndex: 0,
       rows: firstTable.rows,
+      renderInlinePreview,
       tableFrom: firstTable.from,
       tableTo: firstTable.to,
       view,
@@ -277,6 +282,7 @@ describe("Markdown embedded runtime", () => {
       rowCount: movedTable.rows.length,
       rowIndex: 0,
       rows: movedTable.rows,
+      renderInlinePreview,
       tableFrom: movedTable.from,
       tableTo: movedTable.to,
       view,
@@ -309,6 +315,7 @@ describe("Markdown embedded runtime", () => {
       rowCount: table.rows.length,
       rowIndex: 0,
       rows: table.rows,
+      renderInlinePreview,
       tableFrom: table.from,
       tableTo: table.to,
       view,

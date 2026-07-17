@@ -7,6 +7,11 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AssetLibraryHome } from "../src/components/AssetLibraryHome";
 import type { MinimalOnboardingProps, ProjectHomeItem } from "../src/components/MinimalOnboarding";
+import {
+  DEFAULT_TYPOGRAPHY_PREFERENCES,
+  resolveTypography,
+} from "../src/features/typography";
+import { renderWithTestLocalization, stripBidiIsolation } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -47,12 +52,21 @@ describe("Asset Library homepage", () => {
   it("opens a local asset through the existing workspace callback", async () => {
     const onOpenWorkspacePath = vi.fn(async () => undefined);
     const container = renderLibrary({ onOpenWorkspacePath });
-    const button = container.querySelector<HTMLButtonElement>('button[aria-label="Open Local Notes"]');
+    const button = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((candidate) => stripBidiIsolation(candidate.getAttribute("aria-label")) === "Open Local Notes");
     if (!button) throw new Error("Local asset button is missing.");
 
     await act(async () => button.click());
 
     expect(onOpenWorkspacePath).toHaveBeenCalledWith("/Users/example/Local Notes");
+  });
+
+  it("hides Create in Cloud when cloud-only creation is unavailable", () => {
+    const container = renderLibrary({ onCreateCloudProject: undefined });
+
+    expect(container.textContent).toContain("New project");
+    expect(container.textContent).not.toContain("New Cloud project");
+    expect(container.textContent).not.toContain("Create in Cloud");
   });
 });
 
@@ -71,13 +85,14 @@ function renderLibrary(overrides: Partial<MinimalOnboardingProps> = {}) {
     lightThemePreset: "neutral",
     darkThemePreset: "default",
     textSize: "default",
+    typography: resolveTypography(DEFAULT_TYPOGRAPHY_PREFERENCES),
     pointerCursors: false,
     diffMarkers: "color",
     resolvedTheme: "dark",
     ...overrides,
   };
 
-  act(() => root?.render(React.createElement(AssetLibraryHome, props)));
+  act(() => renderWithTestLocalization(root, React.createElement(AssetLibraryHome, props)));
   return container;
 }
 

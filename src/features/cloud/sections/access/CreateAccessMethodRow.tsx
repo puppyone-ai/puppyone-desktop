@@ -1,4 +1,5 @@
 import { DesktopCloudProviderIcon } from "./accessProviders";
+import { useLocalization } from "@puppyone/localization/react";
 import { getAccessProviderLabel } from "./createAccessModel";
 
 export function CreateAccessMethodRow({
@@ -16,8 +17,10 @@ export function CreateAccessMethodRow({
   checked?: boolean;
   onCheckedChange?: (checked: boolean) => void;
 }) {
+  const { t } = useLocalization();
   const inactive = disabled && !locked;
   const enabled = locked || checked;
+  const providerLabel = getAccessProviderLabel(provider, t);
 
   return (
     <div className={`desktop-cloud-create-access-method-row ${enabled ? "enabled" : ""} ${inactive ? "inactive" : ""}`}>
@@ -26,16 +29,19 @@ export function CreateAccessMethodRow({
       </span>
       <div className="desktop-cloud-create-access-method-copy">
         <div>
-          <span>{getAccessProviderLabel(provider)}</span>
-          {inactive ? <em>Soon</em> : null}
+          <span>{providerLabel}</span>
+          {inactive ? <em>{t("cloud.common.soon")}</em> : null}
         </div>
         <p>{description}</p>
       </div>
       <CreateAccessSwitch
         checked={enabled}
         disabled={disabled}
-        title={locked ? "Already enabled" : disabled ? "Coming soon" : undefined}
-        ariaLabel={`${getAccessProviderLabel(provider)} ${enabled ? "on" : "off"}`}
+        title={locked ? t("cloud.access.create.alreadyEnabled") : disabled ? t("cloud.common.comingSoon") : undefined}
+        ariaLabel={t("cloud.access.create.methodToggle", {
+          method: providerLabel,
+          state: t(enabled ? "cloud.common.on" : "cloud.common.off"),
+        })}
         onChange={locked || disabled ? undefined : onCheckedChange}
       />
     </div>

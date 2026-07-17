@@ -1,7 +1,5 @@
 @import "./access/base.css";
 @import "./access/scope-sidebar.css";
-@import "./access/integrations.css";
-@import "./access/workflow-dialog.css";
 @import "./access/legacy-list.css";
 @import "./access/legacy-detail.css";
 @import "./access/scope-settings.css";

@@ -96,14 +96,17 @@ export async function chooseExternalApplication({
   dialog,
   ownerWindow,
   extension,
+  t = defaultTranslate,
 }) {
   const options = {
-    title: extension ? `Choose default app for .${extension}` : "Choose app",
+    title: extension
+      ? t("native.externalApp.chooseForExtension.title", { extension })
+      : t("native.externalApp.choose.title"),
     defaultPath: getDefaultApplicationsPath(),
-    buttonLabel: "Choose",
+    buttonLabel: t("native.externalApp.choose.button"),
     properties: ["openFile"],
     filters: [
-      { name: "Applications", extensions: ["app"] },
+      { name: t("native.externalApp.applications.filter"), extensions: ["app"] },
     ],
   };
   const result = ownerWindow
@@ -119,6 +122,18 @@ export async function chooseExternalApplication({
     extension,
     source: "override",
   };
+}
+
+function defaultTranslate(messageId, values = {}) {
+  const messages = {
+    "native.externalApp.choose.title": "Choose app",
+    "native.externalApp.choose.button": "Choose",
+    "native.externalApp.applications.filter": "Applications",
+  };
+  if (messageId === "native.externalApp.chooseForExtension.title") {
+    return `Choose default app for .${values.extension}`;
+  }
+  return messages[messageId] ?? "";
 }
 
 function getDefaultApplicationsPath() {

@@ -32,14 +32,15 @@
 .change-list-panel {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--po-divider);
+  border-inline-end: 1px solid var(--po-divider);
   background: var(--po-sidebar);
 }
 
 .change-list-panel .browser-toolbar {
   height: var(--desktop-sidebar-toolbar-height);
   min-height: var(--desktop-sidebar-toolbar-height);
-  padding: 0 var(--desktop-sidebar-toolbar-padding-right) 0 var(--desktop-sidebar-toolbar-padding-left);
+  padding-block: 0;
+  padding-inline: var(--desktop-sidebar-toolbar-padding-start) var(--desktop-sidebar-toolbar-padding-end);
   background: var(--po-sidebar);
 }
 
@@ -72,17 +73,15 @@
   align-items: center;
   width: calc(100% - var(--desktop-sidebar-row-left-gap) - var(--desktop-sidebar-row-right-gap));
   min-height: 56px;
-  margin: 1px var(--desktop-sidebar-row-right-gap) 1px var(--desktop-sidebar-row-left-gap);
-  padding:
-    8px
-    var(--desktop-sidebar-row-content-right)
-    8px
-    var(--desktop-sidebar-row-content-left);
+  margin-block: 1px;
+  margin-inline: var(--desktop-sidebar-row-left-gap) var(--desktop-sidebar-row-right-gap);
+  padding-block: 8px;
+  padding-inline: var(--desktop-sidebar-row-content-left) var(--desktop-sidebar-row-content-right);
   border: 0;
   border-radius: var(--desktop-sidebar-row-radius);
   background: transparent;
   color: var(--po-text);
-  text-align: left;
+  text-align: start;
 }
 
 .review-row:hover,

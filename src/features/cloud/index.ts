@@ -1,8 +1,22 @@
+export {
+  cloudContextHasProject,
+  getResolvedCloudProjectId,
+  resolveCloudHubSectionAfterContextChange,
+  resolveCloudProjectNavigationContext,
+  resolveCloudHubSectionForContext,
+  resolveProjectCloudContext,
+  useProjectCloudContext,
+  type ProjectCloudContext,
+} from "./context";
 export { CloudServiceMainView } from "./CloudServiceMainView";
+export {
+  CloudProjectHistorySidebar,
+  CloudProjectHistoryView,
+  type CloudProjectHistoryProps,
+} from "./history";
 export {
   DesktopCloudAccessSidebar,
   DesktopCloudAccessView,
-  DesktopCloudIntegrationsSidebar,
 } from "./DesktopCloudAccessView";
 export type { CloudAccessFilter } from "./accessFilters";
 export { CloudServicePanel } from "./CloudServicePanel";
@@ -24,12 +38,16 @@ export {
   normalizeCloudSection,
 } from "./routes/cloudRoutes";
 export {
-  deriveCloudWorkspaceBinding,
-  resolveMappedCloudProjectId,
+  deriveCloudWorkspaceContext,
 } from "./workspace";
 export { CLOUD_WORKSPACE_SECTIONS } from "./routes/cloudRouteIds";
 export type { CloudAuthState } from "./auth";
 export type { CloudEnvironment, CloudEnvironmentSource } from "./environment";
 export type { CloudRouteContext, CloudRouteDescriptor } from "./routes/cloudRoutes";
 export type { CloudWorkspaceSection } from "./types";
-export type { CloudWorkspaceBindingState } from "./workspace";
+export type { CloudWorkspaceContextState } from "./workspace";
+export { formatCloudMessage } from "./cloudPresentation";
+export { isCloudAccessNavigationResource } from "./sections/access/accessRows";
+export { shouldLoadDesktopCloudAccessData } from "./data/shouldLoadDesktopCloudAccessData";
+export { useDesktopCloudAccessData } from "./data/useDesktopCloudAccessData";
+export { useCloudHistoryController } from "./history/useCloudHistoryController";

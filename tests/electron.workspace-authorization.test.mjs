@@ -104,6 +104,14 @@ describe("sender-bound workspace authorization", () => {
     const event = { sender: { id: 7 } };
     for (const [channel, request] of [
       ["workspace:git-status", { rootPath: otherRoot }],
+      ["workspace:git-push-commit-to-remote", {
+        rootPath: otherRoot,
+        remoteName: "puppyone",
+        destinationBranch: "main",
+        expectedHeadCommitId: "0123456789abcdef0123456789abcdef01234567",
+        expectedBranch: "main",
+      }],
+      ["workspace:git-file-diff", { rootPath: otherRoot, path: "report.docx", scope: "unstaged" }],
       ["workspace:watch-start", { rootPath: otherRoot }],
       ["git-repository:watch-start", { rootPath: otherRoot }],
       ["ai-edit-review:get-latest", { rootPath: otherRoot }],

@@ -1,11 +1,18 @@
 import { ChevronDown, ChevronRight, Monitor } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import type { DesktopCloudScope } from "../../../../lib/cloudApi";
+import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
+import type { DesktopCloudRepositoryView } from "../../../../lib/cloudApi";
 import {
   CloudAuthorityCell,
   CloudCommandBlock,
 } from "../../components/shared";
 import type { CloudAccessSurface } from "../../model";
+import {
+  formatCloudAccessCommandLabel,
+  formatCloudAccessSurfacePrompt,
+  formatCloudAccessSurfaceTitle,
+} from "../../cloudPresentation";
 import {
   copyText,
   formatProviderLabel,
@@ -46,8 +53,9 @@ export function DesktopCloudAccessMethodCard({
   onToggle,
   onCreateMcpEndpoint,
   onUpdatePermissions,
+  canManage = false,
 }: {
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   surface: CloudAccessSurface;
   expanded: boolean;
   creatingMcp: boolean;
@@ -57,16 +65,18 @@ export function DesktopCloudAccessMethodCard({
   onToggle: () => void;
   onCreateMcpEndpoint: () => void;
   onUpdatePermissions: (nextAllowedKeys: ReadonlySet<string>) => Promise<void>;
+  canManage?: boolean;
 }) {
-  const meta = getDesktopCloudAccessMethodMeta(surface);
+  const { t } = useLocalization();
+  const meta = getDesktopCloudAccessMethodMeta(surface, t);
   const live = isConnectorActiveStatus(surface.status);
   const tileProvider = getAccessMethodTileProvider(surface.provider);
-  const promptText = getDesktopCloudAccessPromptText(scope, surface);
+  const promptText = getDesktopCloudAccessPromptText(scope, surface, t);
   const mcpPlaceholder = isDesktopMcpPlaceholderSurface(surface);
   const vmPlaceholder = isDesktopVmPlaceholderSurface(surface);
 
   if (vmPlaceholder) {
-    return <DesktopCloudRemoteWorkspaceCard surface={surface} />;
+    return <DesktopCloudRemoteWorkspaceCard surface={surface} canManage={canManage} />;
   }
 
   if (mcpPlaceholder) {
@@ -78,24 +88,24 @@ export function DesktopCloudAccessMethodCard({
           </span>
           <div className="desktop-cloud-access-method-main">
             <div className="desktop-cloud-access-method-title-line">
-              <h2>MCP Server</h2>
+              <h2>{t("cloud.access.surface.mcp.title")}</h2>
               <span aria-hidden="true">·</span>
               <span className={`desktop-cloud-access-method-status ${mcpError ? "error" : "off"}`}>
                 <span className={`desktop-cloud-web-status-dot ${mcpError ? "warning" : "muted"}`} aria-hidden="true" />
-                {mcpError ? "Error" : "Off"}
+                {t(mcpError ? "cloud.status.error" : "cloud.status.off")}
               </span>
             </div>
             <p title={mcpError ?? meta.description}>{mcpError ?? meta.description}</p>
           </div>
         </div>
-        <button
+        {canManage && <button
           className="desktop-cloud-access-method-remote-button"
           type="button"
           disabled={creatingMcp}
           onClick={onCreateMcpEndpoint}
         >
-          <span>{creatingMcp ? "Creating endpoint" : mcpError ? "Retry" : "Create endpoint"}</span>
-        </button>
+          <span>{t(creatingMcp ? "cloud.access.method.mcp.creating" : mcpError ? "cloud.common.retry" : "cloud.access.method.mcp.create")}</span>
+        </button>}
       </article>
     );
   }
@@ -112,7 +122,7 @@ export function DesktopCloudAccessMethodCard({
             <span aria-hidden="true">·</span>
             <span className={`desktop-cloud-access-method-status ${live ? "active" : ""}`}>
               <span className={`desktop-cloud-web-status-dot ${live ? "ready" : ""}`} aria-hidden="true" />
-              {live ? "Active" : formatStatusLabel(surface.statusLabel || surface.status)}
+              {formatStatusLabel(live ? "active" : surface.status, t)}
             </span>
           </div>
           <p>{meta.description}</p>
@@ -141,13 +151,21 @@ export function DesktopCloudAccessMethodCard({
           pending={configPending}
           error={configError}
           onUpdatePermissions={onUpdatePermissions}
+          canManage={canManage}
         />
       )}
     </article>
   );
 }
 
-export function DesktopCloudRemoteWorkspaceCard({ surface }: { surface?: CloudAccessSurface }) {
+export function DesktopCloudRemoteWorkspaceCard({
+  surface,
+  canManage = false,
+}: {
+  surface?: CloudAccessSurface;
+  canManage?: boolean;
+}) {
+  const { t } = useLocalization();
   return (
     <article className="desktop-cloud-access-method-card remote">
       <div className="desktop-cloud-access-method-info">
@@ -156,20 +174,20 @@ export function DesktopCloudRemoteWorkspaceCard({ surface }: { surface?: CloudAc
         </span>
         <div className="desktop-cloud-access-method-main">
           <div className="desktop-cloud-access-method-title-line">
-            <h2>{surface?.title ?? "Remote Workspace"}</h2>
+            <h2>{surface ? formatCloudAccessSurfaceTitle(surface, t) : t("cloud.access.surface.vm.title")}</h2>
             <span aria-hidden="true">·</span>
             <span className="desktop-cloud-access-method-status off">
               <span className="desktop-cloud-web-status-dot muted" aria-hidden="true" />
-              {surface?.statusLabel ?? "Off"}
+              {formatStatusLabel(surface?.status || "off", t)}
             </span>
           </div>
-          <p>{surface?.prompt ?? "Add your SSH public key, then open this scope in Cursor or VS Code over Remote-SSH."}</p>
+          <p>{surface ? formatCloudAccessSurfacePrompt(surface, t("cloud.scope.workspaceRoot"), t) : t("cloud.access.surface.vm.prompt")}</p>
         </div>
       </div>
-      <button className="desktop-cloud-access-method-remote-button" type="button">
-        <span>Add SSH key</span>
-        <ChevronRight size={13} />
-      </button>
+      {canManage && <button className="desktop-cloud-access-method-remote-button" type="button">
+        <span>{t("cloud.access.method.vm.addSshKey")}</span>
+        <ChevronRight className="desktop-cloud-directional-icon" size={13} />
+      </button>}
     </article>
   );
 }
@@ -180,24 +198,27 @@ function DesktopCloudAccessMethodExpandedDetail({
   pending,
   error,
   onUpdatePermissions,
+  canManage,
 }: {
   surface: CloudAccessSurface;
-  scope: DesktopCloudScope;
+  scope: DesktopCloudRepositoryView;
   pending: boolean;
   error: string | null;
   onUpdatePermissions: (nextAllowedKeys: ReadonlySet<string>) => Promise<void>;
+  canManage: boolean;
 }) {
+  const { t } = useLocalization();
   if (isCliAccessSurface(surface.provider)) {
     return (
       <div className="desktop-cloud-access-method-expanded-detail">
         <DesktopCloudPermissionPanel
-          title="Permissions"
+          title={t("cloud.access.permissions.title")}
           groups={getDesktopCliPermissionGroups(scope)}
           allowedKeys={parseCliCommandPermissions(surface.connector?.config)}
           pending={pending}
           error={error}
-          canUpdate={!!surface.connector}
-          unavailableLabel="CLI connector is not available yet."
+          canUpdate={canManage && !!surface.connector}
+          unavailableLabel={t("cloud.access.permissions.cliUnavailable")}
           onUpdate={onUpdatePermissions}
         />
       </div>
@@ -208,14 +229,14 @@ function DesktopCloudAccessMethodExpandedDetail({
     return (
       <div className="desktop-cloud-access-method-expanded-detail">
         <DesktopCloudPermissionPanel
-          title="MCP tools"
+          title={t("cloud.access.permissions.mcpTools")}
           groups={getDesktopMcpPermissionGroups(writable)}
           allowedKeys={parseMcpToolPermissions(surface.endpoint?.tools_config)}
           pending={pending}
           error={error}
-          canUpdate={!!surface.endpoint}
-          unavailableLabel="MCP endpoint is not available yet."
-          footer="The server applies this policy to both tools/list and tools/call. Client JSON only contains the URL and key."
+          canUpdate={canManage && !!surface.endpoint}
+          unavailableLabel={t("cloud.access.permissions.mcpUnavailable")}
+          footer={t("cloud.access.permissions.mcpPolicyFooter")}
           onUpdate={onUpdatePermissions}
         />
       </div>
@@ -228,8 +249,8 @@ function DesktopCloudAccessMethodExpandedDetail({
         <div className="desktop-cloud-access-method-command-list">
           {commands.map((command) => (
             <CloudCommandBlock
-              key={command.label}
-              label={command.label}
+              key={command.id}
+              label={formatCloudAccessCommandLabel(command, t)}
               value={command.value}
               disabled={command.disabled}
             />
@@ -237,15 +258,15 @@ function DesktopCloudAccessMethodExpandedDetail({
         </div>
       ) : (
         <p className="desktop-cloud-access-method-expanded-note">
-          {surface.endpoint?.description || surface.prompt || "Configuration details will appear here once this access method is connected."}
+          {surface.endpoint?.description || formatCloudAccessSurfacePrompt(surface, getScopeDisplayName(scope, t), t)}
         </p>
       )}
       <div className="desktop-cloud-access-method-expanded-summary">
-        <CloudAuthorityCell label="Cloud path" value={getScopePathLabel(scope)} mono />
-        <CloudAuthorityCell label="Type" value={formatProviderLabel(surface.provider)} />
+        <CloudAuthorityCell label={t("cloud.common.cloudPath")} value={getScopePathLabel(scope)} mono />
+        <CloudAuthorityCell label={t("cloud.common.type")} value={formatProviderLabel(surface.provider, t)} />
         <CloudAuthorityCell
-          label="Status"
-          value={formatStatusLabel(surface.statusLabel || surface.status)}
+          label={t("cloud.common.status")}
+          value={formatStatusLabel(surface.status, t)}
           tone={isConnectorActiveStatus(surface.status) ? "ready" : "warning"}
         />
       </div>
@@ -262,11 +283,12 @@ function DesktopCloudAccessPromptPreview({
   buttonLabel: string;
   icon: ReactNode;
 }) {
+  const { t } = useLocalization();
   const [copied, setCopied] = useState(false);
 
   return (
     <div className="desktop-cloud-access-method-preview">
-      <pre aria-hidden="true">{text || "Access setup is preparing."}</pre>
+      <pre aria-hidden="true" dir="auto">{text || t("cloud.access.setupPreparing")}</pre>
       <div className="desktop-cloud-access-method-preview-fade" aria-hidden="true" />
       <button
         className="desktop-cloud-access-method-copy-button"
@@ -281,31 +303,31 @@ function DesktopCloudAccessPromptPreview({
         }}
       >
         {icon}
-        <span>{copied ? "Copied" : buttonLabel}</span>
+        <span>{copied ? t("cloud.common.copied") : buttonLabel}</span>
       </button>
     </div>
   );
 }
 
-function getDesktopCloudAccessPromptText(scope: DesktopCloudScope, surface: CloudAccessSurface) {
+function getDesktopCloudAccessPromptText(scope: DesktopCloudRepositoryView, surface: CloudAccessSurface, t: MessageFormatter) {
   const commandText = surface.commands
     ?.filter((command) => !command.disabled)
-    .map((command) => `${command.label}\n${command.value}`)
+    .map((command) => `${formatCloudAccessCommandLabel(command, t)}\n${command.value}`)
     .join("\n\n") ?? "";
 
   if (isMcpAccessSurface(surface.provider)) {
     const endpoint = surface.endpoint;
     return [
-      "MCP server",
-      commandText || endpoint?.api_key_hint || "Connection details are preparing.",
+      t("cloud.access.surface.mcp.title"),
+      commandText || endpoint?.api_key_hint || t("cloud.access.connectionPreparing"),
       "",
-      `Scope: ${getScopePathLabel(scope)}`,
+      t("cloud.access.prompt.scope", { scope: bidiIsolate(getScopePathLabel(scope)) }),
     ].join("\n");
   }
 
   return [
-    surface.prompt,
+    formatCloudAccessSurfacePrompt(surface, getScopeDisplayName(scope, t), t),
     commandText,
-    `Scope: ${getScopeDisplayName(scope)}`,
+    t("cloud.access.prompt.scope", { scope: bidiIsolate(getScopeDisplayName(scope, t)) }),
   ].filter(Boolean).join("\n\n");
 }

@@ -1,190 +1,111 @@
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
-import { Check, CreditCard, ExternalLink, Mail, RefreshCw, X } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Mail } from "lucide-react";
+import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
 import {
   getCloudOrganizationEntitlements,
+  getCloudOrganizationAccess,
+  getCloudOrganizationSeatUsage,
   listCloudOrganizationMembers,
   listCloudOrganizations,
   type DesktopCloudOrgMember,
+  type DesktopCloudOrganizationAccess,
   type DesktopCloudOrganization,
   type DesktopCloudOrganizationEntitlements,
+  type DesktopCloudOrganizationSeatUsage,
   type DesktopCloudProject,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
+import {
+  cloudMessage,
+  formatCloudMessage,
+  type CloudMessageDescriptor,
+} from "../cloudPresentation";
 
-type CloudGlobalPageProps = {
+export type CloudGlobalPageProps = {
   accountEmail: string | null;
   session: DesktopCloudSession;
   apiBaseUrl: string | null;
-  projects: DesktopCloudProject[];
+  /** Present only when the catalog was intentionally loaded for this route. */
+  projects?: DesktopCloudProject[];
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onOpen: () => void;
 };
 
-type PlanItem = {
-  type: "metric" | "capability";
-  value?: string;
-  label: string;
-  included?: boolean;
+export type CloudOrganizationDataStatus =
+  | "loading"
+  | "selection-required"
+  | "none"
+  | "ready"
+  | "partial"
+  | "error";
+
+export type CloudOrganizationMembersStatus = "idle" | "loading" | "ready" | "error";
+
+type CloudOrganizationDataState = {
+  contextKey: string;
+  organizations: DesktopCloudOrganization[];
+  selectedOrganizationId: string | null;
+  organization: DesktopCloudOrganization | null;
+  members: DesktopCloudOrgMember[];
+  entitlements: DesktopCloudOrganizationEntitlements | null;
+  seatUsage: DesktopCloudOrganizationSeatUsage | null;
+  status: CloudOrganizationDataStatus;
+  membersStatus: CloudOrganizationMembersStatus;
+  loading: boolean;
+  error: CloudMessageDescriptor | null;
 };
 
-type PlanDefinition = {
-  id: "free" | "plus" | "pro" | "enterprise";
-  name: string;
-  price: string;
-  cadence?: string;
-  line: string;
-  badge?: string;
-  items: PlanItem[];
-};
-
-const PLANS: PlanDefinition[] = [
-  {
-    id: "free",
-    name: "Free",
-    price: "$0",
-    cadence: "/ month",
-    line: "Basic access for one project.",
-    items: [
-      { type: "metric", value: "1", label: "seat" },
-      { type: "metric", value: "1", label: "project" },
-      { type: "metric", value: "2", label: "scopes/project" },
-      { type: "metric", value: "1 GB", label: "storage" },
-      { type: "metric", value: "1 GB", label: "storage/project" },
-      { type: "metric", value: "2,000", label: "files/project" },
-      { type: "metric", value: "50 MB", label: "single file upload" },
-      { type: "capability", label: "Git Remote" },
-      { type: "capability", label: "CLI" },
-      { type: "capability", label: "MCP", included: false },
-      { type: "capability", label: "Workspace", included: false },
-      { type: "capability", label: "Sandbox", included: false },
-      { type: "capability", label: "Enterprise deployment", included: false },
-    ],
-  },
-  {
-    id: "plus",
-    name: "Plus",
-    price: "$15",
-    cadence: "/ month",
-    line: "For small teams.",
-    badge: "Recommended",
-    items: [
-      { type: "metric", value: "10", label: "seats" },
-      { type: "metric", value: "5", label: "projects" },
-      { type: "metric", value: "10", label: "scopes/project" },
-      { type: "metric", value: "50 GB", label: "storage" },
-      { type: "metric", value: "10 GB", label: "storage/project" },
-      { type: "metric", value: "25,000", label: "files/project" },
-      { type: "metric", value: "200 MB", label: "single file upload" },
-      { type: "capability", label: "Git Remote" },
-      { type: "capability", label: "CLI" },
-      { type: "capability", label: "MCP" },
-      { type: "capability", label: "Workspace", included: false },
-      { type: "capability", label: "Sandbox", included: false },
-      { type: "capability", label: "Enterprise deployment", included: false },
-    ],
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: "$100",
-    cadence: "/ month",
-    line: "For larger teams.",
-    items: [
-      { type: "metric", value: "50", label: "seats" },
-      { type: "metric", value: "50", label: "projects" },
-      { type: "metric", value: "Unlimited", label: "scopes" },
-      { type: "metric", value: "500 GB", label: "storage" },
-      { type: "metric", value: "50 GB", label: "storage/project" },
-      { type: "metric", value: "250,000", label: "files/project" },
-      { type: "metric", value: "500 MB", label: "single file upload" },
-      { type: "capability", label: "Git Remote" },
-      { type: "capability", label: "CLI" },
-      { type: "capability", label: "MCP" },
-      { type: "capability", label: "Workspace" },
-      { type: "capability", label: "Sandbox" },
-      { type: "capability", label: "Enterprise deployment", included: false },
-    ],
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    price: "Custom",
-    line: "For private deployments.",
-    items: [
-      { type: "metric", value: "Custom", label: "seats" },
-      { type: "metric", value: "Custom", label: "projects" },
-      { type: "metric", value: "Custom", label: "scopes" },
-      { type: "metric", value: "Custom", label: "storage" },
-      { type: "metric", value: "Custom", label: "storage/project" },
-      { type: "metric", value: "Custom", label: "files/project" },
-      { type: "metric", value: "Custom", label: "single file upload" },
-      { type: "capability", label: "Git Remote" },
-      { type: "capability", label: "CLI" },
-      { type: "capability", label: "MCP" },
-      { type: "capability", label: "Workspace" },
-      { type: "capability", label: "Sandbox" },
-      { type: "capability", label: "Enterprise deployment" },
-    ],
-  },
-];
-
-const UPGRADE_PLANS = PLANS.filter((plan) => plan.id !== "free");
-const CURRENT_SUMMARY_LABELS = new Set([
-  "seat",
-  "seats",
-  "project",
-  "projects",
-  "scopes/project",
-  "scopes",
-  "storage",
-  "storage/project",
-  "single file upload",
-  "Git Remote",
-  "CLI",
-  "MCP",
-  "Workspace",
-  "Sandbox",
-]);
-const UPGRADE_DETAIL_LABELS = new Set([
-  "seats",
-  "projects",
-  "scopes/project",
-  "scopes",
-  "storage",
-  "storage/project",
-  "files/project",
-  "single file upload",
-  "MCP",
-  "Workspace",
-  "Sandbox",
-  "Enterprise deployment",
-]);
-
-export function CloudGlobalTeamPage({ accountEmail, session, apiBaseUrl, projects, onSessionChange, onOpen }: CloudGlobalPageProps) {
+export function CloudGlobalTeamPage({
+  accountEmail,
+  session,
+  apiBaseUrl,
+  projects,
+  onSessionChange,
+  onOpen,
+}: CloudGlobalPageProps) {
+  const { t } = useLocalization();
   const orgData = useCloudOrganizationData(session, apiBaseUrl, onSessionChange);
   const organization = orgData.organization;
-  const members = orgData.members.length > 0 ? orgData.members : buildFallbackMembers(accountEmail);
-  const displayName = accountEmail?.split("@")[0] || "Cloud user";
-  const seatLimit = organization?.seat_limit ?? Math.max(1, members.length);
-  const plan = organization?.plan ?? "free";
+  const members = orgData.members;
+  const displayName = accountEmail?.split("@")[0] || t("cloud.team.cloudUser");
+  const seatLimit = orgData.entitlements?.seat_quantity ?? null;
+  const seatsUsed = orgData.seatUsage?.billable_seat_quantity ?? null;
+  const plan = orgData.entitlements?.plan_id ?? null;
 
   return (
     <CloudOrganizationPageShell
-      title="Team"
-      description={`Manage members and their access to ${organization?.name ?? "your Cloud organization"}.`}
+      title={t("cloud.route.cloud-team.title")}
+      description={t("cloud.team.description", {
+        organization: bidiIsolate(organization?.name ?? t("cloud.organization.yours")),
+      })}
       actions={(
-        <button className="desktop-cloud-org-primary-button" type="button" onClick={onOpen}>
-          <Mail size={14} />
-          <span>Invite Member</span>
-        </button>
+        <>
+          <CloudOrganizationSelector organizationData={orgData} />
+          <button
+            className="desktop-cloud-org-primary-button"
+            type="button"
+            onClick={onOpen}
+            disabled={!organization}
+          >
+            <Mail size={14} />
+            <span>{t("cloud.team.inviteMember")}</span>
+          </button>
+        </>
       )}
     >
       <div className="desktop-cloud-org-card">
         <div className="desktop-cloud-org-card-header">
           <div>
-            <h2>Members</h2>
-            <p>{members.length} / {seatLimit} seats used in your {plan} plan.</p>
+            <h2>{t("cloud.team.members")}</h2>
+            <p>{seatsUsed !== null && seatLimit !== null && plan !== null
+              ? t("cloud.team.seatsUsed", {
+                used: seatsUsed,
+                limit: seatLimit,
+                plan: bidiIsolate(plan),
+              })
+              : t("cloud.team.loadFailed")}</p>
           </div>
         </div>
 
@@ -202,14 +123,14 @@ export function CloudGlobalTeamPage({ accountEmail, session, apiBaseUrl, project
                   )}
                   <div>
                     <strong>
-                      <span>{name}</span>
-                      {member.role === "owner" && <em>Owner</em>}
+                      <span dir="auto">{name}</span>
+                      {member.role === "owner" && <em>{t("cloud.team.role.owner")}</em>}
                     </strong>
                     {member.email && member.display_name && <small>{member.email}</small>}
                   </div>
                 </div>
                 <span className={`desktop-cloud-team-role ${member.role === "owner" ? "owner" : ""}`}>
-                  {formatRole(member.role)}
+                  {formatRole(member.role, t)}
                 </span>
               </div>
             );
@@ -221,10 +142,7 @@ export function CloudGlobalTeamPage({ accountEmail, session, apiBaseUrl, project
             {Array.from({ length: 3 }).map((_, index) => (
               <div key={index}>
                 <span />
-                <div>
-                  <i />
-                  <i />
-                </div>
+                <div><i /><i /></div>
               </div>
             ))}
           </div>
@@ -232,94 +150,27 @@ export function CloudGlobalTeamPage({ accountEmail, session, apiBaseUrl, project
 
         {orgData.error && (
           <div className="desktop-cloud-org-inline-error">
-            <strong>Could not load team details</strong>
-            <span>{orgData.error}</span>
+            <strong>{t("cloud.team.loadFailed")}</strong>
+            <span>{formatCloudMessage(orgData.error, t)}</span>
+          </div>
+        )}
+
+        {orgData.status === "selection-required" && (
+          <div className="desktop-cloud-org-inline-error">
+            <strong>{t("cloud.organization.selectionRequired")}</strong>
           </div>
         )}
 
         <div className="desktop-cloud-org-card-footer">
-          <span>{projects.length} Cloud project{projects.length === 1 ? "" : "s"} in this desktop session.</span>
-          <button type="button" onClick={onOpen}>Open full team page</button>
+          {projects && <span>{t("cloud.project.sessionCount", { count: projects.length })}</span>}
+          <button type="button" onClick={onOpen}>{t("cloud.team.openFullPage")}</button>
         </div>
       </div>
     </CloudOrganizationPageShell>
   );
 }
 
-export function CloudGlobalBillingPage({ session, apiBaseUrl, projects, onSessionChange, onOpen }: CloudGlobalPageProps) {
-  const orgData = useCloudOrganizationData(session, apiBaseUrl, onSessionChange);
-  const organization = orgData.organization;
-  const currentDisplayPlan = normalizeDisplayPlanId(orgData.entitlements?.plan_id || organization?.plan);
-  const currentPlan = getPlanById(currentDisplayPlan);
-  const currentSummaryItems = currentPlan.items.filter((item) => CURRENT_SUMMARY_LABELS.has(item.label));
-
-  return (
-    <CloudOrganizationPageShell
-      title="Billing"
-      description={`Manage the plan for ${organization?.name ?? "your Cloud organization"}.`}
-      actions={(
-        <button className="desktop-cloud-org-secondary-button" type="button" onClick={onOpen}>
-          <RefreshCw size={14} />
-          <span>Refresh</span>
-        </button>
-      )}
-    >
-      <div className="desktop-cloud-billing-stack">
-        {orgData.error && (
-          <div className="desktop-cloud-org-inline-error standalone">
-            <strong>Could not load billing details</strong>
-            <span>{orgData.error}</span>
-          </div>
-        )}
-
-        <section className="desktop-cloud-billing-current">
-          <div className="desktop-cloud-billing-current-main">
-            <div>
-              <div className="desktop-cloud-billing-title-row">
-                <span>Current plan</span>
-                <h2>{currentPlan.name}</h2>
-                {orgData.loading && <em>Syncing</em>}
-              </div>
-              <p>{currentPlan.line}</p>
-            </div>
-            <div className="desktop-cloud-billing-price">
-              <strong>{currentPlan.price}</strong>
-              <span>{currentPlan.cadence}</span>
-              <small>Managed through Polar</small>
-            </div>
-          </div>
-          <div className="desktop-cloud-billing-summary">
-            {currentSummaryItems.map((item) => (
-              <PlanFeature key={`current-${item.value || "included"}-${item.label}`} item={item} />
-            ))}
-          </div>
-        </section>
-
-        <section className="desktop-cloud-billing-options">
-          <div className="desktop-cloud-billing-options-header">
-            <div>
-              <h2>Upgrade options</h2>
-              <p>Pick Plus for MCP, Pro for hosted workspace, or Enterprise for private deployment.</p>
-            </div>
-            <span>Checkout through Polar</span>
-          </div>
-          <div className="desktop-cloud-billing-plan-grid">
-            {UPGRADE_PLANS.map((plan) => (
-              <PlanCard key={plan.id} plan={plan} current={plan.id === currentDisplayPlan} onOpen={onOpen} />
-            ))}
-          </div>
-        </section>
-
-        <div className="desktop-cloud-billing-note">
-          <span>Checkout is handled by Polar. {projects.length} project{projects.length === 1 ? "" : "s"} in this desktop session.</span>
-          <span>Secure billing <ExternalLink size={12} /></span>
-        </div>
-      </div>
-    </CloudOrganizationPageShell>
-  );
-}
-
-function CloudOrganizationPageShell({
+export function CloudOrganizationPageShell({
   title,
   description,
   actions,
@@ -338,7 +189,7 @@ function CloudOrganizationPageShell({
             <h1>{title}</h1>
             <p>{description}</p>
           </div>
-          {actions && <div>{actions}</div>}
+          {actions && <div className="desktop-cloud-org-actions">{actions}</div>}
         </div>
         {children}
       </div>
@@ -346,147 +197,345 @@ function CloudOrganizationPageShell({
   );
 }
 
-function PlanCard({ plan, current, onOpen }: { plan: PlanDefinition; current: boolean; onOpen: () => void }) {
-  const detailItems = plan.items.filter((item) => UPGRADE_DETAIL_LABELS.has(item.label));
-  const isRecommended = Boolean(plan.badge && !current);
-  return (
-    <article className={`desktop-cloud-billing-plan-card ${plan.id === "plus" ? "recommended" : ""}`}>
-      <div>
-        <div className="desktop-cloud-billing-plan-heading">
-          <h3>{plan.name}</h3>
-          {current && <span>Current</span>}
-          {isRecommended && <span>{plan.badge}</span>}
-        </div>
-        <p>{plan.line}</p>
-      </div>
-
-      <div className="desktop-cloud-billing-plan-price">
-        <strong>{plan.price}</strong>
-        {plan.cadence && <span>{plan.cadence}</span>}
-      </div>
-
-      <div className="desktop-cloud-billing-plan-features">
-        {detailItems.map((item) => (
-          <PlanFeature key={`${plan.id}-${item.value || "included"}-${item.label}`} item={item} />
-        ))}
-      </div>
-
-      <button className={plan.id === "plus" ? "primary" : ""} type="button" onClick={onOpen}>
-        {plan.id === "enterprise" ? <Mail size={14} /> : <CreditCard size={14} />}
-        <span>{current ? "Current plan" : plan.id === "enterprise" ? "Contact us" : `Choose ${plan.name}`}</span>
-        {plan.id !== "enterprise" && <ExternalLink size={13} />}
-      </button>
-    </article>
-  );
-}
-
-function useCloudOrganizationData(
+export function useCloudOrganizationData(
   session: DesktopCloudSession,
   apiBaseUrl: string | null,
   onSessionChange: (session: DesktopCloudSession | null) => void,
+  {
+    loadTeamDetails = true,
+    selectionPolicy = "remembered",
+  }: {
+    loadTeamDetails?: boolean;
+    /** Initialize requires a fresh, explicit choice when more than one org is available. */
+    selectionPolicy?: "remembered" | "explicit";
+  } = {},
 ) {
-  const [state, setState] = useState<{
-    organization: DesktopCloudOrganization | null;
-    members: DesktopCloudOrgMember[];
-    entitlements: DesktopCloudOrganizationEntitlements | null;
-    loading: boolean;
-    error: string | null;
-  }>({
-    organization: null,
-    members: [],
-    entitlements: null,
-    loading: true,
-    error: null,
-  });
+  const contextKey = createCloudOrganizationContextKey(session, apiBaseUrl);
+  const preferenceKey = createCloudOrganizationPreferenceKey(session, apiBaseUrl);
+  const [state, setState] = useState<CloudOrganizationDataState>(
+    () => emptyOrganizationState(contextKey),
+  );
+  const [reloadRevision, setReloadRevision] = useState(0);
+  const organizationRequestEpoch = useRef(0);
+  const detailsRequestEpoch = useRef(0);
+  const sessionRef = useRef(session);
+  const apiBaseUrlRef = useRef(apiBaseUrl);
+  const onSessionChangeRef = useRef(onSessionChange);
+  useLayoutEffect(() => {
+    sessionRef.current = session;
+    apiBaseUrlRef.current = apiBaseUrl;
+    onSessionChangeRef.current = onSessionChange;
+  }, [apiBaseUrl, onSessionChange, session]);
+  const effectiveState = state.contextKey === contextKey
+    ? state
+    : emptyOrganizationState(contextKey);
 
   useEffect(() => {
-    let cancelled = false;
+    const requestEpoch = ++organizationRequestEpoch.current;
+    detailsRequestEpoch.current += 1;
+    setState(emptyOrganizationState(contextKey));
     const load = async () => {
-      setState((current) => ({ ...current, loading: true, error: null }));
       try {
-        const organizations = await listCloudOrganizations(session, onSessionChange, apiBaseUrl);
-        const organization = organizations[0] ?? null;
-        if (!organization) {
-          if (!cancelled) {
-            setState({ organization: null, members: [], entitlements: null, loading: false, error: null });
-          }
+        const organizations = await listCloudOrganizations(
+          sessionRef.current,
+          onSessionChangeRef.current,
+          apiBaseUrlRef.current,
+        );
+        if (requestEpoch !== organizationRequestEpoch.current) return;
+        if (organizations.length === 0) {
+          setState({
+            ...emptyOrganizationState(contextKey),
+            organizations,
+            status: "none",
+            loading: false,
+          });
           return;
         }
-
-        const [membersResult, entitlementResult] = await Promise.allSettled([
-          listCloudOrganizationMembers(session, organization.id, onSessionChange, apiBaseUrl),
-          getCloudOrganizationEntitlements(session, organization.id, onSessionChange, apiBaseUrl),
-        ]);
-        if (cancelled) return;
+        const storedSelection = selectionPolicy === "remembered"
+          ? readOrganizationSelection(preferenceKey)
+          : null;
+        const [onlyOrganization] = organizations;
+        const selectedOrganizationId = organizations.length === 1
+          ? onlyOrganization?.id ?? null
+          : organizations.some((organization) => organization.id === storedSelection)
+            ? storedSelection
+            : null;
+        const organization = organizations.find(
+          (candidate) => candidate.id === selectedOrganizationId,
+        ) ?? null;
         setState({
+          ...emptyOrganizationState(contextKey),
+          contextKey,
+          organizations,
+          selectedOrganizationId,
           organization,
-          members: membersResult.status === "fulfilled" ? membersResult.value : [],
-          entitlements: entitlementResult.status === "fulfilled" ? entitlementResult.value : null,
-          loading: false,
-          error: membersResult.status === "rejected" || entitlementResult.status === "rejected"
-            ? "Some organization details could not be loaded."
-            : null,
+          status: organization ? (loadTeamDetails ? "loading" : "ready") : "selection-required",
+          membersStatus: organization && loadTeamDetails ? "loading" : "idle",
+          loading: Boolean(organization && loadTeamDetails),
         });
       } catch (error) {
-        if (!cancelled) {
-          setState({
-            organization: null,
-            members: [],
-            entitlements: null,
-            loading: false,
-            error: error instanceof Error ? error.message : "Unable to load organization details.",
-          });
-        }
+        if (requestEpoch !== organizationRequestEpoch.current) return;
+        setState({
+          ...emptyOrganizationState(contextKey),
+          status: "error",
+          loading: false,
+          error: cloudMessage(
+            "organization-load-failed",
+            undefined,
+            error instanceof Error ? error.message : undefined,
+          ),
+        });
       }
     };
     void load();
     return () => {
-      cancelled = true;
+      if (requestEpoch === organizationRequestEpoch.current) {
+        organizationRequestEpoch.current += 1;
+      }
     };
-  }, [apiBaseUrl, onSessionChange, session]);
+  }, [contextKey, loadTeamDetails, preferenceKey, reloadRevision, selectionPolicy]);
 
-  return state;
+  useEffect(() => {
+    if (!loadTeamDetails || state.contextKey !== contextKey || !state.organization) return;
+    const organization = state.organization;
+    const requestEpoch = ++detailsRequestEpoch.current;
+    const activeSession = sessionRef.current;
+    const activeApiBaseUrl = apiBaseUrlRef.current;
+    const activeOnSessionChange = onSessionChangeRef.current;
+    const load = async () => {
+      const [membersResult, entitlementResult, seatUsageResult] = await Promise.allSettled([
+        listCloudOrganizationMembers(
+          activeSession,
+          organization.id,
+          activeOnSessionChange,
+          activeApiBaseUrl,
+        ),
+        getCloudOrganizationEntitlements(
+          activeSession,
+          organization.id,
+          activeOnSessionChange,
+          activeApiBaseUrl,
+        ),
+        getCloudOrganizationSeatUsage(
+          activeSession,
+          organization.id,
+          activeOnSessionChange,
+          activeApiBaseUrl,
+        ),
+      ]);
+      if (requestEpoch !== detailsRequestEpoch.current) return;
+      const partial = membersResult.status === "rejected"
+        || entitlementResult.status === "rejected"
+        || seatUsageResult.status === "rejected";
+      setState((current) => {
+        if (current.contextKey !== contextKey || current.organization?.id !== organization.id) {
+          return current;
+        }
+        return {
+          ...current,
+          members: membersResult.status === "fulfilled" ? membersResult.value : [],
+          entitlements: entitlementResult.status === "fulfilled" ? entitlementResult.value : null,
+          seatUsage: seatUsageResult.status === "fulfilled" ? seatUsageResult.value : null,
+          status: partial ? "partial" : "ready",
+          membersStatus: membersResult.status === "fulfilled" ? "ready" : "error",
+          loading: false,
+          error: partial ? cloudMessage("organization-partial") : null,
+        };
+      });
+    };
+    void load();
+    return () => {
+      if (requestEpoch === detailsRequestEpoch.current) {
+        detailsRequestEpoch.current += 1;
+      }
+    };
+  }, [contextKey, loadTeamDetails, state.contextKey, state.organization]);
+
+  const selectOrganization = useCallback((organizationId: string) => {
+    if (effectiveState.contextKey !== contextKey) return;
+    const organization = effectiveState.organizations.find(
+      (candidate) => candidate.id === organizationId,
+    );
+    if (!organization || effectiveState.organization?.id === organization.id) return;
+    detailsRequestEpoch.current += 1;
+    if (selectionPolicy === "remembered") {
+      writeOrganizationSelection(preferenceKey, organization.id);
+    }
+    setState({
+      ...emptyOrganizationState(contextKey),
+      organizations: effectiveState.organizations,
+      selectedOrganizationId: organization.id,
+      organization,
+      status: loadTeamDetails ? "loading" : "ready",
+      membersStatus: loadTeamDetails ? "loading" : "idle",
+      loading: loadTeamDetails,
+    });
+  }, [contextKey, effectiveState, loadTeamDetails, preferenceKey, selectionPolicy]);
+
+  const refresh = useCallback(() => {
+    setReloadRevision((revision) => revision + 1);
+  }, []);
+
+  return { ...effectiveState, selectOrganization, refresh };
 }
 
-function buildFallbackMembers(accountEmail: string | null): DesktopCloudOrgMember[] {
-  if (!accountEmail) return [];
-  return [{
-    id: "current-user",
-    user_id: "current-user",
-    email: accountEmail,
-    display_name: accountEmail.split("@")[0],
-    avatar_url: null,
-    role: "owner",
-    joined_at: "",
-  }];
+export function useCloudOrganizationAccess(
+  session: DesktopCloudSession,
+  apiBaseUrl: string | null,
+  organizationId: string | null,
+  onSessionChange: (session: DesktopCloudSession | null) => void,
+) {
+  const contextKey = [
+    createCloudOrganizationContextKey(session, apiBaseUrl),
+    organizationId ?? "",
+  ].join("\u001f");
+  const [state, setState] = useState<{
+    contextKey: string;
+    access: DesktopCloudOrganizationAccess | null;
+    status: "idle" | "loading" | "ready" | "error";
+    error: CloudMessageDescriptor | null;
+  }>(() => ({ contextKey, access: null, status: organizationId ? "loading" : "idle", error: null }));
+  const [reloadRevision, setReloadRevision] = useState(0);
+  const requestEpoch = useRef(0);
+  const effectiveState = state.contextKey === contextKey
+    ? state
+    : { contextKey, access: null, status: organizationId ? "loading" as const : "idle" as const, error: null };
+
+  useEffect(() => {
+    const epoch = ++requestEpoch.current;
+    if (!organizationId) {
+      setState({ contextKey, access: null, status: "idle", error: null });
+      return;
+    }
+    setState({ contextKey, access: null, status: "loading", error: null });
+    void getCloudOrganizationAccess(
+      session,
+      organizationId,
+      onSessionChange,
+      apiBaseUrl,
+    ).then((access) => {
+      if (epoch !== requestEpoch.current) return;
+      if (access.org_id !== organizationId || access.user_id !== session.user_id) {
+        throw new Error("Organization access context mismatch.");
+      }
+      setState({ contextKey, access, status: "ready", error: null });
+    }).catch((error: unknown) => {
+      if (epoch !== requestEpoch.current) return;
+      setState({
+        contextKey,
+        access: null,
+        status: "error",
+        error: cloudMessage(
+          "organization-load-failed",
+          undefined,
+          error instanceof Error ? error.message : undefined,
+        ),
+      });
+    });
+    return () => {
+      if (epoch === requestEpoch.current) requestEpoch.current += 1;
+    };
+  }, [apiBaseUrl, contextKey, onSessionChange, organizationId, reloadRevision, session]);
+
+  const refresh = useCallback(() => {
+    setReloadRevision((revision) => revision + 1);
+  }, []);
+
+  return { ...effectiveState, loading: effectiveState.status === "loading", refresh };
 }
 
-function normalizeDisplayPlanId(value: unknown): PlanDefinition["id"] {
-  const raw = String(value || "").trim().toLowerCase();
-  if (raw === "plus" || raw === "pro" || raw === "enterprise") return raw;
-  return "free";
-}
-
-function getPlanById(id: PlanDefinition["id"]): PlanDefinition {
-  return PLANS.find((plan) => plan.id === id) ?? PLANS[0];
-}
-
-function formatRole(role: string) {
-  if (role === "owner") return "Owner";
-  if (role === "member") return "Member";
-  if (role === "viewer") return "Viewer";
-  return role;
-}
-
-function PlanFeature({ item }: { item: PlanItem }) {
-  const included = item.included !== false;
+export function CloudOrganizationSelector({
+  organizationData,
+}: {
+  organizationData: ReturnType<typeof useCloudOrganizationData>;
+}) {
+  const { t } = useLocalization();
+  if (organizationData.organizations.length <= 1) return null;
   return (
-    <span className={`desktop-cloud-plan-feature ${included ? "" : "disabled"}`}>
-      {included ? <Check size={14} /> : <X size={14} />}
-      <span>
-        {item.value && <strong>{item.value}</strong>}
-        <span className={item.value ? "with-value" : ""}>{item.label}</span>
-      </span>
-    </span>
+    <label className="desktop-cloud-organization-selector">
+      <span>{t("cloud.organization.selectLabel")}</span>
+      <select
+        aria-label={t("cloud.organization.selectLabel")}
+        value={organizationData.selectedOrganizationId ?? ""}
+        onChange={(event) => organizationData.selectOrganization(event.target.value)}
+      >
+        <option value="" disabled>{t("cloud.organization.selectPlaceholder")}</option>
+        {organizationData.organizations.map((organization) => (
+          <option key={organization.id} value={organization.id}>{organization.name}</option>
+        ))}
+      </select>
+    </label>
   );
+}
+
+function emptyOrganizationState(contextKey: string): CloudOrganizationDataState {
+  return {
+    contextKey,
+    organizations: [],
+    selectedOrganizationId: null,
+    organization: null,
+    members: [],
+    entitlements: null,
+    seatUsage: null,
+    status: "loading",
+    membersStatus: "idle",
+    loading: true,
+    error: null,
+  };
+}
+
+function createCloudOrganizationContextKey(
+  session: DesktopCloudSession,
+  apiBaseUrl: string | null,
+): string {
+  return [
+    session.user_id,
+    session.session_generation,
+    normalizeApiIdentity(apiBaseUrl ?? session.api_base_url),
+  ].join("\u001f");
+}
+
+export function createCloudOrganizationPreferenceKey(
+  session: DesktopCloudSession,
+  apiBaseUrl: string | null,
+): string {
+  return [
+    session.user_id,
+    normalizeApiIdentity(apiBaseUrl ?? session.api_base_url),
+  ].join("\u001f");
+}
+
+function normalizeApiIdentity(value: string): string {
+  const trimmed = value.trim().replace(/\/+$/, "");
+  try {
+    const url = new URL(trimmed);
+    return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return trimmed;
+  }
+}
+
+function organizationSelectionStorageKey(preferenceKey: string): string {
+  return `puppyone.cloud.organization-selection.v2:${encodeURIComponent(preferenceKey)}`;
+}
+
+function readOrganizationSelection(preferenceKey: string): string | null {
+  try {
+    return window.localStorage.getItem(organizationSelectionStorageKey(preferenceKey));
+  } catch {
+    return null;
+  }
+}
+
+function writeOrganizationSelection(preferenceKey: string, organizationId: string): void {
+  try {
+    window.localStorage.setItem(organizationSelectionStorageKey(preferenceKey), organizationId);
+  } catch {
+    // Selection remains valid in memory when durable browser storage is unavailable.
+  }
+}
+
+function formatRole(role: string, t: MessageFormatter) {
+  if (role === "owner" || role === "member" || role === "viewer") return t(`cloud.team.role.${role}`);
+  return role;
 }

@@ -15,8 +15,7 @@
   position: absolute;
   z-index: 2;
   top: 0;
-  right: 0;
-  left: 0;
+  inset-inline: 0;
   height: 38px;
   -webkit-app-region: drag;
   user-select: none;
@@ -69,7 +68,7 @@
   background: transparent;
   color: var(--po-text-muted);
   text-align: center;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   transition:
     color 150ms ease-out,
     transform 150ms ease-out;
@@ -82,7 +81,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .folder-drop-primary-action:focus-visible {
@@ -303,8 +302,8 @@
 
 .onboarding-mode-switch {
   position: absolute;
-  left: calc(100% + 16px);
-  right: auto;
+  inset-inline-start: calc(100% + 16px);
+  inset-inline-end: auto;
   bottom: 0;
   z-index: 4;
   display: inline-flex;
@@ -315,7 +314,7 @@
   border: 0;
   background: transparent;
   color: var(--po-text-subtle);
-  cursor: pointer;
+  cursor: var(--po-clickable-cursor, pointer);
   font: inherit;
   font-size: 11.5px;
   font-weight: 560;
@@ -437,8 +436,8 @@
   border-radius: 0;
   background: transparent;
   color: var(--po-text);
-  text-align: left;
-  cursor: pointer;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
   transition:
     background-color 150ms ease,
     color 150ms ease;
@@ -496,7 +495,7 @@
 
 .onboarding-project-row-cloud-badge {
   position: absolute;
-  right: 0;
+  inset-inline-end: 0;
   bottom: 2px;
   display: grid;
   width: 15px;
@@ -693,7 +692,7 @@
 .onboarding-drop-context {
   display: grid;
   gap: 3px;
-  padding-left: 2px;
+  padding-inline-start: 2px;
 }
 
 .onboarding-drop-context span {
@@ -759,8 +758,8 @@
   }
 
   .onboarding-mode-switch {
-    left: auto;
-    right: 0;
+    inset-inline-start: auto;
+    inset-inline-end: 0;
     bottom: 0;
   }
 

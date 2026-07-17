@@ -11,11 +11,14 @@ import { resolveCloudAuthState } from "./resolveCloudAuthState";
 export function useCloudSessionForEnvironment({
   cloudSession,
   sessionRestoring,
+  restoreEnabled = true,
   environment,
   onCloudSessionChange,
 }: {
   cloudSession: DesktopCloudSession | null;
   sessionRestoring: boolean;
+  /** False when the active local workspace has no Cloud locator. */
+  restoreEnabled?: boolean;
   environment: CloudEnvironment;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
 }): CloudAuthState {
@@ -25,7 +28,7 @@ export function useCloudSessionForEnvironment({
     : null;
 
   useEffect(() => {
-    if (!environment.apiBaseUrl || sessionRestoring || effectiveSession) {
+    if (!restoreEnabled || !environment.apiBaseUrl || sessionRestoring || effectiveSession) {
       setEnvironmentSessionRestoring(false);
       return undefined;
     }
@@ -53,6 +56,7 @@ export function useCloudSessionForEnvironment({
     effectiveSession,
     environment.apiBaseUrl,
     onCloudSessionChange,
+    restoreEnabled,
     sessionRestoring,
   ]);
 

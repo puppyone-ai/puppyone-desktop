@@ -2,10 +2,12 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { useLocalization } from "@puppyone/localization";
 import type {
   OnboardingOperationStatus,
   RecentWorkspaceHomeItem,
@@ -21,62 +23,105 @@ import {
   getHomeProjectItems,
 } from "../../app-shell/workspaceHomeModel";
 import {
-  resolveRecentWorkspaceCloudBinding,
-  type RecentWorkspaceCloudBinding,
+  resolveRecentWorkspaceCloudContext,
+  type RecentWorkspaceCloudContext,
 } from "../workspace/cloudProjectResolution";
+import {
+  cloudMessage,
+  formatCloudMessage,
+  type CloudMessageDescriptor,
+} from "../cloudPresentation";
 
 export function useCloudProjectHome({
   activeCloudSession,
+  autoRefreshProjectCatalog = true,
+  autoResolveRecentWorkspaceContexts = true,
   cloudEnabled,
   desktopCloudApiBaseUrl,
+  includeUnboundCloudProjects = true,
   onOpenCloudProject,
   onPendingCloudProjectCreateReady,
   recentWorkspaceItems,
   setHomeOperationStatus,
-  setRestoreWorkspaceError,
   showBrowserSignInStatus,
   startCloudBrowserSignIn,
   updateCloudSession,
 }: {
   activeCloudSession: DesktopCloudSession | null;
+  autoRefreshProjectCatalog?: boolean;
+  autoResolveRecentWorkspaceContexts?: boolean;
   cloudEnabled: boolean;
   desktopCloudApiBaseUrl: string | null;
-  onOpenCloudProject: (project: DesktopCloudProject) => Promise<void>;
+  includeUnboundCloudProjects?: boolean;
+  onOpenCloudProject: (project: DesktopCloudProject) => Promise<void> | void;
   onPendingCloudProjectCreateReady?: () => void;
   recentWorkspaceItems: RecentWorkspaceHomeItem[];
   setHomeOperationStatus: Dispatch<SetStateAction<OnboardingOperationStatus | null>>;
-  setRestoreWorkspaceError: Dispatch<SetStateAction<string | null>>;
   showBrowserSignInStatus: (detail: string) => void;
-  startCloudBrowserSignIn: () => Promise<void>;
+  startCloudBrowserSignIn: () => Promise<boolean>;
   updateCloudSession: (session: DesktopCloudSession | null) => void;
 }) {
+  const { t } = useLocalization();
   const [homeCloudProjects, setHomeCloudProjects] = useState<DesktopCloudProject[]>([]);
   const [homeCloudProjectsLoading, setHomeCloudProjectsLoading] = useState(false);
-  const [homeCloudProjectsError, setHomeCloudProjectsError] = useState<string | null>(null);
-  const [recentWorkspaceCloudBindings, setRecentWorkspaceCloudBindings] = useState<Record<string, RecentWorkspaceCloudBinding>>({});
+  const [homeCloudProjectsErrorState, setHomeCloudProjectsErrorState] = useState<CloudMessageDescriptor | null>(null);
+  const [recentWorkspaceCloudContexts, setRecentWorkspaceCloudContexts] = useState<Record<string, RecentWorkspaceCloudContext>>({});
   const [pendingCloudProjectCreate, setPendingCloudProjectCreate] = useState(false);
+  const [homeCloudProjectCreateDialogOpen, setHomeCloudProjectCreateDialogOpen] = useState(false);
+  const [homeCloudProjectCreateSubmitting, setHomeCloudProjectCreateSubmitting] = useState(false);
+  const [homeCloudProjectCreateError, setHomeCloudProjectCreateError] = useState<string | null>(null);
+  const homeCloudProjectCreateAttemptRef = useRef<{ organizationId: string; idempotencyKey: string } | null>(null);
+  const homeCloudProjectCreateRequestRef = useRef<symbol | null>(null);
+  const activeCloudSessionRef = useRef(activeCloudSession);
+  const updateCloudSessionRef = useRef(updateCloudSession);
+  activeCloudSessionRef.current = activeCloudSession;
+  updateCloudSessionRef.current = updateCloudSession;
+  const cloudSessionIdentityKey = activeCloudSession
+    ? [
+        activeCloudSession.user_id,
+        activeCloudSession.session_generation,
+        activeCloudSession.api_base_url,
+      ].join("\n")
+    : "signed-out";
+  const homeCloudProjectsError = homeCloudProjectsErrorState
+    ? formatCloudMessage(homeCloudProjectsErrorState, t)
+    : null;
+  const setHomeCloudProjectsError = useCallback((error: string | null) => {
+    setHomeCloudProjectsErrorState(error
+      ? cloudMessage("project-list-load-failed", undefined, error)
+      : null);
+  }, []);
 
   const refreshHomeCloudProjects = useCallback(async () => {
-    if (!cloudEnabled || !activeCloudSession) {
+    const activeSession = activeCloudSessionRef.current;
+    if (!cloudEnabled || cloudSessionIdentityKey === "signed-out" || !activeSession) {
       setHomeCloudProjects([]);
       setHomeCloudProjectsLoading(false);
-      setHomeCloudProjectsError(null);
+      setHomeCloudProjectsErrorState(null);
       return;
     }
 
     setHomeCloudProjectsLoading(true);
-    setHomeCloudProjectsError(null);
+    setHomeCloudProjectsErrorState(null);
     try {
-      const projects = await listCloudProjects(activeCloudSession, updateCloudSession);
+      const projects = await listCloudProjects(
+        activeSession,
+        updateCloudSessionRef.current,
+        desktopCloudApiBaseUrl,
+      );
       setHomeCloudProjects(projects);
     } catch (error) {
-      setHomeCloudProjectsError(error instanceof Error ? error.message : String(error));
+      setHomeCloudProjectsErrorState(cloudMessage(
+        "project-list-load-failed",
+        undefined,
+        error instanceof Error ? error.message : String(error),
+      ));
     } finally {
       setHomeCloudProjectsLoading(false);
     }
-  }, [activeCloudSession, cloudEnabled, updateCloudSession]);
+  }, [cloudEnabled, cloudSessionIdentityKey, desktopCloudApiBaseUrl]);
 
-  const recentWorkspaceBindingKey = useMemo(
+  const recentWorkspaceContextKey = useMemo(
     () => recentWorkspaceItems
       .slice(0, 20)
       .map((item) => `${item.workspace.id}\t${item.workspace.path}\t${item.lastOpenedAt ?? ""}`)
@@ -87,32 +132,35 @@ export function useCloudProjectHome({
     () => homeCloudProjects.map((project) => project.id).join("\n"),
     [homeCloudProjects],
   );
+  const homeCloudProjectsRef = useRef(homeCloudProjects);
+  homeCloudProjectsRef.current = homeCloudProjects;
 
   useEffect(() => {
+    if (!autoResolveRecentWorkspaceContexts) return undefined;
     const items = recentWorkspaceItems.slice(0, 20);
     if (!cloudEnabled || items.length === 0) {
-      setRecentWorkspaceCloudBindings({});
+      setRecentWorkspaceCloudContexts({});
       return undefined;
     }
 
     let cancelled = false;
     void Promise.all(
-      items.map((item) => resolveRecentWorkspaceCloudBinding({
+      items.map((item) => resolveRecentWorkspaceCloudContext({
         apiBaseUrl: desktopCloudApiBaseUrl,
         item,
-        onSessionChange: updateCloudSession,
-        projects: homeCloudProjects,
-        session: activeCloudSession,
+        onSessionChange: updateCloudSessionRef.current,
+        projects: homeCloudProjectsRef.current,
+        session: activeCloudSessionRef.current,
       })),
     )
       .then((entries) => {
         if (cancelled) return;
-        setRecentWorkspaceCloudBindings(Object.fromEntries(entries));
+        setRecentWorkspaceCloudContexts(Object.fromEntries(entries));
       })
       .catch((error) => {
         if (!cancelled) {
-          console.warn("Unable to resolve recent workspace Cloud bindings:", error);
-          setRecentWorkspaceCloudBindings({});
+          console.warn("Unable to resolve recent workspace Cloud repository contexts:", error);
+          setRecentWorkspaceCloudContexts({});
         }
       });
 
@@ -120,99 +168,156 @@ export function useCloudProjectHome({
       cancelled = true;
     };
   }, [
-    activeCloudSession,
+    autoResolveRecentWorkspaceContexts,
     cloudEnabled,
+    cloudSessionIdentityKey,
     desktopCloudApiBaseUrl,
     homeCloudProjectIdsKey,
-    recentWorkspaceBindingKey,
+    recentWorkspaceContextKey,
     recentWorkspaceItems,
-    updateCloudSession,
   ]);
 
   const homeProjectItems = useMemo(
     () => getHomeProjectItems({
-      bindings: recentWorkspaceCloudBindings,
+      contexts: recentWorkspaceCloudContexts,
       cloudProjects: homeCloudProjects,
+      includeUnboundCloudProjects,
       recentWorkspaceItems,
     }),
-    [homeCloudProjects, recentWorkspaceCloudBindings, recentWorkspaceItems],
+    [homeCloudProjects, includeUnboundCloudProjects, recentWorkspaceCloudContexts, recentWorkspaceItems],
   );
 
-  const activateCreatedCloudProject = useCallback(async (session: DesktopCloudSession) => {
+  const activateCreatedCloudProject = useCallback(async (
+    session: DesktopCloudSession,
+    organizationId: string,
+    idempotencyKey: string,
+  ) => {
     setHomeOperationStatus({
-      title: "Creating cloud project",
-      detail: "Preparing a new Puppyone Cloud workspace.",
+      title: t("onboarding.operation.creatingCloud.title"),
+      detail: t("onboarding.operation.creatingCloud.detail"),
     });
-    const project = await createCloudProject(session, "Untitled Project", updateCloudSession);
+    const project = await createCloudProject(
+      session,
+      {
+        name: t("onboarding.projects.untitled"),
+        description: null,
+        org_id: organizationId,
+      },
+      idempotencyKey,
+      updateCloudSession,
+      desktopCloudApiBaseUrl,
+    );
     setHomeOperationStatus({
-      title: "Opening cloud project",
-      detail: "Loading the new workspace.",
+      title: t("onboarding.operation.openingCloud.title"),
+      detail: t("onboarding.operation.openingCloud.detail"),
     });
     setHomeCloudProjects((current) => [project, ...current.filter((item) => item.id !== project.id)]);
     await onOpenCloudProject(project);
-  }, [onOpenCloudProject, setHomeOperationStatus, updateCloudSession]);
+  }, [desktopCloudApiBaseUrl, onOpenCloudProject, setHomeOperationStatus, t, updateCloudSession]);
 
   const createCloudProjectFromHomepage = useCallback(async () => {
     if (!activeCloudSession) {
       setPendingCloudProjectCreate(true);
-      showBrowserSignInStatus("Sign in to Puppyone Cloud, then this project will be created.");
+      showBrowserSignInStatus(t("onboarding.status.signInToCreateCloud"));
       void startCloudBrowserSignIn();
       return;
     }
     setPendingCloudProjectCreate(false);
-    try {
-      await activateCreatedCloudProject(activeCloudSession);
-    } catch (error) {
-      setHomeOperationStatus(null);
-      throw error;
-    }
+    setHomeCloudProjectCreateError(null);
+    setHomeCloudProjectCreateDialogOpen(true);
   }, [
-    activateCreatedCloudProject,
     activeCloudSession,
-    setHomeOperationStatus,
     showBrowserSignInStatus,
     startCloudBrowserSignIn,
+    t,
   ]);
 
   useEffect(() => {
     if (!pendingCloudProjectCreate || !activeCloudSession) return undefined;
 
-    let cancelled = false;
     setPendingCloudProjectCreate(false);
     onPendingCloudProjectCreateReady?.();
-    void activateCreatedCloudProject(activeCloudSession).catch((error) => {
-      if (!cancelled) {
-        setHomeOperationStatus(null);
-        setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
-      }
-    });
+    setHomeCloudProjectCreateError(null);
+    setHomeCloudProjectCreateDialogOpen(true);
 
-    return () => {
-      cancelled = true;
-    };
+    return undefined;
   }, [
-    activateCreatedCloudProject,
     activeCloudSession,
     pendingCloudProjectCreate,
     onPendingCloudProjectCreateReady,
-    setHomeOperationStatus,
-    setRestoreWorkspaceError,
   ]);
+
+  const submitHomeCloudProjectCreate = useCallback(async (organizationId: string) => {
+    const session = activeCloudSessionRef.current;
+    const normalizedOrganizationId = organizationId.trim();
+    if (!session || !normalizedOrganizationId || homeCloudProjectCreateRequestRef.current) return;
+    const existingAttempt = homeCloudProjectCreateAttemptRef.current;
+    const attempt = existingAttempt?.organizationId === normalizedOrganizationId
+      ? existingAttempt
+      : {
+          organizationId: normalizedOrganizationId,
+          idempotencyKey: crypto.randomUUID(),
+    };
+    homeCloudProjectCreateAttemptRef.current = attempt;
+    const request = Symbol("create-home-cloud-project");
+    homeCloudProjectCreateRequestRef.current = request;
+    setHomeCloudProjectCreateSubmitting(true);
+    setHomeCloudProjectCreateError(null);
+    try {
+      await activateCreatedCloudProject(session, attempt.organizationId, attempt.idempotencyKey);
+      homeCloudProjectCreateAttemptRef.current = null;
+      setHomeCloudProjectCreateDialogOpen(false);
+    } catch (error) {
+      setHomeOperationStatus(null);
+      setHomeCloudProjectCreateError(formatCloudMessage(
+        cloudMessage(
+          "project-open-failed",
+          undefined,
+          error instanceof Error ? error.message : String(error),
+        ),
+        t,
+      ));
+    } finally {
+      if (homeCloudProjectCreateRequestRef.current === request) {
+        homeCloudProjectCreateRequestRef.current = null;
+        setHomeCloudProjectCreateSubmitting(false);
+      }
+    }
+  }, [activateCreatedCloudProject, setHomeOperationStatus, t]);
+
+  const cancelHomeCloudProjectCreate = useCallback(() => {
+    if (homeCloudProjectCreateRequestRef.current) return;
+    homeCloudProjectCreateAttemptRef.current = null;
+    setHomeCloudProjectCreateError(null);
+    setHomeCloudProjectCreateDialogOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (activeCloudSession) return;
+    homeCloudProjectCreateAttemptRef.current = null;
+    setHomeCloudProjectCreateDialogOpen(false);
+    setHomeCloudProjectCreateError(null);
+  }, [activeCloudSession]);
 
   const openCloudProjectFromHomepage = useCallback(async (projectId: string) => {
     if (!activeCloudSession) {
-      showBrowserSignInStatus("Sign in to Puppyone Cloud, then open this project again.");
+      showBrowserSignInStatus(t("onboarding.status.signInToOpenCloud"));
       void startCloudBrowserSignIn();
       return;
     }
 
     setHomeOperationStatus({
-      title: "Opening cloud project",
-      detail: "Loading the project workspace.",
+      title: t("onboarding.operation.openingCloud.title"),
+      detail: t("onboarding.operation.openingCloud.detail"),
     });
     try {
       const project = homeCloudProjects.find((item) => item.id === projectId)
-        ?? await getCloudProject(activeCloudSession, projectId, updateCloudSession);
+        ?? await getCloudProject(
+          activeCloudSession,
+          projectId,
+          updateCloudSession,
+          desktopCloudApiBaseUrl,
+        );
       await onOpenCloudProject(project);
     } catch (error) {
       setHomeOperationStatus(null);
@@ -220,31 +325,39 @@ export function useCloudProjectHome({
     }
   }, [
     activeCloudSession,
+    desktopCloudApiBaseUrl,
     homeCloudProjects,
     onOpenCloudProject,
     setHomeOperationStatus,
     showBrowserSignInStatus,
     startCloudBrowserSignIn,
+    t,
     updateCloudSession,
   ]);
 
   useEffect(() => {
+    if (!autoRefreshProjectCatalog) return;
     void refreshHomeCloudProjects();
-  }, [refreshHomeCloudProjects]);
+  }, [autoRefreshProjectCatalog, refreshHomeCloudProjects]);
 
   return {
     createCloudProjectFromHomepage,
+    cancelHomeCloudProjectCreate,
     homeCloudProjects,
     homeCloudProjectsError,
     homeCloudProjectsLoading,
+    homeCloudProjectCreateDialogOpen,
+    homeCloudProjectCreateError,
+    homeCloudProjectCreateSubmitting,
     homeProjectItems,
     openCloudProjectFromHomepage,
     pendingCloudProjectCreate,
-    recentWorkspaceCloudBindings,
+    recentWorkspaceCloudContexts,
     refreshHomeCloudProjects,
     setHomeCloudProjects,
     setHomeCloudProjectsError,
     setPendingCloudProjectCreate,
-    setRecentWorkspaceCloudBindings,
+    setRecentWorkspaceCloudContexts,
+    submitHomeCloudProjectCreate,
   };
 }

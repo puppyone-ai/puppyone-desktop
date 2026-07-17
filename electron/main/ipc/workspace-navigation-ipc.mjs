@@ -23,6 +23,10 @@ export function registerWorkspaceNavigationIpcHandlers({
     return workspaceStateStore.getRecentWorkspacesResult();
   });
 
+  ipcMain.handle("workspace:hydrate-recent", async () => {
+    return workspaceStateStore.hydrateRecentWorkspacesResult();
+  });
+
   ipcMain.handle("workspace:forget-last", async (event) => {
     await forgetCurrentWindowWorkspace(event.sender);
     return { ok: true };

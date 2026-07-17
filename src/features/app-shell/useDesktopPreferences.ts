@@ -14,11 +14,14 @@ import {
   POINTER_CURSORS_STORAGE_KEY,
   RIGHT_SIDEBAR_TOOLS_STORAGE_KEY,
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
+  SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY,
   TEXT_SIZE_STORAGE_KEY,
+  TYPOGRAPHY_STORAGE_KEY,
   THEME_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
   getSidebarNavigationOrientation,
   getSidebarNavigationPlacement,
+  parseTypography,
   type ExternalAppsSettings,
   type DiffMarkers,
   type DockIcon,
@@ -27,17 +30,21 @@ import {
   type GitDisplayMode,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
+  type SidebarNavigationVisibilitySettings,
   type ThemeMode,
   type TextSize,
+  type TypographyPreferences,
   type TitlebarActionsSettings,
 } from "../../preferences";
 import {
+  AGENT_PREFERRED_RUNTIME_STORAGE_KEY,
   AGENT_PREFERRED_MODEL_STORAGE_KEY,
   EXPLORER_WIDTH_STORAGE_KEY,
   RIGHT_SIDEBAR_WIDTH_STORAGE_KEY,
   RIGHT_SIDEBAR_SURFACE_STORAGE_KEY,
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   readInitialAgentPreferredModel,
+  readInitialAgentPreferredRuntime,
   readInitialAiEditAssistEnabled,
   readInitialExperimentalSettings,
   readInitialExplorerWidth,
@@ -50,6 +57,7 @@ import {
   readInitialRightSidebarSurface,
   readInitialSidebarCollapsed,
   readInitialSidebarNavigationLayout,
+  readInitialSidebarNavigationVisibilitySettings,
   readInitialTitlebarActionsSettings,
   readInitialDarkThemePreset,
   readInitialDiffMarkers,
@@ -57,6 +65,7 @@ import {
   readInitialLightThemePreset,
   readInitialPointerCursors,
   readInitialTextSize,
+  readInitialTypographyPreferences,
   readInitialThemeMode,
   readSystemDarkMode,
 } from "./preferences";
@@ -66,11 +75,17 @@ export function useDesktopPreferences() {
   const [lightThemePreset, setLightThemePreset] = useState(() => readInitialLightThemePreset());
   const [darkThemePreset, setDarkThemePreset] = useState(() => readInitialDarkThemePreset());
   const [textSize, setTextSize] = useState<TextSize>(() => readInitialTextSize());
+  const [typographyPreferences, setTypographyPreferences] = useState<TypographyPreferences>(
+    () => readInitialTypographyPreferences(),
+  );
   const [pointerCursors, setPointerCursors] = useState(() => readInitialPointerCursors());
   const [dockIcon, setDockIcon] = useState<DockIcon>(() => readInitialDockIcon());
   const [diffMarkers, setDiffMarkers] = useState<DiffMarkers>(() => readInitialDiffMarkers());
   const [fileIconTheme, setFileIconTheme] = useState<FileIconThemeId>(() => readInitialFileIconTheme());
   const [sidebarNavigationLayout, setSidebarNavigationLayout] = useState<SidebarNavigationLayout>(() => readInitialSidebarNavigationLayout());
+  const [sidebarNavigationVisibilitySettings, setSidebarNavigationVisibilitySettings] = useState<SidebarNavigationVisibilitySettings>(
+    () => readInitialSidebarNavigationVisibilitySettings(),
+  );
   const [gitDisplayMode, setGitDisplayMode] = useState<GitDisplayMode>(() => readInitialGitDisplayMode());
   const [filesVisibilitySettings, setFilesVisibilitySettings] = useState<FilesVisibilitySettings>(() => readInitialFilesVisibilitySettings());
   const [externalAppsSettings, setExternalAppsSettings] = useState<ExternalAppsSettings>(() => readInitialExternalAppsSettings());
@@ -83,6 +98,7 @@ export function useDesktopPreferences() {
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(() => readInitialRightSidebarWidth());
   const [rightSidebarSurface, setRightSidebarSurface] = useState(() => readInitialRightSidebarSurface());
+  const [agentPreferredRuntime, setAgentPreferredRuntime] = useState<string | null>(() => readInitialAgentPreferredRuntime());
   const [agentPreferredModel, setAgentPreferredModel] = useState<string | null>(() => readInitialAgentPreferredModel());
   const [systemDark, setSystemDark] = useState(() => readSystemDarkMode());
 
@@ -101,6 +117,19 @@ export function useDesktopPreferences() {
   useEffect(() => {
     window.localStorage.setItem(TEXT_SIZE_STORAGE_KEY, textSize);
   }, [textSize]);
+
+  useEffect(() => {
+    window.localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(typographyPreferences));
+  }, [typographyPreferences]);
+
+  useEffect(() => {
+    const syncTypographyAcrossWindows = (event: StorageEvent) => {
+      if (event.key !== TYPOGRAPHY_STORAGE_KEY && event.key !== null) return;
+      setTypographyPreferences(parseTypography(event.key === null ? null : event.newValue));
+    };
+    window.addEventListener("storage", syncTypographyAcrossWindows);
+    return () => window.removeEventListener("storage", syncTypographyAcrossWindows);
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(POINTER_CURSORS_STORAGE_KEY, pointerCursors ? "true" : "false");
@@ -122,6 +151,13 @@ export function useDesktopPreferences() {
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY, sidebarNavigationLayout);
   }, [sidebarNavigationLayout]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY,
+      JSON.stringify(sidebarNavigationVisibilitySettings),
+    );
+  }, [sidebarNavigationVisibilitySettings]);
 
   useEffect(() => {
     window.localStorage.setItem(GIT_DISPLAY_MODE_STORAGE_KEY, gitDisplayMode);
@@ -168,6 +204,11 @@ export function useDesktopPreferences() {
   }, [rightSidebarSurface]);
 
   useEffect(() => {
+    if (agentPreferredRuntime) window.localStorage.setItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY, agentPreferredRuntime);
+    else window.localStorage.removeItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY);
+  }, [agentPreferredRuntime]);
+
+  useEffect(() => {
     if (agentPreferredModel) window.localStorage.setItem(AGENT_PREFERRED_MODEL_STORAGE_KEY, agentPreferredModel);
     else window.localStorage.removeItem(AGENT_PREFERRED_MODEL_STORAGE_KEY);
   }, [agentPreferredModel]);
@@ -200,17 +241,20 @@ export function useDesktopPreferences() {
     rightSidebarToolsSettings,
     rightSidebarWidth,
     rightSidebarSurface,
+    agentPreferredRuntime,
     agentPreferredModel,
     sidebarCollapsed,
     sidebarNavigationLayout,
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
+    sidebarNavigationVisibilitySettings,
     terminalToolEnabled,
     titlebarActionsSettings,
     darkThemePreset,
     lightThemePreset,
     themeMode,
     textSize,
+    typographyPreferences,
     pointerCursors,
     setAiEditAssistEnabled,
     setDarkThemePreset,
@@ -226,14 +270,17 @@ export function useDesktopPreferences() {
     setRightSidebarToolsSettings,
     setRightSidebarWidth,
     setRightSidebarSurface,
+    setAgentPreferredRuntime,
     setAgentPreferredModel,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
+    setSidebarNavigationVisibilitySettings,
     setTitlebarActionsSettings,
     setLightThemePreset,
     setPointerCursors,
     setTextSize,
     setThemeMode,
+    setTypographyPreferences,
   };
 }
 

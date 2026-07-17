@@ -4,30 +4,31 @@ Architecture home: [Git and Source Control Architecture](README.md).
 
 ## Requirement
 
-The desktop Cloud `Branches` page must render a compact Git history graph that
-uses Git's own topology ordering. The page must not implement a second,
-component-local branch layout engine from `parent_ids`, because that quickly
-drifts from real Git behavior for merge commits, remote heads, and branch
-compaction.
+The desktop Cloud `Branches` page must render a compact Git history graph from
+an authoritative topology source. A mapped local repository uses Git's own
+topology ordering/prefixes. A Cloud-only project uses the backend's stable,
+topologically ordered `parent_ids` + refs snapshot. Neither path may implement
+lane lifetime in React component state.
 
 ## Final Architecture
 
 The graph layout has three layers:
 
-1. `local-api/workspace.mjs` is the topology source. `readGitHistory`
-   calls stock `git log --graph --topo-order` and returns `graph_prefix` plus
-   `graph_continuation_prefixes` alongside commit metadata.
-2. `src/features/cloud/model.ts` converts those Git graph prefixes into
-   `CloudBranchGraphLine` / `CloudBranchGraphSegment` view-model objects. This
-   layer may assign product colors, labels, and branch-ref markers, but it must
-   not infer commit topology from React state. It also owns ref-only rows for
-   branch heads that do not map to a visible commit.
+1. Topology comes from either `local-api/workspace.mjs` (`readGitHistory` calls
+   stock `git log --graph --topo-order` and returns `graph_prefix` plus
+   continuation prefixes) or the Cloud History read API (signed ref snapshot,
+   child-before-parent commits, `parent_ids`, and refs).
+2. `src/features/cloud/graph/model.ts` is the public adapter.
+   `gitTopology.ts` converts Git prefixes; `cloudTopology.ts` maps the server
+   DAG; `shared.ts` owns colors, labels, ref markers, and ref-only rows. These
+   pure modules may decide lanes, but React components may not.
 3. `src/features/cloud/sections/BranchesSection.tsx` renders the graph
    lines and commit rows. It owns SVG drawing only; it must not decide lane
    order, merge routing, or branch lifetime.
 
-`parent_ids` remain useful for metadata, diff workflows, and resolving branch
-head labels, but not for hand-rolling graph lane layout in the UI.
+Local `parent_ids` remain metadata because Git prefixes are the stronger local
+source. Cloud `parent_ids` are authoritative graph facts and may be mapped only
+inside the pure `cloudTopology.ts` policy, never inside JSX.
 
 Branch refs are product state, not just commit topology. If Git collapses a
 branch head onto an existing ancestry line, the model should still expose a

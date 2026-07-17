@@ -4,7 +4,7 @@ import {
   discoverCodexExecutable,
   MIN_SUPPORTED_CODEX_VERSION,
   parseCodexVersion,
-} from "../electron/main/agent/provider-discovery.mjs";
+} from "../electron/main/agent/runtimes/codex/codex-discovery.mjs";
 
 describe("Codex provider discovery", () => {
   it("parses and classifies semantic versions", () => {
@@ -16,12 +16,8 @@ describe("Codex provider discovery", () => {
     expect(MIN_SUPPORTED_CODEX_VERSION).toBe("0.144.1");
   });
 
-  it("returns ready using an absolute executable without exposing shell interpolation", async () => {
-    const spawn = vi.fn((file, args) => createCompletedChild(
-      args.includes("/usr/bin/env -0")
-        ? "PATH=/usr/local/bin\0HOME=/Users/test\0"
-        : "codex-cli 0.144.1\n",
-    ));
+  it("returns ready using deterministic paths without executing a login shell", async () => {
+    const spawn = vi.fn(() => createCompletedChild("codex-cli 0.144.1\n"));
     const fsModule = {
       constants: { X_OK: 1 },
       promises: {
@@ -40,7 +36,9 @@ describe("Codex provider discovery", () => {
     });
     expect(readiness).toMatchObject({ status: "ready", version: "0.144.1", executablePath: "/usr/local/bin/codex" });
     expect(spawn.mock.calls.every((call) => call[2]?.shell === false)).toBe(true);
-    expect(spawn.mock.calls[0][1]).toEqual(["-ilc", "/usr/bin/env -0"]);
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect(spawn.mock.calls[0][1]).toEqual(["--version"]);
+    expect(readiness.environment.PATH).toContain("/Users/test/.local/bin");
   });
 
   it("classifies missing and older installations", async () => {
@@ -59,9 +57,7 @@ describe("Codex provider discovery", () => {
     });
     expect(missing.status).toBe("not-installed");
 
-    const spawn = vi.fn((_file, args) => createCompletedChild(
-      args.includes("/usr/bin/env -0") ? "PATH=/usr/local/bin\0" : "codex-cli 0.90.0\n",
-    ));
+    const spawn = vi.fn(() => createCompletedChild("codex-cli 0.90.0\n"));
     const older = await discoverCodexExecutable({
       fsModule: {
         constants: { X_OK: 1 },

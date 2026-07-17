@@ -2,23 +2,35 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const markdownEditorCss = readFileSync(
-  new URL("../vendor/shared-ui/src/styles/editor/markdown-editor.css", import.meta.url),
+  new URL("../packages/shared-ui/src/styles/editor/markdown-editor.css", import.meta.url),
   "utf8",
 );
 const markdownTableCss = readFileSync(
-  new URL("../vendor/shared-ui/src/styles/editor/markdown-table-widget.css", import.meta.url),
+  new URL("../packages/shared-ui/src/styles/editor/markdown-table-widget.css", import.meta.url),
   "utf8",
 );
 const markdownHtmlCss = readFileSync(
-  new URL("../vendor/shared-ui/src/styles/editor/markdown-html-widget.css", import.meta.url),
+  new URL("../packages/shared-ui/src/styles/editor/markdown-html-widget.css", import.meta.url),
   "utf8",
 );
 const markdownCodeCss = readFileSync(
-  new URL("../vendor/shared-ui/src/styles/editor/markdown-code-widgets.css", import.meta.url),
+  new URL("../packages/shared-ui/src/styles/editor/markdown-code-widgets.css", import.meta.url),
   "utf8",
 );
 
 describe("Markdown editor layout", () => {
+  it("keeps canonical Markdown source invisible until Live Preview commits", () => {
+    const pendingRule = readCssRule(
+      markdownEditorCss,
+      '.markdown-codemirror-editor[data-live-preview="true"][data-preview-state="pending"] .cm-editor',
+    );
+
+    expect(pendingRule).toContain("visibility: hidden;");
+    expect(pendingRule).toContain("pointer-events: none;");
+    expect(markdownEditorCss).not.toMatch(/data-preview-state="pending"[^}]*opacity\s*:/s);
+    expect(markdownEditorCss).not.toMatch(/data-preview-state="pending"[^}]*display\s*:\s*none/s);
+  });
+
   it("keeps vertical document padding fixed while the inline gutter responds to width", () => {
     const editorRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor");
     const contentRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor .cm-content");
@@ -36,11 +48,45 @@ describe("Markdown editor layout", () => {
 
     expect(editorRule).toContain("--po-markdown-breakout-right-gutter: 48px;");
   });
+
+  it("keeps task checkbox visuals compact inside a reliable desktop hit target", () => {
+    const taskLineRule = readCssRule(
+      markdownEditorCss,
+      ".markdown-codemirror-editor .cm-md-task-line",
+    );
+    const controlRule = readCssRule(
+      markdownEditorCss,
+      ".markdown-codemirror-editor .cm-md-task-checkbox-widget",
+    );
+    const indicatorRule = readCssRule(
+      markdownEditorCss,
+      ".markdown-codemirror-editor .cm-md-task-checkbox",
+    );
+    expect(taskLineRule).toContain("--md-task-checkbox-hit-size: 24px;");
+    expect(controlRule).toContain("width: var(--md-task-checkbox-hit-size);");
+    expect(controlRule).toContain("height: var(--md-task-checkbox-hit-size);");
+    expect(controlRule).toContain("font: inherit;");
+    expect(indicatorRule).toContain("width: var(--md-task-checkbox-size);");
+    expect(indicatorRule).toContain("pointer-events: none;");
+    expect(markdownEditorCss).not.toMatch(/cm-md-task-checkbox-widget:hover/);
+  });
+});
+
+describe("Markdown HTML media layout", () => {
+  it("caps raw HTML images at the reading rail without replacing authored sizing", () => {
+    const imageRule = readCssRule(
+      markdownHtmlCss,
+      ".markdown-codemirror-editor .cm-md-html-rendered-surface img",
+    );
+
+    expect(imageRule).toContain("max-width: 100%;");
+    expect(imageRule).not.toMatch(/(^|\n)\s*width\s*:/);
+  });
 });
 
 describe("Markdown rich-block boundary affordance", () => {
-  const richWidgetSelector = ".markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget)";
-  const richSurfaceSelector = ".markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget)";
+  const richWidgetSelector = ".markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget, .cm-md-video-widget)";
+  const richSurfaceSelector = ".markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget, .cm-md-video-widget)";
 
   it("paints state on the inner surface so wrapper spacing stays outside the ring", () => {
     const editorRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor");

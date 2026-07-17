@@ -15,12 +15,12 @@
   --git-row-radius: var(--desktop-sidebar-row-radius);
   position: relative;
   display: flex;
-  width: clamp(260px, 28vw, 380px);
-  min-width: 180px;
+  width: var(--desktop-history-tree-width, clamp(260px, 28vw, 380px));
+  min-width: var(--desktop-history-tree-width, 180px);
   min-height: 0;
   flex: 0 0 auto;
   flex-direction: column;
-  border-right: 1px solid var(--po-divider);
+  border-inline-end: 1px solid var(--po-divider);
   background: var(--po-sidebar);
   transition:
     width 140ms ease,
@@ -43,17 +43,18 @@ body.desktop-history-resizing .desktop-history-panel-tree {
   overflow-x: hidden;
   /* Reserved gutter + reduced right padding keep rows at the standard inset
      whether or not the list scrolls. */
-  padding: 8px calc(var(--git-sidebar-right-gap) - var(--desktop-sidebar-scrollbar-width)) 6px
-    var(--git-sidebar-left-gap);
+  padding-block: 8px 6px;
+  padding-inline:
+    var(--git-sidebar-left-gap)
+    calc(var(--git-sidebar-right-gap) - var(--desktop-sidebar-scrollbar-width));
   scrollbar-gutter: stable;
 }
 
 .desktop-history-panel-tree-resizer {
   position: absolute;
   z-index: 3;
-  top: 0;
-  right: -4px;
-  bottom: 0;
+  inset-block: 0;
+  inset-inline-end: -4px;
   display: flex;
   width: 8px;
   align-items: center;
@@ -67,9 +68,8 @@ body.desktop-history-resizing .desktop-history-panel-tree {
 
 .desktop-history-panel-tree-resizer::after {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 3px;
+  inset-block: 0;
+  inset-inline-start: 3px;
   width: 2px;
   border-radius: 999px;
   background: transparent;
@@ -159,22 +159,6 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
     var(--desktop-utility-page-padding-top)
     var(--desktop-utility-page-padding-inline)
     var(--desktop-utility-page-padding-bottom);
-}
-
-.desktop-working-file-detail-view .desktop-commit-summary {
-  gap: 0;
-  padding-bottom: 12px;
-}
-
-.desktop-working-file-detail-view .desktop-commit-id-row {
-  min-height: 28px;
-  gap: 6px;
-}
-
-.desktop-working-file-detail-view .desktop-commit-id-row strong {
-  font-size: var(--po-text-size-title, 16px);
-  font-weight: var(--po-text-weight-semibold, 600);
-  line-height: 20px;
 }
 
 .desktop-commit-summary {
@@ -274,13 +258,21 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
   color: var(--po-danger);
 }
 
+.desktop-working-file-toolbar {
+  display: flex;
+  min-height: var(--git-action-size);
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
 .desktop-working-file-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .desktop-working-file-actions .secondary-action,
@@ -327,50 +319,6 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
   background: transparent;
   color: var(--po-text-disabled);
   opacity: 0.62;
-}
-
-.desktop-working-file-status {
-  display: inline-flex;
-  height: 18px;
-  flex: 0 0 auto;
-  align-items: center;
-  padding: 0 5px;
-  border-radius: 4px;
-  background: var(--po-control);
-  color: var(--po-text-muted);
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.desktop-working-file-status.modified,
-.desktop-working-file-status.renamed,
-.desktop-working-file-status.copied {
-  background: color-mix(in srgb, var(--po-warning) 8%, transparent);
-  color: var(--po-warning);
-}
-
-.desktop-working-file-status.added,
-.desktop-working-file-status.untracked {
-  background: color-mix(in srgb, var(--po-success) 8%, transparent);
-  color: var(--po-success);
-}
-
-.desktop-working-file-status.deleted,
-.desktop-working-file-status.conflict {
-  background: color-mix(in srgb, var(--po-danger) 8%, transparent);
-  color: var(--po-danger);
-}
-
-.desktop-working-file-status.staged,
-.desktop-working-file-status.remote,
-.desktop-working-file-status.committed {
-  background: color-mix(in srgb, var(--po-accent) 7%, transparent);
-  color: var(--po-text-subtle);
-}
-
-.desktop-working-file-stat {
-  margin-left: 2px;
 }
 
 .desktop-initial-repo-state {
@@ -466,7 +414,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
 }
 
 .desktop-initial-repo-metrics div + div {
-  border-left: 1px solid var(--po-border-subtle);
+  border-inline-start: 1px solid var(--po-border-subtle);
 }
 
 .desktop-initial-repo-metrics span {

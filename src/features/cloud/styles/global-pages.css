@@ -38,6 +38,34 @@
   line-height: 1.5;
 }
 
+.desktop-cloud-org-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.desktop-cloud-organization-selector {
+  display: grid;
+  gap: 4px;
+  color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.desktop-cloud-organization-selector select {
+  width: min(240px, 32vw);
+  height: 32px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: var(--po-panel-raised);
+  color: var(--po-text);
+  font: inherit;
+  font-size: 13px;
+}
+
 .desktop-cloud-org-primary-button,
 .desktop-cloud-org-secondary-button {
   display: inline-flex;
@@ -68,6 +96,12 @@
 .desktop-cloud-org-primary-button:hover,
 .desktop-cloud-org-secondary-button:hover {
   opacity: 0.9;
+}
+
+.desktop-cloud-org-primary-button:disabled,
+.desktop-cloud-org-secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .desktop-cloud-org-card,
@@ -349,7 +383,7 @@
 }
 
 .desktop-cloud-billing-price {
-  text-align: right;
+  text-align: end;
 }
 
 .desktop-cloud-billing-price strong,
@@ -363,7 +397,7 @@
 
 .desktop-cloud-billing-price span,
 .desktop-cloud-billing-plan-price span {
-  margin-left: 4px;
+  margin-inline-start: 4px;
   color: var(--po-text-subtle);
   font-size: 12px;
   font-weight: 500;
@@ -411,7 +445,7 @@
 }
 
 .desktop-cloud-plan-feature .with-value {
-  margin-left: 4px;
+  margin-inline-start: 4px;
 }
 
 .desktop-cloud-billing-options {
@@ -443,7 +477,7 @@
 
 .desktop-cloud-billing-plan-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
 }
 
@@ -510,6 +544,232 @@
   color: var(--po-text-inverse);
 }
 
+.desktop-cloud-billing-plan-card > button:disabled,
+.desktop-cloud-billing-inline-action:disabled,
+.desktop-cloud-billing-seat-control button:disabled,
+.desktop-cloud-billing-quote > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.desktop-cloud-billing-inline-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-cloud-billing-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.desktop-cloud-billing-usage-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px 20px;
+  border: 1px solid var(--po-border);
+  border-radius: 8px;
+  background: var(--po-panel);
+}
+
+.desktop-cloud-billing-usage-card.warning {
+  border-color: color-mix(in srgb, var(--po-warning) 45%, var(--po-border));
+}
+
+.desktop-cloud-billing-usage-card header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.desktop-cloud-billing-usage-card > strong {
+  color: var(--po-text);
+  font-size: 22px;
+  font-weight: 650;
+}
+
+.desktop-cloud-billing-usage-card > small {
+  color: var(--po-text-subtle);
+  font-size: 12px;
+}
+
+.desktop-cloud-billing-meter {
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--po-control);
+}
+
+.desktop-cloud-billing-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--po-success);
+}
+
+.desktop-cloud-billing-usage-card.warning .desktop-cloud-billing-meter > span {
+  background: var(--po-warning);
+}
+
+.desktop-cloud-billing-seat-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--po-text-muted);
+  font-size: 12px;
+}
+
+.desktop-cloud-billing-seat-control input {
+  width: 64px;
+  height: 30px;
+  box-sizing: border-box;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: var(--po-control);
+  color: var(--po-text);
+  padding: 0 8px;
+}
+
+.desktop-cloud-billing-seat-control button,
+.desktop-cloud-billing-quote > button {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: var(--po-panel-raised);
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-cloud-billing-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel) 65%, transparent);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-billing-notice > div {
+  display: grid;
+  gap: 3px;
+}
+
+.desktop-cloud-billing-notice strong {
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.desktop-cloud-billing-notice span {
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.desktop-cloud-billing-notice > button {
+  flex: 0 0 auto;
+  height: 30px;
+  margin-inline-start: auto;
+  padding: 0 10px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: var(--po-panel-raised);
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-cloud-billing-notice > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.desktop-cloud-billing-quote {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--po-border-strong);
+  border-radius: 8px;
+  background: var(--po-panel);
+}
+
+.desktop-cloud-billing-quote > div:first-child > span {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.desktop-cloud-billing-quote h2 {
+  margin: 5px 0 0;
+  color: var(--po-text);
+  font-size: 17px;
+}
+
+.desktop-cloud-billing-quote p,
+.desktop-cloud-billing-quote-price small {
+  margin: 6px 0 0;
+  color: var(--po-text-subtle);
+  font-size: 12px;
+}
+
+.desktop-cloud-billing-quote-price {
+  display: grid;
+  justify-items: end;
+}
+
+.desktop-cloud-billing-quote-price strong {
+  color: var(--po-text);
+  font-size: 28px;
+}
+
+.desktop-cloud-billing-quote-price > span {
+  color: var(--po-text-subtle);
+  font-size: 12px;
+}
+
+.desktop-cloud-billing-boundary-warning {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--po-warning) 12%, transparent);
+  color: var(--po-warning);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-cloud-billing-quote > button {
+  grid-column: 1 / -1;
+  justify-self: end;
+  border-color: transparent;
+  background: var(--po-text);
+  color: var(--po-text-inverse);
+}
+
 .desktop-cloud-billing-note {
   display: flex;
   align-items: center;
@@ -531,11 +791,32 @@
 }
 
 @media (max-width: 1080px) {
+  .desktop-cloud-org-header,
+  .desktop-cloud-org-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .desktop-cloud-org-actions,
+  .desktop-cloud-organization-selector select {
+    width: 100%;
+  }
+
   .desktop-cloud-billing-plan-grid {
     grid-template-columns: 1fr;
   }
 
   .desktop-cloud-billing-plan-card {
     min-height: auto;
+  }
+
+  .desktop-cloud-billing-usage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .desktop-cloud-billing-options-header,
+  .desktop-cloud-billing-seat-control {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

@@ -50,7 +50,7 @@ The update path has five layers:
 The production stable macOS feed is:
 
 ```text
-https://updates.puppyone.ai/desktop/stable/mac
+https://updates.puppyone.ai/desktop/stable/mac/latest
 ```
 
 Cloudflare R2/CDN should use platform-scoped channel directories:
@@ -295,8 +295,14 @@ Build scripts:
   - local unsigned mac artifact build for development verification
   - builds both DMG and zip targets
 - `npm run dist:mac:publish`
-  - CI production publish path
-  - expects signing, notarization, and publish credentials from CI environment
+  - guarded production composition: build/verify, then explicit R2 publish
+  - expects signing, notarization, exact version-tag, and R2 credentials
+- `npm run dist:mac:release`
+  - builds with hardened runtime, signs, notarizes, and verifies the packaged app
+  - does not upload artifacts
+- `npm run publish:mac:r2`
+  - re-verifies the release before uploading versioned and `latest` stable objects
+  - the tagged stable workflow creates the canonical GitHub Release first
 
 ## Verification
 

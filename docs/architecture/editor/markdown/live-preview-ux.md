@@ -12,7 +12,7 @@ This document has two parts with different lifetimes:
   migration content — and remains the reference for everyone working on the
   editor after the current work is done.
 - **Part 2 — Migration plan.** The to-do list and code change map for moving
-  the implementation in `vendor/shared-ui/src/editor/markdown/` onto Part 1.
+  the implementation in `packages/shared-ui/src/editor/markdown/` onto Part 1.
   It is scoped to this one migration; delete or archive it once the new
   behavior has shipped and stabilized.
 
@@ -127,6 +127,13 @@ and patches these edges instead.
    source. Range selections (mouse drags, shift-selects) act on rendered
    text without expanding anything — this kills drag flicker by
    construction.
+7. **Live Preview commits atomically.** A newly selected document may build
+   its canonical EditorView and derived projection in separate scheduled
+   tasks, but raw source is not an intermediate presentation state. The
+   measurable editor stays hidden and non-interactive until the current
+   document revision is confirmed for paint. Source appears immediately only
+   when the user intentionally chooses Source Mode or when Preview fails with
+   an explicit fallback notice.
 
 ## 4. Element lifecycle
 
@@ -372,6 +379,38 @@ affordances.
 - The caret cannot enter a rendered block; it is atomic like the rule. Editing
   happens through the block's source toggle.
 
+### Block rearrangement
+
+When **Markdown block drag handles** is explicitly enabled in Experimental,
+moving the pointer into
+the left reading gutter reveals one quiet six-dot handle for the block under
+the pointer. The document does not tint, lift, fade, or reflow on hover. The
+handle occupies a fixed 22px square on one document-level rail, independent of
+heading size and nested-block indentation. It uses `grab` feedback while
+keeping its glyph visually subordinate to the content.
+
+- Dragging begins only after a short movement threshold. During a drag, the
+  source block stays visually stable and one thin accent line marks the exact
+  insertion boundary. Releasing over the original boundary is a no-op.
+- Root paragraphs, headings, quotes, fenced blocks, tables, and other root
+  blocks move only between root blocks. A list item moves only among sibling
+  items in the same list and carries its nested children with it. Cross-level,
+  cross-container, multi-block, and cross-document dragging are deliberately
+  unsupported.
+- The move preserves the Markdown bytes of the block and surrounding blank-line
+  rhythm. Direct ordered-list numbers are renumbered to match the new order.
+  It commits once, undoes once, and keeps a caret or selection inside the moved
+  block at the same logical text position.
+- `Mod-Shift-ArrowUp` and `Mod-Shift-ArrowDown` move the caret's block through
+  the same command path. Escape cancels an active pointer drag. No document
+  block is made an extra Tab stop merely to expose dragging.
+- The handle and drop indicator have no entrance/bounce animation. Edge
+  autoscroll is continuous and stops immediately on release, cancel, blur, or
+  editor destruction. `prefers-reduced-motion` introduces no different data
+  behavior because the interaction does not depend on decorative motion.
+- Read-only mode, source mode, active IME composition, and the default-disabled
+  experimental preference expose no handle or block-move shortcut.
+
 ### Not yet supported (spec reserved)
 
 Math blocks (`$$`), YAML front matter, footnotes, and `[toc]` follow the
@@ -400,6 +439,7 @@ ranges are hidden and atomic.
 | `[label](url)` | link-styled label | URL part hidden; see click rules below |
 | `[[target]]` / `[[t\|alias]]` | wiki-link label | resolved/missing/ambiguous styling kept |
 | `![alt](src)` | inline image | atomic; see below |
+| `![[image.png]]` | Obsidian-style image embed | workspace-link resolution; atomic |
 | `<https://…>` / bare URL | link text | brackets hidden |
 | common safe inline HTML, including `<span style="color: …">text</span>` | sanitized semantic/styled content | tags reveal per element; blocked capabilities are diagnosed and omitted when structure remains honest, otherwise source stays visible |
 | `\*` escapes | the escaped char | backslash hidden |
@@ -427,9 +467,43 @@ Links and images:
 - Plain click on a link label places the caret (revealing if it lands
   inside); ⌘-click (or Ctrl-click) opens the target. Rationale: this is an
   editor first; click-to-open misfires while editing.
-- An image is atomic. Click selects it; Backspace deletes the whole
-  `![alt](src)` range; Return with the image selected (or a second click)
-  expands it to source for editing.
+- An image is atomic. A single click focuses the mounted image without creating
+  a CodeMirror document selection, so the replacement DOM and decoded resource
+  stay mounted. Backspace/Delete while focused removes the whole
+  `![alt](src)` range; Enter or double-click deliberately expands it to source
+  for editing.
+- Editing unrelated text, including text before the image, does not blank,
+  reload, or re-decode an already rendered image. Only a change to that image's
+  semantic source/context or removal of its owning view replaces the mounted
+  preview.
+- A complete raw HTML `<img ...>` that owns its physical line renders through
+  the same safe-media broker, including `alt`, bounded `width`/`height`, and
+  local workspace sources. Mixed prose plus inline `<img>` remains source.
+- A rendered HTML block's source action reveals that block's canonical range
+  in the main CodeMirror document; it never creates a nested textarea,
+  `contenteditable`, or second source draft inside the widget. Normal typing,
+  IME, history, persistence, and external-change handling therefore keep using
+  the document's single transaction path. Moving the caret outside the range
+  or pressing Escape restores the rendered block.
+
+Video embeds:
+
+- A supported full-line `![[clip.mp4]]` / `![[clip.webm]]` target renders as a
+  block video with native controls, no autoplay, inline playback, and metadata-
+  only preload. `![[clip.mp4|Demo]]` supplies a title;
+  `![[clip.mp4|720x405]]` supplies bounded display geometry.
+- Video targets use the same workspace wiki-link resolution and brokered local
+  asset transport as Obsidian image embeds. Ambiguous or unresolved targets
+  stay honest as a fallback instead of loading an arbitrary same-named file.
+- Editing unrelated text preserves the mounted video element, playback time,
+  buffered state, and capability lease. Changing the video source or removing
+  its owning view disposes that session.
+- Safe raw HTML `<video>` / `<source>` follows the same resource policy. The
+  editor forces controls, strips autoplay, brokers every source/poster, and
+  keeps unsupported executable behavior out of the document DOM. A complete
+  `<video>...</video>` root may occupy one physical line or a normal Markdown
+  HTML block; mixed prose plus inline `<video>` remains source rather than being
+  guessed into a block.
 
 Typing completion: typing the closing delimiter renders the element
 instantly (caret ends at `to`, which is outside per the strict predicate).
@@ -534,10 +608,11 @@ pipeline is the only live-preview pipeline. Future risky editor experiments
 can still use the compartment to ship behind a temporary variant switch, but
 no switch remains for this migration.
 
-After every code change in `vendor/shared-ui`, run
-`npm run check:shared-ui`. `vendor/shared-ui/GENERATED.md` is the current
-source-of-truth note: the historical sync scripts named in
-`vendor/shared-ui/AGENTS.md` do not exist in this repository.
+After every code change in `packages/shared-ui`, run
+`npm run check:shared-ui`. `packages/shared-ui/GENERATED.md` and
+`packages/shared-ui/AGENTS.md` both describe this standalone repository's
+editable canonical copy; historical monorepo sync scripts are intentionally
+not part of this repository.
 
 ## 11. To-do list
 
@@ -606,7 +681,8 @@ CodeMirror text editing)
 - [x] Link click places the caret; ⌘-click opens; read-only click opens;
       Cmd/Ctrl+Enter follows the link under the caret; pointer cursor appears
       only while the open modifier is down.
-- [x] Image atomic selection; Return / second click expands to source.
+- [x] Stable image focus; Enter / double-click expands to source, while
+      Backspace/Delete removes the complete image range.
 - [x] Fence code block arrow-key exit and empty-block Backspace delete; Home
       targets; caret geometry (`coordsAt`) around hidden markers.
 - [x] Table arrow-key entry/exit and Tab / Shift-Tab cell movement.
@@ -658,9 +734,8 @@ New work:
       source-over-preview split; keeps the last successful SVG through
       invalid intermediate states with an inline error strip; read-only
       shows the diagram only.
-- [x] Detection branch in `addMarkdownBlockAndLineDecorations`:
-      `language === "mermaid"` → `MermaidBlockWidget` instead of
-      `CodeBlockWidget`.
+- [x] `codeBlockFeature` compiles a Mermaid fence to a typed `mermaid` embed;
+      the separately registered `mermaidFeature` owns its Widget factory.
 - [x] Widget CSS: container, toolbar, error strip, fit-to-width SVG.
 
 **Phase 8 — table structure editing** (additive feature on the same
@@ -761,6 +836,20 @@ feedback and motion" / "Selection"; §7 block-selected rule):
       tallest cell, so a ring on the span hugged the text and left empty
       padding.
 
+**Phase 11 — same-document block rearrangement** (Part 1 §5 Block
+rearrangement):
+
+- [x] Resolve root blocks and same-list sibling items from the Lezer tree;
+      preserve nested item content without adding persistent block IDs.
+- [x] Apply lossless source-slice relocation, scoped ordered-list renumbering,
+      selection mapping, embedded-draft relocation, and one-step undo/redo
+      through one transaction with a reversible relocation effect.
+- [x] Add one measured handle/drop-line overlay with pointer threshold,
+      capture, Escape cancellation, and edge autoscroll; add the equivalent
+      keyboard commands without extra Tab stops.
+- [x] Add the default-off Experimental preference and dedicated CodeMirror compartment;
+      the disabled state destroys the overlay and removes the move keymap.
+
 ## 12. Code change map
 
 | Area | Current (`markdownCodeMirrorExtensions.ts`) | Target (Part 1) |
@@ -777,6 +866,7 @@ feedback and motion" / "Selection"; §7 block-selected rule):
 | Link click | Click opens link | Click edits; ⌘-click opens |
 | Mermaid fences | Generic editable code-block widget | Rendered diagram; in-place split editing (Phase 7) |
 | Table structure | Cell edit + navigation only; no row/column ops, alignment ignored | Model-layer ops behind keyboard / menu / hover entry points (Phase 8) |
+| Document block order | Source editing only | Same-parent drag handle + keyboard movement, lossless single transaction (Phase 11) |
 
 User-visible behavior changes shipped by this migration:
 
@@ -797,8 +887,9 @@ Current building blocks that stay:
   ViewPlugin, so geometry is known before the view measures).
 - `Decoration.replace` with zero-width widgets for hidden syntax, with
   `coordsAt` overrides so the caret has geometry next to widgets.
-- Widget `eq()` identity to avoid DOM rebuild churn; `estimatedHeight` for
-  scroll stability.
+- Widget `eq()` uses semantic render identity—not mapped absolute offsets—to
+  avoid DOM rebuild churn; event handlers resolve the current source range from
+  CodeMirror. `estimatedHeight` provides scroll stability.
 
 Changes required by Part 1:
 
@@ -888,35 +979,46 @@ Changes required by Part 1:
    strips, pointer drag) call the same feature command and model functions —
    the UI layers own no table-mutation logic. Column-width resizing is
    explicitly out of scope: GFM has no syntax to persist it.
-10. **Module layout (Phase 9, superseded by the vertical-feature migration).**
-    The editor is a hybrid modular monolith: stable machinery is layered, while
-    complex capabilities keep model, plan, interaction, and widget code
-    together. Public assembly remains thin:
+10. **Final module layout and Feature Composition.** Stable machinery is
+    layered, while complex capabilities keep model, plan, interaction, and
+    Widget code together. Public assembly installs one immutable Feature
+    Composition through a CodeMirror Facet:
 
     ```text
     editor/markdown/
       markdownCodeMirrorExtensions.ts   assembly: extension factories, theme
-      core/                             syntax, plans, commands, decorations
+      composition/
+        markdownFeatureComposition.ts   only built-in registration point
+        preview/                         isolated-string compatibility adapter
+      core/                             generic syntax/plans/commands/adapters
+        features/                       pure data + composition port/Facet
         commands/                       view → transaction commands
         syntax/                         Lezer-backed semantic projection
         plans/                          typed plan contract + compiler
         state/                          generic StateFields/effects
         decorations/                    plan → CodeMirror decorations
       features/
-        blockFeatureRegistry.ts         typed block composition boundary
-        inlineFeatureRegistry.ts        typed inline composition boundary
-        table/                          model/plan/commands/focus/widget/drag
-        html/                           tokenizer/model/plan/policy/widget
-        code-block/                     model/plan/widget
-        mermaid/                        renderer/widget
-        image/                          model/plan/widget
+        table/                          tableFeature + model/plan/commands/widget
+        html/                           htmlFeature + tokenizer/model/plan/widget
+        code-block/                     codeBlockFeature + model/plan/widget
+        mermaid/                        mermaidFeature + renderer/widget
+        image/                          imageFeature + model/plan/widget
+        video/                          videoFeature + model/plan/playback widget
+        media/                          syntax feature + shared mechanisms
       platform/                         security, policy, brokers, sessions
-      shared/                           feature-agnostic DOM/measure helpers
+      shared/
+        preview/                        isolated-preview leaf port
+        widgets/                        feature-agnostic DOM/measure helpers
     ```
 
-    `scripts/check-markdown-architecture.mjs` rejects legacy horizontal
-    directories, platform-to-feature dependencies, shared upward dependencies,
-    DOM-backed plans, and core imports of concrete feature widgets.
+    Detection, plan compilation, Widget creation, and Feature-owned editor
+    extensions are indexed from that one frozen list. Main Feature decorations
+    consume `plan.atom` / `plan.embed` without retokenizing feature media. The
+    table-cell adapter is the explicit isolated-string exception.
+    `scripts/check-markdown-architecture.mjs`
+    rejects the deleted block/inline registries, concrete-feature imports from
+    the generic collector/compiler/decorations, platform-to-feature
+    dependencies, shared upward dependencies, and DOM-backed plans.
 
     `styles/editor.css` is an ordered `@import` list over
     `styles/editor/*.css` section files (preview surfaces, code editor,
@@ -981,9 +1083,10 @@ Changes required by Part 1:
     (`is-doc-selected`) remains for document-level selections that
     cover the table source range; it is never the result of an in-cell
     click. Entering a cell collapses any covering block selection so
-    the two chromes never stack. (An earlier "first click selects the
-    table" model was wrong for tables — that pattern fits atomic media
-    like images, not grids whose primary unit is the cell.)
+    the two chromes never stack. An earlier "first click creates a document
+    selection" model was also removed from images: focus is the stable
+    single-click state for an atomic widget, while explicit source expansion
+    owns the document-selection transition.
 
 ## 14. Background: architecture research
 

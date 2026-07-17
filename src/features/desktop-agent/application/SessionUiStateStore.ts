@@ -1,0 +1,73 @@
+export type SessionUiState = {
+  draft: string;
+  scrollTop: number;
+  measurements: Record<string, number>;
+  pinned: boolean;
+};
+
+const EMPTY_SESSION_UI: Readonly<SessionUiState> = Object.freeze({
+  draft: "",
+  scrollTop: 0,
+  measurements: Object.freeze({}),
+  pinned: true,
+});
+
+const DEFAULT_MAX_ENTRIES = 100;
+const DEFAULT_MAX_MEASUREMENTS_PER_SESSION = 1_000;
+
+/** Renderer-only ephemeral state keyed by application session id. */
+export class SessionUiStateStore {
+  private readonly entries = new Map<string, SessionUiState>();
+
+  constructor(
+    private readonly maxEntries = DEFAULT_MAX_ENTRIES,
+    private readonly maxMeasurementsPerSession = DEFAULT_MAX_MEASUREMENTS_PER_SESSION,
+  ) {
+    if (!Number.isInteger(maxEntries) || maxEntries < 1) throw new Error("Session UI cache size must be a positive integer.");
+    if (!Number.isInteger(maxMeasurementsPerSession) || maxMeasurementsPerSession < 1) {
+      throw new Error("Session UI measurement limit must be a positive integer.");
+    }
+  }
+
+  read(key: string): SessionUiState {
+    const stored = this.entries.get(key);
+    if (stored) {
+      // Map insertion order doubles as an inexpensive LRU list.
+      this.entries.delete(key);
+      this.entries.set(key, stored);
+    }
+    const value = stored ?? EMPTY_SESSION_UI;
+    return { ...value, measurements: { ...value.measurements } };
+  }
+
+  patch(key: string, value: Partial<SessionUiState>) {
+    const current = this.entries.get(key) ?? EMPTY_SESSION_UI;
+    const measurements = value.measurements
+      ? Object.fromEntries(Object.entries(value.measurements).slice(-this.maxMeasurementsPerSession))
+      : current.measurements;
+    this.entries.delete(key);
+    this.entries.set(key, {
+      ...current,
+      ...value,
+      measurements,
+    });
+    while (this.entries.size > this.maxEntries) {
+      const oldest = this.entries.keys().next().value;
+      if (typeof oldest !== "string") break;
+      this.entries.delete(oldest);
+    }
+  }
+
+  delete(key: string) {
+    this.entries.delete(key);
+  }
+
+  clear() {
+    this.entries.clear();
+  }
+}
+
+export const agentSessionUiStateLimits = Object.freeze({
+  maxEntries: DEFAULT_MAX_ENTRIES,
+  maxMeasurementsPerSession: DEFAULT_MAX_MEASUREMENTS_PER_SESSION,
+});

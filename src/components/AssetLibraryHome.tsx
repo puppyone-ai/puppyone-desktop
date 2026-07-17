@@ -18,6 +18,8 @@ import type {
   RecentWorkspaceHomeItem,
 } from "./MinimalOnboarding";
 import { InlineLoading } from "./loading";
+import { createTypographyRootProps } from "../features/typography";
+import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
 
 type AssetFilter = "all" | "cloud" | "local";
 type AssetLocationTone = "cloud" | "linked" | "local" | "synced";
@@ -39,10 +41,12 @@ export function AssetLibraryHome({
   lightThemePreset,
   darkThemePreset,
   textSize,
+  typography,
   pointerCursors,
   diffMarkers,
   resolvedTheme,
 }: MinimalOnboardingProps) {
+  const { t } = useLocalization();
   const [filter, setFilter] = useState<AssetFilter>("all");
   const [error, setError] = useState<string | null>(initialError);
   const [dragging, setDragging] = useState(false);
@@ -60,7 +64,7 @@ export function AssetLibraryHome({
     return true;
   }), [assets, filter]);
 
-  const localOperationStatus = getAssetLibraryOperationStatus(openingKey);
+  const localOperationStatus = getAssetLibraryOperationStatus(openingKey, t);
   const activeOperationStatus = operationStatus ?? localOperationStatus;
   const busy = openingKey !== null || Boolean(operationStatus);
 
@@ -107,7 +111,7 @@ export function AssetLibraryHome({
       } else if (item.cloudProjectId && onOpenCloudProject) {
         await onOpenCloudProject(item.cloudProjectId);
       } else {
-        throw new Error("This project is not available from this device.");
+        throw new Error(t("onboarding.library.error.unavailable"));
       }
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
@@ -120,7 +124,7 @@ export function AssetLibraryHome({
     if (busy) return;
     const nextPath = path.trim();
     if (!nextPath.startsWith("/")) {
-      setError("Drop a local folder or use Add from this Mac.");
+      setError(t("onboarding.library.error.dropLocalFolder"));
       return;
     }
 
@@ -150,7 +154,7 @@ export function AssetLibraryHome({
       : null;
 
     if (!droppedPath) {
-      setError("Could not read that folder path. Use Add from this Mac instead.");
+      setError(t("onboarding.library.error.unreadableDrop"));
       return;
     }
     await openDroppedFolder(droppedPath);
@@ -165,6 +169,7 @@ export function AssetLibraryHome({
       data-text-size={textSize}
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
+      {...createTypographyRootProps(typography)}
       onDragEnter={() => setDragging(true)}
       onDragOver={(event) => {
         event.preventDefault();
@@ -174,17 +179,17 @@ export function AssetLibraryHome({
       onDrop={handleDrop}
     >
       <div className="asset-library-home-titlebar" aria-hidden="true" />
-      <section className="asset-library-home" aria-label="Projects">
+      <section className="asset-library-home" aria-label={t("onboarding.projects.title")}>
         <header className="asset-library-home-header">
           <div className="asset-library-home-heading">
-            <h1>Projects</h1>
+            <h1>{t("onboarding.projects.title")}</h1>
           </div>
         </header>
 
-        <div className="asset-library-home-filter-row" role="group" aria-label="Filter assets by location">
-          <AssetFilterButton current={filter} value="all" label="All" onSelect={setFilter} />
-          <AssetFilterButton current={filter} value="cloud" label="Cloud" icon="cloud" onSelect={setFilter} />
-          <AssetFilterButton current={filter} value="local" label="On this Mac" icon="local" onSelect={setFilter} />
+        <div className="asset-library-home-filter-row" role="group" aria-label={t("onboarding.library.filterAriaLabel")}>
+          <AssetFilterButton current={filter} value="all" label={t("onboarding.library.filter.all")} onSelect={setFilter} />
+          <AssetFilterButton current={filter} value="cloud" label={t("onboarding.location.cloud")} icon="cloud" onSelect={setFilter} />
+          <AssetFilterButton current={filter} value="local" label={t("onboarding.library.filter.local")} icon="local" onSelect={setFilter} />
         </div>
 
         {activeOperationStatus && (
@@ -225,15 +230,15 @@ export function AssetLibraryHome({
 
         {visibleAssets.length === 0 && filter !== "all" && (
           <div className="asset-library-home-empty">
-            <strong>No projects in this location</strong>
-            <span>Choose another location filter.</span>
+            <strong>{t("onboarding.library.empty.title")}</strong>
+            <span>{t("onboarding.library.empty.detail")}</span>
           </div>
         )}
 
         {cloudSignedIn && cloudProjectsLoading && (
           <div className="asset-library-home-cloud-status" role="status">
             <RefreshCw size={13} strokeWidth={1.8} aria-hidden="true" />
-            <span>Refreshing Cloud projects</span>
+            <span>{t("onboarding.library.refreshingCloud")}</span>
           </div>
         )}
       </section>
@@ -241,7 +246,7 @@ export function AssetLibraryHome({
       {dragging && (
         <div className="asset-library-home-drop-overlay" aria-hidden="true">
           <FolderOpen size={24} strokeWidth={1.6} />
-          <strong>Add this folder to your library</strong>
+          <strong>{t("onboarding.library.dropOverlay")}</strong>
         </div>
       )}
     </main>
@@ -286,8 +291,9 @@ function AssetLibraryCard({
   opening: boolean;
   onOpen: () => void;
 }) {
-  const name = getAssetName(item);
-  const location = getAssetLocation(item);
+  const { t, formatDate, formatRelativeTime } = useLocalization();
+  const name = getAssetName(item, t("onboarding.projects.untitled"));
+  const location = getAssetLocation(item, t);
   const tooltip = item.localPath ?? item.description ?? item.label;
   const signature = getAssetSignature(item);
 
@@ -299,18 +305,18 @@ function AssetLibraryCard({
         title={tooltip}
         disabled={busy}
         aria-busy={opening || undefined}
-        aria-label={`Open ${name}`}
+        aria-label={t("onboarding.projects.open", { project: bidiIsolate(name) })}
         onClick={onOpen}
       >
         <span className="asset-library-card-cover" data-signature={signature} aria-hidden="true">
           <span className="asset-library-card-monogram">{getAssetMonogram(name)}</span>
         </span>
         <span className="asset-library-card-body">
-          <strong className="asset-library-card-title">{name}</strong>
+          <bdi className="asset-library-card-title">{name}</bdi>
           <span className="asset-library-card-footer">
             <span className={`asset-library-card-location ${location.tone}`}>
               {opening ? (
-                <InlineLoading label="Opening" size="xs" tone="neutral" />
+                <InlineLoading label={t("onboarding.status.opening")} size="xs" tone="neutral" />
               ) : (
                 <>
                   <AssetLocationIcon tone={location.tone} />
@@ -318,7 +324,12 @@ function AssetLibraryCard({
                 </>
               )}
             </span>
-            <span className="asset-library-card-meta">{formatAssetActivity(item.lastOpenedAt ?? item.updatedAt)}</span>
+            <span className="asset-library-card-meta">{formatAssetActivity(
+              item.lastOpenedAt ?? item.updatedAt,
+              t,
+              formatDate,
+              formatRelativeTime,
+            )}</span>
           </span>
         </span>
       </button>
@@ -348,6 +359,7 @@ function NewProjectCard({
   onCreateCloud: () => void;
   onChooseFolder: () => void;
 }) {
+  const { t } = useLocalization();
   return (
     <div
       className={`asset-library-new-project-wrap ${menuOpen ? "is-open" : ""}`}
@@ -375,7 +387,7 @@ function NewProjectCard({
           ) : (
             <Plus size={19} strokeWidth={1.7} aria-hidden="true" />
           )}
-          <span>{cloudAvailable ? "New Cloud project" : "New project"}</span>
+          <span>{t(cloudAvailable ? "onboarding.library.newCloudProject" : "onboarding.library.newProject")}</span>
         </span>
       </button>
       {menuOpen && (
@@ -383,12 +395,12 @@ function NewProjectCard({
           {cloudAvailable && (
             <button type="button" role="menuitem" onClick={onCreateCloud}>
               <Cloud size={15} strokeWidth={1.8} aria-hidden="true" />
-              <strong>Create in Cloud</strong>
+              <strong>{t("onboarding.library.createInCloud")}</strong>
             </button>
           )}
           <button type="button" role="menuitem" onClick={onChooseFolder}>
             <Monitor size={15} strokeWidth={1.8} aria-hidden="true" />
-            <strong>Add from this Mac</strong>
+            <strong>{t("onboarding.library.addFromMac")}</strong>
           </button>
         </div>
       )}
@@ -396,11 +408,11 @@ function NewProjectCard({
   );
 }
 
-function getAssetLocation(item: ProjectHomeItem): { label: string; tone: AssetLocationTone } {
-  if (item.kind === "cloud-local") return { label: "Synced", tone: "synced" };
-  if (item.kind === "cloud-linked") return { label: "Cloud linked", tone: "linked" };
-  if (item.kind === "cloud") return { label: "Cloud", tone: "cloud" };
-  return { label: "On this Mac", tone: "local" };
+function getAssetLocation(item: ProjectHomeItem, t: MessageFormatter): { label: string; tone: AssetLocationTone } {
+  if (item.kind === "cloud-local") return { label: t("onboarding.library.location.synced"), tone: "synced" };
+  if (item.kind === "cloud-linked") return { label: t("onboarding.library.location.linked"), tone: "linked" };
+  if (item.kind === "cloud") return { label: t("onboarding.location.cloud"), tone: "cloud" };
+  return { label: t("onboarding.library.location.local"), tone: "local" };
 }
 
 function assetHasCloudLocation(item: ProjectHomeItem) {
@@ -411,13 +423,13 @@ function assetHasLocalLocation(item: ProjectHomeItem) {
   return Boolean(item.localPath);
 }
 
-function getAssetName(item: ProjectHomeItem) {
+function getAssetName(item: ProjectHomeItem, untitled: string) {
   const projectName = item.detail?.trim();
-  if (projectName && projectName !== item.label && projectName !== "Cloud linked") return projectName;
+  if (projectName && projectName !== item.label) return projectName;
 
-  const source = item.localPath || item.label || "Untitled Asset";
+  const source = item.localPath || item.label || untitled;
   const segments = source.replace(/\/$/, "").split("/");
-  return segments.at(-1)?.trim() || "Untitled Asset";
+  return segments.at(-1)?.trim() || untitled;
 }
 
 function getAssetMonogram(name: string) {
@@ -454,10 +466,15 @@ function getAssetActivityTimestamp(item: ProjectHomeItem) {
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
-function formatAssetActivity(value?: string | null) {
-  if (!value) return "Previously opened";
+function formatAssetActivity(
+  value: string | null | undefined,
+  t: MessageFormatter,
+  formatDate: (value: Date | number | string, options?: Intl.DateTimeFormatOptions) => string,
+  formatRelativeTime: (value: number, unit: Intl.RelativeTimeFormatUnit, options?: Intl.RelativeTimeFormatOptions) => string,
+) {
+  if (!value) return t("onboarding.time.previouslyOpened");
   const timestamp = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) return "Previously opened";
+  if (Number.isNaN(timestamp)) return t("onboarding.time.previouslyOpened");
 
   const elapsed = Math.max(0, Date.now() - timestamp);
   const minute = 60 * 1000;
@@ -465,26 +482,26 @@ function formatAssetActivity(value?: string | null) {
   const day = 24 * hour;
   const week = 7 * day;
 
-  if (elapsed < minute) return "Just now";
-  if (elapsed < hour) return `${Math.max(1, Math.floor(elapsed / minute))}m ago`;
-  if (elapsed < day) return `${Math.max(1, Math.floor(elapsed / hour))}h ago`;
-  if (elapsed < week) return `${Math.max(1, Math.floor(elapsed / day))}d ago`;
+  if (elapsed < minute) return formatRelativeTime(0, "second", { numeric: "auto" });
+  if (elapsed < hour) return formatRelativeTime(-Math.max(1, Math.floor(elapsed / minute)), "minute", { numeric: "auto" });
+  if (elapsed < day) return formatRelativeTime(-Math.max(1, Math.floor(elapsed / hour)), "hour", { numeric: "auto" });
+  if (elapsed < week) return formatRelativeTime(-Math.max(1, Math.floor(elapsed / day)), "day", { numeric: "auto" });
 
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(timestamp);
+  return formatDate(timestamp, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function getAssetLibraryOperationStatus(openingKey: string | null): OnboardingOperationStatus | null {
+function getAssetLibraryOperationStatus(openingKey: string | null, t: MessageFormatter): OnboardingOperationStatus | null {
   if (!openingKey) return null;
   if (openingKey === "__cloud__") {
-    return { title: "Creating project in Cloud", detail: "Preparing a new PuppyOne workspace." };
+    return { title: t("onboarding.operation.creatingCloud.title"), detail: t("onboarding.operation.creatingCloud.detail") };
   }
   if (openingKey === "__new__") {
-    return { title: "Adding from this Mac", detail: "Waiting for folder selection." };
+    return { title: t("onboarding.operation.choosingFolder.title"), detail: t("onboarding.operation.choosingFolder.detail") };
   }
   if (openingKey.startsWith("cloud:")) {
-    return { title: "Opening Cloud project", detail: "Loading the project workspace." };
+    return { title: t("onboarding.operation.openingCloud.title"), detail: t("onboarding.operation.openingCloud.detail") };
   }
-  return { title: "Opening project", detail: "Loading files from this Mac." };
+  return { title: t("onboarding.operation.openingLocal.title"), detail: t("onboarding.operation.openingLocal.detail") };
 }
 
 function createLegacyAssetItems(

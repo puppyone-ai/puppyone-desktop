@@ -26,7 +26,7 @@
   color: var(--po-text-muted);
   font-size: 13px;
   font-weight: 650;
-  text-align: left;
+  text-align: start;
   transition: background 150ms ease, color 150ms ease;
 }
 
@@ -48,11 +48,8 @@
   overflow-x: hidden;
   overflow-y: auto;
   padding-block: var(--desktop-sidebar-list-padding-block);
-  padding-inline: 0;
+  padding-inline: var(--desktop-sidebar-row-left-gap) var(--desktop-sidebar-scroll-right-gap);
   scrollbar-gutter: stable;
-  /* Rows in this list own their horizontal margins through this token, so
-     compensate the reserved gutter here instead of on the list padding. */
-  --desktop-sidebar-row-right-gap: var(--desktop-sidebar-scroll-right-gap);
 }
 
 .desktop-cloud-sidebar-list::-webkit-scrollbar {
@@ -81,8 +78,10 @@
   gap: 8px;
   width: calc(100% - var(--desktop-sidebar-row-left-gap) - var(--desktop-sidebar-row-right-gap));
   min-height: 28px;
-  margin: 1px var(--desktop-sidebar-row-right-gap) 1px var(--desktop-sidebar-row-left-gap);
-  padding: 0 var(--desktop-sidebar-row-content-right) 0 var(--desktop-sidebar-row-content-left);
+  margin-block: 1px;
+  margin-inline: var(--desktop-sidebar-row-left-gap) var(--desktop-sidebar-row-right-gap);
+  padding-block: 0;
+  padding-inline: var(--desktop-sidebar-row-content-left) var(--desktop-sidebar-row-content-right);
 }
 
 .desktop-cloud-sidebar-metric span {
@@ -99,7 +98,7 @@
   color: var(--po-text-muted);
   font-size: 12px;
   font-weight: 600;
-  text-align: right;
+  text-align: end;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -149,14 +148,8 @@
   font-weight: 600;
 }
 
-.desktop-cloud-sidebar-separator {
-  height: 1px;
-  margin:
-    var(--desktop-sidebar-section-top-gap)
-    var(--desktop-sidebar-row-right-gap)
-    var(--desktop-sidebar-section-top-gap)
-    var(--desktop-sidebar-row-left-gap);
-  background: color-mix(in srgb, var(--po-divider) 72%, transparent);
+.desktop-cloud-sidebar-nav-row:not(.active):not(.locked) {
+  color: var(--po-text-subtle);
 }
 
 .desktop-cloud-sidebar-footer {
@@ -164,7 +157,7 @@
   height: var(--desktop-sidebar-nav-height);
   min-height: var(--desktop-sidebar-nav-height);
   align-items: center;
-  justify-content: flex-start;
+  justify-content: start;
   padding: 3px 9px 4px;
   border-top: 1px solid transparent;
   box-sizing: border-box;
@@ -236,6 +229,7 @@
   width: min(100%, 1040px);
   min-height: 100%;
   margin: 0 auto;
+  align-content: start;
   gap: 18px;
 }
 
