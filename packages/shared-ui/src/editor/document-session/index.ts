@@ -1,5 +1,6 @@
 export { DocumentEditingSession } from "./DocumentEditingSession";
 export { DocumentSessionBoundary } from "./DocumentSessionBoundary";
+export { useEditableDocumentSource } from "./EditableDocumentSourceContext";
 export {
   flushActiveDocumentSessions,
   registerActiveDocumentSession,
@@ -15,6 +16,8 @@ export type {
   DocumentPersistedCommit,
   DocumentSessionState,
   DocumentSessionStatus,
-  EditorDocumentSession,
+  DocumentEditingSessionHandle,
+  EditableDocumentSource,
+  ExternalConflictResolution,
   ExternalBaselineResult,
 } from "./types";

@@ -1,27 +1,18 @@
 import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
+import type {
+  MarkdownInlineHtml,
+  MarkdownInlineHtmlStatus,
+} from "../../core/features/markdownFeatureData";
+export type {
+  MarkdownInlineHtml,
+  MarkdownInlineHtmlStatus,
+} from "../../core/features/markdownFeatureData";
 import {
   parseMarkdownHtmlTagToken,
-  type MarkdownHtmlAttribute,
   type MarkdownHtmlTagToken,
 } from "./htmlTagTokenizer";
-
-export type MarkdownInlineHtmlStatus = "complete" | "incomplete" | "malformed";
-
-export type MarkdownInlineHtml = {
-  kind: "inlineHtml";
-  from: number;
-  to: number;
-  tagName: string;
-  openingMarker: { from: number; to: number };
-  contentRange: { from: number; to: number } | null;
-  closingMarker: { from: number; to: number } | null;
-  attributes: readonly MarkdownHtmlAttribute[];
-  status: MarkdownInlineHtmlStatus;
-  containerFrom: number;
-  containerTo: number;
-};
 
 type InlineContainer = {
   from: number;

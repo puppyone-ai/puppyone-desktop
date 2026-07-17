@@ -6,6 +6,23 @@
   border-radius: 6px;
 }
 
+.native-image-preview-shell {
+  position: relative;
+}
+
+.native-image-preview-shell[data-preview-state="loading"] .native-image-preview {
+  opacity: 0;
+}
+
+.native-image-preview-state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--po-text-subtle);
+  font-size: 12px;
+}
+
 .native-video-preview {
   max-width: 100%;
   max-height: 100%;

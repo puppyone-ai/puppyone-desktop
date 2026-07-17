@@ -10,6 +10,7 @@ import {
   moveWorkspaceEntry,
   readWorkspaceTextFile,
   renameWorkspaceEntry,
+  resolveExistingWorkspaceDisplayPath,
   resolveExistingWorkspacePath,
   writeWorkspaceTextFile,
 } from "../../../local-api/workspace.mjs";
@@ -49,6 +50,7 @@ export function registerWorkspaceFileIpcHandlers({
   shell,
   authorizeWorkspaceRoot,
   localFileCapabilities,
+  workspaceWatchService = null,
   convertOfficeDocument = convertWorkspaceOfficeDocumentToDocx,
   t = defaultTranslate,
 }) {
@@ -75,14 +77,16 @@ export function registerWorkspaceFileIpcHandlers({
     if (typeof filePath !== "string" || filePath.trim().length === 0) {
       throw new Error("File path is required.");
     }
-    const canonicalFilePath = await resolveExistingWorkspacePath(rootPath, filePath);
+    const purpose = requireLocalFileCapabilityPurpose(request?.purpose);
+    const canonicalFilePath = purpose === "markdown-asset"
+      ? await resolveExistingWorkspaceDisplayPath(rootPath, filePath)
+      : await resolveExistingWorkspacePath(rootPath, filePath);
     const metadata = await fs.promises.stat(canonicalFilePath).catch((error) => {
       throw new Error(`Unable to resolve local file resource: ${error.message}`);
     });
     if (!metadata.isFile()) throw new Error("Local file resource must be a regular file.");
 
     const relativePath = path.relative(rootPath, canonicalFilePath).split(path.sep).join("/");
-    const purpose = requireLocalFileCapabilityPurpose(request?.purpose);
     const scope = purpose === "file-preview" && getMimeType(canonicalFilePath)?.toLowerCase().startsWith("text/html")
       ? "directory"
       : "exact";
@@ -173,9 +177,23 @@ export function registerWorkspaceFileIpcHandlers({
     if (typeof filePath !== "string" || filePath.trim().length === 0) {
       throw new Error("File path is required.");
     }
+    const senderId = requireIpcSenderId(event);
     const result = await writeWorkspaceTextFile(rootPath, filePath, content, {
       expectedVersion: request?.expectedVersion ?? null,
     });
+    try {
+      workspaceWatchService?.noteInternalWrite?.({
+        rootPath,
+        path: filePath,
+        senderId,
+        version: result?.version ?? null,
+      });
+    } catch (error) {
+      // Watcher-loop suppression is an optimization. Once the atomic write
+      // succeeds, attribution bookkeeping must never turn that durability
+      // acknowledgement into a failed save.
+      console.warn("Unable to attribute internal workspace write:", error);
+    }
     await absorbWorkspaceEditReviewPath(rootPath, filePath);
     return result;
   });

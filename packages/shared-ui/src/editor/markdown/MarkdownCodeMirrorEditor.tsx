@@ -13,6 +13,7 @@ import { markdownLivePreviewContextExtension } from "./core/editor/markdownLiveP
 import { markdownAiEditExtension } from "./core/editor/markdownAiEditExtension";
 import { markdownBlockDragExtension } from "./core/interaction/markdownBlockDrag";
 import { getMarkdownPlanIndex } from "./core/plans/markdownPlanIndex";
+import { markdownRevealedSourceEffect } from "./core/state/revealedSource";
 import { getDocRevision } from "./platform/brokers/transactionBroker";
 import type { AiEditFile } from "../ai-edits/types";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
@@ -43,7 +44,6 @@ export type MarkdownCodeMirrorEditorProps = {
   onChange?: (value: string) => void;
   onSourceRevisionChange?: (revision: EditorSourceRevision) => void;
   onSnapshotPortChange?: (port: EditorSourceSnapshotPort | null) => void;
-  onBeforeDestroy?: (snapshot: EditorSourceSnapshot) => void;
   onEditorBaseReady?: (revision: string) => void;
   onPreviewReady?: (revision: string) => void;
   onPreviewError?: (error: Error) => void;
@@ -69,7 +69,6 @@ export function MarkdownCodeMirrorEditor({
   onChange,
   onSourceRevisionChange,
   onSnapshotPortChange,
-  onBeforeDestroy,
   onEditorBaseReady,
   onPreviewReady,
   onPreviewError,
@@ -89,7 +88,6 @@ export function MarkdownCodeMirrorEditor({
     onChange,
     onSourceRevisionChange,
     onSnapshotPortChange,
-    onBeforeDestroy,
     onEditorBaseReady,
     onPreviewReady,
     onPreviewError,
@@ -98,7 +96,6 @@ export function MarkdownCodeMirrorEditor({
     onChange,
     onSourceRevisionChange,
     onSnapshotPortChange,
-    onBeforeDestroy,
     onEditorBaseReady,
     onPreviewReady,
     onPreviewError,
@@ -225,7 +222,15 @@ export function MarkdownCodeMirrorEditor({
     });
     const snapshotPort: EditorSourceSnapshotPort = {
       readSnapshot: () => readEditorSnapshot(view),
-      readRevision: () => getDocRevision(view.state.doc),
+      replaceContent: (content) => {
+        externalValueRef.current = content;
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: content },
+          effects: markdownRevealedSourceEffect.of(null),
+          annotations: externalDocumentUpdate.of(true),
+        });
+        return readEditorSnapshot(view);
+      },
     };
     callbacksRef.current.onSnapshotPortChange?.(snapshotPort);
     const baseRevision = getDocRevision(view.state.doc);
@@ -238,13 +243,8 @@ export function MarkdownCodeMirrorEditor({
     return () => {
       previewGenerationRef.current += 1;
       unsubscribeTypography();
-      const snapshotStartedAt = performance.now();
-      const snapshot = readEditorSnapshot(view);
-      rendererPerformance.recordOperation(
-        "editor_snapshot_read",
-        performance.now() - snapshotStartedAt,
-      );
-      callbacksRef.current.onBeforeDestroy?.(snapshot);
+      // Detaching the port synchronously lets the host capture the final
+      // snapshot while the CodeMirror document is still alive.
       callbacksRef.current.onSnapshotPortChange?.(null);
       const destroyStartedAt = performance.now();
       view.destroy();
@@ -472,8 +472,18 @@ export function MarkdownCodeMirrorEditor({
     const view = viewRef.current;
     if (!view || Object.is(externalValueRef.current, value)) return;
     externalValueRef.current = value;
+    // A controlled host can echo the editor's newly persisted bytes back as a
+    // prop. Replacing an already-identical CodeMirror document would create a
+    // new document revision, rebuild every decoration, and restart async image
+    // resolution for no semantic change. Prop convergence is not an external
+    // edit; keep the canonical EditorView and its mounted widget sessions.
+    if (
+      view.state.doc.length === value.length
+      && view.state.doc.toString() === value
+    ) return;
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: value },
+      effects: markdownRevealedSourceEffect.of(null),
       annotations: externalDocumentUpdate.of(true),
     });
     callbacksRef.current.onSourceRevisionChange?.({

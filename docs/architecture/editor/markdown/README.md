@@ -58,12 +58,13 @@ diffs, code review, and Markdown renderers without diagram support:
 2. [End-to-end Markdown data flow](architecture.md#1-decision-summary)
    - Source, parser, semantic model, policy, plan, and output adapters.
 3. [Source layout and feature composition](architecture.md#37-source-layout-and-feature-composition)
-   - Physical `core/`, `features/`, `platform/`, and `shared/` ownership.
-4. [Dependency direction](architecture.md#38-dependency-direction-current-state-and-target)
-   - Why Core/Feature is currently bidirectional at folder level and the
-     intended one-way Kernel/Composition structure.
+   - Physical `composition/`, `core/`, `features/`, `platform/`, and `shared/`
+     ownership with one immutable built-in Feature Composition.
+4. [Dependency direction](architecture.md#38-dependency-direction--adopted)
+   - The enforced one-way Core/Feature/Composition ownership and injected
+     compatibility ports.
 5. [Type constraints](architecture.md#39-type-constraints-and-impossible-states)
-   - Current optional union data versus a fully discriminated semantic model.
+   - The shipped discriminated semantic and render-plan unions.
 6. [Transaction and widget lifecycle](architecture.md#310-transaction-and-widget-lifecycle)
    - Atomic commands, DOM rebuild, focus coordination, and resource ownership.
 
@@ -83,10 +84,10 @@ diffs, code review, and Markdown renderers without diagram support:
 
 ## Document lifecycle
 
-- `architecture.md` is the adopted target technical contract and is implemented
-  for the architecture migration: render plans, broad-safe profiles, embed host
-  / widget sessions, brokers, safe-trust default, preview convergence, and
-  Electron web-embed wiring. Sections 12 and 13 record the completed phases.
+- `architecture.md` is the adopted technical contract. The main document plan,
+  Feature Composition, embed lifecycle, policy, and persistence boundary are
+  implemented; §12 records the bounded table-cell adapter and browser-backed
+  acceptance work that remains.
 - Part 1 of `live-preview-ux.md` is the durable UX contract.
 - Part 2 of `live-preview-ux.md` records the previous live-preview migration.
   It is retained during this reorganization so directory cleanup does not

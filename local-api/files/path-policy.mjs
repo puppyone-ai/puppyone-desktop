@@ -59,3 +59,73 @@ export async function resolveExistingWorkspacePath(rootPath, relativePath) {
 
   return canonicalCandidate;
 }
+
+const DISPLAY_SPACE = /[\u0020\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/g;
+
+/**
+ * Resolve an authored display path while preserving exact filesystem semantics
+ * as the primary rule. This narrowly handles visually identical Unicode-space
+ * variants produced by macOS screenshot names. A fallback segment is accepted
+ * only when it has exactly one display-equivalent directory entry; ambiguity
+ * fails closed and symbolic-link traversal remains forbidden.
+ */
+export async function resolveExistingWorkspaceDisplayPath(rootPath, relativePath) {
+  try {
+    return await resolveExistingWorkspacePath(rootPath, relativePath);
+  } catch (exactError) {
+    const canonicalRoot = await fs.realpath(path.resolve(rootPath)).catch(() => {
+      throw exactError;
+    });
+    const normalizedRelative = normalizeRelativePath(relativePath);
+    if (!normalizedRelative) throw exactError;
+
+    const exactCandidate = resolveWorkspacePath(canonicalRoot, normalizedRelative);
+    const exactFailure = await fs.lstat(exactCandidate).then(
+      () => null,
+      (error) => error,
+    );
+    if (!exactFailure || exactFailure.code !== "ENOENT") throw exactError;
+
+    const requestedSegments = normalizedRelative.split("/");
+    const resolvedSegments = [];
+    let currentDirectory = canonicalRoot;
+
+    for (let index = 0; index < requestedSegments.length; index += 1) {
+      const requestedSegment = requestedSegments[index];
+      const entries = await fs.readdir(currentDirectory, { withFileTypes: true }).catch(() => {
+        throw exactError;
+      });
+      const exact = entries.find((entry) => entry.name === requestedSegment) ?? null;
+      const matches = exact
+        ? [exact]
+        : entries.filter((entry) => (
+          getWorkspaceDisplayNameKey(entry.name) === getWorkspaceDisplayNameKey(requestedSegment)
+        ));
+      if (matches.length === 0) throw exactError;
+      if (matches.length > 1) {
+        throw new Error("Workspace entry is ambiguous after Unicode display normalization.");
+      }
+
+      const entry = matches[0];
+      const candidatePath = path.join(currentDirectory, entry.name);
+      const metadata = await fs.lstat(candidatePath).catch(() => {
+        throw exactError;
+      });
+      if (metadata.isSymbolicLink()) {
+        throw new Error("Symbolic links cannot be accessed through workspace file operations.");
+      }
+      if (index < requestedSegments.length - 1 && !metadata.isDirectory()) {
+        throw exactError;
+      }
+
+      resolvedSegments.push(entry.name);
+      currentDirectory = candidatePath;
+    }
+
+    return resolveExistingWorkspacePath(canonicalRoot, resolvedSegments.join("/"));
+  }
+}
+
+function getWorkspaceDisplayNameKey(value) {
+  return value.normalize("NFC").replace(DISPLAY_SPACE, " ");
+}

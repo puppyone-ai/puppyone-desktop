@@ -80,6 +80,7 @@ export function ExperimentalSettingsView({
   }> = [
     { messageKey: "minimalMode", settingKey: "enableMinimalMode" },
     { messageKey: "viewerPlugins", settingKey: "enableViewerPlugins" },
+    { messageKey: "editorSaveStatus", settingKey: "enableEditorSaveStatus" },
     { messageKey: "markdownBlockDrag", settingKey: "enableMarkdownBlockDrag" },
     ...(assetLibraryHomeAvailable
       ? [{ messageKey: "projectsHome", settingKey: "enableAssetLibraryHome" as const }]
@@ -87,6 +88,7 @@ export function ExperimentalSettingsView({
     ...(agentChatAvailable
       ? [{ messageKey: "agentChat", settingKey: "enableAgentChat" as const }]
       : []),
+    { messageKey: "cloudWorkspace", settingKey: "enableCloudWorkspace" },
     { messageKey: "appFiles", settingKey: "enablePuppyoneAppFiles" },
     { messageKey: "flowFiles", settingKey: "enablePuppyFlowFiles" },
   ];

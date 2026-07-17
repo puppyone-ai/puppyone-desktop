@@ -72,9 +72,21 @@ describe("Markdown editor layout", () => {
   });
 });
 
+describe("Markdown HTML media layout", () => {
+  it("caps raw HTML images at the reading rail without replacing authored sizing", () => {
+    const imageRule = readCssRule(
+      markdownHtmlCss,
+      ".markdown-codemirror-editor .cm-md-html-rendered-surface img",
+    );
+
+    expect(imageRule).toContain("max-width: 100%;");
+    expect(imageRule).not.toMatch(/(^|\n)\s*width\s*:/);
+  });
+});
+
 describe("Markdown rich-block boundary affordance", () => {
-  const richWidgetSelector = ".markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget)";
-  const richSurfaceSelector = ".markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget)";
+  const richWidgetSelector = ".markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget, .cm-md-video-widget)";
+  const richSurfaceSelector = ".markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget, .cm-md-video-widget)";
 
   it("paints state on the inner surface so wrapper spacing stays outside the ring", () => {
     const editorRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor");

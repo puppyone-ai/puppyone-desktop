@@ -9,7 +9,6 @@ import {
   CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES,
   CLOUD_GLOBAL_SIDEBAR_ROUTES,
   CLOUD_PROJECT_SIDEBAR_ROUTES,
-  getCloudRoute,
   normalizeCloudSection,
   type CloudRouteDescriptor,
 } from "./routes/cloudRoutes";
@@ -31,20 +30,12 @@ type CloudSidebarNavGroup = {
   items: CloudSidebarNavEntry[];
 };
 
-const SIGNED_OUT_CLOUD_SIDEBAR_ROUTES: CloudSidebarNavEntry[] = [
+/** Preview of project sections while Cloud is unavailable (signed out or not initialized). */
+const LOCKED_PROJECT_PREVIEW_SIDEBAR_ROUTES: CloudSidebarNavEntry[] = [
   ...CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES.map((route) => ({
     ...route,
     locked: true,
   })),
-];
-
-const LOCAL_ONLY_CLOUD_SIDEBAR_ROUTES: CloudSidebarNavEntry[] = [
-  {
-    ...getCloudRoute("initialize"),
-    id: "initialize",
-    labelId: "cloud.initialize.sidebarLabel",
-  },
-  ...CLOUD_GLOBAL_SIDEBAR_ROUTES,
 ];
 
 export function CloudServiceSidebar({
@@ -65,20 +56,19 @@ export function CloudServiceSidebar({
   const signedIn = Boolean(effectiveCloudSession);
   // Project context comes from an authorized resolver / explicit route — never from route alone.
   const inProjectContext = signedIn && projectContext && !localOnlyWorkspaceContext;
-  const baseNavItems: CloudSidebarNavEntry[] = localOnlyWorkspaceContext
-    ? LOCAL_ONLY_CLOUD_SIDEBAR_ROUTES
-    : !signedIn
-      ? SIGNED_OUT_CLOUD_SIDEBAR_ROUTES
-      : inProjectContext && localWorkspaceContext
-        ? CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES
-        : inProjectContext
-          ? CLOUD_PROJECT_SIDEBAR_ROUTES
-          : CLOUD_GLOBAL_SIDEBAR_ROUTES;
+  const baseNavItems: CloudSidebarNavEntry[] = localOnlyWorkspaceContext || !signedIn
+    ? LOCKED_PROJECT_PREVIEW_SIDEBAR_ROUTES
+    : inProjectContext && localWorkspaceContext
+      ? CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES
+      : inProjectContext
+        ? CLOUD_PROJECT_SIDEBAR_ROUTES
+        : CLOUD_GLOBAL_SIDEBAR_ROUTES;
   const navItems = baseNavItems.filter((item) => (
     item.id !== "cloud-billing" || billingEnabled
   )).filter((item) => (
-    !signedIn
-      || !("requiredCapability" in item)
+    // Keep locked preview rows visible even before Project capabilities exist.
+    item.locked
+      || !signedIn
       || !item.requiredCapability
       || projectCapabilities.includes(item.requiredCapability)
   ));
@@ -119,12 +109,10 @@ export function CloudServiceSidebar({
                   <CloudSidebarNavItem
                     key={item.id}
                     item={item}
+                    lockedReason={localOnlyWorkspaceContext ? "initialize" : "sign-in"}
                     active={
-                      !item.locked && (
-                        (localOnlyWorkspaceContext && normalizedActiveSection === item.id)
-                        || (signedIn && (
-                          normalizedActiveSection === item.id
-                        ))
+                      !item.locked && signedIn && (
+                        normalizedActiveSection === item.id
                       )
                     }
                     onSelect={onSelectSection}
@@ -150,22 +138,27 @@ export function CloudServiceSidebar({
 export function CloudSidebarNavItem({
   item,
   active,
+  lockedReason = "sign-in",
   onSelect,
 }: {
   item: CloudSidebarNavEntry;
   active: boolean;
+  lockedReason?: "sign-in" | "initialize";
   onSelect: (section: CloudWorkspaceSection) => void;
 }) {
   const { t } = useLocalization();
   const Icon = item.icon;
   const label = t(item.labelId);
+  const lockedTitle = item.locked
+    ? t(lockedReason === "initialize" ? "cloud.sidebar.initializeToUse" : "cloud.sidebar.signInToUse")
+    : undefined;
 
   return (
     <SidebarRow
       className={`desktop-cloud-sidebar-nav-row ${item.locked ? "locked" : ""}`}
       active={active}
       aria-disabled={item.locked || undefined}
-      title={item.locked ? t("cloud.sidebar.signInToUse") : undefined}
+      title={lockedTitle}
       onClick={() => {
         if (!item.locked) onSelect(item.id);
       }}

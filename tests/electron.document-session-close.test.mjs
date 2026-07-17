@@ -43,12 +43,12 @@ describe("Electron application quit intent", () => {
 describe("Electron document close coordination", () => {
   it("keeps the window alive until the renderer drains all Document Sessions", async () => {
     const harness = createHarness();
-    harness.window.webContents.emit("did-finish-load");
+    harness.webContents.emit("did-finish-load");
 
     const firstClose = harness.window.requestClose();
     expect(firstClose.preventDefault).toHaveBeenCalledOnce();
     expect(harness.window.destroyed).toBe(false);
-    const request = harness.window.webContents.sent[0];
+    const request = harness.webContents.sent[0];
     expect(request.channel).toBe(DOCUMENT_SESSION_FLUSH_REQUEST_CHANNEL);
 
     harness.reply(request.payload.requestId, { ok: true });
@@ -61,9 +61,9 @@ describe("Electron document close coordination", () => {
   it("keeps the window open when persistence fails and the user declines data loss", async () => {
     const onCloseCancelled = vi.fn();
     const harness = createHarness({ dialogResponse: 0, onCloseCancelled });
-    harness.window.webContents.emit("did-finish-load");
+    harness.webContents.emit("did-finish-load");
     harness.window.requestClose();
-    const request = harness.window.webContents.sent[0];
+    const request = harness.webContents.sent[0];
 
     harness.reply(request.payload.requestId, { ok: false, error: "File changed outside PuppyOne" });
     await nextMicrotask();
@@ -78,7 +78,7 @@ describe("Electron document close coordination", () => {
     );
     expect(harness.window.destroyed).toBe(false);
     expect(onCloseCancelled).toHaveBeenCalledWith(harness.window);
-    expect(harness.window.webContents.sent[1]).toEqual({
+    expect(harness.webContents.sent[1]).toEqual({
       channel: DOCUMENT_SESSION_CLOSE_CANCELLED_CHANNEL,
       payload: { requestId: request.payload.requestId },
     });
@@ -86,7 +86,7 @@ describe("Electron document close coordination", () => {
     // Declining the destructive choice returns the coordinator to an idle
     // state, so a later close can retry persistence.
     harness.window.requestClose();
-    const flushRequests = harness.window.webContents.sent.filter(
+    const flushRequests = harness.webContents.sent.filter(
       ({ channel }) => channel === DOCUMENT_SESSION_FLUSH_REQUEST_CHANNEL,
     );
     expect(flushRequests).toHaveLength(2);
@@ -98,9 +98,9 @@ describe("Electron document close coordination", () => {
 
   it("ignores a forged acknowledgement from a different renderer", async () => {
     const harness = createHarness();
-    harness.window.webContents.emit("did-finish-load");
+    harness.webContents.emit("did-finish-load");
     harness.window.requestClose();
-    const requestId = harness.window.webContents.sent[0].payload.requestId;
+    const requestId = harness.webContents.sent[0].payload.requestId;
 
     harness.reply(requestId, { ok: true }, { id: 999 });
     await nextMicrotask();
@@ -111,13 +111,18 @@ describe("Electron document close coordination", () => {
     expect(harness.window.destroyed).toBe(true);
   });
 
-  it("does not block a window that never loaded an editor renderer", () => {
+  it("does not touch destroyed BrowserWindow properties when an unready window closes", () => {
     const harness = createHarness();
-    const event = harness.window.requestClose();
+    let event;
+
+    expect(() => {
+      event = harness.window.requestClose();
+    }).not.toThrow();
 
     expect(event.preventDefault).not.toHaveBeenCalled();
     expect(harness.window.destroyed).toBe(true);
-    expect(harness.window.webContents.sent).toHaveLength(0);
+    expect(harness.webContents.sent).toHaveLength(0);
+    expect(() => harness.window.webContents).toThrow("Object has been destroyed");
   });
 });
 
@@ -140,12 +145,14 @@ function createHarness({ dialogResponse = 0, onCloseCancelled = () => undefined 
   });
   coordinator.registerIpc(trustedIpc);
   const window = new FakeWindow();
+  const webContents = window.webContents;
   coordinator.attachWindow(window);
 
   return {
     dialog,
+    webContents,
     window,
-    reply(requestId, payload, sender = window.webContents) {
+    reply(requestId, payload, sender = webContents) {
       resultListener({ sender }, { requestId, ...payload });
     },
   };
@@ -155,7 +162,12 @@ class FakeWindow extends EventEmitter {
   constructor() {
     super();
     this.destroyed = false;
-    this.webContents = new FakeWebContents();
+    this.attachedWebContents = new FakeWebContents();
+  }
+
+  get webContents() {
+    if (this.destroyed) throw new TypeError("Object has been destroyed");
+    return this.attachedWebContents;
   }
 
   isDestroyed() {
@@ -171,7 +183,7 @@ class FakeWindow extends EventEmitter {
     this.emit("close", event);
     if (event.preventDefault.mock.calls.length === 0) {
       this.destroyed = true;
-      this.webContents.destroyed = true;
+      this.attachedWebContents.destroyed = true;
       this.emit("closed");
     }
     return event;

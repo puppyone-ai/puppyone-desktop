@@ -1,1 +1,1 @@
-export { resolveMarkdownAssetPath } from "./features/image/markdownImageModel";
+export { resolveMarkdownAssetPath } from "./features/media/markdownMediaReference";

@@ -11,6 +11,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DataWorkspace } from "../packages/shared-ui/src/data/DataWorkspace";
+import { flushActiveDocumentSessions } from "../packages/shared-ui/src/editor/document-session/activeDocumentSessions";
 import type { DataNode, FileContent } from "../packages/shared-ui/src/core/types";
 import { createLocalDataPort } from "../src/lib/localFiles";
 import { withTestLocalization } from "./testLocalization";
@@ -24,6 +25,8 @@ let originalDesktopBridge: Window["puppyoneDesktop"];
 afterEach(async () => {
   act(() => root?.unmount());
   root = null;
+  await act(async () => Promise.resolve());
+  await flushActiveDocumentSessions("app-close").catch(() => undefined);
   document.body.innerHTML = "";
   window.puppyoneDesktop = originalDesktopBridge;
   if (temporaryWorkspace) await rm(temporaryWorkspace, { recursive: true, force: true });
@@ -55,6 +58,51 @@ describe("local Markdown editor persistence", () => {
       expectedVersion: fingerprint("alpha"),
     }));
     expect(await readFile(join(fixture.root, "note.md"), "utf8")).toBe("alpha beta");
+  });
+
+  it("drains the latest in-flight revision to disk before close and reloads it", async () => {
+    const fixture = await createLocalWorkspace({ "note.md": "alpha" });
+    const bridge = createFilesystemBridge(fixture.root, fixture.nodes);
+    const persistToDisk = bridge.writeFile.getMockImplementation();
+    if (!persistToDisk) throw new Error("Filesystem bridge write implementation is unavailable.");
+    let releaseFirstWrite: (() => void) | null = null;
+    const firstWriteGate = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    let delayNextWrite = true;
+    bridge.writeFile.mockImplementation(async (request) => {
+      if (delayNextWrite) {
+        delayNextWrite = false;
+        await firstWriteGate;
+      }
+      return persistToDisk(request);
+    });
+    originalDesktopBridge = window.puppyoneDesktop;
+    window.puppyoneDesktop = bridge as Window["puppyoneDesktop"];
+
+    const container = await renderWorkspace(fixture.root, "note.md");
+    const editor = await waitForEditor(container);
+    act(() => editor.dispatch({
+      changes: { from: editor.state.doc.length, insert: " beta" },
+      userEvent: "input.type",
+    }));
+    await waitFor(() => bridge.writeFile.mock.calls.length === 1);
+    act(() => editor.dispatch({
+      changes: { from: editor.state.doc.length, insert: " gamma" },
+      userEvent: "input.type",
+    }));
+
+    const closeDrain = flushActiveDocumentSessions("app-close");
+    releaseFirstWrite?.();
+    await closeDrain;
+
+    expect(await readFile(join(fixture.root, "note.md"), "utf8")).toBe("alpha beta gamma");
+
+    act(() => root?.unmount());
+    root = null;
+    container.remove();
+    const reopened = await renderWorkspace(fixture.root, "note.md");
+    expect((await waitForEditor(reopened)).state.doc.toString()).toBe("alpha beta gamma");
   });
 
   it("keeps the local editor mounted when its pre-navigation save fails", async () => {

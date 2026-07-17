@@ -231,10 +231,6 @@
   background: var(--po-selected);
 }
 
-.markdown-codemirror-editor .cm-activeLine {
-  background: transparent;
-}
-
 .markdown-codemirror-editor .cm-placeholder {
   color: var(--po-text-disabled);
   font-style: italic;
@@ -496,15 +492,15 @@
 /* Rich replaced blocks expose their rendered surface before selection without
    adding permanent chrome. The widget wrapper owns document rhythm; its inner
    surface owns the ring, so vertical spacing never appears inside the frame. */
-.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget) {
+.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget, .cm-md-video-widget) {
   --cm-md-block-current-ring: transparent;
 }
 
-.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget):is(:hover, :focus-within):not(.is-doc-selected) {
+.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget, .cm-md-video-widget):is(:hover, :focus-within):not(.is-doc-selected) {
   --cm-md-block-current-ring: var(--cm-md-block-hover-ring);
 }
 
-.markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget) {
+.markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget, .cm-md-video-widget) {
   border-radius: 6px;
   box-shadow: 0 0 0 2px var(--cm-md-block-current-ring);
   transition: box-shadow 140ms ease;
@@ -516,7 +512,7 @@
  * selection cannot paint replaced-widget interiors). Table styling lives in
  * markdown-table-widget.css; the other block widgets share one accent ring.
  */
-.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget).is-doc-selected {
+.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget, .cm-md-video-widget).is-doc-selected {
   --cm-md-block-current-ring: var(--cm-md-block-selected-ring);
 }
 
@@ -625,7 +621,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget) {
+  .markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget, .cm-md-video-widget) {
     transition: none;
   }
 }

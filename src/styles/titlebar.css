@@ -114,6 +114,7 @@
   align-items: center;
   gap: 3px;
   height: var(--desktop-titlebar-control-height);
+  overflow: visible;
 }
 
 .desktop-titlebar-action-divider {
@@ -150,39 +151,30 @@
   width: var(--desktop-titlebar-tool-action-width);
 }
 
-.desktop-titlebar-terminal-cluster {
-  position: relative;
-  display: inline-flex;
-  height: var(--desktop-titlebar-control-height);
-  align-items: center;
-  overflow: visible;
-  border-radius: var(--desktop-toolbar-action-radius);
-  background: var(--desktop-titlebar-active);
-}
-
-.desktop-titlebar-terminal-cluster > .desktop-titlebar-terminal {
-  border-start-start-radius: 0;
-  border-end-start-radius: 0;
-  background: transparent;
-}
-
 .desktop-titlebar-terminal-menu-wrap {
   position: relative;
   display: flex;
-  height: 100%;
+  flex: 0 0 auto;
   align-items: center;
+  overflow: visible;
 }
 
+/* Standalone square ⋯ button, separate from the Terminal control. */
 .desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger {
-  width: 24px;
-  border-inline-end: 1px solid color-mix(in srgb, var(--desktop-titlebar-text) 10%, transparent);
-  border-start-end-radius: 0;
-  border-end-end-radius: 0;
-  background: transparent;
+  width: var(--desktop-titlebar-control-height);
+  height: var(--desktop-titlebar-control-height);
+  flex: 0 0 var(--desktop-titlebar-control-height);
+  box-sizing: border-box;
+  border-radius: var(--desktop-toolbar-action-radius);
+  background: var(--desktop-titlebar-hover);
+  color: var(--desktop-titlebar-text-muted);
 }
 
-.desktop-titlebar-terminal-menu-trigger[aria-expanded="true"] {
-  background: var(--desktop-titlebar-hover);
+.desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger:hover,
+.desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger:focus-visible,
+.desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger[aria-expanded="true"] {
+  background: var(--desktop-titlebar-active);
+  box-shadow: none;
   color: var(--desktop-titlebar-text);
 }
 

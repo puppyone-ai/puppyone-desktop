@@ -1,18 +1,15 @@
 import {
   isBrokerSafeResolvedAssetUrl,
-  resolveWorkspaceRelativePath,
 } from "../../platform/policy/markdownAssetPolicy";
 import {
   isEscapedInlineToken,
   scanUnescapedDelimiterOnLine,
   type InlineTokenClosingScan,
 } from "../../shared/inlineTokenScan";
-
-export type BrokeredMarkdownAssetUrlResolver = (
-  documentPath: string,
-  href: string,
-  signal?: AbortSignal,
-) => string | null | Promise<string | null>;
+import {
+  isObsidianImageEmbedSize,
+  scanObsidianMediaEmbedAt,
+} from "../media/obsidianMediaEmbed";
 
 export type MarkdownImageToken = {
   from: number;
@@ -20,30 +17,38 @@ export type MarkdownImageToken = {
   alt: string;
   href: string;
   title: string | null;
+  referenceKind: "markdown-path" | "wiki-target";
 };
+
+type BrokeredMarkdownImageUrlResolver = (
+  documentPath: string,
+  href: string,
+  signal?: AbortSignal,
+) => string | null | Promise<string | null>;
 
 export const MARKDOWN_IMAGE_SRCSET_MAX_CANDIDATES = 16;
 export const MARKDOWN_IMAGE_SRCSET_MAX_SOURCE_UNITS = 8_192;
 
-const OBSIDIAN_IMAGE_EXTENSIONS = new Set([
-  "apng",
-  "avif",
-  "bmp",
-  "gif",
-  "ico",
-  "jpeg",
-  "jpg",
-  "png",
-  "svg",
-  "webp",
-]);
-
 export function findMarkdownImageTokens(source: string): MarkdownImageToken[] {
+  return findImageTokens(source, true);
+}
+
+/** Standard `![alt](href)` only; Obsidian embeds come from parser nodes. */
+export function findStandardMarkdownImageTokens(source: string): MarkdownImageToken[] {
+  return findImageTokens(source, false);
+}
+
+function findImageTokens(source: string, includeObsidian: boolean): MarkdownImageToken[] {
   const tokens: MarkdownImageToken[] = [];
 
   for (let index = 0; index < source.length;) {
     if (!source.startsWith("![", index) || isEscapedInlineToken(source, index)) {
       index += 1;
+      continue;
+    }
+
+    if (!includeObsidian && source.startsWith("![[", index)) {
+      index += 3;
       continue;
     }
 
@@ -66,8 +71,25 @@ type MarkdownImageTokenScan = {
 };
 
 function scanMarkdownImageTokenAt(source: string, from: number): MarkdownImageTokenScan {
-  const obsidianScan = scanObsidianImageEmbed(source, from);
-  if (obsidianScan) return obsidianScan;
+  if (source.startsWith("![[", from)) {
+    const scan = scanObsidianMediaEmbedAt(source, from);
+    if (!scan.token || scan.token.kind !== "image") {
+      return { token: null, nextIndex: scan.nextIndex };
+    }
+    return {
+      token: {
+        from: scan.token.from,
+        to: scan.token.to,
+        alt: scan.token.alias && !isObsidianImageEmbedSize(scan.token.alias)
+          ? scan.token.alias
+          : scan.token.target,
+        href: scan.token.target,
+        title: null,
+        referenceKind: "wiki-target",
+      },
+      nextIndex: scan.nextIndex,
+    };
+  }
   return scanStandardMarkdownImage(source, from);
 }
 
@@ -96,41 +118,9 @@ function scanStandardMarkdownImage(source: string, from: number): MarkdownImageT
       alt: source.slice(labelFrom, labelTo),
       href: parsed.href,
       title: parsed.title,
+      referenceKind: "markdown-path",
     },
     nextIndex: destinationTo + 1,
-  };
-}
-
-function scanObsidianImageEmbed(source: string, from: number): MarkdownImageTokenScan | null {
-  if (!source.startsWith("![[", from)) return null;
-
-  const contentFrom = from + 3;
-  const closingScan = scanUnescapedDelimiterOnLine(source, contentFrom, "]]");
-  const closingFrom = closingScan.closingIndex;
-  if (closingFrom === -1) return { token: null, nextIndex: closingScan.nextIndex };
-
-  const content = source.slice(contentFrom, closingFrom);
-  if (!content.trim()) return { token: null, nextIndex: closingScan.nextIndex };
-
-  const pipeOffset = findUnescapedPipe(content);
-  const rawTarget = pipeOffset === -1 ? content : content.slice(0, pipeOffset);
-  const href = rawTarget.trim();
-  if (!href || !isObsidianImageTarget(href)) {
-    return { token: null, nextIndex: closingScan.nextIndex };
-  }
-
-  const rawAlias = pipeOffset === -1 ? "" : content.slice(pipeOffset + 1).trim();
-  const alt = rawAlias && !isObsidianEmbedSize(rawAlias) ? rawAlias : href;
-
-  return {
-    token: {
-      from,
-      to: closingFrom + 2,
-      alt,
-      href,
-      title: null,
-    },
-    nextIndex: closingFrom + 2,
   };
 }
 
@@ -217,31 +207,6 @@ function findTrailingQuotedTitle(value: string): { href: string; title: string }
   return null;
 }
 
-function isObsidianImageTarget(value: string): boolean {
-  const normalized = value.split(/[?#]/, 1)[0]?.trim().toLowerCase() ?? "";
-  const extension = /\.([a-z0-9]+)$/.exec(normalized)?.[1] ?? "";
-  return OBSIDIAN_IMAGE_EXTENSIONS.has(extension);
-}
-
-function isObsidianEmbedSize(value: string): boolean {
-  return /^\d+(?:x\d+)?$/i.test(value.trim());
-}
-
-function findUnescapedPipe(content: string): number {
-  for (let index = 0; index < content.length; index += 1) {
-    if (content[index] === "|" && !isEscapedInlineToken(content, index)) return index;
-  }
-  return -1;
-}
-
-export function resolveMarkdownAssetPath(sourcePath: string, href: string): string | null {
-  // Compatibility entry point for the DataWorkspace host. The policy module
-  // is the only workspace-path parser; keeping a second implementation here
-  // previously allowed malformed escapes and root traversal to diverge from
-  // AssetBroker's decision.
-  return resolveWorkspaceRelativePath(sourcePath, href);
-}
-
 export function isSafeMarkdownImageUrl(value: string): boolean {
   // Compatibility helper for already-brokered sink URLs. It must not be used
   // to authorize a URL copied directly from Markdown source.
@@ -262,7 +227,7 @@ export function isSafeMarkdownImageSrcset(value: string): boolean {
 export async function resolveMarkdownHtmlImageSources(
   source: string,
   documentPath: string,
-  resolver: BrokeredMarkdownAssetUrlResolver | null,
+  resolver: BrokeredMarkdownImageUrlResolver | null,
 ): Promise<string> {
   if (!resolver || !/<img\b/i.test(source)) return source;
 
@@ -293,7 +258,7 @@ export async function resolveMarkdownHtmlImageSources(
 export async function resolveMarkdownImageSrcset(
   value: string,
   documentPath: string,
-  resolver: BrokeredMarkdownAssetUrlResolver,
+  resolver: BrokeredMarkdownImageUrlResolver,
   signal?: AbortSignal,
 ): Promise<string | null> {
   if (

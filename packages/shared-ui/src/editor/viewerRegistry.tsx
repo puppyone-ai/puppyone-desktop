@@ -191,6 +191,14 @@ const PRESET_VIEWER_DEFINITIONS: PresetViewerContribution[] = [
     })),
   }),
   definePresetViewer({
+    id: "puppyflow",
+    match: ({ format }) => format.id === "puppyflow",
+    isEditable: () => true,
+    load: () => import("./puppyflow/PuppyFlowViewer").then(({ PuppyFlowViewer }) => ({
+      default: PuppyFlowViewer,
+    })),
+  }),
+  definePresetViewer({
     id: "json",
     match: ({ document, format }) => document.type === "json" || format.id === "json" || format.id === "jsonl",
     normalizeContent: formatJson,

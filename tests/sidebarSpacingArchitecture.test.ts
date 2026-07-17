@@ -7,6 +7,7 @@ const titlebarCss = readCss("../src/styles/titlebar.css");
 const sidebarPrimitivesCss = readCss("../packages/shared-ui/src/styles/sidebar-primitives.css");
 const sidebarPatternsCss = readCss("../src/styles/sidebar/patterns.css");
 const dataAdapterCss = readCss("../src/features/data-workspace/browser.css");
+const dataShellCss = readCss("../src/features/data-workspace/data-shell.css");
 const dataTreeCss = readCss("../packages/shared-ui/src/styles/data-workspace.css");
 const dataWorkspaceSource = readFileSync(
   new URL("../packages/shared-ui/src/data/DataWorkspace.tsx", import.meta.url),
@@ -189,6 +190,35 @@ describe("sidebar spacing architecture", () => {
     expect(cloudSidebarCss).not.toContain("desktop-cloud-sidebar-separator");
     expect(cloudHistoryHeader).toContain(
       "border-bottom: 1px solid var(--po-sidebar-divider, var(--po-divider));",
+    );
+  });
+
+  it("keeps top and bottom navigation on one scroll-aware edge contract", () => {
+    const sharedFooter = compact(readCssBlock(dataTreeCss, ".data-explorer-footer"));
+    const bottomPlacement = compact(readCssBlock(
+      dataShellCss,
+      '.desktop-data-workspace-wrap[data-sidebar-navigation-placement="bottom"]',
+    ));
+    const sharedFadeGeometry = compact(readCssBlock(
+      dataShellCss,
+      '.desktop-data-workspace-wrap[data-sidebar-navigation-placement="top"] .explorer-tree-shell::before,\n.desktop-data-workspace-wrap[data-sidebar-navigation-placement="bottom"] .explorer-tree-shell::after',
+    ));
+    const topFade = compact(readCssBlock(
+      dataShellCss,
+      '.desktop-data-workspace-wrap[data-sidebar-navigation-placement="top"] .explorer-tree-shell::before',
+    ));
+
+    expect(sharedFooter).toContain(
+      "border-block-start: var(--data-explorer-footer-divider-width, 1px) solid var(--po-sidebar-divider, var(--po-divider));",
+    );
+    expect(bottomPlacement).toContain("--data-explorer-footer-divider-width: 0px;");
+    expect(dataShellCss).not.toContain(".data-explorer-footer:has(");
+    expect(sharedFadeGeometry).toContain(
+      "height: calc(var(--desktop-sidebar-navigation-fade-size) * var(--tree-edge-fade-top, 0));",
+    );
+    expect(topFade).toContain("opacity: var(--tree-edge-fade-top, 0);");
+    expect(dataShellCss).toMatch(
+      /\.desktop-data-workspace-wrap\[data-sidebar-navigation-placement="bottom"\] \.explorer-tree-shell::after\s*\{[^}]*height:\s*calc\(var\(--desktop-sidebar-navigation-fade-size\) \* var\(--tree-edge-fade-bottom, 0\)\);[^}]*opacity:\s*var\(--tree-edge-fade-bottom, 0\);/s,
     );
   });
 

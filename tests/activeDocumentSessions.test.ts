@@ -4,7 +4,7 @@ import {
   registerActiveDocumentSession,
 } from "../packages/shared-ui/src/editor/document-session/activeDocumentSessions";
 import { DocumentEditingSession } from "../packages/shared-ui/src/editor/document-session/DocumentEditingSession";
-import type { EditorDocumentSession } from "../packages/shared-ui/src/editor/document-session/types";
+import type { DocumentEditingSessionHandle } from "../packages/shared-ui/src/editor/document-session/types";
 
 describe("active Document Session registry", () => {
   it("drains every registered session and forgets unmounted sessions", async () => {
@@ -54,11 +54,13 @@ describe("active Document Session registry", () => {
     const unregisterLive = registerActiveDocumentSession(session);
     await Promise.resolve();
 
+    expect(session.dispose).not.toHaveBeenCalled();
     await flushActiveDocumentSessions();
     expect(session.flushCurrent).toHaveBeenCalledOnce();
 
     unregisterLive();
     await Promise.resolve();
+    expect(session.dispose).toHaveBeenCalledOnce();
     await flushActiveDocumentSessions();
     expect(session.flushCurrent).toHaveBeenCalledOnce();
   });
@@ -77,13 +79,12 @@ describe("active Document Session registry", () => {
       },
     });
     session.attachSource({
-      readRevision: () => "r2",
       readSnapshot: () => ({ revision: "r2", content: "after" }),
+      replaceContent: (content) => ({ revision: "external", content }),
     });
     session.reportRevision({ revision: "r2", dirty: true });
     const unregister = registerActiveDocumentSession(session);
 
-    session.dispose();
     unregister();
     await Promise.resolve();
     let closeSettled = false;
@@ -105,12 +106,13 @@ describe("active Document Session registry", () => {
 
 function mockSession(
   flush: () => Promise<void> = async () => undefined,
-): EditorDocumentSession {
+): DocumentEditingSessionHandle {
   return {
     documentId: "notes.md",
+    dispose: vi.fn(),
     flushCurrent: vi.fn(flush),
     hasUnpersistedChanges: () => false,
-  } as unknown as EditorDocumentSession;
+  } as unknown as DocumentEditingSessionHandle;
 }
 
 function deferred<T>() {

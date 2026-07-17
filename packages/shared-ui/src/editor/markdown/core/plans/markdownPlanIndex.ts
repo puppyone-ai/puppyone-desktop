@@ -8,6 +8,10 @@ import {
 import { compileMarkdownElementPlan } from "./markdownPlanCompiler";
 import type { MarkdownElementPlan, SourceRange } from "./markdownPlanTypes";
 import { getMarkdownDocumentProfile } from "./markdownBlockExecution";
+import {
+  markdownFeatureCompositionFacet,
+  type MarkdownFeatureComposition,
+} from "../features/markdownFeatureContract";
 
 export type IndexedMarkdownPlan = {
   element: MarkdownElement;
@@ -16,6 +20,7 @@ export type IndexedMarkdownPlan = {
 
 type MarkdownPlanIndexCacheEntry = {
   tree: ReturnType<typeof syntaxTree>;
+  composition: MarkdownFeatureComposition | null;
   plans: readonly IndexedMarkdownPlan[] | null;
   intervals: MarkdownPlanIntervalNode | null;
   ranges: Map<string, readonly IndexedMarkdownPlan[]>;
@@ -99,10 +104,12 @@ export function getMarkdownPlanIndexDiagnostics() {
 
 function getOrCreateCacheEntry(state: EditorState): MarkdownPlanIndexCacheEntry {
   const tree = syntaxTree(state);
+  const composition = state.facet(markdownFeatureCompositionFacet);
   const existing = markdownPlanIndexCache.get(state.doc);
-  if (existing?.tree === tree) return existing;
+  if (existing?.tree === tree && existing.composition === composition) return existing;
   const created: MarkdownPlanIndexCacheEntry = {
     tree,
+    composition,
     plans: null,
     intervals: null,
     ranges: new Map(),
@@ -122,7 +129,10 @@ function compileAndSortPlans(
   return elements
     .map((element) => ({
       element,
-      plan: compileMarkdownElementPlan(element, { documentProfile }),
+      plan: compileMarkdownElementPlan(element, {
+        documentProfile,
+        featureComposition: state.facet(markdownFeatureCompositionFacet),
+      }),
     }))
     .sort((left, right) => (
       left.plan.sourceRange.from - right.plan.sourceRange.from

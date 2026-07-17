@@ -140,7 +140,6 @@ export type DocumentPersistenceKind = "local-fs" | "cloud";
 export type DocumentPersistenceReason =
   | "edit"
   | "manual"
-  | "mode-switch"
   | "document-close"
   | "document-switch"
   | "workspace-switch"

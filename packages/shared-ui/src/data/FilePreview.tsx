@@ -34,7 +34,6 @@ export type FilePreviewProps = {
   showHeader?: boolean;
   emptySlot?: ReactNode;
   actionSlot?: ReactNode | ((node: DataNode) => ReactNode);
-  renderBody?: (node: DataNode, context: FilePreviewBodyContext) => ReactNode;
   documentPersistence?: DocumentPersistencePort | null;
   onDocumentPersisted?: (commit: DocumentPersistedCommit) => void;
   hideSourceView?: boolean;
@@ -53,17 +52,6 @@ export type FilePreviewProps = {
   documentSourceKind?: DocumentSourceKind;
 };
 
-export type FilePreviewBodyContext = {
-  fileContent: FileContent | null;
-  fileUrl: string | null;
-  fileUrlLoading: boolean;
-  fileUrlError: string | null;
-  loading: boolean;
-  error: string | null;
-  documentPersistence: DocumentPersistencePort | null;
-  onDocumentPersisted?: (commit: DocumentPersistedCommit) => void;
-};
-
 export function FilePreview({
   node,
   fileContent,
@@ -76,7 +64,6 @@ export function FilePreview({
   showHeader = true,
   emptySlot,
   actionSlot,
-  renderBody,
   documentPersistence = null,
   onDocumentPersisted,
   hideSourceView = false,
@@ -107,17 +94,6 @@ export function FilePreview({
 
   const actions = typeof actionSlot === "function" ? actionSlot(node) : actionSlot;
   const deferFallbackContent = loading && !fileContent;
-  const bodyContext: FilePreviewBodyContext = {
-    fileContent: fileContent ?? null,
-    fileUrl,
-    fileUrlLoading,
-    fileUrlError,
-    loading,
-    error,
-    documentPersistence,
-    onDocumentPersisted,
-  };
-  const customBody = renderBody?.(node, bodyContext);
 
   return (
     <div className={`file-preview-shell ${showHeader ? "" : "without-header"}`}>
@@ -149,40 +125,38 @@ export function FilePreview({
       )}
 
       <div className="file-preview-body">
-        {customBody !== undefined ? customBody : (
-          <EditorPreviewBoundary
-            key={node.path}
-            failureTitle={t("shared-ui.preview.crashed")}
-          >
-            <EditorHost
-              node={node}
-              fileContent={fileContent}
-              fileUrl={fileUrl}
-              fileUrlLoading={fileUrlLoading}
-              fileUrlError={fileUrlError}
-              loading={loading}
-              error={error}
-              aiEditFile={aiEditFile}
-              documentPersistence={documentPersistence}
-              onDocumentPersisted={onDocumentPersisted}
-              hideSourceView={hideSourceView}
-              fileIconTheme={fileIconTheme}
-              editorInteractionPreferences={editorInteractionPreferences}
-              saveMode={editorSaveMode}
-              htmlTrustMode={htmlTrustMode}
-              workspaceId={workspaceId}
-              workspaceRoot={workspaceRoot}
-              markdownLinkGraph={markdownLinkGraph}
-              markdownAssetUrlResolver={markdownAssetUrlResolver}
-              appPreview={appPreview}
-              openExternalFile={openExternalFile}
-              convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
-              deferFallbackContent={deferFallbackContent}
-              viewerExtensionAdapter={viewerExtensionAdapter}
-              documentSourceKind={documentSourceKind}
-            />
-          </EditorPreviewBoundary>
-        )}
+        <EditorPreviewBoundary
+          key={node.path}
+          failureTitle={t("shared-ui.preview.crashed")}
+        >
+          <EditorHost
+            node={node}
+            fileContent={fileContent}
+            fileUrl={fileUrl}
+            fileUrlLoading={fileUrlLoading}
+            fileUrlError={fileUrlError}
+            loading={loading}
+            error={error}
+            aiEditFile={aiEditFile}
+            documentPersistence={documentPersistence}
+            onDocumentPersisted={onDocumentPersisted}
+            hideSourceView={hideSourceView}
+            fileIconTheme={fileIconTheme}
+            editorInteractionPreferences={editorInteractionPreferences}
+            saveMode={editorSaveMode}
+            htmlTrustMode={htmlTrustMode}
+            workspaceId={workspaceId}
+            workspaceRoot={workspaceRoot}
+            markdownLinkGraph={markdownLinkGraph}
+            markdownAssetUrlResolver={markdownAssetUrlResolver}
+            appPreview={appPreview}
+            openExternalFile={openExternalFile}
+            convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
+            deferFallbackContent={deferFallbackContent}
+            viewerExtensionAdapter={viewerExtensionAdapter}
+            documentSourceKind={documentSourceKind}
+          />
+        </EditorPreviewBoundary>
       </div>
     </div>
   );

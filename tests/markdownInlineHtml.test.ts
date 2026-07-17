@@ -25,7 +25,10 @@ import {
   parseMarkdownHtmlTagToken,
   scanMarkdownHtmlTagTokens,
 } from "../packages/shared-ui/src/editor/markdown/features/html/htmlTagTokenizer";
-import { puppyMarkdownParserExtensions } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownParserExtensions";
+import {
+  puppyMarkdownFeatureCompositionExtension,
+  puppyMarkdownParserExtensions,
+} from "../packages/shared-ui/src/editor/markdown/composition/markdownFeatureComposition";
 import { getInlineRevealElement } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownElements";
 import { InlineHtmlLineBreakWidget } from "../packages/shared-ui/src/editor/markdown/core/widgets/inlineWidgets";
 import { getMarkdownPlansInRange } from "../packages/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
@@ -34,6 +37,7 @@ function createMarkdownState(source: string) {
   return EditorState.create({
     doc: source,
     extensions: [
+      puppyMarkdownFeatureCompositionExtension,
       markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
     ],
   });
@@ -62,6 +66,7 @@ function buildInlineDecorations(source: string, reveal: { from: number; to: numb
     builders,
     reveal,
     null,
+    "safe",
     null,
     "",
     null,

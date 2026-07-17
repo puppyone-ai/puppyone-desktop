@@ -18,6 +18,7 @@ import {
   type MarkdownMountedBlockExecution,
 } from "../../core/plans/markdownBlockExecution";
 import { createMarkdownTableWindowController } from "./tableWindowController";
+import type { MarkdownInlinePreviewRenderer } from "../../shared/preview/markdownInlinePreviewPort";
 
 export class MarkdownTableWidget extends WidgetType {
   constructor(
@@ -28,6 +29,7 @@ export class MarkdownTableWidget extends WidgetType {
     private readonly markdownLinkGraph: MarkdownLinkGraph | null,
     private readonly documentPath: string,
     private readonly _markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
+    private readonly renderInlinePreview: MarkdownInlinePreviewRenderer,
     private readonly layoutEstimatedHeight = estimateMarkdownTableLayoutHeight(rows),
     private readonly renderKey = createMarkdownTableRenderKey(alignments, rows),
     private readonly execution: MarkdownMountedBlockExecution = MARKDOWN_RICH_BLOCK_EXECUTION,
@@ -45,7 +47,8 @@ export class MarkdownTableWidget extends WidgetType {
       markdownTableExecutionsEqual(widget.execution, this.execution) &&
       widget.markdownLinkGraph === this.markdownLinkGraph &&
       widget.documentPath === this.documentPath &&
-      widget._markdownAssetUrlResolver === this._markdownAssetUrlResolver
+      widget._markdownAssetUrlResolver === this._markdownAssetUrlResolver &&
+      widget.renderInlinePreview === this.renderInlinePreview
     );
   }
 
@@ -109,6 +112,7 @@ export class MarkdownTableWidget extends WidgetType {
           rowCount,
           rowIndex,
           rows: this.rows,
+          renderInlinePreview: this.renderInlinePreview,
           tableFrom: this.from,
           tableTo: this.to,
           view,

@@ -114,7 +114,10 @@ export function App() {
   const fontCatalog = useTypographyCatalog();
   const typography = useTypographyRuntime(preferences.typographyPreferences, fontCatalog);
   const typographyRootProps = useMemo(() => createTypographyRootProps(typography), [typography]);
-  const cloudEnabled = useFeatureFlag("cloudWorkspace");
+  const cloudAvailable = useFeatureFlag("cloudWorkspace");
+  // The build flag only marks availability; PuppyOne Cloud stays hidden until
+  // the user opts into the experiment in Settings.
+  const cloudEnabled = cloudAvailable && preferences.experimentalSettings.enableCloudWorkspace;
   const cloudOnlyWorkspaceEnabled = useFeatureFlag("cloudOnlyWorkspace");
   const assetLibraryHomeAvailable = useFeatureFlag("assetLibraryHome");
   const agentChatAvailable = useFeatureFlag("desktopAgentChat");

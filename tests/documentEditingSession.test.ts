@@ -7,28 +7,15 @@ import { DocumentEditingSession } from "../packages/shared-ui/src/editor/documen
 import type { EditorSourceSnapshot } from "../packages/shared-ui/src/editor/sourceSnapshot";
 
 describe("DocumentEditingSession", () => {
-  it("starts persistence in the next microtask without waiting for a timer or typing pause", async () => {
-    let snapshotReads = 0;
-    let snapshot: EditorSourceSnapshot = { revision: "r1", content: "one" };
+  it("starts persistence in the next microtask without waiting for a timer", async () => {
     const persist = vi.fn(async () => ({ version: "v2" }));
     const session = createSession(persist);
-    session.attachSource({
-      readRevision: () => snapshot.revision,
-      readSnapshot: () => {
-        snapshotReads += 1;
-        return snapshot;
-      },
-    });
-    session.reportRevision({ revision: "r1", dirty: false });
+    const source = bindSource(session, { revision: "r1", content: "one" });
 
-    snapshot = { revision: "r2", content: "two" };
-    session.reportRevision({ revision: "r2", dirty: true });
+    source.change({ revision: "r2", content: "two" });
 
-    expect(snapshotReads).toBe(0);
     expect(persist).not.toHaveBeenCalled();
     await nextMicrotask();
-
-    expect(snapshotReads).toBe(1);
     expect(persist).toHaveBeenCalledWith(expect.objectContaining({
       path: "notes.md",
       content: "two",
@@ -39,32 +26,23 @@ describe("DocumentEditingSession", () => {
     expect(session.getState().storageVersion).toBe("v2");
   });
 
-  it("coalesces synchronous edit transactions to the newest immediate snapshot", async () => {
-    let snapshot: EditorSourceSnapshot = { revision: "r1", content: "one" };
+  it("coalesces edits from one JavaScript turn to the newest snapshot", async () => {
     const persist = vi.fn(async () => ({ version: "v2" }));
     const session = createSession(persist);
-    session.attachSource({
-      readRevision: () => snapshot.revision,
-      readSnapshot: () => snapshot,
-    });
-    session.reportRevision({ revision: "r1", dirty: false });
+    const source = bindSource(session, { revision: "r1", content: "one" });
 
-    snapshot = { revision: "r2", content: "two" };
-    session.reportRevision({ revision: "r2", dirty: true });
-    snapshot = { revision: "r3", content: "three" };
-    session.reportRevision({ revision: "r3", dirty: true });
-
+    source.change({ revision: "r2", content: "two" });
+    source.change({ revision: "r3", content: "three" });
     await nextMicrotask();
 
     expect(persist).toHaveBeenCalledTimes(1);
     expect(persist).toHaveBeenCalledWith(expect.objectContaining({
       revision: "r3",
       content: "three",
-      reason: "edit",
     }));
   });
 
-  it("keeps one automatic write in flight and follows it with only the newest edit", async () => {
+  it("keeps one write in flight and persists only the newest following edit", async () => {
     const first = deferred<{ version: string }>();
     const second = deferred<{ version: string }>();
     const requests: DocumentPersistenceRequest[] = [];
@@ -72,127 +50,32 @@ describe("DocumentEditingSession", () => {
       requests.push(request);
       return requests.length === 1 ? first.promise : second.promise;
     });
-    let snapshot: EditorSourceSnapshot = { revision: "r1", content: "one" };
     const session = createSession(persist);
-    session.attachSource({
-      readRevision: () => snapshot.revision,
-      readSnapshot: () => snapshot,
-    });
-    session.reportRevision({ revision: "r1", dirty: false });
+    const source = bindSource(session, { revision: "r1", content: "one" });
 
-    snapshot = { revision: "r2", content: "two" };
-    session.reportRevision({ revision: "r2", dirty: true });
+    source.change({ revision: "r2", content: "two" });
     await nextMicrotask();
-    expect(requests.map(({ revision }) => revision)).toEqual(["r2"]);
-
-    snapshot = { revision: "r3", content: "three" };
-    session.reportRevision({ revision: "r3", dirty: true });
-    snapshot = { revision: "r4", content: "four" };
-    session.reportRevision({ revision: "r4", dirty: true });
+    source.change({ revision: "r3", content: "three" });
+    source.change({ revision: "r4", content: "four" });
     await nextMicrotask();
-    expect(requests.map(({ revision }) => revision)).toEqual(["r2"]);
 
+    expect(requests.map(({ revision }) => revision)).toEqual(["r2"]);
     first.resolve({ version: "v2" });
     await nextMicrotask();
     expect(requests.map(({ revision }) => revision)).toEqual(["r2", "r4"]);
-    expect(requests[1]).toMatchObject({
-      content: "four",
-      baseVersion: "v2",
-      reason: "edit",
-    });
+    expect(requests[1]).toMatchObject({ content: "four", baseVersion: "v2" });
 
     second.resolve({ version: "v3" });
     await session.flushCurrent("document-close");
-    expect(session.getPersistedContent()).toBe("four");
     expect(session.hasUnpersistedChanges()).toBe(false);
-  });
-
-  it("serializes writes and coalesces an in-flight edit to the newest revision", async () => {
-    const first = deferred<{ version: string }>();
-    const second = deferred<{ version: string }>();
-    const requests: DocumentPersistenceRequest[] = [];
-    const persist = vi.fn((request: DocumentPersistenceRequest) => {
-      requests.push(request);
-      return requests.length === 1 ? first.promise : second.promise;
-    });
-    const session = createSession(persist);
-    let snapshot: EditorSourceSnapshot = { revision: "r2", content: "two" };
-    session.attachSource({
-      readRevision: () => snapshot.revision,
-      readSnapshot: () => snapshot,
-    });
-    session.reportRevision({ revision: "r1", dirty: false });
-    session.reportRevision({ revision: "r2", dirty: true });
-    const firstFlush = session.requestSave("manual");
-
-    snapshot = { revision: "r3", content: "three" };
-    session.reportRevision({ revision: "r3", dirty: true });
-    const finalFlush = session.flushSnapshot(snapshot, "document-switch");
-
-    expect(persist).toHaveBeenCalledTimes(1);
-    first.resolve({ version: "v2" });
-    await firstFlush;
-    await nextMicrotask();
-
-    expect(persist).toHaveBeenCalledTimes(2);
-    expect(requests[1]).toMatchObject({
-      content: "three",
-      revision: "r3",
-      baseVersion: "v2",
-      reason: "document-switch",
-    });
-    second.resolve({ version: "v3" });
-    await finalFlush;
-
-    expect(session.getPersistedContent()).toBe("three");
     expect(session.getState()).toMatchObject({
-      persistedRevision: "r3",
+      currentRevision: "r4",
+      persistedRevision: "r4",
       storageVersion: "v3",
     });
   });
 
-  it("never bypasses an in-flight write when destruction supplies a newer snapshot", async () => {
-    const first = deferred<{ version: string }>();
-    const requests: DocumentPersistenceRequest[] = [];
-    const persist = vi.fn((request: DocumentPersistenceRequest) => {
-      requests.push(request);
-      return requests.length === 1 ? first.promise : Promise.resolve({ version: "v3" });
-    });
-    const session = createSession(persist);
-    session.reportRevision({ revision: "r2", dirty: true });
-    const firstFlush = session.flushSnapshot({ revision: "r2", content: "two" }, "document-switch");
-    session.reportRevision({ revision: "r3", dirty: true });
-    const destroyFlush = session.flushSnapshot({ revision: "r3", content: "three" }, "destroy");
-
-    expect(persist).toHaveBeenCalledTimes(1);
-    first.resolve({ version: "v2" });
-    await firstFlush;
-    await destroyFlush;
-
-    expect(requests.map(({ revision }) => revision)).toEqual(["r2", "r3"]);
-    expect(requests[1].baseVersion).toBe("v2");
-    expect(session.getPersistedContent()).toBe("three");
-  });
-
-  it("reads and drains the exact current snapshot before app close", async () => {
-    const persist = vi.fn(async () => ({ version: "v2" }));
-    const session = createSession(persist);
-    const readSnapshot = vi.fn(() => ({ revision: "r2", content: "closing text" }));
-    session.attachSource({ readRevision: () => "r2", readSnapshot });
-    session.reportRevision({ revision: "r2", dirty: true });
-
-    await session.flushCurrent();
-
-    expect(readSnapshot).toHaveBeenCalledOnce();
-    expect(persist).toHaveBeenCalledWith(expect.objectContaining({
-      content: "closing text",
-      revision: "r2",
-      reason: "app-close",
-    }));
-    expect(session.hasUnpersistedChanges()).toBe(false);
-  });
-
-  it("drains a newer revision that arrives during the first app-close write", async () => {
+  it("does not treat the filesystem echo of an in-flight save as an external conflict", async () => {
     const first = deferred<{ version: string }>();
     const second = deferred<{ version: string }>();
     const requests: DocumentPersistenceRequest[] = [];
@@ -201,58 +84,105 @@ describe("DocumentEditingSession", () => {
       return requests.length === 1 ? first.promise : second.promise;
     });
     const session = createSession(persist);
-    let snapshot = { revision: "r2", content: "first close snapshot" };
-    session.attachSource({ readRevision: () => snapshot.revision, readSnapshot: () => snapshot });
-    session.reportRevision({ revision: "r2", dirty: true });
+    const source = bindSource(session, { revision: "r1", content: "one" });
 
-    let closeSettled = false;
-    const closePromise = session.flushCurrent().then(() => {
-      closeSettled = true;
+    source.change({ revision: "r2", content: "two" });
+    await nextMicrotask();
+    source.change({ revision: "r3", content: "three" });
+    await nextMicrotask();
+
+    expect(session.reconcileExternalBaseline("two", "v2")).toBe("acknowledged");
+    expect(session.getState()).toMatchObject({ status: "saving", error: null });
+
+    first.resolve({ version: "v2" });
+    await nextMicrotask();
+    expect(requests[1]).toMatchObject({ content: "three", baseVersion: "v2" });
+
+    second.resolve({ version: "v3" });
+    await session.flushCurrent("document-close");
+    expect(session.hasUnpersistedChanges()).toBe(false);
+    expect(session.getState()).toMatchObject({
+      status: "saved",
+      error: null,
+      storageVersion: "v3",
     });
-    snapshot = { revision: "r3", content: "last close snapshot" };
-    session.reportRevision({ revision: "r3", dirty: true });
+  });
+
+  it("promotes a pending edit to the navigation drain reason", async () => {
+    const first = deferred<{ version: string }>();
+    const second = deferred<{ version: string }>();
+    const requests: DocumentPersistenceRequest[] = [];
+    const persist = vi.fn((request: DocumentPersistenceRequest) => {
+      requests.push(request);
+      return requests.length === 1 ? first.promise : second.promise;
+    });
+    const session = createSession(persist);
+    const source = bindSource(session, { revision: "r1", content: "one" });
+
+    source.change({ revision: "r2", content: "two" });
+    await nextMicrotask();
+    source.change({ revision: "r3", content: "three" });
+    const drain = session.flushCurrent("document-switch");
+
+    first.resolve({ version: "v2" });
+    await nextMicrotask();
+    expect(requests[1]).toMatchObject({
+      revision: "r3",
+      content: "three",
+      baseVersion: "v2",
+      reason: "document-switch",
+    });
+    second.resolve({ version: "v3" });
+    await drain;
+  });
+
+  it("captures the exact final snapshot before an editor model is destroyed", async () => {
+    const persist = vi.fn(async () => ({ version: "v2" }));
+    const session = createSession(persist);
+    const source = bindSource(session, { revision: "r1", content: "one" });
+    source.change({ revision: "r2", content: "closing text" });
+
+    source.detach();
+    session.dispose();
+    await session.flushCurrent("destroy");
+
+    expect(persist).toHaveBeenCalledWith(expect.objectContaining({
+      revision: "r2",
+      content: "closing text",
+      reason: "destroy",
+    }));
+    expect(session.hasUnpersistedChanges()).toBe(false);
+  });
+
+  it("drains a newer revision that arrives during an app-close write", async () => {
+    const first = deferred<{ version: string }>();
+    const second = deferred<{ version: string }>();
+    const requests: DocumentPersistenceRequest[] = [];
+    const persist = vi.fn((request: DocumentPersistenceRequest) => {
+      requests.push(request);
+      return requests.length === 1 ? first.promise : second.promise;
+    });
+    const session = createSession(persist);
+    const source = bindSource(session, { revision: "r1", content: "one" });
+    source.change({ revision: "r2", content: "first close snapshot" });
+
+    const closePromise = session.flushCurrent("app-close");
+    source.change({ revision: "r3", content: "last close snapshot" });
     first.resolve({ version: "v2" });
     await nextMicrotask();
 
-    expect(closeSettled).toBe(false);
-    expect(requests).toHaveLength(2);
     expect(requests[1]).toMatchObject({
       revision: "r3",
       content: "last close snapshot",
       baseVersion: "v2",
       reason: "app-close",
     });
-
     second.resolve({ version: "v3" });
     await closePromise;
-    expect(closeSettled).toBe(true);
     expect(session.hasUnpersistedChanges()).toBe(false);
   });
 
-  it("waits for a detached source's queued commit during app close", async () => {
-    const write = deferred<{ version: string }>();
-    const persist = vi.fn(() => write.promise);
-    const session = createSession(persist);
-    session.reportRevision({ revision: "r2", dirty: true });
-    const writePromise = session.flushSnapshot(
-      { revision: "r2", content: "closing text" },
-      "destroy",
-    );
-
-    let closeSettled = false;
-    const closePromise = session.flushCurrent().then(() => {
-      closeSettled = true;
-    });
-    await nextMicrotask();
-    expect(closeSettled).toBe(false);
-
-    write.resolve({ version: "v2" });
-    await Promise.all([writePromise, closePromise]);
-    expect(closeSettled).toBe(true);
-    expect(persist).toHaveBeenCalledOnce();
-  });
-
-  it("restores the saved baseline when an undo races an older in-flight write", async () => {
+  it("writes an undo after the older edited value has crossed storage", async () => {
     const first = deferred<{ version: string }>();
     const requests: DocumentPersistenceRequest[] = [];
     const persist = vi.fn((request: DocumentPersistenceRequest) => {
@@ -260,89 +190,139 @@ describe("DocumentEditingSession", () => {
       return requests.length === 1 ? first.promise : Promise.resolve({ version: "v3" });
     });
     const session = createSession(persist);
+    const source = bindSource(session, { revision: "r1", content: "one" });
+    source.change({ revision: "r2", content: "two" });
+    await nextMicrotask();
 
-    session.reportRevision({ revision: "r2", dirty: true });
-    const firstFlush = session.flushSnapshot({ revision: "r2", content: "two" }, "document-switch");
-
-    session.reportRevision({ revision: "r3", dirty: false });
-    const undoFlush = session.flushSnapshot({ revision: "r3", content: "one" }, "destroy");
-
-    expect(persist).toHaveBeenCalledTimes(1);
+    source.change({ revision: "r3", content: "one" }, false);
+    const drain = session.flushCurrent("document-switch");
     first.resolve({ version: "v2" });
-    await firstFlush;
-    await undoFlush;
+    await drain;
 
     expect(requests.map(({ content }) => content)).toEqual(["two", "one"]);
-    expect(requests[1]).toMatchObject({
-      revision: "r3",
-      baseVersion: "v2",
-      reason: "destroy",
-    });
-    expect(session.getPersistedContent()).toBe("one");
+    expect(requests[1]).toMatchObject({ baseVersion: "v2", reason: "document-switch" });
     expect(session.hasUnpersistedChanges()).toBe(false);
   });
 
-  it("does not write twice when a newer revision returns to the in-flight content", async () => {
+  it("does not write twice when a newer revision has the in-flight content", async () => {
     const first = deferred<{ version: string }>();
     const persist = vi.fn(() => first.promise);
     const session = createSession(persist);
+    const source = bindSource(session, { revision: "r1", content: "one" });
+    source.change({ revision: "r2", content: "two" });
+    await nextMicrotask();
 
-    session.reportRevision({ revision: "r2", dirty: true });
-    const firstFlush = session.flushSnapshot({ revision: "r2", content: "two" }, "document-switch");
-    session.reportRevision({ revision: "r3", dirty: true });
-    const finalFlush = session.flushSnapshot({ revision: "r3", content: "two" }, "destroy");
-
+    source.change({ revision: "r3", content: "two" });
+    const drain = session.flushCurrent("document-switch");
     first.resolve({ version: "v2" });
-    await firstFlush;
-    await finalFlush;
+    await drain;
 
     expect(persist).toHaveBeenCalledTimes(1);
     expect(session.getState()).toMatchObject({
       status: "clean",
       currentRevision: "r3",
       persistedRevision: "r3",
-      storageVersion: "v2",
     });
   });
 
-  it("does not overwrite a pending edit with an external baseline", () => {
-    const session = createSession(vi.fn(async () => ({ version: "v2" })));
-    session.reportRevision({ revision: "r2", dirty: true });
+  it("applies an external baseline only while clean", async () => {
+    const persist = vi.fn(async () => ({ version: "v2" }));
+    const session = createSession(persist, "manual");
+    const source = bindSource(session, { revision: "r1", content: "one" });
 
-    expect(session.reconcileExternalBaseline("external", "external-version")).toBe("conflict");
-    expect(session.getPersistedContent()).toBe("one");
+    expect(session.reconcileExternalBaseline("external", "external-v1")).toBe("applied");
+    expect(session.getState()).toMatchObject({ status: "clean", storageVersion: "external-v1" });
+
+    source.change({ revision: "r2", content: "local" });
+    expect(session.reconcileExternalBaseline("agent edit", "external-v2")).toBe("conflict");
     expect(session.getState()).toMatchObject({
       status: "error",
-      storageVersion: "v1",
+      error: { code: "external-conflict" },
+      storageVersion: "external-v1",
+    });
+    await expect(session.requestSave()).rejects.toThrow("changed outside the editor");
+    expect(persist).not.toHaveBeenCalled();
+
+    await session.resolveExternalConflict("reload-external");
+    expect(source.snapshot()).toMatchObject({ content: "agent edit" });
+    expect(session.getState()).toMatchObject({
+      status: "clean",
+      storageVersion: "external-v2",
     });
   });
 
-  it("surfaces a failed conditional write without losing the dirty revision", async () => {
-    const persist = vi.fn(async () => {
-      throw new Error("File changed outside PuppyOne");
-    });
-    const session = createSession(persist);
-    session.reportRevision({ revision: "r2", dirty: true });
+  it("does not let a remounted editor mark detached unsaved content clean", async () => {
+    const persist = vi.fn(async () => ({ version: "v2" }));
+    const session = createSession(persist, "manual");
+    const firstSource = bindSource(session, { revision: "r1", content: "one" });
+    firstSource.change({ revision: "r2", content: "two" });
+    firstSource.detach();
 
-    await expect(
-      session.flushSnapshot({ revision: "r2", content: "two" }, "document-switch"),
-    ).rejects.toThrow("outside PuppyOne");
+    const secondSource = bindSource(session, { revision: "r3", content: "two" });
+    expect(session.hasUnpersistedChanges()).toBe(true);
+    expect(session.getState().status).toBe("dirty");
+
+    await session.requestSave();
+    expect(persist).toHaveBeenCalledWith(expect.objectContaining({
+      revision: "r3",
+      content: "two",
+      reason: "manual",
+    }));
+    secondSource.detach();
+  });
+
+  it("cancels a queued follow-up write when an external conflict arrives", async () => {
+    const first = deferred<{ version: string }>();
+    const persist = vi.fn(() => first.promise);
+    const session = createSession(persist);
+    const source = bindSource(session, { revision: "r1", content: "one" });
+    source.change({ revision: "r2", content: "two" });
+    await nextMicrotask();
+    source.change({ revision: "r3", content: "three" });
+    await nextMicrotask();
+
+    expect(session.reconcileExternalBaseline("agent update", "agent-v2")).toBe("conflict");
+    first.resolve({ version: "v2" });
+    await nextMicrotask();
+
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(session.getState()).toMatchObject({
+      status: "error",
+      error: { code: "external-conflict" },
+    });
+    await expect(session.flushCurrent("document-switch"))
+      .rejects.toThrow("changed outside the editor");
+  });
+
+  it("surfaces a failed conditional write and keeps the dirty snapshot retryable", async () => {
+    const persist = vi.fn()
+      .mockRejectedValueOnce(new Error("File changed outside PuppyOne"))
+      .mockResolvedValueOnce({ version: "v3" });
+    const session = createSession(persist, "manual");
+    const source = bindSource(session, { revision: "r1", content: "one" });
+    source.change({ revision: "r2", content: "two" });
+
+    await expect(session.flushCurrent("document-switch")).rejects.toThrow("outside PuppyOne");
     expect(session.hasUnpersistedChanges()).toBe(true);
     expect(session.getState()).toMatchObject({
       status: "error",
       error: { code: "persistence-failed", detail: "File changed outside PuppyOne" },
     });
+
+    await session.requestSave();
+    expect(session.hasUnpersistedChanges()).toBe(false);
+    expect(persist).toHaveBeenCalledTimes(2);
   });
 
-  it("settles the caller when an adapter throws before returning its Promise", async () => {
+  it("settles the drain when an adapter throws before returning a Promise", async () => {
     const session = createSession(() => {
       throw new Error("Desktop bridge unavailable");
-    });
-    session.reportRevision({ revision: "r2", dirty: true });
+    }, "manual");
+    const source = bindSource(session, { revision: "r1", content: "one" });
+    source.change({ revision: "r2", content: "two" });
 
-    await expect(
-      session.flushSnapshot({ revision: "r2", content: "two" }, "document-switch"),
-    ).rejects.toThrow("Desktop bridge unavailable");
+    await expect(session.flushCurrent("document-switch"))
+      .rejects.toThrow("Desktop bridge unavailable");
     expect(session.getState()).toMatchObject({
       status: "error",
       error: { code: "persistence-failed", detail: "Desktop bridge unavailable" },
@@ -352,17 +332,38 @@ describe("DocumentEditingSession", () => {
 
 function createSession(
   persist: DocumentPersistencePort["persist"],
+  saveMode: "auto" | "manual" = "auto",
 ) {
   return new DocumentEditingSession({
     documentId: "notes.md",
     initialContent: "one",
     initialVersion: "v1",
-    saveMode: "auto",
-    persistence: {
-      kind: "local-fs",
-      persist,
+    saveMode,
+    persistence: { kind: "local-fs", persist },
+  });
+}
+
+function bindSource(
+  session: DocumentEditingSession,
+  initialSnapshot: EditorSourceSnapshot,
+) {
+  let snapshot = initialSnapshot;
+  const detach = session.attachSource({
+    readSnapshot: () => snapshot,
+    replaceContent: (content) => {
+      snapshot = { revision: `${snapshot.revision}:external`, content };
+      return snapshot;
     },
   });
+  session.reportRevision({ revision: snapshot.revision, dirty: false });
+  return {
+    change(nextSnapshot: EditorSourceSnapshot, dirty = true) {
+      snapshot = nextSnapshot;
+      session.reportRevision({ revision: snapshot.revision, dirty });
+    },
+    snapshot: () => snapshot,
+    detach,
+  };
 }
 
 function deferred<T>() {

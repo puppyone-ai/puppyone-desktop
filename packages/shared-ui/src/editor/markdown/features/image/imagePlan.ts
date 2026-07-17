@@ -22,6 +22,7 @@ export function compileImageElementPlan(
       alt: imageData?.alt ?? "",
       href: imageData?.href ?? "",
       title: imageData?.title ?? null,
+      referenceKind: imageData?.referenceKind ?? "markdown-path",
     },
     layout: { lineBreaks: 0, estimatedHeight: 120 },
     diagnostics: imageData ? [] : [{ code: "image.missing-data", message: "image token data unavailable" }],

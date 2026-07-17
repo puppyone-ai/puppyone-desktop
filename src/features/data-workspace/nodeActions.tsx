@@ -16,17 +16,20 @@ import {
   Trash2,
   Workflow,
 } from "lucide-react";
-import { FileGlyphIcon, getMatchedExtension, type DataNode, type FileIconThemeId } from "@puppyone/shared-ui";
+import {
+  createDefaultPuppyFlowDocument,
+  FileGlyphIcon,
+  getMatchedExtension,
+  serializePuppyFlowDocument,
+  type DataNode,
+  type FileIconThemeId,
+  type PuppyFlowDocumentDefaults,
+} from "@puppyone/shared-ui";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
 import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
 import type { ExperimentalSettings } from "../../preferences";
-import {
-  createDefaultPuppyFlowDocument,
-  serializePuppyFlowDocument,
-  type PuppyFlowDocumentDefaults,
-} from "../puppyflow/puppyflowModel";
 
 export type DesktopCreateEntryKind = "folder" | "markdown" | "text" | "json" | "csv" | "app" | "puppyflow";
 export type DesktopCreateEntryAnchor = {

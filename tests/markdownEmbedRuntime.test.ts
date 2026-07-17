@@ -20,6 +20,7 @@ import {
   createTableCellEditor,
   disposeTableCellEditor,
 } from "../packages/shared-ui/src/editor/markdown/features/table/tableCellEditor";
+import type { MarkdownInlinePreviewRenderer } from "../packages/shared-ui/src/editor/markdown/shared/preview/markdownInlinePreviewPort";
 
 const mermaidMocks = vi.hoisted(() => ({
   render: vi.fn(async () => ({
@@ -37,6 +38,9 @@ vi.mock("../packages/shared-ui/src/editor/markdown/features/mermaid/mermaidRende
 }));
 
 const views: EditorView[] = [];
+const renderInlinePreview: MarkdownInlinePreviewRenderer = (target, source) => {
+  target.textContent = source;
+};
 
 afterEach(() => {
   while (views.length > 0) {
@@ -247,6 +251,7 @@ describe("Markdown embedded runtime", () => {
       rowCount: firstTable.rows.length,
       rowIndex: 0,
       rows: firstTable.rows,
+      renderInlinePreview,
       tableFrom: firstTable.from,
       tableTo: firstTable.to,
       view,
@@ -277,6 +282,7 @@ describe("Markdown embedded runtime", () => {
       rowCount: movedTable.rows.length,
       rowIndex: 0,
       rows: movedTable.rows,
+      renderInlinePreview,
       tableFrom: movedTable.from,
       tableTo: movedTable.to,
       view,
@@ -309,6 +315,7 @@ describe("Markdown embedded runtime", () => {
       rowCount: table.rows.length,
       rowIndex: 0,
       rows: table.rows,
+      renderInlinePreview,
       tableFrom: table.from,
       tableTo: table.to,
       view,

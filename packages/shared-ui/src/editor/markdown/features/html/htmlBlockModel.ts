@@ -1,6 +1,8 @@
 import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
+import type { MarkdownHtmlBlockMetrics } from "../../core/features/markdownFeatureData";
+export type { MarkdownHtmlBlockMetrics } from "../../core/features/markdownFeatureData";
 import {
   MARKDOWN_HTML_VOID_TAGS,
   scanMarkdownHtmlTagTokens,
@@ -17,18 +19,11 @@ export type MarkdownHtmlBlock = {
   metrics: MarkdownHtmlBlockMetrics;
 };
 
-export type MarkdownHtmlBlockMetrics = {
-  logicalItems: number;
-  estimatedDomNodes: number;
-  nestingDepth: number;
-  assetCount: number;
-};
-
 export function getMarkdownHtmlBlock(state: EditorState, lineNumber: number): MarkdownHtmlBlock | null {
   const doc = state.doc;
   const firstLine = doc.line(lineNumber);
   const blockNode = findHtmlBlockStartingOnLine(state, firstLine.from, firstLine.to);
-  if (!blockNode) return null;
+  if (!blockNode) return getStandaloneMediaHtmlBlock(state, lineNumber);
 
   const lastPosition = Math.max(blockNode.from, blockNode.to - 1);
   const lastLine = doc.lineAt(lastPosition);
@@ -50,6 +45,69 @@ export function getMarkdownHtmlBlock(state: EditorState, lineNumber: number): Ma
   };
 }
 
+/**
+ * Lezer does not consistently promote a standalone media element on one
+ * physical line to HTMLBlock, especially when it follows paragraph text
+ * without a blank line. Keep the product dialect deliberately narrow: only a
+ * complete <img> or closed <video> root that owns the whole line gets block
+ * media treatment. Other inline HTML remains under the normal Markdown parser,
+ * and four-space-indented source remains an indented code block.
+ */
+function getStandaloneMediaHtmlBlock(
+  state: EditorState,
+  lineNumber: number,
+): MarkdownHtmlBlock | null {
+  const line = state.doc.line(lineNumber);
+  const leadingWhitespace = line.text.match(/^[ \t]*/)?.[0] ?? "";
+  if (leadingWhitespace.includes("\t") || leadingWhitespace.length > 3) return null;
+
+  const trimmedSource = line.text.trim();
+  if (!trimmedSource.startsWith("<")) return null;
+
+  const sourceFrom = line.from + leadingWhitespace.length;
+  const tokens = scanMarkdownHtmlTagTokens(trimmedSource, sourceFrom);
+  const opening = tokens[0] ?? null;
+  const closing = tokens.at(-1) ?? null;
+  const sourceTo = sourceFrom + trimmedSource.length;
+  const isCompleteImage = Boolean(
+    opening
+    && opening.tagName === "img"
+    && !opening.closing
+    && opening.selfClosing
+    && opening.from === sourceFrom
+    && opening.to === sourceTo
+    && tokens.length === 1,
+  );
+  const isCompleteVideo = Boolean(
+    opening
+    && opening.tagName === "video"
+    && !opening.closing
+    && !opening.selfClosing
+    && opening.from === sourceFrom
+    && closing
+    && closing.closing
+    && closing.tagName === "video"
+    && closing.to === sourceTo
+    && isRootHtmlTagClosed(opening, tokens),
+  );
+  if (
+    !opening
+    || (!isCompleteImage && !isCompleteVideo)
+  ) {
+    return null;
+  }
+
+  return {
+    from: line.from,
+    to: line.to,
+    nextLineNumber: line.number + 1,
+    source: line.text,
+    tagName: opening.tagName,
+    closed: true,
+    metrics: estimateHtmlBlockMetrics(tokens),
+  };
+}
+
 function estimateHtmlBlockMetrics(
   tokens: readonly MarkdownHtmlTagToken[],
 ): MarkdownHtmlBlockMetrics {
@@ -66,7 +124,12 @@ function estimateHtmlBlockMetrics(
     }
 
     elementCount += 1;
-    if (token.tagName === "img" || token.tagName === "video" || token.tagName === "audio") {
+    if (
+      token.tagName === "img"
+      || token.tagName === "video"
+      || token.tagName === "audio"
+      || token.tagName === "source"
+    ) {
       assetCount += 1;
     }
     if (token.selfClosing || MARKDOWN_HTML_VOID_TAGS.has(token.tagName)) continue;

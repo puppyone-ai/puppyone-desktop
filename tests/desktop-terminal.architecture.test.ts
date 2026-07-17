@@ -40,18 +40,23 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(globalLayout).not.toContain(".desktop-terminal-");
   });
 
-  it("keeps the Terminal toggle stable and attaches its overflow actions in the titlebar", () => {
+  it("keeps Terminal and overflow as separate titlebar controls", () => {
     const titlebarActions = source("src/features/app-shell/DesktopTitlebarActions.tsx");
     const titlebarCss = source("src/styles/titlebar.css");
     expect(titlebarActions).toContain("TerminalTitlebarActionsMenu");
     expect(titlebarActions).toContain("onClearTerminal");
     expect(titlebarActions).toContain("onResetTerminal");
     expect(titlebarActions).toContain("onToggleTerminal");
+    expect(titlebarActions).toContain('id: "terminal-menu"');
+    expect(titlebarActions).not.toContain("desktop-titlebar-terminal-cluster");
     expect(titlebarActions).toContain(
       'className="desktop-titlebar-menu desktop-titlebar-terminal-menu"',
     );
-    expect(titlebarCss).toContain(".desktop-titlebar-terminal-cluster");
+    expect(titlebarCss).not.toContain(".desktop-titlebar-terminal-cluster");
     expect(titlebarCss).toContain(".desktop-titlebar-terminal-menu");
+    expect(titlebarCss).toContain("width: var(--desktop-titlebar-control-height);");
+    expect(titlebarCss).toContain("height: var(--desktop-titlebar-control-height);");
+    expect(titlebarCss).toContain("background: var(--desktop-titlebar-hover);");
     expect(titlebarCss.indexOf(".desktop-titlebar-terminal-menu {")).toBeGreaterThan(
       titlebarCss.indexOf(".desktop-titlebar-menu {"),
     );
@@ -60,9 +65,6 @@ describe("Desktop Terminal architecture boundaries", () => {
     );
     expect(titlebarCss).toMatch(
       /\.desktop-titlebar-terminal-menu\s*\{[^}]*width:\s*min\(200px, calc\(100vw - 32px\)\);[^}]*\}/s,
-    );
-    expect(titlebarCss).not.toMatch(
-      /\.desktop-titlebar-terminal-menu\s*\{[^}]*padding:/s,
     );
   });
 });

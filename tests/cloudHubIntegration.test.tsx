@@ -348,7 +348,7 @@ describe("Project Cloud repository context semantics", () => {
 });
 
 describe("CloudServiceSidebar project context", () => {
-  it("shows Initialize plus usable global Cloud destinations for a local-only workspace", () => {
+  it("previews locked project sections without an Initialize nav item for a local-only workspace", () => {
     const onSelectSection = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -365,20 +365,21 @@ describe("CloudServiceSidebar project context", () => {
 
     const rows = Array.from(container.querySelectorAll<HTMLButtonElement>(".desktop-cloud-sidebar-nav-row"));
     expect(rows.map((row) => row.textContent)).toEqual([
-      "Initialize",
-      "Cloud Projects",
-      "Templates",
+      "Overview",
+      "History",
+      "Claude",
+      "Automation",
+      "Access",
+      "Settings",
       "Team",
       "Billing",
     ]);
-    expect(rows[0]?.getAttribute("aria-current")).toBe("page");
-    expect(rows[0]?.getAttribute("aria-disabled")).toBeNull();
+    expect(rows.every((row) => row.getAttribute("aria-disabled") === "true")).toBe(true);
+    expect(rows.every((row) => !row.classList.contains("active"))).toBe(true);
+    expect(rows[3]?.getAttribute("title")).toBe("Initialize a Cloud project to use this");
 
-    act(() => rows[0]?.click());
-    expect(onSelectSection).toHaveBeenCalledWith("initialize");
-
-    act(() => rows[1]?.click());
-    expect(onSelectSection).toHaveBeenLastCalledWith("projects");
+    act(() => rows[3]?.click());
+    expect(onSelectSection).not.toHaveBeenCalled();
   });
 
   it("previews the project workspace navigation while signed out", () => {
@@ -735,12 +736,8 @@ describe("CloudRouter local context", () => {
           activeSection="initialize"
           accountEmail={session.user_email}
           accountConnected
-          branchName="main"
-          localChangeCount={0}
           loading={false}
-          cloudBackupLoading={false}
           onSessionChange={vi.fn()}
-          onBackupWorkspace={vi.fn()}
           onOpenProject={vi.fn()}
           onOpenGitSettings={vi.fn()}
           onSelectSection={vi.fn()}
@@ -753,6 +750,7 @@ describe("CloudRouter local context", () => {
     expect(getCloudHistory).not.toHaveBeenCalled();
     expect(container.textContent).toContain("Select a Cloud project to open this section.");
     expect(container.textContent).not.toContain("Initialize this project on PuppyOne Cloud");
+    expect(container.querySelector(".desktop-cloud-publish-hero")).toBeNull();
     expect(container.textContent).not.toContain("Preview Project");
     expect(container.textContent).not.toContain("Repository Git remote");
   });
@@ -781,7 +779,6 @@ describe("CloudRouter local context", () => {
           onOpenGitSettings={vi.fn()}
           onSelectSection={vi.fn()}
           onRefresh={vi.fn()}
-          onReviewChanges={vi.fn()}
         />,
       );
       await flushPromises();
@@ -923,7 +920,6 @@ describe("Local-only Cloud page", () => {
           onSelectSection={vi.fn()}
           onRefresh={vi.fn()}
           onOpenGitSettings={vi.fn()}
-          onReviewChanges={vi.fn()}
         />,
       );
       await flushPromises();
@@ -970,7 +966,6 @@ describe("Local-only Cloud page", () => {
           onSelectSection={vi.fn()}
           onRefresh={vi.fn()}
           onOpenGitSettings={vi.fn()}
-          onReviewChanges={vi.fn()}
         />,
       );
       await flushPromises();
@@ -1010,16 +1005,15 @@ describe("Local-only Cloud page", () => {
         hasHeadCommit
         hasCurrentBranch
         publishLoading={false}
-        onReviewChanges={vi.fn()}
         onPublishWorkspace={vi.fn()}
       />,
     ));
 
-    const nodes = container.querySelectorAll(".desktop-cloud-publish-node");
-    expect(nodes[0]?.textContent).toContain("feature/cloud-ux");
-    expect(nodes[1]?.textContent).toContain("main");
-    expect(container.querySelector(".desktop-cloud-publish-summary")?.textContent)
-      .toContain("Push feature/cloud-ux to Cloud main with its 3 commits.");
+    const localDetails = container.querySelector(".desktop-cloud-publish-details.local");
+    const cloudDetails = container.querySelector(".desktop-cloud-publish-details.cloud");
+    expect(localDetails?.textContent).toContain("feature/cloud-ux");
+    expect(cloudDetails?.textContent).toContain("main");
+    expect(container.querySelector(".desktop-cloud-publish-summary")).toBeNull();
   });
 
   it("shows explicit browser sign-in feedback while a publish intent is pending", async () => {
@@ -1041,7 +1035,6 @@ describe("Local-only Cloud page", () => {
           publishLoading={false}
           publishPending
           publishError={null}
-          onReviewChanges={vi.fn()}
           onPublishWorkspace={vi.fn()}
         />,
       );
@@ -1053,10 +1046,9 @@ describe("Local-only Cloud page", () => {
     const primaryAction = container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary");
     expect(primaryAction?.disabled).toBe(true);
     expect(primaryAction?.getAttribute("aria-busy")).toBe("true");
-    expect(container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-review")?.disabled).toBe(true);
   });
 
-  it("marks truncated Git status counts as minimums in both the node and summary", () => {
+  it("marks truncated Git status counts in the local details without an extra summary", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -1073,14 +1065,12 @@ describe("Local-only Cloud page", () => {
         hasHeadCommit
         hasCurrentBranch
         publishLoading={false}
-        onReviewChanges={vi.fn()}
         onPublishWorkspace={vi.fn()}
       />,
     ));
 
     expect(container.textContent).toContain("At least 1,000 local changes");
-    expect(container.querySelector(".desktop-cloud-publish-summary")?.textContent)
-      .toContain("At least 1,000 uncommitted changes stay local.");
+    expect(container.querySelector(".desktop-cloud-publish-summary")).toBeNull();
   });
 
   it("renders coordinator state and resumes the same interrupted publish", () => {
@@ -1116,7 +1106,6 @@ describe("Local-only Cloud page", () => {
           canAbandon: true,
         }}
         onAbandonPublish={vi.fn()}
-        onReviewChanges={vi.fn()}
         onPublishWorkspace={onPublishWorkspace}
       />,
     ));
@@ -1162,7 +1151,6 @@ describe("Local-only Cloud page", () => {
           onSelectSection={vi.fn()}
           onRefresh={vi.fn()}
           onOpenGitSettings={vi.fn()}
-          onReviewChanges={vi.fn()}
         />,
       );
       await flushPromises();
@@ -1193,7 +1181,6 @@ describe("Local-only Cloud page", () => {
       onSelectSection: vi.fn(),
       onRefresh,
       onOpenGitSettings: vi.fn(),
-      onReviewChanges: vi.fn(),
     };
 
     await act(async () => {
@@ -1261,7 +1248,6 @@ describe("Local-only Cloud page", () => {
         onSelectSection={vi.fn()}
         onRefresh={vi.fn()}
         onOpenGitSettings={vi.fn()}
-        onReviewChanges={vi.fn()}
       />,
     ));
 
@@ -1274,7 +1260,6 @@ describe("Local-only Cloud page", () => {
       ...session,
       api_base_url: "http://localhost:9090",
     } as DesktopCloudSession;
-    const onReviewChanges = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -1322,33 +1307,32 @@ describe("Local-only Cloud page", () => {
           onSelectSection={vi.fn()}
           onRefresh={vi.fn()}
           onOpenGitSettings={vi.fn()}
-          onReviewChanges={onReviewChanges}
         />,
       );
       await flushPromises();
     });
 
-    expect(container.textContent).toContain("Initialize this project on PuppyOne Cloud");
-    expect(container.textContent).toContain("Local Git repository");
     expect(container.textContent).toContain("Local Notes");
     expect(container.textContent).toContain("18 commits");
     expect(container.textContent).toContain("At least 5 local changes");
-    expect(container.querySelector(".desktop-cloud-publish-summary")?.textContent)
-      .toContain("At least 5 uncommitted changes stay local.");
+    expect(container.querySelector(".desktop-cloud-publish-details.local")?.textContent)
+      .toContain("Local Notes");
+    expect(container.querySelector(".desktop-cloud-publish-details.cloud")?.textContent)
+      .toContain("New Cloud project");
+    expect(container.querySelector(".desktop-cloud-publish-symbol.local")?.getAttribute("aria-label"))
+      .toBe("Local Git repository");
+    expect(container.querySelector(".desktop-cloud-publish-symbol.cloud")?.getAttribute("aria-label"))
+      .toBe("PuppyOne Cloud");
+    expect(container.querySelector(".desktop-cloud-publish-summary")).toBeNull();
     expect(container.textContent).toContain("New Cloud project");
     expect(container.textContent).toContain("Not initialized");
     expect(container.textContent).toContain("Initialize and Push");
-    expect(container.querySelector(".desktop-cloud-publish-arrow")?.textContent?.trim()).toBe("Push");
-    expect(container.querySelector(".desktop-cloud-publish-arrow")?.textContent).not.toContain("Git");
+    expect(container.querySelector(".desktop-cloud-publish-arrow")?.getAttribute("aria-label")).toBe("Push");
+    expect(container.querySelector(".desktop-cloud-publish-arrow")?.textContent?.trim()).toBe("");
     expect(container.textContent).not.toContain("Git push");
     expect(container.textContent).not.toContain("Unable to verify");
     expect(container.querySelector(".desktop-cloud-main-alert")).toBeNull();
     expect(getCloudProject).not.toHaveBeenCalled();
-
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-review")?.click();
-    });
-    expect(onReviewChanges).toHaveBeenCalledOnce();
   });
 
   it("stays passive while signed out, then forwards an explicit publish intent", async () => {
@@ -1399,13 +1383,12 @@ describe("Local-only Cloud page", () => {
           onSelectSection={vi.fn()}
           onRefresh={vi.fn()}
           onOpenGitSettings={vi.fn()}
-          onReviewChanges={vi.fn()}
         />,
       );
       await flushPromises();
     });
 
-    expect(container.textContent).toContain("Initialize this project on PuppyOne Cloud");
+    expect(container.querySelector(".desktop-cloud-publish-hero")).not.toBeNull();
     expect(container.textContent).toContain("Sign in to Initialize");
     expect(container.querySelector(".desktop-cloud-main-alert")).toBeNull();
     expect(restoreCloudSession).not.toHaveBeenCalled();

@@ -380,7 +380,9 @@ body.data-sidebar-resizing .data-preview-accessory {
   height: var(--data-explorer-footer-height, auto);
   min-height: var(--data-explorer-footer-min-height, 38px);
   overflow: visible;
-  border-top: 1px solid var(--po-sidebar-divider, var(--po-divider));
+  border-block-start:
+    var(--data-explorer-footer-divider-width, 1px)
+    solid var(--po-sidebar-divider, var(--po-divider));
   background: var(--po-sidebar);
 }
 

@@ -5,8 +5,9 @@ import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DocumentEditingSession } from "../packages/shared-ui/src/editor/document-session/DocumentEditingSession";
-import { PuppyFlowEditor } from "../src/features/puppyflow/PuppyFlowEditor";
+import { PuppyoneEditorHost } from "../packages/shared-ui/src/editor/PuppyoneEditorHost";
+import { preloadPresetViewer } from "../packages/shared-ui/src/editor/PresetViewerRenderer";
+import { resolveEditorViewer } from "../packages/shared-ui/src/editor/viewerRegistry";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -24,36 +25,27 @@ describe("PuppyFlow Document Session integration", () => {
   it("preserves an invalid source verbatim until the user performs an edit", async () => {
     const persist = vi.fn(async () => ({ version: "v2" }));
     const source = "{ invalid puppyflow source";
-    const session = new DocumentEditingSession({
-      documentId: "workflow.puppyflow",
-      initialContent: source,
-      initialVersion: "v1",
-      saveMode: "manual",
-      persistence: {
-        kind: "local-fs",
-        persist,
-      },
-    });
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
+    await preloadPresetViewer(resolveEditorViewer({
+      path: "workflow.puppyflow",
+      name: "workflow.puppyflow",
+      type: "workflow",
+    }).viewer);
 
-    act(() => root?.render(withTestLocalization(
-      <PuppyFlowEditor
-        node={{
-          id: "workflow.puppyflow",
+    await act(async () => root?.render(withTestLocalization(
+      <PuppyoneEditorHost
+        document={{
           path: "workflow.puppyflow",
           name: "workflow.puppyflow",
           type: "workflow",
-        }}
-        fileContent={{
-          path: "workflow.puppyflow",
-          name: "workflow.puppyflow",
-          type: "workflow",
+          sourceKind: "local",
           content: source,
           version: "v1",
         }}
-        documentSession={session}
+        documentPersistence={{ kind: "local-fs", persist }}
+        saveMode="manual"
       />,
     )));
 
@@ -63,6 +55,5 @@ describe("PuppyFlow Document Session integration", () => {
     await Promise.resolve();
 
     expect(persist).not.toHaveBeenCalled();
-    expect(session.getPersistedContent()).toBe(source);
   });
 });

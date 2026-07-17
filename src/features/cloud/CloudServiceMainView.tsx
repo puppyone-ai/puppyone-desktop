@@ -41,7 +41,6 @@ export function CloudServiceMainView({
   onSelectSection,
   onRefresh,
   onOpenGitSettings,
-  onReviewChanges,
 }: CloudServiceMainViewProps) {
   const { t } = useLocalization();
   const cloudRemote = cloudEnvironment.cloudRemote;
@@ -129,7 +128,7 @@ export function CloudServiceMainView({
   if (localOnlyContext) {
     if (error) {
       return (
-        <main className="desktop-cloud-main-view">
+        <main className="desktop-cloud-main-view desktop-cloud-initialize-main-view">
           <div className="desktop-cloud-page-shell">
             <CloudLocalGitStatusError error={error} loading={loading} onRetry={onRefresh} />
           </div>
@@ -139,7 +138,7 @@ export function CloudServiceMainView({
 
     if (!status) {
       return (
-        <main className="desktop-cloud-main-view">
+        <main className="desktop-cloud-main-view desktop-cloud-initialize-main-view">
           <div className="desktop-cloud-page-shell">
             <CloudWorkspaceLoadingState label={t("cloud.initialize.loadingRepository")} />
           </div>
@@ -148,7 +147,7 @@ export function CloudServiceMainView({
     }
 
     return (
-      <main className="desktop-cloud-main-view">
+      <main className="desktop-cloud-main-view desktop-cloud-initialize-main-view">
         <div className="desktop-cloud-page-shell">
           {cloudAction.notice && (
             <div className="desktop-cloud-main-alert success" role="status">
@@ -178,7 +177,6 @@ export function CloudServiceMainView({
               publishState={cloudPublishState}
               publishStateLoading={cloudPublishStateLoading}
               onAbandonPublish={onAbandonPuppyoneBackup}
-              onReviewChanges={onReviewChanges}
               onPublishWorkspace={onStartPuppyoneBackup}
             />
           ) : effectiveCloudSession ? (
@@ -194,7 +192,6 @@ export function CloudServiceMainView({
               publishPending={cloudBackupPending}
               publishError={cloudPublishError}
               onSessionChange={onCloudSessionChange}
-              onReviewChanges={onReviewChanges}
               onPublishWorkspace={onStartPuppyoneBackup}
               onAbandonPublish={onAbandonPuppyoneBackup}
             />
@@ -213,7 +210,6 @@ export function CloudServiceMainView({
               publishLoading={cloudBackupLoading}
               publishPending={cloudBackupPending}
               publishError={cloudPublishError}
-              onReviewChanges={onReviewChanges}
               onPublishWorkspace={onStartPuppyoneBackup}
               onAbandonPublish={onAbandonPuppyoneBackup}
             />
@@ -370,7 +366,6 @@ function AuthenticatedCloudInitialize({
   publishPending,
   publishError,
   onSessionChange,
-  onReviewChanges,
   onPublishWorkspace,
   onAbandonPublish,
 }: {
@@ -385,7 +380,6 @@ function AuthenticatedCloudInitialize({
   publishPending: boolean;
   publishError: CloudServiceMainViewProps["cloudPublishError"];
   onSessionChange: CloudServiceMainViewProps["onCloudSessionChange"];
-  onReviewChanges: () => void;
   onPublishWorkspace: CloudServiceMainViewProps["onStartPuppyoneBackup"];
   onAbandonPublish: () => void;
 }) {
@@ -442,7 +436,6 @@ function AuthenticatedCloudInitialize({
       organizationError={organizationError}
       onSelectOrganization={organizationData.selectOrganization}
       onRetryOrganizations={organizationData.refresh}
-      onReviewChanges={onReviewChanges}
       onPublishWorkspace={onPublishWorkspace}
     />
   );

@@ -1,12 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent as ReactDragEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
-import {
-  formatDocumentSessionError,
-  useDocumentSessionState,
-  type DataNode,
-  type EditorDocumentSession,
-  type FileContent,
-} from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import {
@@ -29,31 +22,31 @@ import {
   type PuppyFlowDocument,
   type PuppyFlowStep,
 } from "./puppyflowModel";
+import { useEditableDocumentSource } from "../document-session/EditableDocumentSourceContext";
+import type { PresetViewerRenderContext } from "../viewerTypes";
 
-type PuppyFlowEditorProps = {
-  node: DataNode;
-  fileContent: FileContent | null;
-  workspacePath?: string | null;
-  loading?: boolean;
-  error?: string | null;
-  documentSession?: EditorDocumentSession | null;
-};
+type PuppyFlowViewerProps = Pick<
+  PresetViewerRenderContext,
+  "document" | "content" | "canEdit" | "workspaceRoot"
+>;
 
 type StepDropPosition = "before" | "after";
 type StepDropTarget = { stepId: string; position: StepDropPosition } | null;
 
 const STEP_DRAG_MIME_TYPE = "application/x-puppyflow-step-id";
 
-export function PuppyFlowEditor({
-  node,
-  fileContent,
-  workspacePath,
-  loading = false,
-  error = null,
-  documentSession = null,
-}: PuppyFlowEditorProps) {
+export function PuppyFlowViewer({
+  document: sourceDocument,
+  content: sourceContent,
+  canEdit,
+  workspaceRoot,
+}: PuppyFlowViewerProps) {
   const { t } = useLocalization();
-  const fallbackTitle = getTitleFromFilename(node.name, t("editor.puppyflow.untitledFlow"));
+  const editingSource = useEditableDocumentSource();
+  const fallbackTitle = getTitleFromFilename(
+    sourceDocument.name,
+    t("editor.puppyflow.untitledFlow"),
+  );
   const defaults = useMemo(() => ({
     title: fallbackTitle,
     prompts: [
@@ -62,69 +55,76 @@ export function PuppyFlowEditor({
     ] as const,
   }), [fallbackTitle, t]);
   const parsed = useMemo(
-    () => parsePuppyFlowDocument(fileContent?.content ?? "", defaults),
-    [defaults, fileContent?.content],
+    () => parsePuppyFlowDocument(sourceContent, defaults),
+    [defaults, sourceContent],
   );
   const [document, setDocument] = useState<PuppyFlowDocument>(parsed.document);
   const [parseError, setParseError] = useState<string | null>(parsed.ok ? null : parsed.error);
   const [runMessage, setRunMessage] = useState<"no-enabled-prompts" | null>(null);
   const [draggedStepId, setDraggedStepId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<StepDropTarget>(null);
-  const workdirPath = useMemo(() => formatWorkspacePath(workspacePath), [workspacePath]);
+  const workdirPath = useMemo(() => formatWorkspacePath(workspaceRoot), [workspaceRoot]);
   const workdirLabel = workdirPath ?? t("editor.puppyflow.workspaceSandbox");
   const workdirTitle = workdirPath
     ? t("editor.puppyflow.workdir", { path: bidiIsolate(workdirPath) })
     : t("editor.puppyflow.workspaceSandbox");
   const latestDocumentRef = useRef<PuppyFlowDocument>(parsed.document);
-  const sourceContentRef = useRef(fileContent?.content ?? "");
-  const documentPathRef = useRef(node.path);
+  const sourceContentRef = useRef(sourceContent);
+  const documentPathRef = useRef(sourceDocument.path);
   const revisionCounterRef = useRef(0);
-  const revisionRef = useRef(createPuppyFlowRevision(node.path, 0));
+  const revisionRef = useRef(createPuppyFlowRevision(sourceDocument.path, 0));
   const draggedStepIdRef = useRef<string | null>(null);
-  const sessionState = useDocumentSessionState(documentSession);
-  const sessionError = formatDocumentSessionError(sessionState.error, t);
 
   useLayoutEffect(() => {
-    const pathChanged = documentPathRef.current !== node.path;
-    const source = fileContent?.content ?? "";
-    const reconciliation = documentSession?.reconcileExternalBaseline(
-      source,
-      fileContent?.version ?? null,
+    const pathChanged = documentPathRef.current !== sourceDocument.path;
+    const reconciliation = editingSource?.reconcileExternalBaseline(
+      sourceContent,
+      sourceDocument.version ?? null,
     ) ?? "applied";
     if (!pathChanged && reconciliation !== "applied") return;
 
-    documentPathRef.current = node.path;
+    documentPathRef.current = sourceDocument.path;
     revisionCounterRef.current = 0;
-    revisionRef.current = createPuppyFlowRevision(node.path, 0);
+    revisionRef.current = createPuppyFlowRevision(sourceDocument.path, 0);
     setDocument(parsed.document);
     latestDocumentRef.current = parsed.document;
-    sourceContentRef.current = source;
+    sourceContentRef.current = sourceContent;
     setParseError(parsed.ok ? null : parsed.error);
     setRunMessage(null);
-  }, [documentSession, fileContent?.content, fileContent?.version, node.path, parsed]);
+  }, [editingSource, parsed, sourceContent, sourceDocument.path, sourceDocument.version]);
 
   useLayoutEffect(() => {
-    if (!documentSession) return undefined;
+    if (!editingSource) return undefined;
     const source = {
       readSnapshot: () => ({
         content: sourceContentRef.current,
         revision: revisionRef.current,
       }),
-      readRevision: () => revisionRef.current,
+      replaceContent: (content: string) => {
+        const replacement = parsePuppyFlowDocument(content, defaults);
+        revisionCounterRef.current += 1;
+        revisionRef.current = createPuppyFlowRevision(
+          sourceDocument.path,
+          revisionCounterRef.current,
+        );
+        sourceContentRef.current = content;
+        latestDocumentRef.current = replacement.document;
+        setDocument(replacement.document);
+        setParseError(replacement.ok ? null : replacement.error);
+        setRunMessage(null);
+        return { content, revision: revisionRef.current };
+      },
     };
-    const detach = documentSession.attachSource(source);
-    documentSession.reportRevision({
+    const detach = editingSource.attachSource(source);
+    editingSource.reportRevision({
       revision: revisionRef.current,
-      dirty: source.readSnapshot().content !== documentSession.getPersistedContent(),
+      dirty: false,
     });
-    return () => {
-      const snapshot = source.readSnapshot();
-      detach();
-      void documentSession.flushSnapshot(snapshot, "destroy").catch(() => undefined);
-    };
-  }, [documentSession, node.path]);
+    return detach;
+  }, [defaults, editingSource, sourceDocument.path]);
 
   const applyDocumentEdit = useCallback((nextDocument: PuppyFlowDocument) => {
+    if (!canEdit) return;
     const nextSource = serializePuppyFlowDocument(nextDocument);
     latestDocumentRef.current = nextDocument;
     sourceContentRef.current = nextSource;
@@ -132,14 +132,15 @@ export function PuppyFlowEditor({
     setParseError(null);
     setRunMessage(null);
     revisionCounterRef.current += 1;
-    revisionRef.current = createPuppyFlowRevision(node.path, revisionCounterRef.current);
-    if (documentSession) {
-      documentSession.reportRevision({
-        revision: revisionRef.current,
-        dirty: nextSource !== documentSession.getPersistedContent(),
-      });
-    }
-  }, [documentSession, node.path]);
+    revisionRef.current = createPuppyFlowRevision(
+      sourceDocument.path,
+      revisionCounterRef.current,
+    );
+    editingSource?.reportRevision({
+      revision: revisionRef.current,
+      dirty: true,
+    });
+  }, [canEdit, editingSource, sourceDocument.path]);
 
   const updateDocument = useCallback((updater: (current: PuppyFlowDocument) => PuppyFlowDocument) => {
     applyDocumentEdit(updater(latestDocumentRef.current));
@@ -219,8 +220,6 @@ export function PuppyFlowEditor({
   }, []);
 
   const handleRun = useCallback(() => {
-    void documentSession?.requestSave("manual").catch(() => undefined);
-
     const compiled = compilePuppyFlowRun(latestDocumentRef.current);
     if (compiled.enabledSteps === 0) {
       setRunMessage("no-enabled-prompts");
@@ -228,28 +227,12 @@ export function PuppyFlowEditor({
     }
 
     setRunMessage(null);
-  }, [documentSession]);
+  }, []);
 
   const resetInvalidFile = useCallback(() => {
     const nextDocument = createDefaultPuppyFlowDocument(defaults);
     applyDocumentEdit(nextDocument);
   }, [applyDocumentEdit, defaults]);
-
-  if (loading && !fileContent) {
-    return (
-      <div className="puppyflow-editor-state">
-        {t("editor.puppyflow.loading")}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="puppyflow-editor-state error">
-        {t("editor.puppyflow.loadFailedDetail", { detail: bidiIsolate(error) })}
-      </div>
-    );
-  }
 
   return (
     <section className="puppyflow-editor-shell" aria-label={t("editor.puppyflow.ariaLabel")}>
@@ -259,18 +242,22 @@ export function PuppyFlowEditor({
       </button>
 
       <div className="puppyflow-document">
-        {sessionError || runMessage ? (
+        {runMessage ? (
           <div className="puppyflow-toolbar-status" role="status">
-            {sessionError ?? (runMessage === "no-enabled-prompts"
+            {runMessage === "no-enabled-prompts"
               ? t("editor.puppyflow.noEnabledPrompts")
-              : null)}
+              : null}
           </div>
         ) : null}
 
         {parseError && (
           <div className="puppyflow-parse-error" role="alert">
             <span>{t("editor.puppyflow.parseFailedDetail", { detail: bidiIsolate(parseError) })}</span>
-            <button type="button" onClick={resetInvalidFile}>{t("editor.puppyflow.resetTemplate")}</button>
+            {canEdit && (
+              <button type="button" onClick={resetInvalidFile}>
+                {t("editor.puppyflow.resetTemplate")}
+              </button>
+            )}
           </div>
         )}
 
@@ -280,6 +267,7 @@ export function PuppyFlowEditor({
               key={step.id}
               step={step}
               index={index}
+              readOnly={!canEdit}
               dragging={draggedStepId === step.id}
               dropPosition={dropTarget?.stepId === step.id ? dropTarget.position : null}
               onDragStart={(event) => {
@@ -328,6 +316,7 @@ export function PuppyFlowEditor({
               type="button"
               aria-label={t("editor.puppyflow.addStep")}
               title={t("editor.puppyflow.addStep")}
+              disabled={!canEdit}
               onClick={addStep}
             >
               <span className="puppyflow-add-icon" aria-hidden="true">
@@ -344,6 +333,7 @@ export function PuppyFlowEditor({
 function PuppyFlowStepRow({
   step,
   index,
+  readOnly,
   dragging,
   dropPosition,
   onDragStart,
@@ -363,6 +353,7 @@ function PuppyFlowStepRow({
 }: {
   step: PuppyFlowStep;
   index: number;
+  readOnly: boolean;
   dragging: boolean;
   dropPosition: StepDropPosition | null;
   onDragStart: (event: ReactDragEvent<HTMLButtonElement>) => void;
@@ -390,6 +381,7 @@ function PuppyFlowStepRow({
       data-dragging={dragging}
       data-drop-position={dropPosition ?? undefined}
       data-disabled={!step.enabled}
+      data-read-only={readOnly || undefined}
       onDragOver={(event) => onDragOver(event, getStepDropPosition(event))}
       onDragEnter={(event) => onDragOver(event, getStepDropPosition(event))}
       onDragLeave={onDragLeave}
@@ -400,7 +392,8 @@ function PuppyFlowStepRow({
       <button
         className="puppyflow-step-grip"
         type="button"
-        draggable
+        draggable={!readOnly}
+        disabled={readOnly}
         aria-label={t("editor.puppyflow.reorderStep", { number: index + 1 })}
         title={t("editor.puppyflow.reorderHint")}
         onDragStart={onDragStart}
@@ -420,6 +413,7 @@ function PuppyFlowStepRow({
             placeholder={t("editor.puppyflow.promptPlaceholder")}
             aria-label={t("editor.puppyflow.promptForStep", { number: index + 1 })}
             dir="auto"
+            readOnly={readOnly}
             onChange={(event) => onPromptChange(event.target.value)}
           />
         </div>
@@ -431,6 +425,7 @@ function PuppyFlowStepRow({
             <select
               value={step.agent}
               aria-label={t("editor.puppyflow.agentForStep", { number: index + 1 })}
+              disabled={readOnly}
               onChange={(event) => onAgentChange(event.target.value as PuppyFlowAgentId)}
             >
               {PUPPYFLOW_AGENT_OPTIONS.map((option) => (
@@ -445,12 +440,13 @@ function PuppyFlowStepRow({
           </span>
         </div>
         <div className="puppyflow-step-actions">
-          <button type="button" aria-label={t("editor.puppyflow.duplicateStep", { number: index + 1 })} onClick={onDuplicate}>
+          <button type="button" disabled={readOnly} aria-label={t("editor.puppyflow.duplicateStep", { number: index + 1 })} onClick={onDuplicate}>
             <Copy size={15} />
           </button>
           <button
             className="puppyflow-toggle"
             type="button"
+            disabled={readOnly}
             data-enabled={step.enabled}
             aria-label={step.enabled
               ? t("editor.puppyflow.disableStep", { number: index + 1 })
@@ -459,7 +455,7 @@ function PuppyFlowStepRow({
           >
             <span />
           </button>
-          <button type="button" aria-label={t("editor.puppyflow.deleteStep", { number: index + 1 })} onClick={onRemove}>
+          <button type="button" disabled={readOnly} aria-label={t("editor.puppyflow.deleteStep", { number: index + 1 })} onClick={onRemove}>
             <Trash2 size={15} />
           </button>
         </div>

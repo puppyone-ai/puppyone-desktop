@@ -49,27 +49,6 @@
   color: var(--po-text);
 }
 
-.markdown-codemirror-editor .cm-md-html-source-block {
-  box-sizing: border-box;
-  width: 100%;
-  max-height: 360px;
-  margin: 0;
-  padding: 12px 14px;
-  overflow: auto;
-  border: 1px solid color-mix(in srgb, var(--po-divider) 82%, transparent);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--po-inset) 76%, transparent);
-  color: color-mix(in srgb, var(--po-text) 78%, var(--po-text-muted));
-  font-family: var(--po-font-mono);
-  font-size: 12px;
-  line-height: 1.55;
-  white-space: pre;
-}
-
-.markdown-codemirror-editor .cm-md-html-source-block code {
-  font: inherit;
-}
-
 .markdown-codemirror-editor .cm-md-html-rendered-surface {
   --background-primary: var(--po-editor-bg);
   --background-primary-alt: color-mix(in srgb, var(--po-panel) 56%, transparent);
@@ -164,6 +143,19 @@
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface summary {
   cursor: var(--po-clickable-cursor, pointer);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface img {
+  max-width: 100%;
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface video {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: min(70vh, 720px);
+  border-radius: 6px;
+  background: #000;
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface img,

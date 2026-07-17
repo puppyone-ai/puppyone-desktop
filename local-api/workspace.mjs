@@ -11,6 +11,7 @@ import {
   isLocalFilePreviewable,
   resolveCopyNameExtension,
 } from "./files/file-format-policy.mjs";
+import { parseSingleByteRange } from "./files/byte-range.mjs";
 import {
   isSameOrInsidePath,
   normalizeRelativePath,
@@ -53,9 +54,11 @@ import {
 export { getGitEnvironmentForTests } from "./git/runner.mjs";
 export { getMimeType } from "./files/file-format-policy.mjs";
 export {
+  resolveExistingWorkspaceDisplayPath,
   resolveExistingWorkspacePath,
   resolveWorkspacePath,
 } from "./files/path-policy.mjs";
+export { openWorkspaceFileRangeStream } from "./files/workspace-file-stream.mjs";
 export {
   readPuppyoneWorkspaceConfig,
   writePuppyoneWorkspaceConfig,
@@ -70,7 +73,8 @@ const MAX_EDITOR_BYTES = 1024 * 1024;
 // Cap for whole-file reads served over the puppyone-local:// protocol (media
 // preview). Bounds main-process memory so a huge file can't OOM the app.
 const MAX_LOCAL_FILE_BYTES = 100 * 1024 * 1024;
-// Maximum length of a single bounded Range read (media protocol + viewer packs).
+// Maximum length of one buffered random-access read. Media protocol responses
+// use the separate backpressured stream path below.
 const MAX_RANGE_READ_BYTES = 8 * 1024 * 1024;
 const MAX_OFFICE_CONVERSION_INPUT_BYTES = 25 * 1024 * 1024;
 const MAX_OFFICE_CONVERSION_OUTPUT_BYTES = 8 * 1024 * 1024;
@@ -243,7 +247,7 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
     // Bounded Range consumers (including Viewer Pack resource brokers) may
     // address files larger than the whole-file media cap. Whole-file reads
     // below still enforce MAX_LOCAL_FILE_BYTES.
-    const range = parseByteRange(options.rangeHeader, metadata.size);
+    const range = parseSingleByteRange(options.rangeHeader, metadata.size);
     if (range?.unsatisfiable) {
       return {
         bytes: Buffer.alloc(0),
@@ -256,9 +260,9 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
     }
 
     if (range) {
-      const span = range.end - range.start + 1;
-      if (span > MAX_RANGE_READ_BYTES) {
-        throw new Error("Range length exceeds host maximum.");
+      const length = range.end - range.start + 1;
+      if (length > MAX_RANGE_READ_BYTES) {
+        throw new Error(`Requested range (${length} bytes) exceeds the ${formatFileSize(MAX_RANGE_READ_BYTES)} per-read limit.`);
       }
       const bytes = await readFileSlice(filePath, range.start, range.end);
       return {
@@ -290,9 +294,6 @@ export async function readWorkspaceFile(rootPath, relativePath, options = undefi
   }
   return fs.readFile(filePath);
 }
-
-// Bounded Range reads for viewer packs and media use MAX_RANGE_READ_BYTES
-// (declared with the other size caps above).
 
 /**
  * Metadata for a workspace file without reading its body. Unlike the media
@@ -494,42 +495,6 @@ export async function convertWorkspaceOfficeDocumentToDocx(rootPath, relativePat
   }
 }
 
-function parseByteRange(rangeHeader, size) {
-  if (typeof rangeHeader !== "string" || rangeHeader.trim().length === 0) return null;
-
-  const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
-  if (!match || size <= 0) return { unsatisfiable: true };
-
-  const [, startValue, endValue] = match;
-  if (!startValue && !endValue) return { unsatisfiable: true };
-
-  if (!startValue) {
-    const suffixLength = Number(endValue);
-    if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0) return { unsatisfiable: true };
-    return {
-      start: Math.max(size - suffixLength, 0),
-      end: size - 1,
-    };
-  }
-
-  const start = Number(startValue);
-  const end = endValue ? Number(endValue) : size - 1;
-  if (
-    !Number.isSafeInteger(start) ||
-    !Number.isSafeInteger(end) ||
-    start < 0 ||
-    end < start ||
-    start >= size
-  ) {
-    return { unsatisfiable: true };
-  }
-
-  return {
-    start,
-    end: Math.min(end, size - 1),
-  };
-}
-
 async function readFileSlice(filePath, start, end) {
   const length = end - start + 1;
   const handle = await fs.open(filePath, "r");
@@ -639,7 +604,7 @@ function normalizeExpectedWorkspaceVersion(value) {
   return value;
 }
 
-function getWorkspaceTextVersion(bytes) {
+export function getWorkspaceTextVersion(bytes) {
   return `sha256:${crypto.createHash("sha256").update(bytes).digest("hex")}`;
 }
 

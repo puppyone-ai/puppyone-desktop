@@ -3,9 +3,10 @@
  * Brokers must evaluate hrefs here before calling any host resolver.
  */
 
-export const MARKDOWN_ASSET_POLICY_VERSION = "2026-07-10";
+export const MARKDOWN_ASSET_POLICY_VERSION = "2026-07-15";
 export const MARKDOWN_ASSET_MAX_DATA_URL_BYTES = 2 * 1024 * 1024;
 export const MARKDOWN_ASSET_MAX_IN_FLIGHT = 8;
+export type MarkdownAssetKind = "image" | "video";
 
 export type MarkdownAssetPolicyContext = {
   documentPath: string;
@@ -52,15 +53,16 @@ const C0_OR_DEL = /[\u0000-\u001f\u007f]/;
 const ENCODED_CONTROL = /%(?:0[0-9a-f]|1[0-9a-f]|7f)/i;
 
 /**
- * Evaluate a Markdown image/asset href for brokered resolution.
+ * Evaluate a Markdown media href for brokered resolution.
  * Markdown source never carries an ambient blob/custom-protocol capability.
- * Remote images require an explicit policy grant. Workspace-relative paths are
+ * Remote media requires an explicit policy grant. Workspace-relative paths are
  * normalized lexically here and are canonicalized/revalidated by the host
  * resolver against the real workspace filesystem.
  */
 export function evaluateMarkdownAssetHref(
   href: string,
   context: MarkdownAssetPolicyContext,
+  kind: MarkdownAssetKind = "image",
 ): MarkdownAssetPolicyResult {
   const trimmed = href.trim();
   if (!trimmed) return { ok: false, reason: "empty-href" };
@@ -75,6 +77,7 @@ export function evaluateMarkdownAssetHref(
   }
 
   if (lower.startsWith("data:")) {
+    if (kind !== "image") return { ok: false, reason: "data-media-kind-denied" };
     return evaluateDataImageHref(trimmed);
   }
 
@@ -84,11 +87,15 @@ export function evaluateMarkdownAssetHref(
     }
     const remoteUrl = parseSafeRemoteAssetUrl(trimmed);
     if (!remoteUrl) return { ok: false, reason: "remote-url-invalid" };
+    const mimeType = guessMimeFromHref(remoteUrl);
+    if (!isMimeCompatibleWithAssetKind(mimeType, kind)) {
+      return { ok: false, reason: "media-kind-mismatch" };
+    }
     return {
       ok: true,
       kind: "safe-direct",
       url: remoteUrl,
-      mimeType: guessMimeFromHref(remoteUrl),
+      mimeType,
     };
   }
 
@@ -110,22 +117,29 @@ export function evaluateMarkdownAssetHref(
     return { ok: false, reason: "invalid-path-segment" };
   }
 
+  const mimeType = guessMimeFromHref(resolvedPath);
+  if (!isMimeCompatibleWithAssetKind(mimeType, kind)) {
+    return { ok: false, reason: "media-kind-mismatch" };
+  }
   return {
     ok: true,
     kind: "workspace-relative",
     path: resolvedPath,
-    mimeType: guessMimeFromHref(resolvedPath),
+    mimeType,
   };
 }
 
-export function isBrokerSafeResolvedAssetUrl(url: string): boolean {
+export function isBrokerSafeResolvedAssetUrl(
+  url: string,
+  kind: MarkdownAssetKind = "image",
+): boolean {
   const trimmed = url.trim();
   if (!trimmed) return false;
   if (C0_OR_DEL.test(trimmed) || ENCODED_CONTROL.test(trimmed)) return false;
   if (/^file:/i.test(trimmed)) return false;
   if (/^(javascript:|vbscript:)/i.test(trimmed)) return false;
   if (/^data:/i.test(trimmed)) {
-    return evaluateDataImageHref(trimmed).ok;
+    return kind === "image" && evaluateDataImageHref(trimmed).ok;
   }
   if (/^https?:/i.test(trimmed)) return parseSafeRemoteAssetUrl(trimmed) !== null;
   return /^(blob:|puppyone-local:)/i.test(trimmed);
@@ -265,5 +279,18 @@ function guessMimeFromHref(href: string): string | null {
   if (clean.endsWith(".bmp")) return "image/bmp";
   if (clean.endsWith(".ico")) return "image/x-icon";
   if (clean.endsWith(".svg")) return "image/svg+xml";
+  if (clean.endsWith(".mp4") || clean.endsWith(".m4v")) return "video/mp4";
+  if (clean.endsWith(".webm")) return "video/webm";
+  if (clean.endsWith(".ogv")) return "video/ogg";
+  if (clean.endsWith(".mov") || clean.endsWith(".qt")) return "video/quicktime";
+  if (clean.endsWith(".3gp") || clean.endsWith(".3gpp")) return "video/3gpp";
+  if (clean.endsWith(".3g2")) return "video/3gpp2";
   return null;
+}
+
+function isMimeCompatibleWithAssetKind(
+  mimeType: string | null,
+  kind: MarkdownAssetKind,
+): boolean {
+  return mimeType === null || mimeType.startsWith(`${kind}/`);
 }

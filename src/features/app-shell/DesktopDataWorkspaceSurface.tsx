@@ -68,7 +68,6 @@ export type DesktopDataWorkspaceSurfaceProps = {
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onNodeActionMenu: (node: DataNode, anchorRect: DOMRect, selectedNodes?: readonly DataNode[]) => void;
   preferences: DesktopPreferencesController;
-  renderPreviewBody: NonNullable<DataWorkspaceProps["renderPreviewBody"]>;
   resolvedSurface: ResolvedWorkspaceSurface;
   viewerExtensionAdapter: DataWorkspaceProps["viewerExtensionAdapter"];
   workspace: Workspace;
@@ -92,7 +91,6 @@ export function DesktopDataWorkspaceSurface({
   onCreateEntryMenu,
   onNodeActionMenu,
   preferences,
-  renderPreviewBody,
   resolvedSurface,
   viewerExtensionAdapter,
   workspace,
@@ -202,7 +200,6 @@ export function DesktopDataWorkspaceSurface({
         ) : undefined}
         showPreviewHeader={false}
         hidePreviewSourceView
-        renderPreviewBody={renderPreviewBody}
         fileIconTheme={preferences.fileIconTheme}
         editorInteractionPreferences={editorInteractionPreferences}
         editorSaveMode="auto"

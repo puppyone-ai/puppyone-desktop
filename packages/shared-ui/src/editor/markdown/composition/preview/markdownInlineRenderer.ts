@@ -12,13 +12,25 @@ import {
   parseMarkdownImageTokenAt,
   resolveMarkdownHtmlImageSources,
 } from "../../features/image/markdownImageModel";
-import { findWikiLinkTokens, type MarkdownWikiLinkToken } from "../links/wikiLinkModel";
+import {
+  resolveMarkdownMediaReference,
+  type MarkdownMediaReferenceKind,
+} from "../../features/media/markdownMediaReference";
+import { findWikiLinkTokens, type MarkdownWikiLinkToken } from "../../core/links/wikiLinkModel";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 
 type InlineToken =
   | { kind: "code"; from: number; to: number; text: string }
   | { kind: "del" | "em" | "strong"; from: number; to: number; text: string }
-  | { kind: "image"; from: number; to: number; alt: string; href: string; title: string | null }
+  | {
+      kind: "image";
+      from: number;
+      to: number;
+      alt: string;
+      href: string;
+      title: string | null;
+      referenceKind: MarkdownMediaReferenceKind;
+    }
   | { kind: "link"; from: number; to: number; label: string; href: string }
   | { kind: "wikiLink"; from: number; to: number; token: MarkdownWikiLinkToken };
 
@@ -332,24 +344,36 @@ function appendImage(
   options: MarkdownInlineRenderOptions,
 ) {
   const resolver = options.resolveAssetUrl ?? null;
-  if (!resolver) {
+  const sourcePath = options.sourcePath ?? "";
+  const resolvedHref = resolveMarkdownMediaReference(
+    sourcePath,
+    token.href,
+    token.referenceKind,
+    options.markdownLinkGraph ?? null,
+  );
+  if (!resolver || !resolvedHref) {
     target.appendChild(createImagePlaceholder(token.alt || token.href));
     return;
   }
 
-  const placeholder = createImagePlaceholder(
-    options.t ? options.t("editor.markdown.loadingImage") : token.alt || token.href,
-  );
+  const placeholder = createLoadingImagePlaceholder();
   target.appendChild(placeholder);
 
-  Promise.resolve(resolver(options.sourcePath ?? "", token.href))
+  Promise.resolve(resolver(sourcePath, resolvedHref))
     .then((resolvedUrl) => {
       if (!placeholder.isConnected) return;
-      placeholder.replaceWith(
-        resolvedUrl && isBrokerSafeResolvedAssetUrl(resolvedUrl)
-          ? createImageElement(resolvedUrl, token.alt, token.title, options.onLayoutChange)
-          : createImagePlaceholder(token.alt || token.href),
-      );
+      if (resolvedUrl && isBrokerSafeResolvedAssetUrl(resolvedUrl)) {
+        placeholder.after(createImageElement(
+          resolvedUrl,
+          token.alt,
+          token.title,
+          placeholder,
+          token.alt || token.href,
+          options.onLayoutChange,
+        ));
+      } else {
+        placeholder.replaceWith(createImagePlaceholder(token.alt || token.href));
+      }
       options.onLayoutChange?.();
     })
     .catch(() => {
@@ -363,15 +387,39 @@ function createImageElement(
   source: string,
   alt: string,
   title: string | null,
+  placeholder: HTMLElement,
+  fallbackLabel: string,
   onLayoutChange: (() => void) | undefined,
 ): HTMLImageElement {
   const image = document.createElement("img");
-  image.src = source;
   image.alt = alt;
-  image.loading = "lazy";
+  image.decoding = "async";
+  image.hidden = true;
+  image.dataset.previewState = "loading";
+  image.setAttribute("aria-hidden", "true");
   if (title) image.title = title;
-  image.addEventListener("load", () => onLayoutChange?.());
-  image.addEventListener("error", () => onLayoutChange?.());
+  image.addEventListener("load", () => {
+    const reveal = () => {
+      if (!image.isConnected || !placeholder.isConnected) return;
+      image.hidden = false;
+      image.dataset.previewState = "ready";
+      image.removeAttribute("aria-hidden");
+      placeholder.remove();
+      onLayoutChange?.();
+    };
+    if (typeof image.decode !== "function") {
+      reveal();
+      return;
+    }
+    void image.decode().catch(() => undefined).then(reveal);
+  }, { once: true });
+  image.addEventListener("error", () => {
+    if (!image.isConnected || !placeholder.isConnected) return;
+    image.remove();
+    placeholder.textContent = fallbackLabel;
+    onLayoutChange?.();
+  }, { once: true });
+  image.src = source;
   return image;
 }
 
@@ -380,6 +428,13 @@ function createImagePlaceholder(labelText: string): HTMLElement {
   label.className = "cm-md-image-placeholder";
   label.textContent = labelText;
   return label;
+}
+
+function createLoadingImagePlaceholder(): HTMLElement {
+  const placeholder = createImagePlaceholder("");
+  placeholder.classList.add("is-loading");
+  placeholder.setAttribute("aria-hidden", "true");
+  return placeholder;
 }
 
 function parseWikiLinkToken(source: string, from: number): InlineToken | null {
@@ -449,6 +504,7 @@ function parseImageToken(source: string, from: number): InlineToken | null {
     alt: token.alt,
     href: token.href,
     title: token.title,
+    referenceKind: token.referenceKind,
   };
 }
 

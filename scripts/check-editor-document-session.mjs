@@ -22,7 +22,7 @@ for (const filePath of walkTypeScript(sharedEditorRoot)) {
 const contributionFiles = [
   ...walkTypeScript(path.join(sharedEditorRoot, "viewers")),
   ...walkTypeScript(path.join(sharedEditorRoot, "markdown")),
-  path.join(repoRoot, "src/features/puppyflow/PuppyFlowEditor.tsx"),
+  ...walkTypeScript(path.join(sharedEditorRoot, "puppyflow")),
 ];
 for (const filePath of contributionFiles) {
   const source = readFileSync(filePath, "utf8");
@@ -31,6 +31,8 @@ for (const filePath of contributionFiles) {
     [/\bdocumentPersistence\b/, "receives a storage adapter"],
     [/\bonSaveContent\b/, "owns the legacy save callback"],
     [/\b(?:window\.)?setTimeout\s*\([^)]*(?:save|persist|write)/is, "owns a save timer"],
+    [/\b(?:requestSave|flushCurrent|flushSnapshot|getPersistedContent|resolveExternalConflict)\b/, "controls the host save lifecycle"],
+    [/\b(?:DocumentEditingSessionHandle|useDocumentSessionState)\b/, "observes the host-only session"],
   ]) {
     if (pattern.test(source)) errors.push(`${relative(filePath)} ${reason}`);
   }
@@ -58,7 +60,7 @@ if (!/readSnapshot\(\),\s*this\.strongestDrainReason\(\)\s*\?\?\s*["']edit["']/.
 
 const externalAdapterPath = path.join(sharedEditorRoot, "viewerHostAdapters.ts");
 const externalAdapterSource = readFileSync(externalAdapterPath, "utf8");
-for (const authority of ["EditorDocumentSession", "DocumentPersistencePort", "documentSession", "persistence"]) {
+for (const authority of ["EditableDocumentSource", "DocumentPersistencePort", "documentSession", "persistence"]) {
   if (new RegExp(`\\b${authority}\\b`).test(externalAdapterSource)) {
     errors.push(`${relative(externalAdapterPath)} exposes ${authority} to an external Viewer Pack`);
   }
@@ -68,6 +70,22 @@ const packTypesPath = path.join(sharedEditorRoot, "viewerPackTypes.ts");
 const packTypesSource = readFileSync(packTypesPath, "utf8");
 if (!/export type ViewerPackFormatContribution\s*=\s*\{[\s\S]*?editable:\s*false;[\s\S]*?\};/.test(packTypesSource)) {
   errors.push(`${relative(packTypesPath)} no longer fixes Viewer Pack v1 contributions to editable: false`);
+}
+
+const sharedUiPublicIndexPath = path.join(repoRoot, "packages/shared-ui/src/index.ts");
+const sharedUiPublicIndexSource = readFileSync(sharedUiPublicIndexPath, "utf8");
+for (const authority of [
+  "DocumentEditingSession",
+  "DocumentSessionBoundary",
+  "DocumentEditingSessionHandle",
+  "EditableDocumentSource",
+  "registerActiveDocumentSession",
+  "useDocumentSessionState",
+  "useEditableDocumentSource",
+]) {
+  if (new RegExp(`\\b${authority}\\b`).test(sharedUiPublicIndexSource)) {
+    errors.push(`${relative(sharedUiPublicIndexPath)} exposes host-only ${authority}`);
+  }
 }
 
 const manifestSchemaPath = path.join(repoRoot, "electron/main/viewer-packs/manifest-schema.mjs");
@@ -99,8 +117,39 @@ const dataWorkspaceSource = readFileSync(dataWorkspacePath, "utf8");
 if (!/await flushActiveDocumentSessions\("document-switch"\)[\s\S]*await onActivePathChange/.test(dataWorkspaceSource)) {
   errors.push(`${relative(dataWorkspacePath)} does not await the Document Session drain before changing files`);
 }
-if (/flushSnapshot\([^;]+\)\.catch\(\(\)\s*=>\s*undefined\)/.test(textFrameSource)) {
-  errors.push(`${relative(textFramePath)} silently consumes an emergency snapshot failure`);
+if (!/useEditableDocumentSource\s*\(\s*\)/.test(textFrameSource)) {
+  errors.push(`${relative(textFramePath)} does not use the narrow editable-source boundary`);
+}
+if (/\b(?:requestSave|flushCurrent|flushSnapshot|getPersistedContent|resolveExternalConflict)\b/.test(textFrameSource)) {
+  errors.push(`${relative(textFramePath)} controls host persistence directly`);
+}
+
+const sourceSnapshotPath = path.join(sharedEditorRoot, "sourceSnapshot.ts");
+const sourceSnapshotSource = readFileSync(sourceSnapshotPath, "utf8");
+if (!/replaceContent:\s*\(content:\s*string\)\s*=>\s*EditorSourceSnapshot/.test(sourceSnapshotSource)) {
+  errors.push(`${relative(sourceSnapshotPath)} does not require format-aware external replacement`);
+}
+for (const relativeAdapterPath of [
+  "viewers/TextEditorFrame.tsx",
+  "markdown/MarkdownCodeMirrorEditor.tsx",
+  "puppyflow/PuppyFlowViewer.tsx",
+]) {
+  const adapterPath = path.join(sharedEditorRoot, relativeAdapterPath);
+  if (!/\breplaceContent\s*:/.test(readFileSync(adapterPath, "utf8"))) {
+    errors.push(`${relative(adapterPath)} cannot apply an accepted external version`);
+  }
+}
+
+const viewerRegistryPath = path.join(sharedEditorRoot, "viewerRegistry.tsx");
+const viewerRegistrySource = readFileSync(viewerRegistryPath, "utf8");
+if (!/id:\s*["']puppyflow["'][\s\S]*?import\(["']\.\/puppyflow\/PuppyFlowViewer["']\)/.test(viewerRegistrySource)) {
+  errors.push(`${relative(viewerRegistryPath)} does not route PuppyFlow through a preset contribution`);
+}
+
+const desktopWorkspaceContentPath = path.join(repoRoot, "src/features/app-shell/DesktopWorkspaceContent.tsx");
+const desktopWorkspaceContentSource = readFileSync(desktopWorkspaceContentPath, "utf8");
+if (/\b(?:PuppyFlowEditor|renderPreviewBody|DocumentSessionBoundary)\b/.test(desktopWorkspaceContentSource)) {
+  errors.push(`${relative(desktopWorkspaceContentPath)} still special-cases a built-in editor outside the contribution router`);
 }
 
 const desktopAppPath = path.join(repoRoot, "src/App.tsx");
@@ -126,9 +175,9 @@ if (!/keeps the local editor mounted when its pre-navigation save fails/.test(lo
 
 const closeDrainSources = [
   {
-    filePath: path.join(sharedEditorRoot, "document-session/DocumentSessionBoundary.tsx"),
-    pattern: /registerActiveDocumentSession\s*\(\s*session\s*\)[\s\S]*session\.dispose\(\)[\s\S]*unregister\(\)/,
-    reason: "does not retain its disposing session for app-close draining",
+    filePath: path.join(sharedEditorRoot, "document-session/activeDocumentSessions.ts"),
+    pattern: /registration\.tokens\.size\s*>\s*0[\s\S]*session\.dispose\(\)[\s\S]*session\.flushCurrent\("destroy"\)/,
+    reason: "does not defer disposal until real retirement or retain the retiring session for app-close draining",
   },
   {
     filePath: path.join(repoRoot, "src/main.tsx"),
@@ -160,6 +209,17 @@ for (const { filePath, pattern, reason } of closeDrainSources) {
   if (!pattern.test(readFileSync(filePath, "utf8"))) {
     errors.push(`${relative(filePath)} ${reason}`);
   }
+}
+
+const documentSessionBoundaryPath = path.join(
+  sharedEditorRoot,
+  "document-session/DocumentSessionBoundary.tsx",
+);
+const documentSessionBoundarySource = readFileSync(documentSessionBoundaryPath, "utf8");
+if (/session\.dispose\(\)/.test(documentSessionBoundarySource)) {
+  errors.push(
+    `${relative(documentSessionBoundaryPath)} permanently disposes a live Session during React StrictMode's cleanup/setup probe`,
+  );
 }
 
 if (errors.length > 0) {

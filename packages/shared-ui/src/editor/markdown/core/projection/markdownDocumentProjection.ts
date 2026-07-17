@@ -28,7 +28,10 @@ import {
   getInputCompositionState,
   markdownComposingBlockLineField,
 } from "../state/composingBlockLine";
-import { markdownExpandedImageField } from "../state/expandedImage";
+import {
+  markdownRevealedSourceField,
+  type MarkdownRevealedSourceRange,
+} from "../state/revealedSource";
 import { getLivePreviewFocusState } from "../state/livePreviewFocus";
 import { getInlineRevealElement } from "../syntax/markdownElements";
 import { getMarkdownPlansInRange } from "../plans/markdownPlanIndex";
@@ -50,7 +53,7 @@ type MarkdownDocumentProjection = {
   inputComposing: boolean;
   composingLineKey: string;
   revealRange: InlineRevealRange | null;
-  expandedImageRange: InlineRevealRange | null;
+  revealedSourceRange: MarkdownRevealedSourceRange | null;
   blockRanges: readonly InlineRevealRange[];
 };
 
@@ -83,7 +86,7 @@ export const markdownLivePreviewDecorations = StateField.define<MarkdownDocument
     const focused = getLivePreviewFocusState(previous.focused, transaction.effects);
     const inputComposing = getInputCompositionState(previous.inputComposing, transaction.effects);
     const composingLine = transaction.state.field(markdownComposingBlockLineField, false) ?? null;
-    const expandedImageRange = transaction.state.field(markdownExpandedImageField, false) ?? null;
+    const revealedSourceRange = transaction.state.field(markdownRevealedSourceField, false) ?? null;
     const revealRange = getLivePreviewInlineRevealRange(transaction.state, focused);
     const contextInvalidation = getDecorationContextInvalidation(transaction);
 
@@ -113,9 +116,13 @@ export const markdownLivePreviewDecorations = StateField.define<MarkdownDocument
       }
 
       const previousRevealRange = mapOptionalRange(previous.revealRange, transaction.changes);
-      const previousExpandedImageRange = mapOptionalRange(previous.expandedImageRange, transaction.changes);
+      const previousRevealedSourceRange = mapRevealedSourceRange(previous.revealedSourceRange, transaction.changes);
       addRangeIfChanged(patchRanges, previousRevealRange, revealRange);
-      addRangeIfChanged(patchRanges, previousExpandedImageRange, expandedImageRange);
+      addRevealedSourceRangeIfChanged(
+        patchRanges,
+        previousRevealedSourceRange,
+        revealedSourceRange,
+      );
       addKeyedLineRange(
         patchRanges,
         transaction.state,
@@ -156,7 +163,7 @@ export const markdownLivePreviewDecorations = StateField.define<MarkdownDocument
       patchRanges.map((range) => expandToStableProjectionRange(transaction.state, range.from, range.to)),
     );
     for (const range of mergedRanges) {
-      const builders = buildProjectionRange(transaction.state, range, revealRange, expandedImageRange, composingLine);
+      const builders = buildProjectionRange(transaction.state, range, revealRange, revealedSourceRange, composingLine);
       decorations = replaceDecorationRange(decorations, range, builders.decorations);
       atomicRanges = replaceDecorationRange(atomicRanges, range, builders.atomicRanges);
     }
@@ -171,7 +178,7 @@ export const markdownLivePreviewDecorations = StateField.define<MarkdownDocument
       inputComposing,
       composingLineKey: composingLine ? `${composingLine.from}:${composingLine.to}` : "",
       revealRange,
-      expandedImageRange,
+      revealedSourceRange,
       blockRanges,
     };
   },
@@ -211,9 +218,9 @@ export function getMarkdownProjectionDiagnostics() {
 
 function createInitialProjection(state: EditorState): MarkdownDocumentProjection {
   const initialRange = getDocumentProjectionRange(state);
-  const expandedImageRange = state.field(markdownExpandedImageField, false) ?? null;
+  const revealedSourceRange = state.field(markdownRevealedSourceField, false) ?? null;
   const composingLine = state.field(markdownComposingBlockLineField, false) ?? null;
-  const builders = buildProjectionRange(state, initialRange, null, expandedImageRange, composingLine);
+  const builders = buildProjectionRange(state, initialRange, null, revealedSourceRange, composingLine);
   return {
     decorations: builders.decorations.length > 0
       ? Decoration.set(builders.decorations, true)
@@ -225,7 +232,7 @@ function createInitialProjection(state: EditorState): MarkdownDocumentProjection
     inputComposing: false,
     composingLineKey: getComposingBlockLineKey(state),
     revealRange: null,
-    expandedImageRange,
+    revealedSourceRange,
     blockRanges: getBlockAtomRanges(state, initialRange),
   };
 }
@@ -238,7 +245,7 @@ function buildProjectionRange(
   state: EditorState,
   range: InlineRevealRange,
   revealRange: InlineRevealRange | null,
-  expandedImageRange: InlineRevealRange | null,
+  revealedSourceRange: MarkdownRevealedSourceRange | null,
   composingLine: InlineRevealRange | null,
 ): MarkdownDecorationBuilders {
   const builders: MarkdownDecorationBuilders = { decorations: [], atomicRanges: [] };
@@ -246,7 +253,7 @@ function buildProjectionRange(
     state,
     builders,
     revealRange,
-    expandedImageRange,
+    revealedSourceRange,
     composingLine,
     state.facet(markdownHtmlTrustModeFacet),
     state.facet(markdownLinkGraphFacet),
@@ -339,6 +346,18 @@ function mapOptionalRange(
   };
 }
 
+function mapRevealedSourceRange(
+  range: MarkdownRevealedSourceRange | null,
+  changes: ChangeDesc,
+): MarkdownRevealedSourceRange | null {
+  if (!range) return null;
+  return {
+    from: changes.mapPos(range.from, -1),
+    to: changes.mapPos(range.to, 1),
+    presentation: range.presentation,
+  };
+}
+
 function mapRange(range: InlineRevealRange, changes: ChangeDesc): InlineRevealRange {
   return {
     from: changes.mapPos(range.from, -1),
@@ -392,6 +411,20 @@ function addRangeIfChanged(
   next: InlineRevealRange | null,
 ) {
   if (sameRange(previous, next)) return;
+  if (previous) ranges.push(previous);
+  if (next) ranges.push(next);
+}
+
+function addRevealedSourceRangeIfChanged(
+  ranges: InlineRevealRange[],
+  previous: MarkdownRevealedSourceRange | null,
+  next: MarkdownRevealedSourceRange | null,
+) {
+  if (
+    previous?.from === next?.from
+    && previous?.to === next?.to
+    && previous?.presentation === next?.presentation
+  ) return;
   if (previous) ranges.push(previous);
   if (next) ranges.push(next);
 }

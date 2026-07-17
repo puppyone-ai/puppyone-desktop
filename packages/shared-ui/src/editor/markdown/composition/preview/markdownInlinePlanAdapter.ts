@@ -1,6 +1,8 @@
-import type { MarkdownLinkGraph } from "../../../viewerTypes";
-import type { MessageFormatter } from "@puppyone/localization/core";
-import { renderMarkdownInlineInto } from "../rendering/inlineRenderer";
+import type {
+  MarkdownInlinePreviewOptions,
+  MarkdownInlinePreviewRenderer,
+} from "../../shared/preview/markdownInlinePreviewPort";
+import { renderMarkdownInlineInto } from "./markdownInlineRenderer";
 
 /**
  * Broker-only options for the isolated-string preview adapter. This adapter
@@ -9,20 +11,7 @@ import { renderMarkdownInlineInto } from "../rendering/inlineRenderer";
  * URL, and broker policies while its lightweight Markdown tokenizer remains an
  * explicit compatibility boundary.
  */
-export type MarkdownInlinePreviewOptions = {
-  markdownLinkGraph?: MarkdownLinkGraph | null;
-  sourcePath?: string;
-  onLayoutChange?: () => void;
-  /** AssetBroker-backed resolver. Required for workspace images to load. */
-  resolveAssetUrl?: (
-    documentPath: string,
-    href: string,
-    signal?: AbortSignal,
-  ) => string | Promise<string | null> | null;
-  /** LinkBroker-backed activation. */
-  openHref?: (href: string) => void;
-  t?: MessageFormatter;
-};
+export type { MarkdownInlinePreviewOptions } from "../../shared/preview/markdownInlinePreviewPort";
 
 /** @deprecated Prefer the contract-accurate MarkdownInlinePreviewOptions name. */
 export type MarkdownInlinePlanOptions = MarkdownInlinePreviewOptions;
@@ -33,11 +22,11 @@ export type MarkdownInlinePlanOptions = MarkdownInlinePreviewOptions;
  * inert unless a LinkBroker-backed `openHref` is supplied. Unsafe hrefs are
  * rejected by the shared URL authority inside the renderer.
  */
-export function renderMarkdownInlineFromSharedPolicy(
+export const renderMarkdownInlineFromSharedPolicy: MarkdownInlinePreviewRenderer = (
   target: Node,
   source: string,
   options: MarkdownInlinePreviewOptions = {},
-): void {
+): void => {
   renderMarkdownInlineInto(target, source, {
     markdownLinkGraph: options.markdownLinkGraph ?? null,
     sourcePath: options.sourcePath,
@@ -46,4 +35,4 @@ export function renderMarkdownInlineFromSharedPolicy(
     openHref: options.openHref,
     t: options.t,
   });
-}
+};

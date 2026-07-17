@@ -46,21 +46,25 @@ export function compileCodeBlockElementPlan(
       message: getMarkdownBudgetFallbackMessage(featureId, execution),
     }]);
   }
-  return {
+  const sharedPlan = {
     presentation: "blockAtom",
     sourceRange: rangeOf(element),
-    embed: mermaid
-      ? { kind: "mermaid", language, sourceReference, code }
-      : { kind: "codeBlock", language, sourceReference, code },
     complexity,
     execution,
-    layout: {
-      estimatedHeight: mermaid
-        ? estimateMermaidLayoutHeight(code)
-        : estimateCodeBlockLayoutHeight(code),
-    },
     diagnostics: [],
     capabilities: BLOCK_EMBED_CAPABILITIES,
+  } as const;
+  if (mermaid) {
+    return {
+      ...sharedPlan,
+      embed: { kind: "mermaid", language, sourceReference, code },
+      layout: { estimatedHeight: estimateMermaidLayoutHeight(code) },
+    };
+  }
+  return {
+    ...sharedPlan,
+    embed: { kind: "codeBlock", language, sourceReference, code },
+    layout: { estimatedHeight: estimateCodeBlockLayoutHeight(code) },
   };
 }
 

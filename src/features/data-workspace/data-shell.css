@@ -183,9 +183,8 @@ body.data-sidebar-resizing * {
     var(--desktop-sidebar-navigation-padding-outer);
 }
 
-.data-explorer-footer:has(.desktop-sidebar-navigation-surface[data-placement="bottom"]) {
-  border-top: 0;
-  background: var(--po-sidebar);
+.desktop-data-workspace-wrap[data-sidebar-navigation-placement="bottom"] {
+  --data-explorer-footer-divider-width: 0px;
 }
 
 .desktop-data-workspace-wrap[data-sidebar-navigation-placement="top"] .explorer-tree-shell::before,

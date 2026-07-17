@@ -77,27 +77,39 @@ export function DesktopTitlebarActions({
     group: "header" | "right-sidebar";
     id: string;
     node: ReactNode;
-  }> = getOrderedHeaderElementDefinitions(titlebarActionsSettings.order)
-    .filter((definition) => (
-      titlebarActionsSettings.enabled[definition.id]
-      && definition.isAvailable(headerElementContext)
-    ))
-    .map((definition) => {
-      const element = definition.render(headerElementContext);
-      return {
-        group: definition.linkedRightSidebarToolId ? "right-sidebar" as const : "header" as const,
-        id: definition.id,
-        node: definition.id === "terminal" && terminalSidebarOpen ? (
-          <div className="desktop-titlebar-terminal-cluster">
-            <TerminalTitlebarActionsMenu
-              onClear={onClearTerminal}
-              onReset={onResetTerminal}
-            />
-            {element}
-          </div>
-        ) : element,
-      };
+  }> = [];
+
+  for (const definition of getOrderedHeaderElementDefinitions(titlebarActionsSettings.order)) {
+    if (
+      !titlebarActionsSettings.enabled[definition.id]
+      || !definition.isAvailable(headerElementContext)
+    ) {
+      continue;
+    }
+
+    const group = definition.linkedRightSidebarToolId ? "right-sidebar" as const : "header" as const;
+    const element = definition.render(headerElementContext);
+
+    // Separate sibling buttons — do not wrap in a shared cluster chrome.
+    if (definition.id === "terminal" && terminalSidebarOpen) {
+      titlebarActionItems.push({
+        group,
+        id: "terminal-menu",
+        node: (
+          <TerminalTitlebarActionsMenu
+            onClear={onClearTerminal}
+            onReset={onResetTerminal}
+          />
+        ),
+      });
+    }
+
+    titlebarActionItems.push({
+      group,
+      id: definition.id,
+      node: element,
     });
+  }
 
   if (agentChatEnabled) {
     titlebarActionItems.push({

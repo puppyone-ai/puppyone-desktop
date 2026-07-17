@@ -9,10 +9,8 @@ type MarkdownViewerProps = Pick<
   | "document"
   | "content"
   | "canEdit"
-  | "documentSession"
   | "hideSourceView"
   | "editorInteractionPreferences"
-  | "saveMode"
   | "aiEditFile"
   | "htmlTrustMode"
   | "workspaceId"
@@ -30,9 +28,7 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
       nodeName={context.document.name}
       defaultMode="live"
       canEdit={context.canEdit}
-      documentSession={context.documentSession}
       hideSourceView={context.hideSourceView}
-      saveMode={context.saveMode}
       sourceSnapshotMode
       renderLive={(value, controls) => (
         <MarkdownCodeMirrorEditor
@@ -49,7 +45,6 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
           markdownAssetUrlResolver={context.markdownAssetUrlResolver}
           onSourceRevisionChange={controls.onSourceRevisionChange}
           onSnapshotPortChange={controls.onSnapshotPortChange}
-          onBeforeDestroy={controls.onBeforeDestroy}
         />
       )}
       renderSource={(value, controls) => (
@@ -66,7 +61,6 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
           markdownAssetUrlResolver={context.markdownAssetUrlResolver}
           onSourceRevisionChange={controls.onSourceRevisionChange}
           onSnapshotPortChange={controls.onSnapshotPortChange}
-          onBeforeDestroy={controls.onBeforeDestroy}
         />
       )}
     />

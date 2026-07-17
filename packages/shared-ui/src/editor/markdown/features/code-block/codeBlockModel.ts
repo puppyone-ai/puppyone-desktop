@@ -1,4 +1,7 @@
 import type { EditorState } from "@codemirror/state";
+import type { MarkdownCodeSourceReference } from "../../core/features/markdownFeatureData";
+
+export type { MarkdownCodeSourceReference } from "../../core/features/markdownFeatureData";
 
 export type MarkdownCodeBlock = {
   from: number;
@@ -7,12 +10,6 @@ export type MarkdownCodeBlock = {
   language: string;
   sourceReference: MarkdownCodeSourceReference | null;
   code: string;
-};
-
-export type MarkdownCodeSourceReference = {
-  path: string;
-  startLine: number;
-  endLine: number;
 };
 
 export type MarkdownCodeFenceInfo = {

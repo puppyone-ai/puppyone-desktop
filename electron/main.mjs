@@ -6,8 +6,10 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import {
   getMimeType,
+  openWorkspaceFileRangeStream,
   readWorkspaceTextFile,
   readWorkspaceFile,
+  statWorkspaceFile,
   resolveLocalWorkspaceIdentity,
   resolveWorkspacePath as resolveLocalWorkspacePath,
   workspaceFromPath,
@@ -473,6 +475,8 @@ app.whenReady().then(async () => {
   registerLocalFileProtocol({
     protocol,
     readWorkspaceFile,
+    openWorkspaceFileRangeStream,
+    statWorkspaceFile,
     getMimeType,
     canonicalizeWorkspacePath,
     isOpenWorkspaceRoot,
@@ -609,6 +613,7 @@ function registerIpcHandlers() {
     shell,
     authorizeWorkspaceRoot,
     localFileCapabilities,
+    workspaceWatchService,
     t: (messageId, values) => localeService.t(messageId, values),
   });
 

@@ -8,7 +8,7 @@ import { findWikiLinkTokens } from "../packages/shared-ui/src/editor/markdown/co
 import {
   createMarkdownInlineFragment,
   MARKDOWN_INLINE_RICH_SOURCE_MAX_CHARS,
-} from "../packages/shared-ui/src/editor/markdown/core/rendering/inlineRenderer";
+} from "../packages/shared-ui/src/editor/markdown/composition/preview/markdownInlineRenderer";
 
 describe("Markdown inline complexity bounds", () => {
   it("skips an already-inspected malformed link line instead of rescanning each opener", () => {
