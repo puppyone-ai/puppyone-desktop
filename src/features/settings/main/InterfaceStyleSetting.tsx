@@ -10,20 +10,29 @@ export function InterfaceStyleSetting({ value, onChange }: InterfaceStyleSetting
   const { t } = useLocalization();
 
   return (
-    <div className="desktop-settings-row desktop-settings-row-control">
-      <span className="desktop-settings-label-stack">
-        <strong>{t("settings.appearance.interfaceStyle.title")}</strong>
-        <small>{t("settings.appearance.interfaceStyle.detail")}</small>
-      </span>
-      <label className="desktop-settings-switch">
-        <input
-          type="checkbox"
-          aria-label={t("settings.appearance.interfaceStyle.title")}
-          checked={value === "windows-xp"}
-          onChange={(event) => onChange(event.target.checked ? "windows-xp" : "default")}
-        />
-        <span aria-hidden="true" />
-      </label>
+    <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
+      <span>{t("settings.appearance.interfaceStyle.title")}</span>
+      <div
+        className="desktop-theme-segment desktop-interface-style-segment"
+        aria-label={t("settings.appearance.interfaceStyle.ariaLabel")}
+      >
+        <button
+          className={value === "default" ? "active" : ""}
+          type="button"
+          aria-pressed={value === "default"}
+          onClick={() => onChange("default")}
+        >
+          {t("settings.appearance.interfaceStyle.default")}
+        </button>
+        <button
+          className={value === "windows-xp" ? "active" : ""}
+          type="button"
+          aria-pressed={value === "windows-xp"}
+          onClick={() => onChange("windows-xp")}
+        >
+          {t("settings.appearance.interfaceStyle.windowsXp")}
+        </button>
+      </div>
     </div>
   );
 }

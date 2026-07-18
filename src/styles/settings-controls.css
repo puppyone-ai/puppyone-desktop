@@ -172,6 +172,10 @@
   color: var(--po-text);
 }
 
+.desktop-interface-style-segment button {
+  min-width: 104px;
+}
+
 .desktop-theme-mode-row {
   align-items: flex-start;
   padding-block: 7px;
