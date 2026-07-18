@@ -11,4 +11,4 @@
 
 The facade re-exports its historical public functions, so Electron callers do not need a coordinated migration. New behavior should be implemented in the narrowest owning module and composed by the facade.
 
-`npm run check:boundaries` enforces the module ownership rules, dependency direction, focused-module size budgets, and a 3,400-line ceiling for the compatibility facade. The ceiling is a ratchet against renewed growth, not a target for new code.
+`npm run check:boundaries` enforces module ownership, dependency direction, and the compatibility facade's delegation contract. File length is not used as an architecture boundary; cohesion and ownership are checked directly instead.

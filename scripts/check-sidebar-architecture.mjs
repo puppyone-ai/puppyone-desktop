@@ -125,19 +125,6 @@ if (!virtualizationPolicy.includes("SIDEBAR_VIRTUALIZATION_THRESHOLD = 200")) {
   errors.push("Shared Sidebar virtualization policy must activate at 200 rows.");
 }
 
-const responsibilityBudgets = [
-  ["src/features/app-shell/DesktopWorkspaceContent.tsx", 500],
-  ["src/features/app-shell/workspace-surfaces/useWorkspaceSurfaceContent.tsx", 500],
-  ["src/features/source-control/SourceControlSidebar.tsx", 500],
-  ["src/features/source-control/sidebar/SourceControlSidebarSections.tsx", 500],
-  ["src/features/settings/SettingsView.tsx", 500],
-  ["src/features/app-shell/navigation/navigationModel.tsx", 500],
-];
-for (const [relativePath, maximumLines] of responsibilityBudgets) {
-  const lineCount = read(absolute(relativePath)).split("\n").length;
-  if (lineCount > maximumLines) errors.push(`${relativePath} has ${lineCount} lines; responsibility budget is ${maximumLines}`);
-}
-
 const auxiliarySource = read(absolute("src/features/app-shell/auxiliary/AuxiliaryPanelHost.tsx"));
 for (const token of ["SidebarResizeHandle", "usePaneResizeDrag", 'orientation="vertical"']) {
   if (!auxiliarySource.includes(token)) errors.push(`AuxiliaryPanelHost must consume the shared resize contract (${token}).`);

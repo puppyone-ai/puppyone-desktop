@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
+import { getInterfaceStyleFirstPaint } from "../appearance/interfaceStyles";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
@@ -114,6 +115,8 @@ export function useDesktopPreferences() {
   const [agentPreferredRuntime, setAgentPreferredRuntime] = useState<string | null>(() => readInitialAgentPreferredRuntime());
   const [agentPreferredModel, setAgentPreferredModel] = useState<string | null>(() => readInitialAgentPreferredModel());
   const [systemDark, setSystemDark] = useState(() => readSystemDarkMode());
+  const activeThemeMode = resolveActiveThemeMode(interfaceStyle, themeMode);
+  const resolvedTheme = activeThemeMode === "system" ? (systemDark ? "dark" : "light") : activeThemeMode;
 
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
@@ -121,8 +124,13 @@ export function useDesktopPreferences() {
 
   useLayoutEffect(() => {
     window.localStorage.setItem(INTERFACE_STYLE_STORAGE_KEY, interfaceStyle);
-    document.documentElement.dataset.interfaceStyle = interfaceStyle;
-  }, [interfaceStyle]);
+    const root = document.documentElement;
+    const firstPaint = getInterfaceStyleFirstPaint(interfaceStyle, resolvedTheme);
+    root.dataset.interfaceStyle = interfaceStyle;
+    root.dataset.initialTheme = resolvedTheme;
+    root.style.setProperty("--initial-shell-background", firstPaint.background);
+    root.style.setProperty("--initial-shell-color-scheme", firstPaint.colorScheme);
+  }, [interfaceStyle, resolvedTheme]);
 
   useEffect(() => {
     window.localStorage.setItem(LIGHT_THEME_PRESET_STORAGE_KEY, lightThemePreset);
@@ -253,8 +261,6 @@ export function useDesktopPreferences() {
     return () => query.removeEventListener("change", sync);
   }, []);
 
-  const activeThemeMode = resolveActiveThemeMode(interfaceStyle, themeMode);
-  const resolvedTheme = activeThemeMode === "system" ? (systemDark ? "dark" : "light") : activeThemeMode;
   const sidebarNavigationPlacement = getSidebarNavigationPlacement(sidebarNavigationLayout);
   const sidebarNavigationOrientation = getSidebarNavigationOrientation(sidebarNavigationLayout);
   const terminalToolEnabled = rightSidebarToolsSettings.enabled.terminal;

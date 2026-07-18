@@ -29,5 +29,4 @@
 @import "./features/changes/changes.css";
 @import "./styles/utility-screens.css";
 @import "./features/source-control/source-control-overrides.css";
-@import "./styles/windows-xp.css";
-@import "./styles/macos-tiger.css";
+@import "./styles/interface-styles.generated.css";

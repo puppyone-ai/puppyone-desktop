@@ -1,5 +1,8 @@
 import { useLocalization } from "@puppyone/localization";
-import type { InterfaceStyle } from "../../../preferences";
+import {
+  INTERFACE_STYLES,
+  type InterfaceStyle,
+} from "../../appearance/interfaceStyles";
 
 type InterfaceStyleSettingProps = {
   value: InterfaceStyle;
@@ -16,30 +19,17 @@ export function InterfaceStyleSetting({ value, onChange }: InterfaceStyleSetting
         className="desktop-theme-segment desktop-interface-style-segment"
         aria-label={t("settings.appearance.interfaceStyle.ariaLabel")}
       >
-        <button
-          className={value === "default" ? "active" : ""}
-          type="button"
-          aria-pressed={value === "default"}
-          onClick={() => onChange("default")}
-        >
-          {t("settings.appearance.interfaceStyle.default")}
-        </button>
-        <button
-          className={value === "windows-xp" ? "active" : ""}
-          type="button"
-          aria-pressed={value === "windows-xp"}
-          onClick={() => onChange("windows-xp")}
-        >
-          {t("settings.appearance.interfaceStyle.windowsXp")}
-        </button>
-        <button
-          className={value === "macos-tiger" ? "active" : ""}
-          type="button"
-          aria-pressed={value === "macos-tiger"}
-          onClick={() => onChange("macos-tiger")}
-        >
-          {t("settings.appearance.interfaceStyle.macosTiger")}
-        </button>
+        {INTERFACE_STYLES.map((style) => (
+          <button
+            className={value === style.id ? "active" : ""}
+            type="button"
+            key={style.id}
+            aria-pressed={value === style.id}
+            onClick={() => onChange(style.id)}
+          >
+            {t(style.labelKey)}
+          </button>
+        ))}
       </div>
     </div>
   );

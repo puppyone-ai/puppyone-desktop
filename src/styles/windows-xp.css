@@ -54,6 +54,89 @@
   --po-tree-root-top-gap: 3px;
   --po-tree-no-root-top-gap: 6px;
   --po-tree-list-bottom-gap: 4px;
+  /* Shared component contract. */
+  --interface-typography-webkit-font-smoothing: auto;
+  --interface-typography-moz-osx-font-smoothing: auto;
+  --interface-shell-box-shadow: inset 0 0 0 1px var(--po-border-strong);
+  --interface-titlebar-context-desktop-titlebar-bg: transparent;
+  --interface-titlebar-context-desktop-titlebar-text: var(--xp-titlebar-text);
+  --interface-titlebar-context-desktop-titlebar-text-muted: var(--xp-titlebar-muted);
+  --interface-titlebar-context-desktop-titlebar-text-disabled: color-mix(in srgb, var(--xp-titlebar-muted) 55%, transparent);
+  --interface-titlebar-context-desktop-titlebar-hover: color-mix(in srgb, var(--xp-button-hover-end) 58%, transparent);
+  --interface-titlebar-context-desktop-titlebar-active: color-mix(in srgb, var(--xp-button-active-start) 68%, transparent);
+  --interface-titlebar-context-desktop-titlebar-focus: var(--po-focus-ring);
+  --interface-titlebar-context-desktop-titlebar-divider: color-mix(in srgb, var(--po-border-strong) 62%, transparent);
+  --interface-titlebar-control-border: 1px solid transparent;
+  --interface-titlebar-control-border-radius: 2px;
+  --interface-titlebar-control-active-border-color: var(--xp-selection-border);
+  --interface-titlebar-control-active-background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
+  --interface-titlebar-control-active-color: #263548;
+  --interface-titlebar-control-active-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-toolbar-border-bottom: 1px solid var(--po-border);
+  --interface-toolbar-background: linear-gradient(180deg, var(--xp-toolbar-start), var(--xp-toolbar-end));
+  --interface-toolbar-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-sidebar-surface-background: var(--po-sidebar);
+  --interface-row-base-border: 1px solid transparent;
+  --interface-neutral-button-hover-border-color: var(--po-warning);
+  --interface-neutral-button-hover-background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
+  --interface-neutral-button-hover-color: #263548;
+  --interface-icon-button-border: 1px solid transparent;
+  --interface-icon-button-border-radius: 2px;
+  --interface-icon-button-active-border-color: var(--xp-selection-border);
+  --interface-icon-button-active-background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
+  --interface-icon-button-active-color: #263548;
+  --interface-icon-button-active-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-menu-border: 1px solid var(--po-menu-border);
+  --interface-menu-border-radius: 2px;
+  --interface-menu-background: var(--po-menu-bg);
+  --interface-menu-box-shadow: var(--po-menu-shadow);
+  --interface-menu-backdrop-filter: none;
+  --interface-dialog-backdrop-backdrop-filter: none;
+  --interface-dialog-backdrop-webkit-backdrop-filter: none;
+  --interface-dialog-footer-padding: 9px 14px 12px;
+  --interface-dialog-footer-border-top: 1px solid var(--po-border-subtle);
+  --interface-dialog-footer-background: var(--po-panel);
+  --interface-dialog-callout-border-radius: 2px;
+  --interface-settings-list-gap: 0;
+  --interface-settings-list-overflow: hidden;
+  --interface-settings-list-border: 1px solid var(--po-border);
+  --interface-settings-list-border-radius: 2px;
+  --interface-settings-list-background: var(--po-panel-raised);
+  --interface-settings-list-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-settings-last-row-border-bottom: 0;
+  --interface-segmented-control-gap: 1px;
+  --interface-segmented-control-padding: 2px;
+  --interface-segmented-control-border: 1px solid var(--po-border);
+  --interface-segmented-control-border-radius: 2px;
+  --interface-segmented-control-background: var(--po-inset);
+  --interface-segmented-control-box-shadow: inset 1px 1px 2px color-mix(in srgb, var(--po-shadow) 42%, transparent);
+  --interface-theme-choice-border-color: var(--po-border);
+  --interface-theme-choice-border-radius: 2px;
+  --interface-theme-choice-background: var(--po-panel-raised);
+  --interface-theme-choice-active-border-color: var(--xp-selection-border);
+  --interface-theme-choice-active-background: linear-gradient(180deg, var(--xp-button-start), var(--xp-button-end));
+  --interface-theme-choice-active-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-preview-border-radius: 2px;
+  --interface-switch-width: 34px;
+  --interface-switch-height: 18px;
+  --interface-switch-track-border-color: var(--po-switch-border-off);
+  --interface-switch-track-border-radius: 2px;
+  --interface-switch-track-background: linear-gradient(180deg, var(--xp-button-start), var(--po-switch-track-off));
+  --interface-switch-track-box-shadow: inset 1px 1px 2px color-mix(in srgb, var(--po-shadow) 44%, transparent);
+  --interface-switch-track-on-border-color: var(--po-switch-border-on);
+  --interface-switch-track-on-background: linear-gradient(180deg, color-mix(in srgb, var(--po-switch-track-on) 68%, white), var(--po-switch-track-on));
+  --interface-switch-thumb-on-transform: translateX(16px);
+  --interface-card-border-radius: 3px;
+  --interface-card-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-footer-border-color: var(--po-border);
+  --interface-footer-background: linear-gradient(180deg, var(--xp-toolbar-start), var(--xp-toolbar-end));
+  --interface-scrollbar-width: var(--po-scrollbar-size);
+  --interface-scrollbar-height: var(--po-scrollbar-size);
+  --interface-scrollbar-background: var(--po-inset);
+  --interface-scrollbar-track-border: 1px solid var(--po-border-subtle);
+  --interface-scrollbar-track-background: var(--po-inset);
+  --interface-scrollbar-thumb-hover-background: linear-gradient(90deg, var(--po-scrollbar-thumb-hover), var(--xp-button-hover-end));
+  --interface-scrollbar-thumb-hover-background-clip: padding-box;
 }
 
 :root[data-interface-style="windows-xp"]
@@ -151,17 +234,6 @@
   --xp-titlebar-muted: #4e6681;
 }
 
-:root[data-interface-style="windows-xp"] :where(.app-shell, .onboarding-shell) {
-  font-family: var(--po-font-sans);
-  font-feature-settings: normal;
-  -webkit-font-smoothing: auto;
-  -moz-osx-font-smoothing: auto;
-}
-
-:root[data-interface-style="windows-xp"] .app-shell {
-  box-shadow: inset 0 0 0 1px var(--po-border-strong);
-}
-
 :root[data-interface-style="windows-xp"] .desktop-titlebar {
   padding-block: 4px 5px;
   border-bottom: 1px solid var(--po-header-divider);
@@ -181,71 +253,11 @@
   display: none;
 }
 
-:root[data-interface-style="windows-xp"] .desktop-titlebar[data-workspace-kind] {
-  --desktop-titlebar-bg: transparent;
-  --desktop-titlebar-text: var(--xp-titlebar-text);
-  --desktop-titlebar-text-muted: var(--xp-titlebar-muted);
-  --desktop-titlebar-text-disabled: color-mix(in srgb, var(--xp-titlebar-muted) 55%, transparent);
-  --desktop-titlebar-hover: color-mix(in srgb, var(--xp-button-hover-end) 58%, transparent);
-  --desktop-titlebar-active: color-mix(in srgb, var(--xp-button-active-start) 68%, transparent);
-  --desktop-titlebar-focus: var(--po-focus-ring);
-  --desktop-titlebar-divider: color-mix(in srgb, var(--po-border-strong) 62%, transparent);
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(
-    .desktop-titlebar-workspace-button,
-    .desktop-titlebar-branch-button,
-    .desktop-titlebar-context-icon-button,
-    .desktop-titlebar-action
-  ) {
-  border: 1px solid transparent;
-  border-radius: 2px;
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(
-    .desktop-titlebar-workspace-button,
-    .desktop-titlebar-branch-button,
-    .desktop-titlebar-context-icon-button,
-    .desktop-titlebar-action
-  ):hover,
-:root[data-interface-style="windows-xp"]
-  :where(
-    .desktop-titlebar-workspace-button,
-    .desktop-titlebar-branch-button,
-    .desktop-titlebar-context-icon-button,
-    .desktop-titlebar-action
-  )[aria-expanded="true"],
-:root[data-interface-style="windows-xp"] .desktop-titlebar-action[aria-pressed="true"] {
-  border-color: var(--xp-selection-border);
-  background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
-  color: #263548;
-  box-shadow: inset 0 1px 0 var(--xp-highlight);
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(.desktop-explorer-toolbar, .browser-toolbar, .csv-table-editor__toolbar, .file-preview-header) {
-  border-bottom: 1px solid var(--po-border);
-  background: linear-gradient(180deg, var(--xp-toolbar-start), var(--xp-toolbar-end));
-  box-shadow: inset 0 1px 0 var(--xp-highlight);
-}
-
 :root[data-interface-style="windows-xp"]
   :where(.po-desktop-sidebar-header, .desktop-settings-sidebar-header) {
   border-bottom: 1px solid var(--po-sidebar-divider);
   background: linear-gradient(180deg, var(--xp-panel-header-start), var(--xp-panel-header-end));
   box-shadow: inset 0 1px 0 var(--xp-highlight);
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(.explorer-column, .desktop-view-surface-sidebar, .change-list-panel, .po-sidebar-root) {
-  background: var(--po-sidebar);
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(.tree-row, .po-sidebar-row, .review-row, .desktop-menu-item) {
-  border: 1px solid transparent;
 }
 
 :root[data-interface-style="windows-xp"]
@@ -281,23 +293,6 @@
 }
 
 :root[data-interface-style="windows-xp"]
-  :where(
-    .po-button--neutral,
-    .desktop-dialog-button,
-    .desktop-settings-action,
-    .desktop-settings-row-action,
-    .desktop-branch-menu-action,
-    .csv-table-editor__actions button,
-    .csv-table-editor__empty button,
-    .desktop-version-control-enable-button,
-    .puppyflow-add-button
-  ):hover:not(:disabled) {
-  border-color: var(--po-warning);
-  background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
-  color: #263548;
-}
-
-:root[data-interface-style="windows-xp"]
   :where(.po-button--primary, .desktop-dialog-button.primary, .desktop-settings-action.primary) {
   border-color: color-mix(in srgb, var(--po-accent) 72%, #102c4d);
   background: linear-gradient(
@@ -309,57 +304,12 @@
   text-shadow: 0 1px color-mix(in srgb, var(--po-accent) 62%, #000000);
 }
 
-:root[data-interface-style="windows-xp"]
-  :where(
-    .po-icon-button,
-    .po-sidebar-icon-button,
-    .desktop-utility-icon-button,
-    .desktop-explorer-actions button,
-    .tree-row-action-button,
-    .desktop-dialog-icon-button,
-    .editor-mode-toggle button
-  ) {
-  border: 1px solid transparent;
-  border-radius: 2px;
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(
-    .po-icon-button,
-    .po-sidebar-icon-button,
-    .desktop-utility-icon-button,
-    .desktop-explorer-actions button,
-    .tree-row-action-button,
-    .desktop-dialog-icon-button,
-    .editor-mode-toggle button
-  ):hover:not(:disabled),
-:root[data-interface-style="windows-xp"] .editor-mode-toggle button.active {
-  border-color: var(--xp-selection-border);
-  background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
-  color: #263548;
-  box-shadow: inset 0 1px 0 var(--xp-highlight);
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(.desktop-menu-surface, .desktop-titlebar-menu, .desktop-node-action-menu) {
-  border: 1px solid var(--po-menu-border);
-  border-radius: 2px;
-  background: var(--po-menu-bg);
-  box-shadow: var(--po-menu-shadow);
-  backdrop-filter: none;
-}
-
 :root[data-interface-style="windows-xp"] .desktop-menu-item:hover:not(:disabled),
 :root[data-interface-style="windows-xp"] .desktop-menu-item:focus-visible:not(:disabled),
 :root[data-interface-style="windows-xp"] .desktop-menu-item.selected {
   border-color: var(--xp-selection-border);
   background: linear-gradient(180deg, var(--xp-button-start), var(--xp-button-end));
   box-shadow: inset 0 1px 0 var(--xp-highlight);
-}
-
-:root[data-interface-style="windows-xp"] .desktop-dialog-backdrop {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 :root[data-interface-style="windows-xp"] .desktop-dialog-surface {
@@ -383,43 +333,10 @@
   padding: 14px 18px 16px;
 }
 
-:root[data-interface-style="windows-xp"] .desktop-dialog-footer {
-  padding: 9px 14px 12px;
-  border-top: 1px solid var(--po-border-subtle);
-  background: var(--po-panel);
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(.desktop-dialog-callout, .desktop-dialog-leading, .desktop-dialog-callout strong) {
-  border-radius: 2px;
-}
-
-:root[data-interface-style="windows-xp"] .desktop-settings-list {
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid var(--po-border);
-  border-radius: 2px;
-  background: var(--po-panel-raised);
-  box-shadow: inset 0 1px 0 var(--xp-highlight);
-}
-
 :root[data-interface-style="windows-xp"] .desktop-settings-row {
   border-bottom: 1px solid var(--po-border-subtle);
   border-radius: 0;
   background: color-mix(in srgb, var(--po-panel-raised) 92%, var(--po-panel) 8%);
-}
-
-:root[data-interface-style="windows-xp"] .desktop-settings-row:last-child {
-  border-bottom: 0;
-}
-
-:root[data-interface-style="windows-xp"] .desktop-theme-segment {
-  gap: 1px;
-  padding: 2px;
-  border: 1px solid var(--po-border);
-  border-radius: 2px;
-  background: var(--po-inset);
-  box-shadow: inset 1px 1px 2px color-mix(in srgb, var(--po-shadow) 42%, transparent);
 }
 
 :root[data-interface-style="windows-xp"] .desktop-theme-segment button {
@@ -434,36 +351,6 @@
   box-shadow: inset 0 1px 0 var(--xp-highlight);
 }
 
-:root[data-interface-style="windows-xp"] .desktop-theme-choice {
-  border-color: var(--po-border);
-  border-radius: 2px;
-  background: var(--po-panel-raised);
-}
-
-:root[data-interface-style="windows-xp"] .desktop-theme-choice:hover,
-:root[data-interface-style="windows-xp"] .desktop-theme-choice.active {
-  border-color: var(--xp-selection-border);
-  background: linear-gradient(180deg, var(--xp-button-start), var(--xp-button-end));
-  box-shadow: inset 0 1px 0 var(--xp-highlight);
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(.desktop-theme-preview, .desktop-theme-preview-surface, .editor-mode-toggle) {
-  border-radius: 2px;
-}
-
-:root[data-interface-style="windows-xp"] .desktop-settings-switch {
-  width: 34px;
-  height: 18px;
-}
-
-:root[data-interface-style="windows-xp"] .desktop-settings-switch span {
-  border-color: var(--po-switch-border-off);
-  border-radius: 2px;
-  background: linear-gradient(180deg, var(--xp-button-start), var(--po-switch-track-off));
-  box-shadow: inset 1px 1px 2px color-mix(in srgb, var(--po-shadow) 44%, transparent);
-}
-
 :root[data-interface-style="windows-xp"] .desktop-settings-switch span::before {
   top: 2px;
   left: 2px;
@@ -474,45 +361,9 @@
   box-shadow: inset 0 1px 0 var(--xp-highlight);
 }
 
-:root[data-interface-style="windows-xp"] .desktop-settings-switch input:checked + span {
-  border-color: var(--po-switch-border-on);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--po-switch-track-on) 68%, white), var(--po-switch-track-on));
-}
-
-:root[data-interface-style="windows-xp"] .desktop-settings-switch input:checked + span::before {
-  transform: translateX(16px);
-}
-
 :root[data-interface-style="windows-xp"]
   :where(.desktop-settings-select, input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
   border-radius: 2px;
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(.editor-mode-toggle, .puppyflow-step-card, .diff-pane, .cloud-project-card, .automation-template-card) {
-  border-radius: 3px;
-  box-shadow: inset 0 1px 0 var(--xp-highlight);
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(.data-explorer-footer, .monitor-footer, .desktop-right-sidebar) {
-  border-color: var(--po-border);
-  background: linear-gradient(180deg, var(--xp-toolbar-start), var(--xp-toolbar-end));
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar {
-  width: var(--po-scrollbar-size);
-  height: var(--po-scrollbar-size);
-  background: var(--po-inset);
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-track,
-:root[data-interface-style="windows-xp"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-corner {
-  border: 1px solid var(--po-border-subtle);
-  background: var(--po-inset);
 }
 
 :root[data-interface-style="windows-xp"]
@@ -523,16 +374,4 @@
   border-radius: 0;
   background: linear-gradient(90deg, var(--po-scrollbar-thumb), var(--xp-button-start));
   background-clip: padding-box;
-}
-
-:root[data-interface-style="windows-xp"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(90deg, var(--po-scrollbar-thumb-hover), var(--xp-button-hover-end));
-  background-clip: padding-box;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :root[data-interface-style="windows-xp"] :where(.app-shell, .onboarding-shell, .desktop-overlay-root) * {
-    scroll-behavior: auto;
-  }
 }

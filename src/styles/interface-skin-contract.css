@@ -1,0 +1,252 @@
+/*
+ * Stable component contract shared by every non-default interface skin.
+ *
+ * Skin stylesheets own visual tokens and historically specific exceptions.
+ * Cross-product component selectors belong here so component refactors do not
+ * have to be repeated independently for every registered skin.
+ */
+
+:root[data-interface-style]:not([data-interface-style="default"]) :where(.app-shell, .onboarding-shell) {
+  font-family: var(--po-font-sans);
+  font-feature-settings: normal;
+  -webkit-font-smoothing: var(--interface-typography-webkit-font-smoothing);
+  -moz-osx-font-smoothing: var(--interface-typography-moz-osx-font-smoothing);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .app-shell {
+  box-shadow: var(--interface-shell-box-shadow);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-titlebar[data-workspace-kind] {
+  --desktop-titlebar-bg: var(--interface-titlebar-context-desktop-titlebar-bg);
+  --desktop-titlebar-text: var(--interface-titlebar-context-desktop-titlebar-text);
+  --desktop-titlebar-text-muted: var(--interface-titlebar-context-desktop-titlebar-text-muted);
+  --desktop-titlebar-text-disabled: var(--interface-titlebar-context-desktop-titlebar-text-disabled);
+  --desktop-titlebar-hover: var(--interface-titlebar-context-desktop-titlebar-hover);
+  --desktop-titlebar-active: var(--interface-titlebar-context-desktop-titlebar-active);
+  --desktop-titlebar-focus: var(--interface-titlebar-context-desktop-titlebar-focus);
+  --desktop-titlebar-divider: var(--interface-titlebar-context-desktop-titlebar-divider);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(
+    .desktop-titlebar-workspace-button,
+    .desktop-titlebar-branch-button,
+    .desktop-titlebar-context-icon-button,
+    .desktop-titlebar-action
+  ) {
+  border: var(--interface-titlebar-control-border);
+  border-radius: var(--interface-titlebar-control-border-radius);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(
+    .desktop-titlebar-workspace-button,
+    .desktop-titlebar-branch-button,
+    .desktop-titlebar-context-icon-button,
+    .desktop-titlebar-action
+  ):hover,
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(
+    .desktop-titlebar-workspace-button,
+    .desktop-titlebar-branch-button,
+    .desktop-titlebar-context-icon-button,
+    .desktop-titlebar-action
+  )[aria-expanded="true"],
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-titlebar-action[aria-pressed="true"] {
+  border-color: var(--interface-titlebar-control-active-border-color);
+  background: var(--interface-titlebar-control-active-background);
+  color: var(--interface-titlebar-control-active-color);
+  box-shadow: var(--interface-titlebar-control-active-box-shadow);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(.desktop-explorer-toolbar, .browser-toolbar, .csv-table-editor__toolbar, .file-preview-header) {
+  border-bottom: var(--interface-toolbar-border-bottom);
+  background: var(--interface-toolbar-background);
+  box-shadow: var(--interface-toolbar-box-shadow);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(.explorer-column, .desktop-view-surface-sidebar, .change-list-panel, .po-sidebar-root) {
+  background: var(--interface-sidebar-surface-background);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(.tree-row, .po-sidebar-row, .review-row, .desktop-menu-item) {
+  border: var(--interface-row-base-border);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(
+    .po-button--neutral,
+    .desktop-dialog-button,
+    .desktop-settings-action,
+    .desktop-settings-row-action,
+    .desktop-branch-menu-action,
+    .csv-table-editor__actions button,
+    .csv-table-editor__empty button,
+    .desktop-version-control-enable-button,
+    .puppyflow-add-button
+  ):hover:not(:disabled) {
+  border-color: var(--interface-neutral-button-hover-border-color);
+  background: var(--interface-neutral-button-hover-background);
+  color: var(--interface-neutral-button-hover-color);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(
+    .po-icon-button,
+    .po-sidebar-icon-button,
+    .desktop-utility-icon-button,
+    .desktop-explorer-actions button,
+    .tree-row-action-button,
+    .desktop-dialog-icon-button,
+    .editor-mode-toggle button
+  ) {
+  border: var(--interface-icon-button-border);
+  border-radius: var(--interface-icon-button-border-radius);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(
+    .po-icon-button,
+    .po-sidebar-icon-button,
+    .desktop-utility-icon-button,
+    .desktop-explorer-actions button,
+    .tree-row-action-button,
+    .desktop-dialog-icon-button,
+    .editor-mode-toggle button
+  ):hover:not(:disabled),
+:root[data-interface-style]:not([data-interface-style="default"]) .editor-mode-toggle button.active {
+  border-color: var(--interface-icon-button-active-border-color);
+  background: var(--interface-icon-button-active-background);
+  color: var(--interface-icon-button-active-color);
+  box-shadow: var(--interface-icon-button-active-box-shadow);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(.desktop-menu-surface, .desktop-titlebar-menu, .desktop-node-action-menu) {
+  border: var(--interface-menu-border);
+  border-radius: var(--interface-menu-border-radius);
+  background: var(--interface-menu-background);
+  box-shadow: var(--interface-menu-box-shadow);
+  backdrop-filter: var(--interface-menu-backdrop-filter);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-dialog-backdrop {
+  backdrop-filter: var(--interface-dialog-backdrop-backdrop-filter);
+  -webkit-backdrop-filter: var(--interface-dialog-backdrop-webkit-backdrop-filter);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-dialog-footer {
+  padding: var(--interface-dialog-footer-padding);
+  border-top: var(--interface-dialog-footer-border-top);
+  background: var(--interface-dialog-footer-background);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(.desktop-dialog-callout, .desktop-dialog-leading, .desktop-dialog-callout strong) {
+  border-radius: var(--interface-dialog-callout-border-radius);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-settings-list {
+  gap: var(--interface-settings-list-gap);
+  overflow: var(--interface-settings-list-overflow);
+  border: var(--interface-settings-list-border);
+  border-radius: var(--interface-settings-list-border-radius);
+  background: var(--interface-settings-list-background);
+  box-shadow: var(--interface-settings-list-box-shadow);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-settings-row:last-child {
+  border-bottom: var(--interface-settings-last-row-border-bottom);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-theme-segment {
+  gap: var(--interface-segmented-control-gap);
+  padding: var(--interface-segmented-control-padding);
+  border: var(--interface-segmented-control-border);
+  border-radius: var(--interface-segmented-control-border-radius);
+  background: var(--interface-segmented-control-background);
+  box-shadow: var(--interface-segmented-control-box-shadow);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-theme-choice {
+  border-color: var(--interface-theme-choice-border-color);
+  border-radius: var(--interface-theme-choice-border-radius);
+  background: var(--interface-theme-choice-background);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-theme-choice:hover,
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-theme-choice.active {
+  border-color: var(--interface-theme-choice-active-border-color);
+  background: var(--interface-theme-choice-active-background);
+  box-shadow: var(--interface-theme-choice-active-box-shadow);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(.desktop-theme-preview, .desktop-theme-preview-surface, .editor-mode-toggle) {
+  border-radius: var(--interface-preview-border-radius);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-settings-switch {
+  width: var(--interface-switch-width);
+  height: var(--interface-switch-height);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-settings-switch span {
+  border-color: var(--interface-switch-track-border-color);
+  border-radius: var(--interface-switch-track-border-radius);
+  background: var(--interface-switch-track-background);
+  box-shadow: var(--interface-switch-track-box-shadow);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-settings-switch input:checked + span {
+  border-color: var(--interface-switch-track-on-border-color);
+  background: var(--interface-switch-track-on-background);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"]) .desktop-settings-switch input:checked + span::before {
+  transform: var(--interface-switch-thumb-on-transform);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(.editor-mode-toggle, .puppyflow-step-card, .diff-pane, .cloud-project-card, .automation-template-card) {
+  border-radius: var(--interface-card-border-radius);
+  box-shadow: var(--interface-card-box-shadow);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(.data-explorer-footer, .monitor-footer, .desktop-right-sidebar) {
+  border-color: var(--interface-footer-border-color);
+  background: var(--interface-footer-background);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar {
+  width: var(--interface-scrollbar-width);
+  height: var(--interface-scrollbar-height);
+  background: var(--interface-scrollbar-background);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-track,
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-corner {
+  border: var(--interface-scrollbar-track-border);
+  background: var(--interface-scrollbar-track-background);
+}
+
+:root[data-interface-style]:not([data-interface-style="default"])
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-thumb:hover {
+  background: var(--interface-scrollbar-thumb-hover-background);
+  background-clip: var(--interface-scrollbar-thumb-hover-background-clip);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-interface-style]:not([data-interface-style="default"])
+    :where(.app-shell, .onboarding-shell, .desktop-overlay-root) * {
+    scroll-behavior: auto;
+  }
+}
