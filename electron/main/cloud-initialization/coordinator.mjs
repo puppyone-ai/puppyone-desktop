@@ -231,7 +231,7 @@ export function createCloudPublishCoordinator({
         const attempt = createPushAttempt({ sequence: 1, commitOid: source.commitOid, now, randomUUID });
         record = createInitialRecord(base, context, session, attempt, now, randomUUID);
         await durableJournal.write(base.rootPath, record, { createOnly: true });
-        events.record("cloud_init_started", eventFields(record));
+        events.record("cloud_init_started", eventFields(record, now));
         await injectFault("after-prepared", record);
       } else {
         assertJournalRemoteTrust(record);
@@ -290,7 +290,7 @@ export function createCloudPublishCoordinator({
           project_state: "empty",
           project_id: projectId,
         });
-        events.record("cloud_project_created", eventFields(record));
+        events.record("cloud_project_created", eventFields(record, now));
         await injectFault("after-project-created", record);
       }
       if (record.checkpoint === "project-created") {
@@ -319,7 +319,7 @@ export function createCloudPublishCoordinator({
           last_error: null,
           attempt: updateAttempt(record.attempt, "uploading", now),
         });
-        events.record("push_attempt_started", eventFields(record));
+        events.record("push_attempt_started", eventFields(record, now));
         await gitService.pushExpectedCommit(
           base.rootPath,
           record,
@@ -334,7 +334,7 @@ export function createCloudPublishCoordinator({
           last_error: null,
           attempt: updateAttempt(record.attempt, "accepted", now, true),
         });
-        events.record("push_attempt_accepted", eventFields(record));
+        events.record("push_attempt_accepted", eventFields(record, now));
         await injectFault("after-push-accepted", record);
       }
 
@@ -344,7 +344,7 @@ export function createCloudPublishCoordinator({
       const latest = await durableJournal.read(base.rootPath).then((entry) => entry.record).catch(() => record);
       const failed = latest ? await persistFailure(base.rootPath, latest, error).catch(() => latest) : null;
       if (failed) {
-        const errorFields = { ...eventFields(failed), error_code: error.publishCode ?? "UNKNOWN" };
+        const errorFields = { ...eventFields(failed, now), error_code: error.publishCode ?? "UNKNOWN" };
         events.record(errorEventName(error), errorFields);
         if (failed.project_state === "empty" && !["accepted", "conflict"].includes(failed.push_state)) {
           events.record("empty_project_retained", { ...errorFields, outcome: "retained" });
@@ -388,7 +388,7 @@ export function createCloudPublishCoordinator({
           cleanup_state: "requested",
           last_error: null,
         });
-        events.record("cleanup_requested", eventFields(record));
+        events.record("cleanup_requested", eventFields(record, now));
       }
       await injectFault("after-cleanup-requested", record);
 
@@ -426,7 +426,7 @@ export function createCloudPublishCoordinator({
       await gitService.cleanupAfterServerAbandon(base.rootPath, record);
       if (record.secret_ref) await secretVault.clear(record.secret_ref);
       await clearJournal(base.rootPath, record);
-      events.record("cleanup_completed", eventFields(record));
+      events.record("cleanup_completed", eventFields(record, now));
       return successResult(null, await getGitStatus(base.rootPath));
     } catch (error) {
       if (isSimulatedCrash(error)) throw error;
@@ -440,7 +440,7 @@ export function createCloudPublishCoordinator({
           last_error: toStoredError(normalizeCleanupError(error), now),
         }).catch(() => latest);
       }
-      events.record("cleanup_failed", { ...eventFields(failed), error_code: error.publishCode ?? "UNKNOWN" });
+      events.record("cleanup_failed", { ...eventFields(failed, now), error_code: error.publishCode ?? "UNKNOWN" });
       const facts = failed ? await readLocalFacts(base.rootPath, failed).catch(() => ({})) : {};
       return failureResult(error, failed ? deriveCloudInitializationState(failed, facts) : null);
     }
@@ -580,7 +580,7 @@ export function createCloudPublishCoordinator({
         last_error: null,
         attempt: updateAttempt(record.attempt, "accepted", now, true),
       });
-      events.record("push_reconciled", { ...eventFields(record), outcome: "accepted" });
+      events.record("push_reconciled", { ...eventFields(record, now), outcome: "accepted" });
     } else if (facts.remoteConflict && record.push_state !== "conflict") {
       record = await persist(rootPath, record, {
         checkpoint: "push-accepted",
@@ -594,7 +594,7 @@ export function createCloudPublishCoordinator({
         ), now),
         attempt: updateAttempt(record.attempt, "conflict", now, true),
       });
-      events.record("push_reconciled", { ...eventFields(record), outcome: "conflict" });
+      events.record("push_reconciled", { ...eventFields(record, now), outcome: "conflict" });
     }
     return { record, facts };
   }
@@ -674,7 +674,7 @@ export function createCloudPublishCoordinator({
     try {
       status = await gitService.finalizeUpstreamAndStatus(rootPath, record);
     } catch {
-      events.record("local_finalize_failed", { ...eventFields(record), error_code: "LOCAL_FINALIZE_FAILED" });
+      events.record("local_finalize_failed", { ...eventFields(record, now), error_code: "LOCAL_FINALIZE_FAILED" });
       status = status ?? await getGitStatus(rootPath).catch(() => undefined);
     }
     if (record.checkpoint !== "completed") {
@@ -747,14 +747,19 @@ function normalizeCleanupError(error) {
   return error;
 }
 
-function eventFields(record) {
+function eventFields(record, now) {
   if (!record) return {};
+  const startedAt = Date.parse(record.attempt?.started_at ?? record.created_at);
+  const durationMs = Number.isFinite(startedAt)
+    ? Math.max(0, now() - startedAt)
+    : null;
   return {
     operation_id: record.operation_id,
     attempt_id: record.attempt?.attempt_id ?? null,
     project_id: record.project_id,
     commit_oid: record.attempt?.commit_oid ?? null,
     attempt_count: record.attempt_count,
+    duration_ms: durationMs,
   };
 }
 

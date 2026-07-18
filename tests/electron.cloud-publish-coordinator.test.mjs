@@ -439,7 +439,11 @@ describe("Cloud publish coordinator", () => {
     });
     expect(telemetry.record).toHaveBeenCalledWith(
       "empty_project_retained",
-      expect.objectContaining({ error_code: "PUSH_FAILED", outcome: "retained" }),
+      expect.objectContaining({
+        duration_ms: expect.any(Number),
+        error_code: "PUSH_FAILED",
+        outcome: "retained",
+      }),
     );
 
     await writeFile(path.join(fixture.root, "latest.md"), "latest committed content\n");
