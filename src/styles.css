@@ -30,3 +30,4 @@
 @import "./styles/utility-screens.css";
 @import "./features/source-control/source-control-overrides.css";
 @import "./styles/windows-xp.css";
+@import "./styles/macos-tiger.css";

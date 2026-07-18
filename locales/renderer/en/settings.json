@@ -4,6 +4,7 @@
   "appearance.interfaceStyle.title": "Theme",
   "appearance.interfaceStyle.ariaLabel": "Interface theme",
   "appearance.interfaceStyle.default": "Default",
+  "appearance.interfaceStyle.macosTiger": "macOS Tiger",
   "appearance.interfaceStyle.windowsXp": "Windows XP",
   "language.title": "Language",
   "language.description": "Choose the language used by PuppyOne menus, controls, and messages on this device.",

@@ -32,6 +32,14 @@ export function InterfaceStyleSetting({ value, onChange }: InterfaceStyleSetting
         >
           {t("settings.appearance.interfaceStyle.windowsXp")}
         </button>
+        <button
+          className={value === "macos-tiger" ? "active" : ""}
+          type="button"
+          aria-pressed={value === "macos-tiger"}
+          onClick={() => onChange("macos-tiger")}
+        >
+          {t("settings.appearance.interfaceStyle.macosTiger")}
+        </button>
       </div>
     </div>
   );

@@ -13,9 +13,9 @@
   color-scheme: light;
 }
 
-:root[data-interface-style="windows-xp"][data-initial-theme="dark"] {
-  background: #17283d;
-  color-scheme: dark;
+:root[data-interface-style="macos-tiger"] {
+  background: #d7d7d7;
+  color-scheme: light;
 }
 
 html,
@@ -42,7 +42,7 @@ body,
   background: #dfe9f5;
 }
 
-:root[data-interface-style="windows-xp"][data-initial-theme="dark"] body,
-:root[data-interface-style="windows-xp"][data-initial-theme="dark"] #root:empty {
-  background: #17283d;
+:root[data-interface-style="macos-tiger"] body,
+:root[data-interface-style="macos-tiger"] #root:empty {
+  background: #d7d7d7;
 }

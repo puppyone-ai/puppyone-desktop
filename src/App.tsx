@@ -174,6 +174,7 @@ export function App() {
     }, []),
   });
   const {
+    activeThemeMode,
     aiEditAssistEnabled,
     explorerWidth,
     experimentalSettings,
@@ -199,7 +200,6 @@ export function App() {
     lightThemePreset,
     pointerCursors,
     textSize,
-    themeMode,
     setAiEditAssistEnabled,
     setExplorerWidth,
     setExternalAppsSettings,
@@ -1000,7 +1000,7 @@ export function App() {
   if (restoringWorkspace && !workspace) {
     return (
       <RestoringWorkspaceScreen
-        themeMode={themeMode}
+        themeMode={activeThemeMode}
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
         textSize={textSize}
@@ -1028,7 +1028,7 @@ export function App() {
           cloudProjectsError={cloudOnlyEntryEnabled ? homeCloudProjectsError : null}
           operationStatus={homeOperationStatus}
           initialError={restoreWorkspaceError}
-          themeMode={themeMode}
+          themeMode={activeThemeMode}
           lightThemePreset={lightThemePreset}
           darkThemePreset={darkThemePreset}
           textSize={textSize}
@@ -1191,7 +1191,7 @@ export function App() {
     <div
       className={`app-shell cloud-runtime ${resolvedTheme === "dark" ? "dark" : ""}`}
       data-minimal-mode={minimalMode ? "true" : undefined}
-      data-theme-mode={themeMode}
+      data-theme-mode={activeThemeMode}
       data-interface-style={interfaceStyle}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
