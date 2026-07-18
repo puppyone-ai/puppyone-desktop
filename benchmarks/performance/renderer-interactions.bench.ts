@@ -7,7 +7,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterAll, bench, describe } from "vitest";
 import { ExplorerTree } from "../../vendor/shared-ui/src/data/ExplorerTree";
 import { MarkdownCodeMirrorEditor } from "../../vendor/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor";
-import { makeExplorerNodes, makeMarkdown, readRepositoryTextFile } from "./fixtures";
+import {
+  makeExplorerNodes,
+  makeFeatureHeavyMarkdown,
+  makeMarkdown,
+  readRepositoryTextFile,
+} from "./fixtures";
 
 const BENCHMARK_OPTIONS = {
   iterations: 3,
@@ -22,6 +27,7 @@ const markdownDocuments = new Map(
 const repositoryArchitectureDocument = readRepositoryTextFile(
   "docs/architecture/editor/markdown/architecture.md",
 );
+const featureHeavyDocument = makeFeatureHeavyMarkdown();
 const explorerHarnesses = new Map(
   [100, 250, 500, 1_000].map((rowCount) => [rowCount, createExplorerHarness(rowCount)]),
 );
@@ -50,6 +56,19 @@ describe("Markdown React mount and disposal", () => {
   bench(`development StrictMode · 6000 lines · ${formatBytes(strictModeSource)}`, () => {
     mountAndDisposeMarkdownEditor(strictModeSource, true);
   }, BENCHMARK_OPTIONS);
+
+  bench(`feature-heavy Live Preview · ${featureHeavyDocument.split("\n").length} lines · ${formatBytes(featureHeavyDocument)}`, () => {
+    mountAndDisposeMarkdownEditor(featureHeavyDocument, false);
+  }, BENCHMARK_OPTIONS);
+});
+
+describe("Markdown React file switching", () => {
+  const sourceA = markdownDocuments.get(10_000) ?? "";
+  const sourceB = featureHeavyDocument;
+
+  bench("A/B switch before first paint · 10000-line to feature-heavy", () => {
+    mountSwitchAndDisposeMarkdownEditor(sourceA, sourceB);
+  }, BENCHMARK_OPTIONS);
 });
 
 describe("Explorer selection update", () => {
@@ -73,6 +92,31 @@ function mountAndDisposeMarkdownEditor(source: string, strictMode: boolean) {
 
   flushSync(() => {
     root.render(strictMode ? createElement(StrictMode, null, editor) : editor);
+  });
+  flushSync(() => root.unmount());
+  parent.remove();
+}
+
+function mountSwitchAndDisposeMarkdownEditor(firstSource: string, secondSource: string) {
+  const parent = document.createElement("div");
+  document.body.appendChild(parent);
+  const root = createRoot(parent);
+
+  flushSync(() => {
+    root.render(createElement(MarkdownCodeMirrorEditor, {
+      value: firstSource,
+      readOnly: false,
+      livePreview: true,
+      documentPath: "first.md",
+    }));
+  });
+  flushSync(() => {
+    root.render(createElement(MarkdownCodeMirrorEditor, {
+      value: secondSource,
+      readOnly: false,
+      livePreview: true,
+      documentPath: "second.md",
+    }));
   });
   flushSync(() => root.unmount());
   parent.remove();

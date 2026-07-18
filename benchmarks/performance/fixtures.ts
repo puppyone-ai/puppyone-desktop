@@ -24,6 +24,33 @@ export function makeMarkdown(lineCount: number): string {
   return lines.join("\n");
 }
 
+/**
+ * A deterministic fixture for table, HTML, Mermaid, task, and link projection.
+ * It is source-first so benchmark input changes are explicit and reviewable.
+ */
+export function makeFeatureHeavyMarkdown(blockCount = 120): string {
+  const blocks: string[] = [];
+  for (let index = 0; index < blockCount; index += 1) {
+    blocks.push(
+      `## Feature block ${index}`,
+      "| Name | Value |",
+      "| --- | ---: |",
+      `| row ${index} | ${index * 2} |`,
+      "",
+      `<details><summary>HTML ${index}</summary><p>Safe <strong>content</strong>.</p></details>`,
+      "",
+      "```mermaid",
+      "flowchart LR",
+      `  A${index}[Start] --> B${index}[End]`,
+      "```",
+      "",
+      `- [ ] Task ${index} with [[Note ${index % 20}]] and [link](note-${index % 20}.md)`,
+      "",
+    );
+  }
+  return blocks.join("\n");
+}
+
 export function makeExplorerNodes(count: number): DataNode[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `node-${index}`,

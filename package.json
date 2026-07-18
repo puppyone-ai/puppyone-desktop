@@ -30,7 +30,9 @@
     "start": "node scripts/start-electron.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bench:performance": "vitest bench --run benchmarks/performance --no-file-parallelism --maxWorkers=1 --minWorkers=1"
+    "bench:performance": "vitest bench --run benchmarks/performance --no-file-parallelism --maxWorkers=1 --minWorkers=1",
+    "bench:performance:baseline": "vitest bench --run benchmarks/performance --no-file-parallelism --maxWorkers=1 --minWorkers=1 --outputJson benchmarks/performance/results/baseline.json",
+    "bench:performance:compare": "vitest bench --run benchmarks/performance --no-file-parallelism --maxWorkers=1 --minWorkers=1 --compare benchmarks/performance/results/baseline.json --outputJson benchmarks/performance/results/latest.json"
   },
   "dependencies": {
     "electron-log": "^5.4.4",
