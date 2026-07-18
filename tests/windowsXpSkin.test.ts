@@ -24,14 +24,16 @@ describe("Windows XP interface skin", () => {
     expect(firstPaint).toContain('storedInterfaceStyle === "windows-xp"');
   });
 
-  it("offers the Appearance switch without changing the shell composition", () => {
+  it("offers Default and Windows XP as Appearance theme choices without changing the shell composition", () => {
     const settings = source("src/features/settings/SettingsView.tsx");
     const interfaceStyleSetting = source("src/features/settings/main/InterfaceStyleSetting.tsx");
     const shell = source("src/components/DesktopCloudShell.tsx");
 
     expect(settings).toContain("<InterfaceStyleSetting");
-    expect(interfaceStyleSetting).toContain('checked={value === "windows-xp"}');
-    expect(interfaceStyleSetting).toContain('onChange(event.target.checked ? "windows-xp" : "default")');
+    expect(interfaceStyleSetting).toContain('onClick={() => onChange("default")}');
+    expect(interfaceStyleSetting).toContain('onClick={() => onChange("windows-xp")}');
+    expect(interfaceStyleSetting).toContain('aria-pressed={value === "windows-xp"}');
+    expect(interfaceStyleSetting).not.toContain('type="checkbox"');
     expect(shell).not.toContain("windows-xp");
   });
 
@@ -64,7 +66,9 @@ describe("Windows XP interface skin", () => {
     for (const { locale } of manifest.locales) {
       const catalog = JSON.parse(source(`locales/renderer/${locale}/settings.json`)) as Record<string, string>;
       expect(catalog["appearance.interfaceStyle.title"], locale).toBeTruthy();
-      expect(catalog["appearance.interfaceStyle.detail"], locale).toBeTruthy();
+      expect(catalog["appearance.interfaceStyle.default"], locale).toBeTruthy();
+      expect(catalog["appearance.interfaceStyle.windowsXp"], locale).toBeTruthy();
+      expect(catalog["appearance.theme.title"], locale).not.toBe(catalog["appearance.interfaceStyle.title"]);
     }
   });
 });
