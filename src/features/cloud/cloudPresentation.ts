@@ -88,8 +88,15 @@ export function formatCloudPublishFailure(
     return t("cloud.message.project-publish-commit-required");
   }
   if (error.code === "BRANCH_REQUIRED") return t("cloud.message.project-publish-branch-required");
-  if (error.code === "IDENTITY_MISMATCH") return t("cloud.initialize.identityMismatch");
+  if (error.code === "SOURCE_MISSING") return t("cloud.initialize.sourceMissing");
+  if (error.code === "IDENTITY_MISMATCH") return t("cloud.initialize.repositoryIdentityMismatch");
   if (error.code === "REMOTE_CONFLICT") return t("cloud.initialize.remoteConflict");
+  if (error.code === "REMOTE_REF_CONFLICT") return t("cloud.initialize.pushConflictDescription");
+  if (error.code === "PUSH_UNCERTAIN") return t("cloud.initialize.pushUncertainDescription");
+  if (error.code === "CLEANUP_FAILED" || error.code === "COMPENSATION_FAILED") {
+    return t("cloud.initialize.cleanupFailed");
+  }
+  if (error.code === "PROJECT_UNAVAILABLE") return t("cloud.initialize.projectUnavailable");
   if (error.code === "PERMISSION_DENIED") return t("cloud.initialize.permissionDenied");
   if (error.code === "JOURNAL_CORRUPT" || error.code === "JOURNAL_IO_FAILED") {
     return t("cloud.initialize.localRecoveryFailed");

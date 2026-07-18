@@ -70,7 +70,7 @@ export type DesktopWorkspaceCloudSurfaceController = {
   backupLoading: boolean;
   backupPending: boolean;
   publishError: { code: CloudPublishErrorCode; retryable: boolean } | null;
-  publishNotice: "abandoned" | null;
+  publishNotice: "cleanup-completed" | null;
   publishProgress: CloudPublishProgress | null;
   publishState: CloudPublishState | null;
   publishStateLoading: boolean;

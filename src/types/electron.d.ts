@@ -25,6 +25,32 @@ import type {
   AgentTurnStartRequest,
   AgentTurnSteerRequest,
 } from "../../shared/agent-contract/types";
+import type {
+  CloudInitializationCleanupRequest,
+  CloudInitializationErrorCode,
+  CloudInitializationIdentityRequest,
+  CloudInitializationProgress,
+  CloudInitializationProgressStage,
+  CloudInitializationResult,
+  CloudInitializationStartRequest,
+  CloudInitializationState,
+} from "./cloudInitialization";
+
+export type {
+  CloudInitializationAction,
+  CloudInitializationCleanupRequest,
+  CloudInitializationCleanupState,
+  CloudInitializationErrorCode,
+  CloudInitializationIdentityRequest,
+  CloudInitializationLocalState,
+  CloudInitializationProgress,
+  CloudInitializationProgressStage,
+  CloudInitializationProjectState,
+  CloudInitializationPushState,
+  CloudInitializationResult,
+  CloudInitializationStartRequest,
+  CloudInitializationState,
+} from "./cloudInitialization";
 
 export type GitStatusEntry = {
   path: string;
@@ -274,101 +300,16 @@ export type GitStatusSnapshot = {
   didHitStatusLimit: boolean;
 };
 
-export type CloudPublishPhase =
-  | "prepared"
-  | "project-created"
-  | "credential-issued"
-  | "remote-configured"
-  | "pushed"
-  | "compensation-pending"
-  | "completed";
-
-export type CloudPublishProgressStage =
-  | "validating"
-  | "creating-project"
-  | "securing-credential"
-  | "configuring-remote"
-  | "checking-remote"
-  | "uploading"
-  | "confirming"
-  | "finalizing"
-  | "completed";
-
-export type CloudPublishErrorCode =
-  | "SESSION_REQUIRED"
-  | "IDENTITY_MISMATCH"
-  | "ORGANIZATION_REQUIRED"
-  | "REPOSITORY_REQUIRED"
-  | "COMMIT_REQUIRED"
-  | "BRANCH_REQUIRED"
-  | "MERGE_TIP_UNSUPPORTED"
-  | "LFS_UNSUPPORTED"
-  | "REMOTE_CONFLICT"
-  | "PROJECT_CREATE_FAILED"
-  | "CREDENTIAL_FAILED"
-  | "REMOTE_CONFIG_FAILED"
-  | "PUSH_FAILED"
-  | "COMPENSATION_FAILED"
-  | "JOURNAL_CORRUPT"
-  | "JOURNAL_IO_FAILED"
-  | "PERMISSION_DENIED"
-  | "UNKNOWN";
-
-export type CloudPublishState = {
-  operationId: string;
-  phase: CloudPublishPhase;
-  projectId: string | null;
-  projectName: string;
-  organizationId: string;
-  expectedHeadCommitId: string;
-  expectedBranch: string;
-  destinationBranch: "main";
-  createdAt: string;
-  updatedAt: string;
-  canResume: boolean;
-  canAbandon: boolean;
-};
-
-export type CloudPublishProgress = {
-  rootPath: string;
-  operationId: string | null;
-  stage: CloudPublishProgressStage;
-  state: CloudPublishState | null;
-  updatedAt: string;
-};
-
-export type CloudPublishResult =
-  | {
-    ok: true;
-    state: CloudPublishState | null;
-    gitStatus?: GitStatusSnapshot;
-  }
-  | {
-    ok: false;
-    state: CloudPublishState | null;
-    error: {
-      code: CloudPublishErrorCode;
-      retryable: boolean;
-      message?: string;
-    };
-  };
-
-export type CloudPublishIdentityRequest = {
-  rootPath: string;
-  apiBaseUrl: string;
-  userId: string;
-};
-
-export type CloudPublishStartRequest = CloudPublishIdentityRequest & {
-  organizationId: string;
-  projectName: string;
-  expectedHeadCommitId: string;
-  expectedBranch: string;
-};
-
-export type CloudPublishAbandonRequest = CloudPublishIdentityRequest & {
-  operationId: string;
-};
+// Transitional type aliases for the rest of the Cloud surface. They point to
+// the independent v2 contract and do not retain v1 phase/boolean semantics.
+export type CloudPublishErrorCode = CloudInitializationErrorCode;
+export type CloudPublishProgressStage = CloudInitializationProgressStage;
+export type CloudPublishState = CloudInitializationState;
+export type CloudPublishProgress = CloudInitializationProgress;
+export type CloudPublishResult = CloudInitializationResult;
+export type CloudPublishIdentityRequest = CloudInitializationIdentityRequest;
+export type CloudPublishStartRequest = CloudInitializationStartRequest;
+export type CloudPublishAbandonRequest = CloudInitializationCleanupRequest;
 
 export type CloudGitConnectRequest = CloudPublishIdentityRequest & {
   projectId: string;
@@ -742,10 +683,10 @@ declare global {
         headers?: Record<string, string>;
         body?: string;
       }) => Promise<DesktopCloudIpcEnvelope<unknown>>;
-      cloudPublishGetState: (request: CloudPublishIdentityRequest) => Promise<CloudPublishResult>;
-      cloudPublishStartOrResume: (request: CloudPublishStartRequest) => Promise<CloudPublishResult>;
-      cloudPublishAbandon: (request: CloudPublishAbandonRequest) => Promise<CloudPublishResult>;
-      onCloudPublishProgress: (callback: (progress: CloudPublishProgress) => void) => () => void;
+      cloudInitializationGetState: (request: CloudInitializationIdentityRequest) => Promise<CloudInitializationResult>;
+      cloudInitializationStart: (request: CloudInitializationStartRequest) => Promise<CloudInitializationResult>;
+      cloudInitializationCleanup: (request: CloudInitializationCleanupRequest) => Promise<CloudInitializationResult>;
+      onCloudInitializationProgress: (callback: (progress: CloudInitializationProgress) => void) => () => void;
       cloudGitConnectProject: (request: CloudGitConnectRequest) => Promise<CloudGitConnectResult>;
       cloudGitAbandonConnect: (request: CloudGitConnectAbandonRequest) => Promise<CloudGitConnectResult>;
       listCloudAccessPointDirectory: (request: {

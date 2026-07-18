@@ -198,6 +198,7 @@ const cloudPublishCoordinator = createCloudPublishCoordinator({
   cloudAuthService,
   gitCredentialManager: cloudGitCredentialManager,
   gitOperationCoordinator,
+  logger: console,
   operationLease: cloudGitOperationLease,
   secretVault: cloudPublishSecretVault,
 });

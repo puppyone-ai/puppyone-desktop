@@ -63,14 +63,14 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   },
   requestCloudApi: (request) => ipcRenderer.invoke("cloud:api-request", request),
   requestCloudSessionApi: (request) => ipcRenderer.invoke("cloud:session-api-request", request),
-  cloudPublishGetState: (request) => ipcRenderer.invoke("cloud-publish:get-state", request),
-  cloudPublishStartOrResume: (request) => ipcRenderer.invoke("cloud-publish:start-or-resume", request),
-  cloudPublishAbandon: (request) => ipcRenderer.invoke("cloud-publish:abandon", request),
-  onCloudPublishProgress: (callback) => {
+  cloudInitializationGetState: (request) => ipcRenderer.invoke("cloud-initialization:get-state", request),
+  cloudInitializationStart: (request) => ipcRenderer.invoke("cloud-initialization:start", request),
+  cloudInitializationCleanup: (request) => ipcRenderer.invoke("cloud-initialization:cleanup", request),
+  onCloudInitializationProgress: (callback) => {
     if (typeof callback !== "function") return () => {};
     const listener = (_event, progress) => callback(progress);
-    ipcRenderer.on("cloud-publish:progress", listener);
-    return () => ipcRenderer.removeListener("cloud-publish:progress", listener);
+    ipcRenderer.on("cloud-initialization:progress", listener);
+    return () => ipcRenderer.removeListener("cloud-initialization:progress", listener);
   },
   cloudGitConnectProject: (request) => ipcRenderer.invoke("cloud-git:connect-project", request),
   cloudGitAbandonConnect: (request) => ipcRenderer.invoke("cloud-git:abandon-connect", request),

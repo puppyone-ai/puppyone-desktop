@@ -93,7 +93,7 @@ import { CloudProjectCreateDialog } from "./features/cloud/components/CloudProje
 import { useWorkspaceSurfaceSwitch } from "./features/cloud/workspace/useWorkspaceSurfaceSwitch";
 import { useCloudWorkspaceContext } from "./features/cloud/workspace/useCloudWorkspaceContext";
 import { shouldBlockWorkspaceCloudResolution } from "./features/cloud/workspace/workspaceCloudResolutionKey";
-import { usePuppyoneCloudBackup } from "./features/cloud/workspace/usePuppyoneCloudBackup";
+import { useCloudInitialization } from "./features/cloud/initialization/useCloudInitialization";
 import { shouldLoadCloudProjectCatalog } from "./features/cloud/workspace/cloudProjectResolution";
 import {
   createTypographyRootProps,
@@ -937,16 +937,16 @@ export function App() {
   ]);
 
   const {
-    cloudBackupLoading,
-    cloudPublishError,
-    cloudPublishNotice,
-    cloudPublishProgress,
-    cloudPublishState,
-    cloudPublishStateLoading,
-    handleAbandonPuppyoneBackup,
-    handleStartPuppyoneBackup,
-    pendingCloudBackupSetup,
-  } = usePuppyoneCloudBackup({
+    cloudInitializationLoading: cloudBackupLoading,
+    cloudInitializationError: cloudPublishError,
+    cloudInitializationNotice: cloudPublishNotice,
+    cloudInitializationProgress: cloudPublishProgress,
+    cloudInitializationState: cloudPublishState,
+    cloudInitializationStateLoading: cloudPublishStateLoading,
+    handleCleanupCloudInitialization: handleAbandonPuppyoneBackup,
+    handleStartCloudInitialization: handleStartPuppyoneBackup,
+    cloudInitializationPending: pendingCloudBackupSetup,
+  } = useCloudInitialization({
     activeCloudSession,
     applyGitStatus,
     captureGitRepositoryContext,

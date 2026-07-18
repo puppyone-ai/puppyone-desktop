@@ -1,10 +1,10 @@
 import type { AiEditRequest, DataNode, DataNodeKind, DataPort, Workspace } from "@puppyone/shared-ui";
 import type {
-  CloudPublishAbandonRequest,
-  CloudPublishIdentityRequest,
-  CloudPublishProgress,
-  CloudPublishResult,
-  CloudPublishStartRequest,
+  CloudInitializationCleanupRequest,
+  CloudInitializationIdentityRequest,
+  CloudInitializationProgress,
+  CloudInitializationResult,
+  CloudInitializationStartRequest,
   CloudGitConnectAbandonRequest,
   CloudGitConnectRequest,
   CloudGitConnectResult,
@@ -272,28 +272,28 @@ export async function getWorkspaceGitStatus(
   }
 }
 
-export async function getWorkspaceCloudPublishState(
-  request: CloudPublishIdentityRequest,
-): Promise<CloudPublishResult> {
-  return getDesktopBridge().cloudPublishGetState(request);
+export async function getWorkspaceCloudInitializationState(
+  request: CloudInitializationIdentityRequest,
+): Promise<CloudInitializationResult> {
+  return getDesktopBridge().cloudInitializationGetState(request);
 }
 
-export async function startOrResumeWorkspaceCloudPublish(
-  request: CloudPublishStartRequest,
-): Promise<CloudPublishResult> {
-  return getDesktopBridge().cloudPublishStartOrResume(request);
+export async function startWorkspaceCloudInitialization(
+  request: CloudInitializationStartRequest,
+): Promise<CloudInitializationResult> {
+  return getDesktopBridge().cloudInitializationStart(request);
 }
 
-export async function abandonWorkspaceCloudPublish(
-  request: CloudPublishAbandonRequest,
-): Promise<CloudPublishResult> {
-  return getDesktopBridge().cloudPublishAbandon(request);
+export async function cleanupWorkspaceCloudInitialization(
+  request: CloudInitializationCleanupRequest,
+): Promise<CloudInitializationResult> {
+  return getDesktopBridge().cloudInitializationCleanup(request);
 }
 
-export function subscribeWorkspaceCloudPublishProgress(
-  callback: (progress: CloudPublishProgress) => void,
+export function subscribeWorkspaceCloudInitializationProgress(
+  callback: (progress: CloudInitializationProgress) => void,
 ): () => void {
-  return getDesktopBridge().onCloudPublishProgress(callback);
+  return getDesktopBridge().onCloudInitializationProgress(callback);
 }
 
 export async function connectWorkspaceCloudProject(
