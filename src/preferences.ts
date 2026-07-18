@@ -341,6 +341,13 @@ export function parseInterfaceStyle(value: string | null | undefined): Interface
   return value === "windows-xp" ? value : DEFAULT_INTERFACE_STYLE;
 }
 
+export function resolveActiveThemeMode(
+  interfaceStyle: InterfaceStyle,
+  themeMode: ThemeMode,
+): ThemeMode {
+  return interfaceStyle === DEFAULT_INTERFACE_STYLE ? themeMode : "light";
+}
+
 export function parseLightThemePreset(value: string | null | undefined): LightThemePreset {
   return isLightThemePreset(value) ? value : DEFAULT_LIGHT_THEME_PRESET;
 }

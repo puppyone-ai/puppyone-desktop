@@ -26,6 +26,7 @@ import {
   getSidebarNavigationPlacement,
   parseLoadingAnimationPreset,
   parseTypography,
+  resolveActiveThemeMode,
   type ExternalAppsSettings,
   type DiffMarkers,
   type DockIcon,
@@ -252,13 +253,15 @@ export function useDesktopPreferences() {
     return () => query.removeEventListener("change", sync);
   }, []);
 
-  const resolvedTheme = themeMode === "system" ? (systemDark ? "dark" : "light") : themeMode;
+  const activeThemeMode = resolveActiveThemeMode(interfaceStyle, themeMode);
+  const resolvedTheme = activeThemeMode === "system" ? (systemDark ? "dark" : "light") : activeThemeMode;
   const sidebarNavigationPlacement = getSidebarNavigationPlacement(sidebarNavigationLayout);
   const sidebarNavigationOrientation = getSidebarNavigationOrientation(sidebarNavigationLayout);
   const terminalToolEnabled = rightSidebarToolsSettings.enabled.terminal;
 
   return {
     aiEditAssistEnabled,
+    activeThemeMode,
     diffMarkers,
     dockIcon,
     explorerWidth,

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { parseInterfaceStyle } from "../src/preferences";
+import { parseInterfaceStyle, resolveActiveThemeMode } from "../src/preferences";
 
 describe("Windows XP interface skin", () => {
   it("accepts only the curated interface style", () => {
@@ -9,6 +9,13 @@ describe("Windows XP interface skin", () => {
     expect(parseInterfaceStyle("default")).toBe("default");
     expect(parseInterfaceStyle("windows-7")).toBe("default");
     expect(parseInterfaceStyle(null)).toBe("default");
+  });
+
+  it("keeps Default color preferences separate from fixed-palette skins", () => {
+    expect(resolveActiveThemeMode("default", "system")).toBe("system");
+    expect(resolveActiveThemeMode("default", "dark")).toBe("dark");
+    expect(resolveActiveThemeMode("windows-xp", "system")).toBe("light");
+    expect(resolveActiveThemeMode("windows-xp", "dark")).toBe("light");
   });
 
   it("persists the style and exposes it at both first paint and the app shell", () => {
@@ -22,6 +29,7 @@ describe("Windows XP interface skin", () => {
     expect(app).toContain("data-interface-style={interfaceStyle}");
     expect(firstPaint).toContain('window.localStorage.getItem("puppyone.desktop.interfaceStyle")');
     expect(firstPaint).toContain('storedInterfaceStyle === "windows-xp"');
+    expect(firstPaint).toContain('interfaceStyle === "default" && dark');
   });
 
   it("offers Default and Windows XP as Appearance theme choices without changing the shell composition", () => {
@@ -34,17 +42,18 @@ describe("Windows XP interface skin", () => {
     expect(interfaceStyleSetting).toContain('onClick={() => onChange("windows-xp")}');
     expect(interfaceStyleSetting).toContain('aria-pressed={value === "windows-xp"}');
     expect(interfaceStyleSetting).not.toContain('type="checkbox"');
+    expect(settings).toContain('interfaceStyle === "default"');
     expect(shell).not.toContain("windows-xp");
   });
 
-  it("loads a final skin layer with light, dark, chrome, control, menu, and dialog treatments", () => {
+  it("loads a fixed-palette skin layer with chrome, control, menu, and dialog treatments", () => {
     const entry = source("src/styles.css").trim();
     const skin = source("src/styles/windows-xp.css");
 
     expect(entry.endsWith('@import "./styles/windows-xp.css";')).toBe(true);
     expect(skin).toContain(':root[data-interface-style="windows-xp"]');
-    expect(skin).toContain(":not(.dark)");
-    expect(skin).toContain(".desktop-theme-preview-surface).dark");
+    expect(skin).not.toContain(":not(.dark)");
+    expect(skin).not.toContain(".desktop-theme-preview-surface).dark");
     for (const selector of [
       ".desktop-titlebar",
       ".desktop-explorer-toolbar",

@@ -201,6 +201,8 @@ export function SettingsView({
             />
             <div className="desktop-settings-list">
               <InterfaceStyleSetting value={interfaceStyle} onChange={onInterfaceStyleChange} />
+              {interfaceStyle === "default" && (
+                <>
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row desktop-theme-mode-row">
                 <span>{t("settings.appearance.theme.title")}</span>
                 <div className="desktop-theme-choice-list" aria-label={t("settings.appearance.theme.ariaLabel")}>
@@ -276,6 +278,8 @@ export function SettingsView({
                   ))}
                 </div>
               </div>
+                </>
+              )}
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.loadingAnimation.title")}</span>
                 <div
