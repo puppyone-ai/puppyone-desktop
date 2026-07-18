@@ -130,10 +130,6 @@ describe("sidebar spacing architecture", () => {
       gitResourcesCss,
       ".desktop-git-section-title span",
     ));
-    const cloudList = compact(readCssBlock(
-      cloudSidebarCss,
-      ".desktop-cloud-sidebar-list",
-    ));
     expect(semanticThemeScope).toContain(
       "--po-shell-divider: color-mix(in srgb, var(--po-text) 10%, transparent);",
     );
@@ -174,10 +170,9 @@ describe("sidebar spacing architecture", () => {
     expect(gitSectionTitleText).toContain(
       "font-size: var(--desktop-sidebar-section-title-font-size, var(--git-font-small));",
     );
-    expect(cloudList).toContain(
-      "padding-inline: var(--desktop-sidebar-row-left-gap) var(--desktop-sidebar-scroll-right-gap);",
-    );
-    expect(cloudList).not.toContain("--desktop-sidebar-row-right-gap:");
+    expect(cloudSidebarSource).toContain("<SidebarScrollArea>");
+    expect(cloudSidebarCss).not.toContain(".desktop-cloud-sidebar-list");
+    expect(cloudSidebarCss).not.toContain(".desktop-cloud-sidebar-nav-row");
     expect(cloudSidebarCss).not.toContain(".desktop-cloud-sidebar-nav-row.locked");
     expect(settingsSidebarSource).toContain("<SidebarGroup");
     expect(cloudSidebarSource).toContain("<SidebarGroup");
@@ -324,11 +319,7 @@ describe("sidebar spacing architecture", () => {
   });
 
   it("keeps every remaining page-level sidebar on the shared block edge", () => {
-    expectBlockPadding(
-      cloudSidebarCss,
-      ".desktop-cloud-sidebar-list",
-      "var(--desktop-sidebar-row-left-gap) var(--desktop-sidebar-scroll-right-gap)",
-    );
+    expect(cloudSidebarCss).not.toContain(".desktop-cloud-sidebar-list");
     expectBlockPadding(accessScopeCss, ".desktop-cloud-access-scope-list", "0");
     expectBlockPadding(
       accessServiceCss,

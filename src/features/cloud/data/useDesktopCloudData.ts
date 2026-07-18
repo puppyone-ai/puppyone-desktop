@@ -5,7 +5,6 @@ import {
   type DesktopCloudDashboard,
   type DesktopCloudMcpEndpoint,
   type DesktopCloudProject,
-  type DesktopCloudProjectReadiness,
   type DesktopCloudRepoIdentity,
   type DesktopCloudScope,
   type DesktopCloudSession,
@@ -34,7 +33,6 @@ export type DesktopCloudDataState = {
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   identity: DesktopCloudRepoIdentity | null;
-  readiness: DesktopCloudProjectReadiness | null;
   initializing: boolean;
   loading: boolean;
   error: CloudMessageDescriptor | null;
@@ -176,7 +174,6 @@ export function useDesktopCloudData({
         connectors: details.connectors,
         mcpEndpoints: details.mcpEndpoints,
         identity: details.identity,
-        readiness: details.readiness,
         initializing: false,
         loading: false,
         error: null,
@@ -283,7 +280,6 @@ function createCloudDataState(
     connectors: [],
     mcpEndpoints: [],
     identity: null,
-    readiness: null,
     initializing: false,
     loading: false,
     error: null,

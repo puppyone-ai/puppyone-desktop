@@ -1,4 +1,4 @@
-import { Bot, Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, LayoutTemplate, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
+import { Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, LayoutTemplate, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import { getCloudAutomationWebPath } from "../../automation/automationDomain";
 import type { CloudWorkspaceSection } from "./cloudRouteIds";
@@ -87,17 +87,6 @@ export const CLOUD_ROUTES = [
     context: "project",
     showInSidebar: true,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/changes`,
-  },
-  {
-    id: "claude",
-    labelId: "cloud.route.claude.label",
-    titleId: "cloud.route.claude.title",
-    descriptionId: "cloud.route.claude.description",
-    icon: Bot,
-    context: "project",
-    showInSidebar: true,
-    requiredCapability: "agent.read",
-    webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/agent`,
   },
   {
     id: "branches",

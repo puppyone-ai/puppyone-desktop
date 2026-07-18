@@ -3,7 +3,6 @@ import type { Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../src/lib/cloudApi";
 
 const cloudApi = vi.hoisted(() => ({
-  getCloudProjectReadiness: vi.fn(),
   getCloudRepositoryContext: vi.fn(),
 }));
 
@@ -41,7 +40,6 @@ const baseArguments = {
 };
 
 beforeEach(() => {
-  cloudApi.getCloudProjectReadiness.mockReset();
   cloudApi.getCloudRepositoryContext.mockReset();
 });
 
@@ -66,8 +64,6 @@ describe("recent workspace Cloud repository context", () => {
       project: { id: "project-1", name: "Notes", capabilities: ["content.read"] },
       scope_path: null,
     });
-    cloudApi.getCloudProjectReadiness.mockResolvedValue({ git: { status: "ready" } });
-
     await expect(resolveRecentWorkspaceCloudContext({
       ...baseArguments,
       item: recentWorkspace({

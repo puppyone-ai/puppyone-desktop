@@ -47,25 +47,6 @@ const listCloudScopes = vi.fn();
 const listCloudConnectors = vi.fn();
 const listCloudMcpEndpoints = vi.fn();
 const getCloudRepoIdentity = vi.fn();
-const getCloudProjectReadiness = vi.fn().mockResolvedValue({
-  project_id: "proj-1",
-  git: {
-    target: { kind: "project_root", project_id: "proj-1" },
-    surface_exists: false,
-    head_exists: false,
-    push_accepted: false,
-    default_branch: "main",
-    state: "git_not_created",
-  },
-  claude: {
-    ready: false,
-    blockers: [
-      "project_git_surface_missing",
-      "project_head_missing",
-      "project_git_push_not_accepted",
-    ],
-  },
-});
 const getCloudDashboard = vi.fn();
 const listCloudRoot = vi.fn();
 const listCloudProjects = vi.fn();
@@ -119,7 +100,6 @@ vi.mock("../src/lib/cloudApi", async () => {
     listCloudConnectors: (...args: unknown[]) => listCloudConnectors(...args),
     listCloudMcpEndpoints: (...args: unknown[]) => listCloudMcpEndpoints(...args),
     getCloudRepoIdentity: (...args: unknown[]) => getCloudRepoIdentity(...args),
-    getCloudProjectReadiness: (...args: unknown[]) => getCloudProjectReadiness(...args),
     getCloudDashboard: (...args: unknown[]) => getCloudDashboard(...args),
     listCloudRoot: (...args: unknown[]) => listCloudRoot(...args),
     listCloudProjects: (...args: unknown[]) => listCloudProjects(...args),
@@ -397,11 +377,10 @@ describe("CloudServiceSidebar project context", () => {
       />,
     ));
 
-    const rows = Array.from(container.querySelectorAll<HTMLButtonElement>(".desktop-cloud-sidebar-nav-row"));
+    const rows = Array.from(container.querySelectorAll<HTMLButtonElement>(".desktop-cloud-sidebar-nav .po-sidebar-row"));
     expect(rows.map((row) => row.textContent)).toEqual([
       "Overview",
       "History",
-      "Claude",
       "Automation",
       "Access",
       "Settings",
@@ -430,11 +409,10 @@ describe("CloudServiceSidebar project context", () => {
       />,
     ));
 
-    const rows = Array.from(container.querySelectorAll<HTMLButtonElement>(".desktop-cloud-sidebar-nav-row"));
+    const rows = Array.from(container.querySelectorAll<HTMLButtonElement>(".desktop-cloud-sidebar-nav .po-sidebar-row"));
     expect(rows.map((row) => row.textContent)).toEqual([
       "Overview",
       "History",
-      "Claude",
       "Automation",
       "Access",
       "Settings",
@@ -446,15 +424,14 @@ describe("CloudServiceSidebar project context", () => {
       group.querySelector(".po-desktop-sidebar-group__title")?.textContent
     ))).toEqual(["Cloud Project", "Organization"]);
     expect(groups.every((group) => group.dataset.disabled === "true")).toBe(true);
-    expect(Array.from(groups[0]?.querySelectorAll(".desktop-cloud-sidebar-nav-row") ?? []).map((row) => row.textContent)).toEqual([
+    expect(Array.from(groups[0]?.querySelectorAll(".po-sidebar-row") ?? []).map((row) => row.textContent)).toEqual([
       "Overview",
       "History",
-      "Claude",
       "Automation",
       "Access",
       "Settings",
     ]);
-    expect(Array.from(groups[1]?.querySelectorAll(".desktop-cloud-sidebar-nav-row") ?? []).map((row) => row.textContent)).toEqual([
+    expect(Array.from(groups[1]?.querySelectorAll(".po-sidebar-row") ?? []).map((row) => row.textContent)).toEqual([
       "Team",
       "Billing",
     ]);
@@ -462,7 +439,7 @@ describe("CloudServiceSidebar project context", () => {
     expect(rows.every((row) => !row.classList.contains("active"))).toBe(true);
 
     const lockedRows = rows;
-    expect(lockedRows).toHaveLength(8);
+    expect(lockedRows).toHaveLength(7);
     expect(lockedRows.every((row) => row.getAttribute("aria-disabled") === "true")).toBe(true);
     expect(lockedRows.every((row) => row.getAttribute("title") === "Sign in to use Cloud")).toBe(true);
     expect(container.querySelector(".desktop-cloud-sidebar-nav-lock")).toBeNull();
@@ -509,6 +486,7 @@ describe("CloudServiceSidebar project context", () => {
 
     expect(container.querySelector('[aria-label="Cloud project sections"]')).not.toBeNull();
     expect(container.textContent).toContain("History");
+    expect(container.textContent).not.toContain("Claude");
     expect(container.textContent).toContain("Automation");
     expect(container.textContent).toContain("Access");
     expect(container.textContent).toContain("Team");
@@ -516,7 +494,7 @@ describe("CloudServiceSidebar project context", () => {
     expect(container.querySelector(".desktop-cloud-sidebar-context-back")).toBeNull();
   });
 
-  it("renders project-management navigation from server capabilities", () => {
+  it("omits the retired Claude route and renders project-management navigation from server capabilities", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -531,7 +509,7 @@ describe("CloudServiceSidebar project context", () => {
         onSelectSection={vi.fn()}
       />,
     ));
-    expect(container.textContent).toContain("Claude");
+    expect(container.textContent).not.toContain("Claude");
     expect(container.textContent).not.toContain("Settings");
 
     act(() => renderWithTestLocalization(root,
@@ -1874,36 +1852,6 @@ describe("History partial failure in aggregate details", () => {
     expect(details.warning).toMatchObject({ code: "project-details-partial" });
   });
 
-  it("loads only the identity and readiness resources required by the Claude route", async () => {
-    const identity = { project_id: "proj-1", remote_url: "https://cloud.example/git/proj-1.git" };
-    const readiness = {
-      project_id: "proj-1",
-      git: { state: "ready" },
-      claude: { ready: true, blockers: [] },
-    };
-    getCloudRepoIdentity.mockResolvedValue(identity);
-    getCloudProjectReadiness.mockResolvedValue(readiness);
-
-    const details = await loadCloudProjectDetails({
-      session,
-      projectId: "proj-1",
-      projects: [{ id: "proj-1", name: "Demo" }],
-      onSessionChange: vi.fn(),
-      cloudApiBaseUrl: "https://cloud.example",
-      resources: ["identity", "readiness"],
-    });
-
-    expect(details.identity).toBe(identity);
-    expect(details.readiness).toBe(readiness);
-    expect(getCloudRepoIdentity).toHaveBeenCalledOnce();
-    expect(getCloudProjectReadiness).toHaveBeenCalledOnce();
-    expect(getCloudDashboard).not.toHaveBeenCalled();
-    expect(listCloudRoot).not.toHaveBeenCalled();
-    expect(getCloudHistory).not.toHaveBeenCalled();
-    expect(listCloudScopes).not.toHaveBeenCalled();
-    expect(listCloudConnectors).not.toHaveBeenCalled();
-    expect(listCloudMcpEndpoints).not.toHaveBeenCalled();
-  });
 });
 
 describe("global Project catalog ownership", () => {
@@ -2227,7 +2175,7 @@ describe("useDesktopCloudData request lifecycle", () => {
       await flushPromises();
     });
     expect(getCloudProject).toHaveBeenCalledTimes(1);
-    expect(getCloudProjectReadiness).toHaveBeenCalledTimes(1);
+    expect(getCloudDashboard).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       renderWithTestLocalization(root,
@@ -2241,7 +2189,7 @@ describe("useDesktopCloudData request lifecycle", () => {
     });
 
     expect(getCloudProject).toHaveBeenCalledTimes(1);
-    expect(getCloudProjectReadiness).toHaveBeenCalledTimes(1);
+    expect(getCloudDashboard).toHaveBeenCalledTimes(1);
   });
 });
 

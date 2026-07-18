@@ -1,9 +1,7 @@
 import type { RecentWorkspaceHomeItem } from "../../../components/MinimalOnboarding";
 import {
   getCloudRepositoryContext,
-  getCloudProjectReadiness,
   type DesktopCloudProject,
-  type DesktopCloudProjectReadiness,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
 import type { RepositoryTarget } from "../repositoryTarget";
@@ -28,7 +26,6 @@ export type RecentWorkspaceCloudContext = {
     | null;
   target?: RepositoryTarget | null;
   scopePath?: string | null;
-  readiness?: DesktopCloudProjectReadiness | null;
   candidateProjectId?: string | null;
   capabilities?: string[];
 };
@@ -125,14 +122,10 @@ export async function resolveRecentWorkspaceCloudContext({
         reason: "locator-conflict",
       }];
     }
-    const readiness = await getCloudProjectReadiness(
-      session, context.project.id, onSessionChange, apiBaseUrl,
-    );
     return [item.workspace.id, {
       projectId: context.project.id,
       target: context.target,
       scopePath: context.scope_path ?? null,
-      readiness,
       capabilities: context.project.capabilities ?? [],
       hasCloudRemote: true,
       error: null,

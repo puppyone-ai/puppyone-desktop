@@ -120,27 +120,6 @@ export type DesktopCloudTemplateInstantiation = {
   project: DesktopCloudProject;
 };
 
-export type DesktopCloudProjectReadiness = {
-  project_id: string;
-  git: {
-    target: Extract<RepositoryTarget, { kind: "project_root" }>;
-    surface_exists: boolean;
-    head_exists: boolean;
-    push_accepted: boolean;
-    default_branch: string;
-    state: "git_not_created" | "awaiting_first_push" | "ready";
-  };
-  claude: {
-    ready: boolean;
-    blockers: Array<
-      | "project_git_surface_missing"
-      | "project_head_missing"
-      | "project_git_push_not_accepted"
-      | string
-    >;
-  };
-};
-
 export type DesktopCloudRepositoryContext = {
   target: RepositoryTarget;
   project: DesktopCloudProject;
@@ -812,21 +791,6 @@ export function getCloudProject(
 ): Promise<DesktopCloudProject> {
   return cloudApiRequest<DesktopCloudProject>(
     `/projects/${encodeURIComponent(projectId)}`,
-    session,
-    onSessionChange,
-    {},
-    apiBaseUrl,
-  );
-}
-
-export function getCloudProjectReadiness(
-  session: DesktopCloudSession,
-  projectId: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudProjectReadiness> {
-  return cloudApiRequest<DesktopCloudProjectReadiness>(
-    `/projects/${encodeURIComponent(projectId)}/readiness`,
     session,
     onSessionChange,
     {},

@@ -24,7 +24,6 @@ import { CloudAutomationRouteSection } from "../sections/AutomationRouteSection"
 import { CloudBranchesSection } from "../sections/BranchesSection";
 import { CloudGitSyncSection } from "../sections/GitSyncSection";
 import { CloudHistorySection } from "../sections/HistorySection";
-import { CloudClaudeSection } from "../sections/ClaudeSection";
 import { CloudMcpCliSection } from "../sections/McpCliSection";
 import { CloudRepositoryOverview } from "../sections/OverviewSection";
 import { CloudAccessSection } from "../sections/access/AccessSection";
@@ -33,7 +32,7 @@ import { getCloudRouteWebPath } from "./cloudRoutes";
 import { formatCloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 import { useFeatureFlag } from "../../flags";
 import { getCloudScopeRows, scopeMatchesMcpEndpoint } from "../utils";
-import { repositoryTargetKey, type RepositoryTarget } from "../repositoryTarget";
+import { repositoryTargetKey } from "../repositoryTarget";
 
 export type CloudActionState = {
   kind: "backup" | "configure-remote" | "copy" | null;
@@ -186,11 +185,6 @@ export function CloudRouter({
       onOpenProject,
       onOpenGitSettings,
       onRefresh: cloudData.reload,
-      repositoryTarget: projectContext?.status === "resolved" ? projectContext.target : null,
-      scopePath: projectContext?.status === "resolved" ? projectContext.scopePath ?? null : null,
-      readiness: projectContext?.status === "resolved"
-        ? projectContext.readiness ?? cloudData.readiness
-        : cloudData.readiness,
       onRemoveCloudRemote: projectContext?.status === "resolved" ? onRemoveCloudRemote : undefined,
       t,
     });
@@ -216,9 +210,6 @@ function renderProjectContextSection({
   onOpenProject,
   onOpenGitSettings,
   onRefresh,
-  repositoryTarget,
-  scopePath,
-  readiness,
   onRemoveCloudRemote,
   t,
 }: {
@@ -238,9 +229,6 @@ function renderProjectContextSection({
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
   onOpenGitSettings: () => void;
   onRefresh: () => Promise<void>;
-  repositoryTarget: RepositoryTarget | null;
-  scopePath: string | null;
-  readiness: import("../../../lib/cloudApi").DesktopCloudProjectReadiness | null;
   onRemoveCloudRemote?: () => void;
   t: MessageFormatter;
 }) {
@@ -292,21 +280,6 @@ function renderProjectContextSection({
         cloudSession={cloudSession}
         apiBaseUrl={cloudApiBaseUrl}
         onSessionChange={onSessionChange}
-      />
-    );
-  }
-
-  if (activeSection === "claude") {
-    return (
-      <CloudClaudeSection
-        readiness={readiness}
-        identity={cloudData.identity}
-        repositoryTarget={repositoryTarget}
-        scopePath={scopePath}
-        loading={cloudData.loading}
-        onCreateGit={() => onSelectSection("access")}
-        onOpenGitSync={onOpenGitSettings}
-        onOpenClaude={() => onOpenProject(projectId, "claude")}
       />
     );
   }

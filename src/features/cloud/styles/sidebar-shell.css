@@ -1,7 +1,3 @@
-.desktop-cloud-service-sidebar {
-  background: var(--po-sidebar);
-}
-
 .desktop-cloud-sidebar-context {
   display: flex;
   height: var(--desktop-sidebar-toolbar-height);
@@ -40,34 +36,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.desktop-cloud-sidebar-list {
-  flex: 1;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding-block: var(--desktop-sidebar-list-padding-block);
-  padding-inline: var(--desktop-sidebar-row-left-gap) var(--desktop-sidebar-scroll-right-gap);
-  scrollbar-gutter: stable;
-}
-
-.desktop-cloud-sidebar-list::-webkit-scrollbar {
-  width: var(--desktop-sidebar-scrollbar-width);
-  height: var(--desktop-sidebar-scrollbar-width);
-}
-
-.desktop-cloud-sidebar-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.desktop-cloud-sidebar-list::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: var(--po-scrollbar-thumb);
-}
-
-.desktop-cloud-sidebar-list::-webkit-scrollbar-thumb:hover {
-  background: var(--po-scrollbar-thumb-hover);
 }
 
 .desktop-cloud-sidebar-metric {
@@ -117,41 +85,6 @@
   flex-direction: column;
 }
 
-.desktop-cloud-sidebar-nav-row {
-  position: relative;
-  gap: 7px;
-  transition: background 150ms ease, color 150ms ease;
-}
-
-.desktop-cloud-sidebar-nav-icon {
-  display: inline-flex;
-  width: 15px;
-  height: 15px;
-  flex: 0 0 15px;
-  align-items: center;
-  justify-content: center;
-  color: currentColor;
-}
-
-.desktop-cloud-sidebar-nav-label {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  color: currentColor;
-  font-size: 13px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-cloud-sidebar-nav-row.active .desktop-cloud-sidebar-nav-label {
-  font-weight: 600;
-}
-
-.desktop-cloud-sidebar-nav-row:not(.active):not(.locked) {
-  color: var(--po-text-subtle);
-}
-
 .desktop-cloud-sidebar-footer {
   display: flex;
   height: var(--desktop-sidebar-nav-height);
@@ -187,6 +120,7 @@
 }
 
 .desktop-cloud-main-view {
+  position: relative;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -234,8 +168,12 @@
 }
 
 .desktop-cloud-loading-state {
+  position: absolute;
+  inset: 0;
   display: grid;
-  min-height: 100%;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   place-items: center;
   color: var(--po-text-muted);
 }

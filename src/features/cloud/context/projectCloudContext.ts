@@ -1,6 +1,5 @@
 import type { CloudWorkspaceSection } from "../routes/cloudRouteIds";
 import { normalizeCloudSection } from "../routes/cloudRoutes";
-import type { DesktopCloudProjectReadiness } from "../../../lib/cloudApi";
 import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 import type { RepositoryTarget } from "../repositoryTarget";
 
@@ -13,7 +12,6 @@ export type ProjectCloudContext =
       projectId: string;
       target: RepositoryTarget;
       scopePath?: string | null;
-      readiness?: DesktopCloudProjectReadiness | null;
       capabilities?: string[];
       warning?: CloudMessageDescriptor;
     }
@@ -73,7 +71,6 @@ export function resolveProjectCloudContext({
   resolving,
   target = null,
   scopePath = null,
-  readiness = null,
   capabilities = [],
 }: {
   resolvedProjectId: string | null;
@@ -92,7 +89,6 @@ export function resolveProjectCloudContext({
   resolving: boolean;
   target?: RepositoryTarget | null;
   scopePath?: string | null;
-  readiness?: DesktopCloudProjectReadiness | null;
   capabilities?: string[];
 }): ProjectCloudContext {
   const projectId = resolvedProjectId?.trim() || null;
@@ -102,7 +98,6 @@ export function resolveProjectCloudContext({
       projectId,
       target,
       ...(scopePath ? { scopePath } : {}),
-      ...(readiness ? { readiness } : {}),
       ...(capabilities.length > 0 ? { capabilities } : {}),
       ...(contextError ? { warning: contextError } : {}),
     };

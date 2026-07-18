@@ -446,7 +446,6 @@ function getCloudProjectDetailResources(
   if (section === "contents") {
     return ["dashboard", "tree", "history", "scopes", "connectors", "mcp-endpoints", "identity"];
   }
-  if (section === "claude") return ["identity", "readiness"];
   if (section === "access" || section === "automation" || section === "mcp-cli") {
     return ["scopes", "connectors", "mcp-endpoints", "identity"];
   }

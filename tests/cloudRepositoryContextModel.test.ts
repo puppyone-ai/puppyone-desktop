@@ -186,7 +186,7 @@ describe("Project Cloud repository context", () => {
       workspaceChanged: false,
     })).toBe("initialize");
     expect(resolveCloudHubSectionAfterContextChange({
-      currentSection: "claude",
+      currentSection: "history",
       hasProjectContext: false,
       workspaceChanged: false,
     })).toBe("initialize");

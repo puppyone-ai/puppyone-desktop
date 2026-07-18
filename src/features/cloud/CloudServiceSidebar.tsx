@@ -95,7 +95,7 @@ export function CloudServiceSidebar({
         </div>
       )}
 
-      <SidebarScrollArea className="desktop-cloud-sidebar-list">
+      <SidebarScrollArea>
         <nav className="desktop-cloud-sidebar-nav" aria-label={t(inProjectContext ? "cloud.sidebar.projectSections" : "cloud.sidebar.sections")}>
           {navGroups.map((group) => {
             const disabled = group.items.every((item) => item.locked);
@@ -155,17 +155,15 @@ export function CloudSidebarNavItem({
 
   return (
     <SidebarRow
-      className={`desktop-cloud-sidebar-nav-row ${item.locked ? "locked" : ""}`}
       active={active}
+      disabled={item.locked}
       aria-disabled={item.locked || undefined}
       title={lockedTitle}
       onClick={() => {
         if (!item.locked) onSelect(item.id);
       }}
-      icon={<span className="desktop-cloud-sidebar-nav-icon">
-        <Icon size={15} />
-      </span>}
-      label={<span className="desktop-cloud-sidebar-nav-label">{label}</span>}
+      icon={<Icon size={15} />}
+      label={label}
     />
   );
 }

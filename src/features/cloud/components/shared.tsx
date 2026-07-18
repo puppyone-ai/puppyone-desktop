@@ -30,9 +30,7 @@ export function CloudWorkspaceLoadingState({ label }: { label?: string }) {
     <div className="desktop-cloud-loading-state" role="status" aria-label={resolvedLabel}>
       <PageLoading
         variant="fill"
-        tone="info"
         label={resolvedLabel}
-        style={{ width: "auto", height: "auto", minHeight: 0, gap: 8 }}
       />
     </div>
   );

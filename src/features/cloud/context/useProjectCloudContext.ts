@@ -50,7 +50,6 @@ export function useProjectCloudContext({
       resolving: context?.resolutionPending === true,
       target: context?.target ?? null,
       scopePath: context?.scopePath ?? null,
-      readiness: context?.readiness ?? null,
       capabilities: context?.capabilities ?? [],
     });
   }, [
