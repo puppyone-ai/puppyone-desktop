@@ -1,5 +1,5 @@
 import { syntaxTree } from "@codemirror/language";
-import { EditorState, StateField } from "@codemirror/state";
+import { EditorState, StateField, type Range } from "@codemirror/state";
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import {
   markdownAssetUrlResolverFacet,
@@ -12,6 +12,10 @@ import { markdownExpandedImageField } from "../state/expandedImage";
 import { getLivePreviewFocusState } from "../state/livePreviewFocus";
 import { getInlineRevealElement } from "../syntax/markdownElements";
 import { addMarkdownBlockAndLineDecorations } from "./blockDecorations";
+import {
+  canIncrementallyUpdateMarkdownPlans,
+  getMarkdownChangedLineRanges,
+} from "../plans/markdownPlanIndex";
 import type { InlineRevealRange, MarkdownDecorationBuilders } from "./decorationPrimitives";
 
 type LivePreviewDecorations = {
@@ -42,6 +46,9 @@ export const markdownLivePreviewDecorations = StateField.define<LivePreviewDecor
         composingLineKey,
         revealSetKey: decorations.revealSetKey,
       };
+    }
+    if (transaction.docChanged && canIncrementallyUpdateMarkdownPlans(transaction)) {
+      return patchMarkdownDecorations(transaction, decorations, focused, inputComposing, composingLineKey, revealSetKey);
     }
     if (
       transaction.docChanged ||
@@ -115,4 +122,54 @@ function buildMarkdownDecorations(state: EditorState, focused: boolean, inputCom
     composingLineKey: composingLine ? `${composingLine.from}:${composingLine.to}` : "",
     revealSetKey: inlineRevealRange ? `${inlineRevealRange.from}:${inlineRevealRange.to}` : "",
   };
+}
+
+function patchMarkdownDecorations(
+  transaction: import("@codemirror/state").Transaction,
+  previous: LivePreviewDecorations,
+  focused: boolean,
+  inputComposing: boolean,
+  composingLineKey: string,
+  revealSetKey: string,
+): LivePreviewDecorations {
+  const builders: MarkdownDecorationBuilders = { decorations: [], atomicRanges: [] };
+  const ranges = getMarkdownChangedLineRanges(transaction);
+  for (const range of ranges) {
+    addMarkdownBlockAndLineDecorations(
+      transaction.state,
+      builders,
+      getLivePreviewInlineRevealRange(transaction.state, focused),
+      transaction.state.field(markdownExpandedImageField, false) ?? null,
+      transaction.state.field(markdownComposingBlockLineField, false) ?? null,
+      transaction.state.facet(markdownHtmlTrustModeFacet),
+      transaction.state.facet(markdownLinkGraphFacet),
+      transaction.state.facet(markdownDocumentPathFacet),
+      transaction.state.facet(markdownAssetUrlResolverFacet),
+      range,
+    );
+  }
+  const mappedDecorations = previous.decorations.map(transaction.changes);
+  const mappedAtomicRanges = previous.atomicRanges.map(transaction.changes);
+  return {
+    decorations: patchDecorationSet(mappedDecorations, builders.decorations, ranges),
+    atomicRanges: patchDecorationSet(mappedAtomicRanges, builders.atomicRanges, ranges),
+    focused,
+    inputComposing,
+    composingLineKey,
+    revealSetKey,
+  };
+}
+
+function patchDecorationSet(
+  mapped: DecorationSet,
+  additions: readonly Range<Decoration>[],
+  ranges: readonly { from: number; to: number }[],
+): DecorationSet {
+  return mapped.update({
+    filter(from, to) {
+      return !ranges.some((range) => from <= range.to && to >= range.from);
+    },
+    add: additions,
+    sort: true,
+  });
 }

@@ -31,10 +31,16 @@ export function addMarkdownBlockAndLineDecorations(
   markdownLinkGraph: MarkdownLinkGraph | null,
   documentPath: string,
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
+  lineRange: { from: number; to: number } | null = null,
 ) {
-  const lineCount = state.doc.lines;
+  const firstLine = lineRange
+    ? state.doc.lineAt(Math.min(lineRange.from, state.doc.length)).number
+    : 1;
+  const lastLine = lineRange
+    ? state.doc.lineAt(Math.min(lineRange.to, state.doc.length)).number
+    : state.doc.lines;
 
-  for (let lineNumber = 1; lineNumber <= lineCount;) {
+  for (let lineNumber = firstLine; lineNumber <= lastLine;) {
     const line = state.doc.line(lineNumber);
     if (composingLine?.from === line.from) {
       builders.decorations.push(

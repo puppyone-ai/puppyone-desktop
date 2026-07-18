@@ -13,6 +13,7 @@ import {
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { markdownLivePreviewDecorations } from "./core/decorations/livePreviewDecorations";
+import { markdownPlanIndexField } from "./core/plans/markdownPlanIndex";
 import { markdownBlockWidgetSelectionExtension } from "./core/interaction/blockWidgetSelection";
 import { markdownEditingKeymap } from "./core/commands/markdownEditingKeymap";
 import { markdownLivePreviewContextExtension } from "./core/editor/markdownLivePreviewContext";
@@ -78,6 +79,7 @@ export function markdownLivePreviewExtension(
     markdownExpandedImageField,
     markdownTableFocusExtension,
     markdownEmbedHostLifecycle,
+    markdownPlanIndexField,
     markdownLivePreviewDecorations,
     markdownBlockWidgetSelectionExtension,
   ];
