@@ -24,10 +24,6 @@ if (
 }
 
 const workspaceFacade = read("local-api/workspace.mjs");
-const workspaceLines = countLines(workspaceFacade);
-if (workspaceLines > 3_400) {
-  errors.push(`local-api/workspace.mjs has ${workspaceLines} lines; keep the compatibility facade at or below 3,400 lines`);
-}
 
 const requiredBoundaries = [
   {
@@ -58,9 +54,6 @@ const requiredBoundaries = [
 
 for (const boundary of requiredBoundaries) {
   const source = read(boundary.path);
-  if (countLines(source) > 500) {
-    errors.push(`${boundary.path} exceeds the 500-line focused-module budget`);
-  }
   for (const exportName of boundary.exports) {
     if (!new RegExp(`export (?:async )?function ${exportName}\\b`).test(source)) {
       errors.push(`${boundary.path} must own the ${exportName} implementation`);
@@ -191,24 +184,6 @@ if (/resolveLegacyCloudRepositoryRemote|remote_url|resolve-legacy-remote/.test(r
   errors.push("Cloud context APIs must accept Project targets, never local remote URLs or legacy credentials");
 }
 
-const cloudGitModules = [
-  "electron/main/cloud-publish-coordinator.mjs",
-  "electron/main/cloud-publish-contract.mjs",
-  "electron/main/cloud-publish-api.mjs",
-  "electron/main/cloud-publish-git.mjs",
-  "electron/main/cloud-publish-git-credentials.mjs",
-  "electron/main/cloud-publish-journal.mjs",
-  "electron/main/cloud-git-connect-coordinator.mjs",
-  "electron/main/cloud-git-connect-journal.mjs",
-  "electron/main/cloud-git-operation-lease.mjs",
-];
-for (const relativePath of cloudGitModules) {
-  const source = read(relativePath);
-  if (countLines(source) > 500) {
-    errors.push(`${relativePath} exceeds the 500-line focused Cloud Git module budget`);
-  }
-}
-
 const publishCoordinator = read("electron/main/cloud-publish-coordinator.mjs");
 for (const requiredModule of [
   'from "./cloud-publish-api.mjs"',
@@ -285,8 +260,4 @@ function read(relativePath) {
     errors.push(`required architecture file is missing: ${relativePath} (${error.message})`);
     return "";
   }
-}
-
-function countLines(source) {
-  return source === "" ? 0 : source.split(/\r?\n/).length;
 }

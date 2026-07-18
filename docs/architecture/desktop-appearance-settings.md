@@ -64,8 +64,9 @@ Rejected, and why:
 
 ### Page Shape
 
-The Appearance section stays a single flat list (Theme, presets, Text size,
-Content font, File icons, Navigation, Header elements,
+The Appearance section stays a single flat list (Interface style, Light or
+Dark controls when supported, presets, Text size, Content font, File icons,
+Navigation, Header elements,
 Pointer cursors, Dock icon). It must fit in roughly one screen. Do not adopt grouped-card layouts
 while the list stays this small.
 
@@ -149,10 +150,22 @@ typography cannot drift independently. The architecture test in
 The initial accepted items were implemented on 2026-07-10; the extensible
 typography foundation followed on 2026-07-13. Current code boundaries:
 
-- `src/preferences.ts` - preset definitions, storage keys
-  (`puppyone.desktop.*`), parse/normalize helpers.
+- `src/features/appearance/interface-style-manifest.json` - canonical built-in
+  interface-style registry, palette capabilities, first-paint colors, and CSS
+  entries. `npm run generate:interface-styles` produces the typed renderer
+  registry, synchronous bootstrap manifest, and deterministic CSS entry.
+- `src/features/appearance/interfaceStyles.ts` - typed lookup, parsing,
+  capability, active-color-mode, and first-paint APIs.
+- `src/preferences.ts` - non-skin preset definitions and preference
+  parse/normalize helpers. It re-exports the appearance types and storage keys
+  for compatibility.
 - `src/features/settings/SettingsView.tsx` - the Appearance section rendering.
+- `src/features/settings/main/InterfacePaletteSettings.tsx` - capability-driven
+  color controls. It never branches on a concrete skin ID.
 - `src/styles/tokens.css` - all `--po-*` design tokens per theme and preset.
+- `src/styles/interface-skin-contract.css` - stable component selectors shared
+  by every non-default skin. Individual skin files supply `--interface-*`
+  contract tokens plus genuinely unique treatments.
 - `src/App.tsx`, `src/features/app-shell/DesktopOverlayPortal.tsx`,
   `src/components/MinimalOnboarding.tsx`,
   `src/features/app-shell/RestoringWorkspaceScreen.tsx` - root elements that
@@ -197,6 +210,39 @@ Implemented:
    (`color | symbols`) is rendered in compact AI review surfaces; its settings
    row lives in the Editor section. The full Git Changes review surface always
    renders `+/-` because color alone cannot communicate its row structure.
+9. **Curated interface styles.** Default, Windows XP, and macOS Tiger are
+   registered built-in styles. Default declares an adaptive System / Light /
+   Dark palette with light and dark preset controls. XP and Tiger declare a
+   fixed light palette, so those controls are absent without discarding the
+   user's saved Default choices.
+
+### Interface Style Extension Contract
+
+An interface style is presentation over the existing component tree. It must
+not fork React components, application behavior, navigation, or information
+architecture. A genuinely structural alternative belongs to a separate Layout
+Preset or product mode.
+
+To add a built-in style:
+
+1. Add one entry to `interface-style-manifest.json`, including its palette
+   capability, localized label key, first-paint palette, and stylesheet.
+2. Add that label to every locale and create the stylesheet rooted at its
+   registered `data-interface-style` value.
+3. Implement every token required by `interface-skin-contract.css`; keep only
+   historically unique selectors in the skin stylesheet.
+4. Run `npm run generate:interface-styles`. Generated files are checked by
+   `npm run check:boundaries`, including contract-token completeness and
+   first-paint/bootstrap parity.
+5. Add or update the per-style visual smoke baseline for titlebar, sidebar,
+   menus, dialogs, settings, and scrollbars.
+
+The manifest is the only manually maintained style list. Settings options,
+persisted-value validation, active palette behavior, first paint, and CSS load
+order derive from it. Third-party styles, if introduced later, must use a
+versioned token-only manifest; arbitrary JavaScript and unrestricted global CSS
+are not part of this built-in extension contract.
+
 ## Invariants
 
 - Do not add a settings control that accepts a free color, raw CSS font family,
@@ -212,8 +258,12 @@ Implemented:
 - Project, branch, and static context labels in the desktop header must use the
   shared chrome size and weight tokens. Do not hard-code a heavier titlebar
   label weight in a feature selector.
-- New visual variety ships as a complete preset in `preferences.ts` +
-  `tokens.css`, keeping light and dark preset counts balanced.
+- New Default-palette variety ships as a complete preset in `preferences.ts` +
+  `tokens.css`, keeping light and dark preset counts balanced. A new interface
+  skin instead follows the registry and shared skin contract above.
+- Runtime and settings code must branch on declared palette capabilities, never
+  on concrete interface-style IDs.
+- Skin CSS must not fork component behavior or use a second component tree.
 - Preset counts stay small (3-4 per mode); adding a preset beyond that
   requires removing or merging one.
 - Appearance preferences are per-device (`localStorage`, `puppyone.desktop.*`
