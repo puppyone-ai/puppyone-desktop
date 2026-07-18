@@ -4,6 +4,7 @@ import type { Workspace } from "@puppyone/shared-ui";
 import type { GitCommitDetail, GitCommitSummary, GitDiffLine, GitFileDiff, GitStatusSnapshot } from "../../types/electron";
 import type { GitMainPanel, GitWorkingSelection } from "./types";
 import { displayGitBranch } from "./viewModel";
+import { getBinaryDiffSummary, resolveGitDiffPresentation } from "./diffRegistry";
 
 type GitStatusViewProps = {
   workspace: Workspace;
@@ -688,6 +689,7 @@ function FileDiffBlock({
   hideHeader?: boolean;
 }) {
   const omittedLines = file.omittedLines ?? 0;
+  const presentation = resolveGitDiffPresentation(file);
 
   return (
     <section className={`desktop-file-diff ${hideHeader ? "without-header" : ""}`}>
@@ -708,8 +710,10 @@ function FileDiffBlock({
         </div>
       )}
 
-      {file.binary ? (
-        <div className="desktop-diff-placeholder">Binary file</div>
+      {presentation.id === "binary-summary" ? (
+        <div className="desktop-diff-placeholder" data-diff-viewer={presentation.id}>
+          {getBinaryDiffSummary(file, presentation.format)}
+        </div>
       ) : file.lines.length === 0 ? (
         <div className="desktop-diff-placeholder">
           {file.truncated ? formatDiffTruncationMessage(omittedLines) : "No textual diff available"}
