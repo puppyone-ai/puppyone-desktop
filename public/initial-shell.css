@@ -8,6 +8,16 @@
   color-scheme: dark;
 }
 
+:root[data-interface-style="windows-xp"] {
+  background: #dfe9f5;
+  color-scheme: light;
+}
+
+:root[data-interface-style="windows-xp"][data-initial-theme="dark"] {
+  background: #17283d;
+  color-scheme: dark;
+}
+
 html,
 body,
 #root {
@@ -25,4 +35,14 @@ body,
 :root[data-initial-theme="dark"] body,
 :root[data-initial-theme="dark"] #root:empty {
   background: #0e0e0e;
+}
+
+:root[data-interface-style="windows-xp"] body,
+:root[data-interface-style="windows-xp"] #root:empty {
+  background: #dfe9f5;
+}
+
+:root[data-interface-style="windows-xp"][data-initial-theme="dark"] body,
+:root[data-interface-style="windows-xp"][data-initial-theme="dark"] #root:empty {
+  background: #17283d;
 }

@@ -1,6 +1,8 @@
 {
   "appearance.title": "外观",
   "appearance.detail": "此设备的本地显示偏好设置。",
+  "appearance.interfaceStyle.title": "Windows XP 风格",
+  "appearance.interfaceStyle.detail": "使用经典蓝色渐变、紧凑控件和立体边框。",
   "language.title": "语言",
   "language.description": "选择此设备上的 PuppyOne 菜单、控件和消息所使用的语言。",
   "language.selectorLabel": "应用语言",

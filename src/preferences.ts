@@ -8,6 +8,7 @@ import type { PulseGridPresetId } from "@puppyone/shared-ui";
 export type { TypographyPreferences } from "./features/typography/fontCatalog";
 
 export type ThemeMode = "system" | "light" | "dark";
+export type InterfaceStyle = "default" | "windows-xp";
 export type LightThemePreset = "neutral" | "warm" | "graphite";
 export type DarkThemePreset = "default" | "warm" | "graphite";
 export type TextSize = "small" | "default" | "large";
@@ -69,6 +70,7 @@ export type ExperimentalSettings = {
 };
 
 export const THEME_STORAGE_KEY = "puppyone.desktop.theme";
+export const INTERFACE_STYLE_STORAGE_KEY = "puppyone.desktop.interfaceStyle";
 export const LEGACY_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.themePreset";
 export const LIGHT_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.lightThemePreset";
 export const DARK_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.darkThemePreset";
@@ -91,6 +93,7 @@ export const GIT_DISPLAY_MODE_STORAGE_KEY = "puppyone.desktop.gitDisplayMode";
 export const EXPERIMENTAL_SETTINGS_STORAGE_KEY = "puppyone.desktop.experimental";
 
 export const DEFAULT_THEME_MODE: ThemeMode = "system";
+export const DEFAULT_INTERFACE_STYLE: InterfaceStyle = "default";
 export const DEFAULT_LIGHT_THEME_PRESET: LightThemePreset = "neutral";
 export const DEFAULT_DARK_THEME_PRESET: DarkThemePreset = "default";
 export const DEFAULT_TEXT_SIZE: TextSize = "default";
@@ -332,6 +335,10 @@ export const DOCK_ICON_OPTIONS = [
 
 export function parseThemeMode(value: string | null | undefined): ThemeMode {
   return value === "light" || value === "dark" || value === "system" ? value : DEFAULT_THEME_MODE;
+}
+
+export function parseInterfaceStyle(value: string | null | undefined): InterfaceStyle {
+  return value === "windows-xp" ? value : DEFAULT_INTERFACE_STYLE;
 }
 
 export function parseLightThemePreset(value: string | null | undefined): LightThemePreset {

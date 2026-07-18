@@ -1,6 +1,8 @@
 {
   "appearance.title": "Aparência",
   "appearance.detail": "Preferências locais de exibição para este dispositivo.",
+  "appearance.interfaceStyle.title": "Estilo Windows XP",
+  "appearance.interfaceStyle.detail": "Use gradientes azuis clássicos, controles compactos e bordas chanfradas.",
   "language.title": "Idioma",
   "language.description": "Escolha o idioma usado nos menus, controles e mensagens do PuppyOne neste dispositivo.",
   "language.selectorLabel": "Idioma do aplicativo",
