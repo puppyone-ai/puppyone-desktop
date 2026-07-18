@@ -415,6 +415,7 @@ export function useWorkspaceSurfaceContent({
         onSelectSection={cloud.onSelectSection}
         onRefresh={git.refreshGitStatus}
         onOpenGitSettings={cloud.onOpenGitSettings}
+        onOpenSourceControl={() => onNavigate("git")}
       />
     ),
   };

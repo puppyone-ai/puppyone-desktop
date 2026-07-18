@@ -735,6 +735,139 @@
   box-shadow: none;
 }
 
+.desktop-cloud-git-prerequisite {
+  display: grid;
+  width: min(100%, 680px);
+  min-width: 0;
+  justify-items: center;
+  gap: 24px;
+  padding: 24px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+
+.desktop-cloud-git-prerequisite-mark {
+  display: flex;
+  width: 56px;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-git-prerequisite-header {
+  display: grid;
+  max-width: 540px;
+  justify-items: center;
+  gap: 10px;
+}
+
+.desktop-cloud-git-prerequisite-header h1 {
+  margin: 0;
+  color: var(--po-text);
+  font-size: clamp(21px, 2.4vw, 24px);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.desktop-cloud-git-prerequisite-header p {
+  margin: 0;
+  color: var(--po-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.desktop-cloud-git-prerequisite-steps {
+  display: grid;
+  width: min(100%, 560px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.desktop-cloud-git-prerequisite-steps li {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  color: var(--po-text-subtle);
+  font-size: 11.5px;
+  font-weight: 560;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.desktop-cloud-git-prerequisite-steps li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 13px;
+  inset-inline-start: calc(50% + 17px);
+  width: calc(100% - 34px);
+  height: 1px;
+  background: var(--po-divider);
+}
+
+.desktop-cloud-git-prerequisite-steps li.current {
+  color: var(--po-text);
+  font-weight: 620;
+}
+
+.desktop-cloud-git-prerequisite-steps li.complete {
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-git-prerequisite-steps li.upcoming {
+  opacity: 0.72;
+}
+
+.desktop-cloud-git-prerequisite-step-marker {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--po-divider);
+  border-radius: 50%;
+  background: var(--po-panel);
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.desktop-cloud-git-prerequisite-steps li.current .desktop-cloud-git-prerequisite-step-marker {
+  border-color: var(--po-border-strong);
+  background: var(--po-control);
+  color: var(--po-text);
+}
+
+.desktop-cloud-git-prerequisite-steps li.complete .desktop-cloud-git-prerequisite-step-marker {
+  border-color: var(--po-border);
+  background: var(--po-control);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-git-prerequisite-actions {
+  margin-top: 0;
+}
+
+.desktop-cloud-git-prerequisite-actions .desktop-cloud-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
 .desktop-cloud-publish-status-error {
   display: grid;
   width: min(100%, 760px);
@@ -1279,6 +1412,11 @@
 }
 
 @container cloud-publish (max-width: 720px) {
+  .desktop-cloud-git-prerequisite {
+    gap: 22px;
+    padding: 20px 16px;
+  }
+
   .desktop-cloud-publish-card {
     gap: 24px;
     padding: 16px;
@@ -1353,6 +1491,38 @@
   }
 
   .desktop-cloud-publish-status-error .desktop-cloud-row-action {
+    width: 100%;
+  }
+}
+
+@container cloud-publish (max-width: 460px) {
+  .desktop-cloud-git-prerequisite-steps {
+    width: min(100%, 280px);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .desktop-cloud-git-prerequisite-steps li {
+    grid-template-columns: 26px minmax(0, 1fr);
+    align-items: center;
+    justify-items: start;
+    padding: 0;
+    text-align: start;
+  }
+
+  .desktop-cloud-git-prerequisite-steps li:not(:last-child)::after {
+    top: 28px;
+    inset-inline-start: 12.5px;
+    width: 1px;
+    height: 10px;
+  }
+
+  .desktop-cloud-git-prerequisite-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .desktop-cloud-git-prerequisite-actions .desktop-cloud-row-action {
     width: 100%;
   }
 }

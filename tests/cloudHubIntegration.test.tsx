@@ -1051,6 +1051,77 @@ describe("Local-only Cloud page", () => {
     expect(container.querySelector(".desktop-cloud-publish-summary")).toBeNull();
   });
 
+  it("replaces duplicate no-repository alerts with one actionable Git prerequisite", () => {
+    const onOpenSourceControl = vi.fn();
+    const onRefresh = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <CloudLocalOnlyWorkspace
+        workspace={{ id: "local-folder", name: "My Private", path: "/tmp/my-private" }}
+        accountEmail="owner@example.com"
+        branchName="No branch"
+        totalCommits={0}
+        localChangeCount={0}
+        isGitRepository={false}
+        hasHeadCommit={false}
+        hasCurrentBranch={false}
+        publishLoading={false}
+        publishError={{ code: "REPOSITORY_REQUIRED", retryable: false }}
+        onOpenSourceControl={onOpenSourceControl}
+        onRefresh={onRefresh}
+        onPublishWorkspace={vi.fn()}
+      />,
+    ));
+
+    expect(container.querySelectorAll(".desktop-cloud-git-prerequisite")).toHaveLength(1);
+    expect(container.textContent).toContain("Set up Git for this folder");
+    expect(container.textContent).toContain("Enable version control");
+    expect(container.textContent).toContain("Create the first commit");
+    expect(container.textContent).toContain("Publish to Cloud");
+    expect(container.querySelectorAll(".desktop-cloud-git-prerequisite-step-marker")).toHaveLength(3);
+    expect(container.querySelector(".desktop-cloud-publish-hero")).toBeNull();
+    expect(container.querySelector(".desktop-cloud-main-alert")).toBeNull();
+    expect(container.querySelector("[role=alert]")).toBeNull();
+
+    const buttons = [...container.querySelectorAll<HTMLButtonElement>("button")];
+    const sourceControl = buttons.find((button) => button.textContent === "Open Source Control");
+    const refresh = buttons.find((button) => button.textContent === "Check again");
+    expect(sourceControl?.disabled).toBe(false);
+    act(() => sourceControl?.click());
+    act(() => refresh?.click());
+    expect(onOpenSourceControl).toHaveBeenCalledOnce();
+    expect(onRefresh).toHaveBeenCalledOnce();
+  });
+
+  it("does not resurrect a stale prerequisite error after Git becomes publishable", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <CloudLocalOnlyWorkspace
+        workspace={{ id: "ready-repository", name: "Ready Repository", path: "/tmp/ready-repository" }}
+        accountEmail="owner@example.com"
+        branchName="main"
+        totalCommits={1}
+        localChangeCount={0}
+        isGitRepository
+        hasHeadCommit
+        hasCurrentBranch
+        publishLoading={false}
+        publishError={{ code: "REPOSITORY_REQUIRED", retryable: false }}
+        onPublishWorkspace={vi.fn()}
+      />,
+    ));
+
+    expect(container.querySelector(".desktop-cloud-publish-hero")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-main-alert")).toBeNull();
+    expect(container.textContent).not.toContain("Git repository with at least one commit is required");
+  });
+
   it("shows explicit browser sign-in feedback while a publish intent is pending", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -1451,8 +1522,10 @@ describe("Local-only Cloud page", () => {
       />,
     ));
 
-    expect(container.textContent).toContain("Check out a branch before pushing to Cloud.");
-    expect(container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary")?.disabled).toBe(true);
+    expect(container.textContent).toContain("Choose a branch");
+    expect(container.textContent).toContain("Create or check out a branch");
+    expect(container.querySelector(".desktop-cloud-publish-hero")).toBeNull();
+    expect(container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary")?.disabled).toBe(false);
   });
 
   it("renders the Initialize/Push flow from live Git state without inferring a Cloud Project", async () => {

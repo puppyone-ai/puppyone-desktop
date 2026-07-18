@@ -42,6 +42,7 @@ export function CloudServiceMainView({
   onSelectSection,
   onRefresh,
   onOpenGitSettings,
+  onOpenSourceControl,
 }: CloudServiceMainViewProps) {
   const { t } = useLocalization();
   const cloudRemote = cloudEnvironment.cloudRemote;
@@ -215,6 +216,8 @@ export function CloudServiceMainView({
               publishState={cloudPublishState}
               publishStateLoading={cloudPublishStateLoading}
               onAbandonPublish={onAbandonPuppyoneBackup}
+              onOpenSourceControl={onOpenSourceControl ?? onOpenGitSettings}
+              onRefresh={onRefresh}
               onPublishWorkspace={onStartPuppyoneBackup}
             />
           ) : (
@@ -231,6 +234,8 @@ export function CloudServiceMainView({
               publishError={cloudPublishError}
               publishProgress={cloudPublishProgress}
               onSessionChange={onCloudSessionChange}
+              onOpenSourceControl={onOpenSourceControl ?? onOpenGitSettings}
+              onRefresh={onRefresh}
               onPublishWorkspace={onStartPuppyoneBackup}
               onAbandonPublish={onAbandonPuppyoneBackup}
             />
@@ -352,6 +357,8 @@ function AuthenticatedCloudInitialize({
   publishError,
   publishProgress,
   onSessionChange,
+  onOpenSourceControl,
+  onRefresh,
   onPublishWorkspace,
   onAbandonPublish,
 }: {
@@ -367,6 +374,8 @@ function AuthenticatedCloudInitialize({
   publishError: CloudServiceMainViewProps["cloudPublishError"];
   publishProgress: CloudServiceMainViewProps["cloudPublishProgress"];
   onSessionChange: CloudServiceMainViewProps["onCloudSessionChange"];
+  onOpenSourceControl: () => void;
+  onRefresh: () => void;
   onPublishWorkspace: CloudServiceMainViewProps["onStartPuppyoneBackup"];
   onAbandonPublish: () => void;
 }) {
@@ -418,6 +427,8 @@ function AuthenticatedCloudInitialize({
       publishError={publishError}
       publishProgress={publishProgress}
       onAbandonPublish={onAbandonPublish}
+      onOpenSourceControl={onOpenSourceControl}
+      onRefresh={onRefresh}
       organizations={organizationData.organizations}
       selectedOrganizationId={organizationData.selectedOrganizationId}
       organizationStatus={organizationData.status === "partial" ? "ready" : organizationData.status}

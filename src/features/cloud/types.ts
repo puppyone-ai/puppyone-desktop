@@ -82,4 +82,5 @@ export type CloudServiceMainViewProps = {
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onRefresh: () => void;
   onOpenGitSettings: () => void;
+  onOpenSourceControl?: () => void;
 };
