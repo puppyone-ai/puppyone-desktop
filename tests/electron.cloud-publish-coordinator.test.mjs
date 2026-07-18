@@ -730,6 +730,73 @@ describe("Cloud publish coordinator", () => {
     expect(await git(fixture.bare, "rev-parse", "refs/heads/main")).toBe(fixture.head);
   });
 
+  it("migrates v1 pre-push state by authoritative absent, accepted, and divergent remote refs", async () => {
+    for (const remoteState of ["absent", "accepted", "divergent"]) {
+      const fixture = await createFixture("main");
+      await replacePausedOperationWithV1(fixture, "remote-configured");
+      let competingCommit = null;
+      if (remoteState === "accepted") {
+        await git(fixture.root, "push", fixture.bare, `${fixture.head}:refs/heads/main`);
+      } else if (remoteState === "divergent") {
+        await git(fixture.root, "switch", "-c", "remote-winner");
+        await writeFile(path.join(fixture.root, "remote-winner.md"), "remote winner\n");
+        await git(fixture.root, "add", "remote-winner.md");
+        await git(fixture.root, "commit", "-qm", "remote winner");
+        competingCommit = await git(fixture.root, "rev-parse", "HEAD");
+        await git(fixture.root, "push", fixture.bare, `${competingCommit}:refs/heads/main`);
+      }
+
+      const result = await createCoordinator(fixture).getState(fixture.request);
+
+      if (remoteState === "absent") {
+        expect(result).toMatchObject({
+          ok: true,
+          state: {
+            project: "empty",
+            push: "idle",
+            availableActions: expect.arrayContaining(["retry-push", "delete-empty-project"]),
+          },
+        });
+      } else if (remoteState === "accepted") {
+        expect(result).toMatchObject({
+          ok: true,
+          state: { project: "published", push: "accepted", availableActions: [] },
+        });
+      } else {
+        expect(result).toMatchObject({
+          ok: true,
+          state: { project: "published", push: "conflict", availableActions: [] },
+        });
+        expect(await git(fixture.bare, "rev-parse", "refs/heads/main")).toBe(competingCommit);
+      }
+    }
+  });
+
+  it("finishes migrated v1 compensation after the local branch and HEAD change", async () => {
+    const fixture = await createFixture("main");
+    const legacy = await replacePausedOperationWithV1(fixture, "compensation-pending");
+    await git(fixture.root, "switch", "-c", "continued-after-v1");
+    await writeFile(path.join(fixture.root, "continued.md"), "continued work\n");
+    await git(fixture.root, "add", "continued.md");
+    await git(fixture.root, "commit", "-qm", "continued work");
+    await writeFile(path.join(fixture.root, "dirty-after-v1.txt"), "preserve me\n");
+    const before = await snapshotUserGitState(fixture.root);
+
+    const pending = await createCoordinator(fixture).getState(fixture.request);
+    expect(pending).toMatchObject({
+      ok: true,
+      state: { cleanup: "requested", availableActions: ["finish-cleanup"] },
+    });
+
+    const finished = await createCoordinator(fixture).cleanup({
+      ...fixture.request,
+      operationId: legacy.operation_id,
+    });
+
+    expect(finished).toMatchObject({ ok: true, state: null });
+    expect(await snapshotUserGitState(fixture.root)).toEqual(before);
+  });
+
   it("offers only Finish cleanup when the Cloud Project is already unavailable", async () => {
     const fixture = await createFixture("main");
     fixture.cloud.projectUnavailable = true;
@@ -895,6 +962,48 @@ function createCoordinator(fixture, options = {}) {
     faultInjector: options.faultInjector,
     telemetry: options.telemetry,
   });
+}
+
+async function replacePausedOperationWithV1(fixture, phase) {
+  const pause = Object.assign(new Error("capture legacy operation"), { simulateCrash: true });
+  await expect(createCoordinator(fixture, {
+    faultInjector: async (point) => {
+      if (point === "after-remote-configured") throw pause;
+    },
+  }).startOrResume(fixture.request)).rejects.toBe(pause);
+  const gitDir = await git(fixture.root, "rev-parse", "--absolute-git-dir");
+  const journalPath = path.join(gitDir, "puppyone", "pending-cloud-publish.v1.json");
+  const record = JSON.parse(await readFile(journalPath, "utf8"));
+  const legacy = {
+    version: 1,
+    kind: "puppyone-cloud-publish",
+    operation_id: record.operation_id,
+    revision: record.revision,
+    phase,
+    api_base_url: record.api_base_url,
+    api_origin: record.api_origin,
+    user_id: record.user_id,
+    organization_id: record.organization_id,
+    project_name: record.project_name,
+    create_payload: record.create_payload,
+    repository_fingerprint: record.repository_fingerprint,
+    expected_head_commit_id: record.attempt.commit_oid,
+    expected_branch: record.selected_source_branch,
+    destination_branch: "main",
+    project_id: record.project_id,
+    credential_id: record.credential_id,
+    secret_ref: record.secret_ref,
+    secret_stored: record.secret_stored,
+    canonical_remote_url: record.canonical_remote_url,
+    credential_username: record.credential_username,
+    credential_config_snapshot: record.credential_config_snapshot,
+    remote_add_intent: record.remote_add_intent,
+    remote_created_by_operation: record.remote_created_by_operation,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+  };
+  await writeFile(journalPath, `${JSON.stringify(legacy)}\n`, { mode: 0o600 });
+  return legacy;
 }
 
 async function git(cwd, ...args) {
