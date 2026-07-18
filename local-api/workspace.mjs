@@ -1060,6 +1060,11 @@ function throwIfGitStatusAborted(signal) {
   throw error;
 }
 
+function normalizeGitHeadCommitId(value) {
+  const candidate = typeof value === "string" ? value.trim() : "";
+  return /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(candidate) ? candidate : "";
+}
+
 export async function getWorkspaceGitStatus(rootPath, options = {}) {
   const root = resolveWorkspacePath(rootPath, null);
   const signal = options.signal;
@@ -1164,16 +1169,12 @@ async function readFastWorkspaceGitStatus(root, options = {}) {
     : "";
 
   let branchName = "";
-  let headCommitId = "";
+  let headCommitId = normalizeGitHeadCommitId(headerOid);
   if (headerHead && headerHead !== "(detached)") {
     branchName = headerHead;
   } else if (headerHead === "(detached)") {
     branchName = "detached";
   }
-  if (headerOid && headerOid !== "(null)") {
-    headCommitId = headerOid;
-  }
-
   if (!branchName || !headCommitId) {
     const [branchResult, symbolicBranchResult, headResult] = await Promise.all([
       branchName
@@ -1196,7 +1197,7 @@ async function readFastWorkspaceGitStatus(root, options = {}) {
         }),
     ]);
     branchName = branchName || branchResult.stdout.trim() || symbolicBranchResult.stdout.trim() || "detached";
-    headCommitId = headCommitId || headResult.stdout.trim();
+    headCommitId = headCommitId || normalizeGitHeadCommitId(headResult.stdout);
   }
 
   throwIfGitStatusAborted(signal);

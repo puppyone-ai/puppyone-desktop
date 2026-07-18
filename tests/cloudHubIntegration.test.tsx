@@ -1424,6 +1424,67 @@ describe("Local-only Cloud page", () => {
       .filter((alert) => alert.textContent === publishFailure)).toHaveLength(1);
   });
 
+  it("guides an unborn repository to its first commit instead of offering publish", async () => {
+    const onOpenSourceControl = vi.fn();
+    const onStartPuppyoneBackup = vi.fn();
+    const localSession = {
+      ...session,
+      api_base_url: "http://localhost:9090",
+    } as DesktopCloudSession;
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudServiceMainView
+          {...testCloudMainState(localSession, "http://localhost:9090")}
+          cloudPublishError={{ code: "SOURCE_MISSING", retryable: false }}
+          workspace={{ id: "unborn-repo", name: "My Private", path: "/tmp/my-private" }}
+          status={{
+            isRepo: true,
+            branch: "main",
+            headCommitId: null,
+            totalCommits: 0,
+            entries: [
+              { path: "temp todo.md", oldPath: null, staged: null, unstaged: "?", status: "?" },
+            ],
+            branches: [],
+            stagedEntries: [],
+            unstagedEntries: [],
+            untrackedEntries: [],
+            remotes: [],
+          } as unknown as GitStatusSnapshot}
+          projectContext={{ status: "local-only", projectId: null }}
+          onCloudSessionChange={vi.fn()}
+          activeSection="initialize"
+          loading={false}
+          error={null}
+          cloudBackupLoading={false}
+          cloudBackupPending={false}
+          onStartPuppyoneBackup={onStartPuppyoneBackup}
+          onSelectSection={vi.fn()}
+          onRefresh={vi.fn()}
+          onOpenGitSettings={vi.fn()}
+          onOpenSourceControl={onOpenSourceControl}
+        />,
+      );
+      await flushPromises();
+    });
+
+    expect(container.textContent).toContain("Create the first commit");
+    expect(container.textContent).not.toContain("Initialize and Push");
+    expect(container.textContent).not.toContain("The selected source branch no longer exists");
+    expect(container.querySelector(".desktop-cloud-main-alert")).toBeNull();
+
+    const sourceControl = [...container.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent === "Open Source Control");
+    expect(sourceControl?.disabled).toBe(false);
+    act(() => sourceControl?.click());
+    expect(onOpenSourceControl).toHaveBeenCalledOnce();
+    expect(onStartPuppyoneBackup).not.toHaveBeenCalled();
+  });
+
   it("shows Git status loading and real failures instead of treating an unknown status as a folder", async () => {
     const onRefresh = vi.fn();
     const localSession = {

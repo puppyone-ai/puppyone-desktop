@@ -161,7 +161,11 @@ export function assertFreshPublishStatus(status, base) {
   if (!status?.isRepo) {
     throw createPublishError("REPOSITORY_REQUIRED", "Current workspace is not a Git repository.", false);
   }
-  if (!status.headCommitId) {
+  if (
+    !COMMIT_ID_PATTERN.test(status.headCommitId ?? "")
+    || !Number.isInteger(status.totalCommits)
+    || status.totalCommits < 1
+  ) {
     throw createPublishError("COMMIT_REQUIRED", "Create a Git commit before publishing.", false);
   }
   const currentBranch = normalizeStatusBranch(status.branch);

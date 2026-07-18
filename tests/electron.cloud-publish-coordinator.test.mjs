@@ -20,6 +20,23 @@ afterEach(async () => {
 });
 
 describe("Cloud publish coordinator", () => {
+  it("rejects an unborn branch before creating any Cloud resources", async () => {
+    const fixture = await createFixture("main");
+    await git(fixture.root, "update-ref", "-d", "refs/heads/main");
+
+    const result = await createCoordinator(fixture).startOrResume(fixture.request);
+
+    expect(result).toMatchObject({
+      ok: false,
+      state: null,
+      error: { code: "COMMIT_REQUIRED", retryable: false },
+    });
+    expect(fixture.cloud.requests).toEqual([]);
+    const gitDir = await git(fixture.root, "rev-parse", "--absolute-git-dir");
+    await expect(readFile(path.join(gitDir, "puppyone", "pending-cloud-publish.v1.json"), "utf8"))
+      .rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("creates once, keeps the credential out of the journal, and maps a feature branch to Cloud main", async () => {
     const fixture = await createFixture("feature/design");
     const coordinator = createCoordinator(fixture);
