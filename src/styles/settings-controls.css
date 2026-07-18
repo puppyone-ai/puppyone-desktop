@@ -306,6 +306,23 @@
   min-width: 70px;
 }
 
+.desktop-loading-animation-segment {
+  max-width: 520px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.desktop-loading-animation-segment button {
+  min-width: 132px;
+}
+
+.desktop-loading-animation-preview {
+  display: inline-grid;
+  width: 17px;
+  flex: 0 0 17px;
+  place-items: center;
+}
+
 .desktop-dock-icon-segment img {
   width: 20px;
   height: 20px;

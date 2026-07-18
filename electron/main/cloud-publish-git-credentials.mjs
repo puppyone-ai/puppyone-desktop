@@ -50,6 +50,14 @@ export function createCloudPublishGitCredentialManager({
         input: credentialInput(remoteUrl, username, secret),
       });
       approved = true;
+      await assertCredentialRoundTrip(
+        rootPath,
+        remoteUrl,
+        username,
+        secret,
+        snapshot,
+        execGitCommand,
+      );
       return {
         async rollback() {
           if (approved) {
@@ -124,6 +132,66 @@ export function createCloudPublishGitCredentialManager({
     detachManaged,
     prepare,
   };
+}
+
+async function assertCredentialRoundTrip(
+  rootPath,
+  remoteUrl,
+  username,
+  expectedSecret,
+  snapshot,
+  execGitCommand,
+) {
+  let stdout;
+  try {
+    ({ stdout } = await execGitCommand(rootPath, secureCredentialCommandArgs(
+      remoteUrl,
+      snapshot,
+      ["credential", "fill"],
+    ), {
+      timeout: GIT_MUTATION_TIMEOUT_MS,
+      input: credentialInput(remoteUrl, username),
+    }));
+  } catch (error) {
+    throw credentialRoundTripFailure(safeCredentialHelperDiagnostic(error), error);
+  }
+
+  const returned = parseCredentialOutput(stdout);
+  if (returned.username !== username || returned.password !== expectedSecret) {
+    throw credentialRoundTripFailure("The secure Git credential helper did not return the stored credential.");
+  }
+}
+
+function parseCredentialOutput(value) {
+  const fields = {};
+  for (const line of String(value || "").split(/\r?\n/)) {
+    if (!line) break;
+    const separator = line.indexOf("=");
+    if (separator <= 0) continue;
+    fields[line.slice(0, separator)] = line.slice(separator + 1);
+  }
+  return fields;
+}
+
+function safeCredentialHelperDiagnostic(error) {
+  const source = [error?.stderr, error?.message]
+    .find((value) => typeof value === "string" && value.trim());
+  if (!source) return "The secure Git credential helper could not retrieve the stored credential.";
+  return String(source)
+    .replace(/pwg_[A-Za-z0-9_-]+/g, "[redacted]")
+    .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/gi, "$1[redacted]@")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 300);
+}
+
+function credentialRoundTripFailure(diagnostic, cause = undefined) {
+  const error = new Error(
+    `The secure Git credential helper failed its store/read verification. ${diagnostic}`,
+    cause ? { cause } : undefined,
+  );
+  error.code = "PUPPYONE_CREDENTIAL_ROUNDTRIP_FAILED";
+  return error;
 }
 
 async function installManagedConfig(rootPath, snapshot, operationId, execGitCommand) {

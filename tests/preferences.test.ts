@@ -8,6 +8,7 @@ import {
   parseDockIcon,
   parseExternalAppsSettings,
   parseExperimentalSettings,
+  parseLoadingAnimationPreset,
   parsePointerCursors,
   parseSidebarNavigationVisibilitySettings,
   parseTextSize,
@@ -73,6 +74,10 @@ describe("appearance preferences", () => {
     expect(parseDockIcon("/tmp/icon.png")).toBe("polished");
     expect(parseDiffMarkers("symbols")).toBe("symbols");
     expect(parseDiffMarkers("both")).toBe("color");
+    expect(parseLoadingAnimationPreset("ikun")).toBe("ikun");
+    expect(parseLoadingAnimationPreset("ymca")).toBe("ymca");
+    expect(parseLoadingAnimationPreset("siu")).toBe("siu");
+    expect(parseLoadingAnimationPreset("sparkles")).toBe("ikun");
   });
 
   it("keeps pointer cursors off unless explicitly enabled", () => {

@@ -33,6 +33,7 @@ export function CloudServiceMainView({
   cloudBackupPending,
   cloudPublishError,
   cloudPublishNotice,
+  cloudPublishProgress,
   cloudPublishState,
   cloudPublishStateLoading,
   onAbandonPuppyoneBackup,
@@ -174,6 +175,7 @@ export function CloudServiceMainView({
               publishLoading={cloudBackupLoading}
               publishPending={cloudBackupPending}
               publishError={cloudPublishError}
+              publishProgress={cloudPublishProgress}
               publishState={cloudPublishState}
               publishStateLoading={cloudPublishStateLoading}
               onAbandonPublish={onAbandonPuppyoneBackup}
@@ -191,6 +193,7 @@ export function CloudServiceMainView({
               publishLoading={cloudBackupLoading}
               publishPending={cloudBackupPending}
               publishError={cloudPublishError}
+              publishProgress={cloudPublishProgress}
               onSessionChange={onCloudSessionChange}
               onPublishWorkspace={onStartPuppyoneBackup}
               onAbandonPublish={onAbandonPuppyoneBackup}
@@ -210,6 +213,7 @@ export function CloudServiceMainView({
               publishLoading={cloudBackupLoading}
               publishPending={cloudBackupPending}
               publishError={cloudPublishError}
+              publishProgress={cloudPublishProgress}
               onPublishWorkspace={onStartPuppyoneBackup}
               onAbandonPublish={onAbandonPuppyoneBackup}
             />
@@ -365,6 +369,7 @@ function AuthenticatedCloudInitialize({
   publishLoading,
   publishPending,
   publishError,
+  publishProgress,
   onSessionChange,
   onPublishWorkspace,
   onAbandonPublish,
@@ -379,6 +384,7 @@ function AuthenticatedCloudInitialize({
   publishLoading: boolean;
   publishPending: boolean;
   publishError: CloudServiceMainViewProps["cloudPublishError"];
+  publishProgress: CloudServiceMainViewProps["cloudPublishProgress"];
   onSessionChange: CloudServiceMainViewProps["onCloudSessionChange"];
   onPublishWorkspace: CloudServiceMainViewProps["onStartPuppyoneBackup"];
   onAbandonPublish: () => void;
@@ -429,6 +435,7 @@ function AuthenticatedCloudInitialize({
       publishLoading={publishLoading}
       publishPending={publishPending}
       publishError={publishError}
+      publishProgress={publishProgress}
       onAbandonPublish={onAbandonPublish}
       organizations={organizationData.organizations}
       selectedOrganizationId={organizationData.selectedOrganizationId}

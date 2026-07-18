@@ -31,7 +31,7 @@ export function CloudHistorySection({
     revisionKey,
     onSessionChange,
   });
-  const sharedProps = {
+  const sidebarProps = {
     rows: history.rows,
     selectedCommitId: history.selectedCommitId,
     loading: history.loading,
@@ -40,18 +40,18 @@ export function CloudHistorySection({
     error: history.error ? formatCloudMessage(history.error, t) : null,
     warning: history.warning ? formatCloudMessage(history.warning, t) : null,
     onSelectCommit: history.selectCommit,
-    onRefresh: history.reload,
     onLoadMore: history.loadMore,
   };
 
   return (
     <section className="desktop-cloud-history-surface" aria-label={t("cloud.history.commitHistoryAria")}>
-      <CloudProjectHistorySidebar {...sharedProps} />
+      <CloudProjectHistorySidebar {...sidebarProps} />
       <CloudProjectHistoryView
-        {...sharedProps}
+        {...sidebarProps}
         projectId={projectId}
         projectName={projectName}
         history={history.history}
+        onRefresh={history.reload}
       />
     </section>
   );

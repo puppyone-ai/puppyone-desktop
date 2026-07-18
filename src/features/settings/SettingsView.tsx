@@ -1,6 +1,11 @@
 import { useState, type CSSProperties } from "react";
 import { Monitor, Moon, PanelBottom, PanelLeft, PanelTop, Sun } from "lucide-react";
-import { FILE_ICON_THEMES, FileGlyphIcon } from "@puppyone/shared-ui";
+import {
+  FILE_ICON_THEMES,
+  PULSE_GRID_PRESET_FRAMES,
+  PULSE_GRID_PRESET_IDS,
+  FileGlyphIcon,
+} from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import { DARK_THEME_PRESETS, DOCK_ICON_OPTIONS, LIGHT_THEME_PRESETS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, TEXT_SIZE_PRESETS } from "../../preferences";
 import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements";
@@ -12,6 +17,7 @@ import { AccountSettingsView } from "./main/AccountSettingsView";
 import { EditorSettingsView, ExperimentalSettingsView } from "./main/EditorSettingsViews";
 import { DefaultAppsSettingsView, FilesSettingsView } from "./main/FileSettingsViews";
 import { GeneralSettingsView } from "./main/GeneralSettingsView";
+import { PulseGrid } from "../../components/loading";
 import { CloudHostingSettingsView, GitSettingsView } from "./main/RepositorySettingsViews";
 import { ThemePreview } from "./main/ThemePreview";
 import type { SettingsViewProps } from "./types";
@@ -25,6 +31,7 @@ export function SettingsView({
   themeMode,
   lightThemePreset,
   darkThemePreset,
+  loadingAnimationPreset,
   textSize,
   typographyPreferences,
   pointerCursors,
@@ -51,6 +58,7 @@ export function SettingsView({
   onThemeModeChange,
   onLightThemePresetChange,
   onDarkThemePresetChange,
+  onLoadingAnimationPresetChange,
   onTextSizeChange,
   onTypographyPreferencesChange,
   onPointerCursorsChange,
@@ -260,6 +268,34 @@ export function SettingsView({
                         ))}
                       </span>
                       <span>{t(`settings.appearance.darkTheme.${preset.id}.label`)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
+                <span>{t("settings.appearance.loadingAnimation.title")}</span>
+                <div
+                  className="desktop-theme-segment desktop-loading-animation-segment"
+                  aria-label={t("settings.appearance.loadingAnimation.ariaLabel")}
+                >
+                  {PULSE_GRID_PRESET_IDS.map((presetId) => (
+                    <button
+                      key={presetId}
+                      className={loadingAnimationPreset === presetId ? "active" : ""}
+                      type="button"
+                      title={t(`settings.appearance.loadingAnimation.${presetId}.description`)}
+                      aria-pressed={loadingAnimationPreset === presetId}
+                      onClick={() => onLoadingAnimationPresetChange(presetId)}
+                    >
+                      <span className="desktop-loading-animation-preview" aria-hidden="true">
+                        <PulseGrid
+                          size="sm"
+                          tone="neutral"
+                          frames={PULSE_GRID_PRESET_FRAMES[presetId]}
+                          ariaHidden
+                        />
+                      </span>
+                      <span>{t(`settings.appearance.loadingAnimation.${presetId}.label`)}</span>
                     </button>
                   ))}
                 </div>

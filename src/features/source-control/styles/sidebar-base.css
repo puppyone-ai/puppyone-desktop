@@ -90,17 +90,23 @@
     calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
 }
 
-.desktop-git-section-empty {
-  align-items: start;
-  min-height: 46px;
+/* Section empties must clear `.desktop-git-sidebar .po-sidebar-empty`'s
+   padding-inline shorthand and sit under the section title label. */
+.desktop-git-sidebar .po-sidebar-empty.desktop-git-section-empty {
+  flex: 0 0 auto;
+  align-items: center;
   justify-content: start;
-  padding-inline-start: calc(
-    var(--desktop-sidebar-row-left-gap)
-    + var(--desktop-sidebar-row-content-left)
+  min-height: 26px;
+  margin-block: var(--git-section-body-top-gap) 0;
+  padding-block: 0;
+  padding-inline: calc(
+    var(--git-sidebar-left-gap)
+    + var(--git-sidebar-content-left)
     + var(--git-section-leading-slot-size)
     + var(--git-section-title-gap)
-  );
-  padding-block-start: 6px;
+  )
+  calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
+  overflow: visible;
   font-style: normal;
   text-align: start;
 }

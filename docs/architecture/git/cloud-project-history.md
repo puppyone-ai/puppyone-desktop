@@ -87,10 +87,13 @@ CloudHistorySection
    page cannot reorder or recolor already-rendered commit rows.
 4. Cloud → History is a two-pane surface with HEAD selected by default,
    selectable commit rows, synchronized details, inline ref pills, ref-only
-   overflow rows, and a read-only Load more action.
-5. History commit rows are uniformly 42px. Git continuation prefixes are
-   folded into the owning row's SVG, rails remain continuous through hover
-   and selection, and lane reuse receives a new path color.
+   overflow rows, and a read-only Load more action. The panes form one continuous
+   workspace: they do not add duplicate History headers, persistent repository
+   footers, or snapshot-hash sections.
+5. History commit rows are uniformly 32px, matching the local Source Control
+   History density. Git continuation prefixes are folded into the owning
+   row's SVG, rails remain continuous through hover and selection, and lane
+   reuse receives a new path color.
 6. The first page resolves main and named refs in one PostgreSQL MVCC snapshot.
    Continuation cursors are signed, project-bound, and carry the immutable
    ordered root set, so ref movement cannot reorder, duplicate, or omit pages.
@@ -184,6 +187,12 @@ The same three-layer rule from `cloud-branch-graph-layout.md` applies:
 - **Incremental loading.** Reaching the end of the loaded window offers
   "load more" (or loads on scroll). The graph extends seamlessly across
   pages.
+- **Shared detail hierarchy.** Cloud commit details reuse the local History
+  hierarchy: compact SHA/message/author metadata, file and line totals, then
+  one canonical format-aware card per changed file. Cloud-only history may
+  show metadata-only card bodies when revision content is unavailable. Refresh
+  and Cloud navigation live as quiet icon actions on the commit identity row;
+  internal snapshot IDs are not part of the default presentation.
 
 ### 4. History route is a two-pane surface
 

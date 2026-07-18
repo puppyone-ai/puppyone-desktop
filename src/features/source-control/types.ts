@@ -85,6 +85,8 @@ export type SourceControlSidebarModel = {
   committedResources: GitSourceControlResource[];
   committedPrimaryAction: GitSidebarPrimaryAction | null;
   showCommittedSection: boolean;
+  showStagedSection: boolean;
+  showUnstagedSection: boolean;
   stagedPrimaryAction: GitSidebarPrimaryAction | null;
   showSimpleChangeAction: boolean;
 };

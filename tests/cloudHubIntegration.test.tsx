@@ -1117,6 +1117,40 @@ describe("Local-only Cloud page", () => {
     expect(onPublishWorkspace).toHaveBeenCalledOnce();
   });
 
+  it("shows the real Cloud publish stage instead of an opaque busy label", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <CloudLocalOnlyWorkspace
+        workspace={{ id: "local-progress", name: "Progress Repo", path: "/tmp/progress-repo" }}
+        accountEmail="owner@example.com"
+        branchName="main"
+        totalCommits={2}
+        localChangeCount={0}
+        isGitRepository
+        hasHeadCommit
+        hasCurrentBranch
+        publishLoading
+        publishProgress={{
+          rootPath: "/tmp/progress-repo",
+          operationId: "11111111-1111-4111-8111-111111111111",
+          stage: "uploading",
+          state: null,
+          updatedAt: "2026-07-17T00:00:00Z",
+        }}
+        onPublishWorkspace={vi.fn()}
+      />,
+    ));
+
+    expect(container.textContent).toContain("Uploading and publishing files…");
+    expect(container.textContent).toContain("ProjectAccessRemoteUploadFinish");
+    expect(container.querySelectorAll(".desktop-cloud-publish-progress li.done")).toHaveLength(3);
+    expect(container.querySelector(".desktop-cloud-publish-progress li.current")?.textContent).toBe("Upload");
+    expect(container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary")?.disabled).toBe(true);
+  });
+
   it("renders a publish failure exactly once on the Initialize page", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);

@@ -1,7 +1,6 @@
 import {
   ChevronDown,
   Clock3,
-  Cloud,
   RefreshCw,
 } from "lucide-react";
 import type { CSSProperties } from "react";
@@ -31,7 +30,6 @@ export function CloudProjectHistorySidebar({
   error,
   warning,
   onSelectCommit,
-  onRefresh,
   onLoadMore,
 }: Pick<
   CloudProjectHistoryProps,
@@ -43,33 +41,14 @@ export function CloudProjectHistorySidebar({
   | "error"
   | "warning"
   | "onSelectCommit"
-  | "onRefresh"
   | "onLoadMore"
 >) {
-  const { formatNumber, t } = useLocalization();
-  const commitRows = rows.filter((row) => row.kind === "commit");
+  const { t } = useLocalization();
   const graphWidth = getHistoryGraphWidth(rows);
   const notice = error ?? warning;
 
   return (
     <SidebarRoot className="desktop-cloud-history-sidebar" aria-label={t("cloud.history.projectHistory")}>
-      <header className="desktop-cloud-history-sidebar-header">
-        <div>
-          <Clock3 size={14} aria-hidden="true" />
-          <span>{t("cloud.route.history.title")}</span>
-          <small>{formatNumber(commitRows.length)}</small>
-        </div>
-        <button
-          type="button"
-          title={t("cloud.history.refresh")}
-          aria-label={t("cloud.history.refresh")}
-          disabled={loading}
-          onClick={() => void onRefresh()}
-        >
-          <RefreshCw size={13} className={loading ? "spin" : undefined} aria-hidden="true" />
-        </button>
-      </header>
-
       {notice && rows.length > 0 && (
         <div className="desktop-cloud-history-sidebar-warning" role="status">
           {notice}
@@ -105,10 +84,8 @@ export function CloudProjectHistorySidebar({
         </ol>
       )}
 
-      <footer className="desktop-cloud-history-sidebar-footer">
-        <Cloud size={13} aria-hidden="true" />
-        <span>{t("cloud.history.cloudRepository")}</span>
-        {hasMore && (
+      {hasMore && (
+        <div className="desktop-cloud-history-sidebar-load-more">
           <button
             type="button"
             disabled={loadingMore}
@@ -119,9 +96,8 @@ export function CloudProjectHistorySidebar({
               : <ChevronDown size={11} aria-hidden="true" />}
             {t("cloud.common.loadMore")}
           </button>
-        )}
-        <small>{t("cloud.scope.readOnly")}</small>
-      </footer>
+        </div>
+      )}
     </SidebarRoot>
   );
 }
@@ -138,7 +114,7 @@ function CloudHistorySidebarRow({
   onSelect: (commitId: string) => void;
 }) {
   const localization = useLocalization();
-  const { t } = localization;
+  const { formatNumber, t } = localization;
   const isCommit = row.kind === "commit";
   const isCurrentHead = row.labels.some((label) => label.current);
   const message = formatCloudGraphRowMessage(row, t);
@@ -146,6 +122,8 @@ function CloudHistorySidebarRow({
   const meta = [author, row.createdAt ? formatRelativeTime(row.createdAt, localization) : null]
     .filter(Boolean)
     .join(" · ");
+  const additions = row.stats?.additions ?? 0;
+  const deletions = row.stats?.deletions ?? 0;
   const contents = (
     <>
       <span
@@ -167,11 +145,13 @@ function CloudHistorySidebarRow({
           } : undefined}
         />
       </span>
-      <span className="desktop-cloud-history-sidebar-row-copy">
-        <strong>
-          <span dir="auto">{message}</span>
+      <span className="desktop-cloud-history-sidebar-row-main">
+        <span className="desktop-cloud-history-sidebar-row-title">
           {isCurrentHead && <span className="desktop-cloud-history-inline-ref head">HEAD</span>}
-          {row.labels.map((label) => (
+          <bdi className="desktop-cloud-history-sidebar-row-message">{message}</bdi>
+          {row.labels.filter((label) => (
+            !(isCurrentHead && formatCloudGraphLabel(label, t) === "HEAD")
+          )).map((label) => (
             <span
               className={`desktop-cloud-history-inline-ref ${label.kind}`}
               key={`${label.kind}:${label.nameCode ?? label.name}`}
@@ -179,11 +159,21 @@ function CloudHistorySidebarRow({
               <bdi>{formatCloudGraphLabel(label, t)}</bdi>
             </span>
           ))}
-        </strong>
-        <span>
-          {isCommit && <code dir="ltr">{shortCommit(row.id)}</code>}
-          <small dir="auto">{meta || t("cloud.history.unknownCommit")}</small>
         </span>
+        {isCommit && (
+          <span
+            className="desktop-cloud-history-sidebar-row-stat"
+            aria-label={t("source-control.diff.changeStats", { additions, deletions })}
+          >
+            <span className="added">+{formatNumber(additions)}</span>
+            <span className="deleted">-{formatNumber(deletions)}</span>
+          </span>
+        )}
+        {!isCommit && (
+          <small className="desktop-cloud-history-sidebar-row-ref-meta" dir="auto">
+            {meta || t("cloud.history.unknownCommit")}
+          </small>
+        )}
       </span>
     </>
   );

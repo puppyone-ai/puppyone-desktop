@@ -56,6 +56,35 @@ describe("settings visual architecture", () => {
     }
   });
 
+  it("offers every loading animation preset from Appearance with localized labels", () => {
+    const view = source("src/features/settings/SettingsView.tsx");
+    const preferences = source("src/preferences.ts");
+    const manifest = JSON.parse(source("locales/manifest.json")) as {
+      locales: Array<{ locale: string }>;
+    };
+
+    expect(view).toContain("PULSE_GRID_PRESET_IDS.map");
+    expect(view).toContain("PULSE_GRID_PRESET_FRAMES[presetId]");
+    expect(view).toContain("onLoadingAnimationPresetChange(presetId)");
+    expect(preferences).toContain('LOADING_ANIMATION_STORAGE_KEY = "puppyone.desktop.loadingAnimation"');
+
+    for (const { locale } of manifest.locales) {
+      const catalog = JSON.parse(source(`locales/renderer/${locale}/settings.json`)) as Record<string, string>;
+      for (const key of [
+        "title",
+        "ariaLabel",
+        "ikun.label",
+        "ikun.description",
+        "ymca.label",
+        "ymca.description",
+        "siu.label",
+        "siu.description",
+      ]) {
+        expect(catalog[`appearance.loadingAnimation.${key}`], `${locale}: ${key}`).toBeTruthy();
+      }
+    }
+  });
+
   it("uses one flat Settings contract and removes legacy card primitives", () => {
     const components = source("src/features/settings/components.tsx");
     const view = source("src/features/settings/SettingsView.tsx");

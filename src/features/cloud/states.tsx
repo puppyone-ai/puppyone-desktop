@@ -8,7 +8,12 @@ import {
 } from "lucide-react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
-import type { CloudPublishErrorCode, CloudPublishState } from "../../types/electron";
+import type {
+  CloudPublishErrorCode,
+  CloudPublishProgress,
+  CloudPublishProgressStage,
+  CloudPublishState,
+} from "../../types/electron";
 import {
   CloudPublishCloudMark,
   CloudPublishFolderMark,
@@ -38,6 +43,7 @@ export function CloudLocalOnlyWorkspace({
   publishLoading,
   publishPending = false,
   publishError = null,
+  publishProgress = null,
   publishState = null,
   publishStateLoading = false,
   organizations = [],
@@ -62,6 +68,7 @@ export function CloudLocalOnlyWorkspace({
   publishLoading: boolean;
   publishPending?: boolean;
   publishError?: { code: CloudPublishErrorCode; retryable: boolean } | null;
+  publishProgress?: CloudPublishProgress | null;
   publishState?: CloudPublishState | null;
   publishStateLoading?: boolean;
   organizations?: readonly { id: string; name: string }[];
@@ -79,6 +86,7 @@ export function CloudLocalOnlyWorkspace({
     || (publishPending && !accountEmail);
   const waitingForSignIn = publishPending && !accountEmail && !publishLoading;
   const publishing = publishLoading;
+  const activeProgressStage = publishProgress?.stage ?? (publishing ? "validating" : null);
   const resolvedReadiness = publishReadiness ?? (
     !isGitRepository
       ? "repository-required"
@@ -101,13 +109,16 @@ export function CloudLocalOnlyWorkspace({
     ? publishState.canResume
     : readyToPush && organizationReady;
   const showPublishSummary = Boolean(
-    publishState
+    activeProgressStage
+    || publishState
     || readinessMessage
     || organizationStatus === "selection-required"
     || organizationError,
   );
   const destinationBranchName = PUPPYONE_CLOUD_DEFAULT_BRANCH;
-  const cloudStatus = publishState
+  const cloudStatus = activeProgressStage
+    ? getCloudPublishProgressLabel(activeProgressStage, t)
+    : publishState
     ? getCloudPublishPhaseLabel(publishState.phase, t)
     : t(waitingForSignIn
       ? "cloud.initialize.waitingForSignIn"
@@ -252,7 +263,9 @@ export function CloudLocalOnlyWorkspace({
 
         {showPublishSummary && (
           <div className={`desktop-cloud-publish-summary ${readinessMessage ? "blocked" : ""}`} role={readinessMessage ? "alert" : undefined}>
-            {publishState ? (
+            {activeProgressStage ? (
+              <CloudPublishProgressIndicator stage={activeProgressStage} t={t} />
+            ) : publishState ? (
               <>
                 <strong>{getCloudPublishPhaseLabel(publishState.phase, t)}</strong>
                 <p>{t("cloud.initialize.resumeDescription", { project: publishState.projectName })}</p>
@@ -278,17 +291,18 @@ export function CloudLocalOnlyWorkspace({
             disabled={publishBusy || !publishEnabled}
             onClick={() => onPublishWorkspace(selectedOrganizationId ?? undefined)}
           >
-            {t(
-              publishing
-                ? "cloud.initialize.initializingAndPushing"
-                : publishState
+            {publishing && <RefreshCw size={13} className="spin" aria-hidden="true" />}
+            <span>
+              {activeProgressStage
+                ? getCloudPublishProgressLabel(activeProgressStage, t)
+                : t(publishState
                   ? "cloud.initialize.resume"
                 : waitingForSignIn
                   ? "cloud.initialize.waitingForSignIn"
                   : !accountEmail
                     ? "cloud.initialize.signInToInitialize"
-                    : "cloud.initialize.initializeAndPush",
-            )}
+                    : "cloud.initialize.initializeAndPush")}
+            </span>
           </button>
           {publishState?.canAbandon && onAbandonPublish && (
             <button
@@ -313,6 +327,73 @@ function getCloudPublishPhaseLabel(
   t: ReturnType<typeof useLocalization>["t"],
 ): string {
   return t(`cloud.initialize.phase.${phase}`);
+}
+
+const CLOUD_PUBLISH_PROGRESS_STEPS = [
+  "project",
+  "access",
+  "remote",
+  "upload",
+  "finish",
+] as const;
+
+function CloudPublishProgressIndicator({
+  stage,
+  t,
+}: {
+  stage: CloudPublishProgressStage;
+  t: ReturnType<typeof useLocalization>["t"];
+}) {
+  const activeIndex = getCloudPublishProgressStepIndex(stage);
+  const completed = stage === "completed";
+  return (
+    <div
+      className="desktop-cloud-publish-progress"
+      data-stage={stage}
+    >
+      <div
+        className="desktop-cloud-publish-progress-current"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <span className="desktop-cloud-publish-progress-pulse" aria-hidden="true" />
+        <strong>{getCloudPublishProgressLabel(stage, t)}</strong>
+      </div>
+      <ol aria-label={t("cloud.initialize.progress.stepsLabel")}>
+        {CLOUD_PUBLISH_PROGRESS_STEPS.map((step, index) => {
+          const isDone = completed || index < activeIndex;
+          const isCurrent = !completed && index === activeIndex;
+          return (
+            <li
+              className={isDone ? "done" : isCurrent ? "current" : undefined}
+              aria-current={isCurrent ? "step" : undefined}
+              key={step}
+            >
+              <span className="desktop-cloud-publish-progress-marker" aria-hidden="true" />
+              <span>{t(`cloud.initialize.progress.step.${step}`)}</span>
+            </li>
+          );
+        })}
+      </ol>
+      <p>{t("cloud.initialize.progress.keepOpen")}</p>
+    </div>
+  );
+}
+
+function getCloudPublishProgressLabel(
+  stage: CloudPublishProgressStage,
+  t: ReturnType<typeof useLocalization>["t"],
+): string {
+  return t(`cloud.initialize.progress.${stage}`);
+}
+
+function getCloudPublishProgressStepIndex(stage: CloudPublishProgressStage): number {
+  if (stage === "validating" || stage === "creating-project") return 0;
+  if (stage === "securing-credential") return 1;
+  if (stage === "configuring-remote" || stage === "checking-remote") return 2;
+  if (stage === "uploading" || stage === "confirming") return 3;
+  return 4;
 }
 
 export function CloudLocalGitStatusError({

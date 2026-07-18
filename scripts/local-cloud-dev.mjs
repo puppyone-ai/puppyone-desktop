@@ -206,7 +206,7 @@ export async function prepareLocalCloudDevServices(
   };
 }
 
-function createServiceDefinitions(config, environment) {
+export function createServiceDefinitions(config, environment) {
   const backendRoot = path.join(config.cloudRoot, "backend");
   const frontendRoot = path.join(config.cloudRoot, "frontend");
   const defaultPython = process.platform === "win32"
@@ -234,6 +234,12 @@ function createServiceDefinitions(config, environment) {
       environment: {
         ...environment,
         FRONTEND_URL: config.webOrigin,
+        // The sibling backend may carry a production PUBLIC_URL in its .env.
+        // A local Desktop-managed API must advertise the exact loopback origin
+        // that serves its Git smart-HTTP endpoints, otherwise the Desktop trust
+        // check correctly rejects the returned canonical remote.
+        PUBLIC_URL: new URL(config.apiHealthUrl).origin,
+        PUPPYONE_PUBLIC_URL_OVERRIDE: new URL(config.apiHealthUrl).origin,
       },
       healthUrl: config.apiHealthUrl,
       kind: "api",

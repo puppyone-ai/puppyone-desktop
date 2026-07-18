@@ -1,7 +1,4 @@
 import { execFile, spawn } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
 
 export const GIT_MAX_BUFFER = 4 * 1024 * 1024;
 export const GIT_STREAM_MAX_BYTES = 8 * 1024 * 1024;
@@ -21,15 +18,69 @@ export const GIT_DEFAULT_TIMEOUT_MS = GIT_READ_TIMEOUT_MS;
 
 export function execGit(rootPath, args, options = {}) {
   const timeout = options.timeout ?? GIT_READ_TIMEOUT_MS;
-  return execFileAsync("git", ["-C", rootPath, "-c", "core.quotePath=false", ...args], {
+  const execOptions = {
     timeout,
     maxBuffer: options.maxBuffer ?? GIT_MAX_BUFFER,
     signal: options.signal,
     env: buildGitEnvironment({ optionalLocks: options.optionalLocks }),
-    input: options.input,
-  }).catch((error) => {
+  };
+  const commandArgs = ["-C", rootPath, "-c", "core.quotePath=false", ...args];
+  const execution = options.input === undefined
+    ? execFilePromise("git", commandArgs, execOptions)
+    : execFilePromiseWithInput("git", commandArgs, execOptions, options.input);
+  return execution.catch((error) => {
     annotateGitError(error, args, timeout);
     throw error;
+  });
+}
+
+function execFilePromise(file, args, options) {
+  return new Promise((resolve, reject) => {
+    execFile(file, args, options, (error, stdout, stderr) => {
+      if (error) {
+        error.stdout ??= stdout;
+        error.stderr ??= stderr;
+        reject(error);
+        return;
+      }
+      resolve({ stdout, stderr });
+    });
+  });
+}
+
+/**
+ * Async child_process.execFile does not support an `input` option. Feed and
+ * close stdin explicitly so commands such as `git credential approve` cannot
+ * wait forever for credentials that Node never delivered.
+ */
+function execFilePromiseWithInput(file, args, options, input) {
+  return new Promise((resolve, reject) => {
+    let stdinError = null;
+    const child = execFile(file, args, options, (error, stdout, stderr) => {
+      if (stdinError) {
+        reject(stdinError);
+        return;
+      }
+      if (error) {
+        error.stdout ??= stdout;
+        error.stderr ??= stderr;
+        reject(error);
+        return;
+      }
+      resolve({ stdout, stderr });
+    });
+
+    if (!child.stdin) {
+      stdinError = new Error("Unable to open stdin for Git command.");
+      child.kill();
+      return;
+    }
+    child.stdin.on("error", (error) => {
+      if (error?.code === "EPIPE" || error?.code === "ECONNRESET") return;
+      stdinError = error;
+      child.kill();
+    });
+    child.stdin.end(input);
   });
 }
 
@@ -39,7 +90,7 @@ export function execGit(rootPath, args, options = {}) {
  */
 export function execGitBuffer(rootPath, args, options = {}) {
   const timeout = options.timeout ?? GIT_READ_TIMEOUT_MS;
-  return execFileAsync("git", ["-C", rootPath, "-c", "core.quotePath=false", ...args], {
+  return execFilePromise("git", ["-C", rootPath, "-c", "core.quotePath=false", ...args], {
     encoding: null,
     timeout,
     maxBuffer: options.maxBuffer ?? GIT_MAX_BUFFER,

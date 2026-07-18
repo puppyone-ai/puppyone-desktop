@@ -971,6 +971,7 @@
   display: inline-flex;
   align-items: center;
   height: 22px;
+  max-width: 100%;
   padding: 0 8px;
   border: 1px solid color-mix(in srgb, var(--po-text-subtle) 22%, transparent);
   border-radius: 999px;
@@ -978,6 +979,9 @@
   color: var(--po-text-subtle);
   font-size: 11px;
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-cloud-publish-summary {
@@ -1020,6 +1024,134 @@
 
 .desktop-cloud-publish-summary.blocked strong {
   color: color-mix(in srgb, var(--po-warning) 82%, var(--po-text));
+}
+
+.desktop-cloud-publish-progress {
+  display: grid;
+  width: min(100%, 620px);
+  min-width: 0;
+  justify-items: center;
+  gap: 12px;
+}
+
+.desktop-cloud-publish-progress-current {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.desktop-cloud-publish-progress-pulse {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--po-accent) 78%, var(--po-text));
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--po-accent) 34%, transparent);
+  animation: desktop-cloud-publish-progress-pulse 1.6s ease-out infinite;
+}
+
+.desktop-cloud-publish-progress[data-stage="completed"] .desktop-cloud-publish-progress-pulse {
+  background: var(--po-success);
+  animation: none;
+}
+
+.desktop-cloud-publish-progress ol {
+  position: relative;
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.desktop-cloud-publish-progress ol::before {
+  position: absolute;
+  z-index: 0;
+  top: 6px;
+  right: 10%;
+  left: 10%;
+  height: 1px;
+  background: color-mix(in srgb, var(--po-text-subtle) 22%, transparent);
+  content: "";
+}
+
+.desktop-cloud-publish-progress li {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 6px;
+  color: color-mix(in srgb, var(--po-text-subtle) 64%, transparent);
+  font-size: 10px;
+  font-weight: 560;
+  line-height: 1.25;
+}
+
+.desktop-cloud-publish-progress li > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-publish-progress-marker {
+  display: block;
+  width: 13px;
+  height: 13px;
+  border: 1px solid color-mix(in srgb, var(--po-text-subtle) 30%, var(--po-panel));
+  border-radius: 50%;
+  background: var(--po-panel);
+  box-shadow: 0 0 0 3px var(--po-panel);
+}
+
+.desktop-cloud-publish-progress li.done,
+.desktop-cloud-publish-progress li.current {
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-publish-progress li.done .desktop-cloud-publish-progress-marker {
+  border-color: color-mix(in srgb, var(--po-success) 78%, var(--po-border));
+  background: var(--po-success);
+}
+
+.desktop-cloud-publish-progress li.current .desktop-cloud-publish-progress-marker {
+  border-color: color-mix(in srgb, var(--po-accent) 82%, var(--po-text));
+  background: var(--po-panel);
+  box-shadow:
+    inset 0 0 0 3px var(--po-panel),
+    inset 0 0 0 7px color-mix(in srgb, var(--po-accent) 82%, var(--po-text)),
+    0 0 0 3px var(--po-panel);
+  animation: desktop-cloud-publish-current-step 1.4s ease-in-out infinite;
+}
+
+.desktop-cloud-publish-progress p {
+  color: color-mix(in srgb, var(--po-text-subtle) 86%, transparent);
+}
+
+@keyframes desktop-cloud-publish-progress-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--po-accent) 34%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+
+@keyframes desktop-cloud-publish-current-step {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 @keyframes desktop-cloud-publish-hero-in {
@@ -1093,6 +1225,21 @@
     opacity 0.16s ease;
 }
 
+.desktop-cloud-publish-actions .desktop-cloud-row-action[aria-busy="true"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: progress;
+}
+
+.desktop-cloud-publish-actions .desktop-cloud-row-action[aria-busy="true"] span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .desktop-cloud-publish-actions .desktop-cloud-row-action:hover:not(:disabled) {
   border-color: var(--po-border-strong);
   background: var(--po-control-hover);
@@ -1125,6 +1272,10 @@
   color: var(--po-text-muted);
   opacity: 0.55;
   box-shadow: none;
+}
+
+.desktop-cloud-publish-actions .desktop-cloud-row-action.desktop-cloud-publish-primary[aria-busy="true"] {
+  opacity: 0.82;
 }
 
 @container cloud-publish (max-width: 720px) {
@@ -1193,6 +1344,10 @@
     justify-self: center;
   }
 
+  .desktop-cloud-publish-progress li > span:last-child {
+    font-size: 9px;
+  }
+
   .desktop-cloud-publish-status-error {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1207,6 +1362,11 @@
   .desktop-cloud-publish-symbol-icon,
   .desktop-cloud-publish-arrow,
   .desktop-cloud-publish-details {
+    animation: none;
+  }
+
+  .desktop-cloud-publish-progress-pulse,
+  .desktop-cloud-publish-progress li.current .desktop-cloud-publish-progress-marker {
     animation: none;
   }
 

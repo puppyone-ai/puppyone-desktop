@@ -2,6 +2,7 @@ import type { Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type {
   CloudPublishErrorCode,
+  CloudPublishProgress,
   CloudPublishState,
   GitStatusSnapshot,
 } from "../../types/electron";
@@ -72,6 +73,7 @@ export type CloudServiceMainViewProps = {
   cloudBackupPending: boolean;
   cloudPublishError: { code: CloudPublishErrorCode; retryable: boolean } | null;
   cloudPublishNotice: "abandoned" | null;
+  cloudPublishProgress?: CloudPublishProgress | null;
   cloudPublishState: CloudPublishState | null;
   cloudPublishStateLoading: boolean;
   onAbandonPuppyoneBackup: () => void;

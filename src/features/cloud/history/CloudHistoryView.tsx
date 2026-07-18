@@ -1,11 +1,9 @@
 import {
   Clock3,
-  ExternalLink,
   RefreshCw,
 } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
 import { PageLoading } from "../../../components/loading";
-import { openCloudApp } from "../../../lib/cloudApi";
 import { CloudCommitDetail } from "./CloudCommitDetail";
 import type { CloudProjectHistoryProps } from "./types";
 
@@ -27,35 +25,10 @@ export function CloudProjectHistoryView({
   );
 
   return (
-    <section className="desktop-cloud-project-history-view">
-      <header className="desktop-cloud-project-history-header">
-        <div className="desktop-cloud-project-history-title">
-          <Clock3 size={15} aria-hidden="true" />
-          <div>
-            <strong>{t("cloud.route.history.title")}</strong>
-            <span dir="auto">{projectName}</span>
-          </div>
-        </div>
-        <div className="desktop-cloud-project-history-actions">
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => void onRefresh()}
-          >
-            <RefreshCw size={13} className={loading ? "spin" : undefined} aria-hidden="true" />
-            <span>{t("cloud.common.refresh")}</span>
-          </button>
-          <button
-            type="button"
-            disabled={!projectId}
-            onClick={() => projectId && openCloudApp(`/projects/${projectId}/changes`)}
-          >
-            <ExternalLink size={13} aria-hidden="true" />
-            <span>{t("cloud.common.openCloud")}</span>
-          </button>
-        </div>
-      </header>
-
+    <section
+      className="desktop-cloud-project-history-view"
+      aria-label={`${t("cloud.route.history.title")} · ${projectName}`}
+    >
       <div className="desktop-cloud-project-history-body">
         {loading && rows.length === 0 ? (
           <PageLoading variant="fill" label={t("cloud.history.loading")} className="desktop-cloud-project-history-loading" />
@@ -77,6 +50,8 @@ export function CloudProjectHistoryView({
             commit={selectedCommit}
             row={selectedRow}
             isHead={isHead}
+            loading={loading}
+            onRefresh={onRefresh}
           />
         ) : (
           <CloudProjectHistoryEmpty

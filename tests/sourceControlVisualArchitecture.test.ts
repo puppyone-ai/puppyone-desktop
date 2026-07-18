@@ -82,6 +82,10 @@ const sidebarResourcesCss = readFileSync(
   new URL("../src/features/source-control/styles/sidebar-resources.css", import.meta.url),
   "utf8",
 );
+const sourceControlOverridesCss = readFileSync(
+  new URL("../src/features/source-control/source-control-overrides.css", import.meta.url),
+  "utf8",
+);
 const gitControllerSource = readFileSync(
   new URL("../src/features/source-control/useDesktopGitController.ts", import.meta.url),
   "utf8",
@@ -127,6 +131,10 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-backup-dismiss",
     ));
+    const errorTitle = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-backup-card.is-error .desktop-git-backup-copy span",
+    ));
 
     expect(card).toContain('grid-template-areas: "copy copy" "dismiss action";');
     expect(card).toContain(
@@ -137,6 +145,11 @@ describe("source-control visual architecture", () => {
     expect(dismiss).toContain("grid-area: dismiss;");
     expect(dismiss).toContain("align-self: center;");
     expect(dismiss).toContain("justify-self: start;");
+    expect(sourceControlSidebarSectionsSource).toContain(
+      'const message = cloudBackupError || t("source-control.backup.reminder");',
+    );
+    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-backup-error");
+    expect(errorTitle).toContain("color: var(--po-danger);");
   });
 
   it("aligns every Git section empty state with its section label", () => {
@@ -150,26 +163,50 @@ describe("source-control visual architecture", () => {
     ));
     const sectionEmpty = compact(readCssBlock(
       sidebarBaseCss,
-      ".desktop-git-section-empty",
+      ".desktop-git-sidebar .po-sidebar-empty.desktop-git-section-empty",
+    ));
+    const sectionEmptyOverride = compact(readCssBlock(
+      sourceControlOverridesCss,
+      ".desktop-git-sidebar .po-sidebar-empty.desktop-git-section-empty",
     ));
     const emptyStateSources = `${sourceControlSidebarSource}\n${sourceControlSidebarSectionsSource}`;
 
-    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(4);
+    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(2);
     expect(emptyStateSources).not.toMatch(/desktop-git-empty-(?:remote|committed|stage|changes)/);
     expect(sourceControlComponentsSource).toContain("<ChevronRight size={14}");
     expect(sidebarBaseCss).toContain("--git-section-leading-slot-size: 14px;");
     expect(sidebarBaseCss).toContain("--git-section-title-gap: 6px;");
+    expect(sidebarBaseCss).toContain("--git-section-body-top-gap: 2px;");
     expect(sectionTitle).toContain("gap: var(--git-section-title-gap);");
     expect(sectionTitleIcon).toContain("width: var(--git-section-leading-slot-size);");
     expect(sectionTitleIcon).toContain("height: var(--git-section-leading-slot-size);");
+    expect(sectionEmpty).toContain("flex: 0 0 auto;");
+    expect(sectionEmpty).toContain("min-height: 26px;");
+    expect(sectionEmpty).toContain("margin-block: var(--git-section-body-top-gap) 0;");
     expect(sectionEmpty).toContain(compact(`
-      padding-inline-start: calc(
-        var(--desktop-sidebar-row-left-gap)
-        + var(--desktop-sidebar-row-content-left)
+      padding-inline: calc(
+        var(--git-sidebar-left-gap)
+        + var(--git-sidebar-content-left)
         + var(--git-section-leading-slot-size)
         + var(--git-section-title-gap)
-      );
+      )
+      calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
     `));
+    expect(sectionEmptyOverride).toContain(compact(`
+      padding-inline: calc(
+        var(--git-sidebar-left-gap)
+        + var(--git-sidebar-content-left)
+        + var(--git-section-leading-slot-size)
+        + var(--git-section-title-gap)
+      )
+      calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
+    `));
+    expect(sidebarResourcesCss).toContain(
+      ".po-sidebar-empty.compact:not(.desktop-git-section-empty)",
+    );
+    expect(sidebarResourcesCss).toContain(
+      ".desktop-git-section-collapse-inner > .po-sidebar-empty.desktop-git-section-empty",
+    );
   });
 
   it("swaps each working-tree status in place without moving destructive actions under the pointer", () => {

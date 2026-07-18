@@ -2,6 +2,7 @@ import type { AiEditRequest, DataNode, DataNodeKind, DataPort, Workspace } from 
 import type {
   CloudPublishAbandonRequest,
   CloudPublishIdentityRequest,
+  CloudPublishProgress,
   CloudPublishResult,
   CloudPublishStartRequest,
   CloudGitConnectAbandonRequest,
@@ -287,6 +288,12 @@ export async function abandonWorkspaceCloudPublish(
   request: CloudPublishAbandonRequest,
 ): Promise<CloudPublishResult> {
   return getDesktopBridge().cloudPublishAbandon(request);
+}
+
+export function subscribeWorkspaceCloudPublishProgress(
+  callback: (progress: CloudPublishProgress) => void,
+): () => void {
+  return getDesktopBridge().onCloudPublishProgress(callback);
 }
 
 export async function connectWorkspaceCloudProject(

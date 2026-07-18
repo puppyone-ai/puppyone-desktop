@@ -19,8 +19,11 @@ describe("Cloud publish coordinator", () => {
   it("creates once, keeps the credential out of the journal, and maps a feature branch to Cloud main", async () => {
     const fixture = await createFixture("feature/design");
     const coordinator = createCoordinator(fixture);
+    const progress = [];
 
-    const result = await coordinator.startOrResume(fixture.request);
+    const result = await coordinator.startOrResume(fixture.request, {
+      onProgress: (event) => progress.push(event),
+    });
 
     expect(result.ok).toBe(true);
     expect(result.state).toMatchObject({ phase: "completed", destinationBranch: "main" });
@@ -43,6 +46,23 @@ describe("Cloud publish coordinator", () => {
     await expect(readFile(path.join(gitDir, "puppyone", "pending-cloud-publish.v1.json"), "utf8"))
       .rejects.toMatchObject({ code: "ENOENT" });
     expect([...fixture.vault.values()].join("\n")).not.toContain("pwg_");
+    expect([...new Set(progress.map(({ stage }) => stage))]).toEqual([
+      "validating",
+      "creating-project",
+      "securing-credential",
+      "configuring-remote",
+      "checking-remote",
+      "uploading",
+      "confirming",
+      "finalizing",
+      "completed",
+    ]);
+    expect(progress.at(-1)).toMatchObject({
+      rootPath: fixture.root,
+      stage: "completed",
+      state: { phase: "completed" },
+    });
+    expect(JSON.stringify(progress)).not.toContain("pwg_");
   });
 
   it("recovers after a crash immediately after remote add without creating another Project", async () => {

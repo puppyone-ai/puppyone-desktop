@@ -7,6 +7,7 @@ import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import type { FilesVisibilitySettings } from "../../../preferences";
 import type {
   CloudPublishErrorCode,
+  CloudPublishProgress,
   CloudPublishState,
   PuppyoneWorkspaceConfig,
   GitStatusSnapshot,
@@ -70,6 +71,7 @@ export type DesktopWorkspaceCloudSurfaceController = {
   backupPending: boolean;
   publishError: { code: CloudPublishErrorCode; retryable: boolean } | null;
   publishNotice: "abandoned" | null;
+  publishProgress: CloudPublishProgress | null;
   publishState: CloudPublishState | null;
   publishStateLoading: boolean;
   cloudApiBaseUrl: string | null;
@@ -288,7 +290,6 @@ export function useWorkspaceSurfaceContent({
         error={cloudHistoryError}
         warning={cloudHistoryWarning}
         onSelectCommit={cloudHistory.selectCommit}
-        onRefresh={cloudHistory.reload}
         onLoadMore={cloudHistory.loadMore}
       />
     ),
@@ -405,6 +406,7 @@ export function useWorkspaceSurfaceContent({
         cloudBackupPending={cloud.backupPending}
         cloudPublishError={cloud.publishError}
         cloudPublishNotice={cloud.publishNotice}
+        cloudPublishProgress={cloud.publishProgress}
         cloudPublishState={cloud.publishState}
         cloudPublishStateLoading={cloud.publishStateLoading}
         onAbandonPuppyoneBackup={cloud.onAbandonPuppyoneBackup}
