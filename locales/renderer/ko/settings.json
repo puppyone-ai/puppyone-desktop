@@ -1,6 +1,8 @@
 {
   "appearance.title": "모양",
   "appearance.detail": "이 기기의 로컬 표시 환경설정입니다.",
+  "appearance.interfaceStyle.title": "Windows XP 스타일",
+  "appearance.interfaceStyle.detail": "클래식한 파란색 그라데이션, 조밀한 컨트롤, 입체적인 테두리를 사용합니다.",
   "language.title": "언어",
   "language.description": "이 기기에서 PuppyOne 메뉴, 컨트롤 및 메시지에 사용할 언어를 선택합니다.",
   "language.selectorLabel": "애플리케이션 언어",

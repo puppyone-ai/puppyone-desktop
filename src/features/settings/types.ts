@@ -1,7 +1,7 @@
 import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import type { DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, LightThemePreset, LoadingAnimationPreset, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
+import type { DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 
 export type SettingsSection = "workspace" | "language" | "appearance" | "external-apps" | "editor" | "experimental" | "git" | "files" | "account" | "cloud";
 
@@ -12,6 +12,7 @@ export type SettingsViewProps = {
   gitStatusLoading: boolean;
   gitStatusError: string | null;
   themeMode: ThemeMode;
+  interfaceStyle: InterfaceStyle;
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
   loadingAnimationPreset: LoadingAnimationPreset;
@@ -39,6 +40,7 @@ export type SettingsViewProps = {
   puppyoneConfigError: string | null;
   updateState: DesktopUpdateState;
   onThemeModeChange: (mode: ThemeMode) => void;
+  onInterfaceStyleChange: (style: InterfaceStyle) => void;
   onLightThemePresetChange: (preset: LightThemePreset) => void;
   onDarkThemePresetChange: (preset: DarkThemePreset) => void;
   onLoadingAnimationPresetChange: (preset: LoadingAnimationPreset) => void;

@@ -6,6 +6,7 @@ import type {
   ExperimentalSettings,
   ExternalAppsSettings,
   FilesVisibilitySettings,
+  InterfaceStyle,
   LightThemePreset,
   LoadingAnimationPreset,
   RightSidebarToolsSettings,
@@ -28,6 +29,7 @@ import type { SettingsSection } from "./types";
 
 export type SettingsPreferencesPort = {
   themeMode: ThemeMode;
+  interfaceStyle: InterfaceStyle;
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
   loadingAnimationPreset: LoadingAnimationPreset;
@@ -46,6 +48,7 @@ export type SettingsPreferencesPort = {
   titlebarActionsSettings: TitlebarActionsSettings;
   aiEditAssistEnabled: boolean;
   setThemeMode: (value: ThemeMode) => void;
+  setInterfaceStyle: (value: InterfaceStyle) => void;
   setLightThemePreset: (value: LightThemePreset) => void;
   setDarkThemePreset: (value: DarkThemePreset) => void;
   setLoadingAnimationPreset: (value: LoadingAnimationPreset) => void;
@@ -119,6 +122,7 @@ export function createSettingsWorkspaceSurface({
         gitStatusLoading={git.loading}
         gitStatusError={git.error}
         themeMode={preferences.themeMode}
+        interfaceStyle={preferences.interfaceStyle}
         lightThemePreset={preferences.lightThemePreset}
         darkThemePreset={preferences.darkThemePreset}
         loadingAnimationPreset={preferences.loadingAnimationPreset}
@@ -146,6 +150,7 @@ export function createSettingsWorkspaceSurface({
         puppyoneConfigError={workspaceConfig.error}
         updateState={updates.state}
         onThemeModeChange={preferences.setThemeMode}
+        onInterfaceStyleChange={preferences.setInterfaceStyle}
         onLightThemePresetChange={preferences.setLightThemePreset}
         onDarkThemePresetChange={preferences.setDarkThemePreset}
         onLoadingAnimationPresetChange={preferences.setLoadingAnimationPreset}

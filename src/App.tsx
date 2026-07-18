@@ -180,6 +180,7 @@ export function App() {
     externalAppsSettings,
     fileIconTheme,
     filesVisibilitySettings,
+    interfaceStyle,
     resolvedTheme,
     rightSidebarOpen,
     rightSidebarToolsSettings,
@@ -1191,6 +1192,7 @@ export function App() {
       className={`app-shell cloud-runtime ${resolvedTheme === "dark" ? "dark" : ""}`}
       data-minimal-mode={minimalMode ? "true" : undefined}
       data-theme-mode={themeMode}
+      data-interface-style={interfaceStyle}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
       data-text-size={textSize}

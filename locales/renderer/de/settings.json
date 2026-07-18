@@ -1,6 +1,8 @@
 {
   "appearance.title": "Darstellung",
   "appearance.detail": "Lokale Anzeigeeinstellungen für dieses Gerät.",
+  "appearance.interfaceStyle.title": "Windows-XP-Stil",
+  "appearance.interfaceStyle.detail": "Verwendet klassische blaue Verläufe, kompakte Steuerelemente und abgeschrägte Rahmen.",
   "language.title": "Sprache",
   "language.description": "Wähle die Sprache für Menüs, Steuerelemente und Meldungen von PuppyOne auf diesem Gerät.",
   "language.selectorLabel": "Anwendungssprache",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
@@ -9,6 +9,7 @@ import {
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
   GIT_DISPLAY_MODE_STORAGE_KEY,
+  INTERFACE_STYLE_STORAGE_KEY,
   DARK_THEME_PRESET_STORAGE_KEY,
   LIGHT_THEME_PRESET_STORAGE_KEY,
   LOADING_ANIMATION_CHANGE_EVENT,
@@ -31,6 +32,7 @@ import {
   type ExperimentalSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
+  type InterfaceStyle,
   type LoadingAnimationPreset,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
@@ -56,6 +58,7 @@ import {
   readInitialFileIconTheme,
   readInitialFilesVisibilitySettings,
   readInitialGitDisplayMode,
+  readInitialInterfaceStyle,
   readInitialRightSidebarToolsSettings,
   readInitialRightSidebarWidth,
   readInitialRightSidebarSurface,
@@ -77,6 +80,7 @@ import {
 
 export function useDesktopPreferences() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readInitialThemeMode());
+  const [interfaceStyle, setInterfaceStyle] = useState<InterfaceStyle>(() => readInitialInterfaceStyle());
   const [lightThemePreset, setLightThemePreset] = useState(() => readInitialLightThemePreset());
   const [darkThemePreset, setDarkThemePreset] = useState(() => readInitialDarkThemePreset());
   const [textSize, setTextSize] = useState<TextSize>(() => readInitialTextSize());
@@ -113,6 +117,11 @@ export function useDesktopPreferences() {
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
   }, [themeMode]);
+
+  useLayoutEffect(() => {
+    window.localStorage.setItem(INTERFACE_STYLE_STORAGE_KEY, interfaceStyle);
+    document.documentElement.dataset.interfaceStyle = interfaceStyle;
+  }, [interfaceStyle]);
 
   useEffect(() => {
     window.localStorage.setItem(LIGHT_THEME_PRESET_STORAGE_KEY, lightThemePreset);
@@ -258,6 +267,7 @@ export function useDesktopPreferences() {
     fileIconTheme,
     filesVisibilitySettings,
     gitDisplayMode,
+    interfaceStyle,
     resolvedTheme,
     rightSidebarOpen,
     rightSidebarToolsSettings,
@@ -289,6 +299,7 @@ export function useDesktopPreferences() {
     setFileIconTheme,
     setFilesVisibilitySettings,
     setGitDisplayMode,
+    setInterfaceStyle,
     setRightSidebarOpen,
     setRightSidebarToolsSettings,
     setRightSidebarWidth,

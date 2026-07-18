@@ -11,6 +11,7 @@ import {
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
   GIT_DISPLAY_MODE_STORAGE_KEY,
+  INTERFACE_STYLE_STORAGE_KEY,
   DARK_THEME_PRESET_STORAGE_KEY,
   LEGACY_THEME_PRESET_STORAGE_KEY,
   LIGHT_THEME_PRESET_STORAGE_KEY,
@@ -31,6 +32,7 @@ import {
   parseExternalAppsSettings,
   parseFilesVisibilitySettings,
   parseGitDisplayMode,
+  parseInterfaceStyle,
   parseLightThemePreset,
   parseLoadingAnimationPreset,
   parsePointerCursors,
@@ -48,6 +50,7 @@ import {
   type ExternalAppsSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
+  type InterfaceStyle,
   type LightThemePreset,
   type LoadingAnimationPreset,
   type RightSidebarToolsSettings,
@@ -77,6 +80,11 @@ export const MAX_RIGHT_SIDEBAR_WIDTH = 760;
 export function readInitialThemeMode(): ThemeMode {
   if (typeof window === "undefined") return DEFAULT_THEME_MODE;
   return parseThemeMode(window.localStorage.getItem(THEME_STORAGE_KEY));
+}
+
+export function readInitialInterfaceStyle(): InterfaceStyle {
+  if (typeof window === "undefined") return parseInterfaceStyle(null);
+  return parseInterfaceStyle(window.localStorage.getItem(INTERFACE_STYLE_STORAGE_KEY));
 }
 
 export function readInitialLightThemePreset(): LightThemePreset {

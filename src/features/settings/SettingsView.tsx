@@ -17,6 +17,7 @@ import { AccountSettingsView } from "./main/AccountSettingsView";
 import { EditorSettingsView, ExperimentalSettingsView } from "./main/EditorSettingsViews";
 import { DefaultAppsSettingsView, FilesSettingsView } from "./main/FileSettingsViews";
 import { GeneralSettingsView } from "./main/GeneralSettingsView";
+import { InterfaceStyleSetting } from "./main/InterfaceStyleSetting";
 import { PulseGrid } from "../../components/loading";
 import { CloudHostingSettingsView, GitSettingsView } from "./main/RepositorySettingsViews";
 import { ThemePreview } from "./main/ThemePreview";
@@ -29,6 +30,7 @@ export function SettingsView({
   gitStatusLoading,
   gitStatusError,
   themeMode,
+  interfaceStyle,
   lightThemePreset,
   darkThemePreset,
   loadingAnimationPreset,
@@ -56,6 +58,7 @@ export function SettingsView({
   puppyoneConfigError,
   updateState,
   onThemeModeChange,
+  onInterfaceStyleChange,
   onLightThemePresetChange,
   onDarkThemePresetChange,
   onLoadingAnimationPresetChange,
@@ -197,6 +200,7 @@ export function SettingsView({
               detail={t("settings.appearance.detail")}
             />
             <div className="desktop-settings-list">
+              <InterfaceStyleSetting value={interfaceStyle} onChange={onInterfaceStyleChange} />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row desktop-theme-mode-row">
                 <span>{t("settings.appearance.theme.title")}</span>
                 <div className="desktop-theme-choice-list" aria-label={t("settings.appearance.theme.ariaLabel")}>
