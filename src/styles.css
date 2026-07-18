@@ -28,3 +28,4 @@
 @import "./ai-edits/ai-edits.css";
 @import "./features/changes/changes.css";
 @import "./styles/utility-screens.css";
+@import "./features/source-control/source-control-overrides.css";

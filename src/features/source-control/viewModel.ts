@@ -258,7 +258,9 @@ export function buildSourceControlSidebarModel({
     committedCount,
     committedResources,
     committedPrimaryAction,
-    showCommittedSection: professionalMode || committedCount > 0 || Boolean(committedPrimaryAction),
+    showCommittedSection: committedCount > 0 || Boolean(committedPrimaryAction),
+    showStagedSection: professionalMode && stagedResources.length > 0,
+    showUnstagedSection: localChangeResources.length > 0,
     stagedPrimaryAction,
     showSimpleChangeAction: !professionalMode && localChangeResources.length > 0,
   };

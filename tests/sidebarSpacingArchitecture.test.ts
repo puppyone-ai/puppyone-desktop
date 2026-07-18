@@ -134,11 +134,6 @@ describe("sidebar spacing architecture", () => {
       cloudSidebarCss,
       ".desktop-cloud-sidebar-list",
     ));
-    const cloudHistoryHeader = compact(readCssBlock(
-      cloudHistorySidebarCss,
-      ".desktop-cloud-history-sidebar-header",
-    ));
-
     expect(semanticThemeScope).toContain(
       "--po-shell-divider: color-mix(in srgb, var(--po-text) 10%, transparent);",
     );
@@ -188,9 +183,8 @@ describe("sidebar spacing architecture", () => {
     expect(cloudSidebarSource).toContain("<SidebarGroup");
     expect(settingsCss).not.toContain("desktop-settings-sidebar-group");
     expect(cloudSidebarCss).not.toContain("desktop-cloud-sidebar-separator");
-    expect(cloudHistoryHeader).toContain(
-      "border-bottom: 1px solid var(--po-sidebar-divider, var(--po-divider));",
-    );
+    expect(cloudHistorySidebarCss).not.toContain(".desktop-cloud-history-sidebar-header");
+    expect(cloudHistorySidebarCss).not.toContain(".desktop-cloud-history-sidebar-footer");
   });
 
   it("keeps top and bottom navigation on one scroll-aware edge contract", () => {

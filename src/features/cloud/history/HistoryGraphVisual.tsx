@@ -5,10 +5,10 @@ import type {
   CloudBranchGraphRow,
 } from "../graph/model";
 
-export const HISTORY_GRAPH_ROW_HEIGHT = 42;
-const HISTORY_GRAPH_LANE_WIDTH = 14;
-const HISTORY_GRAPH_LEFT_PAD = 9;
-const HISTORY_GRAPH_RIGHT_PAD = 8;
+export const HISTORY_GRAPH_ROW_HEIGHT = 32;
+const HISTORY_GRAPH_LANE_WIDTH = 12;
+const HISTORY_GRAPH_LEFT_PAD = 11;
+const HISTORY_GRAPH_RIGHT_PAD = 3;
 
 export function getHistoryGraphWidth(rows: CloudBranchGraphRow[]): number {
   const laneCount = Math.max(
@@ -89,13 +89,16 @@ export function HistoryGraphVisual({
           className={`desktop-cloud-history-graph-node ${node.current ? "current" : ""}`}
           transform={`translate(${getHistoryGraphLaneX(node.lane)} ${middleY})`}
         >
-          <circle className="halo" r={node.current ? 7 : 6} />
-          <circle
+          <rect className="halo" x="-5.5" y="-5.5" width="11" height="11" rx="3" />
+          <rect
             className="node"
-            r={node.current ? 4.8 : 4.3}
-            style={{ fill: node.current ? node.color : "var(--po-panel)", stroke: node.color } as CSSProperties}
+            x={node.current ? -4 : -3.5}
+            y={node.current ? -4 : -3.5}
+            width={node.current ? 8 : 7}
+            height={node.current ? 8 : 7}
+            rx="2"
+            style={{ fill: node.current ? node.color : "var(--cloud-history-node-bg, var(--po-sidebar))", stroke: node.color } as CSSProperties}
           />
-          {node.current && <circle className="core" r="2" />}
         </g>
       )}
     </svg>

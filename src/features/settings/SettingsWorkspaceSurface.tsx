@@ -7,6 +7,7 @@ import type {
   ExternalAppsSettings,
   FilesVisibilitySettings,
   LightThemePreset,
+  LoadingAnimationPreset,
   RightSidebarToolsSettings,
   SidebarNavigationLayout,
   SidebarNavigationVisibilitySettings,
@@ -29,6 +30,7 @@ export type SettingsPreferencesPort = {
   themeMode: ThemeMode;
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
+  loadingAnimationPreset: LoadingAnimationPreset;
   textSize: TextSize;
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
@@ -46,6 +48,7 @@ export type SettingsPreferencesPort = {
   setThemeMode: (value: ThemeMode) => void;
   setLightThemePreset: (value: LightThemePreset) => void;
   setDarkThemePreset: (value: DarkThemePreset) => void;
+  setLoadingAnimationPreset: (value: LoadingAnimationPreset) => void;
   setTextSize: (value: TextSize) => void;
   setTypographyPreferences: (value: TypographyPreferences) => void;
   setPointerCursors: (value: boolean) => void;
@@ -118,6 +121,7 @@ export function createSettingsWorkspaceSurface({
         themeMode={preferences.themeMode}
         lightThemePreset={preferences.lightThemePreset}
         darkThemePreset={preferences.darkThemePreset}
+        loadingAnimationPreset={preferences.loadingAnimationPreset}
         textSize={preferences.textSize}
         typographyPreferences={preferences.typographyPreferences}
         pointerCursors={preferences.pointerCursors}
@@ -144,6 +148,7 @@ export function createSettingsWorkspaceSurface({
         onThemeModeChange={preferences.setThemeMode}
         onLightThemePresetChange={preferences.setLightThemePreset}
         onDarkThemePresetChange={preferences.setDarkThemePreset}
+        onLoadingAnimationPresetChange={preferences.setLoadingAnimationPreset}
         onTextSizeChange={preferences.setTextSize}
         onTypographyPreferencesChange={preferences.setTypographyPreferences}
         onPointerCursorsChange={preferences.setPointerCursors}

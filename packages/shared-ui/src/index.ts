@@ -258,4 +258,30 @@ export { StatusBadge } from "./primitives/StatusBadge";
 export type { StatusBadgeProps } from "./primitives/StatusBadge";
 export { DotsLoader, InlineLoading, PulseGridLoader } from "./primitives/LoadingIndicator";
 export type { LoaderSize, LoaderTone } from "./primitives/LoadingIndicator";
+export {
+  DEFAULT_PULSE_GRID_FRAME_DURATION_MS,
+  DEFAULT_PULSE_GRID_PRESET_ID,
+  PULSE_GRID_DEFAULT_FRAMES,
+  PULSE_GRID_IKUN_FRAMES,
+  PULSE_GRID_ORBIT_FRAMES,
+  PULSE_GRID_POINTS,
+  PULSE_GRID_PRESET_FRAMES,
+  PULSE_GRID_PRESET_IDS,
+  PULSE_GRID_SIU_FRAMES,
+  PULSE_GRID_YMCA_FRAMES,
+  getPulseGridPointAppearance,
+  pulseGridFrame,
+  usePulseGridPlayback,
+} from "./primitives/pulseGridSequence";
+export type {
+  PulseGridFrame,
+  PulseGridFrameEntry,
+  PulseGridFrames,
+  PulseGridPoint,
+  PulseGridPointAppearance,
+  PulseGridPointState,
+  PulseGridPresetId,
+  PulseGridSpriteCell,
+  PulseGridSpriteRow,
+} from "./primitives/pulseGridSequence";
 export * from "./sidebar";

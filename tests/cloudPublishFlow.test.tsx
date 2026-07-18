@@ -18,6 +18,7 @@ const localFiles = vi.hoisted(() => ({
   getWorkspaceCloudPublishState: vi.fn(),
   getWorkspaceGitStatus: vi.fn(),
   startOrResumeWorkspaceCloudPublish: vi.fn(),
+  subscribeWorkspaceCloudPublishProgress: vi.fn(() => () => {}),
 }));
 
 const cloudSession = vi.hoisted(() => ({
@@ -155,6 +156,7 @@ function PublishHarness({
         data-error={publish.cloudPublishError?.code ?? ""}
         data-retryable={String(publish.cloudPublishError?.retryable ?? false)}
         data-phase={publish.cloudPublishState?.phase ?? ""}
+        data-progress={publish.cloudPublishProgress?.stage ?? ""}
         data-project={publish.cloudPublishState?.projectId ?? ""}
         data-notice={publish.cloudPublishNotice ?? ""}
       />
@@ -172,6 +174,7 @@ describe("durable PuppyOne Cloud publish renderer flow", () => {
     localFiles.getWorkspaceCloudPublishState.mockResolvedValue(okResult(null));
     localFiles.getWorkspaceGitStatus.mockResolvedValue(initialStatus);
     localFiles.startOrResumeWorkspaceCloudPublish.mockResolvedValue(okResult(completedState, publishedStatus));
+    localFiles.subscribeWorkspaceCloudPublishProgress.mockImplementation(() => () => {});
     localFiles.abandonWorkspaceCloudPublish.mockResolvedValue(okResult(null, initialStatus));
     actions.applyGitStatus.mockReturnValue(true);
     actions.captureGitRepositoryContext.mockReturnValue(repositoryContext);
@@ -237,6 +240,38 @@ describe("durable PuppyOne Cloud publish renderer flow", () => {
     expect(actions.setActiveView).toHaveBeenCalledWith("cloud");
     expect(readOutput().dataset.phase).toBe("");
     expect(readOutput().dataset.error).toBe("");
+  });
+
+  it("applies main-process publish progress while the durable operation is running", async () => {
+    let finishPublish!: (result: CloudPublishResult) => void;
+    localFiles.startOrResumeWorkspaceCloudPublish.mockReturnValue(new Promise((resolve) => {
+      finishPublish = resolve;
+    }));
+    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
+    await render(<PublishHarness activeSession={session} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
+    await flushPromises();
+
+    await click("start");
+    expect(readOutput().dataset.progress).toBe("validating");
+    const progressListener = localFiles.subscribeWorkspaceCloudPublishProgress.mock.calls.at(-1)?.[0];
+    expect(progressListener).toBeTypeOf("function");
+    await act(async () => {
+      progressListener?.({
+        rootPath: repositoryContext.rootPath,
+        operationId: interruptedState.operationId,
+        stage: "uploading",
+        state: interruptedState,
+        updatedAt: "2026-07-17T00:00:00.000Z",
+      });
+      await Promise.resolve();
+    });
+
+    expect(readOutput().dataset.progress).toBe("uploading");
+    expect(readOutput().dataset.phase).toBe("remote-configured");
+
+    finishPublish(okResult(completedState, publishedStatus));
+    await flushPromises();
+    expect(readOutput().dataset.progress).toBe("");
   });
 
   it("restores and resumes the coordinator journal without deriving a new identity", async () => {

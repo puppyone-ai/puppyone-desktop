@@ -16,7 +16,7 @@ export function registerCloudPublishIpcHandlers({
   const withAuthorizedRoot = (operation) => async (event, request) => {
     try {
       const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-      return await operation({ ...request, rootPath });
+      return await operation({ ...request, rootPath }, event);
     } catch (error) {
       return {
         ok: false,
@@ -48,8 +48,13 @@ export function registerCloudPublishIpcHandlers({
   ipcMain.handle("cloud-publish:get-state", withAuthorizedRoot((request) => (
     cloudPublishCoordinator.getState(request)
   )));
-  ipcMain.handle("cloud-publish:start-or-resume", withAuthorizedRoot((request) => (
-    cloudPublishCoordinator.startOrResume(request)
+  ipcMain.handle("cloud-publish:start-or-resume", withAuthorizedRoot((request, event) => (
+    cloudPublishCoordinator.startOrResume(request, {
+      onProgress: (progress) => {
+        if (event.sender.isDestroyed?.()) return;
+        event.sender.send("cloud-publish:progress", progress);
+      },
+    })
   )));
   ipcMain.handle("cloud-publish:abandon", withAuthorizedRoot((request) => (
     cloudPublishCoordinator.abandon(request)

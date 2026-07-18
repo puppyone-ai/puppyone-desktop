@@ -66,6 +66,12 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   cloudPublishGetState: (request) => ipcRenderer.invoke("cloud-publish:get-state", request),
   cloudPublishStartOrResume: (request) => ipcRenderer.invoke("cloud-publish:start-or-resume", request),
   cloudPublishAbandon: (request) => ipcRenderer.invoke("cloud-publish:abandon", request),
+  onCloudPublishProgress: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, progress) => callback(progress);
+    ipcRenderer.on("cloud-publish:progress", listener);
+    return () => ipcRenderer.removeListener("cloud-publish:progress", listener);
+  },
   cloudGitConnectProject: (request) => ipcRenderer.invoke("cloud-git:connect-project", request),
   cloudGitAbandonConnect: (request) => ipcRenderer.invoke("cloud-git:abandon-connect", request),
   listCloudAccessPointDirectory: (request) => ipcRenderer.invoke("cloud:access-point-list-directory", request),

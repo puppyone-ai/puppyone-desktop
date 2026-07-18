@@ -12,9 +12,21 @@ import {
   createPublishError,
   isSimulatedCrash,
 } from "./cloud-publish-contract.mjs";
+import {
+  CLOUD_INITIAL_PUSH_TIMEOUT_MS,
+  CLOUD_PUSH_RECONCILE_DELAYS_MS,
+  isUncertainPushFailure,
+  pushFailureMessage,
+  reconcileExpectedRemoteHead,
+  remoteConfigFailureMessage,
+  reportCloudPublishProgress,
+  waitForCloudPublishReconciliation,
+} from "./cloud-publish-git-reconciliation.mjs";
 
 const LFS_POINTER_PREAMBLE = "version https://git-lfs.github.com/spec/v1";
 const LFS_POINTER_MAX_BYTES = 512;
+
+export { CLOUD_INITIAL_PUSH_TIMEOUT_MS, CLOUD_PUSH_RECONCILE_DELAYS_MS };
 
 export function createCloudPublishGitService({
   execGitCommand = execGit,
@@ -22,6 +34,7 @@ export function createCloudPublishGitService({
   getGitStatus = getWorkspaceGitStatus,
   gitCredentialManager,
   injectFault = async () => undefined,
+  wait = waitForCloudPublishReconciliation,
 } = {}) {
   if (
     !gitCredentialManager?.prepare
@@ -87,6 +100,7 @@ export function createCloudPublishGitService({
     }
 
     let approval = null;
+    let failureStage = "storing the Git credential";
     try {
       approval = await gitCredentialManager.approve(
         rootPath,
@@ -98,22 +112,27 @@ export function createCloudPublishGitService({
       );
       let created = false;
       if (remote.kind === "missing") {
+        failureStage = "creating the local Cloud remote";
         await execGitCommand(rootPath, ["remote", "add", CLOUD_REMOTE_NAME, record.canonical_remote_url], {
           timeout: GIT_MUTATION_TIMEOUT_MS,
         });
         created = true;
         await injectFault("after-remote-add", record);
       }
+      failureStage = "re-checking the repository identity";
       if (verifyExpectedIdentity) await assertIdentity(rootPath, record);
+      failureStage = "verifying the local Cloud remote";
       await assertExactRemote(rootPath, record.canonical_remote_url);
       await injectFault("after-canonical-remote-verified", record);
       // Use the journaled URL literal for every network side effect. Another
       // Git process can mutate the remote name after our verification.
+      failureStage = "verifying Cloud Git access";
       await execGitCommand(rootPath, secureArgs(record, [
         "ls-remote", "--refs", record.canonical_remote_url,
       ]), {
         timeout: GIT_NETWORK_TIMEOUT_MS,
       });
+      failureStage = "verifying the managed credential configuration";
       await assertManagedCredentialConfig(rootPath, record);
       return created;
     } catch (error) {
@@ -122,7 +141,7 @@ export function createCloudPublishGitService({
       if (error?.publishCode) throw error;
       throw createPublishError(
         "REMOTE_CONFIG_FAILED",
-        "Unable to configure the canonical PuppyOne Cloud Git remote.",
+        remoteConfigFailureMessage(failureStage, error),
         true,
         error,
       );
@@ -141,7 +160,7 @@ export function createCloudPublishGitService({
     );
   }
 
-  async function pushExpectedCommit(rootPath, record, secret) {
+  async function pushExpectedCommit(rootPath, record, secret, onProgress = null) {
     assertCredentialRecordComplete(record);
     await assertIdentity(rootPath, record);
     await assertExactRemote(rootPath, record.canonical_remote_url);
@@ -155,6 +174,7 @@ export function createCloudPublishGitService({
         record.operation_id,
         record.credential_config_snapshot,
       );
+      reportCloudPublishProgress(onProgress, "checking-remote");
       let remoteHead = await readRemoteMain(rootPath, record, execGitCommand, secureArgs);
       if (remoteHead && remoteHead !== record.expected_head_commit_id) {
         throw createPublishError(
@@ -166,15 +186,28 @@ export function createCloudPublishGitService({
       if (!remoteHead) {
         try {
           await injectFault("after-push-remote-verified", record);
+          reportCloudPublishProgress(onProgress, "uploading");
           await execGitCommand(rootPath, secureArgs(record, [
             "push",
             record.canonical_remote_url,
             `${record.expected_head_commit_id}:refs/heads/${CLOUD_DESTINATION_BRANCH}`,
-          ]), { timeout: GIT_NETWORK_TIMEOUT_MS });
+          ]), { timeout: CLOUD_INITIAL_PUSH_TIMEOUT_MS });
           await injectFault("after-push-side-effect", record);
+          reportCloudPublishProgress(onProgress, "confirming");
         } catch (error) {
           if (isSimulatedCrash(error)) throw error;
           remoteHead = await readRemoteMain(rootPath, record, execGitCommand, secureArgs).catch(() => null);
+          if (
+            remoteHead !== record.expected_head_commit_id
+            && isUncertainPushFailure(error)
+          ) {
+            reportCloudPublishProgress(onProgress, "confirming");
+            remoteHead = await reconcileExpectedRemoteHead({
+              expectedHeadCommitId: record.expected_head_commit_id,
+              readRemoteHead: () => readRemoteMain(rootPath, record, execGitCommand, secureArgs),
+              wait,
+            });
+          }
           if (remoteHead !== record.expected_head_commit_id) throw error;
         }
       }
@@ -188,12 +221,18 @@ export function createCloudPublishGitService({
       }
       await injectFault("after-push-reconciled", record);
       await assertManagedCredentialConfig(rootPath, record);
+      reportCloudPublishProgress(onProgress, "finalizing");
       return finalizeUpstreamAndStatus(rootPath, record);
     } catch (error) {
       if (isSimulatedCrash(error)) throw error;
       await approval?.rollback?.().catch(() => undefined);
       if (error?.publishCode) throw error;
-      throw createPublishError("PUSH_FAILED", "Unable to push the initial commit to PuppyOne Cloud.", true, error);
+      throw createPublishError(
+        "PUSH_FAILED",
+        pushFailureMessage(error),
+        true,
+        error,
+      );
     }
   }
 

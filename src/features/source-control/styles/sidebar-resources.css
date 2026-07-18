@@ -42,12 +42,12 @@
 .desktop-git-resizable-section > .desktop-working-tree-list,
 .desktop-git-resizable-section .desktop-git-remote-preview,
 .desktop-git-resizable-section > .desktop-git-committed-summary,
-.desktop-git-resizable-section > .po-sidebar-empty.compact,
+.desktop-git-resizable-section > .po-sidebar-empty.compact:not(.desktop-git-section-empty),
 .desktop-git-section-collapse-inner > .desktop-working-tree-list,
 .desktop-git-section-collapse-inner > .desktop-git-remote-preview,
 .desktop-git-section-collapse-inner > .desktop-git-committed-summary,
 .desktop-git-section-collapse-inner > .desktop-git-preview-summary,
-.desktop-git-section-collapse-inner > .po-sidebar-empty.compact {
+.desktop-git-section-collapse-inner > .po-sidebar-empty.compact:not(.desktop-git-section-empty) {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
@@ -59,7 +59,7 @@
   max-height: none;
 }
 
-.desktop-git-resizable-section > .po-sidebar-empty.compact {
+.desktop-git-resizable-section > .po-sidebar-empty.compact:not(.desktop-git-section-empty) {
   display: block;
 }
 
@@ -67,14 +67,14 @@
   .desktop-working-tree-list,
   .desktop-git-remote-preview,
   .desktop-git-committed-summary,
-  .po-sidebar-empty.compact
+  .po-sidebar-empty.compact:not(.desktop-git-section-empty)
 )::-webkit-scrollbar,
 .desktop-git-section-collapse-inner :is(
   .desktop-working-tree-list,
   .desktop-git-remote-preview,
   .desktop-git-committed-summary,
   .desktop-git-preview-summary,
-  .po-sidebar-empty.compact
+  .po-sidebar-empty.compact:not(.desktop-git-section-empty)
 )::-webkit-scrollbar {
   width: var(--git-sidebar-scrollbar-width);
   height: var(--git-sidebar-scrollbar-width);
@@ -84,14 +84,14 @@
   .desktop-working-tree-list,
   .desktop-git-remote-preview,
   .desktop-git-committed-summary,
-  .po-sidebar-empty.compact
+  .po-sidebar-empty.compact:not(.desktop-git-section-empty)
 )::-webkit-scrollbar-track,
 .desktop-git-section-collapse-inner :is(
   .desktop-working-tree-list,
   .desktop-git-remote-preview,
   .desktop-git-committed-summary,
   .desktop-git-preview-summary,
-  .po-sidebar-empty.compact
+  .po-sidebar-empty.compact:not(.desktop-git-section-empty)
 )::-webkit-scrollbar-track {
   background: transparent;
 }
@@ -100,14 +100,14 @@
   .desktop-working-tree-list,
   .desktop-git-remote-preview,
   .desktop-git-committed-summary,
-  .po-sidebar-empty.compact
+  .po-sidebar-empty.compact:not(.desktop-git-section-empty)
 )::-webkit-scrollbar-thumb,
 .desktop-git-section-collapse-inner :is(
   .desktop-working-tree-list,
   .desktop-git-remote-preview,
   .desktop-git-committed-summary,
   .desktop-git-preview-summary,
-  .po-sidebar-empty.compact
+  .po-sidebar-empty.compact:not(.desktop-git-section-empty)
 )::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: var(--po-scrollbar-thumb);
@@ -260,6 +260,10 @@ body.desktop-git-sidebar-resizing {
   line-height: 1.4;
 }
 
+.desktop-git-backup-card.is-error .desktop-git-backup-copy span {
+  color: var(--po-danger);
+}
+
 .desktop-git-backup-action {
   grid-area: action;
   display: inline-flex;
@@ -312,14 +316,6 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-git-backup-dismiss:disabled {
   opacity: 0.46;
-}
-
-.desktop-git-backup-error {
-  grid-column: 1 / -1;
-  color: var(--po-danger);
-  font-size: 10.5px;
-  font-weight: 560;
-  line-height: 1.35;
 }
 
 .desktop-git-remote-prompt {
@@ -799,7 +795,7 @@ body.desktop-git-sidebar-resizing {
   margin-top: 3px;
 }
 
-.desktop-git-section-row + .po-sidebar-empty.compact {
+.desktop-git-section-row + .po-sidebar-empty.compact:not(.desktop-git-section-empty) {
   margin-top: 4px;
 }
 
@@ -990,4 +986,25 @@ body.desktop-git-sidebar-resizing {
 .desktop-working-tree-revert-action.danger:focus-visible {
   background: color-mix(in srgb, var(--po-danger) 12%, transparent);
   color: var(--po-danger);
+}
+
+/* Keep section Empty under the section title label (after the chevron), not
+   flush to the sidebar edge. Loaded last so it wins the padding-inline fight. */
+.desktop-git-sidebar .desktop-git-section-collapse-inner > .po-sidebar-empty.desktop-git-section-empty,
+.desktop-git-sidebar .desktop-git-resizable-section > .po-sidebar-empty.desktop-git-section-empty {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 26px;
+  margin-block: var(--git-section-body-top-gap) 0;
+  padding-block: 0;
+  padding-inline: calc(
+    var(--git-sidebar-left-gap)
+    + var(--git-sidebar-content-left)
+    + var(--git-section-leading-slot-size)
+    + var(--git-section-title-gap)
+  )
+  calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
+  overflow: visible;
+  text-align: start;
 }

@@ -19,6 +19,10 @@ describe("renderer style architecture", () => {
       'import "@puppyone/shared-ui/shared-ui.css";',
       'import "./styles.css";',
     ]);
+    expectInOrder(styles, [
+      '@import "./features/source-control/source-control.css" layer(features);',
+      '@import "./features/source-control/source-control-overrides.css";',
+    ]);
     expect(styles).toContain('@import "./styles/base.css" layer(reset);');
     expect(tailwindConfig).toMatch(/corePlugins\s*:\s*\{[\s\S]*?preflight\s*:\s*false/);
   });

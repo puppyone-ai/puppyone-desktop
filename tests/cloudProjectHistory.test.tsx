@@ -58,7 +58,7 @@ describe("Cloud project history", () => {
     expect(buildCloudBranchGraphRows({ history })).toHaveLength(27);
   });
 
-  it("selects commits from the graph and shows author, time, SHA, and changed paths", () => {
+  it("selects graph commits and presents them with the canonical local History hierarchy", () => {
     const history = createHistory(2);
     const rows = buildCloudBranchGraphRows({ history });
     const container = render(<HistoryHarness history={history} />);
@@ -66,12 +66,20 @@ describe("Cloud project history", () => {
     expect(container.querySelector('ol[aria-label="Commit history"]')).not.toBeNull();
     expect(container.querySelectorAll('button[data-commit-id]')).toHaveLength(2);
     expect(container.querySelector(".desktop-cloud-history-graph-svg")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-history-sidebar-row-stat")?.textContent).toBe("+0-0");
+    expect(container.querySelector(".desktop-commit-detail.desktop-cloud-commit-detail")).not.toBeNull();
     expect(container.querySelector("h1")?.textContent).toBe("Commit 1");
     expect(container.textContent).toContain("Author 1");
-    expect(container.textContent).toContain("src/file-1.ts");
+    expect(container.querySelector(".desktop-file-diff-identity")?.getAttribute("title")).toBe("src/file-1.ts");
+    expect(container.querySelector('.desktop-file-diff[data-change-kind="modified"]')).not.toBeNull();
     expect(container.textContent).toContain("HEAD");
     expect(container.querySelector(".desktop-cloud-history-inline-ref")).not.toBeNull();
     expect(container.querySelector(".desktop-cloud-history-graph-continuation")).toBeNull();
+    expect(container.querySelector(".desktop-cloud-history-sidebar-header")).toBeNull();
+    expect(container.querySelector(".desktop-cloud-history-sidebar-footer")).toBeNull();
+    expect(container.querySelector(".desktop-cloud-project-history-header")).toBeNull();
+    expect(container.querySelectorAll(".desktop-cloud-commit-actions button")).toHaveLength(2);
+    expect(container.querySelector(".desktop-cloud-commit-technical-meta")).toBeNull();
 
     const olderCommit = Array.from(container.querySelectorAll<HTMLButtonElement>('button[data-commit-id]'))
       .find((button) => button.textContent?.includes("Commit 2"));
@@ -81,8 +89,8 @@ describe("Cloud project history", () => {
 
     expect(container.querySelector("h1")?.textContent).toBe("Commit 2");
     expect(container.textContent).toContain("Author 2");
-    expect(container.textContent).toContain("src/file-2.ts");
-    expect(container.querySelector('.desktop-cloud-commit-file-row[data-change-kind="deleted"]')).not.toBeNull();
+    expect(container.querySelector(".desktop-file-diff-identity")?.getAttribute("title")).toBe("src/file-2.ts");
+    expect(container.querySelector('.desktop-file-diff[data-change-kind="deleted"]')).not.toBeNull();
   });
 
   it("maps merge parents and named refs into stable multi-lane Cloud rows", () => {
@@ -172,7 +180,6 @@ describe("Cloud project history", () => {
         error={null}
         warning={null}
         onSelectCommit={vi.fn()}
-        onRefresh={vi.fn()}
         onLoadMore={onLoadMore}
       />,
     );
@@ -182,7 +189,8 @@ describe("Cloud project history", () => {
     expect(loadMore).toBeDefined();
     act(() => loadMore?.click());
     expect(onLoadMore).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain(testT("cloud.scope.readOnly"));
+    expect(container.textContent).not.toContain(testT("cloud.scope.readOnly"));
+    expect(container.querySelector(".desktop-cloud-history-sidebar-load-more")).not.toBeNull();
     expect(container.textContent).not.toMatch(/checkout|revert|cherry-pick/i);
   });
 
@@ -199,7 +207,6 @@ describe("Cloud project history", () => {
         error={null}
         warning={null}
         onSelectCommit={vi.fn()}
-        onRefresh={vi.fn()}
         onLoadMore={vi.fn()}
       />,
     );
@@ -215,7 +222,7 @@ describe("Cloud project history", () => {
 function HistoryHarness({ history }: { history: DesktopCloudHistory }) {
   const rows = buildCloudBranchGraphRows({ history });
   const [selectedCommitId, setSelectedCommitId] = useState(history.head_commit_id ?? rows[0]?.id ?? null);
-  const sharedProps = {
+  const sidebarProps = {
     rows,
     selectedCommitId,
     loading: false,
@@ -224,18 +231,18 @@ function HistoryHarness({ history }: { history: DesktopCloudHistory }) {
     error: null,
     warning: null,
     onSelectCommit: setSelectedCommitId,
-    onRefresh: vi.fn(),
     onLoadMore: vi.fn(),
   };
 
   return (
     <div>
-      <CloudProjectHistorySidebar {...sharedProps} />
+      <CloudProjectHistorySidebar {...sidebarProps} />
       <CloudProjectHistoryView
-        {...sharedProps}
+        {...sidebarProps}
         projectId="project-1"
         projectName="Cloud Atlas"
         history={history}
+        onRefresh={vi.fn()}
       />
     </div>
   );

@@ -94,6 +94,8 @@ export function GitSidebar({
     committedResources,
     committedPrimaryAction,
     showCommittedSection,
+    showStagedSection,
+    showUnstagedSection,
     stagedPrimaryAction,
     showSimpleChangeAction,
   } = buildSourceControlSidebarModel({
@@ -272,7 +274,7 @@ export function GitSidebar({
     });
   }
 
-  if (professionalMode) {
+  if (showStagedSection) {
     panels.push({
       id: "staged",
       className: "staged",
@@ -309,90 +311,84 @@ export function GitSidebar({
             ) : null}
           />
           <GitSectionCollapse expanded={stagedExpanded}>
-            {stagedResources.length === 0 ? (
-              <SidebarEmptyState compact className="desktop-git-section-empty">{t("source-control.status.empty")}</SidebarEmptyState>
-            ) : (
-              <SourceControlWorkingResourceList
-                resources={stagedResources}
-                selectedWorkingFile={selectedWorkingFile}
-                operationLoading={operationLoading}
-                fileIconTheme={fileIconTheme}
-                onSelectWorkingFile={onSelectWorkingFile}
-                onStagePaths={onStagePaths}
-                onUnstagePaths={onUnstagePaths}
-                onDiscardPaths={onDiscardPaths}
-              />
-            )}
+            <SourceControlWorkingResourceList
+              resources={stagedResources}
+              selectedWorkingFile={selectedWorkingFile}
+              operationLoading={operationLoading}
+              fileIconTheme={fileIconTheme}
+              onSelectWorkingFile={onSelectWorkingFile}
+              onStagePaths={onStagePaths}
+              onUnstagePaths={onUnstagePaths}
+              onDiscardPaths={onDiscardPaths}
+            />
           </GitSectionCollapse>
         </>
       ),
     });
   }
 
-  panels.push({
-    id: "unstaged",
-    className: "unstaged",
-    grow: 1.15,
-    expanded: workingExpanded,
-    bodyRows: getGitSidebarPanelBodyRows(localChangeResources.length, true),
-    content: (
-      <>
-        <SourceControlSectionHeader
-          title={t("source-control.section.unstaged")}
-          count={localChangeResources.length}
-          expanded={workingExpanded}
-          onToggle={() => setWorkingExpanded((expanded) => !expanded)}
-          action={professionalMode ? (
-            workingResources.length > 0 ? (
+  if (showUnstagedSection) {
+    panels.push({
+      id: "unstaged",
+      className: "unstaged",
+      grow: 1.15,
+      expanded: workingExpanded,
+      bodyRows: getGitSidebarPanelBodyRows(localChangeResources.length, true),
+      content: (
+        <>
+          <SourceControlSectionHeader
+            title={t("source-control.section.unstaged")}
+            count={localChangeResources.length}
+            expanded={workingExpanded}
+            onToggle={() => setWorkingExpanded((expanded) => !expanded)}
+            action={professionalMode ? (
+              workingResources.length > 0 ? (
+                <div className="desktop-git-section-actions">
+                  <SidebarIconButton
+                    className="desktop-working-tree-revert-action"
+                    tone="danger"
+                    label={t("source-control.action.discardAll")}
+                    disabled={disabled}
+                    onClick={() => void onDiscardAll()}
+                    icon={<Undo2 size={13} />}
+                  />
+                  <SidebarIconButton
+                    className="desktop-git-stage-all-action"
+                    label={t("source-control.action.stageAll")}
+                    disabled={disabled}
+                    onClick={() => void onStageAll()}
+                    icon={<Plus size={13} />}
+                  />
+                </div>
+              ) : null
+            ) : showSimpleChangeAction ? (
               <div className="desktop-git-section-actions">
-                <SidebarIconButton
-                  className="desktop-working-tree-revert-action"
-                  tone="danger"
-                  label={t("source-control.action.discardAll")}
+                {workingResources.length > 0 && (
+                  <SidebarIconButton
+                    className="desktop-working-tree-revert-action"
+                    tone="danger"
+                    label={t("source-control.action.discardAll")}
+                    disabled={disabled}
+                    onClick={() => void onDiscardAll()}
+                    icon={<Undo2 size={13} />}
+                  />
+                )}
+                <GitOperationButton
+                  className="desktop-git-commit-push-action desktop-git-stage-commit-action"
+                  title={t("source-control.action.stageCommitTitle")}
                   disabled={disabled}
-                  onClick={() => void onDiscardAll()}
-                  icon={<Undo2 size={13} />}
-                />
-                <SidebarIconButton
-                  className="desktop-git-stage-all-action"
-                  label={t("source-control.action.stageAll")}
-                  disabled={disabled}
-                  onClick={() => void onStageAll()}
-                  icon={<Plus size={13} />}
+                  icon="plus"
+                  label={t("source-control.action.stageCommit")}
+                  loadingKey="stage-commit"
+                  loadingLabel={t("source-control.action.committing")}
+                  operationLoading={operationLoading}
+                  primary={primaryActionSlot === "simple"}
+                  onClick={() => void onStageAndCommit()}
                 />
               </div>
-            ) : null
-          ) : showSimpleChangeAction ? (
-            <div className="desktop-git-section-actions">
-              {workingResources.length > 0 && (
-                <SidebarIconButton
-                  className="desktop-working-tree-revert-action"
-                  tone="danger"
-                  label={t("source-control.action.discardAll")}
-                  disabled={disabled}
-                  onClick={() => void onDiscardAll()}
-                  icon={<Undo2 size={13} />}
-                />
-              )}
-              <GitOperationButton
-                className="desktop-git-commit-push-action desktop-git-stage-commit-action"
-                title={t("source-control.action.stageCommitTitle")}
-                disabled={disabled}
-                icon="plus"
-                label={t("source-control.action.stageCommit")}
-                loadingKey="stage-commit"
-                loadingLabel={t("source-control.action.committing")}
-                operationLoading={operationLoading}
-                primary={primaryActionSlot === "simple"}
-                onClick={() => void onStageAndCommit()}
-              />
-            </div>
-          ) : null}
-        />
-        <GitSectionCollapse expanded={workingExpanded}>
-          {localChangeResources.length === 0 ? (
-            <SidebarEmptyState compact className="desktop-git-section-empty">{t("source-control.status.empty")}</SidebarEmptyState>
-          ) : (
+            ) : null}
+          />
+          <GitSectionCollapse expanded={workingExpanded}>
             <SourceControlWorkingResourceList
               resources={localChangeResources}
               selectedWorkingFile={selectedWorkingFile}
@@ -403,11 +399,11 @@ export function GitSidebar({
               onUnstagePaths={onUnstagePaths}
               onDiscardPaths={onDiscardPaths}
             />
-          )}
-        </GitSectionCollapse>
-      </>
-    ),
-  });
+          </GitSectionCollapse>
+        </>
+      ),
+    });
+  }
 
   return (
     <SidebarRoot className="desktop-git-sidebar">

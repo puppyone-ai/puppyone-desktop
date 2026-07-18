@@ -1,0 +1,11 @@
+/* Shared sidebar primitives are intentionally unlayered. Keep this narrowly
+   scoped bridge unlayered as well so section empties retain the Git tree inset. */
+.desktop-git-sidebar .po-sidebar-empty.desktop-git-section-empty {
+  padding-inline: calc(
+    var(--git-sidebar-left-gap)
+    + var(--git-sidebar-content-left)
+    + var(--git-section-leading-slot-size)
+    + var(--git-section-title-gap)
+  )
+  calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
+}

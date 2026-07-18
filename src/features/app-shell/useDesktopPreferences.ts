@@ -11,6 +11,8 @@ import {
   GIT_DISPLAY_MODE_STORAGE_KEY,
   DARK_THEME_PRESET_STORAGE_KEY,
   LIGHT_THEME_PRESET_STORAGE_KEY,
+  LOADING_ANIMATION_CHANGE_EVENT,
+  LOADING_ANIMATION_STORAGE_KEY,
   POINTER_CURSORS_STORAGE_KEY,
   RIGHT_SIDEBAR_TOOLS_STORAGE_KEY,
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
@@ -21,6 +23,7 @@ import {
   TITLEBAR_ACTIONS_STORAGE_KEY,
   getSidebarNavigationOrientation,
   getSidebarNavigationPlacement,
+  parseLoadingAnimationPreset,
   parseTypography,
   type ExternalAppsSettings,
   type DiffMarkers,
@@ -28,6 +31,7 @@ import {
   type ExperimentalSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
+  type LoadingAnimationPreset,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
   type SidebarNavigationVisibilitySettings,
@@ -63,6 +67,7 @@ import {
   readInitialDiffMarkers,
   readInitialDockIcon,
   readInitialLightThemePreset,
+  readInitialLoadingAnimationPreset,
   readInitialPointerCursors,
   readInitialTextSize,
   readInitialTypographyPreferences,
@@ -79,6 +84,9 @@ export function useDesktopPreferences() {
     () => readInitialTypographyPreferences(),
   );
   const [pointerCursors, setPointerCursors] = useState(() => readInitialPointerCursors());
+  const [loadingAnimationPreset, setLoadingAnimationPreset] = useState<LoadingAnimationPreset>(
+    () => readInitialLoadingAnimationPreset(),
+  );
   const [dockIcon, setDockIcon] = useState<DockIcon>(() => readInitialDockIcon());
   const [diffMarkers, setDiffMarkers] = useState<DiffMarkers>(() => readInitialDiffMarkers());
   const [fileIconTheme, setFileIconTheme] = useState<FileIconThemeId>(() => readInitialFileIconTheme());
@@ -134,6 +142,20 @@ export function useDesktopPreferences() {
   useEffect(() => {
     window.localStorage.setItem(POINTER_CURSORS_STORAGE_KEY, pointerCursors ? "true" : "false");
   }, [pointerCursors]);
+
+  useEffect(() => {
+    window.localStorage.setItem(LOADING_ANIMATION_STORAGE_KEY, loadingAnimationPreset);
+    window.dispatchEvent(new Event(LOADING_ANIMATION_CHANGE_EVENT));
+  }, [loadingAnimationPreset]);
+
+  useEffect(() => {
+    const syncLoadingAnimationAcrossWindows = (event: StorageEvent) => {
+      if (event.key !== LOADING_ANIMATION_STORAGE_KEY && event.key !== null) return;
+      setLoadingAnimationPreset(parseLoadingAnimationPreset(event.key === null ? null : event.newValue));
+    };
+    window.addEventListener("storage", syncLoadingAnimationAcrossWindows);
+    return () => window.removeEventListener("storage", syncLoadingAnimationAcrossWindows);
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(DOCK_ICON_STORAGE_KEY, dockIcon);
@@ -252,6 +274,7 @@ export function useDesktopPreferences() {
     titlebarActionsSettings,
     darkThemePreset,
     lightThemePreset,
+    loadingAnimationPreset,
     themeMode,
     textSize,
     typographyPreferences,
@@ -277,6 +300,7 @@ export function useDesktopPreferences() {
     setSidebarNavigationVisibilitySettings,
     setTitlebarActionsSettings,
     setLightThemePreset,
+    setLoadingAnimationPreset,
     setPointerCursors,
     setTextSize,
     setThemeMode,

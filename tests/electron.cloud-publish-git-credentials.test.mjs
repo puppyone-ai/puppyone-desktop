@@ -118,6 +118,38 @@ describe("URL-scoped Cloud Git credentials", () => {
     expect(await configValues(root, `credential.${REMOTE}.puppyonemanaged`)).toEqual([]);
   });
 
+  it("fails closed and restores config when a helper cannot read back an approved credential", async () => {
+    const root = await createRepository();
+    const manager = createCloudPublishGitCredentialManager({
+      platform: "darwin",
+      execGitCommand: async (rootPath, args, options = {}) => {
+        if (args.includes("approve") || args.includes("reject")) {
+          return { stdout: "", stderr: "" };
+        }
+        if (args.includes("fill")) {
+          const error = new Error("helper failed");
+          error.stderr = "failed to get: -50\n";
+          throw error;
+        }
+        return execGit(rootPath, args, options);
+      },
+    });
+    const snapshot = await manager.prepare(root, REMOTE, OPERATION);
+
+    await expect(manager.approve(
+      root,
+      REMOTE,
+      "x-puppyone-token",
+      "pwg_must_not_appear_in_error",
+      OPERATION,
+      snapshot,
+    )).rejects.toMatchObject({
+      code: "PUPPYONE_CREDENTIAL_ROUNDTRIP_FAILED",
+      message: expect.stringMatching(/failed to get: -50/i),
+    });
+    expect(await configValues(root, `credential.${REMOTE}.helper`)).toEqual([]);
+  });
+
   it("keeps saga commands pinned to the safe helper and detects a concurrent local mutation", async () => {
     const root = await createRepository();
     const manager = createCloudPublishGitCredentialManager({
@@ -208,9 +240,19 @@ describe("URL-scoped Cloud Git credentials", () => {
 });
 
 function isolatedCredentialExec(calls) {
+  let approved = null;
   return async (rootPath, args, options = {}) => {
     if (args.includes("credential")) {
       calls.push({ args: [...args], input: options.input ?? "" });
+      const action = args.at(-1);
+      if (action === "approve") approved = parseCredentialInput(options.input);
+      if (action === "reject") approved = null;
+      if (action === "fill" && approved) {
+        return {
+          stdout: Object.entries(approved).map(([key, value]) => `${key}=${value}`).join("\n") + "\n",
+          stderr: "",
+        };
+      }
       return { stdout: "", stderr: "" };
     }
     let isolated = args;
@@ -221,6 +263,13 @@ function isolatedCredentialExec(calls) {
     }
     return execGit(rootPath, isolated, options);
   };
+}
+
+function parseCredentialInput(value) {
+  return Object.fromEntries(String(value || "").trim().split(/\r?\n/).filter(Boolean).map((line) => {
+    const separator = line.indexOf("=");
+    return [line.slice(0, separator), line.slice(separator + 1)];
+  }));
 }
 
 function crashAfterSuccessfulConfigMutation(crashAfter) {

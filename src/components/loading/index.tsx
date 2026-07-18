@@ -1,4 +1,17 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  DEFAULT_PULSE_GRID_FRAME_DURATION_MS,
+  PULSE_GRID_PRESET_FRAMES,
+  getPulseGridPointAppearance,
+  usePulseGridPlayback,
+  type PulseGridFrames,
+  type PulseGridPoint,
+} from "@puppyone/shared-ui";
+import {
+  LOADING_ANIMATION_CHANGE_EVENT,
+  LOADING_ANIMATION_STORAGE_KEY,
+  parseLoadingAnimationPreset,
+} from "../../preferences";
 
 type LoaderSize = "xs" | "sm";
 type LoaderTone = "neutral" | "info" | "success" | "danger";
@@ -25,27 +38,39 @@ const TONE_MAP: Record<LoaderTone, { active: string }> = {
   danger: { active: "var(--po-danger)" },
 };
 
+const PULSE_GRID_TRANSITION_MS = 70;
+const PULSE_GRID_POINT_COUNT = 9;
+const PULSE_GRID_IDLE_OPACITY = 0.18;
+
 export function PulseGrid({
   size = "sm",
   tone = "neutral",
   className,
   style,
   ariaLabel = "Loading",
+  ariaHidden = false,
+  frames,
+  frameDurationMs = DEFAULT_PULSE_GRID_FRAME_DURATION_MS,
 }: {
   size?: LoaderSize;
   tone?: LoaderTone;
   className?: string;
   style?: CSSProperties;
   ariaLabel?: string;
+  ariaHidden?: boolean;
+  frames?: PulseGridFrames;
+  frameDurationMs?: number;
 }) {
   const { cell, gap } = PULSE_GRID_SIZE[size];
   const { active } = TONE_MAP[tone];
+  const preferredFrames = usePreferredPulseGridFrames(frames);
+  const playback = usePulseGridPlayback(preferredFrames, frameDurationMs);
 
   return (
     <span
-      role="status"
-      aria-label={ariaLabel}
+      {...(ariaHidden ? { "aria-hidden": true } : { role: "status", "aria-label": ariaLabel })}
       data-puppy-loader="pulse-grid"
+      data-pulse-grid-frame={playback.frameIndex}
       className={className}
       style={{
         display: "inline-grid",
@@ -55,20 +80,54 @@ export function PulseGrid({
         ...style,
       }}
     >
-      {Array.from({ length: 9 }).map((_, index) => (
-        <span
-          key={index}
-          style={{
-            width: cell,
-            height: cell,
-            borderRadius: Math.max(1, cell / 2),
-            background: active,
-            animation: `puppy-pulse-grid 1.2s ease-in-out ${(index % 3) * 0.08 + Math.floor(index / 3) * 0.08}s infinite`,
-          }}
-        />
-      ))}
+      {Array.from({ length: PULSE_GRID_POINT_COUNT }, (_, index) => {
+        const point = index as PulseGridPoint;
+        const appearance = getPulseGridPointAppearance(playback.frame, point);
+        const isActive = appearance.brightness > 0;
+        return (
+          <span
+            key={point}
+            data-pulse-grid-point={point}
+            data-active={isActive ? "true" : "false"}
+            data-level={appearance.brightness === 1 ? "bright" : isActive ? "medium" : "dark"}
+            style={{
+              width: cell,
+              height: cell,
+              borderRadius: Math.max(1, cell / 2),
+              background: active,
+              opacity: isActive ? appearance.brightness : PULSE_GRID_IDLE_OPACITY,
+              transition: `opacity ${PULSE_GRID_TRANSITION_MS}ms ease-out`,
+            }}
+          />
+        );
+      })}
     </span>
   );
+}
+
+function usePreferredPulseGridFrames(frames: PulseGridFrames | undefined): PulseGridFrames {
+  const [preset, setPreset] = useState(() => readLoadingAnimationPreset());
+
+  useEffect(() => {
+    const sync = () => setPreset(readLoadingAnimationPreset());
+    const syncStorage = (event: StorageEvent) => {
+      if (event.key !== LOADING_ANIMATION_STORAGE_KEY && event.key !== null) return;
+      sync();
+    };
+    window.addEventListener("storage", syncStorage);
+    window.addEventListener(LOADING_ANIMATION_CHANGE_EVENT, sync);
+    return () => {
+      window.removeEventListener("storage", syncStorage);
+      window.removeEventListener(LOADING_ANIMATION_CHANGE_EVENT, sync);
+    };
+  }, []);
+
+  return frames ?? PULSE_GRID_PRESET_FRAMES[preset];
+}
+
+function readLoadingAnimationPreset() {
+  if (typeof window === "undefined") return parseLoadingAnimationPreset(null);
+  return parseLoadingAnimationPreset(window.localStorage.getItem(LOADING_ANIMATION_STORAGE_KEY));
 }
 
 export function Dots({
@@ -119,6 +178,8 @@ export function PageLoading({
   tone = "neutral",
   className,
   style,
+  frames,
+  frameDurationMs,
 }: {
   label?: ReactNode | null;
   ariaLabel?: string;
@@ -127,6 +188,8 @@ export function PageLoading({
   tone?: LoaderTone;
   className?: string;
   style?: CSSProperties;
+  frames?: PulseGridFrames;
+  frameDurationMs?: number;
 }) {
   const fontSize = SIZE_TO_FONT[size];
   const containerStyle: CSSProperties = {
@@ -148,6 +211,8 @@ export function PageLoading({
         size={size}
         tone={tone}
         ariaLabel={ariaLabel || (typeof label === "string" ? label : "Loading")}
+        frames={frames}
+        frameDurationMs={frameDurationMs}
       />
       {label != null && <span style={{ fontSize, lineHeight: 1.4 }}>{label}</span>}
     </div>

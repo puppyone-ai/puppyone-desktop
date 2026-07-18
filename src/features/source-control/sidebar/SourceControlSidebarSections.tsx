@@ -195,9 +195,13 @@ export function GitRemotePrompt({
 }) {
   const { t } = useLocalization();
   if (!cloudEnabled || !state.setupRequired || (dismissed && !cloudBackupError)) return null;
+  const message = cloudBackupError || t("source-control.backup.reminder");
   return (
-    <section className="desktop-git-backup-card">
-      <div className="desktop-git-backup-copy"><span>{t("source-control.backup.reminder")}</span></div>
+    <section
+      className={`desktop-git-backup-card${cloudBackupError ? " is-error" : ""}`}
+      role={cloudBackupError ? "alert" : undefined}
+    >
+      <div className="desktop-git-backup-copy"><span>{message}</span></div>
       <button
         className="desktop-git-backup-dismiss"
         type="button"
@@ -218,7 +222,6 @@ export function GitRemotePrompt({
         {cloudBackupLoading ? <SourceControlDots /> : <Cloud size={13} />}
         <span>{t("source-control.backup.getCloud")}</span>
       </button>
-      {cloudBackupError && <div className="desktop-git-backup-error">{cloudBackupError}</div>}
     </section>
   );
 }

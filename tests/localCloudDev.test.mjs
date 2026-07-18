@@ -1,6 +1,7 @@
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
+  createServiceDefinitions,
   parseEnvText,
   prepareLocalCloudDevServices,
   probeLocalCloudService,
@@ -89,6 +90,26 @@ describe("local Cloud development services", () => {
       { healthUrl: "http://localhost:3000/login", kind: "web" },
       { fetchImpl: vi.fn().mockResolvedValue(response({ body: "<h1>Another app</h1>" })) },
     )).resolves.toEqual({ ready: false, detail: "login page marker is missing" });
+  });
+
+  it("forces the managed backend to advertise its loopback Git origin", () => {
+    const config = {
+      apiHealthUrl: "http://localhost:9090/health",
+      apiHost: "127.0.0.1",
+      apiPort: 9090,
+      cloudRoot: "/workspace/puppyone",
+      webHost: "127.0.0.1",
+      webOrigin: "http://localhost:3000",
+      webPort: 3000,
+      webHealthUrl: "http://localhost:3000/login",
+    };
+
+    const [api] = createServiceDefinitions(config, {
+      PUBLIC_URL: "https://production.example.com/",
+    });
+
+    expect(api.environment.PUBLIC_URL).toBe("http://localhost:9090");
+    expect(api.environment.PUPPYONE_PUBLIC_URL_OVERRIDE).toBe("http://localhost:9090");
   });
 
   it("reuses healthy sibling services without spawning duplicate processes", async () => {

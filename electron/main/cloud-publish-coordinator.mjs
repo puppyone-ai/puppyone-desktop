@@ -27,6 +27,7 @@ import {
 } from "./cloud-publish-contract.mjs";
 import { createCloudPublishGitCredentialManager } from "./cloud-publish-git-credentials.mjs";
 import { createCloudPublishGitService } from "./cloud-publish-git.mjs";
+import { createCloudPublishProgressChannel } from "./cloud-publish-progress.mjs";
 import { createCloudGitOperationLease } from "./cloud-git-operation-lease.mjs";
 import { createCloudPublishJournal } from "./cloud-publish-journal.mjs";
 import { createGitOperationCoordinator, repositoryLockKey } from "./git-operation-coordinator.mjs";
@@ -127,7 +128,7 @@ export function createCloudPublishCoordinator({
     }
   }
 
-  async function startOrResume(request = {}) {
+  async function startOrResume(request = {}, { onProgress = null } = {}) {
     let base;
     let context;
     try {
@@ -140,23 +141,30 @@ export function createCloudPublishCoordinator({
     const fingerprint = requestFingerprint(base);
     const active = inflight.get(key);
     if (active) {
-      if (active.fingerprint === fingerprint) return active.promise;
+      if (active.fingerprint === fingerprint) {
+        active.progress.add(onProgress);
+        return active.promise;
+      }
       return failureResult(createPublishError(
         "IDENTITY_MISMATCH",
         "A different Cloud publish operation is already running for this worktree.",
         false,
       ), null);
     }
+    const progress = createCloudPublishProgressChannel({ rootPath: base.rootPath, now, onProgress });
+    const operation = { fingerprint, progress, promise: null };
+    progress.report("validating");
     const promise = gitOperationCoordinator.run(
       repositoryLockKey(context.identity.commonDir),
-      () => withOperationLease(base.rootPath, () => runPublishUnderLock(base, context)),
+      () => withOperationLease(base.rootPath, () => runPublishUnderLock(base, context, progress.report)),
     ).catch((error) => {
       if (isSimulatedCrash(error)) throw error;
       return failureResult(error, null);
     }).finally(() => {
       if (inflight.get(key)?.promise === promise) inflight.delete(key);
     });
-    inflight.set(key, { fingerprint, promise });
+    operation.promise = promise;
+    inflight.set(key, operation);
     return promise;
   }
 
@@ -215,7 +223,7 @@ export function createCloudPublishCoordinator({
     }
   }
 
-  async function runPublishUnderLock(base, initialContext) {
+  async function runPublishUnderLock(base, initialContext, reportProgress) {
     let record = null;
     try {
       const context = await refreshContext(base.rootPath, initialContext);
@@ -224,6 +232,7 @@ export function createCloudPublishCoordinator({
         throw createPublishError("IDENTITY_MISMATCH", "A Cloud Git connection operation is already pending.", false);
       }
       record = (await durableJournal.read(base.rootPath)).record;
+      reportProgress("validating", record);
       if (!record) {
         const status = await getGitStatus(base.rootPath);
         assertFreshPublishStatus(status, base);
@@ -245,6 +254,7 @@ export function createCloudPublishCoordinator({
         if (record.phase === "completed") {
           const status = await getGitStatus(base.rootPath);
           const completed = toPublicState(record, { identityMatches: true });
+          reportProgress("completed", record);
           await cleanupCompletedOperation(base.rootPath, record);
           return successResult(completed, status);
         }
@@ -254,12 +264,14 @@ export function createCloudPublishCoordinator({
       }
 
       if (record.phase === "prepared") {
+        reportProgress("creating-project", record);
         const projectId = await cloudApi.createProject(record);
         await injectFault("after-project-response", record);
         record = await persist(base.rootPath, record, { phase: "project-created", project_id: projectId });
         await injectFault("after-project-created", record);
       }
       if (record.phase === "project-created") {
+        reportProgress("securing-credential", record);
         const secret = await ensureCredentialSecret(base.rootPath, record);
         record = secret.record;
         const credential = await cloudApi.issueCredential(record, secret.value);
@@ -273,6 +285,7 @@ export function createCloudPublishCoordinator({
         await injectFault("after-credential-issued", record);
       }
       if (record.phase === "credential-issued") {
+        reportProgress("configuring-remote", record);
         if (!record.credential_config_snapshot) {
           const credentialConfig = await gitService.prepareCredentialConfig(base.rootPath, record);
           record = await persist(base.rootPath, record, {
@@ -299,15 +312,22 @@ export function createCloudPublishCoordinator({
 
       let status;
       if (record.phase === "remote-configured") {
-        status = await gitService.pushExpectedCommit(base.rootPath, record, await requireStoredSecret(record));
+        status = await gitService.pushExpectedCommit(
+          base.rootPath,
+          record,
+          await requireStoredSecret(record),
+          (stage) => reportProgress(stage, record),
+        );
         record = await persist(base.rootPath, record, { phase: "pushed" });
         await injectFault("after-pushed", record);
       }
       if (record.phase === "pushed") {
+        reportProgress("finalizing", record);
         status = status ?? await gitService.finalizeUpstreamAndStatus(base.rootPath, record);
         record = await persist(base.rootPath, record, { phase: "completed" });
         await injectFault("after-completed", record);
       }
+      reportProgress("completed", record);
       const completedState = toPublicState(record, { identityMatches: true });
       await cleanupCompletedOperation(base.rootPath, record);
       return successResult(completedState, status ?? await getGitStatus(base.rootPath));

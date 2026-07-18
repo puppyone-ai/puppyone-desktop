@@ -3,6 +3,7 @@ import {
   parseTypographyPreferences,
   type TypographyPreferences,
 } from "./features/typography/fontCatalog";
+import type { PulseGridPresetId } from "@puppyone/shared-ui";
 
 export type { TypographyPreferences } from "./features/typography/fontCatalog";
 
@@ -13,6 +14,7 @@ export type TextSize = "small" | "default" | "large";
 export type DockIcon = "polished" | "light" | "matte";
 export type DiffMarkers = "color" | "symbols";
 export type GitDisplayMode = "simple" | "professional";
+export type LoadingAnimationPreset = PulseGridPresetId;
 
 export type SidebarNavigationLayout =
   | "bottom-horizontal"
@@ -73,6 +75,8 @@ export const DARK_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.darkThemePreset";
 export const TEXT_SIZE_STORAGE_KEY = "puppyone.desktop.textSize";
 export const TYPOGRAPHY_STORAGE_KEY = "puppyone.desktop.typography";
 export const POINTER_CURSORS_STORAGE_KEY = "puppyone.desktop.pointerCursors";
+export const LOADING_ANIMATION_STORAGE_KEY = "puppyone.desktop.loadingAnimation";
+export const LOADING_ANIMATION_CHANGE_EVENT = "puppyone:loading-animation-change";
 export const DOCK_ICON_STORAGE_KEY = "puppyone.desktop.dockIcon";
 export const DIFF_MARKERS_STORAGE_KEY = "puppyone.desktop.diffMarkers";
 export const FILE_ICON_THEME_STORAGE_KEY = "puppyone.desktop.fileIconTheme";
@@ -92,6 +96,7 @@ export const DEFAULT_DARK_THEME_PRESET: DarkThemePreset = "default";
 export const DEFAULT_TEXT_SIZE: TextSize = "default";
 export { DEFAULT_TYPOGRAPHY_PREFERENCES };
 export const DEFAULT_POINTER_CURSORS = false;
+export const DEFAULT_LOADING_ANIMATION_PRESET: LoadingAnimationPreset = "ikun";
 export const DEFAULT_DOCK_ICON: DockIcon = "polished";
 export const DEFAULT_DIFF_MARKERS: DiffMarkers = "color";
 export const DEFAULT_GIT_DISPLAY_MODE: GitDisplayMode = "simple";
@@ -357,6 +362,12 @@ export function parsePointerCursors(value: string | null | undefined): boolean {
   if (value === "true") return true;
   if (value === "false") return false;
   return DEFAULT_POINTER_CURSORS;
+}
+
+export function parseLoadingAnimationPreset(
+  value: string | null | undefined,
+): LoadingAnimationPreset {
+  return value === "ymca" || value === "siu" || value === "ikun" ? value : DEFAULT_LOADING_ANIMATION_PRESET;
 }
 
 export function parseDockIcon(value: string | null | undefined): DockIcon {

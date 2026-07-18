@@ -1,5 +1,13 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
+import {
+  DEFAULT_PULSE_GRID_FRAME_DURATION_MS,
+  PULSE_GRID_DEFAULT_FRAMES,
+  getPulseGridPointAppearance,
+  usePulseGridPlayback,
+  type PulseGridFrames,
+  type PulseGridPoint,
+} from "./pulseGridSequence";
 
 export type LoaderSize = "xs" | "sm";
 export type LoaderTone = "neutral" | "info" | "success" | "warning" | "danger";
@@ -22,11 +30,11 @@ const TONE_MAP: Record<LoaderTone, { active: string }> = {
   danger: { active: "var(--po-danger)" },
 };
 
-const PATTERN = [0, 1, 2, 1, 2, 3, 2, 3, 4];
-const STAGGER_S = 0.07;
-const DURATION_S = 0.9;
 const DOT_BOUNCE_DURATION_S = 1.2;
 const DOT_BOUNCE_STAGGER_S = 0.16;
+const PULSE_GRID_TRANSITION_MS = 70;
+const PULSE_GRID_POINT_COUNT = 9;
+const PULSE_GRID_IDLE_OPACITY = 0.18;
 
 export function PulseGridLoader({
   size = "sm",
@@ -35,6 +43,8 @@ export function PulseGridLoader({
   style,
   ariaLabel,
   ariaHidden = false,
+  frames = PULSE_GRID_DEFAULT_FRAMES,
+  frameDurationMs = DEFAULT_PULSE_GRID_FRAME_DURATION_MS,
 }: {
   size?: LoaderSize;
   tone?: LoaderTone;
@@ -42,16 +52,20 @@ export function PulseGridLoader({
   style?: CSSProperties;
   ariaLabel?: string;
   ariaHidden?: boolean;
+  frames?: PulseGridFrames;
+  frameDurationMs?: number;
 }) {
   const { t } = useLocalization();
   const { dot, gap, radius } = PULSE_GRID_SIZE[size];
   const { active } = TONE_MAP[tone];
   const resolvedAriaLabel = ariaLabel ?? t("shared-ui.loading");
+  const playback = usePulseGridPlayback(frames, frameDurationMs);
 
   return (
     <span
       {...(ariaHidden ? { "aria-hidden": true } : { role: "status", "aria-label": resolvedAriaLabel })}
       data-puppy-loader="pulse-grid"
+      data-pulse-grid-frame={playback.frameIndex}
       className={className}
       style={{
         display: "inline-grid",
@@ -61,18 +75,27 @@ export function PulseGridLoader({
         ...style,
       }}
     >
-      {PATTERN.map((frame, index) => (
-        <span
-          key={index}
-          style={{
-            width: dot,
-            height: dot,
-            borderRadius: radius,
-            background: active,
-            animation: `puppy-pulse-grid ${DURATION_S}s ease-in-out ${frame * STAGGER_S}s infinite`,
-          }}
-        />
-      ))}
+      {Array.from({ length: PULSE_GRID_POINT_COUNT }, (_, index) => {
+        const point = index as PulseGridPoint;
+        const appearance = getPulseGridPointAppearance(playback.frame, point);
+        const isActive = appearance.brightness > 0;
+        return (
+          <span
+            key={point}
+            data-pulse-grid-point={point}
+            data-active={isActive ? "true" : "false"}
+            data-level={appearance.brightness === 1 ? "bright" : isActive ? "medium" : "dark"}
+            style={{
+              width: dot,
+              height: dot,
+              borderRadius: radius,
+              background: active,
+              opacity: isActive ? appearance.brightness : PULSE_GRID_IDLE_OPACITY,
+              transition: `opacity ${PULSE_GRID_TRANSITION_MS}ms ease-out`,
+            }}
+          />
+        );
+      })}
     </span>
   );
 }
@@ -135,6 +158,8 @@ export function InlineLoading({
   size = "xs",
   tone = "neutral",
   indicator = "pulse-grid",
+  frames,
+  frameDurationMs,
   className,
   style,
 }: {
@@ -142,6 +167,8 @@ export function InlineLoading({
   size?: LoaderSize;
   tone?: LoaderTone;
   indicator?: "pulse-grid" | "dots";
+  frames?: PulseGridFrames;
+  frameDurationMs?: number;
   className?: string;
   style?: CSSProperties;
 }) {
@@ -154,7 +181,13 @@ export function InlineLoading({
       {indicator === "dots" ? (
         <DotsLoader size={size} tone={tone} ariaLabel={ariaLabel} />
       ) : (
-        <PulseGridLoader size={size} tone={tone} ariaLabel={ariaLabel} />
+        <PulseGridLoader
+          size={size}
+          tone={tone}
+          ariaLabel={ariaLabel}
+          frames={frames}
+          frameDurationMs={frameDurationMs}
+        />
       )}
       {resolvedLabel != null && <span>{resolvedLabel}</span>}
     </span>

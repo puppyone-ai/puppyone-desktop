@@ -5,11 +5,13 @@ import {
   getWorkspaceCloudPublishState,
   getWorkspaceGitStatus,
   startOrResumeWorkspaceCloudPublish,
+  subscribeWorkspaceCloudPublishProgress,
 } from "../../../lib/localFiles";
 import { onDesktopCloudAuthError } from "../../../lib/cloudSession";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import type {
   CloudPublishErrorCode,
+  CloudPublishProgress,
   CloudPublishResult,
   CloudPublishState,
   GitStatusSnapshot,
@@ -64,6 +66,7 @@ export function usePuppyoneCloudBackup({
   workspaceIsCloud: boolean;
 }) {
   const [cloudPublishState, setCloudPublishState] = useState<CloudPublishState | null>(null);
+  const [cloudPublishProgress, setCloudPublishProgress] = useState<CloudPublishProgress | null>(null);
   const [cloudPublishError, setCloudPublishError] = useState<CloudPublishFailure | null>(null);
   const [cloudPublishNotice, setCloudPublishNotice] = useState<CloudPublishNotice>(null);
   const [cloudPublishStateLoading, setCloudPublishStateLoading] = useState(false);
@@ -107,6 +110,7 @@ export function usePuppyoneCloudBackup({
     stateRequestRef.current = null;
     actionRef.current = null;
     setCloudPublishState(null);
+    setCloudPublishProgress(null);
     setCloudPublishError(null);
     setCloudPublishNotice(null);
     setCloudBackupLoading(false);
@@ -162,12 +166,27 @@ export function usePuppyoneCloudBackup({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publishIdentityKey]);
 
+  useEffect(() => {
+    const rootPath = publishIdentity?.rootPath;
+    if (!rootPath) return undefined;
+    return subscribeWorkspaceCloudPublishProgress((progress) => {
+      if (progress.rootPath !== rootPath || !actionRef.current) return;
+      setCloudPublishProgress(progress);
+      if (progress.state) {
+        setCloudPublishState(progress.state.phase === "completed" ? null : progress.state);
+      }
+    });
+  // The normalized identity key owns this subscription's authority and lifetime.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishIdentityKey]);
+
   const finishSuccessfulPublish = useCallback((
     result: Extract<CloudPublishResult, { ok: true }>,
     context: GitRepositoryContext,
   ) => {
     if (result.gitStatus && !reconcileGitStatus(result.gitStatus, context)) return false;
     setCloudPublishState(result.state?.phase === "completed" ? null : result.state);
+    setCloudPublishProgress(null);
     setCloudPublishError(null);
     setCloudPublishNotice(null);
     if (result.state?.phase !== "completed") return true;
@@ -215,6 +234,13 @@ export function usePuppyoneCloudBackup({
     setCloudPublishStateLoading(false);
     actionRef.current = request;
     setCloudBackupLoading(true);
+    setCloudPublishProgress({
+      rootPath: identity.rootPath,
+      operationId: cloudPublishState?.operationId ?? null,
+      stage: "validating",
+      state: cloudPublishState,
+      updatedAt: new Date().toISOString(),
+    });
     setCloudPublishError(null);
     setCloudPublishNotice(null);
     try {
@@ -249,6 +275,7 @@ export function usePuppyoneCloudBackup({
       if (actionRef.current === request) {
         actionRef.current = null;
         setCloudBackupLoading(false);
+        setCloudPublishProgress(null);
         pendingIntentWorkspaceRef.current = null;
         setPendingCloudBackupSetup(false);
       }
@@ -277,6 +304,7 @@ export function usePuppyoneCloudBackup({
     const request = Symbol("abandon-cloud-publish");
     actionRef.current = request;
     setCloudBackupLoading(true);
+    setCloudPublishProgress(null);
     setCloudPublishError(null);
     setCloudPublishNotice(null);
     try {
@@ -328,6 +356,7 @@ export function usePuppyoneCloudBackup({
     cloudBackupLoading,
     cloudPublishError,
     cloudPublishNotice,
+    cloudPublishProgress,
     cloudPublishState,
     cloudPublishStateLoading,
     handleAbandonPuppyoneBackup,

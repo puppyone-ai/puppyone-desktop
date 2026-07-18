@@ -283,6 +283,17 @@ export type CloudPublishPhase =
   | "compensation-pending"
   | "completed";
 
+export type CloudPublishProgressStage =
+  | "validating"
+  | "creating-project"
+  | "securing-credential"
+  | "configuring-remote"
+  | "checking-remote"
+  | "uploading"
+  | "confirming"
+  | "finalizing"
+  | "completed";
+
 export type CloudPublishErrorCode =
   | "SESSION_REQUIRED"
   | "IDENTITY_MISMATCH"
@@ -316,6 +327,14 @@ export type CloudPublishState = {
   updatedAt: string;
   canResume: boolean;
   canAbandon: boolean;
+};
+
+export type CloudPublishProgress = {
+  rootPath: string;
+  operationId: string | null;
+  stage: CloudPublishProgressStage;
+  state: CloudPublishState | null;
+  updatedAt: string;
 };
 
 export type CloudPublishResult =
@@ -726,6 +745,7 @@ declare global {
       cloudPublishGetState: (request: CloudPublishIdentityRequest) => Promise<CloudPublishResult>;
       cloudPublishStartOrResume: (request: CloudPublishStartRequest) => Promise<CloudPublishResult>;
       cloudPublishAbandon: (request: CloudPublishAbandonRequest) => Promise<CloudPublishResult>;
+      onCloudPublishProgress: (callback: (progress: CloudPublishProgress) => void) => () => void;
       cloudGitConnectProject: (request: CloudGitConnectRequest) => Promise<CloudGitConnectResult>;
       cloudGitAbandonConnect: (request: CloudGitConnectAbandonRequest) => Promise<CloudGitConnectResult>;
       listCloudAccessPointDirectory: (request: {

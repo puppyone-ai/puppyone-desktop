@@ -14,6 +14,7 @@ import {
   DARK_THEME_PRESET_STORAGE_KEY,
   LEGACY_THEME_PRESET_STORAGE_KEY,
   LIGHT_THEME_PRESET_STORAGE_KEY,
+  LOADING_ANIMATION_STORAGE_KEY,
   POINTER_CURSORS_STORAGE_KEY,
   RIGHT_SIDEBAR_TOOLS_STORAGE_KEY,
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
@@ -31,6 +32,7 @@ import {
   parseFilesVisibilitySettings,
   parseGitDisplayMode,
   parseLightThemePreset,
+  parseLoadingAnimationPreset,
   parsePointerCursors,
   parseRightSidebarToolsSettings,
   parseSidebarNavigationLayout,
@@ -47,6 +49,7 @@ import {
   type FilesVisibilitySettings,
   type GitDisplayMode,
   type LightThemePreset,
+  type LoadingAnimationPreset,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
   type SidebarNavigationVisibilitySettings,
@@ -102,6 +105,11 @@ export function readInitialTypographyPreferences(): TypographyPreferences {
 export function readInitialPointerCursors(): boolean {
   if (typeof window === "undefined") return parsePointerCursors(null);
   return parsePointerCursors(window.localStorage.getItem(POINTER_CURSORS_STORAGE_KEY));
+}
+
+export function readInitialLoadingAnimationPreset(): LoadingAnimationPreset {
+  if (typeof window === "undefined") return parseLoadingAnimationPreset(null);
+  return parseLoadingAnimationPreset(window.localStorage.getItem(LOADING_ANIMATION_STORAGE_KEY));
 }
 
 export function readInitialDockIcon(): DockIcon {
